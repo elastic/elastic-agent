@@ -226,8 +226,7 @@ func (u *Upgrader) downloadWithRetries(
 	upgradeDetails *details.Details,
 	diskSpaceErrorFunc func(error) error,
 ) (string, error) {
-	// cancelDeadline := time.Now().Add(settings.Timeout)
-	cancelDeadline := time.Now().Add(10 * time.Minute)
+	cancelDeadline := time.Now().Add(settings.Timeout)
 	cancelCtx, cancel := context.WithDeadline(ctx, cancelDeadline)
 	defer cancel()
 
@@ -246,6 +245,12 @@ func (u *Upgrader) downloadWithRetries(
 		var err error
 		path, err = u.downloadOnce(cancelCtx, factory, version, settings, upgradeDetails, diskSpaceErrorFunc)
 		if err != nil {
+
+			if errors.Is(err, ErrInsufficientDiskSpace) {
+				u.log.Infof("Insufficient disk space error detected, stopping retries")
+				return backoff.Permanent(err)
+			}
+
 			return err
 		}
 		return nil

@@ -2,13 +2,11 @@ package upgrade
 
 import (
 	"errors"
-
-	"github.com/cenkalti/backoff/v4"
 )
 
 const insufficientDiskSpaceErrorStr = "insufficient disk space"
 
-var ErrInsufficientDiskSpace = &InsufficientDiskSpaceError{Err: backoff.Permanent(errors.New(insufficientDiskSpaceErrorStr))}
+var ErrInsufficientDiskSpace = &InsufficientDiskSpaceError{Err: errors.New(insufficientDiskSpaceErrorStr)}
 
 type InsufficientDiskSpaceError struct {
 	Err error

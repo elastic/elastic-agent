@@ -276,6 +276,37 @@ func TestDownloadWithRetries(t *testing.T) {
 		require.NotEmpty(t, *upgradeDetailsRetryErrorMsg)
 		require.Equal(t, *upgradeDetailsRetryErrorMsg, upgradeDetails.Metadata.RetryErrorMsg)
 	})
+
+	t.Run("insufficient_disk_space_stops_retries", func(t *testing.T) {
+		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details, diskSpaceErrorFunc func(error) error) (download.Downloader, error) {
+			return &mockDownloader{"", ErrInsufficientDiskSpace}, nil
+		}
+
+		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{}, nil)
+		require.NoError(t, err)
+
+		parsedVersion, err := agtversion.ParseVersion("8.9.0")
+		require.NoError(t, err)
+
+		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
+
+		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails, nil)
+
+		require.Error(t, err)
+		require.Equal(t, "", path)
+
+		require.ErrorIs(t, err, ErrInsufficientDiskSpace)
+
+		logs := obs.TakeAll()
+		require.Len(t, logs, 2)
+		require.Equal(t, "download attempt 1", logs[0].Message)
+		require.Contains(t, logs[1].Message, "Insufficient disk space error detected, stopping retries")
+
+		require.NotZero(t, *upgradeDetailsRetryUntil)
+		require.False(t, *upgradeDetailsRetryUntilWasUnset)
+
+		require.Empty(t, *upgradeDetailsRetryErrorMsg)
+	})
 }
 
 // mockUpgradeDetails returns a *details.Details value that has an observer registered on it for inspecting

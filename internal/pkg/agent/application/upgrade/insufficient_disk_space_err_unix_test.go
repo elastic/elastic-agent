@@ -7,7 +7,6 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/cenkalti/backoff/v4"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/stretchr/testify/require"
 )
@@ -27,15 +26,14 @@ func (e *mockError) Is(target error) bool {
 
 func TestToDiskSpaceError(t *testing.T) {
 	tests := map[string]struct {
-		err            error
-		want           error
-		permanentError bool
+		err  error
+		want error
 	}{
-		"ENOSPC":         {err: syscall.ENOSPC, want: ErrInsufficientDiskSpace, permanentError: true},
-		"EDQUOT":         {err: syscall.EDQUOT, want: ErrInsufficientDiskSpace, permanentError: true},
-		"wrapped ENOSPC": {err: fmt.Errorf("wrapped: %w", syscall.ENOSPC), want: ErrInsufficientDiskSpace, permanentError: true},
-		"wrapped EDQUOT": {err: fmt.Errorf("wrapped: %w", syscall.EDQUOT), want: ErrInsufficientDiskSpace, permanentError: true},
-		"other error":    {err: &mockError{msg: "some other error"}, want: &mockError{msg: "some other error"}, permanentError: false},
+		"ENOSPC":         {err: syscall.ENOSPC, want: ErrInsufficientDiskSpace},
+		"EDQUOT":         {err: syscall.EDQUOT, want: ErrInsufficientDiskSpace},
+		"wrapped ENOSPC": {err: fmt.Errorf("wrapped: %w", syscall.ENOSPC), want: ErrInsufficientDiskSpace},
+		"wrapped EDQUOT": {err: fmt.Errorf("wrapped: %w", syscall.EDQUOT), want: ErrInsufficientDiskSpace},
+		"other error":    {err: &mockError{msg: "some other error"}, want: &mockError{msg: "some other error"}},
 	}
 
 	for name, test := range tests {
@@ -44,9 +42,6 @@ func TestToDiskSpaceError(t *testing.T) {
 			require.NoError(t, err)
 
 			got := ToDiskSpaceErrorFunc(log)(test.err)
-			if test.permanentError {
-				require.ErrorIs(t, got, &backoff.PermanentError{})
-			}
 			require.ErrorIs(t, got, test.want)
 		})
 	}

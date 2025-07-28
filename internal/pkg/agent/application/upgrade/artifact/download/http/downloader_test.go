@@ -528,3 +528,64 @@ func TestDownloadVersion(t *testing.T) {
 		})
 	}
 }
+
+type testCopyError struct {
+	msg string
+}
+
+func (e *testCopyError) Error() string {
+	return e.msg
+}
+
+func (e *testCopyError) Is(target error) bool {
+	_, ok := target.(*testCopyError)
+	return ok
+}
+
+func TestDownloadFile(t *testing.T) {
+	t.Run("calls diskSpaceErrorFunc on any copy error", func(t *testing.T) {
+		ctx := t.Context()
+		artifactName := "beat/elastic-agent"
+		filename := "elastic-agent-1.2.3-linux-x86_64.tar.gz"
+		fullPath := filepath.Join(t.TempDir(), filename)
+
+		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+			rw.WriteHeader(http.StatusOK)
+			_, _ = rw.Write([]byte("mock content"))
+		}))
+		defer server.Close()
+
+		config := &artifact.Config{
+			OperatingSystem: "linux",
+			Architecture:    "64",
+			SourceURI:       server.URL,
+			TargetDirectory: filepath.Dir(fullPath),
+		}
+
+		log, _ := loggertest.New("downloader")
+		upgradeDetails := details.NewDetails("1.2.3", details.StateRequested, "")
+
+		var receivedError error
+		diskSpaceErrorFunc := func(err error) error {
+			receivedError = err
+			return err
+		}
+
+		copyFuncError := &testCopyError{msg: "mock error"}
+		copyFunc := func(dst io.Writer, src io.Reader) (int64, error) {
+			return 0, copyFuncError
+		}
+
+		downloader := NewDownloaderWithClient(log, config, *server.Client(), upgradeDetails, diskSpaceErrorFunc)
+		downloader.copyFunc = copyFunc
+
+		_, err := downloader.downloadFile(ctx, artifactName, filename, fullPath)
+
+		assert.Error(t, err)
+
+		assert.ErrorIs(t, err, copyFuncError)
+
+		assert.Equal(t, copyFuncError, receivedError)
+	})
+
+}

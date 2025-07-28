@@ -746,15 +746,15 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 			return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
 		}
 
-		// c.logger.Infof("Checking if error is insufficient disk space: errors.Is(err, upgrade.ErrInsufficientDiskSpace) = %v", errors.Is(err, upgrade.ErrInsufficientDiskSpace))
-		// if errors.Is(err, upgrade.ErrInsufficientDiskSpace) {
-		// 	c.logger.Infof("insufficient disk space: %v", err)
-		// 	c.logger.Infof("Unwrapping disk space error from %v to %v", err, upgrade.ErrInsufficientDiskSpace.Err)
-		// 	err = upgrade.ErrInsufficientDiskSpace.Err
-		// 	c.logger.Infof("After unwrapping, error is now: %v (type: %T)", err, err)
-		// }
+		c.logger.Infof("Checking if error is insufficient disk space: errors.Is(err, upgrade.ErrInsufficientDiskSpace) = %v", errors.Is(err, upgrade.ErrInsufficientDiskSpace))
+		if errors.Is(err, upgrade.ErrInsufficientDiskSpace) {
+			c.logger.Infof("insufficient disk space detected: %v", err)
+			c.logger.Infof("Unwrapping disk space error from %v to %v", err, upgrade.ErrInsufficientDiskSpace.Err)
+			err = upgrade.ErrInsufficientDiskSpace.Err
+			c.logger.Infof("After unwrapping, error is now: %v (type: %T)", err, err)
+		}
 
-		// c.logger.Errorf("Setting upgrade details to failed with final error: %v", err)
+		c.logger.Errorf("Setting upgrade details to failed with final error: %v", err)
 		det.Fail(err)
 		return err
 	}

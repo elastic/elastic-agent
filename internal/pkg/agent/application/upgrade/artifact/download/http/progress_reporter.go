@@ -114,7 +114,6 @@ func (dp *downloadProgressReporter) ReportComplete() {
 // either ReportFailed or ReportComplete when they no longer need the downloadProgressReporter
 // to avoid resource leaks.
 func (dp *downloadProgressReporter) ReportFailed(err error) {
-	err = dp.diskSpaceErrorFunc(err)
 	defer close(dp.done)
 
 	// If there are no observers to report progress to, there is nothing to do!

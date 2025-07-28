@@ -7,6 +7,7 @@ package fs
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -290,4 +291,50 @@ func TestDownloader_DownloadAsc(t *testing.T) {
 			assert.Equalf(t, filepath.Join(targetDirPath, tt.want), got, "DownloadAsc(%v, %v)", tt.args.a, tt.args.version)
 		})
 	}
+}
+
+type testCopyError struct {
+	msg string
+}
+
+func (e *testCopyError) Error() string {
+	return e.msg
+}
+
+func (e *testCopyError) Is(target error) bool {
+	_, ok := target.(*testCopyError)
+	return ok
+}
+
+func TestDownloader_downloadFile(t *testing.T) {
+	dropPath := t.TempDir()
+	targetDirPath := t.TempDir()
+
+	createFiles(t, dropPath, []file{
+		{
+			"elastic-agent-1.2.3-linux-x86_64.tar.gz",
+			[]byte("mock content"),
+		},
+	})
+
+	config := &artifact.Config{
+		DropPath:        dropPath,
+		TargetDirectory: targetDirPath,
+	}
+
+	diskSpaceErrorFunc := func(err error) error {
+		return err
+	}
+
+	copyFuncError := &testCopyError{msg: "mock error"}
+
+	copyFunc := func(dst io.Writer, src io.Reader) (int64, error) {
+		return 0, copyFuncError
+	}
+	e := NewDownloader(config, diskSpaceErrorFunc)
+	e.copyFunc = copyFunc
+
+	_, err := e.downloadFile("elastic-agent-1.2.3-linux-x86_64.tar.gz", filepath.Join(targetDirPath, "elastic-agent-1.2.3-linux-x86_64.tar.gz"))
+	require.Error(t, err)
+	assert.ErrorIs(t, err, copyFuncError)
 }

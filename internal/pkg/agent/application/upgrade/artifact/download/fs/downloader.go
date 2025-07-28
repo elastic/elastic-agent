@@ -28,6 +28,7 @@ type Downloader struct {
 	dropPath           string
 	config             *artifact.Config
 	diskSpaceErrorFunc func(error) error
+	copyFunc           func(dst io.Writer, src io.Reader) (written int64, err error)
 }
 
 // NewDownloader creates and configures Elastic Downloader
@@ -36,6 +37,7 @@ func NewDownloader(config *artifact.Config, diskSpaceErrorFunc func(error) error
 		config:             config,
 		dropPath:           getDropPath(config),
 		diskSpaceErrorFunc: diskSpaceErrorFunc,
+		copyFunc:           io.Copy,
 	}
 }
 
@@ -121,7 +123,7 @@ func (e *Downloader) downloadFile(filename, fullPath string) (string, error) {
 	}
 	defer destinationFile.Close()
 
-	_, err = io.Copy(destinationFile, sourceFile)
+	_, err = e.copyFunc(destinationFile, sourceFile)
 	if err != nil {
 		return "", e.diskSpaceErrorFunc(err)
 	}

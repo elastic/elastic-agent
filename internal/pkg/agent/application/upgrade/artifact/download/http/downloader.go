@@ -50,6 +50,7 @@ type Downloader struct {
 	client             http.Client
 	upgradeDetails     *details.Details
 	diskSpaceErrorFunc func(error) error
+	copyFunc           func(dst io.Writer, src io.Reader) (written int64, err error)
 }
 
 // NewDownloader creates and configures Elastic Downloader
@@ -74,6 +75,7 @@ func NewDownloaderWithClient(log *logger.Logger, config *artifact.Config, client
 		client:             client,
 		upgradeDetails:     upgradeDetails,
 		diskSpaceErrorFunc: diskSpaceErrorFunc,
+		copyFunc:           io.Copy,
 	}
 }
 
@@ -215,12 +217,12 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	detailsObserver := newDetailsProgressObserver(e.upgradeDetails)
 	dp := newDownloadProgressReporter(sourceURI, e.config.HTTPTransportSettings.Timeout, fileSize, e.diskSpaceErrorFunc, loggingObserver, detailsObserver)
 	dp.Report(ctx)
-	_, err = io.Copy(destinationFile, io.TeeReader(resp.Body, dp))
+	_, err = e.copyFunc(destinationFile, io.TeeReader(resp.Body, dp))
 	if err != nil {
 		err = e.diskSpaceErrorFunc(err)
 		dp.ReportFailed(err)
 		// return path, file already exists and needs to be cleaned up
-		return fullPath, fmt.Errorf("%s: %w", errors.New("copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI)).Error(), err)
+		return fullPath, errors.New("copying fetched package failed", err, errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
 	dp.ReportComplete()
 
