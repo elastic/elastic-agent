@@ -1273,8 +1273,8 @@ func TestManualRollback(t *testing.T) {
 
 			upgrader, err := NewUpgrader(log, tc.artifactSettings, tc.upgradeSettings, mockAgentInfo, mockWatcherHelper)
 			require.NoError(t, err, "error instantiating upgrader")
-			_, err = upgrader.forceRollbackToPreviousVersion(t.Context(), topDir, tc.now, tc.version, nil)
-			tc.wantErr(t, err, "unexpected error returned by forceRollbackToPreviousVersion()")
+			_, err = upgrader.rollbackToPreviousVersion(t.Context(), topDir, tc.now, tc.version, nil)
+			tc.wantErr(t, err, "unexpected error returned by rollbackToPreviousVersion()")
 			if tc.additionalAsserts != nil {
 				tc.additionalAsserts(t, topDir)
 			}
