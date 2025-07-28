@@ -2,6 +2,12 @@
 
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
+  ASDF_MAGE_VERSION: 1.14.0
+
+  # The following images are defined here and their values will be updated by updatecli
+  # Please do not change them manually.
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1752886846"
+  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1752886846"
 
 steps:
   - group: "Integration tests: packaging"
@@ -26,6 +32,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
 
       - label: "Packaging: Ubuntu x86_64 FIPS"
         key: "packaging-ubuntu-x86-64-fips"
@@ -42,6 +49,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n2-standard-4"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
 
       # Packaging linux/arm64
       - label: "Packaging: linux/arm64 tar.gz"
@@ -58,7 +66,7 @@ steps:
         agents:
           provider: "aws"
           instanceType: "c6g.4xlarge"
-          imagePrefix: "core-ubuntu-2204-aarch64"
+          image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
       - label: "Packaging: Ubuntu arm64 FIPS"
         key: "packaging-ubuntu-arm64-fips"
@@ -75,7 +83,7 @@ steps:
         agents:
           provider: "aws"
           instanceType: "c6g.4xlarge"
-          imagePrefix: "core-ubuntu-2204-aarch64"
+          image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
       - label: "Packaging: windows/amd64 zip"
         key: packaging-windows
@@ -91,6 +99,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
 
       - label: "Packaging: Containers linux/amd64"
         key: packaging-containers-x86-64
@@ -104,6 +113,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           diskSizeGb: 200
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
 
       - label: "Packaging: Containers linux/arm64"
         key: packaging-containers-arm64
@@ -117,8 +127,8 @@ steps:
         agents:
           provider: "aws"
           instanceType: "c6g.4xlarge"
-          imagePrefix: "core-ubuntu-2204-aarch64"
           diskSizeGb: 200
+          image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
       - label: "Packaging: Containers linux/amd64 FIPS"
         key: packaging-containers-x86-64-fips
@@ -133,6 +143,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           diskSizeGb: 200
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
 
       - label: "Packaging: Containers linux/arm64 FIPS"
         key: packaging-containers-arm64-fips
@@ -147,8 +158,8 @@ steps:
         agents:
           provider: "aws"
           instanceType: "c6g.4xlarge"
-          imagePrefix: "core-ubuntu-2204-aarch64"
           diskSizeGb: 200
+          image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
   - label: "Triggering Integration tests"
     depends_on:
