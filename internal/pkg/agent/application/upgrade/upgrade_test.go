@@ -1044,6 +1044,23 @@ func TestIsSameReleaseVersion(t *testing.T) {
 }
 
 func TestManualRollback(t *testing.T) {
+	const updatemarkerwatching456NoRollbackAvailable = `
+    version: 4.5.6
+    hash: newver
+    versioned_home: data/elastic-agent-4.5.6-newver
+    updated_on: 2025-07-11T10:11:12.131415Z
+    prev_version: 1.2.3
+    prev_hash: oldver
+    prev_versioned_home: data/elastic-agent-1.2.3-oldver
+    acked: false
+    action: null
+    details:
+        target_version: 4.5.6
+        state: UPG_WATCHING
+        metadata:
+            retry_until: null
+    desired_outcome: UPGRADE
+    `
 	const updatemarkerwatching456 = `
     version: 4.5.6
     hash: newver
@@ -1065,6 +1082,7 @@ func TestManualRollback(t *testing.T) {
                   valid_until: 2025-07-18T10:11:12.131415Z
     desired_outcome: UPGRADE
     `
+
 	parsed123Version, err := agtversion.ParseVersion("1.2.3")
 	require.NoError(t, err)
 	parsed456Version, err := agtversion.ParseVersion("4.5.6")
@@ -1084,6 +1102,13 @@ func TestManualRollback(t *testing.T) {
 		versionedHome: "data/elastic-agent-4.5.6-newver",
 	}
 
+	// this is the updated_on timestamp in the example
+	nowBeforeTTL, err := time.Parse(time.RFC3339, `2025-07-11T10:11:12Z`)
+	require.NoError(t, err, "error parsing nowBeforeTTL")
+
+	// the update marker yaml assume 7d TLL for rollbacks, let's make an extra day pass
+	nowAfterTTL := nowBeforeTTL.Add(8 * 24 * time.Hour)
+
 	type setupF func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper)
 	type postRollbackAssertionsF func(t *testing.T, topDir string)
 	type testcase struct {
@@ -1091,12 +1116,26 @@ func TestManualRollback(t *testing.T) {
 		setup             setupF
 		artifactSettings  *artifact.Config
 		upgradeSettings   *configuration.UpgradeConfig
+		now               time.Time
 		version           string
 		wantErr           assert.ErrorAssertionFunc
 		additionalAsserts postRollbackAssertionsF
 	}
 
 	testcases := []testcase{
+		{
+			name: "no rollback version - rollback fails",
+			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
+				//do not setup anything here, let the rollback fail
+			},
+			artifactSettings: artifact.DefaultConfig(),
+			upgradeSettings:  configuration.DefaultUpgradeConfig(),
+			version:          "",
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, ErrEmptyRollbackVersion)
+			},
+			additionalAsserts: nil,
+		},
 		{
 			name: "no update marker - rollback fails",
 			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
@@ -1109,6 +1148,85 @@ func TestManualRollback(t *testing.T) {
 				return assert.ErrorIs(t, err, fs.ErrNotExist)
 			},
 			additionalAsserts: nil,
+		},
+		{
+			name: "update marker ok but rollback available is empty - error",
+			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
+				err := os.WriteFile(markerFilePath(paths.DataFrom(topDir)), []byte(updatemarkerwatching456NoRollbackAvailable), 0600)
+				require.NoError(t, err, "error setting up update marker")
+				locker := filelock.NewAppLocker(topDir, "watcher.lock")
+				err = locker.TryLock()
+				require.NoError(t, err, "error locking initial watcher AppLocker")
+				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(locker, nil)
+			},
+			artifactSettings: artifact.DefaultConfig(),
+			upgradeSettings:  configuration.DefaultUpgradeConfig(),
+			version:          "2.3.4-unknown",
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, ErrNoRollbacksAvailable)
+			},
+			additionalAsserts: func(t *testing.T, topDir string) {
+				// marker should be untouched
+				filePath := markerFilePath(paths.DataFrom(topDir))
+				require.FileExists(t, filePath)
+				markerFileBytes, readMarkerErr := os.ReadFile(filePath)
+				require.NoError(t, readMarkerErr)
+
+				assert.YAMLEq(t, updatemarkerwatching456NoRollbackAvailable, string(markerFileBytes), "update marker should be untouched")
+			},
+		},
+		{
+			name: "update marker ok but version is not available for rollback - error",
+			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
+				err := os.WriteFile(markerFilePath(paths.DataFrom(topDir)), []byte(updatemarkerwatching456), 0600)
+				require.NoError(t, err, "error setting up update marker")
+				locker := filelock.NewAppLocker(topDir, "watcher.lock")
+				err = locker.TryLock()
+				require.NoError(t, err, "error locking initial watcher AppLocker")
+				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(locker, nil)
+			},
+			artifactSettings: artifact.DefaultConfig(),
+			upgradeSettings:  configuration.DefaultUpgradeConfig(),
+			version:          "2.3.4-unknown",
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, ErrNoRollbacksAvailable)
+			},
+			additionalAsserts: func(t *testing.T, topDir string) {
+				// marker should be untouched
+				filePath := markerFilePath(paths.DataFrom(topDir))
+				require.FileExists(t, filePath)
+				markerFileBytes, readMarkerErr := os.ReadFile(filePath)
+				require.NoError(t, readMarkerErr)
+
+				assert.YAMLEq(t, updatemarkerwatching456, string(markerFileBytes), "update marker should be untouched")
+			},
+		},
+		{
+			name: "update marker ok but rollback is expired - error",
+			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
+				err := os.WriteFile(markerFilePath(paths.DataFrom(topDir)), []byte(updatemarkerwatching456), 0600)
+				require.NoError(t, err, "error setting up update marker")
+				locker := filelock.NewAppLocker(topDir, "watcher.lock")
+				err = locker.TryLock()
+				require.NoError(t, err, "error locking initial watcher AppLocker")
+				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(locker, nil)
+			},
+			artifactSettings: artifact.DefaultConfig(),
+			upgradeSettings:  configuration.DefaultUpgradeConfig(),
+			now:              nowAfterTTL,
+			version:          "1.2.3",
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, ErrNoRollbacksAvailable)
+			},
+			additionalAsserts: func(t *testing.T, topDir string) {
+				// marker should be untouched
+				filePath := markerFilePath(paths.DataFrom(topDir))
+				require.FileExists(t, filePath)
+				markerFileBytes, readMarkerErr := os.ReadFile(filePath)
+				require.NoError(t, readMarkerErr)
+
+				assert.YAMLEq(t, updatemarkerwatching456, string(markerFileBytes), "update marker should be untouched")
+			},
 		},
 		{
 			name: "update marker ok - takeover watcher, persist rollback and restart most recent watcher",
@@ -1125,6 +1243,7 @@ func TestManualRollback(t *testing.T) {
 			},
 			artifactSettings: artifact.DefaultConfig(),
 			upgradeSettings:  configuration.DefaultUpgradeConfig(),
+			now:              nowBeforeTTL,
 			version:          "1.2.3",
 			wantErr:          assert.NoError,
 			additionalAsserts: func(t *testing.T, topDir string) {
@@ -1154,8 +1273,7 @@ func TestManualRollback(t *testing.T) {
 
 			upgrader, err := NewUpgrader(log, tc.artifactSettings, tc.upgradeSettings, mockAgentInfo, mockWatcherHelper)
 			require.NoError(t, err, "error instantiating upgrader")
-
-			_, err = upgrader.forceRollbackToPreviousVersion(t.Context(), topDir, tc.version, nil, nil)
+			_, err = upgrader.forceRollbackToPreviousVersion(t.Context(), topDir, tc.now, tc.version, nil)
 			tc.wantErr(t, err, "unexpected error returned by forceRollbackToPreviousVersion()")
 			if tc.additionalAsserts != nil {
 				tc.additionalAsserts(t, topDir)
