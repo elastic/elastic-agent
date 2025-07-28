@@ -29,6 +29,9 @@ rules:
       - get
       - watch
       - list
+  {{- with ($presetVal).role.rules }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
 ---
 {{- end }}
 {{- end }}

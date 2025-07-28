@@ -473,8 +473,6 @@ agent:
         create: true
       clusterRole:
         create: true
-      role:
-        create: true
       resources:
         limits:
           memory: 800Mi
@@ -507,8 +505,6 @@ agent:
       serviceAccount:
         create: true
       clusterRole:
-        create: true
-      role:
         create: true
       hostNetwork: true
       resources:

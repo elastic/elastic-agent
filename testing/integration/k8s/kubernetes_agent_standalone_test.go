@@ -259,9 +259,15 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						"presets": map[string]any{
 							"clusterWide": map[string]any{
 								"hostNetwork": true,
+								"role": map[string]any{
+									"create": true,
+								},
 							},
 							"perNode": map[string]any{
 								"hostNetwork": true,
+								"role": map[string]any{
+									"create": true,
+								},
 							},
 						},
 					},
@@ -302,6 +308,18 @@ func TestKubernetesAgentHelm(t *testing.T) {
 							"tag":        kCtx.agentImageTag,
 							"pullPolicy": "Never",
 						},
+						"presets": map[string]any{
+							"perNode": map[string]any{
+								"role": map[string]any{
+									"create": true,
+								},
+							},
+							"clusterWide": map[string]any{
+								"role": map[string]any{
+									"create": true,
+								},
+							},
+						},
 					},
 					"outputs": map[string]any{
 						"default": map[string]any{
@@ -340,6 +358,13 @@ func TestKubernetesAgentHelm(t *testing.T) {
 							"url":     kCtx.enrollParams.FleetURL,
 							"token":   kCtx.enrollParams.EnrollmentToken,
 							"preset":  "perNode",
+						},
+						"presets": map[string]any{
+							"perNode": map[string]any{
+								"role": map[string]any{
+									"create": true,
+								},
+							},
 						},
 					},
 				}),

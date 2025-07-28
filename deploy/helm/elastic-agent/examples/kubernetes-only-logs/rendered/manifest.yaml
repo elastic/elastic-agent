@@ -204,48 +204,6 @@ roleRef:
   name: agent-perNode-example-default
   apiGroup: rbac.authorization.k8s.io
 ---
-# Source: elastic-agent/templates/agent/role.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: agent-pernode-example
-  labels:
-    helm.sh/chart: elastic-agent-9.2.0-beta
-    app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.2.0
-rules:
-  - apiGroups: [ "" ]
-    resources:
-      - pods
-      - pods/log
-      - services
-      - configmaps
-      - secrets
-    verbs:
-      - get
-      - watch
-      - list
----
-# Source: elastic-agent/templates/agent/role-binding.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: agent-pernode-example
-  labels:
-    helm.sh/chart: elastic-agent-9.2.0-beta
-    app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.2.0
-subjects:
-  - kind: ServiceAccount
-    name: agent-pernode-example
-    namespace: "default"
-roleRef:
-  kind: Role
-  name: agent-pernode-example
-  apiGroup: rbac.authorization.k8s.io
----
 # Source: elastic-agent/templates/agent/k8s/daemonset.yaml
 apiVersion: apps/v1
 kind: DaemonSet
