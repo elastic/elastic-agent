@@ -38,7 +38,6 @@ type Migrate struct {
 	coord     migrateCoordinator
 
 	tamperProtectionFn func() bool // allows to inject the flag for tests, defaults to features.TamperProtection
-
 }
 
 // NewMigrate creates a new Migrate handler.
@@ -71,8 +70,11 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 		return err
 	}
 
-	signedData, err := protection.ValidateAction(action, h.coord.Protection().SignatureValidationKey, h.agentInfo.AgentID())
-	if err != nil && !errors.Is(err, protection.ErrNotSigned) {
+	signatureValidationKey := h.coord.Protection().SignatureValidationKey
+	signedData, err := protection.ValidateAction(action, signatureValidationKey, h.agentInfo.AgentID())
+	if len(signatureValidationKey) != 0 && errors.Is(err, protection.ErrNotSigned) {
+		return err
+	} else if err != nil && !errors.Is(err, protection.ErrNotSigned) {
 		return err
 	}
 

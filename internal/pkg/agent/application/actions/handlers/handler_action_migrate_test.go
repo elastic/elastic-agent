@@ -176,13 +176,13 @@ func TestActionMigratelHandler(t *testing.T) {
 		h := NewMigrate(log, mockAgentInfo, coord)
 		h.tamperProtectionFn = func() bool { return false }
 
-		require.Nil(t, h.Handle(t.Context(), action, ack))
-		coord.AssertNumberOfCalls(t, "Migrate", 1)
+		require.ErrorIs(t, h.Handle(t.Context(), action, ack), protection.ErrNotSigned)
+		coord.AssertNumberOfCalls(t, "Migrate", 0)
 
 		// ack delegated to migrate coordinator
 		ack.AssertNumberOfCalls(t, "Ack", 0)
 		ack.AssertNumberOfCalls(t, "Commit", 0)
-		coord.AssertCalled(t, "ReExec", mock.Anything, mock.Anything)
+		coord.AssertNumberOfCalls(t, "ReExec", 0)
 	})
 
 	t.Run("signature not present", func(t *testing.T) {
@@ -277,7 +277,8 @@ func TestActionMigratelHandler(t *testing.T) {
 		h := NewMigrate(log, mockAgentInfo, coord)
 		h.tamperProtectionFn = func() bool { return false }
 
-		require.ErrorIs(t, h.Handle(t.Context(), action, ack), protection.ErrInvalidSignature)
+		err = h.Handle(t.Context(), action, ack)
+		require.ErrorIs(t, err, protection.ErrInvalidSignature)
 		coord.AssertNumberOfCalls(t, "Migrate", 0)
 	})
 
