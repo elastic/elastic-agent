@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -342,4 +343,20 @@ func TestDownloader_downloadFile(t *testing.T) {
 	_, err := e.downloadFile("elastic-agent-1.2.3-linux-x86_64.tar.gz", filepath.Join(targetDirPath, "elastic-agent-1.2.3-linux-x86_64.tar.gz"))
 	assert.Equal(t, err, diskSpaceErr)
 	assert.Equal(t, receivedError, copyFuncError)
+}
+
+func TestDownloader_NewDownloader(t *testing.T) {
+	dropPath := t.TempDir()
+	config := &artifact.Config{
+		OperatingSystem: "linux",
+		Architecture:    "64",
+		DropPath:        dropPath,
+	}
+
+	downloader := NewDownloader(config)
+
+	expectedCopyFunc := reflect.ValueOf(io.Copy).Pointer()
+	actualCopyFunc := reflect.ValueOf(downloader.copyFunc).Pointer()
+	assert.Equal(t, expectedCopyFunc, actualCopyFunc)
+	assert.Equal(t, config, downloader.config)
 }

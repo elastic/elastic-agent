@@ -627,22 +627,27 @@ func TestDownloadFile(t *testing.T) {
 			assert.Equal(t, len(progressReporter.reportFailedCalls), 1)
 			assert.Equal(t, progressReporter.reportFailedCalls[0].err, diskSpaceErr)
 		})
-
 	})
+}
 
-	t.Run("constructor assigns copyFunc, diskSpaceErrorFunc, and progressReporter", func(t *testing.T) {
-		config := &artifact.Config{
-			OperatingSystem: "linux",
-			Architecture:    "amd64",
-		}
-		upgradeDetails := details.NewDetails("1.0.0", details.StateRequested, "")
+func TestDownloader_NewDownloaderWithClient(t *testing.T) {
+	config := &artifact.Config{
+		OperatingSystem: "linux",
+		Architecture:    "amd64",
+	}
+	upgradeDetails := details.NewDetails("1.0.0", details.StateRequested, "")
+	log, _ := loggertest.New("downloader")
 
-		downloader := NewDownloaderWithClient(nil, config, http.Client{}, upgradeDetails)
+	downloader := NewDownloaderWithClient(log, config, http.Client{}, upgradeDetails)
 
-		expectedCopyFunc := reflect.ValueOf(io.Copy)
-		actualCopyFunc := reflect.ValueOf(downloader.copyFunc)
-		assert.Equal(t, expectedCopyFunc.Pointer(), actualCopyFunc.Pointer())
-		assert.NotNil(t, downloader.diskSpaceErrorFunc)
-		assert.NotNil(t, downloader.progressReporter)
-	})
+	expectedCopyFunc := reflect.ValueOf(io.Copy)
+	actualCopyFunc := reflect.ValueOf(downloader.copyFunc)
+	assert.Equal(t, expectedCopyFunc.Pointer(), actualCopyFunc.Pointer())
+
+	assert.NotNil(t, downloader.diskSpaceErrorFunc)
+	assert.NotNil(t, downloader.progressReporter)
+	assert.Equal(t, config, downloader.config)
+	assert.Equal(t, upgradeDetails, downloader.upgradeDetails)
+	assert.Equal(t, http.Client{}, downloader.client)
+	assert.Equal(t, log, downloader.log)
 }
