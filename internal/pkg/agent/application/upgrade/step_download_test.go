@@ -339,3 +339,48 @@ func mockUpgradeDetails(parsedVersion *agtversion.ParsedSemVer) (*details.Detail
 		&upgradeDetailsRetryUntil, &upgradeDetailsRetryUntilWasUnset,
 		&upgradeDetailsRetryErrorMsg
 }
+
+type mockDownloaderFactoryProvider struct {
+	calledWithName string
+}
+
+var mockDownloaderFactoryError = errors.New("downloader factory not found")
+
+func (m *mockDownloaderFactoryProvider) GetDownloaderFactory(name string) (downloaderFactory, error) {
+	m.calledWithName = name
+	return nil, mockDownloaderFactoryError
+}
+
+func TestDownloadArtifact(t *testing.T) {
+	t.Run("should return error if file downloader factory is not found", func(t *testing.T) {
+		logger, err := logger.New("test", false)
+		require.NoError(t, err)
+
+		config := artifact.Config{}
+		u, err := NewUpgrader(logger, &config, nil)
+		require.NoError(t, err)
+
+		u.downloaderFactoryProvider = &mockDownloaderFactoryProvider{}
+
+		_, err = u.downloadArtifact(context.Background(), nil, "file://mockfilepath", nil, false, false)
+		require.Error(t, err)
+		require.ErrorIs(t, err, mockDownloaderFactoryError)
+		require.Equal(t, fileDownloaderFactory, u.downloaderFactoryProvider.(*mockDownloaderFactoryProvider).calledWithName)
+	})
+
+	t.Run("should return error if composed downloader factory is not found", func(t *testing.T) {
+		logger, err := logger.New("test", false)
+		require.NoError(t, err)
+
+		config := artifact.Config{}
+		u, err := NewUpgrader(logger, &config, nil)
+		require.NoError(t, err)
+
+		u.downloaderFactoryProvider = &mockDownloaderFactoryProvider{}
+
+		_, err = u.downloadArtifact(context.Background(), nil, "https://mockuri", nil, false, false)
+		require.Error(t, err)
+		require.ErrorIs(t, err, mockDownloaderFactoryError)
+		require.Equal(t, composedDownloaderFactory, u.downloaderFactoryProvider.(*mockDownloaderFactoryProvider).calledWithName)
+	})
+}
