@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -322,8 +323,11 @@ func TestDownloader_downloadFile(t *testing.T) {
 		TargetDirectory: targetDirPath,
 	}
 
+	var receivedError error
+	diskSpaceErr := errors.New("disk space error")
 	diskSpaceErrorFunc := func(err error) error {
-		return err
+		receivedError = err
+		return diskSpaceErr
 	}
 
 	copyFuncError := &testCopyError{msg: "mock error"}
@@ -336,6 +340,6 @@ func TestDownloader_downloadFile(t *testing.T) {
 	e.diskSpaceErrorFunc = diskSpaceErrorFunc
 
 	_, err := e.downloadFile("elastic-agent-1.2.3-linux-x86_64.tar.gz", filepath.Join(targetDirPath, "elastic-agent-1.2.3-linux-x86_64.tar.gz"))
-	require.Error(t, err)
-	assert.ErrorIs(t, err, copyFuncError)
+	assert.Equal(t, err, diskSpaceErr)
+	assert.Equal(t, receivedError, copyFuncError)
 }

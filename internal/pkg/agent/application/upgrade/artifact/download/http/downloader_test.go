@@ -545,10 +545,11 @@ func (e *testCopyError) Is(target error) bool {
 
 type mockProgressReporter struct {
 	reportFailedCalls []reportFailedCall
+	observers         []progressObserver
 }
 
 func (m *mockProgressReporter) Prepare(sourceURI string, timeout time.Duration, length int, progressObservers ...progressObserver) {
-	// noop
+	m.observers = progressObservers
 }
 
 func (m *mockProgressReporter) Report(ctx context.Context) {
@@ -568,7 +569,7 @@ func (m *mockProgressReporter) Write(b []byte) (int, error) {
 }
 
 func TestDownloadFile(t *testing.T) {
-	t.Run("calls diskSpaceErrorFunc on any copy error", func(t *testing.T) {
+	t.Run("disk space error", func(t *testing.T) {
 		ctx := t.Context()
 		artifactName := "beat/elastic-agent"
 		filename := "elastic-agent-1.2.3-linux-x86_64.tar.gz"
@@ -611,11 +612,22 @@ func TestDownloadFile(t *testing.T) {
 
 		_, err := downloader.downloadFile(ctx, artifactName, filename, fullPath)
 
-		assert.Equal(t, receivedError, copyFuncError)
+		t.Run("prepares reporter with details and logging observers", func(t *testing.T) {
+			assert.Equal(t, len(progressReporter.observers), 2)
+			assert.IsType(t, &loggingProgressObserver{}, progressReporter.observers[0])
+			assert.IsType(t, &detailsProgressObserver{}, progressReporter.observers[1])
+		})
 
-		assert.ErrorIs(t, err, diskSpaceErr)
-		assert.Equal(t, len(progressReporter.reportFailedCalls), 1)
-		assert.Equal(t, progressReporter.reportFailedCalls[0].err, diskSpaceErr)
+		t.Run("calls diskSpaceErrorFunc on any copy error", func(t *testing.T) {
+			assert.Equal(t, receivedError, copyFuncError)
+		})
+
+		t.Run("calls ReportFailed with the result of diskSpaceErrorFunc", func(t *testing.T) {
+			assert.ErrorIs(t, err, diskSpaceErr)
+			assert.Equal(t, len(progressReporter.reportFailedCalls), 1)
+			assert.Equal(t, progressReporter.reportFailedCalls[0].err, diskSpaceErr)
+		})
+
 	})
 
 	t.Run("constructor assigns copyFunc, diskSpaceErrorFunc, and progressReporter", func(t *testing.T) {
