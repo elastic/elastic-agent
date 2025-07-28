@@ -62,14 +62,12 @@ func TestDialContextBlocking_ContextCancellation(t *testing.T) {
 	)
 
 	// Should return an error due to context cancellation
-	if err == nil {
+	require.Error(t, err, "Expected DialContextBlocking to fail with cancelled context")
+	if conn != nil {
 		conn.Close()
-		t.Fatal("Expected DialContextBlocking to fail with cancelled context")
 	}
 
-	if err != context.Canceled {
-		t.Errorf("Expected context.Canceled error, got %v", err)
-	}
+	assert.Equal(t, context.Canceled, err, "Expected context.Canceled error")
 }
 
 func TestDialContextBlocking_InvalidTarget(t *testing.T) {
@@ -82,9 +80,9 @@ func TestDialContextBlocking_InvalidTarget(t *testing.T) {
 	)
 
 	// Should return an error
-	if err == nil {
+	require.Error(t, err, "Expected DialContextBlocking to fail with invalid target")
+	if conn != nil {
 		conn.Close()
-		t.Fatal("Expected DialContextBlocking to fail with invalid target")
 	}
 }
 
@@ -99,12 +97,10 @@ func TestDialContextBlocking_Timeout(t *testing.T) {
 	)
 
 	// Should return an error due to timeout
-	if err == nil {
+	require.Error(t, err, "Expected DialContextBlocking to fail with timeout")
+	if conn != nil {
 		conn.Close()
-		t.Fatal("Expected DialContextBlocking to fail with timeout")
 	}
 
-	if err != context.DeadlineExceeded {
-		t.Errorf("Expected context.DeadlineExceeded error, got %v", err)
-	}
+	assert.Equal(t, context.DeadlineExceeded, err, "Expected context.DeadlineExceeded error")
 }
