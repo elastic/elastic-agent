@@ -32,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
@@ -746,11 +747,11 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 			return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
 		}
 
-		c.logger.Infof("Checking if error is insufficient disk space: errors.Is(err, upgrade.ErrInsufficientDiskSpace) = %v", errors.Is(err, upgrade.ErrInsufficientDiskSpace))
-		if errors.Is(err, upgrade.ErrInsufficientDiskSpace) {
+		c.logger.Infof("Checking if error is insufficient disk space: errors.Is(err, upgradeErrors.ErrInsufficientDiskSpace) = %v", errors.Is(err, upgradeErrors.ErrInsufficientDiskSpace))
+		if errors.Is(err, upgradeErrors.ErrInsufficientDiskSpace) {
 			c.logger.Infof("insufficient disk space detected: %v", err)
-			c.logger.Infof("Unwrapping disk space error from %v to %v", err, upgrade.ErrInsufficientDiskSpace.Err)
-			err = upgrade.ErrInsufficientDiskSpace.Err
+			c.logger.Infof("Unwrapping disk space error from %v to %v", err, upgradeErrors.ErrInsufficientDiskSpace.Err)
+			err = upgradeErrors.ErrInsufficientDiskSpace.Err
 			c.logger.Infof("After unwrapping, error is now: %v (type: %T)", err, err)
 		}
 

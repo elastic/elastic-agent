@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/localremote"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/snapshot"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -67,7 +68,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 			// set specific downloader, local file just uses the fs.NewDownloader
 			// no fallback is allowed because it was requested that this specific source be used
 			factory = func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details, diskSpaceErrorFunc func(error) error) (download.Downloader, error) {
-				return fs.NewDownloader(config, diskSpaceErrorFunc), nil
+				return fs.NewDownloader(config), nil
 			}
 
 			// set specific verifier, local file verifies locally only
@@ -150,23 +151,23 @@ func (u *Upgrader) appendFallbackPGP(targetVersion *agtversion.ParsedSemVer, pgp
 
 func newDownloader(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details, diskSpaceErrorFunc func(error) error) (download.Downloader, error) {
 	if !version.IsSnapshot() {
-		return localremote.NewDownloader(log, settings, upgradeDetails, diskSpaceErrorFunc)
+		return localremote.NewDownloader(log, settings, upgradeDetails)
 	}
 
 	// TODO since we know if it's a snapshot or not, shouldn't we add EITHER the snapshot downloader OR the release one ?
 
 	// try snapshot repo before official
-	snapDownloader, err := snapshot.NewDownloader(log, settings, version, upgradeDetails, diskSpaceErrorFunc)
+	snapDownloader, err := snapshot.NewDownloader(log, settings, version, upgradeDetails)
 	if err != nil {
 		return nil, err
 	}
 
-	httpDownloader, err := http.NewDownloader(log, settings, upgradeDetails, diskSpaceErrorFunc)
+	httpDownloader, err := http.NewDownloader(log, settings, upgradeDetails)
 	if err != nil {
 		return nil, err
 	}
 
-	return composed.NewDownloader(fs.NewDownloader(settings, diskSpaceErrorFunc), snapDownloader, httpDownloader), nil
+	return composed.NewDownloader(fs.NewDownloader(settings), snapDownloader, httpDownloader), nil
 }
 
 func newVerifier(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
@@ -246,7 +247,7 @@ func (u *Upgrader) downloadWithRetries(
 		path, err = u.downloadOnce(cancelCtx, factory, version, settings, upgradeDetails, diskSpaceErrorFunc)
 		if err != nil {
 
-			if errors.Is(err, ErrInsufficientDiskSpace) {
+			if errors.Is(err, upgradeErrors.ErrInsufficientDiskSpace) {
 				u.log.Infof("Insufficient disk space error detected, stopping retries")
 				return backoff.Permanent(err)
 			}

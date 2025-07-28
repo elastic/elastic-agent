@@ -15,6 +15,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
@@ -32,11 +33,11 @@ type Downloader struct {
 }
 
 // NewDownloader creates and configures Elastic Downloader
-func NewDownloader(config *artifact.Config, diskSpaceErrorFunc func(error) error) *Downloader {
+func NewDownloader(config *artifact.Config) *Downloader {
 	return &Downloader{
 		config:             config,
 		dropPath:           getDropPath(config),
-		diskSpaceErrorFunc: diskSpaceErrorFunc,
+		diskSpaceErrorFunc: upgradeErrors.ToDiskSpaceErrorFunc(nil),
 		copyFunc:           io.Copy,
 	}
 }

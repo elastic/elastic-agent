@@ -19,6 +19,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -91,7 +92,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return &mockDownloader{expectedDownloadPath, nil}, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{}, nil)
+		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
 		require.NoError(t, err)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
@@ -141,7 +142,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return nil, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{}, nil)
+		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
 		require.NoError(t, err)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
@@ -196,7 +197,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return nil, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{}, nil)
+		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
 		require.NoError(t, err)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
@@ -241,7 +242,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return &mockDownloader{"", errors.New("download failed")}, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{}, nil)
+		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
 		require.NoError(t, err)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
@@ -279,10 +280,10 @@ func TestDownloadWithRetries(t *testing.T) {
 
 	t.Run("insufficient_disk_space_stops_retries", func(t *testing.T) {
 		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details, diskSpaceErrorFunc func(error) error) (download.Downloader, error) {
-			return &mockDownloader{"", ErrInsufficientDiskSpace}, nil
+			return &mockDownloader{"", upgradeErrors.ErrInsufficientDiskSpace}, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{}, nil)
+		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
 		require.NoError(t, err)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
@@ -295,7 +296,7 @@ func TestDownloadWithRetries(t *testing.T) {
 		require.Error(t, err)
 		require.Equal(t, "", path)
 
-		require.ErrorIs(t, err, ErrInsufficientDiskSpace)
+		require.ErrorIs(t, err, upgradeErrors.ErrInsufficientDiskSpace)
 
 		logs := obs.TakeAll()
 		require.Len(t, logs, 2)

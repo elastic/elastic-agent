@@ -95,7 +95,7 @@ func runTests(t *testing.T, testCases []testCase, td *testDials, config *artifac
 
 			upgradeDetails := details.NewDetails(
 				"8.12.0", details.StateRequested, "")
-			downloader, err := NewDownloader(log, config, upgradeDetails, nil)
+			downloader, err := NewDownloader(log, config, upgradeDetails)
 			require.NoError(t, err, "could not create new downloader")
 
 			pkgPath, err := downloader.Download(cancelCtx, beatSpec, version)

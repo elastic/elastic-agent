@@ -24,6 +24,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
@@ -87,14 +88,14 @@ func IsUpgradeable() bool {
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
-func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.Agent, diskSpaceErrorFunc func(error) error) (*Upgrader, error) {
+func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.Agent) (*Upgrader, error) {
 	return &Upgrader{
 		log:                log,
 		settings:           settings,
 		agentInfo:          agentInfo,
 		upgradeable:        IsUpgradeable(),
 		markerWatcher:      newMarkerFileWatcher(markerFilePath(paths.Data()), log),
-		diskSpaceErrorFunc: diskSpaceErrorFunc,
+		diskSpaceErrorFunc: upgradeErrors.ToDiskSpaceErrorFunc(log),
 	}, nil
 }
 

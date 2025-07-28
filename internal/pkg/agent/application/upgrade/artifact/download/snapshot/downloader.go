@@ -36,7 +36,7 @@ type Downloader struct {
 // We need to pass the versionOverride separately from the config as
 // artifact.Config struct is part of agent configuration and a version
 // override makes no sense there
-func NewDownloader(log *logger.Logger, config *artifact.Config, versionOverride *agtversion.ParsedSemVer, upgradeDetails *details.Details, diskSpaceErrorFunc func(error) error) (download.Downloader, error) {
+func NewDownloader(log *logger.Logger, config *artifact.Config, versionOverride *agtversion.ParsedSemVer, upgradeDetails *details.Details) (download.Downloader, error) {
 	client, err := config.HTTPTransportSettings.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 		httpcommon.WithKeepaliveSettings{Disable: false, IdleConnTimeout: 30 * time.Second},
@@ -45,17 +45,17 @@ func NewDownloader(log *logger.Logger, config *artifact.Config, versionOverride 
 		return nil, err
 	}
 
-	return NewDownloaderWithClient(log, config, versionOverride, client, upgradeDetails, diskSpaceErrorFunc)
+	return NewDownloaderWithClient(log, config, versionOverride, client, upgradeDetails)
 }
 
-func NewDownloaderWithClient(log *logger.Logger, config *artifact.Config, versionOverride *agtversion.ParsedSemVer, client *gohttp.Client, upgradeDetails *details.Details, diskSpaceErrorFunc func(error) error) (download.Downloader, error) {
+func NewDownloaderWithClient(log *logger.Logger, config *artifact.Config, versionOverride *agtversion.ParsedSemVer, client *gohttp.Client, upgradeDetails *details.Details) (download.Downloader, error) {
 	// TODO: decide an appropriate timeout for this
 	cfg, err := snapshotConfig(context.TODO(), client, config, versionOverride)
 	if err != nil {
 		return nil, fmt.Errorf("error creating snapshot config: %w", err)
 	}
 
-	httpDownloader := http.NewDownloaderWithClient(log, cfg, *client, upgradeDetails, diskSpaceErrorFunc)
+	httpDownloader := http.NewDownloaderWithClient(log, cfg, *client, upgradeDetails)
 
 	return &Downloader{
 		downloader:      httpDownloader,

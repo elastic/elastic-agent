@@ -331,8 +331,9 @@ func TestDownloader_downloadFile(t *testing.T) {
 	copyFunc := func(dst io.Writer, src io.Reader) (int64, error) {
 		return 0, copyFuncError
 	}
-	e := NewDownloader(config, diskSpaceErrorFunc)
+	e := NewDownloader(config)
 	e.copyFunc = copyFunc
+	e.diskSpaceErrorFunc = diskSpaceErrorFunc
 
 	_, err := e.downloadFile("elastic-agent-1.2.3-linux-x86_64.tar.gz", filepath.Join(targetDirPath, "elastic-agent-1.2.3-linux-x86_64.tar.gz"))
 	require.Error(t, err)

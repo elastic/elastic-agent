@@ -18,16 +18,16 @@ import (
 
 // NewDownloader creates a downloader which first checks local directory
 // and then fallbacks to remote if configured.
-func NewDownloader(log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details, diskSpaceErrorFunc func(error) error) (download.Downloader, error) {
+func NewDownloader(log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
 	downloaders := make([]download.Downloader, 0, 3)
-	downloaders = append(downloaders, fs.NewDownloader(config, diskSpaceErrorFunc))
+	downloaders = append(downloaders, fs.NewDownloader(config))
 
 	// If the current build is a snapshot we use this downloader to update
 	// to the latest snapshot of the same version. Useful for testing with
 	// a snapshot version of fleet, for example.
 	// try snapshot repo before official
 	if release.Snapshot() {
-		snapDownloader, err := snapshot.NewDownloader(log, config, nil, upgradeDetails, diskSpaceErrorFunc)
+		snapDownloader, err := snapshot.NewDownloader(log, config, nil, upgradeDetails)
 		if err != nil {
 			log.Error(err)
 		} else {
@@ -35,7 +35,7 @@ func NewDownloader(log *logger.Logger, config *artifact.Config, upgradeDetails *
 		}
 	}
 
-	httpDownloader, err := http.NewDownloader(log, config, upgradeDetails, diskSpaceErrorFunc)
+	httpDownloader, err := http.NewDownloader(log, config, upgradeDetails)
 	if err != nil {
 		return nil, err
 	}

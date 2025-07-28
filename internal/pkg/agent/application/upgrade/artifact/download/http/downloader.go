@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
@@ -54,7 +55,7 @@ type Downloader struct {
 }
 
 // NewDownloader creates and configures Elastic Downloader
-func NewDownloader(log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details, diskSpaceErrorFunc func(error) error) (*Downloader, error) {
+func NewDownloader(log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details) (*Downloader, error) {
 	client, err := config.HTTPTransportSettings.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 		httpcommon.WithKeepaliveSettings{Disable: false, IdleConnTimeout: 30 * time.Second},
@@ -64,17 +65,17 @@ func NewDownloader(log *logger.Logger, config *artifact.Config, upgradeDetails *
 	}
 
 	client.Transport = download.WithHeaders(client.Transport, download.Headers)
-	return NewDownloaderWithClient(log, config, *client, upgradeDetails, diskSpaceErrorFunc), nil
+	return NewDownloaderWithClient(log, config, *client, upgradeDetails), nil
 }
 
 // NewDownloaderWithClient creates Elastic Downloader with specific client used
-func NewDownloaderWithClient(log *logger.Logger, config *artifact.Config, client http.Client, upgradeDetails *details.Details, diskSpaceErrorFunc func(error) error) *Downloader {
+func NewDownloaderWithClient(log *logger.Logger, config *artifact.Config, client http.Client, upgradeDetails *details.Details) *Downloader {
 	return &Downloader{
 		log:                log,
 		config:             config,
 		client:             client,
 		upgradeDetails:     upgradeDetails,
-		diskSpaceErrorFunc: diskSpaceErrorFunc,
+		diskSpaceErrorFunc: upgradeErrors.ToDiskSpaceErrorFunc(log),
 		copyFunc:           io.Copy,
 	}
 }
@@ -222,7 +223,7 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 		err = e.diskSpaceErrorFunc(err)
 		dp.ReportFailed(err)
 		// return path, file already exists and needs to be cleaned up
-		return fullPath, errors.New("copying fetched package failed", err, errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
+		return fullPath, fmt.Errorf("%s: %w", errors.New("copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI)).Error(), err)
 	}
 	dp.ReportComplete()
 
