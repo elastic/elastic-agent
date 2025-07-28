@@ -70,7 +70,7 @@ func TestPerformComponentDiagnostics(t *testing.T) {
 		assert.ErrorContains(t, d.Err, "failed to get beat metrics")
 		assert.ErrorContains(t, d.Err, "failed to get input metrics")
 		if translate.GetBeatNameForComponent(&d.Component) == "filebeat" {
-			assert.ErrorContains(t, d.Err, "failed to create filebeat registry archive")
+			assert.ErrorContains(t, d.Err, "failed to get filebeat registry archive")
 		}
 	}
 }
