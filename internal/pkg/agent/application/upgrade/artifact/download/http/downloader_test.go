@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strconv"
 	"testing"
@@ -542,6 +543,30 @@ func (e *testCopyError) Is(target error) bool {
 	return ok
 }
 
+type mockProgressReporter struct {
+	reportFailedCalls []reportFailedCall
+}
+
+func (m *mockProgressReporter) Prepare(sourceURI string, timeout time.Duration, length int, progressObservers ...progressObserver) {
+	// noop
+}
+
+func (m *mockProgressReporter) Report(ctx context.Context) {
+	// noop
+}
+
+func (m *mockProgressReporter) ReportComplete() {
+	// noop
+}
+
+func (m *mockProgressReporter) ReportFailed(err error) {
+	m.reportFailedCalls = append(m.reportFailedCalls, reportFailedCall{err: err})
+}
+
+func (m *mockProgressReporter) Write(b []byte) (int, error) {
+	return len(b), nil
+}
+
 func TestDownloadFile(t *testing.T) {
 	t.Run("calls diskSpaceErrorFunc on any copy error", func(t *testing.T) {
 		ctx := t.Context()
@@ -565,10 +590,13 @@ func TestDownloadFile(t *testing.T) {
 		log, _ := loggertest.New("downloader")
 		upgradeDetails := details.NewDetails("1.2.3", details.StateRequested, "")
 
+		progressReporter := &mockProgressReporter{}
+
 		var receivedError error
+		diskSpaceErr := &testCopyError{msg: "disk space error"}
 		diskSpaceErrorFunc := func(err error) error {
 			receivedError = err
-			return err
+			return diskSpaceErr
 		}
 
 		copyFuncError := &testCopyError{msg: "mock error"}
@@ -579,14 +607,30 @@ func TestDownloadFile(t *testing.T) {
 		downloader := NewDownloaderWithClient(log, config, *server.Client(), upgradeDetails)
 		downloader.copyFunc = copyFunc
 		downloader.diskSpaceErrorFunc = diskSpaceErrorFunc
+		downloader.progressReporter = progressReporter
 
 		_, err := downloader.downloadFile(ctx, artifactName, filename, fullPath)
 
-		assert.Error(t, err)
+		assert.Equal(t, receivedError, copyFuncError)
 
-		assert.ErrorIs(t, err, copyFuncError)
-
-		assert.Equal(t, copyFuncError, receivedError)
+		assert.ErrorIs(t, err, diskSpaceErr)
+		assert.Equal(t, len(progressReporter.reportFailedCalls), 1)
+		assert.Equal(t, progressReporter.reportFailedCalls[0].err, diskSpaceErr)
 	})
 
+	t.Run("constructor assigns copyFunc, diskSpaceErrorFunc, and progressReporter", func(t *testing.T) {
+		config := &artifact.Config{
+			OperatingSystem: "linux",
+			Architecture:    "amd64",
+		}
+		upgradeDetails := details.NewDetails("1.0.0", details.StateRequested, "")
+
+		downloader := NewDownloaderWithClient(nil, config, http.Client{}, upgradeDetails)
+
+		expectedCopyFunc := reflect.ValueOf(io.Copy)
+		actualCopyFunc := reflect.ValueOf(downloader.copyFunc)
+		assert.Equal(t, expectedCopyFunc.Pointer(), actualCopyFunc.Pointer())
+		assert.NotNil(t, downloader.diskSpaceErrorFunc)
+		assert.NotNil(t, downloader.progressReporter)
+	})
 }

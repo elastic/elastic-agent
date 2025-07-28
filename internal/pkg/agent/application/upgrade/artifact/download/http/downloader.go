@@ -44,12 +44,22 @@ const (
 	warningProgressIntervalPercentage = 0.75
 )
 
+// ProgressReporter defines the interface for reporting download progress.
+type ProgressReporter interface {
+	io.Writer
+	Prepare(sourceURI string, timeout time.Duration, length int, progressObservers ...progressObserver)
+	Report(ctx context.Context)
+	ReportComplete()
+	ReportFailed(err error)
+}
+
 // Downloader is a downloader able to fetch artifacts from elastic.co web page.
 type Downloader struct {
 	log                *logger.Logger
 	config             *artifact.Config
 	client             http.Client
 	upgradeDetails     *details.Details
+	progressReporter   ProgressReporter
 	diskSpaceErrorFunc func(error) error
 	copyFunc           func(dst io.Writer, src io.Reader) (written int64, err error)
 }
@@ -77,6 +87,7 @@ func NewDownloaderWithClient(log *logger.Logger, config *artifact.Config, client
 		upgradeDetails:     upgradeDetails,
 		diskSpaceErrorFunc: upgradeErrors.ToDiskSpaceErrorFunc(log),
 		copyFunc:           io.Copy,
+		progressReporter:   &downloadProgressReporter{},
 	}
 }
 
@@ -216,16 +227,16 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 
 	loggingObserver := newLoggingProgressObserver(e.log, e.config.HTTPTransportSettings.Timeout)
 	detailsObserver := newDetailsProgressObserver(e.upgradeDetails)
-	dp := newDownloadProgressReporter(sourceURI, e.config.HTTPTransportSettings.Timeout, fileSize, e.diskSpaceErrorFunc, loggingObserver, detailsObserver)
-	dp.Report(ctx)
-	_, err = e.copyFunc(destinationFile, io.TeeReader(resp.Body, dp))
+	e.progressReporter.Prepare(sourceURI, e.config.HTTPTransportSettings.Timeout, fileSize, loggingObserver, detailsObserver)
+	e.progressReporter.Report(ctx)
+	_, err = e.copyFunc(destinationFile, io.TeeReader(resp.Body, e.progressReporter))
 	if err != nil {
 		err = e.diskSpaceErrorFunc(err)
-		dp.ReportFailed(err)
+		e.progressReporter.ReportFailed(err)
 		// return path, file already exists and needs to be cleaned up
 		return fullPath, fmt.Errorf("%s: %w", errors.New("copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI)).Error(), err)
 	}
-	dp.ReportComplete()
+	e.progressReporter.ReportComplete()
 
 	return fullPath, nil
 }

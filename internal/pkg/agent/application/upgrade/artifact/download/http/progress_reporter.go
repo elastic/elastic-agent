@@ -19,26 +19,18 @@ type downloadProgressReporter struct {
 	downloaded atomic.Int64
 	started    time.Time
 
-	progressObservers  []progressObserver
-	done               chan struct{}
-	diskSpaceErrorFunc func(error) error
+	progressObservers []progressObserver
+	done              chan struct{}
 }
 
-func newDownloadProgressReporter(sourceURI string, timeout time.Duration, length int, diskSpaceErrorFunc func(error) error, progressObservers ...progressObserver) *downloadProgressReporter {
-	interval := time.Duration(float64(timeout) * downloadProgressIntervalPercentage)
-	if interval == 0 {
-		interval = downloadProgressMinInterval
+func (dp *downloadProgressReporter) Prepare(sourceURI string, timeout time.Duration, length int, progressObservers ...progressObserver) {
+	dp.sourceURI = sourceURI
+	dp.interval = time.Duration(float64(timeout) * downloadProgressIntervalPercentage)
+	if dp.interval == 0 {
+		dp.interval = downloadProgressMinInterval
 	}
-
-	return &downloadProgressReporter{
-		sourceURI:          sourceURI,
-		interval:           interval,
-		warnTimeout:        time.Duration(float64(timeout) * warningProgressIntervalPercentage),
-		length:             float64(length),
-		diskSpaceErrorFunc: diskSpaceErrorFunc,
-		progressObservers:  progressObservers,
-		done:               make(chan struct{}),
-	}
+	dp.warnTimeout = time.Duration(float64(timeout) * warningProgressIntervalPercentage)
+	dp.length = float64(length)
 }
 
 func (dp *downloadProgressReporter) Write(b []byte) (int, error) {

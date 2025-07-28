@@ -46,19 +46,15 @@ func (m *mockProgressObserver) ReportFailed(sourceURI string, timePast time.Dura
 func TestReportFailed(t *testing.T) {
 	t.Run("should call ReportFailed on all observers with correct parameters", func(t *testing.T) {
 		testErr := errors.New("test error")
-		convertedErr := errors.New("converted error")
-		diskSpaceErrorFunc := func(err error) error {
-			if err == testErr {
-				return convertedErr
-			}
-			return err
-		}
 
 		observer1 := &mockProgressObserver{}
 		observer2 := &mockProgressObserver{}
 		observers := []progressObserver{observer1, observer2}
 
-		dp := newDownloadProgressReporter("mockurl", 10*time.Second, 1000, diskSpaceErrorFunc, observers...)
+		dp := &downloadProgressReporter{}
+		dp.Prepare("mockurl", 10*time.Second, 1000, observers...)
+
+		dp.Report(t.Context())
 
 		dp.downloaded.Store(500)
 		dp.started = time.Now().Add(-2 * time.Second)
@@ -72,7 +68,7 @@ func TestReportFailed(t *testing.T) {
 		case <-testCtx.Done():
 			t.Error("expected done channel to be closed")
 		case <-dp.done:
-			// noop
+			t.Log("done channel closed")
 		}
 
 		for _, obs := range observers {
