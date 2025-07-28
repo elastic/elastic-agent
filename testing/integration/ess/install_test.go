@@ -167,8 +167,8 @@ func TestInstallWithBasePath(t *testing.T) {
 	t.Run("check second agent can be installed again with --namespace --force", testSecondAgentCanInstallWithForce(ctx, fixture, basePath, false, opts))
 	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
 		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
-	})exs2wewswŵQ	Q19I9	I988JIU
-	8	K(X  BVJKKKI[ H]
+	})
+
 	t.Run("check components set",
 		testComponentsPresence(ctx, fixture,
 			[]componentPresenceDefinition{
