@@ -22,8 +22,6 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
 
-	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
-
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -1078,8 +1076,7 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 	cfg.Port = 0
 	rm, err := runtime.NewManager(l, l, ai, apmtest.DiscardTracer, monitoringMgr, cfg)
 	require.NoError(t, err)
-	otelMgr, err := otelmanager.NewOTelManager(l, logp.InfoLevel, l, otelmanager.EmbeddedExecutionMode, ai, monitoringMgr.ComponentMonitoringConfig)
-	require.NoError(t, err)
+	otelMgr := &fakeOTelManager{}
 	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), l)
 	require.NoError(t, err)
 

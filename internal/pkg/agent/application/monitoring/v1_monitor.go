@@ -277,7 +277,7 @@ func (b *BeatsMonitor) ComponentMonitoringConfig(unitID, binary string) map[stri
 	}
 
 	configMap := make(map[string]any)
-	endpoint := utils.SocketURLWithFallback(unitID, paths.TempDir())
+	endpoint := BeatsMonitoringEndpoint(unitID)
 	if endpoint != "" {
 		httpConfigMap := map[string]any{
 			"enabled": true,
@@ -1268,6 +1268,10 @@ func AgentMonitoringEndpoint(operatingSystem string, cfg *monitoringCfg.Monitori
 	// place in global /tmp to ensure that its small enough to fit; current path is way to long
 	// for it to be used, but needs to be unique per Agent (in the case that multiple are running)
 	return fmt.Sprintf(`unix:///tmp/elastic-agent/%x.sock`, sha256.Sum256([]byte(path)))
+}
+
+func BeatsMonitoringEndpoint(componentID string) string {
+	return utils.SocketURLWithFallback(componentID, paths.TempDir())
 }
 
 func httpCopyRules() []interface{} {

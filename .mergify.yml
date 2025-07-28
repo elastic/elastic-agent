@@ -79,7 +79,6 @@ pull_request_rules:
       - -merged
       - -closed
       - conflict
-      - -author=apmmachine
     actions:
         comment:
           message: |
