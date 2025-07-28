@@ -8,9 +8,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
 	"runtime"
-	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -209,52 +207,6 @@ func isTerminalState(marker *upgrade.UpdateMarker) bool {
 
 func isWindows() bool {
 	return runtime.GOOS == "windows"
-}
-
-func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval time.Duration, log *logger.Logger) error {
-	errChan := make(chan error)
-
-	ctx, cancel := context.WithCancel(ctx)
-
-	//cleanup
-	defer func() {
-		cancel()
-		close(errChan)
-	}()
-
-	agentWatcher := upgrade.NewAgentWatcher(errChan, log, errorCheckInterval)
-	go agentWatcher.Run(ctx)
-
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
-
-	t := time.NewTimer(tilGrace)
-	defer t.Stop()
-
-WATCHLOOP:
-	for {
-		select {
-		case s := <-signals:
-			log.Infof("received signal: (%d): %v during watch", s, s)
-			if s == syscall.SIGINT || s == syscall.SIGTERM {
-				log.Infof("received signal: (%d): %v. Exiting watch", s, s)
-				return ErrWatchCancelled
-			}
-			continue
-		case <-ctx.Done():
-			break WATCHLOOP
-		// grace period passed, agent is considered stable
-		case <-t.C:
-			log.Info("Grace period passed, not watching")
-			break WATCHLOOP
-		// Agent in degraded state.
-		case err := <-errChan:
-			log.Errorf("Agent Error detected: %s", err.Error())
-			return err
-		}
-	}
-
-	return nil
 }
 
 // gracePeriod returns true if it is within grace period and time until grace period ends.
