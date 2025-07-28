@@ -1,0 +1,1238 @@
+version: 9.1.0
+entries:
+    - kind: feature
+      summary: Upgrade-to-Go-1.24.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5309
+      issue: []
+      timestamp: 1723829102
+      file:
+        name: 1723829102-Upgrade-to-Go-1.23.0.yaml
+        checksum: 85618dbc474cb2a75c33ad9eb31600a3b07b230a
+    - kind: breaking-change
+      summary: Remove cloud-defend from agent package
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5481
+      issue: []
+      timestamp: 1725913991
+      file:
+        name: 1725913991-remove-cloud-defend.yaml
+        checksum: 5bc3b5e31f850ce19da3ff2bdd0f6710a15efb06
+    - kind: breaking-change
+      summary: Remove default credentials when running Elastic Agent in container mode
+      description: ELASTICSEARCH_USERNAME and ELASTICSEARCH_PASSWORD now need to be explicitly set when running the agent in container mode
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5536
+      issue: []
+      timestamp: 1726144746
+      file:
+        name: 1726144746-container-default-credentials.yaml
+        checksum: 787ea64973b0a62effa8d92fc308bf95ad084d9d
+    - kind: enhancement
+      summary: Support ELASTICSEARCH_API_KEY environment variable when running in container mode
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5536
+      issue: []
+      timestamp: 1726145045
+      file:
+        name: 1726145045-container-api-key.yaml
+        checksum: 80738c5524291194c91c457bdfb5baf80a339522
+    - kind: feature
+      summary: Enable persistence in the configuration provided with our OTel Collector distribution.
+      description: ""
+      component: elastic-agent,otel
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5549
+      issue: []
+      timestamp: 1726572104
+      file:
+        name: 1726572104-enable-persistence-by-default.yaml
+        checksum: 9f79bc53034a5d6e7c00f14dbb90682bb2331328
+    - kind: security
+      summary: Upgrade to Go 1.22.8.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5731
+      issue: []
+      timestamp: 1728332120
+      file:
+        name: 1728332120-Upgrade-to-Go-1.22.8..yaml
+        checksum: 959431da51ad449f61effe2d131c8ab87139e731
+    - kind: feature
+      summary: Add ability to run Elastic Distribution of OTel Collector at the same time as other inputs
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5767
+      issue: []
+      timestamp: 1729011748
+      file:
+        name: 1729011748-Add-EDOT-hybrid-mode.yaml
+        checksum: 83f6f4cb37cb776770ca9ff99b39228b9529df54
+    - kind: enhancement
+      summary: Add filebeat otel receiver
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5833
+      issue: []
+      timestamp: 1729630977
+      file:
+        name: 1729630977-Add-filebeat-otel-receiver.yaml
+        checksum: 0e5e55864891cc5896a90a015decd87e8f463556
+    - kind: breaking-change
+      summary: crossbuild-debian11
+      description: We're dropping support for Debian 10, so no need to crossbuild using the outdated image anymore. This also updates the statically linked glibc from 2.19 to 2.31.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5847
+      issue: []
+      timestamp: 1729750939
+      file:
+        name: 1729750939-crossbuild-debian11.yaml
+        checksum: 4972f2ef7a2315f39713345eb471a00a0573eff8
+    - kind: enhancement
+      summary: Detect and fail-early cli upgrades if agent is fleet-managed
+      description: This change brings restrictions on the upgrade cli command. If an agent is fleet-managed and is running in unprivileged mode, users won't be able to upgrade the agent using the cli. If an agent is fleet-managed and is running privileged, users will only be able to upgrade the agent using the cli if they provide --force flag.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5864
+      issue: []
+      timestamp: 1729971565
+      file:
+        name: 1729971565-detect-fail-early-fleet-managed-cli-upgrade.yaml
+        checksum: 9e787dd2741fe58524f9736d969f35a0b1dcbecb
+    - kind: feature
+      summary: Add os_family, os_platform and os_version to host provider
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/5941
+      issue:
+        - https://github.com/elastic/integrations/issues/10797
+      timestamp: 1730986549
+      file:
+        name: 1730986549-Add-os_family,-os_platform-and-os_version-to-host-provider.yaml
+        checksum: f2dabf4cc393c6a4bd1c6e30d8fdd6f8ba71fc19
+    - kind: feature
+      summary: Added support for pre-existing Active Directory user for unprivileged mode
+      description: User can specify custom pre-existing user for running unprivileged mode. This user will be given permissions to log on as a service.
+      component: ""
+      pr: []
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4585
+      timestamp: 1731314919
+      file:
+        name: 1731314919-Added-support-for-custom-Active-Directory-user-for-unprivileged-mode.yaml
+        checksum: 1bba4dcbe7d1a12549a958c7849900a3018102c1
+    - kind: enhancement
+      summary: removed endpoint security from linux containers
+      description: Removed elastic endpoint security from linux containers as it has a dependency on systemd.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6016
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/5495
+      timestamp: 1731517501
+      file:
+        name: 1731517501-removed-endpoint-security-from-linux-containers.yaml
+        checksum: 73ce73dcbe55f9a094386af3ce0db5d13327d63e
+    - kind: enhancement
+      summary: re-enable otel subcommand on Windows
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6068
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4976
+      timestamp: 1731962301
+      file:
+        name: 1731962301-re-enable-otel-subcommand-on-Windows.yaml
+        checksum: ea1fe69816ff322cb2cc91ccf32812a4cb5b503c
+    - kind: bug-fix
+      summary: Prevent installing Elastic Defend on non native architecture
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1732110636
+      file:
+        name: 1732110636-elastic-defend-cannot-run-in-emulation.yaml
+        checksum: cc811ca8793718da37ee77b8dfdcc38bf28ed8eb
+    - kind: enhancement
+      summary: Update OTel components to v0.114.0
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1732187698
+      file:
+        name: 1732187698-update-otel-v0.114.0.yaml
+        checksum: 34dc5f9c30bbfd353a2fb037ec36eb36afefb9c6
+    - kind: enhancement
+      summary: Elastic agent returns an actionable error message when a the use trying to execute the enroll command is not the same as the onwer of the elastic-agent program files
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6144
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/4889
+      timestamp: 1732656422
+      file:
+        name: 1732656422-add-actionable-error-message-for-enroll-command.yaml
+        checksum: 26a631d17865361a1dd4c8fee8b14c27e7141ef7
+    - kind: feature
+      summary: add GeoIP processor to EDOT collector
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1732809895
+      file:
+        name: 1732809895-add-GeoIP-processor-to-EDOT-collector.yaml
+        checksum: 277f35b0578e38c852c8b70106d2be39d6bec337
+    - kind: enhancement
+      summary: Only run providers referenced in the policy
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6169
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3609
+      timestamp: 1732840106
+      file:
+        name: 1732840106-Only-run-providers-referenced-in-the-policy.yaml
+        checksum: 0cc32a70c3ce3907a4a97032e870d5ab2f558b3c
+    - kind: feature
+      summary: add metricbeat otel receiver
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6182
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6138
+      timestamp: 1733156311
+      file:
+        name: 1733156311-add-metricbeat-otel-receiver.yaml
+        checksum: b288610f75f9885b18152142766d7f3ef7da32b6
+    - kind: enhancement
+      summary: Add a flag to skip audit/unenroll call to fleet server during uninstall
+      description: This change adds a flag to skip audit/unenroll call to fleet server. While uninstalling elastic-agent it tries to notify fleet server about the uninstallation. But in somecases users might know that the fleet server is unreachable and this notification logs multiple failures continuously. Adding this flag skips this call.
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1733248787
+      file:
+        name: 1733248787-flag-to-skip-fleet-audit.yaml
+        checksum: 90feaadcd5767184283b24e3d939e733974d8dc4
+    - kind: feature
+      summary: Add OpenTelemetry Routing connector to EDOT Collector
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1733317274
+      file:
+        name: 1733317274-add-routing-connector-to-EDOT-collector.yaml
+        checksum: 97ad4a46f22735875d557534e2c11d4874e3ced4
+    - kind: enhancement
+      summary: Update OTel components to v0.115.0
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1733390040
+      file:
+        name: 1733390040-update-otel-0.115.0.yaml
+        checksum: a5e553950b636961aa866fabd996cc98cf4d674f
+    - kind: enhancement
+      summary: Redact common secrets like API keys and passwords in the output from `inspect` command
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1733397457
+      file:
+        name: 1733397457-redact-common-secrets-in-inspect-output.yaml
+        checksum: 3a6f322345d0be9b1b7babcd283360461097d9f4
+    - kind: bug-fix
+      summary: Notify Fleet of uninstall on Windows
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6257
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/5952
+      timestamp: 1733768621
+      file:
+        name: 1733768621-Notify-Fleet-of-uninstall-on-Windows.yaml
+        checksum: 2261f729d790b28259c486904351e809fe15ddd3
+    - kind: bug-fix
+      summary: added retries for requesting download verifiers when upgrading the agent
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6276
+      issue: []
+      timestamp: 1733936340
+      file:
+        name: 1733936340-add-retries-for-download-upgrade-verifiers.yaml
+        checksum: 4ff5442cc287002e52df7244387e7ef464ee2ffc
+    - kind: feature
+      summary: add loadbalancing exporter to EDOT collector
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1734023789
+      file:
+        name: 1734023789-add-loadbalancing-exporter-to-EDOT-collector.yaml
+        checksum: f94fb4193a2f051b82ff70ce5ffa738df36cdb17
+    - kind: enhancement
+      summary: Prevent leaking secrets when logging the component model
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1734098868
+      file:
+        name: 1734098868-prevent-leaking-secrets-when-logging-component-model.yaml
+        checksum: f97e506ed1e434803b4f98914526b461d013f414
+    - kind: enhancement
+      summary: Embed hints-based inputs in the Elastic Agent container image.
+      description: This change includes the addition of hints-based inputs directly within the Elastic Agent container image, enabling streamlined configurations for input discovery when deployed in containerized environments.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6381
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/5661
+      timestamp: 1734512365
+      file:
+        name: 1734512365-embed-hints-inputs-in-agent-container-image.yaml
+        checksum: 377396eb3d0baf5ee407947ab72eedfe50ff5c37
+    - kind: enhancement
+      summary: Update OTel components to v0.116.0
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1734525166
+      file:
+        name: 1734525166-update-otel-v0.116.0.yaml
+        checksum: 60cb22ef685dfcbf9ef1a97d6d64e40d5eca45c3
+    - kind: enhancement
+      summary: Windows add Event Logging to install, uninstall, enroll failures
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/6410
+      issue:
+        - https://github.com/elastic/elastic-agent/6338
+      timestamp: 1734626964
+      file:
+        name: 1734626964-Windows-add-Event-Logging-to-install,-uninstall,-enroll.yaml
+        checksum: e9bafab97ec550ab78494e4f10f5784cc1d80a39
+    - kind: breaking-change
+      summary: Replace default Ubuntu-based images with UBI-minimal-based ones
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6427
+      issue: []
+      timestamp: 1734959878
+      file:
+        name: 1734959878-Replace-default-Ubuntu-based-images-with-UBI-minimal-based-ones.yaml
+        checksum: b8ab6a7dbab04b70007a37fb11224f10c4c7e943
+    - kind: feature
+      summary: removes `list` from kibanaFetchToken in favor of `items` as the former is deprecated and will be removed from the api response
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6437
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6023
+      timestamp: 1735137195
+      file:
+        name: 1735137195-remove-deprecated-list-in-favor-of-items.yaml
+        checksum: 23a9ecf8dad6f29e58581a41e9b8b5ee348c5cba
+    - kind: feature
+      summary: add gateway collector in Helm kube-stack deployment
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1735306293
+      file:
+        name: 1735306293-add-gateway-collector-in-Helm-kube-stack-deployment.yaml
+        checksum: 6ca30d0b19e24fa27872fcd292d10fc31abbb30a
+    - kind: breaking-change
+      summary: Removing --path.install option
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6461/files
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/2489
+      timestamp: 1735664420
+      file:
+        name: 1735664420-remove-deprecated-path-install-cli-flag.yaml
+        checksum: ceedae40882bfee7db7f8eb0c0b1e8fdd4290638
+    - kind: enhancement
+      summary: Added logger to print the status and code when enrollment call to fleet failed.
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6287
+      timestamp: 1736002257
+      file:
+        name: 1736002257-log-fleet-enroll-failure-status-code.yaml
+        checksum: 725fe14f2e5e6a361b8ce21c44ecb37c25c6b4ac
+    - kind: enhancement
+      summary: Update OTel components to v0.117.0
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1736417404
+      file:
+        name: 1736417404-update-otel-v0.117.0.yaml
+        checksum: 391d8bb42bc60ded03da5d51c579e67baf29ae91
+    - kind: feature
+      summary: Add `components` command for `otel` mode.
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1737106864
+      file:
+        name: 1737106864-add_otel_components_cmd.yaml
+        checksum: ed1b96a2a42183ce554618f93d199a28a33407d4
+    - kind: breaking-change
+      summary: Changes to binary distribution
+      description: |
+        Default install installs only:
+          - agentbeat
+          - endpoint-security
+          - pf-host-agent
+        additional flag is added that includes components above and:
+          - cloudbeat
+          - apm-server
+          - fleet-server
+          - pf-elastic-symbolizer
+          - pf-elastic-collector
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1737131552
+      file:
+        name: 1737131552-Changes-to-binary-distribution.yaml
+        checksum: 2e5094fc0897c99c63089c7a64294197a2772633
+    - kind: feature
+      summary: Add receivercreator and k8sobserver to EDOT collector
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1737462864
+      file:
+        name: 1737462864-add_k8s_otel_comps.yaml
+        checksum: 965a483f6d19b83f62b49e0b29dc00f7720baf20
+    - kind: bug-fix
+      summary: The install command is updated so that if a user installs an agent, while there is already an agent, using the `--force` flag replaces the correct one.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6559
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/5595
+      timestamp: 1737473147
+      file:
+        name: 1737473147-force-install-replaces-correct-agent.yaml
+        checksum: b859983d69d2c1bf215fa0b3448cb49ee695e866
+    - kind: bug-fix
+      summary: Fix enrollment for containerised agent when enrollment token changes or the agent is unenrolled
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6568
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3586
+      timestamp: 1737552345
+      file:
+        name: 1737552345-Fix-enrollment-for-containerised-agent-when-there-is-an-enrollement-token-change-or-the-agent-is-unenrolled.yaml
+        checksum: 271f8551f709ec1e7be7e175c792a48a897cf6cc
+    - kind: feature
+      summary: Use a random free port for sub-process communication in containers by default. Avoids port collisions when using host networking in Kubernetes.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6585
+      issue: []
+      timestamp: 1737657890
+      file:
+        name: 1737657890-Use-a-random-free-port-for-sub-process-communication-in-containers.yaml
+        checksum: d8fe375db50cd5643eb921a0e4ec4e541040b95b
+    - kind: feature
+      summary: Add filesource provider
+      description: |
+        filesource provider watches for changes of the files and updates the values of the variables
+        when the content of the file changes.
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6587
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6362
+      timestamp: 1737666699
+      file:
+        name: 1737666699-Add-filesource-provider.yaml
+        checksum: 7f858f76eadbfb558d861f03bc49c088b46e02e1
+    - kind: feature
+      summary: add kafkaexporter and kafkareceiver to EDOT collector
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6562
+      timestamp: 1737717648
+      file:
+        name: 1737717648-add-kafkaexporter-otel-collector.yaml
+        checksum: 62a4f53c8d07652832ca7ffb7fb0abac8a9b9c19
+    - kind: feature
+      summary: add jmxreceiver to EDOT collector
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1737749181
+      file:
+        name: 1737749181-add-jmxreceiver-otel-collector.yaml
+        checksum: b5ba5a564aa217b8c827b74cc19941690de56312
+    - kind: feature
+      summary: add nopreceiver to EDOT collector
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1737750331
+      file:
+        name: 1737750331-add-nopreceiver-otel-collector.yaml
+        checksum: 5658543bbbb08bf6b4b46e5cebe51f51c1f998aa
+    - kind: feature
+      summary: Add context variable support to outputs
+      description: |
+        Adds support for using context variable providers in the outputs section of a policy. Includes fallback support
+        to reference env provider when no provider prefix is provided in the variable.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6602
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6376
+      timestamp: 1737816507
+      file:
+        name: 1737816507-Add-context-variable-support-to-outputs.yaml
+        checksum: a48fcb465af0ff61da95e7833f324f297457c3a2
+    - kind: bug-fix
+      summary: Fix logical race conditions in kubernetes_secrets provider
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6623
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6340
+      timestamp: 1738139927
+      file:
+        name: 1738139927-Fix-logical-race-conditions-in-kubernetes_secrets-provider.yaml
+        checksum: 4ab7092ac0cdc741dfb2d9eb8e309bcf9e10916a
+    - kind: feature
+      summary: Add Nginx receiver and Redis receiver OTel components
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1738160406
+      file:
+        name: 1738160406-add_redis_nginx_otel_comps.yaml
+        checksum: f15594711ea1346dd4e5322addec37903ce18bc2
+    - kind: enhancement
+      summary: Updated the fleet gateway so that when the number of unauthorized fleet responses exceeds the set limit, instead of unenrolling, the gateway starts checking in less frequently.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6619
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/5428
+      timestamp: 1738199968
+      file:
+        name: 1738199968-update-scheduler-when-received-too-many-unathorized-responses.yaml
+        checksum: f3c25d66824668cdb1a227fa4e4fd49decfa51a2
+    - kind: enhancement
+      summary: Update OTel components to v0.119.0
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1738752554
+      file:
+        name: 1738752554-update-otel-v0.119.0.yaml
+        checksum: acf16fd9e6005926f4949b78717daae9648b837e
+    - kind: feature
+      summary: Add --id and --replace-token to enrollment
+      description: |
+        Add support for --id and --replace-token to the install and enroll command. Add support for ELASTIC_AGENT_ID
+        and FLEET_REPLACE_TOKEN to the container support the same behavior as the enroll command. Allows the ability to
+        define a specific ID to use for the Elastic Agent when enrolling into Fleet. The replace-token defines the token
+        that must be used to re-enroll an Elastic Agent with the same ID as a replacement of the previous Elastic Agent.
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6498
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6361
+      timestamp: 1738784301
+      file:
+        name: 1738784301-Add-id-and-replace-token-to-enrollment.yaml
+        checksum: db7f63d59e142273afd4a884e2cf7a60a9661187
+    - kind: enhancement
+      summary: Improve kubernetes_secrets provider secret logging
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6841
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6187
+      timestamp: 1739437836
+      file:
+        name: 1739437836-Improve-kubernetes_secrets-provider-secret-logging.yaml
+        checksum: 0c4b850fae555d18f7a8ba5292f668a28483eaf2
+    - kind: feature
+      summary: add MOtel sample configurations
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6630
+      issue: []
+      timestamp: 1739544282
+      file:
+        name: 1739544282-add-MOtel-sample-configurations.yaml
+        checksum: 06334af7feea3aec65ceed7678a960567525869c
+    - kind: bug-fix
+      summary: Fix deadlock in OTelManager
+      description: |
+        Fixes a deadlock case in the OTelManager where an Update can occur while an error is also being reported
+        which causes the communication with the OTelManager to hit a deadlock.
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6927
+      issue: []
+      timestamp: 1739981369
+      file:
+        name: 1739981369-Fix-deadlock-in-OTelManager.yaml
+        checksum: 333d2fd898e8b4b3f5108f270562f41554bb974a
+    - kind: bug-fix
+      summary: Fix TSDB version_conflict_engine_exception caused by incorrect kube-stack Helm values
+      description: Setting non-zero send_batch_max_size for metrics risks TSDB version_conflict_engine_exception as it causes metrics grouping in es exporter to not work properly.
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1740054191
+      file:
+        name: 1740054191-kube-stack-helm-chart-metrics-batch.yaml
+        checksum: bd3f5c4ea20a4714a84dca8e9c8875c57c53368d
+    - kind: enhancement
+      summary: Allow upgrading deb or rpm agents when using Elastic Defend with tamper protection.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/6907
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6394
+      timestamp: 1740166208
+      file:
+        name: 1740166208-allow-deb-rpm-upgrade-with-tamper-protected-endpoint.yaml
+        checksum: e1124b779230d456de615b055b3d2c2f2ead20e1
+    - kind: feature
+      summary: set replicas for gateway collector
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7011
+      issue: []
+      timestamp: 1740492672
+      file:
+        name: 1740492672-set-replicas-for-gateway-collector.yaml
+        checksum: 4fbd8a8622214c18b656e9ecab4034a17d21535d
+    - kind: enhancement
+      summary: add ApiKey prefix to MOTel host configurations
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7063
+      issue: []
+      timestamp: 1740674973
+      file:
+        name: 1740674973-add-ApiKey-prefix-to-MOTel-host-configurations.yaml
+        checksum: 23aaa12620e5149b642235c310fbf957682d7a7d
+    - kind: bug-fix
+      summary: support ipv6 host in agent monitoring http config
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7073
+      issue: []
+      timestamp: 1740713597
+      file:
+        name: 1740713597-support-agent-monitoring-ipv6.yaml
+        checksum: b0b76e19a1b8637eb247611ad302d47eab9db6bc
+    - kind: enhancement
+      summary: Add elastic.agent.fips to local_metadata
+      description: |
+        Add elastic.agent.fips (bool) attribute to local_metadata sent with enroll and checkin requests.
+        The value of this attribute indicates if the agent is a FIPS-capable distribution.
+      component: elastic-agent
+      pr: []
+      issue:
+        - https://github.com/elastic/elastic-agent/pull/7112
+      timestamp: 1740773781
+      file:
+        name: 1740773781-Add-elastic.agent.fips-to-local_metadata.yaml
+        checksum: 7700361126e87b03fee0a8eb1e87ab40a9e8b28b
+    - kind: enhancement
+      summary: Validate pbkdf2 settings when in FIPS mode
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7187
+      issue: []
+      timestamp: 1741122475
+      file:
+        name: 1741122475-Validate-pbkdf2-settings-when-in-FIPS-mode.yaml
+        checksum: 5e60af2c83b5faf901fb5e504a1c042eb6cf97a2
+    - kind: enhancement
+      summary: FIPS-capable agent file vault
+      description: |
+        Change elastic file vault implementation to allow variable length salt sizes
+        only in FIPS enabled agents.  Increase default salt size to 16 for FIPS
+        compliance. Non-FIPS agents are unchanged.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7360
+      issue: []
+      timestamp: 1741808763
+      file:
+        name: 1741808763-FIPS-Compliant-agent-file-vault.yaml
+        checksum: f20a224aeebd7585e36b202a452f74a485232286
+    - kind: bug-fix
+      summary: Fix elasticsearch exporter configuration in kube-stack values
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1741865161
+      file:
+        name: 1741865161-fix-otel-kube-stack-config.yaml
+        checksum: 469274d8e4bbe2cf8fd3eb02e6c5220ef1c1bdc8
+    - kind: enhancement
+      summary: With this change FIPS-capable agents will only be able to upgrade to other FIPS-capable agents. This change also restricts non-fips to fips upgrades as well.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7312
+      issue:
+        - https://github.com/elastic/ingest-dev/issues/4811
+      timestamp: 1741897911
+      file:
+        name: 1741897911-fips-to-fips-upgrades.yaml
+        checksum: a663c5dbda13750249ee3a61d4632103bbc63224
+    - kind: enhancement
+      summary: Updated the error messages returned for fips upgrades
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7453
+      issue: []
+      timestamp: 1742318642
+      file:
+        name: 1742318642-fips-to-fips-upgrade-error-reword.yaml
+        checksum: 21e493eaabcba3947fb371ec4983ac627f70c957
+    - kind: enhancement
+      summary: Update OTel components to v0.121.0
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1743783374
+      file:
+        name: 1743783374-update-otel-v0.121.0.yaml
+        checksum: 3491d3c13b6ebd1e7895b337d901d7df3e77dce1
+    - kind: enhancement
+      summary: Update OTel components to v0.122.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7725
+      issue: []
+      timestamp: 1744022264
+      file:
+        name: 1744022264-update-otel-components-to-v0.122.0.yaml
+        checksum: b22fa2630f29cd67191e62bec9b1f8a886c0e539
+    - kind: bug-fix
+      summary: Correctly handle sending signal to child process
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7738
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6875
+      timestamp: 1744059162
+      file:
+        name: 1744059162-send-correct-signal-on-windows.yaml
+        checksum: e6708089ece83e111bac8c85b20975ef5e877652
+    - kind: feature
+      summary: Add nopexporter to EDOT Collector
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1744198660
+      file:
+        name: 1744198660-add-nopexporter.yaml
+        checksum: 9f989be89459d35a8fdc48362a0dad19880fa4e1
+    - kind: bug-fix
+      summary: Fix Managed OTLP Helm config to use current image repo.
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1744839123
+      file:
+        name: 1744839123-fix-MOtel-config-image-value.yaml
+        checksum: cd9cb5f75e1b3983a48ee156e478e0a62051ffb6
+    - kind: breaking-change
+      summary: '[otel] Disable process scraper of hostmetrics receiver'
+      description: |
+        The process scraper collects metrics for all available processes of a host without an easy way to limit
+        this to only report top N process for example. This results in quite big amount of timeseries.
+        Since this is not quite critical for any of the available UIs or dashboards we decide to disable
+        it temporarily until we find a better solution. Users that specifically need these metrics
+        can also enable it back manually.
+        Related to https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/39423.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7894
+      issue: []
+      timestamp: 1744886313
+      file:
+        name: 1744886313-otel_disable_process_scraper.yaml
+        checksum: 461df3d166c6ed60e8565e588b5ffce9078798ae
+    - kind: bug-fix
+      summary: |
+        Ship journalctl in the elastic-agent, elastic-agent-complete, and
+        elastic-otel-collector Docker images to enable reading journald
+        logs. Journalctl is not present on *-slim and all Wolfi images.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7995
+      issue:
+        - https://github.com/elastic/beats/issues/44040
+      timestamp: 1745609163
+      file:
+        name: 1745609163-journalctl-on-all-docker-variants.yaml
+        checksum: a125369f2991dde7206d0e39ba90b37fb80ec9be
+    - kind: enhancement
+      summary: Update OTel components to v0.123.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7996
+      issue: []
+      timestamp: 1745610677
+      file:
+        name: 1745610677-update-otel-components-to-v0.123.0.yaml
+        checksum: b17b73a9fe45bfc44a92f0a8d64e2b8eca06dcd8
+    - kind: bug-fix
+      summary: Preserve agent run state on DEB and RPM upgrades
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7999
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3832
+      timestamp: 1745923884
+      file:
+        name: 1745923884-deb-rpm-preserve-run-state.yaml
+        checksum: f4aa59929c389c20bc8104c8da4824979c3b8f35
+    - kind: enhancement
+      summary: Retry enrollment requests on any error
+      description: |
+        If any error is encountered during an attempted enrollment, the elastic-agent
+        will backoff and retry. Add a new --enroll-timeout flag and
+        FLEET_ENROLL_TIMEOUT env var to set how long it tries for, default 10m. A
+        negative value disables the timeout.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8056
+      issue: []
+      timestamp: 1746113477
+      file:
+        name: 1746113477-Retry-enrollment-for-all-errors.yaml
+        checksum: c5a6ee03401f35ef7737c67329850bff144de6cc
+    - kind: feature
+      summary: Adds a new configuration setting, `agent.upgrade.rollback.window`
+      description: |
+        The value of the `agent.upgrade.rollback.window` setting determines the period after upgrading
+        Elastic Agent when a rollback to the previous version can be triggered. This is an optional
+        setting, with a default value of `168h` (7 days). The value can be any string that is parseable
+        by https://pkg.go.dev/time#ParseDuration.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8065
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6881
+      timestamp: 1746197293
+      file:
+        name: 1746197293-config-rollback-window.yaml
+        checksum: c8fad3780a06a39db30f98360292425143637db6
+    - kind: bug-fix
+      summary: Use --header from enrollment when communicating with Fleet Server
+      description: |
+        The --header option for the enrollment command now adds the headers to the communication with Fleet Server. This
+        allows a proxy that requires specific headers present for traffic to flow to be placed in front of a Fleet Server
+        to be used and still allowing the Elastic Agent to enroll.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8071
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6823
+      timestamp: 1746213492
+      file:
+        name: 1746213492-Add-header-to-enrollment-communication-with-Fleet-Server.yaml
+        checksum: d5cf474a8139caa874a432006dbdf5b7444d15b7
+    - kind: other
+      summary: NOTICE.txt now contains only those modules that are used by the Elastic Agent binaries.
+      description: |
+        Only those modules that the Elastic Agent binaries for various platforms directly
+        or indirectly depend on are now included in the NOTICE.txt file . Modules used for development
+        tooling are now excluded from NOTICE.txt.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8053
+      issue: []
+      timestamp: 1746636264
+      file:
+        name: 1746636264-fix-notice.yaml
+        checksum: 5e7c950a899c715c5c3bd7cc2c79e924f8f5585e
+    - kind: security
+      summary: Upgrade to Go 1.24.3.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8109
+      issue: []
+      timestamp: 1746652545
+      file:
+        name: 1746652545-Upgrade-to-Go-1.24.3..yaml
+        checksum: c5b03e2e2685ef389a269f5904fdc53590c7e1b1
+    - kind: other
+      summary: A new NOTICE file, `NOTICE-fips.txt` is included in FIPS-capable Agent distributions.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8124
+      issue: []
+      timestamp: 1746736812
+      file:
+        name: 1746736812-fips-notice.yaml
+        checksum: 68827b357e51534ed8327d87bbb206f6606263c9
+    - kind: bug-fix
+      summary: Address a race condition that can occur in Agent diagnostics if log rotation runs while logs are being zipped.
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1747938268
+      file:
+        name: 1747938268-fix-diag-race-condition.yaml
+        checksum: 25e4883c6751a854d4a2f0897fb83848416c855e
+    - kind: enhancement
+      summary: Update OTel components to v0.125.0
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1749110938
+      file:
+        name: 1749110938-update-otel-components-to-v0.125.0.yaml
+        checksum: 06e731438f75dd5a4f79952514ed9d22d556f101
+    - kind: feature
+      summary: add cumulativetodeltaprocessor to EDOT collector
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1749176965
+      file:
+        name: 1749176965-add-cumulativetodeltaprocessor.yaml
+        checksum: 6c4bc7565ed8fb801a1b02a01ee085488ae960e8
+    - kind: bug-fix
+      summary: Use paths.TempDir for diagnostics actions
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8472
+      issue: []
+      timestamp: 1749742685
+      file:
+        name: 1749742685-Use-paths.TempDir-for-diagnostics-actions.yaml
+        checksum: 1357d25b03d628ff7234a15a51e5dba89459d340
+    - kind: feature
+      summary: Add apmconfig and apikeyauth OTel extensions
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1749824071
+      file:
+        name: 1749824071-add-apmconfig-apikeyauth-extension.yaml
+        checksum: 2b92ba7906ac2c955bf32a47f46eb363c77ca323
+    - kind: bug-fix
+      summary: Use Debian 11 to build linux/arm to match linux/amd64. Upgrades linux/arm64's statically linked glibc from 2.28 to 2.31.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8497
+      issue: []
+      timestamp: 1749844873
+      file:
+        name: 1749844873-Use-Debian-11-for-linux-arm-to-match-linux-amd64.yaml
+        checksum: ddd1264b76219193cfed89ccc87e65b0144e4074
+    - kind: bug-fix
+      summary: relax file ownership check to allow admin re-enrollment on Windows
+      description: |
+        On Windows, the agent previously enforced a strict file ownership (SID) check during re-enrollment, which prevented legitimate admin users from re-enrolling the agent if the owner did not match. This PR changes the Windows-specific logic to a no-op, allowing any admin to re-enroll the agent. This restores usability for admin users, but reintroduces the risk that privileged re-enrollment can break unprivileged installs. The Unix-specific ownership check remains unchanged.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8503
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/7794
+      timestamp: 1749923633
+      file:
+        name: 1749923633-Windows-relax-file-ownership-check-for-re-enrollment.yaml
+        checksum: 650d0f58770863722ed75c0b092c4578f420e1fe
+    - kind: enhancement
+      summary: Update OTel components to v0.127.0
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1750008201
+      file:
+        name: 1750008201-update-otel-components-to-v0.127.0.yaml
+        checksum: 0eacaaf0ba367d9597cf7b69bba487efef2bd31c
+    - kind: feature
+      summary: Add bearertokenauth Otel extension
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1750329445
+      file:
+        name: 1750329445-add-bearertokenauth-extension.yaml
+        checksum: 321fc367b896aed8b01c802a75bd628ab149a608
+    - kind: enhancement
+      summary: Remove deprecated otel elasticsearch exporter config `*_dynamic_index` from code and samples
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8592
+      issue: []
+      timestamp: 1750349806
+      file:
+        name: 1750349806-elasticsearchexporter-deprecated-config.yaml
+        checksum: dc29806a5dc1e29c4842c1829d995ce4202e193f
+    - kind: feature
+      summary: Remove resource/k8s processor and use k8sattributes processor for service attributes
+      description: |
+        This PR removes the `resource/k8s` processor in honour of the k8sattributes processor that
+        provides native support for the Service attributes:
+        https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.127.0/processor/k8sattributesprocessor#configuring-recommended-resource-attributes
+
+        This change is aligned with the respective Semantic Conventions' guidance:
+        https://opentelemetry.io/docs/specs/semconv/non-normative/k8s-attributes/#service-attributes
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8599
+      issue: []
+      timestamp: 1750408426
+      file:
+        name: 1750408426-kube-stack-service-attrs.yaml
+        checksum: 4376b5e7140c31f3330fd7e7f69cf9bee8006bfb
+    - kind: upgrade
+      summary: Bump apmconfig extension to v0.3.0
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1750412496
+      file:
+        name: 1750412496-bump-apmconfig-extension.yaml
+        checksum: 824f9b5a0bf1f70a6be92e916efbdcb6399fef86
+    - kind: deprecation
+      summary: Deprecate the elasticinframetrics processor. It will be removed in 9.2.0.
+      description: ""
+      component: edot
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8659
+      issue: []
+      timestamp: 1750781638
+      file:
+        name: 1750781638-Deprecate-the-elasticinframetrics-processor.yaml
+        checksum: 8c7df8e8a05808ac8279a65b3b32f6fd87f3fff9
+    - kind: other
+      summary: Upgrade Synthetics NodeJS version to latest LTS v20.
+      description: ""
+      component: heartbeat
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8712
+      issue: []
+      timestamp: 1751029489
+      file:
+        name: 1751029489-synth-upgra-node-v20.yaml
+        checksum: 26a735a19317db577652eea4bb1f3e863212da81
+    - kind: bug-fix
+      summary: Remove incorrect logging that unprivileged installations are in beta.
+      description: 'Unprivileged installations went GA in 8.15.0: https://www.elastic.co/docs/reference/fleet/elastic-agent-unprivileged'
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8715
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/8689
+      timestamp: 1751037802
+      file:
+        name: 1751037802-Stop-logging-that-unprivileged-installations-are-in-beta.yaml
+        checksum: 2c2f731f90638eaf61e8ec021ce3c4dd8885ff3a
+    - kind: enhancement
+      summary: Include the forwardconnector as an EDOT collector commponent.
+      description: https://github.com/open-telemetry/opentelemetry-collector/tree/main/connector/forwardconnector
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8753
+      issue: []
+      timestamp: 1751317599
+      file:
+        name: 1751317599-edot-collector-include-forwardconnector.yaml
+        checksum: 04412e4d8553807149ec868f1f5493441ea8e2cb
+    - kind: feature
+      summary: Add file logs only mOTEL kube-stack configuration
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1751444462
+      file:
+        name: 1751444462-add_logs_only_motel_config.yaml
+        checksum: a7768ce2ec6de109e7a9efae7793231f4965cf00
+    - kind: bug-fix
+      summary: Ensure standalone Elastic Agent uses log level from configuration instead of persisted state
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8784
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/8137
+      timestamp: 1751455886
+      file:
+        name: 1751455886-correct-log-level-for-standalone-agents.yaml
+        checksum: e954db0ba6e1738e3d425cf3c8110a40c296a013
+    - kind: enhancement
+      summary: Update OTel components to v0.129.0
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1751458785
+      file:
+        name: 1751458785-update-otel-components-to-v0.129.0.yaml
+        checksum: ee5c51c2d4a5cadd25bbf314358e09fb8cf906a5
+    - kind: enhancement
+      summary: Update APM Config extension to v0.4.0
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1751536568
+      file:
+        name: 1751536568-update-apmconfig-extension-v0.4.0.yaml
+        checksum: 479c152af69e39e8651b7b7e6bbce51a804fc213
+    - kind: enhancement
+      summary: Update Elastic Trace processor to v0.7.0
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1751638649
+      file:
+        name: 1751638649-update-elastictrace-processor-to-v0.7.0.yaml
+        checksum: 798e4080de8a1eefb2072f28db7402d2426e1f55
+    - kind: enhancement
+      summary: Update Elastic APM connector to v0.4.0
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1751638799
+      file:
+        name: 1751638799-update-elasticapm-connector-to-v0.4.0.yaml
+        checksum: 2c17d9d7d90b1c3df280ffc5008dea62e5f075fe
+    - kind: enhancement
+      summary: Update API Key Auth extension to v0.2.0
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1751639092
+      file:
+        name: 1751639092-update-apikeyauth-extension-to-v0.2.0.yaml
+        checksum: 084a35923071e08433a2347aece8d1a6b028b214
+    - kind: enhancement
+      summary: Update Elastic Infra Metrics processor to v0.16.0
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      timestamp: 1751639206
+      file:
+        name: 1751639206-update-elastic-infra-metrics-processor-to-v0.16.0.yaml
+        checksum: f14405b98aad0380ec5278bef6ae53c4e29ebd53
+    - kind: bug-fix
+      summary: Resolve deadlocks in runtime checkin communication
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8881
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/7944
+      timestamp: 1751960319
+      file:
+        name: 1751960319-fix-blocking-issues-inside-runtime-communicator.yaml
+        checksum: d288cc7474997883bc2a9118b2abf150126c9d8c
+    - kind: bug-fix
+      summary: Removed init.d support from RPM packages
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8896
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/8840
+      timestamp: 1752049251
+      file:
+        name: 1752049251-Fixed-SUSE-installation-from-RPM.yaml
+        checksum: bb9eba27e2dfa5885a2abd6140ea506d143b21f5

@@ -1,0 +1,283 @@
+// begin 9.1.0 relnotes
+
+[[release-notes-9.1.0]]
+==  9.1.0
+
+Review important information about the  9.1.0 release.
+
+[discrete]
+[[security-updates-9.1.0]]
+=== Security updates
+
+
+elastic-agent::
+
+* Upgrade To Go 1.22.8. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5731[#https://github.com/elastic/elastic-agent/pull/5731] 
+* Upgrade To Go 1.24.3. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8109[#https://github.com/elastic/elastic-agent/pull/8109] 
+
+[discrete]
+[[breaking-changes-9.1.0]]
+=== Breaking changes
+
+Breaking changes can prevent your application from optimal operation and
+performance. Before you upgrade, review the breaking changes, then mitigate the
+impact to your application.
+
+// TODO: add details and impact
+
+elastic-agent::
+
+[discrete]
+[[breaking-https://github.com/elastic/elastic-agent/pull/5481]]
+.Remove Cloud-Defend From Agent Package. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5481[#https://github.com/elastic/elastic-agent/pull/5481] 
+[%collapsible]
+====
+
+====
+[discrete]
+[[breaking-https://github.com/elastic/elastic-agent/pull/5536]]
+.Remove Default Credentials When Running Elastic Agent In Container Mode. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5536[#https://github.com/elastic/elastic-agent/pull/5536] 
+[%collapsible]
+====
+ELASTICSEARCH_USERNAME and ELASTICSEARCH_PASSWORD now need to be explicitly set when running the agent in container mode
+====
+[discrete]
+[[breaking-https://github.com/elastic/elastic-agent/pull/5847]]
+.Crossbuild-Debian11. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5847[#https://github.com/elastic/elastic-agent/pull/5847] 
+[%collapsible]
+====
+We&#39;re dropping support for Debian 10, so no need to crossbuild using the outdated image anymore. This also updates the statically linked glibc from 2.19 to 2.31.
+====
+[discrete]
+[[breaking-https://github.com/elastic/elastic-agent/pull/6427]]
+.Replace Default Ubuntu-Based Images With Ubi-Minimal-Based Ones. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6427[#https://github.com/elastic/elastic-agent/pull/6427] 
+[%collapsible]
+====
+
+====
+[discrete]
+[[breaking-https://github.com/elastic/elastic-agent/pull/6461/files]]
+.Removing --Path.install Option. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6461/files[#https://github.com/elastic/elastic-agent/pull/6461/files] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/2489[#https://github.com/elastic/elastic-agent/issues/2489]
+[%collapsible]
+====
+
+====
+[discrete]
+[[breaking-]]
+.Changes To Binary Distribution.  
+[%collapsible]
+====
+Default install installs only:
+  - agentbeat
+  - endpoint-security
+  - pf-host-agent
+additional flag is added that includes components above and:
+  - cloudbeat
+  - apm-server
+  - fleet-server
+  - pf-elastic-symbolizer
+  - pf-elastic-collector
+
+====
+[discrete]
+[[breaking-https://github.com/elastic/elastic-agent/pull/7894]]
+.[Otel] Disable Process Scraper Of Hostmetrics Receiver. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7894[#https://github.com/elastic/elastic-agent/pull/7894] 
+[%collapsible]
+====
+The process scraper collects metrics for all available processes of a host without an easy way to limit
+this to only report top N process for example. This results in quite big amount of timeseries.
+Since this is not quite critical for any of the available UIs or dashboards we decide to disable
+it temporarily until we find a better solution. Users that specifically need these metrics
+can also enable it back manually.
+Related to https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/39423.
+
+====
+
+
+
+[discrete]
+[[deprecations-9.1.0]]
+=== Deprecations
+
+The following functionality is deprecated in 9.1.0, and will be removed in
+9.1.0. Deprecated functionality does not have an immediate impact on your
+application, but we strongly recommend you make the necessary updates after you
+upgrade to 9.1.0.
+
+
+edot::
+
+* Deprecate The Elasticinframetrics Processor. It Will Be Removed In 9.2.0. {edot-pull}https://github.com/elastic/elastic-agent/pull/8659[#https://github.com/elastic/elastic-agent/pull/8659] { $k | section}}::$k }}::
+
+[discrete]
+[[new-features-9.1.0]]
+=== New features
+
+The 9.1.0 release adds the following new and notable features.
+
+
+
+
+* Added Support For Pre-Existing Active Directory User For Unprivileged Mode.  {-issue}https://github.com/elastic/elastic-agent/issues/4585[#https://github.com/elastic/elastic-agent/issues/4585]
++
+User can specify custom pre-existing user for running unprivileged mode. This user will be given permissions to log on as a service.
+* Add Filesource Provider. {-pull}https://github.com/elastic/elastic-agent/pull/6587[#https://github.com/elastic/elastic-agent/pull/6587] {-issue}https://github.com/elastic/elastic-agent/issues/6362[#https://github.com/elastic/elastic-agent/issues/6362]
++
+filesource provider watches for changes of the files and updates the values of the variables
+when the content of the file changes.
+
+* Add --Id And --Replace-Token To Enrollment. {-pull}https://github.com/elastic/elastic-agent/pull/6498[#https://github.com/elastic/elastic-agent/pull/6498] {-issue}https://github.com/elastic/elastic-agent/issues/6361[#https://github.com/elastic/elastic-agent/issues/6361]
++
+Add support for --id and --replace-token to the install and enroll command. Add support for ELASTIC_AGENT_ID
+and FLEET_REPLACE_TOKEN to the container support the same behavior as the enroll command. Allows the ability to
+define a specific ID to use for the Elastic Agent when enrolling into Fleet. The replace-token defines the token
+that must be used to re-enroll an Elastic Agent with the same ID as a replacement of the previous Elastic Agent.
+
+elastic-agent::
+
+* Upgrade-To-Go-1.24.0. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5309[#https://github.com/elastic/elastic-agent/pull/5309] 
+* Add Ability To Run Elastic Distribution Of Otel Collector At The Same Time As Other Inputs. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5767[#https://github.com/elastic/elastic-agent/pull/5767] 
+* Add Os_family, Os_platform And Os_version To Host Provider. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5941[#https://github.com/elastic/elastic-agent/pull/5941] {elastic-agent-issue}https://github.com/elastic/integrations/issues/10797[#https://github.com/elastic/integrations/issues/10797]
+* Add Geoip Processor To Edot Collector.  
+* Add Metricbeat Otel Receiver. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6182[#https://github.com/elastic/elastic-agent/pull/6182] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6138[#https://github.com/elastic/elastic-agent/issues/6138]
+* Add Opentelemetry Routing Connector To Edot Collector.  
+* Add Loadbalancing Exporter To Edot Collector.  
+* Removes `List` From Kibanafetchtoken In Favor Of `Items` As The Former Is Deprecated And Will Be Removed From The Api Response. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6437[#https://github.com/elastic/elastic-agent/pull/6437] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6023[#https://github.com/elastic/elastic-agent/issues/6023]
+* Add Gateway Collector In Helm Kube-Stack Deployment.  
+* Add `Components` Command For `Otel` Mode.  
+* Add Receivercreator And K8sobserver To Edot Collector.  
+* Use A Random Free Port For Sub-Process Communication In Containers By Default. Avoids Port Collisions When Using Host Networking In Kubernetes. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6585[#https://github.com/elastic/elastic-agent/pull/6585] 
+* Add Kafkaexporter And Kafkareceiver To Edot Collector.  {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6562[#https://github.com/elastic/elastic-agent/issues/6562]
+* Add Jmxreceiver To Edot Collector.  
+* Add Nopreceiver To Edot Collector.  
+* Add Context Variable Support To Outputs. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6602[#https://github.com/elastic/elastic-agent/pull/6602] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6376[#https://github.com/elastic/elastic-agent/issues/6376]
++
+Adds support for using context variable providers in the outputs section of a policy. Includes fallback support
+to reference env provider when no provider prefix is provided in the variable.
+
+* Add Nginx Receiver And Redis Receiver Otel Components.  
+* Add Motel Sample Configurations. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6630[#https://github.com/elastic/elastic-agent/pull/6630] 
+* Set Replicas For Gateway Collector. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7011[#https://github.com/elastic/elastic-agent/pull/7011] 
+* Add Nopexporter To Edot Collector.  
+* Adds A New Configuration Setting, `Agent.upgrade.rollback.window`. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8065[#https://github.com/elastic/elastic-agent/pull/8065] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6881[#https://github.com/elastic/elastic-agent/issues/6881]
++
+The value of the `agent.upgrade.rollback.window` setting determines the period after upgrading
+Elastic Agent when a rollback to the previous version can be triggered. This is an optional
+setting, with a default value of `168h` (7 days). The value can be any string that is parseable
+by https://pkg.go.dev/time#ParseDuration.
+
+* Add Cumulativetodeltaprocessor To Edot Collector.  
+* Add Apmconfig And Apikeyauth Otel Extensions.  
+* Add Bearertokenauth Otel Extension.  
+* Remove Resource/K8s Processor And Use K8sattributes Processor For Service Attributes. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8599[#https://github.com/elastic/elastic-agent/pull/8599] 
++
+This PR removes the `resource/k8s` processor in honour of the k8sattributes processor that
+provides native support for the Service attributes:
+https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.127.0/processor/k8sattributesprocessor#configuring-recommended-resource-attributes
+
+This change is aligned with the respective Semantic Conventions&#39; guidance:
+https://opentelemetry.io/docs/specs/semconv/non-normative/k8s-attributes/#service-attributes
+
+* Add File Logs Only Motel Kube-Stack Configuration.  
+elastic-agent,otel::
+
+* Enable Persistence In The Configuration Provided With Our Otel Collector Distribution. {elastic-agent,otel-pull}https://github.com/elastic/elastic-agent/pull/5549[#https://github.com/elastic/elastic-agent/pull/5549] 
+
+
+[discrete]
+[[enhancements-9.1.0]]
+=== Enhancements
+
+
+elastic-agent::
+
+* Support Elasticsearch_api_key Environment Variable When Running In Container Mode. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5536[#https://github.com/elastic/elastic-agent/pull/5536] 
+* Add Filebeat Otel Receiver. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5833[#https://github.com/elastic/elastic-agent/pull/5833] 
+* Detect And Fail-Early Cli Upgrades If Agent Is Fleet-Managed. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/5864[#https://github.com/elastic/elastic-agent/pull/5864] 
+* Removed Endpoint Security From Linux Containers. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6016[#https://github.com/elastic/elastic-agent/pull/6016] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/5495[#https://github.com/elastic/elastic-agent/issues/5495]
+* Re-Enable Otel Subcommand On Windows. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6068[#https://github.com/elastic/elastic-agent/pull/6068] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/4976[#https://github.com/elastic/elastic-agent/issues/4976]
+* Update Otel Components To V0.114.0.  
+* Elastic Agent Returns An Actionable Error Message When A The Use Trying To Execute The Enroll Command Is Not The Same As The Onwer Of The Elastic-Agent Program Files. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6144[#https://github.com/elastic/elastic-agent/pull/6144] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/4889[#https://github.com/elastic/elastic-agent/issues/4889]
+* Only Run Providers Referenced In The Policy. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6169[#https://github.com/elastic/elastic-agent/pull/6169] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/3609[#https://github.com/elastic/elastic-agent/issues/3609]
+* Add A Flag To Skip Audit/Unenroll Call To Fleet Server During Uninstall.  
+* Update Otel Components To V0.115.0.  
+* Redact Common Secrets Like Api Keys And Passwords In The Output From `Inspect` Command.  
+* Prevent Leaking Secrets When Logging The Component Model.  
+* Embed Hints-Based Inputs In The Elastic Agent Container Image. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6381[#https://github.com/elastic/elastic-agent/pull/6381] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/5661[#https://github.com/elastic/elastic-agent/issues/5661]
+* Update Otel Components To V0.116.0.  
+* Windows Add Event Logging To Install, Uninstall, Enroll Failures. {elastic-agent-pull}https://github.com/elastic/elastic-agent/6410[#https://github.com/elastic/elastic-agent/6410] {elastic-agent-issue}https://github.com/elastic/elastic-agent/6338[#https://github.com/elastic/elastic-agent/6338]
+* Added Logger To Print The Status And Code When Enrollment Call To Fleet Failed.  {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6287[#https://github.com/elastic/elastic-agent/issues/6287]
+* Update Otel Components To V0.117.0.  
+* Updated The Fleet Gateway So That When The Number Of Unauthorized Fleet Responses Exceeds The Set Limit, Instead Of Unenrolling, The Gateway Starts Checking In Less Frequently. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6619[#https://github.com/elastic/elastic-agent/pull/6619] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/5428[#https://github.com/elastic/elastic-agent/issues/5428]
+* Update Otel Components To V0.119.0.  
+* Improve Kubernetes_secrets Provider Secret Logging. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6841[#https://github.com/elastic/elastic-agent/pull/6841] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6187[#https://github.com/elastic/elastic-agent/issues/6187]
+* Allow Upgrading Deb Or Rpm Agents When Using Elastic Defend With Tamper Protection. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6907[#https://github.com/elastic/elastic-agent/pull/6907] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6394[#https://github.com/elastic/elastic-agent/issues/6394]
+* Add Apikey Prefix To Motel Host Configurations. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7063[#https://github.com/elastic/elastic-agent/pull/7063] 
+* Add Elastic.agent.fips To Local_metadata.  {elastic-agent-issue}https://github.com/elastic/elastic-agent/pull/7112[#https://github.com/elastic/elastic-agent/pull/7112]
+* Validate Pbkdf2 Settings When In Fips Mode. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7187[#https://github.com/elastic/elastic-agent/pull/7187] 
+* Fips-Capable Agent File Vault. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7360[#https://github.com/elastic/elastic-agent/pull/7360] 
+* With This Change Fips-Capable Agents Will Only Be Able To Upgrade To Other Fips-Capable Agents. This Change Also Restricts Non-Fips To Fips Upgrades As Well. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7312[#https://github.com/elastic/elastic-agent/pull/7312] {elastic-agent-issue}https://github.com/elastic/ingest-dev/issues/4811[#https://github.com/elastic/ingest-dev/issues/4811]
+* Updated The Error Messages Returned For Fips Upgrades. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7453[#https://github.com/elastic/elastic-agent/pull/7453] 
+* Update Otel Components To V0.121.0.  
+* Update Otel Components To V0.122.0. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7725[#https://github.com/elastic/elastic-agent/pull/7725] 
+* Update Otel Components To V0.123.0. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7996[#https://github.com/elastic/elastic-agent/pull/7996] 
+* Retry Enrollment Requests On Any Error. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8056[#https://github.com/elastic/elastic-agent/pull/8056] 
+* Update Otel Components To V0.125.0.  
+* Update Otel Components To V0.127.0.  
+* Remove Deprecated Otel Elasticsearch Exporter Config `*_Dynamic_index` From Code And Samples. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8592[#https://github.com/elastic/elastic-agent/pull/8592] 
+* Include The Forwardconnector As An Edot Collector Commponent. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8753[#https://github.com/elastic/elastic-agent/pull/8753] 
+* Update Otel Components To V0.129.0.  
+* Update Apm Config Extension To V0.4.0.  
+* Update Elastic Trace Processor To V0.7.0.  
+* Update Elastic Apm Connector To V0.4.0.  
+* Update Api Key Auth Extension To V0.2.0.  
+* Update Elastic Infra Metrics Processor To V0.16.0.  
+
+
+[discrete]
+[[upgrades-9.1.0]]
+=== Upgrades
+
+
+elastic-agent::
+
+* Bump Apmconfig Extension To V0.3.0.  
+
+
+[discrete]
+[[bug-fixes-9.1.0]]
+=== Bug fixes
+
+
+
+
+* Notify Fleet Of Uninstall On Windows. {-pull}https://github.com/elastic/elastic-agent/pull/6257[#https://github.com/elastic/elastic-agent/pull/6257] {-issue}https://github.com/elastic/elastic-agent/issues/5952[#https://github.com/elastic/elastic-agent/issues/5952]
+* Fix Deadlock In Otelmanager. {-pull}https://github.com/elastic/elastic-agent/pull/6927[#https://github.com/elastic/elastic-agent/pull/6927] 
+elastic-agent::
+
+* Prevent Installing Elastic Defend On Non Native Architecture.  
+* Added Retries For Requesting Download Verifiers When Upgrading The Agent. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6276[#https://github.com/elastic/elastic-agent/pull/6276] 
+* The Install Command Is Updated So That If A User Installs An Agent, While There Is Already An Agent, Using The `--Force` Flag Replaces The Correct One. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6559[#https://github.com/elastic/elastic-agent/pull/6559] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/5595[#https://github.com/elastic/elastic-agent/issues/5595]
+* Fix Enrollment For Containerised Agent When Enrollment Token Changes Or The Agent Is Unenrolled. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6568[#https://github.com/elastic/elastic-agent/pull/6568] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/3586[#https://github.com/elastic/elastic-agent/issues/3586]
+* Fix Logical Race Conditions In Kubernetes_secrets Provider. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/6623[#https://github.com/elastic/elastic-agent/pull/6623] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6340[#https://github.com/elastic/elastic-agent/issues/6340]
+* Fix Tsdb Version_conflict_engine_exception Caused By Incorrect Kube-Stack Helm Values.  
+* Support Ipv6 Host In Agent Monitoring Http Config. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7073[#https://github.com/elastic/elastic-agent/pull/7073] 
+* Fix Elasticsearch Exporter Configuration In Kube-Stack Values.  
+* Correctly Handle Sending Signal To Child Process. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7738[#https://github.com/elastic/elastic-agent/pull/7738] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6875[#https://github.com/elastic/elastic-agent/issues/6875]
+* Fix Managed Otlp Helm Config To Use Current Image Repo.  
+* Ship Journalctl In The Elastic-Agent, Elastic-Agent-Complete, And
+Elastic-Otel-Collector Docker Images To Enable Reading Journald
+Logs. Journalctl Is Not Present On *-Slim And All Wolfi Images.
+. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7995[#https://github.com/elastic/elastic-agent/pull/7995] {elastic-agent-issue}https://github.com/elastic/beats/issues/44040[#https://github.com/elastic/beats/issues/44040]
+* Preserve Agent Run State On Deb And Rpm Upgrades. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7999[#https://github.com/elastic/elastic-agent/pull/7999] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/3832[#https://github.com/elastic/elastic-agent/issues/3832]
+* Use --Header From Enrollment When Communicating With Fleet Server. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8071[#https://github.com/elastic/elastic-agent/pull/8071] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6823[#https://github.com/elastic/elastic-agent/issues/6823]
+* Address A Race Condition That Can Occur In Agent Diagnostics If Log Rotation Runs While Logs Are Being Zipped.  
+* Use Paths.tempdir For Diagnostics Actions. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8472[#https://github.com/elastic/elastic-agent/pull/8472] 
+* Use Debian 11 To Build Linux/Arm To Match Linux/Amd64. Upgrades Linux/Arm64&#39;s Statically Linked Glibc From 2.28 To 2.31. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8497[#https://github.com/elastic/elastic-agent/pull/8497] 
+* Relax File Ownership Check To Allow Admin Re-Enrollment On Windows. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8503[#https://github.com/elastic/elastic-agent/pull/8503] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/7794[#https://github.com/elastic/elastic-agent/issues/7794]
+* Remove Incorrect Logging That Unprivileged Installations Are In Beta. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8715[#https://github.com/elastic/elastic-agent/pull/8715] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/8689[#https://github.com/elastic/elastic-agent/issues/8689]
+* Ensure Standalone Elastic Agent Uses Log Level From Configuration Instead Of Persisted State. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8784[#https://github.com/elastic/elastic-agent/pull/8784] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/8137[#https://github.com/elastic/elastic-agent/issues/8137]
+* Resolve Deadlocks In Runtime Checkin Communication. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8881[#https://github.com/elastic/elastic-agent/pull/8881] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/7944[#https://github.com/elastic/elastic-agent/issues/7944]
+* Removed Init.d Support From Rpm Packages. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8896[#https://github.com/elastic/elastic-agent/pull/8896] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/8840[#https://github.com/elastic/elastic-agent/issues/8840]
+
+// end 9.1.0 relnotes
