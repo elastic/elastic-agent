@@ -113,12 +113,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           diskSizeGb: 200
-<<<<<<< HEAD
-=======
           image: "${IMAGE_UBUNTU_2204_X86_64}"
-        plugins:
-          - *vault_docker_login
->>>>>>> 64e5457f6 (ci: use elastic-agent VM images for packaging (#9121))
 
       - label: "Packaging: Containers linux/arm64"
         key: packaging-containers-arm64
@@ -148,12 +143,7 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           diskSizeGb: 200
-<<<<<<< HEAD
-=======
           image: "${IMAGE_UBUNTU_2204_X86_64}"
-        plugins:
-          - *vault_docker_login
->>>>>>> 64e5457f6 (ci: use elastic-agent VM images for packaging (#9121))
 
       - label: "Packaging: Containers linux/arm64 FIPS"
         key: packaging-containers-arm64-fips
