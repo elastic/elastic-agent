@@ -269,7 +269,7 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 
 	if rollback {
-		return u.forceRollbackToPreviousVersion(ctx, paths.Top(), time.Now(), version, action)
+		return u.rollbackToPreviousVersion(ctx, paths.Top(), time.Now(), version, action)
 	}
 
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
@@ -468,7 +468,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	return cb, nil
 }
 
-func (u *Upgrader) forceRollbackToPreviousVersion(ctx context.Context, topDir string, now time.Time, version string, action *fleetapi.ActionUpgrade) (reexec.ShutdownCallbackFn, error) {
+func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string, now time.Time, version string, action *fleetapi.ActionUpgrade) (reexec.ShutdownCallbackFn, error) {
 	if version == "" {
 		return nil, ErrEmptyRollbackVersion
 	}
@@ -479,12 +479,6 @@ func (u *Upgrader) forceRollbackToPreviousVersion(ctx context.Context, topDir st
 	if err != nil {
 		return nil, fmt.Errorf("stat() on upgrade marker %q failed: %w", updateMarkerPath, err)
 	}
-
-	// TODO Formal checks for verifying we can rollback properly:
-	// 1. d.Metadata.RollbacksAvailable should contain the desired version with a valid TTL (it may need to be written by main agent process before starting watcher)
-	// 2. there has been at least the first restart with the new agent (i.e. we are not still downloading/extracting/rotating)
-	// 3. upgrade marker exists
-	// these should be revalidated after taking over watcher
 
 	watcherExecutable := ""
 	err = withTakeOverWatcher(ctx, u.log, topDir, u.watcherHelper, func() error {
