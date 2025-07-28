@@ -13,11 +13,6 @@ env:
   AGENT_PACKAGE_VERSION: "8.17.9"
   BEAT_VERSION: "8.17.9"
 
-common:
-  - vault_docker_login: &vault_docker_login
-      elastic/vault-docker-login#v0.5.2:
-        secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
-
 steps:
   - group: "Integration tests: packaging"
     key: "int-packaging"
@@ -89,8 +84,6 @@ steps:
           machineType: "n2-standard-8"
           diskSizeGb: 200
           image: "${IMAGE_UBUNTU_2204_X86_64}"
-        plugins:
-          - *vault_docker_login
 
       - label: "Packaging: Containers linux/arm64"
         key: packaging-containers-arm64
