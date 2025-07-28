@@ -586,7 +586,7 @@ type ActionApp struct {
 	Response    map[string]interface{} `json:"response,omitempty" mapstructure:"response,omitempty"`
 	StartedAt   string                 `json:"started_at,omitempty" mapstructure:"started_at,omitempty"`
 	CompletedAt string                 `json:"completed_at,omitempty" mapstructure:"completed_at,omitempty"`
-	Signed      *Signed                `json:"signed,omitempty" mapstructure:"signed,omitempty"`
+	Signature   *Signed                `json:"signed,omitempty" mapstructure:"signed,omitempty"`
 	Error       string                 `json:"error,omitempty" mapstructure:"error,omitempty"`
 }
 
@@ -624,6 +624,10 @@ func (a *ActionApp) AckEvent() AckEvent {
 		CompletedAt:     a.CompletedAt,
 		Error:           a.Error,
 	}
+}
+
+func (a *ActionApp) Signed() *Signed {
+	return a.Signature
 }
 
 // MarshalMap marshals ActionApp into a corresponding map
