@@ -67,3 +67,13 @@ targets:
       file: .buildkite/bk.integration.pipeline.yml
       matchpattern: '(IMAGE_.+): "platform-ingest-elastic-agent-(.+)-(.+)"'
       replacepattern: '$1: "platform-ingest-elastic-agent-$2-{{ source "latestVersion" }}"'
+
+  update-integration.pipeline:
+    name: "Update .buildkite/integration.pipeline.yml"
+    sourceid: latestVersion
+    scmid: githubConfig
+    kind: file
+    spec:
+      file: .buildkite/integration.pipeline.yml
+      matchpattern: '(IMAGE_.+): "platform-ingest-elastic-agent-(.+)-(.+)"'
+      replacepattern: '$1: "platform-ingest-elastic-agent-$2-{{ source "latestVersion" }}"'
