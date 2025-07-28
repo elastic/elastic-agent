@@ -13,7 +13,6 @@ package coordinator
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -788,7 +787,7 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 	// Create a mocked runtime manager that always reports an error
 	runtimeManager := &fakeRuntimeManager{
 		updateCallback: func(comp []component.Component) error {
-			return fmt.Errorf(errorStr)
+			return errors.New(errorStr)
 		},
 		errChan: updateErrChan,
 	}
