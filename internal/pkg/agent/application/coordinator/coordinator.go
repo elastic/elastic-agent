@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -344,7 +343,6 @@ type Coordinator struct {
 	componentModel []component.Component
 
 	// Protection section
-	mx         sync.RWMutex
 	protection protection.Config
 
 	// a sync channel that can be called by other components to check if the main coordinator
@@ -573,16 +571,12 @@ func (c *Coordinator) StateSubscribe(ctx context.Context, bufferLen int) chan St
 // Protection returns the current agent protection configuration
 // This is needed to be able to access the protection configuration for actions validation
 func (c *Coordinator) Protection() protection.Config {
-	c.mx.RLock()
-	defer c.mx.RUnlock()
 	return c.protection
 }
 
 // setProtection sets protection configuration
 func (c *Coordinator) setProtection(protectionConfig protection.Config) {
-	c.mx.Lock()
 	c.protection = protectionConfig
-	c.mx.Unlock()
 }
 
 // ReExec performs the re-execution.
