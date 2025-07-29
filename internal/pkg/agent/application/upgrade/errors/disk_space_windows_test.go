@@ -12,7 +12,7 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/stretchr/testify/require"
-	winSys "golang.org/x/sys/windows"
+	"golang.org/x/sys/windows"
 )
 
 type mockError struct {
@@ -34,10 +34,10 @@ func TestToDiskSpaceError(t *testing.T) {
 			err  error
 			want error
 		}{
-			"ERROR_DISK_FULL":                {err: winSys.ERROR_DISK_FULL, want: ErrInsufficientDiskSpace},
-			"ERROR_HANDLE_DISK_FULL":         {err: winSys.ERROR_HANDLE_DISK_FULL, want: ErrInsufficientDiskSpace},
-			"wrapped ERROR_DISK_FULL":        {err: fmt.Errorf("wrapped: %w", winSys.ERROR_DISK_FULL), want: ErrInsufficientDiskSpace},
-			"wrapped ERROR_HANDLE_DISK_FULL": {err: fmt.Errorf("wrapped: %w", winSys.ERROR_HANDLE_DISK_FULL), want: ErrInsufficientDiskSpace},
+			"ERROR_DISK_FULL":                {err: windows.ERROR_DISK_FULL, want: ErrInsufficientDiskSpace},
+			"ERROR_HANDLE_DISK_FULL":         {err: windows.ERROR_HANDLE_DISK_FULL, want: ErrInsufficientDiskSpace},
+			"wrapped ERROR_DISK_FULL":        {err: fmt.Errorf("wrapped: %w", windows.ERROR_DISK_FULL), want: ErrInsufficientDiskSpace},
+			"wrapped ERROR_HANDLE_DISK_FULL": {err: fmt.Errorf("wrapped: %w", windows.ERROR_HANDLE_DISK_FULL), want: ErrInsufficientDiskSpace},
 			"other error":                    {err: &mockError{msg: "some other error"}, want: &mockError{msg: "some other error"}},
 		}
 
@@ -58,8 +58,8 @@ func TestToDiskSpaceError(t *testing.T) {
 				t.Fatalf("expected no panic, but got: %v", r)
 			}
 		}()
-		_ = ToDiskSpaceErrorFunc(nil)(winSys.ERROR_DISK_FULL)
-		_ = ToDiskSpaceErrorFunc(nil)(fmt.Errorf("wrapped: %w", winSys.ERROR_HANDLE_DISK_FULL))
+		_ = ToDiskSpaceErrorFunc(nil)(windows.ERROR_DISK_FULL)
+		_ = ToDiskSpaceErrorFunc(nil)(fmt.Errorf("wrapped: %w", windows.ERROR_HANDLE_DISK_FULL))
 		_ = ToDiskSpaceErrorFunc(nil)(&mockError{msg: "not disk space"})
 	})
 }

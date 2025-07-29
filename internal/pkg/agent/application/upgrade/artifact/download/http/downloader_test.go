@@ -606,7 +606,7 @@ func TestDownloadFile(t *testing.T) {
 		}
 
 		downloader := NewDownloaderWithClient(log, config, *server.Client(), upgradeDetails)
-		downloader.copyFunc = copyFunc
+		downloader.CopyFunc = copyFunc
 		downloader.diskSpaceErrorFunc = diskSpaceErrorFunc
 		downloader.progressReporter = progressReporter
 
@@ -641,7 +641,7 @@ func TestDownloader_NewDownloaderWithClient(t *testing.T) {
 	downloader := NewDownloaderWithClient(log, config, http.Client{}, upgradeDetails)
 
 	expectedCopyFunc := reflect.ValueOf(io.Copy)
-	actualCopyFunc := reflect.ValueOf(downloader.copyFunc)
+	actualCopyFunc := reflect.ValueOf(downloader.CopyFunc)
 	assert.Equal(t, expectedCopyFunc.Pointer(), actualCopyFunc.Pointer())
 
 	assert.NotNil(t, downloader.diskSpaceErrorFunc)

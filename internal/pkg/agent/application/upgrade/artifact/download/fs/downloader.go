@@ -29,7 +29,7 @@ type Downloader struct {
 	dropPath           string
 	config             *artifact.Config
 	diskSpaceErrorFunc func(error) error
-	copyFunc           func(dst io.Writer, src io.Reader) (written int64, err error)
+	CopyFunc           func(dst io.Writer, src io.Reader) (written int64, err error)
 }
 
 // NewDownloader creates and configures Elastic Downloader
@@ -38,7 +38,7 @@ func NewDownloader(config *artifact.Config) *Downloader {
 		config:             config,
 		dropPath:           getDropPath(config),
 		diskSpaceErrorFunc: upgradeErrors.ToDiskSpaceErrorFunc(nil),
-		copyFunc:           io.Copy,
+		CopyFunc:           io.Copy,
 	}
 }
 
@@ -57,16 +57,26 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 		}
 	}()
 
+	fmt.Printf("[FS_DOWNLOADER] Download called for artifact: %+v, version: %s\n", a, version.String())
+	fmt.Printf("[FS_DOWNLOADER] Config OS: %s, TargetDirectory: %s\n", e.config.OS(), e.config.TargetDirectory)
+
 	// download from source to dest
 	path, err := e.download(e.config.OS(), a, *version, "")
+	fmt.Printf("[FS_DOWNLOADER] download() returned path: %s, err: %v\n", path, err)
 	downloadedFiles = append(downloadedFiles, path)
 	if err != nil {
 		return "", err
 	}
 
+	// download from source to dest
 	hashPath, err := e.download(e.config.OS(), a, *version, ".sha512")
+	fmt.Printf("[FS_DOWNLOADER] hash download() returned path: %s, err: %v\n", hashPath, err)
 	downloadedFiles = append(downloadedFiles, hashPath)
-	return path, err
+	if err != nil {
+		return "", err
+	}
+
+	return path, nil
 }
 
 // DownloadAsc downloads the package .asc file from configured source.
@@ -86,48 +96,69 @@ func (e *Downloader) download(
 	a artifact.Artifact,
 	version agtversion.ParsedSemVer,
 	extension string) (string, error) {
+	fmt.Printf("[FS DEBUG] Internal download called: OS=%s, artifact=%+v, version=%+v, ext=%s\n", operatingSystem, a, version, extension)
 	filename, err := artifact.GetArtifactName(a, version, operatingSystem, e.config.Arch())
 	if err != nil {
+		fmt.Printf("[FS DEBUG] Failed to generate filename: %v\n", err)
 		return "", errors.New(err, "generating package name failed")
 	}
+	fmt.Printf("[FS DEBUG] Generated filename: %s\n", filename)
 
 	fullPath, err := artifact.GetArtifactPath(a, version, operatingSystem, e.config.Arch(), e.config.TargetDirectory)
 	if err != nil {
+		fmt.Printf("[FS DEBUG] Failed to generate path: %v\n", err)
 		return "", errors.New(err, "generating package path failed")
 	}
+	fmt.Printf("[FS DEBUG] Generated fullPath: %s\n", fullPath)
 
 	if extension != "" {
 		filename += extension
 		fullPath += extension
+		fmt.Printf("[FS DEBUG] With extension - filename: %s, fullPath: %s\n", filename, fullPath)
 	}
 
+	fmt.Printf("[FS DEBUG] Calling downloadFile with filename=%s, fullPath=%s\n", filename, fullPath)
 	return e.downloadFile(filename, fullPath)
 }
 
 func (e *Downloader) downloadFile(filename, fullPath string) (string, error) {
 	sourcePath := filepath.Join(e.dropPath, filename)
+	fmt.Printf("[FS DEBUG] downloadFile called - filename=%s, fullPath=%s\n", filename, fullPath)
+	fmt.Printf("[FS DEBUG] dropPath=%s, computed sourcePath=%s\n", e.dropPath, sourcePath)
+
 	sourceFile, err := os.Open(sourcePath)
 	if err != nil {
+		fmt.Printf("[FS DEBUG] Failed to open source file %s: %v\n", sourcePath, err)
 		return "", errors.New(err, fmt.Sprintf("package '%s' not found", sourcePath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath))
 	}
 	defer sourceFile.Close()
+	fmt.Printf("[FS DEBUG] Successfully opened source file: %s\n", sourcePath)
 
 	if destinationDir := filepath.Dir(fullPath); destinationDir != "" && destinationDir != "." {
+		fmt.Printf("[FS DEBUG] Creating destination directory: %s\n", destinationDir)
 		if err := os.MkdirAll(destinationDir, 0755); err != nil {
+			fmt.Printf("[FS DEBUG] Failed to create destination directory: %v\n", err)
 			return "", err
 		}
 	}
 
+	fmt.Printf("[FS DEBUG] Creating destination file: %s\n", fullPath)
 	destinationFile, err := os.OpenFile(fullPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
 	if err != nil {
+		fmt.Printf("[FS DEBUG] Failed to create destination file: %v\n", err)
 		return "", errors.New(err, "creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath))
 	}
 	defer destinationFile.Close()
 
-	_, err = e.copyFunc(destinationFile, sourceFile)
+	fmt.Printf("[FS DEBUG] About to call CopyFunc...\n")
+	_, err = e.CopyFunc(destinationFile, sourceFile)
 	if err != nil {
-		return "", e.diskSpaceErrorFunc(err)
+		fmt.Printf("[FS DEBUG] CopyFunc failed with error: %v\n", err)
+		processedErr := e.diskSpaceErrorFunc(err)
+		fmt.Printf("[FS DEBUG] diskSpaceErrorFunc processed error: %v -> %v\n", err, processedErr)
+		return fullPath, processedErr // Return fullPath so cleanup can remove partial file
 	}
+	fmt.Printf("[FS DEBUG] CopyFunc succeeded\n")
 
 	return fullPath, nil
 }

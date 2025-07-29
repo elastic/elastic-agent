@@ -8,8 +8,12 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"sync"
 	"testing"
@@ -25,7 +29,12 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/composed"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/fs"
+	httpDownloader "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/http"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -35,6 +44,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	mockinfo "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/info"
+
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 	mocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
@@ -1291,4 +1302,501 @@ func (f *fakeAcker) Ack(ctx context.Context, action fleetapi.Action) error {
 func (f *fakeAcker) Commit(ctx context.Context) error {
 	args := f.Called(ctx)
 	return args.Error(0)
+}
+
+type MockDownloader struct {
+	downloadPath string
+	downloadErr  error
+}
+
+func (md *MockDownloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (string, error) {
+	return "", nil
+}
+
+func TestDownloaderFactoryProvider(t *testing.T) {
+	factory := func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
+		return &MockDownloader{}, nil
+	}
+	provider := &downloaderFactoryProvider{
+		downloaderFactories: map[string]downloaderFactory{
+			"mockDownloaderFactory": factory,
+		},
+	}
+
+	actual, err := provider.GetDownloaderFactory("mockDownloaderFactory")
+	require.NoError(t, err)
+	require.Equal(t, reflect.ValueOf(factory).Pointer(), reflect.ValueOf(actual).Pointer())
+
+	_, err = provider.GetDownloaderFactory("nonExistentFactory")
+	require.Error(t, err)
+	require.Equal(t, "downloader factory \"nonExistentFactory\" not found", err.Error())
+}
+
+func TestNewUpgrader(t *testing.T) {
+	logger, err := logger.New("test", false)
+	require.NoError(t, err)
+
+	upgrader, err := NewUpgrader(logger, nil, nil)
+	require.NoError(t, err)
+
+	fileDownloaderFactory, err := upgrader.downloaderFactoryProvider.GetDownloaderFactory(fileDownloaderFactory)
+	require.NoError(t, err)
+
+	fileDownloader, err := fileDownloaderFactory(nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.IsType(t, &fs.Downloader{}, fileDownloader)
+
+	composedDownloader, err := upgrader.downloaderFactoryProvider.GetDownloaderFactory(composedDownloaderFactory)
+	require.NoError(t, err)
+
+	require.Equal(t, reflect.ValueOf(composedDownloader).Pointer(), reflect.ValueOf(newDownloader).Pointer())
+}
+
+func TestUpgradeDownloadArtifactWithInsufficientDiskSpace(t *testing.T) {
+	// tests := map[string]struct {
+	// 	dropPath      string
+	// 	targetPath    string
+	// 	sourceURI     string
+	// 	copyError     error
+	// 	expectedError error
+	// }{}
+	t.Run("file downloader with error", func(t *testing.T) {
+		for _, testError := range TestErrors {
+			t.Run(fmt.Sprintf("file downloader with error %v", testError), func(t *testing.T) {
+				baseDir := t.TempDir()
+				testDownloadPath := filepath.Join(baseDir, "downloads")
+				testTargetPath := filepath.Join(baseDir, "target")
+
+				originalDownloadsPath := paths.Downloads()
+				t.Cleanup(func() {
+					paths.SetDownloads(originalDownloadsPath)
+					err := os.RemoveAll(testDownloadPath)
+					require.NoError(t, err)
+				})
+
+				paths.SetDownloads(testTargetPath)
+
+				testArtifact := artifact.Artifact{
+					Name:     "Elastic Agent",
+					Cmd:      "elastic-agent",
+					Artifact: "beats/elastic-agent",
+				}
+				version := agtversion.NewParsedSemVer(8, 15, 0, "", "")
+
+				expectedFileName, err := artifact.GetArtifactName(testArtifact, *version, runtime.GOOS, runtime.GOARCH)
+				require.NoError(t, err)
+
+				partialData := []byte("partial content written before error")
+				err = os.MkdirAll(testDownloadPath, 0755)
+				require.NoError(t, err)
+				tempArtifactPath := filepath.Join(testDownloadPath, expectedFileName)
+				err = os.WriteFile(tempArtifactPath, partialData, 0644)
+				require.NoError(t, err)
+
+				config := artifact.Config{
+					OperatingSystem:        runtime.GOOS,
+					Architecture:           runtime.GOARCH,
+					DropPath:               testDownloadPath,
+					TargetDirectory:        testTargetPath,
+					SourceURI:              "file://" + tempArtifactPath,
+					RetrySleepInitDuration: 1 * time.Second,
+					HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+						Timeout: 1 * time.Second,
+					},
+				}
+
+				err = os.MkdirAll(config.TargetDirectory, 0755)
+				require.NoError(t, err)
+
+				var expectedDestPath string
+				expectedDestPath, err = artifact.GetArtifactPath(testArtifact, *version, config.OS(), config.Arch(), config.TargetDirectory)
+				require.NoError(t, err)
+
+				copyFunc := func(dst io.Writer, src io.Reader) (int64, error) {
+					_, err := io.Copy(dst, src)
+					require.NoError(t, err)
+
+					require.FileExists(t, expectedDestPath, "partially written file should exist before cleanup")
+					content, err := os.ReadFile(expectedDestPath)
+					require.NoError(t, err)
+					require.Equal(t, partialData, content)
+
+					return 0, testError
+				}
+
+				fileDownloader := fs.NewDownloader(&config)
+				fileDownloader.CopyFunc = copyFunc
+
+				log, err := logger.New("test", false)
+				require.NoError(t, err)
+
+				upgradeDetails := details.NewDetails(version.String(), details.StateDownloading, "test")
+
+				fileFactory := func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
+					return fileDownloader, nil
+				}
+
+				downloaderFactoryProvider := &downloaderFactoryProvider{
+					downloaderFactories: map[string]downloaderFactory{
+						fileDownloaderFactory: fileFactory,
+					},
+				}
+
+				mockAgentInfo := mockinfo.NewAgent(t)
+				mockAgentInfo.On("Version").Return(version.String())
+
+				upgrader, err := NewUpgrader(log, &config, mockAgentInfo)
+				require.NoError(t, err)
+				upgrader.downloaderFactoryProvider = downloaderFactoryProvider
+
+				_, err = upgrader.Upgrade(context.Background(), version.String(), config.SourceURI, nil, upgradeDetails, false, false)
+				require.Error(t, err)
+				require.ErrorIs(t, err, upgradeErrors.ErrInsufficientDiskSpace)
+				require.NoFileExists(t, expectedDestPath, "FS downloader should clean up partial files on error")
+			})
+		}
+	})
+
+	t.Run("composed downloader with error file downloader", func(t *testing.T) {
+		for _, testError := range TestErrors {
+			t.Run(fmt.Sprintf("file downloader with error %v", testError), func(t *testing.T) {
+				baseDir := t.TempDir()
+				testDownloadPath := filepath.Join(baseDir, "downloads")
+				testTargetPath := filepath.Join(baseDir, "target")
+
+				originalDownloadsPath := paths.Downloads()
+				t.Cleanup(func() {
+					paths.SetDownloads(originalDownloadsPath)
+					err := os.RemoveAll(testDownloadPath)
+					require.NoError(t, err)
+				})
+
+				paths.SetDownloads(testTargetPath)
+
+				testArtifact := artifact.Artifact{
+					Name:     "Elastic Agent",
+					Cmd:      "elastic-agent",
+					Artifact: "beats/elastic-agent",
+				}
+				version := agtversion.NewParsedSemVer(8, 15, 0, "", "")
+
+				expectedFileName, err := artifact.GetArtifactName(testArtifact, *version, runtime.GOOS, runtime.GOARCH)
+				require.NoError(t, err)
+
+				partialData := []byte("partial content written before error")
+				err = os.MkdirAll(testDownloadPath, 0755)
+				require.NoError(t, err)
+				tempArtifactPath := filepath.Join(testDownloadPath, expectedFileName)
+				err = os.WriteFile(tempArtifactPath, partialData, 0644)
+				require.NoError(t, err)
+
+				config := artifact.Config{
+					OperatingSystem:        runtime.GOOS,
+					Architecture:           runtime.GOARCH,
+					DropPath:               testDownloadPath,
+					TargetDirectory:        testTargetPath,
+					SourceURI:              tempArtifactPath,
+					RetrySleepInitDuration: 1 * time.Second,
+					HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+						Timeout: 1 * time.Second,
+					},
+				}
+
+				err = os.MkdirAll(config.TargetDirectory, 0755)
+				require.NoError(t, err)
+
+				var expectedDestPath string
+				expectedDestPath, err = artifact.GetArtifactPath(testArtifact, *version, config.OS(), config.Arch(), config.TargetDirectory)
+				require.NoError(t, err)
+
+				copyFunc := func(dst io.Writer, src io.Reader) (int64, error) {
+					_, err := io.Copy(dst, src)
+					require.NoError(t, err)
+
+					require.FileExists(t, expectedDestPath, "partially written file should exist before cleanup")
+					content, err := os.ReadFile(expectedDestPath)
+					require.NoError(t, err)
+					require.Equal(t, partialData, content)
+
+					return 0, testError
+				}
+
+				fileDownloader := fs.NewDownloader(&config)
+				fileDownloader.CopyFunc = copyFunc
+
+				log, err := logger.New("test", false)
+				require.NoError(t, err)
+
+				upgradeDetails := details.NewDetails(version.String(), details.StateDownloading, "test")
+
+				httpDownloader := httpDownloader.NewDownloaderWithClient(log, &config, http.Client{}, upgradeDetails)
+
+				composedDownloader := composed.NewDownloader(fileDownloader, httpDownloader)
+
+				fileFactory := func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
+					return fileDownloader, nil
+				}
+
+				composedFactory := func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
+					return composedDownloader, nil
+				}
+
+				downloaderFactoryProvider := &downloaderFactoryProvider{
+					downloaderFactories: map[string]downloaderFactory{
+						fileDownloaderFactory:     fileFactory,
+						composedDownloaderFactory: composedFactory,
+					},
+				}
+
+				mockAgentInfo := mockinfo.NewAgent(t)
+				mockAgentInfo.On("Version").Return(version.String())
+
+				upgrader, err := NewUpgrader(log, &config, mockAgentInfo)
+				require.NoError(t, err)
+				upgrader.downloaderFactoryProvider = downloaderFactoryProvider
+
+				_, err = upgrader.Upgrade(context.Background(), version.String(), config.SourceURI, nil, upgradeDetails, false, false)
+				require.Error(t, err)
+				require.ErrorIs(t, err, upgradeErrors.ErrInsufficientDiskSpace)
+				require.NoFileExists(t, expectedDestPath, "FS downloader should clean up partial files on error")
+			})
+		}
+	})
+
+	t.Run("composed downloader http downloader", func(t *testing.T) {
+		for _, testError := range TestErrors {
+			t.Run(fmt.Sprintf("composed downloader with error %v", testError), func(t *testing.T) {
+				baseDir := t.TempDir()
+				testTargetPath := filepath.Join(baseDir, "target")
+
+				originalDownloadsPath := paths.Downloads()
+				t.Cleanup(func() {
+					paths.SetDownloads(originalDownloadsPath)
+					err := os.RemoveAll(testTargetPath)
+					require.NoError(t, err)
+				})
+
+				paths.SetDownloads(testTargetPath)
+
+				testArtifact := artifact.Artifact{
+					Name:     "Elastic Agent",
+					Cmd:      "elastic-agent",
+					Artifact: "beats/elastic-agent",
+				}
+				version := agtversion.NewParsedSemVer(8, 15, 0, "", "")
+
+				partialData := []byte("partial content written before error")
+
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusOK)
+					w.Write(partialData)
+				}))
+				defer server.Close()
+
+				config := artifact.Config{
+					OperatingSystem:        runtime.GOOS,
+					Architecture:           runtime.GOARCH,
+					TargetDirectory:        testTargetPath,
+					SourceURI:              server.URL,
+					RetrySleepInitDuration: 1 * time.Second,
+					HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+						Timeout: 1 * time.Second,
+					},
+				}
+
+				var expectedDestPath string
+				expectedDestPath, err := artifact.GetArtifactPath(testArtifact, *version, config.OS(), config.Arch(), config.TargetDirectory)
+				require.NoError(t, err)
+
+				copyFunc := func(dst io.Writer, src io.Reader) (int64, error) {
+					_, err := io.Copy(dst, src)
+					require.NoError(t, err)
+
+					require.FileExists(t, expectedDestPath, "partially written file should exist before cleanup")
+					content, err := os.ReadFile(expectedDestPath)
+					require.NoError(t, err)
+					require.Equal(t, partialData, content)
+
+					return 0, testError
+				}
+
+				log, err := logger.New("test", false)
+				require.NoError(t, err)
+
+				upgradeDetails := details.NewDetails(version.String(), details.StateDownloading, "test")
+
+				fileDownloader := fs.NewDownloader(&config)
+
+				httpDownloader := httpDownloader.NewDownloaderWithClient(log, &config, http.Client{}, upgradeDetails)
+				httpDownloader.CopyFunc = copyFunc
+
+				composedDownloader := composed.NewDownloader(fileDownloader, httpDownloader)
+
+				fileFactory := func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
+					return fileDownloader, nil
+				}
+
+				composedFactory := func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
+					return composedDownloader, nil
+				}
+
+				downloaderFactoryProvider := &downloaderFactoryProvider{
+					downloaderFactories: map[string]downloaderFactory{
+						fileDownloaderFactory:     fileFactory,
+						composedDownloaderFactory: composedFactory,
+					},
+				}
+
+				mockAgentInfo := mockinfo.NewAgent(t)
+				mockAgentInfo.On("Version").Return(version.String())
+
+				upgrader, err := NewUpgrader(log, &config, mockAgentInfo)
+				require.NoError(t, err)
+				upgrader.downloaderFactoryProvider = downloaderFactoryProvider
+
+				_, err = upgrader.Upgrade(context.Background(), version.String(), config.SourceURI, nil, upgradeDetails, false, false)
+				require.Error(t, err)
+				require.ErrorIs(t, err, upgradeErrors.ErrInsufficientDiskSpace)
+				require.NoFileExists(t, expectedDestPath, "HTTP downloader should clean up partial files on error")
+			})
+		}
+	})
+
+	// t.Run("composed downloader file downloader", func(t *testing.T) {
+	// 	partialData := []byte("partial content written before error")
+	// 	copyFunc := func(dst io.Writer, src io.Reader) (int64, error) {
+	// 		// Write some data first to simulate partial copy
+	// 		n, writeErr := dst.Write(partialData)
+	// 		if writeErr != nil {
+	// 			return 0, writeErr
+	// 		}
+	// 		// Then return the disk space error
+	// 		return int64(n), TestErrors[0]
+	// 	}
+
+	// 	// Use separate paths for source files and destination files
+	// 	testDropPath := "/tmp/elastic-agent-test-downloads" // Where FS downloader looks for source files
+	// 	testTargetPath := "/tmp/elastic-agent-test-targets" // Where downloads should be placed
+
+	// 	// Store the original downloads path to restore it later
+	// 	originalDownloadsPath := paths.Downloads()
+	// 	defer paths.SetDownloads(originalDownloadsPath)
+
+	// 	// Set the downloads path for cleanup to look in the target directory
+	// 	paths.SetDownloads(testTargetPath)
+
+	// 	// Create test artifact for path generation
+	// 	testArtifact := artifact.Artifact{
+	// 		Name:     "Elastic Agent",
+	// 		Cmd:      "elastic-agent",
+	// 		Artifact: "beats/elastic-agent",
+	// 	}
+	// 	version := agtversion.NewParsedSemVer(8, 15, 0, "", "")
+
+	// 	// Generate the correct filename for current OS/architecture
+	// 	expectedFileName, err := artifact.GetArtifactName(testArtifact, *version, runtime.GOOS, runtime.GOARCH)
+	// 	require.NoError(t, err)
+
+	// 	config := artifact.Config{
+	// 		OperatingSystem:        runtime.GOOS,
+	// 		Architecture:           runtime.GOARCH,
+	// 		DropPath:               testDropPath,   // Where FS downloader looks for source files
+	// 		TargetDirectory:        testTargetPath, // Where downloads should go (same as cleanup path)
+	// 		RetrySleepInitDuration: 1 * time.Second,
+	// 		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+	// 			Timeout: 1 * time.Second,
+	// 		},
+	// 	}
+
+	// 	// Create the source directory and file (where FS downloader reads from)
+	// 	err = os.MkdirAll(testDropPath, 0755)
+	// 	require.NoError(t, err)
+	// 	tempFilePath := filepath.Join(testDropPath, expectedFileName)
+	// 	err = os.WriteFile(tempFilePath, []byte("test content"), 0644)
+	// 	require.NoError(t, err)
+
+	// 	// Create the target directory (where downloads go)
+	// 	err = os.MkdirAll(testTargetPath, 0755)
+	// 	require.NoError(t, err)
+
+	// 	// Get the expected destination path (in target directory)
+	// 	var expectedDestPath string
+	// 	expectedDestPath, err = artifact.GetArtifactPath(testArtifact, *version, config.OS(), config.Arch(), config.TargetDirectory)
+	// 	require.NoError(t, err)
+
+	// 	// Verify destination file doesn't exist before upgrade
+	// 	require.NoFileExists(t, expectedDestPath, "destination file should not exist before upgrade")
+
+	// 	// Create file downloader with disk space error copy function
+	// 	fileDownloader := fs.NewDownloader(&config)
+	// 	fileDownloader.CopyFunc = copyFunc
+
+	// 	// Create HTTP downloader with disk space error copy function
+	// 	log, err := logger.New("test", false)
+	// 	require.NoError(t, err)
+	// 	upgradeDetails := details.NewDetails("8.15.0", details.StateDownloading, "test")
+
+	// 	httpDownloader, err := downloadhttp.NewDownloader(log, &config, upgradeDetails)
+	// 	require.NoError(t, err)
+	// 	httpDownloader.CopyFunc = copyFunc
+
+	// 	// Create composed downloader with both file and HTTP downloaders
+	// 	composedDownloader := composed.NewDownloader(fileDownloader, httpDownloader)
+
+	// 	composedFactory := func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
+	// 		// Return the composed downloader that will try both file and HTTP
+	// 		return composedDownloader, nil
+	// 	}
+
+	// 	downloaderFactoryProvider := &downloaderFactoryProvider{
+	// 		downloaderFactories: map[string]downloaderFactory{
+	// 			composedDownloaderFactory: composedFactory,
+	// 		},
+	// 	}
+
+	// 	mockAgentInfo := mockinfo.NewAgent(t)
+	// 	mockAgentInfo.On("Version").Return("8.15.0")
+
+	// 	upgrader, err := NewUpgrader(log, &config, mockAgentInfo)
+	// 	require.NoError(t, err)
+	// 	upgrader.downloaderFactoryProvider = downloaderFactoryProvider
+
+	// 	// Get the expected destination path that would be created by the fs downloader
+	// 	expectedDestPath, err = artifact.GetArtifactPath(testArtifact, *version, config.OS(), config.Arch(), config.TargetDirectory)
+	// 	require.NoError(t, err)
+
+	// 	// Verify destination file doesn't exist before upgrade
+	// 	require.NoFileExists(t, expectedDestPath, "destination file should not exist before upgrade")
+
+	// 	_, err = upgrader.Upgrade(context.Background(), "8.15.0", filepath.Join(testDropPath, expectedFileName), nil, upgradeDetails, false, false)
+	// 	require.Error(t, err)
+
+	// 	// The composed downloader should return a joined error containing both:
+	// 	// 1. The insufficient disk space error from the file downloader
+	// 	// 2. The network error from the HTTP downloader
+	// 	require.ErrorIs(t, err, upgradeErrors.ErrInsufficientDiskSpace, "joined error should contain insufficient disk space error")
+
+	// 	// Verify that the error message contains both errors
+	// 	errMsg := err.Error()
+	// 	require.Contains(t, errMsg, "insufficient disk space", "error message should mention disk space")
+	// 	require.Contains(t, errMsg, "lookup beats", "error message should mention the network failure")
+
+	// 	// FS downloader should leave partial files (demonstrating the bug)
+	// 	// This is currently a bug - FS downloader doesn't clean up partial files like HTTP downloader does
+	// 	if _, statErr := os.Stat(expectedDestPath); statErr == nil {
+	// 		// File exists - check if it contains the partial data
+	// 		content, readErr := os.ReadFile(expectedDestPath)
+	// 		if readErr == nil && len(content) > 0 {
+	// 			t.Logf("BUG: FS downloader left partial file with %d bytes: %q", len(content), string(content))
+	// 			require.Contains(t, string(content), string(partialData), "partial file should contain the data written before error")
+
+	// 			// Clean up the partial file for the test
+	// 			os.Remove(expectedDestPath)
+	// 		}
+	// 	}
+
+	// 	// Cleanup the test directory
+	// 	os.RemoveAll(testDropPath)
+	// })
+
 }

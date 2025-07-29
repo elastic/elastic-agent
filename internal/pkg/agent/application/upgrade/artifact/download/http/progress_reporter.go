@@ -31,6 +31,8 @@ func (dp *downloadProgressReporter) Prepare(sourceURI string, timeout time.Durat
 	}
 	dp.warnTimeout = time.Duration(float64(timeout) * warningProgressIntervalPercentage)
 	dp.length = float64(length)
+	dp.progressObservers = progressObservers
+	dp.done = make(chan struct{})
 }
 
 func (dp *downloadProgressReporter) Write(b []byte) (int, error) {

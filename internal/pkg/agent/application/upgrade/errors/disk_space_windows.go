@@ -10,14 +10,13 @@ import (
 	"errors"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-
-	winSys "golang.org/x/sys/windows"
+	"golang.org/x/sys/windows"
 )
 
 // ToDiskSpaceError returns a generic disk space error if the error is a disk space error
 func ToDiskSpaceErrorFunc(log *logger.Logger) func(error) error {
 	return func(err error) error {
-		if errors.Is(err, winSys.ERROR_DISK_FULL) || errors.Is(err, winSys.ERROR_HANDLE_DISK_FULL) {
+		if errors.Is(err, windows.ERROR_DISK_FULL) || errors.Is(err, windows.ERROR_HANDLE_DISK_FULL) {
 			if log != nil {
 				log.Infof("ToDiskSpaceError detected disk space error: %v, returning ErrInsufficientDiskSpace", err)
 			}
