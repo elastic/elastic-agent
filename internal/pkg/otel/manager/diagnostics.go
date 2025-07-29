@@ -124,13 +124,17 @@ func (m *OTelManager) PerformComponentDiagnostics(
 	for idx, diag := range diagnostics {
 		var results []*proto.ActionDiagnosticUnitResult
 		var errs []error
-		jsonMetricDiagnostics, err := GetBeatJsonMetricsDiagnostics(ctx, diag.Component.ID)
+		jsonMetricDiagnostic, err := GetBeatJsonMetricsDiagnostics(ctx, diag.Component.ID)
 		errs = append(errs, err)
-		results = append(results, jsonMetricDiagnostics...)
+		if jsonMetricDiagnostic != nil {
+			results = append(results, jsonMetricDiagnostic)
+		}
 
-		inputMetricsDiagnostics, err := GetBeatInputMetricsDiagnostics(ctx, diag.Component.ID)
+		inputMetricsDiagnostic, err := GetBeatInputMetricsDiagnostics(ctx, diag.Component.ID)
 		errs = append(errs, err)
-		results = append(results, inputMetricsDiagnostics...)
+		if inputMetricsDiagnostic != nil {
+			results = append(results, inputMetricsDiagnostic)
+		}
 
 		if translate.GetBeatNameForComponent(&diag.Component) == "filebeat" {
 			// include filebeat registry, reimplementation of a filebeat diagnostic hook
@@ -159,8 +163,7 @@ func (m *OTelManager) PerformComponentDiagnostics(
 	return diagnostics, nil
 }
 
-func GetBeatJsonMetricsDiagnostics(ctx context.Context, componentID string) ([]*proto.ActionDiagnosticUnitResult, error) {
-	var results []*proto.ActionDiagnosticUnitResult
+func GetBeatJsonMetricsDiagnostics(ctx context.Context, componentID string) (*proto.ActionDiagnosticUnitResult, error) {
 	beatMetrics, err := GetBeatMetricsPayload(ctx, componentID, "/stats")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get stats beat metrics: %w", err)
@@ -171,19 +174,18 @@ func GetBeatJsonMetricsDiagnostics(ctx context.Context, componentID string) ([]*
 		return nil, fmt.Errorf("failed to format stats beat metrics: %w", err)
 	}
 
-	results = append(results, &proto.ActionDiagnosticUnitResult{
+	result := &proto.ActionDiagnosticUnitResult{
 		Name:        "beat_metrics",
 		Description: "Metrics from the default monitoring namespace and expvar.",
 		Filename:    "beat_metrics.json",
 		ContentType: "application/json",
 		Content:     beatMetrics,
 		Generated:   timestamppb.Now(),
-	})
-	return results, nil
+	}
+	return result, nil
 }
 
-func GetBeatInputMetricsDiagnostics(ctx context.Context, componentID string) ([]*proto.ActionDiagnosticUnitResult, error) {
-	var results []*proto.ActionDiagnosticUnitResult
+func GetBeatInputMetricsDiagnostics(ctx context.Context, componentID string) (*proto.ActionDiagnosticUnitResult, error) {
 	inputMetrics, err := GetBeatMetricsPayload(ctx, componentID, "/inputs/")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get input beat metrics: %w", err)
@@ -194,15 +196,15 @@ func GetBeatInputMetricsDiagnostics(ctx context.Context, componentID string) ([]
 		return nil, fmt.Errorf("failed to format input beat metrics: %w", err)
 	}
 
-	results = append(results, &proto.ActionDiagnosticUnitResult{
+	result := &proto.ActionDiagnosticUnitResult{
 		Name:        "input_metrics",
 		Description: "Metrics from active inputs.",
 		Filename:    "input_metrics.json",
 		ContentType: "application/json",
 		Content:     inputMetrics,
 		Generated:   timestamppb.Now(),
-	})
-	return results, nil
+	}
+	return result, nil
 }
 
 func GetBeatMetricsPayload(ctx context.Context, componentID string, path string) ([]byte, error) {
