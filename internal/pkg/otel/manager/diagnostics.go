@@ -163,12 +163,12 @@ func GetBeatJsonMetricsDiagnostics(ctx context.Context, componentID string) ([]*
 	var results []*proto.ActionDiagnosticUnitResult
 	beatMetrics, err := GetBeatMetricsPayload(ctx, componentID, "/stats")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get beat metrics: %w", err)
+		return nil, fmt.Errorf("failed to get stats beat metrics: %w", err)
 	}
 
 	beatMetrics, err = formatJSON(beatMetrics)
 	if err != nil {
-		return nil, fmt.Errorf("failed to format beat metrics: %w", err)
+		return nil, fmt.Errorf("failed to format stats beat metrics: %w", err)
 	}
 
 	results = append(results, &proto.ActionDiagnosticUnitResult{
@@ -186,12 +186,12 @@ func GetBeatInputMetricsDiagnostics(ctx context.Context, componentID string) ([]
 	var results []*proto.ActionDiagnosticUnitResult
 	inputMetrics, err := GetBeatMetricsPayload(ctx, componentID, "/inputs/")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get input metrics: %w", err)
+		return nil, fmt.Errorf("failed to get input beat metrics: %w", err)
 	}
 
 	inputMetrics, err = formatJSON(inputMetrics)
 	if err != nil {
-		return nil, fmt.Errorf("failed to format input metrics: %w", err)
+		return nil, fmt.Errorf("failed to format input beat metrics: %w", err)
 	}
 
 	results = append(results, &proto.ActionDiagnosticUnitResult{

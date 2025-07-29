@@ -67,8 +67,8 @@ func TestPerformComponentDiagnostics(t *testing.T) {
 		assert.Equal(t, expectedDiags[i].Component.ID, d.Component.ID)
 		// we should have errors set about not being able to connect to monitoring endpoints
 		require.NotNil(t, d.Err)
-		assert.ErrorContains(t, d.Err, "failed to get beat metrics")
-		assert.ErrorContains(t, d.Err, "failed to get input metrics")
+		assert.ErrorContains(t, d.Err, "failed to get stats beat metrics")
+		assert.ErrorContains(t, d.Err, "failed to get input beat metrics")
 		if translate.GetBeatNameForComponent(&d.Component) == "filebeat" {
 			assert.ErrorContains(t, d.Err, "failed to get filebeat registry archive")
 		}
@@ -178,7 +178,7 @@ func TestBeatMetrics(t *testing.T) {
 	// two metrics diagnostics and one filebeat registry
 	require.Len(t, diag.Results, 2, "expected 2 diagnostics, got error: %w", diag.Err)
 
-	t.Run("beat metrics", func(t *testing.T) {
+	t.Run("stats beat metrics", func(t *testing.T) {
 		beatMetrics := diag.Results[0]
 		assert.Equal(t, "beat_metrics", beatMetrics.Name)
 		assert.Equal(t, "Metrics from the default monitoring namespace and expvar.", beatMetrics.Description)
@@ -187,7 +187,7 @@ func TestBeatMetrics(t *testing.T) {
 		assert.Equal(t, expectedMetricData, beatMetrics.Content)
 	})
 
-	t.Run("input metrics", func(t *testing.T) {
+	t.Run("input beat metrics", func(t *testing.T) {
 		inputMetrics := diag.Results[1]
 		assert.Equal(t, "input_metrics", inputMetrics.Name)
 		assert.Equal(t, "Metrics from active inputs.", inputMetrics.Description)
