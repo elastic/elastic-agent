@@ -7,6 +7,7 @@ package mage
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 )
@@ -29,6 +30,10 @@ func initPackageVersion() error {
 
 	_, err := os.Stat(PackageVersionFilename)
 	if err != nil {
+		if os.IsNotExist(err) {
+			log.Printf("USE_PACKAGE_VERSION is set, but %q does not exist, not overriding\n", PackageVersionFilename)
+			return nil
+		}
 		return fmt.Errorf("failed to stat %q: %w", PackageVersionFilename, err)
 	}
 
