@@ -1477,6 +1477,10 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 		span.End()
 	}()
 
+	if err = info.InjectAgentConfig(cfg); err != nil {
+		return err
+	}
+
 	// perform and verify ast translation
 	m, err := cfg.ToMapStr()
 	if err != nil {
@@ -1517,10 +1521,6 @@ func (c *Coordinator) generateAST(cfg *config.Config, m map[string]interface{}) 
 		// generateReportableState.
 		c.setConfigError(err)
 	}()
-
-	if err = info.InjectAgentConfig(cfg); err != nil {
-		return err
-	}
 
 	rawAst, err := transpiler.NewAST(m)
 	if err != nil {
