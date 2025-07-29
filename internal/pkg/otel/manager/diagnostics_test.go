@@ -131,7 +131,10 @@ func TestPerformDiagnostics(t *testing.T) {
 
 func TestBeatMetrics(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("Skip test on Windows, it's annoying to set up an npipe http server.")
+		t.Skip("Skip test on Windows.",
+			"It's technically cumbersome to set up an npipe http server.",
+			"And it doesn't have anything to do with the code paths being tested.",
+		)
 	}
 	setTemporaryAgentPath(t)
 	logger, obs := loggertest.New("test")
