@@ -32,7 +32,7 @@ $TestsExitCode = 0
 try {
     Write-Output "~~~ Running integration tests"
     # Get-Ess-Stack will start the ESS stack if it is a BK retry, otherwise it will retrieve ESS stack metadata
-    Get-Ess-Stack -StackVersion $STACK_VERSION $STACK_BUILD_ID
+    Get-Ess-Stack -StackVersion $STACK_VERSION -StackBuildId $STACK_BUILD_ID
     & "$PWD\.buildkite\scripts\buildkite-integration-tests.ps1" $GROUP_NAME $TEST_SUDO
     $TestsExitCode = $LASTEXITCODE
     if ($TestsExitCode -ne 0)
