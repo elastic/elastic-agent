@@ -327,7 +327,7 @@ func (b GolangCrossBuilder) Build() error {
 
 	// Mount $GOPATH/pkg/mod into the container, read-only.
 	hostDir := filepath.Join(build.Default.GOPATH, "pkg", "mod")
-	args = append(args, "-v",  fmt.Sprintf("%s:/go/pkg/mod:ro", hostDir))
+	args = append(args, "-v", fmt.Sprintf("%s:/go/pkg/mod:ro", hostDir))
 
 	// Mount the go build cache into the container.
 	out, err := exec.Command("go", "env", "GOCACHE").Output()
