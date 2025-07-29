@@ -37,16 +37,20 @@ echo "~~~ Running integration tests as $USER"
 
 make install-gotestsum
 
-if [[ -f "${WORKSPACE}/.package-version" ]]; then
-  AGENT_VERSION="$(jq -r '.version' .package-version)"
-  echo "~~~ Agent version: ${AGENT_VERSION} (from .package-version)"
-else
-  AGENT_VERSION=$(grep "const defaultBeatVersion =" version/version.go | cut -d\" -f2)
-  AGENT_VERSION="${AGENT_VERSION}-SNAPSHOT"
-  echo "~~~ Agent version: ${AGENT_VERSION} (from version/version.go)"
-fi
+if [[ -z "${AGENT_VERSION:-}" ]]; then
+  if [[ -f "${WORKSPACE}/.package-version" ]]; then
+    AGENT_VERSION="$(jq -r '.version' .package-version)"
+    echo "~~~ Agent version: ${AGENT_VERSION} (from .package-version)"
+  else
+    AGENT_VERSION=$(grep "const defaultBeatVersion =" version/version.go | cut -d\" -f2)
+    AGENT_VERSION="${AGENT_VERSION}-SNAPSHOT"
+    echo "~~~ Agent version: ${AGENT_VERSION} (from version/version.go)"
+  fi
 
-export AGENT_VERSION
+  export AGENT_VERSION
+else
+  echo "~~~ Agent version: ${AGENT_VERSION} (specified by env var)"
+fi
 
 os_data=$(uname -spr | tr ' ' '_')
 root_suffix=""
