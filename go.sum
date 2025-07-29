@@ -485,8 +485,8 @@ github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumpti
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic/go.mod h1:0vCBR1wgGwZeGmloJ+eCWIZF2S47grTXRzj2mftg2Nk=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
 github.com/elastic/bayeux v1.0.5/go.mod h1:CSI4iP7qeo5MMlkznGvYKftp8M7qqP/3nzmVZoXHY68=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250727121125-6ea1c1a54d7a h1:90ZxXEx+Z/huapLx3db5jujJohGGcISZmG6vUfdaDNY=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250727121125-6ea1c1a54d7a/go.mod h1:gUdyQk97baRv9Zt5SjXIVO3kiXNpf1qY1k5000H5JZM=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250728221353-450489da3d9a h1:tEVjSOmhNlN7nzp9VgAMqoz00O3rpWj+Wyy6JOrXyMM=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250728221353-450489da3d9a/go.mod h1:LLRCHyZrjl44KxPxV2jDTvRpEmqK23TGEHOgk+LdxpU=
 github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae h1:OiShmbWAyGU0MS0ADJWr1/QgeLIZliMk9xsrFicR3/s=
 github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae/go.mod h1:D2IckZVXARugvikE4fv1glvaJMohKSZRzrPsxCjo9O0=
 github.com/elastic/elastic-agent-autodiscover v0.9.2 h1:eBmru2v66HRRHOFf89rDl9OZUr7VsPoT4+ZNYHW6e9I=
