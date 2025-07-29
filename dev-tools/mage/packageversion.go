@@ -22,20 +22,20 @@ type packageVersion struct {
 	StackBuildID string `json:"stack_build_id"`
 }
 
-func initPackageVersion() {
-	_, err := os.Stat(PackageVersionFilename)
-	if err != nil {
-		return
+func initPackageVersion() error {
+	if os.Getenv("USE_PACKAGE_VERSION") != "true" {
+		return nil
 	}
 
-	if os.Getenv("USE_PACKAGE_VERSION") != "true" {
-		return
+	_, err := os.Stat(PackageVersionFilename)
+	if err != nil {
+		return fmt.Errorf("failed to stat %q: %w", PackageVersionFilename, err)
 	}
 
 	pv, err := readPackageVersion()
 	if err != nil {
 		// err is wrapped in readPackageVersion
-		return
+		return err
 	}
 
 	PackagingFromManifest = true
@@ -47,6 +47,7 @@ func initPackageVersion() {
 	_ = os.Setenv("AGENT_VERSION", pv.Version)
 	_ = os.Setenv("AGENT_STACK_VERSION", pv.Version)
 	_ = os.Setenv("SNAPSHOT", "true")
+	return nil
 }
 
 func UpdatePackageVersion(version string, buildID string, manifestURL string, summaryURL string) error {
