@@ -1042,7 +1042,7 @@ agent.logging.level: debug
 			assert.GreaterOrEqual(ct, monitoringDoc.Hits.Total.Value, 1)
 		},
 		2*time.Minute, 5*time.Second,
-		"Expected atleast %d log, got %d", 1, monitoringDoc.Hits.Total.Value)
+		"Expected at least %d log, got %d", 1, monitoringDoc.Hits.Total.Value)
 
 	inputField := monitoringDoc.Hits.Hits[0].Source["input"]
 	inputFieldStr, ok := inputField.(string)
