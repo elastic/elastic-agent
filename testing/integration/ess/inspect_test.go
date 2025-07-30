@@ -74,7 +74,7 @@ func TestInspect(t *testing.T) {
 			}})
 	require.NoErrorf(t, err, "Error when installing agent, output: %s", out)
 	check.ConnectedToFleet(ctx, t, fixture, 5*time.Minute)
-	assert.Eventually(t, func() bool {
+	require.Eventually(t, func() bool {
 		return checkinWithAcker.Acked(policyChangeAction.ActionID)
 	}, 5*time.Minute, time.Second, "Policy change action should have been acked")
 
