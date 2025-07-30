@@ -66,7 +66,11 @@ receivers:
           static_configs:
             - targets: ['0.0.0.0:8888']
   elasticapmintake:
-    
+  apachereceiver:
+  iisreceiver:
+  mysqlreceiver:
+  postgresqlreceiver:
+  sqlqueryreceiver:
 
 connectors:
   spanmetrics:
@@ -155,6 +159,11 @@ service:
         - spanmetrics
         - prometheus
         - elasticapmintake
+        - apachereceiver
+        - iisreceiver
+        - mysqlreceiver
+        - postgresqlreceiver
+        - sqlqueryreceiver
 
     metrics/aggregated:
       receivers:
