@@ -11,9 +11,9 @@ env:
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
 common:
-  - vault_ec_key_prod: &vault_ec_key_prod
+  - vault_ec_key_staging_frh_gov: &vault_ec_key_staging_frh_gov
       elastic/vault-secrets#v0.1.0:
-        path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+        path: "kv/ci-shared/platform-ingest/platform-ingest-ec-staging-frh-gov"
         field: "apiKey"
         env_var: "EC_API_KEY"
 
@@ -33,7 +33,7 @@ steps:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
     plugins:
-      - *vault_ec_key_prod
+      - *vault_ec_key_staging_frh_gov
 
   - group: "fips:Stateful:Ubuntu"
     key: integration-tests-ubuntu-fips
@@ -61,7 +61,7 @@ steps:
           image: "${IMAGE_UBUNTU_X86_64_FIPS}"
           instanceType: "m5.2xlarge"
         plugins:
-          - *vault_ec_key_prod
+          - *vault_ec_key_staging_frh_gov
         matrix:
           setup:
             sudo:
@@ -91,7 +91,7 @@ steps:
           image: "${IMAGE_UBUNTU_ARM64_FIPS}"
           instanceType: "m6g.2xlarge"
         plugins:
-          - *vault_ec_key_prod
+          - *vault_ec_key_staging_frh_gov
         matrix:
           setup:
             sudo:
@@ -118,7 +118,7 @@ steps:
           image: "${IMAGE_UBUNTU_X86_64_FIPS}"
           instanceType: "m5.2xlarge"
         plugins:
-          - *vault_ec_key_prod
+          - *vault_ec_key_staging_frh_gov
 
   - label: ESS FIPS stack cleanup
     depends_on:
@@ -132,7 +132,7 @@ steps:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
     plugins:
-      - *vault_ec_key_prod
+      - *vault_ec_key_staging_frh_gov
 
   - label: Aggregate test reports
     depends_on:
