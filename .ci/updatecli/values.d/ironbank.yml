@@ -2,3 +2,8 @@ config:
   - path: dev-tools/packaging/templates/ironbank
     dockerfile: Dockerfile.tmpl
     manifest: hardening_manifest.yaml.tmpl
+
+pull_request:
+  labels:
+    - dependencies
+    - backport-active-all

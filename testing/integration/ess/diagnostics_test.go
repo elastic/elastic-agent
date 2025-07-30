@@ -8,6 +8,7 @@ package ess
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"io"
 	"io/fs"
@@ -16,6 +17,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -46,7 +48,7 @@ var diagnosticsFiles = []string{
 	"local-config.yaml",
 	"mutex.pprof.gz",
 	"otel.yaml",
-	"otel-final.yaml",
+	"otel-merged.yaml",
 	"pre-config.yaml",
 	"local-config.yaml",
 	"state.yaml",
@@ -295,6 +297,101 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 	assert.Equal(t, "<REDACTED>", yObj.Inputs[0].CustomAttr)
 }
 
+func TestBeatDiagnostics(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: false,
+	})
+
+	configTemplate := `
+inputs:
+  - id: filestream-filebeat
+    type: filestream
+    paths:
+      - {{ .InputFile }}
+    prospector.scanner.fingerprint.enabled: false
+    file_identity.native: ~
+    use_output: default
+    _runtime_experimental: {{ .Runtime }}
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [http://localhost:9200]
+    api_key: placeholder
+agent.monitoring.enabled: false
+`
+
+	var filebeatSetup = map[string]integrationtest.ComponentState{
+		"filestream-default": {
+			State: integrationtest.NewClientState(client.Healthy),
+		},
+	}
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	testCases := []struct {
+		name                         string
+		runtime                      string
+		expectedCompDiagnosticsFiles []string
+		expectedAgentState           *client.State
+	}{
+		{
+			name:    "filebeat process",
+			runtime: "process",
+			expectedCompDiagnosticsFiles: append(compDiagnosticsFiles,
+				"registry.tar.gz",
+				"input_metrics.json",
+				"beat_metrics.json",
+				"beat-rendered-config.yml",
+				"global_processors.txt",
+				"filestream-filebeat/error.txt",
+				"filestream-default/error.txt",
+			),
+			expectedAgentState: integrationtest.NewClientState(client.Healthy),
+		},
+		{
+			name:                         "filebeat container",
+			runtime:                      "otel",
+			expectedCompDiagnosticsFiles: []string{"registry.tar.gz"},
+			expectedAgentState:           integrationtest.NewClientState(client.Degraded),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create the fixture
+			f, err := define.NewFixtureFromLocalBuild(t, define.Version(), integrationtest.WithAllowErrors())
+			require.NoError(t, err)
+			err = f.Prepare(ctx)
+			require.NoError(t, err)
+
+			// Create the data file to ingest
+			inputFile, err := os.CreateTemp(t.TempDir(), "input.txt")
+			require.NoError(t, err, "failed to create temp file to hold data to ingest")
+			t.Cleanup(func() {
+				cErr := inputFile.Close()
+				assert.NoError(t, cErr)
+			})
+			_, err = inputFile.WriteString("hello world\n")
+			require.NoError(t, err, "failed to write data to temp file")
+
+			var configBuffer bytes.Buffer
+			require.NoError(t,
+				template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, map[string]any{
+					"Runtime":   tc.runtime,
+					"InputFile": inputFile.Name(),
+				}))
+			err = f.Run(ctx, integrationtest.State{
+				Configure:  configBuffer.String(),
+				AgentState: tc.expectedAgentState,
+				After:      testDiagnosticsFactory(t, filebeatSetup, diagnosticsFiles, tc.expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
+			})
+			assert.NoError(t, err)
+		})
+	}
+}
+
 func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string) func(ctx context.Context) error {
 	return func(ctx context.Context) error {
 		diagZip, err := fix.ExecDiagnostics(ctx, cmd...)
@@ -304,6 +401,11 @@ func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.C
 		require.NoError(t, err)
 
 		verifyDiagnosticArchive(t, compSetup, diagZip, diagFiles, diagCompFiles, avi)
+
+		// preserve the diagnostic archive if the test failed
+		if t.Failed() {
+			fix.MoveToDiagnosticsDir(diagZip)
+		}
 
 		return nil
 	}
