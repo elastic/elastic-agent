@@ -40,7 +40,7 @@ func TestDownloader_Download(t *testing.T) {
 		fields  fields
 		args    args
 		want    string
-		wantErr assert.ErrorAssertionFunc
+		wantErr bool
 	}{
 		{
 			name: "happy path released version",
@@ -62,7 +62,7 @@ func TestDownloader_Download(t *testing.T) {
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "", "")},
 			want:    "elastic-agent-1.2.3-linux-x86_64.tar.gz",
-			wantErr: assert.NoError,
+			wantErr: false,
 		},
 		{
 			name: "no hash released version",
@@ -80,7 +80,7 @@ func TestDownloader_Download(t *testing.T) {
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "", "")},
 			want:    "elastic-agent-1.2.3-linux-x86_64.tar.gz",
-			wantErr: assert.Error,
+			wantErr: true,
 		},
 		{
 			name: "happy path snapshot version",
@@ -102,7 +102,7 @@ func TestDownloader_Download(t *testing.T) {
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")},
 			want:    "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz",
-			wantErr: assert.NoError,
+			wantErr: false,
 		},
 		{
 			name: "happy path released version with build metadata",
@@ -124,7 +124,7 @@ func TestDownloader_Download(t *testing.T) {
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "", "build19700101")},
 			want:    "elastic-agent-1.2.3+build19700101-linux-x86_64.tar.gz",
-			wantErr: assert.NoError,
+			wantErr: false,
 		},
 		{
 			name: "happy path snapshot version with build metadata",
@@ -146,7 +146,7 @@ func TestDownloader_Download(t *testing.T) {
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "build19700101")},
 			want:    "elastic-agent-1.2.3-SNAPSHOT+build19700101-linux-x86_64.tar.gz",
-			wantErr: assert.NoError,
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
@@ -161,14 +161,21 @@ func TestDownloader_Download(t *testing.T) {
 			config.DropPath = dropPath
 			config.TargetDirectory = targetDirPath
 
-			e := &Downloader{
-				dropPath: dropPath,
-				config:   config,
-			}
+			e := NewDownloader(config)
 			got, err := e.Download(context.TODO(), tt.args.a, tt.args.version)
-			if !tt.wantErr(t, err, fmt.Sprintf("Download(%v, %v)", tt.args.a, tt.args.version)) {
+
+			if tt.wantErr {
+				assert.Error(t, err)
+
+				expectedTargetFile := filepath.Join(targetDirPath, tt.want)
+				expectedHashFile := expectedTargetFile + ".sha512"
+
+				assert.NoFileExists(t, expectedTargetFile, "downloader should clean up partial artifact file on error")
+				assert.NoFileExists(t, expectedHashFile, "downloader should clean up partial hash file on error")
 				return
 			}
+
+			assert.NoError(t, err)
 			assert.Equalf(t, filepath.Join(targetDirPath, tt.want), got, "Download(%v, %v)", tt.args.a, tt.args.version)
 		})
 	}
@@ -282,10 +289,7 @@ func TestDownloader_DownloadAsc(t *testing.T) {
 			config.DropPath = dropPath
 			config.TargetDirectory = targetDirPath
 
-			e := &Downloader{
-				dropPath: dropPath,
-				config:   config,
-			}
+			e := NewDownloader(config)
 			got, err := e.DownloadAsc(context.TODO(), tt.args.a, tt.args.version)
 			if !tt.wantErr(t, err, fmt.Sprintf("DownloadAsc(%v, %v)", tt.args.a, tt.args.version)) {
 				return
@@ -340,9 +344,10 @@ func TestDownloader_downloadFile(t *testing.T) {
 	e.CopyFunc = copyFunc
 	e.diskSpaceErrorFunc = diskSpaceErrorFunc
 
-	_, err := e.downloadFile("elastic-agent-1.2.3-linux-x86_64.tar.gz", filepath.Join(targetDirPath, "elastic-agent-1.2.3-linux-x86_64.tar.gz"))
+	path, err := e.downloadFile("elastic-agent-1.2.3-linux-x86_64.tar.gz", filepath.Join(targetDirPath, "elastic-agent-1.2.3-linux-x86_64.tar.gz"))
 	assert.Equal(t, err, diskSpaceErr)
 	assert.Equal(t, receivedError, copyFuncError)
+	assert.Equal(t, filepath.Join(targetDirPath, "elastic-agent-1.2.3-linux-x86_64.tar.gz"), path)
 }
 
 func TestDownloader_NewDownloader(t *testing.T) {
