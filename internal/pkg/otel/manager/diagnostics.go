@@ -9,6 +9,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -16,6 +18,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -119,27 +123,114 @@ func (m *OTelManager) PerformComponentDiagnostics(
 
 	for idx, diag := range diagnostics {
 		var results []*proto.ActionDiagnosticUnitResult
+		var errs []error
+		jsonMetricDiagnostic, err := GetBeatJsonMetricsDiagnostics(ctx, diag.Component.ID)
+		errs = append(errs, err)
+		if jsonMetricDiagnostic != nil {
+			results = append(results, jsonMetricDiagnostic)
+		}
+
+		inputMetricsDiagnostic, err := GetBeatInputMetricsDiagnostics(ctx, diag.Component.ID)
+		errs = append(errs, err)
+		if inputMetricsDiagnostic != nil {
+			results = append(results, inputMetricsDiagnostic)
+		}
+
 		if translate.GetBeatNameForComponent(&diag.Component) == "filebeat" {
 			// include filebeat registry, reimplementation of a filebeat diagnostic hook
 			registryTarGzBytes, err := FileBeatRegistryTarGz(m.logger, diag.Component.ID)
 			if err != nil {
-				m.logger.Warnf("error creating registry tar.gz: %v", err)
-				continue
+				errs = append(errs, fmt.Errorf("failed to get filebeat registry archive: %w", err))
 			}
-			m.logger.Debugf("created registry tar.gz, size %d", len(registryTarGzBytes))
-			results = append(results, &proto.ActionDiagnosticUnitResult{
-				Name:        "registry",
-				Description: "Filebeat's registry",
-				Filename:    "registry.tar.gz",
-				ContentType: "application/octet-stream",
-				Content:     registryTarGzBytes,
-				Generated:   timestamppb.Now(),
-			})
+			if registryTarGzBytes != nil {
+				m.logger.Debugf("created registry tar.gz, size %d", len(registryTarGzBytes))
+				results = append(results, &proto.ActionDiagnosticUnitResult{
+					Name:        "registry",
+					Description: "Filebeat's registry",
+					Filename:    "registry.tar.gz",
+					ContentType: "application/octet-stream",
+					Content:     registryTarGzBytes,
+					Generated:   timestamppb.Now(),
+				})
+			}
+
 		}
+
 		diagnostics[idx].Results = results
+		diagnostics[idx].Err = errors.Join(errs...)
 	}
 
 	return diagnostics, nil
+}
+
+func GetBeatJsonMetricsDiagnostics(ctx context.Context, componentID string) (*proto.ActionDiagnosticUnitResult, error) {
+	beatMetrics, err := GetBeatMetricsPayload(ctx, componentID, "/stats")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get stats beat metrics: %w", err)
+	}
+
+	beatMetrics, err = formatJSON(beatMetrics)
+	if err != nil {
+		return nil, fmt.Errorf("failed to format stats beat metrics: %w", err)
+	}
+
+	result := &proto.ActionDiagnosticUnitResult{
+		Name:        "beat_metrics",
+		Description: "Metrics from the default monitoring namespace and expvar.",
+		Filename:    "beat_metrics.json",
+		ContentType: "application/json",
+		Content:     beatMetrics,
+		Generated:   timestamppb.Now(),
+	}
+	return result, nil
+}
+
+func GetBeatInputMetricsDiagnostics(ctx context.Context, componentID string) (*proto.ActionDiagnosticUnitResult, error) {
+	inputMetrics, err := GetBeatMetricsPayload(ctx, componentID, "/inputs/")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get input beat metrics: %w", err)
+	}
+
+	inputMetrics, err = formatJSON(inputMetrics)
+	if err != nil {
+		return nil, fmt.Errorf("failed to format input beat metrics: %w", err)
+	}
+
+	result := &proto.ActionDiagnosticUnitResult{
+		Name:        "input_metrics",
+		Description: "Metrics from active inputs.",
+		Filename:    "input_metrics.json",
+		ContentType: "application/json",
+		Content:     inputMetrics,
+		Generated:   timestamppb.Now(),
+	}
+	return result, nil
+}
+
+func GetBeatMetricsPayload(ctx context.Context, componentID string, path string) ([]byte, error) {
+	endpoint := monitoring.PrefixedEndpoint(monitoring.BeatsMonitoringEndpoint(componentID))
+	metricBytes, statusCode, err := monitoring.GetProcessMetrics(ctx, endpoint, path)
+	if err != nil {
+		return nil, err
+	}
+	if statusCode >= 300 {
+		return nil, fmt.Errorf("unexpected status code %d", statusCode)
+	}
+	return metricBytes, nil
+}
+
+func formatJSON(jsonBytes []byte) ([]byte, error) {
+	// remarshal the metrics to produce nicely formatted json
+	var data any
+	if err := json.Unmarshal(jsonBytes, &data); err != nil {
+		return nil, err
+	}
+
+	formattedData, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return formattedData, nil
 }
 
 func FileBeatRegistryPath(componentID string) string {
