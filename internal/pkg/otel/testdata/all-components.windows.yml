@@ -1,3 +1,15 @@
+receivers:
+  iis:
+
 exporters:
   file:
     path: ${env:TMP}\file-exporter-output.json
+  nop:
+
+service:
+  pipelines:
+    metrics:
+      exporters:
+        - nop
+      receivers:
+        - iis
