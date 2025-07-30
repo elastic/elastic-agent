@@ -15,6 +15,30 @@ metadata:
   name: kube-state-metrics
   namespace: default
 ---
+# Source: elastic-agent/templates/agent/service-account.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: agent-clusterwide-example
+  namespace: "default"
+  labels:
+    helm.sh/chart: elastic-agent-9.2.0-beta
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 9.2.0
+---
+# Source: elastic-agent/templates/agent/service-account.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: agent-pernode-example
+  namespace: "default"
+  labels:
+    helm.sh/chart: elastic-agent-9.2.0-beta
+    app.kubernetes.io/name: elastic-agent
+    app.kubernetes.io/instance: example
+    app.kubernetes.io/version: 9.2.0
+---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
 kind: Secret
@@ -22,10 +46,10 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-8.19.0-beta
+    helm.sh/chart: elastic-agent-9.2.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.0
+    app.kubernetes.io/version: 9.2.0
 stringData:
 
   agent.yml: |-
@@ -49,6 +73,10 @@ stringData:
       - data_stream:
           namespace: default
         id: kubernetes/metrics-kubernetes.apiserver
+        processors:
+        - add_fields:
+            fields:
+              onboarding_id: my-onboarding-id
         streams:
         - bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
           data_stream:
@@ -67,6 +95,10 @@ stringData:
       - data_stream:
           namespace: default
         id: kube-state-metrics-kubernetes/metrics
+        processors:
+        - add_fields:
+            fields:
+              onboarding_id: my-onboarding-id
         streams:
         - add_metadata: true
           bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -265,10 +297,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-8.19.0-beta
+    helm.sh/chart: elastic-agent-9.2.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.0
+    app.kubernetes.io/version: 9.2.0
 stringData:
 
   agent.yml: |-
@@ -340,12 +372,19 @@ stringData:
                   - kubernetes.annotations.elastic_co/preserve_original_event
                 - regexp:
                     kubernetes.annotations.elastic_co/preserve_original_event: ^(?i)true$
+          - add_fields:
+              fields:
+                onboarding_id: my-onboarding-id
           prospector.scanner.symlinks: true
         type: filestream
         use_output: default
       - data_stream:
           namespace: default
         id: kubernetes/metrics-kubernetes.container
+        processors:
+        - add_fields:
+            fields:
+              onboarding_id: my-onboarding-id
         streams:
         - add_metadata: true
           bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -364,6 +403,10 @@ stringData:
       - data_stream:
           namespace: default
         id: kubernetes/metrics-kubernetes.node
+        processors:
+        - add_fields:
+            fields:
+              onboarding_id: my-onboarding-id
         streams:
         - add_metadata: true
           bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -382,6 +425,10 @@ stringData:
       - data_stream:
           namespace: default
         id: kubernetes/metrics-kubernetes.pod
+        processors:
+        - add_fields:
+            fields:
+              onboarding_id: my-onboarding-id
         streams:
         - add_metadata: true
           bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -400,6 +447,10 @@ stringData:
       - data_stream:
           namespace: default
         id: kubernetes/metrics-kubernetes.system
+        processors:
+        - add_fields:
+            fields:
+              onboarding_id: my-onboarding-id
         streams:
         - add_metadata: true
           bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -418,6 +469,10 @@ stringData:
       - data_stream:
           namespace: default
         id: kubernetes/metrics-kubernetes.volume
+        processors:
+        - add_fields:
+            fields:
+              onboarding_id: my-onboarding-id
         streams:
         - add_metadata: true
           bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -602,12 +657,10 @@ kind: ClusterRole
 metadata:
   name: agent-clusterWide-example-default
   labels:
-    helm.sh/chart: elastic-agent-8.19.0-beta
+    helm.sh/chart: elastic-agent-9.2.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.0
-  annotations:
-    elastic-agent.k8s.elastic.co/cr: nginx
+    app.kubernetes.io/version: 9.2.0
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
     resources:
@@ -684,12 +737,10 @@ kind: ClusterRole
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-8.19.0-beta
+    helm.sh/chart: elastic-agent-9.2.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.0
-  annotations:
-    elastic-agent.k8s.elastic.co/cr: nginx
+    app.kubernetes.io/version: 9.2.0
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
     resources:
@@ -788,13 +839,13 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-clusterWide-example-default
   labels:
-    helm.sh/chart: elastic-agent-8.19.0-beta
+    helm.sh/chart: elastic-agent-9.2.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.0
+    app.kubernetes.io/version: 9.2.0
 subjects:
   - kind: ServiceAccount
-    name: user-sa-clusterWide
+    name: agent-clusterwide-example
     namespace: "default"
 roleRef:
   kind: ClusterRole
@@ -807,13 +858,13 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-8.19.0-beta
+    helm.sh/chart: elastic-agent-9.2.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.0
+    app.kubernetes.io/version: 9.2.0
 subjects:
   - kind: ServiceAccount
-    name: user-sa-perNode
+    name: agent-pernode-example
     namespace: "default"
 roleRef:
   kind: ClusterRole
@@ -855,10 +906,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-8.19.0-beta
+    helm.sh/chart: elastic-agent-9.2.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.0
+    app.kubernetes.io/version: 9.2.0
 spec:
   selector:
     matchLabels:
@@ -868,7 +919,7 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: 233affcd72143e637a130b5f099c30e194d90042eb00a26512f51c844c65a821
+        checksum/config: 198073338eb92731fe9f2e2f98384fff62a1df1e1440ce1bf9ce77732dba6f2c
     spec:
       automountServiceAccountToken: true
       containers:
@@ -889,7 +940,7 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
-        image: docker.elastic.co/elastic-agent/elastic-agent:8.19.0-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:9.2.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
@@ -927,7 +978,7 @@ spec:
       hostNetwork: true
       nodeSelector:
         kubernetes.io/os: linux
-      serviceAccountName: user-sa-perNode
+      serviceAccountName: agent-pernode-example
       volumes:
       - hostPath:
           path: /var/lib/docker/containers
@@ -1037,10 +1088,10 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-8.19.0-beta
+    helm.sh/chart: elastic-agent-9.2.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.0
+    app.kubernetes.io/version: 9.2.0
 spec:
   selector:
     matchLabels:
@@ -1050,7 +1101,7 @@ spec:
       labels:
         name: agent-clusterwide-example
       annotations:
-        checksum/config: d5c563235f87ab23840416f6679b42b15c094cf361b8794d087b4fdfb8285b4b
+        checksum/config: 19faf4816a2c94cc6f666de0c59c4446e840d5af5069b37fcdf3741b3254d3a3
     spec:
       automountServiceAccountToken: true
       containers:
@@ -1071,7 +1122,7 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
-        image: docker.elastic.co/elastic-agent/elastic-agent:8.19.0-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:9.2.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
@@ -1102,7 +1153,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       nodeSelector:
         kubernetes.io/os: linux
-      serviceAccountName: user-sa-clusterWide
+      serviceAccountName: agent-clusterwide-example
       volumes:
       - emptyDir: {}
         name: agent-data
