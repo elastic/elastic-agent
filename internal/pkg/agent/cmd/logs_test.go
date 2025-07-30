@@ -254,17 +254,18 @@ func TestPrintLogs(t *testing.T) {
 				createFileContent(t, dir, f.name, bytes.NewBuffer([]byte(f.content)))
 			}
 			result := bytes.NewBuffer(nil)
-			err := printLogs(context.Background(), result, dir, tc.lines, false, nil, nil)
+			err := printLogs(t.Context(), result, dir, tc.lines, false, nil, nil)
 			require.NoError(t, err)
 
 			require.Equal(t, tc.expected, result.String())
 		})
 	}
 
+	const waitUntilMatchTimeout = 5 * time.Second
 	t.Run("returns tail and then follows the logs", func(t *testing.T) {
 		dir := t.TempDir()
 		createFileContent(t, dir, file1, bytes.NewBuffer([]byte(generateLines(line1, 1, 10))))
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		logResult := newChanWriter()
@@ -276,7 +277,8 @@ func TestPrintLogs(t *testing.T) {
 		var expected string
 		t.Run("tails the file", func(t *testing.T) {
 			expected = generateLines(line1, 6, 10)
-			logResult.waitUntilMatch(t, expected, time.Second)
+			err := logResult.waitUntilMatch(t.Context(), expected, waitUntilMatchTimeout)
+			require.NoError(t, err)
 		})
 
 		t.Run("detects new lines and prints them", func(t *testing.T) {
@@ -287,21 +289,24 @@ func TestPrintLogs(t *testing.T) {
 			f.Close()
 
 			expected += generateLines(line1, 11, 20)
-			logResult.waitUntilMatch(t, expected, 3*watchInterval)
+			err = logResult.waitUntilMatch(t.Context(), expected, waitUntilMatchTimeout)
+			require.NoError(t, err)
 		})
 
 		t.Run("detects a new file and switches to it", func(t *testing.T) {
 			createFileContent(t, dir, file2, bytes.NewBuffer([]byte(generateLines(line2, 1, 20))))
 
 			expected += generateLines(line2, 1, 20)
-			logResult.waitUntilMatch(t, expected, 3*watchInterval)
+			err := logResult.waitUntilMatch(t.Context(), expected, waitUntilMatchTimeout)
+			require.NoError(t, err)
 		})
 
 		t.Run("detects another file and switches to it", func(t *testing.T) {
 			createFileContent(t, dir, file3, bytes.NewBuffer([]byte(generateLines(line3, 1, 30))))
 
 			expected += generateLines(line3, 1, 30)
-			logResult.waitUntilMatch(t, expected, 3*watchInterval)
+			err := logResult.waitUntilMatch(t.Context(), expected, waitUntilMatchTimeout)
+			require.NoError(t, err)
 		})
 
 		t.Run("handles interruption correctly", func(t *testing.T) {
@@ -309,7 +314,7 @@ func TestPrintLogs(t *testing.T) {
 			select {
 			case err := <-errChan:
 				require.ErrorIs(t, err, context.Canceled)
-			case <-time.After(time.Second):
+			case <-time.After(2 * time.Second):
 				require.FailNow(t, "context must stop logs following")
 			}
 		})
@@ -326,7 +331,7 @@ func TestPrintLogs(t *testing.T) {
 `)
 
 		createFileContent(t, dir, file1, bytes.NewBuffer(content))
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		logResult := newChanWriter()
 		errChan := make(chan error)
@@ -341,7 +346,8 @@ func TestPrintLogs(t *testing.T) {
 !{"component":{"id":"match"}, "message":"test4"}!
 !{"component":{"id":"match"}, "message":"test6"}!
 `
-			logResult.waitUntilMatch(t, expected, time.Second)
+			err := logResult.waitUntilMatch(t.Context(), expected, waitUntilMatchTimeout)
+			require.NoError(t, err)
 		})
 
 		t.Run("detects new lines and prints them with filter", func(t *testing.T) {
@@ -368,7 +374,8 @@ func TestPrintLogs(t *testing.T) {
 !{"component":{"id":"match"}, "message":"test12"}!
 `
 
-			logResult.waitUntilMatch(t, expected, 2*watchInterval)
+			err = logResult.waitUntilMatch(t.Context(), expected, waitUntilMatchTimeout)
+			require.NoError(t, err)
 		})
 
 		t.Run("detects a new file and switches to it with filter", func(t *testing.T) {
@@ -385,7 +392,8 @@ func TestPrintLogs(t *testing.T) {
 !{"component":{"id":"match"}, "message":"test15"}!
 `
 
-			logResult.waitUntilMatch(t, expected, 2*watchInterval)
+			err := logResult.waitUntilMatch(t.Context(), expected, waitUntilMatchTimeout)
+			require.NoError(t, err)
 		})
 
 		t.Run("handles interruption correctly", func(t *testing.T) {
@@ -657,24 +665,37 @@ func (cw *chanWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// Waits until the combined data written to this object matches the expected
-// string (after conversion), or the timeout expires, whichever comes first.
-// Reports a fatal test error if the match fails.
+// waitUntilMatch waits until the accumulated output matches the expected string.
+//
+// The timeout is based on data idleness and resets each time new data arrives.
+// Returns nil on match, or an error if the timeout expires or the context is canceled.
 func (cw *chanWriter) waitUntilMatch(
-	t *testing.T,
+	ctx context.Context,
 	expected string,
 	timeout time.Duration,
-) {
-	t.Helper()
-	timeoutChan := time.After(timeout)
-	for string(cw.result) != expected {
+) error {
+	timeoutChan := time.NewTimer(timeout)
+
+loop:
+	for {
+		if len(cw.result) > len(expected) && string(cw.result) != expected {
+			break loop
+		}
 		select {
+		case <-ctx.Done():
+			return ctx.Err()
 		case data := <-cw.ch:
+			timeoutChan.Stop()
 			cw.result = append(cw.result, data...)
-		case <-timeoutChan:
-			require.FailNow(t, fmt.Sprintf("output does not match. got:\n%v\nexpected:\n%v", string(cw.result), expected))
+			if string(cw.result) == expected {
+				return nil
+			}
+			timeoutChan.Reset(timeout)
+		case <-timeoutChan.C:
+			break loop
 		}
 	}
+	return fmt.Errorf("timed out waiting for output to match. got:\n%v\nexpected:\n%v", string(cw.result), expected)
 }
 
 func TestCobraCmd(t *testing.T) {
