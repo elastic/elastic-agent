@@ -138,6 +138,7 @@ service:
         - otlp
         - nop
         - elasticapmintake
+        - sqlquery
 
     logs/forward_receive:
       receivers:
