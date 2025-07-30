@@ -929,6 +929,8 @@ func TestSensitiveLogsESExporter(t *testing.T) {
 	require.NoError(t, err)
 
 	configTemplate := `
+agent.grpc:
+  port: 6790
 inputs:
   - type: filestream
     id: filestream-e2e
@@ -955,7 +957,6 @@ agent:
     logs: true
     _runtime_experimental: otel
 agent.logging.level: debug
-agent.logging.to_stderr: true
 `
 	index := "logs-sensitive-" + info.Namespace
 	var configBuffer bytes.Buffer
@@ -1010,11 +1011,14 @@ agent.logging.to_stderr: true
 		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 2)
 	}, 1*time.Minute, 1*time.Second)
 
+	// Check 1:
+	// Ensure sensitive logs from ES exporter are not shipped to ES
 	rawQuery := map[string]any{
 		"query": map[string]any{
 			"bool": map[string]any{
 				"must": map[string]any{
 					"match_phrase": map[string]any{
+						// this message comes from ES exporter
 						"message": "failed to index document; input may contain sensitive data",
 					},
 				},
@@ -1026,9 +1030,7 @@ agent.logging.to_stderr: true
 		},
 	}
 
-	// Make sure find the logs
 	var monitoringDoc estools.Documents
-
 	assert.EventuallyWithT(t,
 		func(ct *assert.CollectT) {
 			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
@@ -1045,8 +1047,38 @@ agent.logging.to_stderr: true
 	inputField := monitoringDoc.Hits.Hits[0].Source["input"]
 	inputFieldStr, ok := inputField.(string)
 	if ok {
+		// we check if it contains the original message line
 		assert.NotContains(t, inputFieldStr, "message: Line", "monitoring logs contain original input")
 	}
+
+	// Check 2:
+	// Ensure event logs from elastic owned components is not shipped i.e drop_processor works correctly
+	rawQuery = map[string]any{
+		"query": map[string]any{
+			"bool": map[string]any{
+				"must": map[string]any{
+					"match": map[string]any{
+						// event logs contain a special field on them
+						"log.type": "event",
+					},
+				},
+				"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestamp}}},
+			},
+		},
+		"sort": []map[string]any{
+			{"@timestamp": map[string]any{"order": "asc"}},
+		},
+	}
+
+	findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer findCancel()
+
+	docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, "logs-elastic_agent*", map[string]interface{}{
+		"log.type": "event",
+	})
+
+	assert.NoError(t, err)
+	assert.Zero(t, docs.Hits.Total.Value)
 }
 
 // setStrictMapping takes es client and index name
