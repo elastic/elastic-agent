@@ -111,25 +111,18 @@ func (e *Downloader) Reload(c *artifact.Config) error {
 // Download fetches the package from configured source.
 // Returns absolute path to downloaded package and an error.
 func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (_ string, err error) {
-	fmt.Printf("[HTTP_DOWNLOADER] Download called for artifact: %+v, version: %s\n", a, version.String())
-	fmt.Printf("[HTTP_DOWNLOADER] Config TargetDirectory: %s\n", e.config.TargetDirectory)
-
 	remoteArtifact := a.Artifact
 	downloadedFiles := make([]string, 0, 2)
 	defer func() {
 		if err != nil {
-			fmt.Printf("[HTTP_DOWNLOADER] Download failed with error: %v\n", err)
 			for _, path := range downloadedFiles {
 				os.Remove(path)
 			}
-		} else {
-			fmt.Printf("[HTTP_DOWNLOADER] Download succeeded\n")
 		}
 	}()
 
 	// download from source to dest
 	path, err := e.download(ctx, remoteArtifact, e.config.OS(), a, *version)
-	fmt.Printf("[HTTP_DOWNLOADER] download() returned path: %s, err: %v\n", path, err)
 	downloadedFiles = append(downloadedFiles, path)
 	if err != nil {
 		return "", err
@@ -137,7 +130,6 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 
 	// download hash from source to dest, only if hash does not exist
 	hashPath, err := e.downloadHash(ctx, remoteArtifact, e.config.OS(), a, *version)
-	fmt.Printf("[HTTP_DOWNLOADER] hash download() returned path: %s, err: %v\n", hashPath, err)
 	downloadedFiles = append(downloadedFiles, hashPath)
 	if err != nil {
 		return "", err
@@ -219,13 +211,11 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 
 	resp, err := e.client.Do(req.WithContext(ctx))
 	if err != nil {
-		// return path, file already exists and needs to be cleaned up
 		return fullPath, errors.New(err, "fetching package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		// return path, file already exists and needs to be cleaned up
 		return fullPath, errors.New(fmt.Sprintf("call to '%s' returned unsuccessful status code: %d", sourceURI, resp.StatusCode), errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
 
@@ -240,17 +230,12 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	detailsObserver := newDetailsProgressObserver(e.upgradeDetails)
 	e.progressReporter.Prepare(sourceURI, e.config.HTTPTransportSettings.Timeout, fileSize, loggingObserver, detailsObserver)
 	e.progressReporter.Report(ctx)
-	fmt.Printf("[HTTP_DOWNLOADER] About to call CopyFunc for sourceURI: %s\n", sourceURI)
 	_, err = e.CopyFunc(destinationFile, io.TeeReader(resp.Body, e.progressReporter))
 	if err != nil {
-		fmt.Printf("[HTTP_DOWNLOADER] CopyFunc failed with error: %v\n", err)
 		err = e.diskSpaceErrorFunc(err)
-		fmt.Printf("[HTTP_DOWNLOADER] diskSpaceErrorFunc processed error: %v\n", err)
 		e.progressReporter.ReportFailed(err)
-		// return path, file already exists and needs to be cleaned up
 		return fullPath, fmt.Errorf("%s: %w", errors.New("copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI)).Error(), err)
 	}
-	fmt.Printf("[HTTP_DOWNLOADER] CopyFunc succeeded\n")
 	e.progressReporter.ReportComplete()
 
 	return fullPath, nil
