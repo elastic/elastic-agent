@@ -24,6 +24,7 @@ steps:
       ASDF_TERRAFORM_VERSION: 1.9.2
       FIPS: "true"
       TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
+      EC_ENDPOINT: "https://api.staging.elastic-gov.com"
     command: |
       source .buildkite/scripts/steps/ess_start.sh
     artifact_paths:
