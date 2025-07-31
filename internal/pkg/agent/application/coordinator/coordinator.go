@@ -31,11 +31,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-<<<<<<< HEAD
-=======
 	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
->>>>>>> 83cef65b5 ([Migrate agent to different cluster] Accept signed action  (#9148))
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
