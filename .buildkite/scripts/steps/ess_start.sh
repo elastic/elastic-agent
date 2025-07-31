@@ -7,7 +7,11 @@ source .buildkite/scripts/steps/fleet.sh
 STACK_VERSION="$(jq -r '.version' .package-version)"
 STACK_BUILD_ID="$(jq -r '.stack_build_id' .package-version)"
 
-ess_up "$STACK_VERSION" "$STACK_BUILD_ID" "$ESS_REGION"
+if [ -z "$ESS_REGION" ]; then
+  ess_up "$STACK_VERSION" "$STACK_BUILD_ID"
+else
+  ess_up "$STACK_VERSION" "$STACK_BUILD_ID" "$ESS_REGION"
+fi
 
 preinstall_fleet_packages
 
