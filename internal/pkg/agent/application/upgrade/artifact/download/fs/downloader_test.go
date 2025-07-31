@@ -172,6 +172,7 @@ func TestDownloader_Download(t *testing.T) {
 
 				assert.NoFileExists(t, expectedTargetFile, "downloader should clean up partial artifact file on error")
 				assert.NoFileExists(t, expectedHashFile, "downloader should clean up partial hash file on error")
+				assert.NoDirExists(t, targetDirPath, "downloader should clean up target directory on error")
 				return
 			}
 

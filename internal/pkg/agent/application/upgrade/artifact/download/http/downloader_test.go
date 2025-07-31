@@ -71,6 +71,8 @@ func TestDownload(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			require.Equal(t, targetDir, filepath.Dir(artifactPath))
+
 			_, err = os.Stat(artifactPath)
 			if err != nil {
 				t.Fatal(err)
@@ -375,7 +377,7 @@ func TestDownloadVersion(t *testing.T) {
 		fields  fields
 		args    args
 		want    string
-		wantErr assert.ErrorAssertionFunc
+		wantErr bool
 	}{
 		{
 			name: "happy path released version",
@@ -397,7 +399,7 @@ func TestDownloadVersion(t *testing.T) {
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "", "")},
 			want:    "elastic-agent-1.2.3-linux-x86_64.tar.gz",
-			wantErr: assert.NoError,
+			wantErr: false,
 		},
 		{
 			name: "no hash released version",
@@ -415,7 +417,7 @@ func TestDownloadVersion(t *testing.T) {
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "", "")},
 			want:    "elastic-agent-1.2.3-linux-x86_64.tar.gz",
-			wantErr: assert.Error,
+			wantErr: true,
 		},
 		{
 			name: "happy path snapshot version",
@@ -437,7 +439,7 @@ func TestDownloadVersion(t *testing.T) {
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")},
 			want:    "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz",
-			wantErr: assert.NoError,
+			wantErr: false,
 		},
 		{
 			name: "happy path released version with build metadata",
@@ -459,7 +461,7 @@ func TestDownloadVersion(t *testing.T) {
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "", "build19700101")},
 			want:    "elastic-agent-1.2.3+build19700101-linux-x86_64.tar.gz",
-			wantErr: assert.NoError,
+			wantErr: false,
 		},
 		{
 			name: "happy path snapshot version with build metadata",
@@ -481,7 +483,7 @@ func TestDownloadVersion(t *testing.T) {
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "build19700101")},
 			want:    "elastic-agent-1.2.3-SNAPSHOT+build19700101-linux-x86_64.tar.gz",
-			wantErr: assert.NoError,
+			wantErr: false,
 		},
 	}
 
@@ -521,11 +523,18 @@ func TestDownloadVersion(t *testing.T) {
 
 			got, err := downloader.Download(context.TODO(), tt.args.a, tt.args.version)
 
-			if !tt.wantErr(t, err, fmt.Sprintf("Download(%v, %v)", tt.args.a, tt.args.version)) {
+			assert.Equalf(t, filepath.Join(targetDirPath, tt.want), got, "Download(%v, %v)", tt.args.a, tt.args.version)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+
+				assert.NoFileExists(t, filepath.Join(targetDirPath, tt.want))
+				assert.NoFileExists(t, filepath.Join(targetDirPath, tt.want+".sha512"))
+				assert.NoDirExists(t, targetDirPath)
 				return
 			}
 
-			assert.Equalf(t, filepath.Join(targetDirPath, tt.want), got, "Download(%v, %v)", tt.args.a, tt.args.version)
+			assert.NoError(t, err)
 		})
 	}
 }

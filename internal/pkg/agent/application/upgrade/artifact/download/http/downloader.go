@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
+	"go.elastic.co/apm/v2"
 )
 
 const (
@@ -117,26 +118,27 @@ func (e *Downloader) Reload(c *artifact.Config) error {
 // Download fetches the package from configured source.
 // Returns absolute path to downloaded package and an error.
 func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (_ string, err error) {
+	span, ctx := apm.StartSpan(ctx, "download", "app.internal")
+	defer span.End()
 	remoteArtifact := a.Artifact
-	downloadedFiles := make([]string, 0, 2)
 	defer func() {
 		if err != nil {
-			for _, path := range downloadedFiles {
-				os.Remove(path)
+			rmErr := os.RemoveAll(e.config.TargetDirectory)
+			if rmErr != nil {
+				err = errors.New(err, "failed to remove target directory", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, e.config.TargetDirectory))
 			}
+			apm.CaptureError(ctx, err).Send()
 		}
 	}()
 
 	// download from source to dest
 	path, err := e.download(ctx, remoteArtifact, e.config.OS(), a, *version)
-	downloadedFiles = append(downloadedFiles, path)
 	if err != nil {
 		return "", err
 	}
 
 	// download hash from source to dest, only if hash does not exist
-	hashPath, err := e.downloadHash(ctx, remoteArtifact, e.config.OS(), a, *version)
-	downloadedFiles = append(downloadedFiles, hashPath)
+	_, err = e.downloadHash(ctx, remoteArtifact, e.config.OS(), a, *version)
 
 	return path, err
 }
