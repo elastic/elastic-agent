@@ -65,9 +65,6 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 
 			// set specific downloader, local file just uses the fs.NewDownloader
 			// no fallback is allowed because it was requested that this specific source be used
-			// factory = func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
-			// 	return fs.NewDownloader(config), nil
-			// }
 			factory, err = u.downloaderFactoryProvider.GetDownloaderFactory(fileDownloaderFactory)
 			if err != nil {
 				return "", err
@@ -90,7 +87,6 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 
 	if factory == nil {
 		// set the factory to the newDownloader factory
-		// factory = newDownloader
 		factory, err = u.downloaderFactoryProvider.GetDownloaderFactory(composedDownloaderFactory)
 		if err != nil {
 			return "", err
