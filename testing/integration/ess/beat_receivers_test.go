@@ -883,8 +883,8 @@ func genIgnoredFields(goos string) []string {
 
 // TestSensitiveLogsESExporter tests sensitive logs from ex-exporter are not sent to fleet
 func TestSensitiveLogsESExporter(t *testing.T) {
-	// ES exporter logs the original document if they are failed to index only when
-	// "telemetry::log_failed_docs_input" setting is true and debug level is set
+	// The ES exporter logs the original document on indexing failure only if
+	// the "telemetry::log_failed_docs_input" setting is enabled and the log level is set to debug.
 	info := define.Require(t, define.Requirements{
 		Group: integration.Default,
 		Local: true,
