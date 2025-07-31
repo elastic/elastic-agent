@@ -56,6 +56,9 @@ func initPackageVersion() error {
 
 	dropPath := filepath.Join("build", "distributions", "elastic-agent-drop")
 	dropPath, err = filepath.Abs(dropPath)
+	if err != nil {
+		return fmt.Errorf("failed to obtain absolute path for default drop path: %w", err)
+	}
 
 	_ = os.Setenv("AGENT_DROP_PATH", dropPath)
 
