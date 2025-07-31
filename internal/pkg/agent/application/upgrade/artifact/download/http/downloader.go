@@ -47,21 +47,23 @@ const (
 // ProgressReporter defines the interface for reporting download progress.
 type ProgressReporter interface {
 	io.Writer
-	Prepare(sourceURI string, timeout time.Duration, length int, progressObservers ...progressObserver)
+	// Prepare(sourceURI string, timeout time.Duration, length int, progressObservers ...progressObserver)
 	Report(ctx context.Context)
 	ReportComplete()
 	ReportFailed(err error)
 }
 
+type progressReporterProvider func(sourceURI string, timeout time.Duration, length int, progressObservers ...progressObserver) ProgressReporter
+
 // Downloader is a downloader able to fetch artifacts from elastic.co web page.
 type Downloader struct {
-	log                *logger.Logger
-	config             *artifact.Config
-	client             http.Client
-	upgradeDetails     *details.Details
-	progressReporter   ProgressReporter
-	diskSpaceErrorFunc func(error) error
-	CopyFunc           func(dst io.Writer, src io.Reader) (written int64, err error)
+	log                      *logger.Logger
+	config                   *artifact.Config
+	client                   http.Client
+	upgradeDetails           *details.Details
+	progressReporterProvider progressReporterProvider
+	diskSpaceErrorFunc       func(error) error
+	CopyFunc                 func(dst io.Writer, src io.Reader) (written int64, err error)
 }
 
 // NewDownloader creates and configures Elastic Downloader
@@ -78,16 +80,20 @@ func NewDownloader(log *logger.Logger, config *artifact.Config, upgradeDetails *
 	return NewDownloaderWithClient(log, config, *client, upgradeDetails), nil
 }
 
+func progressReporterProviderFunc(sourceURI string, timeout time.Duration, length int, progressObservers ...progressObserver) ProgressReporter {
+	return newDownloadProgressReporter(sourceURI, timeout, length, progressObservers...)
+}
+
 // NewDownloaderWithClient creates Elastic Downloader with specific client used
 func NewDownloaderWithClient(log *logger.Logger, config *artifact.Config, client http.Client, upgradeDetails *details.Details) *Downloader {
 	return &Downloader{
-		log:                log,
-		config:             config,
-		client:             client,
-		upgradeDetails:     upgradeDetails,
-		diskSpaceErrorFunc: upgradeErrors.ToDiskSpaceErrorFunc(log),
-		CopyFunc:           io.Copy,
-		progressReporter:   &downloadProgressReporter{},
+		log:                      log,
+		config:                   config,
+		client:                   client,
+		upgradeDetails:           upgradeDetails,
+		diskSpaceErrorFunc:       upgradeErrors.ToDiskSpaceErrorFunc(log),
+		CopyFunc:                 io.Copy,
+		progressReporterProvider: progressReporterProviderFunc,
 	}
 }
 
@@ -228,15 +234,15 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 
 	loggingObserver := newLoggingProgressObserver(e.log, e.config.HTTPTransportSettings.Timeout) //nolint:staticcheck
 	detailsObserver := newDetailsProgressObserver(e.upgradeDetails)
-	e.progressReporter.Prepare(sourceURI, e.config.HTTPTransportSettings.Timeout, fileSize, loggingObserver, detailsObserver) //nolint:staticcheck
-	e.progressReporter.Report(ctx)
-	_, err = e.CopyFunc(destinationFile, io.TeeReader(resp.Body, e.progressReporter))
+	progressReporter := e.progressReporterProvider(sourceURI, e.config.HTTPTransportSettings.Timeout, fileSize, loggingObserver, detailsObserver) //nolint:staticcheck
+	progressReporter.Report(ctx)
+	_, err = e.CopyFunc(destinationFile, io.TeeReader(resp.Body, progressReporter))
 	if err != nil {
 		err = e.diskSpaceErrorFunc(err)
-		e.progressReporter.ReportFailed(err)
+		progressReporter.ReportFailed(err)
 		return fullPath, fmt.Errorf("%s: %w", errors.New("copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI)).Error(), err)
 	}
-	e.progressReporter.ReportComplete()
+	progressReporter.ReportComplete()
 
 	return fullPath, nil
 }

@@ -545,11 +545,6 @@ func (e *testCopyError) Is(target error) bool {
 
 type mockProgressReporter struct {
 	reportFailedCalls []reportFailedCall
-	observers         []progressObserver
-}
-
-func (m *mockProgressReporter) Prepare(sourceURI string, timeout time.Duration, length int, progressObservers ...progressObserver) {
-	m.observers = progressObservers
 }
 
 func (m *mockProgressReporter) Report(ctx context.Context) {
@@ -608,15 +603,11 @@ func TestDownloadFile(t *testing.T) {
 		downloader := NewDownloaderWithClient(log, config, *server.Client(), upgradeDetails)
 		downloader.CopyFunc = copyFunc
 		downloader.diskSpaceErrorFunc = diskSpaceErrorFunc
-		downloader.progressReporter = progressReporter
+		downloader.progressReporterProvider = func(sourceURI string, timeout time.Duration, length int, progressObservers ...progressObserver) ProgressReporter {
+			return progressReporter
+		}
 
 		_, err := downloader.downloadFile(ctx, artifactName, filename, fullPath)
-
-		t.Run("prepares reporter with details and logging observers", func(t *testing.T) {
-			assert.Equal(t, len(progressReporter.observers), 2)
-			assert.IsType(t, &loggingProgressObserver{}, progressReporter.observers[0])
-			assert.IsType(t, &detailsProgressObserver{}, progressReporter.observers[1])
-		})
 
 		t.Run("calls diskSpaceErrorFunc on any copy error", func(t *testing.T) {
 			assert.Equal(t, receivedError, copyFuncError)
@@ -645,7 +636,12 @@ func TestDownloader_NewDownloaderWithClient(t *testing.T) {
 	assert.Equal(t, expectedCopyFunc.Pointer(), actualCopyFunc.Pointer())
 
 	assert.NotNil(t, downloader.diskSpaceErrorFunc)
-	assert.NotNil(t, downloader.progressReporter)
+
+	assert.NotNil(t, downloader.progressReporterProvider)
+	expectedProvider := reflect.ValueOf(progressReporterProviderFunc)
+	actualProvider := reflect.ValueOf(downloader.progressReporterProvider)
+	assert.Equal(t, expectedProvider.Pointer(), actualProvider.Pointer())
+
 	assert.Equal(t, config, downloader.config)
 	assert.Equal(t, upgradeDetails, downloader.upgradeDetails)
 	assert.Equal(t, http.Client{}, downloader.client)

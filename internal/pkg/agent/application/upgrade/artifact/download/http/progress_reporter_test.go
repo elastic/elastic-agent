@@ -47,24 +47,6 @@ func (m *mockProgressObserver) ReportFailed(sourceURI string, timePast time.Dura
 	})
 }
 
-func TestPrepare(t *testing.T) {
-	t.Run("should set the sourceURI, interval, warnTimeout, length, progressObservers, and done channel", func(t *testing.T) {
-		dp := &downloadProgressReporter{}
-		dp.Prepare("mockurl", 10*time.Second, 1000, &mockProgressObserver{})
-		require.Equal(t, "mockurl", dp.sourceURI)
-		require.Equal(t, time.Duration(float64(10*time.Second)*downloadProgressIntervalPercentage), dp.interval)
-		require.Equal(t, time.Duration(float64(10*time.Second)*warningProgressIntervalPercentage), dp.warnTimeout)
-		require.Equal(t, 1000.0, dp.length)
-		require.Equal(t, 1, len(dp.progressObservers))
-		require.NotNil(t, dp.done)
-	})
-	t.Run("should set the interval to downloadProgressMinInterval if the timeout is 0", func(t *testing.T) {
-		dp := &downloadProgressReporter{}
-		dp.Prepare("mockurl", 0, 1000, &mockProgressObserver{})
-		require.Equal(t, downloadProgressMinInterval, dp.interval)
-	})
-}
-
 func TestReportFailed(t *testing.T) {
 	t.Run("should call ReportFailed on all observers with correct parameters", func(t *testing.T) {
 		testErr := errors.New("test error")
@@ -73,8 +55,7 @@ func TestReportFailed(t *testing.T) {
 		observer2 := &mockProgressObserver{}
 		observers := []progressObserver{observer1, observer2}
 
-		dp := &downloadProgressReporter{}
-		dp.Prepare("mockurl", 10*time.Second, 1000, observers...)
+		dp := newDownloadProgressReporter("mockurl", 10*time.Second, 1000, observers...)
 
 		dp.Report(t.Context())
 
@@ -113,5 +94,21 @@ func TestReportFailed(t *testing.T) {
 
 			require.NotEqual(t, expected, call)
 		}
+	})
+}
+
+func TestNewDownloadProgressReporter(t *testing.T) {
+	t.Run("should create a new download progress reporter with the correct parameters", func(t *testing.T) {
+		dp := newDownloadProgressReporter("mockurl", 10*time.Second, 1000, &mockProgressObserver{})
+		require.Equal(t, "mockurl", dp.sourceURI)
+		require.Equal(t, time.Duration(float64(10*time.Second)*downloadProgressIntervalPercentage), dp.interval)
+		require.Equal(t, time.Duration(float64(10*time.Second)*warningProgressIntervalPercentage), dp.warnTimeout)
+		require.Equal(t, float64(1000), dp.length)
+		require.Equal(t, 1, len(dp.progressObservers))
+		require.NotNil(t, dp.done)
+	})
+	t.Run("should set the interval to downloadProgressMinInterval if the timeout is 0", func(t *testing.T) {
+		dp := newDownloadProgressReporter("mockurl", 0, 1000, &mockProgressObserver{})
+		require.Equal(t, time.Duration(float64(downloadProgressMinInterval)), dp.interval)
 	})
 }

@@ -1505,6 +1505,7 @@ func TestCoordinatorInitiatesUpgrade(t *testing.T) {
 		overrideStateChan:  overrideStateChan,
 		upgradeDetailsChan: upgradeDetailsChan,
 		upgradeMgr:         upgradeMgr,
+		detailsProvider:    details.NewDetails,
 		logger:             logp.NewLogger("testing"),
 	}
 

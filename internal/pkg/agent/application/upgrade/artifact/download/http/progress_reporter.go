@@ -23,16 +23,20 @@ type downloadProgressReporter struct {
 	done              chan struct{}
 }
 
-func (dp *downloadProgressReporter) Prepare(sourceURI string, timeout time.Duration, length int, progressObservers ...progressObserver) {
-	dp.sourceURI = sourceURI
-	dp.interval = time.Duration(float64(timeout) * downloadProgressIntervalPercentage)
-	if dp.interval == 0 {
-		dp.interval = downloadProgressMinInterval
+func newDownloadProgressReporter(sourceURI string, timeout time.Duration, length int, progressObservers ...progressObserver) *downloadProgressReporter {
+	interval := time.Duration(float64(timeout) * downloadProgressIntervalPercentage)
+	if interval == 0 {
+		interval = downloadProgressMinInterval
 	}
-	dp.warnTimeout = time.Duration(float64(timeout) * warningProgressIntervalPercentage)
-	dp.length = float64(length)
-	dp.progressObservers = progressObservers
-	dp.done = make(chan struct{})
+
+	return &downloadProgressReporter{
+		sourceURI:         sourceURI,
+		interval:          interval,
+		warnTimeout:       time.Duration(float64(timeout) * warningProgressIntervalPercentage),
+		length:            float64(length),
+		progressObservers: progressObservers,
+		done:              make(chan struct{}),
+	}
 }
 
 func (dp *downloadProgressReporter) Write(b []byte) (int, error) {
