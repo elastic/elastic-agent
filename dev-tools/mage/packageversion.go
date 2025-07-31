@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -52,6 +53,12 @@ func initPackageVersion() error {
 	_ = os.Setenv("AGENT_VERSION", pv.Version)
 	_ = os.Setenv("AGENT_STACK_VERSION", pv.Version)
 	_ = os.Setenv("SNAPSHOT", "true")
+
+	dropPath := filepath.Join("build", "distributions", "elastic-agent-drop")
+	dropPath, err = filepath.Abs(dropPath)
+
+	_ = os.Setenv("AGENT_DROP_PATH", dropPath)
+
 	return nil
 }
 

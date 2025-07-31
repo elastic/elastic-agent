@@ -578,6 +578,9 @@ func Package(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed downloading manifest: %w", err)
 		}
+		// we need that dependency to essentially download
+		// the components from the given manifest
+		mg.Deps(DownloadManifest)
 	}
 
 	var dependenciesVersion string
