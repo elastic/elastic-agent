@@ -17,6 +17,8 @@ import (
 	"strings"
 	"time"
 
+	"go.elastic.co/apm/v2"
+
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
@@ -25,7 +27,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
-	"go.elastic.co/apm/v2"
 )
 
 const (
