@@ -73,18 +73,12 @@ func UpdatePackageVersion(version string, buildID string, manifestURL string, su
 }
 
 func writePackageVersion(pv packageVersion) error {
-	f, err := os.OpenFile(PackageVersionFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
-	if err != nil {
-		return fmt.Errorf("failed to open %q for write: %w", PackageVersionFilename, err)
-	}
-	defer f.Close()
-
 	pvBytes, err := json.MarshalIndent(pv, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal package version: %w", err)
 	}
 
-	_, err = f.Write(pvBytes)
+	err = os.WriteFile(PackageVersionFilename, pvBytes, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write package version: %w", err)
 	}
