@@ -429,6 +429,62 @@ func (a *ActionSettings) String() string {
 	return s.String()
 }
 
+<<<<<<< HEAD
+=======
+type ActionMigrate struct {
+	ActionID   string            `json:"id" yaml:"id"`
+	ActionType string            `json:"type" yaml:"type"`
+	Data       ActionMigrateData `json:"data,omitempty"`
+
+	Signature *Signed `json:"signed,omitempty" yaml:"signed,omitempty" mapstructure:"signed,omitempty"`
+
+	Err error `json:"-" yaml:"-" mapstructure:"-"`
+}
+
+// ID returns the ID of the Action.
+func (a *ActionMigrate) ID() string {
+	return a.ActionID
+}
+
+// Signed returns the Signed portion of the Action.
+func (a *ActionMigrate) Signed() *Signed {
+	return a.Signature
+}
+
+// Type returns the type of the Action.
+func (a *ActionMigrate) Type() string {
+	return a.ActionType
+}
+
+func (a *ActionMigrate) String() string {
+	var s strings.Builder
+	s.WriteString("id: ")
+	s.WriteString(a.ActionID)
+	s.WriteString(", type: ")
+	s.WriteString(a.ActionType)
+	return s.String()
+}
+
+func (a *ActionMigrate) AckEvent() AckEvent {
+	event := newAckEvent(a.ActionID, a.ActionType)
+	if a.Err != nil {
+		event.Error = a.Err.Error()
+	}
+	return event
+}
+
+type ActionMigrateData struct {
+	// TargetURI: URI of Fleet Server in a target cluster.
+	TargetURI string `json:"target_uri" yaml:"target_uri"`
+
+	// EnrollmentToken: Enrollment token used to enroll agent to a new cluster.
+	EnrollmentToken string `json:"enrollment_token" yaml:"enrollment_token"`
+
+	// Settings: An embedded JSON object that holds user-provided settings like TLS.
+	Settings json.RawMessage `json:"settings" yaml:"settings,omitempty"`
+}
+
+>>>>>>> 83cef65b5 ([Migrate agent to different cluster] Accept signed action  (#9148))
 func (a *ActionSettings) AckEvent() AckEvent {
 	return newAckEvent(a.ActionID, a.ActionType)
 }
@@ -529,7 +585,7 @@ type ActionApp struct {
 	Response    map[string]interface{} `json:"response,omitempty" mapstructure:"response,omitempty"`
 	StartedAt   string                 `json:"started_at,omitempty" mapstructure:"started_at,omitempty"`
 	CompletedAt string                 `json:"completed_at,omitempty" mapstructure:"completed_at,omitempty"`
-	Signed      *Signed                `json:"signed,omitempty" mapstructure:"signed,omitempty"`
+	Signature   *Signed                `json:"signed,omitempty" mapstructure:"signed,omitempty"`
 	Error       string                 `json:"error,omitempty" mapstructure:"error,omitempty"`
 }
 
@@ -567,6 +623,10 @@ func (a *ActionApp) AckEvent() AckEvent {
 		CompletedAt:     a.CompletedAt,
 		Error:           a.Error,
 	}
+}
+
+func (a *ActionApp) Signed() *Signed {
+	return a.Signature
 }
 
 // MarshalMap marshals ActionApp into a corresponding map
