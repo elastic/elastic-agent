@@ -15,16 +15,19 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -41,10 +44,12 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/reload"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
@@ -1958,4 +1963,152 @@ func TestHasEndpoint(t *testing.T) {
 			assert.Equal(t, tc.expected, result, "HasEndpoint result mismatch")
 		})
 	}
+}
+
+type mockUpgradeMgrUpgradeErrorHandlingTest struct {
+	upgradeErr error
+}
+
+func (m *mockUpgradeMgrUpgradeErrorHandlingTest) Upgradeable() bool {
+	return true
+}
+
+func (m *mockUpgradeMgrUpgradeErrorHandlingTest) Reload(rawConfig *config.Config) error {
+	return nil
+}
+
+func (m *mockUpgradeMgrUpgradeErrorHandlingTest) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (reexec.ShutdownCallbackFn, error) {
+	return nil, m.upgradeErr
+}
+
+func (m *mockUpgradeMgrUpgradeErrorHandlingTest) Ack(ctx context.Context, acker acker.Acker) error {
+	return nil
+}
+
+func (m *mockUpgradeMgrUpgradeErrorHandlingTest) AckAction(ctx context.Context, acker acker.Acker, action fleetapi.Action) error {
+	return errors.New("ack action error")
+}
+
+func (m *mockUpgradeMgrUpgradeErrorHandlingTest) MarkerWatcher() upgrade.MarkerWatcher {
+	return nil
+}
+
+type testDetail struct {
+	initialState  details.State
+	expectedState details.State
+	failedState   details.State
+	errorMsg      string
+}
+
+func TestCoordinatorUpgradeErrorHandling(t *testing.T) {
+	testCases := map[string]struct {
+		upgradeErr    error
+		expectedError error
+		detail        testDetail
+	}{
+		"insufficient disk space": {
+			upgradeErr:    upgradeErrors.ErrInsufficientDiskSpace,
+			expectedError: upgradeErrors.ErrInsufficientDiskSpace,
+			detail: testDetail{
+				initialState:  details.StateRequested,
+				expectedState: details.StateFailed,
+				failedState:   details.StateRequested,
+				errorMsg:      upgradeErrors.ErrInsufficientDiskSpace.Error(),
+			},
+		},
+		"wrapped insufficient disk space": {
+			upgradeErr:    fmt.Errorf("wrapped: %w", upgradeErrors.ErrInsufficientDiskSpace),
+			expectedError: upgradeErrors.ErrInsufficientDiskSpace,
+			detail: testDetail{
+				initialState:  details.StateRequested,
+				expectedState: details.StateFailed,
+				failedState:   details.StateRequested,
+				errorMsg:      upgradeErrors.ErrInsufficientDiskSpace.Error(),
+			},
+		},
+		"same version error": {
+			upgradeErr:    upgrade.ErrUpgradeSameVersion,
+			expectedError: errors.New("ack action error"),
+			detail: testDetail{
+				initialState:  details.StateRequested,
+				expectedState: details.StateCompleted,
+				failedState:   "",
+				errorMsg:      "",
+			},
+		},
+		"generic error": {
+			upgradeErr:    errors.New("test error"),
+			expectedError: errors.New("test error"),
+			detail: testDetail{
+				initialState:  details.StateRequested,
+				expectedState: details.StateFailed,
+				failedState:   details.StateRequested,
+				errorMsg:      "test error",
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			upgradeMgr := &mockUpgradeMgrUpgradeErrorHandlingTest{}
+			upgradeMgr.upgradeErr = tc.upgradeErr
+
+			det := details.NewDetails("1.0.0", tc.detail.initialState, "test-action-id")
+			detailsProvider := func(version string, state details.State, actionID string) *details.Details {
+				return det
+			}
+
+			coord := &Coordinator{
+				upgradeMgr:         upgradeMgr,
+				detailsProvider:    detailsProvider,
+				stateBroadcaster:   broadcaster.New(State{State: agentclient.Healthy, Message: "Running"}, 64, 32),
+				overrideStateChan:  make(chan *coordinatorOverrideState),
+				upgradeDetailsChan: make(chan *details.Details, 2),
+			}
+
+			go func() {
+				state1 := <-coord.overrideStateChan
+				assert.Equal(t, agentclient.Upgrading, state1.state)
+
+				state2 := <-coord.overrideStateChan
+				assert.Nil(t, state2)
+			}()
+
+			err := coord.Upgrade(t.Context(), "mockversion", "mockuri", nil, false, false)
+			require.Error(t, err)
+			require.Equal(t, err, tc.expectedError)
+
+			require.Equal(t, tc.detail.expectedState, det.State, "State mismatch")
+			require.Equal(t, tc.detail.failedState, det.Metadata.FailedState, "FailedState mismatch")
+			require.Equal(t, tc.detail.errorMsg, det.Metadata.ErrorMsg, "ErrorMsg mismatch")
+		})
+	}
+
+}
+
+func TestCoordinatorNew(t *testing.T) {
+	t.Run("correctly sets details provider", func(t *testing.T) {
+		coord := New(
+			nil,
+			nil,
+			logp.InfoLevel,
+			nil,
+			component.RuntimeSpecs{},
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			false,
+			nil,
+			nil,
+		)
+
+		assert.NotNil(t, coord.detailsProvider)
+		detailsProviderPtr := reflect.ValueOf(coord.detailsProvider).Pointer()
+		newDetailsPtr := reflect.ValueOf(details.NewDetails).Pointer()
+		assert.Equal(t, newDetailsPtr, detailsProviderPtr, "detailsProvider should be details.NewDetails")
+	})
 }

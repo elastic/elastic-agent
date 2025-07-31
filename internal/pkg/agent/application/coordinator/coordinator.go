@@ -360,6 +360,7 @@ type Coordinator struct {
 	// run a ticker that checks to see if we have a new PID.
 	componentPIDTicker         *time.Ticker
 	componentPidRequiresUpdate *atomic.Bool
+	detailsProvider            func(string, details.State, string) *details.Details
 }
 
 // The channels Coordinator reads to receive updates from the various managers.
@@ -479,7 +480,8 @@ func New(
 		componentPIDTicker:         time.NewTicker(time.Second * 30),
 		componentPidRequiresUpdate: &atomic.Bool{},
 
-		fleetAcker: fleetAcker,
+		fleetAcker:      fleetAcker,
+		detailsProvider: details.NewDetails,
 	}
 	// Setup communication channels for any non-nil components. This pattern
 	// lets us transparently accept nil managers / simulated events during
@@ -735,7 +737,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	if action != nil {
 		actionID = action.ActionID
 	}
-	det := details.NewDetails(version, details.StateRequested, actionID)
+	det := c.detailsProvider(version, details.StateRequested, actionID)
 	det.RegisterObserver(c.SetUpgradeDetails)
 
 	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
@@ -748,7 +750,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		}
 
 		if errors.Is(err, upgradeErrors.ErrInsufficientDiskSpace) {
-			err = upgradeErrors.ErrInsufficientDiskSpace.Err
+			err = upgradeErrors.ErrInsufficientDiskSpace
 		}
 
 		det.Fail(err)
