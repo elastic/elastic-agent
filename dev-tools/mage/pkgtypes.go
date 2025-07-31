@@ -975,7 +975,7 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 		}
 
 		if mg.Verbose() {
-			log.Println("Adding", os.FileMode(header.Mode), header.Name) //nolint:staticcheck // guaranteed safe conversion
+			log.Println("Adding", os.FileMode(header.Mode), header.Name) //nolint:gosec // guaranteed safe conversion
 		}
 		if err := ar.WriteHeader(header); err != nil {
 			return err
@@ -1043,7 +1043,7 @@ func addSymlinkToTar(tmpdir string, ar *tar.Writer, baseDir string, pkgFile Pack
 		header.Typeflag = tar.TypeSymlink
 
 		if mg.Verbose() {
-			log.Println("Adding", os.FileMode(header.Mode), header.Name) //nolint:staticcheck // guaranteed safe conversion
+			log.Println("Adding", os.FileMode(header.Mode), header.Name) //nolint:gosec // guaranteed safe conversion
 		}
 		if err := ar.WriteHeader(header); err != nil {
 			return err
