@@ -66,7 +66,7 @@ type Downloader struct {
 
 // NewDownloader creates and configures Elastic Downloader
 func NewDownloader(log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details) (*Downloader, error) {
-	client, err := config.HTTPTransportSettings.Client(
+	client, err := config.HTTPTransportSettings.Client( //nolint:staticcheck
 		httpcommon.WithAPMHTTPInstrumentation(),
 		httpcommon.WithKeepaliveSettings{Disable: false, IdleConnTimeout: 30 * time.Second},
 	)
@@ -93,7 +93,7 @@ func NewDownloaderWithClient(log *logger.Logger, config *artifact.Config, client
 
 func (e *Downloader) Reload(c *artifact.Config) error {
 	// reload client
-	client, err := c.HTTPTransportSettings.Client(
+	client, err := c.HTTPTransportSettings.Client( //nolint:staticcheck
 		httpcommon.WithAPMHTTPInstrumentation(),
 	)
 	if err != nil {
@@ -226,9 +226,9 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 		}
 	}
 
-	loggingObserver := newLoggingProgressObserver(e.log, e.config.HTTPTransportSettings.Timeout)
+	loggingObserver := newLoggingProgressObserver(e.log, e.config.HTTPTransportSettings.Timeout) //nolint:staticcheck
 	detailsObserver := newDetailsProgressObserver(e.upgradeDetails)
-	e.progressReporter.Prepare(sourceURI, e.config.HTTPTransportSettings.Timeout, fileSize, loggingObserver, detailsObserver)
+	e.progressReporter.Prepare(sourceURI, e.config.HTTPTransportSettings.Timeout, fileSize, loggingObserver, detailsObserver) //nolint:staticcheck
 	e.progressReporter.Report(ctx)
 	_, err = e.CopyFunc(destinationFile, io.TeeReader(resp.Body, e.progressReporter))
 	if err != nil {
