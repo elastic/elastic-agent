@@ -955,6 +955,7 @@ agent:
     logs: true
     _runtime_experimental: otel
 agent.logging.level: debug
+agent.logging.stderr: true
 `
 	index := "logs-sensitive-" + info.Namespace
 	var configBuffer bytes.Buffer
