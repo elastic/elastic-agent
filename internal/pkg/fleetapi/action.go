@@ -429,8 +429,10 @@ func (a *ActionSettings) String() string {
 	return s.String()
 }
 
-<<<<<<< HEAD
-=======
+func (a *ActionSettings) AckEvent() AckEvent {
+	return newAckEvent(a.ActionID, a.ActionType)
+}
+
 type ActionMigrate struct {
 	ActionID   string            `json:"id" yaml:"id"`
 	ActionType string            `json:"type" yaml:"type"`
@@ -482,11 +484,6 @@ type ActionMigrateData struct {
 
 	// Settings: An embedded JSON object that holds user-provided settings like TLS.
 	Settings json.RawMessage `json:"settings" yaml:"settings,omitempty"`
-}
-
->>>>>>> 83cef65b5 ([Migrate agent to different cluster] Accept signed action  (#9148))
-func (a *ActionSettings) AckEvent() AckEvent {
-	return newAckEvent(a.ActionID, a.ActionType)
 }
 
 // ActionCancel is a request to cancel an action.
