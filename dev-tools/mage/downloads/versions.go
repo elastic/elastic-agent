@@ -106,49 +106,9 @@ func CheckPRVersion(version string, fallbackVersion string) string {
 	return version
 }
 
-// FetchElasticArtifact fetches an artifact from the right repository, returning binary name, path and error
-func FetchElasticArtifact(ctx context.Context, artifact string, version string, os string, arch string, extension string, isDocker bool, xpack bool) (string, string, error) {
-	useCISnapshots := GithubCommitSha1 != ""
-
-	return FetchElasticArtifactForSnapshots(ctx, useCISnapshots, artifact, version, os, arch, extension, isDocker, xpack)
-}
-
-// FetchElasticArtifactForSnapshots fetches an artifact from the right repository, returning binary name, path and error
-func FetchElasticArtifactForSnapshots(ctx context.Context, useCISnapshots bool, artifact string, version string, os string, arch string, extension string, isDocker bool, xpack bool) (string, string, error) {
-	binaryName := buildArtifactName(artifact, version, os, arch, extension, isDocker)
-	binaryPath, err := FetchProjectBinaryForSnapshots(ctx, useCISnapshots, artifact, binaryName, artifact, version, timeoutFactor, xpack, "", false)
-	if err != nil {
-		logger.Error("Could not download the binary for the Elastic artifact",
-			slog.String("artifact", artifact),
-			slog.String("version", version),
-			slog.String("os", os),
-			slog.String("arch", arch),
-			slog.String("extension", extension),
-			slog.String("error", err.Error()),
-		)
-		return "", "", err
-	}
-
-	return binaryName, binaryPath, nil
-}
-
 // GetCommitVersion returns a version including the version and the git commit, if it exists
 func GetCommitVersion(version string) string {
 	return newElasticVersion(version).HashedVersion
-}
-
-// GetElasticArtifactURL returns the URL of a released artifact, which its full name is defined in the first argument,
-// from Elastic's artifact repository, building the JSON path query based on the full name
-// It also returns the URL of the sha512 file of the released artifact.
-// i.e. GetElasticArtifactURL("elastic-agent-$VERSION-$ARCH.deb", "elastic-agent", "$VERSION")
-// i.e. GetElasticArtifactURL("elastic-agent-$VERSION-x86_64.rpm", "elastic-agent","$VERSION")
-// i.e. GetElasticArtifactURL("elastic-agent-$VERSION-linux-$ARCH.tar.gz", "elastic-agent","$VERSION")
-func GetElasticArtifactURL(artifactName string, artifact string, version string) (string, string, error) {
-	resolver := NewArtifactURLResolver(artifactName, artifact, version)
-	if resolver == nil {
-		return "", "", errors.New("nil resolver returned")
-	}
-	return resolver.Resolve()
 }
 
 // GetElasticArtifactVersion returns the current version:
