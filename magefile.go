@@ -3929,18 +3929,7 @@ func (Helm) ensureRepository(repoName, repoURL string, settings *cli.EnvSettings
 	return nil
 }
 
-// BuildDependencies builds the dependencies for the Elastic-Agent Helm chart.
-//
-// This is a custom implementation that extends the functionality of `helm dependency update`.
-// The standard Helm command assumes that all dependency repositories have been added beforehand
-// via `helm repo add`, otherwise it fails. This method improves usability by ensuring all
-// required repositories are added automatically before resolving dependencies.
-//
-// Furthermore, `helm dependency update` downloads dependencies as `.tgz` archives into the `charts/`
-// directory but does not untar them. For our integration tests, we require the subcharts to be
-// extracted. This method downloads and extracts each `.tgz` archive and removes the archive afterward,
-// so that only the extracted subcharts remain in the `charts/` directory.
-func (h Helm) BuildDependencies() error {
+func (h Helm) handleDependencies(update bool) error {
 	settings := cli.New()
 	settings.SetNamespace("")
 	actionConfig := &action.Configuration{}
@@ -4008,9 +3997,15 @@ func (h Helm) BuildDependencies() error {
 	if client.Verify {
 		man.Verify = downloader.VerifyIfPossible
 	}
-	err = man.Build()
-	if err != nil {
-		return fmt.Errorf("failed to build helm dependencies: %w", err)
+
+	if update {
+		if err = man.Update(); err != nil {
+			return fmt.Errorf("failed to build helm dependencies: %w", err)
+		}
+	} else {
+		if err = man.Build(); err != nil {
+			return fmt.Errorf("failed to update helm dependencies: %w", err)
+		}
 	}
 
 	subChartDir := filepath.Join(helmChartPath, "charts")
@@ -4037,6 +4032,25 @@ func (h Helm) BuildDependencies() error {
 	}
 
 	return nil
+}
+
+// BuildDependencies builds the dependencies for the Elastic-Agent Helm chart.
+//
+// This is a custom implementation that extends the functionality of `helm dependency update`.
+// The standard Helm command assumes that all dependency repositories have been added beforehand
+// via `helm repo add`, otherwise it fails. This method improves usability by ensuring all
+// required repositories are added automatically before resolving dependencies.
+//
+// Furthermore, `helm dependency update` downloads dependencies as `.tgz` archives into the `charts/`
+// directory but does not untar them. For our integration tests, we require the subcharts to be
+// extracted. This method downloads and extracts each `.tgz` archive and removes the archive afterward,
+// so that only the extracted subcharts remain in the `charts/` directory.
+func (h Helm) BuildDependencies() error {
+	return h.handleDependencies(false)
+}
+
+func (h Helm) UpdateDependencies() error {
+	return h.handleDependencies(true)
 }
 
 // Package packages the Elastic-Agent Helm chart. Note that you need to set SNAPSHOT="false" to build a production-ready package.
