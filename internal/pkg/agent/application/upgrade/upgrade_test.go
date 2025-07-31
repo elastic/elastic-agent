@@ -1446,14 +1446,15 @@ type testError struct {
 	expectedError error
 }
 
-func TestRefactoredDownloader(t *testing.T) {
+func TestUpgradeDownloadErrors(t *testing.T) {
 	testArtifact := artifact.Artifact{
 		Name:     "Elastic Agent",
 		Cmd:      "elastic-agent",
 		Artifact: "beats/elastic-agent",
 	}
 	version := agtversion.NewParsedSemVer(8, 15, 0, "", "")
-	expectedFileName, err := artifact.GetArtifactName(testArtifact, *version, runtime.GOOS, runtime.GOARCH)
+	tempConfig := &artifact.Config{}
+	expectedFileName, err := artifact.GetArtifactName(testArtifact, *version, tempConfig.OS(), tempConfig.Arch())
 	require.NoError(t, err)
 	partialData := []byte("partial content written before error")
 
@@ -1529,8 +1530,6 @@ func TestRefactoredDownloader(t *testing.T) {
 					testTargetPath := filepath.Join(baseDir, "target")
 
 					config := artifact.Config{
-						OperatingSystem: runtime.GOOS,
-						Architecture:    runtime.GOARCH,
 						TargetDirectory: testTargetPath,
 					}
 
