@@ -5,6 +5,7 @@
 package downloads
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -43,11 +44,11 @@ func downloadFile(downloadRequest *downloadRequest) error {
 	retryCount := 1
 	var fileReader io.ReadCloser
 	download := func() error {
-		req, err := http.NewRequest(http.MethodGet, downloadRequest.URL, nil)
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, downloadRequest.URL, nil)
 		if err != nil {
 			return fmt.Errorf("creating request: %w", err)
 		}
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := http.DefaultClient.Do(req) //nolint:bodyclose // we do close this outside of the function
 		if err != nil {
 			retryCount++
 			return fmt.Errorf("downloading file %s: %w", downloadRequest.URL, err)
