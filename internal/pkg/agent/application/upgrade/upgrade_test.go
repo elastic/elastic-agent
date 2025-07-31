@@ -1305,18 +1305,16 @@ func (f *fakeAcker) Commit(ctx context.Context) error {
 	return args.Error(0)
 }
 
-type MockDownloader struct {
-	downloadPath string
-	downloadErr  error
+type mockDownloaderFactoryProviderTest struct {
 }
 
-func (md *MockDownloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (string, error) {
+func (md *mockDownloaderFactoryProviderTest) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (string, error) {
 	return "", nil
 }
 
 func TestDownloaderFactoryProvider(t *testing.T) {
 	factory := func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
-		return &MockDownloader{}, nil
+		return &mockDownloaderFactoryProviderTest{}, nil
 	}
 	provider := &downloaderFactoryProvider{
 		downloaderFactories: map[string]downloaderFactory{
