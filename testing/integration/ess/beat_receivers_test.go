@@ -929,8 +929,6 @@ func TestSensitiveLogsESExporter(t *testing.T) {
 	require.NoError(t, err)
 
 	configTemplate := `
-agent.grpc:
-  port: 6790
 inputs:
   - type: filestream
     id: filestream-e2e
