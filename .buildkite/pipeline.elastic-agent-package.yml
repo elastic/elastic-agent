@@ -42,9 +42,9 @@ steps:
         required: "false"
         options:
           - label: "True"
-            value: "--dry-run"
+            value: "true"
           - label: "False"
-            value: ""
+            value: "false"
         hint: "If the DRA release manager script would actually publish anything or just print"
 
   - wait: ~
@@ -143,7 +143,7 @@ steps:
         export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
       fi
       if [[ -z "$${DRA_DRY_RUN}" ]]; then
-        DRA_DRY_RUN=$(buildkite-agent meta-data get DRA_DRY_RUN --default "")
+        DRA_DRY_RUN=$(buildkite-agent meta-data get DRA_DRY_RUN --default "false")
         export DRA_DRY_RUN
       fi
       if [[ -z "$${DRA_VERSION}" ]]; then
@@ -167,6 +167,7 @@ steps:
     env:
       DRA_PROJECT_ID: "elastic-agent-package"
       DRA_PROJECT_ARTIFACT_ID: "agent-package"
+      DRA_DRY_RUN: "true"
     artifact_paths:
       - "build/distributions/**/*"
     command: |
@@ -181,8 +182,6 @@ steps:
       echo "--- File listing after workaround"
       ls -alR build
       echo "+++ Checking artifact validity with release-manager collect dry run"
-      DRA_DRY_RUN="--dry-run"
-      export DRA_DRY_RUN
       .buildkite/scripts/steps/dra-publish.sh
       # Artifacts will be uploaded via the artifact_paths entry above
       echo "+++ Set job metadata if TRIGGER_JOB_ID is properly set"
