@@ -111,7 +111,7 @@ DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=tar.gz mage 
 If you build the same agent package often (when running integration tests, for example),
 you can also set KEEP_ARCHIVE=true in your environment. The packaging step will then
 avoid deleting the binary archive after the package is generated, removing the need to
-re-download binaries on every invocaion.
+re-download binaries on every invocation.
 
 The resulting package will be produced in the build/distributions directory. The version is controlled by the value in [version.go](version/version.go).
 To install the agent extract the package and run the install command:
