@@ -13,7 +13,7 @@ env:
 common:
   - vault_ec_key_staging_frh_gov: &vault_ec_key_staging_frh_gov
       elastic/vault-secrets#v0.1.0:
-        path: "kv/ci-shared/platform-ingest/platform-ingest-ec-staging-frh-gov"
+        path: "kv/ci-shared/platform-ingest/platform-ingest-ec-staging-gov"
         field: "apiKey"
         env_var: "EC_API_KEY"
 
