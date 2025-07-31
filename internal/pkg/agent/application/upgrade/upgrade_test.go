@@ -1375,7 +1375,7 @@ func setupForFileDownloader(sourcePrefix string, expectedFileName string, partia
 func setupForHttpDownloader(partialData []byte) (setupFunc, *httptest.Server) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write(partialData)
+		w.Write(partialData) //nolint:errcheck //test code
 	}))
 
 	return func(t *testing.T, config *artifact.Config, basePath string, targetPath string) {
@@ -1474,12 +1474,14 @@ func TestRefactoredDownloader(t *testing.T) {
 		copyFuncError: mockTestError,
 		expectedError: mockTestError,
 	})
+	fileDownloaderTestErrors = append(fileDownloaderTestErrors, testErrors...)
 
 	composedDownloaderTestErrors := []testError{}
 	composedDownloaderTestErrors = append(composedDownloaderTestErrors, testError{
 		copyFuncError: mockTestError,
 		expectedError: context.DeadlineExceeded,
 	})
+	composedDownloaderTestErrors = append(composedDownloaderTestErrors, testErrors...)
 
 	log, err := logger.New("test", false)
 	require.NoError(t, err)
@@ -1561,8 +1563,8 @@ func TestRefactoredDownloader(t *testing.T) {
 					upgrader.downloaderFactoryProvider = downloaderFactoryProvider
 
 					_, err = upgrader.Upgrade(context.Background(), version.String(), config.SourceURI, nil, upgradeDetails, false, false)
-					require.Error(t, err)
-					require.ErrorIs(t, err, testError.expectedError)
+					require.Error(t, err, "expected error got none")
+					require.ErrorIs(t, err, testError.expectedError, "expected error mismatch")
 					require.NoFileExists(t, expectedDestPath, tc.cleanupMsg)
 				})
 			}
