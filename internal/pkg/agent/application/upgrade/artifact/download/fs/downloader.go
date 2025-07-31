@@ -67,11 +67,8 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 	// download from source to dest
 	hashPath, err := e.download(e.config.OS(), a, *version, ".sha512")
 	downloadedFiles = append(downloadedFiles, hashPath)
-	if err != nil {
-		return "", err
-	}
 
-	return path, nil
+	return path, err
 }
 
 // DownloadAsc downloads the package .asc file from configured source.

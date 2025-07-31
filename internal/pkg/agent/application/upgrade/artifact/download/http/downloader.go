@@ -137,11 +137,8 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 	// download hash from source to dest, only if hash does not exist
 	hashPath, err := e.downloadHash(ctx, remoteArtifact, e.config.OS(), a, *version)
 	downloadedFiles = append(downloadedFiles, hashPath)
-	if err != nil {
-		return "", err
-	}
 
-	return path, nil
+	return path, err
 }
 
 func (e *Downloader) composeURI(artifactName, packageName string) (string, error) {
