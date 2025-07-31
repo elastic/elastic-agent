@@ -8,7 +8,7 @@ exporters:
 
 service:
   pipelines:
-    metrics:
+    metrics/windows-only:
       exporters:
         - nop
       receivers:
