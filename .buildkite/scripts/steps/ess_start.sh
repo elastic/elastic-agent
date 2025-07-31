@@ -7,7 +7,11 @@ source .buildkite/scripts/steps/fleet.sh
 OVERRIDE_STACK_VERSION="$(cat .package-version)"
 OVERRIDE_STACK_VERSION=${OVERRIDE_STACK_VERSION}"-SNAPSHOT"
 
-ess_up $OVERRIDE_STACK_VERSION $ESS_REGION
+if [ -z "$ESS_REGION" ]; then
+  ess_up $OVERRIDE_STACK_VERSION
+else
+   ess_up $OVERRIDE_STACK_VERSION $ESS_REGION
+fi
 
 preinstall_fleet_packages
 
