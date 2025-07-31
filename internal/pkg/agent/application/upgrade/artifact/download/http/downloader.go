@@ -138,7 +138,6 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 		return "", err
 	}
 
-	// download hash from source to dest, only if hash does not exist
 	_, err = e.downloadHash(ctx, remoteArtifact, e.config.OS(), a, *version)
 
 	return path, err

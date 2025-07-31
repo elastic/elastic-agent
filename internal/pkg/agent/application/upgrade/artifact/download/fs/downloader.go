@@ -63,7 +63,6 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 		return "", err
 	}
 
-	// download from source to dest
 	_, err = e.download(e.config.OS(), a, *version, ".sha512")
 
 	return path, err
