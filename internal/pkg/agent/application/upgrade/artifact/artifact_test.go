@@ -23,7 +23,6 @@ func TestArtifacts(t *testing.T) {
 		version      agtversion.ParsedSemVer
 		arch         string
 		expectedName string
-		targetDir    string
 		expectedPath string
 	}{
 		"no_fips_arm64": {
@@ -31,7 +30,6 @@ func TestArtifacts(t *testing.T) {
 			version:      *version,
 			arch:         "arm64",
 			expectedName: "elastic-agent-9.1.0-linux-arm64.tar.gz",
-			targetDir:    targetDir,
 			expectedPath: filepath.Join(targetDir, "elastic-agent-9.1.0-linux-arm64.tar.gz"),
 		},
 		"fips_x86": {
@@ -39,7 +37,6 @@ func TestArtifacts(t *testing.T) {
 			version:      *version,
 			arch:         "32",
 			expectedName: "elastic-agent-fips-9.1.0-linux-x86.tar.gz",
-			targetDir:    targetDir,
 			expectedPath: filepath.Join(targetDir, "elastic-agent-fips-9.1.0-linux-x86.tar.gz"),
 		},
 		"fips_x86_64": {
@@ -47,7 +44,6 @@ func TestArtifacts(t *testing.T) {
 			version:      *version,
 			arch:         "64",
 			expectedName: "elastic-agent-fips-9.1.0-linux-x86_64.tar.gz",
-			targetDir:    targetDir,
 			expectedPath: filepath.Join(targetDir, "elastic-agent-fips-9.1.0-linux-x86_64.tar.gz"),
 		},
 	}
@@ -58,7 +54,7 @@ func TestArtifacts(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, test.expectedName, artifactName)
 
-			artifactPath, err := GetArtifactPath(test.a, test.version, "linux", test.arch, test.targetDir)
+			artifactPath, err := GetArtifactPath(test.a, test.version, "linux", test.arch, targetDir)
 			require.NoError(t, err)
 			require.Equal(t, test.expectedPath, artifactPath)
 		})
