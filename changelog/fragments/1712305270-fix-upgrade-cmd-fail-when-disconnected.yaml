@@ -1,5 +1,0 @@
-kind: bug-fix
-summary: Fix failing upgrade command when gRPC server interrupts connection
-component: "elastic-agent"
-pr: https://github.com/elastic/elastic-agent/pull/4519
-issue: https://github.com/elastic/elastic-agent/issues/3890

@@ -1,5 +1,0 @@
-kind: enhancement
-summary: Use more stable snapshot API for upgrades to snapshot versions
-component: "elastic-agent"
-pr: https://github.com/elastic/elastic-agent/pull/4693
-issue: https://github.com/elastic/elastic-agent/issues/4458
