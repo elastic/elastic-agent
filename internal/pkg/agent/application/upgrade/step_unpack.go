@@ -137,7 +137,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 		}
 
 		dstPath := strings.TrimPrefix(mappedPackagePath, "data/")
-		dstPath = filepath.Join(dataDir, dstPath)
+		dstPath = filepath.Join(dataDir, dstPath) // TODO: look into this, this may be the new home to cleanup
 
 		if skipFn(dstPath) {
 			return nil
@@ -400,7 +400,7 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 		}
 
 		rel := filepath.FromSlash(strings.TrimPrefix(fileName, "data/"))
-		abs := filepath.Join(dataDir, rel)
+		abs := filepath.Join(dataDir, rel) // TODO: if anything happens remove abs most likely, check this
 
 		// find the root dir
 		if currentDir := filepath.Dir(abs); rootDir == "" || len(filepath.Dir(rootDir)) > len(currentDir) {

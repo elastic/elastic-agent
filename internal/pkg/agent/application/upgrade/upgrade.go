@@ -321,7 +321,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, fmt.Errorf("versionedhome is empty: %v", unpackRes)
 	}
 
-	newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome)
+	newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome) // TODO: this is the dir to cleanup if anything goes wrong
 
 	if err := copyActionStore(u.log, newHome); err != nil {
 		return nil, errors.New(err, "failed to copy action store")
@@ -337,7 +337,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	det.SetState(details.StateReplacing)
 
 	// create symlink to the <new versioned-home>/elastic-agent
-	hashedDir := unpackRes.VersionedHome
+	hashedDir := unpackRes.VersionedHome // TODO: this is important, this is the name of the new agent home directory
 
 	symlinkPath := filepath.Join(paths.Top(), agentName)
 
@@ -536,7 +536,7 @@ func isSameVersion(log *logger.Logger, current agentVersion, newVersion agentVer
 }
 
 func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {
-	oldAgentPath := paths.BinaryPath(filepath.Join(topDirPath, oldVersionedHome), agentName)
+	oldAgentPath := paths.BinaryPath(filepath.Join(topDirPath, oldVersionedHome), agentName) // TODO: topdir + new version home is the place to clean up: same as the newAgentInstallPath below
 	err := changeSymlink(log, topDirPath, filepath.Join(topDirPath, agentName), oldAgentPath)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("rolling back install: restoring symlink to %q failed: %w", oldAgentPath, err)
