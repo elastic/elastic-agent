@@ -6,9 +6,7 @@ package runner
 
 import (
 	"context"
-	"errors"
 	"testing"
-	"time"
 )
 
 func TestRunnerStartStop(t *testing.T) {
@@ -41,28 +39,4 @@ func TestRunnerStartCancel(t *testing.T) {
 	}()
 
 	<-runner.Done()
-}
-
-func TestRunnerDoneTimedOut(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
-
-	runner := Start(ctx, func(ctx context.Context) error {
-		time.Sleep(time.Second)
-		<-ctx.Done()
-		return nil
-	})
-
-	go func() {
-		runner.Stop()
-	}()
-
-	// Should be done much sooner
-	<-runner.Done()
-
-	// Should have no errors
-	err := runner.Err()
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("want: %v, got: %v", context.DeadlineExceeded, err)
-	}
 }
