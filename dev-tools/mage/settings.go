@@ -70,10 +70,6 @@ var (
 	PACKAGES     = EnvOr("PACKAGES", "")
 	CI           = EnvOr("CI", "")
 
-	// CrossBuildMountModcache mounts $GOPATH/pkg/mod into
-	// the crossbuild images at /go/pkg/mod, read-only,  when set to true.
-	CrossBuildMountModcache = true
-
 	BeatName        = EnvOr("BEAT_NAME", defaultName)
 	BeatServiceName = EnvOr("BEAT_SERVICE_NAME", BeatName)
 	BeatIndexPrefix = EnvOr("BEAT_INDEX_PREFIX", BeatName)
