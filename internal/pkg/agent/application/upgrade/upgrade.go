@@ -480,10 +480,26 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 		return nil, fmt.Errorf("stat() on upgrade marker %q failed: %w", updateMarkerPath, err)
 	}
 
-	watcherExecutable := ""
+	// read the upgrade marker
+	updateMarker, err := LoadMarker(paths.DataFrom(topDir))
+	if err != nil {
+		return nil, fmt.Errorf("loading marker: %w", err)
+	}
+
+	if updateMarker == nil {
+		return nil, ErrNilUpdateMarker
+	}
+
+	// extract the agent installs involved in the upgrade and select the most appropriate watcher executable
+	previous, current, err := extractAgentInstallsFromMarker(updateMarker)
+	if err != nil {
+		return nil, fmt.Errorf("extracting current and previous install details: %w", err)
+	}
+	watcherExecutable := u.watcherHelper.SelectWatcherExecutable(topDir, previous, current)
+
 	err = withTakeOverWatcher(ctx, u.log, topDir, u.watcherHelper, func() error {
 		// read the upgrade marker
-		updateMarker, err := LoadMarker(paths.DataFrom(topDir))
+		updateMarker, err = LoadMarker(paths.DataFrom(topDir))
 		if err != nil {
 			return fmt.Errorf("loading marker: %w", err)
 		}
@@ -512,23 +528,17 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 			return fmt.Errorf("persisting rollback in update marker: %w", err)
 		}
 
-		// extract the agent installs involved in the upgrade and select the most appropriate watcher executable
-		previous, current, err := extractAgentInstallsFromMarker(updateMarker)
-		if err != nil {
-			return fmt.Errorf("extracting current and previous install details: %w", err)
-		}
-		watcherExecutable = u.watcherHelper.SelectWatcherExecutable(topDir, previous, current)
 		return nil
 	})
 
-	if err != nil {
-		return nil, err
+	// Invoke watcher again (now that we released the watcher applocks)
+	_, invokeWatcherErr := u.watcherHelper.InvokeWatcher(u.log, watcherExecutable)
+	if invokeWatcherErr != nil {
+		return nil, goerrors.Join(err, fmt.Errorf("invoking watcher: %w", invokeWatcherErr))
 	}
 
-	// Invoke watcher again (now that we released the watcher applocks)
-	_, err = u.watcherHelper.InvokeWatcher(u.log, watcherExecutable)
 	if err != nil {
-		return nil, fmt.Errorf("invoking watcher: %w", err)
+		return nil, err
 	}
 
 	return nil, nil
