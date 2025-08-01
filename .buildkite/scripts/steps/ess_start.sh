@@ -7,7 +7,7 @@ source .buildkite/scripts/steps/fleet.sh
 OVERRIDE_STACK_VERSION="$(cat .package-version)"
 OVERRIDE_STACK_VERSION=${OVERRIDE_STACK_VERSION}"-SNAPSHOT"
 
-ess_up $OVERRIDE_STACK_VERSION ${ESS_REGION:-"gcp-us-west2"} ${ESS_DEPLOYMENT_TEMPLATE_ID:-"gcp-storage-optimized"}
+ess_up $OVERRIDE_STACK_VERSION
 
 preinstall_fleet_packages
 
