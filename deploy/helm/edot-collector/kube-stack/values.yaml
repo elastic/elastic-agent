@@ -515,7 +515,26 @@ collectors:
             resource: limits.cpu
       - name: GOMEMLIMIT
         value: "1025MiB"
+    # ports:
+    #   - name: opamp-apmconfig
+    #     port: 4320
+    #     protocol: TCP
     config:
+      extensions:
+        bearertokenauth:
+          scheme: "APIKey"
+          token: ${env:ELASTIC_API_KEY}
+        # Extension for EDOT SDKs remote configuration: https://github.com/elastic/opentelemetry-collector-components/tree/main/extension/apmconfigextension
+        # apmconfig:
+        #   source:
+        #    elasticsearch:
+        #      endpoint: ${env:ELASTIC_ENDPOINT}
+        #      auth:
+        #        authenticator: bearertokenauth
+        #   opamp:
+        #     protocols:
+        #       http:
+        #         endpoint: 0.0.0.0:4320
       connectors:
         routing:
           default_pipelines: [metrics/otel]
@@ -568,7 +587,8 @@ collectors:
         elasticsearch/otel:
           endpoints: # List of Elasticsearch endpoints.
             - ${env:ELASTIC_ENDPOINT}
-          api_key: ${env:ELASTIC_API_KEY} # API key for Elasticsearch authentication.
+          auth:
+            authenticator: bearertokenauth
           # Enable in order to skip the SSL certificate Check
           # tls:
           #   insecure_skip_verify: true
@@ -577,10 +597,14 @@ collectors:
         elasticsearch/ecs:
           endpoints:
             - ${env:ELASTIC_ENDPOINT}
-          api_key: ${env:ELASTIC_API_KEY}
+          auth:
+            authenticator: bearertokenauth
           mapping:
             mode: ecs
       service:
+        extensions:
+          - bearertokenauth
+          # - apmconfig
         pipelines:
           metrics:
             receivers: [otlp]
