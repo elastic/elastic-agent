@@ -7,6 +7,8 @@ env:
   IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1753491662"
   IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-1753491662"
   IMAGE_UBUNTU_ARM64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1753491662"
+  # Remove AGENT_VERSION pinning once 9.1.1 DRA and stack are released
+  AGENT_VERSION: "9.1.0-SNAPSHOT"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -56,7 +58,7 @@ steps:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
     plugins:
-      - *vault_ec_key_prod  
+      - *vault_ec_key_prod
 
   - group: "fips:Stateful:Ubuntu"
     key: integration-tests-ubuntu-fips
@@ -84,7 +86,7 @@ steps:
           image: "${IMAGE_UBUNTU_X86_64_FIPS}"
           instanceType: "m5.2xlarge"
         plugins:
-          - *vault_ec_key_prod  
+          - *vault_ec_key_prod
         matrix:
           setup:
             sudo:
@@ -114,7 +116,7 @@ steps:
           image: "${IMAGE_UBUNTU_ARM64_FIPS}"
           instanceType: "m6g.2xlarge"
         plugins:
-          - *vault_ec_key_prod  
+          - *vault_ec_key_prod
         matrix:
           setup:
             sudo:
@@ -155,7 +157,7 @@ steps:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
     plugins:
-      - *vault_ec_key_prod  
+      - *vault_ec_key_prod
 
   - label: Aggregate test reports
     depends_on:
