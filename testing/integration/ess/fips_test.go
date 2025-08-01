@@ -70,7 +70,6 @@ func TestFIPS(t *testing.T) {
 
 func ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t *testing.T, info *define.Info) {
 	t.Helper()
-
 	// Check that the Fleet Server in the deployment is healthy
 	fleetServerHost, err := fleettools.DefaultURL(t.Context(), info.KibanaClient)
 	statusUrl, err := url.JoinPath(fleetServerHost, "/api/status")
