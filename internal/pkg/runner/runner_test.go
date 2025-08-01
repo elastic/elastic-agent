@@ -43,28 +43,6 @@ func TestRunnerStartCancel(t *testing.T) {
 	<-runner.Done()
 }
 
-func TestRunnerDoneWithTimeout(t *testing.T) {
-	ctx, cn := context.WithCancel(context.Background())
-	defer cn()
-
-	runner := Start(ctx, func(ctx context.Context) error {
-		<-ctx.Done()
-		return nil
-	})
-
-	go func() {
-		runner.Stop()
-	}()
-
-	// Should be done much sooner
-	<-runner.DoneWithTimeout(time.Second)
-
-	// Should have no errors
-	if runner.Err() != nil {
-		t.Fatal(runner.Err())
-	}
-}
-
 func TestRunnerDoneTimedOut(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
@@ -80,7 +58,11 @@ func TestRunnerDoneTimedOut(t *testing.T) {
 	}()
 
 	// Should be done much sooner
-	<-runner.DoneWithTimeout(500 * time.Millisecond)
+	select {
+	case <-runner.Done():
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timed out")
+	}
 
 	// Should have no errors
 	err := runner.Err()
