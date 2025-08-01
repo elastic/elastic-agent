@@ -183,23 +183,6 @@ entries:
       file:
         name: 1744839123-fix-MOtel-config-image-value.yaml
         checksum: cd9cb5f75e1b3983a48ee156e478e0a62051ffb6
-    - kind: breaking-change
-      summary: '[otel] Disable process scraper of hostmetrics receiver'
-      description: |
-        The process scraper collects metrics for all available processes of a host without an easy way to limit
-        this to only report top N process for example. This results in quite big amount of timeseries.
-        Since this is not quite critical for any of the available UIs or dashboards we decide to disable
-        it temporarily until we find a better solution. Users that specifically need these metrics
-        can also enable it back manually.
-        Related to https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/39423.
-      component: elastic-agent
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/7894
-      issue: []
-      timestamp: 1744886313
-      file:
-        name: 1744886313-otel_disable_process_scraper.yaml
-        checksum: 461df3d166c6ed60e8565e588b5ffce9078798ae
     - kind: bug-fix
       summary: |
         Ship journalctl in the elastic-agent, elastic-agent-complete, and
