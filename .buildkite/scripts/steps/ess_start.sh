@@ -4,10 +4,10 @@ set -euo pipefail
 source .buildkite/scripts/steps/ess.sh
 source .buildkite/scripts/steps/fleet.sh
 
-OVERRIDE_STACK_VERSION="$(cat .package-version)"
-OVERRIDE_STACK_VERSION=${OVERRIDE_STACK_VERSION}"-SNAPSHOT"
+STACK_VERSION="$(jq -r '.version' .package-version)"
+STACK_BUILD_ID="$(jq -r '.stack_build_id' .package-version)"
 
-ess_up $OVERRIDE_STACK_VERSION
+ess_up "$STACK_VERSION" "$STACK_BUILD_ID"
 
 preinstall_fleet_packages
 

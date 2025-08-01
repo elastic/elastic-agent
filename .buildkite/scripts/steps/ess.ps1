@@ -1,6 +1,7 @@
 function ess_up {
   param (
       [string]$StackVersion,
+      [string]$StackBuildId = "",
       [string]$EssRegion = "gcp-us-west2"
   )
 
@@ -22,6 +23,7 @@ function ess_up {
   & terraform init
   & terraform apply -auto-approve `
       -var="stack_version=$StackVersion" `
+      -var="stack_build_id=$StackBuildId" `
       -var="ess_region=$EssRegion" `
       -var="creator=$BuildkiteBuildCreator" `
       -var="buildkite_id=$BuildkiteBuildNumber" `
@@ -99,12 +101,13 @@ function Retry-Command {
 
 function Get-Ess-Stack {
   param (
-      [string]$StackVersion
+      [string]$StackVersion,
+      [string]$StackBuildId = ""
   )
 
   if ($Env:BUILDKITE_RETRY_COUNT -gt 0) {
       Write-Output "The step is retried, starting the ESS stack again"
-      ess_up $StackVersion
+      ess_up $StackVersion $StackBuildId
       Write-Output "ESS stack is up. ES_HOST: $Env:ELASTICSEARCH_HOST"
   } else {
       # TODO: Use a metadata prefix for "fips." if we ever need to test Windows artifacts for FIPS.

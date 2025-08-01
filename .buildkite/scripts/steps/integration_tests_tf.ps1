@@ -9,10 +9,15 @@ $PSVersionTable.PSVersion
 
 . "$PWD\.buildkite\scripts\steps\ess.ps1"
 
-# Read package version from .package-version file
-$PACKAGE_VERSION = Get-Content .package-version -ErrorAction SilentlyContinue
-if ($PACKAGE_VERSION) {
-    $PACKAGE_VERSION = "${PACKAGE_VERSION}-SNAPSHOT"
+# Override the stack version from `.package-version` contents
+# There is a time when the current snapshot is not available on cloud yet, so we cannot use the latest version automatically
+# This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready
+$packageVersionContent = Get-Content .package-version -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json
+if ($packageVersionContent -and $packageVersionContent.version ) {
+    $STACK_VERSION = $packageVersionContent.version
+}
+if ($packageVersionContent -and $packageVersionContent.stack_build_id ) {
+    $STACK_BUILD_ID = $packageVersionContent.stack_build_id
 }
 
 Write-Output "~~~ Building test binaries"
@@ -27,7 +32,7 @@ $TestsExitCode = 0
 try {
     Write-Output "~~~ Running integration tests"
     # Get-Ess-Stack will start the ESS stack if it is a BK retry, otherwise it will retrieve ESS stack metadata
-    Get-Ess-Stack -StackVersion $PACKAGE_VERSION
+    Get-Ess-Stack -StackVersion $STACK_VERSION -StackBuildId $STACK_BUILD_ID
     & "$PWD\.buildkite\scripts\buildkite-integration-tests.ps1" $GROUP_NAME $TEST_SUDO
     $TestsExitCode = $LASTEXITCODE
     if ($TestsExitCode -ne 0)

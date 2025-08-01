@@ -20,11 +20,11 @@ if [ -z "$TEST_SUDO" ]; then
   exit 1
 fi
 
-# Override the agent package version using a string with format <major>.<minor>.<patch>
-# There is a time when the snapshot is not built yet, so we cannot use the latest version automatically
+# Override the stack version from `.package-version` contents
+# There is a time when the current snapshot is not available on cloud yet, so we cannot use the latest version automatically
 # This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
-OVERRIDE_STACK_VERSION="$(cat .package-version)"
-OVERRIDE_STACK_VERSION=${OVERRIDE_STACK_VERSION}"-SNAPSHOT"
+STACK_VERSION="$(jq -r '.version' .package-version)"
+STACK_BUILD_ID="$(jq -r '.stack_build_id' .package-version)"
 
 echo "~~~ Building test binaries"
 mage build:testBinaries
@@ -35,7 +35,7 @@ mage build:testBinaries
 if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 || "${FORCE_ESS_CREATE:-false}" == "true" ]]; then
   echo "~~~ The steps is retried, starting the ESS stack again"
   trap 'ess_down' EXIT
-  ess_up $OVERRIDE_STACK_VERSION || (echo -e "^^^ +++\nFailed to start ESS stack")
+  ess_up "$STACK_VERSION" "$STACK_BUILD_ID" || (echo -e "^^^ +++\nFailed to start ESS stack")
 else
   # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data
   echo "~~~ Receiving ESS stack metadata"
