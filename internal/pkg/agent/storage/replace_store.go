@@ -87,6 +87,9 @@ func (r *ReplaceOnSuccessStore) Save(in io.Reader) error {
 	ts := time.Now()
 	backFilename := r.target + "." + ts.Format(fsSafeTs) + ".bak"
 	if err := file.SafeFileRotate(backFilename, r.target); err != nil {
+		if checkRotateErrorAndRetry(err, backFilename, r.target) {
+			return nil
+		}
 		return errors.New(err,
 			fmt.Sprintf("could not backup %s", r.target),
 			errors.TypeFilesystem,
@@ -97,6 +100,9 @@ func (r *ReplaceOnSuccessStore) Save(in io.Reader) error {
 	if err != nil {
 		// Rollback on any errors to minimize non working state.
 		if err := file.SafeFileRotate(r.target, backFilename); err != nil {
+			if checkRotateErrorAndRetry(err, r.target, backFilename) {
+				return nil
+			}
 			return errors.New(err,
 				fmt.Sprintf("could not rollback %s to %s", backFilename, r.target),
 				errors.TypeFilesystem,
@@ -163,6 +169,9 @@ func (r *ReplaceOnSuccessStore) Save(in io.Reader) error {
 	}
 
 	if err := file.SafeFileRotate(r.target, tmpFile); err != nil {
+		if checkRotateErrorAndRetry(err, r.target, tmpFile) {
+			return nil
+		}
 		return errors.New(err,
 			fmt.Sprintf("could not replace target file %s with %s", r.target, tmpFile),
 			errors.TypeFilesystem,
