@@ -301,7 +301,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override ap
 		}
 	}()
 
-	diagHooks := diagnostics.GlobalHooks()
+	diagHooks := diagnostics.GlobalHooks(l.Named("diagnostics"))
 	diagHooks = append(diagHooks, coord.DiagnosticHooks()...)
 	controlLog := l.Named("control")
 	control := server.New(controlLog, agentInfo, coord, tracer, diagHooks, cfg.Settings.GRPC)
