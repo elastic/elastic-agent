@@ -56,13 +56,6 @@ func WithVaultOwnership(ownership utils.FileOwner) OptionFunc {
 	}
 }
 
-// WithVaultEntryName allows to specify the vault key entry name in the keychain (it applies only for keychain vault on darwin)
-func WithVaultEntryName(entryName string) OptionFunc {
-	return func(o *Options) {
-		o.entryName = entryName
-	}
-}
-
 // WithUnprivileged creates an unprivileged vault, has an effect only on Darwin
 func WithUnprivileged(unprivileged bool) OptionFunc {
 	return func(o *Options) {

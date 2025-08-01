@@ -72,12 +72,6 @@ func GetAgentSecret(ctx context.Context, opts ...vault.OptionFunc) (secret Secre
 	return Get(ctx, AgentSecretKey, opts...)
 }
 
-// SetAgentSecret saves the agent secret from the vault
-// This is needed for migration from 8.3.0-8.3.2 to higher versions
-func SetAgentSecret(ctx context.Context, secret Secret, opts ...vault.OptionFunc) error {
-	return Set(ctx, AgentSecretKey, secret, opts...)
-}
-
 // Get reads the secret key from the vault
 func Get(ctx context.Context, key string, opts ...vault.OptionFunc) (secret Secret, err error) {
 	// open vault readonly, will not create the vault directory or the seed it was not created before

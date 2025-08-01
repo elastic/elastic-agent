@@ -39,15 +39,6 @@ func newSubscriptionAll(ctx context.Context) *SubscriptionAll {
 	}
 }
 
-// NewSubscriptionAllWithChannel creates a SubscriptionAll using an existing channel
-// For Test purposes ONLY.
-func NewSubscriptionAllWithChannel(ctx context.Context, evtChan chan ComponentComponentState) *SubscriptionAll {
-	return &SubscriptionAll{
-		ctx: ctx,
-		ch:  evtChan,
-	}
-}
-
 // Ch provides the channel to get state changes.
 func (s *SubscriptionAll) Ch() <-chan ComponentComponentState {
 	return s.ch

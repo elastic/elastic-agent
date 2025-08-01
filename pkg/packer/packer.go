@@ -95,12 +95,3 @@ func MustUnpack(pack string) PackMap {
 	}
 	return v
 }
-
-// MustPackFile will pack all the files matching the patterns and will panic on any errors.
-func MustPackFile(patterns ...string) (string, []string) {
-	v, files, err := Pack(patterns...)
-	if err != nil {
-		panic(err)
-	}
-	return v, files
-}
