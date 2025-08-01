@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/localremote"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/snapshot"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -35,8 +36,6 @@ const (
 	defaultUpgradeFallbackPGP     = "https://artifacts.elastic.co/GPG-KEY-elastic-agent"
 	fleetUpgradeFallbackPGPFormat = "/api/agents/upgrades/%d.%d.%d/pgp-public-key"
 )
-
-type downloaderFactory func(*agtversion.ParsedSemVer, *logger.Logger, *artifact.Config, *details.Details) (download.Downloader, error)
 
 type downloader func(context.Context, downloaderFactory, *agtversion.ParsedSemVer, *artifact.Config, *details.Details) (string, error)
 
@@ -66,8 +65,9 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 
 			// set specific downloader, local file just uses the fs.NewDownloader
 			// no fallback is allowed because it was requested that this specific source be used
-			factory = func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
-				return fs.NewDownloader(config), nil
+			factory, err = u.downloaderFactoryProvider.GetDownloaderFactory(fileDownloaderFactory)
+			if err != nil {
+				return "", err
 			}
 
 			// set specific verifier, local file verifies locally only
@@ -87,7 +87,10 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 
 	if factory == nil {
 		// set the factory to the newDownloader factory
-		factory = newDownloader
+		factory, err = u.downloaderFactoryProvider.GetDownloaderFactory(composedDownloaderFactory)
+		if err != nil {
+			return "", err
+		}
 		u.log.Infow("Downloading upgrade artifact", "version", parsedVersion,
 			"source_uri", settings.SourceURI, "drop_path", settings.DropPath,
 			"target_path", settings.TargetDirectory, "install_path", settings.InstallPath)
@@ -102,7 +105,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 
 	path, err := downloaderFunc(ctx, factory, parsedVersion, &settings, upgradeDetails)
 	if err != nil {
-		return "", errors.New(err, "failed download of agent binary")
+		return "", fmt.Errorf("failed download of agent binary: %w", err)
 	}
 
 	if skipVerifyOverride {
@@ -243,6 +246,12 @@ func (u *Upgrader) downloadWithRetries(
 		var err error
 		path, err = u.downloadOnce(cancelCtx, factory, version, settings, upgradeDetails)
 		if err != nil {
+
+			if errors.Is(err, upgradeErrors.ErrInsufficientDiskSpace) {
+				u.log.Infof("Insufficient disk space error detected, stopping retries")
+				return backoff.Permanent(err)
+			}
+
 			return err
 		}
 		return nil

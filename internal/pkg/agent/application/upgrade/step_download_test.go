@@ -19,6 +19,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -276,6 +277,37 @@ func TestDownloadWithRetries(t *testing.T) {
 		require.NotEmpty(t, *upgradeDetailsRetryErrorMsg)
 		require.Equal(t, *upgradeDetailsRetryErrorMsg, upgradeDetails.Metadata.RetryErrorMsg)
 	})
+
+	t.Run("insufficient_disk_space_stops_retries", func(t *testing.T) {
+		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
+			return &mockDownloader{"", upgradeErrors.ErrInsufficientDiskSpace}, nil
+		}
+
+		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		require.NoError(t, err)
+
+		parsedVersion, err := agtversion.ParseVersion("8.9.0")
+		require.NoError(t, err)
+
+		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
+
+		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+
+		require.Error(t, err)
+		require.Equal(t, "", path)
+
+		require.ErrorIs(t, err, upgradeErrors.ErrInsufficientDiskSpace)
+
+		logs := obs.TakeAll()
+		require.Len(t, logs, 2)
+		require.Equal(t, "download attempt 1", logs[0].Message)
+		require.Contains(t, logs[1].Message, "Insufficient disk space error detected, stopping retries")
+
+		require.NotZero(t, *upgradeDetailsRetryUntil)
+		require.False(t, *upgradeDetailsRetryUntilWasUnset)
+
+		require.Empty(t, *upgradeDetailsRetryErrorMsg)
+	})
 }
 
 // mockUpgradeDetails returns a *details.Details value that has an observer registered on it for inspecting
@@ -306,4 +338,49 @@ func mockUpgradeDetails(parsedVersion *agtversion.ParsedSemVer) (*details.Detail
 	return upgradeDetails,
 		&upgradeDetailsRetryUntil, &upgradeDetailsRetryUntilWasUnset,
 		&upgradeDetailsRetryErrorMsg
+}
+
+type mockDownloaderFactoryProvider struct {
+	calledWithName string
+}
+
+var mockDownloaderFactoryError = errors.New("downloader factory not found")
+
+func (m *mockDownloaderFactoryProvider) GetDownloaderFactory(name string) (downloaderFactory, error) {
+	m.calledWithName = name
+	return nil, mockDownloaderFactoryError
+}
+
+func TestDownloadArtifact(t *testing.T) {
+	t.Run("should return error if file downloader factory is not found", func(t *testing.T) {
+		logger, err := logger.New("test", false)
+		require.NoError(t, err)
+
+		config := artifact.Config{}
+		u, err := NewUpgrader(logger, &config, nil)
+		require.NoError(t, err)
+
+		u.downloaderFactoryProvider = &mockDownloaderFactoryProvider{}
+
+		_, err = u.downloadArtifact(context.Background(), nil, "file://mockfilepath", nil, false, false)
+		require.Error(t, err)
+		require.ErrorIs(t, err, mockDownloaderFactoryError)
+		require.Equal(t, fileDownloaderFactory, u.downloaderFactoryProvider.(*mockDownloaderFactoryProvider).calledWithName)
+	})
+
+	t.Run("should return error if composed downloader factory is not found", func(t *testing.T) {
+		logger, err := logger.New("test", false)
+		require.NoError(t, err)
+
+		config := artifact.Config{}
+		u, err := NewUpgrader(logger, &config, nil)
+		require.NoError(t, err)
+
+		u.downloaderFactoryProvider = &mockDownloaderFactoryProvider{}
+
+		_, err = u.downloadArtifact(context.Background(), nil, "https://mockuri", nil, false, false)
+		require.Error(t, err)
+		require.ErrorIs(t, err, mockDownloaderFactoryError)
+		require.Equal(t, composedDownloaderFactory, u.downloaderFactoryProvider.(*mockDownloaderFactoryProvider).calledWithName)
+	})
 }

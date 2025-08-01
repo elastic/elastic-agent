@@ -15,6 +15,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
@@ -25,15 +26,19 @@ const (
 
 // Downloader is a downloader able to fetch artifacts from elastic.co web page.
 type Downloader struct {
-	dropPath string
-	config   *artifact.Config
+	dropPath           string
+	config             *artifact.Config
+	diskSpaceErrorFunc func(error) error
+	CopyFunc           func(dst io.Writer, src io.Reader) (written int64, err error)
 }
 
 // NewDownloader creates and configures Elastic Downloader
 func NewDownloader(config *artifact.Config) *Downloader {
 	return &Downloader{
-		config:   config,
-		dropPath: getDropPath(config),
+		config:             config,
+		dropPath:           getDropPath(config),
+		diskSpaceErrorFunc: upgradeErrors.ToDiskSpaceErrorFunc(nil),
+		CopyFunc:           io.Copy,
 	}
 }
 
@@ -42,11 +47,11 @@ func NewDownloader(config *artifact.Config) *Downloader {
 func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (_ string, err error) {
 	span, ctx := apm.StartSpan(ctx, "download", "app.internal")
 	defer span.End()
-	downloadedFiles := make([]string, 0, 2)
 	defer func() {
 		if err != nil {
-			for _, path := range downloadedFiles {
-				os.Remove(path)
+			rmErr := os.RemoveAll(e.config.TargetDirectory)
+			if rmErr != nil {
+				err = errors.New(err, "failed to remove target directory", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, e.config.TargetDirectory))
 			}
 			apm.CaptureError(ctx, err).Send()
 		}
@@ -54,13 +59,12 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 
 	// download from source to dest
 	path, err := e.download(e.config.OS(), a, *version, "")
-	downloadedFiles = append(downloadedFiles, path)
 	if err != nil {
 		return "", err
 	}
 
-	hashPath, err := e.download(e.config.OS(), a, *version, ".sha512")
-	downloadedFiles = append(downloadedFiles, hashPath)
+	_, err = e.download(e.config.OS(), a, *version, ".sha512")
+
 	return path, err
 }
 
@@ -101,6 +105,7 @@ func (e *Downloader) download(
 
 func (e *Downloader) downloadFile(filename, fullPath string) (string, error) {
 	sourcePath := filepath.Join(e.dropPath, filename)
+
 	sourceFile, err := os.Open(sourcePath)
 	if err != nil {
 		return "", errors.New(err, fmt.Sprintf("package '%s' not found", sourcePath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath))
@@ -119,9 +124,10 @@ func (e *Downloader) downloadFile(filename, fullPath string) (string, error) {
 	}
 	defer destinationFile.Close()
 
-	_, err = io.Copy(destinationFile, sourceFile)
+	_, err = e.CopyFunc(destinationFile, sourceFile)
 	if err != nil {
-		return "", err
+		processedErr := e.diskSpaceErrorFunc(err)
+		return fullPath, processedErr
 	}
 
 	return fullPath, nil

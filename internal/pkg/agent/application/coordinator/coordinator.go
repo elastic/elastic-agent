@@ -32,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -357,6 +358,7 @@ type Coordinator struct {
 	// run a ticker that checks to see if we have a new PID.
 	componentPIDTicker         *time.Ticker
 	componentPidRequiresUpdate *atomic.Bool
+	detailsProvider            func(string, details.State, string) *details.Details
 }
 
 // The channels Coordinator reads to receive updates from the various managers.
@@ -476,7 +478,8 @@ func New(
 		componentPIDTicker:         time.NewTicker(time.Second * 30),
 		componentPidRequiresUpdate: &atomic.Bool{},
 
-		fleetAcker: fleetAcker,
+		fleetAcker:      fleetAcker,
+		detailsProvider: details.NewDetails,
 	}
 	// Setup communication channels for any non-nil components. This pattern
 	// lets us transparently accept nil managers / simulated events during
@@ -728,7 +731,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	if action != nil {
 		actionID = action.ActionID
 	}
-	det := details.NewDetails(version, details.StateRequested, actionID)
+	det := c.detailsProvider(version, details.StateRequested, actionID)
 	det.RegisterObserver(c.SetUpgradeDetails)
 
 	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
@@ -739,6 +742,11 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 			det.SetState(details.StateCompleted)
 			return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
 		}
+
+		if errors.Is(err, upgradeErrors.ErrInsufficientDiskSpace) {
+			err = upgradeErrors.ErrInsufficientDiskSpace
+		}
+
 		det.Fail(err)
 		return err
 	}
