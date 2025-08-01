@@ -1150,6 +1150,26 @@ func TestManualRollback(t *testing.T) {
 			additionalAsserts: nil,
 		},
 		{
+			name: "update marker is malformed - rollback fails",
+			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
+				err := os.WriteFile(markerFilePath(paths.DataFrom(topDir)), []byte("this is not a proper YAML file"), 0600)
+				require.NoError(t, err, "error setting up update marker")
+				locker := filelock.NewAppLocker(topDir, "watcher.lock")
+				err = locker.TryLock()
+				require.NoError(t, err, "error locking initial watcher AppLocker")
+				// there's no takeover watcher so no expectation on that or InvokeWatcher
+				t.Cleanup(func() {
+					unlockErr := locker.Unlock()
+					assert.NoError(t, unlockErr, "error unlocking initial watcher AppLocker")
+				})
+			},
+			artifactSettings:  artifact.DefaultConfig(),
+			upgradeSettings:   configuration.DefaultUpgradeConfig(),
+			version:           "1.2.3",
+			wantErr:           assert.Error,
+			additionalAsserts: nil,
+		},
+		{
 			name: "update marker ok but rollback available is empty - error",
 			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
 				err := os.WriteFile(markerFilePath(paths.DataFrom(topDir)), []byte(updatemarkerwatching456NoRollbackAvailable), 0600)
@@ -1158,6 +1178,9 @@ func TestManualRollback(t *testing.T) {
 				err = locker.TryLock()
 				require.NoError(t, err, "error locking initial watcher AppLocker")
 				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(locker, nil)
+				newerWatcherExecutable := filepath.Join(topDir, "data", "elastic-agent-4.5.6-newver", "elastic-agent")
+				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstall456).Return(newerWatcherExecutable)
+				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable).Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for realsies"}}, nil)
 			},
 			artifactSettings: artifact.DefaultConfig(),
 			upgradeSettings:  configuration.DefaultUpgradeConfig(),
@@ -1184,6 +1207,9 @@ func TestManualRollback(t *testing.T) {
 				err = locker.TryLock()
 				require.NoError(t, err, "error locking initial watcher AppLocker")
 				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(locker, nil)
+				newerWatcherExecutable := filepath.Join(topDir, "data", "elastic-agent-4.5.6-newver", "elastic-agent")
+				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstall456).Return(newerWatcherExecutable)
+				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable).Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for realsies"}}, nil)
 			},
 			artifactSettings: artifact.DefaultConfig(),
 			upgradeSettings:  configuration.DefaultUpgradeConfig(),
@@ -1210,6 +1236,9 @@ func TestManualRollback(t *testing.T) {
 				err = locker.TryLock()
 				require.NoError(t, err, "error locking initial watcher AppLocker")
 				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(locker, nil)
+				newerWatcherExecutable := filepath.Join(topDir, "data", "elastic-agent-4.5.6-newver", "elastic-agent")
+				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstall456).Return(newerWatcherExecutable)
+				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable).Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for realsies"}}, nil)
 			},
 			artifactSettings: artifact.DefaultConfig(),
 			upgradeSettings:  configuration.DefaultUpgradeConfig(),
