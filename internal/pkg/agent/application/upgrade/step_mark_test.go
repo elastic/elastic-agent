@@ -364,7 +364,7 @@ func TestUpdateActiveCommit(t *testing.T) {
 func TestMarkUpgrade(t *testing.T) {
 	var parsed123SNAPSHOT = agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")
 	var parsed456SNAPSHOT = agtversion.NewParsedSemVer(4, 5, 6, "SNAPSHOT", "")
-
+	var parsed920SNAPSHOT = agtversion.NewParsedSemVer(9, 2, 0, "SNAPSHOT", "")
 	// fix a timestamp (truncated to the second because of loss of precision during marshalling/unmarshalling)
 	updatedOnNow := time.Now().UTC().Truncate(time.Second)
 
@@ -467,7 +467,7 @@ func TestMarkUpgrade(t *testing.T) {
 			},
 		},
 		{
-			name: "rollback window specified - available rollbacks must be present",
+			name: "rollback window specified but new version is too low - no rollbacks",
 			args: args{
 				updatedOn: updatedOnNow,
 				currentAgent: agentInstall{
@@ -504,6 +504,52 @@ func TestMarkUpgrade(t *testing.T) {
 					Action:            nil,
 					Details: &details.Details{
 						TargetVersion: "4.5.6-SNAPSHOT",
+						State:         "UPG_REPLACING",
+						ActionID:      "",
+					},
+					DesiredOutcome: OUTCOME_UPGRADE,
+				}
+				assert.Equal(t, expectedMarker, actualMarker)
+			},
+		},
+		{
+			name: "rollback window specified and new version is at least 9.2.0-SNAPSHOT - available rollbacks must be present",
+			args: args{
+				updatedOn: updatedOnNow,
+				currentAgent: agentInstall{
+					parsedVersion: parsed920SNAPSHOT,
+					version:       "9.2.0-SNAPSHOT",
+					hash:          "newagt",
+					versionedHome: filepath.Join("data", "elastic-agent-9.2.0-SNAPSHOT-newagt"),
+				},
+				previousAgent: agentInstall{
+					parsedVersion: parsed123SNAPSHOT,
+					version:       "1.2.3-SNAPSHOT",
+					hash:          "prvagt",
+					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
+				},
+				action:         nil,
+				details:        details.NewDetails("9.2.0-SNAPSHOT", details.StateReplacing, ""),
+				desiredOutcome: OUTCOME_UPGRADE,
+				rollbackWindow: 7 * 24 * time.Hour,
+			},
+			wantErr: assert.NoError,
+			assertAfterMark: func(t *testing.T, dataDir string) {
+				actualMarker, err := LoadMarker(dataDir)
+				require.NoError(t, err, "error reading actualMarker content after writing")
+
+				expectedMarker := &UpdateMarker{
+					Version:           "9.2.0-SNAPSHOT",
+					Hash:              "newagt",
+					VersionedHome:     filepath.Join("data", "elastic-agent-9.2.0-SNAPSHOT-newagt"),
+					UpdatedOn:         updatedOnNow,
+					PrevVersion:       "1.2.3-SNAPSHOT",
+					PrevHash:          "prvagt",
+					PrevVersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
+					Acked:             false,
+					Action:            nil,
+					Details: &details.Details{
+						TargetVersion: "9.2.0-SNAPSHOT",
 						State:         "UPG_REPLACING",
 						ActionID:      "",
 						Metadata: details.Metadata{

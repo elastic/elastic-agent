@@ -65,6 +65,9 @@ var (
 	ErrNilUpdateMarker      = errors.New("loaded a nil update marker")
 	ErrEmptyRollbackVersion = errors.New("rollback version is empty")
 	ErrNoRollbacksAvailable = errors.New("no rollbacks available")
+
+	// Version_9_2_0_SNAPSHOT is the minimum version for manual rollback and rollback reason
+	Version_9_2_0_SNAPSHOT = agtversion.NewParsedSemVer(9, 2, 0, "SNAPSHOT", "")
 )
 
 func init() {
@@ -426,7 +429,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		versionedHome: currentVersionedHome,
 	}
 	rollbackWindow := time.Duration(0)
-	if u.upgradeSettings != nil && u.upgradeSettings.Rollback != nil { // TODO && target version supports manual rollback and deferred cleanup
+	if u.upgradeSettings != nil && u.upgradeSettings.Rollback != nil {
 		rollbackWindow = u.upgradeSettings.Rollback.Window
 	}
 	if err := u.markUpgrade(u.log,
