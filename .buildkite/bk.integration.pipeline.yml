@@ -6,14 +6,12 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1751072471"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1751072471"
-  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1751072471"
-  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1751072471"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1751072471"
-  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1751072471"
-  # Remove AGENT_PACKAGE_VERSION pinning once 9.0.4 DRA and stack are released
-  AGENT_VERSION: "9.0.3-SNAPSHOT"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1753491662"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1753491662"
+  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1753491662"
+  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1753491662"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1753491662"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1753491662"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -39,6 +37,11 @@ common:
           KIBANA_HOST: ea-serverless-it-kibana-hostname
           KIBANA_USERNAME: ea-serverless-it-kibana-username
           KIBANA_PASSWORD: ea-serverless-it-kibana-password
+  - vault_ec_key_prod: &vault_ec_key_prod
+      elastic/vault-secrets#v0.1.0:
+        path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+        field: "apiKey"
+        env_var: "EC_API_KEY"  
 
 steps:
   - label: Start ESS stack for integration tests
@@ -48,16 +51,18 @@ steps:
           context: "buildkite/elastic-agent-extended-testing - ESS stack provision"
     env:
       ASDF_TERRAFORM_VERSION: 1.9.2
-    command: |
-      #!/usr/bin/env bash
-      set -euo pipefail
-      source .buildkite/scripts/steps/ess_start.sh
+    command: .buildkite/scripts/steps/ess_start.sh
+    retry:
+      automatic:
+        limit: 1
     artifact_paths:
       - test_infra/ess/*.tfstate
       - test_infra/ess/*.lock.hcl
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
+    plugins:
+      - *vault_ec_key_prod
 
   - group: "Extended runtime leak tests"
     key: extended-integration-tests
@@ -85,6 +90,9 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - *vault_ec_key_prod
+
       - label: "Windows:2025:amd64:sudo"
         depends_on:
           - packaging-windows
@@ -103,6 +111,9 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
+        plugins:
+          - *vault_ec_key_prod
+  
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-ubuntu-x86-64
         env:
@@ -120,6 +131,8 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
+        plugins:
+          - *vault_ec_key_prod
 
   - group: "Stateful: Windows"
     key: integration-tests-win
@@ -147,6 +160,8 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - *vault_ec_key_prod
         matrix:
           - default
           - fleet
@@ -175,6 +190,8 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - *vault_ec_key_prod
         matrix:
           - default
 
@@ -196,6 +213,8 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - *vault_ec_key_prod
         matrix:
           - default
           - fleet
@@ -224,6 +243,8 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
+        plugins:
+          - *vault_ec_key_prod
         matrix:
           - default
 
@@ -252,6 +273,8 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
+        plugins:
+          - *vault_ec_key_prod
         matrix:
           - default
 
@@ -274,6 +297,8 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
+        plugins:
+          - *vault_ec_key_prod  
         matrix:
           - default
           - upgrade
@@ -308,6 +333,8 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - *vault_ec_key_prod
         matrix:
           - default
           - upgrade
@@ -344,6 +371,8 @@ steps:
           provider: "aws"
           image: "${IMAGE_UBUNTU_2404_ARM_64}"
           instanceType: "m6g.xlarge"
+        plugins:
+          - *vault_ec_key_prod
         matrix:
           - default
 
@@ -372,6 +401,8 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_DEBIAN_12}"
+        plugins:
+          - *vault_ec_key_prod
         matrix:
           - default
 
@@ -394,6 +425,8 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_DEBIAN_12}"
+        plugins:
+          - *vault_ec_key_prod
         matrix:
           - default
           - upgrade
@@ -433,6 +466,8 @@ steps:
         retry:
           automatic:
             limit: 1
+        plugins:
+          - *vault_ec_key_prod
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
@@ -468,6 +503,8 @@ steps:
           machineType: "n2-standard-4"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
           diskSizeGb: 80
+        plugins:
+          - *vault_ec_key_prod
         matrix:
           setup:
             variants:
@@ -571,7 +608,8 @@ steps:
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
-
+    plugins:
+      - *vault_ec_key_prod
   - label: Aggregate test reports
     # Warning: The key has a hook in pre-command
     key: aggregate-reports

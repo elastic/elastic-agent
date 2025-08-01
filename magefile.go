@@ -27,6 +27,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -372,11 +373,6 @@ func GolangCrossBuild() error {
 	// return GolangCrossBuildOSS()
 
 	return nil
-}
-
-// BuildGoDaemon builds the go-daemon binary (use crossBuildGoDaemon).
-func BuildGoDaemon() error {
-	return devtools.BuildGoDaemon()
 }
 
 // BinaryOSS build the fleet artifact.
@@ -725,19 +721,13 @@ func CrossBuild() error {
 	return devtools.CrossBuild()
 }
 
-// CrossBuildGoDaemon cross-builds the go-daemon binary using Docker.
-func CrossBuildGoDaemon() error {
-	mg.Deps(EnsureCrossBuildOutputDir)
-	return devtools.CrossBuildGoDaemon()
-}
-
 // PackageAgentCore cross-builds and packages distribution artifacts containing
 // only elastic-agent binaries with no extra files or dependencies.
 func PackageAgentCore() {
 	start := time.Now()
 	defer func() { fmt.Println("packageAgentCore ran for", time.Since(start)) }()
 
-	mg.Deps(CrossBuild, CrossBuildGoDaemon)
+	mg.Deps(CrossBuild)
 
 	devtools.UseElasticAgentCorePackaging()
 
@@ -1077,7 +1067,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 
 	log.Println("--- Running post packaging ")
 	mg.Deps(Update)
-	mg.Deps(agentBinaryTarget, CrossBuildGoDaemon)
+	mg.Deps(agentBinaryTarget)
 
 	// compile the elastic-agent.exe proxy binary for the windows archive
 	if slices.Contains(platforms, "windows/amd64") {
@@ -2089,46 +2079,47 @@ func (Integration) Single(ctx context.Context, testName string) error {
 }
 
 // TestServerless runs the integration tests defined in testing/integration/serverless
-func (Integration) TestServerless(ctx context.Context) error {
+func (i Integration) TestServerless(ctx context.Context) error {
+	return i.testServerless(ctx, false, "")
+}
+
+// TestServerlessSingle runs a single integration test defined in testing/integration/serverless
+func (i Integration) TestServerlessSingle(ctx context.Context, testName string) error {
+	return i.testServerless(ctx, false, testName)
+}
+
+func (i Integration) testServerless(ctx context.Context, matrix bool, testName string) error {
 	err := os.Setenv("STACK_PROVISIONER", "serverless")
 	if err != nil {
 		return fmt.Errorf("error setting serverless stack env var: %w", err)
 	}
 
-	return integRunner(ctx, "testing/integration/serverless", false, "")
+	return integRunner(ctx, "testing/integration/serverless", matrix, testName)
 }
 
-// TestKubernetes runs kubernetes integration tests
-func (Integration) TestKubernetes(ctx context.Context) error {
+// TestKubernetes runs the integration tests defined in testing/integration/k8s
+func (i Integration) TestKubernetes(ctx context.Context) error {
+	return i.testKubernetes(ctx, false, "")
+}
+
+// TestKubernetesSingle runs a single integration test defined in testing/integration/k8s
+func (i Integration) TestKubernetesSingle(ctx context.Context, testName string) error {
+	return i.testKubernetes(ctx, false, testName)
+}
+
+// TestKubernetesMatrix runs a matrix of integration tests defined in testing/integration/k8s
+func (i Integration) TestKubernetesMatrix(ctx context.Context) error {
+	return i.testKubernetes(ctx, true, "")
+}
+
+func (i Integration) testKubernetes(ctx context.Context, matrix bool, testName string) error {
 	mg.Deps(Integration.BuildKubernetesTestData)
 	// invoke integration tests
 	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
 		return err
 	}
 
-	return integRunner(ctx, "testing/integration/k8s", false, "")
-}
-
-// TestKubernetesSingle runs single k8s integration test
-func (Integration) TestKubernetesSingle(ctx context.Context, testName string) error {
-	mg.Deps(Integration.BuildKubernetesTestData)
-	// invoke integration tests
-	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
-		return err
-	}
-
-	return integRunner(ctx, "testing/integration/k8s", false, testName)
-}
-
-// TestKubernetesMatrix runs a matrix of kubernetes integration tests
-func (Integration) TestKubernetesMatrix(ctx context.Context) error {
-	mg.Deps(Integration.BuildKubernetesTestData)
-	// invoke integration tests
-	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
-		return err
-	}
-
-	return integRunner(ctx, "testing/integration/k8s", true, "")
+	return integRunner(ctx, "testing/integration/k8s", matrix, testName)
 }
 
 // BuildKubernetesTestData builds the test data required to run k8s integration tests
@@ -2169,20 +2160,39 @@ func (Integration) BuildKubernetesTestData(ctx context.Context) error {
 // UpdateVersions runs an update on the `.agent-versions.yml` fetching
 // the latest version list from the artifact API.
 func (Integration) UpdateVersions(ctx context.Context) error {
-	maxSnapshots := 3
+	agentVersion, err := version.ParseVersion(bversion.Agent)
+	if err != nil {
+		return fmt.Errorf("failed to parse agent version %s: %w", bversion.Agent, err)
+	}
+
+	// maxSnapshots is the maximum number of snapshots from
+	// releases branches we want to include in the snapshot list
+	maxSnapshots := 2
 
 	branches, err := git.GetReleaseBranches(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list release branches: %w", err)
 	}
 
-	// -1 because we manually add 7.17 below
-	if len(branches) > maxSnapshots-1 {
-		branches = branches[:maxSnapshots-1]
+	// limit the number of snapshot branches to the maxSnapshots
+	targetSnapshotBranches := branches[:maxSnapshots]
+
+	// we also want to always include the latest snapshot from lts release branches
+	ltsBranches := []string{
+		// 7.17 is an LTS branch so we need to include it always
+		"7.17",
 	}
 
-	// it's not a part of this repository, cannot be retrieved with `GetReleaseBranches`
-	branches = append(branches, "7.17")
+	// if we have a newer version of the agent, we want to include the latest snapshot from 8.19 LTS branch
+	if agentVersion.Major() > 8 || agentVersion.Major() == 8 && agentVersion.Minor() > 19 {
+		// order is important
+		ltsBranches = append([]string{"8.19"}, ltsBranches...)
+	}
+
+	// need to include the LTS branches, sort them and remove duplicates
+	targetSnapshotBranches = append(targetSnapshotBranches, ltsBranches...)
+	sort.Slice(targetSnapshotBranches, git.Less(targetSnapshotBranches))
+	targetSnapshotBranches = slices.Compact(targetSnapshotBranches)
 
 	// uncomment if want to have the current version snapshot on the list as well
 	// branches = append([]string{"master"}, branches...)
@@ -2192,7 +2202,7 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 		CurrentMajors:    1,
 		PreviousMinors:   2,
 		PreviousMajors:   1,
-		SnapshotBranches: branches,
+		SnapshotBranches: targetSnapshotBranches,
 	}
 	b, _ := json.MarshalIndent(reqs, "", "  ")
 	fmt.Println(string(b))
@@ -2643,9 +2653,18 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 	return integRunner(ctx, "testing/integration/beats/serverless", false, "TestBeatsServerless")
 }
 
-// TestForResourceLeaks runs tests that check for resource leaks
-func (Integration) TestForResourceLeaks(ctx context.Context) error {
-	return integRunner(ctx, "testing/integration/leak", false, "TestLongRunningAgentForLeaks")
+// TestForResourceLeaks runs the integration tests defined in testing/integration/leak
+func (i Integration) TestForResourceLeaks(ctx context.Context) error {
+	return i.testForResourceLeaks(ctx, false, "")
+}
+
+// TestForResourceLeaksSingle runs a single integration test defined in testing/integration/leak
+func (i Integration) TestForResourceLeaksSingle(ctx context.Context, testName string) error {
+	return i.testForResourceLeaks(ctx, false, testName)
+}
+
+func (i Integration) testForResourceLeaks(ctx context.Context, matrix bool, testName string) error {
+	return integRunner(ctx, "testing/integration/leak", matrix, testName)
 }
 
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
@@ -3541,6 +3560,9 @@ func (Helm) UpdateAgentVersion() error {
 		filepath.Join(helmMOtelChartPath, "values.yaml"): {
 			{"defaultCRConfig.image.tag", agentVersion},
 		},
+		filepath.Join(helmMOtelChartPath, "logs-values.yaml"): {
+			{"defaultCRConfig.image.tag", agentVersion},
+		},
 	} {
 		if err := updateYamlFile(yamlFile, keyVals...); err != nil {
 			return fmt.Errorf("failed to update agent version: %w", err)
@@ -3664,18 +3686,7 @@ func (Helm) ensureRepository(repoName, repoURL string, settings *cli.EnvSettings
 	return nil
 }
 
-// BuildDependencies builds the dependencies for the Elastic-Agent Helm chart.
-//
-// This is a custom implementation that extends the functionality of `helm dependency update`.
-// The standard Helm command assumes that all dependency repositories have been added beforehand
-// via `helm repo add`, otherwise it fails. This method improves usability by ensuring all
-// required repositories are added automatically before resolving dependencies.
-//
-// Furthermore, `helm dependency update` downloads dependencies as `.tgz` archives into the `charts/`
-// directory but does not untar them. For our integration tests, we require the subcharts to be
-// extracted. This method downloads and extracts each `.tgz` archive and removes the archive afterward,
-// so that only the extracted subcharts remain in the `charts/` directory.
-func (h Helm) BuildDependencies() error {
+func (h Helm) handleDependencies(update bool) error {
 	settings := cli.New()
 	settings.SetNamespace("")
 	actionConfig := &action.Configuration{}
@@ -3743,9 +3754,15 @@ func (h Helm) BuildDependencies() error {
 	if client.Verify {
 		man.Verify = downloader.VerifyIfPossible
 	}
-	err = man.Build()
-	if err != nil {
-		return fmt.Errorf("failed to build helm dependencies: %w", err)
+
+	if update {
+		if err = man.Update(); err != nil {
+			return fmt.Errorf("failed to build helm dependencies: %w", err)
+		}
+	} else {
+		if err = man.Build(); err != nil {
+			return fmt.Errorf("failed to update helm dependencies: %w", err)
+		}
 	}
 
 	subChartDir := filepath.Join(helmChartPath, "charts")
@@ -3772,6 +3789,25 @@ func (h Helm) BuildDependencies() error {
 	}
 
 	return nil
+}
+
+// BuildDependencies builds the dependencies for the Elastic-Agent Helm chart.
+//
+// This is a custom implementation that extends the functionality of `helm dependency update`.
+// The standard Helm command assumes that all dependency repositories have been added beforehand
+// via `helm repo add`, otherwise it fails. This method improves usability by ensuring all
+// required repositories are added automatically before resolving dependencies.
+//
+// Furthermore, `helm dependency update` downloads dependencies as `.tgz` archives into the `charts/`
+// directory but does not untar them. For our integration tests, we require the subcharts to be
+// extracted. This method downloads and extracts each `.tgz` archive and removes the archive afterward,
+// so that only the extracted subcharts remain in the `charts/` directory.
+func (h Helm) BuildDependencies() error {
+	return h.handleDependencies(false)
+}
+
+func (h Helm) UpdateDependencies() error {
+	return h.handleDependencies(true)
 }
 
 // Package packages the Elastic-Agent Helm chart. Note that you need to set SNAPSHOT="false" to build a production-ready package.

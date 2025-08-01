@@ -7,6 +7,7 @@ package downloads
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -94,6 +95,10 @@ func (r *ArtifactURLResolver) Resolve() (string, string, error) {
 				slog.Duration("elapsedTime", exp.GetElapsedTime()),
 				slog.String("resp", bodyStr),
 			)
+			var statusError httpStatusError
+			if errors.As(err, &statusError) && !statusError.IsRetryable() {
+				return backoff.Permanent(err)
+			}
 			retryCount++
 
 			return err
@@ -220,8 +225,11 @@ func (as *ArtifactsSnapshotVersion) GetSnapshotArtifactVersion(project string, v
 				slog.Duration("elapsedTime", exp.GetElapsedTime()),
 				slog.String("resp", bodyStr),
 			)
+			var statusError httpStatusError
+			if errors.As(err, &statusError) && !statusError.IsRetryable() {
+				return backoff.Permanent(err)
+			}
 			retryCount++
-
 			return err
 		}
 
@@ -348,6 +356,10 @@ func (asur *ArtifactsSnapshotURLResolver) Resolve() (string, string, error) {
 				slog.Duration("elapsedTime", exp.GetElapsedTime()),
 				slog.String("resp", bodyStr),
 			)
+			var statusError httpStatusError
+			if errors.As(err, &statusError) && !statusError.IsRetryable() {
+				return backoff.Permanent(err)
+			}
 			retryCount++
 
 			return err
@@ -451,7 +463,7 @@ func (r *ReleaseURLResolver) Resolve() (string, string, error) {
 		req := httpRequest{URL: url}
 		bodyStr, err := head(req)
 		if err != nil {
-			logger.Debug("Resolver failed",
+			logger.Warn("Resolver failed",
 				slog.String("kind", r.Kind()),
 				slog.String("error", err.Error()),
 				slog.Int("retry", retryCount),
@@ -459,6 +471,10 @@ func (r *ReleaseURLResolver) Resolve() (string, string, error) {
 				slog.Duration("elapsedTime", exp.GetElapsedTime()),
 				slog.String("resp", bodyStr),
 			)
+			var statusError httpStatusError
+			if errors.As(err, &statusError) && !statusError.IsRetryable() {
+				return backoff.Permanent(err)
+			}
 
 			retryCount++
 
