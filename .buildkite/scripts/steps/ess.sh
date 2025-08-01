@@ -19,6 +19,7 @@ function ess_up() {
   BUILDKITE_BUILD_NUMBER="${BUILDKITE_BUILD_NUMBER:-"0"}"
   BUILDKITE_PIPELINE_SLUG="${BUILDKITE_PIPELINE_SLUG:-"elastic-agent-integration-tests"}"
 
+  export TF_LOG=DEBUG
   pushd "${TF_DIR}"
   terraform init
   terraform apply \
