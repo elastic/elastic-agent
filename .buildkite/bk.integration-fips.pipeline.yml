@@ -26,6 +26,7 @@ steps:
       TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
       EC_ENDPOINT: "https://api.staging.elastic-gov.com"
       ESS_REGION: "us-gov-east-1"
+      ESS_DEPLOYMENT_TEMPLATE_ID: "default"
     command: |
       source .buildkite/scripts/steps/ess_start.sh
     artifact_paths:

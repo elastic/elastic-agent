@@ -8,7 +8,8 @@ function ess_up() {
   local STACK_VERSION=$1
   local STACK_BUILD_ID=${2:-""}
   local ESS_REGION=${3:-"gcp-us-west2"}
-    
+  local ESS_DEPLOYMENT_TEMPLATE_ID=${3:-"gcp-storage-optimized"}
+
   if [ -z "$STACK_VERSION" ]; then
     echo "Error: Specify stack version: ess_up [stack_version]" >&2
     return 1
@@ -17,14 +18,15 @@ function ess_up() {
   BUILDKITE_BUILD_CREATOR="${BUILDKITE_BUILD_CREATOR:-"$(get_git_user_email)"}"
   BUILDKITE_BUILD_NUMBER="${BUILDKITE_BUILD_NUMBER:-"0"}"
   BUILDKITE_PIPELINE_SLUG="${BUILDKITE_PIPELINE_SLUG:-"elastic-agent-integration-tests"}"
-  
-  pushd "${TF_DIR}"    
+
+  pushd "${TF_DIR}"
   terraform init
   terraform apply \
     -auto-approve \
     -var="stack_version=${STACK_VERSION}" \
     -var="stack_build_id=${STACK_BUILD_ID}" \
     -var="ess_region=${ESS_REGION}" \
+    -var="deployment_template_id=${ESS_DEPLOYMENT_TEMPLATE_ID}" \
     -var="creator=${BUILDKITE_BUILD_CREATOR}" \
     -var="buildkite_id=${BUILDKITE_BUILD_NUMBER}" \
     -var="pipeline=${BUILDKITE_PIPELINE_SLUG}"
@@ -40,10 +42,10 @@ function ess_up() {
 }
 
 function ess_down() {
-  echo "~~~ Tearing down the ESS Stack"  
+  echo "~~~ Tearing down the ESS Stack"
   local WORKSPACE=$(git rev-parse --show-toplevel)
   local TF_DIR="${WORKSPACE}/test_infra/ess/"
-  
+
   pushd "${TF_DIR}"
   terraform init
   terraform destroy -auto-approve
@@ -52,15 +54,15 @@ function ess_down() {
 
 function get_git_user_email() {
   if ! git rev-parse --is-inside-work-tree &>/dev/null; then
-    echo "unknown"  
+    echo "unknown"
     return
   fi
 
   local email
   email=$(git config --get user.email)
-  
+
   if [ -z "$email" ]; then
-    echo "unknown"  
+    echo "unknown"
   else
     echo "$email"
   fi
