@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -euo pipefail
 
@@ -34,10 +34,10 @@ if [[ -z "${BRANCH:-""}" ]]; then
   exit 1
 fi
 
-# Listing Release manager
-function run_release_manager_list() {
-    local _project_id="${1}" _artifact_set="${2}" _workflow="${3}" _commit="${4}" _branch="${5}" _version="${6}"
-    echo "+++ :hammer_and_pick: Release manager listing ${_branch} ${_workflow} DRA artifacts..."
+function run_release_manager() {
+    local _command="${1}" _project_id="${2}" _artifact_set="${3}" _workflow="${4}" _commit="${5}" _branch="${6}" _version="${7}" _dry_run="${8:-""}"
+    echo "+++ :hammer_and_pick: Release manager ${_command} ${_branch} ${_workflow} ${_dry_run} DRA artifacts..."
+    # shellcheck disable=SC2086
     docker run --rm \
         --name release-manager \
         -e VAULT_ADDR="${VAULT_ADDR_SECRET}" \
@@ -45,28 +45,7 @@ function run_release_manager_list() {
         -e VAULT_SECRET_ID="${VAULT_SECRET}" \
         --mount type=bind,readonly=false,src="${PWD}",target=/artifacts \
         docker.elastic.co/infra/release-manager:latest \
-        cli list \
-        --project "${_project_id}" \
-        --branch "${_branch}" \
-        --commit "${_commit}" \
-        --workflow "${_workflow}" \
-        --version "${_version}" \
-        --artifact-set "${_artifact_set}" \
-        --qualifier "${VERSION_QUALIFIER}"
-}
-
-# Publish DRA artifacts
-function run_release_manager_collect() {
-    local _project_id="${1}" _artifact_set="${2}" _workflow="${3}" _commit="${4}" _branch="${5}" _version="${6}" _dry_run="${7}"
-    echo "+++ :hammer_and_pick: Publishing ${_branch} ${_workflow} DRA artifacts..."
-    docker run --rm \
-        --name release-manager \
-        -e VAULT_ADDR="${VAULT_ADDR_SECRET}" \
-        -e VAULT_ROLE_ID="${VAULT_ROLE_ID_SECRET}" \
-        -e VAULT_SECRET_ID="${VAULT_SECRET}" \
-        --mount type=bind,readonly=false,src="${PWD}",target=/artifacts \
-        docker.elastic.co/infra/release-manager:latest \
-        cli collect \
+        cli "${_command}" \
         --project "${_project_id}" \
         --branch "${_branch}" \
         --commit "${_commit}" \
@@ -77,9 +56,12 @@ function run_release_manager_collect() {
         ${_dry_run}
 }
 
+echo "~~~ Fetch Release Manager Docker image"
+docker pull docker.elastic.co/infra/release-manager:latest
+
 echo "+++ Release Manager Workflow: ${WORKFLOW} / Branch: ${BRANCH} / VERSION_QUALIFIER: ${VERSION_QUALIFIER} / Commit: ${COMMIT}"
-run_release_manager_list "${DRA_PROJECT_ID}" "${DRA_PROJECT_ARTIFACT_ID}" "${WORKFLOW}" "${COMMIT}" "${BRANCH}" "${PACKAGE_VERSION}"
-run_release_manager_collect "${DRA_PROJECT_ID}" "${DRA_PROJECT_ARTIFACT_ID}" "${WORKFLOW}" "${COMMIT}" "${BRANCH}" "${PACKAGE_VERSION}" "${DRY_RUN}"
+run_release_manager "list" "${DRA_PROJECT_ID}" "${DRA_PROJECT_ARTIFACT_ID}" "${WORKFLOW}" "${COMMIT}" "${BRANCH}" "${PACKAGE_VERSION}"
+run_release_manager "collect" "${DRA_PROJECT_ID}" "${DRA_PROJECT_ARTIFACT_ID}" "${WORKFLOW}" "${COMMIT}" "${BRANCH}" "${PACKAGE_VERSION}" "${DRY_RUN}"
 RM_EXIT_CODE=$?
 
 exit $RM_EXIT_CODE

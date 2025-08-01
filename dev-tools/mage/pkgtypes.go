@@ -630,12 +630,45 @@ func PackageZip(spec PackageSpec) error {
 
 // PackageTarGz packages a gzipped tar file.
 func PackageTarGz(spec PackageSpec) error {
-	// Create a buffer to write our archive to.
-	buf := new(bytes.Buffer)
+	baseDir := spec.rootDir()
+
+	// Create the output file.
+	if spec.OutputFile == "" {
+		outputTarGz, err := spec.Expand(defaultBinaryName + ".tar.gz")
+		if err != nil {
+			return err
+		}
+		spec.OutputFile = filepath.Join(distributionsDir, outputTarGz)
+	}
+	spec.OutputFile = TarGz.AddFileExtension(spec.OutputFile)
+
+	// Open the output file.
+	log.Println("Creating output file at", spec.OutputFile)
+	outFile, err := os.Create(CreateDir(spec.OutputFile))
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := outFile.Close(); err != nil {
+			log.Printf("failed to close output file: %v", err)
+		}
+	}()
+
+	// Create a gzip writer to our output file
+	gzWriter := gzip.NewWriter(outFile)
+	defer func() {
+		if err := gzWriter.Close(); err != nil {
+			log.Printf("failed to close gzip writer: %v", err)
+		}
+	}()
 
 	// Create a new tar archive.
-	w := tar.NewWriter(buf)
-	baseDir := spec.rootDir()
+	w := tar.NewWriter(gzWriter)
+	defer func() {
+		if err := w.Close(); err != nil {
+			log.Printf("failed to close tar writer: %v", err)
+		}
+	}()
 
 	// // Replace the darwin-universal by darwin-x86_64 and darwin-arm64. Also
 	// // keep the other files.
@@ -689,33 +722,10 @@ func PackageTarGz(spec PackageSpec) error {
 	if err := w.Close(); err != nil {
 		return err
 	}
-
-	// Output tar.gz to disk.
-	if spec.OutputFile == "" {
-		outputTarGz, err := spec.Expand(defaultBinaryName + ".tar.gz")
-		if err != nil {
-			return err
-		}
-		spec.OutputFile = filepath.Join(distributionsDir, outputTarGz)
-	}
-	spec.OutputFile = TarGz.AddFileExtension(spec.OutputFile)
-
-	// Open the output file.
-	log.Println("Creating output file at", spec.OutputFile)
-	outFile, err := os.Create(CreateDir(spec.OutputFile))
-	if err != nil {
+	if err := gzWriter.Close(); err != nil {
 		return err
 	}
-	defer outFile.Close()
-
-	// Gzip compress the data.
-	gzWriter := gzip.NewWriter(outFile)
-	if _, err = gzWriter.Write(buf.Bytes()); err != nil {
-		return err
-	}
-
-	// Close and flush.
-	if err = gzWriter.Close(); err != nil {
+	if err := outFile.Close(); err != nil {
 		return err
 	}
 
