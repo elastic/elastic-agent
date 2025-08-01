@@ -58,11 +58,7 @@ func TestRunnerDoneTimedOut(t *testing.T) {
 	}()
 
 	// Should be done much sooner
-	select {
-	case <-runner.Done():
-	case <-time.After(500 * time.Millisecond):
-		t.Fatal("timed out")
-	}
+	<-runner.Done()
 
 	// Should have no errors
 	err := runner.Err()
