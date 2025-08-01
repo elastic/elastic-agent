@@ -77,6 +77,7 @@ inputs:
     description: "Endpoint Security"
     platforms:
       - windows/amd64
+      - windows/arm64
     outputs: *outputs
     proxied_actions: *proxied_actions
     runtime:
@@ -85,8 +86,8 @@ inputs:
           message: "Elastic Defend requires Elastic Agent be running as Administrator or SYSTEM"
         - condition: ${install.in_default} == false
           message: "Elastic Defend requires Elastic Agent be installed at the default installation path"
-        - condition: ${runtime.native_arch} != '' and ${runtime.native_arch} != 'amd64'
-          message: "Elastic Defend cannot be installed on Windows running on non-AMD64 CPU"
+        - condition: ${runtime.native_arch} != '' and ${runtime.arch} != ${runtime.native_arch}
+          message: "Elastic Defend cannot run on an emulated architecture"
         - condition: ${runtime.major} < 6 or (${runtime.major} == 6 and ${runtime.minor} < 2)
           message: "Elastic Defend requires Windows 10 / Server 2012 or newer."
     service:
