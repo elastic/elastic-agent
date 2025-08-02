@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -99,6 +100,7 @@ type Upgrader struct {
 	fleetServerURI            string
 	markerWatcher             MarkerWatcher
 	downloaderFactoryProvider DownloaderFactoryProvider
+	upgradeCleaner            upgradeCleaner
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -128,6 +130,11 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.A
 		upgradeable:               IsUpgradeable(),
 		markerWatcher:             newMarkerFileWatcher(markerFilePath(paths.Data()), log),
 		downloaderFactoryProvider: downloaderFactoryProvider,
+		upgradeCleaner: &upgradeCleanup{
+			log:          log,
+			rollbackFunc: rollbackInstall,
+			cleanupFuncs: []func() error{},
+		},
 	}, nil
 }
 
@@ -226,6 +233,102 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 	}
 
 	return nil
+}
+
+type upgradeCleaner interface {
+	setupRollback(topDirPath, newHomeDir, oldHomeDir string) error
+	setupArchiveCleanup(archivePath string) error
+	setupUnpackCleanup(newHomeDir, oldHomeDir string) error
+	cleanup(err error) error
+}
+type upgradeCleanup struct {
+	log                  *logger.Logger
+	rollbackToggle       bool
+	archiveCleanupToggle bool
+	unpackCleanupToggle  bool
+	rollbackFunc         func(*logger.Logger, string, string, string) error
+	cleanupFuncs         []func() error
+}
+
+func (u *upgradeCleanup) setupArchiveCleanup(archivePath string) error {
+	u.log.Debugf("Setting up cleanup for archive, archivePath: %s", archivePath)
+	if archivePath == "" {
+		msg := "archive path is empty, cannot cleanup"
+		u.log.Errorf(msg)
+		return errors.New(msg)
+	}
+	u.archiveCleanupToggle = true
+
+	u.cleanupFuncs = append(u.cleanupFuncs, func() error {
+		return os.RemoveAll(archivePath)
+	})
+
+	return nil
+}
+
+func (u *upgradeCleanup) setupUnpackCleanup(newHomeDir, oldHomeDir string) error {
+	u.log.Debugf("Setting up cleanup for unpack, newVersionedHome: %s", newHomeDir)
+
+	if !u.archiveCleanupToggle {
+		msg := "Cannot setup for unpack cleanup before archive cleanup is setup"
+		u.log.Debugf(msg)
+		return errors.New(msg)
+	}
+
+	if newHomeDir == "" || oldHomeDir == "" {
+		msg := "new or old versioned home is empty, cannot cleanup"
+		u.log.Errorf(msg)
+		return errors.New(msg)
+	}
+
+	if newHomeDir == oldHomeDir {
+		msg := "new and old versioned home are the same, cannot cleanup"
+		u.log.Errorf(msg)
+		return errors.New(msg)
+	}
+
+	u.unpackCleanupToggle = true
+
+	u.cleanupFuncs = append(u.cleanupFuncs, func() error {
+		return os.RemoveAll(newHomeDir)
+	})
+
+	return nil
+}
+
+func (u *upgradeCleanup) setupRollback(topDirPath, newHomeDir, oldHomeDir string) error {
+	u.log.Debugf("Setting up cleanup for rollback, topDirPath: %s, oldVersionedHome: %s, newVersionedHome: %s", topDirPath, oldHomeDir, newHomeDir)
+
+	if !u.unpackCleanupToggle {
+		msg := "Cannot setup for rollback before unpack cleanup is setup"
+		u.log.Debugf(msg)
+		return errors.New(msg)
+	}
+
+	u.rollbackToggle = true
+
+	u.cleanupFuncs = append(u.cleanupFuncs, func() error {
+		return rollbackInstall(u.log, topDirPath, newHomeDir, oldHomeDir)
+	})
+
+	return nil
+}
+
+func (u *upgradeCleanup) cleanup(err error) error {
+	if err == nil {
+		u.log.Debugf("No error, skipping cleanup")
+		return nil
+	}
+
+	slices.Reverse(u.cleanupFuncs)
+
+	for _, cleanupFunc := range u.cleanupFuncs {
+		if cleanupErr := cleanupFunc(); cleanupErr != nil {
+			return goerrors.Join(err, cleanupErr)
+		}
+	}
+
+	return err
 }
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
@@ -351,7 +454,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	if err := changeSymlink(u.log, paths.Top(), symlinkPath, newPath); err != nil {
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
-		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
+		rollbackErr := rollbackInstall(u.log, paths.Top(), hashedDir, currentVersionedHome)
 		return nil, goerrors.Join(err, rollbackErr)
 	}
 
@@ -380,7 +483,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		previous,     // old agent version data
 		action, det, OUTCOME_UPGRADE); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
-		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
+		rollbackErr := rollbackInstall(u.log, paths.Top(), hashedDir, currentVersionedHome)
 		return nil, goerrors.Join(err, rollbackErr)
 	}
 
@@ -389,14 +492,14 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	var watcherCmd *exec.Cmd
 	if watcherCmd, err = InvokeWatcher(u.log, watcherExecutable); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
-		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
+		rollbackErr := rollbackInstall(u.log, paths.Top(), hashedDir, currentVersionedHome)
 		return nil, goerrors.Join(err, rollbackErr)
 	}
 
 	watcherWaitErr := waitForWatcher(ctx, u.log, markerFilePath(paths.Data()), watcherMaxWaitTime)
 	if watcherWaitErr != nil {
 		killWatcherErr := watcherCmd.Process.Kill()
-		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
+		rollbackErr := rollbackInstall(u.log, paths.Top(), hashedDir, currentVersionedHome)
 		return nil, goerrors.Join(watcherWaitErr, killWatcherErr, rollbackErr)
 	}
 
@@ -535,7 +638,7 @@ func isSameVersion(log *logger.Logger, current agentVersion, newVersion agentVer
 	return current == newVersion
 }
 
-func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {
+func rollbackInstall(log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {
 	oldAgentPath := paths.BinaryPath(filepath.Join(topDirPath, oldVersionedHome), agentName) // TODO: topdir + new version home is the place to clean up: same as the newAgentInstallPath below
 	err := changeSymlink(log, topDirPath, filepath.Join(topDirPath, agentName), oldAgentPath)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
