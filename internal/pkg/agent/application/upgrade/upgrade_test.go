@@ -1152,6 +1152,10 @@ func TestManualRollback(t *testing.T) {
 				err = locker.TryLock()
 				require.NoError(t, err, "error locking initial watcher AppLocker")
 				// there's no takeover watcher so no expectation on that or InvokeWatcher
+				t.Cleanup(func() {
+					unlockErr := locker.Unlock()
+					assert.NoError(t, unlockErr, "error unlocking initial watcher AppLocker")
+				})
 			},
 			artifactSettings:  artifact.DefaultConfig(),
 			upgradeSettings:   configuration.DefaultUpgradeConfig(),
