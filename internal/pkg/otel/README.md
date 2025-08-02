@@ -55,7 +55,6 @@ This section provides a summary of components included in the Elastic Distributi
 | [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusreceiver/v0.129.0/receiver/prometheusreceiver/README.md) | v0.129.0 |
 | [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.129.0/receiver/receivercreator/README.md) | v0.129.0 |
 | [redisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/redisreceiver/v0.129.0/receiver/redisreceiver/README.md) | v0.129.0 |
-| [sqlqueryreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/sqlqueryreceiver/v0.129.0/receiver/sqlqueryreceiver/README.md) | v0.129.0 |
 | [zipkinreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zipkinreceiver/v0.129.0/receiver/zipkinreceiver/README.md) | v0.129.0 |
 
 ### Exporters
