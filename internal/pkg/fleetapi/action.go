@@ -438,12 +438,19 @@ type ActionMigrate struct {
 	ActionType string            `json:"type" yaml:"type"`
 	Data       ActionMigrateData `json:"data,omitempty"`
 
+	Signature *Signed `json:"signed,omitempty" yaml:"signed,omitempty" mapstructure:"signed,omitempty"`
+
 	Err error `json:"-" yaml:"-" mapstructure:"-"`
 }
 
 // ID returns the ID of the Action.
 func (a *ActionMigrate) ID() string {
 	return a.ActionID
+}
+
+// Signed returns the Signed portion of the Action.
+func (a *ActionMigrate) Signed() *Signed {
+	return a.Signature
 }
 
 // Type returns the type of the Action.
@@ -579,7 +586,7 @@ type ActionApp struct {
 	Response    map[string]interface{} `json:"response,omitempty" mapstructure:"response,omitempty"`
 	StartedAt   string                 `json:"started_at,omitempty" mapstructure:"started_at,omitempty"`
 	CompletedAt string                 `json:"completed_at,omitempty" mapstructure:"completed_at,omitempty"`
-	Signed      *Signed                `json:"signed,omitempty" mapstructure:"signed,omitempty"`
+	Signature   *Signed                `json:"signed,omitempty" mapstructure:"signed,omitempty"`
 	Error       string                 `json:"error,omitempty" mapstructure:"error,omitempty"`
 }
 
@@ -617,6 +624,10 @@ func (a *ActionApp) AckEvent() AckEvent {
 		CompletedAt:     a.CompletedAt,
 		Error:           a.Error,
 	}
+}
+
+func (a *ActionApp) Signed() *Signed {
+	return a.Signature
 }
 
 // MarshalMap marshals ActionApp into a corresponding map

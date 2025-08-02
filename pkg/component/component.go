@@ -591,7 +591,10 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 				}
 
 				for headerName, headerVal := range agentHeaders {
-					headers[headerName] = headerVal
+					// only set headers for those that are not already set
+					if _, ok := headers[headerName]; !ok {
+						headers[headerName] = headerVal
+					}
 				}
 
 				output[headersKey] = headers

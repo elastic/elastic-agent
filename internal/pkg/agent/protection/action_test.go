@@ -202,13 +202,14 @@ func TestValidateAction(t *testing.T) {
 		wantErr    error
 	}{
 		{
-			name:   "empty action",
-			action: getTestAction(t, nil, nil),
+			name:    "empty action",
+			action:  getTestAction(t, nil, nil),
+			wantErr: ErrNotSigned,
 		},
 		{
-			name:       "unsigned action",
-			action:     unsignedAction,
-			wantAction: unsignedAction,
+			name:    "unsigned action",
+			action:  unsignedAction,
+			wantErr: ErrNotSigned,
 		},
 		{
 			name:       "signed action, empty agent id",
@@ -234,9 +235,9 @@ func TestValidateAction(t *testing.T) {
 			name: "signed action corrupted/empty data",
 			action: func() fleetapi.ActionApp {
 				ac := signedAction
-				ac.Signed = &fleetapi.Signed{
+				ac.Signature = &fleetapi.Signed{
 					Data:      "",
-					Signature: ac.Signed.Signature,
+					Signature: ac.Signature.Signature,
 				}
 				return ac
 			}(),
@@ -251,8 +252,8 @@ func TestValidateAction(t *testing.T) {
 			name: "signed action empty signature",
 			action: func() fleetapi.ActionApp {
 				ac := signedAction
-				ac.Signed = &fleetapi.Signed{
-					Data:      ac.Signed.Data,
+				ac.Signature = &fleetapi.Signed{
+					Data:      ac.Signature.Data,
 					Signature: "",
 				}
 				return ac
@@ -263,9 +264,9 @@ func TestValidateAction(t *testing.T) {
 			name: "signed action invalid base64 data",
 			action: func() fleetapi.ActionApp {
 				ac := signedAction
-				ac.Signed = &fleetapi.Signed{
+				ac.Signature = &fleetapi.Signed{
 					Data:      "ABC",
-					Signature: ac.Signed.Signature,
+					Signature: ac.Signature.Signature,
 				}
 				return ac
 			}(),
@@ -275,8 +276,8 @@ func TestValidateAction(t *testing.T) {
 			name: "signed action invalid base64 signature",
 			action: func() fleetapi.ActionApp {
 				ac := signedAction
-				ac.Signed = &fleetapi.Signed{
-					Data:      ac.Signed.Data,
+				ac.Signature = &fleetapi.Signed{
+					Data:      ac.Signature.Data,
 					Signature: "ABC",
 				}
 				return ac
@@ -287,7 +288,7 @@ func TestValidateAction(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			validated, err := ValidateAction(tc.action, pubK, tc.agentID)
+			validated, err := ValidateAction(&tc.action, pubK, tc.agentID)
 
 			diff := cmp.Diff(tc.wantErr, err, cmpopts.EquateErrors())
 			if diff != "" {
@@ -295,7 +296,7 @@ func TestValidateAction(t *testing.T) {
 			}
 
 			if tc.wantErr == nil {
-				diff = cmp.Diff(tc.wantAction, validated)
+				diff = cmp.Diff(tc.wantAction.Data, validated)
 				if diff != "" {
 					t.Fatal(diff)
 				}

@@ -2166,7 +2166,8 @@ func TestToComponents(t *testing.T) {
 						"type":    "elasticsearch",
 						"enabled": true,
 						"headers": map[string]interface{}{
-							"header-two": "val-2",
+							"header-two":   "val-2",
+							"header-three": "val-3",
 						},
 					},
 				},
@@ -2195,8 +2196,9 @@ func TestToComponents(t *testing.T) {
 							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "elasticsearch",
 								"headers": map[string]interface{}{
-									"header-two": "val-2",
-									"header-one": "val-1",
+									"header-two":   "val-2",
+									"header-one":   "val-1",
+									"header-three": "val-3",
 								},
 							}),
 						},
@@ -2214,7 +2216,8 @@ func TestToComponents(t *testing.T) {
 				},
 			},
 			headers: &testHeadersProvider{headers: map[string]string{
-				"header-one": "val-1",
+				"header-one":   "val-1",
+				"header-three": "val-3-diff",
 			}},
 		},
 		{
@@ -2227,6 +2230,7 @@ func TestToComponents(t *testing.T) {
 						"enabled": true,
 						"headers": map[string]interface{}{
 							"cloud1": "beat1",
+							"cloud3": "beat3",
 						},
 					},
 				},
@@ -2257,6 +2261,7 @@ func TestToComponents(t *testing.T) {
 								"headers": map[string]interface{}{
 									"cloud1": "beat1",
 									"cloud2": "beat2",
+									"cloud3": "beat3",
 								},
 							}),
 						},
@@ -2275,6 +2280,7 @@ func TestToComponents(t *testing.T) {
 			},
 			headers: &testHeadersProvider{headers: map[string]string{
 				"cloud2": "beat2",
+				"cloud3": "beat3-diff",
 			}},
 		},
 		{

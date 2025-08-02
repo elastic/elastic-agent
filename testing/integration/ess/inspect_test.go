@@ -74,6 +74,9 @@ func TestInspect(t *testing.T) {
 			}})
 	require.NoErrorf(t, err, "Error when installing agent, output: %s", out)
 	check.ConnectedToFleet(ctx, t, fixture, 5*time.Minute)
+	require.Eventually(t, func() bool {
+		return checkinWithAcker.Acked(policyChangeAction.ActionID)
+	}, 5*time.Minute, time.Second, "Policy change action should have been acked")
 
 	p, err := fixture.Exec(ctx, []string{"inspect"})
 	require.NoErrorf(t, err, "Error when running inspect, output: %s", p)
