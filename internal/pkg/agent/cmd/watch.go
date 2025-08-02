@@ -8,9 +8,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
 	"runtime"
-	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -36,6 +34,8 @@ const (
 	watcherName     = "elastic-agent-watcher"
 	watcherLockFile = "watcher.lock"
 )
+
+var ErrWatchCancelled = errors.New("watch cancelled")
 
 func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
@@ -102,6 +102,30 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		_ = locker.Unlock()
 	}()
 
+	if marker.DesiredOutcome == upgrade.OUTCOME_ROLLBACK {
+		// TODO: there should be some sanity check in rollback functions like the installation we are going back to should exist and work
+		log.Info("rolling back because of DesiredOutcome=%s", marker.DesiredOutcome.String())
+		err = installModifier.Rollback(context.Background(), log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash)
+		if err != nil {
+			return fmt.Errorf("rolling back: %w", err)
+		}
+
+		if marker.Details == nil {
+			actionID := ""
+			if marker.Action != nil {
+				actionID = marker.Action.ActionID
+			}
+			marker.Details = details.NewDetails(marker.Version, details.StateRollback, actionID)
+		}
+		marker.Details.SetStateWithReason(details.StateRollback, details.ReasonManualRollback)
+		err := upgrade.SaveMarker(dataDir, marker, true)
+		if err != nil {
+			return fmt.Errorf("saving marker after rolling back: %w", err)
+		}
+
+		return nil
+	}
+
 	isWithinGrace, tilGrace := gracePeriod(marker, cfg.GracePeriod)
 	if isTerminalState(marker) || !isWithinGrace {
 		stateString := ""
@@ -130,6 +154,11 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	errorCheckInterval := cfg.ErrorCheck.Interval
 	ctx := context.Background()
 	if err := watcher.Watch(ctx, tilGrace, errorCheckInterval, log); err != nil {
+		if errors.Is(err, ErrWatchCancelled) {
+			// the watch has been cancelled prematurely, don't clean or rollback just yet
+			return nil
+		}
+
 		log.Error("Error detected, proceeding to rollback: %v", err)
 
 		upgradeDetails.SetStateWithReason(details.StateRollback, details.ReasonWatchFailed)
@@ -178,48 +207,6 @@ func isTerminalState(marker *upgrade.UpdateMarker) bool {
 
 func isWindows() bool {
 	return runtime.GOOS == "windows"
-}
-
-func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval time.Duration, log *logger.Logger) error {
-	errChan := make(chan error)
-
-	ctx, cancel := context.WithCancel(ctx)
-
-	//cleanup
-	defer func() {
-		cancel()
-		close(errChan)
-	}()
-
-	agentWatcher := upgrade.NewAgentWatcher(errChan, log, errorCheckInterval)
-	go agentWatcher.Run(ctx)
-
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
-
-	t := time.NewTimer(tilGrace)
-	defer t.Stop()
-
-WATCHLOOP:
-	for {
-		select {
-		case <-signals:
-			// ignore
-			continue
-		case <-ctx.Done():
-			break WATCHLOOP
-		// grace period passed, agent is considered stable
-		case <-t.C:
-			log.Info("Grace period passed, not watching")
-			break WATCHLOOP
-		// Agent in degraded state.
-		case err := <-errChan:
-			log.Errorf("Agent Error detected: %s", err.Error())
-			return err
-		}
-	}
-
-	return nil
 }
 
 // gracePeriod returns true if it is within grace period and time until grace period ends.
@@ -273,7 +260,11 @@ func getConfig(streams *cli.IOStreams) *configuration.Configuration {
 }
 
 func initUpgradeDetails(marker *upgrade.UpdateMarker, saveMarker func(*upgrade.UpdateMarker, bool) error, log *logp.Logger) *details.Details {
+	// FIXME this should edit details not rewrite them
 	upgradeDetails := details.NewDetails(version.GetAgentPackageVersion(), details.StateWatching, marker.GetActionID())
+	if marker.Details != nil {
+		upgradeDetails.Metadata.RollbacksAvailable = marker.Details.Metadata.RollbacksAvailable
+	}
 	upgradeDetails.RegisterObserver(func(details *details.Details) {
 		marker.Details = details
 		if err := saveMarker(marker, true); err != nil {

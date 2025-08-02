@@ -11,7 +11,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
-	"context"
 	"errors"
 	"io"
 	"os"
@@ -25,19 +24,13 @@ import (
 
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
-	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/version"
 	agtversion "github.com/elastic/elastic-agent/version"
 )
 
-func repackageArchive(ctx context.Context, t *testing.T, startFixture *atesting.Fixture, newVersionBuildMetadata string, currentVersion *version.ParsedSemVer, newPackageContainingDir string, parsedNewVersion *version.ParsedSemVer) (*version.ParsedSemVer, error) {
-	err := startFixture.EnsurePrepared(ctx)
-	require.NoErrorf(t, err, "fixture should be prepared")
-
-	// retrieve the compressed package file location
-	srcPackage, err := startFixture.SrcPackage(ctx)
-	require.NoErrorf(t, err, "error retrieving start fixture source package")
-
+// repackageArchive will take a srcPackage elastic-agent package and create a modified copy that will present parsedNewVersion
+// in package version file, manifest and relevant metadata.
+func repackageArchive(t *testing.T, srcPackage string, newVersionBuildMetadata string, currentVersion *version.ParsedSemVer, parsedNewVersion *version.ParsedSemVer) (*version.ParsedSemVer, string, error) {
 	originalPackageFileName := filepath.Base(srcPackage)
 
 	// integration test fixtures and package names treat the version as a string including the "-SNAPSHOT" suffix
@@ -54,8 +47,8 @@ func repackageArchive(ctx context.Context, t *testing.T, startFixture *atesting.
 	// calculate the new package name
 	newPackageFileName := strings.Replace(originalPackageFileName, currentVersion.String(), versionForFixture.String(), 1)
 	t.Logf("originalPackageName: %q newPackageFileName: %q", originalPackageFileName, newPackageFileName)
-
-	newPackageAbsPath := filepath.Join(newPackageContainingDir, newPackageFileName)
+	outDir := t.TempDir()
+	newPackageAbsPath := filepath.Join(outDir, newPackageFileName)
 
 	// hack the package based on type
 	ext := filepath.Ext(originalPackageFileName)
@@ -76,9 +69,9 @@ func repackageArchive(ctx context.Context, t *testing.T, startFixture *atesting.
 	}
 
 	// Create hash file for the new package
-	err = mage.CreateSHA512File(newPackageAbsPath)
+	err := mage.CreateSHA512File(newPackageAbsPath)
 	require.NoErrorf(t, err, "error creating .sha512 for file %q", newPackageAbsPath)
-	return versionForFixture, err
+	return versionForFixture, newPackageAbsPath, err
 }
 
 func repackageTarArchive(t *testing.T, srcPackagePath string, newPackagePath string, newVersion *version.ParsedSemVer) {

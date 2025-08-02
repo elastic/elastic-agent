@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -24,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -37,6 +39,15 @@ const reallyFastWatcherCfg = `
 agent.upgrade.watcher:
   grace_period: 2m
   error_check.interval: 5s
+`
+
+const fastWatcherCfgWithRollbackWindow = `
+agent.upgrade:
+    watcher:
+        grace_period: 2m
+        error_check.interval: 5s
+    rollback:
+        window: 10m
 `
 
 // TestStandaloneUpgradeRollback tests the scenario where upgrading to a new version
@@ -232,8 +243,6 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 				require.NoError(t, err)
 
 				// Create a new package with a different version (IAR-style)
-				newPackageContainingDir := t.TempDir()
-
 				// modify the version with the "+buildYYYYMMDDHHMMSS"
 				currentVersion, err := version.ParseVersion(define.Version())
 				require.NoErrorf(t, err, "define.Version() %q is not parsable.", define.Version())
@@ -241,12 +250,19 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 				newVersionBuildMetadata := "build" + time.Now().Format("20060102150405")
 				parsedNewVersion := version.NewParsedSemVer(currentVersion.Major(), currentVersion.Minor(), currentVersion.Patch(), "", newVersionBuildMetadata)
 
-				versionForFixture, err := repackageArchive(t.Context(), t, fromFixture, newVersionBuildMetadata, currentVersion, newPackageContainingDir, parsedNewVersion)
+				err = fromFixture.EnsurePrepared(t.Context())
+				require.NoErrorf(t, err, "fixture should be prepared")
+
+				// retrieve the compressed package file location
+				srcPackage, err := fromFixture.SrcPackage(t.Context())
+				require.NoErrorf(t, err, "error retrieving start fixture source package")
+
+				versionForFixture, repackagedArchiveFile, err := repackageArchive(t, srcPackage, newVersionBuildMetadata, currentVersion, parsedNewVersion)
 				require.NoError(t, err, "error repackaging the archive built from the same commit")
 
 				// I wish I could just pass the location of the package on disk to the whole upgrade tests/fixture/fetcher code
 				// but I would have to break too much code for that, when in Rome... add more code on top of inflexible code
-				repackagedLocalFetcher := atesting.LocalFetcher(newPackageContainingDir)
+				repackagedLocalFetcher := atesting.LocalFetcher(filepath.Dir(repackagedArchiveFile))
 				toFixture, err := atesting.NewFixture(
 					t,
 					versionForFixture.String(),
@@ -321,6 +337,79 @@ func TestFleetManagedUpgradeRollbackOnRestarts(t *testing.T) {
 			managedRollbackRestartTest(ctx, t, info, from, to)
 		})
 	}
+}
+
+// TestStandaloneUpgradeManualRollback tests the scenario where, after upgrading to a new version
+// of Agent, a manual rollback is triggered. It checks that the Agent is rolled back to the previous version.
+func TestStandaloneUpgradeManualRollback(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Upgrade,
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+	})
+
+	type fixturesSetupFunc func(t *testing.T) (from *atesting.Fixture, to *atesting.Fixture)
+	testcases := []struct {
+		name          string
+		fixturesSetup fixturesSetupFunc
+	}{
+		{
+			name: "upgrade to a repackaged agent built from the same commit",
+			fixturesSetup: func(t *testing.T) (from *atesting.Fixture, to *atesting.Fixture) {
+				// Upgrade from the current build to the same build as Independent Agent Release.
+
+				// Start from the build under test.
+				fromFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+				require.NoError(t, err)
+
+				// Create a new package with a different version (IAR-style)
+				// modify the version with the "+buildYYYYMMDDHHMMSS"
+				currentVersion, err := version.ParseVersion(define.Version())
+				require.NoErrorf(t, err, "define.Version() %q is not parsable.", define.Version())
+
+				newVersionBuildMetadata := "build" + time.Now().Format("20060102150405")
+				parsedNewVersion := version.NewParsedSemVer(currentVersion.Major(), currentVersion.Minor(), currentVersion.Patch(), "", newVersionBuildMetadata)
+
+				err = fromFixture.EnsurePrepared(t.Context())
+				require.NoErrorf(t, err, "fixture should be prepared")
+
+				// retrieve the compressed package file location
+				srcPackage, err := fromFixture.SrcPackage(t.Context())
+				require.NoErrorf(t, err, "error retrieving start fixture source package")
+
+				versionForFixture, repackagedArchiveFile, err := repackageArchive(t, srcPackage, newVersionBuildMetadata, currentVersion, parsedNewVersion)
+				require.NoError(t, err, "error repackaging the archive built from the same commit")
+
+				repackagedLocalFetcher := atesting.LocalFetcher(filepath.Dir(repackagedArchiveFile))
+				toFixture, err := atesting.NewFixture(
+					t,
+					versionForFixture.String(),
+					atesting.WithFetcher(repackagedLocalFetcher),
+				)
+				require.NoError(t, err)
+
+				return fromFixture, toFixture
+			},
+		},
+	}
+
+	// set up start ficture with a rollback window of 1h
+	rollbackWindowConfig := `
+agent.upgrade.rollback.window: 1h
+`
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
+			defer cancel()
+			from, to := tc.fixturesSetup(t)
+
+			err := from.Configure(ctx, []byte(rollbackWindowConfig))
+			require.NoError(t, err, "error setting up rollback window")
+			standaloneManualRollbackTest(ctx, t, from, to)
+		})
+	}
+
 }
 
 func managedRollbackRestartTest(ctx context.Context, t *testing.T, info *define.Info, from *atesting.Fixture, to *atesting.Fixture) {
@@ -401,11 +490,29 @@ func managedRollbackRestartTest(ctx context.Context, t *testing.T, info *define.
 }
 
 func standaloneRollbackRestartTest(ctx context.Context, t *testing.T, startFixture *atesting.Fixture, endFixture *atesting.Fixture) {
+	standaloneRollbackTest(ctx, t, startFixture, endFixture, reallyFastWatcherCfg, details.ReasonWatchFailed,
+		func(t *testing.T, _ client.Client) {
+			restartAgentNTimes(t, 3, 10*time.Second)
+		})
+}
+
+func standaloneManualRollbackTest(ctx context.Context, t *testing.T, startFixture *atesting.Fixture, endFixture *atesting.Fixture) {
+	standaloneRollbackTest(ctx, t, startFixture, endFixture, fastWatcherCfgWithRollbackWindow, details.ReasonManualRollback,
+		func(t *testing.T, client client.Client) {
+			t.Logf("sending version=%s rollback=%v upgrade to agent", startFixture.Version(), true)
+			retVal, err := client.Upgrade(ctx, startFixture.Version(), true, "", false, false)
+			require.NoError(t, err, "error triggering manual rollback to version %s", startFixture.Version())
+			t.Logf("received output %s from upgrade command", retVal)
+		},
+	)
+}
+
+func standaloneRollbackTest(ctx context.Context, t *testing.T, startFixture *atesting.Fixture, endFixture *atesting.Fixture, customConfig string, rollbackReason string, rollbackTrigger func(t *testing.T, client client.Client)) {
 
 	startVersionInfo, err := startFixture.ExecVersion(ctx)
 	require.NoError(t, err, "failed to get start agent build version info")
 
-	endVersionInfo, err := startFixture.ExecVersion(ctx)
+	endVersionInfo, err := endFixture.ExecVersion(ctx)
 	require.NoError(t, err, "failed to get end agent build version info")
 
 	t.Logf("Testing Elastic Agent upgrade from %s to %s...", startFixture.Version(), endVersionInfo.Binary.String())
@@ -420,15 +527,19 @@ func standaloneRollbackRestartTest(ctx context.Context, t *testing.T, startFixtu
 	err = upgradetest.PerformUpgrade(
 		ctx, startFixture, endFixture, t,
 		upgradetest.WithPostUpgradeHook(postUpgradeHook),
-		upgradetest.WithCustomWatcherConfig(reallyFastWatcherCfg),
+		upgradetest.WithCustomWatcherConfig(customConfig),
 		upgradetest.WithDisableHashCheck(true))
 	if !errors.Is(err, ErrPostExit) {
 		require.NoError(t, err)
 	}
 
-	// A few seconds after the upgrade, deliberately restart upgraded Agent a
-	// couple of times to simulate Agent crashing.
-	restartAgentNTimes(t, 3, 10*time.Second)
+	elasticAgentClient := startFixture.Client()
+	err = elasticAgentClient.Connect(ctx)
+	require.NoError(t, err, "error connecting to installed elastic agent")
+	defer elasticAgentClient.Disconnect()
+
+	// A few seconds after the upgrade, trigger a rollback using the passed trigger
+	rollbackTrigger(t, elasticAgentClient)
 
 	// wait for the agent to be healthy and back at the start version
 	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
@@ -448,17 +559,15 @@ func standaloneRollbackRestartTest(ctx context.Context, t *testing.T, startFixtu
 	require.NoError(t, err)
 
 	if !startVersion.Less(*version.NewParsedSemVer(8, 12, 0, "", "")) {
-		client := startFixture.Client()
-		err = client.Connect(ctx)
 		require.NoError(t, err)
 
-		state, err := client.State(ctx)
+		state, err := elasticAgentClient.State(ctx)
 		require.NoError(t, err)
 
 		require.NotNil(t, state.UpgradeDetails)
 		assert.Equal(t, details.StateRollback, details.State(state.UpgradeDetails.State))
 		if !startVersion.Less(*upgradetest.Version_9_2_0_SNAPSHOT) {
-			assert.Equal(t, details.ReasonWatchFailed, state.UpgradeDetails.Metadata.Reason)
+			assert.Equal(t, rollbackReason, state.UpgradeDetails.Metadata.Reason)
 		}
 	}
 
