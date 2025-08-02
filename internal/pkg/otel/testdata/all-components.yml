@@ -71,19 +71,6 @@ receivers:
   postgresql:
     username: test
     password: test
-  sqlquery:
-    driver: postgres
-    datasource: "host=localhost port=5432 user=postgres password=s3cr3t sslmode=disable"
-    queries:
-      - sql: "select * from my_logs where log_id > $$1"
-        tracking_start_value: "10000"
-        tracking_column: log_id
-        logs:
-          - body_column: log_body
-      - sql: "select count(*) as count, genre from movie group by genre"
-        metrics:
-          - metric_name: movie.genres
-            value_column: "count"
 
 connectors:
   spanmetrics:
@@ -138,7 +125,6 @@ service:
         - otlp
         - nop
         - elasticapmintake
-        - sqlquery
 
     logs/forward_receive:
       receivers:
@@ -176,7 +162,6 @@ service:
         - apache
         - mysql
         - postgresql
-        - sqlquery
 
     metrics/aggregated:
       receivers:
