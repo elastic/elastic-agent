@@ -46,6 +46,7 @@ func saveConfigToStore(store storage.Store, reader io.Reader) error {
 	retryWithConstantBackoff := backoff.NewConstantBackOff(saveRetryInterval)
 
 	// Retry save operation
+	//nolint:errcheck // ignore returned error because we're interested in the error from the save operation, saveErr
 	backoff.Retry(retryableSaveFn, backoff.WithContext(retryWithConstantBackoff, retryCtx))
 
 	return saveErr
