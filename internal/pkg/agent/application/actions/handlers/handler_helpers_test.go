@@ -6,14 +6,21 @@ package handlers
 
 import (
 	"context"
+	"io"
 	"math"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/pkg/component"
 
 	"github.com/google/go-cmp/cmp"
@@ -214,4 +221,34 @@ func TestProxiedActionsNotifier(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSaveConfigToStore(t *testing.T) {
+	// Create destination file
+	tmpDir := t.TempDir()
+	dest := filepath.Join(tmpDir, "dest.txt")
+	err := os.WriteFile(dest, []byte("existing content"), 0644)
+	require.NoError(t, err)
+
+	// Create disk store and content to save to it
+	store, err := storage.NewDiskStore(dest)
+	require.NoError(t, err)
+	reader := io.NopCloser(io.Reader(strings.NewReader("new content")))
+
+	// Open handle on destination file for 1.5 seconds
+	destFile, err := os.Open(dest)
+	require.NoError(t, err)
+	time.AfterFunc(1500*time.Millisecond, func() {
+		destFile.Close() // Close the handle after 1.5 seconds
+	})
+	defer destFile.Close()
+
+	// Try to save content to store
+	err = saveConfigToStore(store, reader)
+	require.NoError(t, err)
+
+	// Check that dest file has been replaced with new file
+	data, err := os.ReadFile(dest)
+	require.NoError(t, err)
+	require.Equal(t, "new content", string(data))
 }
