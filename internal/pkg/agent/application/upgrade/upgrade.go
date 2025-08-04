@@ -237,7 +237,7 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 
 type upgradeCleaner interface {
 	setupRollback(topDirPath, newHomeDir, oldHomeDir string) error
-	setupArchiveCleanup(archivePath string) error
+	setupArchiveCleanup(downloadResult download.DownloadResult) error
 	setupUnpackCleanup(newHomeDir, oldHomeDir string) error
 	cleanup(err error) error
 }
@@ -250,9 +250,9 @@ type upgradeCleanup struct {
 	cleanupFuncs         []func() error
 }
 
-func (u *upgradeCleanup) setupArchiveCleanup(archivePath string) error {
-	u.log.Debugf("Setting up cleanup for archive, archivePath: %s", archivePath)
-	if archivePath == "" {
+func (u *upgradeCleanup) setupArchiveCleanup(downloadResult download.DownloadResult) error {
+	u.log.Debugf("Setting up cleanup for archive, archivePath: %s", downloadResult.ArtifactPath)
+	if downloadResult.ArtifactPath == "" {
 		msg := "archive path is empty, cannot cleanup"
 		u.log.Errorf(msg)
 		return errors.New(msg)
@@ -260,7 +260,8 @@ func (u *upgradeCleanup) setupArchiveCleanup(archivePath string) error {
 	u.archiveCleanupToggle = true
 
 	u.cleanupFuncs = append(u.cleanupFuncs, func() error {
-		return os.RemoveAll(archivePath)
+		//TODO: remove the hash file as well
+		return os.RemoveAll(downloadResult.ArtifactPath)
 	})
 
 	return nil
@@ -333,6 +334,16 @@ func (u *upgradeCleanup) cleanup(err error) error {
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+	defer func() {
+		if err != nil {
+			cleanupErr := u.upgradeCleaner.cleanup(err)
+			if cleanupErr != nil {
+				u.log.Errorw("Error cleaning up after upgrade", "error.message", cleanupErr)
+				err = goerrors.Join(err, cleanupErr)
+			}
+		}
+	}()
+
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 
 	currentVersion := agentVersion{
@@ -375,7 +386,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, fmt.Errorf("error parsing version %q: %w", version, err)
 	}
 
-	archivePath, err := u.downloadArtifact(ctx, parsedVersion, sourceURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+	downloadResult, err := u.downloadArtifact(ctx, parsedVersion, sourceURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 	if err != nil {
 		// Run the same pre-upgrade cleanup task to get rid of any newly downloaded files
 		// This may have an issue if users are upgrading to the same version number.
@@ -386,11 +397,15 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, err
 	}
 
+	if err := u.upgradeCleaner.setupArchiveCleanup(downloadResult); err != nil {
+		return nil, err
+	}
+
 	det.SetState(details.StateExtracting)
 
-	metadata, err := u.getPackageMetadata(archivePath)
+	metadata, err := u.getPackageMetadata(downloadResult.ArtifactPath)
 	if err != nil {
-		return nil, fmt.Errorf("reading metadata for elastic agent version %s package %q: %w", version, archivePath, err)
+		return nil, fmt.Errorf("reading metadata for elastic agent version %s package %q: %w", version, downloadResult.ArtifactPath, err)
 	}
 
 	newVersion := extractAgentVersion(metadata, version)
@@ -410,21 +425,41 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		u.log.Warnf("error encountered when detecting used flavor with top path %q: %w", paths.Top(), err)
 	}
 	u.log.Debugf("detected used flavor: %q", detectedFlavor)
-	unpackRes, err := u.unpack(version, archivePath, paths.Data(), detectedFlavor)
+	unpackRes, unpackErr := u.unpack(version, downloadResult.ArtifactPath, paths.Data(), detectedFlavor)
+
+	if unpackErr != nil {
+		err = goerrors.Join(err, unpackErr)
+	}
+
+	newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome)
+	u.log.Infof("newHome: %s", newHome)
+
+	if unpackCleanupSetupErr := u.upgradeCleaner.setupUnpackCleanup(newHome, paths.Home()); unpackCleanupSetupErr != nil {
+		err = goerrors.Join(err, unpackCleanupSetupErr)
+	}
+
 	if err != nil {
 		return nil, err
 	}
+
+	u.log.Infof("unpackRes: %+v", unpackRes)
 
 	newHash := unpackRes.Hash
 	if newHash == "" {
 		return nil, errors.New("unknown hash")
 	}
 
-	if unpackRes.VersionedHome == "" {
-		return nil, fmt.Errorf("versionedhome is empty: %v", unpackRes)
-	}
+	u.log.Infof("unpackRes.Hash: %s", unpackRes.Hash)
 
-	newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome) // TODO: this is the dir to cleanup if anything goes wrong
+	// if unpackRes.VersionedHome == "" {// TODO: need to assert that unpack
+	// returns a versioned home at all times
+	// 	return nil, fmt.Errorf("versionedhome is empty: %v", unpackRes)
+	// }
+
+	u.log.Infof("unpackRes.VersionedHome: %s", unpackRes.VersionedHome)
+
+	// newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome) // TODO: this is the dir to cleanup if anything goes wrong
+	// u.log.Infof("newHome: %s", newHome)
 
 	if err := copyActionStore(u.log, newHome); err != nil {
 		return nil, errors.New(err, "failed to copy action store")
@@ -433,6 +468,9 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	newRunPath := filepath.Join(newHome, "run")
 	oldRunPath := filepath.Join(paths.Run())
 
+	u.log.Infof("oldRunPath: %s", oldRunPath)
+	u.log.Infof("newRunPath: %s", newRunPath)
+
 	if err := copyRunDirectory(u.log, oldRunPath, newRunPath); err != nil {
 		return nil, errors.New(err, "failed to copy run directory")
 	}
@@ -440,17 +478,28 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	det.SetState(details.StateReplacing)
 
 	// create symlink to the <new versioned-home>/elastic-agent
-	hashedDir := unpackRes.VersionedHome // TODO: this is important, this is the name of the new agent home directory
+	hashedDir := unpackRes.VersionedHome
+	u.log.Infof("hashedDir: %s", hashedDir)
 
 	symlinkPath := filepath.Join(paths.Top(), agentName)
+	u.log.Infof("symlinkPath: %s", symlinkPath)
 
 	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
 	newPath := paths.BinaryPath(filepath.Join(paths.Top(), hashedDir), agentName)
+	u.log.Infof("newPath: %s", newPath)
 
 	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
 	if err != nil {
 		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
 	}
+
+	if rollbackSetupErr := u.upgradeCleaner.setupRollback(paths.Top(), newHome, currentVersionedHome); rollbackSetupErr != nil {
+		err = goerrors.Join(err, rollbackSetupErr)
+	}
+
+	u.log.Infof("currentVersionedHome: %s", currentVersionedHome)
+	changeSymlink(u.log, paths.Top(), symlinkPath, newPath)
+	return nil, errors.New("we are done here")
 
 	if err := changeSymlink(u.log, paths.Top(), symlinkPath, newPath); err != nil {
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
@@ -639,13 +688,16 @@ func isSameVersion(log *logger.Logger, current agentVersion, newVersion agentVer
 }
 
 func rollbackInstall(log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {
-	oldAgentPath := paths.BinaryPath(filepath.Join(topDirPath, oldVersionedHome), agentName) // TODO: topdir + new version home is the place to clean up: same as the newAgentInstallPath below
+	log.Infof("Rolling back install, topDirPath: %s, versionedHome: %s, oldVersionedHome: %s", topDirPath, versionedHome, oldVersionedHome)
+	oldAgentPath := paths.BinaryPath(filepath.Join(topDirPath, oldVersionedHome), agentName)
+	log.Infof("oldAgentPath: %s", oldAgentPath)
 	err := changeSymlink(log, topDirPath, filepath.Join(topDirPath, agentName), oldAgentPath)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("rolling back install: restoring symlink to %q failed: %w", oldAgentPath, err)
 	}
 
 	newAgentInstallPath := filepath.Join(topDirPath, versionedHome)
+	log.Infof("newAgentInstallPath: %s", newAgentInstallPath)
 	err = os.RemoveAll(newAgentInstallPath)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("rolling back install: removing new agent install at %q failed: %w", newAgentInstallPath, err)

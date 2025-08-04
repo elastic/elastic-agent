@@ -118,7 +118,7 @@ func (e *Downloader) Reload(c *artifact.Config) error {
 
 // Download fetches the package from configured source.
 // Returns absolute path to downloaded package and an error.
-func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (_ string, err error) {
+func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (_ download.DownloadResult, err error) {
 	span, ctx := apm.StartSpan(ctx, "download", "app.internal")
 	defer span.End()
 	remoteArtifact := a.Artifact
@@ -137,13 +137,19 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 	path, err := e.download(ctx, remoteArtifact, e.config.OS(), a, *version)
 	downloadedFiles = append(downloadedFiles, path)
 	if err != nil {
-		return "", err
+		return download.DownloadResult{}, err
 	}
 
-	hashPath, err := e.downloadHash(ctx, remoteArtifact, e.config.OS(), a, *version)
-	downloadedFiles = append(downloadedFiles, hashPath)
+	hash, err := e.downloadHash(ctx, remoteArtifact, e.config.OS(), a, *version)
+	downloadedFiles = append(downloadedFiles, hash)
+	if err != nil {
+		return download.DownloadResult{}, err
+	}
 
-	return path, err
+	return download.DownloadResult{
+		ArtifactPath: path,
+		ArtifactHash: hash,
+	}, nil
 }
 
 func (e *Downloader) composeURI(artifactName, packageName string) (string, error) {

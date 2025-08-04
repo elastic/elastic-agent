@@ -146,7 +146,7 @@ func TestDownloadVersion(t *testing.T) {
 				return
 			}
 
-			assert.Equalf(t, filepath.Join(targetDirPath, tt.want), got, "Download(%v, %v)", tt.args.a, tt.args.version)
+			assert.Equalf(t, filepath.Join(targetDirPath, tt.want), got.ArtifactPath, "Download(%v, %v)", tt.args.a, tt.args.version)
 		})
 	}
 

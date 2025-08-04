@@ -31,8 +31,10 @@ type mockDownloader struct {
 	downloadErr  error
 }
 
-func (md *mockDownloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (string, error) {
-	return md.downloadPath, md.downloadErr
+func (md *mockDownloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (download.DownloadResult, error) {
+	return download.DownloadResult{
+		ArtifactPath: md.downloadPath,
+	}, md.downloadErr
 }
 
 func TestFallbackIsAppended(t *testing.T) {

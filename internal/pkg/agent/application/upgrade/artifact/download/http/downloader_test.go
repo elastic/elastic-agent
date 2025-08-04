@@ -66,19 +66,19 @@ func TestDownload(t *testing.T) {
 
 			upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 			testClient := NewDownloaderWithClient(log, config, elasticClient, upgradeDetails)
-			artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
+			downloadResult, err := testClient.Download(context.Background(), beatSpec, version)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			require.Equal(t, targetDir, filepath.Dir(artifactPath))
+			require.Equal(t, targetDir, filepath.Dir(downloadResult.ArtifactPath))
 
-			_, err = os.Stat(artifactPath)
+			_, err = os.Stat(downloadResult.ArtifactPath)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			os.Remove(artifactPath)
+			os.Remove(downloadResult.ArtifactPath)
 		})
 	}
 }
@@ -118,8 +118,8 @@ func TestDownloadBodyError(t *testing.T) {
 	log, obs := loggertest.New("downloader")
 	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails)
-	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
-	os.Remove(artifactPath)
+	downloadResult, err := testClient.Download(context.Background(), beatSpec, version)
+	os.Remove(downloadResult.ArtifactPath)
 	if err == nil {
 		t.Fatal("expected Download to return an error")
 	}
@@ -175,8 +175,8 @@ func TestDownloadLogProgressWithLength(t *testing.T) {
 	log, obs := loggertest.New("downloader")
 	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails)
-	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
-	os.Remove(artifactPath)
+	downloadResult, err := testClient.Download(context.Background(), beatSpec, version)
+	os.Remove(downloadResult.ArtifactPath)
 	require.NoError(t, err, "Download should not have errored")
 
 	expectedURL := fmt.Sprintf("%s/%s-%s-%s", srv.URL, "beats/agentbeat/agentbeat", version, "linux-x86_64.tar.gz")
@@ -258,8 +258,8 @@ func TestDownloadLogProgressWithoutLength(t *testing.T) {
 	log, obs := loggertest.New("downloader")
 	upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 	testClient := NewDownloaderWithClient(log, config, *client, upgradeDetails)
-	artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
-	os.Remove(artifactPath)
+	downloadResult, err := testClient.Download(context.Background(), beatSpec, version)
+	os.Remove(downloadResult.ArtifactPath)
 	require.NoError(t, err, "Download should not have errored")
 
 	expectedURL := fmt.Sprintf("%s/%s-%s-%s", srv.URL, "beats/agentbeat/agentbeat", version, "linux-x86_64.tar.gz")

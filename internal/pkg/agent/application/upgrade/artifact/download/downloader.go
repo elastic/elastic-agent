@@ -13,5 +13,10 @@ import (
 
 // Downloader is an interface allowing download of an artifact
 type Downloader interface {
-	Download(ctx context.Context, a artifact.Artifact, version *version.ParsedSemVer) (string, error)
+	Download(ctx context.Context, a artifact.Artifact, version *version.ParsedSemVer) (DownloadResult, error)
+}
+
+type DownloadResult struct {
+	ArtifactPath string
+	ArtifactHash string
 }

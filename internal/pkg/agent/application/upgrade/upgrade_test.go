@@ -1308,8 +1308,8 @@ func (f *fakeAcker) Commit(ctx context.Context) error {
 type mockDownloaderFactoryProviderTest struct {
 }
 
-func (md *mockDownloaderFactoryProviderTest) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (string, error) {
-	return "", nil
+func (md *mockDownloaderFactoryProviderTest) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (download.DownloadResult, error) {
+	return download.DownloadResult{}, nil
 }
 
 func TestDownloaderFactoryProvider(t *testing.T) {

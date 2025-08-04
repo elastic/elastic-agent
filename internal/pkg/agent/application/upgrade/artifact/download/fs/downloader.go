@@ -15,6 +15,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
@@ -44,7 +45,7 @@ func NewDownloader(config *artifact.Config) *Downloader {
 
 // Download fetches the package from configured source.
 // Returns absolute path to downloaded package and an error.
-func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (_ string, err error) {
+func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (_ download.DownloadResult, err error) {
 	span, ctx := apm.StartSpan(ctx, "download", "app.internal")
 	defer span.End()
 	downloadedFiles := make([]string, 0, 2)
@@ -61,13 +62,19 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 	path, err := e.download(e.config.OS(), a, *version, "")
 	downloadedFiles = append(downloadedFiles, path)
 	if err != nil {
-		return "", err
+		return download.DownloadResult{}, err
 	}
 
-	hashPath, err := e.download(e.config.OS(), a, *version, ".sha512")
-	downloadedFiles = append(downloadedFiles, hashPath)
+	hash, err := e.download(e.config.OS(), a, *version, ".sha512")
+	downloadedFiles = append(downloadedFiles, hash)
+	if err != nil {
+		return download.DownloadResult{}, err
+	}
 
-	return path, err
+	return download.DownloadResult{
+		ArtifactPath: path,
+		ArtifactHash: hash,
+	}, nil
 }
 
 // DownloadAsc downloads the package .asc file from configured source.
