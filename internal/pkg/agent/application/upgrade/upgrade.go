@@ -8,7 +8,6 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -577,24 +576,6 @@ func extractAgentVersion(metadata packageMetadata, upgradeVersion string) agentV
 func isSameVersion(log *logger.Logger, current agentVersion, newVersion agentVersion) bool {
 	log.Debugw("Comparing current and new agent version", "current_version", current, "new_version", newVersion)
 	return current == newVersion
-}
-
-func rollbackInstall(log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {
-	log.Infof("Rolling back install, topDirPath: %s, versionedHome: %s, oldVersionedHome: %s", topDirPath, versionedHome, oldVersionedHome)
-	oldAgentPath := paths.BinaryPath(filepath.Join(topDirPath, oldVersionedHome), agentName)
-	log.Infof("oldAgentPath: %s", oldAgentPath)
-	err := changeSymlink(log, topDirPath, filepath.Join(topDirPath, agentName), oldAgentPath)
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("rolling back install: restoring symlink to %q failed: %w", oldAgentPath, err)
-	}
-
-	newAgentInstallPath := filepath.Join(topDirPath, versionedHome)
-	log.Infof("newAgentInstallPath: %s", newAgentInstallPath)
-	err = os.RemoveAll(newAgentInstallPath)
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("rolling back install: removing new agent install at %q failed: %w", newAgentInstallPath, err)
-	}
-	return nil
 }
 
 func copyActionStore(log *logger.Logger, newHome string) error {
