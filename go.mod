@@ -44,6 +44,7 @@ require (
 	github.com/knadh/koanf/maps v0.1.1
 	github.com/magefile/mage v1.15.0
 	github.com/oklog/ulid/v2 v2.1.0
+<<<<<<< HEAD
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.121.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.121.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.121.0
@@ -59,6 +60,26 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.121.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver v0.121.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.121.0
+=======
+	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.129.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.129.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.129.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.129.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.129.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.129.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.129.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.129.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.129.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.129.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.129.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver v0.129.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver v0.129.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver v0.129.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.129.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.129.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver v0.129.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.129.0
+>>>>>>> 9b447e7d5 (add k8s_leader_elector otel extension (#9065))
 	github.com/otiai10/copy v1.14.0
 	github.com/rednafi/link-patrol v0.0.0-20240826150821-057643e74d4d
 	github.com/rs/zerolog v1.27.0
@@ -461,6 +482,7 @@ require (
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/nginxinc/nginx-prometheus-exporter v0.11.0 // indirect
 	github.com/nxadm/tail v1.4.11 // indirect
+<<<<<<< HEAD
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/signaltometricsconnector v0.120.1 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer v0.121.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/aws/ecsutil v0.121.0 // indirect
@@ -486,6 +508,40 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/jaeger v0.121.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheus v0.121.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/zipkin v0.121.0 // indirect
+=======
+	github.com/oklog/ulid v1.3.1 // indirect
+	github.com/onsi/ginkgo v1.16.5 // indirect
+	github.com/open-telemetry/opamp-go v0.19.1-0.20250423191708-8d78a5169350 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/connector/signaltometricsconnector v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/aws/ecsutil v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/exp/metrics v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/filter v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/gopsutilenv v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/kafka v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/kubelet v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/metadataproviders v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/pdatautil v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/sharedcomponent v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/batchpersignal v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/core/xidutils v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/experimentalmetricmetadata v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/kafka/configkafka v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/kafka/topic v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/azure v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/jaeger v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheus v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/zipkin v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/winperfcounters v0.129.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/deltatocumulativeprocessor v0.129.0 // indirect
+>>>>>>> 9b447e7d5 (add k8s_leader_elector otel extension (#9065))
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0 // indirect
 	github.com/openshift/api v3.9.0+incompatible // indirect
