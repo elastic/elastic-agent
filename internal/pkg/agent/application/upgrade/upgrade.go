@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -398,13 +397,10 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	u.log.Infof("currentVersionedHome: %s", currentVersionedHome)
-	changeSymlink(u.log, paths.Top(), symlinkPath, newPath)
-	return nil, errors.New("we are done here")
 
-	if err := changeSymlink(u.log, paths.Top(), symlinkPath, newPath); err != nil {
-		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
-		rollbackErr := rollbackInstall(u.log, paths.Top(), hashedDir, currentVersionedHome)
-		return nil, goerrors.Join(err, rollbackErr)
+	err = changeSymlink(u.log, paths.Top(), symlinkPath, newPath)
+	if err != nil {
+		return nil, err
 	}
 
 	// We rotated the symlink successfully: prepare the current and previous agent installation details for the update marker
@@ -426,30 +422,26 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		versionedHome: currentVersionedHome,
 	}
 
-	if err := markUpgrade(u.log,
+	err = markUpgrade(u.log,
 		paths.Data(), // data dir to place the marker in
 		current,      // new agent version data
 		previous,     // old agent version data
-		action, det, OUTCOME_UPGRADE); err != nil {
-		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
-		rollbackErr := rollbackInstall(u.log, paths.Top(), hashedDir, currentVersionedHome)
-		return nil, goerrors.Join(err, rollbackErr)
+		action, det, OUTCOME_UPGRADE)
+	if err != nil {
+		return nil, err
 	}
 
 	watcherExecutable := selectWatcherExecutable(paths.Top(), previous, current)
 
-	var watcherCmd *exec.Cmd
-	if watcherCmd, err = InvokeWatcher(u.log, watcherExecutable); err != nil {
-		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
-		rollbackErr := rollbackInstall(u.log, paths.Top(), hashedDir, currentVersionedHome)
-		return nil, goerrors.Join(err, rollbackErr)
+	watcherCmd, err := InvokeWatcher(u.log, watcherExecutable)
+	if err != nil {
+		return nil, err
 	}
 
-	watcherWaitErr := waitForWatcher(ctx, u.log, markerFilePath(paths.Data()), watcherMaxWaitTime)
-	if watcherWaitErr != nil {
-		killWatcherErr := watcherCmd.Process.Kill()
-		rollbackErr := rollbackInstall(u.log, paths.Top(), hashedDir, currentVersionedHome)
-		return nil, goerrors.Join(watcherWaitErr, killWatcherErr, rollbackErr)
+	err = waitForWatcher(ctx, u.log, markerFilePath(paths.Data()), watcherMaxWaitTime)
+	if err != nil {
+		err = goerrors.Join(err, watcherCmd.Process.Kill())
+		return nil, err
 	}
 
 	cb := shutdownCallback(u.log, paths.Home(), release.Version(), version, filepath.Join(paths.Top(), unpackRes.VersionedHome))
