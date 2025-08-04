@@ -105,7 +105,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 
 	downloadResult, err := downloaderFunc(ctx, factory, parsedVersion, &settings, upgradeDetails)
 	if err != nil {
-		return download.DownloadResult{}, fmt.Errorf("failed download of agent binary: %w", err)
+		return downloadResult, fmt.Errorf("failed download of agent binary: %w", err)
 	}
 
 	if skipVerifyOverride {
@@ -115,12 +115,12 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 	if verifier == nil {
 		verifier, err = newVerifier(parsedVersion, u.log, &settings)
 		if err != nil {
-			return download.DownloadResult{}, errors.New(err, "initiating verifier")
+			return downloadResult, errors.New(err, "initiating verifier")
 		}
 	}
 
 	if err := verifier.Verify(ctx, agentArtifact, *parsedVersion, skipDefaultPgp, pgpBytes...); err != nil {
-		return download.DownloadResult{}, errors.New(err, "failed verification of agent binary")
+		return downloadResult, errors.New(err, "failed verification of agent binary")
 	}
 	return downloadResult, nil
 }
@@ -213,7 +213,7 @@ func (u *Upgrader) downloadOnce(
 	// used that to configure the URL we download the files from)
 	downloadResult, err := downloader.Download(ctx, agentArtifact, version)
 	if err != nil {
-		return download.DownloadResult{}, fmt.Errorf("unable to download package: %w", err)
+		return downloadResult, fmt.Errorf("unable to download package: %w", err)
 	}
 
 	// Download successful
@@ -264,7 +264,7 @@ func (u *Upgrader) downloadWithRetries(
 	}
 
 	if err := backoff.RetryNotify(opFn, boCtx, opFailureNotificationFn); err != nil {
-		return download.DownloadResult{}, err
+		return downloadResult, err
 	}
 
 	// Clear retry details upon success

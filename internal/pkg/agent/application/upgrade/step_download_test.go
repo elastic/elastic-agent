@@ -103,9 +103,9 @@ func TestDownloadWithRetries(t *testing.T) {
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(settings.Timeout)
 
-		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		downloadResult, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
 		require.NoError(t, err)
-		require.Equal(t, expectedDownloadPath, path)
+		require.Equal(t, expectedDownloadPath, downloadResult.ArtifactPath)
 
 		logs := obs.TakeAll()
 		require.Len(t, logs, 1)
@@ -153,9 +153,9 @@ func TestDownloadWithRetries(t *testing.T) {
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(settings.Timeout)
 
-		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		downloadResult, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
 		require.NoError(t, err)
-		require.Equal(t, expectedDownloadPath, path)
+		require.Equal(t, expectedDownloadPath, downloadResult.ArtifactPath)
 
 		logs := obs.TakeAll()
 		require.Len(t, logs, 3)
@@ -208,9 +208,9 @@ func TestDownloadWithRetries(t *testing.T) {
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(settings.Timeout)
 
-		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		downloadResult, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
 		require.NoError(t, err)
-		require.Equal(t, expectedDownloadPath, path)
+		require.Equal(t, expectedDownloadPath, downloadResult.ArtifactPath)
 
 		logs := obs.TakeAll()
 		require.Len(t, logs, 3)
@@ -253,9 +253,9 @@ func TestDownloadWithRetries(t *testing.T) {
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(testCaseSettings.Timeout)
 
-		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &testCaseSettings, upgradeDetails)
+		downloadResult, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &testCaseSettings, upgradeDetails)
 		require.Equal(t, "context deadline exceeded", err.Error())
-		require.Equal(t, "", path)
+		require.Equal(t, "", downloadResult.ArtifactPath)
 
 		logs := obs.TakeAll()
 		logsJSON, err := json.MarshalIndent(logs, "", " ")
@@ -293,10 +293,10 @@ func TestDownloadWithRetries(t *testing.T) {
 
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 
-		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		downloadResult, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
 
 		require.Error(t, err)
-		require.Equal(t, "", path)
+		require.Equal(t, "", downloadResult.ArtifactPath)
 
 		require.ErrorIs(t, err, upgradeErrors.ErrInsufficientDiskSpace)
 

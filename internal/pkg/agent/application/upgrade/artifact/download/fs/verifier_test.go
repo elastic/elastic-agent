@@ -227,8 +227,6 @@ func TestVerify(t *testing.T) {
 			testClient := NewDownloader(config)
 			downloadResult, err := testClient.Download(ctx, agentSpec, testVersion)
 			require.NoError(t, err, "fs.Downloader could not download artifacts")
-			_, err = testClient.DownloadAsc(context.Background(), agentSpec, *testVersion)
-			require.NoError(t, err, "fs.Downloader could not download artifacts .asc file")
 
 			_, err = os.Stat(downloadResult.ArtifactPath)
 			require.NoError(t, err)

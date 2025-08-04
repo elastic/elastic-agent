@@ -523,7 +523,7 @@ func TestDownloadVersion(t *testing.T) {
 
 			got, err := downloader.Download(context.TODO(), tt.args.a, tt.args.version)
 
-			assert.Equalf(t, filepath.Join(targetDirPath, tt.want), got, "Download(%v, %v)", tt.args.a, tt.args.version)
+			assert.Equalf(t, filepath.Join(targetDirPath, tt.want), got.ArtifactPath, "Download(%v, %v)", tt.args.a, tt.args.version)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -616,7 +616,7 @@ func TestDownloadFile(t *testing.T) {
 			return progressReporter
 		}
 
-		_, err := downloader.downloadFile(ctx, artifactName, filename, fullPath)
+		err := downloader.downloadFile(ctx, artifactName, filename, fullPath)
 
 		t.Run("calls diskSpaceErrorFunc on any copy error", func(t *testing.T) {
 			assert.Equal(t, receivedError, copyFuncError)

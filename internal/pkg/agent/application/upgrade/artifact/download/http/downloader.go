@@ -22,6 +22,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/common"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -66,6 +67,7 @@ type Downloader struct {
 	progressReporterProvider progressReporterProvider
 	diskSpaceErrorFunc       func(error) error
 	CopyFunc                 func(dst io.Writer, src io.Reader) (written int64, err error)
+	getFilePathAndName       func(a artifact.Artifact, version agtversion.ParsedSemVer, remoteArtifact, operatingSystem, arch, targetDir string) (common.ArtifactPathAndName, error)
 }
 
 // NewDownloader creates and configures Elastic Downloader
@@ -96,6 +98,7 @@ func NewDownloaderWithClient(log *logger.Logger, config *artifact.Config, client
 		diskSpaceErrorFunc:       upgradeErrors.ToDiskSpaceErrorFunc(log),
 		CopyFunc:                 io.Copy,
 		progressReporterProvider: progressReporterProviderFunc,
+		getFilePathAndName:       common.GetArtifactPathAndName,
 	}
 }
 
@@ -118,11 +121,15 @@ func (e *Downloader) Reload(c *artifact.Config) error {
 
 // Download fetches the package from configured source.
 // Returns absolute path to downloaded package and an error.
-func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (_ download.DownloadResult, err error) {
+func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (download.DownloadResult, error) {
 	span, ctx := apm.StartSpan(ctx, "download", "app.internal")
 	defer span.End()
+
+	var err error
+	downloadResult := download.DownloadResult{}
 	remoteArtifact := a.Artifact
 	downloadedFiles := make([]string, 0, 2)
+
 	defer func() {
 		if err != nil {
 			for _, path := range downloadedFiles {
@@ -133,23 +140,27 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 		}
 	}()
 
-	// download from source to dest
-	path, err := e.download(ctx, remoteArtifact, e.config.OS(), a, *version)
-	downloadedFiles = append(downloadedFiles, path)
+	artifactPathAndName, err := e.getFilePathAndName(a, *version, remoteArtifact, e.config.OS(), e.config.Arch(), e.config.TargetDirectory)
 	if err != nil {
-		return download.DownloadResult{}, err
+		return downloadResult, err
 	}
 
-	hash, err := e.downloadHash(ctx, remoteArtifact, e.config.OS(), a, *version)
-	downloadedFiles = append(downloadedFiles, hash)
+	downloadResult.ArtifactPath = artifactPathAndName.ArtifactPath
+	downloadResult.ArtifactHashPath = artifactPathAndName.HashPath
+
+	err = e.downloadFile(ctx, remoteArtifact, artifactPathAndName.ArtifactName, artifactPathAndName.ArtifactPath)
+	downloadedFiles = append(downloadedFiles, artifactPathAndName.ArtifactPath)
 	if err != nil {
-		return download.DownloadResult{}, err
+		return downloadResult, err
 	}
 
-	return download.DownloadResult{
-		ArtifactPath: path,
-		ArtifactHash: hash,
-	}, nil
+	err = e.downloadFile(ctx, remoteArtifact, artifactPathAndName.HashName, artifactPathAndName.HashPath)
+	downloadedFiles = append(downloadedFiles, artifactPathAndName.HashPath)
+	if err != nil {
+		return downloadResult, err
+	}
+
+	return downloadResult, nil
 }
 
 func (e *Downloader) composeURI(artifactName, packageName string) (string, error) {
@@ -169,68 +180,37 @@ func (e *Downloader) composeURI(artifactName, packageName string) (string, error
 	return uri.String(), nil
 }
 
-func (e *Downloader) download(ctx context.Context, remoteArtifact string, operatingSystem string, a artifact.Artifact, version agtversion.ParsedSemVer) (string, error) {
-	filename, err := artifact.GetArtifactName(a, version, operatingSystem, e.config.Arch())
-	if err != nil {
-		return "", errors.New(err, "generating package name failed")
-	}
-
-	fullPath, err := artifact.GetArtifactPath(a, version, operatingSystem, e.config.Arch(), e.config.TargetDirectory)
-	if err != nil {
-		return "", errors.New(err, "generating package path failed")
-	}
-
-	return e.downloadFile(ctx, remoteArtifact, filename, fullPath)
-}
-
-func (e *Downloader) downloadHash(ctx context.Context, remoteArtifact string, operatingSystem string, a artifact.Artifact, version agtversion.ParsedSemVer) (string, error) {
-	filename, err := artifact.GetArtifactName(a, version, operatingSystem, e.config.Arch())
-	if err != nil {
-		return "", errors.New(err, "generating package name failed")
-	}
-
-	fullPath, err := artifact.GetArtifactPath(a, version, operatingSystem, e.config.Arch(), e.config.TargetDirectory)
-	if err != nil {
-		return "", errors.New(err, "generating package path failed")
-	}
-
-	filename = filename + ".sha512"
-	fullPath = fullPath + ".sha512"
-
-	return e.downloadFile(ctx, remoteArtifact, filename, fullPath)
-}
-
-func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, fullPath string) (string, error) {
+func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, fullPath string) error {
 	sourceURI, err := e.composeURI(artifactName, filename)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	req, err := http.NewRequest("GET", sourceURI, nil)
 	if err != nil {
-		return "", errors.New(err, "fetching package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
+		return errors.New(err, "fetching package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
 
 	if destinationDir := filepath.Dir(fullPath); destinationDir != "" && destinationDir != "." {
 		if err := os.MkdirAll(destinationDir, 0o755); err != nil {
-			return "", err
+			return err
 		}
 	}
 
 	destinationFile, err := os.OpenFile(fullPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
 	if err != nil {
-		return "", errors.New(err, "creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath))
+		return errors.New(err, "creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath))
 	}
 	defer destinationFile.Close()
 
 	resp, err := e.client.Do(req.WithContext(ctx))
 	if err != nil {
-		return fullPath, errors.New(err, "fetching package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
+		return errors.New(err, "fetching package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return fullPath, errors.New(fmt.Sprintf("call to '%s' returned unsuccessful status code: %d", sourceURI, resp.StatusCode), errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
+		return errors.New(fmt.Sprintf("call to '%s' returned unsuccessful status code: %d", sourceURI, resp.StatusCode), errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
 
 	fileSize := -1
@@ -248,9 +228,9 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	if err != nil {
 		err = e.diskSpaceErrorFunc(err)
 		progressReporter.ReportFailed(err)
-		return fullPath, fmt.Errorf("%s: %w", errors.New("copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI)).Error(), err)
+		return fmt.Errorf("%s: %w", errors.New("copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI)).Error(), err)
 	}
 	progressReporter.ReportComplete()
 
-	return fullPath, nil
+	return nil
 }

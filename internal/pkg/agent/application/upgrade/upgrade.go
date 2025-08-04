@@ -13,7 +13,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 	"time"
 
@@ -27,6 +26,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	fsDownloader "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/fs"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
@@ -91,6 +91,13 @@ func (d *downloaderFactoryProvider) GetDownloaderFactory(name string) (downloade
 	return factory, nil
 }
 
+type upgradeCleaner interface {
+	setupSymlinkCleanup(symlinkFunc changeSymlinkFunc, topDirPath, oldVersionedHome, agentName string) error
+	setupArchiveCleanup(downloadResult download.DownloadResult) error
+	setupUnpackCleanup(newHomeDir, oldHomeDir string) error
+	cleanup(err error) error
+}
+
 // Upgrader performs an upgrade
 type Upgrader struct {
 	log                       *logger.Logger
@@ -101,6 +108,7 @@ type Upgrader struct {
 	markerWatcher             MarkerWatcher
 	downloaderFactoryProvider DownloaderFactoryProvider
 	upgradeCleaner            upgradeCleaner
+	diskSpaceErrorFunc        func(error) error
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -132,9 +140,9 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.A
 		downloaderFactoryProvider: downloaderFactoryProvider,
 		upgradeCleaner: &upgradeCleanup{
 			log:          log,
-			rollbackFunc: rollbackInstall,
 			cleanupFuncs: []func() error{},
 		},
+		diskSpaceErrorFunc: upgradeErrors.ToDiskSpaceErrorFunc(log),
 	}, nil
 }
 
@@ -235,110 +243,13 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 	return nil
 }
 
-type upgradeCleaner interface {
-	setupRollback(topDirPath, newHomeDir, oldHomeDir string) error
-	setupArchiveCleanup(downloadResult download.DownloadResult) error
-	setupUnpackCleanup(newHomeDir, oldHomeDir string) error
-	cleanup(err error) error
-}
-type upgradeCleanup struct {
-	log                  *logger.Logger
-	rollbackToggle       bool
-	archiveCleanupToggle bool
-	unpackCleanupToggle  bool
-	rollbackFunc         func(*logger.Logger, string, string, string) error
-	cleanupFuncs         []func() error
-}
-
-func (u *upgradeCleanup) setupArchiveCleanup(downloadResult download.DownloadResult) error {
-	u.log.Debugf("Setting up cleanup for archive, archivePath: %s", downloadResult.ArtifactPath)
-	if downloadResult.ArtifactPath == "" {
-		msg := "archive path is empty, cannot cleanup"
-		u.log.Errorf(msg)
-		return errors.New(msg)
-	}
-	u.archiveCleanupToggle = true
-
-	u.cleanupFuncs = append(u.cleanupFuncs, func() error {
-		//TODO: remove the hash file as well
-		return os.RemoveAll(downloadResult.ArtifactPath)
-	})
-
-	return nil
-}
-
-func (u *upgradeCleanup) setupUnpackCleanup(newHomeDir, oldHomeDir string) error {
-	u.log.Debugf("Setting up cleanup for unpack, newVersionedHome: %s", newHomeDir)
-
-	if !u.archiveCleanupToggle {
-		msg := "Cannot setup for unpack cleanup before archive cleanup is setup"
-		u.log.Debugf(msg)
-		return errors.New(msg)
-	}
-
-	if newHomeDir == "" || oldHomeDir == "" {
-		msg := "new or old versioned home is empty, cannot cleanup"
-		u.log.Errorf(msg)
-		return errors.New(msg)
-	}
-
-	if newHomeDir == oldHomeDir {
-		msg := "new and old versioned home are the same, cannot cleanup"
-		u.log.Errorf(msg)
-		return errors.New(msg)
-	}
-
-	u.unpackCleanupToggle = true
-
-	u.cleanupFuncs = append(u.cleanupFuncs, func() error {
-		return os.RemoveAll(newHomeDir)
-	})
-
-	return nil
-}
-
-func (u *upgradeCleanup) setupRollback(topDirPath, newHomeDir, oldHomeDir string) error {
-	u.log.Debugf("Setting up cleanup for rollback, topDirPath: %s, oldVersionedHome: %s, newVersionedHome: %s", topDirPath, oldHomeDir, newHomeDir)
-
-	if !u.unpackCleanupToggle {
-		msg := "Cannot setup for rollback before unpack cleanup is setup"
-		u.log.Debugf(msg)
-		return errors.New(msg)
-	}
-
-	u.rollbackToggle = true
-
-	u.cleanupFuncs = append(u.cleanupFuncs, func() error {
-		return rollbackInstall(u.log, topDirPath, newHomeDir, oldHomeDir)
-	})
-
-	return nil
-}
-
-func (u *upgradeCleanup) cleanup(err error) error {
-	if err == nil {
-		u.log.Debugf("No error, skipping cleanup")
-		return nil
-	}
-
-	slices.Reverse(u.cleanupFuncs)
-
-	for _, cleanupFunc := range u.cleanupFuncs {
-		if cleanupErr := cleanupFunc(); cleanupErr != nil {
-			return goerrors.Join(err, cleanupErr)
-		}
-	}
-
-	return err
-}
-
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	defer func() {
 		if err != nil {
 			cleanupErr := u.upgradeCleaner.cleanup(err)
 			if cleanupErr != nil {
-				u.log.Errorw("Error cleaning up after upgrade", "error.message", cleanupErr)
+				u.log.Errorf("Error cleaning up after upgrade: %w", cleanupErr)
 				err = goerrors.Join(err, cleanupErr)
 			}
 		}
@@ -426,17 +337,14 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 	u.log.Debugf("detected used flavor: %q", detectedFlavor)
 	unpackRes, unpackErr := u.unpack(version, downloadResult.ArtifactPath, paths.Data(), detectedFlavor)
-
-	if unpackErr != nil {
-		err = goerrors.Join(err, unpackErr)
-	}
+	err = u.diskSpaceErrorFunc(unpackErr)
+	err = goerrors.Join(err, unpackErr)
 
 	newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome)
 	u.log.Infof("newHome: %s", newHome)
 
-	if unpackCleanupSetupErr := u.upgradeCleaner.setupUnpackCleanup(newHome, paths.Home()); unpackCleanupSetupErr != nil {
-		err = goerrors.Join(err, unpackCleanupSetupErr)
-	}
+	unpackCleanupSetupErr := u.upgradeCleaner.setupUnpackCleanup(newHome, paths.Home())
+	err = goerrors.Join(err, unpackCleanupSetupErr)
 
 	if err != nil {
 		return nil, err
@@ -451,15 +359,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	u.log.Infof("unpackRes.Hash: %s", unpackRes.Hash)
 
-	// if unpackRes.VersionedHome == "" {// TODO: need to assert that unpack
-	// returns a versioned home at all times
-	// 	return nil, fmt.Errorf("versionedhome is empty: %v", unpackRes)
-	// }
-
 	u.log.Infof("unpackRes.VersionedHome: %s", unpackRes.VersionedHome)
-
-	// newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome) // TODO: this is the dir to cleanup if anything goes wrong
-	// u.log.Infof("newHome: %s", newHome)
 
 	if err := copyActionStore(u.log, newHome); err != nil {
 		return nil, errors.New(err, "failed to copy action store")
@@ -493,8 +393,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
 	}
 
-	if rollbackSetupErr := u.upgradeCleaner.setupRollback(paths.Top(), newHome, currentVersionedHome); rollbackSetupErr != nil {
-		err = goerrors.Join(err, rollbackSetupErr)
+	if symlinkCleanupSetupErr := u.upgradeCleaner.setupSymlinkCleanup(changeSymlink, paths.Top(), currentVersionedHome, agentName); symlinkCleanupSetupErr != nil {
+		err = goerrors.Join(err, symlinkCleanupSetupErr)
 	}
 
 	u.log.Infof("currentVersionedHome: %s", currentVersionedHome)

@@ -17,6 +17,6 @@ type Downloader interface {
 }
 
 type DownloadResult struct {
-	ArtifactPath string
-	ArtifactHash string
+	ArtifactPath     string
+	ArtifactHashPath string
 }

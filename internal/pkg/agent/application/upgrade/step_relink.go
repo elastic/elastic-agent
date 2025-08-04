@@ -21,7 +21,6 @@ const (
 
 func changeSymlink(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
 	log.Infof("Changing symlink, topDirPath: %s, symlinkPath: %s, newTarget: %s", topDirPath, symlinkPath, newTarget)
-	return nil
 	// handle windows suffixes
 	if runtime.GOOS == windows {
 		symlinkPath += exe
