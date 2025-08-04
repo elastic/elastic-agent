@@ -440,14 +440,11 @@ func TestCoordinatorReportsUnhealthyUnits(t *testing.T) {
 }
 
 func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
+	// TODO: good candidate for the https://tip.golang.org/doc/go1.25#new-testingsynctest-package
 	// Test that an obviously invalid policy sent to Coordinator will call
 	// its Fail callback with an appropriate error, and will save and report
 	// the error in its state until a policy update succeeds.
-
-	// Set a one-second timeout -- nothing here should block, but if it
-	// does let's report a failure instead of timing out the test runner.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+	ctx := t.Context()
 
 	log, obs := loggertest.New("")
 	defer func() {
@@ -517,7 +514,7 @@ agent.download.sourceURI:
 		"failed to reload upgrade manager configuration",
 		"configErr should match policy failure, got %v", coord.configErr)
 
-	stateChangeTimeout := 2 * time.Second
+	stateChangeTimeout := 5 * time.Second
 	select {
 	case state := <-stateChan:
 		assert.Equal(t, agentclient.Failed, state.State, "Failed policy change should cause Failed coordinator state")

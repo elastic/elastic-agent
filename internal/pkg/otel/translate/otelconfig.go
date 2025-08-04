@@ -10,6 +10,10 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
+
 	koanfmaps "github.com/knadh/koanf/maps"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
@@ -188,8 +192,7 @@ func getReceiversConfigForComponent(
 	// Beat config inside a beat receiver is nested under an additional key. Not sure if this simple translation is
 	// always safe. We should either ensure this is always the case, or have an explicit mapping.
 	beatName := strings.TrimSuffix(receiverType.String(), "receiver")
-	beatDataPath := filepath.Join(paths.Run(), comp.ID)
-	binaryName := getBeatNameForComponent(comp)
+	binaryName := GetBeatNameForComponent(comp)
 	dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
 
 	receiverConfig := map[string]any{
@@ -199,7 +202,7 @@ func getReceiversConfigForComponent(
 		},
 		// just like we do for beats processes, each receiver needs its own data path
 		"path": map[string]any{
-			"data": beatDataPath,
+			"data": BeatDataPath(comp.ID),
 		},
 		// adds additional context on logs emitted by beatreceivers to uniquely identify per component logs
 		"logging": map[string]any{
@@ -232,7 +235,18 @@ func getReceiversConfigForComponent(
 	}
 
 	// add monitoring config if necessary
+	// we enable the basic monitoring endpoint by default, because we want to use it for diagnostics even if
+	// agent self-monitoring is disabled
 	monitoringConfig := beatMonitoringConfigGetter(comp.ID, beatName)
+	if monitoringConfig == nil {
+		endpoint := monitoring.BeatsMonitoringEndpoint(comp.ID)
+		monitoringConfig = map[string]any{
+			"http": map[string]any{
+				"enabled": true,
+				"host":    endpoint,
+			},
+		}
+	}
 	koanfmaps.Merge(monitoringConfig, receiverConfig)
 
 	return map[string]any{
@@ -264,8 +278,8 @@ func getExportersConfigForComponent(comp *component.Component) (exporterCfg map[
 	return exportersConfig, queueSettings, nil
 }
 
-// getBeatNameForComponent returns the beat binary name that would be used to run this component.
-func getBeatNameForComponent(comp *component.Component) string {
+// GetBeatNameForComponent returns the beat binary name that would be used to run this component.
+func GetBeatNameForComponent(comp *component.Component) string {
 	// TODO: Add this information directly to the spec?
 	if comp.InputSpec == nil || comp.InputSpec.BinaryName != "agentbeat" {
 		return ""
@@ -276,7 +290,7 @@ func getBeatNameForComponent(comp *component.Component) string {
 // getSignalForComponent returns the otel signal for the given component. Currently, this is always logs, even for
 // metricbeat.
 func getSignalForComponent(comp *component.Component) (pipeline.Signal, error) {
-	beatName := getBeatNameForComponent(comp)
+	beatName := GetBeatNameForComponent(comp)
 	switch beatName {
 	case "filebeat", "metricbeat":
 		return pipeline.SignalLogs, nil
@@ -287,7 +301,7 @@ func getSignalForComponent(comp *component.Component) (pipeline.Signal, error) {
 
 // getReceiverTypeForComponent returns the receiver type for the given component.
 func getReceiverTypeForComponent(comp *component.Component) (otelcomponent.Type, error) {
-	beatName := getBeatNameForComponent(comp)
+	beatName := GetBeatNameForComponent(comp)
 	switch beatName {
 	case "filebeat":
 		return otelcomponent.MustNewType(fbreceiver.Name), nil
@@ -384,7 +398,7 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 // getDefaultDatastreamTypeForComponent returns the default datastream type for a given component.
 // This is needed to translate from the agent policy config format to the beats config format.
 func getDefaultDatastreamTypeForComponent(comp *component.Component) (string, error) {
-	beatName := getBeatNameForComponent(comp)
+	beatName := GetBeatNameForComponent(comp)
 	switch beatName {
 	case "filebeat":
 		return "logs", nil
@@ -397,7 +411,8 @@ func getDefaultDatastreamTypeForComponent(comp *component.Component) (string, er
 
 // translateEsOutputToExporter translates an elasticsearch output configuration to an elasticsearch exporter configuration.
 func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
-	esConfig, err := elasticsearchtranslate.ToOTelConfig(cfg)
+	// TODO: Figure out a way to avoid needing a logger for this function
+	esConfig, err := elasticsearchtranslate.ToOTelConfig(cfg, logp.L())
 	if err != nil {
 		return nil, err
 	}
@@ -409,4 +424,8 @@ func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
 	// for compatibility with beats, we want bodymap mapping
 	esConfig["mapping"] = map[string]any{"mode": "bodymap"}
 	return esConfig, nil
+}
+
+func BeatDataPath(componentId string) string {
+	return filepath.Join(paths.Run(), componentId)
 }

@@ -277,7 +277,7 @@ func (b *BeatsMonitor) ComponentMonitoringConfig(unitID, binary string) map[stri
 	}
 
 	configMap := make(map[string]any)
-	endpoint := utils.SocketURLWithFallback(unitID, paths.TempDir())
+	endpoint := BeatsMonitoringEndpoint(unitID)
 	if endpoint != "" {
 		httpConfigMap := map[string]any{
 			"enabled": true,
@@ -674,7 +674,7 @@ func (b *BeatsMonitor) getHttpStreams(
 			continue
 		}
 
-		endpoints := []interface{}{prefixedEndpoint(utils.SocketURLWithFallback(compInfo.ID, paths.TempDir()))}
+		endpoints := []interface{}{PrefixedEndpoint(BeatsMonitoringEndpoint(compInfo.ID))}
 		name := sanitizeName(binaryName)
 
 		// Do not create http streams if runtime-manager is otel and binary is of beat type
@@ -746,7 +746,7 @@ func (b *BeatsMonitor) getBeatsStreams(
 			continue
 		}
 
-		endpoints := []interface{}{prefixedEndpoint(utils.SocketURLWithFallback(compInfo.ID, paths.TempDir()))}
+		endpoints := []interface{}{PrefixedEndpoint(utils.SocketURLWithFallback(compInfo.ID, paths.TempDir()))}
 		name := sanitizeName(binaryName)
 		dataset := fmt.Sprintf("elastic_agent.%s", name)
 		indexName := fmt.Sprintf("metrics-elastic_agent.%s-%s", name, monitoringNamespace)
@@ -1190,7 +1190,7 @@ func loggingPath(id, operatingSystem string) string {
 	return fmt.Sprintf(logFileFormat, paths.Home(), id)
 }
 
-func prefixedEndpoint(endpoint string) string {
+func PrefixedEndpoint(endpoint string) string {
 	if endpoint == "" || strings.HasPrefix(endpoint, httpPlusPrefix) || strings.HasPrefix(endpoint, httpPrefix) {
 		return endpoint
 	}
@@ -1248,7 +1248,7 @@ func changeOwner(path string, uid, gid int) error {
 
 // HttpPlusAgentMonitoringEndpoint provides an agent monitoring endpoint path with a `http+` prefix.
 func HttpPlusAgentMonitoringEndpoint(operatingSystem string, cfg *monitoringCfg.MonitoringConfig) string {
-	return prefixedEndpoint(AgentMonitoringEndpoint(operatingSystem, cfg))
+	return PrefixedEndpoint(AgentMonitoringEndpoint(operatingSystem, cfg))
 }
 
 // AgentMonitoringEndpoint provides an agent monitoring endpoint path.
@@ -1268,6 +1268,10 @@ func AgentMonitoringEndpoint(operatingSystem string, cfg *monitoringCfg.Monitori
 	// place in global /tmp to ensure that its small enough to fit; current path is way to long
 	// for it to be used, but needs to be unique per Agent (in the case that multiple are running)
 	return fmt.Sprintf(`unix:///tmp/elastic-agent/%x.sock`, sha256.Sum256([]byte(path)))
+}
+
+func BeatsMonitoringEndpoint(componentID string) string {
+	return utils.SocketURLWithFallback(componentID, paths.TempDir())
 }
 
 func httpCopyRules() []interface{} {

@@ -46,8 +46,10 @@ var (
 	Version_8_19_0_SNAPSHOT = version.NewParsedSemVer(8, 19, 0, "SNAPSHOT", "")
 
 	// Version_9_1_0_SNAPSHOT is a FIPS-capable artifact.
-	// Version_9_1_0_SNAPSHOT is the minimum version for manual rollback and rollback reason
 	Version_9_1_0_SNAPSHOT = version.NewParsedSemVer(9, 1, 0, "SNAPSHOT", "")
+
+	// Version_9_2_0_SNAPSHOT is the minimum version for manual rollback and rollback reason
+	Version_9_2_0_SNAPSHOT = version.NewParsedSemVer(9, 2, 0, "SNAPSHOT", "")
 
 	// ErrNoSnapshot is returned when a requested snapshot is not on the version list.
 	ErrNoSnapshot = errors.New("failed to find a snapshot on the version list")
