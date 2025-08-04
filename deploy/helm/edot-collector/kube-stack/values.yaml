@@ -521,9 +521,6 @@ collectors:
     #     protocol: TCP
     config:
       extensions:
-        bearertokenauth:
-          scheme: "APIKey"
-          token: ${env:ELASTIC_API_KEY}
         # Extension for EDOT SDKs remote configuration: https://github.com/elastic/opentelemetry-collector-components/tree/main/extension/apmconfigextension
         # apmconfig:
         #   source:
@@ -535,6 +532,9 @@ collectors:
         #     protocols:
         #       http:
         #         endpoint: 0.0.0.0:4320
+        bearertokenauth:
+          scheme: "APIKey"
+          token: ${env:ELASTIC_API_KEY}
       connectors:
         routing:
           default_pipelines: [metrics/otel]
