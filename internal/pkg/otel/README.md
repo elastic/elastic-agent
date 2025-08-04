@@ -91,6 +91,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [bearertokenauthextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/bearertokenauthextension/v0.129.0/extension/bearertokenauthextension/README.md) | v0.129.0 |
 | [filestorage](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/storage/filestorage/v0.129.0/extension/storage/filestorage/README.md) | v0.129.0 |
 | [healthcheckextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckextension/v0.129.0/extension/healthcheckextension/README.md) | v0.129.0 |
+| [k8sleaderelector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/k8sleaderelector/v0.129.0/extension/k8sleaderelector/README.md) | v0.129.0 |
 | [k8sobserver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/observer/k8sobserver/v0.129.0/extension/observer/k8sobserver/README.md) | v0.129.0 |
 | [memorylimiterextension](https://github.com/open-telemetry/opentelemetry-collector/blob/extension/memorylimiterextension/v0.129.0/extension/memorylimiterextension/README.md) | v0.129.0 |
 | [pprofextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/pprofextension/v0.129.0/extension/pprofextension/README.md) | v0.129.0 |
