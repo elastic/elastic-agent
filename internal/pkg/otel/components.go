@@ -59,6 +59,11 @@ import (
 	// Extensions
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension"
+<<<<<<< HEAD
+=======
+	healthcheckv2extension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector"
+>>>>>>> 9b447e7d5 (add k8s_leader_elector otel extension (#9065))
 	k8sobserver "github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver"
 	pprofextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension"
 	filestorage "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage"
@@ -155,6 +160,11 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		}
 
 		extensions := []extension.Factory{
+<<<<<<< HEAD
+=======
+			k8sleaderelector.NewFactory(),
+			healthcheckv2extension.NewFactory(),
+>>>>>>> 9b447e7d5 (add k8s_leader_elector otel extension (#9065))
 			memorylimiterextension.NewFactory(),
 			filestorage.NewFactory(),
 			healthcheckextension.NewFactory(),
