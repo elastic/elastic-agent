@@ -134,6 +134,7 @@ func (p *provisioner) Clean(ctx context.Context, cfg common.Config, _ []common.I
 func (p *provisioner) ogcPull(ctx context.Context) error {
 	args := []string{
 		"pull",
+		"--quiet",
 		"docker.elastic.co/observability-ci/ogc:5.0.1",
 	}
 	var output bytes.Buffer
