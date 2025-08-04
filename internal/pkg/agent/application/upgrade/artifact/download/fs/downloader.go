@@ -47,11 +47,11 @@ func NewDownloader(config *artifact.Config) *Downloader {
 func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (_ string, err error) {
 	span, ctx := apm.StartSpan(ctx, "download", "app.internal")
 	defer span.End()
+	downloadedFiles := make([]string, 0, 2)
 	defer func() {
 		if err != nil {
-			rmErr := os.RemoveAll(e.config.TargetDirectory)
-			if rmErr != nil {
-				err = errors.New(err, "failed to remove target directory", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, e.config.TargetDirectory))
+			for _, path := range downloadedFiles {
+				os.Remove(path)
 			}
 			apm.CaptureError(ctx, err).Send()
 		}
@@ -59,11 +59,13 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 
 	// download from source to dest
 	path, err := e.download(e.config.OS(), a, *version, "")
+	downloadedFiles = append(downloadedFiles, path)
 	if err != nil {
 		return "", err
 	}
 
-	_, err = e.download(e.config.OS(), a, *version, ".sha512")
+	hashPath, err := e.download(e.config.OS(), a, *version, ".sha512")
+	downloadedFiles = append(downloadedFiles, hashPath)
 
 	return path, err
 }

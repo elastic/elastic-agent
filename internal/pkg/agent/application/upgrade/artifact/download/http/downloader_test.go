@@ -530,7 +530,7 @@ func TestDownloadVersion(t *testing.T) {
 
 				assert.NoFileExists(t, filepath.Join(targetDirPath, tt.want))
 				assert.NoFileExists(t, filepath.Join(targetDirPath, tt.want+".sha512"))
-				assert.NoDirExists(t, targetDirPath)
+				assert.DirExists(t, targetDirPath)
 				return
 			}
 

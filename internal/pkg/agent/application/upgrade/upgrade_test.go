@@ -1563,7 +1563,7 @@ func TestUpgradeDownloadErrors(t *testing.T) {
 					require.Error(t, err, "expected error got none")
 					require.ErrorIs(t, err, testError.expectedError, "expected error mismatch")
 					require.NoFileExists(t, expectedDestPath, tc.cleanupMsg)
-					require.NoDirExists(t, testTargetPath, tc.cleanupMsg)
+					require.DirExists(t, testTargetPath, "target directory should not be cleaned up")
 				})
 			}
 		})

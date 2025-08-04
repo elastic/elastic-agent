@@ -122,23 +122,26 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 	span, ctx := apm.StartSpan(ctx, "download", "app.internal")
 	defer span.End()
 	remoteArtifact := a.Artifact
+	downloadedFiles := make([]string, 0, 2)
 	defer func() {
 		if err != nil {
-			rmErr := os.RemoveAll(e.config.TargetDirectory)
-			if rmErr != nil {
-				err = errors.New(err, "failed to remove target directory", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, e.config.TargetDirectory))
+			for _, path := range downloadedFiles {
+				if err := os.Remove(path); err != nil {
+					e.log.Warnf("failed to cleanup %s: %v", path, err)
+				}
 			}
-			apm.CaptureError(ctx, err).Send()
 		}
 	}()
 
 	// download from source to dest
 	path, err := e.download(ctx, remoteArtifact, e.config.OS(), a, *version)
+	downloadedFiles = append(downloadedFiles, path)
 	if err != nil {
 		return "", err
 	}
 
-	_, err = e.downloadHash(ctx, remoteArtifact, e.config.OS(), a, *version)
+	hashPath, err := e.downloadHash(ctx, remoteArtifact, e.config.OS(), a, *version)
+	downloadedFiles = append(downloadedFiles, hashPath)
 
 	return path, err
 }
