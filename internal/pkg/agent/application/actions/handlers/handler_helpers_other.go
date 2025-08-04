@@ -12,8 +12,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 )
 
-// On non-Windows platforms, save operations are not retried
-// upon error.
-func checkSaveErrorAndRetry(_ error, _ storage.Store, _ io.Reader) bool {
-	return false
+// saveConfigToStore saves the given configuration (reader) to the given store
+func saveConfigToStore(store storage.Store, reader io.Reader) error {
+	return store.Save(reader)
 }
