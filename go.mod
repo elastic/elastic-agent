@@ -51,11 +51,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.129.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.129.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.129.0
-<<<<<<< HEAD
-=======
-	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.129.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.129.0
->>>>>>> 9b447e7d5 (add k8s_leader_elector otel extension (#9065))
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.129.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.129.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.129.0
