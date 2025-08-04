@@ -223,6 +223,10 @@ func TestGetOtelConfig(t *testing.T) {
 				"max_size": 1600,
 				"min_size": 0,
 			},
+			"compression": "gzip",
+			"compression_params": map[string]any{
+				"level": 1,
+			},
 			"mapping": map[string]any{
 				"mode": "bodymap",
 			},
@@ -642,9 +646,6 @@ func TestGetOtelConfig(t *testing.T) {
 				assert.Equal(t, tt.expectedConfig.ToStringMap(), actualConf.ToStringMap())
 			}
 
-			if actualConf != nil {
-				t.Logf("%v", actualConf.ToStringMap())
-			}
 			if tt.expectedError != nil {
 				assert.Error(t, actualError)
 				assert.EqualError(t, actualError, tt.expectedError.Error())
