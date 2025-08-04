@@ -1,18 +1,3 @@
-extensions:
-  bearertokenauth:
-    scheme: "APIKey"
-    token: ${env:ELASTIC_API_KEY}
-  # Extension for EDOT SDKs remote configuration: https://github.com/elastic/opentelemetry-collector-components/tree/main/extension/apmconfigextension
-  # apmconfig:
-  #   source:
-  #    elasticsearch:
-  #      endpoint: ${env:ELASTIC_ENDPOINT}
-  #      auth:
-  #        authenticator: bearertokenauth
-  #   opamp:
-  #     protocols:
-  #       http:
-
 receivers:
   # Receives data from other Collectors in Agent mode
   otlp:
@@ -64,8 +49,7 @@ exporters:
   elasticsearch/otel:
     endpoints:
       - ${ELASTIC_ENDPOINT} # Will be populated from environment variable
-    auth:
-      authenticator: bearertokenauth
+    api_key: ${ELASTIC_API_KEY} # Will be populated from environment variable
     # tls:
     #   insecure_skip_verify: true
     mapping:
@@ -73,15 +57,11 @@ exporters:
   elasticsearch/ecs:
     endpoints:
       - ${ELASTIC_ENDPOINT} # Will be populated from environment variable
-    auth:
-      authenticator: bearertokenauth
+    api_key: ${ELASTIC_API_KEY} # Will be populated from environment variable
     mapping:
       mode: ecs
 
 service:
-  extensions:
-    - bearertokenauth
-    # - apmconfig
   pipelines:
     metrics:
       receivers: [otlp]
