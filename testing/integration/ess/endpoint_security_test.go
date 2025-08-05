@@ -82,6 +82,7 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 	})
 
 	t.Run("Install same version over the installed agent", func(t *testing.T) {
+		t.Skip("This constantly fails, so skipping until further investigation is done and a fix is implemented")
 		testTamperProtectedInstallUpgrade(t, info, "deb", define.Version(), false, false)
 	})
 

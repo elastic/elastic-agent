@@ -21,7 +21,7 @@ require (
 	github.com/elastic/elastic-agent-libs v0.21.4
 	github.com/elastic/elastic-agent-system-metrics v0.11.16
 	github.com/elastic/elastic-transport-go/v8 v8.7.0
-	github.com/elastic/go-elasticsearch/v8 v8.18.1
+	github.com/elastic/go-elasticsearch/v8 v8.19.0
 	github.com/elastic/go-licenser v0.4.2
 	github.com/elastic/go-sysinfo v1.15.3
 	github.com/elastic/go-ucfg v0.8.9-0.20250307075119-2a22403faaea
@@ -53,6 +53,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.129.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.129.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.129.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.129.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.129.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.129.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.129.0
@@ -521,7 +522,6 @@ require (
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/open-telemetry/opamp-go v0.19.1-0.20250423191708-8d78a5169350 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/signaltometricsconnector v0.129.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.129.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer v0.129.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/aws/ecsutil v0.129.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.129.0 // indirect
