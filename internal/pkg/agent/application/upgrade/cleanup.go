@@ -16,7 +16,7 @@ import (
 )
 
 // cleanNonMatchingVersionsFromDownloads will remove files that do not have the passed version number from the downloads directory.
-func cleanNonMatchingVersionsFromDownloads(log *logger.Logger, version string) error {
+func (u *upgradeArtifactDownloader) cleanNonMatchingVersionsFromDownloads(log *logger.Logger, version string) error {
 	downloadsPath := paths.Downloads()
 	log.Infow("Cleaning up non-matching downloaded versions", "version", version, "downloads.path", downloadsPath)
 

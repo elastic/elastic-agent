@@ -37,16 +37,30 @@ const (
 	fleetUpgradeFallbackPGPFormat = "/api/agents/upgrades/%d.%d.%d/pgp-public-key"
 )
 
+func newUpgradeArtifactDownloader(log *logger.Logger, settings *artifact.Config, downloaderFactoryProvider DownloaderFactoryProvider) *upgradeArtifactDownloader {
+	return &upgradeArtifactDownloader{
+		log:                       log,
+		settings:                  settings,
+		downloaderFactoryProvider: downloaderFactoryProvider,
+	}
+}
+
+type upgradeArtifactDownloader struct {
+	log                       *logger.Logger
+	settings                  *artifact.Config
+	downloaderFactoryProvider DownloaderFactoryProvider
+}
+
 type downloader func(context.Context, downloaderFactory, *agtversion.ParsedSemVer, *artifact.Config, *details.Details) (download.DownloadResult, error)
 
-func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ download.DownloadResult, err error) {
+func (u *upgradeArtifactDownloader) downloadArtifact(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, fleetServerURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ download.DownloadResult, err error) {
 	span, ctx := apm.StartSpan(ctx, "downloadArtifact", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
 		span.End()
 	}()
 
-	pgpBytes = u.appendFallbackPGP(parsedVersion, pgpBytes)
+	pgpBytes = u.appendFallbackPGP(parsedVersion, fleetServerURI, pgpBytes)
 
 	// do not update source config
 	settings := *u.settings
@@ -125,7 +139,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 	return downloadResult, nil
 }
 
-func (u *Upgrader) appendFallbackPGP(targetVersion *agtversion.ParsedSemVer, pgpBytes []string) []string {
+func (u *upgradeArtifactDownloader) appendFallbackPGP(targetVersion *agtversion.ParsedSemVer, fleetServerURI string, pgpBytes []string) []string {
 	if pgpBytes == nil {
 		pgpBytes = make([]string, 0, 1)
 	}
@@ -134,10 +148,10 @@ func (u *Upgrader) appendFallbackPGP(targetVersion *agtversion.ParsedSemVer, pgp
 	pgpBytes = append(pgpBytes, fallbackPGP)
 
 	// add a secondary fallback if fleet server is configured
-	u.log.Debugf("Considering fleet server uri for pgp check fallback %q", u.fleetServerURI)
-	if u.fleetServerURI != "" {
+	u.log.Debugf("Considering fleet server uri for pgp check fallback %q", fleetServerURI)
+	if fleetServerURI != "" {
 		secondaryPath, err := url.JoinPath(
-			u.fleetServerURI,
+			fleetServerURI,
 			fmt.Sprintf(fleetUpgradeFallbackPGPFormat, targetVersion.Major(), targetVersion.Minor(), targetVersion.Patch()),
 		)
 		if err != nil {
@@ -197,7 +211,7 @@ func newVerifier(version *agtversion.ParsedSemVer, log *logger.Logger, settings 
 	return composed.NewVerifier(log, fsVerifier, snapshotVerifier, remoteVerifier), nil
 }
 
-func (u *Upgrader) downloadOnce(
+func (u *upgradeArtifactDownloader) downloadOnce(
 	ctx context.Context,
 	factory downloaderFactory,
 	version *agtversion.ParsedSemVer,
@@ -220,7 +234,7 @@ func (u *Upgrader) downloadOnce(
 	return downloadResult, nil
 }
 
-func (u *Upgrader) downloadWithRetries(
+func (u *upgradeArtifactDownloader) downloadWithRetries(
 	ctx context.Context,
 	factory downloaderFactory,
 	version *agtversion.ParsedSemVer,

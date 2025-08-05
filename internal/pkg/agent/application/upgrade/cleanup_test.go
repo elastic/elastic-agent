@@ -11,6 +11,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	"github.com/stretchr/testify/require"
@@ -34,7 +35,8 @@ func setupDir(t *testing.T) {
 func TestPreUpgradeCleanup(t *testing.T) {
 	setupDir(t)
 	log := newErrorLogger(t)
-	err := cleanNonMatchingVersionsFromDownloads(log, "8.4.0")
+	u := newUpgradeArtifactDownloader(log, &artifact.Config{}, nil)
+	err := u.cleanNonMatchingVersionsFromDownloads(log, "8.4.0")
 	require.NoError(t, err)
 
 	files, err := os.ReadDir(paths.Downloads())

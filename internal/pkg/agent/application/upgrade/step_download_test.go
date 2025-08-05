@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
@@ -58,11 +57,8 @@ func TestFallbackIsAppended(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			l, _ := loggertest.New(tc.name)
-			u := Upgrader{
-				fleetServerURI: tc.fleetServerURI,
-				log:            l,
-			}
-			res := u.appendFallbackPGP(tc.targetVersion, tc.passedBytes)
+			u := newUpgradeArtifactDownloader(l, &artifact.Config{}, nil)
+			res := u.appendFallbackPGP(tc.targetVersion, tc.fleetServerURI, tc.passedBytes)
 			// check default fallback is passed and is very last
 			require.NotNil(t, res)
 			require.Equal(t, tc.expectedLen, len(res))
@@ -94,8 +90,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return &mockDownloader{expectedDownloadPath, nil}, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
-		require.NoError(t, err)
+		u := newUpgradeArtifactDownloader(testLogger, &settings, nil)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
@@ -144,8 +139,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return nil, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
-		require.NoError(t, err)
+		u := newUpgradeArtifactDownloader(testLogger, &settings, nil)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
@@ -199,8 +193,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return nil, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
-		require.NoError(t, err)
+		u := newUpgradeArtifactDownloader(testLogger, &settings, nil)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
@@ -244,8 +237,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return &mockDownloader{"", errors.New("download failed")}, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
-		require.NoError(t, err)
+		u := newUpgradeArtifactDownloader(testLogger, &settings, nil)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
@@ -285,8 +277,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return &mockDownloader{"", upgradeErrors.ErrInsufficientDiskSpace}, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
-		require.NoError(t, err)
+		u := newUpgradeArtifactDownloader(testLogger, &settings, nil)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
@@ -359,12 +350,11 @@ func TestDownloadArtifact(t *testing.T) {
 		require.NoError(t, err)
 
 		config := artifact.Config{}
-		u, err := NewUpgrader(logger, &config, nil)
-		require.NoError(t, err)
+		u := newUpgradeArtifactDownloader(logger, &config, nil)
 
 		u.downloaderFactoryProvider = &mockDownloaderFactoryProvider{}
 
-		_, err = u.downloadArtifact(context.Background(), nil, "file://mockfilepath", nil, false, false)
+		_, err = u.downloadArtifact(context.Background(), nil, "file://mockfilepath", "", nil, false, false)
 		require.Error(t, err)
 		require.ErrorIs(t, err, mockDownloaderFactoryError)
 		require.Equal(t, fileDownloaderFactory, u.downloaderFactoryProvider.(*mockDownloaderFactoryProvider).calledWithName)
@@ -375,12 +365,11 @@ func TestDownloadArtifact(t *testing.T) {
 		require.NoError(t, err)
 
 		config := artifact.Config{}
-		u, err := NewUpgrader(logger, &config, nil)
-		require.NoError(t, err)
+		u := newUpgradeArtifactDownloader(logger, &config, nil)
 
 		u.downloaderFactoryProvider = &mockDownloaderFactoryProvider{}
 
-		_, err = u.downloadArtifact(context.Background(), nil, "https://mockuri", nil, false, false)
+		_, err = u.downloadArtifact(context.Background(), nil, "https://mockuri", "", nil, false, false)
 		require.Error(t, err)
 		require.ErrorIs(t, err, mockDownloaderFactoryError)
 		require.Equal(t, composedDownloaderFactory, u.downloaderFactoryProvider.(*mockDownloaderFactoryProvider).calledWithName)

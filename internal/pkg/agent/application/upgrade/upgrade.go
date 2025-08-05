@@ -96,17 +96,22 @@ type upgradeCleaner interface {
 	cleanup(err error) error
 }
 
+type artifactDownloader interface {
+	downloadArtifact(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, fleetServerURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (download.DownloadResult, error)
+	cleanNonMatchingVersionsFromDownloads(log *logger.Logger, version string) error
+}
+
 // Upgrader performs an upgrade
 type Upgrader struct {
-	log                       *logger.Logger
-	settings                  *artifact.Config
-	agentInfo                 info.Agent
-	upgradeable               bool
-	fleetServerURI            string
-	markerWatcher             MarkerWatcher
-	downloaderFactoryProvider DownloaderFactoryProvider
-	upgradeCleaner            upgradeCleaner
-	diskSpaceErrorFunc        func(error) error
+	log                *logger.Logger
+	settings           *artifact.Config
+	agentInfo          info.Agent
+	upgradeable        bool
+	fleetServerURI     string
+	markerWatcher      MarkerWatcher
+	upgradeCleaner     upgradeCleaner
+	diskSpaceErrorFunc func(error) error
+	artifactDownloader artifactDownloader
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -130,17 +135,17 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.A
 	}
 
 	return &Upgrader{
-		log:                       log,
-		settings:                  settings,
-		agentInfo:                 agentInfo,
-		upgradeable:               IsUpgradeable(),
-		markerWatcher:             newMarkerFileWatcher(markerFilePath(paths.Data()), log),
-		downloaderFactoryProvider: downloaderFactoryProvider,
+		log:           log,
+		settings:      settings,
+		agentInfo:     agentInfo,
+		upgradeable:   IsUpgradeable(),
+		markerWatcher: newMarkerFileWatcher(markerFilePath(paths.Data()), log),
 		upgradeCleaner: &upgradeCleanup{
 			log:          log,
 			cleanupFuncs: []func() error{},
 		},
 		diskSpaceErrorFunc: upgradeErrors.ToDiskSpaceErrorFunc(log),
+		artifactDownloader: newUpgradeArtifactDownloader(log, settings, downloaderFactoryProvider),
 	}, nil
 }
 
@@ -241,6 +246,18 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 	return nil
 }
 
+// type upgradeProcessWithFuncs interface {
+// 	download(funcs downloadFuncs, params downloadParams) (download.DownloadResult, error)
+// 	unpack(funcs unpackFuncs, params unpackParams) (unpackStepResult, error)
+// 	replace(funcs replaceFuncs, params replaceParams) error
+// 	watch(funcs watchFuncs, params watchParams) error
+// }
+
+type upgradeStep interface {
+	downloadArtifact(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, fleetServerURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (download.DownloadResult, error)
+	cleanNonMatchingVersions(log *logger.Logger, version string) error
+}
+
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	defer func() {
@@ -281,7 +298,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	span, ctx := apm.StartSpan(ctx, "upgrade", "app.internal")
 	defer span.End()
 
-	err = cleanNonMatchingVersionsFromDownloads(u.log, u.agentInfo.Version())
+	err = u.artifactDownloader.cleanNonMatchingVersionsFromDownloads(u.log, u.agentInfo.Version())
 	if err != nil {
 		u.log.Errorw("Unable to clean downloads before update", "error.message", err, "downloads.path", paths.Downloads())
 	}
@@ -295,11 +312,11 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, fmt.Errorf("error parsing version %q: %w", version, err)
 	}
 
-	downloadResult, err := u.downloadArtifact(ctx, parsedVersion, sourceURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+	downloadResult, err := u.artifactDownloader.downloadArtifact(ctx, parsedVersion, sourceURI, u.fleetServerURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 	if err != nil {
 		// Run the same pre-upgrade cleanup task to get rid of any newly downloaded files
 		// This may have an issue if users are upgrading to the same version number.
-		if dErr := cleanNonMatchingVersionsFromDownloads(u.log, u.agentInfo.Version()); dErr != nil {
+		if dErr := u.artifactDownloader.cleanNonMatchingVersionsFromDownloads(u.log, u.agentInfo.Version()); dErr != nil {
 			u.log.Errorw("Unable to remove file after verification failure", "error.message", dErr)
 		}
 
