@@ -1,0 +1,92 @@
+// begin 9.1.0 relnotes
+
+[[release-notes-9.1.0]]
+==  9.1.0
+
+Review important information about the  9.1.0 release.
+
+[discrete]
+[[security-updates-9.1.0]]
+=== Security updates
+
+elastic-agent::
+
+* Upgrade To Go 1.24.3. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8109[#https://github.com/elastic/elastic-agent/pull/8109]
+
+[discrete]
+[[deprecations-9.1.0]]
+=== Deprecations
+
+The following functionality is deprecated in 9.1.0, and will be removed in
+9.1.0. Deprecated functionality does not have an immediate impact on your
+application, but we strongly recommend you make the necessary updates after you
+upgrade to 9.1.0.
+
+edot::
+
+* Deprecate The Elasticinframetrics Processor. It Will Be Removed In 9.2.0. {edot-pull}https://github.com/elastic/elastic-agent/pull/8659[#https://github.com/elastic/elastic-agent/pull/8659]
+
+[discrete]
+[[new-features-9.1.0]]
+=== New features
+
+The 9.1.0 release adds the following new and notable features.
+
+elastic-agent::
+
+* Adds A New Configuration Setting, `Agent.upgrade.rollback.window`. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8065[#https://github.com/elastic/elastic-agent/pull/8065] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6881[#https://github.com/elastic/elastic-agent/issues/6881]
++
+The value of the `agent.upgrade.rollback.window` setting determines the period after upgrading
+Elastic Agent when a rollback to the previous version can be triggered. This is an optional
+setting, with a default value of `168h` (7 days). The value can be any string that is parseable
+by https://pkg.go.dev/time#ParseDuration.
+* Remove Resource/K8s Processor And Use K8sattributes Processor For Service Attributes. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8599[#https://github.com/elastic/elastic-agent/pull/8599]
++
+This PR removes the `resource/k8s` processor in honour of the k8sattributes processor that
+provides native support for the Service attributes:
+https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.127.0/processor/k8sattributesprocessor#configuring-recommended-resource-attributes
+
+This change is aligned with the respective Semantic Conventions&#39; guidance:
+https://opentelemetry.io/docs/specs/semconv/non-normative/k8s-attributes/#service-attributes
+
+[discrete]
+[[enhancements-9.1.0]]
+=== Enhancements
+
+elastic-agent::
+
+* Add Elastic.agent.fips To Local_metadata.  {elastic-agent-issue}https://github.com/elastic/elastic-agent/pull/7112[#https://github.com/elastic/elastic-agent/pull/7112]
+* Validate Pbkdf2 Settings When In Fips Mode. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7187[#https://github.com/elastic/elastic-agent/pull/7187]
+* Fips-Capable Agent File Vault. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7360[#https://github.com/elastic/elastic-agent/pull/7360]
+* With This Change Fips-Capable Agents Will Only Be Able To Upgrade To Other Fips-Capable Agents. This Change Also Restricts Non-Fips To Fips Upgrades As Well. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7312[#https://github.com/elastic/elastic-agent/pull/7312] {elastic-agent-issue}https://github.com/elastic/ingest-dev/issues/4811[#https://github.com/elastic/ingest-dev/issues/4811]
+* Updated The Error Messages Returned For Fips Upgrades. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7453[#https://github.com/elastic/elastic-agent/pull/7453]
+* Retry Enrollment Requests On Any Error. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8056[#https://github.com/elastic/elastic-agent/pull/8056]
+* Remove Deprecated Otel Elasticsearch Exporter Config `*_Dynamic_index` From Code And Samples. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8592[#https://github.com/elastic/elastic-agent/pull/8592]
+* Include The Forwardconnector As An Edot Collector Commponent. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8753[#https://github.com/elastic/elastic-agent/pull/8753]
+* Update Otel Components To V0.129.0. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8819[#https://github.com/elastic/elastic-agent/pull/8819]
+* Update Apm Config Extension To V0.4.0. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8819[#https://github.com/elastic/elastic-agent/pull/8819]
+* Update Elastic Trace Processor To V0.7.0. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8819[#https://github.com/elastic/elastic-agent/pull/8819]
+* Update Elastic Apm Connector To V0.4.0. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8819[#https://github.com/elastic/elastic-agent/pull/8819]
+* Update Api Key Auth Extension To V0.2.0. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8819[#https://github.com/elastic/elastic-agent/pull/8819]
+* Update Elastic Infra Metrics Processor To V0.16.0. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8819[#https://github.com/elastic/elastic-agent/pull/8819]
+* Bump Apmconfig Extension To V0.3.0. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8819[#https://github.com/elastic/elastic-agent/pull/8819]
+
+[discrete]
+[[bug-fixes-9.1.0]]
+=== Bug fixes
+
+elastic-agent::
+
+* Correctly Handle Sending Signal To Child Process. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7738[#https://github.com/elastic/elastic-agent/pull/7738] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6875[#https://github.com/elastic/elastic-agent/issues/6875]
+* Preserve Agent Run State On Deb And Rpm Upgrades. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/7999[#https://github.com/elastic/elastic-agent/pull/7999]
+* Use --Header From Enrollment When Communicating With Fleet Server. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8071[#https://github.com/elastic/elastic-agent/pull/8071] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/6823[#https://github.com/elastic/elastic-agent/issues/6823]
+* Address A Race Condition That Can Occur In Agent Diagnostics If Log Rotation Runs While Logs Are Being Zipped.
+* Use Paths.tempdir For Diagnostics Actions. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8472[#https://github.com/elastic/elastic-agent/pull/8472]
+* Use Debian 11 To Build Linux/Arm To Match Linux/Amd64. Upgrades Linux/Arm64&#39;s Statically Linked Glibc From 2.28 To 2.31. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8497[#https://github.com/elastic/elastic-agent/pull/8497]
+* Relax File Ownership Check To Allow Admin Re-Enrollment On Windows. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8503[#https://github.com/elastic/elastic-agent/pull/8503] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/7794[#https://github.com/elastic/elastic-agent/issues/7794]
+* Remove Incorrect Logging That Unprivileged Installations Are In Beta. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8715[#https://github.com/elastic/elastic-agent/pull/8715] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/8689[#https://github.com/elastic/elastic-agent/issues/8689]
+* Ensure Standalone Elastic Agent Uses Log Level From Configuration Instead Of Persisted State. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8784[#https://github.com/elastic/elastic-agent/pull/8784] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/8137[#https://github.com/elastic/elastic-agent/issues/8137]
+* Resolve Deadlocks In Runtime Checkin Communication. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8881[#https://github.com/elastic/elastic-agent/pull/8881] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/7944[#https://github.com/elastic/elastic-agent/issues/7944]
+* Removed Init.d Support From Rpm Packages. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8896[#https://github.com/elastic/elastic-agent/pull/8896] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/8840[#https://github.com/elastic/elastic-agent/issues/8840]
+
+// end 9.1.0 relnotes
