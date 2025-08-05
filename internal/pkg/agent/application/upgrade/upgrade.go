@@ -108,6 +108,12 @@ type unpacker interface {
 	detectFlavor(topPath, flavor string) (string, error)
 }
 
+type replacer interface {
+	copyActionStore(log *logger.Logger, newHome string) error
+	copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error
+	changeSymlink(log *logger.Logger, topPath, symlinkPath, newPath string) error
+}
+
 // Upgrader performs an upgrade
 type Upgrader struct {
 	log                *logger.Logger
@@ -120,6 +126,7 @@ type Upgrader struct {
 	diskSpaceErrorFunc func(error) error
 	artifactDownloader artifactDownloader
 	unpacker           unpacker
+	replacer           replacer
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -155,6 +162,7 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.A
 		diskSpaceErrorFunc: upgradeErrors.ToDiskSpaceErrorFunc(log),
 		artifactDownloader: newUpgradeArtifactDownloader(log, settings, downloaderFactoryProvider),
 		unpacker:           &upgradeUnpacker{log: log},
+		replacer:           &upgradeReplacer{},
 	}, nil
 }
 
@@ -253,6 +261,13 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 	}
 
 	return nil
+}
+
+type upgradeReplacer struct {
+}
+
+func (u *upgradeReplacer) changeSymlink(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
+	return changeSymlink(log, topDirPath, symlinkPath, newTarget)
 }
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
@@ -373,13 +388,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, err
 	}
 
-	// u.log.Infof("unpackRes: %+v", unpackRes)
-
-	// u.log.Infof("unpackRes.Hash: %s", unpackRes.Hash)
-
-	// u.log.Infof("unpackRes.VersionedHome: %s", unpackRes.VersionedHome)
-
-	err = copyActionStore(u.log, newHome)
+	err = u.replacer.copyActionStore(u.log, newHome)
 	if err != nil {
 		err = fmt.Errorf("failed to copy action store: %w", u.diskSpaceErrorFunc(err))
 		return nil, err
@@ -388,10 +397,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	newRunPath := filepath.Join(newHome, "run")
 	oldRunPath := filepath.Join(paths.Run())
 
-	// u.log.Infof("oldRunPath: %s", oldRunPath)
-	// u.log.Infof("newRunPath: %s", newRunPath)
-
-	err = copyRunDirectory(u.log, oldRunPath, newRunPath)
+	err = u.replacer.copyRunDirectory(u.log, oldRunPath, newRunPath)
 	if err != nil {
 		err = fmt.Errorf("failed to copy run directory: %w", u.diskSpaceErrorFunc(err))
 		return nil, err
@@ -421,7 +427,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	u.log.Infof("currentVersionedHome: %s", currentVersionedHome)
 
-	err = changeSymlink(u.log, paths.Top(), symlinkPath, newPath)
+	err = u.replacer.changeSymlink(u.log, paths.Top(), symlinkPath, newPath)
 	if err != nil {
 		return nil, err
 	}
@@ -602,7 +608,7 @@ func isSameVersion(log *logger.Logger, current agentVersion, newVersion agentVer
 	return current == newVersion
 }
 
-func copyActionStore(log *logger.Logger, newHome string) error {
+func (u *upgradeReplacer) copyActionStore(log *logger.Logger, newHome string) error {
 	// copies legacy action_store.yml, state.yml and state.enc encrypted file if exists
 	storePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile()}
 	log.Infow("Copying action store", "new_home_path", newHome)
@@ -627,7 +633,7 @@ func copyActionStore(log *logger.Logger, newHome string) error {
 	return nil
 }
 
-func copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error {
+func (u *upgradeReplacer) copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error {
 	log.Infow("Copying run directory", "new_run_path", newRunPath, "old_run_path", oldRunPath)
 
 	if err := os.MkdirAll(newRunPath, runDirMod); err != nil {
