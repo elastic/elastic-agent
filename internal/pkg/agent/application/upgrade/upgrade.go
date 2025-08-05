@@ -101,6 +101,13 @@ type artifactDownloader interface {
 	cleanNonMatchingVersionsFromDownloads(log *logger.Logger, version string) error
 }
 
+type unpacker interface {
+	getPackageMetadata(archivePath string) (packageMetadata, error)
+	extractAgentVersion(metadata packageMetadata, version string) agentVersion
+	unpack(version, archivePath, topPath, flavor string) (unpackResult, error)
+	detectFlavor(topPath, flavor string) (string, error)
+}
+
 // Upgrader performs an upgrade
 type Upgrader struct {
 	log                *logger.Logger
@@ -112,6 +119,7 @@ type Upgrader struct {
 	upgradeCleaner     upgradeCleaner
 	diskSpaceErrorFunc func(error) error
 	artifactDownloader artifactDownloader
+	unpacker           unpacker
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -146,6 +154,7 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.A
 		},
 		diskSpaceErrorFunc: upgradeErrors.ToDiskSpaceErrorFunc(log),
 		artifactDownloader: newUpgradeArtifactDownloader(log, settings, downloaderFactoryProvider),
+		unpacker:           &upgradeUnpacker{log: log},
 	}, nil
 }
 
@@ -246,18 +255,6 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 	return nil
 }
 
-// type upgradeProcessWithFuncs interface {
-// 	download(funcs downloadFuncs, params downloadParams) (download.DownloadResult, error)
-// 	unpack(funcs unpackFuncs, params unpackParams) (unpackStepResult, error)
-// 	replace(funcs replaceFuncs, params replaceParams) error
-// 	watch(funcs watchFuncs, params watchParams) error
-// }
-
-type upgradeStep interface {
-	downloadArtifact(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, fleetServerURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (download.DownloadResult, error)
-	cleanNonMatchingVersions(log *logger.Logger, version string) error
-}
-
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	defer func() {
@@ -329,13 +326,14 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	det.SetState(details.StateExtracting)
 
-	metadata, err := u.getPackageMetadata(downloadResult.ArtifactPath)
+	metadata, err := u.unpacker.getPackageMetadata(downloadResult.ArtifactPath)
 	if err != nil {
 		return nil, fmt.Errorf("reading metadata for elastic agent version %s package %q: %w", version, downloadResult.ArtifactPath, err)
 	}
 
-	newVersion := extractAgentVersion(metadata, version)
-	if err := checkUpgrade(u.log, currentVersion, newVersion, metadata); err != nil {
+	newVersion := u.unpacker.extractAgentVersion(metadata, version)
+
+	if err := checkUpgrade(u.log, currentVersion, newVersion, metadata); err != nil { // pass this as param to unpack step in upgrade executor
 		return nil, fmt.Errorf("cannot upgrade the agent: %w", err)
 	}
 
@@ -346,12 +344,13 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	// no default flavor, keep everything in case flavor is not specified
 	// in case of error fallback to keep-all
-	detectedFlavor, err := install.UsedFlavor(paths.Top(), "")
+	detectedFlavor, err := u.unpacker.detectFlavor(paths.Top(), "")
 	if err != nil {
 		u.log.Warnf("error encountered when detecting used flavor with top path %q: %w", paths.Top(), err)
 	}
 	u.log.Debugf("detected used flavor: %q", detectedFlavor)
-	unpackRes, unpackErr := u.unpack(version, downloadResult.ArtifactPath, paths.Data(), detectedFlavor)
+
+	unpackRes, unpackErr := u.unpacker.unpack(version, downloadResult.ArtifactPath, paths.Data(), detectedFlavor)
 	err = goerrors.Join(err, u.diskSpaceErrorFunc(unpackErr))
 
 	if unpackRes.VersionedHome == "" {
@@ -583,7 +582,7 @@ func (u *Upgrader) sourceURI(retrievedURI string) string {
 	return u.settings.SourceURI
 }
 
-func extractAgentVersion(metadata packageMetadata, upgradeVersion string) agentVersion {
+func (u *upgradeUnpacker) extractAgentVersion(metadata packageMetadata, upgradeVersion string) agentVersion {
 	newVersion := agentVersion{}
 	if metadata.manifest != nil {
 		packageDesc := metadata.manifest.Package

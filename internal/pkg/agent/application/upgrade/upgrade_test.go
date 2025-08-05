@@ -809,7 +809,9 @@ func TestExtractVersion(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actualNewVersion := extractAgentVersion(test.args.metadata, test.args.version)
+			log, _ := loggertest.New(test.name)
+			unpacker := &upgradeUnpacker{log: log}
+			actualNewVersion := unpacker.extractAgentVersion(test.args.metadata, test.args.version)
 			assert.Equal(t, test.want.newVersion, actualNewVersion, "Unexpected new version result: extractAgentVersion(%v, %v) should be %v",
 				test.args.metadata, test.args.version, test.want.newVersion)
 		})

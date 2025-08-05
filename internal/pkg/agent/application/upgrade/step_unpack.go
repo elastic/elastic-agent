@@ -35,8 +35,12 @@ type unpackResult struct {
 	VersionedHome string `json:"versioned-home" yaml:"versioned-home"`
 }
 
+type upgradeUnpacker struct {
+	log *logger.Logger
+}
+
 // unpack unpacks archive correctly, skips root (symlink, config...) unpacks data/*
-func (u *Upgrader) unpack(version, archivePath, dataDir string, flavor string) (unpackResult, error) {
+func (u *upgradeUnpacker) unpack(version, archivePath, dataDir string, flavor string) (unpackResult, error) {
 	// unpack must occur in directory that holds the installation directory
 	// or the extraction will be double nested
 	var unpackRes unpackResult
@@ -61,7 +65,7 @@ type packageMetadata struct {
 	hash     string
 }
 
-func (u *Upgrader) getPackageMetadata(archivePath string) (packageMetadata, error) {
+func (u *upgradeUnpacker) getPackageMetadata(archivePath string) (packageMetadata, error) {
 	ext := filepath.Ext(archivePath)
 	if ext == ".gz" {
 		// if we got gzip extension we need another extension before last
@@ -728,4 +732,8 @@ func getFilesContentFromTar(archivePath string, files ...string) (map[string]io.
 // formatted using OS-dependent path separators
 func createVersionedHomeFromHash(hash string) string {
 	return filepath.Join("data", fmt.Sprintf("elastic-agent-%s", hash[:hashLen]))
+}
+
+func (u *upgradeUnpacker) detectFlavor(topPath, flavor string) (string, error) {
+	return install.UsedFlavor(topPath, flavor)
 }
