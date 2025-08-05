@@ -4,6 +4,8 @@
 {{- $agentName := index . 2 }}
   agent.yml: |-
     {{- if eq $.Values.agent.fleet.enabled false }}
+    {{- if ($presetVal)._inputs }}
+    {{- /*  traditional agent config */}}
     id: {{ $agentName }}
     {{- with ($presetVal).outputs }}
     outputs:
@@ -20,13 +22,22 @@
       {{- with ($presetVal)._inputs }}
       {{- . | toYaml | nindent 6 }}
       {{- end }}
-    {{- else }}
-    fleet:
-      enabled: true
-    {{- end }}
     {{- with ($presetVal).providers }}
     providers:
       {{- . | toYaml | nindent 6 }}
+    {{- end }}
+    {{- end }}
+    {{- if ($presetVal).otelConfig }}
+    {{- /*  we have also otel config which is directly embedded in the agent config */}}
+    {{- ($presetVal).otelConfig | toYaml | nindent 4 }}
+    {{- end }}
+    {{- else }}
+    fleet:
+      enabled: true
+    {{- with ($presetVal).providers }}
+    providers:
+      {{- . | toYaml | nindent 6 }}
+    {{- end }}
     {{- end }}
   {{- if eq $.Values.agent.fleet.enabled true }}
   {{- if $.Values.agent.fleet.ca.value }}

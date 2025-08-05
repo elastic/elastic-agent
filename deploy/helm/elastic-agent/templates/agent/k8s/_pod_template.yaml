@@ -78,7 +78,25 @@ template:
         {{- else }}
         image: "{{ $.Values.agent.image.repository }}:{{ $.Values.agent.version }}"
         {{- end }}
+        {{- if ($presetVal).command }}
+        {{- /* user values define already the command at the preset */}}
+        command:
+          {{- ($presetVal).command | toYaml | nindent 10 }}
+        {{- else if (eq (dig "_execMode" "" $presetVal) "otel") }}
+        {{- /* under otel execMode the command must point to elastic-agent */}}
+        command: ["elastic-agent"]
+        {{- end }}
+        {{- if ($presetVal).args }}
+        {{- /* user values define already the args at the preset */}}
+        args:
+          {{- ($presetVal).args | toYaml | nindent 10 }}
+        {{- else if (eq (dig "_execMode" "" $presetVal) "otel") }}
+        {{- /* under otel execMode the args must change */}}
+        args: ["otel", "--config", "/etc/elastic-agent/agent.yml"]
+        {{- else }}
+        {{- /* traditional/hybrid mode */}}
         args: ["-c", "/etc/elastic-agent/agent.yml", "-e"]
+        {{- end }}
         {{- with ($presetVal).securityContext }}
         securityContext:
           {{- . | toYaml | nindent 10 }}
