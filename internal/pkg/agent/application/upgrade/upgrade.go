@@ -335,11 +335,20 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 	u.log.Debugf("detected used flavor: %q", detectedFlavor)
 	unpackRes, unpackErr := u.unpack(version, downloadResult.ArtifactPath, paths.Data(), detectedFlavor)
-	err = u.diskSpaceErrorFunc(unpackErr)
-	err = goerrors.Join(err, unpackErr)
+	err = goerrors.Join(err, u.diskSpaceErrorFunc(unpackErr))
+
+	if unpackRes.VersionedHome == "" {
+		err = goerrors.Join(err, fmt.Errorf("unknown versioned home"))
+		return nil, err
+	}
+
+	newHash := unpackRes.Hash
+	if newHash == "" {
+		err = goerrors.Join(err, fmt.Errorf("unknown hash"))
+		return nil, err
+	}
 
 	newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome)
-	u.log.Infof("newHome: %s", newHome)
 
 	unpackCleanupSetupErr := u.upgradeCleaner.setupUnpackCleanup(newHome, paths.Home())
 	err = goerrors.Join(err, unpackCleanupSetupErr)
@@ -348,29 +357,28 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, err
 	}
 
-	u.log.Infof("unpackRes: %+v", unpackRes)
+	// u.log.Infof("unpackRes: %+v", unpackRes)
 
-	newHash := unpackRes.Hash
-	if newHash == "" {
-		return nil, errors.New("unknown hash")
-	}
+	// u.log.Infof("unpackRes.Hash: %s", unpackRes.Hash)
 
-	u.log.Infof("unpackRes.Hash: %s", unpackRes.Hash)
+	// u.log.Infof("unpackRes.VersionedHome: %s", unpackRes.VersionedHome)
 
-	u.log.Infof("unpackRes.VersionedHome: %s", unpackRes.VersionedHome)
-
-	if err := copyActionStore(u.log, newHome); err != nil {
-		return nil, errors.New(err, "failed to copy action store")
+	err = copyActionStore(u.log, newHome)
+	if err != nil {
+		err = fmt.Errorf("failed to copy action store: %w", u.diskSpaceErrorFunc(err))
+		return nil, err
 	}
 
 	newRunPath := filepath.Join(newHome, "run")
 	oldRunPath := filepath.Join(paths.Run())
 
-	u.log.Infof("oldRunPath: %s", oldRunPath)
-	u.log.Infof("newRunPath: %s", newRunPath)
+	// u.log.Infof("oldRunPath: %s", oldRunPath)
+	// u.log.Infof("newRunPath: %s", newRunPath)
 
-	if err := copyRunDirectory(u.log, oldRunPath, newRunPath); err != nil {
-		return nil, errors.New(err, "failed to copy run directory")
+	err = copyRunDirectory(u.log, oldRunPath, newRunPath)
+	if err != nil {
+		err = fmt.Errorf("failed to copy run directory: %w", u.diskSpaceErrorFunc(err))
+		return nil, err
 	}
 
 	det.SetState(details.StateReplacing)

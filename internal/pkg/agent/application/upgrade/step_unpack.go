@@ -27,7 +27,7 @@ import (
 )
 
 // UnpackResult contains the location and hash of the unpacked agent files
-type UnpackResult struct {
+type unpackResult struct {
 	// Hash contains the unpacked agent commit hash, limited to a length of 6 for backward compatibility
 	Hash string `json:"hash" yaml:"hash"`
 	// VersionedHome indicates the path (relative to topPath, formatted in os-dependent fashion) where to find the unpacked agent files
@@ -36,10 +36,10 @@ type UnpackResult struct {
 }
 
 // unpack unpacks archive correctly, skips root (symlink, config...) unpacks data/*
-func (u *Upgrader) unpack(version, archivePath, dataDir string, flavor string) (UnpackResult, error) {
+func (u *Upgrader) unpack(version, archivePath, dataDir string, flavor string) (unpackResult, error) {
 	// unpack must occur in directory that holds the installation directory
 	// or the extraction will be double nested
-	var unpackRes UnpackResult
+	var unpackRes unpackResult
 	var err error
 	if runtime.GOOS == windows {
 		unpackRes, err = unzip(u.log, archivePath, dataDir, flavor)
@@ -78,9 +78,9 @@ func (u *Upgrader) getPackageMetadata(archivePath string) (packageMetadata, erro
 	}
 }
 
-func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (UnpackResult, error) {
+func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (unpackResult, error) {
 	var hash, rootDir string
-	result := UnpackResult{}
+	result := unpackResult{}
 
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
@@ -319,12 +319,12 @@ func getPackageMetadataFromZipReader(r *zip.ReadCloser, fileNamePrefix string) (
 	return ret, nil
 }
 
-func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (UnpackResult, error) {
+func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (unpackResult, error) {
 	var versionedHome string
 	var rootDir string
 	var hash string
 
-	result := UnpackResult{}
+	result := unpackResult{}
 
 	// Look up manifest in the archive and prepare path mappings, if any
 	pm := pathMapper{}

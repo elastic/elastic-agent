@@ -219,7 +219,7 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 	tests := []struct {
 		name       string
 		args       args
-		want       UnpackResult
+		want       unpackResult
 		wantErr    assert.ErrorAssertionFunc
 		checkFiles checkExtractedPath
 		flavor     string
@@ -233,7 +233,7 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 					return createTarArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.tar.gz", i)
 				},
 			},
-			want: UnpackResult{
+			want: unpackResult{
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-abcdef"),
 			},
@@ -252,7 +252,7 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 					return createTarArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.tar.gz", i)
 				},
 			},
-			want: UnpackResult{
+			want: unpackResult{
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
@@ -268,7 +268,7 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 					return createTarArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.tar.gz", i)
 				},
 			},
-			want: UnpackResult{
+			want: unpackResult{
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
@@ -293,7 +293,7 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 					return createTarArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.tar.gz", i)
 				},
 			},
-			want: UnpackResult{
+			want: unpackResult{
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
@@ -348,7 +348,7 @@ func TestUpgrader_unpackZip(t *testing.T) {
 	tests := []struct {
 		name       string
 		args       args
-		want       UnpackResult
+		want       unpackResult
 		wantErr    assert.ErrorAssertionFunc
 		checkFiles checkExtractedPath
 		flavor     string
@@ -361,7 +361,7 @@ func TestUpgrader_unpackZip(t *testing.T) {
 					return createZipArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.zip", i)
 				},
 			},
-			want: UnpackResult{
+			want: unpackResult{
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-abcdef"),
 			},
@@ -379,7 +379,7 @@ func TestUpgrader_unpackZip(t *testing.T) {
 					return createZipArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.zip", i)
 				},
 			},
-			want: UnpackResult{
+			want: unpackResult{
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
@@ -395,7 +395,7 @@ func TestUpgrader_unpackZip(t *testing.T) {
 					return createZipArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.zip", i)
 				},
 			},
-			want: UnpackResult{
+			want: unpackResult{
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
@@ -419,7 +419,7 @@ func TestUpgrader_unpackZip(t *testing.T) {
 					return createZipArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.zip", i)
 				},
 			},
-			want: UnpackResult{
+			want: unpackResult{
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
