@@ -32,7 +32,10 @@ func saveConfigToStore(store storage.Store, reader io.Reader) error {
 			// Retryable error, so return it
 			return saveErr
 		}
-
+		if err != nil {
+			// Non-retryable error, so mark it as permanent
+			return backoff.Permanent(saveErr)
+		}
 		// saveErr is an error that should not be retried. Return nil to
 		// signal to the retrier that it should not retry.
 		return nil
