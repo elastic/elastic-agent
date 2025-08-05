@@ -25,19 +25,18 @@ const saveRetryDuration = 2 * time.Second
 // On Windows platforms, the save operation is retried if the error is an
 // ACCESS_DENIED error, which can happen if the file is locked by another process.
 func saveConfigToStore(store storage.Store, reader io.Reader) error {
-	var saveErr error
 	retryableSaveFn := func() error {
-		saveErr = store.Save(reader)
-		if errors.Is(saveErr, syscall.ERROR_ACCESS_DENIED) {
+		err := store.Save(reader)
+		if errors.Is(err, syscall.ERROR_ACCESS_DENIED) {
 			// Retryable error, so return it
-			return saveErr
+			return err
 		}
+
 		if err != nil {
 			// Non-retryable error, so mark it as permanent
-			return backoff.Permanent(saveErr)
+			return backoff.Permanent(err)
 		}
-		// saveErr is an error that should not be retried. Return nil to
-		// signal to the retrier that it should not retry.
+
 		return nil
 	}
 
@@ -49,8 +48,5 @@ func saveConfigToStore(store storage.Store, reader io.Reader) error {
 	retryWithConstantBackoff := backoff.NewConstantBackOff(saveRetryInterval)
 
 	// Retry save operation
-	//nolint:errcheck // ignore returned error because we're interested in the error from the save operation, saveErr
-	backoff.Retry(retryableSaveFn, backoff.WithContext(retryWithConstantBackoff, retryCtx))
-
-	return saveErr
+	return backoff.Retry(retryableSaveFn, backoff.WithContext(retryWithConstantBackoff, retryCtx))
 }
