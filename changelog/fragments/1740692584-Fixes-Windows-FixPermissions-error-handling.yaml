@@ -1,6 +1,0 @@
-kind: bug-fix
-summary: Fixes an issue where `FixPermissions` on Windows incorrectly returned an error message due to improper handling of Windows API return values.
-description: Corrects error handling in `FixPermissions` on Windows by properly checking the return value of Win32 APIs calls. The previous implementation incorrectly propagated an unrelated error message.
-component: elastic-agent
-pr: https://github.com/elastic/elastic-agent/pull/7059
-issue: https://github.com/elastic/elastic-agent/issues/6917
