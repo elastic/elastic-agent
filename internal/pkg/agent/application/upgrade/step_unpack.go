@@ -24,6 +24,7 @@ import (
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 // UnpackResult contains the location and hash of the unpacked agent files
@@ -736,4 +737,19 @@ func createVersionedHomeFromHash(hash string) string {
 
 func (u *upgradeUnpacker) detectFlavor(topPath, flavor string) (string, error) {
 	return install.UsedFlavor(topPath, flavor)
+}
+
+func (u *upgradeUnpacker) extractAgentVersion(metadata packageMetadata, upgradeVersion string) agentVersion {
+	newVersion := agentVersion{}
+	if metadata.manifest != nil {
+		packageDesc := metadata.manifest.Package
+		newVersion.version = packageDesc.Version
+		newVersion.snapshot = packageDesc.Snapshot
+	} else {
+		// extract version info from the version string (we can ignore parsing errors as it would have never passed the download step)
+		parsedVersion, _ := agtversion.ParseVersion(upgradeVersion)
+		newVersion.version, newVersion.snapshot = parsedVersion.ExtractSnapshotFromVersionString()
+	}
+	newVersion.hash = metadata.hash
+	return newVersion
 }

@@ -649,3 +649,177 @@ func TestGetFileNamePrefix(t *testing.T) {
 	}
 
 }
+
+func TestExtractVersion(t *testing.T) {
+	type args struct {
+		metadata packageMetadata
+		version  string
+	}
+	type want struct {
+		newVersion agentVersion
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "same version, snapshot flag and hash",
+			args: args{
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Version:       "1.2.3",
+							Snapshot:      true,
+							VersionedHome: "",
+							PathMappings:  nil,
+						},
+					},
+					hash: "abcdef",
+				},
+				version: "unused",
+			},
+			want: want{
+				newVersion: agentVersion123SNAPSHOTabcdef,
+			},
+		},
+		{
+			name: "same hash, snapshot flag, different version",
+			args: args{
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Version:       "1.2.3-repackaged",
+							Snapshot:      true,
+							VersionedHome: "",
+							PathMappings:  nil,
+						},
+					},
+					hash: "abcdef",
+				},
+				version: "unused",
+			},
+			want: want{
+				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
+			},
+		},
+		{
+			name: "same version and hash, different snapshot flag (SNAPSHOT promotion to release)",
+			args: args{
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Version:       "1.2.3",
+							Snapshot:      false,
+							VersionedHome: "",
+							PathMappings:  nil,
+						},
+					},
+					hash: "abcdef",
+				},
+				version: "unused",
+			},
+			want: want{
+				newVersion: agentVersion123abcdef,
+			},
+		},
+		{
+			name: "same version and snapshot, different hash (SNAPSHOT upgrade)",
+			args: args{
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Version:       "1.2.3",
+							Snapshot:      true,
+							VersionedHome: "",
+							PathMappings:  nil,
+						},
+					},
+					hash: "ghijkl",
+				},
+				version: "unused",
+			},
+			want: want{
+				newVersion: agentVersion123SNAPSHOTghijkl,
+			},
+		},
+		{
+			name: "same version, snapshot flag and hash, no manifest",
+			args: args{
+				metadata: packageMetadata{
+					manifest: nil,
+					hash:     "abcdef",
+				},
+				version: "1.2.3-SNAPSHOT",
+			},
+			want: want{
+				newVersion: agentVersion123SNAPSHOTabcdef,
+			},
+		},
+		{
+			name: "same hash, snapshot flag, different version, no manifest",
+			args: args{
+				metadata: packageMetadata{
+					manifest: nil,
+					hash:     "abcdef",
+				},
+				version: "1.2.3-SNAPSHOT.repackaged",
+			},
+			want: want{
+				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
+			},
+		},
+		{
+			name: "same version and hash, different snapshot flag, no manifest (SNAPSHOT promotion to release)",
+			args: args{
+				metadata: packageMetadata{
+					manifest: nil,
+					hash:     "abcdef",
+				},
+				version: "1.2.3",
+			},
+			want: want{
+				newVersion: agentVersion123abcdef,
+			},
+		},
+		{
+			name: "same version and snapshot, different hash (SNAPSHOT upgrade)",
+			args: args{
+				metadata: packageMetadata{
+					manifest: nil,
+					hash:     "ghijkl",
+				},
+				version: "1.2.3-SNAPSHOT",
+			},
+			want: want{
+				newVersion: agentVersion123SNAPSHOTghijkl,
+			},
+		},
+		{
+			name: "same version and snapshot, no hash (SNAPSHOT upgrade before download)",
+			args: args{
+				metadata: packageMetadata{
+					manifest: nil,
+				},
+				version: "1.2.3-SNAPSHOT",
+			},
+			want: want{
+				newVersion: agentVersion{
+					version:  "1.2.3",
+					snapshot: true,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			log, _ := loggertest.New(test.name)
+			unpacker := &upgradeUnpacker{log: log}
+			actualNewVersion := unpacker.extractAgentVersion(test.args.metadata, test.args.version)
+			assert.Equal(t, test.want.newVersion, actualNewVersion, "Unexpected new version result: extractAgentVersion(%v, %v) should be %v",
+				test.args.metadata, test.args.version, test.want.newVersion)
+		})
+	}
+}

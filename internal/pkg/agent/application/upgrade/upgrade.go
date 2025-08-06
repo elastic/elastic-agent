@@ -594,21 +594,6 @@ func (u *Upgrader) sourceURI(retrievedURI string) string {
 	return u.settings.SourceURI
 }
 
-func (u *upgradeUnpacker) extractAgentVersion(metadata packageMetadata, upgradeVersion string) agentVersion {
-	newVersion := agentVersion{}
-	if metadata.manifest != nil {
-		packageDesc := metadata.manifest.Package
-		newVersion.version = packageDesc.Version
-		newVersion.snapshot = packageDesc.Snapshot
-	} else {
-		// extract version info from the version string (we can ignore parsing errors as it would have never passed the download step)
-		parsedVersion, _ := agtversion.ParseVersion(upgradeVersion)
-		newVersion.version, newVersion.snapshot = parsedVersion.ExtractSnapshotFromVersionString()
-	}
-	newVersion.hash = metadata.hash
-	return newVersion
-}
-
 func isSameVersion(log *logger.Logger, current agentVersion, newVersion agentVersion) bool {
 	log.Debugw("Comparing current and new agent version", "current_version", current, "new_version", newVersion)
 	return current == newVersion
