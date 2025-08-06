@@ -10,11 +10,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
-	"github.com/otiai10/copy"
 	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -27,7 +25,6 @@ import (
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
@@ -118,6 +115,11 @@ type watcher interface {
 	waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout) error
 	selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string
 	markUpgrade(log *logger.Logger, dataDir string, current, previous agentInstall, action *fleetapi.ActionUpgrade, det *details.Details, outcome UpgradeOutcome) error
+}
+
+type agentDirectoryCopier interface {
+	copyActionStore(log *logger.Logger, newHome string) error
+	copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error
 }
 
 // Upgrader performs an upgrade
@@ -550,59 +552,6 @@ func isSameVersion(log *logger.Logger, current agentVersion, newVersion agentVer
 	return current == newVersion
 }
 
-type agentDirectoryCopier interface {
-	copyActionStore(log *logger.Logger, newHome string) error
-	copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error
-}
-
-type directoryCopier struct {
-}
-
-func (u *directoryCopier) copyActionStore(log *logger.Logger, newHome string) error {
-	// copies legacy action_store.yml, state.yml and state.enc encrypted file if exists
-	storePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile()}
-	log.Infow("Copying action store", "new_home_path", newHome)
-
-	for _, currentActionStorePath := range storePaths {
-		newActionStorePath := filepath.Join(newHome, filepath.Base(currentActionStorePath))
-		log.Infow("Copying action store path", "from", currentActionStorePath, "to", newActionStorePath)
-		currentActionStore, err := os.ReadFile(currentActionStorePath)
-		if os.IsNotExist(err) {
-			// nothing to copy
-			continue
-		}
-		if err != nil {
-			return err
-		}
-
-		if err := os.WriteFile(newActionStorePath, currentActionStore, 0o600); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (u *directoryCopier) copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error {
-	log.Infow("Copying run directory", "new_run_path", newRunPath, "old_run_path", oldRunPath)
-
-	if err := os.MkdirAll(newRunPath, runDirMod); err != nil {
-		return errors.New(err, "failed to create run directory")
-	}
-
-	err := copyDir(log, oldRunPath, newRunPath, true)
-	if os.IsNotExist(err) {
-		// nothing to copy, operation ok
-		log.Infow("Run directory not present", "old_run_path", oldRunPath)
-		return nil
-	}
-	if err != nil {
-		return errors.New(err, "failed to copy %q to %q", oldRunPath, newRunPath)
-	}
-
-	return nil
-}
-
 // shutdownCallback returns a callback function to be executing during shutdown once all processes are closed.
 // this goes through runtime directory of agent and copies all the state files created by processes to new versioned
 // home directory with updated process name to match new version.
@@ -634,80 +583,6 @@ func shutdownCallback(l *logger.Logger, homePath, prevVersion, newVersion, newHo
 		}
 		return nil
 	}
-}
-
-func readProcessDirs(runtimeDir string) ([]string, error) {
-	pipelines, err := readDirs(runtimeDir)
-	if err != nil {
-		return nil, err
-	}
-
-	processDirs := make([]string, 0)
-	for _, p := range pipelines {
-		dirs, err := readDirs(p)
-		if err != nil {
-			return nil, err
-		}
-
-		processDirs = append(processDirs, dirs...)
-	}
-
-	return processDirs, nil
-}
-
-// readDirs returns list of absolute paths to directories inside specified path.
-func readDirs(dir string) ([]string, error) {
-	dirEntries, err := os.ReadDir(dir)
-	if err != nil && !os.IsNotExist(err) {
-		return nil, err
-	}
-
-	dirs := make([]string, 0, len(dirEntries))
-	for _, de := range dirEntries {
-		if !de.IsDir() {
-			continue
-		}
-
-		dirs = append(dirs, filepath.Join(dir, de.Name()))
-	}
-
-	return dirs, nil
-}
-
-func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
-	var onErr func(src, dst string, err error) error
-
-	if ignoreErrs {
-		onErr = func(src, dst string, err error) error {
-			if err == nil {
-				return nil
-			}
-
-			// ignore all errors, just log them
-			l.Infof("ignoring error: failed to copy %q to %q: %s", src, dst, err.Error())
-			return nil
-		}
-	}
-
-	// Try to detect if we are running with SSDs. If we are increase the copy concurrency,
-	// otherwise fall back to the default.
-	copyConcurrency := 1
-	hasSSDs, detectHWErr := install.HasAllSSDs()
-	if detectHWErr != nil {
-		l.Infow("Could not determine block storage type, disabling copy concurrency", "error.message", detectHWErr)
-	}
-	if hasSSDs {
-		copyConcurrency = runtime.NumCPU() * 4
-	}
-
-	return copy.Copy(from, to, copy.Options{
-		OnSymlink: func(_ string) copy.SymlinkAction {
-			return copy.Shallow
-		},
-		Sync:         true,
-		OnError:      onErr,
-		NumOfWorkers: int64(copyConcurrency),
-	})
 }
 
 // IsInProgress checks if an Elastic Agent upgrade is already in progress. It
