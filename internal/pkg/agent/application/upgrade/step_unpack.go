@@ -67,7 +67,7 @@ func (u *unpacker) unpack(version, archivePath, dataDir string, flavor string) (
 	// or the extraction will be double nested
 	var unpackRes UnpackResult
 	var err error
-	if runtime.GOOS == windows {
+	if runtime.GOOS == windowsOSName {
 		unpackRes, err = u.unzip(u.log, archivePath, dataDir, flavor, u.copy, u.mkdirAll, u.openFile)
 	} else {
 		unpackRes, err = u.untar(u.log, archivePath, dataDir, flavor, u.copy, u.mkdirAll, u.openFile)
