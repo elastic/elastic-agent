@@ -5,7 +5,7 @@
   agent.yml: |-
     {{- if eq $.Values.agent.fleet.enabled false }}
     {{- if ($presetVal)._inputs }}
-    {{- /*  traditional agent config */}}
+    {{- /*  elastic-agent config */}}
     id: {{ $agentName }}
     {{- with ($presetVal).outputs }}
     outputs:

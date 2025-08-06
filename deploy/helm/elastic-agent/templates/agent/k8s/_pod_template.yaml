@@ -94,7 +94,7 @@ template:
         {{- /* under otel execMode the args must change */}}
         args: ["otel", "--config", "/etc/elastic-agent/agent.yml"]
         {{- else }}
-        {{- /* traditional/hybrid mode */}}
+        {{- /* hybrid mode */}}
         args: ["-c", "/etc/elastic-agent/agent.yml", "-e"]
         {{- end }}
         {{- with ($presetVal).securityContext }}

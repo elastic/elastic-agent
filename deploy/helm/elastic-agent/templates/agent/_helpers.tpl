@@ -117,7 +117,7 @@ Validate and initialise the defined agent presets
 {{- $presetInputs := dig "_inputs" (list) $presetVal -}}
 {{- if empty $presetInputs -}}
 {{- if (dig "otelConfig" (dict) $presetVal) -}}
-{{/* since there are no tradinional _inputs defined and there */}}
+{{/* since there are no elastic-agent _inputs defined and there */}}
 {{/* is only otelConfig the execMode is otel */}}
 {{- $_ := set $presetVal "_execMode" "otel" -}}
 {{- else -}}
