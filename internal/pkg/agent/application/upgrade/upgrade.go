@@ -9,6 +9,7 @@ import (
 	goerrors "errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -115,6 +116,7 @@ type watcher interface {
 	waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout) error
 	selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string
 	markUpgrade(log *logger.Logger, dataDir string, current, previous agentInstall, action *fleetapi.ActionUpgrade, det *details.Details, outcome UpgradeOutcome) error
+	invokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error)
 }
 
 type agentDirectoryCopier interface {
@@ -137,6 +139,7 @@ type Upgrader struct {
 	relinker           relinker
 	watcher            watcher
 	directoryCopier    agentDirectoryCopier
+	upgradeExecutor    upgradeExecutor
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -159,22 +162,34 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.A
 		downloaderFactories: downloaderFactories,
 	}
 
+	upgradeCleaner := &upgradeCleanup{
+		log:          log,
+		cleanupFuncs: []func() error{},
+	}
+
 	return &Upgrader{
-		log:           log,
-		settings:      settings,
-		agentInfo:     agentInfo,
-		upgradeable:   IsUpgradeable(),
-		markerWatcher: newMarkerFileWatcher(markerFilePath(paths.Data()), log),
-		upgradeCleaner: &upgradeCleanup{
-			log:          log,
-			cleanupFuncs: []func() error{},
-		},
+		log:                log,
+		settings:           settings,
+		agentInfo:          agentInfo,
+		upgradeable:        IsUpgradeable(),
+		markerWatcher:      newMarkerFileWatcher(markerFilePath(paths.Data()), log),
+		upgradeCleaner:     upgradeCleaner,
 		diskSpaceErrorFunc: upgradeErrors.ToDiskSpaceErrorFunc(log),
 		artifactDownloader: newUpgradeArtifactDownloader(log, settings, downloaderFactoryProvider),
 		unpacker:           &upgradeUnpacker{log: log},
 		relinker:           &upgradeRelinker{},
 		watcher:            &upgradeWatcher{},
 		directoryCopier:    &directoryCopier{},
+		upgradeExecutor: &ExecuteUpgrade{
+			log:                log,
+			upgradeCleaner:     upgradeCleaner,
+			artifactDownloader: newUpgradeArtifactDownloader(log, settings, downloaderFactoryProvider),
+			unpacker:           &upgradeUnpacker{log: log},
+			relinker:           &upgradeRelinker{},
+			watcher:            &upgradeWatcher{},
+			directoryCopier:    &directoryCopier{},
+			diskSpaceErrorFunc: upgradeErrors.ToDiskSpaceErrorFunc(log),
+		},
 	}, nil
 }
 
@@ -277,6 +292,10 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+	return u.newUpgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+}
+
+func (u *Upgrader) oldUpgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	defer func() {
 		if err != nil {
 			cleanupErr := u.upgradeCleaner.cleanup(err)
@@ -475,6 +494,118 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	err = u.watcher.waitForWatcher(ctx, u.log, markerFilePath(paths.Data()), watcherMaxWaitTime, context.WithTimeout)
 	if err != nil {
 		err = goerrors.Join(err, watcherCmd.Process.Kill())
+		return nil, err
+	}
+
+	cb := shutdownCallback(u.log, paths.Home(), release.Version(), version, filepath.Join(paths.Top(), unpackRes.VersionedHome))
+
+	// Clean everything from the downloads dir
+	u.log.Infow("Removing downloads directory", "file.path", paths.Downloads())
+	err = os.RemoveAll(paths.Downloads())
+	if err != nil {
+		u.log.Errorw("Unable to clean downloads after update", "error.message", err, "file.path", paths.Downloads())
+	}
+
+	return cb, nil
+}
+
+func (u *Upgrader) newUpgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+	defer func() {
+		if err != nil {
+			cleanupErr := u.upgradeCleaner.cleanup(err)
+			if cleanupErr != nil {
+				u.log.Errorf("Error cleaning up after upgrade: %w", cleanupErr)
+				err = goerrors.Join(err, cleanupErr)
+			}
+		}
+	}()
+
+	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
+
+	currentVersion := agentVersion{
+		version:  release.Version(),
+		snapshot: release.Snapshot(),
+		hash:     release.Commit(),
+		fips:     release.FIPSDistribution(),
+	}
+
+	// Compare versions and exit before downloading anything if the upgrade
+	// is for the same release version that is currently running
+	if isSameReleaseVersion(u.log, currentVersion, version) {
+		u.log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
+		return nil, ErrUpgradeSameVersion
+	}
+
+	// Inform the Upgrade Marker Watcher that we've started upgrading. Note that this
+	// is only possible to do in-memory since, today, the  process that's initiating
+	// the upgrade is the same as the Agent process in which the Upgrade Marker Watcher is
+	// running. If/when, in the future, the process initiating the upgrade is separated
+	// from the Agent process in which the Upgrade Marker Watcher is running, such in-memory
+	// communication will need to be replaced with inter-process communication (e.g. via
+	// a file, e.g. the Upgrade Marker file or something else).
+	u.markerWatcher.SetUpgradeStarted()
+
+	span, ctx := apm.StartSpan(ctx, "upgrade", "app.internal")
+	defer span.End()
+
+	sourceURI = u.sourceURI(sourceURI)
+
+	parsedTargetVersion, err := agtversion.ParseVersion(version)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing version %q: %w", version, err)
+	}
+
+	downloadResult, err := u.upgradeExecutor.downloadArtifact(ctx, parsedTargetVersion, u.agentInfo, sourceURI, u.fleetServerURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+	if err != nil {
+		return nil, err
+	}
+
+	unpackRes, err := u.upgradeExecutor.unpackArtifact(downloadResult, version, downloadResult.ArtifactPath, paths.Top(), "", paths.Data(), paths.Home(), det, currentVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	newRunPath := filepath.Join(unpackRes.newHome, "run")
+	oldRunPath := filepath.Join(paths.Run())
+
+	symlinkPath := filepath.Join(paths.Top(), agentName)
+	u.log.Infof("symlinkPath: %s", symlinkPath)
+
+	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
+	newPath := paths.BinaryPath(filepath.Join(paths.Top(), unpackRes.VersionedHome), agentName)
+	u.log.Infof("newPath: %s", newPath)
+
+	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
+	if err != nil {
+		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
+	}
+
+	err = u.upgradeExecutor.replaceOldWithNew(u.log, unpackRes, currentVersionedHome, paths.Top(), agentName, paths.Home(), oldRunPath, newRunPath, symlinkPath, newPath, det)
+	if err != nil {
+		return nil, err
+	}
+
+	// We rotated the symlink successfully: prepare the current and previous agent installation details for the update marker
+	// In update marker the `current` agent install is the one where the symlink is pointing (the new one we didn't start yet)
+	// while the `previous` install is the currently executing elastic-agent that is no longer reachable via the symlink.
+	// After the restart at the end of the function, everything lines up correctly.
+	current := agentInstall{
+		parsedVersion: parsedTargetVersion,
+		version:       version,
+		hash:          unpackRes.Hash,
+		versionedHome: unpackRes.VersionedHome,
+	}
+
+	previousParsedVersion := currentagtversion.GetParsedAgentPackageVersion()
+	previous := agentInstall{
+		parsedVersion: previousParsedVersion,
+		version:       release.VersionWithSnapshot(),
+		hash:          release.Commit(),
+		versionedHome: currentVersionedHome,
+	}
+
+	err = u.upgradeExecutor.watchNewAgent(ctx, u.log, markerFilePath(paths.Data()), paths.Top(), paths.Data(), watcherMaxWaitTime, context.WithTimeout, current, previous, action, det, OUTCOME_UPGRADE)
+	if err != nil {
 		return nil, err
 	}
 
