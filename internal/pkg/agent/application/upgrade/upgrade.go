@@ -113,6 +113,11 @@ type replacer interface {
 	copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error
 	changeSymlink(log *logger.Logger, topPath, symlinkPath, newPath string) error
 }
+type watcher interface {
+	waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration) error
+	selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string
+	markUpgrade(log *logger.Logger, dataDir string, current, previous agentInstall, action *fleetapi.ActionUpgrade, det *details.Details, outcome UpgradeOutcome) error
+}
 
 // Upgrader performs an upgrade
 type Upgrader struct {
@@ -127,6 +132,7 @@ type Upgrader struct {
 	artifactDownloader artifactDownloader
 	unpacker           unpacker
 	replacer           replacer
+	watcher            watcher
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -163,6 +169,7 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.A
 		artifactDownloader: newUpgradeArtifactDownloader(log, settings, downloaderFactoryProvider),
 		unpacker:           &upgradeUnpacker{log: log},
 		replacer:           &upgradeReplacer{},
+		watcher:            &upgradeWatcher{},
 	}, nil
 }
 
@@ -268,6 +275,9 @@ type upgradeReplacer struct {
 
 func (u *upgradeReplacer) changeSymlink(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
 	return changeSymlink(log, topDirPath, symlinkPath, newTarget)
+}
+
+type upgradeWatcher struct {
 }
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
@@ -451,7 +461,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		versionedHome: currentVersionedHome,
 	}
 
-	err = markUpgrade(u.log,
+	err = u.watcher.markUpgrade(u.log,
 		paths.Data(), // data dir to place the marker in
 		current,      // new agent version data
 		previous,     // old agent version data
@@ -460,14 +470,14 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, err
 	}
 
-	watcherExecutable := selectWatcherExecutable(paths.Top(), previous, current)
+	watcherExecutable := u.watcher.selectWatcherExecutable(paths.Top(), previous, current)
 
 	watcherCmd, err := InvokeWatcher(u.log, watcherExecutable)
 	if err != nil {
 		return nil, err
 	}
 
-	err = waitForWatcher(ctx, u.log, markerFilePath(paths.Data()), watcherMaxWaitTime)
+	err = u.watcher.waitForWatcher(ctx, u.log, markerFilePath(paths.Data()), watcherMaxWaitTime)
 	if err != nil {
 		err = goerrors.Join(err, watcherCmd.Process.Kill())
 		return nil, err
@@ -485,7 +495,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	return cb, nil
 }
 
-func selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string {
+func (u *upgradeWatcher) selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string {
 	// check if the upgraded version is less than the previous (currently installed) version
 	if current.parsedVersion.Less(*previous.parsedVersion) {
 		// use the current agent executable for watch, if downgrading the old agent doesn't understand the current agent's path structure.
@@ -496,7 +506,7 @@ func selectWatcherExecutable(topDir string, previous agentInstall, current agent
 	}
 }
 
-func waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration) error {
+func (u *upgradeWatcher) waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration) error {
 	return waitForWatcherWithTimeoutCreationFunc(ctx, log, markerFilePath, waitTime, context.WithTimeout)
 }
 

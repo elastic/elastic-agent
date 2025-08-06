@@ -197,7 +197,7 @@ type agentInstall struct {
 }
 
 // markUpgrade marks update happened so we can handle grace period
-func markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, desiredOutcome UpgradeOutcome) error {
+func (u *upgradeWatcher) markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, desiredOutcome UpgradeOutcome) error {
 
 	if len(previousAgent.hash) > hashLen {
 		previousAgent.hash = previousAgent.hash[:hashLen]

@@ -1204,7 +1204,8 @@ func Test_selectWatcherExecutable(t *testing.T) {
 	fakeTopDir := filepath.Join(t.TempDir(), "Elastic", "Agent")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, paths.BinaryPath(filepath.Join(fakeTopDir, tt.want), agentName), selectWatcherExecutable(fakeTopDir, tt.args.previous, tt.args.current), "selectWatcherExecutable(%v, %v)", tt.args.previous, tt.args.current)
+			watcher := &upgradeWatcher{}
+			assert.Equalf(t, paths.BinaryPath(filepath.Join(fakeTopDir, tt.want), agentName), watcher.selectWatcherExecutable(fakeTopDir, tt.args.previous, tt.args.current), "selectWatcherExecutable(%v, %v)", tt.args.previous, tt.args.current)
 		})
 	}
 }
