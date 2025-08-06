@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/configure"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/utils"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -42,7 +43,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 		Use:   "watch",
 		Short: "Watch the Elastic Agent for failures and initiate rollback",
 		Long:  `This command watches Elastic Agent for failures and initiates rollback if necessary.`,
-		Run: func(_ *cobra.Command, _ []string) {
+		Run: func(c *cobra.Command, _ []string) {
 			cfg := getConfig(streams)
 			log, err := configuredLogger(cfg, watcherName)
 			if err != nil {
@@ -53,6 +54,16 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 			// Make sure to flush any buffered logs before we're done.
 			defer log.Sync() //nolint:errcheck // flushing buffered logs is best effort.
 
+			takedown, _ := c.Flags().GetBool("takedown")
+			if takedown {
+				err = takedownWatcher(log, utils.GetWatcherPIDs)
+				if err != nil {
+					log.Errorf("error taking down watcher: %v", err)
+					os.Exit(5)
+				}
+				return
+			}
+
 			if err := watchCmd(log, paths.Top(), cfg.Settings.Upgrade.Watcher, new(upgradeAgentWatcher), new(upgradeInstallationModifier)); err != nil {
 				log.Errorw("Watch command failed", "error.message", err)
 				fmt.Fprintf(streams.Err, "Watch command failed: %v\n%s\n", err, troubleshootMessage())
@@ -60,7 +71,8 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 			}
 		},
 	}
-
+	cmd.Flags().BoolP("takedown", "t", false, "Take down the running watcher")
+	cmd.Flags().MarkHidden("takedown") //nolint:errcheck // not required
 	return cmd
 }
 
@@ -104,7 +116,7 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 
 	if marker.DesiredOutcome == upgrade.OUTCOME_ROLLBACK {
 		// TODO: there should be some sanity check in rollback functions like the installation we are going back to should exist and work
-		log.Info("rolling back because of DesiredOutcome=%s", marker.DesiredOutcome.String())
+		log.Infof("rolling back because of DesiredOutcome=%s", marker.DesiredOutcome.String())
 		err = installModifier.Rollback(context.Background(), log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash)
 		if err != nil {
 			return fmt.Errorf("rolling back: %w", err)
@@ -118,7 +130,7 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 			marker.Details = details.NewDetails(marker.Version, details.StateRollback, actionID)
 		}
 		marker.Details.SetStateWithReason(details.StateRollback, details.ReasonManualRollback)
-		err := upgrade.SaveMarker(dataDir, marker, true)
+		err = upgrade.SaveMarker(dataDir, marker, true)
 		if err != nil {
 			return fmt.Errorf("saving marker after rolling back: %w", err)
 		}
