@@ -8,13 +8,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
@@ -374,4 +378,49 @@ func TestDownloadArtifact(t *testing.T) {
 		require.ErrorIs(t, err, mockDownloaderFactoryError)
 		require.Equal(t, composedDownloaderFactory, u.downloaderFactoryProvider.(*mockDownloaderFactoryProvider).calledWithName)
 	})
+}
+
+func setupDir(t *testing.T) {
+	t.Helper()
+	dir := t.TempDir()
+	paths.SetDownloads(dir)
+
+	err := os.WriteFile(filepath.Join(dir, "test-8.3.0-file"), []byte("hello, world!"), 0600)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(dir, "test-8.4.0-file"), []byte("hello, world!"), 0600)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(dir, "test-8.5.0-file"), []byte("hello, world!"), 0600)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(dir, "test-hash-file"), []byte("hello, world!"), 0600)
+	require.NoError(t, err)
+}
+
+func TestPreUpgradeCleanup(t *testing.T) {
+	setupDir(t)
+	log := newErrorLogger(t)
+	u := newUpgradeArtifactDownloader(log, &artifact.Config{}, nil)
+	err := u.cleanNonMatchingVersionsFromDownloads(log, "8.4.0")
+	require.NoError(t, err)
+
+	files, err := os.ReadDir(paths.Downloads())
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	require.Equal(t, "test-8.4.0-file", files[0].Name())
+	p, err := os.ReadFile(filepath.Join(paths.Downloads(), files[0].Name()))
+	require.NoError(t, err)
+	require.Equal(t, []byte("hello, world!"), p)
+}
+
+func newErrorLogger(t *testing.T) *logger.Logger {
+	t.Helper()
+
+	loggerCfg := logger.DefaultLoggingConfig()
+	loggerCfg.Level = logp.ErrorLevel
+
+	eventLoggerCfg := logger.DefaultEventLoggingConfig()
+	eventLoggerCfg.Level = loggerCfg.Level
+
+	log, err := logger.NewFromConfig("", loggerCfg, eventLoggerCfg, false)
+	require.NoError(t, err)
+	return log
 }
