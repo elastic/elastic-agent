@@ -128,27 +128,9 @@ func (u *ExecuteUpgrade) replaceOldWithNew(log *logger.Logger, unpackStepResult 
 
 	upgradeDetails.SetState(details.StateReplacing)
 
-	// create symlink to the <new versioned-home>/elastic-agent
-	// hashedDir := unpackRes.VersionedHome
-	// u.log.Infof("hashedDir: %s", hashedDir)
-
-	// symlinkPath := filepath.Join(topPath, agentName)
-	// u.log.Infof("symlinkPath: %s", symlinkPath)
-
-	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
-	// newPath := paths.BinaryPath(filepath.Join(topPath, unpackStepResult.VersionedHome), agentName)
-	// u.log.Infof("newPath: %s", newPath)
-
-	// currentVersionedHome, err := filepath.Rel(topPath, currentHome)
-	// if err != nil {
-	// 	return fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", currentHome, topPath, err)
-	// }
-
 	if err := u.upgradeCleaner.setupSymlinkCleanup(u.relinker.changeSymlink, topPath, currentVersionedHome, agentName); err != nil {
 		return fmt.Errorf("error setting up symlink cleanup: %w", err)
 	}
-
-	u.log.Infof("currentVersionedHome: %s", currentVersionedHome)
 
 	return u.relinker.changeSymlink(u.log, topPath, symlinkPath, newBinPath)
 }
