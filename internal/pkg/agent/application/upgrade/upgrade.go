@@ -117,8 +117,11 @@ type replacer interface {
 type relinker interface {
 	changeSymlink(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error
 }
+
+type createContextWithTimeout func(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc)
+
 type watcher interface {
-	waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration) error
+	waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout) error
 	selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string
 	markUpgrade(log *logger.Logger, dataDir string, current, previous agentInstall, action *fleetapi.ActionUpgrade, det *details.Details, outcome UpgradeOutcome) error
 }
@@ -473,7 +476,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, err
 	}
 
-	err = u.watcher.waitForWatcher(ctx, u.log, markerFilePath(paths.Data()), watcherMaxWaitTime)
+	err = u.watcher.waitForWatcher(ctx, u.log, markerFilePath(paths.Data()), watcherMaxWaitTime, context.WithTimeout)
 	if err != nil {
 		err = goerrors.Join(err, watcherCmd.Process.Kill())
 		return nil, err
@@ -489,37 +492,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	return cb, nil
-}
-
-type createContextWithTimeout func(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc)
-
-func waitForWatcherWithTimeoutCreationFunc(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout) error {
-	// Wait for the watcher to be up and running
-	watcherContext, cancel := createTimeoutContext(ctx, waitTime)
-	defer cancel()
-
-	markerWatcher := newMarkerFileWatcher(markerFilePath, log)
-	err := markerWatcher.Run(watcherContext)
-	if err != nil {
-		return fmt.Errorf("error starting update marker watcher: %w", err)
-	}
-
-	log.Infof("waiting up to %s for upgrade watcher to set %s state in upgrade marker", waitTime, details.StateWatching)
-
-	for {
-		select {
-		case updMarker := <-markerWatcher.Watch():
-			if updMarker.Details != nil && updMarker.Details.State == details.StateWatching {
-				// watcher started and it is watching, all good
-				log.Infof("upgrade watcher set %s state in upgrade marker: exiting wait loop", details.StateWatching)
-				return nil
-			}
-
-		case <-watcherContext.Done():
-			log.Errorf("upgrade watcher did not start watching within %s or context has expired", waitTime)
-			return goerrors.Join(ErrWatcherNotStarted, watcherContext.Err())
-		}
-	}
 }
 
 // Ack acks last upgrade action

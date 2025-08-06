@@ -5,15 +5,20 @@
 package upgrade
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 func TestSaveAndLoadMarker_NoLoss(t *testing.T) {
@@ -257,6 +262,141 @@ desired_outcome: true
 			// Clean up
 			err = os.Remove(markerFile)
 			require.NoError(t, err, "Failed to clean up marker file")
+		})
+	}
+}
+
+func TestWaitForWatcher(t *testing.T) {
+	wantErrWatcherNotStarted := func(t assert.TestingT, err error, i ...interface{}) bool {
+		return assert.ErrorIs(t, err, ErrWatcherNotStarted, i)
+	}
+
+	tests := []struct {
+		name                string
+		states              []details.State
+		stateChangeInterval time.Duration
+		cancelWaitContext   bool
+		wantErr             assert.ErrorAssertionFunc
+	}{
+		{
+			name:                "Happy path: watcher is watching already",
+			states:              []details.State{details.StateWatching},
+			stateChangeInterval: 1 * time.Millisecond,
+			wantErr:             assert.NoError,
+		},
+		{
+			name:                "Sad path: watcher is never starting",
+			states:              []details.State{details.StateReplacing},
+			stateChangeInterval: 1 * time.Millisecond,
+			cancelWaitContext:   true,
+			wantErr:             wantErrWatcherNotStarted,
+		},
+		{
+			name: "Runaround path: marker is jumping around and landing on watching",
+			states: []details.State{
+				details.StateRequested,
+				details.StateScheduled,
+				details.StateDownloading,
+				details.StateExtracting,
+				details.StateReplacing,
+				details.StateRestarting,
+				details.StateWatching,
+			},
+			stateChangeInterval: 1 * time.Millisecond,
+			wantErr:             assert.NoError,
+		},
+		{
+			name:                "Timeout: marker is never created",
+			states:              nil,
+			stateChangeInterval: 1 * time.Millisecond,
+			cancelWaitContext:   true,
+			wantErr:             wantErrWatcherNotStarted,
+		},
+		{
+			name: "Timeout2: state doesn't get there in time",
+			states: []details.State{
+				details.StateRequested,
+				details.StateScheduled,
+				details.StateDownloading,
+				details.StateExtracting,
+				details.StateReplacing,
+				details.StateRestarting,
+			},
+
+			stateChangeInterval: 1 * time.Millisecond,
+			cancelWaitContext:   true,
+			wantErr:             wantErrWatcherNotStarted,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			deadline, ok := t.Deadline()
+			if !ok {
+				deadline = time.Now().Add(5 * time.Second)
+			}
+			testCtx, testCancel := context.WithDeadline(context.Background(), deadline)
+			defer testCancel()
+
+			tmpDir := t.TempDir()
+			updMarkerFilePath := filepath.Join(tmpDir, markerFilename)
+
+			waitContext, waitCancel := context.WithCancel(testCtx)
+			defer waitCancel()
+
+			fakeTimeout := 30 * time.Second
+
+			// in order to take timing out of the equation provide a context that we can cancel manually
+			// still assert that the parent context and timeout passed are correct
+			var createContextFunc createContextWithTimeout = func(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+				assert.Same(t, testCtx, ctx, "parent context should be the same as the waitForWatcherCall")
+				assert.Equal(t, fakeTimeout, timeout, "timeout used in new context should be the same as testcase")
+
+				return waitContext, waitCancel
+			}
+
+			if len(tt.states) > 0 {
+				initialState := tt.states[0]
+				writeState(t, updMarkerFilePath, initialState)
+			}
+
+			wg := new(sync.WaitGroup)
+
+			var furtherStates []details.State
+			if len(tt.states) > 1 {
+				// we have more states to produce
+				furtherStates = tt.states[1:]
+			}
+
+			wg.Add(1)
+
+			// worker goroutine: writes out additional states while the test is blocked on waitOnWatcher() call and expires
+			// the wait context if cancelWaitContext is set to true. Timing of the goroutine is driven by stateChangeInterval.
+			go func() {
+				defer wg.Done()
+				tick := time.NewTicker(tt.stateChangeInterval)
+				defer tick.Stop()
+				for _, state := range furtherStates {
+					select {
+					case <-testCtx.Done():
+						return
+					case <-tick.C:
+						writeState(t, updMarkerFilePath, state)
+					}
+				}
+				if tt.cancelWaitContext {
+					<-tick.C
+					waitCancel()
+				}
+			}()
+
+			log, _ := loggertest.New(tt.name)
+
+			watcher := &upgradeWatcher{}
+
+			tt.wantErr(t, watcher.waitForWatcher(testCtx, log, updMarkerFilePath, fakeTimeout, createContextFunc), fmt.Sprintf("waitForWatcher %s, %v, %s, %s)", updMarkerFilePath, tt.states, tt.stateChangeInterval, fakeTimeout))
+
+			// wait for goroutines to finish
+			wg.Wait()
 		})
 	}
 }
