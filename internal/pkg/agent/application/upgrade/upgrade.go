@@ -180,7 +180,7 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.A
 		relinker:           &upgradeRelinker{},
 		watcher:            &upgradeWatcher{},
 		directoryCopier:    &directoryCopier{},
-		upgradeExecutor: &ExecuteUpgrade{
+		upgradeExecutor: &executeUpgrade{
 			log:                log,
 			upgradeCleaner:     upgradeCleaner,
 			artifactDownloader: newUpgradeArtifactDownloader(log, settings, downloaderFactoryProvider),
@@ -293,6 +293,7 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	return u.newUpgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+	// return u.oldUpgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 }
 
 func (u *Upgrader) oldUpgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {

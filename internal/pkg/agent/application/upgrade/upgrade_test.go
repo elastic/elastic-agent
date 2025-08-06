@@ -1147,13 +1147,18 @@ func TestUpgradeDownloadErrors(t *testing.T) {
 
 					downloaderFactoryProvider := tc.factoryProviderFunc(&config, copyFunc)
 					artifactDownloader := newUpgradeArtifactDownloader(log, &config, downloaderFactoryProvider)
+					executeUpgrade := &executeUpgrade{
+						log:                log,
+						artifactDownloader: artifactDownloader,
+					}
 
 					mockAgentInfo := mockinfo.NewAgent(t)
 					mockAgentInfo.On("Version").Return(version.String())
 
 					upgrader, err := NewUpgrader(log, &config, mockAgentInfo)
 					require.NoError(t, err)
-					upgrader.artifactDownloader = artifactDownloader
+					// upgrader.artifactDownloader = artifactDownloader
+					upgrader.upgradeExecutor = executeUpgrade
 
 					_, err = upgrader.Upgrade(context.Background(), version.String(), config.SourceURI, nil, upgradeDetails, false, false)
 					require.Error(t, err, "expected error got none")

@@ -24,7 +24,7 @@ type upgradeExecutor interface {
 	watchNewAgent(ctx context.Context, log *logger.Logger, markerFilePath, topPath, dataPath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout, newAgentInstall agentInstall, previousAgentInstall agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, upgradeOutcome UpgradeOutcome) error
 }
 
-type ExecuteUpgrade struct {
+type executeUpgrade struct {
 	log                *logger.Logger
 	upgradeCleaner     upgradeCleaner
 	artifactDownloader artifactDownloader
@@ -41,7 +41,7 @@ type unpackStepResult struct {
 	unpackResult
 }
 
-func (u *ExecuteUpgrade) downloadArtifact(ctx context.Context, parsedTargetVersion *agtversion.ParsedSemVer, agentInfo info.Agent, sourceURI string, fleetServerURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (download.DownloadResult, error) {
+func (u *executeUpgrade) downloadArtifact(ctx context.Context, parsedTargetVersion *agtversion.ParsedSemVer, agentInfo info.Agent, sourceURI string, fleetServerURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (download.DownloadResult, error) {
 	err := u.artifactDownloader.cleanNonMatchingVersionsFromDownloads(u.log, agentInfo.Version())
 	if err != nil {
 		u.log.Errorw("Unable to clean downloads before update", "error.message", err, "downloads.path", paths.Downloads())
@@ -63,7 +63,7 @@ func (u *ExecuteUpgrade) downloadArtifact(ctx context.Context, parsedTargetVersi
 	return downloadResult, u.upgradeCleaner.setupArchiveCleanup(downloadResult)
 }
 
-func (u *ExecuteUpgrade) unpackArtifact(downloadResult download.DownloadResult, version, archivePath, topPath, flavor, dataPath, currentHome string, upgradeDetails *details.Details, currentVersion agentVersion) (unpackStepResult, error) {
+func (u *executeUpgrade) unpackArtifact(downloadResult download.DownloadResult, version, archivePath, topPath, flavor, dataPath, currentHome string, upgradeDetails *details.Details, currentVersion agentVersion) (unpackStepResult, error) {
 	upgradeDetails.SetState(details.StateExtracting)
 
 	metadata, err := u.unpacker.getPackageMetadata(downloadResult.ArtifactPath)
@@ -117,7 +117,7 @@ func (u *ExecuteUpgrade) unpackArtifact(downloadResult download.DownloadResult, 
 	return unpackStepResult, unpackErr
 }
 
-func (u *ExecuteUpgrade) replaceOldWithNew(log *logger.Logger, unpackStepResult unpackStepResult, currentVersionedHome, topPath, agentName, currentHome, oldRunPath, newRunPath, symlinkPath, newBinPath string, upgradeDetails *details.Details) error {
+func (u *executeUpgrade) replaceOldWithNew(log *logger.Logger, unpackStepResult unpackStepResult, currentVersionedHome, topPath, agentName, currentHome, oldRunPath, newRunPath, symlinkPath, newBinPath string, upgradeDetails *details.Details) error {
 	if err := u.directoryCopier.copyActionStore(u.log, unpackStepResult.newHome); err != nil {
 		return fmt.Errorf("failed to copy action store: %w", u.diskSpaceErrorFunc(err))
 	}
@@ -135,7 +135,7 @@ func (u *ExecuteUpgrade) replaceOldWithNew(log *logger.Logger, unpackStepResult 
 	return u.relinker.changeSymlink(u.log, topPath, symlinkPath, newBinPath)
 }
 
-func (u *ExecuteUpgrade) watchNewAgent(ctx context.Context, log *logger.Logger, markerFilePath, topPath, dataPath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout, newAgentInstall agentInstall, previousAgentInstall agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, upgradeOutcome UpgradeOutcome) error {
+func (u *executeUpgrade) watchNewAgent(ctx context.Context, log *logger.Logger, markerFilePath, topPath, dataPath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout, newAgentInstall agentInstall, previousAgentInstall agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, upgradeOutcome UpgradeOutcome) error {
 	if err := u.watcher.markUpgrade(u.log,
 		dataPath,             // data dir to place the marker in
 		newAgentInstall,      // new agent version data
