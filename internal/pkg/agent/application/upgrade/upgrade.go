@@ -113,6 +113,10 @@ type replacer interface {
 	copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error
 	changeSymlink(log *logger.Logger, topPath, symlinkPath, newPath string) error
 }
+
+type relinker interface {
+	changeSymlink(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error
+}
 type watcher interface {
 	waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration) error
 	selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string
@@ -131,7 +135,7 @@ type Upgrader struct {
 	diskSpaceErrorFunc func(error) error
 	artifactDownloader artifactDownloader
 	unpacker           unpacker
-	replacer           replacer
+	relinker           relinker
 	watcher            watcher
 }
 
@@ -168,7 +172,7 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.A
 		diskSpaceErrorFunc: upgradeErrors.ToDiskSpaceErrorFunc(log),
 		artifactDownloader: newUpgradeArtifactDownloader(log, settings, downloaderFactoryProvider),
 		unpacker:           &upgradeUnpacker{log: log},
-		replacer:           &upgradeReplacer{},
+		relinker:           &upgradeRelinker{},
 		watcher:            &upgradeWatcher{},
 	}, nil
 }
@@ -431,13 +435,13 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
 	}
 
-	if symlinkCleanupSetupErr := u.upgradeCleaner.setupSymlinkCleanup(changeSymlink, paths.Top(), currentVersionedHome, agentName); symlinkCleanupSetupErr != nil {
+	if symlinkCleanupSetupErr := u.upgradeCleaner.setupSymlinkCleanup(u.relinker.changeSymlink, paths.Top(), currentVersionedHome, agentName); symlinkCleanupSetupErr != nil {
 		err = goerrors.Join(err, symlinkCleanupSetupErr)
 	}
 
 	u.log.Infof("currentVersionedHome: %s", currentVersionedHome)
 
-	err = u.replacer.changeSymlink(u.log, paths.Top(), symlinkPath, newPath)
+	err = u.relinker.changeSymlink(u.log, paths.Top(), symlinkPath, newPath)
 	if err != nil {
 		return nil, err
 	}

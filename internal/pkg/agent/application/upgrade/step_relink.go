@@ -19,7 +19,11 @@ const (
 	exe     = ".exe"
 )
 
-func changeSymlink(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
+type upgradeRelinker struct {
+}
+
+// TODO: add tests for this
+func (u *upgradeRelinker) changeSymlink(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
 	log.Infof("Changing symlink, topDirPath: %s, symlinkPath: %s, newTarget: %s", topDirPath, symlinkPath, newTarget)
 	// handle windows suffixes
 	if runtime.GOOS == windows {
@@ -27,7 +31,7 @@ func changeSymlink(log *logger.Logger, topDirPath, symlinkPath, newTarget string
 		newTarget += exe
 	}
 
-	prevNewPath := prevSymlinkPath(topDirPath)
+	prevNewPath := u.prevSymlinkPath(topDirPath)
 	log.Infow("Changing symlink", "symlink_path", symlinkPath, "new_path", newTarget, "prev_path", prevNewPath)
 
 	// remove symlink to avoid upgrade failures
@@ -43,7 +47,8 @@ func changeSymlink(log *logger.Logger, topDirPath, symlinkPath, newTarget string
 	return file.SafeFileRotate(symlinkPath, prevNewPath)
 }
 
-func prevSymlinkPath(topDirPath string) string {
+// TODO: add tests for this
+func (u *upgradeRelinker) prevSymlinkPath(topDirPath string) string {
 	agentPrevName := agentName + ".prev"
 
 	// handle windows suffixes
