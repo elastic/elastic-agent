@@ -1334,27 +1334,6 @@ func TestDownloaderFactoryProvider(t *testing.T) {
 	require.Equal(t, "downloader factory \"nonExistentFactory\" not found", err.Error())
 }
 
-func TestNewUpgrader(t *testing.T) {
-	// TODO: address this test
-	// logger, err := logger.New("test", false)
-	// require.NoError(t, err)
-
-	// upgrader, err := NewUpgrader(logger, nil, nil)
-	// require.NoError(t, err)
-
-	// fileDownloaderFactory, err := upgrader.artifactDownloader.downloaderFactoryProvider.GetDownloaderFactory(fileDownloaderFactory)
-	// require.NoError(t, err)
-
-	// fileDownloader, err := fileDownloaderFactory(nil, nil, nil, nil)
-	// require.NoError(t, err)
-	// require.IsType(t, &fs.Downloader{}, fileDownloader)
-
-	// composedDownloader, err := upgrader.downloaderFactoryProvider.GetDownloaderFactory(composedDownloaderFactory)
-	// require.NoError(t, err)
-
-	// require.Equal(t, reflect.ValueOf(composedDownloader).Pointer(), reflect.ValueOf(newDownloader).Pointer())
-}
-
 func setupForFileDownloader(sourcePrefix string, expectedFileName string, partialData []byte) setupFunc {
 	return func(t *testing.T, config *artifact.Config, basePath string, targetPath string) {
 		testDownloadPath := filepath.Join(basePath, "downloads")
