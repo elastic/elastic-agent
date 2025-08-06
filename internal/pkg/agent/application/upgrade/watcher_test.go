@@ -10,16 +10,17 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v3"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
@@ -874,34 +875,34 @@ func writeState(t *testing.T, path string, state details.State) {
 // This test cannot run in parallel because it deals with launching test processes and verifying their state.
 // In case of aggressive PID reuse along with parallel execution, this test could kill "innocent" processes
 func TestTakeOverWatcher(t *testing.T) {
-	testExecutablePath := filepath.Join("..", "filelock", "testlocker", "testlocker")
-	if runtime.GOOS == "windows" {
-		testExecutablePath += ".exe"
-	}
-	testExecutableAbsolutePath, err := filepath.Abs(testExecutablePath)
-	require.NoError(t, err, "error calculating absolute test executable part")
+	//testExecutablePath := filepath.Join("..", "filelock", "testlocker", "testlocker")
+	//if runtime.GOOS == "windows" {
+	//	testExecutablePath += ".exe"
+	//}
+	//testExecutableAbsolutePath, err := filepath.Abs(testExecutablePath)
+	//require.NoError(t, err, "error calculating absolute test executable part")
+	//
+	//require.FileExists(t, testExecutableAbsolutePath,
+	//	"testlocker binary not found.\n"+
+	//		"Check that:\n"+
+	//		"- test binaries have been built with mage dev:buildtestbinaries\n"+
+	//		"- the path of the executable is correct")
 
-	require.FileExists(t, testExecutableAbsolutePath,
-		"testlocker binary not found.\n"+
-			"Check that:\n"+
-			"- test binaries have been built with mage dev:buildtestbinaries\n"+
-			"- the path of the executable is correct")
+	//returnCmdPIDsFetcher := func(cmds ...*process.Info) watcherPIDsFetcher {
+	//	return func() ([]int, error) {
+	//		pids := make([]int, 0, len(cmds))
+	//		for _, c := range cmds {
+	//			if c.Process != nil {
+	//				pids = append(pids, c.Process.Pid)
+	//			}
+	//		}
+	//
+	//		return pids, nil
+	//	}
+	//}
 
-	returnCmdPIDsFetcher := func(cmds ...*process.Info) watcherPIDsFetcher {
-		return func() ([]int, error) {
-			pids := make([]int, 0, len(cmds))
-			for _, c := range cmds {
-				if c.Process != nil {
-					pids = append(pids, c.Process.Pid)
-				}
-			}
-
-			return pids, nil
-		}
-	}
-
-	type setupFunc func(t *testing.T, workdir string) (watcherPIDsFetcher, []*process.Info)
-	type assertFunc func(t *testing.T, workdir string, appLocker *filelock.AppLocker, cmds []*process.Info)
+	type setupFunc func(t *testing.T, workdir string, mockWatcherGrappler *mockWatcherGrappler)
+	type assertFunc func(t *testing.T, workdir string, appLocker *filelock.AppLocker)
 
 	testcases := []struct {
 		name               string
@@ -911,74 +912,81 @@ func TestTakeOverWatcher(t *testing.T) {
 	}{
 		{
 			name: "no contention for watcher applocker",
-			setup: func(t *testing.T, workdir string) (watcherPIDsFetcher, []*process.Info) {
-				// nothing to do here, always return and empty list of pids
-				return func() ([]int, error) {
-					return nil, nil
-				}, nil
+			setup: func(t *testing.T, workdir string, mockWatcherGrappler *mockWatcherGrappler) {
+				// nothing to do here
 			},
 			wantErr: assert.NoError,
-			assertPostTakeover: func(t *testing.T, workdir string, appLocker *filelock.AppLocker, _ []*process.Info) {
+			assertPostTakeover: func(t *testing.T, workdir string, appLocker *filelock.AppLocker) {
 				assert.NotNil(t, appLocker, "appLocker should not be nil")
 				assert.FileExists(t, filepath.Join(workdir, watcherApplockerFileName))
 			},
 		},
 		{
-			name: "contention with test binary listening to signals: test binary is terminated gracefully",
-			setup: func(t *testing.T, workdir string) (watcherPIDsFetcher, []*process.Info) {
-				cancelFunc, cmd := createTestlockerCommand(t.Context(), t, testExecutableAbsolutePath, workdir, false)
-				t.Cleanup(cancelFunc)
-				require.NoError(t, err, "error starting testlocker binary")
+			name: "contention with a process that can be taken down: no error",
+			setup: func(t *testing.T, workdir string, mockWatcherGrappler *mockWatcherGrappler) {
+				// create and lock an applocker
+				locker := filelock.NewAppLocker(workdir, watcherApplockerFileName)
+				err := locker.TryLock()
+				require.NoError(t, err, "error setting up the applocker")
+				mockWatcherGrappler.EXPECT().TakeDownWatcher(mock.Anything, mock.Anything).Run(func(_ context.Context, _ *logp.Logger) {
+					unlockErr := locker.Unlock()
+					assert.NoError(t, unlockErr, "error unlocking the applocker")
+				}).Return(nil)
 
-				// wait for test binary to acquire lock
-				require.EventuallyWithT(t, func(collect *assert.CollectT) {
-					assert.FileExists(collect, filepath.Join(workdir, watcherApplockerFileName), "watcher applocker should have been created by the test binary")
-				}, 10*time.Second, 100*time.Millisecond)
-				require.NotNil(t, cmd.Process, "process details for testlocker should not be nil")
-
-				t.Logf("started testlocker process with PID %d", cmd.Process.Pid)
-
-				return returnCmdPIDsFetcher(cmd), []*process.Info{cmd}
+				// add a cleanup to unlock the applocker at the end of the test anyway in case of failures
+				t.Cleanup(func() {
+					locker.Unlock()
+				})
 			},
 			wantErr: assert.NoError,
-			assertPostTakeover: func(t *testing.T, workdir string, appLocker *filelock.AppLocker, cmds []*process.Info) {
+			assertPostTakeover: func(t *testing.T, workdir string, appLocker *filelock.AppLocker) {
 				assert.NotNil(t, appLocker, "appLocker should not be nil")
 				assert.FileExists(t, filepath.Join(workdir, watcherApplockerFileName))
-				assert.Len(t, cmds, 1)
-				testlockerProcess := cmds[0]
-				require.NotNil(t, testlockerProcess.Cmd, "test locker process info should have exec.Cmd set")
-				err = testlockerProcess.Cmd.Wait()
-				assert.NoError(t, err, "error waiting for testlocker process to terminate")
-				if assert.NotNil(t, testlockerProcess.Cmd.ProcessState, "test locker process should have completed and process state set") {
-					assert.True(t, testlockerProcess.Cmd.ProcessState.Success(), "test locker process should be successful")
-				}
 			},
 		},
 		{
-			name: "contention with test binary not listening to signals: test binary is not terminated and error is returned by takeOverWatcher",
-			setup: func(t *testing.T, workdir string) (watcherPIDsFetcher, []*process.Info) {
-				cancelFunc, cmd := createTestlockerCommand(t.Context(), t, testExecutableAbsolutePath, workdir, true)
-				t.Cleanup(cancelFunc)
+			name: "contention with a process that can be taken down with multiple attempts: no error",
+			setup: func(t *testing.T, workdir string, mockWatcherGrappler *mockWatcherGrappler) {
+				// create and lock an applocker
+				locker := filelock.NewAppLocker(workdir, watcherApplockerFileName)
+				err := locker.TryLock()
+				require.NoError(t, err, "error setting up the applocker")
+				mockWatcherGrappler.EXPECT().TakeDownWatcher(mock.Anything, mock.Anything).Return(fmt.Errorf("some takedown error")).Once()
+				mockWatcherGrappler.EXPECT().TakeDownWatcher(mock.Anything, mock.Anything).Run(func(_ context.Context, _ *logp.Logger) {
+					unlockErr := locker.Unlock()
+					assert.NoError(t, unlockErr, "error unlocking the applocker")
+				}).Return(nil)
 
-				// wait for test binary to acquire lock
-				require.EventuallyWithT(t, func(collect *assert.CollectT) {
-					assert.FileExists(collect, filepath.Join(workdir, watcherApplockerFileName), "watcher applocker should have been created by the test binary")
-				}, 10*time.Second, 100*time.Millisecond)
-				require.NotNil(t, cmd.Process, "process details for testlocker should not be nil")
+				// add a cleanup to unlock the applocker at the end of the test anyway in case of failures
+				t.Cleanup(func() {
+					locker.Unlock()
+				})
+			},
+			wantErr: assert.NoError,
+			assertPostTakeover: func(t *testing.T, workdir string, appLocker *filelock.AppLocker) {
+				assert.NotNil(t, appLocker, "appLocker should not be nil")
+				assert.FileExists(t, filepath.Join(workdir, watcherApplockerFileName))
+			},
+		},
+		{
+			name: "contention with a process that cannot be taken down: error is returned by takeOverWatcher",
+			setup: func(t *testing.T, workdir string, mockWatcherGrappler *mockWatcherGrappler) {
+				// create and lock an applocker
+				locker := filelock.NewAppLocker(workdir, watcherApplockerFileName)
+				err := locker.TryLock()
+				require.NoError(t, err, "error setting up the applocker")
 
-				t.Logf("started testlocker process with PID %d", cmd.Process.Pid)
+				// Expect the calls to applocker but do not release the lock
+				mockWatcherGrappler.EXPECT().TakeDownWatcher(mock.Anything, mock.Anything).Return(nil)
 
-				return returnCmdPIDsFetcher(cmd), []*process.Info{cmd}
+				// add a cleanup to unlock the applocker at the end of the test anyway
+				t.Cleanup(func() {
+					locker.Unlock()
+				})
 			},
 			wantErr: assert.Error,
-			assertPostTakeover: func(t *testing.T, workdir string, appLocker *filelock.AppLocker, cmds []*process.Info) {
+			assertPostTakeover: func(t *testing.T, workdir string, appLocker *filelock.AppLocker) {
 				assert.Nil(t, appLocker, "appLocker should be nil")
-				assert.Len(t, cmds, 1)
-				testlockerProcess := cmds[0]
-				require.NotNil(t, testlockerProcess.Process, "testlocker process should not be nil")
-				assert.Nil(t, testlockerProcess.Cmd.ProcessState, "testlocker process should not have ProcessState set since it should still be running")
-				err := testlockerProcess.Process.Kill()
-				assert.NoError(t, err, "error killing testlocker process")
 			},
 		},
 	}
@@ -987,9 +995,11 @@ func TestTakeOverWatcher(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			workDir := t.TempDir()
 			logger, logs := loggertest.New(t.Name())
-			pidFetcher, cmds := tc.setup(t, workDir)
 
-			appLocker, err := takeOverWatcher(t.Context(), logger, workDir, pidFetcher, 10*time.Second, 500*time.Millisecond, 100*time.Millisecond)
+			mockGrappler := newMockWatcherGrappler(t)
+			tc.setup(t, workDir, mockGrappler)
+
+			appLocker, err := takeOverWatcher(t.Context(), logger, mockGrappler, workDir, 10*time.Second, 500*time.Millisecond, 100*time.Millisecond)
 			loggertest.PrintObservedLogs(logs.TakeAll(), t.Log)
 
 			tc.wantErr(t, err)
@@ -1000,7 +1010,7 @@ func TestTakeOverWatcher(t *testing.T) {
 				}(appLocker)
 			}
 			if tc.assertPostTakeover != nil {
-				tc.assertPostTakeover(t, workDir, appLocker, cmds)
+				tc.assertPostTakeover(t, workDir, appLocker)
 			}
 		})
 	}

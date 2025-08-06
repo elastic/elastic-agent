@@ -33,6 +33,10 @@ func (a upgradeInstallationModifier) Rollback(ctx context.Context, log *logger.L
 	return upgrade.Rollback(ctx, log, c, topDirPath, prevVersionedHome, prevHash)
 }
 
+// watcherPIDsFetcher defines the type of function responsible for fetching watcher PIDs.
+// This will allow for easier testing of takeOverWatcher using fake binaries
+type watcherPIDsFetcher func() ([]int, error)
+
 func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval time.Duration, log *logger.Logger) error {
 	errChan := make(chan error)
 
@@ -48,7 +52,7 @@ func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval time.
 	go agtWatcher.Run(ctx)
 
 	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
 
 	graceTimer := time.NewTimer(tilGrace)
 	defer graceTimer.Stop()
