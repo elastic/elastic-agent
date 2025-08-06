@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"time"
@@ -20,8 +19,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/core/process"
-	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
@@ -286,17 +283,14 @@ func (a AgentWatcherHelper) WaitForWatcher(ctx context.Context, log *logger.Logg
 }
 
 func (a AgentWatcherHelper) TakeOverWatcher(ctx context.Context, log *logger.Logger, topDir string) (*filelock.AppLocker, error) {
-	return takeOverWatcher(ctx, log, topDir, utils.GetWatcherPIDs, 30*time.Second, 500*time.Millisecond, 100*time.Millisecond)
+	return takeOverWatcher(ctx, log, topDir, 30*time.Second, 500*time.Millisecond, 100*time.Millisecond)
 }
 
-// watcherPIDsFetcher defines the type of function responsible for fetching watcher PIDs.
-// This will allow for easier testing of takeOverWatcher using fake binaries
-type watcherPIDsFetcher func() ([]int, error)
-
 // Private functions providing implementation of AgentWatcherHelper
-func takeOverWatcher(ctx context.Context, log *logger.Logger, topDir string, pidFetchFunc watcherPIDsFetcher, timeout time.Duration, watcherSweepInterval time.Duration, takeOverInterval time.Duration) (*filelock.AppLocker, error) {
+func takeOverWatcher(ctx context.Context, log *logger.Logger, topDir string, timeout time.Duration, watcherSweepInterval time.Duration, takeOverInterval time.Duration) (*filelock.AppLocker, error) {
 	takeoverCtx, takeoverCancel := context.WithTimeout(ctx, timeout)
 	defer takeoverCancel()
+
 	go func() {
 		sweepTicker := time.NewTicker(watcherSweepInterval)
 		defer sweepTicker.Stop()
@@ -305,27 +299,15 @@ func takeOverWatcher(ctx context.Context, log *logger.Logger, topDir string, pid
 			case <-takeoverCtx.Done():
 				return
 			case <-sweepTicker.C:
-				pids, err := pidFetchFunc()
+				cmd := createTakeDownWatcherCommand(takeoverCtx)
+				log.Debugf("launching takedown with %v", cmd.Args)
+				output, err := cmd.CombinedOutput()
+				log.Debugf("takedown output: %s", string(output))
 				if err != nil {
-					log.Errorf("error listing watcher processes: %s", err)
+					log.Errorf("error taking down watcher: %s", err)
 					continue
 				}
 
-				// this should be run continuously and concurrently attempting to get the app locker
-				for _, pid := range pids {
-					log.Debugf("attempting to kill watcher process with PID: %d", pid)
-					watcherProcess, findProcErr := os.FindProcess(pid)
-					if findProcErr != nil {
-						log.Errorf("error finding process with PID: %d: %s", pid, findProcErr)
-						continue
-					}
-					killProcErr := process.Terminate(watcherProcess)
-					if killProcErr != nil {
-						log.Errorf("error killing process with PID: %d: %s", pid, killProcErr)
-						continue
-					}
-					log.Debugf("killed watcher process with PID: %d", pid)
-				}
 			}
 		}
 	}()

@@ -48,7 +48,7 @@ func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval time.
 	go agtWatcher.Run(ctx)
 
 	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
 
 	graceTimer := time.NewTimer(tilGrace)
 	defer graceTimer.Stop()
