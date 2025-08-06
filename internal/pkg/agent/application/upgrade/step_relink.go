@@ -15,14 +15,14 @@ import (
 )
 
 const (
-	windows = "windows"
-	exe     = ".exe"
+	windowsOSName = "windows"
+	exe           = ".exe"
 )
 
 func changeSymlink(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
 
 	// handle windows suffixes
-	if runtime.GOOS == windows {
+	if runtime.GOOS == windowsOSName {
 		symlinkPath += exe
 		newTarget += exe
 	}
@@ -47,7 +47,7 @@ func prevSymlinkPath(topDirPath string) string {
 	agentPrevName := agentName + ".prev"
 
 	// handle windows suffixes
-	if runtime.GOOS == windows {
+	if runtime.GOOS == windowsOSName {
 		agentPrevName = agentName + ".exe.prev"
 	}
 
