@@ -10,6 +10,7 @@ import (
 	goerrors "errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -369,4 +370,8 @@ func saveMarkerToPath(marker *UpdateMarker, markerFile string, shouldFsync bool)
 
 func markerFilePath(dataDirPath string) string {
 	return filepath.Join(dataDirPath, markerFilename)
+}
+
+func (u *upgradeWatcher) invokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error) {
+	return InvokeWatcher(log, agentExecutable)
 }
