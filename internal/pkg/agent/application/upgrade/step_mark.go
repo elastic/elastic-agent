@@ -5,6 +5,7 @@
 package upgrade
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -195,6 +196,8 @@ type agentInstall struct {
 	hash          string
 	versionedHome string
 }
+type upgradeWatcher struct {
+}
 
 // markUpgrade marks update happened so we can handle grace period
 func (u *upgradeWatcher) markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, desiredOutcome UpgradeOutcome) error {
@@ -232,6 +235,23 @@ func (u *upgradeWatcher) markUpgrade(log *logger.Logger, dataDirPath string, age
 	}
 
 	return nil
+}
+
+// TODO: add tests for this
+func (u *upgradeWatcher) selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string {
+	// check if the upgraded version is less than the previous (currently installed) version
+	if current.parsedVersion.Less(*previous.parsedVersion) {
+		// use the current agent executable for watch, if downgrading the old agent doesn't understand the current agent's path structure.
+		return paths.BinaryPath(filepath.Join(topDir, previous.versionedHome), agentName)
+	} else {
+		// use the new agent executable as it should be able to parse the new update marker
+		return paths.BinaryPath(filepath.Join(topDir, current.versionedHome), agentName)
+	}
+}
+
+// TODO: add tests for this
+func (u *upgradeWatcher) waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration) error {
+	return waitForWatcherWithTimeoutCreationFunc(ctx, log, markerFilePath, waitTime, context.WithTimeout)
 }
 
 // UpdateActiveCommit updates active.commit file to point to active version.

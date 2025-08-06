@@ -491,21 +491,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	return cb, nil
 }
 
-func (u *upgradeWatcher) selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string {
-	// check if the upgraded version is less than the previous (currently installed) version
-	if current.parsedVersion.Less(*previous.parsedVersion) {
-		// use the current agent executable for watch, if downgrading the old agent doesn't understand the current agent's path structure.
-		return paths.BinaryPath(filepath.Join(topDir, previous.versionedHome), agentName)
-	} else {
-		// use the new agent executable as it should be able to parse the new update marker
-		return paths.BinaryPath(filepath.Join(topDir, current.versionedHome), agentName)
-	}
-}
-
-func (u *upgradeWatcher) waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration) error {
-	return waitForWatcherWithTimeoutCreationFunc(ctx, log, markerFilePath, waitTime, context.WithTimeout)
-}
-
 type createContextWithTimeout func(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc)
 
 func waitForWatcherWithTimeoutCreationFunc(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout) error {
