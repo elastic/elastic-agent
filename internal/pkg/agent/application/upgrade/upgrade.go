@@ -108,12 +108,6 @@ type unpacker interface {
 	detectFlavor(topPath, flavor string) (string, error)
 }
 
-type replacer interface {
-	copyActionStore(log *logger.Logger, newHome string) error
-	copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error
-	changeSymlink(log *logger.Logger, topPath, symlinkPath, newPath string) error
-}
-
 type relinker interface {
 	changeSymlink(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error
 }
