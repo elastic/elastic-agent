@@ -45,9 +45,6 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 		t.Fatal("ECH API key missing")
 	}
 
-	startVersions := getUpgradeableFIPSVersions(t)
-	endVersion := define.Version()
-
 	prov, err := ess.NewProvisioner(ess.ProvisionerConfig{
 		Identifier: "it-upgrade-integrations-server",
 		APIKey:     echApiKey,
@@ -57,6 +54,9 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 	prov.SetLogger(t)
 	statefulProv, ok := prov.(*ess.StatefulProvisioner)
 	require.True(t, ok)
+
+	startVersions := getUpgradeableFIPSVersions(t, statefulProv)
+	endVersion := define.Version()
 
 	t.Logf("Running test cases for upgrade from versions [%v] to version [%s]", startVersions, endVersion)
 	for _, startVersion := range startVersions {
@@ -109,9 +109,15 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 }
 
 // getUpgradeableFIPSVersions returns stack versions to use as the start version for an upgrade.
-func getUpgradeableFIPSVersions(t *testing.T) version.SortableParsedVersions {
+func getUpgradeableFIPSVersions(t *testing.T, prov *ess.StatefulProvisioner) version.SortableParsedVersions {
+	// Get the list of versions we use in upgrade integration tests in general.
 	versions, err := upgradetest.GetUpgradableVersions()
 	require.NoError(t, err, "could not get upgradable versions")
+
+	// Filter the list down to versions that are FIPS-capable and actually available
+	// in the ECH region
+	echVersions, err := prov.AvailableVersions()
+	require.NoError(t, err)
 
 	filteredVersions := make([]*version.ParsedSemVer, 0)
 	for _, ver := range versions {
@@ -120,10 +126,26 @@ func getUpgradeableFIPSVersions(t *testing.T) version.SortableParsedVersions {
 			continue
 		}
 
+		// Filter out versions that are not available in the ECH region
+		if !isVersionInList(ver, echVersions) {
+			continue
+		}
+
 		filteredVersions = append(filteredVersions, ver)
 	}
 
+	// Sort the final list so the test cases are run in a sorted order,
+	// making it easier for humans to follow and consume the output.
 	sortedVers := version.SortableParsedVersions(filteredVersions)
 	sort.Sort(sortedVers)
 	return sortedVers
+}
+
+func isVersionInList(candidateVersion *version.ParsedSemVer, allowedVersions []*version.ParsedSemVer) bool {
+	for _, allowedVersion := range allowedVersions {
+		if allowedVersion.Equal(*candidateVersion) {
+			return true
+		}
+	}
+	return false
 }
