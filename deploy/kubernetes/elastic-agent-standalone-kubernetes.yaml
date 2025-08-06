@@ -571,7 +571,7 @@ data:
             hosts:
               - 'localhost:10249'
               # On Openshift port should be adjusted:
-              # - 'localhost:29101'
+              # - 'localhost:29.01'
             period: 10s
           - data_stream:
               dataset: kubernetes.container
