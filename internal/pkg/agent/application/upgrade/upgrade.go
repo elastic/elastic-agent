@@ -137,6 +137,7 @@ type Upgrader struct {
 	unpacker           unpacker
 	relinker           relinker
 	watcher            watcher
+	directoryCopier    agentDirectoryCopier
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -174,6 +175,7 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.A
 		unpacker:           &upgradeUnpacker{log: log},
 		relinker:           &upgradeRelinker{},
 		watcher:            &upgradeWatcher{},
+		directoryCopier:    &directoryCopier{},
 	}, nil
 }
 
@@ -272,16 +274,6 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 	}
 
 	return nil
-}
-
-type upgradeReplacer struct {
-}
-
-func (u *upgradeReplacer) changeSymlink(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
-	return changeSymlink(log, topDirPath, symlinkPath, newTarget)
-}
-
-type upgradeWatcher struct {
 }
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
@@ -402,7 +394,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, err
 	}
 
-	err = u.replacer.copyActionStore(u.log, newHome)
+	err = u.directoryCopier.copyActionStore(u.log, newHome)
 	if err != nil {
 		err = fmt.Errorf("failed to copy action store: %w", u.diskSpaceErrorFunc(err))
 		return nil, err
@@ -411,7 +403,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	newRunPath := filepath.Join(newHome, "run")
 	oldRunPath := filepath.Join(paths.Run())
 
-	err = u.replacer.copyRunDirectory(u.log, oldRunPath, newRunPath)
+	err = u.directoryCopier.copyRunDirectory(u.log, oldRunPath, newRunPath)
 	if err != nil {
 		err = fmt.Errorf("failed to copy run directory: %w", u.diskSpaceErrorFunc(err))
 		return nil, err
@@ -622,7 +614,15 @@ func isSameVersion(log *logger.Logger, current agentVersion, newVersion agentVer
 	return current == newVersion
 }
 
-func (u *upgradeReplacer) copyActionStore(log *logger.Logger, newHome string) error {
+type agentDirectoryCopier interface {
+	copyActionStore(log *logger.Logger, newHome string) error
+	copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error
+}
+
+type directoryCopier struct {
+}
+
+func (u *directoryCopier) copyActionStore(log *logger.Logger, newHome string) error {
 	// copies legacy action_store.yml, state.yml and state.enc encrypted file if exists
 	storePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile()}
 	log.Infow("Copying action store", "new_home_path", newHome)
@@ -647,7 +647,7 @@ func (u *upgradeReplacer) copyActionStore(log *logger.Logger, newHome string) er
 	return nil
 }
 
-func (u *upgradeReplacer) copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error {
+func (u *directoryCopier) copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error {
 	log.Infow("Copying run directory", "new_run_path", newRunPath, "old_run_path", oldRunPath)
 
 	if err := os.MkdirAll(newRunPath, runDirMod); err != nil {
