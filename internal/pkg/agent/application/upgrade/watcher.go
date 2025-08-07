@@ -283,11 +283,29 @@ func (a AgentWatcherHelper) WaitForWatcher(ctx context.Context, log *logger.Logg
 }
 
 func (a AgentWatcherHelper) TakeOverWatcher(ctx context.Context, log *logger.Logger, topDir string) (*filelock.AppLocker, error) {
-	return takeOverWatcher(ctx, log, topDir, 30*time.Second, 500*time.Millisecond, 100*time.Millisecond)
+	return takeOverWatcher(ctx, log, new(commandWatcherGrappler), topDir, 30*time.Second, 500*time.Millisecond, 100*time.Millisecond)
+}
+
+// watcherGrappler is an abstraction over the way elastic-agent main process should take down (stop, gracefully if possible) a watcher process
+type watcherGrappler interface {
+	TakeDownWatcher(ctx context.Context, log *logger.Logger) error
+}
+
+type commandWatcherGrappler struct{}
+
+func (c commandWatcherGrappler) TakeDownWatcher(ctx context.Context, log *logger.Logger) error {
+	cmd := createTakeDownWatcherCommand(ctx)
+	log.Debugf("launching takedown with %v", cmd.Args)
+	output, err := cmd.CombinedOutput()
+	log.Debugf("takedown output: %s", string(output))
+	if err != nil {
+		return fmt.Errorf("watcher command takedown failed: %w", err)
+	}
+	return nil
 }
 
 // Private functions providing implementation of AgentWatcherHelper
-func takeOverWatcher(ctx context.Context, log *logger.Logger, topDir string, timeout time.Duration, watcherSweepInterval time.Duration, takeOverInterval time.Duration) (*filelock.AppLocker, error) {
+func takeOverWatcher(ctx context.Context, log *logger.Logger, watcherGrappler watcherGrappler, topDir string, timeout time.Duration, watcherSweepInterval time.Duration, takeOverInterval time.Duration) (*filelock.AppLocker, error) {
 	takeoverCtx, takeoverCancel := context.WithTimeout(ctx, timeout)
 	defer takeoverCancel()
 
@@ -299,10 +317,7 @@ func takeOverWatcher(ctx context.Context, log *logger.Logger, topDir string, tim
 			case <-takeoverCtx.Done():
 				return
 			case <-sweepTicker.C:
-				cmd := createTakeDownWatcherCommand(takeoverCtx)
-				log.Debugf("launching takedown with %v", cmd.Args)
-				output, err := cmd.CombinedOutput()
-				log.Debugf("takedown output: %s", string(output))
+				err := watcherGrappler.TakeDownWatcher(takeoverCtx, log)
 				if err != nil {
 					log.Errorf("error taking down watcher: %s", err)
 					continue

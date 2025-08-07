@@ -7,8 +7,11 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"syscall"
+
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func takedownWatcher(log *logger.Logger, pidFetchFunc watcherPIDsFetcher) error {
@@ -40,4 +43,5 @@ func takedownWatcher(log *logger.Logger, pidFetchFunc watcherPIDsFetcher) error 
 		}
 
 	}
+	return nil
 }

@@ -16,10 +16,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-// watcherPIDsFetcher defines the type of function responsible for fetching watcher PIDs.
-// This will allow for easier testing of takeOverWatcher using fake binaries
-type watcherPIDsFetcher func() ([]int, error)
-
 var (
 	kernel32API = gowindows.NewLazySystemDLL("kernel32.dll")
 
