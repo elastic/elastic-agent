@@ -510,6 +510,9 @@ func Package(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed downloading manifest: %w", err)
 		}
+		// we need that dependency to essentially download
+		// the components from the given manifest
+		mg.Deps(DownloadManifest)
 	}
 
 	var dependenciesVersion string
@@ -2148,33 +2151,28 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 
 // UpdatePackageVersion update the file that contains the latest available snapshot version
 func (Integration) UpdatePackageVersion(ctx context.Context) error {
-	const packageVersionFilename = ".package-version"
-
 	currentReleaseBranch, err := git.GetCurrentReleaseBranch(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to identify the current release branch: %w", err)
 	}
 
-	sc := snapshots.NewSnapshotsClient()
-	versions, err := sc.FindLatestSnapshots(ctx, []string{currentReleaseBranch})
+	branchInformation, err := findLatestBuildForBranch(ctx, baseURLForSnapshotDRA, currentReleaseBranch)
 	if err != nil {
-		return fmt.Errorf("failed to fetch a manifest for the latest snapshot: %w", err)
-	}
-	if len(versions) != 1 {
-		return fmt.Errorf("expected a single version, got %v", versions)
-	}
-	packageVersion := versions[0].CoreVersion()
-	file, err := os.OpenFile(packageVersionFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
-	if err != nil {
-		return fmt.Errorf("failed to open %s for write: %w", packageVersionFilename, err)
-	}
-	defer file.Close()
-	_, err = file.WriteString(packageVersion)
-	if err != nil {
-		return fmt.Errorf("failed to write the package version file %s: %w", packageVersionFilename, err)
+		return fmt.Errorf("failed to get latest build for branch %q: %w", currentReleaseBranch, err)
 	}
 
-	fmt.Println(packageVersion)
+	err = devtools.UpdatePackageVersion(
+		branchInformation.Version, branchInformation.BuildID,
+		branchInformation.ManifestURL, branchInformation.SummaryURL)
+	if err != nil {
+		return fmt.Errorf("failed to write package version: %w", err)
+	}
+
+	packageVersionBytes, err := os.ReadFile(devtools.PackageVersionFilename)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+	fmt.Println(string(packageVersionBytes))
 
 	return nil
 }
