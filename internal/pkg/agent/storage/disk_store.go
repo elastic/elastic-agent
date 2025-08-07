@@ -108,9 +108,6 @@ func (d *DiskStore) Save(in io.Reader) error {
 	}
 
 	if err := file.SafeFileRotate(d.target, tmpFile); err != nil {
-		if checkRotateErrorAndRetry(err, d.target, tmpFile) {
-			return nil
-		}
 		return errors.New(err,
 			fmt.Sprintf("could not replace target file %s", d.target),
 			errors.TypeFilesystem,
