@@ -4,6 +4,7 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -17,11 +18,34 @@ import (
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
-type upgradeExecutor interface {
-	downloadArtifact(ctx context.Context, parsedTargetVersion *agtversion.ParsedSemVer, agentInfo info.Agent, sourceURI string, fleetServerURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (download.DownloadResult, error)
-	unpackArtifact(downloadResult download.DownloadResult, version, archivePath, topPath, flavor, dataPath, currentHome string, upgradeDetails *details.Details, currentVersion agentVersion) (unpackStepResult, error)
-	replaceOldWithNew(log *logger.Logger, unpackStepResult unpackStepResult, currentVersionedHome, topPath, agentName, currentHome, oldRunPath, newRunPath, symlinkPath, newBinPath string, upgradeDetails *details.Details) error
-	watchNewAgent(ctx context.Context, log *logger.Logger, markerFilePath, topPath, dataPath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout, newAgentInstall agentInstall, previousAgentInstall agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, upgradeOutcome UpgradeOutcome) error
+type artifactDownloader interface {
+	downloadArtifact(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, fleetServerURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (download.DownloadResult, error)
+	cleanNonMatchingVersionsFromDownloads(log *logger.Logger, version string) error
+}
+
+type unpacker interface {
+	getPackageMetadata(archivePath string) (packageMetadata, error)
+	extractAgentVersion(metadata packageMetadata, version string) agentVersion
+	unpack(version, archivePath, topPath, flavor string) (unpackResult, error)
+	detectFlavor(topPath, flavor string) (string, error)
+}
+
+type relinker interface {
+	changeSymlink(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error
+}
+
+type createContextWithTimeout func(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc)
+
+type watcher interface {
+	waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout) error
+	selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string
+	markUpgrade(log *logger.Logger, dataDir string, current, previous agentInstall, action *fleetapi.ActionUpgrade, det *details.Details, outcome UpgradeOutcome) error
+	invokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error)
+}
+
+type agentDirectoryCopier interface {
+	copyActionStore(log *logger.Logger, newHome string) error
+	copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error
 }
 
 type executeUpgrade struct {

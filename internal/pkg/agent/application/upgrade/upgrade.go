@@ -9,7 +9,6 @@ import (
 	goerrors "errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -94,52 +93,29 @@ type upgradeCleaner interface {
 	cleanup(err error) error
 }
 
-type artifactDownloader interface {
-	downloadArtifact(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, fleetServerURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (download.DownloadResult, error)
-	cleanNonMatchingVersionsFromDownloads(log *logger.Logger, version string) error
-}
-
-type unpacker interface {
-	getPackageMetadata(archivePath string) (packageMetadata, error)
-	extractAgentVersion(metadata packageMetadata, version string) agentVersion
-	unpack(version, archivePath, topPath, flavor string) (unpackResult, error)
-	detectFlavor(topPath, flavor string) (string, error)
-}
-
-type relinker interface {
-	changeSymlink(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error
-}
-
-type createContextWithTimeout func(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc)
-
-type watcher interface {
-	waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout) error
-	selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string
-	markUpgrade(log *logger.Logger, dataDir string, current, previous agentInstall, action *fleetapi.ActionUpgrade, det *details.Details, outcome UpgradeOutcome) error
-	invokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error)
-}
-
-type agentDirectoryCopier interface {
-	copyActionStore(log *logger.Logger, newHome string) error
-	copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error
+type upgradeExecutor interface {
+	downloadArtifact(ctx context.Context, parsedTargetVersion *agtversion.ParsedSemVer, agentInfo info.Agent, sourceURI string, fleetServerURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (download.DownloadResult, error)
+	unpackArtifact(downloadResult download.DownloadResult, version, archivePath, topPath, flavor, dataPath, currentHome string, upgradeDetails *details.Details, currentVersion agentVersion) (unpackStepResult, error)
+	replaceOldWithNew(log *logger.Logger, unpackStepResult unpackStepResult, currentVersionedHome, topPath, agentName, currentHome, oldRunPath, newRunPath, symlinkPath, newBinPath string, upgradeDetails *details.Details) error
+	watchNewAgent(ctx context.Context, log *logger.Logger, markerFilePath, topPath, dataPath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout, newAgentInstall agentInstall, previousAgentInstall agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, upgradeOutcome UpgradeOutcome) error
 }
 
 // Upgrader performs an upgrade
 type Upgrader struct {
-	log                *logger.Logger
-	settings           *artifact.Config
-	agentInfo          info.Agent
-	upgradeable        bool
-	fleetServerURI     string
-	markerWatcher      MarkerWatcher
-	upgradeCleaner     upgradeCleaner
-	diskSpaceErrorFunc func(error) error
-	artifactDownloader artifactDownloader
-	unpacker           unpacker
-	relinker           relinker
-	watcher            watcher
-	directoryCopier    agentDirectoryCopier
-	upgradeExecutor    upgradeExecutor
+	log            *logger.Logger
+	settings       *artifact.Config
+	agentInfo      info.Agent
+	upgradeable    bool
+	fleetServerURI string
+	markerWatcher  MarkerWatcher
+	upgradeCleaner upgradeCleaner
+	// diskSpaceErrorFunc func(error) error
+	// artifactDownloader artifactDownloader
+	// unpacker           unpacker
+	// relinker           relinker
+	// watcher            watcher
+	// directoryCopier    agentDirectoryCopier
+	upgradeExecutor upgradeExecutor
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -168,18 +144,18 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.A
 	}
 
 	return &Upgrader{
-		log:                log,
-		settings:           settings,
-		agentInfo:          agentInfo,
-		upgradeable:        IsUpgradeable(),
-		markerWatcher:      newMarkerFileWatcher(markerFilePath(paths.Data()), log),
-		upgradeCleaner:     upgradeCleaner,
-		diskSpaceErrorFunc: upgradeErrors.ToDiskSpaceErrorFunc(log),
-		artifactDownloader: newUpgradeArtifactDownloader(log, settings, downloaderFactoryProvider),
-		unpacker:           &upgradeUnpacker{log: log},
-		relinker:           &upgradeRelinker{},
-		watcher:            &upgradeWatcher{},
-		directoryCopier:    &directoryCopier{},
+		log:            log,
+		settings:       settings,
+		agentInfo:      agentInfo,
+		upgradeable:    IsUpgradeable(),
+		markerWatcher:  newMarkerFileWatcher(markerFilePath(paths.Data()), log),
+		upgradeCleaner: upgradeCleaner,
+		// diskSpaceErrorFunc: upgradeErrors.ToDiskSpaceErrorFunc(log),
+		// artifactDownloader: newUpgradeArtifactDownloader(log, settings, downloaderFactoryProvider),
+		// unpacker:           &upgradeUnpacker{log: log},
+		// relinker:           &upgradeRelinker{},
+		// watcher:            &upgradeWatcher{},
+		// directoryCopier:    &directoryCopier{},
 		upgradeExecutor: &executeUpgrade{
 			log:                log,
 			upgradeCleaner:     upgradeCleaner,
@@ -296,219 +272,219 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	// return u.oldUpgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 }
 
-func (u *Upgrader) oldUpgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
-	defer func() {
-		if err != nil {
-			cleanupErr := u.upgradeCleaner.cleanup(err)
-			if cleanupErr != nil {
-				u.log.Errorf("Error cleaning up after upgrade: %w", cleanupErr)
-				err = goerrors.Join(err, cleanupErr)
-			}
-		}
-	}()
+// func (u *Upgrader) oldUpgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+// 	defer func() {
+// 		if err != nil {
+// 			cleanupErr := u.upgradeCleaner.cleanup(err)
+// 			if cleanupErr != nil {
+// 				u.log.Errorf("Error cleaning up after upgrade: %w", cleanupErr)
+// 				err = goerrors.Join(err, cleanupErr)
+// 			}
+// 		}
+// 	}()
 
-	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
+// 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 
-	currentVersion := agentVersion{
-		version:  release.Version(),
-		snapshot: release.Snapshot(),
-		hash:     release.Commit(),
-		fips:     release.FIPSDistribution(),
-	}
+// 	currentVersion := agentVersion{
+// 		version:  release.Version(),
+// 		snapshot: release.Snapshot(),
+// 		hash:     release.Commit(),
+// 		fips:     release.FIPSDistribution(),
+// 	}
 
-	// Compare versions and exit before downloading anything if the upgrade
-	// is for the same release version that is currently running
-	if isSameReleaseVersion(u.log, currentVersion, version) {
-		u.log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
-		return nil, ErrUpgradeSameVersion
-	}
+// 	// Compare versions and exit before downloading anything if the upgrade
+// 	// is for the same release version that is currently running
+// 	if isSameReleaseVersion(u.log, currentVersion, version) {
+// 		u.log.Warnf("Upgrade action skipped because agent is already at version %s", currentVersion)
+// 		return nil, ErrUpgradeSameVersion
+// 	}
 
-	// Inform the Upgrade Marker Watcher that we've started upgrading. Note that this
-	// is only possible to do in-memory since, today, the  process that's initiating
-	// the upgrade is the same as the Agent process in which the Upgrade Marker Watcher is
-	// running. If/when, in the future, the process initiating the upgrade is separated
-	// from the Agent process in which the Upgrade Marker Watcher is running, such in-memory
-	// communication will need to be replaced with inter-process communication (e.g. via
-	// a file, e.g. the Upgrade Marker file or something else).
-	u.markerWatcher.SetUpgradeStarted()
+// 	// Inform the Upgrade Marker Watcher that we've started upgrading. Note that this
+// 	// is only possible to do in-memory since, today, the  process that's initiating
+// 	// the upgrade is the same as the Agent process in which the Upgrade Marker Watcher is
+// 	// running. If/when, in the future, the process initiating the upgrade is separated
+// 	// from the Agent process in which the Upgrade Marker Watcher is running, such in-memory
+// 	// communication will need to be replaced with inter-process communication (e.g. via
+// 	// a file, e.g. the Upgrade Marker file or something else).
+// 	u.markerWatcher.SetUpgradeStarted()
 
-	span, ctx := apm.StartSpan(ctx, "upgrade", "app.internal")
-	defer span.End()
+// 	span, ctx := apm.StartSpan(ctx, "upgrade", "app.internal")
+// 	defer span.End()
 
-	err = u.artifactDownloader.cleanNonMatchingVersionsFromDownloads(u.log, u.agentInfo.Version())
-	if err != nil {
-		u.log.Errorw("Unable to clean downloads before update", "error.message", err, "downloads.path", paths.Downloads())
-	}
+// 	err = u.artifactDownloader.cleanNonMatchingVersionsFromDownloads(u.log, u.agentInfo.Version())
+// 	if err != nil {
+// 		u.log.Errorw("Unable to clean downloads before update", "error.message", err, "downloads.path", paths.Downloads())
+// 	}
 
-	det.SetState(details.StateDownloading)
+// 	det.SetState(details.StateDownloading)
 
-	sourceURI = u.sourceURI(sourceURI)
+// 	sourceURI = u.sourceURI(sourceURI)
 
-	parsedVersion, err := agtversion.ParseVersion(version)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing version %q: %w", version, err)
-	}
+// 	parsedVersion, err := agtversion.ParseVersion(version)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("error parsing version %q: %w", version, err)
+// 	}
 
-	downloadResult, err := u.artifactDownloader.downloadArtifact(ctx, parsedVersion, sourceURI, u.fleetServerURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
-	if err != nil {
-		// Run the same pre-upgrade cleanup task to get rid of any newly downloaded files
-		// This may have an issue if users are upgrading to the same version number.
-		if dErr := u.artifactDownloader.cleanNonMatchingVersionsFromDownloads(u.log, u.agentInfo.Version()); dErr != nil {
-			u.log.Errorw("Unable to remove file after verification failure", "error.message", dErr)
-		}
+// 	downloadResult, err := u.artifactDownloader.downloadArtifact(ctx, parsedVersion, sourceURI, u.fleetServerURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+// 	if err != nil {
+// 		// Run the same pre-upgrade cleanup task to get rid of any newly downloaded files
+// 		// This may have an issue if users are upgrading to the same version number.
+// 		if dErr := u.artifactDownloader.cleanNonMatchingVersionsFromDownloads(u.log, u.agentInfo.Version()); dErr != nil {
+// 			u.log.Errorw("Unable to remove file after verification failure", "error.message", dErr)
+// 		}
 
-		return nil, err
-	}
+// 		return nil, err
+// 	}
 
-	if err := u.upgradeCleaner.setupArchiveCleanup(downloadResult); err != nil {
-		return nil, err
-	}
+// 	if err := u.upgradeCleaner.setupArchiveCleanup(downloadResult); err != nil {
+// 		return nil, err
+// 	}
 
-	det.SetState(details.StateExtracting)
+// 	det.SetState(details.StateExtracting)
 
-	metadata, err := u.unpacker.getPackageMetadata(downloadResult.ArtifactPath)
-	if err != nil {
-		return nil, fmt.Errorf("reading metadata for elastic agent version %s package %q: %w", version, downloadResult.ArtifactPath, err)
-	}
+// 	metadata, err := u.unpacker.getPackageMetadata(downloadResult.ArtifactPath)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("reading metadata for elastic agent version %s package %q: %w", version, downloadResult.ArtifactPath, err)
+// 	}
 
-	newVersion := u.unpacker.extractAgentVersion(metadata, version)
+// 	newVersion := u.unpacker.extractAgentVersion(metadata, version)
 
-	if err := checkUpgrade(u.log, currentVersion, newVersion, metadata); err != nil { // pass this as param to unpack step in upgrade executor
-		return nil, fmt.Errorf("cannot upgrade the agent: %w", err)
-	}
+// 	if err := checkUpgrade(u.log, currentVersion, newVersion, metadata); err != nil { // pass this as param to unpack step in upgrade executor
+// 		return nil, fmt.Errorf("cannot upgrade the agent: %w", err)
+// 	}
 
-	u.log.Infow("Unpacking agent package", "version", newVersion)
+// 	u.log.Infow("Unpacking agent package", "version", newVersion)
 
-	// Nice to have: add check that no archive files end up in the current versioned home
-	// default to no flavor to avoid breaking behavior
+// 	// Nice to have: add check that no archive files end up in the current versioned home
+// 	// default to no flavor to avoid breaking behavior
 
-	// no default flavor, keep everything in case flavor is not specified
-	// in case of error fallback to keep-all
-	detectedFlavor, err := u.unpacker.detectFlavor(paths.Top(), "")
-	if err != nil {
-		u.log.Warnf("error encountered when detecting used flavor with top path %q: %w", paths.Top(), err)
-	}
-	u.log.Debugf("detected used flavor: %q", detectedFlavor)
+// 	// no default flavor, keep everything in case flavor is not specified
+// 	// in case of error fallback to keep-all
+// 	detectedFlavor, err := u.unpacker.detectFlavor(paths.Top(), "")
+// 	if err != nil {
+// 		u.log.Warnf("error encountered when detecting used flavor with top path %q: %w", paths.Top(), err)
+// 	}
+// 	u.log.Debugf("detected used flavor: %q", detectedFlavor)
 
-	unpackRes, unpackErr := u.unpacker.unpack(version, downloadResult.ArtifactPath, paths.Data(), detectedFlavor)
-	err = goerrors.Join(err, u.diskSpaceErrorFunc(unpackErr))
+// 	unpackRes, unpackErr := u.unpacker.unpack(version, downloadResult.ArtifactPath, paths.Data(), detectedFlavor)
+// 	err = goerrors.Join(err, u.diskSpaceErrorFunc(unpackErr))
 
-	if unpackRes.VersionedHome == "" {
-		err = goerrors.Join(err, fmt.Errorf("unknown versioned home"))
-		return nil, err
-	}
+// 	if unpackRes.VersionedHome == "" {
+// 		err = goerrors.Join(err, fmt.Errorf("unknown versioned home"))
+// 		return nil, err
+// 	}
 
-	newHash := unpackRes.Hash
-	if newHash == "" {
-		err = goerrors.Join(err, fmt.Errorf("unknown hash"))
-		return nil, err
-	}
+// 	newHash := unpackRes.Hash
+// 	if newHash == "" {
+// 		err = goerrors.Join(err, fmt.Errorf("unknown hash"))
+// 		return nil, err
+// 	}
 
-	newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome)
+// 	newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome)
 
-	unpackCleanupSetupErr := u.upgradeCleaner.setupUnpackCleanup(newHome, paths.Home())
-	err = goerrors.Join(err, unpackCleanupSetupErr)
+// 	unpackCleanupSetupErr := u.upgradeCleaner.setupUnpackCleanup(newHome, paths.Home())
+// 	err = goerrors.Join(err, unpackCleanupSetupErr)
 
-	if err != nil {
-		return nil, err
-	}
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	err = u.directoryCopier.copyActionStore(u.log, newHome)
-	if err != nil {
-		err = fmt.Errorf("failed to copy action store: %w", u.diskSpaceErrorFunc(err))
-		return nil, err
-	}
+// 	err = u.directoryCopier.copyActionStore(u.log, newHome)
+// 	if err != nil {
+// 		err = fmt.Errorf("failed to copy action store: %w", u.diskSpaceErrorFunc(err))
+// 		return nil, err
+// 	}
 
-	newRunPath := filepath.Join(newHome, "run")
-	oldRunPath := filepath.Join(paths.Run())
+// 	newRunPath := filepath.Join(newHome, "run")
+// 	oldRunPath := filepath.Join(paths.Run())
 
-	err = u.directoryCopier.copyRunDirectory(u.log, oldRunPath, newRunPath)
-	if err != nil {
-		err = fmt.Errorf("failed to copy run directory: %w", u.diskSpaceErrorFunc(err))
-		return nil, err
-	}
+// 	err = u.directoryCopier.copyRunDirectory(u.log, oldRunPath, newRunPath)
+// 	if err != nil {
+// 		err = fmt.Errorf("failed to copy run directory: %w", u.diskSpaceErrorFunc(err))
+// 		return nil, err
+// 	}
 
-	det.SetState(details.StateReplacing)
+// 	det.SetState(details.StateReplacing)
 
-	// create symlink to the <new versioned-home>/elastic-agent
-	hashedDir := unpackRes.VersionedHome
-	u.log.Infof("hashedDir: %s", hashedDir)
+// 	// create symlink to the <new versioned-home>/elastic-agent
+// 	hashedDir := unpackRes.VersionedHome
+// 	u.log.Infof("hashedDir: %s", hashedDir)
 
-	symlinkPath := filepath.Join(paths.Top(), agentName)
-	u.log.Infof("symlinkPath: %s", symlinkPath)
+// 	symlinkPath := filepath.Join(paths.Top(), agentName)
+// 	u.log.Infof("symlinkPath: %s", symlinkPath)
 
-	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
-	newPath := paths.BinaryPath(filepath.Join(paths.Top(), hashedDir), agentName)
-	u.log.Infof("newPath: %s", newPath)
+// 	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
+// 	newPath := paths.BinaryPath(filepath.Join(paths.Top(), hashedDir), agentName)
+// 	u.log.Infof("newPath: %s", newPath)
 
-	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
-	if err != nil {
-		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
-	}
+// 	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
+// 	if err != nil {
+// 		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
+// 	}
 
-	if symlinkCleanupSetupErr := u.upgradeCleaner.setupSymlinkCleanup(u.relinker.changeSymlink, paths.Top(), currentVersionedHome, agentName); symlinkCleanupSetupErr != nil {
-		err = goerrors.Join(err, symlinkCleanupSetupErr)
-	}
+// 	if symlinkCleanupSetupErr := u.upgradeCleaner.setupSymlinkCleanup(u.relinker.changeSymlink, paths.Top(), currentVersionedHome, agentName); symlinkCleanupSetupErr != nil {
+// 		err = goerrors.Join(err, symlinkCleanupSetupErr)
+// 	}
 
-	u.log.Infof("currentVersionedHome: %s", currentVersionedHome)
+// 	u.log.Infof("currentVersionedHome: %s", currentVersionedHome)
 
-	err = u.relinker.changeSymlink(u.log, paths.Top(), symlinkPath, newPath)
-	if err != nil {
-		return nil, err
-	}
+// 	err = u.relinker.changeSymlink(u.log, paths.Top(), symlinkPath, newPath)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	// We rotated the symlink successfully: prepare the current and previous agent installation details for the update marker
-	// In update marker the `current` agent install is the one where the symlink is pointing (the new one we didn't start yet)
-	// while the `previous` install is the currently executing elastic-agent that is no longer reachable via the symlink.
-	// After the restart at the end of the function, everything lines up correctly.
-	current := agentInstall{
-		parsedVersion: parsedVersion,
-		version:       version,
-		hash:          unpackRes.Hash,
-		versionedHome: unpackRes.VersionedHome,
-	}
+// 	// We rotated the symlink successfully: prepare the current and previous agent installation details for the update marker
+// 	// In update marker the `current` agent install is the one where the symlink is pointing (the new one we didn't start yet)
+// 	// while the `previous` install is the currently executing elastic-agent that is no longer reachable via the symlink.
+// 	// After the restart at the end of the function, everything lines up correctly.
+// 	current := agentInstall{
+// 		parsedVersion: parsedVersion,
+// 		version:       version,
+// 		hash:          unpackRes.Hash,
+// 		versionedHome: unpackRes.VersionedHome,
+// 	}
 
-	previousParsedVersion := currentagtversion.GetParsedAgentPackageVersion()
-	previous := agentInstall{
-		parsedVersion: previousParsedVersion,
-		version:       release.VersionWithSnapshot(),
-		hash:          release.Commit(),
-		versionedHome: currentVersionedHome,
-	}
+// 	previousParsedVersion := currentagtversion.GetParsedAgentPackageVersion()
+// 	previous := agentInstall{
+// 		parsedVersion: previousParsedVersion,
+// 		version:       release.VersionWithSnapshot(),
+// 		hash:          release.Commit(),
+// 		versionedHome: currentVersionedHome,
+// 	}
 
-	err = u.watcher.markUpgrade(u.log,
-		paths.Data(), // data dir to place the marker in
-		current,      // new agent version data
-		previous,     // old agent version data
-		action, det, OUTCOME_UPGRADE)
-	if err != nil {
-		return nil, err
-	}
+// 	err = u.watcher.markUpgrade(u.log,
+// 		paths.Data(), // data dir to place the marker in
+// 		current,      // new agent version data
+// 		previous,     // old agent version data
+// 		action, det, OUTCOME_UPGRADE)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	watcherExecutable := u.watcher.selectWatcherExecutable(paths.Top(), previous, current)
+// 	watcherExecutable := u.watcher.selectWatcherExecutable(paths.Top(), previous, current)
 
-	watcherCmd, err := InvokeWatcher(u.log, watcherExecutable)
-	if err != nil {
-		return nil, err
-	}
+// 	watcherCmd, err := InvokeWatcher(u.log, watcherExecutable)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	err = u.watcher.waitForWatcher(ctx, u.log, markerFilePath(paths.Data()), watcherMaxWaitTime, context.WithTimeout)
-	if err != nil {
-		err = goerrors.Join(err, watcherCmd.Process.Kill())
-		return nil, err
-	}
+// 	err = u.watcher.waitForWatcher(ctx, u.log, markerFilePath(paths.Data()), watcherMaxWaitTime, context.WithTimeout)
+// 	if err != nil {
+// 		err = goerrors.Join(err, watcherCmd.Process.Kill())
+// 		return nil, err
+// 	}
 
-	cb := shutdownCallback(u.log, paths.Home(), release.Version(), version, filepath.Join(paths.Top(), unpackRes.VersionedHome))
+// 	cb := shutdownCallback(u.log, paths.Home(), release.Version(), version, filepath.Join(paths.Top(), unpackRes.VersionedHome))
 
-	// Clean everything from the downloads dir
-	u.log.Infow("Removing downloads directory", "file.path", paths.Downloads())
-	err = os.RemoveAll(paths.Downloads())
-	if err != nil {
-		u.log.Errorw("Unable to clean downloads after update", "error.message", err, "file.path", paths.Downloads())
-	}
+// 	// Clean everything from the downloads dir
+// 	u.log.Infow("Removing downloads directory", "file.path", paths.Downloads())
+// 	err = os.RemoveAll(paths.Downloads())
+// 	if err != nil {
+// 		u.log.Errorw("Unable to clean downloads after update", "error.message", err, "file.path", paths.Downloads())
+// 	}
 
-	return cb, nil
-}
+// 	return cb, nil
+// }
 
 func (u *Upgrader) newUpgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	defer func() {
