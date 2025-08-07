@@ -312,7 +312,7 @@ func (u *Upgrader) newUpgrade(ctx context.Context, version string, sourceURI str
 		return nil, err
 	}
 
-	unpackRes, err := u.upgradeExecutor.unpackArtifact(downloadResult, version, downloadResult.ArtifactPath, paths.Top(), "", paths.Data(), paths.Home(), det, currentVersion)
+	unpackRes, err := u.upgradeExecutor.unpackArtifact(downloadResult, version, downloadResult.ArtifactPath, paths.Top(), "", paths.Data(), paths.Home(), det, currentVersion, checkUpgrade)
 	if err != nil {
 		return nil, err
 	}
