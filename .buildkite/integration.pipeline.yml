@@ -106,7 +106,8 @@ steps:
         env:
           PACKAGES: "docker"
           PLATFORMS: "linux/amd64"
-        command: ".buildkite/scripts/steps/integration-package.sh"
+        command: |
+          .buildkite/scripts/steps/integration-package.sh
         artifact_paths:
           - build/distributions/**
         agents:
