@@ -6,7 +6,8 @@ function ess_up() {
   local WORKSPACE=$(git rev-parse --show-toplevel)
   local TF_DIR="${WORKSPACE}/test_infra/ess/"
   local STACK_VERSION=$1
-  local ESS_REGION=${2:-"gcp-us-west2"}
+  local STACK_BUILD_ID=${2:-""}
+  local ESS_REGION=${3:-"gcp-us-west2"}
     
   if [ -z "$STACK_VERSION" ]; then
     echo "Error: Specify stack version: ess_up [stack_version]" >&2
@@ -22,6 +23,7 @@ function ess_up() {
   terraform apply \
     -auto-approve \
     -var="stack_version=${STACK_VERSION}" \
+    -var="stack_build_id=${STACK_BUILD_ID}" \
     -var="ess_region=${ESS_REGION}" \
     -var="creator=${BUILDKITE_BUILD_CREATOR}" \
     -var="buildkite_id=${BUILDKITE_BUILD_NUMBER}" \

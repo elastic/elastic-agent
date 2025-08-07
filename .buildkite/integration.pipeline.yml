@@ -106,7 +106,13 @@ steps:
         env:
           PACKAGES: "docker"
           PLATFORMS: "linux/amd64"
+<<<<<<< HEAD
         command: ".buildkite/scripts/steps/integration-package.sh"
+=======
+        command: |
+          .buildkite/scripts/steps/integration-package.sh
+          .buildkite/scripts/steps/integration-cloud-image-push.sh
+>>>>>>> a155660c4 (ci: build agent from snapshot DRA (#9048))
         artifact_paths:
           - build/distributions/**
         agents:
@@ -130,6 +136,44 @@ steps:
           diskSizeGb: 200
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
+<<<<<<< HEAD
+=======
+      - label: "Packaging: Containers linux/amd64 FIPS"
+        key: packaging-containers-x86-64-fips
+        env:
+          PACKAGES: "docker"
+          PLATFORMS: "linux/amd64"
+          FIPS: "true"
+        command: |
+          .buildkite/scripts/steps/integration-package.sh
+          .buildkite/scripts/steps/integration-cloud-image-push.sh
+        artifact_paths:
+          - build/distributions/**
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          diskSizeGb: 200
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
+        plugins:
+          - *vault_docker_login
+
+      - label: "Packaging: Containers linux/arm64 FIPS"
+        key: packaging-containers-arm64-fips
+        env:
+          PACKAGES: "docker"
+          PLATFORMS: "linux/arm64"
+          FIPS: "true"
+        command: |
+          .buildkite/scripts/steps/integration-package.sh
+        artifact_paths:
+          - build/distributions/**
+        agents:
+          provider: "aws"
+          instanceType: "c6g.4xlarge"
+          diskSizeGb: 200
+          image: "${IMAGE_UBUNTU_2204_ARM_64}"
+
+>>>>>>> a155660c4 (ci: build agent from snapshot DRA (#9048))
   - label: "Triggering Integration tests"
     depends_on:
       - int-packaging

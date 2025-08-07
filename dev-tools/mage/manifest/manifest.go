@@ -218,10 +218,10 @@ func DownloadComponents(ctx context.Context, manifest string, platforms []string
 			if err != nil {
 				return fmt.Errorf("failed to create directory %s", targetPath)
 			}
-			log.Printf("+++ Prepare to download [%s] project [%s] for [%s]", spec.BinaryName, spec.ProjectName, platform)
+			fmt.Printf("Prepare to download [%s] project [%s] for [%s]\n", spec.BinaryName, spec.ProjectName, platform)
 
 			if !spec.SupportsPlatform(platform) {
-				log.Printf(">>>>>>>>> Binary [%s] does not support platform [%s] ", spec.BinaryName, platform)
+				fmt.Printf("Binary [%s] does not support platform [%s]\n", spec.BinaryName, platform)
 				continue
 			}
 
@@ -230,8 +230,13 @@ func DownloadComponents(ctx context.Context, manifest string, platforms []string
 				return err
 			}
 
+<<<<<<< HEAD
 			for _, p := range pkgURL {
 				log.Printf(">>>>>>>>> Downloading [%s] [%s] ", spec.BinaryName, p)
+=======
+			for _, p := range resolvedPackage.URLs {
+				fmt.Printf("Downloading [%s] [%s]\n", spec.BinaryName, p)
+>>>>>>> a155660c4 (ci: build agent from snapshot DRA (#9048))
 				pkgFilename := path.Base(p)
 				downloadTarget := filepath.Join(targetPath, pkgFilename)
 				if _, err := os.Stat(downloadTarget); err != nil {
@@ -248,7 +253,7 @@ func DownloadComponents(ctx context.Context, manifest string, platforms []string
 		return fmt.Errorf("error downloading files: %w", err)
 	}
 
-	log.Printf("Downloads for manifest %q complete.", manifest)
+	fmt.Printf("Downloads for manifest %q complete.\n", manifest)
 	return nil
 }
 
