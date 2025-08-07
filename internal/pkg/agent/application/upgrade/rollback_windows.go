@@ -12,8 +12,6 @@ import (
 	"time"
 
 	"golang.org/x/sys/windows"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
 const (
@@ -22,12 +20,9 @@ const (
 	afterRestartDelay = 20 * time.Second
 )
 
-func invokeCmd(agentExecutable string) *exec.Cmd {
+func InvokeCmdWithArgs(executable string, args ...string) *exec.Cmd {
 	// #nosec G204 -- user cannot inject any parameters to this command
-	cmd := exec.Command(agentExecutable, watcherSubcommand,
-		"--path.config", paths.Config(),
-		"--path.home", paths.Top(),
-	)
+	cmd := exec.Command(executable, args...)
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		// Signals are sent to process groups, and child process are part of the
