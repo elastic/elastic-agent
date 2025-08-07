@@ -102,7 +102,7 @@ service:
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
       processors: [resourcedetection, attributes/dataset, resource/process]
-      exporters: [elasticsearch/ecs]
+      exporters: [elasticsearch/otel]
     logs/platformlogs:
       receivers: [filelog/platformlogs]
       processors: [resourcedetection]
