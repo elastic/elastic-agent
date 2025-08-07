@@ -92,7 +92,6 @@ const (
 	metaDir           = "_meta"
 	snapshotEnv       = "SNAPSHOT"
 	devEnv            = "DEV"
-	fipsEnv           = "FIPS"
 	externalArtifacts = "EXTERNAL"
 	platformsEnv      = "PLATFORMS"
 	packagesEnv       = "PACKAGES"
@@ -340,13 +339,6 @@ func (Build) WindowsArchiveRootBinary() error {
 		LDFlags: []string{
 			"-s", // Strip all debug symbols from binary (does not affect Go stack traces).
 		},
-	}
-
-	if devtools.FIPSBuild {
-		// there is no actual FIPS relevance for this particular binary
-		// but better safe than sorry
-		args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips")
-		args.CGO = true
 	}
 
 	return devtools.Build(args)
@@ -659,13 +651,6 @@ func ExtractComponentsFromSelectedPkgSpecs(pkgSpecs []devtools.OSPackageArgs) ([
 }
 
 func isSelected(pkg devtools.OSPackageArgs) bool {
-
-	// Checks if this package is compatible with the FIPS settings
-	if pkg.Spec.FIPS != devtools.FIPSBuild {
-		log.Printf("Skipping %s/%s package type because FIPS flag doesn't match [pkg=%v, build=%v]", pkg.Spec.Name, pkg.OS, pkg.Spec.FIPS, devtools.FIPSBuild)
-		return false
-	}
-
 	platforms := devtools.Platforms
 	for _, platform := range platforms {
 		if !isPackageSelectedForPlatform(pkg, platform) {
@@ -935,9 +920,6 @@ func (Cloud) Image(ctx context.Context) {
 	variant := os.Getenv(dockerVariants)
 	defer os.Setenv(dockerVariants, variant)
 
-	fips := os.Getenv(fipsEnv)
-	defer os.Setenv(fipsEnv, fips)
-
 	os.Setenv(platformsEnv, "linux/amd64")
 	os.Setenv(packagesEnv, "docker")
 	os.Setenv(devEnv, "true")
@@ -951,13 +933,6 @@ func (Cloud) Image(ctx context.Context) {
 		os.Setenv(snapshotEnv, "true")
 		devtools.Snapshot = true
 	}
-
-	fipsVal, err := strconv.ParseBool(fips)
-	if err != nil {
-		fipsVal = false
-	}
-	os.Setenv(fipsEnv, strconv.FormatBool(fipsVal))
-	devtools.FIPSBuild = fipsVal
 
 	devtools.DevBuild = true
 	devtools.Platforms = devtools.Platforms.Filter("linux/amd64")
@@ -1280,7 +1255,6 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 					cmd.Env = append(os.Environ(),
 						fmt.Sprintf("PWD=%s", pwd),
 						"AGENT_PACKAGING=on",
-						fmt.Sprintf("FIPS=%v", devtools.FIPSBuild),
 					)
 					if envVar := selectedPackageTypes(); envVar != "" {
 						cmd.Env = append(cmd.Env, envVar)
@@ -1439,13 +1413,12 @@ type branchInfo struct {
 // place them under build/dra/buildID. It accepts one argument that has to be a release branch present in staging DRA
 func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 
-	elasticAgentCoreComponents := packaging.FilterComponents(packaging.WithProjectName(agentCoreProjectName), packaging.WithFIPS(devtools.FIPSBuild))
+	elasticAgentCoreComponents := packaging.FilterComponents(packaging.WithProjectName(agentCoreProjectName))
 
 	if len(elasticAgentCoreComponents) != 1 {
 		return fmt.Errorf(
-			"found an unexpected number of elastic-agent-core components (should be 1) [projectName: %q, fips: %v]: %v",
+			"found an unexpected number of elastic-agent-core components (should be 1) [projectName: %q : %v]: %v",
 			agentCoreProjectName,
-			devtools.FIPSBuild,
 			elasticAgentCoreComponents,
 		)
 	}
@@ -1683,13 +1656,12 @@ func downloadDRAArtifacts(ctx context.Context, build *manifest.Build, version st
 
 func useDRAAgentBinaryForPackage(ctx context.Context, manifestURL string, version string) error {
 
-	elasticAgentCoreComponents := packaging.FilterComponents(packaging.WithProjectName(agentCoreProjectName), packaging.WithFIPS(devtools.FIPSBuild))
+	elasticAgentCoreComponents := packaging.FilterComponents(packaging.WithProjectName(agentCoreProjectName))
 
 	if len(elasticAgentCoreComponents) != 1 {
 		return fmt.Errorf(
-			"found an unexpected number of elastic-agent-core components (should be 1) [projectName: %q, fips: %v]: %v",
+			"found an unexpected number of elastic-agent-core components (should be 1) [projectName: %q]: %v",
 			agentCoreProjectName,
-			devtools.FIPSBuild,
 			elasticAgentCoreComponents,
 		)
 	}
@@ -1998,12 +1970,6 @@ func buildVars() map[string]string {
 
 	isSnapshot, _ := os.LookupEnv(snapshotEnv)
 	vars["github.com/elastic/elastic-agent/internal/pkg/release.snapshot"] = isSnapshot
-
-	if fipsFlag, fipsFound := os.LookupEnv(fipsEnv); fipsFound {
-		if fips, err := strconv.ParseBool(fipsFlag); err == nil && fips {
-			vars["github.com/elastic/elastic-agent/internal/pkg/release.fips"] = "true"
-		}
-	}
 
 	if isDevFlag, devFound := os.LookupEnv(devEnv); devFound {
 		if isDev, err := strconv.ParseBool(isDevFlag); err == nil && isDev {

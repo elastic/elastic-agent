@@ -249,10 +249,6 @@ func CrossBuildImage(platform string) (string, error) {
 		return "", err
 	}
 
-	if FIPSBuild {
-		tagSuffix += "-fips"
-	}
-
 	return BeatsCrossBuildImage + ":" + goVersion + "-" + tagSuffix, nil
 }
 
@@ -344,7 +340,6 @@ func (b GolangCrossBuilder) Build() error {
 		"--env", fmt.Sprintf("SNAPSHOT=%v", Snapshot),
 		"--env", fmt.Sprintf("DEV=%v", DevBuild),
 		"--env", fmt.Sprintf("EXTERNAL=%v", ExternalBuild),
-		"--env", fmt.Sprintf("FIPS=%v", FIPSBuild),
 		"-v", repoInfo.RootDir+":"+mountPoint,
 		"-w", workDir,
 		image,

@@ -50,12 +50,6 @@ func Package() error {
 				continue
 			}
 
-			// Checks if this package is compatible with the FIPS settings
-			if pkg.Spec.FIPS != FIPSBuild {
-				log.Printf("Skipping %s/%s package type because FIPS flag doesn't match [pkg=%v, build=%v]", pkg.Spec.Name, pkg.OS, pkg.Spec.FIPS, FIPSBuild)
-				continue
-			}
-
 			for _, pkgType := range pkg.Types {
 				if !IsPackageTypeSelected(pkgType) {
 					log.Printf("Skipping %s package type because it is not selected", pkgType)
@@ -167,11 +161,11 @@ type packageBuilder struct {
 }
 
 func (b packageBuilder) Build() error {
-	fmt.Printf(">> package: Building %v type=%v for platform=%v fips=%v\n", b.Spec.Name, b.Type, b.Platform.Name, b.Spec.FIPS)
+	fmt.Printf(">> package: Building %v type=%v for platform=%v\n", b.Spec.Name, b.Type, b.Platform.Name)
 	log.Printf("Package spec: %+v", b.Spec)
 	if err := b.Type.Build(b.Spec); err != nil {
-		return fmt.Errorf("failed building %v type=%v for platform=%v fips=%v : %w",
-			b.Spec.Name, b.Type, b.Platform.Name, b.Spec.FIPS, err)
+		return fmt.Errorf("failed building %v type=%v for platform=%v : %w",
+			b.Spec.Name, b.Type, b.Platform.Name, err)
 	}
 	return nil
 }

@@ -94,7 +94,6 @@ type PackageSpec struct {
 	Arch              string                 `yaml:"arch,omitempty"`
 	Vendor            string                 `yaml:"vendor,omitempty"`
 	Snapshot          bool                   `yaml:"snapshot"`
-	FIPS              bool                   `yaml:"fips"`
 	Version           string                 `yaml:"version,omitempty"`
 	License           string                 `yaml:"license,omitempty"`
 	URL               string                 `yaml:"url,omitempty"`
@@ -430,7 +429,6 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 		s.packageDir = filepath.Clean(mustExpand(s.packageDir))
 	}
 	s.evalContext["PackageDir"] = s.packageDir
-	s.evalContext["fips"] = s.FIPS
 
 	evaluatedFiles := make(map[string]PackageFile, len(s.Files))
 	for target, f := range s.Files {
@@ -763,7 +761,7 @@ func runFPM(spec PackageSpec, packageType PackageType) error {
 	}
 	defer os.Remove(inputTar)
 
-	outputFile, err := spec.Expand("{{.Name}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.Arch}}{{if .FIPS}}-fips{{end}}")
+	outputFile, err := spec.Expand("{{.Name}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.Arch}}")
 	if err != nil {
 		return err
 	}

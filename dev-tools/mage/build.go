@@ -18,8 +18,6 @@ import (
 	"github.com/magefile/mage/sh"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-
-	"github.com/elastic/elastic-agent/dev-tools/packaging"
 )
 
 // BuildArgs are the arguments used for the "build" target and they define how
@@ -88,19 +86,6 @@ func DefaultBuildArgs() BuildArgs {
 
 	if positionIndependentCodeSupported() {
 		args.ExtraFlags = append(args.ExtraFlags, "-buildmode", "pie")
-	}
-
-	if FIPSBuild {
-
-		fipsConfig := packaging.Settings().FIPS
-
-		for _, tag := range fipsConfig.Compile.Tags {
-			args.ExtraFlags = append(args.ExtraFlags, "-tags="+tag)
-		}
-		args.CGO = args.CGO || fipsConfig.Compile.CGO
-		for varName, value := range fipsConfig.Compile.Env {
-			args.Env[varName] = value
-		}
 	}
 
 	if DevBuild {

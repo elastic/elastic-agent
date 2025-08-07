@@ -99,8 +99,7 @@ func TestTar(t *testing.T) {
 	tarFiles := getFiles(t, regexp.MustCompile(`-\w+\.tar\.gz$`))
 	for _, tarFile := range tarFiles {
 		t.Run(filepath.Base(tarFile), func(t *testing.T) {
-			fipsPackage := strings.Contains(tarFile, "-fips-")
-			checkTar(t, tarFile, fipsPackage)
+			checkTar(t, tarFile)
 		})
 
 	}
@@ -119,10 +118,9 @@ func TestDocker(t *testing.T) {
 	dockers := getFiles(t, regexp.MustCompile(`\.docker\.tar\.gz$`))
 	sizeMap := make(map[string]int64)
 	for _, docker := range dockers {
-		fipsPackage := strings.Contains(docker, "-fips-")
 		t.Run(filepath.Base(docker), func(t *testing.T) {
 			t.Log(docker)
-			k, s := checkDocker(t, docker, fipsPackage)
+			k, s := checkDocker(t, docker)
 			sizeMap[k] = s
 		})
 	}
@@ -207,7 +205,7 @@ func checkDeb(t *testing.T, file string, buf *bytes.Buffer) {
 	checkSystemdUnitPermissions(t, p)
 }
 
-func checkTar(t *testing.T, file string, fipsCheck bool) {
+func checkTar(t *testing.T, file string) {
 	p, err := readTar(file)
 	if err != nil {
 		t.Error(err)
@@ -228,15 +226,9 @@ func checkTar(t *testing.T, file string, fipsCheck bool) {
 	err = mage.Extract(file, tempExtractionPath)
 	require.NoErrorf(t, err, "error extracting archive %q", file)
 
-	t.Run("check_manifest_file", testManifestFile(tempExtractionPath, fipsCheck))
+	t.Run("check_manifest_file", testManifestFile(tempExtractionPath))
 
 	checkSha512PackageHash(t, file)
-
-	if fipsCheck {
-		t.Run("FIPS check", func(t *testing.T) {
-			checkFIPS(t, tempExtractionPath)
-		})
-	}
 }
 
 func checkZip(t *testing.T, file string) {
@@ -258,12 +250,12 @@ func checkZip(t *testing.T, file string) {
 	err = mage.Extract(file, tempExtractionPath)
 	require.NoErrorf(t, err, "error extracting archive %q", file)
 
-	t.Run("check_manifest_file", testManifestFile(tempExtractionPath, false))
+	t.Run("check_manifest_file", testManifestFile(tempExtractionPath))
 
 	checkSha512PackageHash(t, file)
 }
 
-func testManifestFile(agentPackageRootDir string, checkFips bool) func(t *testing.T) {
+func testManifestFile(agentPackageRootDir string) func(t *testing.T) {
 	return func(t *testing.T) {
 		dirEntries, err := os.ReadDir(agentPackageRootDir)
 		require.NoErrorf(t, err, "error listing extraction dir %q", agentPackageRootDir)
@@ -355,7 +347,7 @@ func checkNpcapNotices(pkg, file string, contents io.Reader) error {
 	return nil
 }
 
-func checkDocker(t *testing.T, file string, fipsPackage bool) (string, int64) {
+func checkDocker(t *testing.T, file string) (string, int64) {
 	if strings.Contains(file, "elastic-otel-collector") {
 		return checkEdotCollectorDocker(t, file)
 	}
@@ -370,10 +362,7 @@ func checkDocker(t *testing.T, file string, fipsPackage bool) (string, int64) {
 	checkDockerLabels(t, p, info, file)
 	checkDockerUser(t, p, info, *rootUserContainer)
 	checkFilePermissions(t, p, configFilePattern, os.FileMode(0644))
-	if !fipsPackage {
-		// FIPS docker image do not contain an otelcol script, run this check only on non FIPS compliant images
-		checkFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
-	}
+	checkFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
 	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
 	checkModulesPresent(t, "", p)
 	checkModulesDPresent(t, "", p)
@@ -744,80 +733,6 @@ func checkDockerUser(t *testing.T, p *packageFile, info *dockerInfo, expectRoot 
 			t.Errorf("unexpected docker user: %s", info.Config.User)
 		}
 	})
-}
-
-func checkFIPS(t *testing.T, agentPackageRootDir string) {
-	dirEntries, err := os.ReadDir(agentPackageRootDir)
-	require.NoErrorf(t, err, "error listing extraction dir %q", agentPackageRootDir)
-	require.Lenf(t, dirEntries, 1, "archive should contain a single directory: found %v", dirEntries)
-
-	extractedPackageDir := filepath.Join(agentPackageRootDir, dirEntries[0].Name())
-	t.Logf("Checking agent binary in %q for FIPS compliance", extractedPackageDir)
-	m := parseManifest(t, extractedPackageDir)
-	versionedHome := m.Package.VersionedHome
-	versionedHomePath := filepath.Join(extractedPackageDir, versionedHome)
-	require.DirExistsf(t, versionedHomePath, " versiondedHome directory %q not found in %q", versionedHome, extractedPackageDir)
-	binaryPath := filepath.Join(extractedPackageDir, versionedHome, "elastic-agent") // TODO eventually we will need to support .exe as well
-	require.FileExistsf(t, binaryPath, "Unable to find elastic-agent executable in versioned home in %q", extractedPackageDir)
-
-	binaries := []string{binaryPath}
-	componentsDir := filepath.Join(versionedHomePath, "components")
-	entries, err := filepath.Glob(filepath.Join(componentsDir, "*.spec.yml"))
-	require.NoError(t, err)
-	for _, dirEntry := range entries {
-		componentBinary := strings.TrimSuffix(dirEntry, ".spec.yml")
-		binaries = append(binaries, componentBinary)
-	}
-
-	for _, binary := range binaries {
-		binaryRelPath, err := filepath.Rel(agentPackageRootDir, binary)
-		require.NoError(t, err)
-		t.Run(binaryRelPath, func(t *testing.T) {
-			fileInfo, err := os.Stat(binary)
-			require.NoErrorf(t, err, "error collecting info on component %s", binary)
-			require.Truef(t, fileInfo.Mode().IsRegular() && (fileInfo.Mode().Perm()&0111 > 0), "component %s exists and has a spec file but it's not an executable regular file", binary)
-
-			info, err := buildinfo.ReadFile(binary)
-			require.NoError(t, err)
-
-			foundTags := false
-			foundExperiment := false
-			for _, setting := range info.Settings {
-				switch setting.Key {
-				case "-tags":
-					foundTags = true
-					require.Contains(t, setting.Value, "requirefips")
-					continue
-				case "GOEXPERIMENT":
-					foundExperiment = true
-					require.Contains(t, setting.Value, "systemcrypto")
-					continue
-				}
-			}
-
-			require.True(t, foundTags, "Did not find -tags within binary version information")
-			require.True(t, foundExperiment, "Did not find GOEXPERIMENT within binary version information")
-
-			// TODO only elf is supported at the moment, in the future we will need to use macho (darwin) and pe (windows)
-			f, err := elf.Open(binary)
-			require.NoError(t, err, "unable to open ELF file")
-
-			symbols, err := f.Symbols()
-			if err != nil {
-				t.Logf("no symbols present in %q: %v", binary, err)
-				return
-			}
-
-			hasOpenSSL := false
-			for _, symbol := range symbols {
-				if strings.Contains(symbol.Name, "OpenSSL_version") {
-					hasOpenSSL = true
-					break
-				}
-			}
-			require.True(t, hasOpenSSL, "unable to find OpenSSL_version symbol")
-		})
-	}
 }
 
 // ensureNoBuildIDLinks checks for regressions related to

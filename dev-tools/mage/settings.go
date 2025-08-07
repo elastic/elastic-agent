@@ -88,7 +88,6 @@ var (
 	Snapshot      bool
 	DevBuild      bool
 	ExternalBuild bool
-	FIPSBuild     bool
 
 	versionQualified bool
 	versionQualifier string
@@ -155,11 +154,6 @@ func initGlobals() {
 		panic(fmt.Errorf("failed to parse EXTERNAL env value: %w", err))
 	}
 
-	FIPSBuild, err = strconv.ParseBool(EnvOr("FIPS", "false"))
-	if err != nil {
-		panic(fmt.Errorf("failed to parse FIPS env value: %w", err))
-	}
-
 	versionQualifier, versionQualified = os.LookupEnv("VERSION_QUALIFIER")
 
 	agentPackageVersion = EnvOr(agentPackageVersionEnvVar, "")
@@ -224,7 +218,6 @@ func varMap(args ...map[string]interface{}) map[string]interface{} {
 		"Snapshot":        Snapshot,
 		"DEV":             DevBuild,
 		"EXTERNAL":        ExternalBuild,
-		"FIPS":            FIPSBuild,
 		"Qualifier":       versionQualifier,
 		"CI":              CI,
 	}
@@ -344,7 +337,7 @@ func AgentPackageVersion() (string, error) {
 	return BeatQualifiedVersion()
 }
 
-func PackageManifest(fips bool) (string, error) {
+func PackageManifest() (string, error) {
 
 	packageVersion, err := AgentPackageVersion()
 	if err != nil {
@@ -366,15 +359,14 @@ func PackageManifest(fips bool) (string, error) {
 		return "", fmt.Errorf("retrieving agent flavors: %w", err)
 	}
 
-	return GeneratePackageManifest(BeatName, packageVersion, Snapshot, hash, commitHashShort, fips, registry)
+	return GeneratePackageManifest(BeatName, packageVersion, Snapshot, hash, commitHashShort, registry)
 }
 
-func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, fullHash, shortHash string, fips bool, flavorsRegistry map[string][]string) (string, error) {
+func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, fullHash, shortHash string, flavorsRegistry map[string][]string) (string, error) {
 	m := v1.NewManifest()
 	m.Package.Version = packageVersion
 	m.Package.Snapshot = snapshot
 	m.Package.Hash = fullHash
-	m.Package.Fips = fips
 
 	versionedHomePath := path.Join("data", fmt.Sprintf("%s-%s", beatName, shortHash))
 	m.Package.VersionedHome = versionedHomePath

@@ -34,17 +34,7 @@ packageTypes: &all-package-types
       5 # docker
 
 # Settings section contains general compiling and packaging settings
-settings:
-  fips:
-    compile:
-      cgo: true
-      env:
-        GOEXPERIMENT: systemcrypto
-      tags:
-        - requirefips
-      platforms:
-        - *linux-amd64
-        - *linux-arm64
+#settings:
 
 # List *all* the components available for packaging in elastic-agent
 components:
@@ -54,7 +44,6 @@ components:
   #    packageName: <template representing the name of the archive to download/extract>
   #    binaryName: <binary name>
   #    rootDir: <template representing directory from the archive root where the binary is located>
-  #    fips: <boolean indicating if this component is FIPS-capable>
   #    platforms:
   #      - <platform, use anchors for platforms above>
   #    pythonWheel: true # true if it's a package that is not platform specific
@@ -64,7 +53,6 @@ components:
     packageName: agentbeat-{{.Version}}-{{.Platform}}.{{.Ext}}
     rootDir: agentbeat-{{.Version}}-{{.Platform}}
     binaryName: agentbeat
-    fips: false
     platforms: *all-platforms
     packageTypes: *all-package-types
   - &comp-apm_server
@@ -72,7 +60,6 @@ components:
     packageName: apm-server-{{.Version}}-{{.Platform}}.{{.Ext}}
     rootDir: apm-server-{{.Version}}-{{.Platform}}
     binaryName: apm-server
-    fips: false
     platforms:
       - *linux-amd64
       - *linux-arm64
@@ -84,7 +71,6 @@ components:
     packageName: cloudbeat-{{.Version}}-{{.Platform}}.{{.Ext}}
     rootDir: cloudbeat-{{.Version}}-{{.Platform}}
     binaryName: cloudbeat
-    fips: false
     platforms:
       - *linux-amd64
       - *linux-arm64
@@ -98,7 +84,6 @@ components:
     # we don't extract/manipulate the archive during packaging, it has its own special handling in the 'service' docker image
     rootDir: elasticsearch_connectors-{{beat_version}}
     binaryName: connectors
-    fips: false
     platforms:
       - *linux-amd64
       - *linux-arm64
@@ -109,7 +94,6 @@ components:
     packageName: endpoint-security-{{.Version}}-{{.Platform}}.{{.Ext}}
     rootDir: endpoint-security-{{.Version}}-{{.Platform}}
     binaryName: endpoint-security
-    fips: false
     platforms: *all-platforms
     packageTypes: *all-package-types
   - &comp-fleet-server
@@ -117,7 +101,6 @@ components:
     packageName: fleet-server-{{.Version}}-{{.Platform}}.{{.Ext}}
     rootDir: fleet-server-{{.Version}}-{{.Platform}}
     binaryName: fleet-server
-    fips: false
     platforms: *all-platforms
     packageTypes: *all-package-types
   - &comp-pf-elastic-collector
@@ -125,7 +108,6 @@ components:
     packageName: pf-elastic-collector-{{.Version}}-{{.Platform}}.{{.Ext}}
     rootDir: pf-elastic-collector-{{.Version}}-{{.Platform}}
     binaryName: pf-elastic-collector
-    fips: false
     platforms:
       - *linux-amd64
       - *linux-arm64
@@ -135,7 +117,6 @@ components:
     packageName: pf-elastic-symbolizer-{{.Version}}-{{.Platform}}.{{.Ext}}
     rootDir: pf-elastic-symbolizer-{{.Version}}-{{.Platform}}
     binaryName: pf-elastic-symbolizer
-    fips: false
     platforms:
       - *linux-amd64
       - *linux-arm64
@@ -145,7 +126,6 @@ components:
     packageName: pf-host-agent-{{.Version}}-{{.Platform}}.{{.Ext}}
     rootDir: pf-host-agent-{{.Version}}-{{.Platform}}
     binaryName: pf-host-agent
-    fips: false
     platforms:
       - *linux-amd64
       - *linux-arm64
@@ -156,7 +136,6 @@ components:
     packageName: elastic-agent-core-{{.Version}}-{{.Platform}}.{{.Ext}}
     rootDir: elastic-agent-core-{{.Version}}-{{.Platform}}
     binaryName: elastic-agent
-    fips: false
     platforms: *all-platforms
     packageTypes: *all-package-types
 # The shared section contains YAML anchors that are used to
@@ -244,7 +223,7 @@ shared:
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/manifest.yaml:
         mode: 0644
         content: >
-          {{ manifest .fips }}
+          {{ manifest }}
 
   - &linux_otel_files
     'otelcol':
@@ -289,7 +268,7 @@ shared:
     'manifest.yaml':
       mode: 0644
       content: >
-        {{ manifest .fips }}
+        {{ manifest }}
 
   - &agent_binary_files
     '{{.BeatName}}{{.BinaryExt}}':
@@ -420,6 +399,7 @@ shared:
 
   - &agent_docker_spec
     <<: *agent_binary_spec
+    # Default docker image name is <spec name>-<docker variant>
     extra_vars:
       dockerfile: 'Dockerfile.elastic-agent.tmpl'
       docker_entrypoint: 'docker-entrypoint.elastic-agent.tmpl'
