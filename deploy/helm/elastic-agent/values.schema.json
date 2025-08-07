@@ -1243,6 +1243,34 @@
                         }
                     ]
                 },
+                "command": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Command for the container.",
+                    "examples": [
+                        [
+                            "/usr/local/bin/elastic-agent"
+                        ]
+                    ]
+                },
+                "args": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Arguments for the container command.",
+                    "examples": [
+                        [
+                            "run"
+                        ]
+                    ]
+                },
+                "otelConfig": {
+                    "type": "object",
+                    "description": "OpenTelemetry configuration."
+                },
                 "service": {
                     "type": "object",
                     "description": "Service configuration.",
