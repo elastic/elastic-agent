@@ -32,7 +32,11 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
+<<<<<<< HEAD
 	t.Skip("Skip this test until elastic agent version pinning is removed from Integration test runs on CI")
+=======
+	t.Skip("Skip this test because it is not compatible with .package-version pinning")
+>>>>>>> a155660c4 (ci: build agent from snapshot DRA (#9048))
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
