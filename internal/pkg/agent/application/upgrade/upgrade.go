@@ -104,19 +104,13 @@ type upgradeExecutor interface {
 
 // Upgrader performs an upgrade
 type Upgrader struct {
-	log            *logger.Logger
-	settings       *artifact.Config
-	agentInfo      info.Agent
-	upgradeable    bool
-	fleetServerURI string
-	markerWatcher  MarkerWatcher
-	upgradeCleaner upgradeCleaner
-	// diskSpaceErrorFunc func(error) error
-	// artifactDownloader artifactDownloader
-	// unpacker           unpacker
-	// relinker           relinker
-	// watcher            watcher
-	// directoryCopier    agentDirectoryCopier
+	log             *logger.Logger
+	settings        *artifact.Config
+	agentInfo       info.Agent
+	upgradeable     bool
+	fleetServerURI  string
+	markerWatcher   MarkerWatcher
+	upgradeCleaner  upgradeCleaner
 	upgradeExecutor upgradeExecutor
 }
 
@@ -152,12 +146,6 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.A
 		upgradeable:    IsUpgradeable(),
 		markerWatcher:  newMarkerFileWatcher(markerFilePath(paths.Data()), log),
 		upgradeCleaner: upgradeCleaner,
-		// diskSpaceErrorFunc: upgradeErrors.ToDiskSpaceErrorFunc(log),
-		// artifactDownloader: newUpgradeArtifactDownloader(log, settings, downloaderFactoryProvider),
-		// unpacker:           &upgradeUnpacker{log: log},
-		// relinker:           &upgradeRelinker{},
-		// watcher:            &upgradeWatcher{},
-		// directoryCopier:    &directoryCopier{},
 		upgradeExecutor: &executeUpgrade{
 			log:                log,
 			upgradeCleaner:     upgradeCleaner,
