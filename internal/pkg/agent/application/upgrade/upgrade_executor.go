@@ -61,7 +61,6 @@ type executeUpgrade struct {
 
 type unpackStepResult struct {
 	newHome string
-	newHash string
 	unpackResult
 }
 
@@ -130,7 +129,6 @@ func (u *executeUpgrade) unpackArtifact(downloadResult download.DownloadResult, 
 
 	unpackStepResult := unpackStepResult{
 		newHome:      newHome,
-		newHash:      newHash,
 		unpackResult: unpackRes,
 	}
 
