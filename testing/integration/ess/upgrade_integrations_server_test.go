@@ -58,7 +58,7 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 	statefulProv, ok := prov.(*ess.StatefulProvisioner)
 	require.True(t, ok)
 
-	startVersions = filterVersionsForECH(t, startVersions)
+	startVersions = filterVersionsForECH(t, startVersions, statefulProv)
 
 	t.Logf("Running test cases for upgrade from versions [%v] to version [%s]", startVersions, endVersion)
 	for _, startVersion := range startVersions {
