@@ -171,6 +171,15 @@ func InvokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error
 
 }
 
+func invokeCmd(agentExecutable string) *exec.Cmd {
+	return InvokeCmdWithArgs(
+		agentExecutable,
+		watcherSubcommand,
+		"--path.config", paths.Config(),
+		"--path.home", paths.Top(),
+	)
+}
+
 func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) error {
 	restartViaDaemonFn := func(ctx context.Context) error {
 		connectCtx, connectCancel := context.WithTimeout(ctx, 3*time.Second)

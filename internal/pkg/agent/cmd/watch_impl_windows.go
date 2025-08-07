@@ -7,6 +7,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"unsafe"
@@ -32,6 +33,7 @@ func takedownWatcher(log *logger.Logger, pidFetchFunc watcherPIDsFetcher) error 
 
 	ownPID := os.Getpid()
 
+	var accumulatedSignalingErrors error
 	for _, pid := range pids {
 
 		if pid == ownPID {
@@ -39,50 +41,10 @@ func takedownWatcher(log *logger.Logger, pidFetchFunc watcherPIDsFetcher) error 
 		}
 
 		log.Debugf("attempting to terminate watcher process with PID: %d", pid)
-		// define an anonymous function in order to leverage the defer() for freeing console and other housekeeping
-		func() {
-
-			r1, _, consoleErr := freeConsoleProc.Call()
-			if r1 == 0 {
-				log.Errorf("error preemptively detaching from console: %s", consoleErr)
-			}
-
-			r1, _, consoleErr = attachConsoleProc.Call(uintptr(pid))
-			if r1 == 0 {
-				log.Errorf("error attaching console to watcher process with PID: %d -> %s", pid, consoleErr)
-				return
-			}
-			log.Infof("successfully attached console with PID: %d", pid)
-
-			defer func() {
-				r1, _, consoleErr = freeConsoleProc.Call()
-				if r1 == 0 {
-					log.Errorf("error detaching from console: %s", consoleErr)
-				} else {
-					log.Infof("successfully detached from console of PID: %d", pid)
-				}
-			}()
-
-			list, consoleErr := GetConsoleProcessList()
-			if consoleErr != nil {
-				log.Errorf("error listing console processes: %s", consoleErr)
-			}
-
-			log.Infof("Own PID: %d, Watcher pid %d, Process list on console: %v", os.Getpid(), pid, list)
-
-			// Normally we would want to send the Ctrl+Break event only to the watcher process but due to the fact that
-			// the parent process of the watcher has already terminated, we have to hug it tightly and take it down with us
-			// by specifying processGroupID=0
-			killProcErr := gowindows.GenerateConsoleCtrlEvent(gowindows.CTRL_BREAK_EVENT, 0)
-
-			if killProcErr != nil {
-				log.Errorf("error terminating process with PID: %d: %s", pid, killProcErr)
-				return
-			}
-		}()
-
+		accumulatedSignalingErrors = errors.Join(accumulatedSignalingErrors, signalPID(log, pid))
 	}
-	return nil
+
+	return accumulatedSignalingErrors
 }
 
 // GetConsoleProcessList retrieves the list of process IDs attached to the current console
@@ -102,4 +64,44 @@ func GetConsoleProcessList() ([]uint32, error) {
 	}
 
 	return pids[:count], nil
+}
+
+// signalPID takes care of signaling a given PID. It also leverages defer() for freeing console and other housekeeping
+func signalPID(log *logger.Logger, pid int) error {
+	r1, _, consoleErr := freeConsoleProc.Call()
+	if r1 == 0 {
+		log.Warnf("error preemptively detaching from console: %s", consoleErr)
+	}
+
+	r1, _, consoleErr = attachConsoleProc.Call(uintptr(pid))
+	if r1 == 0 {
+		return fmt.Errorf("error attaching console to watcher process with PID %d: %w", pid, consoleErr)
+	}
+	log.Infof("successfully attached console with PID: %d", pid)
+
+	defer func() {
+		r1, _, consoleErr = freeConsoleProc.Call()
+		if r1 == 0 {
+			log.Errorf("error detaching from console: %s", consoleErr)
+		} else {
+			log.Infof("successfully detached from console of PID: %d", pid)
+		}
+	}()
+
+	if list, consoleProcessListErr := GetConsoleProcessList(); consoleProcessListErr != nil {
+		log.Errorf("error listing console processes: %s", consoleProcessListErr)
+	} else {
+		log.Infof("Own PID: %d, Watcher pid %d, Process list on console: %v", os.Getpid(), pid, list)
+	}
+
+	// Normally we would want to send the Ctrl+Break event only to the watcher process but due to the fact that
+	// the parent process of the watcher has already terminated, we have to hug it tightly and take it down with us
+	// by specifying processGroupID=0
+	killProcErr := gowindows.GenerateConsoleCtrlEvent(gowindows.CTRL_BREAK_EVENT, uint32(pid))
+
+	if killProcErr != nil {
+		return fmt.Errorf("error signaling process with PID: %d: %w", pid, killProcErr)
+	}
+
+	return nil
 }

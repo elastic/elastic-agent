@@ -26,9 +26,8 @@ var lockFile = flag.String(lockFileFlagName, "", "path to lock file")
 var ignoreSignals = flag.Bool(ignoreSignalFlagName, false, "ignore signals")
 
 func main() {
-
-	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	flag.Parse()
 	if *lockFile == "" {
@@ -52,13 +51,14 @@ func main() {
 	log.Printf(AcquiredLockLogFmt, *lockFile)
 
 	for {
-		s := <-signalCh
+
+		s := <-signalChan
 		if *ignoreSignals {
-			log.Printf("Received signal: %s, ignoring it...", s.String())
+			log.Printf("Received signal %v , ignoring it...", s)
 			continue
 		}
 
-		log.Printf("Received signal: %s, exiting", s.String())
+		log.Printf("Received signal %v , exiting...", s)
 		break
 	}
 }
