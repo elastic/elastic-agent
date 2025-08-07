@@ -27,7 +27,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
-	"github.com/elastic/elastic-agent/pkg/core/process"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -875,31 +874,6 @@ func writeState(t *testing.T, path string, state details.State) {
 // This test cannot run in parallel because it deals with launching test processes and verifying their state.
 // In case of aggressive PID reuse along with parallel execution, this test could kill "innocent" processes
 func TestTakeOverWatcher(t *testing.T) {
-	//testExecutablePath := filepath.Join("..", "filelock", "testlocker", "testlocker")
-	//if runtime.GOOS == "windows" {
-	//	testExecutablePath += ".exe"
-	//}
-	//testExecutableAbsolutePath, err := filepath.Abs(testExecutablePath)
-	//require.NoError(t, err, "error calculating absolute test executable part")
-	//
-	//require.FileExists(t, testExecutableAbsolutePath,
-	//	"testlocker binary not found.\n"+
-	//		"Check that:\n"+
-	//		"- test binaries have been built with mage dev:buildtestbinaries\n"+
-	//		"- the path of the executable is correct")
-
-	//returnCmdPIDsFetcher := func(cmds ...*process.Info) watcherPIDsFetcher {
-	//	return func() ([]int, error) {
-	//		pids := make([]int, 0, len(cmds))
-	//		for _, c := range cmds {
-	//			if c.Process != nil {
-	//				pids = append(pids, c.Process.Pid)
-	//			}
-	//		}
-	//
-	//		return pids, nil
-	//	}
-	//}
 
 	type setupFunc func(t *testing.T, workdir string, mockWatcherGrappler *mockWatcherGrappler)
 	type assertFunc func(t *testing.T, workdir string, appLocker *filelock.AppLocker)
@@ -1015,19 +989,4 @@ func TestTakeOverWatcher(t *testing.T) {
 		})
 	}
 
-}
-
-func createTestlockerCommand(ctx context.Context, t *testing.T, testExecutablePath string, workdir string, ignoreSignals bool) (context.CancelFunc, *process.Info) {
-	cmdCtx, cmdCancel := context.WithCancel(ctx)
-	args := []string{"-lockfile", filepath.Join(workdir, watcherApplockerFileName)}
-	if ignoreSignals {
-		args = append(args, "-ignoresignals")
-	}
-	proc, err := process.Start(
-		testExecutablePath,
-		process.WithArgs(args),
-		process.WithContext(cmdCtx),
-	)
-	require.NoError(t, err, "error starting testlocker binary")
-	return cmdCancel, proc
 }
