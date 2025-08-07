@@ -44,6 +44,7 @@ packages:
       dir: "{{.InterfaceDirRelative}}"
       mockname: "{{.Mock}}{{.InterfaceName | firstUpper}}"
       outpkg: "{{.PackageName}}"
+      filename: "{{.Mock | lower}}_{{.InterfaceName | lower}}_test.go"
     interfaces:
       WatcherHelper:
       watcherGrappler:
