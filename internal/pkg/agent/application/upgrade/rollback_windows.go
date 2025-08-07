@@ -12,8 +12,6 @@ import (
 	"time"
 
 	"golang.org/x/sys/windows"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
 const (
@@ -22,16 +20,13 @@ const (
 	afterRestartDelay = 20 * time.Second
 )
 
-func invokeCmd(agentExecutable string) *exec.Cmd {
+func InvokeCmdWithArgs(executable string, args ...string) *exec.Cmd {
 	// #nosec G204 -- user cannot inject any parameters to this command
-	cmd := exec.Command(agentExecutable, watcherSubcommand,
-		"--path.config", paths.Config(),
-		"--path.home", paths.Top(),
-	)
+	cmd := exec.Command(executable, args...)
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		// Signals are sent to process groups, and child process are part of the
-		// parent's prcoess group. So to send a signal to a
+		// parent's process group. So to send a signal to a
 		// child process and not have it also affect ourselves
 		// (the parent process), the child needs to be created in a new
 		// process group.
@@ -44,7 +39,7 @@ func invokeCmd(agentExecutable string) *exec.Cmd {
 		// Watcher process will also need a console in order to receive CTRL_BREAK_EVENT on windows.
 		// Elastic Agent main process running as a service does not have a console allocated and the watcher process will also
 		// outlive its parent during an upgrade operation so we add the CREATE_NEW_CONSOLE flag.
-		CreationFlags: windows.CREATE_NEW_PROCESS_GROUP & windows.CREATE_NEW_CONSOLE,
+		CreationFlags: windows.CREATE_NEW_PROCESS_GROUP,
 	}
 	return cmd
 }
