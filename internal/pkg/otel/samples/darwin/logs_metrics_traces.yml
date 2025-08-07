@@ -122,7 +122,7 @@ service:
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
       processors: [resourcedetection]
-      exporters: [elasticsearch/ecs]
+      exporters: [elasticsearch/otel]
 
     metrics/aggregated-metrics:
       receivers: [elasticapm]
