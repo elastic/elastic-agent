@@ -2,7 +2,6 @@ package upgrade
 
 import (
 	"errors"
-	goerrors "errors"
 	"fmt"
 	"path/filepath"
 	"testing"
@@ -378,7 +377,7 @@ func TestUnpackArtifactStep(t *testing.T) {
 			diskSpaceError:          errors.New("test error"),
 			calledUnpackerFuncs:     []string{"getPackageMetadata", "extractAgentVersion", "detectFlavor", "unpack"},
 			uncalledUnpackerFuncs:   []string{},
-			unpackStepError:         goerrors.Join(errors.New("test error"), errors.New("unknown versioned home")),
+			unpackStepError:         errors.Join(errors.New("test error"), errors.New("unknown versioned home")),
 			cleanerCalled:           false,
 		},
 		"if unpack fails, and hash is unknown, should return combined error": {
@@ -401,7 +400,7 @@ func TestUnpackArtifactStep(t *testing.T) {
 			diskSpaceError:          errors.New("test error"),
 			calledUnpackerFuncs:     []string{"getPackageMetadata", "extractAgentVersion", "detectFlavor", "unpack"},
 			uncalledUnpackerFuncs:   []string{},
-			unpackStepError:         goerrors.Join(errors.New("test error"), errors.New("unknown hash")),
+			unpackStepError:         errors.Join(errors.New("test error"), errors.New("unknown hash")),
 			cleanerCalled:           false,
 		},
 		"if unpack fails, and setup unpack cleanup fails, should return combined error": {
@@ -424,7 +423,7 @@ func TestUnpackArtifactStep(t *testing.T) {
 			diskSpaceError:          errors.New("test unpack error"),
 			calledUnpackerFuncs:     []string{"getPackageMetadata", "extractAgentVersion", "detectFlavor", "unpack"},
 			uncalledUnpackerFuncs:   []string{},
-			unpackStepError:         goerrors.Join(errors.New("test unpack error"), errors.New("test setup unpack cleanup error")),
+			unpackStepError:         errors.Join(errors.New("test unpack error"), errors.New("test setup unpack cleanup error")),
 			cleanerCalled:           true,
 		},
 	}
