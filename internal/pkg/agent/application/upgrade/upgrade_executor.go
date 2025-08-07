@@ -86,7 +86,7 @@ func (u *executeUpgrade) downloadArtifact(ctx context.Context, parsedTargetVersi
 	return downloadResult, u.upgradeCleaner.setupArchiveCleanup(downloadResult)
 }
 
-func (u *executeUpgrade) unpackArtifact(downloadResult download.DownloadResult, version, archivePath, topPath, flavor, dataPath, currentHome string, upgradeDetails *details.Details, currentVersion agentVersion) (unpackStepResult, error) {
+func (u *executeUpgrade) unpackArtifact(downloadResult download.DownloadResult, version, archivePath, topPath, flavor, dataPath, currentHome string, upgradeDetails *details.Details, currentVersion agentVersion, checkUpgradeFn checkUpgradeFn) (unpackStepResult, error) {
 	upgradeDetails.SetState(details.StateExtracting)
 
 	metadata, err := u.unpacker.getPackageMetadata(downloadResult.ArtifactPath)
@@ -96,7 +96,7 @@ func (u *executeUpgrade) unpackArtifact(downloadResult download.DownloadResult, 
 
 	newVersion := u.unpacker.extractAgentVersion(metadata, version)
 
-	if err := checkUpgrade(u.log, currentVersion, newVersion, metadata); err != nil {
+	if err := checkUpgradeFn(u.log, currentVersion, newVersion, metadata); err != nil {
 		return unpackStepResult{}, fmt.Errorf("cannot upgrade the agent: %w", err)
 	}
 
