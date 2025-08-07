@@ -37,3 +37,16 @@ packages:
       installationModifier:
         config:
           mockname: "InstallationModifier"
+  github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade:
+    config:
+      inpackage: true
+      dir: internal/pkg/agent/application/upgrade
+      mockname: "mock_{{.InterfaceName}}"
+    interfaces:
+      artifactDownloader:
+      unpacker:
+      relinker:
+      watcher:
+      agentDirectoryCopier:
+      upgradeCleaner:
+
