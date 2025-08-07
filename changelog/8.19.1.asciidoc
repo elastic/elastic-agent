@@ -1,0 +1,48 @@
+// begin 8.19.1 relnotes
+
+[[release-notes-8.19.1]]
+==  8.19.1
+
+Review important information about the  8.19.1 release.
+
+[discrete]
+[[new-features-8.19.1]]
+=== New features
+
+The 8.19.1 release adds the following new and notable features.
+
+elastic-agent::
+
+* Add K8s Leader Elector Otel Extension. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9065[#https://github.com/elastic/elastic-agent/pull/9065]
+
+
+[discrete]
+[[enhancements-8.19.1]]
+=== Enhancements
+
+elastic-agent::
+
+* Include The Forwardconnector As An Edot Collector Commponent. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8753[#https://github.com/elastic/elastic-agent/pull/8753]
+* Update Otel Components To V0.129.0. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8819[#https://github.com/elastic/elastic-agent/pull/8819]
+* Update Apm Config Extension To V0.4.0. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8819[#https://github.com/elastic/elastic-agent/pull/8819]
+* Update Elastic Trace Processor To V0.7.0. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8819[#https://github.com/elastic/elastic-agent/pull/8819]
+* Update Elastic Apm Connector To V0.4.0. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8819[#https://github.com/elastic/elastic-agent/pull/8819]
+* Update Api Key Auth Extension To V0.2.0. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8819[#https://github.com/elastic/elastic-agent/pull/8819]
+* Update Elastic Infra Metrics Processor To V0.16.0. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8819[#https://github.com/elastic/elastic-agent/pull/8819]
+* Rename Otel Collector Config File In Diagnostics From Otel-Final.yaml To Otel-Merged.yaml. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9052[#https://github.com/elastic/elastic-agent/pull/9052]
+
+
+
+[discrete]
+[[bug-fixes-8.19.1]]
+=== Bug fixes
+
+
+elastic-agent::
+
+* Remove Incorrect Logging That Unprivileged Installations Are In Beta. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8715[#https://github.com/elastic/elastic-agent/pull/8715] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/8689[#https://github.com/elastic/elastic-agent/issues/8689]
+* Ensure Standalone Elastic Agent Uses Log Level From Configuration Instead Of Persisted State. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8784[#https://github.com/elastic/elastic-agent/pull/8784] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/8137[#https://github.com/elastic/elastic-agent/issues/8137]
+* Resolve Deadlocks In Runtime Checkin Communication. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8881[#https://github.com/elastic/elastic-agent/pull/8881] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/7944[#https://github.com/elastic/elastic-agent/issues/7944]
+* Removed Init.d Support From Rpm Packages. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/8896[#https://github.com/elastic/elastic-agent/pull/8896] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/8840[#https://github.com/elastic/elastic-agent/issues/8840]
+
+// end 8.19.1 relnotes

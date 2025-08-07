@@ -1,0 +1,196 @@
+version: 8.19.1
+entries:
+    - kind: other
+      summary: Upgrade Synthetics NodeJS version to latest LTS v20.
+      description: ""
+      component: heartbeat
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8712
+      issue: []
+      timestamp: 1751029489
+      file:
+        name: 1751029489-synth-upgra-node-v20.yaml
+        checksum: 26a735a19317db577652eea4bb1f3e863212da81
+    - kind: bug-fix
+      summary: Remove incorrect logging that unprivileged installations are in beta.
+      description: 'Unprivileged installations went GA in 8.15.0: https://www.elastic.co/docs/reference/fleet/elastic-agent-unprivileged'
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8715
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/8689
+      timestamp: 1751037802
+      file:
+        name: 1751037802-Stop-logging-that-unprivileged-installations-are-in-beta.yaml
+        checksum: 2c2f731f90638eaf61e8ec021ce3c4dd8885ff3a
+    - kind: enhancement
+      summary: Include the forwardconnector as an EDOT collector commponent.
+      description: https://github.com/open-telemetry/opentelemetry-collector/tree/main/connector/forwardconnector
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8753
+      issue: []
+      timestamp: 1751317599
+      file:
+        name: 1751317599-edot-collector-include-forwardconnector.yaml
+        checksum: 04412e4d8553807149ec868f1f5493441ea8e2cb
+    - kind: bug-fix
+      summary: Ensure standalone Elastic Agent uses log level from configuration instead of persisted state
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8784
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/8137
+      timestamp: 1751455886
+      file:
+        name: 1751455886-correct-log-level-for-standalone-agents.yaml
+        checksum: e954db0ba6e1738e3d425cf3c8110a40c296a013
+    - kind: enhancement
+      summary: Update OTel components to v0.129.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9159
+        - https://github.com/elastic/elastic-agent/pull/8939
+        - https://github.com/elastic/elastic-agent/pull/9264
+        - https://github.com/elastic/elastic-agent/pull/9265
+        - https://github.com/elastic/elastic-agent/pull/9206
+        - https://github.com/elastic/elastic-agent/pull/8819
+      issue: []
+      timestamp: 1751458785
+      file:
+        name: 1751458785-update-otel-components-to-v0.129.0.yaml
+        checksum: ee5c51c2d4a5cadd25bbf314358e09fb8cf906a5
+    - kind: enhancement
+      summary: Update APM Config extension to v0.4.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9159
+        - https://github.com/elastic/elastic-agent/pull/8939
+        - https://github.com/elastic/elastic-agent/pull/9264
+        - https://github.com/elastic/elastic-agent/pull/9265
+        - https://github.com/elastic/elastic-agent/pull/9206
+        - https://github.com/elastic/elastic-agent/pull/8819
+      issue: []
+      timestamp: 1751536568
+      file:
+        name: 1751536568-update-apmconfig-extension-v0.4.0.yaml
+        checksum: 479c152af69e39e8651b7b7e6bbce51a804fc213
+    - kind: enhancement
+      summary: Update Elastic Trace processor to v0.7.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9159
+        - https://github.com/elastic/elastic-agent/pull/8939
+        - https://github.com/elastic/elastic-agent/pull/9264
+        - https://github.com/elastic/elastic-agent/pull/9265
+        - https://github.com/elastic/elastic-agent/pull/9206
+        - https://github.com/elastic/elastic-agent/pull/8819
+      issue: []
+      timestamp: 1751638649
+      file:
+        name: 1751638649-update-elastictrace-processor-to-v0.7.0.yaml
+        checksum: 798e4080de8a1eefb2072f28db7402d2426e1f55
+    - kind: enhancement
+      summary: Update Elastic APM connector to v0.4.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9159
+        - https://github.com/elastic/elastic-agent/pull/8939
+        - https://github.com/elastic/elastic-agent/pull/9264
+        - https://github.com/elastic/elastic-agent/pull/9265
+        - https://github.com/elastic/elastic-agent/pull/9206
+        - https://github.com/elastic/elastic-agent/pull/8819
+      issue: []
+      timestamp: 1751638799
+      file:
+        name: 1751638799-update-elasticapm-connector-to-v0.4.0.yaml
+        checksum: 2c17d9d7d90b1c3df280ffc5008dea62e5f075fe
+    - kind: enhancement
+      summary: Update API Key Auth extension to v0.2.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9159
+        - https://github.com/elastic/elastic-agent/pull/8939
+        - https://github.com/elastic/elastic-agent/pull/9264
+        - https://github.com/elastic/elastic-agent/pull/9265
+        - https://github.com/elastic/elastic-agent/pull/9206
+        - https://github.com/elastic/elastic-agent/pull/8819
+      issue: []
+      timestamp: 1751639092
+      file:
+        name: 1751639092-update-apikeyauth-extension-to-v0.2.0.yaml
+        checksum: 084a35923071e08433a2347aece8d1a6b028b214
+    - kind: enhancement
+      summary: Update Elastic Infra Metrics processor to v0.16.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9159
+        - https://github.com/elastic/elastic-agent/pull/8939
+        - https://github.com/elastic/elastic-agent/pull/9264
+        - https://github.com/elastic/elastic-agent/pull/9265
+        - https://github.com/elastic/elastic-agent/pull/9206
+        - https://github.com/elastic/elastic-agent/pull/8819
+      issue: []
+      timestamp: 1751639206
+      file:
+        name: 1751639206-update-elastic-infra-metrics-processor-to-v0.16.0.yaml
+        checksum: f14405b98aad0380ec5278bef6ae53c4e29ebd53
+    - kind: bug-fix
+      summary: Resolve deadlocks in runtime checkin communication
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8881
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/7944
+      timestamp: 1751960319
+      file:
+        name: 1751960319-fix-blocking-issues-inside-runtime-communicator.yaml
+        checksum: d288cc7474997883bc2a9118b2abf150126c9d8c
+    - kind: bug-fix
+      summary: Removed init.d support from RPM packages
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8896
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/8840
+      timestamp: 1752049251
+      file:
+        name: 1752049251-Fixed-SUSE-installation-from-RPM.yaml
+        checksum: bb9eba27e2dfa5885a2abd6140ea506d143b21f5
+    - kind: feature
+      summary: Rename OTel collector config file in diagnostics from otel-final.yaml to otel-merged.yaml
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9159
+        - https://github.com/elastic/elastic-agent/pull/9264
+        - https://github.com/elastic/elastic-agent/pull/9265
+        - https://github.com/elastic/elastic-agent/pull/9206
+        - https://github.com/elastic/elastic-agent/pull/9052
+      issue: []
+      timestamp: 1752754955
+      file:
+        name: 1752754955-rename-otel-diagnostic-file.yaml
+        checksum: 65c19ff2380a2e381ccc0ba5677825241d84a127
+    - kind: feature
+      summary: Add k8s leader elector Otel extension
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9264
+        - https://github.com/elastic/elastic-agent/pull/9265
+        - https://github.com/elastic/elastic-agent/pull/9065
+      issue: []
+      timestamp: 1752827328
+      file:
+        name: 1752827328-add_k8sleaderelector_extension.yaml
+        checksum: 2dae784245fbcf96055c2a2898fe911ce2eeaea9
