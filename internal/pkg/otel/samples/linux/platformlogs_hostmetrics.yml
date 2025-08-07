@@ -108,8 +108,8 @@ service:
   pipelines:
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
-      processors: [resourcedetection, attributes/dataset, resource/process]
-      exporters: [elasticsearch/ecs]
+      processors: [resourcedetection]
+      exporters: [elasticsearch/otel]
     logs/platformlogs:
       receivers: [filelog/platformlogs]
       processors: [resourcedetection]
