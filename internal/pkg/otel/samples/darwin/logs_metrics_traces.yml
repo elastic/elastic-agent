@@ -121,7 +121,7 @@ service:
 
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
-      processors: [resourcedetection, attributes/dataset, resource/process]
+      processors: [resourcedetection]
       exporters: [elasticsearch/ecs]
 
     metrics/aggregated-metrics:
