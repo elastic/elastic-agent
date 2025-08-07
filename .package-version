@@ -1,1 +1,8 @@
-9.1.1
+{
+  "version": "9.1.1-SNAPSHOT",
+  "build_id": "9.1.1-e8fd9f6e",
+  "manifest_url": "https://snapshots.elastic.co/9.1.1-e8fd9f6e/manifest-9.1.1-SNAPSHOT.json",
+  "summary_url": "https://snapshots.elastic.co/9.1.1-e8fd9f6e/summary-9.1.1-SNAPSHOT.html",
+  "core_version": "9.1.1",
+  "stack_build_id": "9.1.1-e8fd9f6e-SNAPSHOT"
+}
