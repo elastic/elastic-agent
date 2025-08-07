@@ -128,8 +128,8 @@ service:
 
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
-      processors: [resourcedetection, attributes/dataset, resource/process]
-      exporters: [elasticsearch/ecs]
+      processors: [resourcedetection]
+      exporters: [elasticsearch/otel]
 
     metrics/aggregated-metrics:
       receivers: [elasticapm]
