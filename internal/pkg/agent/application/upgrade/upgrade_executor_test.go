@@ -77,10 +77,6 @@ func TestDownloadArtifactStep(t *testing.T) {
 		pgpBytes:           []string{"mockPGPBytes"},
 	}
 
-	// skipVerifyOverride := false
-	// skipDefaultPgp := false
-	// pgpBytes := []string{"mockPGPBytes"}
-
 	mockArtifactDownloader := &mockArtifactDownloader{}
 	mockUpgradeCleaner := &mockUpgradeCleaner{}
 	upgradeExecutor := &executeUpgrade{
