@@ -7,6 +7,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
@@ -48,72 +49,348 @@ func (m *mockUpgradeCleaner) cleanup(err error) error {
 
 func TestDownloadArtifactStep(t *testing.T) {
 	ctx := t.Context()
-	log, _ := loggertest.New("test")
 	parsedVersion, err := agtversion.ParseVersion("9.1.0")
 	require.NoError(t, err)
 
-	// agentInfo := &info.AgentInfo{}
-	// sourceURI := "mockURI"
-	// fleetServerURI := "mockFleetServerURI"
-	// upgradeDetails := &details.Details{}
+	t.Run("should download artifact and setup archive cleanup", func(t *testing.T) {
+		log, _ := loggertest.New("test")
+		testValues := struct {
+			parsedVersion      *agtversion.ParsedSemVer
+			agentInfo          *info.AgentInfo
+			sourceURI          string
+			fleetServerURI     string
+			upgradeDetails     *details.Details
+			skipVerifyOverride bool
+			skipDefaultPgp     bool
+			pgpBytes           []string
+		}{
+			parsedVersion:      parsedVersion,
+			agentInfo:          &info.AgentInfo{},
+			sourceURI:          "mockURI",
+			fleetServerURI:     "mockFleetServerURI",
+			upgradeDetails:     &details.Details{},
+			skipVerifyOverride: false,
+			skipDefaultPgp:     false,
+			pgpBytes:           []string{"mockPGPBytes"},
+		}
 
-	testValues := struct {
-		parsedVersion      *agtversion.ParsedSemVer
-		agentInfo          *info.AgentInfo
-		sourceURI          string
-		fleetServerURI     string
-		upgradeDetails     *details.Details
-		skipVerifyOverride bool
-		skipDefaultPgp     bool
-		pgpBytes           []string
-	}{
-		parsedVersion:      parsedVersion,
-		agentInfo:          &info.AgentInfo{},
-		sourceURI:          "mockURI",
-		fleetServerURI:     "mockFleetServerURI",
-		upgradeDetails:     &details.Details{},
-		skipVerifyOverride: false,
-		skipDefaultPgp:     false,
-		pgpBytes:           []string{"mockPGPBytes"},
-	}
+		mockArtifactDownloader := &mockArtifactDownloader{}
+		mockUpgradeCleaner := &mockUpgradeCleaner{}
+		upgradeExecutor := &executeUpgrade{
+			log:                log,
+			artifactDownloader: mockArtifactDownloader,
+			upgradeCleaner:     mockUpgradeCleaner,
+		}
 
-	mockArtifactDownloader := &mockArtifactDownloader{}
-	mockUpgradeCleaner := &mockUpgradeCleaner{}
-	upgradeExecutor := &executeUpgrade{
-		log:                log,
-		artifactDownloader: mockArtifactDownloader,
-		upgradeCleaner:     mockUpgradeCleaner,
-	}
+		nonMatchingCallCount := 0
+		mockArtifactDownloader.cleanNonMatchingVersionsFromDownloadsTestFunc = func(log *logger.Logger, version string) error {
+			nonMatchingCallCount++
+			require.Equal(t, testValues.agentInfo.Version(), version)
+			return nil
+		}
 
-	nonMatchingCallCount := 0
-	mockArtifactDownloader.cleanNonMatchingVersionsFromDownloadsTestFunc = func(log *logger.Logger, version string) error {
-		nonMatchingCallCount++
-		require.Equal(t, testValues.agentInfo.Version(), version)
-		return nil
-	}
+		mockDownloadResult := download.DownloadResult{
+			ArtifactPath:     "mockArtifactPath",
+			ArtifactHashPath: "mockArtifactHashPath",
+		}
+		mockArtifactDownloader.dowloadArtifactTestFunc = func(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, fleetServerURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (download.DownloadResult, error) {
+			require.Equal(t, testValues.parsedVersion, parsedVersion)
+			require.Equal(t, testValues.sourceURI, sourceURI)
+			require.Equal(t, testValues.fleetServerURI, fleetServerURI)
+			require.Equal(t, testValues.upgradeDetails, upgradeDetails)
+			require.Equal(t, testValues.skipVerifyOverride, skipVerifyOverride)
+			require.Equal(t, testValues.skipDefaultPgp, skipDefaultPgp)
+			require.Equal(t, testValues.pgpBytes, pgpBytes)
+			return mockDownloadResult, nil
+		}
 
-	mockDownloadResult := download.DownloadResult{
-		ArtifactPath:     "mockArtifactPath",
-		ArtifactHashPath: "mockArtifactHashPath",
-	}
-	mockArtifactDownloader.dowloadArtifactTestFunc = func(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, fleetServerURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (download.DownloadResult, error) {
-		require.Equal(t, testValues.parsedVersion, parsedVersion)
-		require.Equal(t, testValues.sourceURI, sourceURI)
-		require.Equal(t, testValues.fleetServerURI, fleetServerURI)
-		require.Equal(t, testValues.upgradeDetails, upgradeDetails)
-		require.Equal(t, testValues.skipVerifyOverride, skipVerifyOverride)
-		require.Equal(t, testValues.skipDefaultPgp, skipDefaultPgp)
-		require.Equal(t, testValues.pgpBytes, pgpBytes)
-		return mockDownloadResult, nil
-	}
+		cleanerCallCount := 0
+		mockUpgradeCleaner.setupArchiveCleanupTestFunc = func(downloadResult download.DownloadResult) error {
+			cleanerCallCount++
+			require.Equal(t, mockDownloadResult, downloadResult)
+			return nil
+		}
 
-	mockUpgradeCleaner.setupArchiveCleanupTestFunc = func(downloadResult download.DownloadResult) error {
+		downloadResult, err := upgradeExecutor.downloadArtifact(ctx, testValues.parsedVersion, testValues.agentInfo, testValues.sourceURI, testValues.fleetServerURI, testValues.upgradeDetails, testValues.skipVerifyOverride, testValues.skipDefaultPgp, testValues.pgpBytes...)
+		require.NoError(t, err)
 		require.Equal(t, mockDownloadResult, downloadResult)
-		return nil
-	}
+		require.Equal(t, 1, nonMatchingCallCount)
+		require.Equal(t, 1, cleanerCallCount)
+	})
 
-	downloadResult, err := upgradeExecutor.downloadArtifact(ctx, testValues.parsedVersion, testValues.agentInfo, testValues.sourceURI, testValues.fleetServerURI, testValues.upgradeDetails, testValues.skipVerifyOverride, testValues.skipDefaultPgp, testValues.pgpBytes...)
-	require.NoError(t, err)
-	require.Equal(t, mockDownloadResult, downloadResult)
-	require.Equal(t, 1, nonMatchingCallCount)
+	t.Run("when initial cleanup of non-matching versions fails, should log error", func(t *testing.T) {
+		log, obs := loggertest.New("test")
+		testValues := struct {
+			parsedVersion      *agtversion.ParsedSemVer
+			agentInfo          *info.AgentInfo
+			sourceURI          string
+			fleetServerURI     string
+			upgradeDetails     *details.Details
+			skipVerifyOverride bool
+			skipDefaultPgp     bool
+			pgpBytes           []string
+		}{
+			parsedVersion:      parsedVersion,
+			agentInfo:          &info.AgentInfo{},
+			sourceURI:          "mockURI",
+			fleetServerURI:     "mockFleetServerURI",
+			upgradeDetails:     &details.Details{},
+			skipVerifyOverride: false,
+			skipDefaultPgp:     false,
+			pgpBytes:           []string{"mockPGPBytes"},
+		}
+
+		mockArtifactDownloader := &mockArtifactDownloader{}
+		mockUpgradeCleaner := &mockUpgradeCleaner{}
+		upgradeExecutor := &executeUpgrade{
+			log:                log,
+			artifactDownloader: mockArtifactDownloader,
+			upgradeCleaner:     mockUpgradeCleaner,
+		}
+
+		nonMatchingCallCount := 0
+		mockArtifactDownloader.cleanNonMatchingVersionsFromDownloadsTestFunc = func(log *logger.Logger, version string) error {
+			nonMatchingCallCount++
+			require.Equal(t, testValues.agentInfo.Version(), version)
+			return errors.New("test error")
+		}
+
+		mockDownloadResult := download.DownloadResult{
+			ArtifactPath:     "mockArtifactPath",
+			ArtifactHashPath: "mockArtifactHashPath",
+		}
+		mockArtifactDownloader.dowloadArtifactTestFunc = func(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, fleetServerURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (download.DownloadResult, error) {
+			require.Equal(t, testValues.parsedVersion, parsedVersion)
+			require.Equal(t, testValues.sourceURI, sourceURI)
+			require.Equal(t, testValues.fleetServerURI, fleetServerURI)
+			require.Equal(t, testValues.upgradeDetails, upgradeDetails)
+			require.Equal(t, testValues.skipVerifyOverride, skipVerifyOverride)
+			require.Equal(t, testValues.skipDefaultPgp, skipDefaultPgp)
+			require.Equal(t, testValues.pgpBytes, pgpBytes)
+			return mockDownloadResult, nil
+		}
+
+		cleanerCallCount := 0
+		mockUpgradeCleaner.setupArchiveCleanupTestFunc = func(downloadResult download.DownloadResult) error {
+			cleanerCallCount++
+			require.Equal(t, mockDownloadResult, downloadResult)
+			return nil
+		}
+
+		downloadResult, err := upgradeExecutor.downloadArtifact(ctx, testValues.parsedVersion, testValues.agentInfo, testValues.sourceURI, testValues.fleetServerURI, testValues.upgradeDetails, testValues.skipVerifyOverride, testValues.skipDefaultPgp, testValues.pgpBytes...)
+		require.NoError(t, err)
+		require.Equal(t, mockDownloadResult, downloadResult)
+		require.Equal(t, 1, nonMatchingCallCount)
+		require.Equal(t, 1, obs.Len())
+		require.Equal(t, "Unable to clean downloads before update", obs.All()[0].Message)
+		require.Equal(t, 1, cleanerCallCount)
+	})
+
+	t.Run("when download fails, and cleanup of non-matching versions succeeds, should return error", func(t *testing.T) {
+		log, _ := loggertest.New("test")
+		testValues := struct {
+			parsedVersion      *agtversion.ParsedSemVer
+			agentInfo          *info.AgentInfo
+			sourceURI          string
+			fleetServerURI     string
+			upgradeDetails     *details.Details
+			skipVerifyOverride bool
+			skipDefaultPgp     bool
+			pgpBytes           []string
+		}{
+			parsedVersion:      parsedVersion,
+			agentInfo:          &info.AgentInfo{},
+			sourceURI:          "mockURI",
+			fleetServerURI:     "mockFleetServerURI",
+			upgradeDetails:     &details.Details{},
+			skipVerifyOverride: false,
+			skipDefaultPgp:     false,
+			pgpBytes:           []string{"mockPGPBytes"},
+		}
+
+		mockArtifactDownloader := &mockArtifactDownloader{}
+		mockUpgradeCleaner := &mockUpgradeCleaner{}
+		upgradeExecutor := &executeUpgrade{
+			log:                log,
+			artifactDownloader: mockArtifactDownloader,
+			upgradeCleaner:     mockUpgradeCleaner,
+		}
+
+		nonMatchingCallCount := 0
+		mockArtifactDownloader.cleanNonMatchingVersionsFromDownloadsTestFunc = func(log *logger.Logger, version string) error {
+			nonMatchingCallCount++
+			require.Equal(t, testValues.agentInfo.Version(), version)
+			return nil
+		}
+
+		mockDownloadResult := download.DownloadResult{
+			ArtifactPath:     "mockArtifactPath",
+			ArtifactHashPath: "mockArtifactHashPath",
+		}
+
+		mockArtifactDownloader.dowloadArtifactTestFunc = func(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, fleetServerURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (download.DownloadResult, error) {
+			require.Equal(t, testValues.parsedVersion, parsedVersion)
+			require.Equal(t, testValues.sourceURI, sourceURI)
+			require.Equal(t, testValues.fleetServerURI, fleetServerURI)
+			require.Equal(t, testValues.upgradeDetails, upgradeDetails)
+			require.Equal(t, testValues.skipVerifyOverride, skipVerifyOverride)
+			require.Equal(t, testValues.skipDefaultPgp, skipDefaultPgp)
+			require.Equal(t, testValues.pgpBytes, pgpBytes)
+			return mockDownloadResult, errors.New("test error")
+		}
+
+		cleanerCallCount := 0
+		mockUpgradeCleaner.setupArchiveCleanupTestFunc = func(downloadResult download.DownloadResult) error {
+			cleanerCallCount++
+			require.Equal(t, mockDownloadResult, downloadResult)
+			return nil
+		}
+
+		downloadResult, err := upgradeExecutor.downloadArtifact(ctx, testValues.parsedVersion, testValues.agentInfo, testValues.sourceURI, testValues.fleetServerURI, testValues.upgradeDetails, testValues.skipVerifyOverride, testValues.skipDefaultPgp, testValues.pgpBytes...)
+		require.Error(t, err)
+		require.ErrorIs(t, err, errors.New("test error"))
+		require.Equal(t, mockDownloadResult, downloadResult)
+		require.Equal(t, 2, nonMatchingCallCount)
+		require.Equal(t, 0, cleanerCallCount)
+	})
+
+	t.Run("when download fails, and cleanup of non-matching versions fails, should log error and return error", func(t *testing.T) {
+		log, obs := loggertest.New("test")
+		testValues := struct {
+			parsedVersion      *agtversion.ParsedSemVer
+			agentInfo          *info.AgentInfo
+			sourceURI          string
+			fleetServerURI     string
+			upgradeDetails     *details.Details
+			skipVerifyOverride bool
+			skipDefaultPgp     bool
+			pgpBytes           []string
+		}{
+			parsedVersion:      parsedVersion,
+			agentInfo:          &info.AgentInfo{},
+			sourceURI:          "mockURI",
+			fleetServerURI:     "mockFleetServerURI",
+			upgradeDetails:     &details.Details{},
+			skipVerifyOverride: false,
+			skipDefaultPgp:     false,
+			pgpBytes:           []string{"mockPGPBytes"},
+		}
+
+		mockArtifactDownloader := &mockArtifactDownloader{}
+		mockUpgradeCleaner := &mockUpgradeCleaner{}
+		upgradeExecutor := &executeUpgrade{
+			log:                log,
+			artifactDownloader: mockArtifactDownloader,
+			upgradeCleaner:     mockUpgradeCleaner,
+		}
+
+		nonMatchingCallCount := 0
+		mockArtifactDownloader.cleanNonMatchingVersionsFromDownloadsTestFunc = func(log *logger.Logger, version string) error {
+			nonMatchingCallCount++
+			require.Equal(t, testValues.agentInfo.Version(), version)
+			if nonMatchingCallCount == 2 {
+				return errors.New("test non-matching error")
+			}
+			return nil
+		}
+
+		mockDownloadResult := download.DownloadResult{
+			ArtifactPath:     "mockArtifactPath",
+			ArtifactHashPath: "mockArtifactHashPath",
+		}
+
+		mockArtifactDownloader.dowloadArtifactTestFunc = func(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, fleetServerURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (download.DownloadResult, error) {
+			require.Equal(t, testValues.parsedVersion, parsedVersion)
+			require.Equal(t, testValues.sourceURI, sourceURI)
+			require.Equal(t, testValues.fleetServerURI, fleetServerURI)
+			require.Equal(t, testValues.upgradeDetails, upgradeDetails)
+			require.Equal(t, testValues.skipVerifyOverride, skipVerifyOverride)
+			require.Equal(t, testValues.skipDefaultPgp, skipDefaultPgp)
+			require.Equal(t, testValues.pgpBytes, pgpBytes)
+			return mockDownloadResult, errors.New("test download error")
+		}
+
+		cleanerCallCount := 0
+		mockUpgradeCleaner.setupArchiveCleanupTestFunc = func(downloadResult download.DownloadResult) error {
+			cleanerCallCount++
+			require.Equal(t, mockDownloadResult, downloadResult)
+			return nil
+		}
+
+		downloadResult, err := upgradeExecutor.downloadArtifact(ctx, testValues.parsedVersion, testValues.agentInfo, testValues.sourceURI, testValues.fleetServerURI, testValues.upgradeDetails, testValues.skipVerifyOverride, testValues.skipDefaultPgp, testValues.pgpBytes...)
+		require.Error(t, err)
+		require.ErrorIs(t, err, errors.New("test download error"))
+		require.Equal(t, mockDownloadResult, downloadResult)
+		require.Equal(t, 2, nonMatchingCallCount)
+		require.Equal(t, 0, cleanerCallCount)
+		require.Equal(t, 1, obs.Len())
+		require.Equal(t, "Unable to remove file after verification failure", obs.All()[0].Message)
+	})
+
+	t.Run("when download succeeds, but setting up archive cleanup fails, should return error", func(t *testing.T) {
+		log, _ := loggertest.New("test")
+		testValues := struct {
+			parsedVersion      *agtversion.ParsedSemVer
+			agentInfo          *info.AgentInfo
+			sourceURI          string
+			fleetServerURI     string
+			upgradeDetails     *details.Details
+			skipVerifyOverride bool
+			skipDefaultPgp     bool
+			pgpBytes           []string
+		}{
+			parsedVersion:      parsedVersion,
+			agentInfo:          &info.AgentInfo{},
+			sourceURI:          "mockURI",
+			fleetServerURI:     "mockFleetServerURI",
+			upgradeDetails:     &details.Details{},
+			skipVerifyOverride: false,
+			skipDefaultPgp:     false,
+			pgpBytes:           []string{"mockPGPBytes"},
+		}
+
+		mockArtifactDownloader := &mockArtifactDownloader{}
+		mockUpgradeCleaner := &mockUpgradeCleaner{}
+		upgradeExecutor := &executeUpgrade{
+			log:                log,
+			artifactDownloader: mockArtifactDownloader,
+			upgradeCleaner:     mockUpgradeCleaner,
+		}
+
+		nonMatchingCallCount := 0
+		mockArtifactDownloader.cleanNonMatchingVersionsFromDownloadsTestFunc = func(log *logger.Logger, version string) error {
+			nonMatchingCallCount++
+			require.Equal(t, testValues.agentInfo.Version(), version)
+			return nil
+		}
+
+		mockDownloadResult := download.DownloadResult{
+			ArtifactPath:     "mockArtifactPath",
+			ArtifactHashPath: "mockArtifactHashPath",
+		}
+		mockArtifactDownloader.dowloadArtifactTestFunc = func(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, fleetServerURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (download.DownloadResult, error) {
+			require.Equal(t, testValues.parsedVersion, parsedVersion)
+			require.Equal(t, testValues.sourceURI, sourceURI)
+			require.Equal(t, testValues.fleetServerURI, fleetServerURI)
+			require.Equal(t, testValues.upgradeDetails, upgradeDetails)
+			require.Equal(t, testValues.skipVerifyOverride, skipVerifyOverride)
+			require.Equal(t, testValues.skipDefaultPgp, skipDefaultPgp)
+			require.Equal(t, testValues.pgpBytes, pgpBytes)
+			return mockDownloadResult, nil
+		}
+
+		cleanerCallCount := 0
+		mockUpgradeCleaner.setupArchiveCleanupTestFunc = func(downloadResult download.DownloadResult) error {
+			cleanerCallCount++
+			require.Equal(t, mockDownloadResult, downloadResult)
+			return errors.New("test cleanup error")
+		}
+
+		downloadResult, err := upgradeExecutor.downloadArtifact(ctx, testValues.parsedVersion, testValues.agentInfo, testValues.sourceURI, testValues.fleetServerURI, testValues.upgradeDetails, testValues.skipVerifyOverride, testValues.skipDefaultPgp, testValues.pgpBytes...)
+		require.Error(t, err)
+		require.ErrorIs(t, err, errors.New("test cleanup error"))
+		require.Equal(t, mockDownloadResult, downloadResult)
+		require.Equal(t, 1, nonMatchingCallCount)
+		require.Equal(t, 1, cleanerCallCount)
+	})
 }
