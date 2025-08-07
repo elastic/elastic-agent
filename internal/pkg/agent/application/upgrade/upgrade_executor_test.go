@@ -24,25 +24,14 @@ func TestDownloadArtifactStep(t *testing.T) {
 	ctx := t.Context()
 	parsedVersion, err := agtversion.ParseVersion("9.1.0")
 	require.NoError(t, err)
-	testValues := struct {
-		parsedVersion      *agtversion.ParsedSemVer
-		agentInfo          *info.AgentInfo
-		sourceURI          string
-		fleetServerURI     string
-		upgradeDetails     *details.Details
-		skipVerifyOverride bool
-		skipDefaultPgp     bool
-		pgpBytes           []string
-	}{
-		parsedVersion:      parsedVersion,
-		agentInfo:          &info.AgentInfo{},
-		sourceURI:          "mockURI",
-		fleetServerURI:     "mockFleetServerURI",
-		upgradeDetails:     &details.Details{},
-		skipVerifyOverride: false,
-		skipDefaultPgp:     false,
-		pgpBytes:           []string{"mockPGPBytes"},
-	}
+
+	agentInfo := &info.AgentInfo{}
+	sourceURI := "mockURI"
+	fleetServerURI := "mockFleetServerURI"
+	upgradeDetails := &details.Details{}
+	skipVerifyOverride := false
+	skipDefaultPgp := false
+	pgpBytes := []string{"mockPGPBytes"}
 
 	testCases := map[string]downloadStepTestCase{
 		"should download artifact and setup archive cleanup": {
@@ -100,22 +89,22 @@ func TestDownloadArtifactStep(t *testing.T) {
 				ArtifactHashPath: "mockArtifactHashPath",
 			}
 
-			pgpBytesConverted := make([]interface{}, len(testValues.pgpBytes))
-			for i, v := range testValues.pgpBytes {
+			pgpBytesConverted := make([]interface{}, len(pgpBytes))
+			for i, v := range pgpBytes {
 				pgpBytesConverted[i] = v
 			}
 
 			for _, err := range tc.cleanNonMatchingVersionsFromDownloadsErrors {
-				mockArtifactDownloader.EXPECT().cleanNonMatchingVersionsFromDownloads(log, testValues.agentInfo.Version()).Return(err).Once()
+				mockArtifactDownloader.EXPECT().cleanNonMatchingVersionsFromDownloads(log, agentInfo.Version()).Return(err).Once()
 			}
 			mockArtifactDownloader.EXPECT().downloadArtifact(
 				ctx,
-				testValues.parsedVersion,
-				testValues.sourceURI,
-				testValues.fleetServerURI,
-				testValues.upgradeDetails,
-				testValues.skipVerifyOverride,
-				testValues.skipDefaultPgp,
+				parsedVersion,
+				sourceURI,
+				fleetServerURI,
+				upgradeDetails,
+				skipVerifyOverride,
+				skipDefaultPgp,
 				pgpBytesConverted...,
 			).Return(mockDownloadResult, tc.downloadArtifactError)
 
@@ -123,10 +112,12 @@ func TestDownloadArtifactStep(t *testing.T) {
 				mockUpgradeCleaner.EXPECT().setupArchiveCleanup(mockDownloadResult).Return(tc.setupArchiveCleanupError)
 			}
 
-			downloadResult, err := upgradeExecutor.downloadArtifact(ctx, testValues.parsedVersion, testValues.agentInfo, testValues.sourceURI, testValues.fleetServerURI, testValues.upgradeDetails, testValues.skipVerifyOverride, testValues.skipDefaultPgp, testValues.pgpBytes...)
+			downloadResult, err := upgradeExecutor.downloadArtifact(ctx, parsedVersion, agentInfo, sourceURI, fleetServerURI, upgradeDetails, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 
 			mockArtifactDownloader.AssertExpectations(t)
 			mockUpgradeCleaner.AssertExpectations(t)
+
+			require.Equal(t, details.StateDownloading, upgradeDetails.State)
 
 			if !tc.setupArchiveCleanupCalled {
 				mockUpgradeCleaner.AssertNotCalled(t, "setupArchiveCleanup")
