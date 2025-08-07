@@ -14,8 +14,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/sha512"
-	"debug/buildinfo"
-	"debug/elf"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
