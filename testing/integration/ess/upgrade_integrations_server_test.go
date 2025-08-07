@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 	"testing"
 	"time"
@@ -136,19 +137,10 @@ func filterVersionsForECH(t *testing.T, versions []*version.ParsedSemVer, echPro
 
 	filteredVersions := make([]*version.ParsedSemVer, 0)
 	for _, ver := range versions {
-		if isVersionInList(ver, echVersions) {
+		if slices.Contains(echVersions, ver) {
 			filteredVersions = append(filteredVersions, ver)
 		}
 	}
 
 	return filteredVersions
-}
-
-func isVersionInList(candidateVersion *version.ParsedSemVer, allowedVersions []*version.ParsedSemVer) bool {
-	for _, allowedVersion := range allowedVersions {
-		if allowedVersion.Equal(*candidateVersion) {
-			return true
-		}
-	}
-	return false
 }
