@@ -259,12 +259,10 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	defer func() {
-		if err != nil {
-			cleanupErr := u.upgradeCleaner.cleanup(err)
-			if cleanupErr != nil {
-				u.log.Errorf("Error cleaning up after upgrade: %w", cleanupErr)
-				err = goerrors.Join(err, cleanupErr)
-			}
+		cleanupErr := u.upgradeCleaner.cleanup(err)
+		if cleanupErr != nil {
+			u.log.Errorf("Error cleaning up after upgrade: %w", cleanupErr)
+			err = goerrors.Join(err, cleanupErr)
 		}
 	}()
 
