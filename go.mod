@@ -14,7 +14,7 @@ require (
 	github.com/docker/docker v28.2.2+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250807160352-8df1efe87f1c
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250808152328-d24319456ec0
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.10.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
@@ -31,7 +31,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.5.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.16.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.9.0
-	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.1.1
+	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.2.0
 	github.com/fatih/color v1.18.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-viper/mapstructure/v2 v2.3.0
@@ -575,7 +575,7 @@ require (
 	github.com/prometheus/exporter-toolkit v0.14.0 // indirect
 	github.com/prometheus/otlptranslator v0.0.0-20250620074007-94f535e0c588 // indirect
 	github.com/prometheus/procfs v0.17.0 // indirect
-	github.com/prometheus/prometheus v0.304.3-0.20250703114031-419d436a447a // indirect
+	github.com/prometheus/prometheus v0.305.0 // indirect
 	github.com/prometheus/sigv4 v0.2.0 // indirect
 	github.com/puzpuzpuz/xsync/v3 v3.5.1 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
