@@ -3,12 +3,16 @@ package upgrade
 import (
 	"errors"
 	"fmt"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
@@ -680,6 +684,116 @@ func TestReplaceOldWithNewStep(t *testing.T) {
 			}
 
 			require.NoError(t, err, "expected no error, got %v", err)
+		})
+	}
+}
+
+type watchNewAgentTestCase struct {
+	markUpgradeError    error
+	invokeWatcherError  error
+	waitForWatcherError error
+	calledFuncs         []string
+	uncalledFuncs       []string
+	expectedError       error
+}
+
+func TestWatchNewAgentStep(t *testing.T) {
+	log, _ := loggertest.New("test")
+	ctx := t.Context()
+
+	markerFilePath := "mockMarkerFilePath"
+	topPath := "mockTopPath"
+	dataPath := "mockDataPath"
+	watcherExecutable := "mockWatcherExecutable"
+	waitTime := time.Second * 10
+
+	var createTimeoutContext createContextWithTimeout
+
+	newAgentInstall := agentInstall{
+		versionedHome: "mockNewVersionedHome",
+		hash:          "mockNewHash",
+	}
+	previousAgentInstall := agentInstall{
+		versionedHome: "mockPreviousVersionedHome",
+		hash:          "mockPreviousHash",
+	}
+	action := &fleetapi.ActionUpgrade{}
+	upgradeDetails := &details.Details{}
+	upgradeOutcome := OUTCOME_UPGRADE
+	watcherCmd := &exec.Cmd{}
+	watcherCmd.Process = &os.Process{}
+
+	testCases := map[string]watchNewAgentTestCase{
+		"should mark upgrade and invoke watcher": {
+			markUpgradeError:    nil,
+			invokeWatcherError:  nil,
+			waitForWatcherError: nil,
+			calledFuncs:         []string{"markUpgrade", "selectWatcherExecutable", "invokeWatcher", "waitForWatcher"},
+			uncalledFuncs:       []string{},
+			expectedError:       nil,
+		},
+		"should return error if marking upgrade fails": {
+			markUpgradeError:    errors.New("test error"),
+			invokeWatcherError:  nil,
+			waitForWatcherError: nil,
+			calledFuncs:         []string{"markUpgrade"},
+			uncalledFuncs:       []string{"selectWatcherExecutable", "invokeWatcher", "waitForWatcher"},
+			expectedError:       errors.New("test error"),
+		},
+		"should return error if invoking watcher fails": {
+			markUpgradeError:    nil,
+			invokeWatcherError:  errors.New("test error"),
+			waitForWatcherError: nil,
+			calledFuncs:         []string{"markUpgrade", "selectWatcherExecutable", "invokeWatcher"},
+			uncalledFuncs:       []string{"waitForWatcher"},
+			expectedError:       errors.New("test error"),
+		},
+		"if waiting for watcher fails, should kill watcher process and return combined error": {
+			markUpgradeError:    nil,
+			invokeWatcherError:  nil,
+			waitForWatcherError: errors.New("test error"),
+			calledFuncs:         []string{"markUpgrade", "selectWatcherExecutable", "invokeWatcher", "waitForWatcher"},
+			uncalledFuncs:       []string{},
+			expectedError:       errors.Join(errors.New("test error"), errors.New("os: process not initialized")),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			mockWatcher := &mock_watcher{}
+
+			upgradeExecutor := &executeUpgrade{
+				log:     log,
+				watcher: mockWatcher,
+			}
+
+			for _, calledFunc := range tc.calledFuncs {
+				switch calledFunc {
+				case "markUpgrade":
+					mockWatcher.EXPECT().markUpgrade(log, dataPath, newAgentInstall, previousAgentInstall, action, upgradeDetails, upgradeOutcome).Return(tc.markUpgradeError)
+				case "selectWatcherExecutable":
+					mockWatcher.EXPECT().selectWatcherExecutable(topPath, previousAgentInstall, newAgentInstall).Return(watcherExecutable)
+				case "invokeWatcher":
+					mockWatcher.EXPECT().invokeWatcher(log, watcherExecutable).Return(watcherCmd, tc.invokeWatcherError)
+				case "waitForWatcher":
+					mockWatcher.EXPECT().waitForWatcher(ctx, log, markerFilePath, waitTime, mock.AnythingOfType("upgrade.createContextWithTimeout")).Return(tc.waitForWatcherError)
+				}
+			}
+
+			err := upgradeExecutor.watchNewAgent(ctx, markerFilePath, topPath, dataPath, waitTime, createTimeoutContext, newAgentInstall, previousAgentInstall, action, upgradeDetails, upgradeOutcome)
+
+			mockWatcher.AssertExpectations(t)
+			for _, uncalledFunc := range tc.uncalledFuncs {
+				mockWatcher.AssertNotCalled(t, uncalledFunc, "expected %v to not be called", uncalledFunc)
+			}
+
+			if tc.expectedError != nil {
+				require.Equal(t, tc.expectedError.Error(), err.Error(), "expected error to be %v, got %v", tc.expectedError, err)
+				return
+			}
+
+			require.NoError(t, err)
+
 		})
 	}
 }
