@@ -445,7 +445,6 @@ func TestUnpackArtifactStep(t *testing.T) {
 				return tc.checkUpgradeError
 			}
 
-			func() {
 				for _, calledFunc := range tc.calledUnpackerFuncs {
 					switch calledFunc {
 					case "getPackageMetadata":
@@ -458,7 +457,7 @@ func TestUnpackArtifactStep(t *testing.T) {
 						mockUnpacker.EXPECT().unpack(version, downloadResult.ArtifactPath, dataPath, detectedFlavor).Return(tc.unpackResult, tc.unpackError)
 					}
 				}
-			}()
+
 			if tc.cleanerCalled {
 				mockUpgradeCleaner.EXPECT().setupUnpackCleanup(newHome, currentHome).Return(tc.setupUnpackCleanupError)
 			}
