@@ -1,0 +1,26 @@
+// begin 9.1.1 relnotes
+
+[[release-notes-9.1.1]]
+==  9.1.1
+
+Review important information about the  9.1.1 release.
+
+[discrete]
+[[new-features-9.1.1]]
+=== New features
+
+The 9.1.1 release adds the following new and notable features.
+
+elastic-agent::
+
+* Add K8s Leader Elector Otel Extension. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9065[#https://github.com/elastic/elastic-agent/pull/9065]
+
+[discrete]
+[[bug-fixes-9.1.1]]
+=== Bug fixes
+
+elastic-agent::
+
+* Do not Overwrite Elasticsearch Output Headers From Enrollment --Headers Flag. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9199[#https://github.com/elastic/elastic-agent/pull/9199] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/9197[#https://github.com/elastic/elastic-agent/issues/9197]
+
+// end 9.1.1 relnotes
