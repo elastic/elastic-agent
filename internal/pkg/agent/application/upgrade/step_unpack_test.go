@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
@@ -223,6 +224,7 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 		wantErr    assert.ErrorAssertionFunc
 		checkFiles checkExtractedPath
 		flavor     string
+		copyFunc   func(dst io.Writer, src io.Reader) (int64, error)
 	}{
 		{
 			name: "file before containing folder",
@@ -258,6 +260,24 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 			},
 			wantErr:    assert.NoError,
 			checkFiles: checkExtractedFilesWithManifest,
+		},
+		{
+			name: "when copying files fails, it should return error",
+			args: args{
+				version:      "1.2.3",
+				archiveFiles: append(archiveFilesWithManifestNoSymlink, agentArchiveSymLink),
+				archiveGenerator: func(t *testing.T, i []files) (string, error) {
+					return createTarArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.tar.gz", i)
+				},
+			},
+			want: unpackResult{
+				Hash:          "abcdef",
+				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
+			},
+			wantErr: assert.Error,
+			copyFunc: func(dst io.Writer, src io.Reader) (int64, error) {
+				return 0, errors.New("test copy error")
+			},
 		},
 		{
 			name: "package with basic flavor",
@@ -313,6 +333,15 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.copyFunc != nil {
+				tmpCopyFunc := unpackArchiveCopyFunc
+				unpackArchiveCopyFunc = tt.copyFunc
+
+				t.Cleanup(func() {
+					unpackArchiveCopyFunc = tmpCopyFunc
+				})
+			}
+
 			testTop := t.TempDir()
 			testDataDir := filepath.Join(testTop, "data")
 			err := os.MkdirAll(testDataDir, 0o777)
@@ -352,6 +381,7 @@ func TestUpgrader_unpackZip(t *testing.T) {
 		wantErr    assert.ErrorAssertionFunc
 		checkFiles checkExtractedPath
 		flavor     string
+		copyFunc   func(dst io.Writer, src io.Reader) (int64, error)
 	}{
 		{
 			name: "file before containing folder",
@@ -386,7 +416,23 @@ func TestUpgrader_unpackZip(t *testing.T) {
 			wantErr:    assert.NoError,
 			checkFiles: checkExtractedFilesWithManifest,
 		},
-
+		{
+			name: "when copying files fails, it should return error",
+			args: args{
+				archiveFiles: archiveFilesWithManifestNoSymlink,
+				archiveGenerator: func(t *testing.T, i []files) (string, error) {
+					return createZipArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.zip", i)
+				},
+			},
+			want: unpackResult{
+				Hash:          "abcdef",
+				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
+			},
+			wantErr: assert.Error,
+			copyFunc: func(dst io.Writer, src io.Reader) (int64, error) {
+				return 0, errors.New("test copy error")
+			},
+		},
 		{
 			name: "package with basic flavor",
 			args: args{
@@ -439,6 +485,14 @@ func TestUpgrader_unpackZip(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.copyFunc != nil {
+				tmpCopyFunc := unpackArchiveCopyFunc
+				unpackArchiveCopyFunc = tt.copyFunc
+
+				t.Cleanup(func() {
+					unpackArchiveCopyFunc = tmpCopyFunc
+				})
+			}
 
 			testTop := t.TempDir()
 			testDataDir := filepath.Join(testTop, "data")
