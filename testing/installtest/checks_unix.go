@@ -20,6 +20,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install/usermgmt"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 )
 
@@ -30,7 +31,7 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opt
 		if opts.Username != "" {
 			username = opts.Username
 		}
-		uid, err := install.FindUID(username)
+		uid, err := usermgmt.FindUID(username)
 		if err != nil {
 			return fmt.Errorf("failed to find %s user: %w", username, err)
 		}
@@ -39,7 +40,7 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opt
 		if opts.Username != "" {
 			group = opts.Group
 		}
-		gid, err := install.FindGID(group)
+		gid, err := usermgmt.FindGID(group)
 		if err != nil {
 			return fmt.Errorf("failed to find %s group: %w", group, err)
 		}

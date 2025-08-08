@@ -360,6 +360,15 @@ func (c *commandRuntime) start(comm Communicator) error {
 		// already running
 		return nil
 	}
+
+	// pre run hook
+	if c.current.InputSpec != nil {
+		c.log.Debugf("running PreRun hooks for %q", c.current.ID)
+		if err := c.current.InputSpec.Spec.Hooks.ExecuteHooks(component.HookPreRun, c.log); err != nil {
+			return fmt.Errorf("failed during pre-run hook execution for %q: %w", c.current.ID, err)
+		}
+	}
+
 	cmdSpec := c.getCommandSpec()
 	env := make([]string, 0, len(cmdSpec.Env)+2)
 	for _, e := range cmdSpec.Env {

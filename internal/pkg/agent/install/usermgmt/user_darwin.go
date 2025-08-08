@@ -4,7 +4,7 @@
 
 //go:build darwin
 
-package install
+package usermgmt
 
 import (
 	"bufio"

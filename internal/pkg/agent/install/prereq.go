@@ -10,6 +10,7 @@ import (
 
 	"github.com/schollz/progressbar/v3"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install/usermgmt"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -20,13 +21,13 @@ func EnsureUserAndGroup(username string, groupName string, pt *progressbar.Progr
 	var ownership utils.FileOwner
 
 	// ensure required group
-	ownership.GID, err = FindGID(groupName)
-	if err != nil && !errors.Is(err, ErrGroupNotFound) {
+	ownership.GID, err = usermgmt.FindGID(groupName)
+	if err != nil && !errors.Is(err, usermgmt.ErrGroupNotFound) {
 		return utils.FileOwner{}, fmt.Errorf("failed finding group %s: %w", groupName, err)
 	}
-	if forceCreate && errors.Is(err, ErrGroupNotFound) {
+	if forceCreate && errors.Is(err, usermgmt.ErrGroupNotFound) {
 		pt.Describe(fmt.Sprintf("Creating group %s", groupName))
-		ownership.GID, err = CreateGroup(groupName)
+		ownership.GID, err = usermgmt.CreateGroup(groupName)
 		if err != nil {
 			pt.Describe(fmt.Sprintf("Failed to create group %s", groupName))
 			return utils.FileOwner{}, fmt.Errorf("failed to create group %s: %w", groupName, err)
@@ -35,18 +36,18 @@ func EnsureUserAndGroup(username string, groupName string, pt *progressbar.Progr
 	}
 
 	// ensure required user
-	ownership.UID, err = FindUID(username)
-	if err != nil && !errors.Is(err, ErrUserNotFound) {
+	ownership.UID, err = usermgmt.FindUID(username)
+	if err != nil && !errors.Is(err, usermgmt.ErrUserNotFound) {
 		return utils.FileOwner{}, fmt.Errorf("failed finding username %s: %w", username, err)
 	}
-	if forceCreate && errors.Is(err, ErrUserNotFound) {
+	if forceCreate && errors.Is(err, usermgmt.ErrUserNotFound) {
 		pt.Describe(fmt.Sprintf("Creating user %s", username))
-		ownership.UID, err = CreateUser(username, ownership.GID)
+		ownership.UID, err = usermgmt.CreateUser(username, ownership.GID)
 		if err != nil {
 			pt.Describe(fmt.Sprintf("Failed to create user %s", username))
 			return utils.FileOwner{}, fmt.Errorf("failed to create user %s: %w", username, err)
 		}
-		err = AddUserToGroup(username, groupName)
+		err = usermgmt.AddUserToGroup(username, groupName)
 		if err != nil {
 			pt.Describe(fmt.Sprintf("Failed to add user %s to group %s", username, groupName))
 			return utils.FileOwner{}, fmt.Errorf("failed to add user %s to group %s: %w", username, groupName, err)
@@ -54,7 +55,7 @@ func EnsureUserAndGroup(username string, groupName string, pt *progressbar.Progr
 		pt.Describe(fmt.Sprintf("Successfully created user %s", username))
 	}
 
-	if err := EnsureRights(username); err != nil {
+	if err := usermgmt.EnsureRights(username); err != nil {
 		pt.Describe(fmt.Sprintf("Failed to assign rights to user %s", username))
 		return utils.FileOwner{}, fmt.Errorf("failed to set proper rights to user %s: %w", username, err)
 	}
