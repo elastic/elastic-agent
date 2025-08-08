@@ -27,6 +27,8 @@ import (
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
+var unpackArchiveCopyFunc = io.Copy
+
 // UnpackResult contains the location and hash of the unpacked agent files
 type unpackResult struct {
 	// Hash contains the unpacked agent commit hash, limited to a length of 6 for backward compatibility
@@ -188,7 +190,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (unpa
 			}()
 
 			//nolint:gosec // legacy
-			if _, err = io.Copy(f, rc); err != nil {
+			if _, err = unpackArchiveCopyFunc(f, rc); err != nil {
 				return err
 			}
 		}
@@ -437,7 +439,7 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (unpa
 			}
 
 			//nolint:gosec // legacy
-			_, err = io.Copy(wf, tr)
+			_, err = unpackArchiveCopyFunc(wf, tr)
 			if closeErr := wf.Close(); closeErr != nil && err == nil {
 				err = closeErr
 			}
