@@ -7,6 +7,7 @@ package upgrade
 import (
 	"context"
 	"crypto/tls"
+	goerrors "errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
@@ -42,7 +44,9 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	version "github.com/elastic/elastic-agent/pkg/version"
 	mockinfo "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/info"
+	currentagtversion "github.com/elastic/elastic-agent/version"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
@@ -1041,7 +1045,245 @@ type testError struct {
 	expectedError error
 }
 
-func TestUpgradeDownloadErrors(t *testing.T) {
+type upgradeTestCase struct {
+	targetVersion          string
+	parsedTargetVersion    *agtversion.ParsedSemVer
+	downloadError          error
+	unpackError            error
+	replaceOldWithNewError error
+	watchNewAgentError     error
+	cleanupError           error
+	cleanupCalledWith      error
+	expectedError          error
+	expectCallback         bool
+	calledFuncs            []string
+	uncalledFuncs          []string
+}
+
+func TestUpgrade(t *testing.T) {
+	ctx := t.Context()
+	log, _ := loggertest.New("test")
+
+	defaultTargetVersion := "1.0.0"
+	defaultParsedTargetVersion, err := agtversion.ParseVersion(defaultTargetVersion)
+	require.NoError(t, err)
+
+	currentReleaseVersion := release.VersionWithSnapshot()
+	parsedCurrentReleaseVersion, err := agtversion.ParseVersion(currentReleaseVersion)
+	require.NoError(t, err)
+
+	invalidTargetVersion := "invalidTargetVersion"
+
+	sourceURI := "mockUri"
+	action := &fleetapi.ActionUpgrade{}
+	details := &details.Details{}
+	skipVerify := false
+	skipDefaultPgp := false
+	pgpBytes := []string{"mockPGPBytes"}
+	pgpBytesConverted := make([]interface{}, len(pgpBytes))
+	for i, v := range pgpBytes {
+		pgpBytesConverted[i] = v
+	}
+	agentInfo := &info.AgentInfo{}
+
+	topPath := t.TempDir()
+	paths.SetTop(topPath)
+
+	markerFilePath := markerFilePath(paths.Data())
+	currentVersionedHome, err := filepath.Rel(topPath, paths.Home())
+	require.NoError(t, err)
+	symlinkPath := filepath.Join(topPath, agentName)
+
+	downloadResult := download.DownloadResult{
+		ArtifactPath:     "mockArtifactPath",
+		ArtifactHashPath: "mockArtifactHashPath",
+	}
+
+	unpackStepResult := unpackStepResult{
+		newHome: "mockNewHome",
+		unpackResult: unpackResult{
+			VersionedHome: "mockVersionedHome",
+			Hash:          "mockHash",
+		},
+	}
+
+	newRunPath := filepath.Join(unpackStepResult.newHome, "run")
+
+	newBinaryPath := paths.BinaryPath(filepath.Join(topPath, unpackStepResult.VersionedHome), agentName)
+
+	currentVersion := agentVersion{
+		version:  release.Version(),
+		snapshot: release.Snapshot(),
+		hash:     release.Commit(),
+		fips:     release.FIPSDistribution(),
+	}
+
+	defaultCleanupError := errors.New("test cleanup error")
+
+	previousAgentInstall := agentInstall{
+		parsedVersion: currentagtversion.GetParsedAgentPackageVersion(),
+		version:       release.VersionWithSnapshot(),
+		hash:          release.Commit(),
+		versionedHome: currentVersionedHome,
+	}
+
+	testCases := map[string]upgradeTestCase{
+		"should download artifact, unpack it, replace the old agent and watch the new agent": {
+			targetVersion:          defaultTargetVersion,
+			parsedTargetVersion:    defaultParsedTargetVersion,
+			downloadError:          nil,
+			unpackError:            nil,
+			replaceOldWithNewError: nil,
+			watchNewAgentError:     nil,
+			cleanupError:           nil,
+			cleanupCalledWith:      nil,
+			expectCallback:         true,
+			calledFuncs:            []string{"downloadArtifact", "unpackArtifact", "replaceOldWithNew", "watchNewAgent"},
+			uncalledFuncs:          []string{},
+		},
+		"if the target version is the same release version, it should return error": {
+			targetVersion:          currentReleaseVersion,
+			parsedTargetVersion:    parsedCurrentReleaseVersion,
+			downloadError:          nil,
+			unpackError:            nil,
+			replaceOldWithNewError: nil,
+			watchNewAgentError:     nil,
+			cleanupError:           defaultCleanupError,
+			cleanupCalledWith:      ErrUpgradeSameVersion,
+			expectCallback:         false,
+			calledFuncs:            []string{},
+			uncalledFuncs:          []string{"downloadArtifact", "unpackArtifact", "replaceOldWithNew", "watchNewAgent"},
+			expectedError:          goerrors.Join(ErrUpgradeSameVersion, defaultCleanupError),
+		},
+		"if the target version cannot be parsed, it should return error": {
+			targetVersion:          invalidTargetVersion,
+			parsedTargetVersion:    nil,
+			downloadError:          nil,
+			unpackError:            nil,
+			replaceOldWithNewError: nil,
+			watchNewAgentError:     nil,
+			cleanupError:           defaultCleanupError,
+			cleanupCalledWith:      fmt.Errorf("error parsing version %q: %w", "invalidTargetVersion", version.ErrNoMatch),
+			expectCallback:         false,
+			calledFuncs:            []string{},
+			uncalledFuncs:          []string{"downloadArtifact", "unpackArtifact", "replaceOldWithNew", "watchNewAgent"},
+			expectedError:          goerrors.Join(fmt.Errorf("error parsing version %q: %w", "invalidTargetVersion", version.ErrNoMatch), defaultCleanupError),
+		},
+		"if the download fails, it should return error": {
+			targetVersion:          defaultTargetVersion,
+			parsedTargetVersion:    defaultParsedTargetVersion,
+			downloadError:          errors.New("test download error"),
+			unpackError:            nil,
+			replaceOldWithNewError: nil,
+			watchNewAgentError:     nil,
+			cleanupError:           defaultCleanupError,
+			cleanupCalledWith:      errors.New("test download error"),
+			expectCallback:         false,
+			calledFuncs:            []string{"downloadArtifact"},
+			uncalledFuncs:          []string{"unpackArtifact", "replaceOldWithNew", "watchNewAgent"},
+			expectedError:          goerrors.Join(errors.New("test download error"), defaultCleanupError),
+		},
+		"if the unpack fails, it should return error": {
+			targetVersion:          defaultTargetVersion,
+			parsedTargetVersion:    defaultParsedTargetVersion,
+			downloadError:          nil,
+			unpackError:            errors.New("test unpack error"),
+			replaceOldWithNewError: nil,
+			watchNewAgentError:     nil,
+			cleanupError:           defaultCleanupError,
+			cleanupCalledWith:      errors.New("test unpack error"),
+			expectCallback:         false,
+			calledFuncs:            []string{"downloadArtifact", "unpackArtifact"},
+			uncalledFuncs:          []string{"replaceOldWithNew", "watchNewAgent"},
+			expectedError:          goerrors.Join(errors.New("test unpack error"), defaultCleanupError),
+		},
+		"if the replace old with new fails, it should return error": {
+			targetVersion:          defaultTargetVersion,
+			parsedTargetVersion:    defaultParsedTargetVersion,
+			downloadError:          nil,
+			unpackError:            nil,
+			replaceOldWithNewError: errors.New("test replace old with new error"),
+			watchNewAgentError:     nil,
+			cleanupError:           defaultCleanupError,
+			cleanupCalledWith:      errors.New("test replace old with new error"),
+			expectCallback:         false,
+			calledFuncs:            []string{"downloadArtifact", "unpackArtifact", "replaceOldWithNew"},
+			uncalledFuncs:          []string{"watchNewAgent"},
+			expectedError:          goerrors.Join(errors.New("test replace old with new error"), defaultCleanupError),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			newAgentInstall := agentInstall{
+				parsedVersion: tc.parsedTargetVersion,
+				version:       tc.targetVersion,
+				hash:          unpackStepResult.Hash,
+				versionedHome: unpackStepResult.VersionedHome,
+			}
+
+			downloadsPath := t.TempDir()
+			paths.SetDownloads(downloadsPath)
+
+			mockCleaner := &mock_upgradeCleaner{}
+			mockExecutor := &mock_upgradeExecutor{}
+
+			upgrader := &Upgrader{
+				log:             log,
+				agentInfo:       agentInfo,
+				markerWatcher:   newMarkerFileWatcher(markerFilePath, log),
+				upgradeCleaner:  mockCleaner,
+				upgradeExecutor: mockExecutor,
+			}
+
+			for _, funcName := range tc.calledFuncs {
+				switch funcName {
+				case "downloadArtifact":
+					mockExecutor.EXPECT().downloadArtifact(ctx, tc.parsedTargetVersion, agentInfo, sourceURI, "", details, skipVerify, skipDefaultPgp, pgpBytesConverted...).Return(downloadResult, tc.downloadError)
+
+				case "unpackArtifact":
+					mockExecutor.EXPECT().unpackArtifact(downloadResult, tc.targetVersion, downloadResult.ArtifactPath, topPath, "", paths.Data(), paths.Home(), details, currentVersion, mock.AnythingOfType("checkUpgradeFn")).Return(unpackStepResult, tc.unpackError)
+
+				case "replaceOldWithNew":
+					mockExecutor.EXPECT().replaceOldWithNew(unpackStepResult, currentVersionedHome, topPath, agentName, paths.Home(), paths.Run(), newRunPath, symlinkPath, newBinaryPath, details).Return(tc.replaceOldWithNewError)
+
+				case "watchNewAgent":
+					mockExecutor.EXPECT().watchNewAgent(ctx, markerFilePath, topPath, paths.Data(), watcherMaxWaitTime, mock.AnythingOfType("createContextWithTimeout"), newAgentInstall, previousAgentInstall, action, details, OUTCOME_UPGRADE).Return(tc.watchNewAgentError)
+				}
+			}
+
+			mockCleaner.EXPECT().cleanup(tc.cleanupCalledWith).Return(tc.cleanupError)
+
+			cb, err := upgrader.Upgrade(ctx, tc.targetVersion, sourceURI, action, details, skipVerify, skipDefaultPgp, pgpBytes...)
+
+			if len(tc.calledFuncs) > 0 {
+				mockExecutor.AssertExpectations(t)
+			}
+
+			for _, funcName := range tc.uncalledFuncs {
+				mockExecutor.AssertNotCalled(t, funcName, "expected %v to not be called", funcName)
+			}
+
+			mockCleaner.AssertExpectations(t)
+
+			if tc.expectCallback {
+				require.NotNil(t, cb)
+			} else {
+				require.Nil(t, cb)
+			}
+
+			if tc.expectedError != nil {
+				require.Equal(t, tc.expectedError.Error(), err.Error(), "expected error to be %v, got %v", tc.expectedError, err)
+				return
+			}
+
+			require.NoError(t, err, "expected no error, got %v", err)
+
+		})
+	}
+}
+
+func TesE2EtUpgradeDownloadErrors(t *testing.T) {
 	testArtifact := artifact.Artifact{
 		Name:     "Elastic Agent",
 		Cmd:      "elastic-agent",

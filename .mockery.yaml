@@ -49,4 +49,5 @@ packages:
       watcher:
       agentDirectoryCopier:
       upgradeCleaner:
+      upgradeExecutor:
 
