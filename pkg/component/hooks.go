@@ -202,10 +202,10 @@ func (hd *HookDefinition) fixPermissions() error {
 	//			   target_os: [windows]
 	//             user: root
 	//             group: root
-	//             # windows specific
-	//             inherit_permissions: false
 	//             fail_on_path_not_exist: false
 	//             mask: 0770 # default 0770 if not specified
+	//             # windows specific
+	//             inherit_permissions: false
 
 	targetOs, _ := hd.GetStringSliceArg("target_os")
 	shouldRun := len(targetOs) == 0 // no target specified means all

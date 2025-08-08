@@ -21,6 +21,8 @@ func FixPermissions(path string, inheritPermissions bool, username string, group
 	//			   target_os: [windows]
 	//             user: root
 	//             group: root
+	//             fail_on_path_not_exist: false
+	//             mask: 0770 # default 0770 if not specified
 	//             # windows specific
 	//             inherit_permissions: false
 
