@@ -356,7 +356,7 @@ func (u *Upgrader) newUpgrade(ctx context.Context, version string, sourceURI str
 		versionedHome: currentVersionedHome,
 	}
 
-	err = u.upgradeExecutor.watchNewAgent(ctx, u.log, markerFilePath(paths.Data()), paths.Top(), paths.Data(), watcherMaxWaitTime, context.WithTimeout, current, previous, action, det, OUTCOME_UPGRADE)
+	err = u.upgradeExecutor.watchNewAgent(ctx, markerFilePath(paths.Data()), paths.Top(), paths.Data(), watcherMaxWaitTime, context.WithTimeout, current, previous, action, det, OUTCOME_UPGRADE)
 	if err != nil {
 		return nil, err
 	}
