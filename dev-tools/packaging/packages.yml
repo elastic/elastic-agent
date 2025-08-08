@@ -1,9 +1,155 @@
 ---
 
-# This file contains the package specifications for both Community Beats and
-# Official Beats. The shared section contains YAML anchors that are used to
-# define common parts of the package in order to not repeat ourselves.
+# This file contains the package specifications for Elastic Agent
 
+# List all the available platforms
+platforms: &all-platforms
+  - &linux-amd64
+    os: linux
+    arch: x86_64
+  - &linux-arm64
+    os: linux
+    arch: arm64
+  - &windows-amd64
+    os: windows
+    arch: x86_64
+  - &darwin-amd64
+    os: darwin
+    arch: x86_64
+  - &darwin-arm64
+    os: darwin
+    arch: aarch64
+
+# List all the package type constants (see dev-tools/mage/pkgcommon/pkgcommon-types.go)
+packageTypes: &all-package-types
+  - &pkg-type-rpm
+      1 # RPM
+  - &pkg-type-deb
+      2 # Deb
+  - &pkg-type-zip
+      3 # zip
+  - &pkg-type-targz
+      4 # tar.gz
+  - &pkg-type-docker
+      5 # docker
+
+# Settings section contains general compiling and packaging settings
+#settings:
+
+# List *all* the components available for packaging in elastic-agent
+components:
+  # general template for new components (all attributes are mandatory)
+  #  - &comp-<anchor name>
+  #    projectName: <project name under manifest>
+  #    packageName: <template representing the name of the archive to download/extract>
+  #    binaryName: <binary name>
+  #    rootDir: <template representing directory from the archive root where the binary is located>
+  #    platforms:
+  #      - <platform, use anchors for platforms above>
+  #    pythonWheel: true # true if it's a package that is not platform specific
+  #    packageTypes: *all-package-types # package types it should be included in
+  - &comp-agentbeat
+    projectName: beats
+    packageName: agentbeat-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: agentbeat-{{.Version}}-{{.Platform}}
+    binaryName: agentbeat
+    platforms: *all-platforms
+    packageTypes: *all-package-types
+  - &comp-apm_server
+    projectName: apm-server
+    packageName: apm-server-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: apm-server-{{.Version}}-{{.Platform}}
+    binaryName: apm-server
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+      - *windows-amd64
+      - *darwin-amd64
+    packageTypes: *all-package-types
+  - &comp-cloudbeat
+    projectName: cloudbeat
+    packageName: cloudbeat-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: cloudbeat-{{.Version}}-{{.Platform}}
+    binaryName: cloudbeat
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+  - &comp-cloud-defend
+    projectName: cloud-defend
+    packageName: cloud-defend-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: cloud-defend-{{.Version}}-{{.Arch}}
+    binaryName: cloud-defend
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes:
+      - *pkg-type-docker
+  - &comp-connectors
+    projectName: connectors
+    packageName: connectors-{{.Version}}.zip
+    # FIXME: connectors use only <major>.<minor>.<patch> in the root directory name so the definition should be something
+    # using the beat_version or similar
+    # We don't support that yet, so we are defining a rootDir that will error out if rendered. This is not a problem since
+    # we don't extract/manipulate the archive during packaging, it has its own special handling in the 'service' docker image
+    rootDir: elasticsearch_connectors-{{beat_version}}
+    binaryName: connectors
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    pythonWheel: true
+    packageTypes: *all-package-types
+  - &comp-endpoint
+    projectName: endpoint-dev
+    packageName: endpoint-security-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: endpoint-security-{{.Version}}-{{.Platform}}
+    binaryName: endpoint-security
+    platforms: *all-platforms
+    packageTypes: *all-package-types
+  - &comp-fleet-server
+    projectName: fleet-server
+    packageName: fleet-server-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: fleet-server-{{.Version}}-{{.Platform}}
+    binaryName: fleet-server
+    platforms: *all-platforms
+    packageTypes: *all-package-types
+  - &comp-pf-elastic-collector
+    projectName: prodfiler
+    packageName: pf-elastic-collector-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: pf-elastic-collector-{{.Version}}-{{.Platform}}
+    binaryName: pf-elastic-collector
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+  - &comp-pf-elastic-symbolizer
+    projectName: prodfiler
+    packageName: pf-elastic-symbolizer-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: pf-elastic-symbolizer-{{.Version}}-{{.Platform}}
+    binaryName: pf-elastic-symbolizer
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+  - &comp-pf-host-agent
+    projectName: prodfiler
+    packageName: pf-host-agent-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: pf-host-agent-{{.Version}}-{{.Platform}}
+    binaryName: pf-host-agent
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
+  # Elastic Agent core component, defined here because it's a dependency when packaging using elastic-agent DRA
+  - &comp-elastic-agent-core
+    projectName: elastic-agent-core
+    packageName: elastic-agent-core-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: elastic-agent-core-{{.Version}}-{{.Platform}}
+    binaryName: elastic-agent
+    platforms: *all-platforms
+    packageTypes: *all-package-types
+# The shared section contains YAML anchors that are used to
+# define common parts of the package in order to not repeat ourselves.
 shared:
   - &common
     name: '{{.BeatName}}'
@@ -17,6 +163,21 @@ shared:
     description: '{{.BeatDescription}}'
 
   # agent specific
+
+  # components included in elastic-agent package specs defined before components support in this YAML
+  - &elastic_agent_components
+    components:
+      - *comp-agentbeat
+      - *comp-apm_server
+      - *comp-cloudbeat
+      - *comp-cloud-defend
+      - *comp-connectors
+      - *comp-endpoint
+      - *comp-fleet-server
+      - *comp-pf-elastic-collector
+      - *comp-pf-elastic-symbolizer
+      - *comp-pf-host-agent
+
   # Deb/RPM spec for community beats.
   - &deb_rpm_agent_spec
     <<: *common
@@ -164,7 +325,7 @@ shared:
     <<: *agent_darwin_app_bundle_files
     <<: *agent_binary_common_files
 
-  - &agent_components
+  - &agent_unpacked_components_files
     'data/{{.BeatName}}-{{ commit_short }}/components':
       source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/'
       mode: 0755
@@ -174,21 +335,23 @@ shared:
   # Binary package spec (tar.gz for linux) for community beats.
   - &agent_binary_spec
     <<: *common
+    <<: *elastic_agent_components
     files:
       <<: *agent_binary_files
-      <<: *agent_components
       <<: *linux_otel_files
-
+      <<: *agent_unpacked_components_files
 
   - &agent_darwin_binary_spec
     <<: *common
+    <<: *elastic_agent_components
     files:
       <<: *agent_darwin_binary_files
-      <<: *agent_components
+      <<: *agent_unpacked_components_files
 
   # Binary package spec (zip for windows) for community beats.
   - &agent_windows_binary_spec
     <<: *common
+    <<: *elastic_agent_components
     files:
       <<: *agent_binary_files
       'data/{{.BeatName}}-{{ commit_short }}/components':
@@ -238,6 +401,7 @@ shared:
     docker_variant: 'wolfi'
     extra_vars:
       from: '--platform=linux/amd64 cgr.dev/chainguard/wolfi-base'
+
   - &docker_wolfi_arm_spec
     docker_variant: 'wolfi'
     extra_vars:
@@ -1096,7 +1260,6 @@ specs:
             symlink: true
             mode: 0755
 
-
   # Elastic Beat with Elastic License and binary taken from the x-pack dir.
   elastic_beat_agent_demo_binaries:
     ###
@@ -1144,6 +1307,7 @@ specs:
         <<: *common
         <<: *elastic_license_for_binaries
         version: '{{ beat_version }}'
+        # this is a way to place 'core' in the correct place for both the archive and the root dir, see defaultRootDir in dev-tools/mage/pkgtypes.go
         qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
