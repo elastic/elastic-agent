@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
@@ -163,11 +164,16 @@ func TestDownloader_Download(t *testing.T) {
 			e := NewDownloader(config)
 			got, err := e.Download(context.TODO(), tt.args.a, tt.args.version)
 
+			expectedTargetFile := filepath.Join(targetDirPath, tt.want)
+			expectedHashFile := expectedTargetFile + ".sha512"
+
+			expectedDownloadResult := download.DownloadResult{
+				ArtifactPath:     expectedTargetFile,
+				ArtifactHashPath: expectedHashFile,
+			}
+
 			if tt.wantErr {
 				assert.Error(t, err)
-
-				expectedTargetFile := filepath.Join(targetDirPath, tt.want)
-				expectedHashFile := expectedTargetFile + ".sha512"
 
 				assert.NoFileExists(t, expectedTargetFile, "downloader should clean up partial artifact file on error")
 				assert.NoFileExists(t, expectedHashFile, "downloader should clean up partial hash file on error")
@@ -176,7 +182,7 @@ func TestDownloader_Download(t *testing.T) {
 			}
 
 			assert.NoError(t, err)
-			assert.Equalf(t, filepath.Join(targetDirPath, tt.want), got, "Download(%v, %v)", tt.args.a, tt.args.version)
+			assert.Equalf(t, expectedDownloadResult, got, "Download(%v, %v)", tt.args.a, tt.args.version)
 		})
 	}
 }
