@@ -10,8 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 
 	"go.opentelemetry.io/collector/confmap"
 
