@@ -48,7 +48,7 @@ func FixPermissions(path string, _ bool, username string, groupname string, fail
 	}
 
 	if mask > 0 {
-		opts = append(opts, perms.WithMask(os.FileMode(mask))) //nolint:gosec // G115 Conversion from int to uint32 is safe here.
+		opts = append(opts, perms.WithMask(os.FileMode(mask)))
 	}
 
 	err = perms.FixPermissions(path, opts...)

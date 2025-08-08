@@ -337,15 +337,17 @@ func (c *commandRuntime) forceCompState(state client.UnitState, msg string) {
 // compState updates just the component state not all the units.
 func (c *commandRuntime) compState(state client.UnitState) {
 	msg := stateUnknownMessage
-	if state == client.UnitStateHealthy {
+	switch state {
+	case client.UnitStateHealthy:
 		msg = fmt.Sprintf("Healthy: communicating with pid '%d'", c.proc.PID)
-	} else if state == client.UnitStateDegraded {
+	case client.UnitStateDegraded:
 		if c.missedCheckins == 1 {
 			msg = fmt.Sprintf("Degraded: pid '%d' missed 1 check-in", c.proc.PID)
 		} else {
 			msg = fmt.Sprintf("Degraded: pid '%d' missed %d check-ins", c.proc.PID, c.missedCheckins)
 		}
 	}
+
 	if c.state.compState(state, msg) {
 		c.sendObserved()
 	}
