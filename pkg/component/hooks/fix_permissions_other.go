@@ -7,6 +7,8 @@
 package hooks
 
 import (
+	"fmt"
+	"math"
 	"os"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install/usermgmt"
@@ -16,7 +18,7 @@ import (
 
 func FixPermissions(path string, _ bool, username string, groupname string, failOnNotExist bool, mask int) error {
 	// only valid config is
-	var uid, gid int = -1, -1
+	var uid, gid = -1, -1
 	var err error
 	if len(username) > 0 {
 		uid, err = usermgmt.FindUID(username)
@@ -41,8 +43,12 @@ func FixPermissions(path string, _ bool, username string, groupname string, fail
 		opts = append(opts, perms.WithOwnership(ownership))
 	}
 
+	if mask > math.MaxInt32 {
+		return fmt.Errorf("mask %d nout of range expected 0-%d", mask, math.MaxInt32)
+	}
+
 	if mask > 0 {
-		opts = append(opts, perms.WithMask(os.FileMode(mask)))
+		opts = append(opts, perms.WithMask(os.FileMode(mask))) //nolint:gosec // G115 Conversion from int to uint32 is safe here.
 	}
 
 	err = perms.FixPermissions(path, opts...)

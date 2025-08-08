@@ -124,11 +124,11 @@ func (hd *HookDefinition) GetIntArg(key string) (int, bool) {
 		case int64:
 			return int(v), true
 		case uint64:
-			return int(v), true
+			return int(v), true //nolint:gosec // G115 Conversion from int to uint32 is safe here.
 		case uint32:
 			return int(v), true
 		case uint:
-			return int(v), true
+			return int(v), true //nolint:gosec // G115 Conversion from int to uint32 is safe here.
 		case float32:
 			// Handle case where YAML/JSON might parse as float.
 			// Make sure we return the value only if it's truly int

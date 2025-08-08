@@ -9,8 +9,9 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
 func TestHookDefinition_GetArg(t *testing.T) {
