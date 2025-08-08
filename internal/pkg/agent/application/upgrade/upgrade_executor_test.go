@@ -445,18 +445,18 @@ func TestUnpackArtifactStep(t *testing.T) {
 				return tc.checkUpgradeError
 			}
 
-				for _, calledFunc := range tc.calledUnpackerFuncs {
-					switch calledFunc {
-					case "getPackageMetadata":
-						mockUnpacker.EXPECT().getPackageMetadata(downloadResult.ArtifactPath).Return(mockMetadata, tc.getPackageMetadataError)
-					case "extractAgentVersion":
-						mockUnpacker.EXPECT().extractAgentVersion(mockMetadata, version).Return(newVersion)
-					case "detectFlavor":
-						mockUnpacker.EXPECT().detectFlavor(topPath, "").Return(detectedFlavor, tc.detectFlavorError)
-					case "unpack":
-						mockUnpacker.EXPECT().unpack(version, downloadResult.ArtifactPath, dataPath, detectedFlavor).Return(tc.unpackResult, tc.unpackError)
-					}
+			for _, calledFunc := range tc.calledUnpackerFuncs {
+				switch calledFunc {
+				case "getPackageMetadata":
+					mockUnpacker.EXPECT().getPackageMetadata(downloadResult.ArtifactPath).Return(mockMetadata, tc.getPackageMetadataError)
+				case "extractAgentVersion":
+					mockUnpacker.EXPECT().extractAgentVersion(mockMetadata, version).Return(newVersion)
+				case "detectFlavor":
+					mockUnpacker.EXPECT().detectFlavor(topPath, "").Return(detectedFlavor, tc.detectFlavorError)
+				case "unpack":
+					mockUnpacker.EXPECT().unpack(version, downloadResult.ArtifactPath, dataPath, detectedFlavor).Return(tc.unpackResult, tc.unpackError)
 				}
+			}
 
 			if tc.cleanerCalled {
 				mockUpgradeCleaner.EXPECT().setupUnpackCleanup(newHome, currentHome).Return(tc.setupUnpackCleanupError)
