@@ -139,7 +139,7 @@ func (u *executeUpgrade) unpackArtifact(downloadResult download.DownloadResult, 
 	return unpackStepResult, unpackErr
 }
 
-func (u *executeUpgrade) replaceOldWithNew(log *logger.Logger, unpackStepResult unpackStepResult, currentVersionedHome, topPath, agentName, currentHome, oldRunPath, newRunPath, symlinkPath, newBinPath string, upgradeDetails *details.Details) error {
+func (u *executeUpgrade) replaceOldWithNew(unpackStepResult unpackStepResult, currentVersionedHome, topPath, agentName, currentHome, oldRunPath, newRunPath, symlinkPath, newBinPath string, upgradeDetails *details.Details) error {
 	if err := u.directoryCopier.copyActionStore(u.log, unpackStepResult.newHome); err != nil {
 		return fmt.Errorf("failed to copy action store: %w", u.diskSpaceErrorFunc(err))
 	}
