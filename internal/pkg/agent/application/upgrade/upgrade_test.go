@@ -1058,6 +1058,7 @@ type upgradeTestCase struct {
 	expectCallback         bool
 	calledFuncs            []string
 	uncalledFuncs          []string
+	downloadsDirCleaned    bool
 }
 
 func TestUpgrade(t *testing.T) {
@@ -1140,6 +1141,7 @@ func TestUpgrade(t *testing.T) {
 			expectCallback:         true,
 			calledFuncs:            []string{"downloadArtifact", "unpackArtifact", "replaceOldWithNew", "watchNewAgent"},
 			uncalledFuncs:          []string{},
+			downloadsDirCleaned:    true,
 		},
 		"if the target version is the same release version, it should return error": {
 			targetVersion:          currentReleaseVersion,
@@ -1154,6 +1156,7 @@ func TestUpgrade(t *testing.T) {
 			calledFuncs:            []string{},
 			uncalledFuncs:          []string{"downloadArtifact", "unpackArtifact", "replaceOldWithNew", "watchNewAgent"},
 			expectedError:          goerrors.Join(ErrUpgradeSameVersion, defaultCleanupError),
+			downloadsDirCleaned:    false,
 		},
 		"if the target version cannot be parsed, it should return error": {
 			targetVersion:          invalidTargetVersion,
@@ -1168,6 +1171,7 @@ func TestUpgrade(t *testing.T) {
 			calledFuncs:            []string{},
 			uncalledFuncs:          []string{"downloadArtifact", "unpackArtifact", "replaceOldWithNew", "watchNewAgent"},
 			expectedError:          goerrors.Join(fmt.Errorf("error parsing version %q: %w", "invalidTargetVersion", version.ErrNoMatch), defaultCleanupError),
+			downloadsDirCleaned:    false,
 		},
 		"if the download fails, it should return error": {
 			targetVersion:          defaultTargetVersion,
@@ -1182,6 +1186,7 @@ func TestUpgrade(t *testing.T) {
 			calledFuncs:            []string{"downloadArtifact"},
 			uncalledFuncs:          []string{"unpackArtifact", "replaceOldWithNew", "watchNewAgent"},
 			expectedError:          goerrors.Join(errors.New("test download error"), defaultCleanupError),
+			downloadsDirCleaned:    false,
 		},
 		"if the unpack fails, it should return error": {
 			targetVersion:          defaultTargetVersion,
@@ -1196,6 +1201,7 @@ func TestUpgrade(t *testing.T) {
 			calledFuncs:            []string{"downloadArtifact", "unpackArtifact"},
 			uncalledFuncs:          []string{"replaceOldWithNew", "watchNewAgent"},
 			expectedError:          goerrors.Join(errors.New("test unpack error"), defaultCleanupError),
+			downloadsDirCleaned:    false,
 		},
 		"if the replace old with new fails, it should return error": {
 			targetVersion:          defaultTargetVersion,
@@ -1210,6 +1216,7 @@ func TestUpgrade(t *testing.T) {
 			calledFuncs:            []string{"downloadArtifact", "unpackArtifact", "replaceOldWithNew"},
 			uncalledFuncs:          []string{"watchNewAgent"},
 			expectedError:          goerrors.Join(errors.New("test replace old with new error"), defaultCleanupError),
+			downloadsDirCleaned:    false,
 		},
 	}
 
@@ -1272,13 +1279,18 @@ func TestUpgrade(t *testing.T) {
 				require.Nil(t, cb)
 			}
 
+			if tc.downloadsDirCleaned {
+				require.NoDirExists(t, downloadsPath, "downloads directory should be cleaned up")
+			} else {
+				require.DirExists(t, downloadsPath, "downloads directory should not be cleaned up")
+			}
+
 			if tc.expectedError != nil {
 				require.Equal(t, tc.expectedError.Error(), err.Error(), "expected error to be %v, got %v", tc.expectedError, err)
 				return
 			}
 
 			require.NoError(t, err, "expected no error, got %v", err)
-
 		})
 	}
 }
