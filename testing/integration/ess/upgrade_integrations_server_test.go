@@ -59,6 +59,7 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 	require.True(t, ok)
 
 	startVersions = filterVersionsForECH(t, startVersions, statefulProv)
+	startVersions = filterVersionsForSameReleaseType(t, startVersions, endVersion)
 
 	t.Logf("Running test cases for upgrade from versions [%v] to version [%s]", startVersions, endVersion)
 	for _, startVersion := range startVersions {
@@ -151,4 +152,21 @@ func isVersionInList(candidateVersion *version.ParsedSemVer, allowedVersions []*
 		}
 	}
 	return false
+}
+
+func filterVersionsForSameReleaseType(t *testing.T, versions []*version.ParsedSemVer, endVersion string) []*version.ParsedSemVer {
+	endVersionParsed, err := version.ParseVersion(endVersion)
+	require.NoError(t, err)
+	isEndVersionSnapshot := endVersionParsed.IsSnapshot()
+
+	filteredVersions := make([]*version.ParsedSemVer, 0)
+	for _, ver := range versions {
+		if isEndVersionSnapshot && ver.IsSnapshot() {
+			filteredVersions = append(filteredVersions, ver)
+		} else if !isEndVersionSnapshot && !ver.IsSnapshot() {
+			filteredVersions = append(filteredVersions, ver)
+		}
+	}
+
+	return filteredVersions
 }
