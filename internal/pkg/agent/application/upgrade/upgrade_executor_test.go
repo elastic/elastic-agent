@@ -12,6 +12,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
