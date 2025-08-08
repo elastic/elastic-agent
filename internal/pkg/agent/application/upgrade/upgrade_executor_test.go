@@ -502,3 +502,184 @@ func TestUnpackArtifactStep(t *testing.T) {
 		})
 	}
 }
+
+type replaceOldWithNewTestCase struct {
+	copyActionStoreError         error
+	copyRunDirectoryError        error
+	setupSymlinkCleanupError     error
+	setupSymlinkCleanupCalled    bool
+	changeSymlinkError           error
+	changeSymlinkCalled          bool
+	upgradeDetailsStateSet       bool
+	calledDirectoryCopierFuncs   []string
+	uncalledDirectoryCopierFuncs []string
+	diskSpaceErrorFuncCalled     bool
+	diskSpaceError               error
+	expectedError                error
+}
+
+func TestReplaceOldWithNewStep(t *testing.T) {
+	log, _ := loggertest.New("test")
+
+	unpackStepResult := unpackStepResult{
+		newHome: "mockNewHome",
+		unpackResult: unpackResult{
+			VersionedHome: "mockVersionedHome",
+			Hash:          "mockHash",
+		},
+	}
+	currentVersionedHome := "mockCurrentVersionedHome"
+	topPath := "mockTopPath"
+	agentName := "mockAgentName"
+	currentHome := "mockCurrentHome"
+	oldRunPath := "mockOldRunPath"
+	newRunPath := "mockNewRunPath"
+	symlinkPath := "mockSymlinkPath"
+	newBinPath := "mockNewBinPath"
+
+	testCases := map[string]replaceOldWithNewTestCase{
+		"should migrate action store and run directory and change symlink": {
+			copyActionStoreError:         nil,
+			copyRunDirectoryError:        nil,
+			setupSymlinkCleanupError:     nil,
+			setupSymlinkCleanupCalled:    true,
+			changeSymlinkError:           nil,
+			changeSymlinkCalled:          true,
+			upgradeDetailsStateSet:       true,
+			calledDirectoryCopierFuncs:   []string{"copyActionStore", "copyRunDirectory"},
+			uncalledDirectoryCopierFuncs: []string{},
+			diskSpaceErrorFuncCalled:     false,
+			diskSpaceError:               nil,
+			expectedError:                nil,
+		},
+		"if copying action store fails, should return error": {
+			copyActionStoreError:         errors.New("test error"),
+			copyRunDirectoryError:        nil,
+			setupSymlinkCleanupError:     nil,
+			setupSymlinkCleanupCalled:    false,
+			changeSymlinkError:           nil,
+			changeSymlinkCalled:          false,
+			upgradeDetailsStateSet:       false,
+			calledDirectoryCopierFuncs:   []string{"copyActionStore"},
+			uncalledDirectoryCopierFuncs: []string{"copyRunDirectory"},
+			diskSpaceErrorFuncCalled:     true,
+			diskSpaceError:               errors.New("test error"),
+			expectedError:                fmt.Errorf("failed to copy action store: %w", errors.New("test error")),
+		},
+		"if copying run directory fails, should return error": {
+			copyActionStoreError:         nil,
+			copyRunDirectoryError:        errors.New("test error"),
+			setupSymlinkCleanupError:     nil,
+			setupSymlinkCleanupCalled:    false,
+			changeSymlinkError:           nil,
+			changeSymlinkCalled:          false,
+			upgradeDetailsStateSet:       false,
+			calledDirectoryCopierFuncs:   []string{"copyActionStore", "copyRunDirectory"},
+			uncalledDirectoryCopierFuncs: []string{},
+			diskSpaceErrorFuncCalled:     true,
+			diskSpaceError:               errors.New("test error"),
+			expectedError:                fmt.Errorf("failed to copy run directory: %w", errors.New("test error")),
+		},
+		"if setting up symlink cleanup fails, should return error": {
+			copyActionStoreError:         nil,
+			copyRunDirectoryError:        nil,
+			setupSymlinkCleanupError:     errors.New("test error"),
+			setupSymlinkCleanupCalled:    true,
+			changeSymlinkError:           nil,
+			changeSymlinkCalled:          false,
+			upgradeDetailsStateSet:       true,
+			calledDirectoryCopierFuncs:   []string{"copyActionStore", "copyRunDirectory"},
+			uncalledDirectoryCopierFuncs: []string{},
+			diskSpaceErrorFuncCalled:     false,
+			diskSpaceError:               nil,
+			expectedError:                fmt.Errorf("error setting up symlink cleanup: %w", errors.New("test error")),
+		},
+		"if changing symlink fails, should return error": {
+			copyActionStoreError:         nil,
+			copyRunDirectoryError:        nil,
+			setupSymlinkCleanupError:     nil,
+			setupSymlinkCleanupCalled:    true,
+			changeSymlinkError:           errors.New("test error"),
+			changeSymlinkCalled:          true,
+			upgradeDetailsStateSet:       true,
+			calledDirectoryCopierFuncs:   []string{"copyActionStore", "copyRunDirectory"},
+			uncalledDirectoryCopierFuncs: []string{},
+			diskSpaceErrorFuncCalled:     false,
+			diskSpaceError:               nil,
+			expectedError:                errors.New("test error"),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			upgradeDetails := &details.Details{}
+
+			mockDirectoryCopier := &mock_agentDirectoryCopier{}
+			mockUpgradeCleaner := &mock_upgradeCleaner{}
+			mockRelinker := &mock_relinker{}
+
+			for _, calledFunc := range tc.calledDirectoryCopierFuncs {
+				switch calledFunc {
+				case "copyActionStore":
+					mockDirectoryCopier.EXPECT().copyActionStore(log, unpackStepResult.newHome).Return(tc.copyActionStoreError)
+				case "copyRunDirectory":
+					mockDirectoryCopier.EXPECT().copyRunDirectory(log, oldRunPath, newRunPath).Return(tc.copyRunDirectoryError)
+				}
+			}
+
+			if tc.setupSymlinkCleanupCalled {
+				mockUpgradeCleaner.EXPECT().setupSymlinkCleanup(mock.AnythingOfType("upgrade.changeSymlinkFunc"), topPath, currentVersionedHome, agentName).Return(tc.setupSymlinkCleanupError)
+			}
+
+			if tc.changeSymlinkCalled {
+				mockRelinker.EXPECT().changeSymlink(log, topPath, symlinkPath, newBinPath).Return(tc.changeSymlinkError)
+			}
+
+			var diskSpaceErrorCalledWith error
+			diskSpaceErrorFuncCalled := false
+			upgradeExecutor := &executeUpgrade{
+				log:             log,
+				upgradeCleaner:  mockUpgradeCleaner,
+				directoryCopier: mockDirectoryCopier,
+				relinker:        mockRelinker,
+				diskSpaceErrorFunc: func(err error) error {
+					diskSpaceErrorFuncCalled = true
+					diskSpaceErrorCalledWith = err
+					return err
+				},
+			}
+
+			err := upgradeExecutor.replaceOldWithNew(unpackStepResult, currentVersionedHome, topPath, agentName, currentHome, oldRunPath, newRunPath, symlinkPath, newBinPath, upgradeDetails)
+
+			mockDirectoryCopier.AssertExpectations(t)
+
+			if tc.setupSymlinkCleanupCalled {
+				mockUpgradeCleaner.AssertExpectations(t)
+			} else {
+				mockUpgradeCleaner.AssertNotCalled(t, "setupSymlinkCleanup", "expected setupSymlinkCleanup to not be called")
+			}
+
+			if tc.changeSymlinkCalled {
+				mockRelinker.AssertExpectations(t)
+			} else {
+				mockRelinker.AssertNotCalled(t, "changeSymlink", "expected changeSymlink to not be called")
+			}
+
+			if tc.upgradeDetailsStateSet {
+				require.Equal(t, details.StateReplacing, upgradeDetails.State, "expected state to be %v, got %v", details.StateReplacing, upgradeDetails.State)
+			} else {
+				require.Empty(t, upgradeDetails.State, "expected state to be empty, got %v", upgradeDetails.State)
+			}
+
+			require.Equal(t, tc.diskSpaceError, diskSpaceErrorCalledWith, "expected disk space error to be %v, got %v", tc.diskSpaceError, diskSpaceErrorCalledWith)
+			require.Equal(t, tc.diskSpaceErrorFuncCalled, diskSpaceErrorFuncCalled, "expected disk space error func to be called")
+
+			if tc.expectedError != nil {
+				require.Equal(t, tc.expectedError.Error(), err.Error(), "expected error to be %s, got %v", tc.expectedError, err)
+				return
+			}
+
+			require.NoError(t, err, "expected no error, got %v", err)
+		})
+	}
+}
