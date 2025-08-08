@@ -35,16 +35,16 @@ func FixPermissions(path string, _ bool, username string, groupname string, fail
 		}
 	}
 
+	if mask > math.MaxInt32 {
+		return fmt.Errorf("mask %d nout of range expected 0-%d", mask, math.MaxInt32)
+	}
+
 	var opts []perms.OptFunc
 	if uid != -1 || gid != -1 {
 		ownership := utils.FileOwner{}
 		ownership.GID = gid
 		ownership.UID = uid
 		opts = append(opts, perms.WithOwnership(ownership))
-	}
-
-	if mask > math.MaxInt32 {
-		return fmt.Errorf("mask %d nout of range expected 0-%d", mask, math.MaxInt32)
 	}
 
 	if mask > 0 {

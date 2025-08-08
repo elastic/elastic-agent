@@ -7,6 +7,8 @@
 package hooks
 
 import (
+	"fmt"
+	"math"
 	"os"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install/usermgmt"
@@ -42,6 +44,10 @@ func FixPermissions(path string, inheritPermissions bool, username string, group
 		if err != nil {
 			return err
 		}
+	}
+
+	if mask > math.MaxInt32 {
+		return fmt.Errorf("mask %d nout of range expected 0-%d", mask, math.MaxInt32)
 	}
 
 	var opts []perms.OptFunc
