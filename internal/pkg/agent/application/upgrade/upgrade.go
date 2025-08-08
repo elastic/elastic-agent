@@ -98,7 +98,7 @@ type checkUpgradeFn func(log *logger.Logger, currentVersion, newVersion agentVer
 type upgradeExecutor interface {
 	downloadArtifact(ctx context.Context, parsedTargetVersion *agtversion.ParsedSemVer, agentInfo info.Agent, sourceURI string, fleetServerURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (download.DownloadResult, error)
 	unpackArtifact(downloadResult download.DownloadResult, version, archivePath, topPath, flavor, dataPath, currentHome string, upgradeDetails *details.Details, currentVersion agentVersion, checkUpgradeFn checkUpgradeFn) (unpackStepResult, error)
-	replaceOldWithNew(log *logger.Logger, unpackStepResult unpackStepResult, currentVersionedHome, topPath, agentName, currentHome, oldRunPath, newRunPath, symlinkPath, newBinPath string, upgradeDetails *details.Details) error
+	replaceOldWithNew(unpackStepResult unpackStepResult, currentVersionedHome, topPath, agentName, currentHome, oldRunPath, newRunPath, symlinkPath, newBinPath string, upgradeDetails *details.Details) error
 	watchNewAgent(ctx context.Context, log *logger.Logger, markerFilePath, topPath, dataPath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout, newAgentInstall agentInstall, previousAgentInstall agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, upgradeOutcome UpgradeOutcome) error
 }
 
@@ -332,7 +332,7 @@ func (u *Upgrader) newUpgrade(ctx context.Context, version string, sourceURI str
 		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
 	}
 
-	err = u.upgradeExecutor.replaceOldWithNew(u.log, unpackRes, currentVersionedHome, paths.Top(), agentName, paths.Home(), oldRunPath, newRunPath, symlinkPath, newPath, det)
+	err = u.upgradeExecutor.replaceOldWithNew(unpackRes, currentVersionedHome, paths.Top(), agentName, paths.Home(), oldRunPath, newRunPath, symlinkPath, newPath, det)
 	if err != nil {
 		return nil, err
 	}
