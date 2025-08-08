@@ -24,6 +24,7 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -523,7 +524,15 @@ func TestDownloadVersion(t *testing.T) {
 
 			got, err := downloader.Download(context.TODO(), tt.args.a, tt.args.version)
 
-			assert.Equalf(t, filepath.Join(targetDirPath, tt.want), got.ArtifactPath, "Download(%v, %v)", tt.args.a, tt.args.version)
+			expectedTargetFile := filepath.Join(targetDirPath, tt.want)
+			expectedTargetHashFile := expectedTargetFile + ".sha512"
+
+			expectedDownloadResult := download.DownloadResult{
+				ArtifactPath:     expectedTargetFile,
+				ArtifactHashPath: expectedTargetHashFile,
+			}
+
+			assert.Equalf(t, expectedDownloadResult, got, "Download(%v, %v)", tt.args.a, tt.args.version)
 
 			if tt.wantErr {
 				assert.Error(t, err)
