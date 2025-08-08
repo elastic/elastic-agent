@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/stretchr/testify/require"
 
 	"go.opentelemetry.io/collector/confmap"
@@ -640,7 +641,8 @@ func TestGetOtelConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, getBeatMonitoringConfig)
+			l, _ := loggertest.New("test")
+			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, getBeatMonitoringConfig, l)
 			if actualConf == nil || tt.expectedConfig == nil {
 				assert.Equal(t, tt.expectedConfig, actualConf)
 			} else { // this gives a nicer diff
