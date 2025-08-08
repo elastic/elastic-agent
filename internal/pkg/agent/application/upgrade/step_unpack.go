@@ -114,7 +114,6 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (unpa
 		versionedHome = createVersionedHomeFromHash(hash)
 	}
 
-	log.Infof("THE VERSIONED HOME IN UNZIP IS %s", versionedHome)
 	result.VersionedHome = versionedHome
 
 	skipFn, err := skipFnFromZip(log, r, flavor, fileNamePrefix, createVersionedHomeFromHash(hash), registry)
@@ -148,7 +147,6 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (unpa
 
 		dstPath := strings.TrimPrefix(mappedPackagePath, "data/")
 		dstPath = filepath.Join(dataDir, dstPath) // TODO: look into this, this may be the new home to cleanup
-		log.Infof("THE DESTINATION PATH IN UNZIP IS %s", dstPath)
 
 		if skipFn(dstPath) {
 			return nil
@@ -352,7 +350,6 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (unpa
 		versionedHome = createVersionedHomeFromHash(metadata.hash)
 	}
 
-	log.Infof("THE VERSIONED HOME IN UNTAR IS %s", versionedHome)
 	result.VersionedHome = versionedHome
 
 	skipFn, err := skipFnFromTar(log, archivePath, flavor, registry)
@@ -416,7 +413,6 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (unpa
 
 		rel := filepath.FromSlash(strings.TrimPrefix(fileName, "data/"))
 		abs := filepath.Join(dataDir, rel) // TODO: if anything happens remove abs most likely, check this
-		log.Infof("THE ABSOLUTE PATH IN UNTAR IS %s", abs)
 
 		// find the root dir
 		if currentDir := filepath.Dir(abs); rootDir == "" || len(filepath.Dir(rootDir)) > len(currentDir) {
