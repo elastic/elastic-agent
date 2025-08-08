@@ -32,7 +32,7 @@ steps:
       env:
         DRA_WORKFLOW: "snapshot"
         PLATFORMS: "linux/amd64 windows/amd64 darwin/amd64"
-    
+
     - label: ":package: linux/arm64 darwin/arm64 Elastic-Agent Core Snapshot"
       commands:
         - .buildkite/scripts/steps/build-agent-core.sh
