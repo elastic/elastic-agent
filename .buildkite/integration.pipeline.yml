@@ -9,6 +9,11 @@ env:
   IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1753491662"
   IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1753491662"
 
+common:
+  - vault_docker_login: &vault_docker_login
+      elastic/vault-docker-login#v0.5.2:
+        secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+
 steps:
   - group: "Integration tests: packaging"
     key: "int-packaging"
@@ -108,6 +113,7 @@ steps:
           PLATFORMS: "linux/amd64"
         command: |
           .buildkite/scripts/steps/integration-package.sh
+          .buildkite/scripts/steps/integration-cloud-image-push.sh
         artifact_paths:
           - build/distributions/**
         agents:
@@ -115,6 +121,8 @@ steps:
           machineType: "n2-standard-8"
           diskSizeGb: 200
           image: "${IMAGE_UBUNTU_2204_X86_64}"
+        plugins:
+          - *vault_docker_login
 
       - label: "Packaging: Containers linux/arm64"
         key: packaging-containers-arm64
@@ -139,6 +147,7 @@ steps:
           FIPS: "true"
         command: |
           .buildkite/scripts/steps/integration-package.sh
+          .buildkite/scripts/steps/integration-cloud-image-push.sh
         artifact_paths:
           - build/distributions/**
         agents:
@@ -146,6 +155,8 @@ steps:
           machineType: "n2-standard-8"
           diskSizeGb: 200
           image: "${IMAGE_UBUNTU_2204_X86_64}"
+        plugins:
+          - *vault_docker_login
 
       - label: "Packaging: Containers linux/arm64 FIPS"
         key: packaging-containers-arm64-fips
