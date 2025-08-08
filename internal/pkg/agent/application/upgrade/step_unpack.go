@@ -117,6 +117,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (unpa
 	}
 
 	result.VersionedHome = versionedHome
+	result.Hash = hash
 
 	skipFn, err := skipFnFromZip(log, r, flavor, fileNamePrefix, createVersionedHomeFromHash(hash), registry)
 	if err != nil {
@@ -210,8 +211,6 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (unpa
 			return result, err
 		}
 	}
-
-	result.Hash = hash
 
 	return result, nil
 }
@@ -353,6 +352,7 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (unpa
 	}
 
 	result.VersionedHome = versionedHome
+	result.Hash = hash
 
 	skipFn, err := skipFnFromTar(log, archivePath, flavor, registry)
 	if err != nil {
@@ -468,7 +468,6 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (unpa
 			return result, errors.New(fmt.Sprintf("tar file entry %s contained unsupported file type %v", fileName, mode), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fileName))
 		}
 	}
-	result.Hash = hash
 
 	return result, nil
 }
