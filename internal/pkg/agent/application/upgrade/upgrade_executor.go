@@ -157,7 +157,7 @@ func (u *executeUpgrade) replaceOldWithNew(unpackStepResult unpackStepResult, cu
 	return u.relinker.changeSymlink(u.log, topPath, symlinkPath, newBinPath)
 }
 
-func (u *executeUpgrade) watchNewAgent(ctx context.Context, log *logger.Logger, markerFilePath, topPath, dataPath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout, newAgentInstall agentInstall, previousAgentInstall agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, upgradeOutcome UpgradeOutcome) error {
+func (u *executeUpgrade) watchNewAgent(ctx context.Context, markerFilePath, topPath, dataPath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout, newAgentInstall agentInstall, previousAgentInstall agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, upgradeOutcome UpgradeOutcome) error {
 	if err := u.watcher.markUpgrade(u.log,
 		dataPath,             // data dir to place the marker in
 		newAgentInstall,      // new agent version data

@@ -99,7 +99,7 @@ type upgradeExecutor interface {
 	downloadArtifact(ctx context.Context, parsedTargetVersion *agtversion.ParsedSemVer, agentInfo info.Agent, sourceURI string, fleetServerURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (download.DownloadResult, error)
 	unpackArtifact(downloadResult download.DownloadResult, version, archivePath, topPath, flavor, dataPath, currentHome string, upgradeDetails *details.Details, currentVersion agentVersion, checkUpgradeFn checkUpgradeFn) (unpackStepResult, error)
 	replaceOldWithNew(unpackStepResult unpackStepResult, currentVersionedHome, topPath, agentName, currentHome, oldRunPath, newRunPath, symlinkPath, newBinPath string, upgradeDetails *details.Details) error
-	watchNewAgent(ctx context.Context, log *logger.Logger, markerFilePath, topPath, dataPath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout, newAgentInstall agentInstall, previousAgentInstall agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, upgradeOutcome UpgradeOutcome) error
+	watchNewAgent(ctx context.Context, markerFilePath, topPath, dataPath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout, newAgentInstall agentInstall, previousAgentInstall agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, upgradeOutcome UpgradeOutcome) error
 }
 
 // Upgrader performs an upgrade
