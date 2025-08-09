@@ -950,101 +950,6 @@ func TestDownloaderFactoryProvider(t *testing.T) {
 	require.Equal(t, "downloader factory \"nonExistentFactory\" not found", err.Error())
 }
 
-func setupForFileDownloader(sourcePrefix string, expectedFileName string, partialData []byte) setupFunc {
-	return func(t *testing.T, config *artifact.Config, basePath string, targetPath string) {
-		testDownloadPath := filepath.Join(basePath, "downloads")
-		originalDownloadsPath := paths.Downloads()
-		t.Cleanup(func() {
-			paths.SetDownloads(originalDownloadsPath)
-		})
-		paths.SetDownloads(targetPath)
-		err := os.MkdirAll(testDownloadPath, 0755)
-		require.NoError(t, err)
-		tempArtifactPath := filepath.Join(testDownloadPath, expectedFileName)
-		err = os.WriteFile(tempArtifactPath, partialData, 0644)
-		require.NoError(t, err)
-
-		config.SourceURI = sourcePrefix + tempArtifactPath
-		config.DropPath = testDownloadPath
-	}
-}
-
-func setupForHttpDownloader(partialData []byte) (setupFunc, *httptest.Server) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write(partialData) //nolint:errcheck //test code
-	}))
-
-	return func(t *testing.T, config *artifact.Config, basePath string, targetPath string) {
-		config.SourceURI = server.URL
-		config.RetrySleepInitDuration = 1 * time.Second
-		config.HTTPTransportSettings = httpcommon.HTTPTransportSettings{
-			Timeout: 1 * time.Second,
-		}
-	}, server
-}
-
-func fileDownloaderFactoryProvider(config *artifact.Config, copyFunc func(dst io.Writer, src io.Reader) (int64, error)) *downloaderFactoryProvider {
-	fileDownloader := fs.NewDownloader(config)
-	fileDownloader.CopyFunc = copyFunc
-
-	fileFactory := func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
-		return fileDownloader, nil
-	}
-
-	return &downloaderFactoryProvider{
-		downloaderFactories: map[string]downloaderFactory{
-			fileDownloaderFactory: fileFactory,
-		},
-	}
-}
-
-func composedDownloaderFactoryProvider(config *artifact.Config, copyFunc func(dst io.Writer, src io.Reader) (int64, error), log *logger.Logger, upgradeDetails *details.Details) *downloaderFactoryProvider {
-	fileDownloader := fs.NewDownloader(config)
-	httpDownloader := httpDownloader.NewDownloaderWithClient(log, config, http.Client{}, upgradeDetails)
-
-	if strings.HasPrefix(config.SourceURI, "http://") || strings.HasPrefix(config.SourceURI, "https://") {
-		httpDownloader.CopyFunc = copyFunc
-	} else {
-		fileDownloader.CopyFunc = copyFunc
-	}
-
-	composedDownloader := composed.NewDownloader(fileDownloader, httpDownloader)
-
-	fileFactory := func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
-		return fileDownloader, nil
-	}
-	composedFactory := func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
-		return composedDownloader, nil
-	}
-
-	return &downloaderFactoryProvider{
-		downloaderFactories: map[string]downloaderFactory{
-			fileDownloaderFactory:     fileFactory,
-			composedDownloaderFactory: composedFactory,
-		},
-	}
-}
-
-type setupFunc func(t *testing.T, config *artifact.Config, basePath string, targetPath string)
-type factoryProviderFunc func(config *artifact.Config, copyFunc func(dst io.Writer, src io.Reader) (int64, error)) *downloaderFactoryProvider
-type mockError struct {
-	message string
-}
-
-func (e *mockError) Error() string {
-	return e.message
-}
-
-func (e *mockError) Is(target error) bool {
-	return e.message == target.Error()
-}
-
-type testError struct {
-	copyFuncError error
-	expectedError error
-}
-
 type upgradeTestCase struct {
 	targetVersion          string
 	parsedTargetVersion    *agtversion.ParsedSemVer
@@ -1293,6 +1198,101 @@ func TestUpgrade(t *testing.T) {
 			require.NoError(t, err, "expected no error, got %v", err)
 		})
 	}
+}
+
+func setupForFileDownloader(sourcePrefix string, expectedFileName string, partialData []byte) setupFunc {
+	return func(t *testing.T, config *artifact.Config, basePath string, targetPath string) {
+		testDownloadPath := filepath.Join(basePath, "downloads")
+		originalDownloadsPath := paths.Downloads()
+		t.Cleanup(func() {
+			paths.SetDownloads(originalDownloadsPath)
+		})
+		paths.SetDownloads(targetPath)
+		err := os.MkdirAll(testDownloadPath, 0755)
+		require.NoError(t, err)
+		tempArtifactPath := filepath.Join(testDownloadPath, expectedFileName)
+		err = os.WriteFile(tempArtifactPath, partialData, 0644)
+		require.NoError(t, err)
+
+		config.SourceURI = sourcePrefix + tempArtifactPath
+		config.DropPath = testDownloadPath
+	}
+}
+
+func setupForHttpDownloader(partialData []byte) (setupFunc, *httptest.Server) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write(partialData) //nolint:errcheck //test code
+	}))
+
+	return func(t *testing.T, config *artifact.Config, basePath string, targetPath string) {
+		config.SourceURI = server.URL
+		config.RetrySleepInitDuration = 1 * time.Second
+		config.HTTPTransportSettings = httpcommon.HTTPTransportSettings{
+			Timeout: 1 * time.Second,
+		}
+	}, server
+}
+
+func fileDownloaderFactoryProvider(config *artifact.Config, copyFunc func(dst io.Writer, src io.Reader) (int64, error)) *downloaderFactoryProvider {
+	fileDownloader := fs.NewDownloader(config)
+	fileDownloader.CopyFunc = copyFunc
+
+	fileFactory := func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
+		return fileDownloader, nil
+	}
+
+	return &downloaderFactoryProvider{
+		downloaderFactories: map[string]downloaderFactory{
+			fileDownloaderFactory: fileFactory,
+		},
+	}
+}
+
+func composedDownloaderFactoryProvider(config *artifact.Config, copyFunc func(dst io.Writer, src io.Reader) (int64, error), log *logger.Logger, upgradeDetails *details.Details) *downloaderFactoryProvider {
+	fileDownloader := fs.NewDownloader(config)
+	httpDownloader := httpDownloader.NewDownloaderWithClient(log, config, http.Client{}, upgradeDetails)
+
+	if strings.HasPrefix(config.SourceURI, "http://") || strings.HasPrefix(config.SourceURI, "https://") {
+		httpDownloader.CopyFunc = copyFunc
+	} else {
+		fileDownloader.CopyFunc = copyFunc
+	}
+
+	composedDownloader := composed.NewDownloader(fileDownloader, httpDownloader)
+
+	fileFactory := func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
+		return fileDownloader, nil
+	}
+	composedFactory := func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
+		return composedDownloader, nil
+	}
+
+	return &downloaderFactoryProvider{
+		downloaderFactories: map[string]downloaderFactory{
+			fileDownloaderFactory:     fileFactory,
+			composedDownloaderFactory: composedFactory,
+		},
+	}
+}
+
+type setupFunc func(t *testing.T, config *artifact.Config, basePath string, targetPath string)
+type factoryProviderFunc func(config *artifact.Config, copyFunc func(dst io.Writer, src io.Reader) (int64, error)) *downloaderFactoryProvider
+type mockError struct {
+	message string
+}
+
+func (e *mockError) Error() string {
+	return e.message
+}
+
+func (e *mockError) Is(target error) bool {
+	return e.message == target.Error()
+}
+
+type testError struct {
+	copyFuncError error
+	expectedError error
 }
 
 func TesE2EtUpgradeDownloadErrors(t *testing.T) {
