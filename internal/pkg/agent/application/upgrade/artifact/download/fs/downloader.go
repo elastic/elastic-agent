@@ -86,6 +86,31 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 	return downloadResult, nil
 }
 
+// DownloadAsc downloads the package .asc file from configured source.
+// It returns absolute path to the downloaded file and a no-nil error if any occurs.
+func (e *Downloader) DownloadAsc(_ context.Context, a artifact.Artifact, version agtversion.ParsedSemVer) (string, error) {
+	filename, err := artifact.GetArtifactName(a, version, e.config.OS(), e.config.Arch())
+	if err != nil {
+		return "", errors.New(err, "generating package name failed")
+	}
+
+	filename += ".asc"
+
+	fullPath, err := artifact.GetArtifactPath(a, version, e.config.OS(), e.config.Arch(), e.config.TargetDirectory)
+	if err != nil {
+		return "", errors.New(err, "generating package path failed")
+	}
+
+	fullPath += ".asc"
+
+	err = e.downloadFile(filename, fullPath)
+	if err != nil {
+		return "", err
+	}
+
+	return fullPath, nil
+}
+
 func (e *Downloader) downloadFile(filename, fullPath string) error {
 	sourcePath := filepath.Join(e.dropPath, filename)
 
