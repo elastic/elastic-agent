@@ -11,8 +11,6 @@ import (
 	"os/exec"
 	"syscall"
 	"time"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
 const (
@@ -21,12 +19,9 @@ const (
 	afterRestartDelay = 2 * time.Second
 )
 
-func invokeCmd(agentExecutable string) *exec.Cmd {
+func InvokeCmdWithArgs(executable string, args ...string) *exec.Cmd {
 	// #nosec G204 -- user cannot inject any parameters to this command
-	cmd := exec.Command(agentExecutable, watcherSubcommand,
-		"--path.config", paths.Config(),
-		"--path.home", paths.Top(),
-	)
+	cmd := exec.Command(executable, args...)
 
 	var cred = &syscall.Credential{
 		Uid:         uint32(os.Getuid()),
@@ -38,7 +33,7 @@ func invokeCmd(agentExecutable string) *exec.Cmd {
 		Credential: cred,
 		Setsid:     true,
 		// propagate sigint instead of sigkill so we can ignore it
-		Pdeathsig: syscall.SIGINT,
+		Pdeathsig: syscall.Signal(0x0),
 	}
 	cmd.SysProcAttr = sysproc
 	return cmd

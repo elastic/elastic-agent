@@ -197,7 +197,7 @@ type agentInstall struct {
 }
 
 // markUpgrade marks update happened so we can handle grace period
-func markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, desiredOutcome UpgradeOutcome) error {
+func markUpgrade(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, desiredOutcome UpgradeOutcome, rollbackWindow time.Duration) error {
 
 	if len(previousAgent.hash) > hashLen {
 		previousAgent.hash = previousAgent.hash[:hashLen]
@@ -207,7 +207,7 @@ func markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent ag
 		Version:           agent.version,
 		Hash:              agent.hash,
 		VersionedHome:     agent.versionedHome,
-		UpdatedOn:         time.Now(),
+		UpdatedOn:         updatedOn,
 		PrevVersion:       previousAgent.version,
 		PrevHash:          previousAgent.hash,
 		PrevVersionedHome: previousAgent.versionedHome,
@@ -216,13 +216,26 @@ func markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent ag
 		DesiredOutcome:    desiredOutcome,
 	}
 
+	if rollbackWindow > 0 && agent.parsedVersion != nil && !agent.parsedVersion.Less(*Version_9_2_0_SNAPSHOT) {
+		// if we have a not empty rollback window, write the prev version in the rollbacks_available field
+		// we also need to check the destination version because the manual rollback and delayed cleanup will be
+		// handled by that version of agent, so it needs to be recent enough
+		upgradeDetails.Metadata.RollbacksAvailable = []details.RollbackAvailable{
+			{
+				Version:    previousAgent.version,
+				Home:       previousAgent.versionedHome,
+				ValidUntil: updatedOn.Add(rollbackWindow),
+			},
+		}
+	}
+
 	markerBytes, err := yaml.Marshal(newMarkerSerializer(marker))
 	if err != nil {
 		return errors.New(err, errors.TypeConfig, "failed to parse marker file")
 	}
 
 	markerPath := markerFilePath(dataDirPath)
-	log.Infow("Writing upgrade marker file", "file.path", markerPath, "hash", marker.Hash, "prev_hash", marker.PrevHash)
+	log.Infow("Writing upgrade marker file", "file.path", markerPath, "hash", marker.Hash, "prev_hash", marker.PrevHash, "content", string(markerBytes))
 	if err := os.WriteFile(markerPath, markerBytes, 0600); err != nil {
 		return errors.New(err, errors.TypeFilesystem, "failed to create update marker file", errors.M(errors.MetaKeyPath, markerPath))
 	}

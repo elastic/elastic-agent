@@ -9,6 +9,7 @@ package ess
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -82,12 +83,16 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 		newVersionBuildMetadata := "build" + time.Now().Format("20060102150405")
 		parsedNewVersion := version.NewParsedSemVer(currentVersion.Major(), currentVersion.Minor(), currentVersion.Patch(), "", newVersionBuildMetadata)
 
-		newPackageContainingDir := t.TempDir()
+		err = startFixture.EnsurePrepared(t.Context())
+		require.NoErrorf(t, err, "fixture should be prepared")
 
-		versionForFixture, err := repackageArchive(ctx, t, startFixture, newVersionBuildMetadata, currentVersion, newPackageContainingDir, parsedNewVersion)
+		// retrieve the compressed package file location
+		srcPackage, err := startFixture.SrcPackage(t.Context())
+		require.NoErrorf(t, err, "error retrieving start fixture source package")
 
-		// I wish I could just pass the location of the package on disk to the whole upgrade tests/fixture/fetcher code
-		// but I would have to break too much code for that, when in Rome... add more code on top of inflexible code
+		versionForFixture, repackagedArchiveFile, err := repackageArchive(t, srcPackage, newVersionBuildMetadata, currentVersion, parsedNewVersion)
+
+		newPackageContainingDir := filepath.Dir(repackagedArchiveFile)
 		repackagedLocalFetcher := atesting.LocalFetcher(newPackageContainingDir)
 
 		endFixture, err := atesting.NewFixture(t, versionForFixture.String(), atesting.WithFetcher(repackagedLocalFetcher))
