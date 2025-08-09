@@ -1449,7 +1449,7 @@ func createArchive(t *testing.T, archiveName string, archiveFiles []files) (stri
 func TestE2EUpgradeUnpackErrors(t *testing.T) {
 	log, _ := loggertest.New("test")
 
-	tempConfig := &artifact.Config{} // used only to get os and arch, runtime.GOARCH returns amd64 instead of 64 which is not a valid arch when used in GetArtifactName
+	tempConfig := &artifact.Config{} // used only to get os and arch, runtime.GOARCH returns amd64 which is not a valid arch when used in GetArtifactName
 
 	testVersion := agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")
 	upgradeDetails := details.NewDetails(testVersion.String(), details.StateRequested, "test")
