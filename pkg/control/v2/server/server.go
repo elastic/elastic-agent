@@ -196,14 +196,16 @@ func (s *Server) DiagnosticAgent(ctx context.Context, req *cproto.DiagnosticAgen
 			return nil, ctx.Err()
 		}
 		r := h.Hook(ctx)
-		res = append(res, &cproto.DiagnosticFileResult{
-			Name:        h.Name,
-			Filename:    h.Filename,
-			Description: h.Description,
-			ContentType: h.ContentType,
-			Content:     r,
-			Generated:   timestamppb.New(time.Now().UTC()),
-		})
+		if r != nil {
+			res = append(res, &cproto.DiagnosticFileResult{
+				Name:        h.Name,
+				Filename:    h.Filename,
+				Description: h.Description,
+				ContentType: h.ContentType,
+				Content:     r,
+				Generated:   timestamppb.New(time.Now().UTC()),
+			})
+		}
 	}
 
 	for _, metric := range req.AdditionalMetrics {

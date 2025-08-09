@@ -15,6 +15,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -49,22 +50,10 @@ type diagnosticsProvider interface {
 	PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error)
 }
 
-// abstractLogger represents a logger implementation
-type abstractLogger interface {
-	Debug(args ...interface{})
-	Debugf(template string, args ...interface{})
-	Debugw(msg string, keysAndValues ...interface{})
-	Infof(template string, args ...interface{})
-	Warn(args ...interface{})
-	Warnw(msg string, keysAndValues ...interface{})
-	Errorf(template string, args ...interface{})
-	Errorw(msg string, keysAndValues ...interface{})
-}
-
 // Diagnostics is the handler to process Diagnostics actions.
 // When a Diagnostics action is received a full diagnostics bundle is taken and uploaded to fleet-server.
 type Diagnostics struct {
-	log          abstractLogger
+	log          *logger.Logger
 	diagProvider diagnosticsProvider
 	limiter      *rate.Limiter
 	uploader     Uploader
@@ -72,7 +61,7 @@ type Diagnostics struct {
 }
 
 // NewDiagnostics returns a new Diagnostics handler.
-func NewDiagnostics(log abstractLogger, topPath string, coord diagnosticsProvider, cfg config.Limit, uploader Uploader) *Diagnostics {
+func NewDiagnostics(log *logger.Logger, topPath string, coord diagnosticsProvider, cfg config.Limit, uploader Uploader) *Diagnostics {
 	if topPath == "" {
 		topPath = paths.Top()
 	}
@@ -197,7 +186,7 @@ func (h *Diagnostics) collectDiag(ctx context.Context, action *fleetapi.ActionDi
 
 // runHooks runs the agent diagnostics hooks.
 func (h *Diagnostics) runHooks(ctx context.Context, action *fleetapi.ActionDiagnostics) ([]client.DiagnosticFileResult, error) {
-	hooks := append(h.diagProvider.DiagnosticHooks(), diagnostics.GlobalHooks()...)
+	hooks := append(h.diagProvider.DiagnosticHooks(), diagnostics.GlobalHooks(h.log)...)
 
 	// Currently CPU is the only additional metric we can collect.
 	// If this changes we would need to change how we scan AdditionalMetrics.
