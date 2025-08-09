@@ -1412,7 +1412,6 @@ func TesE2EtUpgradeDownloadErrors(t *testing.T) {
 
 					upgrader, err := NewUpgrader(log, &config, mockAgentInfo)
 					require.NoError(t, err)
-					// upgrader.artifactDownloader = artifactDownloader
 					upgrader.upgradeExecutor = executeUpgrade
 
 					_, err = upgrader.Upgrade(context.Background(), version.String(), config.SourceURI, nil, upgradeDetails, false, false)
