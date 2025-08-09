@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -1421,6 +1422,131 @@ func TesE2EtUpgradeDownloadErrors(t *testing.T) {
 					require.DirExists(t, testTargetPath, "target directory should not be cleaned up")
 				})
 			}
+		})
+	}
+}
+
+func archiveFilesWithArchiveDirName(archiveWithoutSuffix string, archiveFiles []files) []files {
+	modifiedArchiveFiles := make([]files, len(archiveFiles))
+	for i, file := range archiveFiles {
+		file.path = strings.Replace(file.path, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64", archiveWithoutSuffix, 1)
+		modifiedArchiveFiles[i] = file
+	}
+	return modifiedArchiveFiles
+}
+
+func createArchive(t *testing.T, archiveName string, archiveFiles []files) (string, error) {
+	archiveWithoutSuffix := strings.TrimSuffix(archiveName, ".tar.gz")
+	archiveWithoutSuffix = strings.TrimSuffix(archiveWithoutSuffix, ".zip")
+
+	archiveFiles = archiveFilesWithArchiveDirName(archiveWithoutSuffix, archiveFiles)
+
+	if runtime.GOOS == "windows" {
+		return createZipArchive(t, archiveName, archiveFiles)
+	}
+	return createTarArchive(t, archiveName, archiveFiles)
+}
+
+func TestE2EUpgradeUnpackErrors(t *testing.T) {
+	log, _ := loggertest.New("test")
+
+	testVersion := agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")
+	upgradeDetails := details.NewDetails(testVersion.String(), details.StateRequested, "test")
+	artifactName, err := artifact.GetArtifactName(agentArtifact, *testVersion, runtime.GOOS, runtime.GOARCH)
+	require.NoError(t, err)
+
+	versionedHome := "data/elastic-agent-1.2.3-SNAPSHOT-abcdef"
+
+	t.Logf("Expected artifact name: %s", artifactName)
+
+	archive, err := createArchive(t, artifactName, archiveFilesWithMoreComponents)
+	require.NoError(t, err)
+	t.Logf("Created archive: %s", archive)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, archive)
+	}))
+	t.Cleanup(server.Close)
+
+	tmpCopyFunc := unpackArchiveCopyFunc
+	t.Cleanup(func() {
+		unpackArchiveCopyFunc = tmpCopyFunc
+	})
+
+	testCases := map[string]testError{
+		"should cleanup downloaded artifact and partially unpacked archive on generic error": {
+			copyFuncError: errors.New("test copy error"),
+			expectedError: errors.New("test copy error"),
+		},
+	}
+
+	for _, te := range TestErrors {
+		testCases[fmt.Sprintf("should cleanup downloaded artifact and partially unpacked archive on disk space error: %v and return InsufficientDiskSpace error", te)] = testError{
+			copyFuncError: te,
+			expectedError: upgradeErrors.ErrInsufficientDiskSpace,
+		}
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			mockAgentInfo := mockinfo.NewAgent(t)
+			mockAgentInfo.On("Version").Return(testVersion.String())
+
+			baseDir := t.TempDir()
+			paths.SetTop(baseDir)
+			testTargetPath := filepath.Join(baseDir, "target")
+			versionedHomePath := filepath.Join(baseDir, versionedHome)
+
+			config := artifact.Config{
+				TargetDirectory:        testTargetPath,
+				SourceURI:              server.URL,
+				RetrySleepInitDuration: 1 * time.Second,
+				HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+					Timeout: 1 * time.Second,
+				},
+			}
+
+			unpackArchiveCopyFunc = func(dst io.Writer, src io.Reader) (int64, error) {
+				require.DirExists(t, versionedHomePath, "versionedHomePath should exist before copying")
+				entries, err := os.ReadDir(versionedHomePath)
+				require.NoError(t, err, "reading versionedHomePath failed")
+				require.Len(t, entries, 1, "versionedHomePath should only contain one file before copying")
+
+				fileInfo, err := entries[0].Info()
+				require.NoError(t, err, "getting file info failed")
+				require.False(t, fileInfo.IsDir(), "the entry in versionedHomePath should be a file")
+
+				filePath := filepath.Join(versionedHomePath, entries[0].Name())
+				file, err := os.Open(filePath)
+				require.NoError(t, err, fmt.Sprintf("error opening file %s", filePath))
+
+				defer file.Close()
+
+				stat, err := file.Stat()
+				require.NoError(t, err, fmt.Sprintf("error getting file info for %s", filePath))
+				require.Equal(t, int64(0), stat.Size(), "file in versionedHomePath should be empty")
+
+				_, err = io.Copy(dst, src)
+				require.NoError(t, err, fmt.Sprintf("error copying archive to %s", versionedHomePath))
+
+				statAfter, err := file.Stat()
+				require.NoError(t, err, fmt.Sprintf("error getting file info for %s", filePath))
+				require.NotEqual(t, int64(0), statAfter.Size(), "file in versionedHomePath should not be empty after copying")
+
+				return 0, tc.copyFuncError
+			}
+
+			upgrader, err := NewUpgrader(log, &config, mockAgentInfo)
+			require.NoError(t, err)
+
+			_, err = upgrader.Upgrade(context.Background(), testVersion.String(), server.URL, nil, upgradeDetails, true, true)
+			require.ErrorIs(t, err, tc.expectedError, "expected error mismatch")
+
+			require.NoDirExists(t, versionedHomePath, "partially unpacked archive should be cleaned up")
+
+			artifactPath, err := artifact.GetArtifactPath(agentArtifact, *testVersion, runtime.GOOS, runtime.GOARCH, config.TargetDirectory)
+			require.NoError(t, err)
+			require.NoFileExists(t, artifactPath, "downloaded artifact should be cleaned up")
 		})
 	}
 }
