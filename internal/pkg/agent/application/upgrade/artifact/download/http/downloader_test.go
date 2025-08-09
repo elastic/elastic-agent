@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strconv"
 	"testing"
@@ -69,6 +70,8 @@ func TestDownload(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+
+			require.Equal(t, targetDir, filepath.Dir(artifactPath))
 
 			_, err = os.Stat(artifactPath)
 			if err != nil {
@@ -374,7 +377,7 @@ func TestDownloadVersion(t *testing.T) {
 		fields  fields
 		args    args
 		want    string
-		wantErr assert.ErrorAssertionFunc
+		wantErr bool
 	}{
 		{
 			name: "happy path released version",
@@ -396,7 +399,7 @@ func TestDownloadVersion(t *testing.T) {
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "", "")},
 			want:    "elastic-agent-1.2.3-linux-x86_64.tar.gz",
-			wantErr: assert.NoError,
+			wantErr: false,
 		},
 		{
 			name: "no hash released version",
@@ -414,7 +417,7 @@ func TestDownloadVersion(t *testing.T) {
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "", "")},
 			want:    "elastic-agent-1.2.3-linux-x86_64.tar.gz",
-			wantErr: assert.Error,
+			wantErr: true,
 		},
 		{
 			name: "happy path snapshot version",
@@ -436,7 +439,7 @@ func TestDownloadVersion(t *testing.T) {
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")},
 			want:    "elastic-agent-1.2.3-SNAPSHOT-linux-x86_64.tar.gz",
-			wantErr: assert.NoError,
+			wantErr: false,
 		},
 		{
 			name: "happy path released version with build metadata",
@@ -458,7 +461,7 @@ func TestDownloadVersion(t *testing.T) {
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "", "build19700101")},
 			want:    "elastic-agent-1.2.3+build19700101-linux-x86_64.tar.gz",
-			wantErr: assert.NoError,
+			wantErr: false,
 		},
 		{
 			name: "happy path snapshot version with build metadata",
@@ -480,7 +483,7 @@ func TestDownloadVersion(t *testing.T) {
 			},
 			args:    args{a: agentSpec, version: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "build19700101")},
 			want:    "elastic-agent-1.2.3-SNAPSHOT+build19700101-linux-x86_64.tar.gz",
-			wantErr: assert.NoError,
+			wantErr: false,
 		},
 	}
 
@@ -520,11 +523,136 @@ func TestDownloadVersion(t *testing.T) {
 
 			got, err := downloader.Download(context.TODO(), tt.args.a, tt.args.version)
 
-			if !tt.wantErr(t, err, fmt.Sprintf("Download(%v, %v)", tt.args.a, tt.args.version)) {
+			assert.Equalf(t, filepath.Join(targetDirPath, tt.want), got, "Download(%v, %v)", tt.args.a, tt.args.version)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+
+				assert.NoFileExists(t, filepath.Join(targetDirPath, tt.want))
+				assert.NoFileExists(t, filepath.Join(targetDirPath, tt.want+".sha512"))
+				assert.DirExists(t, targetDirPath)
 				return
 			}
 
-			assert.Equalf(t, filepath.Join(targetDirPath, tt.want), got, "Download(%v, %v)", tt.args.a, tt.args.version)
+			assert.NoError(t, err)
 		})
 	}
+}
+
+type testCopyError struct {
+	msg string
+}
+
+func (e *testCopyError) Error() string {
+	return e.msg
+}
+
+func (e *testCopyError) Is(target error) bool {
+	_, ok := target.(*testCopyError)
+	return ok
+}
+
+type mockProgressReporter struct {
+	reportFailedCalls []reportFailedCall
+}
+
+func (m *mockProgressReporter) Report(ctx context.Context) {
+	// noop
+}
+
+func (m *mockProgressReporter) ReportComplete() {
+	// noop
+}
+
+func (m *mockProgressReporter) ReportFailed(err error) {
+	m.reportFailedCalls = append(m.reportFailedCalls, reportFailedCall{err: err})
+}
+
+func (m *mockProgressReporter) Write(b []byte) (int, error) {
+	return len(b), nil
+}
+
+func TestDownloadFile(t *testing.T) {
+	t.Run("disk space error", func(t *testing.T) {
+		ctx := t.Context()
+		artifactName := "beat/elastic-agent"
+		filename := "elastic-agent-1.2.3-linux-x86_64.tar.gz"
+		fullPath := filepath.Join(t.TempDir(), filename)
+
+		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+			rw.WriteHeader(http.StatusOK)
+			_, _ = rw.Write([]byte("mock content"))
+		}))
+		defer server.Close()
+
+		config := &artifact.Config{
+			OperatingSystem: "linux",
+			Architecture:    "64",
+			SourceURI:       server.URL,
+			TargetDirectory: filepath.Dir(fullPath),
+		}
+
+		log, _ := loggertest.New("downloader")
+		upgradeDetails := details.NewDetails("1.2.3", details.StateRequested, "")
+
+		progressReporter := &mockProgressReporter{}
+
+		var receivedError error
+		diskSpaceErr := &testCopyError{msg: "disk space error"}
+		diskSpaceErrorFunc := func(err error) error {
+			receivedError = err
+			return diskSpaceErr
+		}
+
+		copyFuncError := &testCopyError{msg: "mock error"}
+		copyFunc := func(dst io.Writer, src io.Reader) (int64, error) {
+			return 0, copyFuncError
+		}
+
+		downloader := NewDownloaderWithClient(log, config, *server.Client(), upgradeDetails)
+		downloader.CopyFunc = copyFunc
+		downloader.diskSpaceErrorFunc = diskSpaceErrorFunc
+		downloader.progressReporterProvider = func(sourceURI string, timeout time.Duration, length int, progressObservers ...progressObserver) ProgressReporter {
+			return progressReporter
+		}
+
+		_, err := downloader.downloadFile(ctx, artifactName, filename, fullPath)
+
+		t.Run("calls diskSpaceErrorFunc on any copy error", func(t *testing.T) {
+			assert.Equal(t, receivedError, copyFuncError)
+		})
+
+		t.Run("calls ReportFailed with the result of diskSpaceErrorFunc", func(t *testing.T) {
+			assert.ErrorIs(t, err, diskSpaceErr)
+			assert.Equal(t, len(progressReporter.reportFailedCalls), 1)
+			assert.Equal(t, progressReporter.reportFailedCalls[0].err, diskSpaceErr)
+		})
+	})
+}
+
+func TestDownloader_NewDownloaderWithClient(t *testing.T) {
+	config := &artifact.Config{
+		OperatingSystem: "linux",
+		Architecture:    "amd64",
+	}
+	upgradeDetails := details.NewDetails("1.0.0", details.StateRequested, "")
+	log, _ := loggertest.New("downloader")
+
+	downloader := NewDownloaderWithClient(log, config, http.Client{}, upgradeDetails)
+
+	expectedCopyFunc := reflect.ValueOf(io.Copy)
+	actualCopyFunc := reflect.ValueOf(downloader.CopyFunc)
+	assert.Equal(t, expectedCopyFunc.Pointer(), actualCopyFunc.Pointer())
+
+	assert.NotNil(t, downloader.diskSpaceErrorFunc)
+
+	assert.NotNil(t, downloader.progressReporterProvider)
+	expectedProvider := reflect.ValueOf(progressReporterProviderFunc)
+	actualProvider := reflect.ValueOf(downloader.progressReporterProvider)
+	assert.Equal(t, expectedProvider.Pointer(), actualProvider.Pointer())
+
+	assert.Equal(t, config, downloader.config)
+	assert.Equal(t, upgradeDetails, downloader.upgradeDetails)
+	assert.Equal(t, http.Client{}, downloader.client)
+	assert.Equal(t, log, downloader.log)
 }

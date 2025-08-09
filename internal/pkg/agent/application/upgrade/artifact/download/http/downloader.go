@@ -17,10 +17,13 @@ import (
 	"strings"
 	"time"
 
+	"go.elastic.co/apm/v2"
+
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
@@ -43,17 +46,31 @@ const (
 	warningProgressIntervalPercentage = 0.75
 )
 
+// ProgressReporter defines the interface for reporting download progress.
+type ProgressReporter interface {
+	io.Writer
+	// Prepare(sourceURI string, timeout time.Duration, length int, progressObservers ...progressObserver)
+	Report(ctx context.Context)
+	ReportComplete()
+	ReportFailed(err error)
+}
+
+type progressReporterProvider func(sourceURI string, timeout time.Duration, length int, progressObservers ...progressObserver) ProgressReporter
+
 // Downloader is a downloader able to fetch artifacts from elastic.co web page.
 type Downloader struct {
-	log            *logger.Logger
-	config         *artifact.Config
-	client         http.Client
-	upgradeDetails *details.Details
+	log                      *logger.Logger
+	config                   *artifact.Config
+	client                   http.Client
+	upgradeDetails           *details.Details
+	progressReporterProvider progressReporterProvider
+	diskSpaceErrorFunc       func(error) error
+	CopyFunc                 func(dst io.Writer, src io.Reader) (written int64, err error)
 }
 
 // NewDownloader creates and configures Elastic Downloader
 func NewDownloader(log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details) (*Downloader, error) {
-	client, err := config.HTTPTransportSettings.Client(
+	client, err := config.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 		httpcommon.WithKeepaliveSettings{Disable: false, IdleConnTimeout: 30 * time.Second},
 	)
@@ -65,19 +82,26 @@ func NewDownloader(log *logger.Logger, config *artifact.Config, upgradeDetails *
 	return NewDownloaderWithClient(log, config, *client, upgradeDetails), nil
 }
 
+func progressReporterProviderFunc(sourceURI string, timeout time.Duration, length int, progressObservers ...progressObserver) ProgressReporter {
+	return newDownloadProgressReporter(sourceURI, timeout, length, progressObservers...)
+}
+
 // NewDownloaderWithClient creates Elastic Downloader with specific client used
 func NewDownloaderWithClient(log *logger.Logger, config *artifact.Config, client http.Client, upgradeDetails *details.Details) *Downloader {
 	return &Downloader{
-		log:            log,
-		config:         config,
-		client:         client,
-		upgradeDetails: upgradeDetails,
+		log:                      log,
+		config:                   config,
+		client:                   client,
+		upgradeDetails:           upgradeDetails,
+		diskSpaceErrorFunc:       upgradeErrors.ToDiskSpaceErrorFunc(log),
+		CopyFunc:                 io.Copy,
+		progressReporterProvider: progressReporterProviderFunc,
 	}
 }
 
 func (e *Downloader) Reload(c *artifact.Config) error {
 	// reload client
-	client, err := c.HTTPTransportSettings.Client(
+	client, err := c.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 	)
 	if err != nil {
@@ -95,6 +119,8 @@ func (e *Downloader) Reload(c *artifact.Config) error {
 // Download fetches the package from configured source.
 // Returns absolute path to downloaded package and an error.
 func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (_ string, err error) {
+	span, ctx := apm.StartSpan(ctx, "download", "app.internal")
+	defer span.End()
 	remoteArtifact := a.Artifact
 	downloadedFiles := make([]string, 0, 2)
 	defer func() {
@@ -116,6 +142,7 @@ func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version 
 
 	hashPath, err := e.downloadHash(ctx, remoteArtifact, e.config.OS(), a, *version)
 	downloadedFiles = append(downloadedFiles, hashPath)
+
 	return path, err
 }
 
@@ -192,13 +219,11 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 
 	resp, err := e.client.Do(req.WithContext(ctx))
 	if err != nil {
-		// return path, file already exists and needs to be cleaned up
 		return fullPath, errors.New(err, "fetching package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		// return path, file already exists and needs to be cleaned up
 		return fullPath, errors.New(fmt.Sprintf("call to '%s' returned unsuccessful status code: %d", sourceURI, resp.StatusCode), errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
 
@@ -209,17 +234,17 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 		}
 	}
 
-	loggingObserver := newLoggingProgressObserver(e.log, e.config.HTTPTransportSettings.Timeout)
+	loggingObserver := newLoggingProgressObserver(e.log, e.config.Timeout)
 	detailsObserver := newDetailsProgressObserver(e.upgradeDetails)
-	dp := newDownloadProgressReporter(sourceURI, e.config.HTTPTransportSettings.Timeout, fileSize, loggingObserver, detailsObserver)
-	dp.Report(ctx)
-	_, err = io.Copy(destinationFile, io.TeeReader(resp.Body, dp))
+	progressReporter := e.progressReporterProvider(sourceURI, e.config.Timeout, fileSize, loggingObserver, detailsObserver)
+	progressReporter.Report(ctx)
+	_, err = e.CopyFunc(destinationFile, io.TeeReader(resp.Body, progressReporter))
 	if err != nil {
-		dp.ReportFailed(err)
-		// return path, file already exists and needs to be cleaned up
-		return fullPath, errors.New(err, "copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
+		err = e.diskSpaceErrorFunc(err)
+		progressReporter.ReportFailed(err)
+		return fullPath, fmt.Errorf("%s: %w", errors.New("copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI)).Error(), err)
 	}
-	dp.ReportComplete()
+	progressReporter.ReportComplete()
 
 	return fullPath, nil
 }

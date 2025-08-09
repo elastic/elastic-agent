@@ -23,6 +23,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	fsDownloader "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/fs"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -40,13 +42,15 @@ import (
 )
 
 const (
-	agentName          = "elastic-agent"
-	hashLen            = 6
-	agentCommitFile    = ".elastic-agent.active.commit"
-	runDirMod          = 0770
-	snapshotSuffix     = "-SNAPSHOT"
-	watcherMaxWaitTime = 30 * time.Second
-	fipsPrefix         = "-fips"
+	agentName                 = "elastic-agent"
+	hashLen                   = 6
+	agentCommitFile           = ".elastic-agent.active.commit"
+	runDirMod                 = 0770
+	snapshotSuffix            = "-SNAPSHOT"
+	watcherMaxWaitTime        = 30 * time.Second
+	fipsPrefix                = "-fips"
+	fileDownloaderFactory     = "fileDownloaderFactory"
+	composedDownloaderFactory = "composedDownloaderFactory"
 )
 
 var agentArtifact = artifact.Artifact{
@@ -68,14 +72,33 @@ func init() {
 	}
 }
 
+type downloaderFactory func(*agtversion.ParsedSemVer, *logger.Logger, *artifact.Config, *details.Details) (download.Downloader, error)
+
+type DownloaderFactoryProvider interface {
+	GetDownloaderFactory(name string) (downloaderFactory, error)
+}
+
+type downloaderFactoryProvider struct {
+	downloaderFactories map[string]downloaderFactory
+}
+
+func (d *downloaderFactoryProvider) GetDownloaderFactory(name string) (downloaderFactory, error) {
+	factory, ok := d.downloaderFactories[name]
+	if !ok {
+		return nil, fmt.Errorf("downloader factory %q not found", name)
+	}
+	return factory, nil
+}
+
 // Upgrader performs an upgrade
 type Upgrader struct {
-	log            *logger.Logger
-	settings       *artifact.Config
-	agentInfo      info.Agent
-	upgradeable    bool
-	fleetServerURI string
-	markerWatcher  MarkerWatcher
+	log                       *logger.Logger
+	settings                  *artifact.Config
+	agentInfo                 info.Agent
+	upgradeable               bool
+	fleetServerURI            string
+	markerWatcher             MarkerWatcher
+	downloaderFactoryProvider DownloaderFactoryProvider
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -87,12 +110,24 @@ func IsUpgradeable() bool {
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
 func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.Agent) (*Upgrader, error) {
+	downloaderFactories := map[string]downloaderFactory{
+		fileDownloaderFactory: func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
+			return fsDownloader.NewDownloader(config), nil
+		},
+		composedDownloaderFactory: newDownloader,
+	}
+
+	downloaderFactoryProvider := &downloaderFactoryProvider{
+		downloaderFactories: downloaderFactories,
+	}
+
 	return &Upgrader{
-		log:           log,
-		settings:      settings,
-		agentInfo:     agentInfo,
-		upgradeable:   IsUpgradeable(),
-		markerWatcher: newMarkerFileWatcher(markerFilePath(paths.Data()), log),
+		log:                       log,
+		settings:                  settings,
+		agentInfo:                 agentInfo,
+		upgradeable:               IsUpgradeable(),
+		markerWatcher:             newMarkerFileWatcher(markerFilePath(paths.Data()), log),
+		downloaderFactoryProvider: downloaderFactoryProvider,
 	}, nil
 }
 
