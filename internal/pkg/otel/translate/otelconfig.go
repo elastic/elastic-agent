@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 
@@ -39,7 +40,7 @@ const OtelNamePrefix = "_agent-component/"
 
 // BeatMonitoringConfigGetter is a function that returns the monitoring configuration for a beat receiver.
 type BeatMonitoringConfigGetter func(unitID, binary string) map[string]any
-type exporterConfigTranslationFunc func(*config.C) (map[string]any, error)
+type exporterConfigTranslationFunc func(*config.C, *logp.Logger) (map[string]any, error)
 
 var (
 	OtelSupportedOutputTypes         = []string{"elasticsearch"}
@@ -56,6 +57,7 @@ func GetOtelConfig(
 	model *component.Model,
 	info info.Agent,
 	beatMonitoringConfigGetter BeatMonitoringConfigGetter,
+	logger *logp.Logger,
 ) (*confmap.Conf, error) {
 	components := getSupportedComponents(model)
 	if len(components) == 0 {
@@ -64,7 +66,7 @@ func GetOtelConfig(
 	otelConfig := confmap.New() // base config, nothing here for now
 
 	for _, comp := range components {
-		componentConfig, compErr := getCollectorConfigForComponent(comp, info, beatMonitoringConfigGetter)
+		componentConfig, compErr := getCollectorConfigForComponent(comp, info, beatMonitoringConfigGetter, logger)
 		if compErr != nil {
 			return nil, compErr
 		}
@@ -119,15 +121,23 @@ func getExporterID(exporterType otelcomponent.Type, outputName string) otelcompo
 	return otelcomponent.NewIDWithName(exporterType, exporterName)
 }
 
+// getExtensionID returns the id for beatsauth extension
+// outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
+func getExtensionID(outputName string) otelcomponent.ID {
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("beatsauth"), extensionName)
+}
+
 // getCollectorConfigForComponent returns the Otel collector config required to run the given component.
 // This function returns a full, valid configuration that can then be merged with configurations for other components.
 func getCollectorConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
 	beatMonitoringConfigGetter BeatMonitoringConfigGetter,
+	logger *logp.Logger,
 ) (*confmap.Conf, error) {
 
-	exportersConfig, outputQueueConfig, err := getExportersConfigForComponent(comp)
+	exportersConfig, outputQueueConfig, extensionConfig, err := getExportersConfigForComponent(comp, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -153,6 +163,10 @@ func getCollectorConfigForComponent(
 		"service": map[string]any{
 			"pipelines": pipelinesConfig,
 		},
+	}
+
+	if extensionConfig != nil {
+		fullConfig["extensions"] = extensionConfig
 	}
 	return confmap.NewFromStringMap(fullConfig), nil
 }
@@ -256,26 +270,33 @@ func getReceiversConfigForComponent(
 
 // getReceiversConfigForComponent returns the exporters configuration and queue settings for a component. Usually this will be a single
 // exporter, but in principle it could be more.
-func getExportersConfigForComponent(comp *component.Component) (exporterCfg map[string]any, queueCfg map[string]any, err error) {
+func getExportersConfigForComponent(comp *component.Component, logger *logp.Logger) (exporterCfg map[string]any, queueCfg map[string]any, extensionCfg map[string]any, err error) {
 	exportersConfig := map[string]any{}
+	extensionConfig := map[string]any{}
 	exporterType, err := getExporterTypeForComponent(comp)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	var queueSettings map[string]any
 	for _, unit := range comp.Units {
 		if unit.Type == client.UnitTypeOutput {
 			var unitExportersConfig map[string]any
-			unitExportersConfig, queueSettings, err = unitToExporterConfig(unit, exporterType, comp.InputType)
+			var unitExtensionConfig map[string]any
+			unitExportersConfig, queueSettings, unitExtensionConfig, err = unitToExporterConfig(unit, exporterType, comp.InputType, logger)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 			for k, v := range unitExportersConfig {
 				exportersConfig[k] = v
 			}
+			if unitExtensionConfig != nil {
+				for k, v := range unitExtensionConfig {
+					extensionConfig[k] = v
+				}
+			}
 		}
 	}
-	return exportersConfig, queueSettings, nil
+	return exportersConfig, queueSettings, extensionConfig, nil
 }
 
 // GetBeatNameForComponent returns the beat binary name that would be used to run this component.
@@ -323,13 +344,13 @@ func getExporterTypeForComponent(comp *component.Component) (otelcomponent.Type,
 }
 
 // unitToExporterConfig translates a component.Unit to return an otel exporter configuration and output queue settings
-func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, inputType string) (exportersCfg map[string]any, queueSettings map[string]any, err error) {
+func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, inputType string, logger *logp.Logger) (exportersCfg map[string]any, queueSettings map[string]any, extensionCfg map[string]any, err error) {
 	if unit.Type == client.UnitTypeInput {
-		return nil, nil, fmt.Errorf("unit type is an input, expected output: %v", unit)
+		return nil, nil, nil, fmt.Errorf("unit type is an input, expected output: %v", unit)
 	}
 	configTranslationFunc, ok := configTranslationFuncForExporter[exporterType]
 	if !ok {
-		return nil, nil, fmt.Errorf("no config translation function for exporter type: %s", exporterType)
+		return nil, nil, nil, fmt.Errorf("no config translation function for exporter type: %s", exporterType)
 	}
 	// we'd like to use the same exporter for all outputs with the same name, so we parse out the name for the unit id
 	// these will be deduplicated by the configuration merging process at the end
@@ -340,30 +361,53 @@ func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, 
 	unitConfigMap := unit.Config.GetSource().AsMap() // this is what beats do in libbeat/management/generate.go
 	outputCfgC, err := config.NewConfigFrom(unitConfigMap)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
-	}
-	// Config translation function can mutate queue settings defined under output config
-	exporterConfig, err := configTranslationFunc(outputCfgC)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
+		return nil, nil, nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
 	}
 
-	exportersCfg = map[string]any{
-		exporterId.String(): exporterConfig,
+	// Config translation function can mutate queue settings defined under output config
+	exporterConfig, err := configTranslationFunc(outputCfgC, logger)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
 	}
 
 	// If output config contains queue settings defined by user/preset field, it should be promoted to the receiver section
 	if ok := outputCfgC.HasField("queue"); ok {
 		err := outputCfgC.Unpack(&queueSettings)
 		if err != nil {
-			return nil, nil, fmt.Errorf("error unpacking queue settings for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
+			return nil, nil, nil, fmt.Errorf("error unpacking queue settings for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
 		}
 		if queue, ok := queueSettings["queue"].(map[string]any); ok {
 			queueSettings = queue
 		}
 	}
 
-	return exportersCfg, queueSettings, nil
+	// use beatsauth extension for ssl parameters not supported by ES exporter
+	if exporterType.String() == "elasticsearch" {
+		// get extension ID
+		extensionID := getExtensionID(outputName)
+		extensionConfig, err := getBeatsAuthExtensionConfig(outputCfgC)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("error supporting ssl parameters for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
+		}
+
+		if extensionConfig != nil {
+			// sets extensionCfg
+			extensionCfg = map[string]any{
+				extensionID.String(): extensionConfig,
+			}
+			// add authenticator to ES config
+			exporterConfig["auth"] = map[string]any{
+				"authenticator": extensionID.String(),
+			}
+		}
+
+	}
+
+	exportersCfg = map[string]any{
+		exporterId.String(): exporterConfig,
+	}
+
+	return exportersCfg, queueSettings, extensionCfg, nil
 }
 
 // getInputsForUnit returns the beat inputs for a unit. These can directly be plugged into a beats receiver config.
@@ -410,9 +454,8 @@ func getDefaultDatastreamTypeForComponent(comp *component.Component) (string, er
 }
 
 // translateEsOutputToExporter translates an elasticsearch output configuration to an elasticsearch exporter configuration.
-func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
-	// TODO: Figure out a way to avoid needing a logger for this function
-	esConfig, err := elasticsearchtranslate.ToOTelConfig(cfg, logp.L())
+func translateEsOutputToExporter(cfg *config.C, logger *logp.Logger) (map[string]any, error) {
+	esConfig, err := elasticsearchtranslate.ToOTelConfig(cfg, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -428,4 +471,35 @@ func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
 
 func BeatDataPath(componentId string) string {
 	return filepath.Join(paths.Run(), componentId)
+}
+
+// getBeatsAuthExtensionConfig sets following ssl parameters on beatsauth
+// verification_mode
+// ca_trusted_fingerprint
+// ca_sha256
+func getBeatsAuthExtensionConfig(cfg *config.C) (map[string]any, error) {
+	var sslConfig httpcommon.HTTPTransportSettings
+	err := cfg.Unpack(&sslConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	// if ssl is not enabled or if verification mode is none, then we do not need beatsauth extension
+	if !sslConfig.TLS.IsEnabled() || sslConfig.TLS.VerificationMode.String() == "none" {
+		return nil, nil
+	}
+
+	finalConfig := map[string]any{
+		"tls": map[string]any{
+			"verification_mode": sslConfig.TLS.VerificationMode.String(),
+		},
+	}
+
+	if len(sslConfig.TLS.CASha256) != 0 {
+		finalConfig["tls"].(map[string]any)["ca_sha256"] = sslConfig.TLS.CASha256
+	} else if sslConfig.TLS.CATrustedFingerprint != "" {
+		finalConfig["tls"].(map[string]any)["ca_trusted_fingerprint"] = sslConfig.TLS.CATrustedFingerprint
+	}
+
+	return finalConfig, nil
 }
