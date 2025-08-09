@@ -1453,7 +1453,7 @@ func TestE2EUpgradeUnpackErrors(t *testing.T) {
 
 	testVersion := agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")
 	upgradeDetails := details.NewDetails(testVersion.String(), details.StateRequested, "test")
-	artifactName, err := artifact.GetArtifactName(agentArtifact, *testVersion, runtime.GOOS, runtime.GOARCH)
+	artifactName, err := artifact.GetArtifactName(agentArtifact, *testVersion, tempConfig.OS(), tempConfig.Arch())
 	require.NoError(t, err)
 
 	versionedHome := "data/elastic-agent-1.2.3-SNAPSHOT-abcdef"
