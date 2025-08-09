@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent
 
-go 1.24.5
+go 1.24.6
 
 require (
 	github.com/Jeffail/gabs/v2 v2.6.0
