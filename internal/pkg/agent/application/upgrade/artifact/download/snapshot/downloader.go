@@ -81,7 +81,7 @@ func (e *Downloader) Reload(c *artifact.Config) error {
 
 // Download fetches the package from configured source.
 // Returns absolute path to downloaded package and an error.
-func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (string, error) {
+func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (download.DownloadResult, error) {
 	// remove build metadata to match filename of the package for the specific snapshot build
 	strippedVersion := agtversion.NewParsedSemVer(version.Major(), version.Minor(), version.Patch(), version.Prerelease(), "")
 	return e.downloader.Download(ctx, a, strippedVersion)

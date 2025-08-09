@@ -7,15 +7,18 @@ package upgrade
 import (
 	"context"
 	"crypto/tls"
+	goerrors "errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"runtime"
-	"sync"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/gofrs/flock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -23,9 +26,15 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/composed"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/fs"
+	httpDownloader "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/http"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -35,88 +44,14 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	version "github.com/elastic/elastic-agent/pkg/version"
+	mockinfo "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/info"
+	currentagtversion "github.com/elastic/elastic-agent/version"
+
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 	mocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
 )
-
-func Test_CopyFile(t *testing.T) {
-	l, _ := logger.New("test", false)
-	tt := []struct {
-		Name        string
-		From        string
-		To          string
-		IgnoreErr   bool
-		KeepOpen    bool
-		ExpectedErr bool
-	}{
-		{
-			"Existing, no onerr",
-			filepath.Join(".", "test", "case1", "README.md"),
-			filepath.Join(".", "test", "case1", "copy", "README.md"),
-			false,
-			false,
-			false,
-		},
-		{
-			"Existing but open",
-			filepath.Join(".", "test", "case2", "README.md"),
-			filepath.Join(".", "test", "case2", "copy", "README.md"),
-			false,
-			true,
-			runtime.GOOS == "windows", // this fails only on,
-		},
-		{
-			"Existing but open, ignore errors",
-			filepath.Join(".", "test", "case3", "README.md"),
-			filepath.Join(".", "test", "case3", "copy", "README.md"),
-			true,
-			true,
-			false,
-		},
-		{
-			"Not existing, accept errors",
-			filepath.Join(".", "test", "case4", "README.md"),
-			filepath.Join(".", "test", "case4", "copy", "README.md"),
-			false,
-			false,
-			true,
-		},
-		{
-			"Not existing, ignore errors",
-			filepath.Join(".", "test", "case4", "README.md"),
-			filepath.Join(".", "test", "case4", "copy", "README.md"),
-			true,
-			false,
-			false,
-		},
-	}
-
-	for _, tc := range tt {
-		t.Run(tc.Name, func(t *testing.T) {
-			defer func() {
-				// cleanup
-				_ = os.RemoveAll(filepath.Dir(tc.To))
-			}()
-
-			var fl *flock.Flock
-			if tc.KeepOpen {
-				// this uses syscalls to create inter-process lock
-				fl = flock.New(tc.From)
-				_, err := fl.TryLock()
-				require.NoError(t, err)
-
-				defer func() {
-					require.NoError(t, fl.Unlock())
-				}()
-
-			}
-
-			err := copyDir(l, tc.From, tc.To, tc.IgnoreErr)
-			require.Equal(t, tc.ExpectedErr, err != nil, err)
-		})
-	}
-}
 
 func TestShutdownCallback(t *testing.T) {
 	type testcase struct {
@@ -632,178 +567,6 @@ var agentVersion123SNAPSHOTghijkl = agentVersion{
 	hash:     "ghijkl",
 }
 
-func TestExtractVersion(t *testing.T) {
-	type args struct {
-		metadata packageMetadata
-		version  string
-	}
-	type want struct {
-		newVersion agentVersion
-	}
-
-	tests := []struct {
-		name string
-		args args
-		want want
-	}{
-		{
-			name: "same version, snapshot flag and hash",
-			args: args{
-				metadata: packageMetadata{
-					manifest: &v1.PackageManifest{
-						Package: v1.PackageDesc{
-							Version:       "1.2.3",
-							Snapshot:      true,
-							VersionedHome: "",
-							PathMappings:  nil,
-						},
-					},
-					hash: "abcdef",
-				},
-				version: "unused",
-			},
-			want: want{
-				newVersion: agentVersion123SNAPSHOTabcdef,
-			},
-		},
-		{
-			name: "same hash, snapshot flag, different version",
-			args: args{
-				metadata: packageMetadata{
-					manifest: &v1.PackageManifest{
-						Package: v1.PackageDesc{
-							Version:       "1.2.3-repackaged",
-							Snapshot:      true,
-							VersionedHome: "",
-							PathMappings:  nil,
-						},
-					},
-					hash: "abcdef",
-				},
-				version: "unused",
-			},
-			want: want{
-				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
-			},
-		},
-		{
-			name: "same version and hash, different snapshot flag (SNAPSHOT promotion to release)",
-			args: args{
-				metadata: packageMetadata{
-					manifest: &v1.PackageManifest{
-						Package: v1.PackageDesc{
-							Version:       "1.2.3",
-							Snapshot:      false,
-							VersionedHome: "",
-							PathMappings:  nil,
-						},
-					},
-					hash: "abcdef",
-				},
-				version: "unused",
-			},
-			want: want{
-				newVersion: agentVersion123abcdef,
-			},
-		},
-		{
-			name: "same version and snapshot, different hash (SNAPSHOT upgrade)",
-			args: args{
-				metadata: packageMetadata{
-					manifest: &v1.PackageManifest{
-						Package: v1.PackageDesc{
-							Version:       "1.2.3",
-							Snapshot:      true,
-							VersionedHome: "",
-							PathMappings:  nil,
-						},
-					},
-					hash: "ghijkl",
-				},
-				version: "unused",
-			},
-			want: want{
-				newVersion: agentVersion123SNAPSHOTghijkl,
-			},
-		},
-		{
-			name: "same version, snapshot flag and hash, no manifest",
-			args: args{
-				metadata: packageMetadata{
-					manifest: nil,
-					hash:     "abcdef",
-				},
-				version: "1.2.3-SNAPSHOT",
-			},
-			want: want{
-				newVersion: agentVersion123SNAPSHOTabcdef,
-			},
-		},
-		{
-			name: "same hash, snapshot flag, different version, no manifest",
-			args: args{
-				metadata: packageMetadata{
-					manifest: nil,
-					hash:     "abcdef",
-				},
-				version: "1.2.3-SNAPSHOT.repackaged",
-			},
-			want: want{
-				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
-			},
-		},
-		{
-			name: "same version and hash, different snapshot flag, no manifest (SNAPSHOT promotion to release)",
-			args: args{
-				metadata: packageMetadata{
-					manifest: nil,
-					hash:     "abcdef",
-				},
-				version: "1.2.3",
-			},
-			want: want{
-				newVersion: agentVersion123abcdef,
-			},
-		},
-		{
-			name: "same version and snapshot, different hash (SNAPSHOT upgrade)",
-			args: args{
-				metadata: packageMetadata{
-					manifest: nil,
-					hash:     "ghijkl",
-				},
-				version: "1.2.3-SNAPSHOT",
-			},
-			want: want{
-				newVersion: agentVersion123SNAPSHOTghijkl,
-			},
-		},
-		{
-			name: "same version and snapshot, no hash (SNAPSHOT upgrade before download)",
-			args: args{
-				metadata: packageMetadata{
-					manifest: nil,
-				},
-				version: "1.2.3-SNAPSHOT",
-			},
-			want: want{
-				newVersion: agentVersion{
-					version:  "1.2.3",
-					snapshot: true,
-				},
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			actualNewVersion := extractAgentVersion(test.args.metadata, test.args.version)
-			assert.Equal(t, test.want.newVersion, actualNewVersion, "Unexpected new version result: extractAgentVersion(%v, %v) should be %v",
-				test.args.metadata, test.args.version, test.want.newVersion)
-		})
-	}
-}
-
 func TestCheckUpgrade(t *testing.T) {
 	type args struct {
 		current    agentVersion
@@ -959,139 +722,6 @@ func TestCheckUpgrade(t *testing.T) {
 	}
 }
 
-func TestWaitForWatcher(t *testing.T) {
-	wantErrWatcherNotStarted := func(t assert.TestingT, err error, i ...interface{}) bool {
-		return assert.ErrorIs(t, err, ErrWatcherNotStarted, i)
-	}
-
-	tests := []struct {
-		name                string
-		states              []details.State
-		stateChangeInterval time.Duration
-		cancelWaitContext   bool
-		wantErr             assert.ErrorAssertionFunc
-	}{
-		{
-			name:                "Happy path: watcher is watching already",
-			states:              []details.State{details.StateWatching},
-			stateChangeInterval: 1 * time.Millisecond,
-			wantErr:             assert.NoError,
-		},
-		{
-			name:                "Sad path: watcher is never starting",
-			states:              []details.State{details.StateReplacing},
-			stateChangeInterval: 1 * time.Millisecond,
-			cancelWaitContext:   true,
-			wantErr:             wantErrWatcherNotStarted,
-		},
-		{
-			name: "Runaround path: marker is jumping around and landing on watching",
-			states: []details.State{
-				details.StateRequested,
-				details.StateScheduled,
-				details.StateDownloading,
-				details.StateExtracting,
-				details.StateReplacing,
-				details.StateRestarting,
-				details.StateWatching,
-			},
-			stateChangeInterval: 1 * time.Millisecond,
-			wantErr:             assert.NoError,
-		},
-		{
-			name:                "Timeout: marker is never created",
-			states:              nil,
-			stateChangeInterval: 1 * time.Millisecond,
-			cancelWaitContext:   true,
-			wantErr:             wantErrWatcherNotStarted,
-		},
-		{
-			name: "Timeout2: state doesn't get there in time",
-			states: []details.State{
-				details.StateRequested,
-				details.StateScheduled,
-				details.StateDownloading,
-				details.StateExtracting,
-				details.StateReplacing,
-				details.StateRestarting,
-			},
-
-			stateChangeInterval: 1 * time.Millisecond,
-			cancelWaitContext:   true,
-			wantErr:             wantErrWatcherNotStarted,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			deadline, ok := t.Deadline()
-			if !ok {
-				deadline = time.Now().Add(5 * time.Second)
-			}
-			testCtx, testCancel := context.WithDeadline(context.Background(), deadline)
-			defer testCancel()
-
-			tmpDir := t.TempDir()
-			updMarkerFilePath := filepath.Join(tmpDir, markerFilename)
-
-			waitContext, waitCancel := context.WithCancel(testCtx)
-			defer waitCancel()
-
-			fakeTimeout := 30 * time.Second
-
-			// in order to take timing out of the equation provide a context that we can cancel manually
-			// still assert that the parent context and timeout passed are correct
-			var createContextFunc createContextWithTimeout = func(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
-				assert.Same(t, testCtx, ctx, "parent context should be the same as the waitForWatcherCall")
-				assert.Equal(t, fakeTimeout, timeout, "timeout used in new context should be the same as testcase")
-
-				return waitContext, waitCancel
-			}
-
-			if len(tt.states) > 0 {
-				initialState := tt.states[0]
-				writeState(t, updMarkerFilePath, initialState)
-			}
-
-			wg := new(sync.WaitGroup)
-
-			var furtherStates []details.State
-			if len(tt.states) > 1 {
-				// we have more states to produce
-				furtherStates = tt.states[1:]
-			}
-
-			wg.Add(1)
-
-			// worker goroutine: writes out additional states while the test is blocked on waitOnWatcher() call and expires
-			// the wait context if cancelWaitContext is set to true. Timing of the goroutine is driven by stateChangeInterval.
-			go func() {
-				defer wg.Done()
-				tick := time.NewTicker(tt.stateChangeInterval)
-				defer tick.Stop()
-				for _, state := range furtherStates {
-					select {
-					case <-testCtx.Done():
-						return
-					case <-tick.C:
-						writeState(t, updMarkerFilePath, state)
-					}
-				}
-				if tt.cancelWaitContext {
-					<-tick.C
-					waitCancel()
-				}
-			}()
-
-			log, _ := loggertest.New(tt.name)
-
-			tt.wantErr(t, waitForWatcherWithTimeoutCreationFunc(testCtx, log, updMarkerFilePath, fakeTimeout, createContextFunc), fmt.Sprintf("waitForWatcher %s, %v, %s, %s)", updMarkerFilePath, tt.states, tt.stateChangeInterval, fakeTimeout))
-
-			// wait for goroutines to finish
-			wg.Wait()
-		})
-	}
-}
-
 func writeState(t *testing.T, path string, state details.State) {
 	ms := newMarkerSerializer(&UpdateMarker{
 		Version:           "version",
@@ -1190,7 +820,8 @@ func Test_selectWatcherExecutable(t *testing.T) {
 	fakeTopDir := filepath.Join(t.TempDir(), "Elastic", "Agent")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, paths.BinaryPath(filepath.Join(fakeTopDir, tt.want), agentName), selectWatcherExecutable(fakeTopDir, tt.args.previous, tt.args.current), "selectWatcherExecutable(%v, %v)", tt.args.previous, tt.args.current)
+			watcher := &upgradeWatcher{}
+			assert.Equalf(t, paths.BinaryPath(filepath.Join(fakeTopDir, tt.want), agentName), watcher.selectWatcherExecutable(fakeTopDir, tt.args.previous, tt.args.current), "selectWatcherExecutable(%v, %v)", tt.args.previous, tt.args.current)
 		})
 	}
 }
@@ -1291,4 +922,505 @@ func (f *fakeAcker) Ack(ctx context.Context, action fleetapi.Action) error {
 func (f *fakeAcker) Commit(ctx context.Context) error {
 	args := f.Called(ctx)
 	return args.Error(0)
+}
+
+type mockDownloaderFactoryProviderTest struct {
+}
+
+func (md *mockDownloaderFactoryProviderTest) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (download.DownloadResult, error) {
+	return download.DownloadResult{}, nil
+}
+
+func TestDownloaderFactoryProvider(t *testing.T) {
+	factory := func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
+		return &mockDownloaderFactoryProviderTest{}, nil
+	}
+	provider := &downloaderFactoryProvider{
+		downloaderFactories: map[string]downloaderFactory{
+			"mockDownloaderFactory": factory,
+		},
+	}
+
+	actual, err := provider.GetDownloaderFactory("mockDownloaderFactory")
+	require.NoError(t, err)
+	require.Equal(t, reflect.ValueOf(factory).Pointer(), reflect.ValueOf(actual).Pointer())
+
+	_, err = provider.GetDownloaderFactory("nonExistentFactory")
+	require.Error(t, err)
+	require.Equal(t, "downloader factory \"nonExistentFactory\" not found", err.Error())
+}
+
+func setupForFileDownloader(sourcePrefix string, expectedFileName string, partialData []byte) setupFunc {
+	return func(t *testing.T, config *artifact.Config, basePath string, targetPath string) {
+		testDownloadPath := filepath.Join(basePath, "downloads")
+		originalDownloadsPath := paths.Downloads()
+		t.Cleanup(func() {
+			paths.SetDownloads(originalDownloadsPath)
+		})
+		paths.SetDownloads(targetPath)
+		err := os.MkdirAll(testDownloadPath, 0755)
+		require.NoError(t, err)
+		tempArtifactPath := filepath.Join(testDownloadPath, expectedFileName)
+		err = os.WriteFile(tempArtifactPath, partialData, 0644)
+		require.NoError(t, err)
+
+		config.SourceURI = sourcePrefix + tempArtifactPath
+		config.DropPath = testDownloadPath
+	}
+}
+
+func setupForHttpDownloader(partialData []byte) (setupFunc, *httptest.Server) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write(partialData) //nolint:errcheck //test code
+	}))
+
+	return func(t *testing.T, config *artifact.Config, basePath string, targetPath string) {
+		config.SourceURI = server.URL
+		config.RetrySleepInitDuration = 1 * time.Second
+		config.HTTPTransportSettings = httpcommon.HTTPTransportSettings{
+			Timeout: 1 * time.Second,
+		}
+	}, server
+}
+
+func fileDownloaderFactoryProvider(config *artifact.Config, copyFunc func(dst io.Writer, src io.Reader) (int64, error)) *downloaderFactoryProvider {
+	fileDownloader := fs.NewDownloader(config)
+	fileDownloader.CopyFunc = copyFunc
+
+	fileFactory := func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
+		return fileDownloader, nil
+	}
+
+	return &downloaderFactoryProvider{
+		downloaderFactories: map[string]downloaderFactory{
+			fileDownloaderFactory: fileFactory,
+		},
+	}
+}
+
+func composedDownloaderFactoryProvider(config *artifact.Config, copyFunc func(dst io.Writer, src io.Reader) (int64, error), log *logger.Logger, upgradeDetails *details.Details) *downloaderFactoryProvider {
+	fileDownloader := fs.NewDownloader(config)
+	httpDownloader := httpDownloader.NewDownloaderWithClient(log, config, http.Client{}, upgradeDetails)
+
+	if strings.HasPrefix(config.SourceURI, "http://") || strings.HasPrefix(config.SourceURI, "https://") {
+		httpDownloader.CopyFunc = copyFunc
+	} else {
+		fileDownloader.CopyFunc = copyFunc
+	}
+
+	composedDownloader := composed.NewDownloader(fileDownloader, httpDownloader)
+
+	fileFactory := func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
+		return fileDownloader, nil
+	}
+	composedFactory := func(ver *agtversion.ParsedSemVer, l *logger.Logger, config *artifact.Config, d *details.Details) (download.Downloader, error) {
+		return composedDownloader, nil
+	}
+
+	return &downloaderFactoryProvider{
+		downloaderFactories: map[string]downloaderFactory{
+			fileDownloaderFactory:     fileFactory,
+			composedDownloaderFactory: composedFactory,
+		},
+	}
+}
+
+type setupFunc func(t *testing.T, config *artifact.Config, basePath string, targetPath string)
+type factoryProviderFunc func(config *artifact.Config, copyFunc func(dst io.Writer, src io.Reader) (int64, error)) *downloaderFactoryProvider
+type mockError struct {
+	message string
+}
+
+func (e *mockError) Error() string {
+	return e.message
+}
+
+func (e *mockError) Is(target error) bool {
+	return e.message == target.Error()
+}
+
+type testError struct {
+	copyFuncError error
+	expectedError error
+}
+
+type upgradeTestCase struct {
+	targetVersion          string
+	parsedTargetVersion    *agtversion.ParsedSemVer
+	downloadError          error
+	unpackError            error
+	replaceOldWithNewError error
+	watchNewAgentError     error
+	cleanupError           error
+	cleanupCalledWith      error
+	expectedError          error
+	expectCallback         bool
+	calledFuncs            []string
+	uncalledFuncs          []string
+	downloadsDirCleaned    bool
+}
+
+func TestUpgrade(t *testing.T) {
+	ctx := t.Context()
+	log, _ := loggertest.New("test")
+
+	defaultTargetVersion := "1.0.0"
+	defaultParsedTargetVersion, err := agtversion.ParseVersion(defaultTargetVersion)
+	require.NoError(t, err)
+
+	currentReleaseVersion := release.VersionWithSnapshot()
+	parsedCurrentReleaseVersion, err := agtversion.ParseVersion(currentReleaseVersion)
+	require.NoError(t, err)
+
+	invalidTargetVersion := "invalidTargetVersion"
+
+	sourceURI := "mockUri"
+	action := &fleetapi.ActionUpgrade{}
+	details := &details.Details{}
+	skipVerify := false
+	skipDefaultPgp := false
+	pgpBytes := []string{"mockPGPBytes"}
+	pgpBytesConverted := make([]interface{}, len(pgpBytes))
+	for i, v := range pgpBytes {
+		pgpBytesConverted[i] = v
+	}
+	agentInfo := &info.AgentInfo{}
+
+	topPath := t.TempDir()
+	paths.SetTop(topPath)
+
+	markerFilePath := markerFilePath(paths.Data())
+	currentVersionedHome, err := filepath.Rel(topPath, paths.Home())
+	require.NoError(t, err)
+	symlinkPath := filepath.Join(topPath, agentName)
+
+	downloadResult := download.DownloadResult{
+		ArtifactPath:     "mockArtifactPath",
+		ArtifactHashPath: "mockArtifactHashPath",
+	}
+
+	unpackStepResult := unpackStepResult{
+		newHome: "mockNewHome",
+		unpackResult: unpackResult{
+			VersionedHome: "mockVersionedHome",
+			Hash:          "mockHash",
+		},
+	}
+
+	newRunPath := filepath.Join(unpackStepResult.newHome, "run")
+
+	newBinaryPath := paths.BinaryPath(filepath.Join(topPath, unpackStepResult.VersionedHome), agentName)
+
+	currentVersion := agentVersion{
+		version:  release.Version(),
+		snapshot: release.Snapshot(),
+		hash:     release.Commit(),
+		fips:     release.FIPSDistribution(),
+	}
+
+	defaultCleanupError := errors.New("test cleanup error")
+
+	previousAgentInstall := agentInstall{
+		parsedVersion: currentagtversion.GetParsedAgentPackageVersion(),
+		version:       release.VersionWithSnapshot(),
+		hash:          release.Commit(),
+		versionedHome: currentVersionedHome,
+	}
+
+	testCases := map[string]upgradeTestCase{
+		"should download artifact, unpack it, replace the old agent and watch the new agent": {
+			targetVersion:          defaultTargetVersion,
+			parsedTargetVersion:    defaultParsedTargetVersion,
+			downloadError:          nil,
+			unpackError:            nil,
+			replaceOldWithNewError: nil,
+			watchNewAgentError:     nil,
+			cleanupError:           nil,
+			cleanupCalledWith:      nil,
+			expectCallback:         true,
+			calledFuncs:            []string{"downloadArtifact", "unpackArtifact", "replaceOldWithNew", "watchNewAgent"},
+			uncalledFuncs:          []string{},
+			downloadsDirCleaned:    true,
+		},
+		"if the target version is the same release version, it should return error": {
+			targetVersion:          currentReleaseVersion,
+			parsedTargetVersion:    parsedCurrentReleaseVersion,
+			downloadError:          nil,
+			unpackError:            nil,
+			replaceOldWithNewError: nil,
+			watchNewAgentError:     nil,
+			cleanupError:           defaultCleanupError,
+			cleanupCalledWith:      ErrUpgradeSameVersion,
+			expectCallback:         false,
+			calledFuncs:            []string{},
+			uncalledFuncs:          []string{"downloadArtifact", "unpackArtifact", "replaceOldWithNew", "watchNewAgent"},
+			expectedError:          goerrors.Join(ErrUpgradeSameVersion, defaultCleanupError),
+			downloadsDirCleaned:    false,
+		},
+		"if the target version cannot be parsed, it should return error": {
+			targetVersion:          invalidTargetVersion,
+			parsedTargetVersion:    nil,
+			downloadError:          nil,
+			unpackError:            nil,
+			replaceOldWithNewError: nil,
+			watchNewAgentError:     nil,
+			cleanupError:           defaultCleanupError,
+			cleanupCalledWith:      fmt.Errorf("error parsing version %q: %w", "invalidTargetVersion", version.ErrNoMatch),
+			expectCallback:         false,
+			calledFuncs:            []string{},
+			uncalledFuncs:          []string{"downloadArtifact", "unpackArtifact", "replaceOldWithNew", "watchNewAgent"},
+			expectedError:          goerrors.Join(fmt.Errorf("error parsing version %q: %w", "invalidTargetVersion", version.ErrNoMatch), defaultCleanupError),
+			downloadsDirCleaned:    false,
+		},
+		"if the download fails, it should return error": {
+			targetVersion:          defaultTargetVersion,
+			parsedTargetVersion:    defaultParsedTargetVersion,
+			downloadError:          errors.New("test download error"),
+			unpackError:            nil,
+			replaceOldWithNewError: nil,
+			watchNewAgentError:     nil,
+			cleanupError:           defaultCleanupError,
+			cleanupCalledWith:      errors.New("test download error"),
+			expectCallback:         false,
+			calledFuncs:            []string{"downloadArtifact"},
+			uncalledFuncs:          []string{"unpackArtifact", "replaceOldWithNew", "watchNewAgent"},
+			expectedError:          goerrors.Join(errors.New("test download error"), defaultCleanupError),
+			downloadsDirCleaned:    false,
+		},
+		"if the unpack fails, it should return error": {
+			targetVersion:          defaultTargetVersion,
+			parsedTargetVersion:    defaultParsedTargetVersion,
+			downloadError:          nil,
+			unpackError:            errors.New("test unpack error"),
+			replaceOldWithNewError: nil,
+			watchNewAgentError:     nil,
+			cleanupError:           defaultCleanupError,
+			cleanupCalledWith:      errors.New("test unpack error"),
+			expectCallback:         false,
+			calledFuncs:            []string{"downloadArtifact", "unpackArtifact"},
+			uncalledFuncs:          []string{"replaceOldWithNew", "watchNewAgent"},
+			expectedError:          goerrors.Join(errors.New("test unpack error"), defaultCleanupError),
+			downloadsDirCleaned:    false,
+		},
+		"if the replace old with new fails, it should return error": {
+			targetVersion:          defaultTargetVersion,
+			parsedTargetVersion:    defaultParsedTargetVersion,
+			downloadError:          nil,
+			unpackError:            nil,
+			replaceOldWithNewError: errors.New("test replace old with new error"),
+			watchNewAgentError:     nil,
+			cleanupError:           defaultCleanupError,
+			cleanupCalledWith:      errors.New("test replace old with new error"),
+			expectCallback:         false,
+			calledFuncs:            []string{"downloadArtifact", "unpackArtifact", "replaceOldWithNew"},
+			uncalledFuncs:          []string{"watchNewAgent"},
+			expectedError:          goerrors.Join(errors.New("test replace old with new error"), defaultCleanupError),
+			downloadsDirCleaned:    false,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			newAgentInstall := agentInstall{
+				parsedVersion: tc.parsedTargetVersion,
+				version:       tc.targetVersion,
+				hash:          unpackStepResult.Hash,
+				versionedHome: unpackStepResult.VersionedHome,
+			}
+
+			downloadsPath := t.TempDir()
+			paths.SetDownloads(downloadsPath)
+
+			mockCleaner := &mock_upgradeCleaner{}
+			mockExecutor := &mock_upgradeExecutor{}
+
+			upgrader := &Upgrader{
+				log:             log,
+				agentInfo:       agentInfo,
+				markerWatcher:   newMarkerFileWatcher(markerFilePath, log),
+				upgradeCleaner:  mockCleaner,
+				upgradeExecutor: mockExecutor,
+			}
+
+			for _, funcName := range tc.calledFuncs {
+				switch funcName {
+				case "downloadArtifact":
+					mockExecutor.EXPECT().downloadArtifact(ctx, tc.parsedTargetVersion, agentInfo, sourceURI, "", details, skipVerify, skipDefaultPgp, pgpBytesConverted...).Return(downloadResult, tc.downloadError)
+
+				case "unpackArtifact":
+					mockExecutor.EXPECT().unpackArtifact(downloadResult, tc.targetVersion, downloadResult.ArtifactPath, topPath, "", paths.Data(), paths.Home(), details, currentVersion, mock.AnythingOfType("checkUpgradeFn")).Return(unpackStepResult, tc.unpackError)
+
+				case "replaceOldWithNew":
+					mockExecutor.EXPECT().replaceOldWithNew(unpackStepResult, currentVersionedHome, topPath, agentName, paths.Home(), paths.Run(), newRunPath, symlinkPath, newBinaryPath, details).Return(tc.replaceOldWithNewError)
+
+				case "watchNewAgent":
+					mockExecutor.EXPECT().watchNewAgent(ctx, markerFilePath, topPath, paths.Data(), watcherMaxWaitTime, mock.AnythingOfType("createContextWithTimeout"), newAgentInstall, previousAgentInstall, action, details, OUTCOME_UPGRADE).Return(tc.watchNewAgentError)
+				}
+			}
+
+			mockCleaner.EXPECT().cleanup(tc.cleanupCalledWith).Return(tc.cleanupError)
+
+			cb, err := upgrader.Upgrade(ctx, tc.targetVersion, sourceURI, action, details, skipVerify, skipDefaultPgp, pgpBytes...)
+
+			if len(tc.calledFuncs) > 0 {
+				mockExecutor.AssertExpectations(t)
+			}
+
+			for _, funcName := range tc.uncalledFuncs {
+				mockExecutor.AssertNotCalled(t, funcName, "expected %v to not be called", funcName)
+			}
+
+			mockCleaner.AssertExpectations(t)
+
+			if tc.expectCallback {
+				require.NotNil(t, cb)
+			} else {
+				require.Nil(t, cb)
+			}
+
+			if tc.downloadsDirCleaned {
+				require.NoDirExists(t, downloadsPath, "downloads directory should be cleaned up")
+			} else {
+				require.DirExists(t, downloadsPath, "downloads directory should not be cleaned up")
+			}
+
+			if tc.expectedError != nil {
+				require.Equal(t, tc.expectedError.Error(), err.Error(), "expected error to be %v, got %v", tc.expectedError, err)
+				return
+			}
+
+			require.NoError(t, err, "expected no error, got %v", err)
+		})
+	}
+}
+
+func TesE2EtUpgradeDownloadErrors(t *testing.T) {
+	testArtifact := artifact.Artifact{
+		Name:     "Elastic Agent",
+		Cmd:      "elastic-agent",
+		Artifact: "beats/elastic-agent",
+	}
+	version := agtversion.NewParsedSemVer(8, 15, 0, "", "")
+	tempConfig := &artifact.Config{}
+	expectedFileName, err := artifact.GetArtifactName(testArtifact, *version, tempConfig.OS(), tempConfig.Arch())
+	require.NoError(t, err)
+	partialData := []byte("partial content written before error")
+
+	testErrors := []testError{}
+
+	for _, te := range TestErrors {
+		testErrors = append(testErrors, testError{
+			copyFuncError: te,
+			expectedError: upgradeErrors.ErrInsufficientDiskSpace,
+		})
+	}
+
+	mockTestError := &mockError{message: "test error"}
+	fileDownloaderTestErrors := []testError{}
+	fileDownloaderTestErrors = append(fileDownloaderTestErrors, testError{
+		copyFuncError: mockTestError,
+		expectedError: mockTestError,
+	})
+	fileDownloaderTestErrors = append(fileDownloaderTestErrors, testErrors...)
+
+	composedDownloaderTestErrors := []testError{}
+	composedDownloaderTestErrors = append(composedDownloaderTestErrors, testError{
+		copyFuncError: mockTestError,
+		expectedError: context.DeadlineExceeded,
+	})
+	composedDownloaderTestErrors = append(composedDownloaderTestErrors, testErrors...)
+
+	log, err := logger.New("test", false)
+	require.NoError(t, err)
+	upgradeDetails := details.NewDetails(version.String(), details.StateDownloading, "test")
+
+	testCases := map[string]struct {
+		setupFunc           setupFunc
+		factoryProviderFunc factoryProviderFunc
+		cleanupMsg          string
+		errors              []testError
+	}{
+		"file downloader": {
+			setupFunc: setupForFileDownloader("file://", expectedFileName, partialData),
+			factoryProviderFunc: func(config *artifact.Config, copyFunc func(io.Writer, io.Reader) (int64, error)) *downloaderFactoryProvider {
+				return fileDownloaderFactoryProvider(config, copyFunc)
+			},
+			cleanupMsg: "file downloader should clean up partial files on error",
+			errors:     fileDownloaderTestErrors,
+		},
+		"composed file downloader": {
+			setupFunc: setupForFileDownloader("", expectedFileName, partialData),
+			factoryProviderFunc: func(config *artifact.Config, copyFunc func(io.Writer, io.Reader) (int64, error)) *downloaderFactoryProvider {
+				return composedDownloaderFactoryProvider(config, copyFunc, log, upgradeDetails)
+			},
+			cleanupMsg: "composed file downloader should clean up partial files on error",
+			errors:     composedDownloaderTestErrors,
+		},
+		"composed http downloader": {
+			setupFunc: func() setupFunc {
+				setupFunc, server := setupForHttpDownloader(partialData)
+				t.Cleanup(server.Close)
+				return setupFunc
+			}(),
+			factoryProviderFunc: func(config *artifact.Config, copyFunc func(io.Writer, io.Reader) (int64, error)) *downloaderFactoryProvider {
+				return composedDownloaderFactoryProvider(config, copyFunc, log, upgradeDetails)
+			},
+			cleanupMsg: "composed http downloader should clean up partial files on error",
+			errors:     composedDownloaderTestErrors,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			for _, testError := range tc.errors {
+				t.Run(fmt.Sprintf("with error %v", testError.copyFuncError), func(t *testing.T) {
+					baseDir := t.TempDir()
+					testTargetPath := filepath.Join(baseDir, "target")
+
+					config := artifact.Config{
+						TargetDirectory: testTargetPath,
+					}
+
+					tc.setupFunc(t, &config, baseDir, testTargetPath)
+
+					expectedDestPath, err := artifact.GetArtifactPath(testArtifact, *version, config.OS(), config.Arch(), config.TargetDirectory)
+					require.NoError(t, err)
+
+					copyFunc := func(dst io.Writer, src io.Reader) (int64, error) {
+						_, err := io.Copy(dst, src)
+						require.NoError(t, err)
+
+						require.FileExists(t, expectedDestPath, "partially written file should exist before cleanup")
+						content, err := os.ReadFile(expectedDestPath)
+						require.NoError(t, err)
+						require.Equal(t, partialData, content)
+
+						return 0, testError.copyFuncError
+					}
+
+					downloaderFactoryProvider := tc.factoryProviderFunc(&config, copyFunc)
+					artifactDownloader := newUpgradeArtifactDownloader(log, &config, downloaderFactoryProvider)
+					executeUpgrade := &executeUpgrade{
+						log:                log,
+						artifactDownloader: artifactDownloader,
+					}
+
+					mockAgentInfo := mockinfo.NewAgent(t)
+					mockAgentInfo.On("Version").Return(version.String())
+
+					upgrader, err := NewUpgrader(log, &config, mockAgentInfo)
+					require.NoError(t, err)
+					// upgrader.artifactDownloader = artifactDownloader
+					upgrader.upgradeExecutor = executeUpgrade
+
+					_, err = upgrader.Upgrade(context.Background(), version.String(), config.SourceURI, nil, upgradeDetails, false, false)
+					require.Error(t, err, "expected error got none")
+					require.ErrorIs(t, err, testError.expectedError, "expected error mismatch")
+					require.NoFileExists(t, expectedDestPath, tc.cleanupMsg)
+					require.DirExists(t, testTargetPath, "target directory should not be cleaned up")
+				})
+			}
+		})
+	}
 }

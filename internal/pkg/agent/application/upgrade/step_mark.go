@@ -5,9 +5,12 @@
 package upgrade
 
 import (
+	"context"
 	"encoding/json"
+	goerrors "errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -195,9 +198,11 @@ type agentInstall struct {
 	hash          string
 	versionedHome string
 }
+type upgradeWatcher struct {
+}
 
 // markUpgrade marks update happened so we can handle grace period
-func markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, desiredOutcome UpgradeOutcome) error {
+func (u *upgradeWatcher) markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, desiredOutcome UpgradeOutcome) error {
 
 	if len(previousAgent.hash) > hashLen {
 		previousAgent.hash = previousAgent.hash[:hashLen]
@@ -232,6 +237,48 @@ func markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent ag
 	}
 
 	return nil
+}
+
+// TODO: add tests for this
+func (u *upgradeWatcher) selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string {
+	// check if the upgraded version is less than the previous (currently installed) version
+	if current.parsedVersion.Less(*previous.parsedVersion) {
+		// use the current agent executable for watch, if downgrading the old agent doesn't understand the current agent's path structure.
+		return paths.BinaryPath(filepath.Join(topDir, previous.versionedHome), agentName)
+	} else {
+		// use the new agent executable as it should be able to parse the new update marker
+		return paths.BinaryPath(filepath.Join(topDir, current.versionedHome), agentName)
+	}
+}
+
+// TODO: add tests for this
+func (u *upgradeWatcher) waitForWatcher(ctx context.Context, log *logger.Logger, markerFilePath string, waitTime time.Duration, createTimeoutContext createContextWithTimeout) error {
+	// Wait for the watcher to be up and running
+	watcherContext, cancel := createTimeoutContext(ctx, waitTime)
+	defer cancel()
+
+	markerWatcher := newMarkerFileWatcher(markerFilePath, log)
+	err := markerWatcher.Run(watcherContext)
+	if err != nil {
+		return fmt.Errorf("error starting update marker watcher: %w", err)
+	}
+
+	log.Infof("waiting up to %s for upgrade watcher to set %s state in upgrade marker", waitTime, details.StateWatching)
+
+	for {
+		select {
+		case updMarker := <-markerWatcher.Watch():
+			if updMarker.Details != nil && updMarker.Details.State == details.StateWatching {
+				// watcher started and it is watching, all good
+				log.Infof("upgrade watcher set %s state in upgrade marker: exiting wait loop", details.StateWatching)
+				return nil
+			}
+
+		case <-watcherContext.Done():
+			log.Errorf("upgrade watcher did not start watching within %s or context has expired", waitTime)
+			return goerrors.Join(ErrWatcherNotStarted, watcherContext.Err())
+		}
+	}
 }
 
 // UpdateActiveCommit updates active.commit file to point to active version.
@@ -323,4 +370,8 @@ func saveMarkerToPath(marker *UpdateMarker, markerFile string, shouldFsync bool)
 
 func markerFilePath(dataDirPath string) string {
 	return filepath.Join(dataDirPath, markerFilename)
+}
+
+func (u *upgradeWatcher) invokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error) {
+	return InvokeWatcher(log, agentExecutable)
 }

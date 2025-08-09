@@ -26,9 +26,9 @@ type FailingDownloader struct {
 	called bool
 }
 
-func (d *FailingDownloader) Download(context.Context, artifact.Artifact, *agtversion.ParsedSemVer) (string, error) {
+func (d *FailingDownloader) Download(context.Context, artifact.Artifact, *agtversion.ParsedSemVer) (download.DownloadResult, error) {
 	d.called = true
-	return "", errors.New("failing")
+	return download.DownloadResult{}, errors.New("failing")
 }
 
 func (d *FailingDownloader) Called() bool { return d.called }
@@ -37,9 +37,11 @@ type SuccDownloader struct {
 	called bool
 }
 
-func (d *SuccDownloader) Download(context.Context, artifact.Artifact, *agtversion.ParsedSemVer) (string, error) {
+func (d *SuccDownloader) Download(context.Context, artifact.Artifact, *agtversion.ParsedSemVer) (download.DownloadResult, error) {
 	d.called = true
-	return succ, nil
+	return download.DownloadResult{
+		ArtifactPath: succ,
+	}, nil
 }
 func (d *SuccDownloader) Called() bool { return d.called }
 
@@ -70,7 +72,7 @@ func TestComposed(t *testing.T) {
 		d := NewDownloader(tc.downloaders[0], tc.downloaders[1])
 		r, _ := d.Download(context.TODO(), artifact.Artifact{Name: "a"}, parseVersion)
 
-		assert.Equal(t, tc.expectedResult, r == succ)
+		assert.Equal(t, tc.expectedResult, r.ArtifactPath == succ)
 
 		assert.True(t, tc.checkFunc(tc.downloaders))
 	}

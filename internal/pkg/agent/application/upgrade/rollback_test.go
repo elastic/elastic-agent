@@ -504,7 +504,8 @@ func createUpdateMarker(t *testing.T, log *logger.Logger, topDir, newAgentVersio
 		hash:          oldAgentHash,
 		versionedHome: oldAgentVersionedHome,
 	}
-	err := markUpgrade(log,
+	watcher := &upgradeWatcher{}
+	err := watcher.markUpgrade(log,
 		paths.DataFrom(topDir),
 		newAgentInstall,
 		oldAgentInstall,

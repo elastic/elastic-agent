@@ -225,12 +225,12 @@ func TestVerify(t *testing.T) {
 			pgpKey := prepareTestCase(t, agentSpec, testVersion, config)
 
 			testClient := NewDownloader(config)
-			artifactPath, err := testClient.Download(ctx, agentSpec, testVersion)
+			downloadResult, err := testClient.Download(ctx, agentSpec, testVersion)
 			require.NoError(t, err, "fs.Downloader could not download artifacts")
 			_, err = testClient.DownloadAsc(context.Background(), agentSpec, *testVersion)
 			require.NoError(t, err, "fs.Downloader could not download artifacts .asc file")
 
-			_, err = os.Stat(artifactPath)
+			_, err = os.Stat(downloadResult.ArtifactPath)
 			require.NoError(t, err)
 
 			testVerifier, err := NewVerifier(log, config, pgpKey)

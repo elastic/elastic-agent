@@ -46,8 +46,10 @@ func Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPa
 		// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
 		symlinkTarget = paths.BinaryPath(filepath.Join(paths.DataFrom(topDirPath), hashedDir), agentName)
 	}
+
+	relinker := &upgradeRelinker{}
 	// change symlink
-	if err := changeSymlink(log, topDirPath, symlinkPath, symlinkTarget); err != nil {
+	if err := relinker.changeSymlink(log, topDirPath, symlinkPath, symlinkTarget); err != nil {
 		return err
 	}
 
@@ -102,9 +104,10 @@ func cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash s
 		return err
 	}
 
+	relinker := &upgradeRelinker{}
 	// remove symlink to avoid upgrade failures, ignore error
-	prevSymlink := prevSymlinkPath(topDirPath)
-	log.Infow("Removing previous symlink path", "file.path", prevSymlinkPath(topDirPath))
+	prevSymlink := relinker.prevSymlinkPath(topDirPath)
+	log.Infow("Removing previous symlink path", "file.path", prevSymlink)
 	_ = os.Remove(prevSymlink)
 
 	dirPrefix := fmt.Sprintf("%s-", agentName)

@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
@@ -219,10 +220,11 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 	tests := []struct {
 		name       string
 		args       args
-		want       UnpackResult
-		wantErr    assert.ErrorAssertionFunc
+		want       unpackResult
+		wantErr    error
 		checkFiles checkExtractedPath
 		flavor     string
+		copyFunc   func(dst io.Writer, src io.Reader) (int64, error)
 	}{
 		{
 			name: "file before containing folder",
@@ -233,11 +235,11 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 					return createTarArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.tar.gz", i)
 				},
 			},
-			want: UnpackResult{
+			want: unpackResult{
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-abcdef"),
 			},
-			wantErr: assert.NoError,
+			wantErr: nil,
 			checkFiles: func(t *testing.T, testDataDir string) {
 				versionedHome := filepath.Join(testDataDir, "elastic-agent-abcdef")
 				checkExtractedFilesOutOfOrder(t, versionedHome)
@@ -252,12 +254,30 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 					return createTarArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.tar.gz", i)
 				},
 			},
-			want: UnpackResult{
+			want: unpackResult{
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
-			wantErr:    assert.NoError,
+			wantErr:    nil,
 			checkFiles: checkExtractedFilesWithManifest,
+		},
+		{
+			name: "when copying files fails, it should return error",
+			args: args{
+				version:      "1.2.3",
+				archiveFiles: append(archiveFilesWithManifestNoSymlink, agentArchiveSymLink),
+				archiveGenerator: func(t *testing.T, i []files) (string, error) {
+					return createTarArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.tar.gz", i)
+				},
+			},
+			want: unpackResult{
+				Hash:          "abcdef",
+				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
+			},
+			wantErr: errors.New("test copy error"),
+			copyFunc: func(dst io.Writer, src io.Reader) (int64, error) {
+				return 0, errors.New("test copy error")
+			},
 		},
 		{
 			name: "package with basic flavor",
@@ -268,11 +288,11 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 					return createTarArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.tar.gz", i)
 				},
 			},
-			want: UnpackResult{
+			want: unpackResult{
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
-			wantErr: assert.NoError,
+			wantErr: nil,
 			flavor:  "basic",
 			checkFiles: func(t *testing.T, testDataDir string) {
 				checkFilesPresence(t, testDataDir,
@@ -293,11 +313,11 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 					return createTarArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.tar.gz", i)
 				},
 			},
-			want: UnpackResult{
+			want: unpackResult{
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
-			wantErr: assert.NoError,
+			wantErr: nil,
 			flavor:  "servers",
 			checkFiles: func(t *testing.T, testDataDir string) {
 				checkFilesPresence(t, testDataDir,
@@ -313,6 +333,15 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.copyFunc != nil {
+				tmpCopyFunc := unpackArchiveCopyFunc
+				unpackArchiveCopyFunc = tt.copyFunc
+
+				t.Cleanup(func() {
+					unpackArchiveCopyFunc = tmpCopyFunc
+				})
+			}
+
 			testTop := t.TempDir()
 			testDataDir := filepath.Join(testTop, "data")
 			err := os.MkdirAll(testDataDir, 0o777)
@@ -323,9 +352,7 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 			require.NoError(t, err, "creation of test archive file failed")
 
 			got, err := untar(log, archiveFile, testDataDir, tt.flavor)
-			if !tt.wantErr(t, err, fmt.Sprintf("untar(%v, %v, %v)", tt.args.version, archiveFile, testDataDir)) {
-				return
-			}
+			assert.ErrorIs(t, err, tt.wantErr, fmt.Sprintf("untar(%v, %v, %v)", tt.args.version, archiveFile, testDataDir))
 			assert.Equalf(t, tt.want, got, "untar(%v, %v, %v)", tt.args.version, archiveFile, testDataDir)
 			if tt.checkFiles != nil {
 				tt.checkFiles(t, testDataDir)
@@ -348,10 +375,11 @@ func TestUpgrader_unpackZip(t *testing.T) {
 	tests := []struct {
 		name       string
 		args       args
-		want       UnpackResult
-		wantErr    assert.ErrorAssertionFunc
+		want       unpackResult
+		wantErr    error
 		checkFiles checkExtractedPath
 		flavor     string
+		copyFunc   func(dst io.Writer, src io.Reader) (int64, error)
 	}{
 		{
 			name: "file before containing folder",
@@ -361,11 +389,11 @@ func TestUpgrader_unpackZip(t *testing.T) {
 					return createZipArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.zip", i)
 				},
 			},
-			want: UnpackResult{
+			want: unpackResult{
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-abcdef"),
 			},
-			wantErr: assert.NoError,
+			wantErr: nil,
 			checkFiles: func(t *testing.T, testDataDir string) {
 				versionedHome := filepath.Join(testDataDir, "elastic-agent-abcdef")
 				checkExtractedFilesOutOfOrder(t, versionedHome)
@@ -379,14 +407,30 @@ func TestUpgrader_unpackZip(t *testing.T) {
 					return createZipArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.zip", i)
 				},
 			},
-			want: UnpackResult{
+			want: unpackResult{
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
-			wantErr:    assert.NoError,
+			wantErr:    nil,
 			checkFiles: checkExtractedFilesWithManifest,
 		},
-
+		{
+			name: "when copying files fails, it should return error",
+			args: args{
+				archiveFiles: archiveFilesWithManifestNoSymlink,
+				archiveGenerator: func(t *testing.T, i []files) (string, error) {
+					return createZipArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.zip", i)
+				},
+			},
+			want: unpackResult{
+				Hash:          "abcdef",
+				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
+			},
+			wantErr: errors.New("test copy error"),
+			copyFunc: func(dst io.Writer, src io.Reader) (int64, error) {
+				return 0, errors.New("test copy error")
+			},
+		},
 		{
 			name: "package with basic flavor",
 			args: args{
@@ -395,11 +439,12 @@ func TestUpgrader_unpackZip(t *testing.T) {
 					return createZipArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.zip", i)
 				},
 			},
-			want: UnpackResult{
+			want: unpackResult{
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
-			wantErr: assert.NoError,
+			// wantErr: assert.NoError,
+			wantErr: nil,
 			flavor:  "basic",
 			checkFiles: func(t *testing.T, testDataDir string) {
 				checkFilesPresence(t, testDataDir,
@@ -419,11 +464,11 @@ func TestUpgrader_unpackZip(t *testing.T) {
 					return createZipArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.zip", i)
 				},
 			},
-			want: UnpackResult{
+			want: unpackResult{
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
-			wantErr: assert.NoError,
+			wantErr: nil,
 			flavor:  "servers",
 			checkFiles: func(t *testing.T, testDataDir string) {
 				checkFilesPresence(t, testDataDir,
@@ -439,6 +484,14 @@ func TestUpgrader_unpackZip(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.copyFunc != nil {
+				tmpCopyFunc := unpackArchiveCopyFunc
+				unpackArchiveCopyFunc = tt.copyFunc
+
+				t.Cleanup(func() {
+					unpackArchiveCopyFunc = tmpCopyFunc
+				})
+			}
 
 			testTop := t.TempDir()
 			testDataDir := filepath.Join(testTop, "data")
@@ -450,9 +503,7 @@ func TestUpgrader_unpackZip(t *testing.T) {
 			require.NoError(t, err, "creation of test archive file failed")
 
 			got, err := unzip(log, archiveFile, testDataDir, tt.flavor)
-			if !tt.wantErr(t, err, fmt.Sprintf("unzip(%v, %v)", archiveFile, testDataDir)) {
-				return
-			}
+			assert.ErrorIs(t, err, tt.wantErr, fmt.Sprintf("unzip(%v, %v)", archiveFile, testDataDir))
 			assert.Equalf(t, tt.want, got, "unzip(%v, %v)", archiveFile, testDataDir)
 			if tt.checkFiles != nil {
 				tt.checkFiles(t, testDataDir)
@@ -648,4 +699,178 @@ func TestGetFileNamePrefix(t *testing.T) {
 		})
 	}
 
+}
+
+func TestExtractVersion(t *testing.T) {
+	type args struct {
+		metadata packageMetadata
+		version  string
+	}
+	type want struct {
+		newVersion agentVersion
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "same version, snapshot flag and hash",
+			args: args{
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Version:       "1.2.3",
+							Snapshot:      true,
+							VersionedHome: "",
+							PathMappings:  nil,
+						},
+					},
+					hash: "abcdef",
+				},
+				version: "unused",
+			},
+			want: want{
+				newVersion: agentVersion123SNAPSHOTabcdef,
+			},
+		},
+		{
+			name: "same hash, snapshot flag, different version",
+			args: args{
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Version:       "1.2.3-repackaged",
+							Snapshot:      true,
+							VersionedHome: "",
+							PathMappings:  nil,
+						},
+					},
+					hash: "abcdef",
+				},
+				version: "unused",
+			},
+			want: want{
+				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
+			},
+		},
+		{
+			name: "same version and hash, different snapshot flag (SNAPSHOT promotion to release)",
+			args: args{
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Version:       "1.2.3",
+							Snapshot:      false,
+							VersionedHome: "",
+							PathMappings:  nil,
+						},
+					},
+					hash: "abcdef",
+				},
+				version: "unused",
+			},
+			want: want{
+				newVersion: agentVersion123abcdef,
+			},
+		},
+		{
+			name: "same version and snapshot, different hash (SNAPSHOT upgrade)",
+			args: args{
+				metadata: packageMetadata{
+					manifest: &v1.PackageManifest{
+						Package: v1.PackageDesc{
+							Version:       "1.2.3",
+							Snapshot:      true,
+							VersionedHome: "",
+							PathMappings:  nil,
+						},
+					},
+					hash: "ghijkl",
+				},
+				version: "unused",
+			},
+			want: want{
+				newVersion: agentVersion123SNAPSHOTghijkl,
+			},
+		},
+		{
+			name: "same version, snapshot flag and hash, no manifest",
+			args: args{
+				metadata: packageMetadata{
+					manifest: nil,
+					hash:     "abcdef",
+				},
+				version: "1.2.3-SNAPSHOT",
+			},
+			want: want{
+				newVersion: agentVersion123SNAPSHOTabcdef,
+			},
+		},
+		{
+			name: "same hash, snapshot flag, different version, no manifest",
+			args: args{
+				metadata: packageMetadata{
+					manifest: nil,
+					hash:     "abcdef",
+				},
+				version: "1.2.3-SNAPSHOT.repackaged",
+			},
+			want: want{
+				newVersion: agentVersion123SNAPSHOTabcdefRepackaged,
+			},
+		},
+		{
+			name: "same version and hash, different snapshot flag, no manifest (SNAPSHOT promotion to release)",
+			args: args{
+				metadata: packageMetadata{
+					manifest: nil,
+					hash:     "abcdef",
+				},
+				version: "1.2.3",
+			},
+			want: want{
+				newVersion: agentVersion123abcdef,
+			},
+		},
+		{
+			name: "same version and snapshot, different hash (SNAPSHOT upgrade)",
+			args: args{
+				metadata: packageMetadata{
+					manifest: nil,
+					hash:     "ghijkl",
+				},
+				version: "1.2.3-SNAPSHOT",
+			},
+			want: want{
+				newVersion: agentVersion123SNAPSHOTghijkl,
+			},
+		},
+		{
+			name: "same version and snapshot, no hash (SNAPSHOT upgrade before download)",
+			args: args{
+				metadata: packageMetadata{
+					manifest: nil,
+				},
+				version: "1.2.3-SNAPSHOT",
+			},
+			want: want{
+				newVersion: agentVersion{
+					version:  "1.2.3",
+					snapshot: true,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			log, _ := loggertest.New(test.name)
+			unpacker := &upgradeUnpacker{log: log}
+			actualNewVersion := unpacker.extractAgentVersion(test.args.metadata, test.args.version)
+			assert.Equal(t, test.want.newVersion, actualNewVersion, "Unexpected new version result: extractAgentVersion(%v, %v) should be %v",
+				test.args.metadata, test.args.version, test.want.newVersion)
+		})
+	}
 }

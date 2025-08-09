@@ -24,10 +24,13 @@ import (
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
+var unpackArchiveCopyFunc = io.Copy
+
 // UnpackResult contains the location and hash of the unpacked agent files
-type UnpackResult struct {
+type unpackResult struct {
 	// Hash contains the unpacked agent commit hash, limited to a length of 6 for backward compatibility
 	Hash string `json:"hash" yaml:"hash"`
 	// VersionedHome indicates the path (relative to topPath, formatted in os-dependent fashion) where to find the unpacked agent files
@@ -35,11 +38,15 @@ type UnpackResult struct {
 	VersionedHome string `json:"versioned-home" yaml:"versioned-home"`
 }
 
+type upgradeUnpacker struct {
+	log *logger.Logger
+}
+
 // unpack unpacks archive correctly, skips root (symlink, config...) unpacks data/*
-func (u *Upgrader) unpack(version, archivePath, dataDir string, flavor string) (UnpackResult, error) {
+func (u *upgradeUnpacker) unpack(version, archivePath, dataDir string, flavor string) (unpackResult, error) {
 	// unpack must occur in directory that holds the installation directory
 	// or the extraction will be double nested
-	var unpackRes UnpackResult
+	var unpackRes unpackResult
 	var err error
 	if runtime.GOOS == windows {
 		unpackRes, err = unzip(u.log, archivePath, dataDir, flavor)
@@ -49,7 +56,7 @@ func (u *Upgrader) unpack(version, archivePath, dataDir string, flavor string) (
 
 	if err != nil {
 		u.log.Errorw("Failed to unpack upgrade artifact", "error.message", err, "version", version, "file.path", archivePath, "unpack_result", unpackRes)
-		return UnpackResult{}, err
+		return unpackRes, err
 	}
 
 	u.log.Infow("Unpacked upgrade artifact", "version", version, "file.path", archivePath, "unpack_result", unpackRes)
@@ -61,7 +68,7 @@ type packageMetadata struct {
 	hash     string
 }
 
-func (u *Upgrader) getPackageMetadata(archivePath string) (packageMetadata, error) {
+func (u *upgradeUnpacker) getPackageMetadata(archivePath string) (packageMetadata, error) {
 	ext := filepath.Ext(archivePath)
 	if ext == ".gz" {
 		// if we got gzip extension we need another extension before last
@@ -78,11 +85,13 @@ func (u *Upgrader) getPackageMetadata(archivePath string) (packageMetadata, erro
 	}
 }
 
-func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (UnpackResult, error) {
+func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (unpackResult, error) {
 	var hash, rootDir string
+	result := unpackResult{}
+
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
-		return UnpackResult{}, err
+		return result, err
 	}
 	defer r.Close()
 
@@ -93,7 +102,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 
 	metadata, err := getPackageMetadataFromZipReader(r, fileNamePrefix)
 	if err != nil {
-		return UnpackResult{}, fmt.Errorf("retrieving package metadata from %q: %w", archivePath, err)
+		return result, fmt.Errorf("retrieving package metadata from %q: %w", archivePath, err)
 	}
 
 	hash = metadata.hash[:hashLen]
@@ -107,9 +116,12 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 		versionedHome = createVersionedHomeFromHash(hash)
 	}
 
+	result.VersionedHome = versionedHome
+	result.Hash = hash
+
 	skipFn, err := skipFnFromZip(log, r, flavor, fileNamePrefix, createVersionedHomeFromHash(hash), registry)
 	if err != nil {
-		return UnpackResult{}, err
+		return result, err
 	}
 
 	unpackFile := func(f *zip.File) (err error) {
@@ -137,7 +149,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 		}
 
 		dstPath := strings.TrimPrefix(mappedPackagePath, "data/")
-		dstPath = filepath.Join(dataDir, dstPath)
+		dstPath = filepath.Join(dataDir, dstPath) // TODO: look into this, this may be the new home to cleanup
 
 		if skipFn(dstPath) {
 			return nil
@@ -179,7 +191,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 			}()
 
 			//nolint:gosec // legacy
-			if _, err = io.Copy(f, rc); err != nil {
+			if _, err = unpackArchiveCopyFunc(f, rc); err != nil {
 				return err
 			}
 		}
@@ -196,14 +208,11 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 		}
 
 		if err := unpackFile(f); err != nil {
-			return UnpackResult{}, err
+			return result, err
 		}
 	}
 
-	return UnpackResult{
-		Hash:          hash,
-		VersionedHome: versionedHome,
-	}, nil
+	return result, nil
 }
 
 // getPackageMetadataFromZip reads an archive on a path archivePath and parses metadata from manifest file
@@ -314,17 +323,19 @@ func getPackageMetadataFromZipReader(r *zip.ReadCloser, fileNamePrefix string) (
 	return ret, nil
 }
 
-func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (UnpackResult, error) {
+func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (unpackResult, error) {
 	var versionedHome string
 	var rootDir string
 	var hash string
+
+	result := unpackResult{}
 
 	// Look up manifest in the archive and prepare path mappings, if any
 	pm := pathMapper{}
 
 	metadata, err := getPackageMetadataFromTar(archivePath)
 	if err != nil {
-		return UnpackResult{}, fmt.Errorf("retrieving package metadata from %q: %w", archivePath, err)
+		return result, fmt.Errorf("retrieving package metadata from %q: %w", archivePath, err)
 	}
 
 	hash = metadata.hash[:hashLen]
@@ -340,20 +351,23 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 		versionedHome = createVersionedHomeFromHash(metadata.hash)
 	}
 
+	result.VersionedHome = versionedHome
+	result.Hash = hash
+
 	skipFn, err := skipFnFromTar(log, archivePath, flavor, registry)
 	if err != nil {
-		return UnpackResult{}, err
+		return result, err
 	}
 
 	r, err := os.Open(archivePath)
 	if err != nil {
-		return UnpackResult{}, errors.New(fmt.Sprintf("artifact for 'elastic-agent' could not be found at '%s'", archivePath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, archivePath))
+		return result, errors.New(fmt.Sprintf("artifact for 'elastic-agent' could not be found at '%s'", archivePath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, archivePath))
 	}
 	defer r.Close()
 
 	zr, err := gzip.NewReader(r)
 	if err != nil {
-		return UnpackResult{}, errors.New("requires gzip-compressed body", err, errors.TypeFilesystem)
+		return result, errors.New("requires gzip-compressed body", err, errors.TypeFilesystem)
 	}
 
 	tr := tar.NewReader(zr)
@@ -370,11 +384,11 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 			break
 		}
 		if err != nil {
-			return UnpackResult{}, err
+			return result, err
 		}
 
 		if !validFileName(f.Name) {
-			return UnpackResult{}, errors.New("tar contained invalid filename: %q", f.Name, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, f.Name))
+			return result, errors.New("tar contained invalid filename: %q", f.Name, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, f.Name))
 		}
 
 		fileName := strings.TrimPrefix(f.Name, fileNamePrefix)
@@ -400,7 +414,7 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 		}
 
 		rel := filepath.FromSlash(strings.TrimPrefix(fileName, "data/"))
-		abs := filepath.Join(dataDir, rel)
+		abs := filepath.Join(dataDir, rel) // TODO: if anything happens remove abs most likely, check this
 
 		// find the root dir
 		if currentDir := filepath.Dir(abs); rootDir == "" || len(filepath.Dir(rootDir)) > len(currentDir) {
@@ -415,22 +429,22 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 			// create non-existing containing folders with 0750 permissions right now, we'll fix the permission of each
 			// directory as we come across them while processing the other package entries
 			if err = os.MkdirAll(filepath.Dir(abs), 0750); err != nil {
-				return UnpackResult{}, errors.New(err, "TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+				return result, errors.New(err, "TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 			}
 
 			// remove any world permissions from the file
 			wf, err := os.OpenFile(abs, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode.Perm()&0770)
 			if err != nil {
-				return UnpackResult{}, errors.New(err, "TarInstaller: creating file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+				return result, errors.New(err, "TarInstaller: creating file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 			}
 
 			//nolint:gosec // legacy
-			_, err = io.Copy(wf, tr)
+			_, err = unpackArchiveCopyFunc(wf, tr)
 			if closeErr := wf.Close(); closeErr != nil && err == nil {
 				err = closeErr
 			}
 			if err != nil {
-				return UnpackResult{}, fmt.Errorf("TarInstaller: error writing to %s: %w", abs, err)
+				return result, fmt.Errorf("TarInstaller: error writing to %s: %w", abs, err)
 			}
 		case mode.IsDir():
 			log.Debugw("Unpacking directory", "archive", "tar", "file.path", abs)
@@ -439,26 +453,23 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 			if errors.Is(err, fs.ErrNotExist) {
 				// the directory does not exist, create it and any non-existing parent directory with the same permissions
 				if err := os.MkdirAll(abs, mode.Perm()&0770); err != nil {
-					return UnpackResult{}, errors.New(err, "TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+					return result, errors.New(err, "TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 				}
 			} else if err != nil {
-				return UnpackResult{}, errors.New(err, "TarInstaller: stat() directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+				return result, errors.New(err, "TarInstaller: stat() directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 			} else {
 				// directory already exists, set the appropriate permissions
 				err = os.Chmod(abs, mode.Perm()&0770)
 				if err != nil {
-					return UnpackResult{}, errors.New(err, fmt.Sprintf("TarInstaller: setting permissions %O for directory %q", mode.Perm()&0770, abs), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+					return result, errors.New(err, fmt.Sprintf("TarInstaller: setting permissions %O for directory %q", mode.Perm()&0770, abs), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 				}
 			}
 		default:
-			return UnpackResult{}, errors.New(fmt.Sprintf("tar file entry %s contained unsupported file type %v", fileName, mode), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fileName))
+			return result, errors.New(fmt.Sprintf("tar file entry %s contained unsupported file type %v", fileName, mode), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fileName))
 		}
 	}
 
-	return UnpackResult{
-		Hash:          hash,
-		VersionedHome: versionedHome,
-	}, nil
+	return result, nil
 }
 
 func skipFnFromTar(log *logger.Logger, archivePath string, flavor string, registry map[string][]string) (install.SkipFn, error) {
@@ -719,4 +730,23 @@ func getFilesContentFromTar(archivePath string, files ...string) (map[string]io.
 // formatted using OS-dependent path separators
 func createVersionedHomeFromHash(hash string) string {
 	return filepath.Join("data", fmt.Sprintf("elastic-agent-%s", hash[:hashLen]))
+}
+
+func (u *upgradeUnpacker) detectFlavor(topPath, flavor string) (string, error) {
+	return install.UsedFlavor(topPath, flavor)
+}
+
+func (u *upgradeUnpacker) extractAgentVersion(metadata packageMetadata, upgradeVersion string) agentVersion {
+	newVersion := agentVersion{}
+	if metadata.manifest != nil {
+		packageDesc := metadata.manifest.Package
+		newVersion.version = packageDesc.Version
+		newVersion.snapshot = packageDesc.Snapshot
+	} else {
+		// extract version info from the version string (we can ignore parsing errors as it would have never passed the download step)
+		parsedVersion, _ := agtversion.ParseVersion(upgradeVersion)
+		newVersion.version, newVersion.snapshot = parsedVersion.ExtractSnapshotFromVersionString()
+	}
+	newVersion.hash = metadata.hash
+	return newVersion
 }

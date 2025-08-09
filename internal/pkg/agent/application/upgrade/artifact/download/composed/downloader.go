@@ -36,21 +36,21 @@ func NewDownloader(downloaders ...download.Downloader) *Downloader {
 
 // Download fetches the package from configured source.
 // Returns absolute path to downloaded package and an error.
-func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *version.ParsedSemVer) (string, error) {
+func (e *Downloader) Download(ctx context.Context, a artifact.Artifact, version *version.ParsedSemVer) (download.DownloadResult, error) {
 	var errs []error
 	span, ctx := apm.StartSpan(ctx, "download", "app.internal")
 	defer span.End()
 
 	for _, d := range e.dd {
-		s, e := d.Download(ctx, a, version)
-		if e == nil {
-			return s, nil
+		downloadResult, err := d.Download(ctx, a, version)
+		if err == nil {
+			return downloadResult, nil
 		}
 
-		errs = append(errs, e)
+		errs = append(errs, err)
 	}
 
-	return "", goerrors.Join(errs...)
+	return download.DownloadResult{}, goerrors.Join(errs...)
 }
 
 func (e *Downloader) Reload(c *artifact.Config) error {

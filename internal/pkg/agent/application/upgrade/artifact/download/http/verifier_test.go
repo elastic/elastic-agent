@@ -98,11 +98,11 @@ func runTests(t *testing.T, testCases []testCase, td *testDials, config *artifac
 			downloader, err := NewDownloader(log, config, upgradeDetails)
 			require.NoError(t, err, "could not create new downloader")
 
-			pkgPath, err := downloader.Download(cancelCtx, beatSpec, version)
+			downloadResult, err := downloader.Download(cancelCtx, beatSpec, version)
 			require.NoErrorf(t, err, "failed downloading %s v%s",
 				beatSpec.Artifact, version)
 
-			_, err = os.Stat(pkgPath)
+			_, err = os.Stat(downloadResult.ArtifactPath)
 			if err != nil {
 				t.Fatal(err)
 			}

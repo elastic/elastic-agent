@@ -8,17 +8,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -30,8 +34,10 @@ type mockDownloader struct {
 	downloadErr  error
 }
 
-func (md *mockDownloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (string, error) {
-	return md.downloadPath, md.downloadErr
+func (md *mockDownloader) Download(ctx context.Context, a artifact.Artifact, version *agtversion.ParsedSemVer) (download.DownloadResult, error) {
+	return download.DownloadResult{
+		ArtifactPath: md.downloadPath,
+	}, md.downloadErr
 }
 
 func TestFallbackIsAppended(t *testing.T) {
@@ -55,11 +61,8 @@ func TestFallbackIsAppended(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			l, _ := loggertest.New(tc.name)
-			u := Upgrader{
-				fleetServerURI: tc.fleetServerURI,
-				log:            l,
-			}
-			res := u.appendFallbackPGP(tc.targetVersion, tc.passedBytes)
+			u := newUpgradeArtifactDownloader(l, &artifact.Config{}, nil)
+			res := u.appendFallbackPGP(tc.targetVersion, tc.fleetServerURI, tc.passedBytes)
 			// check default fallback is passed and is very last
 			require.NotNil(t, res)
 			require.Equal(t, tc.expectedLen, len(res))
@@ -91,8 +94,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return &mockDownloader{expectedDownloadPath, nil}, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
-		require.NoError(t, err)
+		u := newUpgradeArtifactDownloader(testLogger, &settings, nil)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
@@ -100,9 +102,9 @@ func TestDownloadWithRetries(t *testing.T) {
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(settings.Timeout)
 
-		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		downloadResult, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
 		require.NoError(t, err)
-		require.Equal(t, expectedDownloadPath, path)
+		require.Equal(t, expectedDownloadPath, downloadResult.ArtifactPath)
 
 		logs := obs.TakeAll()
 		require.Len(t, logs, 1)
@@ -141,8 +143,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return nil, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
-		require.NoError(t, err)
+		u := newUpgradeArtifactDownloader(testLogger, &settings, nil)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
@@ -150,9 +151,9 @@ func TestDownloadWithRetries(t *testing.T) {
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(settings.Timeout)
 
-		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		downloadResult, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
 		require.NoError(t, err)
-		require.Equal(t, expectedDownloadPath, path)
+		require.Equal(t, expectedDownloadPath, downloadResult.ArtifactPath)
 
 		logs := obs.TakeAll()
 		require.Len(t, logs, 3)
@@ -196,8 +197,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return nil, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
-		require.NoError(t, err)
+		u := newUpgradeArtifactDownloader(testLogger, &settings, nil)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
@@ -205,9 +205,9 @@ func TestDownloadWithRetries(t *testing.T) {
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(settings.Timeout)
 
-		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		downloadResult, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
 		require.NoError(t, err)
-		require.Equal(t, expectedDownloadPath, path)
+		require.Equal(t, expectedDownloadPath, downloadResult.ArtifactPath)
 
 		logs := obs.TakeAll()
 		require.Len(t, logs, 3)
@@ -241,8 +241,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return &mockDownloader{"", errors.New("download failed")}, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
-		require.NoError(t, err)
+		u := newUpgradeArtifactDownloader(testLogger, &settings, nil)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
@@ -250,9 +249,9 @@ func TestDownloadWithRetries(t *testing.T) {
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(testCaseSettings.Timeout)
 
-		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &testCaseSettings, upgradeDetails)
+		downloadResult, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &testCaseSettings, upgradeDetails)
 		require.Equal(t, "context deadline exceeded", err.Error())
-		require.Equal(t, "", path)
+		require.Equal(t, "", downloadResult.ArtifactPath)
 
 		logs := obs.TakeAll()
 		logsJSON, err := json.MarshalIndent(logs, "", " ")
@@ -275,6 +274,36 @@ func TestDownloadWithRetries(t *testing.T) {
 		// since we didn't have a successful download.
 		require.NotEmpty(t, *upgradeDetailsRetryErrorMsg)
 		require.Equal(t, *upgradeDetailsRetryErrorMsg, upgradeDetails.Metadata.RetryErrorMsg)
+	})
+
+	t.Run("insufficient_disk_space_stops_retries", func(t *testing.T) {
+		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
+			return &mockDownloader{"", upgradeErrors.ErrInsufficientDiskSpace}, nil
+		}
+
+		u := newUpgradeArtifactDownloader(testLogger, &settings, nil)
+
+		parsedVersion, err := agtversion.ParseVersion("8.9.0")
+		require.NoError(t, err)
+
+		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
+
+		downloadResult, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+
+		require.Error(t, err)
+		require.Equal(t, "", downloadResult.ArtifactPath)
+
+		require.ErrorIs(t, err, upgradeErrors.ErrInsufficientDiskSpace)
+
+		logs := obs.TakeAll()
+		require.Len(t, logs, 2)
+		require.Equal(t, "download attempt 1", logs[0].Message)
+		require.Contains(t, logs[1].Message, "Insufficient disk space error detected, stopping retries")
+
+		require.NotZero(t, *upgradeDetailsRetryUntil)
+		require.False(t, *upgradeDetailsRetryUntilWasUnset)
+
+		require.Empty(t, *upgradeDetailsRetryErrorMsg)
 	})
 }
 
@@ -306,4 +335,92 @@ func mockUpgradeDetails(parsedVersion *agtversion.ParsedSemVer) (*details.Detail
 	return upgradeDetails,
 		&upgradeDetailsRetryUntil, &upgradeDetailsRetryUntilWasUnset,
 		&upgradeDetailsRetryErrorMsg
+}
+
+type mockDownloaderFactoryProvider struct {
+	calledWithName string
+}
+
+var mockDownloaderFactoryError = errors.New("downloader factory not found")
+
+func (m *mockDownloaderFactoryProvider) GetDownloaderFactory(name string) (downloaderFactory, error) {
+	m.calledWithName = name
+	return nil, mockDownloaderFactoryError
+}
+
+func TestDownloadArtifact(t *testing.T) {
+	t.Run("should return error if file downloader factory is not found", func(t *testing.T) {
+		logger, err := logger.New("test", false)
+		require.NoError(t, err)
+
+		config := artifact.Config{}
+		u := newUpgradeArtifactDownloader(logger, &config, nil)
+
+		u.downloaderFactoryProvider = &mockDownloaderFactoryProvider{}
+
+		_, err = u.downloadArtifact(context.Background(), nil, "file://mockfilepath", "", nil, false, false)
+		require.Error(t, err)
+		require.ErrorIs(t, err, mockDownloaderFactoryError)
+		require.Equal(t, fileDownloaderFactory, u.downloaderFactoryProvider.(*mockDownloaderFactoryProvider).calledWithName)
+	})
+
+	t.Run("should return error if composed downloader factory is not found", func(t *testing.T) {
+		logger, err := logger.New("test", false)
+		require.NoError(t, err)
+
+		config := artifact.Config{}
+		u := newUpgradeArtifactDownloader(logger, &config, nil)
+
+		u.downloaderFactoryProvider = &mockDownloaderFactoryProvider{}
+
+		_, err = u.downloadArtifact(context.Background(), nil, "https://mockuri", "", nil, false, false)
+		require.Error(t, err)
+		require.ErrorIs(t, err, mockDownloaderFactoryError)
+		require.Equal(t, composedDownloaderFactory, u.downloaderFactoryProvider.(*mockDownloaderFactoryProvider).calledWithName)
+	})
+}
+
+func setupDir(t *testing.T) {
+	t.Helper()
+	dir := t.TempDir()
+	paths.SetDownloads(dir)
+
+	err := os.WriteFile(filepath.Join(dir, "test-8.3.0-file"), []byte("hello, world!"), 0600)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(dir, "test-8.4.0-file"), []byte("hello, world!"), 0600)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(dir, "test-8.5.0-file"), []byte("hello, world!"), 0600)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(dir, "test-hash-file"), []byte("hello, world!"), 0600)
+	require.NoError(t, err)
+}
+
+func TestPreUpgradeCleanup(t *testing.T) {
+	setupDir(t)
+	log := newErrorLogger(t)
+	u := newUpgradeArtifactDownloader(log, &artifact.Config{}, nil)
+	err := u.cleanNonMatchingVersionsFromDownloads(log, "8.4.0")
+	require.NoError(t, err)
+
+	files, err := os.ReadDir(paths.Downloads())
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	require.Equal(t, "test-8.4.0-file", files[0].Name())
+	p, err := os.ReadFile(filepath.Join(paths.Downloads(), files[0].Name()))
+	require.NoError(t, err)
+	require.Equal(t, []byte("hello, world!"), p)
+}
+
+func newErrorLogger(t *testing.T) *logger.Logger {
+	t.Helper()
+
+	loggerCfg := logger.DefaultLoggingConfig()
+	loggerCfg.Level = logp.ErrorLevel
+
+	eventLoggerCfg := logger.DefaultEventLoggingConfig()
+	eventLoggerCfg.Level = loggerCfg.Level
+
+	log, err := logger.NewFromConfig("", loggerCfg, eventLoggerCfg, false)
+	require.NoError(t, err)
+	return log
 }
