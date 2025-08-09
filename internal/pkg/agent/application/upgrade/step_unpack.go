@@ -149,7 +149,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (unpa
 		}
 
 		dstPath := strings.TrimPrefix(mappedPackagePath, "data/")
-		dstPath = filepath.Join(dataDir, dstPath) // TODO: look into this, this may be the new home to cleanup
+		dstPath = filepath.Join(dataDir, dstPath)
 
 		if skipFn(dstPath) {
 			return nil
