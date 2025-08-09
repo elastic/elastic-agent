@@ -14,7 +14,6 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/go-ucfg"
-	"github.com/elastic/go-ucfg/cfgutil"
 )
 
 // options hold the specified options
@@ -304,18 +303,6 @@ func LoadFile(path string) (*Config, error) {
 		return nil, err
 	}
 	return NewConfigFrom(fp)
-}
-
-// LoadFiles takes multiples files, load and merge all of them in a single one.
-func LoadFiles(paths ...string) (*Config, error) {
-	merger := cfgutil.NewCollector(nil)
-	for _, path := range paths {
-		cfg, err := LoadFile(path)
-		if err := merger.Add(cfg.access(), err); err != nil {
-			return nil, err
-		}
-	}
-	return newConfigFrom(merger.Config(), nil), nil
 }
 
 func getOptions(opts ...interface{}) ([]ucfg.Option, options, error) {

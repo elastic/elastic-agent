@@ -70,20 +70,6 @@ func WithEnv(env []string) StartOption {
 	}
 }
 
-// WithUID sets UID
-func WithUID(uid int) StartOption {
-	return func(cfg *StartConfig) {
-		cfg.uid = uid
-	}
-}
-
-// WithGID sets GID
-func WithGID(gid int) StartOption {
-	return func(cfg *StartConfig) {
-		cfg.gid = gid
-	}
-}
-
 // WithCmdOptions sets the exec.Cmd options
 func WithCmdOptions(cmdOpts ...CmdOption) StartOption {
 	return func(cfg *StartConfig) {
