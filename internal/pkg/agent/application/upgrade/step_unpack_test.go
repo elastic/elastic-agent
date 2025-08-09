@@ -221,7 +221,7 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 		name       string
 		args       args
 		want       unpackResult
-		wantErr    assert.ErrorAssertionFunc
+		wantErr    error
 		checkFiles checkExtractedPath
 		flavor     string
 		copyFunc   func(dst io.Writer, src io.Reader) (int64, error)
@@ -239,7 +239,7 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-abcdef"),
 			},
-			wantErr: assert.NoError,
+			wantErr: nil,
 			checkFiles: func(t *testing.T, testDataDir string) {
 				versionedHome := filepath.Join(testDataDir, "elastic-agent-abcdef")
 				checkExtractedFilesOutOfOrder(t, versionedHome)
@@ -258,7 +258,7 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
-			wantErr:    assert.NoError,
+			wantErr:    nil,
 			checkFiles: checkExtractedFilesWithManifest,
 		},
 		{
@@ -274,7 +274,7 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
-			wantErr: assert.Error,
+			wantErr: errors.New("test copy error"),
 			copyFunc: func(dst io.Writer, src io.Reader) (int64, error) {
 				return 0, errors.New("test copy error")
 			},
@@ -292,7 +292,7 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
-			wantErr: assert.NoError,
+			wantErr: nil,
 			flavor:  "basic",
 			checkFiles: func(t *testing.T, testDataDir string) {
 				checkFilesPresence(t, testDataDir,
@@ -317,7 +317,7 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
-			wantErr: assert.NoError,
+			wantErr: nil,
 			flavor:  "servers",
 			checkFiles: func(t *testing.T, testDataDir string) {
 				checkFilesPresence(t, testDataDir,
@@ -352,9 +352,7 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 			require.NoError(t, err, "creation of test archive file failed")
 
 			got, err := untar(log, archiveFile, testDataDir, tt.flavor)
-			if !tt.wantErr(t, err, fmt.Sprintf("untar(%v, %v, %v)", tt.args.version, archiveFile, testDataDir)) {
-				return
-			}
+			assert.ErrorIs(t, err, tt.wantErr, fmt.Sprintf("untar(%v, %v, %v)", tt.args.version, archiveFile, testDataDir))
 			assert.Equalf(t, tt.want, got, "untar(%v, %v, %v)", tt.args.version, archiveFile, testDataDir)
 			if tt.checkFiles != nil {
 				tt.checkFiles(t, testDataDir)
@@ -378,7 +376,7 @@ func TestUpgrader_unpackZip(t *testing.T) {
 		name       string
 		args       args
 		want       unpackResult
-		wantErr    assert.ErrorAssertionFunc
+		wantErr    error
 		checkFiles checkExtractedPath
 		flavor     string
 		copyFunc   func(dst io.Writer, src io.Reader) (int64, error)
@@ -395,7 +393,7 @@ func TestUpgrader_unpackZip(t *testing.T) {
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-abcdef"),
 			},
-			wantErr: assert.NoError,
+			wantErr: nil,
 			checkFiles: func(t *testing.T, testDataDir string) {
 				versionedHome := filepath.Join(testDataDir, "elastic-agent-abcdef")
 				checkExtractedFilesOutOfOrder(t, versionedHome)
@@ -413,7 +411,7 @@ func TestUpgrader_unpackZip(t *testing.T) {
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
-			wantErr:    assert.NoError,
+			wantErr:    nil,
 			checkFiles: checkExtractedFilesWithManifest,
 		},
 		{
@@ -428,7 +426,7 @@ func TestUpgrader_unpackZip(t *testing.T) {
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
-			wantErr: assert.Error,
+			wantErr: errors.New("test copy error"),
 			copyFunc: func(dst io.Writer, src io.Reader) (int64, error) {
 				return 0, errors.New("test copy error")
 			},
@@ -445,7 +443,8 @@ func TestUpgrader_unpackZip(t *testing.T) {
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
-			wantErr: assert.NoError,
+			// wantErr: assert.NoError,
+			wantErr: nil,
 			flavor:  "basic",
 			checkFiles: func(t *testing.T, testDataDir string) {
 				checkFilesPresence(t, testDataDir,
@@ -469,7 +468,7 @@ func TestUpgrader_unpackZip(t *testing.T) {
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
-			wantErr: assert.NoError,
+			wantErr: nil,
 			flavor:  "servers",
 			checkFiles: func(t *testing.T, testDataDir string) {
 				checkFilesPresence(t, testDataDir,
@@ -504,9 +503,7 @@ func TestUpgrader_unpackZip(t *testing.T) {
 			require.NoError(t, err, "creation of test archive file failed")
 
 			got, err := unzip(log, archiveFile, testDataDir, tt.flavor)
-			if !tt.wantErr(t, err, fmt.Sprintf("unzip(%v, %v)", archiveFile, testDataDir)) {
-				return
-			}
+			assert.ErrorIs(t, err, tt.wantErr, fmt.Sprintf("unzip(%v, %v)", archiveFile, testDataDir))
 			assert.Equalf(t, tt.want, got, "unzip(%v, %v)", archiveFile, testDataDir)
 			if tt.checkFiles != nil {
 				tt.checkFiles(t, testDataDir)
