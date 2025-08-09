@@ -56,8 +56,6 @@ connectors:
   elasticapm:
 
 processors:
-  # DEPRECATED: The elasticinframetrics processor is deprecated and will be removed in 9.2.0.
-  elasticinframetrics:
   resourcedetection:
     detectors: ["system"]
     system:
@@ -89,26 +87,9 @@ processors:
           enabled: true
         os.type:
           enabled: true
-  attributes/dataset:
-    actions:
-      - key: event.dataset
-        from_attribute: data_stream.dataset
-        action: upsert
-  resource/process:
-    attributes:
-      - key: process.executable.name
-        action: delete
-      - key: process.executable.path
-        action: delete
   elastictrace:
 
 exporters:
-  elasticsearch/ecs:
-    endpoints: ["${env:ELASTIC_ENDPOINT}"]
-    api_key: ${env:ELASTIC_API_KEY}
-    mapping:
-      mode: ecs
-
   elasticsearch/otel:
     endpoints: [ "${env:ELASTIC_ENDPOINT}" ]
     api_key: ${env:ELASTIC_API_KEY}
@@ -130,8 +111,8 @@ service:
 
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
-      processors: [elasticinframetrics, resourcedetection, attributes/dataset, resource/process]
-      exporters: [elasticsearch/ecs]
+      processors: [resourcedetection]
+      exporters: [elasticsearch/otel]
 
     metrics/aggregated-metrics:
       receivers: [elasticapm]
