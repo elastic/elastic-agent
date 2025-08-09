@@ -17,6 +17,7 @@ import (
 	"golang.org/x/sys/windows/svc/eventlog"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install/usermgmt"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
@@ -82,11 +83,11 @@ func withServiceOptions(username string, groupName string, password string) ([]s
 
 	// service requires a password to launch as the use
 	// this sets it to a random password that is only known by the service
-	password, err := RandomPassword()
+	password, err := usermgmt.RandomPassword()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate random password: %w", err)
 	}
-	err = SetUserPassword(username, password)
+	err = usermgmt.SetUserPassword(username, password)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set user %s password for service: %w", username, err)
 	}

@@ -23,6 +23,8 @@ type InputSpec struct {
 	Command      *CommandSpec `config:"command,omitempty" yaml:"command,omitempty"`
 	Service      *ServiceSpec `config:"service,omitempty" yaml:"service,omitempty"`
 	IsolateUnits bool         `config:"isolate_units,omitempty" yaml:"isolate_units,omitempty"`
+
+	Hooks ComponentHooks `config:"hooks,omitempty" yaml:"hooks,omitempty"`
 }
 
 // Validate ensures correctness of input specification.
@@ -56,5 +58,10 @@ func (s *InputSpec) Validate() error {
 			return fmt.Errorf("input '%s' defined 'runtime.preventions.%d.condition' failed to compile: %w", s.Name, idx, err)
 		}
 	}
+
+	if err := s.Hooks.Validate(); err != nil {
+		return fmt.Errorf("input '%s' defines one or more invalid hooks: %w", s.Name, err)
+	}
+
 	return nil
 }
