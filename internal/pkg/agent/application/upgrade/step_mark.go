@@ -228,7 +228,7 @@ func (u *upgradeWatcher) markUpgrade(log *logger.Logger, dataDirPath string, age
 
 	markerPath := markerFilePath(dataDirPath)
 	log.Infow("Writing upgrade marker file", "file.path", markerPath, "hash", marker.Hash, "prev_hash", marker.PrevHash)
-	if err := os.WriteFile(markerPath, markerBytes, 0600); err != nil {
+	if err := writeFile(markerPath, markerBytes, 0600); err != nil {
 		return errors.New(err, errors.TypeFilesystem, "failed to create update marker file", errors.M(errors.MetaKeyPath, markerPath))
 	}
 
