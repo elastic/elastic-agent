@@ -1159,7 +1159,7 @@ func TestUpgrade(t *testing.T) {
 					mockExecutor.EXPECT().unpackArtifact(downloadResult, tc.targetVersion, downloadResult.ArtifactPath, topPath, "", paths.Data(), paths.HomePath(), details, currentVersion, mock.AnythingOfType("checkUpgradeFn")).Return(unpackStepResult, tc.unpackError)
 
 				case "replaceOldWithNew":
-					mockExecutor.EXPECT().replaceOldWithNew(unpackStepResult, currentVersionedHome, topPath, agentName, paths.Home(), paths.Run(), newRunPath, symlinkPath, newBinaryPath, details).Return(tc.replaceOldWithNewError)
+					mockExecutor.EXPECT().replaceOldWithNew(unpackStepResult, currentVersionedHome, topPath, agentName, paths.Run(), newRunPath, symlinkPath, newBinaryPath, details).Return(tc.replaceOldWithNewError)
 
 				case "watchNewAgent":
 					mockExecutor.EXPECT().watchNewAgent(ctx, markerFilePath, topPath, paths.Data(), watcherMaxWaitTime, mock.AnythingOfType("createContextWithTimeout"), newAgentInstall, previousAgentInstall, action, details, OUTCOME_UPGRADE).Return(tc.watchNewAgentError)
