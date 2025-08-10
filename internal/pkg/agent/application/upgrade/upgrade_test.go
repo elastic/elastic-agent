@@ -1296,7 +1296,7 @@ type testError struct {
 	expectedError error
 }
 
-func TesE2EtUpgradeDownloadErrors(t *testing.T) {
+func TestUpgradeDownloadErrors(t *testing.T) {
 	testArtifact := artifact.Artifact{
 		Name:     "Elastic Agent",
 		Cmd:      "elastic-agent",
@@ -1461,7 +1461,7 @@ func createArchive(t *testing.T, archiveName string, archiveFiles []files) (stri
 	return createTarArchive(t, archiveName, archiveFiles)
 }
 
-func TestE2EUpgradeUnpackErrors(t *testing.T) {
+func TestUpgradeUnpackErrors(t *testing.T) {
 	log, _ := loggertest.New("test")
 
 	tempConfig := &artifact.Config{} // used only to get os and arch, runtime.GOARCH returns amd64 which is not a valid arch when used in GetArtifactName
