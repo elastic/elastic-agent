@@ -1567,10 +1567,7 @@ func TestUpgradeUnpackErrors(t *testing.T) {
 			require.ErrorIs(t, err, tc.expectedError, "expected error mismatch")
 
 			require.NoDirExists(t, versionedHomePath, "partially unpacked archive should be cleaned up")
-
-			artifactPath, err := artifact.GetArtifactPath(agentArtifact, *testVersion, runtime.GOOS, runtime.GOARCH, config.TargetDirectory)
-			require.NoError(t, err)
-			require.NoFileExists(t, artifactPath, "downloaded artifact should be cleaned up")
+			require.NoFileExists(t, config.TargetDirectory, "downloaded artifact should be cleaned up")
 		})
 	}
 }
