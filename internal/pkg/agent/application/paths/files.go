@@ -78,19 +78,21 @@ func AgentCapabilitiesPath() string {
 	return filepath.Join(Config(), defaultAgentCapabilitiesFile)
 }
 
+var HomePath = Home // used only for mocking Home() for testing purposes
+
 // AgentActionStoreFile is the file that contains the action that can be replayed after restart.
 func AgentActionStoreFile() string {
-	return filepath.Join(Home(), defaultAgentActionStoreFile)
+	return filepath.Join(HomePath(), defaultAgentActionStoreFile)
 }
 
 // AgentStateStoreYmlFile is the file that contains the persisted state of the agent including the action that can be replayed after restart.
 func AgentStateStoreYmlFile() string {
-	return filepath.Join(Home(), defaultAgentStateStoreYmlFile)
+	return filepath.Join(HomePath(), defaultAgentStateStoreYmlFile)
 }
 
 // AgentStateStoreFile is the file that contains the persisted state of the agent including the action that can be replayed after restart encrypted.
 func AgentStateStoreFile() string {
-	return filepath.Join(Home(), defaultAgentStateStoreFile)
+	return filepath.Join(HomePath(), defaultAgentStateStoreFile)
 }
 
 // AgentInputsDPath is directory that contains the fragment of inputs yaml for K8s deployment.
