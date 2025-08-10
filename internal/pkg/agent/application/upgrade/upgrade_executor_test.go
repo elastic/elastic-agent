@@ -535,7 +535,6 @@ func TestReplaceOldWithNewStep(t *testing.T) {
 	currentVersionedHome := "mockCurrentVersionedHome"
 	topPath := "mockTopPath"
 	agentName := "mockAgentName"
-	currentHome := "mockCurrentHome"
 	oldRunPath := "mockOldRunPath"
 	newRunPath := "mockNewRunPath"
 	symlinkPath := "mockSymlinkPath"
@@ -653,7 +652,7 @@ func TestReplaceOldWithNewStep(t *testing.T) {
 				},
 			}
 
-			err := upgradeExecutor.replaceOldWithNew(unpackStepResult, currentVersionedHome, topPath, agentName, currentHome, oldRunPath, newRunPath, symlinkPath, newBinPath, upgradeDetails)
+			err := upgradeExecutor.replaceOldWithNew(unpackStepResult, currentVersionedHome, topPath, agentName, oldRunPath, newRunPath, symlinkPath, newBinPath, upgradeDetails)
 
 			mockDirectoryCopier.AssertExpectations(t)
 

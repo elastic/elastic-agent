@@ -110,17 +110,17 @@ func (_c *mock_upgradeExecutor_downloadArtifact_Call) RunAndReturn(run func(cont
 	return _c
 }
 
-// replaceOldWithNew provides a mock function with given fields: unpackStepResult0, currentVersionedHome, topPath, agentName, currentHome, oldRunPath, newRunPath, symlinkPath, newBinPath, upgradeDetails
-func (_m *mock_upgradeExecutor) replaceOldWithNew(unpackStepResult0 unpackStepResult, currentVersionedHome string, topPath string, agentName string, currentHome string, oldRunPath string, newRunPath string, symlinkPath string, newBinPath string, upgradeDetails *details.Details) error {
-	ret := _m.Called(unpackStepResult0, currentVersionedHome, topPath, agentName, currentHome, oldRunPath, newRunPath, symlinkPath, newBinPath, upgradeDetails)
+// replaceOldWithNew provides a mock function with given fields: unpackStepResult0, currentVersionedHome, topPath, agentName, oldRunPath, newRunPath, symlinkPath, newBinPath, upgradeDetails
+func (_m *mock_upgradeExecutor) replaceOldWithNew(unpackStepResult0 unpackStepResult, currentVersionedHome string, topPath string, agentName string, oldRunPath string, newRunPath string, symlinkPath string, newBinPath string, upgradeDetails *details.Details) error {
+	ret := _m.Called(unpackStepResult0, currentVersionedHome, topPath, agentName, oldRunPath, newRunPath, symlinkPath, newBinPath, upgradeDetails)
 
 	if len(ret) == 0 {
 		panic("no return value specified for replaceOldWithNew")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(unpackStepResult, string, string, string, string, string, string, string, string, *details.Details) error); ok {
-		r0 = rf(unpackStepResult0, currentVersionedHome, topPath, agentName, currentHome, oldRunPath, newRunPath, symlinkPath, newBinPath, upgradeDetails)
+	if rf, ok := ret.Get(0).(func(unpackStepResult, string, string, string, string, string, string, string, *details.Details) error); ok {
+		r0 = rf(unpackStepResult0, currentVersionedHome, topPath, agentName, oldRunPath, newRunPath, symlinkPath, newBinPath, upgradeDetails)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -138,19 +138,18 @@ type mock_upgradeExecutor_replaceOldWithNew_Call struct {
 //   - currentVersionedHome string
 //   - topPath string
 //   - agentName string
-//   - currentHome string
 //   - oldRunPath string
 //   - newRunPath string
 //   - symlinkPath string
 //   - newBinPath string
 //   - upgradeDetails *details.Details
-func (_e *mock_upgradeExecutor_Expecter) replaceOldWithNew(unpackStepResult0 interface{}, currentVersionedHome interface{}, topPath interface{}, agentName interface{}, currentHome interface{}, oldRunPath interface{}, newRunPath interface{}, symlinkPath interface{}, newBinPath interface{}, upgradeDetails interface{}) *mock_upgradeExecutor_replaceOldWithNew_Call {
-	return &mock_upgradeExecutor_replaceOldWithNew_Call{Call: _e.mock.On("replaceOldWithNew", unpackStepResult0, currentVersionedHome, topPath, agentName, currentHome, oldRunPath, newRunPath, symlinkPath, newBinPath, upgradeDetails)}
+func (_e *mock_upgradeExecutor_Expecter) replaceOldWithNew(unpackStepResult0 interface{}, currentVersionedHome interface{}, topPath interface{}, agentName interface{}, oldRunPath interface{}, newRunPath interface{}, symlinkPath interface{}, newBinPath interface{}, upgradeDetails interface{}) *mock_upgradeExecutor_replaceOldWithNew_Call {
+	return &mock_upgradeExecutor_replaceOldWithNew_Call{Call: _e.mock.On("replaceOldWithNew", unpackStepResult0, currentVersionedHome, topPath, agentName, oldRunPath, newRunPath, symlinkPath, newBinPath, upgradeDetails)}
 }
 
-func (_c *mock_upgradeExecutor_replaceOldWithNew_Call) Run(run func(unpackStepResult0 unpackStepResult, currentVersionedHome string, topPath string, agentName string, currentHome string, oldRunPath string, newRunPath string, symlinkPath string, newBinPath string, upgradeDetails *details.Details)) *mock_upgradeExecutor_replaceOldWithNew_Call {
+func (_c *mock_upgradeExecutor_replaceOldWithNew_Call) Run(run func(unpackStepResult0 unpackStepResult, currentVersionedHome string, topPath string, agentName string, oldRunPath string, newRunPath string, symlinkPath string, newBinPath string, upgradeDetails *details.Details)) *mock_upgradeExecutor_replaceOldWithNew_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(unpackStepResult), args[1].(string), args[2].(string), args[3].(string), args[4].(string), args[5].(string), args[6].(string), args[7].(string), args[8].(string), args[9].(*details.Details))
+		run(args[0].(unpackStepResult), args[1].(string), args[2].(string), args[3].(string), args[4].(string), args[5].(string), args[6].(string), args[7].(string), args[8].(*details.Details))
 	})
 	return _c
 }
@@ -160,7 +159,7 @@ func (_c *mock_upgradeExecutor_replaceOldWithNew_Call) Return(_a0 error) *mock_u
 	return _c
 }
 
-func (_c *mock_upgradeExecutor_replaceOldWithNew_Call) RunAndReturn(run func(unpackStepResult, string, string, string, string, string, string, string, string, *details.Details) error) *mock_upgradeExecutor_replaceOldWithNew_Call {
+func (_c *mock_upgradeExecutor_replaceOldWithNew_Call) RunAndReturn(run func(unpackStepResult, string, string, string, string, string, string, string, *details.Details) error) *mock_upgradeExecutor_replaceOldWithNew_Call {
 	_c.Call.Return(run)
 	return _c
 }
