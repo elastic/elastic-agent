@@ -15,6 +15,9 @@ import (
 type directoryCopier struct {
 }
 
+var writeFile = os.WriteFile
+var dirCopy = copy.Copy
+
 // TODO: add tests for this
 // Update to accept copydir function
 func (d *directoryCopier) copyActionStore(log *logger.Logger, newHome string) error {
@@ -34,7 +37,7 @@ func (d *directoryCopier) copyActionStore(log *logger.Logger, newHome string) er
 			return err
 		}
 
-		if err := os.WriteFile(newActionStorePath, currentActionStore, 0o600); err != nil {
+		if err := writeFile(newActionStorePath, currentActionStore, 0o600); err != nil {
 			return err
 		}
 	}
@@ -90,7 +93,7 @@ func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
 		copyConcurrency = runtime.NumCPU() * 4
 	}
 
-	return copy.Copy(from, to, copy.Options{
+	return dirCopy(from, to, copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
 		},
