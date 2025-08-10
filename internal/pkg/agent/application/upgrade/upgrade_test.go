@@ -1426,22 +1426,19 @@ func TestUpgradeDownloadErrors(t *testing.T) {
 	}
 }
 
-func archiveFilesWithArchiveDirName(archiveName string, archiveFiles []files) []files {
+func archiveFilesWithArchiveDirName(archiveName string) func(file files) files {
 	archiveWithoutSuffix := strings.TrimSuffix(archiveName, ".tar.gz")
 	archiveWithoutSuffix = strings.TrimSuffix(archiveWithoutSuffix, ".zip")
 
-	modifiedArchiveFiles := make([]files, len(archiveFiles))
-	for i, file := range archiveFiles {
+	return func(file files) files {
 		file.path = strings.Replace(file.path, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64", archiveWithoutSuffix, 1)
-		modifiedArchiveFiles[i] = file
-	}
 
-	return modifiedArchiveFiles
+		return file
+	}
 }
 
-func archiveFilesWithVersionedHome(version string, meta string, archiveFiles []files) []files {
-	modifiedArchiveFiles := make([]files, len(archiveFiles))
-	for i, file := range archiveFiles {
+func archiveFilesWithVersionedHome(version string, meta string) func(file files) files {
+	return func(file files) files {
 		if file.content == ea_123_manifest {
 			newContent := strings.ReplaceAll(file.content, "1.2.3", version)
 			newContent = strings.ReplaceAll(newContent, "abcdef", meta)
@@ -1449,6 +1446,17 @@ func archiveFilesWithVersionedHome(version string, meta string, archiveFiles []f
 			file.content = newContent
 		}
 		file.path = strings.ReplaceAll(file.path, "abcdef", meta)
+
+		return file
+	}
+}
+
+func modifyArchiveFiles(archiveFiles []files, modFuncs ...func(file files) files) []files {
+	modifiedArchiveFiles := make([]files, len(archiveFiles))
+	for i, file := range archiveFiles {
+		for _, modFunc := range modFuncs {
+			file = modFunc(file)
+		}
 		modifiedArchiveFiles[i] = file
 	}
 
@@ -1473,7 +1481,7 @@ func TestUpgradeUnpackErrors(t *testing.T) {
 	artifactName, err := artifact.GetArtifactName(agentArtifact, *testVersion, tempConfig.OS(), tempConfig.Arch())
 	require.NoError(t, err)
 
-	archive, err := createArchive(t, artifactName, archiveFilesWithArchiveDirName(artifactName, archiveFilesWithMoreComponents))
+	archive, err := createArchive(t, artifactName, modifyArchiveFiles(archiveFilesWithMoreComponents, archiveFilesWithArchiveDirName(artifactName)))
 	require.NoError(t, err)
 	t.Logf("Created archive: %s", archive)
 
@@ -1582,15 +1590,21 @@ func TestUpgradeDirectoryCopyErrors(t *testing.T) {
 	initialArtifactName, err := artifact.GetArtifactName(agentArtifact, *initialVersion, tempConfig.OS(), tempConfig.Arch())
 	require.NoError(t, err)
 
-	initialArchiveFiles := archiveFilesWithArchiveDirName(initialArtifactName, archiveFilesWithMoreComponents)
-	initialArchiveFiles = archiveFilesWithVersionedHome(initialVersion.CoreVersion(), "abcdef", initialArchiveFiles)
+	modFuncs := []func(file files) files{
+		archiveFilesWithArchiveDirName(initialArtifactName),
+		archiveFilesWithVersionedHome(initialVersion.CoreVersion(), "abcdef"),
+	}
+
+	initialArchiveFiles := modifyArchiveFiles(archiveFilesWithMoreComponents, modFuncs...)
 
 	targetVersion := agtversion.NewParsedSemVer(3, 4, 5, "SNAPSHOT", "")
 	targetArtifactName, err := artifact.GetArtifactName(agentArtifact, *targetVersion, tempConfig.OS(), tempConfig.Arch())
 	require.NoError(t, err)
 
-	targetArchiveFiles := archiveFilesWithArchiveDirName(targetArtifactName, archiveFilesWithMoreComponents)
-	targetArchiveFiles = archiveFilesWithVersionedHome(targetVersion.CoreVersion(), "ghijkl", targetArchiveFiles)
+	targetArchiveFiles := modifyArchiveFiles(archiveFilesWithMoreComponents,
+		archiveFilesWithArchiveDirName(targetArtifactName),
+		archiveFilesWithVersionedHome(targetVersion.CoreVersion(), "ghijkl"),
+	)
 
 	mockAgentInfo := mockinfo.NewAgent(t)
 	mockAgentInfo.On("Version").Return(targetVersion.String())
