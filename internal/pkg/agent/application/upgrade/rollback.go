@@ -33,6 +33,8 @@ const (
 	restartBackoffMax  = 90 * time.Second
 )
 
+var execCommandFunc = exec.Command
+
 // Rollback rollbacks to previous version which was functioning before upgrade.
 func Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string) error {
 	symlinkPath := filepath.Join(topDirPath, agentName)

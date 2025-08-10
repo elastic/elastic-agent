@@ -21,7 +21,7 @@ const (
 
 func invokeCmd(agentExecutable string) *exec.Cmd {
 	// #nosec G204 -- user cannot inject any parameters to this command
-	cmd := exec.Command(agentExecutable, watcherSubcommand,
+	cmd := execCommandFunc(agentExecutable, watcherSubcommand,
 		"--path.config", paths.Config(),
 		"--path.home", paths.Top(),
 	)
