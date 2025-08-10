@@ -1425,21 +1425,36 @@ func TesE2EtUpgradeDownloadErrors(t *testing.T) {
 	}
 }
 
-func archiveFilesWithArchiveDirName(archiveWithoutSuffix string, archiveFiles []files) []files {
+func archiveFilesWithArchiveDirName(archiveName string, archiveFiles []files) []files {
+	archiveWithoutSuffix := strings.TrimSuffix(archiveName, ".tar.gz")
+	archiveWithoutSuffix = strings.TrimSuffix(archiveWithoutSuffix, ".zip")
+
 	modifiedArchiveFiles := make([]files, len(archiveFiles))
 	for i, file := range archiveFiles {
 		file.path = strings.Replace(file.path, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64", archiveWithoutSuffix, 1)
 		modifiedArchiveFiles[i] = file
 	}
+
+	return modifiedArchiveFiles
+}
+
+func archiveFilesWithVersionedHome(version string, meta string, archiveFiles []files) []files {
+	modifiedArchiveFiles := make([]files, len(archiveFiles))
+	for i, file := range archiveFiles {
+		if file.content == ea_123_manifest {
+			newContent := strings.ReplaceAll(file.content, "1.2.3", version)
+			newContent = strings.ReplaceAll(newContent, "abcdef", meta)
+
+			file.content = newContent
+		}
+		file.path = strings.ReplaceAll(file.path, "abcdef", meta)
+		modifiedArchiveFiles[i] = file
+	}
+
 	return modifiedArchiveFiles
 }
 
 func createArchive(t *testing.T, archiveName string, archiveFiles []files) (string, error) {
-	archiveWithoutSuffix := strings.TrimSuffix(archiveName, ".tar.gz")
-	archiveWithoutSuffix = strings.TrimSuffix(archiveWithoutSuffix, ".zip")
-
-	archiveFiles = archiveFilesWithArchiveDirName(archiveWithoutSuffix, archiveFiles)
-
 	if runtime.GOOS == "windows" {
 		return createZipArchive(t, archiveName, archiveFiles)
 	}
@@ -1550,4 +1565,144 @@ func TestE2EUpgradeUnpackErrors(t *testing.T) {
 			require.NoFileExists(t, artifactPath, "downloaded artifact should be cleaned up")
 		})
 	}
+}
+
+func TestUpgradeCopyDirErrors(t *testing.T) {
+	log, _ := loggertest.New("test")
+
+	tempConfig := &artifact.Config{} // used only to get os and arch, runtime.GOARCH returns amd64 which is not a valid arch when used in GetArtifactName
+
+	// Prepare to override HomePath
+	tmpHomePath := paths.HomePath
+	t.Cleanup(func() {
+		paths.HomePath = tmpHomePath
+	})
+
+	initialVersion := agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")
+	initialArtifactName, err := artifact.GetArtifactName(agentArtifact, *initialVersion, tempConfig.OS(), tempConfig.Arch())
+	require.NoError(t, err)
+
+	initialArchiveFiles := archiveFilesWithArchiveDirName(initialArtifactName, archiveFilesWithMoreComponents)
+	initialArchiveFiles = archiveFilesWithVersionedHome(initialVersion.CoreVersion(), "abcdef", initialArchiveFiles)
+
+	targetVersion := agtversion.NewParsedSemVer(3, 4, 5, "SNAPSHOT", "")
+	targetArtifactName, err := artifact.GetArtifactName(agentArtifact, *targetVersion, tempConfig.OS(), tempConfig.Arch())
+	require.NoError(t, err)
+
+	targetArchiveFiles := archiveFilesWithArchiveDirName(targetArtifactName, archiveFilesWithMoreComponents)
+	targetArchiveFiles = archiveFilesWithVersionedHome(targetVersion.CoreVersion(), "ghijkl", targetArchiveFiles)
+
+	mockAgentInfo := mockinfo.NewAgent(t)
+	mockAgentInfo.On("Version").Return(targetVersion.String())
+
+	upgradeDetails := details.NewDetails(targetVersion.String(), details.StateRequested, "test")
+
+	tempUnpacker := &upgradeUnpacker{ // used only to unpack the initial archive
+		log: log,
+	}
+
+	testCases := map[string]struct {
+		writeFileError error
+		expectedError  error
+	}{
+		"should return error if action store copy fails": {
+			writeFileError: errors.New("test write error"),
+			expectedError:  errors.New("test write error"),
+		},
+	}
+
+	for _, te := range TestErrors {
+		testCases[fmt.Sprintf("should return error if action store copy fails with disk space error: %v", te)] = struct {
+			writeFileError error
+			expectedError  error
+		}{
+			writeFileError: te,
+			expectedError:  upgradeErrors.ErrInsufficientDiskSpace,
+		}
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			paths.SetTop(t.TempDir())
+
+			initialArchive, err := createArchive(t, initialArtifactName, initialArchiveFiles)
+			require.NoError(t, err)
+
+			t.Logf("Created archive: %s", initialArchive)
+
+			initialUnpackRes, err := tempUnpacker.unpack(initialVersion.String(), initialArchive, paths.Data(), "")
+			require.NoError(t, err)
+
+			checkExtractedFilesWithManifestAndVersionedHome(t, paths.Data(), filepath.Join(paths.Top(), initialUnpackRes.VersionedHome))
+
+			// Overriding HomePath which is just a var holding paths.Home() because
+			// Home() returns "unknow" short commit and returns the release version
+			// which is set in init.
+			paths.HomePath = func() string {
+				actualPath := filepath.Join(paths.Top(), initialUnpackRes.VersionedHome)
+				return actualPath
+			}
+
+			// The file list does not contain the action store files, so we need to
+			// create them
+			err = os.WriteFile(paths.AgentActionStoreFile(), []byte("initial agent action store content"), 0o600)
+			require.NoError(t, err)
+			err = os.WriteFile(paths.AgentStateStoreYmlFile(), []byte("initial agent state yml content"), 0o600)
+			require.NoError(t, err)
+			err = os.WriteFile(paths.AgentStateStoreFile(), []byte("initial agent state enc content"), 0o600)
+			require.NoError(t, err)
+
+			targetArchive, err := createArchive(t, targetArtifactName, targetArchiveFiles)
+			require.NoError(t, err)
+
+			t.Logf("Created archive: %s", targetArchive)
+
+			newVersionedHome := "data/elastic-agent-3.4.5-SNAPSHOT-ghijkl"
+			newVersionedHomePath := filepath.Join(paths.Top(), newVersionedHome)
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.ServeFile(w, r, targetArchive)
+			}))
+			t.Cleanup(server.Close)
+
+			tmpWriteFile := writeFile
+			t.Cleanup(func() {
+				writeFile = tmpWriteFile
+			})
+
+			writeFile = func(name string, data []byte, perm os.FileMode) error {
+				require.DirExists(t, paths.HomePath(), "home path should exist before writing")
+				require.NoFileExists(t, name, fmt.Sprintf("file %s should not exist before writing", name))
+
+				err := tmpWriteFile(name, data, perm)
+				require.NoError(t, err)
+
+				require.FileExists(t, name, fmt.Sprintf("file %s should exist after writing", name))
+
+				return tc.writeFileError
+			}
+
+			config := artifact.Config{
+				TargetDirectory:        paths.Downloads(),
+				SourceURI:              server.URL,
+				RetrySleepInitDuration: 1 * time.Second,
+				HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+					Timeout: 1 * time.Second,
+				},
+			}
+
+			upgrader, err := NewUpgrader(log, &config, mockAgentInfo)
+			require.NoError(t, err)
+
+			_, err = upgrader.Upgrade(context.Background(), targetVersion.String(), server.URL, nil, upgradeDetails, true, true)
+			require.ErrorIs(t, err, tc.expectedError, "expected error mismatch")
+
+			require.NoDirExists(t, newVersionedHomePath, "the new agent directory should be cleaned up if action store copy fails")
+
+			entries, err := os.ReadDir(config.TargetDirectory)
+			require.NoError(t, err, "reading target directory failed")
+			require.Len(t, entries, 0, "the downloaded artifact should be cleaned up if action store copy fails")
+		})
+	}
+
 }
