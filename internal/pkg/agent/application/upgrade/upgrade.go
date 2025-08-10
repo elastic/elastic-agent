@@ -114,11 +114,13 @@ type Upgrader struct {
 	upgradeExecutor upgradeExecutor
 }
 
+var releaseUpgradeableFunc = release.Upgradeable
+
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
 func IsUpgradeable() bool {
 	// only upgradeable if running from Agent installer and running under the
 	// control of the system supervisor (or built specifically with upgrading enabled)
-	return release.Upgradeable() || (paths.RunningInstalled() && info.RunningUnderSupervisor())
+	return releaseUpgradeableFunc() || (paths.RunningInstalled() && info.RunningUnderSupervisor())
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
@@ -256,6 +258,8 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 	return nil
 }
 
+var contextWithTimeoutFunc = context.WithTimeout
+
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	defer func() {
@@ -350,7 +354,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		versionedHome: currentVersionedHome,
 	}
 
-	err = u.upgradeExecutor.watchNewAgent(ctx, markerFilePath(paths.Data()), paths.Top(), paths.Data(), watcherMaxWaitTime, context.WithTimeout, current, previous, action, det, OUTCOME_UPGRADE)
+	err = u.upgradeExecutor.watchNewAgent(ctx, markerFilePath(paths.Data()), paths.Top(), paths.Data(), watcherMaxWaitTime, contextWithTimeoutFunc, current, previous, action, det, OUTCOME_UPGRADE)
 	if err != nil {
 		return nil, err
 	}
