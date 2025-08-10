@@ -1468,16 +1468,15 @@ func TestE2EUpgradeUnpackErrors(t *testing.T) {
 
 	testVersion := agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")
 	upgradeDetails := details.NewDetails(testVersion.String(), details.StateRequested, "test")
+
 	artifactName, err := artifact.GetArtifactName(agentArtifact, *testVersion, tempConfig.OS(), tempConfig.Arch())
 	require.NoError(t, err)
 
-	versionedHome := "data/elastic-agent-1.2.3-SNAPSHOT-abcdef"
-
-	t.Logf("Expected artifact name: %s", artifactName)
-
-	archive, err := createArchive(t, artifactName, archiveFilesWithMoreComponents)
+	archive, err := createArchive(t, artifactName, archiveFilesWithArchiveDirName(artifactName, archiveFilesWithMoreComponents))
 	require.NoError(t, err)
 	t.Logf("Created archive: %s", archive)
+
+	versionedHome := "data/elastic-agent-1.2.3-SNAPSHOT-abcdef"
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, archive)
