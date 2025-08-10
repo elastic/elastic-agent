@@ -22,6 +22,8 @@ const (
 type upgradeRelinker struct {
 }
 
+var symlinkFunc = os.Symlink
+
 // TODO: add tests for this
 func (u *upgradeRelinker) changeSymlink(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
 	log.Infof("Changing symlink, topDirPath: %s, symlinkPath: %s, newTarget: %s", topDirPath, symlinkPath, newTarget)
@@ -39,7 +41,7 @@ func (u *upgradeRelinker) changeSymlink(log *logger.Logger, topDirPath, symlinkP
 		return err
 	}
 
-	if err := os.Symlink(newTarget, prevNewPath); err != nil {
+	if err := symlinkFunc(newTarget, prevNewPath); err != nil {
 		return errors.New(err, errors.TypeFilesystem, "failed to update agent symlink")
 	}
 
