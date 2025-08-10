@@ -1156,7 +1156,7 @@ func TestUpgrade(t *testing.T) {
 					mockExecutor.EXPECT().downloadArtifact(ctx, tc.parsedTargetVersion, agentInfo, sourceURI, "", details, skipVerify, skipDefaultPgp, pgpBytesConverted...).Return(downloadResult, tc.downloadError)
 
 				case "unpackArtifact":
-					mockExecutor.EXPECT().unpackArtifact(downloadResult, tc.targetVersion, downloadResult.ArtifactPath, topPath, "", paths.Data(), paths.Home(), details, currentVersion, mock.AnythingOfType("checkUpgradeFn")).Return(unpackStepResult, tc.unpackError)
+					mockExecutor.EXPECT().unpackArtifact(downloadResult, tc.targetVersion, downloadResult.ArtifactPath, topPath, "", paths.Data(), paths.HomePath(), details, currentVersion, mock.AnythingOfType("checkUpgradeFn")).Return(unpackStepResult, tc.unpackError)
 
 				case "replaceOldWithNew":
 					mockExecutor.EXPECT().replaceOldWithNew(unpackStepResult, currentVersionedHome, topPath, agentName, paths.Home(), paths.Run(), newRunPath, symlinkPath, newBinaryPath, details).Return(tc.replaceOldWithNewError)

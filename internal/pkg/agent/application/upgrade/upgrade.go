@@ -306,7 +306,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, err
 	}
 
-	unpackRes, err := u.upgradeExecutor.unpackArtifact(downloadResult, version, downloadResult.ArtifactPath, paths.Top(), "", paths.Data(), paths.Home(), det, currentVersion, checkUpgrade)
+	unpackRes, err := u.upgradeExecutor.unpackArtifact(downloadResult, version, downloadResult.ArtifactPath, paths.Top(), "", paths.Data(), paths.HomePath(), det, currentVersion, checkUpgrade)
 	if err != nil {
 		return nil, err
 	}
@@ -321,9 +321,9 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	newPath := paths.BinaryPath(filepath.Join(paths.Top(), unpackRes.VersionedHome), agentName)
 	u.log.Infof("newPath: %s", newPath)
 
-	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
+	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.HomePath())
 	if err != nil {
-		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
+		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.HomePath(), paths.Top(), err)
 	}
 
 	err = u.upgradeExecutor.replaceOldWithNew(unpackRes, currentVersionedHome, paths.Top(), agentName, oldRunPath, newRunPath, symlinkPath, newPath, det)
