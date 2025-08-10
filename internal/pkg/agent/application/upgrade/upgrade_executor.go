@@ -164,7 +164,7 @@ func (u *executeUpgrade) watchNewAgent(ctx context.Context, markerFilePath, topP
 		previousAgentInstall, // old agent version data
 		action, upgradeDetails, upgradeOutcome); err != nil {
 
-		return err
+		return u.diskSpaceErrorFunc(err)
 	}
 
 	watcherExecutable := u.watcher.selectWatcherExecutable(topPath, previousAgentInstall, newAgentInstall)
