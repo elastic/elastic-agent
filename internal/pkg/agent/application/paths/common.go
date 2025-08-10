@@ -197,7 +197,7 @@ func DataFrom(topDirPath string) string {
 
 // Run returns the run directory for Agent
 func Run() string {
-	return filepath.Join(Home(), "run")
+	return filepath.Join(HomePath(), "run")
 }
 
 // Components returns the component directory for Agent
