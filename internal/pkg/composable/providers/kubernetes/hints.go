@@ -131,7 +131,7 @@ func (m *hintsBuilder) getFromMeta(value string, kubeMeta mapstr.M) string {
 			m.logger.Debugf("cannot convert value into string: %v", val)
 			return ""
 		}
-		value = strings.Replace(value, match, hintVal, -1)
+		value = strings.ReplaceAll(value, match, hintVal)
 	}
 	return value
 }
