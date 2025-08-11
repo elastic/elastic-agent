@@ -30,7 +30,7 @@ func createTakeDownWatcherCommand(ctx context.Context) *exec.Cmd {
 	return cmd
 }
 
-func takedownWatcher(ctx context.Context, log *logger.Logger, pidFetchFunc watcherPIDsFetcher) error {
+func TakedownWatcher(ctx context.Context, log *logger.Logger, pidFetchFunc watcherPIDsFetcher) error {
 	pids, err := pidFetchFunc()
 	if err != nil {
 		return fmt.Errorf("error listing watcher processes: %s", err)

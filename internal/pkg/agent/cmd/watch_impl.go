@@ -33,10 +33,6 @@ func (a upgradeInstallationModifier) Rollback(ctx context.Context, log *logger.L
 	return upgrade.Rollback(ctx, log, c, topDirPath, prevVersionedHome, prevHash)
 }
 
-// watcherPIDsFetcher defines the type of function responsible for fetching watcher PIDs.
-// This will allow for easier testing of takeOverWatcher using fake binaries
-type watcherPIDsFetcher func() ([]int, error)
-
 func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval time.Duration, log *logger.Logger) error {
 	errChan := make(chan error)
 

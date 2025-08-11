@@ -19,7 +19,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 const (
@@ -284,7 +283,7 @@ func (a AgentWatcherHelper) WaitForWatcher(ctx context.Context, log *logger.Logg
 }
 
 func (a AgentWatcherHelper) TakeOverWatcher(ctx context.Context, log *logger.Logger, topDir string) (*filelock.AppLocker, error) {
-	return takeOverWatcher(ctx, log, new(inProcessWatcherGrappler), topDir, 30*time.Second, 500*time.Millisecond, 100*time.Millisecond)
+	return takeOverWatcher(ctx, log, new(commandWatcherGrappler), topDir, 30*time.Second, 500*time.Millisecond, 100*time.Millisecond)
 }
 
 // watcherPIDsFetcher defines the type of function responsible for fetching watcher PIDs.
@@ -349,12 +348,6 @@ func takeOverWatcher(ctx context.Context, log *logger.Logger, watcherGrappler wa
 			return locker, nil
 		}
 	}
-}
-
-type inProcessWatcherGrappler struct{}
-
-func (i inProcessWatcherGrappler) TakeDownWatcher(ctx context.Context, log *logger.Logger) error {
-	return takedownWatcher(ctx, log, utils.GetWatcherPIDs)
 }
 
 func selectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string {

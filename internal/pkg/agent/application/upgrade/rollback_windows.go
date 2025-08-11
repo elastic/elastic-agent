@@ -49,7 +49,7 @@ func InvokeCmdWithArgs(executable string, args ...string) *exec.Cmd {
 	return cmd
 }
 
-func StartWatcherCmd(log *logger.Logger, createCmd cmdFactory) (*exec.Cmd, error) {
+func StartWatcherCmd(log *logger.Logger, createCmd cmdFactory, wait bool) (*exec.Cmd, error) {
 	// allocConsole
 	r1, _, consoleErr := allocConsoleProc.Call()
 	if r1 == 0 {
