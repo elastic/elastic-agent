@@ -6,8 +6,8 @@ package handlers
 
 import (
 	"context"
-	"io"
 	"math"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
@@ -230,20 +230,22 @@ func TestSaveConfigToStore(t *testing.T) {
 	err := os.WriteFile(dest, []byte("existing content"), 0644)
 	require.NoError(t, err)
 
-	// Create disk store and content to save to it
-	store, err := storage.NewDiskStore(dest)
-	require.NoError(t, err)
-	reader := io.NopCloser(io.Reader(strings.NewReader("new content")))
-
-	// Open handle on destination file for 1.5 seconds
+	// Open handle on destination file and keep it open for a random duration
+	// between [200ms, 1800ms).
+	openDuration := time.Duration(200+rand.Intn(1800-200)) * time.Millisecond
 	destFile, err := os.Open(dest)
 	require.NoError(t, err)
-	time.AfterFunc(1500*time.Millisecond, func() {
-		destFile.Close() // Close the handle after 1.5 seconds
+	time.AfterFunc(openDuration, func() {
+		destFile.Close()
 	})
 	defer destFile.Close()
 
+	// Create disk store
+	store, err := storage.NewDiskStore(dest)
+	require.NoError(t, err)
+
 	// Try to save content to store
+	reader := strings.NewReader("new content")
 	err = saveConfigToStore(store, reader)
 	require.NoError(t, err)
 
