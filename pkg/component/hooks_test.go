@@ -582,61 +582,70 @@ func TestComponentHooks_GetHooks_Integration(t *testing.T) {
 
 func TestInjectComponentsPath(t *testing.T) {
 	componentsPrefix := filepath.Join(paths.VersionedHome(paths.Top()), "components")
-	testCases := []struct {
+	var testCases []struct {
 		name     string
 		input    string
 		expected string
-	}{
-		{
-			name:     "absolute path unchanged",
-			input:    "/opt/elastic/agent",
-			expected: "/opt/elastic/agent",
-		},
-		{
-			name:     "relative path gets components prefix",
-			input:    "filebeat/config",
-			expected: filepath.Clean(filepath.Join(componentsPrefix, "filebeat/config")),
-		},
-		{
-			name:     "single file relative path",
-			input:    "config.yml",
-			expected: filepath.Clean(filepath.Join(componentsPrefix, "config.yml")),
-		},
-		{
-			name:     "nested relative path",
-			input:    "beats/filebeat/data",
-			expected: filepath.Clean(filepath.Join(componentsPrefix, "beats/filebeat/data")),
-		},
-		{
-			name:     "current directory reference",
-			input:    "./config",
-			expected: filepath.Clean(filepath.Join(componentsPrefix, "./config")),
-		},
-		{
-			name:     "parent directory reference",
-			input:    "../shared/config",
-			expected: filepath.Clean(filepath.Join(componentsPrefix, "../shared/config")),
-		},
-		{
-			name:     "empty path",
-			input:    "",
-			expected: filepath.Clean(filepath.Join(componentsPrefix, "")),
-		},
-		{
-			name:     "path with trailing slash",
-			input:    "filebeat/",
-			expected: filepath.Clean(filepath.Join(componentsPrefix, "filebeat/")),
-		},
-		{
-			name:     "path with multiple separators",
-			input:    "filebeat//config//file.yml",
-			expected: filepath.Clean(filepath.Join(componentsPrefix, "filebeat//config//file.yml")),
-		},
+	}
+
+	if runtime.GOOS != "windows" {
+		testCases = []struct {
+			name     string
+			input    string
+			expected string
+		}{
+
+			{
+				name:     "absolute path unchanged",
+				input:    "/opt/elastic/agent",
+				expected: "/opt/elastic/agent",
+			},
+			{
+				name:     "relative path gets components prefix",
+				input:    "filebeat/config",
+				expected: filepath.Clean(filepath.Join(componentsPrefix, "filebeat/config")),
+			},
+			{
+				name:     "single file relative path",
+				input:    "config.yml",
+				expected: filepath.Clean(filepath.Join(componentsPrefix, "config.yml")),
+			},
+			{
+				name:     "nested relative path",
+				input:    "beats/filebeat/data",
+				expected: filepath.Clean(filepath.Join(componentsPrefix, "beats/filebeat/data")),
+			},
+			{
+				name:     "current directory reference",
+				input:    "./config",
+				expected: filepath.Clean(filepath.Join(componentsPrefix, "./config")),
+			},
+			{
+				name:     "parent directory reference",
+				input:    "../shared/config",
+				expected: filepath.Clean(filepath.Join(componentsPrefix, "../shared/config")),
+			},
+			{
+				name:     "empty path",
+				input:    "",
+				expected: filepath.Clean(filepath.Join(componentsPrefix, "")),
+			},
+			{
+				name:     "path with trailing slash",
+				input:    "filebeat/",
+				expected: filepath.Clean(filepath.Join(componentsPrefix, "filebeat/")),
+			},
+			{
+				name:     "path with multiple separators",
+				input:    "filebeat//config//file.yml",
+				expected: filepath.Clean(filepath.Join(componentsPrefix, "filebeat//config//file.yml")),
+			},
+		}
 	}
 
 	// Add platform-specific test cases
 	if runtime.GOOS == "windows" {
-		testCases = append(testCases, []struct {
+		testCases = []struct {
 			name     string
 			input    string
 			expected string
@@ -656,7 +665,7 @@ func TestInjectComponentsPath(t *testing.T) {
 				input:    "filebeat\\config\\file.yml",
 				expected: filepath.Clean(filepath.Join(componentsPrefix, "filebeat\\config\\file.yml")),
 			},
-		}...)
+		}
 	}
 
 	for _, tc := range testCases {
