@@ -7,11 +7,16 @@
 package upgrade
 
 import (
+	"errors"
+	"fmt"
+	"os"
 	"os/exec"
 	"syscall"
 	"time"
 
 	"golang.org/x/sys/windows"
+
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -42,4 +47,43 @@ func InvokeCmdWithArgs(executable string, args ...string) *exec.Cmd {
 		CreationFlags: windows.CREATE_NEW_PROCESS_GROUP,
 	}
 	return cmd
+}
+
+func StartWatcherCmd(log *logger.Logger, createCmd cmdFactory) (*exec.Cmd, error) {
+	// allocConsole
+	r1, _, consoleErr := allocConsoleProc.Call()
+	if r1 == 0 {
+		if !errors.Is(consoleErr, windows.ERROR_ACCESS_DENIED) {
+			return nil, fmt.Errorf("error allocating console: %w", consoleErr)
+		} else {
+			log.Warnf("Already possessing a console")
+		}
+
+	}
+	cmd := createCmd()
+	log.Infow("Starting upgrade watcher", "path", cmd.Path, "args", cmd.Args, "env", cmd.Env, "dir", cmd.Dir)
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start Upgrade Watcher: %w", err)
+	}
+	list, consoleErr := GetConsoleProcessList()
+	if consoleErr != nil {
+		log.Errorf("failed to get console process list: %v", consoleErr)
+	} else {
+		log.Infof("Found console processes %v", list)
+	}
+	// free console
+	r1, _, consoleErr = freeConsoleProc.Call()
+	if r1 == 0 {
+		return nil, fmt.Errorf("error freeing console: %w", consoleErr)
+	}
+	upgradeWatcherPID := cmd.Process.Pid
+	agentPID := os.Getpid()
+
+	go func() {
+		if err := cmd.Wait(); err != nil {
+			log.Infow("Upgrade Watcher exited with error", "agent.upgrade.watcher.process.pid", agentPID, "agent.process.pid", upgradeWatcherPID, "error.message", err)
+		}
+	}()
+
+	return cmd, nil
 }
