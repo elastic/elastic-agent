@@ -30,7 +30,7 @@ func TestOtelFlagsSetup(t *testing.T) {
 }
 
 func TestGetConfigFiles(t *testing.T) {
-	cmd := NewOtelCommandWithArgs(nil, nil)
+	cmd := newOtelCommandWithArgs(nil, nil)
 	configFile := "sample.yaml"
 	require.NoError(t, cmd.Flag(otelConfigFlagName).Value.Set(configFile))
 
@@ -46,7 +46,7 @@ func TestGetConfigFiles(t *testing.T) {
 }
 
 func TestGetConfigFilesWithDefault(t *testing.T) {
-	cmd := NewOtelCommandWithArgs(nil, nil)
+	cmd := newOtelCommandWithArgs(nil, nil)
 
 	setVal := "set=val"
 	sets, err := getSets([]string{setVal})
@@ -60,7 +60,7 @@ func TestGetConfigFilesWithDefault(t *testing.T) {
 }
 
 func TestGetConfigErrorWhenNoConfig(t *testing.T) {
-	cmd := NewOtelCommandWithArgs(nil, nil)
+	cmd := newOtelCommandWithArgs(nil, nil)
 
 	_, err := getConfigFiles(cmd, false)
 	require.Error(t, err)

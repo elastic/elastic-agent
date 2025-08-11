@@ -256,10 +256,10 @@ func Build(params BuildArgs) error {
 	if mg.Verbose() {
 		output = os.Stdout
 	}
-	return run(env, output, os.Stderr, "go", params.WorkDir, args...)
+	return Run(env, output, os.Stderr, "go", params.WorkDir, args...)
 }
 
-func run(env map[string]string, stdout, stderr io.Writer, cmd string, workingDir string, args ...string) (err error) {
+func Run(env map[string]string, stdout, stderr io.Writer, cmd string, workingDir string, args ...string) (err error) {
 	expand := func(s string) string {
 		s2, ok := env[s]
 		if ok {

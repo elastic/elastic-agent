@@ -446,7 +446,7 @@ func getTestBinariesPath() ([]string, error) {
 		filepath.Join(wd, "pkg", "component", "fake", "component"),
 		filepath.Join(wd, "internal", "pkg", "agent", "install", "testblocking"),
 		filepath.Join(wd, "pkg", "core", "process", "testsignal"),
-		filepath.Join(wd, "internal", "pkg", "otel", "manager", "testing"),
+		filepath.Join(wd, "internal", "edot", "cmd", "testing"),
 	}
 	return testBinaryPkgs, nil
 }
@@ -465,7 +465,7 @@ func (Build) TestBinaries() error {
 		}
 
 		outputName := filepath.Join(pkg, binary)
-		err := RunGo("build", "-o", outputName, filepath.Join(pkg))
+		err := devtools.Run(nil, nil, os.Stderr, "go", pkg, "build", "-o", outputName, pkg)
 		if err != nil {
 			return err
 		}
