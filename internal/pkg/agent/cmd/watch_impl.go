@@ -47,8 +47,10 @@ func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval time.
 	agtWatcher := upgrade.NewAgentWatcher(errChan, log, errorCheckInterval)
 	go agtWatcher.Run(ctx)
 
+	// Allow for signals to interrupt the watch
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
+	defer signal.Stop(signals)
 
 	graceTimer := time.NewTimer(tilGrace)
 	defer graceTimer.Stop()
