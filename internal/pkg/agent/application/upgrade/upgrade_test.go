@@ -1292,3 +1292,75 @@ func (f *fakeAcker) Commit(ctx context.Context) error {
 	args := f.Called(ctx)
 	return args.Error(0)
 }
+
+// archiveFilesWithArchiveDirName function is used to modify the archive files to
+// match the desired archive directory name for test cases. Modifies the file
+// paths. The archive files are based on the global variables in step_unpack_test.go.
+func archiveFilesWithArchiveDirName(archiveName string) func(file files) files {
+	archiveWithoutSuffix := strings.TrimSuffix(archiveName, ".tar.gz")
+	archiveWithoutSuffix = strings.TrimSuffix(archiveWithoutSuffix, ".zip")
+
+	return func(file files) files {
+		file.path = strings.Replace(file.path, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64", archiveWithoutSuffix, 1)
+
+		return file
+	}
+}
+
+// archiveFilesWithVersionedHome function is used to modify the archive files to
+// match the desired versioned home path for test cases. Modifies the manifest
+// and file paths. The archive files are based on the global variables in
+// step_unpack_test.go.
+func archiveFilesWithVersionedHome(version string, meta string) func(file files) files {
+	return func(file files) files {
+		if file.content == ea_123_manifest {
+			newContent := strings.ReplaceAll(file.content, "1.2.3", version)
+			newContent = strings.ReplaceAll(newContent, "abcdef", meta)
+
+			file.content = newContent
+		}
+		file.path = strings.ReplaceAll(file.path, "abcdef", meta)
+
+		return file
+	}
+}
+
+// ModifyArchiveFiles function is used to modify the archive files to match the
+// test scenarios. The archive files are based on the global variables in
+// step_unpack_test.go.
+func modifyArchiveFiles(archiveFiles []files, modFuncs ...func(file files) files) []files {
+	modifiedArchiveFiles := make([]files, len(archiveFiles))
+	for i, file := range archiveFiles {
+		for _, modFunc := range modFuncs {
+			file = modFunc(file)
+		}
+		modifiedArchiveFiles[i] = file
+	}
+
+	return modifiedArchiveFiles
+}
+
+// buildArchiveFiles is used to modify the archive files found in
+// step_unpack_test.go to fit the desired test scenarios by setting the archive
+// dir name and the versioned home path.
+func buildArchiveFiles(t *testing.T, archiveFiles []files, parsedVersion *agtversion.ParsedSemVer, metadata string) (string, []files) {
+	tempConfig := &artifact.Config{} // used only to get os and arch, runtime.GOARCH returns amd64 which is not a valid arch when used in GetArtifactName
+	archiveName, err := artifact.GetArtifactName(agentArtifact, *parsedVersion, tempConfig.OS(), tempConfig.Arch())
+	require.NoError(t, err)
+
+	modifiedArchiveFiles := modifyArchiveFiles(archiveFiles,
+		archiveFilesWithArchiveDirName(archiveName),
+		archiveFilesWithVersionedHome(parsedVersion.CoreVersion(), metadata),
+	)
+
+	return archiveName, modifiedArchiveFiles
+}
+
+// createArchive function is used to create mock archives for upgrade tests.
+// Uses the helpers in step_unpack_test.go to create the archive.
+func createArchive(t *testing.T, archiveName string, archiveFiles []files) (string, error) {
+	if runtime.GOOS == "windows" {
+		return createZipArchive(t, archiveName, archiveFiles)
+	}
+	return createTarArchive(t, archiveName, archiveFiles)
+}
