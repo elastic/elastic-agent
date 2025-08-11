@@ -27,7 +27,6 @@ var (
 	freeConsoleProc           = kernel32API.NewProc("FreeConsole")
 	attachConsoleProc         = kernel32API.NewProc("AttachConsole")
 	procGetConsoleProcessList = kernel32API.NewProc("GetConsoleProcessList")
-	procSetConsoleHandler     = kernel32API.NewProc("SetConsoleCtrlHandler")
 	allocConsoleProc          = kernel32API.NewProc("AllocConsole")
 )
 
@@ -47,7 +46,7 @@ func createTakeDownWatcherCommand(ctx context.Context) *exec.Cmd {
 	return cmd
 }
 
-func takedownWatcher(ctx context.Context, log *logger.Logger, pidFetchFunc watcherPIDsFetcher) error {
+func TakedownWatcher(ctx context.Context, log *logger.Logger, pidFetchFunc watcherPIDsFetcher) error {
 	pids, err := pidFetchFunc()
 	if err != nil {
 		return fmt.Errorf("error listing watcher processes: %s", err)
