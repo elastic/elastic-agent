@@ -8,7 +8,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
+	"path/filepath"
+	goruntime "runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -26,6 +27,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -117,12 +119,18 @@ func NewOTelManager(
 	case SubprocessExecutionMode:
 		// NOTE: if we stop embedding the collector binary in elastic-agent, we need to
 		// change this
-		executable, err := os.Executable()
+		elasticAgentExecutableDir, err := paths.RetrieveExecutableDir()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get the path to the collector executable: %w", err)
 		}
+
+		edotExecutable := filepath.Join(elasticAgentExecutableDir, "edot")
+		if goruntime.GOOS == "windows" {
+			edotExecutable += ".exe"
+		}
+
 		recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
-		exec = newSubprocessExecution(logLevel, executable)
+		exec = newSubprocessExecution(logLevel, edotExecutable)
 	default:
 		return nil, errors.New("unknown otel collector exec")
 	}

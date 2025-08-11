@@ -10,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
+	"github.com/elastic/elastic-agent-libs/logp"
 
 	koanfmaps "github.com/knadh/koanf/maps"
 
@@ -19,10 +19,13 @@ import (
 	"go.opentelemetry.io/collector/pipeline"
 	"golang.org/x/exp/maps"
 
+	elasticsearchtranslate "github.com/elastic/beats/v7/libbeat/otelbeat/oteltranslate/outputs/elasticsearch"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/config"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -407,19 +410,18 @@ func getDefaultDatastreamTypeForComponent(comp *component.Component) (string, er
 // translateEsOutputToExporter translates an elasticsearch output configuration to an elasticsearch exporter configuration.
 func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
 	// TODO: Figure out a way to avoid needing a logger for this function
-	//esConfig, err := elasticsearchtranslate.ToOTelConfig(cfg, logp.L())
-	//if err != nil {
-	//	return nil, err
-	//}
-	//// dynamic indexing works by default
-	//
-	//// we also want to use dynamic log ids
-	//esConfig["logs_dynamic_id"] = map[string]any{"enabled": true}
-	//
-	//// for compatibility with beats, we want bodymap mapping
-	//esConfig["mapping"] = map[string]any{"mode": "bodymap"}
-	//return esConfig, nil
-	return nil, nil
+	esConfig, err := elasticsearchtranslate.ToOTelConfig(cfg, logp.L())
+	if err != nil {
+		return nil, err
+	}
+	// dynamic indexing works by default
+
+	// we also want to use dynamic log ids
+	esConfig["logs_dynamic_id"] = map[string]any{"enabled": true}
+
+	// for compatibility with beats, we want bodymap mapping
+	esConfig["mapping"] = map[string]any{"mode": "bodymap"}
+	return esConfig, nil
 }
 
 func BeatDataPath(componentId string) string {

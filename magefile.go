@@ -366,16 +366,25 @@ func GolangCrossBuildOSS() error {
 // GolangCrossBuild build the Beat binary inside of the golang-builder.
 // Do not use directly, use crossBuild instead.
 func GolangCrossBuild() error {
+	// build elastic-agent
 	params := devtools.DefaultGolangCrossBuildArgs()
 	params.OutputDir = "build/golang-crossbuild"
+	params.Package = "github.com/elastic/elastic-agent"
 	injectBuildVars(params.Vars)
-
 	if err := devtools.GolangCrossBuild(params); err != nil {
-		return err
+		return fmt.Errorf("error building elastic-agent: %w", err)
 	}
 
-	// TODO: no OSS bits just yet
-	// return GolangCrossBuildOSS()
+	// build EDOT
+	edotParams := devtools.DefaultGolangCrossBuildArgs()
+	edotParams.Name = "edot-" + devtools.Platform.GOOS + "-" + devtools.Platform.Arch
+	edotParams.Package = "github.com/elastic/elastic-agent/internal/edot"
+	edotParams.OutputDir = "build/golang-crossbuild"
+	edotParams.WorkDir = "./internal/edot"
+	injectBuildVars(edotParams.Vars)
+	if err := devtools.GolangCrossBuild(edotParams); err != nil {
+		return fmt.Errorf("error building edot: %w", err)
+	}
 
 	return nil
 }
