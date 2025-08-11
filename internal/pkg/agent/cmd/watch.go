@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"runtime"
 	"time"
 
@@ -44,6 +45,11 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 		Short: "Watch the Elastic Agent for failures and initiate rollback",
 		Long:  `This command watches Elastic Agent for failures and initiates rollback if necessary.`,
 		Run: func(c *cobra.Command, _ []string) {
+
+			// Initially ignore all signals
+			ignoredSignalsChannel := make(chan os.Signal, 1)
+			signal.Notify(ignoredSignalsChannel)
+
 			cfg := getConfig(streams)
 			log, err := configuredLogger(cfg, watcherName)
 			if err != nil {
