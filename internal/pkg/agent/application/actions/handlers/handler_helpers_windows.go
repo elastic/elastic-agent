@@ -24,11 +24,16 @@ const saveRetryDuration = 2 * time.Second
 // saveConfigToStore saves the given configuration (reader) to the given store.
 // On Windows platforms, the save operation is retried if the error is an
 // ACCESS_DENIED error, which can happen if the file is locked by another process.
-func saveConfigToStore(store storage.Store, reader io.Reader) error {
+func saveConfigToStore(store storage.Store, reader io.ReadSeeker) error {
 	retryableSaveFn := func() error {
 		err := store.Save(reader)
 		if errors.Is(err, syscall.ERROR_ACCESS_DENIED) {
-			// Retryable error, so return it
+			// Retryable error, so reset reader position to start and return the error
+			if _, seekErr := reader.Seek(0, io.SeekStart); seekErr != nil {
+				// Could not reset reader position; we can no longer retry
+				return backoff.Permanent(errors.Join(err, seekErr))
+			}
+
 			return err
 		}
 

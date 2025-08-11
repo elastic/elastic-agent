@@ -447,7 +447,7 @@ func clientEqual(k1 remote.Config, k2 remote.Config) bool {
 	return true
 }
 
-func fleetToReader(agentID string, headers map[string]string, cfg *configuration.Configuration) (io.Reader, error) {
+func fleetToReader(agentID string, headers map[string]string, cfg *configuration.Configuration) (io.ReadSeeker, error) {
 	configToStore := map[string]interface{}{
 		"fleet": cfg.Fleet,
 		"agent": map[string]interface{}{ // Add event logging configuration here!
