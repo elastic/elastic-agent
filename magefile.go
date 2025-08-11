@@ -3648,8 +3648,8 @@ func hasCleanOnExit() bool {
 func (Otel) Readme() error {
 	fmt.Println(">> Building internal/pkg/otel/README.md")
 
-	readmeTmpl := filepath.Join("internal", "pkg", "otel", "templates", "README.md.tmpl")
-	readmeOut := filepath.Join("internal", "pkg", "otel", "README.md")
+	readmeTmpl := filepath.Join("internal", "edot", "templates", "README.md.tmpl")
+	readmeOut := filepath.Join("internal", "edot", "README.md")
 
 	// read README template
 	tmpl, err := template.ParseFiles(readmeTmpl)
@@ -3657,7 +3657,7 @@ func (Otel) Readme() error {
 		return fmt.Errorf("failed to parse README template: %w", err)
 	}
 
-	data, err := otel.GetOtelDependencies("go.mod")
+	data, err := otel.GetOtelDependencies(filepath.Join("internal", "edot", "go.mod"))
 	if err != nil {
 		return fmt.Errorf("Failed to get OTel dependencies: %w", err)
 	}
