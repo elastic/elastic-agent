@@ -79,7 +79,7 @@ jobs:
           project-id: "elastic-observability-ci"
 
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@6a7c903a70c8625ed6700fa299f5ddb4ca6022e9
+        uses: google-github-actions/setup-gcloud@cb1e50a9932213ecece00a606661ae9ca44f3397
 
       # TODO: as soon as the oblt-framework supports elastic-observability-ci we can avoid this step.
       # NOTE:
