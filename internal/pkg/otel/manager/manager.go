@@ -33,7 +33,6 @@ type ExecutionMode string
 
 const (
 	SubprocessExecutionMode ExecutionMode = "subprocess"
-	EmbeddedExecutionMode   ExecutionMode = "embedded"
 )
 
 type collectorRecoveryTimer interface {
@@ -124,9 +123,6 @@ func NewOTelManager(
 		}
 		recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
 		exec = newSubprocessExecution(logLevel, executable)
-	case EmbeddedExecutionMode:
-		recoveryTimer = newRestarterNoop()
-		exec = newExecutionEmbedded()
 	default:
 		return nil, errors.New("unknown otel collector exec")
 	}

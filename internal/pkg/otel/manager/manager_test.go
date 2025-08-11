@@ -589,7 +589,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	defer cancel()
 	base, obs := loggertest.New("otel")
 	l, _ := loggertest.New("otel-manager")
-	m, err := NewOTelManager(l, logp.DebugLevel, base, EmbeddedExecutionMode, nil, nil)
+	m, err := NewOTelManager(l, logp.DebugLevel, base, SubprocessExecutionMode, nil, nil)
 	require.NoError(t, err, "could not create otel manager")
 
 	go func() {

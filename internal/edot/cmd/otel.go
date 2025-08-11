@@ -19,9 +19,10 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/service"
 
+	"github.com/elastic/elastic-agent/internal/edot/pkg"
+	"github.com/elastic/elastic-agent/internal/edot/pkg/agentprovider"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/internal/pkg/otel"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/agentprovider"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -102,7 +103,7 @@ func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool,
 	defer cancel()
 	go service.ProcessWindowsControlEvents(stopCollector)
 
-	return otel.Run(ctx, stop, settings)
+	return pkg.Run(ctx, stop, settings)
 }
 
 func prepareCollectorSettings(configFiles []string, supervised bool, supervisedLoggingLevel string) (*otelcol.CollectorSettings, error) {
@@ -113,8 +114,8 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 		if err != nil {
 			return nil, fmt.Errorf("failed to create config provider: %w", err)
 		}
-		settings = otel.NewSettings(release.Version(), []string{configProvider.URI()},
-			otel.WithConfigProviderFactory(configProvider.NewFactory()),
+		settings = pkg.NewSettings(release.Version(), []string{configProvider.URI()},
+			pkg.WithConfigProviderFactory(configProvider.NewFactory()),
 		)
 
 		// setup logger
@@ -151,7 +152,7 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 
 		settings.DisableGracefulShutdown = false
 	} else {
-		settings = otel.NewSettings(release.Version(), configFiles)
+		settings = pkg.NewSettings(release.Version(), configFiles)
 	}
 	return settings, nil
 }
@@ -164,7 +165,7 @@ func prepareEnv() error {
 		// The filestorage extension will handle directory creation since create_directory: true is set by default.
 		// If the user hasn’t specified the env:STATE_PATH in filestorage config, they may have opted for a custom path, and the extension will create the directory accordingly.
 		// In this case, setting env:STATE_PATH will have no effect.
-		if err := os.Setenv("STATE_PATH", defaultStateDirectory); err != nil {
+		if err := os.Setenv("STATE_PATH", cmd.DefaultStateDirectory); err != nil {
 			return err
 		}
 	}

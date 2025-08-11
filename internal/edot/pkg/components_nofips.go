@@ -4,7 +4,7 @@
 
 //go:build !requirefips
 
-package otel
+package pkg
 
 import (
 	kafkaexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter"
