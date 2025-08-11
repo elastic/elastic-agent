@@ -528,7 +528,8 @@ func standaloneRollbackTest(ctx context.Context, t *testing.T, startFixture *ate
 		ctx, startFixture, endFixture, t,
 		upgradetest.WithPostUpgradeHook(postUpgradeHook),
 		upgradetest.WithCustomWatcherConfig(customConfig),
-		upgradetest.WithDisableHashCheck(true))
+		upgradetest.WithDisableHashCheck(true),
+	)
 	if !errors.Is(err, ErrPostExit) {
 		require.NoError(t, err)
 	}

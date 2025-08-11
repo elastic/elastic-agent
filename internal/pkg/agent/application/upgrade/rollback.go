@@ -149,29 +149,23 @@ func InvokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error
 		log.Info("agent is not upgradable, not starting watcher")
 		return nil, nil
 	}
-
-	cmd := invokeCmd(agentExecutable)
-	log.Infow("Starting upgrade watcher", "path", cmd.Path, "args", cmd.Args, "env", cmd.Env, "dir", cmd.Dir)
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start Upgrade Watcher: %w", err)
+	// invokeWatcherCmd and StartWatcherCmd are platform-specific functions dealing with process launching details.
+	cmd, err := StartWatcherCmd(log, func() *exec.Cmd { return invokeWatcherCmd(agentExecutable) })
+	if err != nil {
+		return nil, fmt.Errorf("starting watcher process: %w", err)
 	}
 
 	upgradeWatcherPID := cmd.Process.Pid
 	agentPID := os.Getpid()
-
-	go func() {
-		if err := cmd.Wait(); err != nil {
-			log.Infow("Upgrade Watcher exited with error", "agent.upgrade.watcher.process.pid", agentPID, "agent.process.pid", upgradeWatcherPID, "error.message", err)
-		}
-	}()
-
 	log.Infow("Upgrade Watcher invoked", "agent.upgrade.watcher.process.pid", upgradeWatcherPID, "agent.process.pid", agentPID)
 
 	return cmd, nil
 
 }
 
-func invokeCmd(agentExecutable string) *exec.Cmd {
+type cmdFactory func() *exec.Cmd
+
+func invokeWatcherCmd(agentExecutable string) *exec.Cmd {
 	return InvokeCmdWithArgs(
 		agentExecutable,
 		watcherSubcommand,
