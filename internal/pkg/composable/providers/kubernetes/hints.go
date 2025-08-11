@@ -117,7 +117,7 @@ func (m *hintsBuilder) getFromMeta(value string, kubeMeta mapstr.M) string {
 	if value == "" {
 		return ""
 	}
-	r := regexp.MustCompile(`\${([^{}]+)}`)
+	r := regexp.MustCompile(`\${(kubernetes\.[^{}]+)}`)
 	matches := r.FindAllString(value, -1)
 	for _, match := range matches {
 		key := strings.TrimSuffix(strings.TrimPrefix(match, "${kubernetes."), "}")
