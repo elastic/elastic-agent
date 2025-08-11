@@ -6,7 +6,15 @@
 
 package upgrade
 
-func StartWatcherCmd(log *logger.Logger, createCmd cmdFactory) (*exec.Cmd, error) {
+import (
+	"fmt"
+	"os"
+	"os/exec"
+
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+)
+
+func StartWatcherCmd(log *logger.Logger, createCmd cmdFactory, wait bool) (*exec.Cmd, error) {
 	cmd := createCmd()
 	log.Infow("Starting upgrade watcher", "path", cmd.Path, "args", cmd.Args, "env", cmd.Env, "dir", cmd.Dir)
 	if err := cmd.Start(); err != nil {
@@ -16,11 +24,12 @@ func StartWatcherCmd(log *logger.Logger, createCmd cmdFactory) (*exec.Cmd, error
 	upgradeWatcherPID := cmd.Process.Pid
 	agentPID := os.Getpid()
 
-	go func() {
-		if err := cmd.Wait(); err != nil {
-			log.Infow("Upgrade Watcher exited with error", "agent.upgrade.watcher.process.pid", agentPID, "agent.process.pid", upgradeWatcherPID, "error.message", err)
-		}
-	}()
-
+	if wait {
+		go func() {
+			if err := cmd.Wait(); err != nil {
+				log.Infow("Upgrade Watcher exited with error", "agent.upgrade.watcher.process.pid", agentPID, "agent.process.pid", upgradeWatcherPID, "error.message", err)
+			}
+		}()
+	}
 	return cmd, nil
 }

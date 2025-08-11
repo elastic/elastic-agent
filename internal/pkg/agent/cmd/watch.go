@@ -56,7 +56,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 
 			takedown, _ := c.Flags().GetBool("takedown")
 			if takedown {
-				err = takedownWatcher(log, utils.GetWatcherPIDs)
+				err = upgrade.TakedownWatcher(context.Background(), log, utils.GetWatcherPIDs)
 				if err != nil {
 					log.Errorf("error taking down watcher: %v", err)
 					os.Exit(5)
