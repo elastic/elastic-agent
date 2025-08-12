@@ -116,7 +116,13 @@ Validate and initialise the defined agent presets
 {{- if eq $.Values.agent.fleet.enabled false -}}
 {{- $presetInputs := dig "_inputs" (list) $presetVal -}}
 {{- if empty $presetInputs -}}
+{{- if (dig "otelConfig" (dict) $presetVal) -}}
+{{/* since there are no elastic-agent _inputs defined and there */}}
+{{/* is only otelConfig the execMode is otel */}}
+{{- $_ := set $presetVal "_execMode" "otel" -}}
+{{- else -}}
 {{- $_ := unset $.Values.agent.presets $presetName}}
+{{- end -}}
 {{- else -}}
 {{- $monitoringOutput := dig "agent" "monitoring" "use_output" "" $presetVal -}}
 {{- if $monitoringOutput -}}
@@ -338,6 +344,29 @@ app.kubernetes.io/version: {{ .Values.agent.version}}
 {{- $presetInputs := dig "_inputs" (list) $preset -}}
 {{- $presetInputs = uniq (concat $presetInputs $inputVal) -}}
 {{- $_ := set $preset "_inputs" $presetInputs -}}
+{{- end -}}
+
+{{- define "elasticagent.preset.mutate.otelConfig" -}}
+{{- $ := index . 0 -}}
+{{- $presetVal := index . 1 -}}
+{{- $otelConfigVal := index . 2 -}}
+{{- $presetOtelConfig := dig "otelConfig" (dict) $presetVal -}}
+{{- $presetOtelConfig = uniq (deepCopy $presetOtelConfig | merge $otelConfigVal) -}}
+{{- $_ := set $presetVal "otelConfig" $presetOtelConfig -}}
+{{- end -}}
+
+{{- define "elasticagent.preset.mutate.command" -}}
+{{- $ := index . 0 -}}
+{{- $presetVal := index . 1 -}}
+{{- $commandVal := index . 2 -}}
+{{- $_ := set $presetVal "command" $commandVal -}}
+{{- end -}}
+
+{{- define "elasticagent.preset.mutate.args" -}}
+{{- $ := index . 0 -}}
+{{- $presetVal := index . 1 -}}
+{{- $argsVal := index . 2 -}}
+{{- $_ := set $presetVal "args" $argsVal -}}
 {{- end -}}
 
 {{- define "elasticagent.preset.mutate.securityContext.capabilities.add" -}}
