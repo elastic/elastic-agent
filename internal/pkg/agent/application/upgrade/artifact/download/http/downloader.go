@@ -6,6 +6,7 @@ package http
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -189,7 +190,7 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	// using common.OpenFile here for testability
 	destinationFile, err := common.OpenFile(fullPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
 	if err != nil {
-		return "", errors.New(err, "creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath))
+		return "", goerrors.Join(errors.New("creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath)), err)
 	}
 	defer destinationFile.Close()
 
@@ -222,7 +223,7 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	if err != nil {
 		dp.ReportFailed(err)
 		// return path, file already exists and needs to be cleaned up
-		return fullPath, errors.New(err, "copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
+		return fullPath, goerrors.Join(errors.New("copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI)), err)
 	}
 	dp.ReportComplete()
 
