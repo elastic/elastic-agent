@@ -232,7 +232,7 @@ func TestSaveConfigToStore(t *testing.T) {
 
 	// Open handle on destination file and keep it open for a random duration
 	// between [200ms, 1800ms).
-	openDuration := time.Duration(200+rand.Intn(1800-200)) * time.Millisecond
+	openDuration := time.Duration(200+rand.UintN(1800-200)) * time.Millisecond
 	destFile, err := os.Open(dest)
 	require.NoError(t, err)
 	time.AfterFunc(openDuration, func() {
