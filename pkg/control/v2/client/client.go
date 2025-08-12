@@ -234,13 +234,6 @@ func WithAddress(address string) Option {
 	}
 }
 
-// WithMaxMsgSize adjures the GRPC connection maximum message size.
-func WithMaxMsgSize(maxMsgSize int) Option {
-	return func(c *client) {
-		c.maxMsgSize = maxMsgSize
-	}
-}
-
 // client manages the state and communication to the Elastic Agent.
 type client struct {
 	ctx        context.Context
