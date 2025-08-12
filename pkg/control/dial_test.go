@@ -19,11 +19,9 @@ import (
 )
 
 func TestDialContextBlocking_Success(t *testing.T) {
-	// Create a buffer connection for testing
 	buffer := bufconn.Listen(1024 * 1024)
 	defer buffer.Close()
 
-	// Start a mock gRPC server
 	server := grpc.NewServer()
 	go func() {
 		if err := server.Serve(buffer); err != nil {
