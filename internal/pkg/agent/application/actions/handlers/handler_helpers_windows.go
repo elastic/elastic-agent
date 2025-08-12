@@ -27,28 +27,24 @@ const saveRetryDuration = 2 * time.Second
 // ACCESS_DENIED error, which can happen if the file is locked by another process.
 func saveConfigToStore(store storage.Store, reader io.ReadSeeker, log *logger.Logger) error {
 	log = log.Named("saveConfigToStore_windows")
-	numSaveAttempts := 0
 
 	retryableSaveFn := func() error {
 		err := store.Save(reader)
-		numSaveAttempts++
-		log.Debugf("save attempt %d", numSaveAttempts)
-
 		if errors.Is(err, syscall.ERROR_ACCESS_DENIED) {
 			// Retryable error, so reset reader position to start and return the error
 			if _, seekErr := reader.Seek(0, io.SeekStart); seekErr != nil {
 				// Could not reset reader position; we can no longer retry
-				log.Debugf("got retryable error: %v, but no longer retrying save due to error resetting reader: %v", err.Error(), seekErr.Error())
+				log.Debugf("save failed; got retryable error: %v, but not retrying save due to error resetting reader: %v", err.Error(), seekErr.Error())
 				return backoff.Permanent(errors.Join(err, seekErr))
 			}
 
-			log.Debugf("retrying save due to retryable error: %v", err.Error())
+			log.Debugf("save failed; retrying save due to retryable error: %v", err.Error())
 			return err
 		}
 
 		if err != nil {
 			// Non-retryable error, so mark it as permanent
-			log.Debugf("no longer retrying save due to non-retryable error: %v", err.Error())
+			log.Debugf("save failed; not retrying save due to non-retryable error: %v", err.Error())
 			return backoff.Permanent(err)
 		}
 
