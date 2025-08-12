@@ -49,7 +49,10 @@ func InvokeCmdWithArgs(executable string, args ...string) *exec.Cmd {
 	return cmd
 }
 
-func StartWatcherCmd(log *logger.Logger, createCmd cmdFactory, wait bool) (*exec.Cmd, error) {
+func StartWatcherCmd(log *logger.Logger, createCmd cmdFactory, opts ...WatcherInvocationOpt) (*exec.Cmd, error) {
+
+	invocationOpts := applyWatcherInvocationOpts(opts...)
+
 	// allocConsole
 	r1, _, consoleErr := allocConsoleProc.Call()
 	if r1 == 0 {
@@ -82,6 +85,9 @@ func StartWatcherCmd(log *logger.Logger, createCmd cmdFactory, wait bool) (*exec
 	go func() {
 		if err := cmd.Wait(); err != nil {
 			log.Infow("Upgrade Watcher exited with error", "agent.upgrade.watcher.process.pid", agentPID, "agent.process.pid", upgradeWatcherPID, "error.message", err)
+		}
+		if invocationOpts.postWatchHook != nil {
+			invocationOpts.postWatchHook()
 		}
 	}()
 
