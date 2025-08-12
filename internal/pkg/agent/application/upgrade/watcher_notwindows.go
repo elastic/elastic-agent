@@ -65,3 +65,12 @@ func TakedownWatcher(ctx context.Context, log *logger.Logger, pidFetchFunc watch
 	}
 	return accumulatedSignalingErrors
 }
+
+func isProcessLive(process *os.Process) (bool, error) {
+	signalErr := process.Signal(syscall.Signal(0))
+	if signalErr != nil {
+		return false, nil //nolint:nilerr // if we receive an error it means that the process is not running, so the check completed without errors
+	} else {
+		return true, nil
+	}
+}

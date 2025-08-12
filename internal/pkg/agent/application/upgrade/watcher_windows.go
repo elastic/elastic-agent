@@ -130,3 +130,25 @@ func signalPID(log *logger.Logger, pid int) error {
 
 	return nil
 }
+
+func isProcessLive(process *os.Process) (bool, error) {
+	//exitCodeStillActive according to  https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getexitcodeprocess
+	const exitCodeStillActive = 259
+	// Open the process with PROCESS_QUERY_LIMITED_INFORMATION access
+	handle, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(process.Pid))
+	if err != nil {
+		return false, fmt.Errorf("OpenProcess failed: %w", err)
+	}
+
+	defer func(handle windows.Handle) {
+		_ = windows.CloseHandle(handle)
+	}(handle)
+
+	var exitCode uint32
+	err = windows.GetExitCodeProcess(handle, &exitCode)
+	if err != nil {
+		return false, fmt.Errorf("getting process exit code: %w", err)
+	}
+
+	return exitCode == exitCodeStillActive, nil
+}
