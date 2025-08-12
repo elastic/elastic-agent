@@ -7,7 +7,7 @@ package handlers
 import (
 	"context"
 	"math"
-	"math/rand"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"strings"
