@@ -13,6 +13,6 @@ import (
 )
 
 // saveConfigToStore saves the given configuration (reader) to the given store
-func saveConfigToStore(store storage.Store, reader io.Reader) error {
+func saveConfigToStore(store storage.Store, reader io.ReadSeeker) error {
 	return store.Save(reader)
 }
