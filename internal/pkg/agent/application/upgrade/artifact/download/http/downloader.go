@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/common"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -221,7 +222,13 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	// using common.Copy here for testability
 	_, err = common.Copy(destinationFile, io.TeeReader(resp.Body, dp))
 	if err != nil {
-		dp.ReportFailed(err)
+		// checking for disk space error here before passing it into the reporter
+		// so the details observer sets the state with clean error message
+		reportedErr := err
+		if downloadErrors.IsDiskSpaceError(err) {
+			reportedErr = downloadErrors.ErrInsufficientDiskSpace
+		}
+		dp.ReportFailed(reportedErr)
 		// return path, file already exists and needs to be cleaned up
 		return fullPath, goerrors.Join(errors.New("copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI)), err)
 	}
