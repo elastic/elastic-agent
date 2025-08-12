@@ -18,6 +18,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -275,6 +276,37 @@ func TestDownloadWithRetries(t *testing.T) {
 		// since we didn't have a successful download.
 		require.NotEmpty(t, *upgradeDetailsRetryErrorMsg)
 		require.Equal(t, *upgradeDetailsRetryErrorMsg, upgradeDetails.Metadata.RetryErrorMsg)
+	})
+
+	t.Run("insufficient_disk_space_stops_retries", func(t *testing.T) {
+		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
+			return &mockDownloader{"", downloadErrors.ErrInsufficientDiskSpace}, nil
+		}
+
+		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
+		require.NoError(t, err)
+
+		parsedVersion, err := agtversion.ParseVersion("8.9.0")
+		require.NoError(t, err)
+
+		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
+
+		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+
+		require.Error(t, err)
+		require.Equal(t, "", path)
+
+		require.ErrorIs(t, err, downloadErrors.ErrInsufficientDiskSpace)
+
+		logs := obs.TakeAll()
+		require.Len(t, logs, 2)
+		require.Equal(t, "download attempt 1", logs[0].Message)
+		require.Contains(t, logs[1].Message, "insufficient disk space error detected, stopping retries")
+
+		require.NotZero(t, *upgradeDetailsRetryUntil)
+		require.False(t, *upgradeDetailsRetryUntilWasUnset)
+
+		require.Empty(t, *upgradeDetailsRetryErrorMsg)
 	})
 }
 
