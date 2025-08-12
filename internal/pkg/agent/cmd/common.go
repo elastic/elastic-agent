@@ -93,6 +93,7 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.AddCommand(newDiagnosticsCommand(args, streams))
 	cmd.AddCommand(newComponentCommandWithArgs(args, streams))
 	cmd.AddCommand(newLogsCommandWithArgs(args, streams))
+	cmd.AddCommand(newOtelCommandWithArgs(args, streams))
 	cmd.AddCommand(newApplyFlavorCommandWithArgs(args, streams))
 
 	// windows special hidden sub-command (only added on Windows)
