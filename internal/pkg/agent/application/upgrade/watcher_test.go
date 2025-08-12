@@ -913,7 +913,7 @@ func TestTakeOverWatcher(t *testing.T) {
 
 				// add a cleanup to unlock the applocker at the end of the test anyway in case of failures
 				t.Cleanup(func() {
-					locker.Unlock()
+					_ = locker.Unlock()
 				})
 			},
 			wantErr: assert.NoError,
@@ -937,7 +937,7 @@ func TestTakeOverWatcher(t *testing.T) {
 
 				// add a cleanup to unlock the applocker at the end of the test anyway in case of failures
 				t.Cleanup(func() {
-					locker.Unlock()
+					_ = locker.Unlock()
 				})
 			},
 			wantErr: assert.NoError,
@@ -959,7 +959,7 @@ func TestTakeOverWatcher(t *testing.T) {
 
 				// add a cleanup to unlock the applocker at the end of the test anyway
 				t.Cleanup(func() {
-					locker.Unlock()
+					_ = locker.Unlock()
 				})
 			},
 			wantErr: assert.Error,
@@ -1149,7 +1149,7 @@ func Test_takedownWatcher(t *testing.T) {
 				<-testlockerProcess.waitChan
 
 				if assert.NotNil(t, testlockerProcess.cmd.ProcessState, "test locker process should have been terminated") {
-					assert.NotEqual(t, 0, testlockerProcess.cmd.ProcessState.ExitCode(), "test locker process shouldnot return a successful exit code")
+					assert.NotEqual(t, 0, testlockerProcess.cmd.ProcessState.ExitCode(), "test locker process should not return a successful exit code")
 				}
 			},
 		},
@@ -1216,7 +1216,7 @@ func isProcessRunning(cmd *exec.Cmd) (bool, error) {
 		// on unix system we always get a process back, we need to do some further checks
 		signalErr := cmd.Process.Signal(syscall.Signal(0))
 		if signalErr != nil {
-			return false, nil
+			return false, nil //nolint:nilerr // if we receive an error it means that the process is not running, so the check completed without errors
 		} else {
 			return true, nil
 		}

@@ -24,8 +24,8 @@ func InvokeCmdWithArgs(executable string, args ...string) *exec.Cmd {
 	cmd := exec.Command(executable, args...)
 
 	var cred = &syscall.Credential{
-		Uid:         uint32(os.Getuid()),
-		Gid:         uint32(os.Getgid()),
+		Uid:         uint32(os.Getuid()), //nolint:gosec // int -> uint32 no overflow is possible since os.Getuid() should return a value compatible with uint32
+		Gid:         uint32(os.Getgid()), //nolint:gosec // int -> uint32 no overflow is possible since os.Getgid() should return a value compatible with uint32
 		Groups:      nil,
 		NoSetGroups: true,
 	}
