@@ -12,8 +12,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -1043,7 +1043,7 @@ func Test_takedownWatcher(t *testing.T) {
 	}{
 		{
 			name: "no contention for watcher applocker",
-			setup: func(t *testing.T, log *logger.Logger, workdir string) (watcherPIDsFetcher, []testProcess) {
+			setup: func(_ *testing.T, _ *logger.Logger, _ string) (watcherPIDsFetcher, []testProcess) {
 				// nothing to do here, always return and empty list of pids
 				return func() ([]int, error) {
 					return nil, nil
@@ -1065,8 +1065,7 @@ func Test_takedownWatcher(t *testing.T) {
 		{
 			name: "contention with test binary listening to signals: test binary is terminated gracefully",
 			setup: func(t *testing.T, log *logger.Logger, workdir string) (watcherPIDsFetcher, []testProcess) {
-
-				cmd, testChan := createTestlockerCommand(t, log, applockerFileName, testExecutableAbsolutePath, workdir, false)
+				cmd, testChan := createTestlockerCommand(t, log.Named("testlocker"), applockerFileName, testExecutableAbsolutePath, workdir, false)
 				require.NoError(t, err, "error starting testlocker binary")
 
 				// wait for test binary to acquire lock
@@ -1087,7 +1086,7 @@ func Test_takedownWatcher(t *testing.T) {
 				require.NotNil(t, testlockerProcess, "test locker process info should have a not nil cmd")
 
 				require.Eventually(t, func() bool {
-					running, checkErr := isProcessRunning(testlockerProcess.cmd)
+					running, checkErr := isProcessRunning(t, testlockerProcess.cmd)
 					if checkErr != nil {
 						t.Logf("error checking for testlocker process running: %s", checkErr.Error())
 						return false
@@ -1112,7 +1111,7 @@ func Test_takedownWatcher(t *testing.T) {
 		{
 			name: "contention with test binary not listening to signals: test binary is not terminated",
 			setup: func(t *testing.T, log *logger.Logger, workdir string) (watcherPIDsFetcher, []testProcess) {
-				cmd, waitChan := createTestlockerCommand(t, log, applockerFileName, testExecutableAbsolutePath, workdir, true)
+				cmd, waitChan := createTestlockerCommand(t, log.Named("testlocker"), applockerFileName, testExecutableAbsolutePath, workdir, true)
 				require.NoError(t, err, "error starting testlocker binary")
 
 				// wait for test binary to acquire lock
@@ -1134,7 +1133,7 @@ func Test_takedownWatcher(t *testing.T) {
 
 				// check that the process is still running for a time
 				assert.Never(t, func() bool {
-					running, checkErr := isProcessRunning(testlockerProcess.cmd)
+					running, checkErr := isProcessRunning(t, testlockerProcess.cmd)
 					if checkErr != nil {
 						t.Logf("error checking for testlocker process running: %s", checkErr.Error())
 						return false
@@ -1159,9 +1158,12 @@ func Test_takedownWatcher(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			workDir := t.TempDir()
 			log, obsLogs := loggertest.New(t.Name())
+			t.Cleanup(func() {
+				// however it ends, try to print out the logs of TakedownWatcher
+				loggertest.PrintObservedLogs(obsLogs.All(), t.Log)
+			})
 			pidFetcher, processInfos := tc.setup(t, log, workDir)
-			tc.wantErr(t, TakedownWatcher(t.Context(), log, pidFetcher))
-			t.Logf("test logs: %v", obsLogs)
+			tc.wantErr(t, TakedownWatcher(t.Context(), log.Named("TakedownWatcher"), pidFetcher))
 			if tc.assertPostTakedown != nil {
 				tc.assertPostTakedown(t, workDir, processInfos)
 			}
@@ -1195,30 +1197,30 @@ func createTestlockerCommand(t *testing.T, log *logger.Logger, applockerFileName
 	return watcherCmd, watchTerminated
 }
 
-func isProcessRunning(cmd *exec.Cmd) (bool, error) {
+func isProcessRunning(t *testing.T, cmd *exec.Cmd) (bool, error) {
 	if cmd.Process == nil {
 		return false, nil
 	}
-
+	t.Logf("checking if pid %d is still running", cmd.Process.Pid)
 	// search for the pid on the running processes
 	process, err := os.FindProcess(cmd.Process.Pid)
 	if err != nil {
+		t.Logf("error string: %q", err.Error())
+		if runtime.GOOS == "windows" && strings.Contains(err.Error(), "The parameter is incorrect") {
+			// in windows, noone can hear you scream
+			// invalid parameter means that the process object cannot be found
+			t.Logf("pid %d is not running because on windows we got an incorrect parameter error", cmd.Process.Pid)
+			return false, nil
+		}
+
+		t.Logf("error finding process: %T %v", err, err)
 		return false, err
 	}
 
 	if process == nil {
+		t.Logf("pid %d is not running because os.GetProcess returned a nil process", cmd.Process.Pid)
 		return false, nil
 	}
-	// if process is not nil we need to split between unix and non-unix OSes
-	if runtime.GOOS == "windows" {
-		return true, nil
-	} else {
-		// on unix system we always get a process back, we need to do some further checks
-		signalErr := cmd.Process.Signal(syscall.Signal(0))
-		if signalErr != nil {
-			return false, nil //nolint:nilerr // if we receive an error it means that the process is not running, so the check completed without errors
-		} else {
-			return true, nil
-		}
-	}
+
+	return isProcessLive(cmd.Process)
 }
