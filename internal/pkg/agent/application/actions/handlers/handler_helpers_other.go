@@ -10,9 +10,10 @@ import (
 	"io"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // saveConfigToStore saves the given configuration (reader) to the given store
-func saveConfigToStore(store storage.Store, reader io.ReadSeeker) error {
+func saveConfigToStore(store storage.Store, reader io.ReadSeeker, _ *logger.Logger) error {
 	return store.Save(reader)
 }

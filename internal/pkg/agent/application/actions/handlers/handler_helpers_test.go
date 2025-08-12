@@ -22,6 +22,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -246,7 +247,8 @@ func TestSaveConfigToStore(t *testing.T) {
 
 	// Try to save content to store
 	reader := strings.NewReader("new content")
-	err = saveConfigToStore(store, reader)
+	log, _ := loggertest.New("test")
+	err = saveConfigToStore(store, reader, log)
 	require.NoError(t, err)
 
 	// Check that dest file has been replaced with new file
