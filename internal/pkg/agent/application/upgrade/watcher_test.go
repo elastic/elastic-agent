@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -1024,8 +1025,15 @@ func Test_takedownWatcher(t *testing.T) {
 		}
 	}
 
-	type setupFunc func(t *testing.T, log *logger.Logger, workdir string) (watcherPIDsFetcher, []*exec.Cmd)
-	type assertFunc func(t *testing.T, workdir string, cmds []*exec.Cmd)
+	// create a struct with a *exec.Cmd and a channel that will be closed when Wait() returns for the exec.Cmd
+	// this should keep the data race detector happy.
+	type testProcess struct {
+		cmd      *exec.Cmd
+		waitChan chan struct{}
+	}
+
+	type setupFunc func(t *testing.T, log *logger.Logger, workdir string) (watcherPIDsFetcher, []testProcess)
+	type assertFunc func(t *testing.T, workdir string, cmds []testProcess)
 
 	tests := []struct {
 		name               string
@@ -1035,14 +1043,14 @@ func Test_takedownWatcher(t *testing.T) {
 	}{
 		{
 			name: "no contention for watcher applocker",
-			setup: func(t *testing.T, log *logger.Logger, workdir string) (watcherPIDsFetcher, []*exec.Cmd) {
+			setup: func(t *testing.T, log *logger.Logger, workdir string) (watcherPIDsFetcher, []testProcess) {
 				// nothing to do here, always return and empty list of pids
 				return func() ([]int, error) {
 					return nil, nil
 				}, nil
 			},
 			wantErr: assert.NoError,
-			assertPostTakedown: func(t *testing.T, workdir string, _ []*exec.Cmd) {
+			assertPostTakedown: func(t *testing.T, workdir string, _ []testProcess) {
 				// we should be able to lock, no problem
 				locker := filelock.NewAppLocker(workdir, applockerFileName)
 				lockError := locker.TryLock()
@@ -1056,8 +1064,9 @@ func Test_takedownWatcher(t *testing.T) {
 		},
 		{
 			name: "contention with test binary listening to signals: test binary is terminated gracefully",
-			setup: func(t *testing.T, log *logger.Logger, workdir string) (watcherPIDsFetcher, []*exec.Cmd) {
-				cmd := createTestlockerCommand(t, log, applockerFileName, testExecutableAbsolutePath, workdir, false)
+			setup: func(t *testing.T, log *logger.Logger, workdir string) (watcherPIDsFetcher, []testProcess) {
+
+				cmd, testChan := createTestlockerCommand(t, log, applockerFileName, testExecutableAbsolutePath, workdir, false)
 				require.NoError(t, err, "error starting testlocker binary")
 
 				// wait for test binary to acquire lock
@@ -1068,26 +1077,28 @@ func Test_takedownWatcher(t *testing.T) {
 
 				t.Logf("started testlocker process with PID %d", cmd.Process.Pid)
 
-				return returnCmdPIDsFetcher(cmd), []*exec.Cmd{cmd}
+				return returnCmdPIDsFetcher(cmd), []testProcess{{cmd: cmd, waitChan: testChan}}
 			},
 			wantErr: assert.NoError,
-			assertPostTakedown: func(t *testing.T, workdir string, cmds []*exec.Cmd) {
+			assertPostTakedown: func(t *testing.T, workdir string, cmds []testProcess) {
 
 				assert.Len(t, cmds, 1)
 				testlockerProcess := cmds[0]
 				require.NotNil(t, testlockerProcess, "test locker process info should have a not nil cmd")
 
-				go func() {
-					// reap the child process
-					waitErr := testlockerProcess.Wait()
-					assert.NoError(t, waitErr, "error waiting for test locker process to exit")
-				}()
+				require.Eventually(t, func() bool {
+					running, checkErr := isProcessRunning(testlockerProcess.cmd)
+					if checkErr != nil {
+						t.Logf("error checking for testlocker process running: %s", checkErr.Error())
+						return false
+					}
+					return !running
+				}, 30*time.Second, 100*time.Millisecond, "test locker process should have exited")
 
-				require.EventuallyWithT(t, func(t *assert.CollectT) {
-					require.NotNil(t, testlockerProcess.ProcessState, "test locker process should have completed and process state set")
-					assert.True(t, testlockerProcess.ProcessState.Exited(), "test locker process should have terminated")
-					assert.Equal(t, 0, testlockerProcess.ProcessState.ExitCode(), "test locker process should have a successful exit status")
-				}, 30*time.Second, 100*time.Millisecond, "test locker process should have exited gracefully")
+				<-testlockerProcess.waitChan
+
+				assert.True(t, testlockerProcess.cmd.ProcessState.Exited(), "test locker process should have terminated")
+				assert.Equal(t, 0, testlockerProcess.cmd.ProcessState.ExitCode(), "test locker process should have a successful exit status")
 
 				assert.FileExists(t, filepath.Join(workdir, applockerFileName))
 				testApplocker := filelock.NewAppLocker(workdir, applockerFileName)
@@ -1100,8 +1111,8 @@ func Test_takedownWatcher(t *testing.T) {
 		},
 		{
 			name: "contention with test binary not listening to signals: test binary is not terminated",
-			setup: func(t *testing.T, log *logger.Logger, workdir string) (watcherPIDsFetcher, []*exec.Cmd) {
-				cmd := createTestlockerCommand(t, log, applockerFileName, testExecutableAbsolutePath, workdir, true)
+			setup: func(t *testing.T, log *logger.Logger, workdir string) (watcherPIDsFetcher, []testProcess) {
+				cmd, waitChan := createTestlockerCommand(t, log, applockerFileName, testExecutableAbsolutePath, workdir, true)
 				require.NoError(t, err, "error starting testlocker binary")
 
 				// wait for test binary to acquire lock
@@ -1112,31 +1123,33 @@ func Test_takedownWatcher(t *testing.T) {
 
 				t.Logf("started testlocker process with PID %d", cmd.Process.Pid)
 
-				return returnCmdPIDsFetcher(cmd), []*exec.Cmd{cmd}
+				return returnCmdPIDsFetcher(cmd), []testProcess{{cmd: cmd, waitChan: waitChan}}
 			},
 			wantErr: assert.NoError,
-			assertPostTakedown: func(t *testing.T, workdir string, cmds []*exec.Cmd) {
+			assertPostTakedown: func(t *testing.T, workdir string, cmds []testProcess) {
 
 				assert.Len(t, cmds, 1)
 				testlockerProcess := cmds[0]
 				require.NotNil(t, testlockerProcess, "test locker process info should have exec.Cmd set")
 
-				go func() {
-					// reap the child process
-					waitErr := testlockerProcess.Wait()
-					assert.Error(t, waitErr, "waiting for testlocker process should return error")
-				}()
-
 				// check that the process is still running for a time
 				assert.Never(t, func() bool {
-					return testlockerProcess.ProcessState != nil && testlockerProcess.ProcessState.Exited()
+					running, checkErr := isProcessRunning(testlockerProcess.cmd)
+					if checkErr != nil {
+						t.Logf("error checking for testlocker process running: %s", checkErr.Error())
+						return false
+					}
+					return !running
 				}, 1*time.Second, 100*time.Millisecond, "test locker process should still be running for some time")
 
-				err = testlockerProcess.Process.Kill()
+				// Kill the process explicitly
+				err = testlockerProcess.cmd.Process.Kill()
 				assert.NoError(t, err, "error killing testlocker process")
 
-				if assert.Nil(t, testlockerProcess.ProcessState, "test locker process should have been terminated") {
-					assert.NotEqual(t, 0, testlockerProcess.ProcessState.ExitCode(), "test locker process shouldnot return a successful exit code")
+				<-testlockerProcess.waitChan
+
+				if assert.NotNil(t, testlockerProcess.cmd.ProcessState, "test locker process should have been terminated") {
+					assert.NotEqual(t, 0, testlockerProcess.cmd.ProcessState.ExitCode(), "test locker process shouldnot return a successful exit code")
 				}
 			},
 		},
@@ -1156,7 +1169,9 @@ func Test_takedownWatcher(t *testing.T) {
 	}
 }
 
-func createTestlockerCommand(t *testing.T, log *logger.Logger, applockerFileName string, testExecutablePath string, workdir string, ignoreSignals bool) *exec.Cmd {
+func createTestlockerCommand(t *testing.T, log *logger.Logger, applockerFileName string, testExecutablePath string, workdir string, ignoreSignals bool) (*exec.Cmd, chan struct{}) {
+
+	watchTerminated := make(chan struct{})
 
 	args := []string{"-lockfile", filepath.Join(workdir, applockerFileName)}
 	if ignoreSignals {
@@ -1164,18 +1179,46 @@ func createTestlockerCommand(t *testing.T, log *logger.Logger, applockerFileName
 	}
 
 	// use the same invoke as the one used to launch a watcher
-	watcherCmd, err := StartWatcherCmd(
-		log,
-		func() *exec.Cmd {
-			cmd := InvokeCmdWithArgs(testExecutablePath, args...)
+	watcherCmd, err := StartWatcherCmd(log, func() *exec.Cmd {
+		cmd := InvokeCmdWithArgs(testExecutablePath, args...)
 
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			return cmd
-		},
-		false,
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd
+	},
+		WithWatcherPostWaitHook(func() {
+			close(watchTerminated)
+		}),
 	)
 
 	require.NoError(t, err, "error starting testlocker binary")
-	return watcherCmd
+	return watcherCmd, watchTerminated
+}
+
+func isProcessRunning(cmd *exec.Cmd) (bool, error) {
+	if cmd.Process == nil {
+		return false, nil
+	}
+
+	// search for the pid on the running processes
+	process, err := os.FindProcess(cmd.Process.Pid)
+	if err != nil {
+		return false, err
+	}
+
+	if process == nil {
+		return false, nil
+	}
+	// if process is not nil we need to split between unix and non-unix OSes
+	if runtime.GOOS == "windows" {
+		return true, nil
+	} else {
+		// on unix system we always get a process back, we need to do some further checks
+		signalErr := cmd.Process.Signal(syscall.Signal(0))
+		if signalErr != nil {
+			return false, nil
+		} else {
+			return true, nil
+		}
+	}
 }

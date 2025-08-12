@@ -150,7 +150,7 @@ func InvokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error
 		return nil, nil
 	}
 	// invokeWatcherCmd and StartWatcherCmd are platform-specific functions dealing with process launching details.
-	cmd, err := StartWatcherCmd(log, func() *exec.Cmd { return invokeWatcherCmd(agentExecutable) }, true)
+	cmd, err := StartWatcherCmd(log, func() *exec.Cmd { return invokeWatcherCmd(agentExecutable) })
 	if err != nil {
 		return nil, fmt.Errorf("starting watcher process: %w", err)
 	}
@@ -161,6 +161,27 @@ func InvokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error
 
 	return cmd, nil
 
+}
+
+type WatcherInvocationOpt func(opts *watcherInvocationOptions)
+type watcherHook func()
+
+type watcherInvocationOptions struct {
+	postWatchHook watcherHook
+}
+
+func WithWatcherPostWaitHook(h watcherHook) WatcherInvocationOpt {
+	return func(opts *watcherInvocationOptions) {
+		opts.postWatchHook = h
+	}
+}
+
+func applyWatcherInvocationOpts(opts ...WatcherInvocationOpt) *watcherInvocationOptions {
+	invocationOpts := new(watcherInvocationOptions)
+	for _, opt := range opts {
+		opt(invocationOpts)
+	}
+	return invocationOpts
 }
 
 type cmdFactory func() *exec.Cmd
