@@ -8,6 +8,7 @@ package k8s
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bufio"
 	"bytes"
 	"context"
@@ -19,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -257,9 +259,15 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						"presets": map[string]any{
 							"clusterWide": map[string]any{
 								"hostNetwork": true,
+								"role": map[string]any{
+									"create": true,
+								},
 							},
 							"perNode": map[string]any{
 								"hostNetwork": true,
+								"role": map[string]any{
+									"create": true,
+								},
 							},
 						},
 					},
@@ -276,6 +284,8 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				k8sStepCheckRestrictUpgrade("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
 				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
 				k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
+				k8sStepValidateDiagnostics("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+				k8sStepValidateDiagnostics("name=agent-clusterwide-helm-agent", 1, "agent"),
 			},
 		},
 		{
@@ -298,6 +308,18 @@ func TestKubernetesAgentHelm(t *testing.T) {
 							"tag":        kCtx.agentImageTag,
 							"pullPolicy": "Never",
 						},
+						"presets": map[string]any{
+							"perNode": map[string]any{
+								"role": map[string]any{
+									"create": true,
+								},
+							},
+							"clusterWide": map[string]any{
+								"role": map[string]any{
+									"create": true,
+								},
+							},
+						},
 					},
 					"outputs": map[string]any{
 						"default": map[string]any{
@@ -314,6 +336,9 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
 				k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
 				k8sStepRunInnerTests("app.kubernetes.io/name=kube-state-metrics", 1, "agent"),
+				k8sStepValidateDiagnostics("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+				k8sStepValidateDiagnostics("name=agent-clusterwide-helm-agent", 1, "agent"),
+				k8sStepValidateDiagnostics("app.kubernetes.io/name=kube-state-metrics", 1, "agent"),
 			},
 		},
 		{
@@ -334,10 +359,18 @@ func TestKubernetesAgentHelm(t *testing.T) {
 							"token":   kCtx.enrollParams.EnrollmentToken,
 							"preset":  "perNode",
 						},
+						"presets": map[string]any{
+							"perNode": map[string]any{
+								"role": map[string]any{
+									"create": true,
+								},
+							},
+						},
 					},
 				}),
 				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
 				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+				k8sStepValidateDiagnostics("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
 			},
 		},
 		{
@@ -1119,6 +1152,61 @@ func k8sStepRunInnerTests(agentPodLabelSelector string, expectedPodNumber int, c
 				t.Log(stderr.String())
 			}
 			require.NoError(t, err, "error at k8s inner tests execution")
+		}
+	}
+}
+
+// k8sStepValidateDiagnostics invokes the elastic-agent diagnostics inside the pods returned by the selector, downloads the
+// produced zip archive and unzips it.
+func k8sStepValidateDiagnostics(agentPodLabelSelector string, expectedPodNumber int, containerName string) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		perNodePodList := &corev1.PodList{}
+		err := kCtx.client.Resources(namespace).List(ctx, perNodePodList, func(opt *metav1.ListOptions) {
+			opt.LabelSelector = agentPodLabelSelector
+		})
+		require.NoError(t, err, "failed to list pods with selector ", perNodePodList)
+		require.NotEmpty(t, perNodePodList.Items, "no pods found with selector ", perNodePodList)
+		require.Equal(t, expectedPodNumber, len(perNodePodList.Items), "unexpected number of pods found with selector ", perNodePodList)
+
+		tmpDir := t.TempDir()
+
+		for _, pod := range perNodePodList.Items {
+			var stdout, stderr bytes.Buffer
+			execCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+			err = kCtx.client.Resources().ExecInPod(execCtx, namespace, pod.Name, containerName,
+				[]string{"elastic-agent", "diagnostics", "-f", "/usr/share/elastic-agent/diagnostics.zip"}, &stdout, &stderr)
+			cancel()
+			if err != nil {
+				t.Log(stderr.String())
+			}
+			require.NoError(t, err, "error at k8s diagnostics execution")
+			execCtx, cancel = context.WithTimeout(ctx, 2*time.Minute)
+			err = kCtx.client.Resources().ExecInPod(execCtx, namespace, pod.Name, containerName,
+				[]string{"cat", "/usr/share/elastic-agent/diagnostics.zip"}, &stdout, &stderr)
+			cancel()
+			if err != nil {
+				t.Log(stderr.String())
+			}
+			require.NoError(t, err, "error at retrieving diagnostics zip")
+			zipReader, err := zip.NewReader(bytes.NewReader(stdout.Bytes()), int64(stdout.Len()))
+			require.NoError(t, err, "error at unzipping diagnostics zip")
+			var elasticAgentK8sDiagnostics string
+			for _, zippedFile := range zipReader.File {
+				if zippedFile.Name != "elastic-agent-k8s.zip" {
+					continue
+				}
+				elasticAgentK8sDiagnostics = filepath.Join(tmpDir, pod.Name, zippedFile.Name)
+				err := copyZipFileToPath(zippedFile, elasticAgentK8sDiagnostics)
+				if !assert.NoError(t, err, "failed to copy elastic-agent-k8s.zip from diagnostics") {
+					elasticAgentK8sDiagnostics = ""
+				}
+				break
+			}
+			if !assert.NotEmpty(t, elasticAgentK8sDiagnostics, "failed to find elastic-agent-k8s.zip in diagnostics") {
+				continue
+			}
+			err = checkK8sDiagnosticsArchive(elasticAgentK8sDiagnostics, pod.GetName())
+			assert.NoError(t, err, "failed to validate elastic-agent-k8s.zip in diagnostics")
 		}
 	}
 }

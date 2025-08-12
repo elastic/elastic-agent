@@ -7,6 +7,7 @@
 package k8s
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -17,6 +18,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -38,6 +40,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
+	k8sDiagnostics "github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	aclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -562,4 +565,95 @@ func queryK8sNamespaceDataStream(dsType, dataset, datastreamNamespace, k8snamesp
 			},
 		},
 	}
+}
+
+func checkK8sDiagnosticsArchive(archivePath string, agentPodName string) error {
+	archiveBytes, err := os.ReadFile(archivePath)
+	if err != nil {
+		return fmt.Errorf("failed to read the k8s diagnostics archive %s: %w", archivePath, err)
+	}
+
+	type zipFileValidator struct {
+		validate func(*zip.File, *zipFileValidator)
+		err      error
+	}
+
+	podYamlPath := filepath.Join(k8sDiagnostics.K8sSubdir, fmt.Sprintf(k8sDiagnostics.PodK8sManifestFormat, agentPodName))
+	validators := map[string]*zipFileValidator{
+		podYamlPath: {
+			err: fmt.Errorf("%s is not present in diagnostics", podYamlPath),
+			validate: func(f *zip.File, validator *zipFileValidator) {
+				validator.err = nil
+			},
+		},
+		k8sDiagnostics.K8sDiagnosticsErrorFile: {
+			validate: func(f *zip.File, validator *zipFileValidator) {
+				validatorErr := errors.New("errors.txt file should not be present")
+				reader, err := f.Open()
+				if err != nil {
+					validatorErr = errors.Join(validatorErr, fmt.Errorf("failed to open zip file %s: %w", f.Name, err))
+					return
+				}
+				defer reader.Close()
+
+				contents, err := io.ReadAll(reader)
+				if err != nil {
+					validatorErr = errors.Join(validatorErr, fmt.Errorf("failed to read zip file %s: %w", f.Name, err))
+					return
+				}
+
+				if len(contents) != 0 {
+					return
+				}
+
+				validator.err = validatorErr
+			},
+		},
+	}
+
+	zipReader, err := zip.NewReader(bytes.NewReader(archiveBytes), int64(len(archiveBytes)))
+	if err != nil {
+		return fmt.Errorf("failed to open the k8s diagnostics archive %s: %w", archivePath, err)
+	}
+
+	for _, f := range zipReader.File {
+		v, ok := validators[f.Name]
+		if !ok {
+			continue
+		}
+		v.validate(f, v)
+	}
+
+	var validatorErr error
+	for _, v := range validators {
+		validatorErr = errors.Join(validatorErr, v.err)
+	}
+
+	return validatorErr
+}
+
+func copyZipFileToPath(file *zip.File, targetPath string) error {
+	fileReader, err := file.Open()
+	if err != nil {
+		return fmt.Errorf("failed to open zip file %s: %w", file.Name, err)
+	}
+	defer fileReader.Close()
+
+	parentDir := filepath.Dir(targetPath)
+	err = os.MkdirAll(parentDir, 0755)
+	if err != nil {
+		return fmt.Errorf("failed to create parent directory %s: %w", parentDir, err)
+	}
+
+	outFile, err := os.Create(targetPath)
+	if err != nil {
+		return fmt.Errorf("failed to create output file %s: %w", targetPath, err)
+	}
+	defer outFile.Close()
+
+	_, err = io.Copy(outFile, fileReader)
+	if err != nil {
+		return fmt.Errorf("failed to copy zip file %s to %s: %w", file.Name, targetPath, err)
+	}
+	return nil
 }
