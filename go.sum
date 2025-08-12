@@ -487,8 +487,8 @@ github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumpti
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic/go.mod h1:0vCBR1wgGwZeGmloJ+eCWIZF2S47grTXRzj2mftg2Nk=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
 github.com/elastic/bayeux v1.0.5/go.mod h1:CSI4iP7qeo5MMlkznGvYKftp8M7qqP/3nzmVZoXHY68=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250808152328-d24319456ec0 h1:No+6Txi+qfAQiWv/VgY8FKreKfz9Uw178DKJbgDhGHs=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250808152328-d24319456ec0/go.mod h1:L2no4KurpjG8ov2AMAVfCdFLzunw9rWY98m2410eJs8=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250812063232-2e0b894269e8 h1:CCoZ3OxkjwQ9Mg3wm/tMVZ7bJUgMZhsyeX3RL7Cp+J0=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250812063232-2e0b894269e8/go.mod h1:7rFXDo5IViULLSZXF5wPCb+lIYXx8/NXH1cT7wtrm5Q=
 github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae h1:OiShmbWAyGU0MS0ADJWr1/QgeLIZliMk9xsrFicR3/s=
 github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae/go.mod h1:D2IckZVXARugvikE4fv1glvaJMohKSZRzrPsxCjo9O0=
 github.com/elastic/elastic-agent-autodiscover v0.10.0 h1:WJ4zl9uSfk1kHmn2B/0byQBLIL607Zt4LNfOgV7+XN0=
@@ -1409,8 +1409,8 @@ github.com/prometheus/procfs v0.0.3/go.mod h1:4A/X28fw3Fc593LaREMrKMqOKvUAntwMDa
 github.com/prometheus/procfs v0.0.8/go.mod h1:7Qr8sr6344vo1JqZ6HhLceV9o3AJ1Ff+GxbHq6oeK9A=
 github.com/prometheus/procfs v0.17.0 h1:FuLQ+05u4ZI+SS/w9+BWEM2TXiHKsUQ9TADiRH7DuK0=
 github.com/prometheus/procfs v0.17.0/go.mod h1:oPQLaDAMRbA+u8H5Pbfq+dl3VDAvHxMUOVhe0wYB2zw=
-github.com/prometheus/prometheus v0.305.0 h1:UO/LsM32/E9yBDtvQj8tN+WwhbyWKR10lO35vmFLx0U=
-github.com/prometheus/prometheus v0.305.0/go.mod h1:JG+jKIDUJ9Bn97anZiCjwCxRyAx+lpcEQ0QnZlUlbwY=
+github.com/prometheus/prometheus v0.304.3-0.20250703114031-419d436a447a h1:g/nRTrO18wB/VeyJfU2DMAbwWh7Pt/wJ/FcbDlMZb+A=
+github.com/prometheus/prometheus v0.304.3-0.20250703114031-419d436a447a/go.mod h1:L4c564sBwcHLfk60S2IRO2QjLKxPCdy/vxT9tw/T2Jk=
 github.com/prometheus/sigv4 v0.2.0 h1:qDFKnHYFswJxdzGeRP63c4HlH3Vbn1Yf/Ao2zabtVXk=
 github.com/prometheus/sigv4 v0.2.0/go.mod h1:D04rqmAaPPEUkjRQxGqjoxdyJuyCh6E0M18fZr0zBiE=
 github.com/puzpuzpuz/xsync/v3 v3.5.1 h1:GJYJZwO6IdxN/IKbneznS6yPkVC+c3zyY/j19c++5Fg=
