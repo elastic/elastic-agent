@@ -97,12 +97,12 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 	}
 
 	if err := os.MkdirAll(paths.Downloads(), 0750); err != nil {
-		return "", errors.New(err, fmt.Sprintf("failed to create download directory at %s", paths.Downloads()))
+		return "", fmt.Errorf("failed to create download directory at %s: %w", paths.Downloads(), err)
 	}
 
 	path, err := downloaderFunc(ctx, factory, parsedVersion, &settings, upgradeDetails)
 	if err != nil {
-		return "", errors.New(err, "failed download of agent binary")
+		return "", fmt.Errorf("failed download of agent binary: %w", err)
 	}
 
 	if skipVerifyOverride {
