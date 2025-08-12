@@ -10,7 +10,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd"
+	"github.com/elastic/elastic-agent/internal/edot/cmd"
 )
 
 func main() {

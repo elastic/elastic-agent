@@ -8,13 +8,16 @@ import (
 	"errors"
 	"fmt"
 	"go/build"
+	"io"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/josephspurrier/goversioninfo"
+	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -35,6 +38,8 @@ type BuildArgs struct {
 	Vars        map[string]string // Vars that are passed as -X key=value with the ldflags.
 	ExtraFlags  []string
 	WinMetadata bool // Add resource metadata to Windows binaries (like add the version number to the .exe properties).
+	Package     string
+	WorkDir     string
 }
 
 // buildTagRE is a regexp to match strings like "-tags=abcd"
@@ -205,10 +210,14 @@ func Build(params BuildArgs) error {
 	env["CGO_ENABLED"] = cgoEnabled
 
 	// Spec
+	outputDir, err := filepath.Abs(filepath.Join(params.OutputDir, binaryName))
+	if err != nil {
+		return fmt.Errorf("failed getting absolute path for %v: %w", params.OutputDir, err)
+	}
 	args := []string{
 		"build",
 		"-o",
-		filepath.Join(params.OutputDir, binaryName),
+		outputDir,
 	}
 	args = append(args, params.ParseBuildTags()...)
 
@@ -238,8 +247,51 @@ func Build(params BuildArgs) error {
 		defer os.Remove(syso)
 	}
 
+	if params.Package != "" {
+		args = append(args, params.Package)
+	}
+
 	log.Println("Adding build environment vars:", env)
-	return sh.RunWith(env, "go", args...)
+	var output io.Writer
+	if mg.Verbose() {
+		output = os.Stdout
+	}
+	return Run(env, output, os.Stderr, "go", params.WorkDir, args...)
+}
+
+func Run(env map[string]string, stdout, stderr io.Writer, cmd string, workingDir string, args ...string) (err error) {
+	expand := func(s string) string {
+		s2, ok := env[s]
+		if ok {
+			return s2
+		}
+		return os.Getenv(s)
+	}
+	cmd = os.Expand(cmd, expand)
+	for i := range args {
+		args[i] = os.Expand(args[i], expand)
+	}
+
+	c := exec.Command(cmd, args...)
+	c.Env = os.Environ()
+	for k, v := range env {
+		c.Env = append(c.Env, k+"="+v)
+	}
+	c.Dir = workingDir
+	c.Stderr = stderr
+	c.Stdout = stdout
+	c.Stdin = os.Stdin
+
+	var quoted []string
+	for i := range args {
+		quoted = append(quoted, fmt.Sprintf("%q", args[i]))
+	}
+	// To protect against logging from doing exec in global variables
+	if mg.Verbose() {
+		log.Println("exec:", cmd, strings.Join(quoted, " "))
+	}
+	err = c.Run()
+	return err
 }
 
 // MakeWindowsSysoFile generates a .syso file containing metadata about the

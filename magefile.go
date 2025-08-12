@@ -366,16 +366,25 @@ func GolangCrossBuildOSS() error {
 // GolangCrossBuild build the Beat binary inside of the golang-builder.
 // Do not use directly, use crossBuild instead.
 func GolangCrossBuild() error {
+	// build elastic-agent
 	params := devtools.DefaultGolangCrossBuildArgs()
 	params.OutputDir = "build/golang-crossbuild"
+	params.Package = "github.com/elastic/elastic-agent"
 	injectBuildVars(params.Vars)
-
 	if err := devtools.GolangCrossBuild(params); err != nil {
-		return err
+		return fmt.Errorf("error building elastic-agent: %w", err)
 	}
 
-	// TODO: no OSS bits just yet
-	// return GolangCrossBuildOSS()
+	// build EDOT
+	edotParams := devtools.DefaultGolangCrossBuildArgs()
+	edotParams.Name = "edot-" + devtools.Platform.GOOS + "-" + devtools.Platform.Arch
+	edotParams.Package = "github.com/elastic/elastic-agent/internal/edot"
+	edotParams.OutputDir = "build/golang-crossbuild"
+	edotParams.WorkDir = "./internal/edot"
+	injectBuildVars(edotParams.Vars)
+	if err := devtools.GolangCrossBuild(edotParams); err != nil {
+		return fmt.Errorf("error building edot: %w", err)
+	}
 
 	return nil
 }
@@ -437,7 +446,7 @@ func getTestBinariesPath() ([]string, error) {
 		filepath.Join(wd, "pkg", "component", "fake", "component"),
 		filepath.Join(wd, "internal", "pkg", "agent", "install", "testblocking"),
 		filepath.Join(wd, "pkg", "core", "process", "testsignal"),
-		filepath.Join(wd, "internal", "pkg", "otel", "manager", "testing"),
+		filepath.Join(wd, "internal", "edot", "cmd", "testing"),
 	}
 	return testBinaryPkgs, nil
 }
@@ -456,7 +465,7 @@ func (Build) TestBinaries() error {
 		}
 
 		outputName := filepath.Join(pkg, binary)
-		err := RunGo("build", "-o", outputName, filepath.Join(pkg))
+		err := devtools.Run(nil, nil, os.Stderr, "go", pkg, "build", "-o", outputName, pkg)
 		if err != nil {
 			return err
 		}
@@ -3639,8 +3648,8 @@ func hasCleanOnExit() bool {
 func (Otel) Readme() error {
 	fmt.Println(">> Building internal/pkg/otel/README.md")
 
-	readmeTmpl := filepath.Join("internal", "pkg", "otel", "templates", "README.md.tmpl")
-	readmeOut := filepath.Join("internal", "pkg", "otel", "README.md")
+	readmeTmpl := filepath.Join("internal", "edot", "templates", "README.md.tmpl")
+	readmeOut := filepath.Join("internal", "edot", "README.md")
 
 	// read README template
 	tmpl, err := template.ParseFiles(readmeTmpl)
@@ -3648,7 +3657,7 @@ func (Otel) Readme() error {
 		return fmt.Errorf("failed to parse README template: %w", err)
 	}
 
-	data, err := otel.GetOtelDependencies("go.mod")
+	data, err := otel.GetOtelDependencies(filepath.Join("internal", "edot", "go.mod"))
 	if err != nil {
 		return fmt.Errorf("Failed to get OTel dependencies: %w", err)
 	}
