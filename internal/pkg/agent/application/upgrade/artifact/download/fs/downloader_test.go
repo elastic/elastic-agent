@@ -7,6 +7,7 @@ package fs
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,7 +15,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/common"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -289,5 +294,84 @@ func TestDownloader_DownloadAsc(t *testing.T) {
 			}
 			assert.Equalf(t, filepath.Join(targetDirPath, tt.want), got, "DownloadAsc(%v, %v)", tt.args.a, tt.args.version)
 		})
+	}
+}
+
+func TestDownloadDiskSpaceError(t *testing.T) {
+
+	testCases := map[string]struct {
+		mockReturnedError error
+		expectedError     error
+	}{
+		"when fs downloader runs into a generic error, it should return error and clean up the downloaded file": {
+			mockReturnedError: errors.New("test error"),
+			expectedError:     errors.New("test error"),
+		},
+	}
+
+	for _, osErr := range downloadErrors.OS_DiskSpaceErrors {
+		testCases[fmt.Sprintf("when fs downloader runs into disk space error, it should return insufficient disk space error and clean up the downloaded file: %v", osErr)] = struct {
+			mockReturnedError error
+			expectedError     error
+		}{
+			mockReturnedError: osErr,
+			expectedError:     osErr,
+		}
+	}
+
+	funcNames := []common.MockStdLibFuncName{common.CopyFuncName, common.OpenFileFuncName, common.MkdirAllFuncName}
+
+	for testName, tc := range testCases {
+		for _, funcName := range funcNames {
+			t.Run(fmt.Sprintf("%s-%s", testName, funcName), func(t *testing.T) {
+				stdLibMocker := common.PrepareStdLibMocks(common.StdLibMocks{
+					CopyMock: func(dst io.Writer, src io.Reader) (int64, error) {
+						return 0, tc.mockReturnedError
+					},
+					OpenFileMock: func(name string, flag int, perm os.FileMode) (*os.File, error) {
+						return nil, tc.mockReturnedError
+					},
+					MkdirAllMock: func(path string, perm os.FileMode) error {
+						return tc.mockReturnedError
+					},
+				})
+
+				stdLibMocker(t, funcName)
+
+				baseDir := t.TempDir()
+				paths.SetTop(baseDir)
+				config := &artifact.Config{
+					DropPath:        filepath.Join(baseDir, "drop"),
+					TargetDirectory: filepath.Join(baseDir, "target"),
+				}
+
+				err := os.MkdirAll(config.DropPath, 0o755)
+				require.NoError(t, err)
+
+				err = os.MkdirAll(config.TargetDirectory, 0o755)
+				require.NoError(t, err)
+
+				parsedVersion := agtversion.NewParsedSemVer(1, 2, 3, "", "")
+
+				artifactName, err := artifact.GetArtifactName(agentSpec, *parsedVersion, config.OS(), config.Arch())
+				require.NoError(t, err)
+
+				sourceArtifactPath := filepath.Join(config.DropPath, artifactName)
+				sourceArtifactHashPath := sourceArtifactPath + ".sha512"
+
+				err = os.WriteFile(sourceArtifactPath, []byte("test"), 0o666)
+				require.NoError(t, err, "failed to create source artifact file")
+
+				err = os.WriteFile(sourceArtifactHashPath, []byte("test"), 0o666)
+				require.NoError(t, err, "failed to create source artifact hash file")
+
+				downloader := NewDownloader(config)
+				targetArtifactPath, err := downloader.Download(context.Background(), agentSpec, parsedVersion)
+
+				require.ErrorIs(t, err, tc.expectedError)
+
+				require.NoFileExists(t, targetArtifactPath)
+			})
+		}
 	}
 }
