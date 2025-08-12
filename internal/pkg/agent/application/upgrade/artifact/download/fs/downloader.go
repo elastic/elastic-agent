@@ -7,7 +7,6 @@ package fs
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -15,6 +14,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/common"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
@@ -108,18 +108,21 @@ func (e *Downloader) downloadFile(filename, fullPath string) (string, error) {
 	defer sourceFile.Close()
 
 	if destinationDir := filepath.Dir(fullPath); destinationDir != "" && destinationDir != "." {
-		if err := os.MkdirAll(destinationDir, 0755); err != nil {
+		// using common.MkdirAll here for testability
+		if err := common.MkdirAll(destinationDir, 0755); err != nil {
 			return "", err
 		}
 	}
 
-	destinationFile, err := os.OpenFile(fullPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
+	// using common.OpenFile here for testability
+	destinationFile, err := common.OpenFile(fullPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
 	if err != nil {
 		return "", errors.New(err, "creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath))
 	}
 	defer destinationFile.Close()
 
-	_, err = io.Copy(destinationFile, sourceFile)
+	// using common.Copy here for testability
+	_, err = common.Copy(destinationFile, sourceFile)
 	if err != nil {
 		return "", err
 	}
