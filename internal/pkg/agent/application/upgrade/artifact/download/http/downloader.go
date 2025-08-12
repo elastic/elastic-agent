@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/common"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -179,12 +180,14 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	}
 
 	if destinationDir := filepath.Dir(fullPath); destinationDir != "" && destinationDir != "." {
-		if err := os.MkdirAll(destinationDir, 0o755); err != nil {
+		// using common.MkdirAll here for testability
+		if err := common.MkdirAll(destinationDir, 0o755); err != nil {
 			return "", err
 		}
 	}
 
-	destinationFile, err := os.OpenFile(fullPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
+	// using common.OpenFile here for testability
+	destinationFile, err := common.OpenFile(fullPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
 	if err != nil {
 		return "", errors.New(err, "creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath))
 	}
@@ -213,7 +216,9 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	detailsObserver := newDetailsProgressObserver(e.upgradeDetails)
 	dp := newDownloadProgressReporter(sourceURI, e.config.Timeout, fileSize, loggingObserver, detailsObserver)
 	dp.Report(ctx)
-	_, err = io.Copy(destinationFile, io.TeeReader(resp.Body, dp))
+
+	// using common.Copy here for testability
+	_, err = common.Copy(destinationFile, io.TeeReader(resp.Body, dp))
 	if err != nil {
 		dp.ReportFailed(err)
 		// return path, file already exists and needs to be cleaned up
