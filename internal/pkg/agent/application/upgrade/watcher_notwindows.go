@@ -33,7 +33,7 @@ func createTakeDownWatcherCommand(ctx context.Context) *exec.Cmd {
 func TakedownWatcher(ctx context.Context, log *logger.Logger, pidFetchFunc watcherPIDsFetcher) error {
 	pids, err := pidFetchFunc()
 	if err != nil {
-		return fmt.Errorf("error listing watcher processes: %s", err)
+		return fmt.Errorf("error listing watcher processes: %w", err)
 	}
 
 	ownPID := os.Getpid()
@@ -52,13 +52,13 @@ func TakedownWatcher(ctx context.Context, log *logger.Logger, pidFetchFunc watch
 
 		process, err := os.FindProcess(pid)
 		if err != nil {
-			accumulatedSignalingErrors = errors.Join(accumulatedSignalingErrors, fmt.Errorf("error finding watcher process with PID: %d: %s", pid, err))
+			accumulatedSignalingErrors = errors.Join(accumulatedSignalingErrors, fmt.Errorf("error finding watcher process with PID: %d: %w", pid, err))
 			continue
 		}
 
 		err = process.Signal(syscall.SIGTERM)
 		if err != nil {
-			accumulatedSignalingErrors = errors.Join(accumulatedSignalingErrors, fmt.Errorf("error killing watcher process with PID: %d: %s", pid, err))
+			accumulatedSignalingErrors = errors.Join(accumulatedSignalingErrors, fmt.Errorf("error killing watcher process with PID: %d: %w", pid, err))
 			continue
 		}
 
