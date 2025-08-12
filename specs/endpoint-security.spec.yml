@@ -31,7 +31,7 @@ inputs:
             - "verify"
             - "--log"
             - "stderr"
-          timeout: 30s
+          timeout: 60s
         install:
           args:
             - "install"
