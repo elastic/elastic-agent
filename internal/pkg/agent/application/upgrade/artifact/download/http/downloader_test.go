@@ -23,6 +23,8 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/common"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -526,5 +528,85 @@ func TestDownloadVersion(t *testing.T) {
 
 			assert.Equalf(t, filepath.Join(targetDirPath, tt.want), got, "Download(%v, %v)", tt.args.a, tt.args.version)
 		})
+	}
+}
+
+func TestDownloadDiskSpaceError(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "elastic.co test server generates an OpenPGP key which results in a SHA-1 violation.")
+	targetDir, err := os.MkdirTemp(os.TempDir(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	log, _ := loggertest.New("downloader")
+	timeout := 30 * time.Second
+	testCases := getTestCases()
+	server, _, _ := getElasticCoServer(t)
+	elasticClient := getElasticCoClient(server)
+
+	config := &artifact.Config{
+		SourceURI:       source,
+		TargetDirectory: targetDir,
+		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+			Timeout: timeout,
+		},
+	}
+
+	errorTestCase := []struct {
+		funcName          common.MockStdLibFuncName
+		mockReturnedError error
+		expectedError     error
+	}{}
+
+	funcNames := []common.MockStdLibFuncName{common.CopyFuncName, common.OpenFileFuncName, common.MkdirAllFuncName}
+	for _, osErr := range downloadErrors.OS_DiskSpaceErrors {
+		for _, funcName := range funcNames {
+
+			errorTestCase = append(errorTestCase, struct {
+				funcName          common.MockStdLibFuncName
+				mockReturnedError error
+				expectedError     error
+			}{
+				funcName:          funcName,
+				mockReturnedError: osErr,
+				expectedError:     osErr,
+			})
+		}
+	}
+	for _, testCase := range testCases {
+		for _, etc := range errorTestCase {
+			testName := fmt.Sprintf("%s-binary-%s-%s", testCase.system, testCase.arch, etc.funcName)
+			t.Run(testName, func(t *testing.T) {
+				stdLibMocker := common.PrepareStdLibMocks(common.StdLibMocks{
+					CopyMock: func(dst io.Writer, src io.Reader) (int64, error) {
+						return 0, etc.mockReturnedError
+					},
+					OpenFileMock: func(name string, flag int, perm os.FileMode) (*os.File, error) {
+						return nil, etc.mockReturnedError
+					},
+					MkdirAllMock: func(path string, perm os.FileMode) error {
+						return etc.mockReturnedError
+					},
+				})
+				stdLibMocker(t, etc.funcName)
+
+				config.OperatingSystem = testCase.system
+				config.Architecture = testCase.arch
+
+				upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
+				testClient := NewDownloaderWithClient(log, config, elasticClient, upgradeDetails)
+				artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
+
+				require.ErrorIs(t, err, etc.expectedError, "expected error mismatch")
+				require.NoFileExists(t, artifactPath)
+
+				if etc.funcName == common.CopyFuncName {
+					require.Equal(t, details.StateFailed, upgradeDetails.State)
+					require.Equal(t, "insufficient disk space", upgradeDetails.Metadata.ErrorMsg)
+				}
+
+				os.Remove(artifactPath)
+			})
+		}
 	}
 }
