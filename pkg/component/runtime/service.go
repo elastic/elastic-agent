@@ -9,7 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os/exec"
 	"runtime"
+	"slices"
 	"time"
 
 	"github.com/kardianos/service"
@@ -239,6 +241,16 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 				// Start service
 				err = s.start(ctx)
 				if err != nil {
+					// If the error is due to a non-fatal exit code, continue running the service
+					var exitErr *exec.ExitError
+					if errors.As(err, &exitErr) {
+						exitCode := exitErr.ExitCode()
+						if slices.Contains(s.comp.InputSpec.Spec.Service.Operations.Install.NonFatalExitCodes, exitCode) {
+							s.log.Warnf("service %s install failed with non-fatal exit code %d, continuing to run...", s.name(), exitCode)
+							continue
+						}
+					}
+
 					cisStop()
 					break
 				}
