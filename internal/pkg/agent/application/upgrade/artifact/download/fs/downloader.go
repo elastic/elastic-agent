@@ -6,6 +6,7 @@ package fs
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -117,7 +118,7 @@ func (e *Downloader) downloadFile(filename, fullPath string) (string, error) {
 	// using common.OpenFile here for testability
 	destinationFile, err := common.OpenFile(fullPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
 	if err != nil {
-		return "", errors.New(err, "creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath))
+		return "", goerrors.Join(errors.New("creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath)), err)
 	}
 	defer destinationFile.Close()
 
