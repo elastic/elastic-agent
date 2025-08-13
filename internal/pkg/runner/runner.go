@@ -7,7 +7,6 @@ package runner
 import (
 	"context"
 	"sync"
-	"time"
 )
 
 type RunnerFunc func(context.Context) error
@@ -39,25 +38,6 @@ func (r *Runner) Err() error {
 
 func (r *Runner) Done() <-chan struct{} {
 	return r.done
-}
-
-func (r *Runner) DoneWithTimeout(to time.Duration) <-chan struct{} {
-	done := make(chan struct{})
-
-	t := time.NewTimer(to)
-
-	go func() {
-		defer t.Stop()
-
-		select {
-		case <-r.Done():
-		case <-t.C:
-			r.setError(context.DeadlineExceeded)
-		}
-		close(done)
-	}()
-
-	return done
 }
 
 func Start(ctx context.Context, fn RunnerFunc) *Runner {

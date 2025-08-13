@@ -36,7 +36,7 @@ type Reason string
 
 const (
 	ReasonUninstall Reason = "uninstall"
-	ReasonMigration Reason = "migration"
+	ReasonMigration Reason = "migrated"
 )
 
 type AuditUnenrollRequest struct {

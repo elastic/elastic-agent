@@ -32,6 +32,7 @@ func TestUpgradeBrokenPackageVersion(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
+	t.Skip("Skip this test because it is not compatible with .package-version pinning")
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
