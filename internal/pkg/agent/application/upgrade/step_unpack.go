@@ -166,8 +166,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 				}
 			}()
 
-			//nolint:gosec // legacy
-			if _, err = io.Copy(f, rc); err != nil {
+			if _, err = io.Copy(f, rc); err != nil { //nolint:gosec // legacy
 				return err
 			}
 		}
@@ -341,8 +340,7 @@ func untar(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error
 				return UnpackResult{}, errors.New(err, "TarInstaller: creating file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 			}
 
-			//nolint:gosec // legacy
-			_, err = io.Copy(wf, tr)
+			_, err = io.Copy(wf, tr) //nolint:gosec // legacy
 			if closeErr := wf.Close(); closeErr != nil && err == nil {
 				err = closeErr
 			}
