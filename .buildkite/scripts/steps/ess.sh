@@ -39,10 +39,10 @@ function ess_up() {
 }
 
 function ess_down() {
-  echo "~~~ Tearing down the ESS Stack"
+  echo "~~~ Tearing down the ESS Stack"  
   local WORKSPACE=$(git rev-parse --show-toplevel)
   local TF_DIR="${WORKSPACE}/test_infra/ess/"
-
+  
   pushd "${TF_DIR}"
   terraform init
   terraform destroy -auto-approve
@@ -51,15 +51,15 @@ function ess_down() {
 
 function get_git_user_email() {
   if ! git rev-parse --is-inside-work-tree &>/dev/null; then
-    echo "unknown"
+    echo "unknown"  
     return
   fi
 
   local email
   email=$(git config --get user.email)
-
+  
   if [ -z "$email" ]; then
-    echo "unknown"
+    echo "unknown"  
   else
     echo "$email"
   fi
