@@ -50,7 +50,7 @@ func NewNodeEventer(
 		Node:         cfg.Node,
 		IsUpdated:    isUpdated,
 		HonorReSyncs: true,
-	}, nil)
+	}, nil, logger)
 	if err != nil {
 		return nil, errors.New(err, "couldn't create kubernetes watcher")
 	}
