@@ -574,6 +574,8 @@ func copyActionStore(log *logger.Logger, newHome string) error {
 	return nil
 }
 
+var copyRunDirectoryFunc = copyRunDirectory // abstraction for testability
+
 func copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error {
 	log.Infow("Copying run directory", "new_run_path", newRunPath, "old_run_path", oldRunPath)
 
