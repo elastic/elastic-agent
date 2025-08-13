@@ -9,7 +9,7 @@ receivers:
 #    start_at: beginning
 
   # Receiver for CPU, Disk, Memory, and Filesystem metrics
-  hostmetrics/system:
+  hostmetrics:
     collection_interval: 10s
     scrapers:
       cpu:
@@ -42,7 +42,7 @@ receivers:
       disk: {}
       filesystem: {}
   # Receiver for logs, traces, and metrics from SDKs
-  otlp/fromsdk:
+  otlp:
     protocols:
       grpc:
       http:
@@ -63,10 +63,25 @@ connectors:
   elasticapm: {}
 
 processors:
+  # [Elastic Infra Metrics Processor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticinframetricsprocessor)
   # DEPRECATED: The elasticinframetrics processor is deprecated and will be removed in 9.2.0.
   elasticinframetrics:
+    add_system_metrics: true
+    drop_original: true
+  # [Attributes Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/attributesprocessor)
+  attributes/dataset:
+    actions:
+      - key: event.dataset
+        from_attribute: data_stream.dataset
+        action: upsert
+  resource/process:
+    attributes:
+      - key: process.executable.name
+        action: delete
+      - key: process.executable.path
+        action: delete
   resourcedetection:
-    detectors: ["system"]
+    detectors: ["system", "ec2"] # Detects resources from the system and EC2 instances.
     system:
       hostname_sources: ["os"]
       resource_attributes:
@@ -96,61 +111,67 @@ processors:
           enabled: true
         os.type:
           enabled: true
-  attributes/dataset:
-    actions:
-      - key: event.dataset
-        from_attribute: data_stream.dataset
-        action: upsert
-  resource/process:
-    attributes:
-      - key: process.executable.name
-        action: delete
-      - key: process.executable.path
-        action: delete
+    ec2:
+      resource_attributes:
+        host.name:
+          enabled: false
+        host.id:
+          enabled: true
   elastictrace:
 
 exporters:
+  debug: {}
+  # [Elasticsearch exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/README.md)
+  elasticsearch/otel:
+    endpoints: # List of Elasticsearch endpoints.
+      - ${env:ELASTIC_ENDPOINT}
+    api_key: ${env:ELASTIC_API_KEY} # API key for Elasticsearch authentication.
+    # Enable in order to skip the SSL certificate Check
+    # tls:
+    #   insecure_skip_verify: true
+    mapping:
+      mode: otel
   elasticsearch/ecs:
-    endpoints: ["${env:ELASTIC_ENDPOINT}"]
+    endpoints:
+      - ${env:ELASTIC_ENDPOINT}
     api_key: ${env:ELASTIC_API_KEY}
     mapping:
       mode: ecs
 
-  elasticsearch/otel:
-    endpoints: [ "${env:ELASTIC_ENDPOINT}" ]
-    api_key: ${env:ELASTIC_API_KEY}
-    mapping:
-      mode: otel
-
 service:
   extensions: [file_storage]
   pipelines:
-    traces/fromsdk:
-      receivers: [otlp/fromsdk]
-      processors: [elastictrace]
-      exporters: [elasticapm, elasticsearch/otel]
-
-    metrics/fromsdk:
-      receivers: [otlp/fromsdk]
+    metrics:
+      receivers: [otlp]
+      exporters: [routing]
+    metrics/infra/ecs:
+      receivers: [routing]
+      processors:
+        - elasticinframetrics
+        - attributes/dataset
+        - resource/process
+        - batch/metrics
+      exporters: [debug, elasticsearch/ecs]
+    metrics/otel:
+      receivers: [routing]
+      processors: [batch]
+      exporters: [debug, elasticsearch/otel]
+    metrics/aggregated-otel-metrics:
+      receivers:
+        - elasticapm
+      processors:
+      exporters:
+        - debug
+        - elasticsearch/otel
+    logs:
+      receivers: [otlp]
       processors: []
-      exporters: [elasticsearch/otel]
-
-    metrics/hostmetrics:
-      receivers: [hostmetrics/system]
-      processors: [elasticinframetrics, resourcedetection, attributes/dataset, resource/process]
-      exporters: [elasticsearch/ecs]
-
-    metrics/aggregated-metrics:
-      receivers: [elasticapm]
-      processors: []
-      exporters: [elasticsearch/otel]
-
-    logs/fromsdk:
-      receivers: [otlp/fromsdk]
-      processors: []
-      exporters: [elasticapm, elasticsearch/otel]
-
+      exporters: [debug, elasticapm, elasticsearch/otel]
     logs/platformlogs:
       receivers: [filelog/platformlogs]
       processors: [resourcedetection]
       exporters: [elasticsearch/otel]
+    traces:
+      receivers: [otlp]
+      processors: [elastictrace]
+      exporters: [debug, elasticapm, elasticsearch/otel]
