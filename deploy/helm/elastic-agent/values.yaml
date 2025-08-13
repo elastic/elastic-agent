@@ -300,6 +300,14 @@ kubernetes:
       # -- system metric stream vars
       # @section -- 2 - Kubernetes integration
       vars: {}
+
+autoOps:
+  # -- enable autoOps integration
+  # @section -- 3 - AutoOps integration
+  enabled: false
+
+  token: ""
+
 system:
   # -- enable System integration.
   # @section -- 4 - System integration
@@ -530,6 +538,15 @@ agent:
         kubernetes:
           node: ${NODE_NAME}
           scope: node
+    autoOps:
+      mode: deployment
+      serviceAccount:
+        create: true
+      clusterRole:
+        create: false
+      nodeSelector:
+        kubernetes.io/os: linux
+
 kube-state-metrics:
   enabled: true
   fullnameOverride: "kube-state-metrics"
