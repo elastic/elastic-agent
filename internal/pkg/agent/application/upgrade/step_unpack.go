@@ -186,7 +186,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 
 			// Using common.Copy instead of io.Copy so that we can
 			// mock it in tests.
-			if _, err = common.Copy(f, rc); err != nil { //nolint:gosec // legacy
+			if _, err = common.Copy(f, rc); err != nil {
 				return err
 			}
 		}
@@ -437,7 +437,7 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 
 			// Using common.Copy instead of io.Copy so that we can
 			// mock it in tests.
-			_, err = common.Copy(wf, tr) //nolint:gosec // legacy
+			_, err = common.Copy(wf, tr)
 			if closeErr := wf.Close(); closeErr != nil && err == nil {
 				err = closeErr
 			}
