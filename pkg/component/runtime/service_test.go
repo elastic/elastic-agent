@@ -319,7 +319,10 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 	}()
 
 	// Run the service
-	go service.Run(ctx, comm)
+	go func() {
+		err := service.Run(ctx, comm)
+		require.EqualError(t, err, context.Canceled.Error())
+	}()
 
 	service.actionCh <- actionModeSigned{
 		actionMode: actionStart,
@@ -329,7 +332,11 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 	// warning log message about Endpoint's install operation failing with a non-fatal exit
 	// code but the service runtime continuing to run.
 	cisAddr, err := getConnInfoServerAddress(runtime.GOOS, true, cisPort, cisSocket)
+	require.NoError(t, err)
+
 	parsedCISAddr, err := url.Parse(cisAddr)
+	require.NoError(t, err)
+
 	expectedWarnLogMsg := fmt.Sprintf("exit code %d is non-fatal, continuing to run...", nonFatalExitCode)
 	require.Eventually(t, func() bool {
 		_, err = net.Dial(parsedCISAddr.Scheme, parsedCISAddr.Host+parsedCISAddr.Path)
