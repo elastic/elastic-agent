@@ -14,8 +14,11 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/elastic/elastic-agent-libs/api/npipe"
 
 	"go.uber.org/zap/zapcore"
 
@@ -339,7 +342,16 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 
 	expectedWarnLogMsg := fmt.Sprintf("exit code %d is non-fatal, continuing to run...", nonFatalExitCode)
 	require.Eventually(t, func() bool {
-		_, err = net.Dial(parsedCISAddr.Scheme, parsedCISAddr.Host+parsedCISAddr.Path)
+		if runtime.GOOS != "windows" {
+			_, err = net.Dial("unix", parsedCISAddr.Host+parsedCISAddr.Path)
+		} else {
+			if strings.HasPrefix(cisAddr, "npipe:///") {
+				path := strings.TrimPrefix(cisAddr, "npipe:///")
+				cisAddr = `\\.\pipe\` + path
+			}
+			_, err = npipe.Dial(cisAddr)("", "")
+		}
+
 		if err != nil {
 			t.Logf("Connection info server is not running: %v", err)
 			return false
