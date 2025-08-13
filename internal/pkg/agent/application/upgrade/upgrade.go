@@ -547,6 +547,8 @@ func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versio
 	return nil
 }
 
+var copyActionStoreFunc = copyActionStore // abstraction for testability
+
 func copyActionStore(log *logger.Logger, newHome string) error {
 	// copies legacy action_store.yml, state.yml and state.enc encrypted file if exists
 	storePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile()}
