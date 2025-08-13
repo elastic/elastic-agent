@@ -5,10 +5,7 @@
 package aesgcm
 
 import (
-	"crypto/aes"
 	"crypto/rand"
-	"encoding/hex"
-	"errors"
 	"strconv"
 	"testing"
 
@@ -31,21 +28,6 @@ func TestNewKey(t *testing.T) {
 			t.Error(diff)
 		}
 	}
-}
-
-func TestNewKeyHexString(t *testing.T) {
-	for _, kt := range testKeyTypes {
-		s, err := NewKeyHexString(kt)
-		if err != nil {
-			t.Error(err)
-		}
-
-		diff := cmp.Diff(int(kt)*2, len(s))
-		if diff != "" {
-			t.Error(diff)
-		}
-	}
-
 }
 
 func TestEncryptDecrypt(t *testing.T) {
@@ -143,61 +125,4 @@ func TestEncryptDecryptDifferentLengths(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestEncryptDecryptHex(t *testing.T) {
-	fipsutils.SkipIfFIPSOnly(t, "aesgcm does not use NewGCMWithRandomNonce.")
-	aes256Key, err := NewKeyHexString(AES256)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tests := []struct {
-		name string
-		key  string
-		data []byte
-		err  error
-	}{
-		{
-			name: "emptykey",
-			key:  "",
-			err:  aes.KeySizeError(0),
-		},
-		{
-			name: "nonhexkey",
-			key:  "123",
-			err:  hex.ErrLength,
-		},
-		{
-			name: "foobar",
-			key:  aes256Key,
-			data: []byte("foobar"),
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			enc, err := EncryptHex(tc.key, tc.data)
-			if !errors.Is(tc.err, err) {
-				t.Fatal(cmp.Diff(tc.err, err))
-			}
-
-			dec, err := DecryptHex(tc.key, enc)
-			if !errors.Is(tc.err, err) {
-				t.Fatal(cmp.Diff(tc.err, err))
-			}
-
-			if len(tc.data) == 0 {
-				diff := cmp.Diff(len(tc.data), len(dec))
-				if diff != "" {
-					t.Error(diff)
-				}
-			} else {
-				diff := cmp.Diff(tc.data, dec)
-				if diff != "" {
-					t.Error(diff)
-				}
-			}
-		})
-	}
-
 }

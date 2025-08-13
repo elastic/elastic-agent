@@ -5,7 +5,6 @@
 package backoff
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -58,7 +57,7 @@ func TestUnblockAfterInit(t *testing.T) {
 			b := f(c)
 
 			startedAt := time.Now()
-			assert.True(t, WaitOnError(b, errors.New("bad bad")))
+			assert.True(t, b.Wait())
 			assert.True(t, time.Since(startedAt) >= init)
 		})
 	}
