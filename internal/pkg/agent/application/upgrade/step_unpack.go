@@ -19,6 +19,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/common"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
@@ -148,8 +149,11 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 			// check if the directory already exists
 			_, err = os.Stat(dstPath)
 			if errors.Is(err, fs.ErrNotExist) {
-				// the directory does not exist, create it and any non-existing parent directory with the same permissions
-				if err := os.MkdirAll(dstPath, f.Mode().Perm()&0770); err != nil {
+				// the directory does not exist, create it and any non-existing
+				// parent directory with the same permissions.
+				// Using common.MkdirAll instead of os.MkdirAll so that we can
+				// mock it in tests.
+				if err := common.MkdirAll(dstPath, f.Mode().Perm()&0770); err != nil {
 					return fmt.Errorf("creating directory %q: %w", dstPath, err)
 				}
 			} else if err != nil {
@@ -168,7 +172,9 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 			// create non-existing containing folders with 0770 permissions right now, we'll fix the permission of each
 			// directory as we come across them while processing the other package entries
 			_ = os.MkdirAll(filepath.Dir(dstPath), 0770)
-			f, err := os.OpenFile(dstPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode()&0770)
+			// Using common.OpenFile instead of os.OpenFile so that we can
+			// mock it in tests.
+			f, err := common.OpenFile(dstPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode()&0770)
 			if err != nil {
 				return err
 			}
@@ -178,7 +184,9 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 				}
 			}()
 
-			if _, err = io.Copy(f, rc); err != nil { //nolint:gosec // legacy
+			// Using common.Copy instead of io.Copy so that we can
+			// mock it in tests.
+			if _, err = common.Copy(f, rc); err != nil { //nolint:gosec // legacy
 				return err
 			}
 		}
@@ -413,17 +421,23 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 			log.Debugw("Unpacking file", "archive", "tar", "file.path", abs)
 			// create non-existing containing folders with 0750 permissions right now, we'll fix the permission of each
 			// directory as we come across them while processing the other package entries
-			if err = os.MkdirAll(filepath.Dir(abs), 0750); err != nil {
+			// Using common.MkdirAll instead of os.MkdirAll so that we can
+			// mock it in tests.
+			if err = common.MkdirAll(filepath.Dir(abs), 0750); err != nil {
 				return UnpackResult{}, errors.New(err, "TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 			}
 
 			// remove any world permissions from the file
-			wf, err := os.OpenFile(abs, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode.Perm()&0770)
+			// Using common.OpenFile instead of os.OpenFile so that we can
+			// mock it in tests.
+			wf, err := common.OpenFile(abs, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode.Perm()&0770)
 			if err != nil {
 				return UnpackResult{}, errors.New(err, "TarInstaller: creating file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 			}
 
-			_, err = io.Copy(wf, tr) //nolint:gosec // legacy
+			// Using common.Copy instead of io.Copy so that we can
+			// mock it in tests.
+			_, err = common.Copy(wf, tr) //nolint:gosec // legacy
 			if closeErr := wf.Close(); closeErr != nil && err == nil {
 				err = closeErr
 			}
@@ -435,8 +449,11 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 			// check if the directory already exists
 			_, err = os.Stat(abs)
 			if errors.Is(err, fs.ErrNotExist) {
-				// the directory does not exist, create it and any non-existing parent directory with the same permissions
-				if err := os.MkdirAll(abs, mode.Perm()&0770); err != nil {
+				// the directory does not exist, create it and any non-existing
+				// parent directory with the same permissions.
+				// Using common.MkdirAll instead of os.MkdirAll so that we can
+				// mock it in tests.
+				if err := common.MkdirAll(abs, mode.Perm()&0770); err != nil {
 					return UnpackResult{}, errors.New(err, "TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
 				}
 			} else if err != nil {
