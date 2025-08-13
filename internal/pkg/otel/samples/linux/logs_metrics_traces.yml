@@ -158,7 +158,7 @@ service:
     metrics/aggregated-otel-metrics:
       receivers:
         - elasticapm
-      processors:
+      processors: []
       exporters:
         - debug
         - elasticsearch/otel
