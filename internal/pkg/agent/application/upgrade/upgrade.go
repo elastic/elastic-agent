@@ -320,14 +320,14 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome)
 
-	if err := copyActionStore(u.log, newHome); err != nil {
+	if err := copyActionStoreFunc(u.log, newHome); err != nil {
 		return nil, errors.New(err, "failed to copy action store")
 	}
 
 	newRunPath := filepath.Join(newHome, "run")
 	oldRunPath := filepath.Join(paths.Run())
 
-	if err := copyRunDirectory(u.log, oldRunPath, newRunPath); err != nil {
+	if err := copyRunDirectoryFunc(u.log, oldRunPath, newRunPath); err != nil {
 		return nil, errors.New(err, "failed to copy run directory")
 	}
 
