@@ -306,7 +306,13 @@ autoOps:
   # @section -- 3 - AutoOps integration
   enabled: false
 
-  token: ""
+  autoops_token: ""
+  autoops_es_url: ""
+  temp_resource_id: ""
+  otel_url: ""
+  es_api_key: ""
+  cloud_connected_mode_api_key: ""
+  cloud_connected_mode_api_url: ""
 
 system:
   # -- enable System integration.
