@@ -150,11 +150,10 @@ service:
         - elasticinframetrics
         - attributes/dataset
         - resource/process
-        - batch/metrics
       exporters: [debug, elasticsearch/ecs]
     metrics/otel:
       receivers: [routing]
-      processors: [batch]
+      processors: []
       exporters: [debug, elasticsearch/otel]
     metrics/aggregated-otel-metrics:
       receivers:
