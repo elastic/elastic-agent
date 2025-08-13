@@ -667,6 +667,8 @@ func readDirs(dir string) ([]string, error) {
 	return dirs, nil
 }
 
+var fileDirCopyFunc = copy.Copy // abstraction for testability
+
 func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
 	var onErr func(src, dst string, err error) error
 
@@ -693,7 +695,7 @@ func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
 		copyConcurrency = runtime.NumCPU() * 4
 	}
 
-	return copy.Copy(from, to, copy.Options{
+	return fileDirCopyFunc(from, to, copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
 		},
