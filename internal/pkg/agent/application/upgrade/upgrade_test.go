@@ -5,16 +5,19 @@
 package upgrade
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
 	"io/fs"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -30,7 +33,9 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/common"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -1673,6 +1678,134 @@ func TestCopyRunDirectory(t *testing.T) {
 			content, err := os.ReadFile(filepath.Join(newRunPath, "file.txt"))
 			require.NoError(t, err, "error reading from %s", filepath.Join(newRunPath, "file.txt"))
 			require.Equal(t, []byte("content for old run file"), content, "content of %s is not as expected", filepath.Join(newRunPath, "file.txt"))
+		})
+	}
+}
+
+func TestUpgradeUnpackErrors(t *testing.T) {
+	log, _ := loggertest.New("test")
+
+	targetVersion := agtversion.NewParsedSemVer(3, 4, 5, "SNAPSHOT", "")
+	targetArtifactName, targetArchiveFiles := buildArchiveFiles(t, archiveFilesWithMoreComponents, targetVersion, "ghijkl")
+
+	// Get the content of the component file to be used in copy function
+	// assertions. It will be used to make sure the error gets triggered in the
+	// copy call in the unpacker and not the downloader.
+	targetArchiveComponentsFileContent := ""
+	for _, file := range targetArchiveFiles {
+		if file.fType == REGULAR {
+			dir := filepath.Dir(file.path)
+			if strings.HasSuffix(dir, "components") {
+				targetArchiveComponentsFileContent = file.content
+				break
+			}
+		}
+	}
+
+	// dir name of the versioned home
+	// used to calculate component paths
+	newVersionedDirName := "elastic-agent-3.4.5-SNAPSHOT-ghijkl"
+
+	mockAgentInfo := info.NewAgent(t)
+	mockAgentInfo.On("Version").Return(targetVersion.String())
+
+	upgradeDetails := details.NewDetails(targetVersion.String(), details.StateRequested, "test")
+
+	mockStdlibFuncs := []common.MockStdLibFuncName{common.CopyFuncName, common.OpenFileFuncName, common.MkdirAllFuncName}
+
+	testCases := map[string]struct {
+		mockStdlibFunc    common.MockStdLibFuncName
+		mockReturnedError error
+		expectedError     error
+	}{}
+
+	for _, mockStdlibFunc := range mockStdlibFuncs {
+		for _, te := range downloadErrors.OS_DiskSpaceErrors {
+			testCases[fmt.Sprintf("unpack_should_return_error_if_unpack_%s_fails: %v", mockStdlibFunc, te)] = struct {
+				mockStdlibFunc    common.MockStdLibFuncName
+				mockReturnedError error
+				expectedError     error
+			}{
+				mockStdlibFunc:    mockStdlibFunc,
+				mockReturnedError: te,
+				expectedError:     downloadErrors.ErrInsufficientDiskSpace,
+			}
+		}
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			paths.SetTop(tempDir)
+			paths.SetDownloads(filepath.Join(tempDir, "downloads"))
+
+			targetArchive, err := createArchive(t, targetArtifactName, targetArchiveFiles)
+			require.NoError(t, err)
+
+			// Used to assert that the mkdirAll error is triggered in the
+			// unpacker and not the downloader
+			newComponentsDir := filepath.Join(paths.Data(), newVersionedDirName, "components")
+			// Used to assert that the openFile error is triggered in the
+			// unpacker and not the downloader
+			newComponentsFile := filepath.Join(newComponentsDir, "comp1")
+
+			t.Logf("Created archive: %s", targetArchive)
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.ServeFile(w, r, targetArchive)
+			}))
+			t.Cleanup(server.Close)
+
+			config := artifact.Config{
+				TargetDirectory:        paths.Downloads(),
+				SourceURI:              server.URL,
+				RetrySleepInitDuration: 1 * time.Second,
+				HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+					Timeout: 1 * time.Second,
+				},
+			}
+
+			stdlibMocker := common.PrepareStdLibMocks(common.StdLibMocks{
+				CopyMock: func(dst io.Writer, src io.Reader) (int64, error) {
+					// If the content is not the same as the target archive components file content,
+					// write the content to the destination. This is to make
+					// sure that the error is triggered in unpacker and not in downloader
+					buf, err := io.ReadAll(src)
+					require.NoError(t, err)
+					if !bytes.Equal(buf, []byte(targetArchiveComponentsFileContent)) {
+						return io.Copy(dst, bytes.NewReader(buf))
+					}
+
+					return 0, tc.mockReturnedError
+				},
+				OpenFileMock: func(name string, flag int, perm os.FileMode) (*os.File, error) {
+					// Make sure that the openFile error is triggered in the
+					// unpacker and not the downloader
+					if name != newComponentsFile {
+						return os.OpenFile(name, flag, perm)
+					}
+
+					return nil, tc.mockReturnedError
+				},
+				MkdirAllMock: func(path string, perm os.FileMode) error {
+					// Make sure that the mkdirAll error is triggered in the
+					// unpacker and not the downloader
+					if path != newComponentsDir {
+						return os.MkdirAll(path, perm)
+					}
+
+					return tc.mockReturnedError
+				},
+			})
+
+			stdlibMocker(t, tc.mockStdlibFunc)
+
+			upgrader, err := NewUpgrader(log, &config, mockAgentInfo)
+			require.NoError(t, err)
+
+			_, err = upgrader.Upgrade(context.Background(), targetVersion.String(), server.URL, nil, upgradeDetails, true, true)
+			require.ErrorIs(t, err, tc.expectedError, "expected error mismatch")
+			require.Equal(t, upgradeDetails.State, details.StateExtracting)
 		})
 	}
 }
