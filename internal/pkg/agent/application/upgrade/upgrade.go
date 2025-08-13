@@ -580,7 +580,7 @@ func copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error {
 	log.Infow("Copying run directory", "new_run_path", newRunPath, "old_run_path", oldRunPath)
 
 	if err := os.MkdirAll(newRunPath, runDirMod); err != nil {
-		return errors.New(err, "failed to create run directory")
+		return fmt.Errorf("failed to create run directory: %w", err)
 	}
 
 	err := copyDir(log, oldRunPath, newRunPath, true)
@@ -590,7 +590,7 @@ func copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error {
 		return nil
 	}
 	if err != nil {
-		return errors.New(err, "failed to copy %q to %q", oldRunPath, newRunPath)
+		return fmt.Errorf("failed to copy %q to %q: %w", oldRunPath, newRunPath, err)
 	}
 
 	return nil
