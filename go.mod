@@ -26,7 +26,7 @@ require (
 	github.com/elastic/go-sysinfo v1.15.3
 	github.com/elastic/go-ucfg v0.8.9-0.20250307075119-2a22403faaea
 	github.com/elastic/mock-es v0.0.0-20250324153755-573fc6c0ac4b
-	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.4.0
+	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.6.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.3.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.5.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.16.0
@@ -347,7 +347,7 @@ require (
 	github.com/elastic/lunes v0.1.0 // indirect
 	github.com/elastic/mito v1.22.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
-	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.7.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.8.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.21.0 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
 	github.com/elastic/sarama v1.19.1-0.20250603175145-7672917f26b6 // indirect
