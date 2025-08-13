@@ -424,7 +424,7 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 			// Using common.MkdirAll instead of os.MkdirAll so that we can
 			// mock it in tests.
 			if err = common.MkdirAll(filepath.Dir(abs), 0750); err != nil {
-				return UnpackResult{}, errors.New(err, "TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+				return UnpackResult{}, goerrors.Join(err, errors.New("TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs)))
 			}
 
 			// remove any world permissions from the file
@@ -432,7 +432,7 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 			// mock it in tests.
 			wf, err := common.OpenFile(abs, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode.Perm()&0770)
 			if err != nil {
-				return UnpackResult{}, errors.New(err, "TarInstaller: creating file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+				return UnpackResult{}, goerrors.Join(err, errors.New("TarInstaller: creating file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs)))
 			}
 
 			// Using common.Copy instead of io.Copy so that we can
@@ -454,7 +454,7 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 				// Using common.MkdirAll instead of os.MkdirAll so that we can
 				// mock it in tests.
 				if err := common.MkdirAll(abs, mode.Perm()&0770); err != nil {
-					return UnpackResult{}, errors.New(err, "TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+					return UnpackResult{}, goerrors.Join(err, errors.New("TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs)))
 				}
 			} else if err != nil {
 				return UnpackResult{}, errors.New(err, "TarInstaller: stat() directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
@@ -462,7 +462,7 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 				// directory already exists, set the appropriate permissions
 				err = os.Chmod(abs, mode.Perm()&0770)
 				if err != nil {
-					return UnpackResult{}, errors.New(err, fmt.Sprintf("TarInstaller: setting permissions %O for directory %q", mode.Perm()&0770, abs), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs))
+					return UnpackResult{}, goerrors.Join(err, errors.New("TarInstaller: setting permissions %O for directory %q", mode.Perm()&0770, abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs)))
 				}
 			}
 		default:
