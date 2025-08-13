@@ -6,6 +6,7 @@ source .buildkite/scripts/steps/fleet.sh
 
 STACK_VERSION="$(jq -r '.version' .package-version)"
 STACK_BUILD_ID="$(jq -r '.stack_build_id' .package-version)"
+ESS_REGION="${ESS_REGION:-gcp-us-west2}"
 
 ess_up "$STACK_VERSION" "$STACK_BUILD_ID" "$ESS_REGION"
 
