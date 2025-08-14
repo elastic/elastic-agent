@@ -128,6 +128,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor v0.130.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.130.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.130.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver v0.130.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.130.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.130.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver v0.130.0
@@ -505,7 +506,6 @@ require (
 	github.com/mitchellh/mapstructure v1.5.1-0.20231216201459-8508981c8b6c // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
-	github.com/moby/go-archive v0.1.0 // indirect
 	github.com/moby/locker v1.0.1 // indirect
 	github.com/moby/spdystream v0.5.0 // indirect
 	github.com/moby/sys/mountinfo v0.7.2 // indirect
@@ -528,6 +528,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/aws/ecsutil v0.130.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.130.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.130.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/docker v0.130.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/exp/metrics v0.130.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/filter v0.130.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/gopsutilenv v0.130.0 // indirect

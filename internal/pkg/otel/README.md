@@ -35,6 +35,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+| [dockerstatsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/dockerstatsreceiver/v0.130.0/receiver/dockerstatsreceiver/README.md) | v0.130.0 |
 | [elasticapmintakereceiver](https://github.com/elastic/opentelemetry-collector-components/blob/receiver/elasticapmintakereceiver/v0.2.0/receiver/elasticapmintakereceiver/README.md) | v0.2.0 |
 | [filelogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/filelogreceiver/v0.130.0/receiver/filelogreceiver/README.md) | v0.130.0 |
 | [hostmetricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/hostmetricsreceiver/v0.130.0/receiver/hostmetricsreceiver/README.md) | v0.130.0 |
