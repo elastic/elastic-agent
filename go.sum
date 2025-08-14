@@ -1165,7 +1165,6 @@ github.com/open-telemetry/opamp-go v0.19.1-0.20250423191708-8d78a5169350 h1:W+Dz
 github.com/open-telemetry/opamp-go v0.19.1-0.20250423191708-8d78a5169350/go.mod h1:/ks8JtVfx2wtZINPRTp/IxaGoMFAB6Uberx1Jcaur6M=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.129.0 h1:umTGxmLosj0DzNopkL8tqTLqQFDo6P91UcZR66QBkDI=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.129.0/go.mod h1:bICNqDxGxJIwEcNXbCKP3tQGdX13BKdt8SjpZuDbqV4=
-github.com/open-telemetry/opentelemetry-collector-contrib/connector/signaltometricsconnector v0.129.0/go.mod h1:VO1ZGJfJBbwY2C3mAuQvRMmM+FZCsGOmFOz68iJ48jI=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/signaltometricsconnector v0.130.0 h1:XBWumNqTjEEhAgr9lyHmPiUaj8O1nTPzP45QYgdKCiw=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/signaltometricsconnector v0.130.0/go.mod h1:yEa+asy2WzO19ApEgF6zKZz79xyXPfrfYFomoKJPulI=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.129.0 h1:vO0qgtI55j4tCKzuIEu+IW1b8MUjnwMKKefcIlB/Fto=
