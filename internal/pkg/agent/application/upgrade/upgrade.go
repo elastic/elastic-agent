@@ -387,7 +387,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		versionedHome: currentVersionedHome,
 	}
 
-	if err := markUpgrade(u.log,
+	if err := markUpgradeFunc(u.log,
 		paths.Data(), // data dir to place the marker in
 		current,      // new agent version data
 		previous,     // old agent version data
