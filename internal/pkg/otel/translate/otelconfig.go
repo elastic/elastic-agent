@@ -23,6 +23,7 @@ import (
 	"github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/config"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -397,7 +398,7 @@ func getDefaultDatastreamTypeForComponent(comp *component.Component) (string, er
 
 // translateEsOutputToExporter translates an elasticsearch output configuration to an elasticsearch exporter configuration.
 func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
-	esConfig, err := elasticsearchtranslate.ToOTelConfig(cfg)
+	esConfig, err := elasticsearchtranslate.ToOTelConfig(cfg, logp.NewLogger(""))
 	if err != nil {
 		return nil, err
 	}
