@@ -579,7 +579,7 @@ var copyRunDirectoryFunc = copyRunDirectory // abstraction for testability
 func copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error {
 	log.Infow("Copying run directory", "new_run_path", newRunPath, "old_run_path", oldRunPath)
 
-	if err := os.MkdirAll(newRunPath, runDirMod); err != nil {
+	if err := common.MkdirAll(newRunPath, runDirMod); err != nil {
 		return fmt.Errorf("failed to create run directory: %w", err)
 	}
 
