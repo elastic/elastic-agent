@@ -319,7 +319,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, errors.New("unknown hash")
 	}
 
-	if err := copyActionStore(u.log, newHome); err != nil {
+	if err := copyActionStoreFunc(u.log, newHome); err != nil {
 		return nil, errors.New(err, "failed to copy action store")
 	}
 
