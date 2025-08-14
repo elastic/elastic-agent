@@ -566,7 +566,7 @@ func copyActionStore(log *logger.Logger, newHome string) error {
 			return err
 		}
 
-		if err := os.WriteFile(newActionStorePath, currentActionStore, 0o600); err != nil {
+		if err := common.WriteFile(newActionStorePath, currentActionStore, 0o600); err != nil {
 			return err
 		}
 	}
