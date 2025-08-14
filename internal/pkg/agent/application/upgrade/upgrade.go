@@ -241,6 +241,20 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
+	cleanupPaths := []string{}
+	defer func() {
+		if err != nil {
+			// If there is an error, we need to clean up downloads and any
+			// extracted agent files.
+			for _, path := range cleanupPaths {
+				rmErr := os.RemoveAll(path)
+				if rmErr != nil {
+					u.log.Errorw("error removing path during upgrade cleanup", "error.message", rmErr, "path", path)
+					err = goerrors.Join(err, rmErr)
+				}
+			}
+		}
+	}()
 
 	defer func() {
 		if err != nil {
