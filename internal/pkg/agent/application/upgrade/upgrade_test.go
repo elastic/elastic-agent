@@ -8,6 +8,8 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,6 +28,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -38,6 +41,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
+	"github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/info"
 	mocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
 )
 
@@ -1364,4 +1368,117 @@ func createArchive(t *testing.T, archiveName string, archiveFiles []files) (stri
 		return createZipArchive(t, archiveName, archiveFiles)
 	}
 	return createTarArchive(t, archiveName, archiveFiles)
+}
+
+func TestUpgradeMarkUpgradeError(t *testing.T) {
+	log, _ := loggertest.New("test")
+
+	initialVersion := agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")
+	initialArchiveName, initialArchiveFiles := buildArchiveFiles(t, archiveFilesWithMoreComponents, initialVersion, "abcdef")
+
+	targetVersion := agtversion.NewParsedSemVer(3, 4, 5, "SNAPSHOT", "")
+	targetArchiveName, targetArchiveFiles := buildArchiveFiles(t, archiveFilesWithMoreComponents, targetVersion, "ghijkl")
+
+	mockAgentInfo := info.NewAgent(t)
+	mockAgentInfo.On("Version").Return(targetVersion.String())
+
+	upgradeDetails := details.NewDetails(targetVersion.String(), details.StateRequested, "test")
+
+	tempUnpacker, err := NewUpgrader(log, &artifact.Config{}, mockAgentInfo) // used only to unpack the initial archive
+	require.NoError(t, err)
+
+	type testCase struct {
+		markUpgradeError error
+		expectedError    error
+	}
+
+	genericError := errors.New("test mark upgrade error")
+
+	testCases := map[string]testCase{
+		"should return generic error if mark upgrade fails": {
+			markUpgradeError: genericError,
+			expectedError:    genericError,
+		},
+	}
+	for _, te := range upgradeErrors.OS_DiskSpaceErrors {
+		testCases[fmt.Sprintf("should return disk space error if mark upgrade fails with disk space error: %v", te)] = testCase{
+			markUpgradeError: te,
+			expectedError:    upgradeErrors.ErrInsufficientDiskSpace,
+		}
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			baseDir := t.TempDir()
+			paths.SetTop(baseDir)
+
+			initialArchive, err := createArchive(t, initialArchiveName, initialArchiveFiles)
+			require.NoError(t, err)
+
+			t.Logf("Created archive: %s", initialArchive)
+
+			initialUnpackRes, err := tempUnpacker.unpack(initialVersion.String(), initialArchive, paths.Data(), "")
+			require.NoError(t, err)
+
+			paths.SetDownloads(filepath.Join(baseDir, initialUnpackRes.VersionedHome, "downloads")) // ensure the upgrader uses a predictable path for downloads
+
+			// The archive file list does not contain the action store files, so we need to
+			// create them
+			actionStorePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile()}
+			for _, path := range actionStorePaths {
+				err := os.MkdirAll(filepath.Dir(path), 0o700)
+				require.NoError(t, err, "error creating directory %s", filepath.Dir(path))
+
+				err = os.WriteFile(path, []byte(fmt.Sprintf("initial agent %s content", filepath.Base(path))), 0o600)
+				require.NoError(t, err, "error writing to %s", path)
+			}
+
+			// Create several files in the initial run path and save their paths in an array.
+			initialRunPath := paths.Run()
+			require.NoError(t, os.MkdirAll(initialRunPath, 0o755))
+
+			for i := 0; i < 3; i++ {
+				filePath := filepath.Join(initialRunPath, fmt.Sprintf("file%d.txt", i))
+				err := os.WriteFile(filePath, []byte(fmt.Sprintf("content for file %d", i)), 0o600)
+				require.NoError(t, err)
+			}
+
+			targetArchive, err := createArchive(t, targetArchiveName, targetArchiveFiles)
+			require.NoError(t, err)
+
+			t.Logf("Created archive: %s", targetArchive)
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.ServeFile(w, r, targetArchive)
+			}))
+			t.Cleanup(server.Close)
+
+			config := artifact.Config{
+				TargetDirectory:        paths.Downloads(),
+				SourceURI:              server.URL,
+				RetrySleepInitDuration: 1 * time.Second,
+				HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+					Timeout: 1 * time.Second,
+				},
+			}
+
+			tmpMarkUpgradeFunc := markUpgradeFunc
+			t.Cleanup(func() {
+				markUpgradeFunc = tmpMarkUpgradeFunc
+			})
+
+			mockCalled := false // this is used to assert that the mock was called
+			markUpgradeFunc = func(log *logger.Logger, dataDirPath string, agent agentInstall, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, desiredOutcome UpgradeOutcome) error {
+				mockCalled = true
+				return tc.markUpgradeError
+			}
+
+			upgrader, err := NewUpgrader(log, &config, mockAgentInfo)
+			require.NoError(t, err)
+
+			_, err = upgrader.Upgrade(context.Background(), targetVersion.String(), server.URL, nil, upgradeDetails, true, true)
+			require.True(t, mockCalled, "markUpgradeFunc was not called")
+			require.ErrorIs(t, err, tc.expectedError, "expected error mismatch")
+		})
+	}
 }
