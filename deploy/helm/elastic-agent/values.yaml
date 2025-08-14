@@ -300,7 +300,6 @@ kubernetes:
       # -- system metric stream vars
       # @section -- 2 - Kubernetes integration
       vars: {}
-
 autoOps:
   enabled: false
   autoops_token: ""
@@ -312,7 +311,6 @@ autoOps:
   es_api_key: ""
   cloud_connected_mode_api_key: ""
   cloud_connected_mode_api_url: ""
-
 system:
   # -- enable System integration.
   # @section -- 4 - System integration
@@ -551,7 +549,6 @@ agent:
         create: false
       nodeSelector:
         kubernetes.io/os: linux
-
 kube-state-metrics:
   enabled: true
   fullnameOverride: "kube-state-metrics"
