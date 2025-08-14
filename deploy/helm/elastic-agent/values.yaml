@@ -302,10 +302,7 @@ kubernetes:
       vars: {}
 
 autoOps:
-  # -- enable autoOps integration
-  # @section -- 3 - AutoOps integration
   enabled: false
-
   autoops_token: ""
   autoops_es_url: ""
   es_password: ""

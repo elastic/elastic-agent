@@ -331,7 +331,7 @@
                 }
             }
         },
-        "auto_ops": {
+        "autoOps": {
             "type": "object",
             "description": "Configuration for AutoOps integration.",
             "properties": {
@@ -341,13 +341,36 @@
                 },
                 "autoops_token": {
                     "type": "string",
-                    "description": "..."
+                    "description": "Token to register into AutOps"
                 },
-                "autoops_es_url": {
+                "autoops_otel_url": {
+                    "type": "string",
+                    "description": "Otel server URL"
+                },
+                "autoops_temp_resource_id": {
                     "type": "string",
                     "description": "..."
+                },
+                "es_password": {
+                    "type": "string",
+                    "description": "Monitored ES cluster password"
+                },
+                "es_username": {
+                    "type": "string",
+                    "description": "Monitored ES cluster username"
+                },
+                "es_api_key": {
+                    "type": "string",
+                    "description": "Monitored ES cluster api key"
+                },
+                "elastic_cloud_connected_mode_api_key": {
+                    "type": "string",
+                    "description": "Cloud connected api key"
+                },
+                "elastic_cloud_connected_mode_api_url": {
+                    "type": "string",
+                    "description": "Cloud connected api url"
                 }
-                ....
             }
         },
         "extraIntegrations": {
