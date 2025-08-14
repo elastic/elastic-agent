@@ -7,6 +7,7 @@
 {{- include "elasticagent.preset.mutate.envs" (list $presetVal $autoOpsEnvVars)}}
 {{- end -}}
 {{- end -}}
+
 {{- define "elasticagent.autoops.config" -}}
 receivers:
   metricbeatreceiver:
@@ -57,44 +58,68 @@ service:
       encoding: json
 {{- end -}}
 
-{{- define "elasticagent.autoops.envVars" }}
-{{- $presetName := "autoOps" }}
-{{- $agentName := include "elasticagent.preset.fullname" (list $ $presetName) }}
+{{- define "elasticagent.autoops.envVars" -}}
+{{- $presetName := "autoOps" -}}
+{{- $agentName := include "elasticagent.preset.fullname" (list $ $presetName) -}}
 extraEnvs:
+  # Always present
   - name: AUTOOPS_TOKEN
     valueFrom:
       secretKeyRef:
         name: {{ $agentName }}-autoops
         key: autoops-token
+
   - name: AUTOOPS_TEMP_RESOURCE_ID
     valueFrom:
       secretKeyRef:
         name: {{ $agentName }}-autoops
         key: temp-resource-id
+
   - name: AUTOOPS_OTEL_URL
     valueFrom:
       secretKeyRef:
         name: {{ $agentName }}-autoops
         key: otel-url
+
   - name: AUTOOPS_ES_URL
     valueFrom:
       secretKeyRef:
         name: {{ $agentName }}-autoops
         key: autoops-es-url
+
+  # Only if API key provided
+  {{- if $.Values.autoOps.es_api_key }}
   - name: ELASTICSEARCH_READ_API_KEY
     valueFrom:
       secretKeyRef:
         name: {{ $agentName }}-autoops
         key: es-api-key
+  {{- end }}
+
+  # Only if BOTH username & password provided
+  {{- if and $.Values.autoOps.es_username $.Values.autoOps.es_password }}
+  - name: ELASTICSEARCH_READ_USERNAME
+    valueFrom:
+      secretKeyRef:
+        name: {{ $agentName }}-autoops
+        key: es-username
+  - name: ELASTICSEARCH_READ_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: {{ $agentName }}-autoops
+        key: es-password
+  {{- end }}
+
   - name: ELASTIC_CLOUD_CONNECTED_MODE_API_KEY
     valueFrom:
       secretKeyRef:
         name: {{ $agentName }}-autoops
         key: cloud-connected-mode-api-key
+
   - name: ELASTIC_CLOUD_CONNECTED_MODE_API_URL
     valueFrom:
       secretKeyRef:
         name: {{ $agentName }}-autoops
         key: cloud-connected-mode-api-url
         optional: true
-{{- end }}
+{{- end -}}

@@ -331,6 +331,36 @@
                 }
             }
         },
+        "auto_ops": {
+            "type": "object",
+            "description": "Configuration for AutoOps integration.",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Enable AutoOps integration."
+                },
+                "config": {
+                    "type": "string",
+                    "description": "AutoOps OTEL configuration file."
+                },
+                "envVars": {
+                    "type": "array",
+                    "items": {
+                        "type": "object"
+                    },
+                    "description": "AutoOps environment variables for configuration",
+                    "examples": [
+                        [
+                            {
+                                "name": "ENV_VAR_NAME",
+                                "value": "value"
+                            }
+                        ]
+                    ]
+
+                }
+            }
+        },
         "extraIntegrations": {
             "type": "object",
             "description": "Configuration for extra integrations.",

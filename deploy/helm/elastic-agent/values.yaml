@@ -308,6 +308,8 @@ autoOps:
 
   autoops_token: ""
   autoops_es_url: ""
+  es_password: ""
+  es_username: ""
   temp_resource_id: ""
   otel_url: ""
   es_api_key: ""
