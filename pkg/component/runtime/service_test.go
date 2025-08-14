@@ -372,6 +372,10 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 func mockEndpointBinary(t *testing.T, exitCode int) string {
 	// Build a mock Endpoint binary that can return a specific exit code.
 	outPath := filepath.Join(t.TempDir(), "mock_endpoint")
+	if runtime.GOOS == "windows" {
+		outPath += ".exe"
+	}
+
 	cmd := exec.Command(
 		"go", "build",
 		"-o", outPath,
