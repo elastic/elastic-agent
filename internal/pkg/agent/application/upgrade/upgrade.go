@@ -295,6 +295,20 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 	u.log.Debugf("detected used flavor: %q", detectedFlavor)
 	unpackRes, err := u.unpack(version, archivePath, paths.Data(), detectedFlavor)
+
+	// If VersionedHome is empty then unpack has not started unpacking the
+	// archive yet. There's nothing to clean up. Return the error.
+	if unpackRes.VersionedHome == "" {
+		return nil, goerrors.Join(err, fmt.Errorf("versionedhome is empty: %v", unpackRes))
+	}
+
+	// If VersionedHome is not empty, it means that the unpack function has
+	// started extracting the archive. It may have failed while extracting.
+	// Setup newHome to be cleanedup.
+	newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome)
+
+	cleanupPaths = append(cleanupPaths, newHome)
+
 	if err != nil {
 		return nil, err
 	}
@@ -303,12 +317,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	if newHash == "" {
 		return nil, errors.New("unknown hash")
 	}
-
-	if unpackRes.VersionedHome == "" {
-		return nil, fmt.Errorf("versionedhome is empty: %v", unpackRes)
-	}
-
-	newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome)
 
 	if err := copyActionStore(u.log, newHome); err != nil {
 		return nil, errors.New(err, "failed to copy action store")
