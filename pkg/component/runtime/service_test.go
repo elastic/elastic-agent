@@ -302,6 +302,8 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 	endpoint.InputSpec.BinaryPath = mockEndpointBinary(t, nonFatalExitCode)
 	endpoint.InputSpec.BinaryName = "endpoint"
 
+	t.Logf("mock binary path: %s\n", endpoint.InputSpec.BinaryPath)
+
 	// Create new service runtime with component
 	service, err := newServiceRuntime(endpoint, log, true)
 	require.NoError(t, err)
