@@ -18,6 +18,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 
 	"go.elastic.co/apm/v2"
 	apmtransport "go.elastic.co/apm/v2/transport"
@@ -194,6 +195,15 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override ap
 	isRoot, err := utils.HasRoot()
 	if err != nil {
 		return logReturn(l, fmt.Errorf("failed to check for root/Administrator privileges: %w", err))
+	}
+
+	// fix permissions
+	if isRoot {
+		topPath := paths.Top()
+		err = perms.FixPermissions(topPath)
+		if err != nil {
+			return fmt.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
+		}
 	}
 
 	l.Infow("Elastic Agent started",

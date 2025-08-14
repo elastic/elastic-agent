@@ -5,6 +5,7 @@
 package monitoring
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"maps"
@@ -27,6 +28,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -103,6 +105,30 @@ type componentInfo struct {
 
 type monitoringConfig struct {
 	C *monitoringCfg.MonitoringConfig `config:"agent.monitoring"`
+}
+
+func GetMonitoringFn(ctx context.Context, cfg map[string]interface{}) (func(
+	policy map[string]interface{},
+	components []component.Component,
+	componentIDPidMap map[string]uint64,
+) (map[string]interface{}, error), error) {
+	config, err := config.NewConfigFrom(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	agentCfg := configuration.DefaultConfiguration()
+	if err := config.UnpackTo(agentCfg); err != nil {
+		return nil, err
+	}
+
+	agentInfo, err := info.NewAgentInfoWithLog(ctx, "error", false)
+	if err != nil {
+		return nil, fmt.Errorf("could not load agent info: %w", err)
+	}
+
+	monitor := New(agentCfg.Settings.V1MonitoringEnabled, agentCfg.Settings.DownloadConfig.OS(), agentCfg.Settings.MonitoringConfig, agentInfo)
+	return monitor.MonitoringConfig, nil
 }
 
 // New creates a new BeatsMonitor instance.
