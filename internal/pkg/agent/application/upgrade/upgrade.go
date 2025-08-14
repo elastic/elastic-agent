@@ -307,6 +307,15 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	archivePath, err := u.artifactDownloader.downloadArtifact(ctx, parsedVersion, sourceURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+
+	// If the artifactPath is not empty, then the artifact was downloaded.
+	// There may still be an error in the download process, so we need to add
+	// the archive and hash path to the cleanup slice.
+	if archivePath != "" {
+		archiveHashPath := archivePath + ".sha512"
+		cleanupPaths = append(cleanupPaths, archivePath, archiveHashPath)
+	}
+
 	if err != nil {
 		// Run the same pre-upgrade cleanup task to get rid of any newly downloaded files
 		// This may have an issue if users are upgrading to the same version number.
