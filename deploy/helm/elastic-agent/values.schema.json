@@ -339,26 +339,15 @@
                     "type": "boolean",
                     "description": "Enable AutoOps integration."
                 },
-                "config": {
+                "autoops_token": {
                     "type": "string",
-                    "description": "AutoOps OTEL configuration file."
+                    "description": "..."
                 },
-                "envVars": {
-                    "type": "array",
-                    "items": {
-                        "type": "object"
-                    },
-                    "description": "AutoOps environment variables for configuration",
-                    "examples": [
-                        [
-                            {
-                                "name": "ENV_VAR_NAME",
-                                "value": "value"
-                            }
-                        ]
-                    ]
-
+                "autoops_es_url": {
+                    "type": "string",
+                    "description": "..."
                 }
+                ....
             }
         },
         "extraIntegrations": {
