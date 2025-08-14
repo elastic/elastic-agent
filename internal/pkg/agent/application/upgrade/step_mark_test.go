@@ -12,8 +12,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/common"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 func TestSaveAndLoadMarker_NoLoss(t *testing.T) {
@@ -257,6 +260,71 @@ desired_outcome: true
 			// Clean up
 			err = os.Remove(markerFile)
 			require.NoError(t, err, "Failed to clean up marker file")
+		})
+	}
+}
+
+// Test asserting that errors from os.WriteFile are wrapped and returned
+func TestMarkUpgradeWriteFileError(t *testing.T) {
+	log, _ := loggertest.New("test")
+	agent := agentInstall{
+		version:       "8.5.0",
+		hash:          "abc123",
+		versionedHome: "home/v8.5.0",
+	}
+	previousAgent := agentInstall{
+		version:       "8.4.0",
+		hash:          "xyz789",
+		versionedHome: "home/v8.4.0",
+	}
+	action := &fleetapi.ActionUpgrade{
+		ActionID:   "action-123",
+		ActionType: "UPGRADE",
+		Data: fleetapi.ActionUpgradeData{
+			Version:   "8.5.0",
+			SourceURI: "https://example.com/upgrade",
+		},
+	}
+	upgradeDetails := details.NewDetails("8.5.0", details.StateScheduled, "action-123")
+	desiredOutcome := OUTCOME_UPGRADE
+
+	type testCase struct {
+		fileName      string
+		expectedError error
+	}
+
+	testCases := map[string]testCase{
+		"should return error if it fails writing to top dir": {
+			fileName:      "commit",
+			expectedError: os.ErrPermission,
+		},
+		"should return error if it fails writing to data dir": {
+			fileName:      "marker",
+			expectedError: os.ErrPermission,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			baseDir := t.TempDir()
+			paths.SetTop(baseDir)
+
+			markerPath := markerFilePath(paths.Data())
+
+			setStdlibMock := common.PrepareStdLibMocks(common.StdLibMocks{
+				WriteFileMock: func(name string, data []byte, perm os.FileMode) error {
+					if tc.fileName == "marker" && name == markerPath {
+						return tc.expectedError
+					}
+					return tc.expectedError
+				},
+			})
+
+			setStdlibMock(t, common.WriteFileFuncName)
+
+			err := markUpgrade(log, paths.Data(), agent, previousAgent, action, upgradeDetails, desiredOutcome)
+			require.Error(t, err)
+			require.ErrorIs(t, err, os.ErrPermission)
 		})
 	}
 }
