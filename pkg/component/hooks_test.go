@@ -399,7 +399,7 @@ func TestHookDefinition_GetStringSliceArg(t *testing.T) {
 func TestHookDefinition_GetArgMethods_Integration(t *testing.T) {
 	// Test with realistic hook arguments
 	hd := &HookDefinition{
-		Type: "fix-permissions",
+		Type: "apply-permissions",
 		Args: map[string]interface{}{
 			"path":                   "/opt/elastic/agent",
 			"mask":                   755,
@@ -463,7 +463,7 @@ func TestComponentHooks_GetHooks(t *testing.T) {
 	// Setup test hooks
 	preRunHooks := []HookDefinition{
 		{
-			Type: "fix-permissions",
+			Type: "apply-permissions",
 			Args: map[string]interface{}{
 				"path": "/opt/elastic/pre",
 				"mask": 755,
@@ -477,19 +477,8 @@ func TestComponentHooks_GetHooks(t *testing.T) {
 		},
 	}
 
-	postRunHooks := []HookDefinition{
-		{
-			Type: "backup",
-			Args: map[string]interface{}{
-				"source":      "/data",
-				"destination": "/backup",
-			},
-		},
-	}
-
 	componentHooks := &ComponentHooks{
-		PreRun:  preRunHooks,
-		PostRun: postRunHooks,
+		PreRun: preRunHooks,
 	}
 
 	testCases := []struct {
@@ -546,7 +535,7 @@ func TestComponentHooks_GetHooks_Integration(t *testing.T) {
 	componentHooks := &ComponentHooks{
 		PreRun: []HookDefinition{
 			{
-				Type: "fix-permissions",
+				Type: "apply-permissions",
 				Args: map[string]interface{}{
 					"path":                "/opt/elastic/filebeat",
 					"mask":                755,
@@ -564,7 +553,7 @@ func TestComponentHooks_GetHooks_Integration(t *testing.T) {
 	assert.Len(t, preRunHooks, 1)
 
 	hook := preRunHooks[0]
-	assert.Equal(t, "fix-permissions", hook.Type)
+	assert.Equal(t, "apply-permissions", hook.Type)
 
 	// Verify we can extract arguments correctly
 	path, ok := hook.GetStringArg("path")
@@ -578,6 +567,138 @@ func TestComponentHooks_GetHooks_Integration(t *testing.T) {
 	targetOS, ok := hook.GetStringSliceArg("target_os")
 	assert.True(t, ok)
 	assert.Equal(t, []string{"linux", "darwin"}, targetOS)
+}
+
+func TestComponentHooks_Validate(t *testing.T) {
+	testCases := []struct {
+		name        string
+		hooks       ComponentHooks
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "valid hooks",
+			hooks: ComponentHooks{
+				PreRun: []HookDefinition{
+					{
+						Type: HookTypeApplyPermissions,
+						Args: map[string]interface{}{
+							"path": "/opt/elastic",
+							"mask": 0755,
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "multiple valid hooks",
+			hooks: ComponentHooks{
+				PreRun: []HookDefinition{
+					{
+						Type: HookTypeApplyPermissions,
+						Args: map[string]interface{}{
+							"path": "/opt/elastic",
+						},
+					},
+					{
+						Type: HookTypeApplyPermissions,
+						Args: map[string]interface{}{
+							"path": "/var/log/elastic",
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "empty hook type",
+			hooks: ComponentHooks{
+				PreRun: []HookDefinition{
+					{
+						Type: "",
+						Args: map[string]interface{}{
+							"path": "/opt/elastic",
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorMsg:    "hook at index 0 in pre-run has empty type",
+		},
+		{
+			name: "invalid hook type",
+			hooks: ComponentHooks{
+				PreRun: []HookDefinition{
+					{
+						Type: "unknown-hook-type",
+						Args: map[string]interface{}{
+							"path": "/opt/elastic",
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorMsg:    "unknown hook type 'unknown-hook-type' at index 0 in pre-run",
+		},
+		{
+			name: "multiple validation errors",
+			hooks: ComponentHooks{
+				PreRun: []HookDefinition{
+					{
+						Type: "",
+						Args: map[string]interface{}{
+							"path": "/opt/elastic",
+						},
+					},
+					{
+						Type: "invalid-type",
+						Args: map[string]interface{}{
+							"path": "/var/log",
+						},
+					},
+				},
+			},
+			expectError: true,
+			errorMsg:    "hook at index 0 in pre-run has empty type; unknown hook type 'invalid-type' at index 1 in pre-run",
+		},
+		{
+			name: "no hooks defined",
+			hooks: ComponentHooks{
+				PreRun: []HookDefinition{},
+			},
+			expectError: false,
+		},
+		{
+			name:        "nil hooks",
+			hooks:       ComponentHooks{},
+			expectError: false,
+		},
+		{
+			name: "hook with no args",
+			hooks: ComponentHooks{
+				PreRun: []HookDefinition{
+					{
+						Type: HookTypeApplyPermissions,
+					},
+				},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.hooks.Validate()
+
+			if tc.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errorMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
 
 func TestInjectComponentsPath(t *testing.T) {

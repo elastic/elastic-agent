@@ -23,6 +23,7 @@ type opts struct {
 
 type OptFunc func(o *opts)
 
+// WithInherit adjusts permission inheritance for FixPermissions.
 func WithInherit(inherit bool) OptFunc {
 	return func(o *opts) {
 		o.inherit = inherit

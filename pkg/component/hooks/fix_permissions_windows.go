@@ -17,7 +17,7 @@ import (
 )
 
 func FixPermissions(path string, inheritPermissions bool, username string, groupname string, failOnNotExist bool, mask int) error {
-	//         - hook_type: "fix-permissions"
+	//         - hook_type: "apply-permissions"
 	//           args:
 	//             path: "/opt/elastic/metricbeat" // relative paths will be prefixed with components path
 	//			   target_os: [windows]

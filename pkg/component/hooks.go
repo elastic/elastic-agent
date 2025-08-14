@@ -22,11 +22,11 @@ const (
 
 // Hook types
 const (
-	HookTypeFixPermissions = "fix-permissions"
+	HookTypeApplyPermissions = "apply-permissions"
 )
 
 var supportedHooks = []string{
-	HookTypeFixPermissions,
+	HookTypeApplyPermissions,
 }
 
 // HookDefinition defines a single hook with its type and arguments
@@ -37,8 +37,7 @@ type HookDefinition struct {
 
 // ComponentHooks defines all hooks for a component organized by execution point
 type ComponentHooks struct {
-	PreRun  []HookDefinition `config:"pre_run,omitempty" yaml:"pre_run,omitempty" json:"pre_run,omitempty"`
-	PostRun []HookDefinition `config:"post_run,omitempty" yaml:"post_run,omitempty" json:"post_run,omitempty"`
+	PreRun []HookDefinition `config:"pre_run,omitempty" yaml:"pre_run,omitempty" json:"pre_run,omitempty"`
 }
 
 // GetHooks returns hooks for a specific execution point
@@ -88,7 +87,7 @@ func (c *ComponentHooks) Validate() error {
 // Run executes the hook with its arguments
 func (hd *HookDefinition) Run() error {
 	switch hd.Type {
-	case HookTypeFixPermissions:
+	case HookTypeApplyPermissions:
 		return hd.fixPermissions()
 	default:
 		return fmt.Errorf("unknown hook type: %s", hd.Type)
@@ -196,7 +195,7 @@ func (hd *HookDefinition) fixPermissions() error {
 	// example yaml:
 	//     hooks:
 	//       pre_run:
-	//         - hook_type: "fix-permissions"
+	//         - hook_type: "apply-permissions"
 	//           args:
 	//             path: "/opt/elastic/metricbeat" // relative paths will be prefixed with components path
 	//			   target_os: [windows]
