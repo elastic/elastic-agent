@@ -8,7 +8,7 @@ function ess_up() {
   local STACK_VERSION=$1
   local STACK_BUILD_ID=${2:-""}
   local ESS_REGION=${3:-"gcp-us-west2"}
-
+    
   if [ -z "$STACK_VERSION" ]; then
     echo "Error: Specify stack version: ess_up [stack_version]" >&2
     return 1
@@ -17,9 +17,8 @@ function ess_up() {
   BUILDKITE_BUILD_CREATOR="${BUILDKITE_BUILD_CREATOR:-"$(get_git_user_email)"}"
   BUILDKITE_BUILD_NUMBER="${BUILDKITE_BUILD_NUMBER:-"0"}"
   BUILDKITE_PIPELINE_SLUG="${BUILDKITE_PIPELINE_SLUG:-"elastic-agent-integration-tests"}"
-
-  export TF_LOG=DEBUG
-  pushd "${TF_DIR}"
+  
+  pushd "${TF_DIR}"    
   terraform init
   terraform apply \
     -auto-approve \
