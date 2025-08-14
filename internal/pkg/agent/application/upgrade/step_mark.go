@@ -6,6 +6,7 @@ package upgrade
 
 import (
 	"encoding/json"
+	goerrors "errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -224,7 +225,7 @@ func markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent ag
 	markerPath := markerFilePath(dataDirPath)
 	log.Infow("Writing upgrade marker file", "file.path", markerPath, "hash", marker.Hash, "prev_hash", marker.PrevHash)
 	if err := os.WriteFile(markerPath, markerBytes, 0600); err != nil {
-		return errors.New(err, errors.TypeFilesystem, "failed to create update marker file", errors.M(errors.MetaKeyPath, markerPath))
+		return goerrors.Join(err, errors.New(errors.TypeFilesystem, "failed to create update marker file", errors.M(errors.MetaKeyPath, markerPath)))
 	}
 
 	if err := UpdateActiveCommit(log, paths.Top(), agent.hash); err != nil {
@@ -239,7 +240,7 @@ func UpdateActiveCommit(log *logger.Logger, topDirPath, hash string) error {
 	activeCommitPath := filepath.Join(topDirPath, agentCommitFile)
 	log.Infow("Updating active commit", "file.path", activeCommitPath, "hash", hash)
 	if err := os.WriteFile(activeCommitPath, []byte(hash), 0600); err != nil {
-		return errors.New(err, errors.TypeFilesystem, "failed to update active commit", errors.M(errors.MetaKeyPath, activeCommitPath))
+		return goerrors.Join(err, errors.New(errors.TypeFilesystem, "failed to update active commit", errors.M(errors.MetaKeyPath, activeCommitPath)))
 	}
 
 	return nil
