@@ -20,6 +20,7 @@ const (
 	OpenFileFuncName  MockStdLibFuncName = "openFile"
 	MkdirAllFuncName  MockStdLibFuncName = "mkdirAll"
 	WriteFileFuncName MockStdLibFuncName = "writeFile"
+	ReadFileFuncName  MockStdLibFuncName = "readFile"
 )
 
 type StdLibMocks struct {
@@ -27,6 +28,7 @@ type StdLibMocks struct {
 	OpenFileMock  func(name string, flag int, perm os.FileMode) (*os.File, error)
 	MkdirAllMock  func(path string, perm os.FileMode) error
 	WriteFileMock func(name string, data []byte, perm os.FileMode) error
+	ReadFileMock  func(name string) ([]byte, error)
 }
 
 // PrepareStdLibMocks is a helper function that can be used to mock the stdlib
@@ -37,6 +39,7 @@ func PrepareStdLibMocks(mocks StdLibMocks) func(t *testing.T, funcName MockStdLi
 		OpenFileFuncName:  func(t *testing.T) { setMock(t, &OpenFile, mocks.OpenFileMock) },
 		MkdirAllFuncName:  func(t *testing.T) { setMock(t, &MkdirAll, mocks.MkdirAllMock) },
 		WriteFileFuncName: func(t *testing.T) { setMock(t, &WriteFile, mocks.WriteFileMock) },
+		ReadFileFuncName:  func(t *testing.T) { setMock(t, &ReadFile, mocks.ReadFileMock) },
 	}
 
 	return func(t *testing.T, funcName MockStdLibFuncName) {

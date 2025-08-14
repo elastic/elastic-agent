@@ -14,3 +14,4 @@ var Copy = io.Copy
 var OpenFile = os.OpenFile
 var MkdirAll = os.MkdirAll
 var WriteFile = os.WriteFile
+var ReadFile = os.ReadFile
