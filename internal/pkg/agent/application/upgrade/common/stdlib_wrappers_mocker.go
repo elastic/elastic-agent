@@ -16,24 +16,27 @@ import (
 type MockStdLibFuncName string
 
 const (
-	CopyFuncName     MockStdLibFuncName = "copy"
-	OpenFileFuncName MockStdLibFuncName = "openFile"
-	MkdirAllFuncName MockStdLibFuncName = "mkdirAll"
+	CopyFuncName      MockStdLibFuncName = "copy"
+	OpenFileFuncName  MockStdLibFuncName = "openFile"
+	MkdirAllFuncName  MockStdLibFuncName = "mkdirAll"
+	WriteFileFuncName MockStdLibFuncName = "writeFile"
 )
 
 type StdLibMocks struct {
-	CopyMock     func(dst io.Writer, src io.Reader) (int64, error)
-	OpenFileMock func(name string, flag int, perm os.FileMode) (*os.File, error)
-	MkdirAllMock func(path string, perm os.FileMode) error
+	CopyMock      func(dst io.Writer, src io.Reader) (int64, error)
+	OpenFileMock  func(name string, flag int, perm os.FileMode) (*os.File, error)
+	MkdirAllMock  func(path string, perm os.FileMode) error
+	WriteFileMock func(name string, data []byte, perm os.FileMode) error
 }
 
 // PrepareStdLibMocks is a helper function that can be used to mock the stdlib
 // wrappers. Replaces the wrapper with the mock and cleans up after the test.
 func PrepareStdLibMocks(mocks StdLibMocks) func(t *testing.T, funcName MockStdLibFuncName) {
 	setters := map[MockStdLibFuncName]func(t *testing.T){
-		CopyFuncName:     func(t *testing.T) { setMock(t, &Copy, mocks.CopyMock) },
-		OpenFileFuncName: func(t *testing.T) { setMock(t, &OpenFile, mocks.OpenFileMock) },
-		MkdirAllFuncName: func(t *testing.T) { setMock(t, &MkdirAll, mocks.MkdirAllMock) },
+		CopyFuncName:      func(t *testing.T) { setMock(t, &Copy, mocks.CopyMock) },
+		OpenFileFuncName:  func(t *testing.T) { setMock(t, &OpenFile, mocks.OpenFileMock) },
+		MkdirAllFuncName:  func(t *testing.T) { setMock(t, &MkdirAll, mocks.MkdirAllMock) },
+		WriteFileFuncName: func(t *testing.T) { setMock(t, &WriteFile, mocks.WriteFileMock) },
 	}
 
 	return func(t *testing.T, funcName MockStdLibFuncName) {
