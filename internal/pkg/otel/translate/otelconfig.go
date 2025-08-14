@@ -166,8 +166,23 @@ func getCollectorConfigForComponent(
 	}
 
 	if extensionConfig != nil {
+		// set extension definition
 		fullConfig["extensions"] = extensionConfig
+
+		// get service map
+		serviceMap := fullConfig["service"].(map[string]any)
+
+		// we need to convert []string to []interface for this to work
+		// this is required because otel's merging logic expects []interface
+		serviceInterface := make([]interface{}, len(maps.Keys(extensionConfig)))
+		for i, v := range maps.Keys(extensionConfig) {
+			serviceInterface[i] = v
+		}
+
+		serviceMap["extensions"] = serviceInterface
 	}
+
+	fmt.Println(confmap.NewFromStringMap(fullConfig))
 	return confmap.NewFromStringMap(fullConfig), nil
 }
 

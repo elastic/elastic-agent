@@ -261,8 +261,9 @@ func TestGetOtelConfig(t *testing.T) {
 				"authenticator": "beatsauth/_agent-component/default",
 			},
 			"tls": map[string]any{
-				"insecure_skip_verify":         false,
 				"include_system_ca_certs_pool": true,
+				"min_version":                  "1.2",
+				"max_version":                  "1.3",
 			},
 		},
 	}
@@ -451,6 +452,7 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 				"service": map[string]any{
+					"extensions": []string{"beatsauth/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/filestream-default": map[string][]string{
 							"exporters": []string{"elasticsearch/_agent-component/default"},
@@ -545,6 +547,7 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 				"service": map[string]any{
+					"extensions": []string{"beatsauth/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
 							"exporters": []string{"elasticsearch/_agent-component/default"},
@@ -650,6 +653,7 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 				"service": map[string]any{
+					"extensions": []string{"beatsauth/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/system-metrics": map[string][]string{
 							"exporters": []string{"elasticsearch/_agent-component/default"},
@@ -939,21 +943,39 @@ func TestBeatsAuthExtension(t *testing.T) {
 	testCases := []struct {
 		name                    string
 		inputSSLConfig          map[string]any
-		expectedESConfig        map[string]any
-		shouldAuthExist         bool
+		expectedES_TLSConfig    map[string]any
 		expectedBeatsAuthConfig map[string]any
+		shouldAuthExist         bool
 	}{
 		{
 			name: "when ssl.enabled is true",
 			inputSSLConfig: map[string]any{
 				"enabled": true,
 			},
-			expectedESConfig: map[string]any{
-				"insecure_skip_verify":         false,
+			expectedES_TLSConfig: map[string]any{
 				"include_system_ca_certs_pool": true,
+				"min_version":                  "1.2",
+				"max_version":                  "1.3",
 			},
 			expectedBeatsAuthConfig: map[string]any{
 				"verification_mode": "full",
+			},
+			shouldAuthExist: true,
+		},
+		{
+			name: "when ca_trusted_fingerprint is set",
+			inputSSLConfig: map[string]any{
+				"verification_mode":      "full",
+				"ca_trusted_fingerprint": "a3:5f:bf:93:12:8f:bc:5c:ab:14:6d:bf:e4:2a:7f:98:9d:2f:16:92:76:c4:12:ab:67:89:fc:56:4b:8e:0c:43",
+			},
+			expectedES_TLSConfig: map[string]any{
+				"include_system_ca_certs_pool": true,
+				"min_version":                  "1.2",
+				"max_version":                  "1.3",
+			},
+			expectedBeatsAuthConfig: map[string]any{
+				"verification_mode":      "full",
+				"ca_trusted_fingerprint": "a3:5f:bf:93:12:8f:bc:5c:ab:14:6d:bf:e4:2a:7f:98:9d:2f:16:92:76:c4:12:ab:67:89:fc:56:4b:8e:0c:43",
 			},
 			shouldAuthExist: true,
 		},
@@ -962,23 +984,13 @@ func TestBeatsAuthExtension(t *testing.T) {
 			inputSSLConfig: map[string]any{
 				"verification_mode": "none",
 			},
-			expectedESConfig: map[string]any{
+			expectedES_TLSConfig: map[string]any{
 				"insecure_skip_verify":         true,
 				"include_system_ca_certs_pool": true,
+				"min_version":                  "1.2",
+				"max_version":                  "1.3",
 			},
 			shouldAuthExist: false,
-		},
-		{
-			name: "when ca_trusted_fingerprint is set",
-			inputSSLConfig: map[string]any{
-				"verification_mode":      "full",
-				"ca_trusted_fingerprint": "a3:5f:bf:93:12:8f:bc:5c:ab:14:6d:bf:e4:2a:7f:98:9d:2f:16:92:76:c4:12:ab:67:89:fc:56:4b:8e:0c:43",
-			},
-			expectedBeatsAuthConfig: map[string]any{
-				"verification_mode":      "full",
-				"ca_trusted_fingerprint": "a3:5f:bf:93:12:8f:bc:5c:ab:14:6d:bf:e4:2a:7f:98:9d:2f:16:92:76:c4:12:ab:67:89:fc:56:4b:8e:0c:43",
-			},
-			shouldAuthExist: true,
 		},
 	}
 
@@ -986,6 +998,7 @@ func TestBeatsAuthExtension(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			tempMap := esInputConfig
 			tempMap["ssl"] = test.inputSSLConfig
+			expectedES := esOutputConfig
 
 			units := []component.Unit{
 				{
@@ -1000,21 +1013,21 @@ func TestBeatsAuthExtension(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// if auth should not exist, then ES config should not have auth key
-			if !test.shouldAuthExist {
-				expectedES := esOutputConfig
+			// add expected TLS config
+			expectedES["elasticsearch/_agent-component/default"].(map[string]any)["tls"] = test.expectedES_TLSConfig
+
+			if test.shouldAuthExist {
+				// check ES exporter config
+				require.Equal(t, expectedES, gotES)
+
+				// check beats auth config
+				expectedBeatsAuth := extensionConfig
+				expectedBeatsAuth["beatsauth/_agent-component/default"].(map[string]any)["tls"] = test.expectedBeatsAuthConfig
+				require.Equal(t, expectedBeatsAuth, gotBeatsAuth)
+			} else { // if auth should not exist, then ES config should not have auth key
 				delete(expectedES["elasticsearch/_agent-component/default"].(map[string]any), "auth")
 				require.Equal(t, expectedES, gotES)
-				return
 			}
-
-			expectedES := esOutputConfig
-			expectedES["elasticsearch/_agent-component/default"].(map[string]any)["tls"] = test.expectedESConfig
-			require.Equal(t, expectedES, gotES)
-
-			expectedBeatsAuth := extensionConfig
-			expectedBeatsAuth["beatsauth/_agent-component/default"].(map[string]any)["tls"] = test.expectedBeatsAuthConfig
-			require.Equal(t, expectedBeatsAuth, gotBeatsAuth)
 
 		})
 	}
