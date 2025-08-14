@@ -557,7 +557,7 @@ func copyActionStore(log *logger.Logger, newHome string) error {
 	for _, currentActionStorePath := range storePaths {
 		newActionStorePath := filepath.Join(newHome, filepath.Base(currentActionStorePath))
 		log.Infow("Copying action store path", "from", currentActionStorePath, "to", newActionStorePath)
-		currentActionStore, err := os.ReadFile(currentActionStorePath)
+		currentActionStore, err := common.ReadFile(currentActionStorePath)
 		if os.IsNotExist(err) {
 			// nothing to copy
 			continue
