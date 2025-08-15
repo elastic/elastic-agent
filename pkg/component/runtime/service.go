@@ -246,7 +246,8 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 					if errors.As(err, &exitErr) {
 						exitCode := exitErr.ExitCode()
 						s.log.Debugf("service %s start failed with exit code %d, err = %s", s.name(), exitCode, err)
-						if slices.Contains(s.comp.InputSpec.Spec.Service.Operations.Install.NonFatalExitCodes, exitCode) {
+						if s.comp.InputSpec.Spec.Service.Operations.Install != nil &&
+							slices.Contains(s.comp.InputSpec.Spec.Service.Operations.Install.NonFatalExitCodes, exitCode) {
 							s.log.Warnf("exit code %d is non-fatal, continuing to run...", exitCode)
 							continue
 						}
