@@ -86,9 +86,11 @@ type agentWatcher interface {
 	Watch(ctx context.Context, tilGrace, errorCheckInterval time.Duration, log *logp.Logger) error
 }
 
+type rollbackHook func(ctx context.Context, log *logger.Logger, topDirPath string) error
+
 type installationModifier interface {
 	Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool) error
-	Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string) error
+	Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string, preRestart rollbackHook) error
 }
 
 func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcherConfig, watcher agentWatcher, installModifier installationModifier) error {
@@ -120,25 +122,29 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		_ = locker.Unlock()
 	}()
 
-	if marker.DesiredOutcome == upgrade.OUTCOME_ROLLBACK && marker.Details.State != details.StateRollback {
+	if marker.DesiredOutcome == upgrade.OUTCOME_ROLLBACK && marker.Details != nil && marker.Details.State != details.StateRollback {
 		// TODO: there should be some sanity check in rollback functions like the installation we are going back to should exist and work
 		log.Infof("rolling back because of DesiredOutcome=%s", marker.DesiredOutcome.String())
-		err = installModifier.Rollback(context.Background(), log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash)
-		if err != nil {
-			return fmt.Errorf("rolling back: %w", err)
+
+		updateMarkerAndDetails := func(_ context.Context, _ *logger.Logger, _ string) error {
+			if marker.Details == nil {
+				actionID := ""
+				if marker.Action != nil {
+					actionID = marker.Action.ActionID
+				}
+				marker.Details = details.NewDetails(marker.Version, details.StateRollback, actionID)
+			}
+			marker.Details.SetStateWithReason(details.StateRollback, details.ReasonManualRollback)
+			err = upgrade.SaveMarker(dataDir, marker, true)
+			if err != nil {
+				return fmt.Errorf("saving marker after rolling back: %w", err)
+			}
+			return nil
 		}
 
-		if marker.Details == nil {
-			actionID := ""
-			if marker.Action != nil {
-				actionID = marker.Action.ActionID
-			}
-			marker.Details = details.NewDetails(marker.Version, details.StateRollback, actionID)
-		}
-		marker.Details.SetStateWithReason(details.StateRollback, details.ReasonManualRollback)
-		err = upgrade.SaveMarker(dataDir, marker, true)
+		err = installModifier.Rollback(context.Background(), log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash, updateMarkerAndDetails)
 		if err != nil {
-			return fmt.Errorf("saving marker after rolling back: %w", err)
+			return fmt.Errorf("rolling back: %w", err)
 		}
 
 		return nil
@@ -180,7 +186,7 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		log.Error("Error detected, proceeding to rollback: %v", err)
 
 		upgradeDetails.SetStateWithReason(details.StateRollback, details.ReasonWatchFailed)
-		err = installModifier.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash)
+		err = installModifier.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash, nil)
 		if err != nil {
 			log.Error("rollback failed", err)
 			upgradeDetails.Fail(err)
