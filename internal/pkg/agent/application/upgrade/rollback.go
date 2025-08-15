@@ -35,6 +35,36 @@ const (
 
 // Rollback rollbacks to previous version which was functioning before upgrade.
 func Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string) error {
+	return RollbackWithOpts(ctx, log, c, topDirPath, prevVersionedHome, prevHash)
+}
+
+var FatalRollbackError = errors.New("Fatal rollback error")
+
+type RollbackHook func(ctx context.Context, log *logger.Logger, topDirPath string) error
+type rollbackSettings struct {
+	preRestartHook RollbackHook
+}
+
+func newRollbackSettings(opts ...RollbackOpt) *rollbackSettings {
+	rs := new(rollbackSettings)
+	for _, opt := range opts {
+		opt(rs)
+	}
+	return rs
+}
+
+type RollbackOpt func(*rollbackSettings)
+
+func WithPreRestartHook(h RollbackHook) RollbackOpt {
+	return func(s *rollbackSettings) {
+		s.preRestartHook = h
+	}
+}
+
+func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, topDirPath string, prevVersionedHome string, prevHash string, opts ...RollbackOpt) error {
+
+	settings := newRollbackSettings(opts...)
+
 	symlinkPath := filepath.Join(topDirPath, agentName)
 
 	var symlinkTarget string
@@ -54,6 +84,18 @@ func Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPa
 	// revert active commit
 	if err := UpdateActiveCommit(log, topDirPath, prevHash, os.WriteFile); err != nil {
 		return err
+	}
+
+	// Hook
+	if settings.preRestartHook != nil {
+		hookErr := settings.preRestartHook(ctx, log, topDirPath)
+		if hookErr != nil {
+			if errors.Is(hookErr, FatalRollbackError) {
+				return fmt.Errorf("pre-restart hook failed: %w", hookErr)
+			} else {
+				log.Warnf("pre-restart hook failed: %v", hookErr)
+			}
+		}
 	}
 
 	// Restart

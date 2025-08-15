@@ -29,8 +29,12 @@ func (a upgradeInstallationModifier) Cleanup(log *logger.Logger, topDirPath, cur
 	return upgrade.Cleanup(log, topDirPath, currentVersionedHome, currentHash, removeMarker, keepLogs)
 }
 
-func (a upgradeInstallationModifier) Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string) error {
-	return upgrade.Rollback(ctx, log, c, topDirPath, prevVersionedHome, prevHash)
+func (a upgradeInstallationModifier) Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string, preRestart rollbackHook) error {
+	var opts []upgrade.RollbackOpt
+	if preRestart != nil {
+		opts = append(opts, upgrade.WithPreRestartHook(upgrade.RollbackHook(preRestart)))
+	}
+	return upgrade.RollbackWithOpts(ctx, log, c, topDirPath, prevVersionedHome, prevHash, opts...)
 }
 
 func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval time.Duration, log *logger.Logger) error {
