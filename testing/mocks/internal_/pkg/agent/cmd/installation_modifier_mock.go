@@ -80,17 +80,17 @@ func (_c *InstallationModifier_Cleanup_Call) RunAndReturn(run func(*logp.Logger,
 	return _c
 }
 
-// Rollback provides a mock function with given fields: ctx, log, c, topDirPath, prevVersionedHome, prevHash
-func (_m *InstallationModifier) Rollback(ctx context.Context, log *logp.Logger, c client.Client, topDirPath string, prevVersionedHome string, prevHash string) error {
-	ret := _m.Called(ctx, log, c, topDirPath, prevVersionedHome, prevHash)
+// Rollback provides a mock function with given fields: ctx, log, c, topDirPath, prevVersionedHome, prevHash, preRestart
+func (_m *InstallationModifier) Rollback(ctx context.Context, log *logp.Logger, c client.Client, topDirPath string, prevVersionedHome string, prevHash string, preRestart func(context.Context, *logp.Logger, string, string, string) error) error {
+	ret := _m.Called(ctx, log, c, topDirPath, prevVersionedHome, prevHash, preRestart)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Rollback")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *logp.Logger, client.Client, string, string, string) error); ok {
-		r0 = rf(ctx, log, c, topDirPath, prevVersionedHome, prevHash)
+	if rf, ok := ret.Get(0).(func(context.Context, *logp.Logger, client.Client, string, string, string, func(context.Context, *logp.Logger, string, string, string) error) error); ok {
+		r0 = rf(ctx, log, c, topDirPath, prevVersionedHome, prevHash, preRestart)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -110,13 +110,14 @@ type InstallationModifier_Rollback_Call struct {
 //   - topDirPath string
 //   - prevVersionedHome string
 //   - prevHash string
-func (_e *InstallationModifier_Expecter) Rollback(ctx interface{}, log interface{}, c interface{}, topDirPath interface{}, prevVersionedHome interface{}, prevHash interface{}) *InstallationModifier_Rollback_Call {
-	return &InstallationModifier_Rollback_Call{Call: _e.mock.On("Rollback", ctx, log, c, topDirPath, prevVersionedHome, prevHash)}
+//   - preRestart func(context.Context , *logp.Logger , string , string , string) error
+func (_e *InstallationModifier_Expecter) Rollback(ctx interface{}, log interface{}, c interface{}, topDirPath interface{}, prevVersionedHome interface{}, prevHash interface{}, preRestart interface{}) *InstallationModifier_Rollback_Call {
+	return &InstallationModifier_Rollback_Call{Call: _e.mock.On("Rollback", ctx, log, c, topDirPath, prevVersionedHome, prevHash, preRestart)}
 }
 
-func (_c *InstallationModifier_Rollback_Call) Run(run func(ctx context.Context, log *logp.Logger, c client.Client, topDirPath string, prevVersionedHome string, prevHash string)) *InstallationModifier_Rollback_Call {
+func (_c *InstallationModifier_Rollback_Call) Run(run func(ctx context.Context, log *logp.Logger, c client.Client, topDirPath string, prevVersionedHome string, prevHash string, preRestart func(context.Context, *logp.Logger, string, string, string) error)) *InstallationModifier_Rollback_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*logp.Logger), args[2].(client.Client), args[3].(string), args[4].(string), args[5].(string))
+		run(args[0].(context.Context), args[1].(*logp.Logger), args[2].(client.Client), args[3].(string), args[4].(string), args[5].(string), args[6].(func(context.Context, *logp.Logger, string, string, string) error))
 	})
 	return _c
 }
@@ -126,7 +127,7 @@ func (_c *InstallationModifier_Rollback_Call) Return(_a0 error) *InstallationMod
 	return _c
 }
 
-func (_c *InstallationModifier_Rollback_Call) RunAndReturn(run func(context.Context, *logp.Logger, client.Client, string, string, string) error) *InstallationModifier_Rollback_Call {
+func (_c *InstallationModifier_Rollback_Call) RunAndReturn(run func(context.Context, *logp.Logger, client.Client, string, string, string, func(context.Context, *logp.Logger, string, string, string) error) error) *InstallationModifier_Rollback_Call {
 	_c.Call.Return(run)
 	return _c
 }

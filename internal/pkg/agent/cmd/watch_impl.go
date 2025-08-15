@@ -6,6 +6,9 @@ package cmd
 
 import (
 	"context"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -26,6 +29,59 @@ func (a upgradeInstallationModifier) Cleanup(log *logger.Logger, topDirPath, cur
 	return upgrade.Cleanup(log, topDirPath, currentVersionedHome, currentHash, removeMarker, keepLogs)
 }
 
-func (a upgradeInstallationModifier) Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string) error {
-	return upgrade.Rollback(ctx, log, c, topDirPath, prevVersionedHome, prevHash)
+func (a upgradeInstallationModifier) Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string, preRestart func(ctx context.Context, log *logger.Logger, topDirPath string, rollbackVersionedHome string, rollbackHash string) error) error {
+	var opts []upgrade.RollbackOpt
+	if preRestart != nil {
+		opts = append(opts, upgrade.WithPreRestartHook(preRestart))
+	}
+	return upgrade.RollbackWithOpts(ctx, log, c, topDirPath, prevVersionedHome, prevHash, opts...)
+}
+
+func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval time.Duration, log *logger.Logger) error {
+	errChan := make(chan error)
+
+	ctx, cancel := context.WithCancel(ctx)
+
+	//cleanup
+	defer func() {
+		cancel()
+		close(errChan)
+	}()
+
+	agtWatcher := upgrade.NewAgentWatcher(errChan, log, errorCheckInterval)
+	go agtWatcher.Run(ctx)
+
+	// Allow for signals to interrupt the watch
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
+	defer signal.Stop(signals)
+
+	graceTimer := time.NewTimer(tilGrace)
+	defer graceTimer.Stop()
+
+	return watchLoop(ctx, log, signals, errChan, graceTimer.C)
+}
+
+func watchLoop(ctx context.Context, log *logger.Logger, signals <-chan os.Signal, errChan <-chan error, graceTimer <-chan time.Time) error {
+	for {
+		select {
+		case s := <-signals:
+			log.Infof("received signal: (%d): %v during watch", s, s)
+			if s == syscall.SIGINT || s == syscall.SIGTERM {
+				log.Infof("received signal: (%d): %v. Exiting watch", s, s)
+				return ErrWatchCancelled
+			}
+			continue
+		case <-ctx.Done():
+			return nil
+		// grace period passed, agent is considered stable
+		case <-graceTimer:
+			log.Info("Grace period passed, not watching")
+			return nil
+		// Agent in degraded state.
+		case err := <-errChan:
+			log.Errorf("Agent Error detected: %s", err.Error())
+			return err
+		}
+	}
 }
