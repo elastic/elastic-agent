@@ -23,6 +23,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/common"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -197,6 +199,16 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
 
+	defer func() {
+		if err != nil {
+			// Add the disk space error to the error chain if it is a disk space error
+			// so that we can use errors.Is to check for it
+			if upgradeErrors.IsDiskSpaceError(err) {
+				err = goerrors.Join(err, upgradeErrors.ErrInsufficientDiskSpace)
+			}
+		}
+	}()
+
 	currentVersion := agentVersion{
 		version:  release.Version(),
 		snapshot: release.Snapshot(),
@@ -288,15 +300,15 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome)
 
-	if err := copyActionStore(u.log, newHome); err != nil {
-		return nil, errors.New(err, "failed to copy action store")
+	if err := copyActionStoreFunc(u.log, newHome); err != nil {
+		return nil, fmt.Errorf("failed to copy action store: %w", err)
 	}
 
 	newRunPath := filepath.Join(newHome, "run")
 	oldRunPath := filepath.Join(paths.Run())
 
-	if err := copyRunDirectory(u.log, oldRunPath, newRunPath); err != nil {
-		return nil, errors.New(err, "failed to copy run directory")
+	if err := copyRunDirectoryFunc(u.log, oldRunPath, newRunPath); err != nil {
+		return nil, fmt.Errorf("failed to copy run directory: %w", err)
 	}
 
 	det.SetState(details.StateReplacing)
@@ -515,6 +527,8 @@ func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versio
 	return nil
 }
 
+var copyActionStoreFunc = copyActionStore // abstraction for testability
+
 func copyActionStore(log *logger.Logger, newHome string) error {
 	// copies legacy action_store.yml, state.yml and state.enc encrypted file if exists
 	storePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile()}
@@ -523,7 +537,7 @@ func copyActionStore(log *logger.Logger, newHome string) error {
 	for _, currentActionStorePath := range storePaths {
 		newActionStorePath := filepath.Join(newHome, filepath.Base(currentActionStorePath))
 		log.Infow("Copying action store path", "from", currentActionStorePath, "to", newActionStorePath)
-		currentActionStore, err := os.ReadFile(currentActionStorePath)
+		currentActionStore, err := common.ReadFile(currentActionStorePath)
 		if os.IsNotExist(err) {
 			// nothing to copy
 			continue
@@ -532,7 +546,7 @@ func copyActionStore(log *logger.Logger, newHome string) error {
 			return err
 		}
 
-		if err := os.WriteFile(newActionStorePath, currentActionStore, 0o600); err != nil {
+		if err := common.WriteFile(newActionStorePath, currentActionStore, 0o600); err != nil {
 			return err
 		}
 	}
@@ -540,11 +554,13 @@ func copyActionStore(log *logger.Logger, newHome string) error {
 	return nil
 }
 
+var copyRunDirectoryFunc = copyRunDirectory // abstraction for testability
+
 func copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error {
 	log.Infow("Copying run directory", "new_run_path", newRunPath, "old_run_path", oldRunPath)
 
-	if err := os.MkdirAll(newRunPath, runDirMod); err != nil {
-		return errors.New(err, "failed to create run directory")
+	if err := common.MkdirAll(newRunPath, runDirMod); err != nil {
+		return fmt.Errorf("failed to create run directory: %w", err)
 	}
 
 	err := copyDir(log, oldRunPath, newRunPath, true)
@@ -554,7 +570,7 @@ func copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error {
 		return nil
 	}
 	if err != nil {
-		return errors.New(err, "failed to copy %q to %q", oldRunPath, newRunPath)
+		return fmt.Errorf("failed to copy %q to %q: %w", oldRunPath, newRunPath, err)
 	}
 
 	return nil
@@ -631,6 +647,8 @@ func readDirs(dir string) ([]string, error) {
 	return dirs, nil
 }
 
+var fileDirCopyFunc = copy.Copy // abstraction for testability
+
 func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
 	var onErr func(src, dst string, err error) error
 
@@ -657,7 +675,7 @@ func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
 		copyConcurrency = runtime.NumCPU() * 4
 	}
 
-	return copy.Copy(from, to, copy.Options{
+	return fileDirCopyFunc(from, to, copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
 		},
