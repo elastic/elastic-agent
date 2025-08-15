@@ -1,0 +1,17 @@
+project: Elastic Agent docs
+products:
+  - id: elastic-agent
+exclude:
+  - "*.md"
+  - "manifests/kustomize-autosharding/README.md"
+cross_links:
+  - docs-content
+  - beats
+toc:
+  - toc: release-notes
+subs:
+  agent:   "Elastic Agent"
+  agents:   "Elastic Agents"
+  beats:   "Beats"
+  fleet-server:   "Fleet Server"
+  fleet:   "Fleet"
