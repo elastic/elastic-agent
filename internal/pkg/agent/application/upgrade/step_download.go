@@ -123,6 +123,8 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, parsedVersion
 		return "", fmt.Errorf("failed download of agent binary: %w", err)
 	}
 
+	// If there are errors in the following steps, we return the path so that we
+	// can cleanup the downloaded files.
 	if skipVerifyOverride {
 		return path, nil
 	}
@@ -130,12 +132,12 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, parsedVersion
 	if verifier == nil {
 		verifier, err = newVerifier(parsedVersion, a.log, &settings)
 		if err != nil {
-			return "", errors.New(err, "initiating verifier")
+			return path, errors.New(err, "initiating verifier")
 		}
 	}
 
 	if err := verifier.Verify(ctx, agentArtifact, *parsedVersion, skipDefaultPgp, pgpBytes...); err != nil {
-		return "", errors.New(err, "failed verification of agent binary")
+		return path, errors.New(err, "failed verification of agent binary")
 	}
 	return path, nil
 }
