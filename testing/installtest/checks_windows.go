@@ -16,6 +16,7 @@ import (
 	"golang.org/x/sys/windows"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install/usermgmt"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 )
 
@@ -62,7 +63,7 @@ func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, opt
 		}
 
 		// Check that the elastic-agent user/group exist.
-		uid, err := install.FindUID(username)
+		uid, err := usermgmt.FindUID(username)
 		if err != nil {
 			return fmt.Errorf("failed to find %s user: %w", username, err)
 		}
@@ -75,7 +76,7 @@ func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, opt
 		if opts.Username != "" {
 			group = opts.Group
 		}
-		gid, err := install.FindGID(group)
+		gid, err := usermgmt.FindGID(group)
 		if err != nil {
 			return fmt.Errorf("failed to find %s group: %w", group, err)
 		}

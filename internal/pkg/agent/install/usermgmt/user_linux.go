@@ -4,7 +4,7 @@
 
 //go:build linux
 
-package install
+package usermgmt
 
 import (
 	"errors"

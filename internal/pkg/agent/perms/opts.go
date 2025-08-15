@@ -18,9 +18,17 @@ const (
 type opts struct {
 	mask      os.FileMode
 	ownership utils.FileOwner
+	inherit   bool
 }
 
 type OptFunc func(o *opts)
+
+// WithInherit adjusts permission inheritance for FixPermissions.
+func WithInherit(inherit bool) OptFunc {
+	return func(o *opts) {
+		o.inherit = inherit
+	}
+}
 
 // WithMask adjusts the default mask used.
 func WithMask(mask os.FileMode) OptFunc {

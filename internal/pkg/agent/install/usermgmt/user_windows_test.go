@@ -4,7 +4,7 @@
 
 //go:build windows
 
-package install
+package usermgmt
 
 import (
 	"fmt"

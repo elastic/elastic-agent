@@ -84,7 +84,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 				switch {
 				case err == nil:
 					// first level doesn't inherit
-					inherit := topPath != walkPath
+					inherit := o.inherit || topPath != walkPath
 					return applyPermissions(walkPath, true, inherit, userSID, groupSID, grants...)
 				case errors.Is(err, fs.ErrNotExist):
 					return nil
