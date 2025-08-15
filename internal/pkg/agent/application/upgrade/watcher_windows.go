@@ -122,6 +122,7 @@ func signalPID(log *logger.Logger, pid int) error {
 	// Normally we would want to send the Ctrl+Break event only to the watcher process but due to the fact that
 	// the parent process of the watcher has already terminated, we have to hug it tightly and take it down with us
 	// by specifying processGroupID=0
+	//nolint:gosec // int -> uint32 no overflow is possible since windows PID is a DWORD (uint32) (see https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocessid and https://learn.microsoft.com/en-us/windows/win32/winprog/windows-data-types)
 	killProcErr := windows.GenerateConsoleCtrlEvent(windows.CTRL_BREAK_EVENT, uint32(pid))
 
 	if killProcErr != nil {
@@ -135,6 +136,7 @@ func isProcessLive(process *os.Process) (bool, error) {
 	//exitCodeStillActive according to  https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getexitcodeprocess
 	const exitCodeStillActive = 259
 	// Open the process with PROCESS_QUERY_LIMITED_INFORMATION access
+	//nolint:gosec // int -> uint32 no overflow is possible since windows PID is a DWORD (uint32) (see https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocessid and https://learn.microsoft.com/en-us/windows/win32/winprog/windows-data-types)
 	handle, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(process.Pid))
 	if err != nil {
 		return false, fmt.Errorf("OpenProcess failed: %w", err)
