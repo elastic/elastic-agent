@@ -44,6 +44,19 @@ receivers:
 extensions:
   file_storage:
     directory: ${env:STORAGE_DIR}
+  bearertokenauth:
+    scheme: "APIKey"
+    token: ${env:ELASTIC_API_KEY}
+  # Extension for EDOT SDKs remote configuration: https://github.com/elastic/opentelemetry-collector-components/tree/main/extension/apmconfigextension
+  # apmconfig:
+  #   source:
+  #    elasticsearch:
+  #      endpoint: ${env:ELASTIC_ENDPOINT}
+  #      auth:
+  #        authenticator: bearertokenauth
+  #   opamp:
+  #     protocols:
+  #       http:
 
 connectors:
   elasticapm:
@@ -98,18 +111,23 @@ processors:
 exporters:
   elasticsearch/ecs:
     endpoints: ["${env:ELASTIC_ENDPOINT}"]
-    api_key: ${env:ELASTIC_API_KEY}
+    auth:
+      authenticator: bearertokenauth
     mapping:
       mode: ecs
 
   elasticsearch/otel:
     endpoints: [ "${env:ELASTIC_ENDPOINT}" ]
-    api_key: ${env:ELASTIC_API_KEY}
+    auth:
+      authenticator: bearertokenauth
     mapping:
       mode: otel
 
 service:
-  extensions: [file_storage]
+  extensions:
+    - file_storage
+    - bearertokenauth
+    # - apmconfig
   pipelines:
     traces/fromsdk:
       receivers: [otlp/fromsdk]
