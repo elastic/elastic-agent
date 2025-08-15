@@ -28,6 +28,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
@@ -1544,26 +1545,6 @@ func TestUpgradeErrorHandling(t *testing.T) {
 	}
 }
 
-type mockSender struct{}
-
-func (m *mockSender) Send(ctx context.Context, method, path string, params url.Values, headers http.Header, body io.Reader) (*http.Response, error) {
-	return nil, nil
-}
-
-func (m *mockSender) URI() string {
-	return "mockURI"
-}
-func TestSetClient(t *testing.T) {
-	log, _ := loggertest.New("test")
-	upgrader := &Upgrader{
-		log:                log,
-		artifactDownloader: &mockArtifactDownloader{},
-	}
-
-	upgrader.SetClient(&mockSender{})
-	require.Equal(t, "mockURI", upgrader.artifactDownloader.(*mockArtifactDownloader).fleetServerURI)
-}
-
 func TestCopyActionStore(t *testing.T) {
 	log, _ := loggertest.New("TestCopyActionStore")
 
@@ -1747,4 +1728,24 @@ func TestCopyRunDirectory(t *testing.T) {
 			require.Equal(t, []byte("content for old run file"), content, "content of %s is not as expected", filepath.Join(newRunPath, "file.txt"))
 		})
 	}
+}
+
+type mockSender struct{}
+
+func (m *mockSender) Send(ctx context.Context, method, path string, params url.Values, headers http.Header, body io.Reader) (*http.Response, error) {
+	return nil, nil
+}
+
+func (m *mockSender) URI() string {
+	return "mockURI"
+}
+func TestSetClient(t *testing.T) {
+	log, _ := loggertest.New("test")
+	upgrader := &Upgrader{
+		log:                log,
+		artifactDownloader: &mockArtifactDownloader{},
+	}
+
+	upgrader.SetClient(&mockSender{})
+	require.Equal(t, "mockURI", upgrader.artifactDownloader.(*mockArtifactDownloader).fleetServerURI)
 }
