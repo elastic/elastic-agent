@@ -626,9 +626,10 @@ func (s *serviceRuntime) sendObserved() {
 func (s *serviceRuntime) compState(state client.UnitState, missedCheckins int) {
 	name := s.name()
 	msg := stateUnknownMessage
-	if state == client.UnitStateHealthy {
+	switch state {
+	case client.UnitStateHealthy:
 		msg = fmt.Sprintf("Healthy: communicating with %s service", name)
-	} else if state == client.UnitStateDegraded {
+	case client.UnitStateDegraded:
 		if missedCheckins == 1 {
 			msg = fmt.Sprintf("Degraded: %s service missed 1 check-in", name)
 		} else {
