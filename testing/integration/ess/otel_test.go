@@ -1040,7 +1040,10 @@ func TestOtelFilestreamInput(t *testing.T) {
 	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
 	decodedApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err)
-	configTemplate := `inputs:
+	configTemplate := `
+agent.grpc: 
+  port: 6799
+inputs:
   - type: filestream
     id: filestream-e2e
     use_output: default
@@ -1059,6 +1062,8 @@ outputs:
     hosts: [{{.ESEndpoint}}]
     api_key: "{{.ESApiKey}}"
     preset: "balanced"
+    ssl.enabled: true
+    ssl.verification_mode: full
   monitoring:
     type: elasticsearch
     hosts: [{{.ESEndpoint}}]
