@@ -41,6 +41,8 @@ inputs:
             - "--resources"
             - "endpoint-security-resources.zip"
           timeout: 600s
+          non_fatal_exit_codes:
+            - 28 # tamper protection enabled but could not (re)install
         uninstall:
           args:
             - "uninstall"
