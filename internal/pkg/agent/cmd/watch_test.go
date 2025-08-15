@@ -5,6 +5,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"runtime"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -177,7 +179,7 @@ func Test_watchCmd(t *testing.T) {
 					Watch(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(errors.New("some watch error due to agent misbehaving"))
 				installModifier.EXPECT().
-					Rollback(mock.Anything, mock.Anything, mock.Anything, paths.Top(), "elastic-agent-prvver", "prvver").
+					Rollback(mock.Anything, mock.Anything, mock.Anything, paths.Top(), "elastic-agent-prvver", "prvver", (func(context.Context, *logp.Logger, string, string, string) error)(nil)).
 					Return(nil)
 			},
 			args: args{
@@ -301,7 +303,7 @@ func Test_watchCmd(t *testing.T) {
 				require.NoError(t, err)
 
 				installModifier.EXPECT().
-					Rollback(mock.Anything, mock.Anything, mock.Anything, paths.Top(), "elastic-agent-prvver", "prvver").
+					Rollback(mock.Anything, mock.Anything, mock.Anything, paths.Top(), "elastic-agent-prvver", "prvver", mock.Anything).
 					Return(nil)
 			},
 			args: args{
@@ -341,7 +343,7 @@ func Test_watchCmd(t *testing.T) {
 				require.NoError(t, err)
 
 				installModifier.EXPECT().
-					Rollback(mock.Anything, mock.Anything, mock.Anything, paths.Top(), "elastic-agent-prvver", "prvver").
+					Rollback(mock.Anything, mock.Anything, mock.Anything, paths.Top(), "elastic-agent-prvver", "prvver", mock.Anything).
 					Return(nil)
 			},
 			args: args{
