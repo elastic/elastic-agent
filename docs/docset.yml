@@ -10,8 +10,10 @@ cross_links:
 toc:
   - toc: release-notes
 subs:
-  agent:   "Elastic Agent"
-  agents:   "Elastic Agents"
-  beats:   "Beats"
-  fleet-server:   "Fleet Server"
-  fleet:   "Fleet"
+  agent:          "Elastic Agent"
+  agent-issue:    "https://github.com/elastic/elastic-agent/issues/"
+  agent-pull:     "https://github.com/elastic/elastic-agent/pull/"
+  agents:         "Elastic Agents"
+  beats:          "Beats"
+  es:             "Elasticsearch"
+  fleet:          "Fleet"
