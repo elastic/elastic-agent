@@ -113,7 +113,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 	}
 
 	if verifier == nil {
-		verifier, err = newVerifier(parsedVersion, u.log, &settings)
+		verifier, err = newVerifierFunc(parsedVersion, u.log, &settings)
 		if err != nil {
 			return path, errors.New(err, "initiating verifier")
 		}
@@ -171,6 +171,8 @@ func newDownloader(version *agtversion.ParsedSemVer, log *logger.Logger, setting
 
 	return composed.NewDownloader(fs.NewDownloader(settings), snapDownloader, httpDownloader), nil
 }
+
+var newVerifierFunc = newVerifier // abstraction for testability
 
 func newVerifier(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
 	pgp := release.PGP()
