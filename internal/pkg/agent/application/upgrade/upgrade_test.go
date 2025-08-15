@@ -5,12 +5,17 @@
 package upgrade
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -25,6 +30,8 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/common"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -37,6 +44,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
+	"github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/info"
 	mocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
 )
 
@@ -1291,4 +1299,204 @@ func (f *fakeAcker) Ack(ctx context.Context, action fleetapi.Action) error {
 func (f *fakeAcker) Commit(ctx context.Context) error {
 	args := f.Called(ctx)
 	return args.Error(0)
+}
+
+// archiveFilesWithArchiveDirName function is used to modify the archive files to
+// match the desired archive directory name for test cases. Modifies the file
+// paths. The archive files are based on the global variables in step_unpack_test.go.
+func archiveFilesWithArchiveDirName(archiveName string) func(file files) files {
+	archiveWithoutSuffix := strings.TrimSuffix(archiveName, ".tar.gz")
+	archiveWithoutSuffix = strings.TrimSuffix(archiveWithoutSuffix, ".zip")
+
+	return func(file files) files {
+		file.path = strings.Replace(file.path, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64", archiveWithoutSuffix, 1)
+
+		return file
+	}
+}
+
+// archiveFilesWithVersionedHome function is used to modify the archive files to
+// match the desired versioned home path for test cases. Modifies the manifest
+// and file paths. The archive files are based on the global variables in
+// step_unpack_test.go.
+func archiveFilesWithVersionedHome(version string, meta string) func(file files) files {
+	return func(file files) files {
+		if file.content == ea_123_manifest {
+			newContent := strings.ReplaceAll(file.content, "1.2.3", version)
+			newContent = strings.ReplaceAll(newContent, "abcdef", meta)
+
+			file.content = newContent
+		}
+		file.path = strings.ReplaceAll(file.path, "abcdef", meta)
+
+		return file
+	}
+}
+
+// ModifyArchiveFiles function is used to modify the archive files to match the
+// test scenarios. The archive files are based on the global variables in
+// step_unpack_test.go.
+func modifyArchiveFiles(archiveFiles []files, modFuncs ...func(file files) files) []files {
+	modifiedArchiveFiles := make([]files, len(archiveFiles))
+	for i, file := range archiveFiles {
+		for _, modFunc := range modFuncs {
+			file = modFunc(file)
+		}
+		modifiedArchiveFiles[i] = file
+	}
+
+	return modifiedArchiveFiles
+}
+
+// buildArchiveFiles is used to modify the archive files found in
+// step_unpack_test.go to fit the desired test scenarios by setting the archive
+// dir name and the versioned home path.
+func buildArchiveFiles(t *testing.T, archiveFiles []files, parsedVersion *agtversion.ParsedSemVer, metadata string) (string, []files) {
+	tempConfig := &artifact.Config{} // used only to get os and arch, runtime.GOARCH returns amd64 which is not a valid arch when used in GetArtifactName
+	archiveName, err := artifact.GetArtifactName(agentArtifact, *parsedVersion, tempConfig.OS(), tempConfig.Arch())
+	require.NoError(t, err)
+
+	modifiedArchiveFiles := modifyArchiveFiles(archiveFiles,
+		archiveFilesWithArchiveDirName(archiveName),
+		archiveFilesWithVersionedHome(parsedVersion.CoreVersion(), metadata),
+	)
+
+	return archiveName, modifiedArchiveFiles
+}
+
+// createArchive function is used to create mock archives for upgrade tests.
+// Uses the helpers in step_unpack_test.go to create the archive.
+func createArchive(t *testing.T, archiveName string, archiveFiles []files) (string, error) {
+	if runtime.GOOS == "windows" {
+		return createZipArchive(t, archiveName, archiveFiles)
+	}
+	return createTarArchive(t, archiveName, archiveFiles)
+}
+
+func TestUpgradeUnpackErrors(t *testing.T) {
+	log, _ := loggertest.New("test")
+
+	targetVersion := agtversion.NewParsedSemVer(3, 4, 5, "SNAPSHOT", "")
+	targetArtifactName, targetArchiveFiles := buildArchiveFiles(t, archiveFilesWithMoreComponents, targetVersion, "ghijkl")
+
+	// Get the content of the component file to be used in copy function
+	// assertions. It will be used to make sure the error gets triggered in the
+	// copy call in the unpacker and not the downloader.
+	targetArchiveComponentsFileContent := ""
+	for _, file := range targetArchiveFiles {
+		if file.fType == REGULAR {
+			dir := filepath.Dir(file.path)
+			if strings.HasSuffix(dir, "components") {
+				targetArchiveComponentsFileContent = file.content
+				break
+			}
+		}
+	}
+
+	// dir name of the versioned home
+	// used to calculate component paths
+	newVersionedDirName := "elastic-agent-3.4.5-SNAPSHOT-ghijkl"
+
+	mockAgentInfo := info.NewAgent(t)
+	mockAgentInfo.On("Version").Return(targetVersion.String())
+
+	upgradeDetails := details.NewDetails(targetVersion.String(), details.StateRequested, "test")
+
+	mockStdlibFuncs := []common.MockStdLibFuncName{common.CopyFuncName, common.OpenFileFuncName, common.MkdirAllFuncName}
+
+	testCases := map[string]struct {
+		mockStdlibFunc    common.MockStdLibFuncName
+		mockReturnedError error
+		expectedError     error
+	}{}
+
+	for _, mockStdlibFunc := range mockStdlibFuncs {
+		for _, te := range downloadErrors.OS_DiskSpaceErrors {
+			testCases[fmt.Sprintf("unpack_should_return_error_if_unpack_%s_fails: %v", mockStdlibFunc, te)] = struct {
+				mockStdlibFunc    common.MockStdLibFuncName
+				mockReturnedError error
+				expectedError     error
+			}{
+				mockStdlibFunc:    mockStdlibFunc,
+				mockReturnedError: te,
+				expectedError:     downloadErrors.ErrInsufficientDiskSpace,
+			}
+		}
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			paths.SetTop(tempDir)
+			paths.SetDownloads(filepath.Join(tempDir, "downloads"))
+
+			targetArchive, err := createArchive(t, targetArtifactName, targetArchiveFiles)
+			require.NoError(t, err)
+
+			// Used to assert that the mkdirAll error is triggered in the
+			// unpacker and not the downloader
+			newComponentsDir := filepath.Join(paths.Data(), newVersionedDirName, "components")
+			// Used to assert that the openFile error is triggered in the
+			// unpacker and not the downloader
+			newComponentsFile := filepath.Join(newComponentsDir, "comp1")
+
+			t.Logf("Created archive: %s", targetArchive)
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.ServeFile(w, r, targetArchive)
+			}))
+			t.Cleanup(server.Close)
+
+			config := artifact.Config{
+				TargetDirectory:        paths.Downloads(),
+				SourceURI:              server.URL,
+				RetrySleepInitDuration: 1 * time.Second,
+				HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+					Timeout: 1 * time.Second,
+				},
+			}
+
+			stdlibMocker := common.PrepareStdLibMocks(common.StdLibMocks{
+				CopyMock: func(dst io.Writer, src io.Reader) (int64, error) {
+					// If the content is not the same as the target archive components file content,
+					// write the content to the destination. This is to make
+					// sure that the error is triggered in unpacker and not in downloader
+					buf, err := io.ReadAll(src)
+					require.NoError(t, err)
+					if !bytes.Equal(buf, []byte(targetArchiveComponentsFileContent)) {
+						return io.Copy(dst, bytes.NewReader(buf))
+					}
+
+					return 0, tc.mockReturnedError
+				},
+				OpenFileMock: func(name string, flag int, perm os.FileMode) (*os.File, error) {
+					// Make sure that the openFile error is triggered in the
+					// unpacker and not the downloader
+					if name != newComponentsFile {
+						return os.OpenFile(name, flag, perm)
+					}
+
+					return nil, tc.mockReturnedError
+				},
+				MkdirAllMock: func(path string, perm os.FileMode) error {
+					// Make sure that the mkdirAll error is triggered in the
+					// unpacker and not the downloader
+					if path != newComponentsDir {
+						return os.MkdirAll(path, perm)
+					}
+
+					return tc.mockReturnedError
+				},
+			})
+
+			stdlibMocker(t, tc.mockStdlibFunc)
+
+			upgrader, err := NewUpgrader(log, &config, mockAgentInfo)
+			require.NoError(t, err)
+
+			_, err = upgrader.Upgrade(context.Background(), targetVersion.String(), server.URL, nil, upgradeDetails, true, true)
+			require.ErrorIs(t, err, tc.expectedError, "expected error mismatch")
+			require.Equal(t, upgradeDetails.State, details.StateExtracting)
+		})
+	}
 }
