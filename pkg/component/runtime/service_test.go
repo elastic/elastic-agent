@@ -5,13 +5,30 @@
 package runtime
 
 import (
+	"context"
+	"fmt"
+	"net"
 	"net/url"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/elastic/elastic-agent-libs/api/npipe"
+
+	"go.uber.org/zap/zapcore"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -254,4 +271,123 @@ func TestGetConnInfoServerAddress(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestCISKeepsRunningOnNonFatalExitCodeFromStart tests that the connection info
+// server keeps running when starting a service component results in a non-fatal
+// exit code.
+func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
+	log, logObs := loggertest.New("test")
+	const nonFatalExitCode = 99
+	const cisPort = 9999
+	const cisSocket = ".teaci.sock"
+
+	// Make an Endpoint component for testing
+	endpoint := makeEndpointComponent(t, map[string]interface{}{})
+	endpoint.InputSpec.Spec.Service = &component.ServiceSpec{
+		CPort:   cisPort,
+		CSocket: cisSocket,
+		Log:     nil,
+		Operations: component.ServiceOperationsSpec{
+			Check: &component.ServiceOperationsCommandSpec{},
+			Install: &component.ServiceOperationsCommandSpec{
+				NonFatalExitCodes: []int{nonFatalExitCode},
+			},
+		},
+		Timeouts: component.ServiceTimeoutSpec{},
+	}
+
+	// Create binary mocking Endpoint such that executing it will return
+	// the non-fatal exit code from the spec above.
+	endpoint.InputSpec.BinaryPath = mockEndpointBinary(t, nonFatalExitCode)
+	endpoint.InputSpec.BinaryName = "endpoint"
+
+	t.Logf("mock binary path: %s\n", endpoint.InputSpec.BinaryPath)
+
+	// Create new service runtime with component
+	service, err := newServiceRuntime(endpoint, log, true)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	comm := newMockCommunicator("")
+
+	// Observe component state
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-service.ch:
+			}
+		}
+	}()
+
+	// Run the service
+	go func() {
+		err := service.Run(ctx, comm)
+		require.EqualError(t, err, context.Canceled.Error())
+	}()
+
+	service.actionCh <- actionModeSigned{
+		actionMode: actionStart,
+	}
+
+	// Check that connection info server is still running and that we see the
+	// warning log message about Endpoint's install operation failing with a non-fatal exit
+	// code but the service runtime continuing to run.
+	cisAddr, err := getConnInfoServerAddress(runtime.GOOS, true, cisPort, cisSocket)
+	require.NoError(t, err)
+
+	parsedCISAddr, err := url.Parse(cisAddr)
+	require.NoError(t, err)
+
+	expectedWarnLogMsg := fmt.Sprintf("exit code %d is non-fatal, continuing to run...", nonFatalExitCode)
+	require.Eventually(t, func() bool {
+		if runtime.GOOS != "windows" {
+			_, err = net.Dial("unix", parsedCISAddr.Host+parsedCISAddr.Path)
+		} else {
+			if strings.HasPrefix(cisAddr, "npipe:///") {
+				path := strings.TrimPrefix(cisAddr, "npipe:///")
+				cisAddr = `\\.\pipe\` + path
+			}
+			_, err = npipe.Dial(cisAddr)("", "")
+		}
+
+		if err != nil {
+			t.Logf("Connection info server is not running: %v", err)
+			return false
+		}
+
+		logs := logObs.TakeAll()
+		for _, l := range logs {
+			t.Logf("[%s] %s", l.Level, l.Message)
+			if l.Level == zapcore.WarnLevel && l.Message == expectedWarnLogMsg {
+				return true
+			}
+		}
+
+		return false
+	}, 2*time.Second, 200*time.Millisecond)
+}
+
+func mockEndpointBinary(t *testing.T, exitCode int) string {
+	// Build a mock Endpoint binary that can return a specific exit code.
+	outPath := filepath.Join(t.TempDir(), "mock_endpoint")
+	if runtime.GOOS == "windows" {
+		outPath += ".exe"
+	}
+
+	cmd := exec.Command(
+		"go", "build",
+		"-o", outPath,
+		"-ldflags", "-X 'main.ExitCode="+strconv.Itoa(exitCode)+"'",
+		"testdata/exitcode/main.go",
+	)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	require.NoError(t, err)
+
+	return outPath
 }

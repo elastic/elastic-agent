@@ -134,7 +134,8 @@ type ServiceOperationsSpec struct {
 
 // ServiceOperationsCommandSpec is the specification for execution of binaries to perform the check, install, and uninstall.
 type ServiceOperationsCommandSpec struct {
-	Args    []string         `config:"args,omitempty" yaml:"args,omitempty"`
-	Env     []CommandEnvSpec `config:"env,omitempty" yaml:"env,omitempty"`
-	Timeout time.Duration    `config:"timeout,omitempty" yaml:"timeout,omitempty"`
+	Args              []string         `config:"args,omitempty" yaml:"args,omitempty"`
+	Env               []CommandEnvSpec `config:"env,omitempty" yaml:"env,omitempty"`
+	Timeout           time.Duration    `config:"timeout,omitempty" yaml:"timeout,omitempty"`
+	NonFatalExitCodes []int            `config:"non_fatal_exit_codes,omitempty" yaml:"non_fatal_exit_codes,omitempty"`
 }
