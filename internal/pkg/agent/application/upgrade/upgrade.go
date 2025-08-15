@@ -23,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -193,9 +194,21 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 	return nil
 }
 
+var markUpgradeFunc = markUpgrade
+
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
+
+	defer func() {
+		if err != nil {
+			// Add the disk space error to the error chain if it is a disk space error
+			// so that we can use errors.Is to check for it
+			if upgradeErrors.IsDiskSpaceError(err) {
+				err = goerrors.Join(err, upgradeErrors.ErrInsufficientDiskSpace)
+			}
+		}
+	}()
 
 	currentVersion := agentVersion{
 		version:  release.Version(),
@@ -339,7 +352,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		versionedHome: currentVersionedHome,
 	}
 
-	if err := markUpgrade(u.log,
+	if err := markUpgradeFunc(u.log,
 		paths.Data(), // data dir to place the marker in
 		current,      // new agent version data
 		previous,     // old agent version data
