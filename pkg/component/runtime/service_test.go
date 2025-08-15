@@ -371,6 +371,88 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 	}, 2*time.Second, 200*time.Millisecond)
 }
 
+// TestServiceStartRetry tests that the service runtime will
+// retry the service start command if it fails
+func TestServiceStartRetry(t *testing.T) {
+	// Shorten service restart delay for testing
+	origServiceRestartDelay := serviceRestartDelay
+	serviceRestartDelay = 2 * time.Second
+	t.Cleanup(func() {
+		serviceRestartDelay = origServiceRestartDelay
+	})
+
+	log, logObs := loggertest.New("test")
+	const cisPort = 9999
+	const cisSocket = ".teaci.sock"
+
+	// Make an Endpoint component for testing
+	endpoint := makeEndpointComponent(t, map[string]interface{}{})
+	endpoint.InputSpec.Spec.Service = &component.ServiceSpec{
+		CPort:   cisPort,
+		CSocket: cisSocket,
+		Log:     nil,
+		Operations: component.ServiceOperationsSpec{
+			Check:   &component.ServiceOperationsCommandSpec{},
+			Install: &component.ServiceOperationsCommandSpec{},
+		},
+		Timeouts: component.ServiceTimeoutSpec{},
+	}
+
+	// Create binary mocking Endpoint such that executing it will return
+	// the non-fatal exit code from the spec above.
+	endpoint.InputSpec.BinaryPath = mockEndpointBinary(t, 99)
+	endpoint.InputSpec.BinaryName = "endpoint"
+
+	t.Logf("mock binary path: %s\n", endpoint.InputSpec.BinaryPath)
+
+	// Create new service runtime with component
+	service, err := newServiceRuntime(endpoint, log, true)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	comm := newMockCommunicator("")
+
+	// Observe component state
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-service.ch:
+			}
+		}
+	}()
+
+	// Run the service runtime
+	go func() {
+		err := service.Run(ctx, comm)
+		require.EqualError(t, err, context.Canceled.Error())
+	}()
+
+	// Start the service
+	service.actionCh <- actionModeSigned{
+		actionMode: actionStart,
+	}
+
+	// Expect 1 restart (== 2 start attempts) within serviceRestartDelay+1s
+	const expectedNumStartAttempts = 2
+	expectedRestartLogMsg := fmt.Sprintf(
+		"failed to start endpoint service, err: %s, restarting (%d/10) after waiting for %v",
+		"failed install endpoint service: exit status 99", expectedNumStartAttempts, serviceRestartDelay,
+	)
+	require.Eventually(t, func() bool {
+		logs := logObs.TakeAll()
+		for _, l := range logs {
+			t.Logf("[%s] %s", l.Level, l.Message)
+			if l.Level == zapcore.ErrorLevel && l.Message == expectedRestartLogMsg {
+				return true
+			}
+		}
+		return false
+	}, serviceRestartDelay+1*time.Second, 500*time.Millisecond)
+}
+
 func mockEndpointBinary(t *testing.T, exitCode int) string {
 	// Build a mock Endpoint binary that can return a specific exit code.
 	outPath := filepath.Join(t.TempDir(), "mock_endpoint")
