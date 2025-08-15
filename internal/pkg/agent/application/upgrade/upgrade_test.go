@@ -8,6 +8,8 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -24,8 +26,10 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -1364,4 +1368,123 @@ func createArchive(t *testing.T, archiveName string, archiveFiles []files) (stri
 		return createZipArchive(t, archiveName, archiveFiles)
 	}
 	return createTarArchive(t, archiveName, archiveFiles)
+}
+
+func TestUpgradeErrorCleanup(t *testing.T) {
+
+	log, _ := loggertest.New("test")
+	tempConfig := &artifact.Config{} // used only to get os and arch, runtime.GOARCH returns amd64 which is not a valid arch when used in GetArtifactName
+
+	initialVersion := agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")
+	initialArtifactName, initialArchiveFiles := buildArchiveFiles(t, archiveFilesWithMoreComponents, initialVersion, "abcdef")
+
+	targetVersion := agtversion.NewParsedSemVer(3, 4, 5, "SNAPSHOT", "")
+	targetArtifactName, targetArchiveFiles := buildArchiveFiles(t, archiveFilesWithMoreComponents, targetVersion, "ghijkl")
+
+	initialArchive, err := createArchive(t, initialArtifactName, initialArchiveFiles)
+	require.NoError(t, err)
+
+	targetArchive, err := createArchive(t, targetArtifactName, targetArchiveFiles)
+	require.NoError(t, err)
+
+	tempUnpacker, err := NewUpgrader(log, tempConfig, &info.AgentInfo{}) // used only to unpack the initial archive
+	require.NoError(t, err)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, targetArchive)
+	}))
+	t.Cleanup(server.Close)
+
+	testError := errors.New("test error")
+
+	type testCase struct {
+		errorFrom     string
+		expectedError error
+		skipVerify    bool
+	}
+
+	testCases := map[string]testCase{
+		"should return error and cleanup downloads if the download step fails": {
+			errorFrom:     "downloadArtifact",
+			expectedError: testError,
+			skipVerify:    false, // we are triggering error in the verifier to simulate download failure, so we should not skip verify
+		},
+		"should return error, cleanup downloads and extracted archive if copyActionStore fails": {
+			errorFrom:     "copyActionStore",
+			expectedError: testError,
+			skipVerify:    true, // skip verify, we don't want to trigger error in the verifier
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			paths.SetTop(t.TempDir())
+			initialUnpackRes, err := tempUnpacker.unpack(initialVersion.String(), initialArchive, paths.Data(), "")
+			require.NoError(t, err)
+
+			targetVersionedHome := filepath.Join(paths.Data(), "elastic-agent-3.4.5-SNAPSHOT-ghijkl")
+
+			// Set the downloads dir in the initial versioned home path
+			initialVersionedHome := filepath.Join(paths.Data(), initialUnpackRes.VersionedHome)
+			paths.SetDownloads(filepath.Join(initialVersionedHome, "downloads"))
+
+			settings := artifact.Config{
+				TargetDirectory:        paths.Downloads(),
+				SourceURI:              server.URL,
+				RetrySleepInitDuration: 1 * time.Second,
+				HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+					Timeout: 1 * time.Second,
+				},
+			}
+
+			tmpNewVerifier := newVerifierFunc
+			t.Cleanup(func() {
+				newVerifierFunc = tmpNewVerifier
+			})
+
+			newVerifierFunc = func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
+				// Assert that the artifact is downloaded
+				archivePath, err := artifact.GetArtifactPath(agentArtifact, *targetVersion, settings.OS(), settings.Arch(), settings.TargetDirectory)
+				require.NoError(t, err)
+				require.FileExists(t, archivePath)
+
+				// Only return error if we want to simulate download failure
+				if tc.errorFrom == "downloadArtifact" {
+					return nil, tc.expectedError
+				}
+
+				return tmpNewVerifier(version, log, settings)
+			}
+
+			tmpCopyActionStore := copyActionStoreFunc
+			t.Cleanup(func() {
+				copyActionStoreFunc = tmpCopyActionStore
+			})
+			copyActionStoreFunc = func(log *logger.Logger, newHome string) error {
+				require.DirExists(t, targetVersionedHome, "target versioned home path should exist")
+
+				files, err := os.ReadDir(newHome)
+				require.NoError(t, err, "failed to read target versioned home directory")
+				require.NotEmpty(t, files, "target versioned home directory should not be empty")
+
+				// no need to check for the errorFrom field, this will only get executed if the download step succeeds
+				return tc.expectedError
+			}
+
+			upgradeDetails := details.NewDetails(targetVersion.String(), details.StateRequested, "")
+
+			upgrader, err := NewUpgrader(log, &settings, &info.AgentInfo{})
+			require.NoError(t, err)
+
+			_, err = upgrader.Upgrade(context.Background(), targetVersion.String(), server.URL, nil, upgradeDetails, tc.skipVerify, true)
+			require.ErrorIs(t, err, tc.expectedError)
+
+			require.DirExists(t, initialVersionedHome, "initial versioned home path should not be cleaned up")
+			require.NoDirExists(t, paths.Downloads(), "downloads directory should be cleaned up")
+			if tc.errorFrom == "copyActionStore" {
+				require.NoDirExists(t, targetVersionedHome, "target versioned home path should be cleaned up")
+			}
+		})
+	}
+
 }
