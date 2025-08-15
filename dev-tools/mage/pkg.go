@@ -34,6 +34,15 @@ func Package() error {
 	// platforms := updateWithDarwinUniversal(Platforms)
 	platforms := Platforms
 
+	if mg.Verbose() {
+		debugSelectedPackageSpecsWithPlatform := make([]string, 0, len(Packages))
+		for _, p := range Packages {
+			debugSelectedPackageSpecsWithPlatform = append(debugSelectedPackageSpecsWithPlatform, fmt.Sprintf("spec %s on %s/%s", p.Spec.Name, p.OS, p.Arch))
+		}
+
+		log.Printf("Packaging for platforms %v, packages %v", platforms, debugSelectedPackageSpecsWithPlatform)
+	}
+
 	tasks := make(map[string][]interface{})
 	for _, target := range platforms {
 		for _, pkg := range Packages {
@@ -42,12 +51,12 @@ func Package() error {
 			}
 
 			for _, pkgType := range pkg.Types {
-				if !isPackageTypeSelected(pkgType) {
+				if !IsPackageTypeSelected(pkgType) {
 					log.Printf("Skipping %s package type because it is not selected", pkgType)
 					continue
 				}
 
-				if pkgType == Docker && !isDockerVariantSelected(pkg.Spec.DockerVariant) {
+				if pkgType == Docker && !IsDockerVariantSelected(pkg.Spec.DockerVariant) {
 					log.Printf("Skipping %s docker variant type because it is not selected", pkg.Spec.DockerVariant)
 					continue
 				}
@@ -80,7 +89,6 @@ func Package() error {
 				spec.OS = target.GOOS()
 				spec.Arch = packageArch
 				spec.Snapshot = Snapshot
-				spec.FIPS = FIPSBuild
 				spec.evalContext = map[string]interface{}{
 					"GOOS":          target.GOOS(),
 					"GOARCH":        target.GOARCH(),
@@ -100,6 +108,10 @@ func Package() error {
 
 				spec = spec.Evaluate()
 
+				if mg.Verbose() {
+					log.Printf("Adding task for packaging %s on %s/%s", spec.Name, target.GOOS(), target.Arch())
+				}
+
 				tasks[target.GOOS()+"-"+target.Arch()] = append(tasks[target.GOOS()+"-"+target.Arch()], packageBuilder{target, spec, pkgType}.Build)
 			}
 		}
@@ -112,9 +124,9 @@ func Package() error {
 	return nil
 }
 
-// isPackageTypeSelected returns true if SelectedPackageTypes is empty or if
+// IsPackageTypeSelected returns true if SelectedPackageTypes is empty or if
 // pkgType is present on SelectedPackageTypes. It returns false otherwise.
-func isPackageTypeSelected(pkgType PackageType) bool {
+func IsPackageTypeSelected(pkgType PackageType) bool {
 	if len(SelectedPackageTypes) == 0 {
 		return true
 	}
@@ -127,9 +139,9 @@ func isPackageTypeSelected(pkgType PackageType) bool {
 	return false
 }
 
-// isDockerVariantSelected returns true if SelectedDockerVariants is empty or if
+// IsDockerVariantSelected returns true if SelectedDockerVariants is empty or if
 // docVariant is present on SelectedDockerVariants. It returns false otherwise.
-func isDockerVariantSelected(docVariant DockerVariant) bool {
+func IsDockerVariantSelected(docVariant DockerVariant) bool {
 	if len(SelectedDockerVariants) == 0 {
 		return true
 	}
@@ -149,11 +161,11 @@ type packageBuilder struct {
 }
 
 func (b packageBuilder) Build() error {
-	fmt.Printf(">> package: Building %v type=%v for platform=%v fips=%v\n", b.Spec.Name, b.Type, b.Platform.Name, b.Spec.FIPS)
+	fmt.Printf(">> package: Building %v type=%v for platform=%v\n", b.Spec.Name, b.Type, b.Platform.Name)
 	log.Printf("Package spec: %+v", b.Spec)
 	if err := b.Type.Build(b.Spec); err != nil {
-		return fmt.Errorf("failed building %v type=%v for platform=%v fips=%v : %w",
-			b.Spec.Name, b.Type, b.Platform.Name, b.Spec.FIPS, err)
+		return fmt.Errorf("failed building %v type=%v for platform=%v : %w",
+			b.Spec.Name, b.Type, b.Platform.Name, err)
 	}
 	return nil
 }
@@ -222,7 +234,7 @@ func TestPackages(options ...TestPackagesOption) error {
 		args = append(args, "-v")
 	}
 
-	args = append(args, MustExpand("{{ elastic_beats_dir }}/dev-tools/packaging/package_test.go"))
+	args = append(args, MustExpand("{{ elastic_beats_dir }}/dev-tools/packaging/testing/package_test.go"))
 
 	if params.HasModules {
 		args = append(args, "--modules")
@@ -246,10 +258,6 @@ func TestPackages(options ...TestPackagesOption) error {
 
 	if BeatUser == "root" {
 		args = append(args, "-root-owner")
-	}
-
-	if FIPSBuild {
-		args = append(args, "-fips")
 	}
 
 	args = append(args, "-files", MustExpand("{{.PWD}}/build/distributions/*"))

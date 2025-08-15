@@ -28,6 +28,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
+	"github.com/elastic/elastic-agent/dev-tools/packaging"
 )
 
 const (
@@ -39,13 +40,13 @@ const (
 	packageStagingDir = "build/package"
 
 	// defaultBinaryName specifies the output file for zip and tar.gz.
-	defaultBinaryName = "{{.Name}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}{{if .FIPS}}-fips{{end}}"
+	defaultBinaryName = "{{.Name}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}"
 
 	// defaultRootDir is the default name of the root directory contained inside of zip and
 	// tar.gz packages.
 	// NOTE: This uses .BeatName instead of .Name because we wanted the internal
 	// directory to not include "-oss".
-	defaultRootDir = "{{.BeatName}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}{{if .FIPS}}-fips{{end}}"
+	defaultRootDir = "{{.BeatName}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}"
 
 	componentConfigMode os.FileMode = 0600
 
@@ -92,7 +93,6 @@ type PackageSpec struct {
 	Arch              string                 `yaml:"arch,omitempty"`
 	Vendor            string                 `yaml:"vendor,omitempty"`
 	Snapshot          bool                   `yaml:"snapshot"`
-	FIPS              bool                   `yaml:"fips"`
 	Version           string                 `yaml:"version,omitempty"`
 	License           string                 `yaml:"license,omitempty"`
 	URL               string                 `yaml:"url,omitempty"`
@@ -105,6 +105,7 @@ type PackageSpec struct {
 	Qualifier         string                 `yaml:"qualifier,omitempty"`   // Optional
 	OutputFile        string                 `yaml:"output_file,omitempty"` // Optional
 	ExtraVars         map[string]string      `yaml:"extra_vars,omitempty"`  // Optional
+	Components        []packaging.BinarySpec `yaml:"components"`            // Optional: Components required for this package
 
 	evalContext            map[string]interface{}
 	packageDir             string
@@ -601,12 +602,45 @@ func PackageZip(spec PackageSpec) error {
 
 // PackageTarGz packages a gzipped tar file.
 func PackageTarGz(spec PackageSpec) error {
-	// Create a buffer to write our archive to.
-	buf := new(bytes.Buffer)
+	baseDir := spec.rootDir()
+
+	// Create the output file.
+	if spec.OutputFile == "" {
+		outputTarGz, err := spec.Expand(defaultBinaryName + ".tar.gz")
+		if err != nil {
+			return err
+		}
+		spec.OutputFile = filepath.Join(distributionsDir, outputTarGz)
+	}
+	spec.OutputFile = TarGz.AddFileExtension(spec.OutputFile)
+
+	// Open the output file.
+	log.Println("Creating output file at", spec.OutputFile)
+	outFile, err := os.Create(CreateDir(spec.OutputFile))
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := outFile.Close(); err != nil {
+			log.Printf("failed to close output file: %v", err)
+		}
+	}()
+
+	// Create a gzip writer to our output file
+	gzWriter := gzip.NewWriter(outFile)
+	defer func() {
+		if err := gzWriter.Close(); err != nil {
+			log.Printf("failed to close gzip writer: %v", err)
+		}
+	}()
 
 	// Create a new tar archive.
-	w := tar.NewWriter(buf)
-	baseDir := spec.rootDir()
+	w := tar.NewWriter(gzWriter)
+	defer func() {
+		if err := w.Close(); err != nil {
+			log.Printf("failed to close tar writer: %v", err)
+		}
+	}()
 
 	// // Replace the darwin-universal by darwin-x86_64 and darwin-arm64. Also
 	// // keep the other files.
@@ -660,33 +694,10 @@ func PackageTarGz(spec PackageSpec) error {
 	if err := w.Close(); err != nil {
 		return err
 	}
-
-	// Output tar.gz to disk.
-	if spec.OutputFile == "" {
-		outputTarGz, err := spec.Expand(defaultBinaryName + ".tar.gz")
-		if err != nil {
-			return err
-		}
-		spec.OutputFile = filepath.Join(distributionsDir, outputTarGz)
-	}
-	spec.OutputFile = TarGz.AddFileExtension(spec.OutputFile)
-
-	// Open the output file.
-	log.Println("Creating output file at", spec.OutputFile)
-	outFile, err := os.Create(CreateDir(spec.OutputFile))
-	if err != nil {
+	if err := gzWriter.Close(); err != nil {
 		return err
 	}
-	defer outFile.Close()
-
-	// Gzip compress the data.
-	gzWriter := gzip.NewWriter(outFile)
-	if _, err = gzWriter.Write(buf.Bytes()); err != nil {
-		return err
-	}
-
-	// Close and flush.
-	if err = gzWriter.Close(); err != nil {
+	if err := outFile.Close(); err != nil {
 		return err
 	}
 
@@ -733,7 +744,7 @@ func runFPM(spec PackageSpec, packageType PackageType) error {
 	}
 	defer os.Remove(inputTar)
 
-	outputFile, err := spec.Expand("{{.Name}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.Arch}}{{if .FIPS}}-fips{{end}}")
+	outputFile, err := spec.Expand("{{.Name}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.Arch}}")
 	if err != nil {
 		return err
 	}
@@ -771,7 +782,7 @@ func runFPM(spec PackageSpec, packageType PackageType) error {
 		args = append(args, "--vendor", spec.Vendor)
 	}
 	if spec.License != "" {
-		args = append(args, "--license", strings.Replace(spec.License, " ", "-", -1))
+		args = append(args, "--license", strings.ReplaceAll(spec.License, " ", "-"))
 	}
 	if spec.Description != "" {
 		args = append(args, "--description", spec.Description)

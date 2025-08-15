@@ -14,6 +14,32 @@ import (
 	"net/url"
 )
 
+// simple error wrapper for http codes >=400
+var _ error = httpStatusError(0)
+
+type httpStatusError int
+
+func (e httpStatusError) Error() string {
+	return fmt.Sprintf("received HTTP error code %d: %s", e, e.StatusText())
+}
+
+func (e httpStatusError) StatusCode() int {
+	return int(e)
+}
+
+func (e httpStatusError) StatusText() string {
+	return http.StatusText(e.StatusCode())
+}
+
+func (e httpStatusError) IsRetryable() bool {
+	switch e.StatusCode() {
+	case http.StatusTooManyRequests, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return true
+	default:
+		return false
+	}
+}
+
 // httpRequest configures an HTTP request
 type httpRequest struct {
 	BasicAuthUser     string
@@ -147,5 +173,5 @@ func request(r httpRequest) (string, error) {
 		return bodyString, nil
 	}
 
-	return bodyString, fmt.Errorf("%s request failed with %d", r.method, resp.StatusCode)
+	return bodyString, fmt.Errorf("%s request failed with error: %w", r.method, httpStatusError(resp.StatusCode))
 }
