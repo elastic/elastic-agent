@@ -5,86 +5,82 @@
 package downloads
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/cenkalti/backoff/v4"
-	"github.com/gofrs/uuid/v5"
 )
 
 // downloadRequest struct contains download details ad path and URL
 type downloadRequest struct {
-	URL                 string
-	DownloadPath        string
-	UnsanitizedFilePath string
+	URL        string
+	TargetPath string
 }
 
 // downloadFile will download a url and store it in a temporary path.
 // It writes to the destination file as it downloads it, without
 // loading the entire file into memory.
 func downloadFile(downloadRequest *downloadRequest) error {
-	var filePath string
-	if downloadRequest.DownloadPath == "" {
-		u, err := uuid.NewV4()
-		if err != nil {
-			return fmt.Errorf("failed to create UUID: %w", err)
-		}
-		tempParentDir := filepath.Join(os.TempDir(), u.String())
-		err = mkdirAll(tempParentDir)
-		if err != nil {
-			return fmt.Errorf("creating directory: %w", err)
-		}
-		u, err = uuid.NewV4()
-		if err != nil {
-			return fmt.Errorf("failed to create UUID: %w", err)
-		}
-		filePath = filepath.Join(tempParentDir, u.String())
-		downloadRequest.DownloadPath = filePath
-	} else {
-		u, err := uuid.NewV4()
-		if err != nil {
-			return fmt.Errorf("failed to create UUID: %w", err)
-		}
-		filePath = filepath.Join(downloadRequest.DownloadPath, u.String())
-	}
+	stat, _ := os.Stat(downloadRequest.TargetPath)
 
-	tempFile, err := os.Create(filePath)
-	if err != nil {
-		return fmt.Errorf("creating file: %w", err)
-	}
-	defer tempFile.Close()
-
-	downloadRequest.UnsanitizedFilePath = tempFile.Name()
 	exp := getExponentialBackoff(3)
 
 	retryCount := 1
-	var fileReader io.Reader
+	var fileReader io.ReadCloser
 	download := func() error {
-		r := httpRequest{URL: downloadRequest.URL}
-		bodyStr, err := get(r)
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, downloadRequest.URL, nil)
+		if err != nil {
+			return fmt.Errorf("creating request: %w", err)
+		}
+		// if the target file already exists, add the If-Modified-Since header
+		if stat != nil {
+			req.Header.Add("If-Modified-Since", stat.ModTime().Format(http.TimeFormat))
+		}
+
+		resp, err := http.DefaultClient.Do(req) //nolint:bodyclose // we do close this outside of the function
 		if err != nil {
 			retryCount++
 			return fmt.Errorf("downloading file %s: %w", downloadRequest.URL, err)
 		}
 
-		fileReader = strings.NewReader(bodyStr)
+		if resp.StatusCode == http.StatusNotModified {
+			return nil
+		}
+
+		fileReader = resp.Body
 		return nil
 	}
 
-	err = backoff.Retry(download, exp)
+	err := backoff.Retry(download, exp)
 	if err != nil {
 		return err
 	}
 
-	_, err = io.Copy(tempFile, fileReader)
-	if err != nil {
-		return fmt.Errorf("writing file %s: %w", tempFile.Name(), err)
+	if fileReader == nil { // file already exists with the same content
+		return nil
 	}
 
-	_ = os.Chmod(tempFile.Name(), 0666)
+	targetFile, err := os.Create(downloadRequest.TargetPath)
+	if err != nil {
+		return fmt.Errorf("creating file: %w", err)
+	}
+	defer func() {
+		_ = targetFile.Close()
+	}()
+
+	_, err = io.Copy(targetFile, fileReader)
+	if err != nil {
+		return fmt.Errorf("writing file %s: %w", targetFile.Name(), err)
+	}
+	err = fileReader.Close()
+	if err != nil {
+		return fmt.Errorf("closing reader: %w", err)
+	}
+
+	_ = os.Chmod(targetFile.Name(), 0666)
 
 	return nil
 }
