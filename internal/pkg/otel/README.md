@@ -100,10 +100,17 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+<<<<<<< HEAD
 | [elasticapmconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/elasticapmconnector/v0.4.0/connector/elasticapmconnector/README.md) | v0.4.0 |
 | [forwardconnector](https://github.com/open-telemetry/opentelemetry-collector/blob/connector/forwardconnector/v0.129.0/connector/forwardconnector/README.md) | v0.129.0 |
 | [routingconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/routingconnector/v0.129.0/connector/routingconnector/README.md) | v0.129.0 |
 | [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.129.0/connector/spanmetricsconnector/README.md) | v0.129.0 |
+=======
+| [elasticapmconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/elasticapmconnector/v0.6.0/connector/elasticapmconnector/README.md) | v0.6.0 |
+| [forwardconnector](https://github.com/open-telemetry/opentelemetry-collector/blob/connector/forwardconnector/v0.130.0/connector/forwardconnector/README.md) | v0.130.0 |
+| [routingconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/routingconnector/v0.130.0/connector/routingconnector/README.md) | v0.130.0 |
+| [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.130.0/connector/spanmetricsconnector/README.md) | v0.130.0 |
+>>>>>>> 1929f008d (build(deps): bump github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector from 0.4.0 to 0.6.0 (#9329))
 ## Persistence in OpenTelemetry Collector
 
 By default, the OpenTelemetry Collector is stateless, which means it doesn't store offsets on disk while reading files. As a result, if you restart the collector, it won't retain the last read offset, potentially leading to data duplication or loss. However, we have configured persistence in the settings provided with the Elastic Agent package.
