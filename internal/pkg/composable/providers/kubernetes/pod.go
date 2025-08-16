@@ -72,7 +72,7 @@ func NewPodEventer(
 		Node:         cfg.Node,
 		Namespace:    cfg.Namespace,
 		HonorReSyncs: true,
-	}, nil)
+	}, nil, logger)
 	if err != nil {
 		return nil, errors.New(err, "couldn't create kubernetes watcher")
 	}
@@ -86,7 +86,7 @@ func NewPodEventer(
 			SyncTimeout:  cfg.SyncPeriod,
 			Node:         cfg.Node,
 			HonorReSyncs: true,
-		}, nil)
+		}, nil, logger)
 		if err != nil {
 			logger.Errorf("couldn't create watcher for %T due to error %+v", &kubernetes.Node{}, err)
 		}
@@ -97,7 +97,7 @@ func NewPodEventer(
 			SyncTimeout:  cfg.SyncPeriod,
 			Namespace:    cfg.Namespace,
 			HonorReSyncs: true,
-		}, nil)
+		}, nil, logger)
 		if err != nil {
 			logger.Errorf("couldn't create watcher for %T due to error %+v", &kubernetes.Namespace{}, err)
 		}
@@ -122,7 +122,7 @@ func NewPodEventer(
 				SyncTimeout:  cfg.SyncPeriod,
 				Namespace:    cfg.Namespace,
 				HonorReSyncs: true,
-			}, nil, metadata.RemoveUnnecessaryReplicaSetData)
+			}, nil, metadata.RemoveUnnecessaryReplicaSetData, logger)
 		if err != nil {
 			logger.Errorf("Error creating watcher for %T due to error %+v", &kubernetes.Namespace{}, err)
 		}
@@ -132,7 +132,7 @@ func NewPodEventer(
 			SyncTimeout:  cfg.SyncPeriod,
 			Namespace:    cfg.Namespace,
 			HonorReSyncs: true,
-		}, nil)
+		}, nil, logger)
 		if err != nil {
 			logger.Errorf("Error creating watcher for %T due to error %+v", &kubernetes.Job{}, err)
 		}

@@ -51,7 +51,7 @@ func NewServiceEventer(
 		Node:         cfg.Node,
 		Namespace:    cfg.Namespace,
 		HonorReSyncs: true,
-	}, nil)
+	}, nil, logger)
 	if err != nil {
 		return nil, errors.New(err, "couldn't create kubernetes watcher")
 	}
@@ -66,7 +66,7 @@ func NewServiceEventer(
 			SyncTimeout:  cfg.SyncPeriod,
 			Namespace:    cfg.Namespace,
 			HonorReSyncs: true,
-		}, nil)
+		}, nil, logger)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create watcher for %T due to error %w", &kubernetes.Namespace{}, err)
 		}
