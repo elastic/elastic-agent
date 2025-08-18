@@ -1,5 +1,7 @@
 ## 9.0.0 [elastic-agent-9.0.0-release-notes]
 
+_This release also includes: [Breaking changes](/release-notes/breaking-changes.md#elastic-agent-9.0.0-breaking-changes)._
+
 ### Features and enhancements [elastic-agent-9.0.0-features-enhancements]
 
 * Adds the Azure Asset Inventory definition to Cloudbeat for {{agent}} [#5323]({{agent-pull}}5323)

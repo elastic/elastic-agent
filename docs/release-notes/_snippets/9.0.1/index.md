@@ -1,5 +1,6 @@
 ## 9.0.1 [elastic-agent-release-notes-9.0.1]
 
+_This release also includes: [Breaking changes](/release-notes/breaking-changes.md#elastic-agent-9.0.1-breaking-changes)._
 
 ### Features and enhancements [elastic-agent-9.0.1-features-enhancements]
 

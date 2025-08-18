@@ -1,5 +1,6 @@
 ## 9.1.0 [elastic-agent-release-notes-9.1.0]
 
+_This release also includes: [Deprecations](/release-notes/deprecations.md#elastic-agent-9.1.0-deprecations)._
 
 ### Features and enhancements [elastic-agent-9.1.0-features-enhancements]
 
