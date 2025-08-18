@@ -86,9 +86,11 @@ type agentWatcher interface {
 	Watch(ctx context.Context, tilGrace, errorCheckInterval time.Duration, log *logp.Logger) error
 }
 
+type rollbackHook func(ctx context.Context, log *logger.Logger, topDirPath string) error
+
 type installationModifier interface {
 	Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool) error
-	Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string, preRestart func(ctx context.Context, log *logger.Logger, topDirPath string, rollbackVersionedHome string, rollbackHash string) error) error
+	Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string, preRestart rollbackHook) error
 }
 
 func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcherConfig, watcher agentWatcher, installModifier installationModifier) error {
@@ -120,11 +122,11 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		_ = locker.Unlock()
 	}()
 
-	if marker.DesiredOutcome == upgrade.OUTCOME_ROLLBACK && marker.Details.State != details.StateRollback {
+	if marker.DesiredOutcome == upgrade.OUTCOME_ROLLBACK && marker.Details != nil && marker.Details.State != details.StateRollback {
 		// TODO: there should be some sanity check in rollback functions like the installation we are going back to should exist and work
 		log.Infof("rolling back because of DesiredOutcome=%s", marker.DesiredOutcome.String())
 
-		updateMarkerAndDetails := func(_ context.Context, _ *logger.Logger, _ string, _ string, _ string) error {
+		updateMarkerAndDetails := func(_ context.Context, _ *logger.Logger, _ string) error {
 			if marker.Details == nil {
 				actionID := ""
 				if marker.Action != nil {
