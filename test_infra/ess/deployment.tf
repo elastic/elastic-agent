@@ -58,6 +58,12 @@ variable "kibana_docker_image" {
   description = "Docker image override for kibana"
 }
 
+variable "docker_images_name_suffix" {
+  type        = string
+  default     = ""
+  description = "Suffix to append to the docker images names"
+}
+
 resource "random_uuid" "deployment_suffix" {
 }
 
@@ -80,9 +86,9 @@ locals {
     yamldecode(file("${path.module}/../../pkg/testing/ess/create_deployment_csp_configuration.yaml")))
 
   images_version = coalesce(var.stack_build_id, var.stack_version)
-  integration_server_docker_image = coalesce(var.integration_server_docker_image, local.ess_properties.docker.integration_server_image, "docker.elastic.co/cloud-release/elastic-agent-cloud:${local.images_version}")
-  elasticsearch_docker_image = coalesce(var.elasticsearch_docker_image, local.ess_properties.docker.elasticsearch_image, "docker.elastic.co/cloud-release/elasticsearch-cloud-ess:${local.images_version}")
-  kibana_docker_image = coalesce(var.kibana_docker_image, local.ess_properties.docker.kibana_image, "docker.elastic.co/cloud-release/kibana-cloud:${local.images_version}")
+  integration_server_docker_image = coalesce(var.integration_server_docker_image, local.ess_properties.docker.integration_server_image, "docker.elastic.co/cloud-release/elastic-agent-cloud${var.docker_images_name_suffix}:${local.images_version}")
+  elasticsearch_docker_image = coalesce(var.elasticsearch_docker_image, local.ess_properties.docker.elasticsearch_image, "docker.elastic.co/cloud-release/elasticsearch-cloud-ess${var.docker_images_name_suffix}:${local.images_version}")
+  kibana_docker_image = coalesce(var.kibana_docker_image, local.ess_properties.docker.kibana_image, "docker.elastic.co/cloud-release/kibana-cloud${var.docker_images_name_suffix}:${local.images_version}")
 }
 
 # If we have defined a stack version, validate that this version exists on that region and return it.
