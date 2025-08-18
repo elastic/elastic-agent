@@ -256,7 +256,7 @@ func extractVars(i string, defaultProvider string) ([]varI, error) {
 					res = append(res, &varString{maybeAddDefaultProvider(string(is), defaultProvider)})
 				}
 				is = is[:0]         // slice to zero length; to keep allocated memory
-				constant = r == ':' // not a constant when ':'
+				constant = r == ':' // not a constant when '|'
 			} else {
 				is = append(is, r)
 			}
