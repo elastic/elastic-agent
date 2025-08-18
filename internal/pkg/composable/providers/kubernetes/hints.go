@@ -117,7 +117,7 @@ func (m *hintsBuilder) getFromMeta(value string, kubeMeta mapstr.M) string {
 	if value == "" {
 		return ""
 	}
-	r := regexp.MustCompile(`\${([^{}]+)}`)
+	r := regexp.MustCompile(`\${(kubernetes\.[^{}]+)}`)
 	matches := r.FindAllString(value, -1)
 	for _, match := range matches {
 		key := strings.TrimSuffix(strings.TrimPrefix(match, "${kubernetes."), "}")
@@ -131,7 +131,7 @@ func (m *hintsBuilder) getFromMeta(value string, kubeMeta mapstr.M) string {
 			m.logger.Debugf("cannot convert value into string: %v", val)
 			return ""
 		}
-		value = strings.Replace(value, match, hintVal, -1)
+		value = strings.ReplaceAll(value, match, hintVal)
 	}
 	return value
 }
