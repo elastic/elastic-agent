@@ -40,7 +40,18 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.filter.outputs.matrix) }}
     steps:
+<<<<<<< HEAD
       - uses: actions/checkout@v4
+=======
+      - uses: actions/checkout@v5
+        with:
+          # NOTE: as long as the updatecli bump differs between branches, we need to
+          # checkout the branch that we are going to bump that we are going to bump
+          # this is needed to ensure that the updatecli bump is done against the correct updatecli
+          # pipeline. For instance, https://github.com/elastic/elastic-agent/pull/8035 was not
+          # backported to the short lived branches.
+          ref: ${{ matrix.branch }}
+>>>>>>> 85e5eaf4d (build(deps): bump actions/checkout from 4 to 5 (#9413))
 
       - uses: elastic/oblt-actions/updatecli/run@v1
         with:
