@@ -616,6 +616,8 @@ outputs:
 		ignoredFields := []string{
 			"@timestamp",
 			"agent.id",
+			// We ignore agent.version because a different version is forced in CI
+			"agent.version",
 			"agent.ephemeral_id",
 			"elastic_agent.id",
 			"data_stream.namespace",
