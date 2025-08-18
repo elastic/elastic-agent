@@ -261,9 +261,8 @@ func TestGetOtelConfig(t *testing.T) {
 				"authenticator": "beatsauth/_agent-component/default",
 			},
 			"tls": map[string]any{
-				"include_system_ca_certs_pool": true,
-				"min_version":                  "1.2",
-				"max_version":                  "1.3",
+				"min_version": "1.2",
+				"max_version": "1.3",
 			},
 		},
 	}
@@ -452,7 +451,7 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 				"service": map[string]any{
-					"extensions": []string{"beatsauth/_agent-component/default"},
+					"extensions": []interface{}{"beatsauth/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/filestream-default": map[string][]string{
 							"exporters": []string{"elasticsearch/_agent-component/default"},
@@ -547,7 +546,7 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 				"service": map[string]any{
-					"extensions": []string{"beatsauth/_agent-component/default"},
+					"extensions": []interface{}{"beatsauth/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
 							"exporters": []string{"elasticsearch/_agent-component/default"},
@@ -653,7 +652,7 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 				"service": map[string]any{
-					"extensions": []string{"beatsauth/_agent-component/default"},
+					"extensions": []interface{}{"beatsauth/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/system-metrics": map[string][]string{
 							"exporters": []string{"elasticsearch/_agent-component/default"},
@@ -953,9 +952,8 @@ func TestBeatsAuthExtension(t *testing.T) {
 				"enabled": true,
 			},
 			expectedES_TLSConfig: map[string]any{
-				"include_system_ca_certs_pool": true,
-				"min_version":                  "1.2",
-				"max_version":                  "1.3",
+				"min_version": "1.2",
+				"max_version": "1.3",
 			},
 			expectedBeatsAuthConfig: map[string]any{
 				"verification_mode": "full",
@@ -969,9 +967,8 @@ func TestBeatsAuthExtension(t *testing.T) {
 				"ca_trusted_fingerprint": "a3:5f:bf:93:12:8f:bc:5c:ab:14:6d:bf:e4:2a:7f:98:9d:2f:16:92:76:c4:12:ab:67:89:fc:56:4b:8e:0c:43",
 			},
 			expectedES_TLSConfig: map[string]any{
-				"include_system_ca_certs_pool": true,
-				"min_version":                  "1.2",
-				"max_version":                  "1.3",
+				"min_version": "1.2",
+				"max_version": "1.3",
 			},
 			expectedBeatsAuthConfig: map[string]any{
 				"verification_mode":      "full",
@@ -985,10 +982,9 @@ func TestBeatsAuthExtension(t *testing.T) {
 				"verification_mode": "none",
 			},
 			expectedES_TLSConfig: map[string]any{
-				"insecure_skip_verify":         true,
-				"include_system_ca_certs_pool": true,
-				"min_version":                  "1.2",
-				"max_version":                  "1.3",
+				"insecure_skip_verify": true,
+				"min_version":          "1.2",
+				"max_version":          "1.3",
 			},
 			shouldAuthExist: false,
 		},
