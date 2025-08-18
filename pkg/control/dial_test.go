@@ -31,7 +31,7 @@ func TestDialContextBlocking_Success(t *testing.T) {
 	defer server.Stop()
 
 	// Test successful connection
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	conn, err := DialContextBlocking(ctx, "bufconn",
@@ -51,7 +51,7 @@ func TestDialContextBlocking_Success(t *testing.T) {
 
 func TestDialContextBlocking_ContextCancellation(t *testing.T) {
 	// Create a context that cancels immediately
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel() // Cancel immediately
 
 	// Try to establish connection with cancelled context
@@ -69,7 +69,7 @@ func TestDialContextBlocking_ContextCancellation(t *testing.T) {
 }
 
 func TestDialContextBlocking_InvalidTarget(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 1*time.Second)
 	defer cancel()
 
 	// Try to connect to an invalid target
@@ -86,7 +86,7 @@ func TestDialContextBlocking_InvalidTarget(t *testing.T) {
 
 func TestDialContextBlocking_Timeout(t *testing.T) {
 	// Create a very short timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
 	defer cancel()
 
 	// Try to connect to a non-existent service
