@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"runtime"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/kardianos/service"
@@ -40,7 +41,8 @@ var (
 	// ErrInvalidServiceSpec error invalid service specification.
 	ErrInvalidServiceSpec = errors.New("invalid service spec")
 
-	serviceRestartDelay = 30 * time.Second // variable so it can be shortened in tests
+	serviceRestartDelay   = 30 * time.Second // variable so it can be shortened in tests
+	serviceRestartDelayMu sync.RWMutex       // needed to avoid data race in tests
 )
 
 type executeServiceCommandFunc func(ctx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec) error
@@ -264,11 +266,12 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 					}
 
 					// Schedule a restart of the service after a delay by resending the start action on the action channel
+					delay := getServiceRestartDelay()
 					s.log.Errorf(
 						"failed to start %s service, err: %v, restarting (%d/%d) after waiting for %v",
-						s.name(), err, numStartAttempts, maxServiceStartAttempts, serviceRestartDelay,
+						s.name(), err, numStartAttempts, maxServiceStartAttempts, delay,
 					)
-					time.AfterFunc(serviceRestartDelay, func() {
+					time.AfterFunc(delay, func() {
 						s.actionCh <- as
 					})
 					continue
@@ -743,4 +746,16 @@ func uninstallService(ctx context.Context, log *logger.Logger, comp component.Co
 
 	log.Debugf("uninstall %s service", comp.BinaryName())
 	return executeServiceCommandImpl(ctx, log, comp.InputSpec.BinaryPath, uninstallSpec)
+}
+
+func getServiceRestartDelay() time.Duration {
+	serviceRestartDelayMu.RLock()
+	defer serviceRestartDelayMu.RUnlock()
+	return serviceRestartDelay
+}
+
+func setServiceRestartDelay(delay time.Duration) {
+	serviceRestartDelayMu.Lock()
+	defer serviceRestartDelayMu.Unlock()
+	serviceRestartDelay = delay
 }

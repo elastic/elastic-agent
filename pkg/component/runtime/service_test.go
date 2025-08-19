@@ -375,10 +375,10 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 // retry the service start command if it fails
 func TestServiceStartRetry(t *testing.T) {
 	// Shorten service restart delay for testing
-	origServiceRestartDelay := serviceRestartDelay
-	serviceRestartDelay = 2 * time.Second
+	origServiceRestartDelay := getServiceRestartDelay()
+	setServiceRestartDelay(2 * time.Second)
 	t.Cleanup(func() {
-		serviceRestartDelay = origServiceRestartDelay
+		setServiceRestartDelay(origServiceRestartDelay)
 	})
 
 	log, logObs := loggertest.New("test")
@@ -450,7 +450,7 @@ func TestServiceStartRetry(t *testing.T) {
 			}
 		}
 		return false
-	}, serviceRestartDelay+1*time.Second, 500*time.Millisecond)
+	}, getServiceRestartDelay()+1*time.Second, 500*time.Millisecond)
 }
 
 func mockEndpointBinary(t *testing.T, exitCode int) string {
