@@ -11,7 +11,7 @@
 kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
-summary: Fix default constant support in output configuration
+summary: Fix Docker container failing to start with no matching vars: ${env.ELASTICSEARCH_API_KEY:} and similar errors by restoring support for `:` to set default values.
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
