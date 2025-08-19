@@ -1041,6 +1041,8 @@ func TestOtelFilestreamInput(t *testing.T) {
 	decodedApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err)
 	configTemplate := `
+agent.grpc:
+  port: 6799
 inputs:
   - type: filestream
     id: filestream-e2e

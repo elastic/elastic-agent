@@ -157,32 +157,22 @@ func getCollectorConfigForComponent(
 		},
 	}
 
+	// we need to convert []string to []interface for this to work
+	extensionKey := make([]interface{}, len(maps.Keys(extensionConfig)))
+	for i, v := range maps.Keys(extensionConfig) {
+		extensionKey[i] = v
+	}
+
 	fullConfig := map[string]any{
-		"receivers": receiversConfig,
-		"exporters": exportersConfig,
+		"receivers":  receiversConfig,
+		"exporters":  exportersConfig,
+		"extensions": extensionConfig,
 		"service": map[string]any{
-			"pipelines": pipelinesConfig,
+			"extensions": extensionKey,
+			"pipelines":  pipelinesConfig,
 		},
 	}
 
-	if extensionConfig != nil {
-		// set extension definition
-		fullConfig["extensions"] = extensionConfig
-
-		// get service map
-		serviceMap := fullConfig["service"].(map[string]any)
-
-		// we need to convert []string to []interface for this to work
-		// this is required because otel's merging logic expects []interface
-		serviceInterface := make([]interface{}, len(maps.Keys(extensionConfig)))
-		for i, v := range maps.Keys(extensionConfig) {
-			serviceInterface[i] = v
-		}
-
-		serviceMap["extensions"] = serviceInterface
-	}
-
-	fmt.Println(confmap.NewFromStringMap(fullConfig))
 	return confmap.NewFromStringMap(fullConfig), nil
 }
 
@@ -304,10 +294,8 @@ func getExportersConfigForComponent(comp *component.Component, logger *logp.Logg
 			for k, v := range unitExportersConfig {
 				exportersConfig[k] = v
 			}
-			if unitExtensionConfig != nil {
-				for k, v := range unitExtensionConfig {
-					extensionConfig[k] = v
-				}
+			for k, v := range unitExtensionConfig {
+				extensionConfig[k] = v
 			}
 		}
 	}
@@ -396,7 +384,8 @@ func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, 
 		}
 	}
 
-	// use beatsauth extension for ssl parameters not supported by ES exporter
+	// beatsauth extension is not tested with other output types yet
+	// This extension is used to support ssl parameters
 	if exporterType.String() == "elasticsearch" {
 		// get extension ID
 		extensionID := getExtensionID(outputName)
@@ -499,11 +488,6 @@ func getBeatsAuthExtensionConfig(cfg *config.C) (map[string]any, error) {
 		return nil, err
 	}
 
-	// if ssl is not enabled or if verification mode is none, then we do not need beatsauth extension
-	if !sslConfig.TLS.IsEnabled() || sslConfig.TLS.VerificationMode.String() == "none" {
-		return nil, nil
-	}
-
 	finalConfig := map[string]any{
 		"tls": map[string]any{
 			"verification_mode": sslConfig.TLS.VerificationMode.String(),
@@ -512,7 +496,9 @@ func getBeatsAuthExtensionConfig(cfg *config.C) (map[string]any, error) {
 
 	if len(sslConfig.TLS.CASha256) != 0 {
 		finalConfig["tls"].(map[string]any)["ca_sha256"] = sslConfig.TLS.CASha256
-	} else if sslConfig.TLS.CATrustedFingerprint != "" {
+	}
+
+	if sslConfig.TLS.CATrustedFingerprint != "" {
 		finalConfig["tls"].(map[string]any)["ca_trusted_fingerprint"] = sslConfig.TLS.CATrustedFingerprint
 	}
 
