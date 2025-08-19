@@ -246,6 +246,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 
 				// Start service
 				numStartAttempts++
+				s.log.Debugf("starting %s service, attempt %d/%d", s.name(), numStartAttempts, maxServiceStartAttempts)
 				err = s.start(ctx)
 				if err != nil {
 					// If the error is due to a non-fatal exit code, continue running the service
