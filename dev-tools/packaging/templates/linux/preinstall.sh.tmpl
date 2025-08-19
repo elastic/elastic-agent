@@ -2,8 +2,6 @@
 
 set -e
 
-<<<<<<< HEAD
-=======
 # we need to stop the agent to have all components stopped as well
 if systemctl --quiet is-active elastic-agent; then
   echo "elastic-agent is running, stopping it"
@@ -12,34 +10,6 @@ else
   echo "elastic-agent is not running"
 fi
 
-SERVICE_NAME="ElasticEndpoint"
-
-# Check if the endpoint service is installed
-if systemctl list-unit-files --type=service | grep -q "^${SERVICE_NAME}.service"; then
-    echo "$SERVICE_NAME is installed"
-
-    # Remove the vault directory if it exists
-    if [ -d "/opt/Elastic/Endpoint/state/vault" ]; then
-
-        # Check if the endpoint is running
-        if systemctl --quiet is-active $SERVICE_NAME; then
-            echo "$SERVICE_NAME is running, stopping it"
-            systemctl --quiet stop $SERVICE_NAME
-        else
-            echo "$SERVICE_NAME is not running"
-        fi
-
-        echo "$SERVICE_NAME is tamper protected"
-        echo "Removing $SERVICE_NAME vault"
-        rm -rf "/opt/Elastic/Endpoint/state/vault"
-    else
-        echo "$SERVICE_NAME tamper protection is not enabled"
-    fi
-else
-    echo "$SERVICE_NAME is not installed"
-fi
-
->>>>>>> eb0d46c91 (fix: endpoint with tamper protection deb upgrade (#9462))
 commit_hash="{{ commit_short }}"
 version_dir="{{agent_package_version}}{{snapshot_suffix}}"
 symlink="/usr/share/elastic-agent/bin/elastic-agent"
