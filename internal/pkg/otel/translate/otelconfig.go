@@ -499,7 +499,7 @@ func getBeatsAuthExtensionConfig(cfg *config.C) (map[string]any, error) {
 
 	finalConfig = map[string]any{
 		"tls": map[string]any{
-			"verification_mode": sslConfig.TLS.VerificationMode,
+			"verification_mode": sslConfig.TLS.VerificationMode.String(),
 		},
 	}
 
