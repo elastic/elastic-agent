@@ -394,15 +394,13 @@ func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, 
 			return nil, nil, nil, fmt.Errorf("error supporting ssl parameters for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
 		}
 
-		if extensionConfig != nil {
-			// sets extensionCfg
-			extensionCfg = map[string]any{
-				extensionID.String(): extensionConfig,
-			}
-			// add authenticator to ES config
-			exporterConfig["auth"] = map[string]any{
-				"authenticator": extensionID.String(),
-			}
+		// sets extensionCfg
+		extensionCfg = map[string]any{
+			extensionID.String(): extensionConfig,
+		}
+		// add authenticator to ES config
+		exporterConfig["auth"] = map[string]any{
+			"authenticator": extensionID.String(),
 		}
 
 	}
@@ -488,9 +486,20 @@ func getBeatsAuthExtensionConfig(cfg *config.C) (map[string]any, error) {
 		return nil, err
 	}
 
-	finalConfig := map[string]any{
+	var finalConfig map[string]any
+
+	if sslConfig.TLS == nil {
+		finalConfig = map[string]any{
+			"tls": map[string]any{
+				"verification_mode": "full",
+			},
+		}
+		return finalConfig, nil
+	}
+
+	finalConfig = map[string]any{
 		"tls": map[string]any{
-			"verification_mode": sslConfig.TLS.VerificationMode.String(),
+			"verification_mode": sslConfig.TLS.VerificationMode,
 		},
 	}
 
