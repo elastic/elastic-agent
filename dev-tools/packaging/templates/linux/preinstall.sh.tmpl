@@ -18,6 +18,13 @@ if systemctl list-unit-files --type=service | grep -q "^${SERVICE_NAME}.service"
 
     # Remove the vault directory if it exists
     if [ -d "/opt/Elastic/Endpoint/state/vault" ]; then
+        # we need to stop the agent to prevent it from invoking endpoint
+        if systemctl --quiet is-active elastic-agent; then
+          echo "elastic-agent is running, stopping it"
+          systemctl --quiet stop elastic-agent
+        else
+          echo "elastic-agent is not running"
+        fi
 
         # Check if the endpoint is running
         if systemctl --quiet is-active $SERVICE_NAME; then
