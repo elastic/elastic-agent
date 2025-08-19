@@ -11,10 +11,10 @@ outputs:
   default:
     type: elasticsearch
     hosts: [127.0.0.1:9200]
-    api_key: "example-key"
-    #username: "elastic"
-    #password: "changeme"
     preset: balanced
+    username: ${ELASTICSEARCH_USERNAME:}
+    password: ${ELASTICSEARCH_PASSWORD:}
+    api_key: ${ELASTICSEARCH_API_KEY:}
 
 
 
@@ -49,10 +49,10 @@ inputs:
 #       data_stream.dataset: system.process
 #       # While running in unprivileged mode, process/process_summary metricsets can emit
 #       # partial metrics. Some metrics that require privileged access can be missing.
-#       # On Windows, non-administrator users may not be able to access protected processes, leading 
-#       # to missing details like command line and arguments. On Unix, non-root users can't access 
-#       # procfs without the right permissions. 
-#       # Errors like ERROR_ACCESS_DENIED, EPERM, and EACCESS may result in partial metrics. 
+#       # On Windows, non-administrator users may not be able to access protected processes, leading
+#       # to missing details like command line and arguments. On Unix, non-root users can't access
+#       # procfs without the right permissions.
+#       # Errors like ERROR_ACCESS_DENIED, EPERM, and EACCESS may result in partial metrics.
 #       # Enabling the config below will mark the metricset as degraded when this occurs.
 #       # You may want to enable it to identify potential permission-related issues.
 #       # If you're unable to provide the necessary access, you can disable this config to keep
@@ -201,11 +201,11 @@ inputs:
 #   # is force killed
 #   stop_timeout: 30s
 
-# agent.grpc:
+agent.grpc:
 #   # listen address for the GRPC server that spawned processes connect back to.
 #   address: localhost
 #   # port for the GRPC server that spawned processes connect back to.
-#   port: 6789
+  port: 6790
 #   # max_message_size limits the message size in agent internal communication
 #   # default is 100MB
 #   max_message_size: 104857600
