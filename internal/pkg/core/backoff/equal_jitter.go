@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+// randFn defines a signature for functions that return a random duration.
+// It's used to allow injecting a deterministic random function for testing purposes.
+type randFn func(n time.Duration) time.Duration
+
 // EqualJitterBackoff implements an equal jitter strategy, meaning the wait time will consist of two parts,
 // the first will be exponential and the other half will be random and will provide the jitter
 // necessary to distribute the wait on remote endpoint.
@@ -21,23 +25,29 @@ type EqualJitterBackoff struct {
 	nextRand time.Duration
 
 	last time.Time
+
+	// Expose randFn to ensure the jitter is always the same for testing
+	// purposes. Constructor uses rand.N which is not deterministic.
+	randFn randFn
 }
 
 // NewEqualJitterBackoff returns a new EqualJitter object.
 func NewEqualJitterBackoff(done <-chan struct{}, init, max time.Duration) Backoff {
-	return &EqualJitterBackoff{
-		duration: init * 2, // Allow to sleep at least the init period on the first wait.
-		done:     done,
-		init:     init,
-		max:      max,
-		nextRand: rand.N(init),
+	bo := &EqualJitterBackoff{
+		done:   done,
+		init:   init,
+		max:    max,
+		randFn: rand.N[time.Duration],
 	}
+	bo.Reset()
+	return bo
 }
 
 // Reset resets the duration of the backoff.
 func (b *EqualJitterBackoff) Reset() {
 	// Allow to sleep at least the init period on the first wait.
 	b.duration = b.init * 2
+	b.nextRand = b.randFn(b.init)
 }
 
 func (b *EqualJitterBackoff) NextWait() time.Duration {
@@ -51,7 +61,7 @@ func (b *EqualJitterBackoff) Wait() bool {
 	backoff := b.NextWait()
 
 	// increase duration for next wait.
-	b.nextRand = rand.N(b.duration)
+	b.nextRand = b.randFn(b.duration)
 	b.duration *= 2
 	if b.duration > b.max {
 		b.duration = b.max
