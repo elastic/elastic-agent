@@ -80,6 +80,23 @@ func TestVars_Replace(t *testing.T) {
 			false,
 		},
 		{
+<<<<<<< HEAD
+=======
+			// data will be resolved to other.data since 'other' is the default provider
+			// set at variable creation (see mustMakeVarsWithDefault call)
+			"${un-der_score.missing|un-der_score.missing2|data}",
+			NewStrVal("info"),
+			false,
+			false,
+		},
+		{
+			`${un-der_score.missing\|'fallback'}`,
+			NewStrVal(""),
+			true,
+			false,
+		},
+		{
+>>>>>>> c067b6aa7 (Add support for variable parser to handle `:` as default constant . (#9451))
 			"${un-der_score.missing|'fallback'}",
 			NewStrVal("fallback"),
 			false,
@@ -250,6 +267,36 @@ func TestVars_Replace(t *testing.T) {
 		{
 			`${special.key6}`,
 			NewStrVal("$${"),
+			false,
+			false,
+		},
+		{
+			"${missing.key:}",
+			NewStrVal(""),
+			false,
+			false,
+		},
+		{
+			`${missing.key\:constant_string}`,
+			NewStrVal(""),
+			true,
+			false,
+		},
+		{
+			"${missing.key:constant_string}",
+			NewStrVal("constant_string"),
+			false,
+			false,
+		},
+		{
+			"${missing.key|missing.key2:constant_string}",
+			NewStrVal("constant_string"),
+			false,
+			false,
+		},
+		{
+			"${un-der_score.with-dash:not_used}",
+			NewStrVal("dash-value"),
 			false,
 			false,
 		},
