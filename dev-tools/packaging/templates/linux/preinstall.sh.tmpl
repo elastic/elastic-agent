@@ -2,6 +2,14 @@
 
 set -e
 
+# we need to stop the agent to have all components stopped as well
+if systemctl --quiet is-active elastic-agent; then
+  echo "elastic-agent is running, stopping it"
+  systemctl --quiet stop elastic-agent
+else
+  echo "elastic-agent is not running"
+fi
+
 SERVICE_NAME="ElasticEndpoint"
 
 # Check if the endpoint service is installed
