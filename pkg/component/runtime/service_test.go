@@ -383,7 +383,7 @@ func TestServiceStartRetry(t *testing.T) {
 
 	log, logObs := loggertest.New("test")
 	const cisPort = 9999
-	const cisSocket = ".teaci.sock"
+	const cisSocket = ".tssrci.sock"
 
 	// Make an Endpoint component for testing
 	endpoint := makeEndpointComponent(t, map[string]interface{}{})
