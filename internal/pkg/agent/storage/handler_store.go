@@ -4,9 +4,7 @@
 
 package storage
 
-import (
-	"io"
-)
+import "io"
 
 type handlerFunc func(io.Reader) error
 

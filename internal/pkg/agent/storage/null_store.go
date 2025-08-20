@@ -4,9 +4,7 @@
 
 package storage
 
-import (
-	"io"
-)
+import "io"
 
 // NullStore this is only use to split the work into multiples PRs.
 type NullStore struct{}
