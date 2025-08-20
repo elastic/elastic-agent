@@ -64,7 +64,7 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 	}
 
 	// if endpoint is present do not proceed
-	if h.tamperProtectionFn() && h.coord.HasEndpoint() {
+	if h.isAgentTamperProtected() {
 		err := errors.New("unsupported action: tamper protected agent")
 		h.ackFailure(ctx, err, action, ack)
 		return err
@@ -120,4 +120,8 @@ func (h *Migrate) ackFailure(ctx context.Context, err error, action *fleetapi.Ac
 			"error.message", err,
 			"action", action)
 	}
+}
+
+func (h *Migrate) isAgentTamperProtected() bool {
+	return h.tamperProtectionFn() && h.coord.Protection().Enabled
 }
