@@ -121,7 +121,7 @@ func (d *EncryptedDiskStore) ensureKey(ctx context.Context) error {
 // corrupt the previously written file.
 // Specially on windows systems, if the original files is still open because of
 // Load(), Save() would fail.
-func (d *EncryptedDiskStore) Save(in io.Reader, rotateOpts ...file.RotateOpt) error {
+func (d *EncryptedDiskStore) Save(in io.Reader) error {
 	// Ensure has agent key
 	err := d.ensureKey(d.ctx)
 	if err != nil {
@@ -187,7 +187,7 @@ func (d *EncryptedDiskStore) Save(in io.Reader, rotateOpts ...file.RotateOpt) er
 			errors.M(errors.MetaKeyPath, tmpFile))
 	}
 
-	if err := file.SafeFileRotate(d.target, tmpFile, rotateOpts...); err != nil {
+	if err := file.SafeFileRotate(d.target, tmpFile); err != nil {
 		return errors.New(err,
 			fmt.Sprintf("could not replace target file %s", d.target),
 			errors.TypeFilesystem,

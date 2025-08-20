@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/file"
+	"github.com/cenkalti/backoff/v4"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/pkg/core/logger"

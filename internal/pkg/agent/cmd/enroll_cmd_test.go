@@ -28,7 +28,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	libsFile "github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -45,7 +44,7 @@ type mockSaver struct {
 	mock.Mock
 }
 
-func (m *mockSaver) Save(in io.Reader, _ ...libsFile.RotateOpt) error {
+func (m *mockSaver) Save(in io.Reader) error {
 	args := m.Called(in)
 	return args.Error(0)
 }
@@ -56,7 +55,7 @@ type mockStore struct {
 	Content []byte
 }
 
-func (m *mockStore) Save(in io.Reader, _ ...libsFile.RotateOpt) error {
+func (m *mockStore) Save(in io.Reader) error {
 	m.Called = true
 	if m.Err != nil {
 		return m.Err

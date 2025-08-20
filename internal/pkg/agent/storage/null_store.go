@@ -6,14 +6,12 @@ package storage
 
 import (
 	"io"
-
-	"github.com/elastic/elastic-agent-libs/file"
 )
 
 // NullStore this is only use to split the work into multiples PRs.
 type NullStore struct{}
 
 // Save takes the fleetConfig and persist it, will return an errors on failure.
-func (m *NullStore) Save(_ io.Reader, _ ...file.RotateOpt) error {
+func (m *NullStore) Save(_ io.Reader) error {
 	return nil
 }

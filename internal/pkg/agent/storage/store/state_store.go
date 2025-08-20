@@ -13,8 +13,6 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/elastic/elastic-agent-libs/file"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
@@ -26,7 +24,7 @@ import (
 const Version = "1"
 
 type saver interface {
-	Save(io.Reader, ...file.RotateOpt) error
+	Save(io.Reader) error
 }
 
 type saveLoader interface {

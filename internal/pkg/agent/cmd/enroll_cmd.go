@@ -33,8 +33,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 	"github.com/elastic/elastic-agent/pkg/utils"
-
-	"github.com/elastic/elastic-agent-libs/file"
 )
 
 const (
@@ -53,7 +51,7 @@ var (
 )
 
 type saver interface {
-	Save(io.Reader, ...file.RotateOpt) error
+	Save(io.Reader) error
 }
 
 // enrollCmd is an enroll subcommand that interacts between the Kibana API and the Agent.
