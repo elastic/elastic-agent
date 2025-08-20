@@ -46,12 +46,18 @@ func (h *PrivilegeLevelChange) Handle(ctx context.Context, a fleetapi.Action, ac
 	return h.handle(ctx, a, acker)
 }
 
-func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {
+func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) (rerr error) {
 	h.log.Debugf("handlerPrivilegeLevelChange: action '%+v' received", a)
 	action, ok := a.(*fleetapi.ActionPrivilegeLevelChange)
 	if !ok {
 		return fmt.Errorf("invalid type, expected ActionPrivilegeLevelChange and received %T", a)
 	}
+
+	defer func() {
+		if rerr != nil {
+			h.ackFailure(ctx, rerr, action, acker)
+		}
+	}()
 
 	if !action.Data.Unprivileged {
 		// only unprivileged supported at this point
@@ -101,6 +107,22 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 	// restart
 	h.coord.ReExec(nil)
 	return nil
+}
+
+func (h *PrivilegeLevelChange) ackFailure(ctx context.Context, err error, action *fleetapi.ActionPrivilegeLevelChange, acker acker.Acker) {
+	action.Err = err
+
+	if err := acker.Ack(ctx, action); err != nil {
+		h.log.Errorw("failed to ack privilege level change action",
+			"error.message", err,
+			"action", action)
+	}
+
+	if err := acker.Commit(ctx); err != nil {
+		h.log.Errorw("failed to commit privilege level change action",
+			"error.message", err,
+			"action", action)
+	}
 }
 
 type noopDescriber struct{}
