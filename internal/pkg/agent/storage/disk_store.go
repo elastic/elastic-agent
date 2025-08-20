@@ -54,7 +54,7 @@ func (d *DiskStore) Delete() error {
 // Save accepts a persistedConfig and saved it to a target file, to do so we will
 // make a temporary files if the write is successful we are replacing the target file with the
 // original content.
-func (d *DiskStore) Save(in io.Reader) error {
+func (d *DiskStore) Save(in io.Reader, rotateOpts ...file.RotateOpt) error {
 	tmpFile := d.target + ".tmp"
 
 	fd, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, permMask)
@@ -107,7 +107,7 @@ func (d *DiskStore) Save(in io.Reader) error {
 			errors.M(errors.MetaKeyPath, tmpFile))
 	}
 
-	if err := file.SafeFileRotate(d.target, tmpFile); err != nil {
+	if err := file.SafeFileRotate(d.target, tmpFile, rotateOpts...); err != nil {
 		return errors.New(err,
 			fmt.Sprintf("could not replace target file %s", d.target),
 			errors.TypeFilesystem,

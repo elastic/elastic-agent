@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -19,7 +20,7 @@ type Store interface {
 	// Save the io.Reader. Depending on the underlying implementation, if
 	// Storage.Load() was called, the io.ReadCloser MUST be closed before Save()
 	// can be called.
-	Save(io.Reader) error
+	Save(io.Reader, ...file.RotateOpt) error
 }
 
 // Storage interacts with on-disk data stores.

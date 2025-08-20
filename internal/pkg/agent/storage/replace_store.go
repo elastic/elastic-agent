@@ -56,7 +56,7 @@ func NewReplaceOnSuccessStore(target string, replaceWith []byte, wrapped Store, 
 }
 
 // Save will replace a target file with new content if the wrapped store is successful.
-func (r *ReplaceOnSuccessStore) Save(in io.Reader) error {
+func (r *ReplaceOnSuccessStore) Save(in io.Reader, rotateOpts ...file.RotateOpt) error {
 	// Ensure we can read the target files before delegating any call to the wrapped store.
 	target, err := os.ReadFile(r.target)
 	if err != nil {
@@ -86,7 +86,7 @@ func (r *ReplaceOnSuccessStore) Save(in io.Reader) error {
 
 	ts := time.Now()
 	backFilename := r.target + "." + ts.Format(fsSafeTs) + ".bak"
-	if err := file.SafeFileRotate(backFilename, r.target); err != nil {
+	if err := file.SafeFileRotate(backFilename, r.target, rotateOpts...); err != nil {
 		return errors.New(err,
 			fmt.Sprintf("could not backup %s", r.target),
 			errors.TypeFilesystem,
@@ -96,7 +96,7 @@ func (r *ReplaceOnSuccessStore) Save(in io.Reader) error {
 	fd, err := os.OpenFile(r.target, os.O_CREATE|os.O_WRONLY, permMask)
 	if err != nil {
 		// Rollback on any errors to minimize non working state.
-		if err := file.SafeFileRotate(r.target, backFilename); err != nil {
+		if err := file.SafeFileRotate(r.target, backFilename, rotateOpts...); err != nil {
 			return errors.New(err,
 				fmt.Sprintf("could not rollback %s to %s", backFilename, r.target),
 				errors.TypeFilesystem,
@@ -162,7 +162,7 @@ func (r *ReplaceOnSuccessStore) Save(in io.Reader) error {
 			errors.M(errors.MetaKeyPath, tmpFile))
 	}
 
-	if err := file.SafeFileRotate(r.target, tmpFile); err != nil {
+	if err := file.SafeFileRotate(r.target, tmpFile, rotateOpts...); err != nil {
 		return errors.New(err,
 			fmt.Sprintf("could not replace target file %s with %s", r.target, tmpFile),
 			errors.TypeFilesystem,

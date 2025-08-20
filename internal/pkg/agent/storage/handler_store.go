@@ -4,9 +4,13 @@
 
 package storage
 
-import "io"
+import (
+	"io"
 
-type handlerFunc func(io.Reader) error
+	"github.com/elastic/elastic-agent-libs/file"
+)
+
+type handlerFunc func(io.Reader, ...file.RotateOpt) error
 
 // HandlerStore take a function handler and wrap it into the store interface.
 type HandlerStore struct {
@@ -19,6 +23,6 @@ func NewHandlerStore(fn handlerFunc) *HandlerStore {
 }
 
 // Save calls the handler.
-func (h *HandlerStore) Save(in io.Reader) error {
-	return h.fn(in)
+func (h *HandlerStore) Save(in io.Reader, rotateOpts ...file.RotateOpt) error {
+	return h.fn(in, rotateOpts...)
 }

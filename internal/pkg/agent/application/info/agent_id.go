@@ -11,6 +11,8 @@ import (
 	"io"
 	"time"
 
+	"github.com/elastic/elastic-agent-libs/file"
+
 	"github.com/gofrs/uuid/v5"
 	"gopkg.in/yaml.v2"
 
@@ -38,7 +40,7 @@ type persistentAgentInfo struct {
 }
 
 type ioStore interface {
-	Save(io.Reader) error
+	Save(io.Reader, ...file.RotateOpt) error
 	Load() (io.ReadCloser, error)
 }
 

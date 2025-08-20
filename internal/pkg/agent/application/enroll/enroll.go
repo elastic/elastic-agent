@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent-libs/file"
+
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
@@ -46,7 +48,7 @@ const (
 )
 
 type saver interface {
-	Save(io.Reader) error
+	Save(io.Reader, ...file.RotateOpt) error
 }
 
 func EnrollWithBackoff(

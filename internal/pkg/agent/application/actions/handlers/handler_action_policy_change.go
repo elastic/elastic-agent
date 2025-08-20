@@ -391,8 +391,7 @@ func saveConfig(agentInfo info.Agent, validatedConfig *configuration.Configurati
 			errors.TypeUnexpected, errors.M("hosts", validatedConfig.Fleet.Client.Hosts))
 	}
 
-	err = store.Save(reader)
-	if err != nil {
+	if err := saveConfigToStore(store, reader); err != nil {
 		return errors.New(
 			err, "fail to persist new Fleet Server API client hosts",
 			errors.TypeFilesystem, errors.M("hosts", validatedConfig.Fleet.Client.Hosts))
