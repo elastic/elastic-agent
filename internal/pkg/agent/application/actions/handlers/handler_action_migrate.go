@@ -27,7 +27,6 @@ const ()
 type migrateCoordinator interface {
 	Migrate(_ context.Context, _ *fleetapi.ActionMigrate, _ func(done <-chan struct{}) backoff.Backoff) error
 	ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string)
-	HasEndpoint() bool
 	Protection() protection.Config
 }
 
