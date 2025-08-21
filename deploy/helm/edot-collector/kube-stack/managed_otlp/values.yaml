@@ -469,6 +469,10 @@ collectors:
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
         pipelines:
+          # Disable default non used kube-stack Helm Chart pipelines
+          logs: null
+          metrics: null
+          traces: null
           logs/node:
             receivers:
               - filelog
