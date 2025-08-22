@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -354,11 +353,19 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 		return "", fmt.Errorf("⚠️ Beats local path usage is deprecated and not used to fetch the binaries. Please use the packaging job to generate the artifacts to be consumed by these tests")
 	}
 
+	if downloadPath == "" {
+		return "", errors.New("downloadPath cannot be empty")
+	}
+
 	handleDownload := func(URL string) (string, error) {
 		name := artifactName
+		if strings.HasSuffix(URL, ".sha512") {
+			name = fmt.Sprintf("%s.sha512", name)
+		}
+		downloadFilePath := filepath.Join(downloadPath, name)
 		downloadRequest := downloadRequest{
-			DownloadPath: downloadPath,
-			URL:          URL,
+			TargetPath: downloadFilePath,
+			URL:        URL,
 		}
 		span, _ := apm.StartSpanOptions(ctx, "Fetching Project binary", "project.url.fetch-binary", apm.SpanOptions{
 			Parent: apm.SpanFromContext(ctx).TraceContext(),
@@ -379,28 +386,14 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 
 		err := downloadFile(&downloadRequest)
 		if err != nil {
-			return downloadRequest.UnsanitizedFilePath, err
-		}
-
-		if strings.HasSuffix(URL, ".sha512") {
-			name = fmt.Sprintf("%s.sha512", name)
-		}
-		// use artifact name as file name to avoid having URL params in the name
-		sanitizedFilePath := filepath.Join(path.Dir(downloadRequest.UnsanitizedFilePath), name)
-		err = os.Rename(downloadRequest.UnsanitizedFilePath, sanitizedFilePath)
-		if err != nil {
-			logger.Warn("Could not sanitize downloaded file name. Keeping old name",
-				slog.String("fileName", downloadRequest.UnsanitizedFilePath),
-				slog.String("sanitizedFileName", sanitizedFilePath),
-			)
-			sanitizedFilePath = downloadRequest.UnsanitizedFilePath
+			return "", err
 		}
 
 		binariesMutex.Lock()
-		binariesCache[URL] = sanitizedFilePath
+		binariesCache[URL] = downloadFilePath
 		binariesMutex.Unlock()
 
-		return sanitizedFilePath, nil
+		return downloadFilePath, nil
 	}
 
 	var downloadURL, downloadShaURL string
