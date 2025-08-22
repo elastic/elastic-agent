@@ -6,6 +6,7 @@ package fleet
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -84,6 +85,9 @@ type FleetGateway struct {
 	checkinFailCounter int
 	stateFetcher       func() coordinator.State
 	stateStore         stateStore
+	stateChan          chan coordinator.State
+	checkinCancel      context.CancelCauseFunc
+	checkinStateMutex  sync.Mutex
 	errCh              chan error
 	actionCh           chan []fleetapi.Action
 }
@@ -96,6 +100,7 @@ func New(
 	acker acker.Acker,
 	stateFetcher func() coordinator.State,
 	stateStore stateStore,
+	stateChan chan coordinator.State,
 ) (*FleetGateway, error) {
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	return newFleetGatewayWithScheduler(
@@ -107,6 +112,7 @@ func New(
 		acker,
 		stateFetcher,
 		stateStore,
+		stateChan,
 	)
 }
 
@@ -119,6 +125,7 @@ func newFleetGatewayWithScheduler(
 	acker acker.Acker,
 	stateFetcher func() coordinator.State,
 	stateStore stateStore,
+	stateChan chan coordinator.State,
 ) (*FleetGateway, error) {
 	return &FleetGateway{
 		log:          log,
@@ -129,6 +136,7 @@ func newFleetGatewayWithScheduler(
 		acker:        acker,
 		stateFetcher: stateFetcher,
 		stateStore:   stateStore,
+		stateChan:    stateChan,
 		errCh:        make(chan error),
 		actionCh:     make(chan []fleetapi.Action, 1),
 	}, nil
@@ -192,7 +200,10 @@ func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 		f.log.Debugf("Checking started")
 		resp, took, err := f.execute(ctx)
 		if err != nil {
-			f.checkinFailCounter++
+			// don't count that as failed attempt
+			if !errors.Is(err, context.Canceled) || !errors.Is(context.Cause(ctx), errComponentStateChanged) {
+				f.checkinFailCounter++
+			}
 
 			// Report the first two failures at warn level as they may be recoverable with retries.
 			if f.checkinFailCounter <= 2 {
@@ -347,7 +358,8 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// get current state
-	state := f.stateFetcher()
+	var state coordinator.State
+	state, ctx = f.initCheckIn(ctx)
 
 	// convert components into checkin components structure
 	components := f.convertToCheckinComponents(state.Components, state.Collector)
@@ -368,6 +380,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	resp, took, err := cmd.Execute(ctx, req)
+	f.endCheckIn()
 	if isUnauth(err) {
 		f.unauthCounter++
 		if f.shouldUseLongSched() {
@@ -396,6 +409,57 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	return resp, took, nil
+}
+
+func (f *FleetGateway) StateWatch(ctx context.Context) error {
+	f.log.Info("FleetGateway state watching started")
+	for {
+		select {
+		case <-ctx.Done():
+			f.log.Info("FleetGateway state watching stopped")
+			return ctx.Err()
+		case st := <-f.stateChan:
+			f.log.Infof("FleetGateway state change notification %#v", st)
+			// TODO: check for specific changes?
+			f.cancelCheckIn()
+		}
+	}
+}
+
+// initCheckIn wraps the state fetching to send in the check-in request under the checkin state mutex.
+// After the state is fetched the checkin cancellation function has be initialized and the new context
+// is returned.
+func (f *FleetGateway) initCheckIn(ctx context.Context) (coordinator.State, context.Context) {
+	f.checkinStateMutex.Lock()
+	defer f.checkinStateMutex.Unlock()
+
+	if f.checkinCancel != nil {
+		f.checkinCancel(nil) // ensure ctx cleanup
+	}
+
+	ctx2, ctxCancel := context.WithCancelCause(ctx)
+	state := f.stateFetcher()
+	f.checkinCancel = ctxCancel
+	return state, ctx2
+}
+
+func (f *FleetGateway) endCheckIn() {
+	f.checkinStateMutex.Lock()
+	defer f.checkinStateMutex.Unlock()
+
+	if f.checkinCancel != nil {
+		f.checkinCancel(nil) // ensure ctx cleanup
+		f.checkinCancel = nil
+	}
+}
+
+func (f *FleetGateway) cancelCheckIn() {
+	f.checkinStateMutex.Lock()
+	defer f.checkinStateMutex.Unlock()
+
+	if f.checkinCancel != nil {
+		f.checkinCancel(errComponentStateChanged)
+	}
 }
 
 // shouldUseLongSched checks if the max number of trying an invalid key is reached
@@ -447,3 +511,5 @@ func RequestBackoff(done <-chan struct{}) backoff.Backoff {
 		defaultFleetBackoffSettings.Max,
 	)
 }
+
+var errComponentStateChanged = errors.New("error component state changed")

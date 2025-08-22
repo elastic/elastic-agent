@@ -168,6 +168,8 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		}
 	}
 
+	gatewayStateSub := m.coord.StateSubscribe(ctx, 32)
+
 	gateway, err := fleetgateway.New(
 		m.log,
 		m.agentInfo,
@@ -175,6 +177,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		m.actionAcker,
 		m.coord.State,
 		m.stateStore,
+		gatewayStateSub,
 	)
 	if err != nil {
 		return err
@@ -208,9 +211,12 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		}
 	})
 
+	gatewayStateWatch := runner.Start(context.Background(), gateway.StateWatch)
+
 	// Run the gateway.
 	gatewayRunner := runner.Start(gatewayCtx, func(ctx context.Context) error {
 		defer gatewayErrorsRunner.Stop()
+		defer gatewayStateWatch.Stop()
 		return gateway.Run(ctx)
 	})
 
@@ -257,7 +263,6 @@ func (m *managedConfigManager) wasUnenrolled() bool {
 }
 
 func (m *managedConfigManager) initFleetServer(ctx context.Context, cfg *configuration.FleetServerConfig) error {
-
 	if m.fleetInitTimeout == 0 {
 		m.fleetInitTimeout = 30 * time.Second
 	}

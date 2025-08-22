@@ -34,7 +34,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
-type clientCallbackFunc func(headers http.Header, body io.Reader) (*http.Response, error)
+type clientCallbackFunc func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error)
 
 type testingClient struct {
 	sync.Mutex
@@ -43,7 +43,7 @@ type testingClient struct {
 }
 
 func (t *testingClient) Send(
-	_ context.Context,
+	ctx context.Context,
 	_ string,
 	_ string,
 	_ url.Values,
@@ -53,7 +53,7 @@ func (t *testingClient) Send(
 	t.Lock()
 	defer t.Unlock()
 	defer func() { t.received <- struct{}{} }()
-	return t.callback(headers, body)
+	return t.callback(ctx, headers, body)
 }
 
 func (t *testingClient) URI() string {
@@ -91,6 +91,7 @@ func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGat
 			noop.New(),
 			emptyStateFetcher,
 			stateStore,
+			make(chan coordinator.State),
 		)
 
 		require.NoError(t, err)
@@ -137,7 +138,7 @@ func TestFleetGateway(t *testing.T) {
 		defer cancel()
 
 		waitFn := ackSeq(
-			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
+			client.Answer(func(_ context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
 				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 				return resp, nil
 			}),
@@ -169,7 +170,7 @@ func TestFleetGateway(t *testing.T) {
 		defer cancel()
 
 		waitFn := ackSeq(
-			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
+			client.Answer(func(_ context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
 				// TODO: assert no events
 				resp := wrapStrToResp(http.StatusOK, `
 	{
@@ -230,11 +231,12 @@ func TestFleetGateway(t *testing.T) {
 			noop.New(),
 			emptyStateFetcher,
 			stateStore,
+			make(chan coordinator.State),
 		)
 		require.NoError(t, err)
 
 		waitFn := ackSeq(
-			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
+			client.Answer(func(_ context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
 				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 				return resp, nil
 			}),
@@ -282,10 +284,11 @@ func TestFleetGateway(t *testing.T) {
 			noop.New(),
 			emptyStateFetcher,
 			stateStore,
+			make(chan coordinator.State),
 		)
 		require.NoError(t, err)
 
-		ch2 := client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
+		ch2 := client.Answer(func(_ context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
 			resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 			return resp, nil
 		})
@@ -341,12 +344,13 @@ func TestFleetGateway(t *testing.T) {
 			noop.New(),
 			stateFetcher,
 			stateStore,
+			make(chan coordinator.State),
 		)
 
 		require.NoError(t, err)
 
 		waitFn := ackSeq(
-			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
+			client.Answer(func(_ context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
 				data, err := io.ReadAll(body)
 				require.NoError(t, err)
 
@@ -377,6 +381,61 @@ func TestFleetGateway(t *testing.T) {
 		default:
 		}
 	})
+
+	t.Run("Test cancel checkin on sate update", func(t *testing.T) {
+		scheduler := scheduler.NewStepper()
+		client := newTestingClient()
+
+		ctx, cancel := context.WithCancel(context.Background())
+
+		log, _ := logger.New("tst", false)
+		stateStore := newStateStore(t, log)
+
+		stateChannel := make(chan coordinator.State, 10)
+
+		gateway, err := newFleetGatewayWithScheduler(
+			log,
+			settings,
+			agentInfo,
+			client,
+			scheduler,
+			noop.New(),
+			emptyStateFetcher,
+			stateStore,
+			stateChannel,
+		)
+		require.NoError(t, err)
+
+		requestSent := make(chan struct{}, 10)
+
+		// (emulate long poll) wait for the context to be cancelled
+		ch2 := client.Answer(func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
+			requestSent <- struct{}{}
+			<-ctx.Done()
+			err := context.Cause(ctx)
+			assert.ErrorIs(t, err, errComponentStateChanged)
+			return nil, err
+		})
+
+		errCh := runFleetGateway(ctx, gateway)
+		// start state watcher
+		go func() {
+			err := gateway.StateWatch(ctx)
+			assert.ErrorIs(t, err, context.Canceled)
+		}()
+		scheduler.Next()
+
+		<-requestSent
+
+		// State change arrives while waiting on fleet sever long poll
+		stateChannel <- coordinator.State{}
+
+		<-ch2
+
+		cancel()
+		err = <-errCh
+		require.NoError(t, err)
+	})
 }
 
 func TestRetriesOnFailures(t *testing.T) {
@@ -396,7 +455,7 @@ func TestRetriesOnFailures(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			fail := func(_ http.Header, _ io.Reader) (*http.Response, error) {
+			fail := func(_ context.Context, _ http.Header, _ io.Reader) (*http.Response, error) {
 				return wrapStrToResp(http.StatusInternalServerError, "something is bad"), nil
 			}
 			clientWaitFn := client.Answer(fail)
@@ -413,7 +472,7 @@ func TestRetriesOnFailures(t *testing.T) {
 
 			// API recover
 			waitFn := ackSeq(
-				client.Answer(func(_ http.Header, body io.Reader) (*http.Response, error) {
+				client.Answer(func(_ context.Context, _ http.Header, body io.Reader) (*http.Response, error) {
 					resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 					return resp, nil
 				}),
@@ -444,7 +503,7 @@ func TestRetriesOnFailures(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			fail := func(_ http.Header, _ io.Reader) (*http.Response, error) {
+			fail := func(_ context.Context, _ http.Header, _ io.Reader) (*http.Response, error) {
 				return wrapStrToResp(http.StatusInternalServerError, "something is bad"), nil
 			}
 			waitChan := client.Answer(fail)
@@ -606,7 +665,7 @@ func TestFleetGatewaySchedulerSwitch(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		unauth := func(_ http.Header, _ io.Reader) (*http.Response, error) {
+		unauth := func(_ context.Context, _ http.Header, _ io.Reader) (*http.Response, error) {
 			return nil, client.ErrInvalidAPIKey
 		}
 
@@ -641,7 +700,7 @@ func TestFleetGatewaySchedulerSwitch(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		unauth := func(_ http.Header, _ io.Reader) (*http.Response, error) {
+		unauth := func(_ context.Context, _ http.Header, _ io.Reader) (*http.Response, error) {
 			resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 			return resp, nil
 		}
