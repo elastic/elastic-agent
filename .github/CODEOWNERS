@@ -17,3 +17,4 @@
 /internal/pkg/otel/samples/darwin/autoops_es.yml @elastic/opex
 /internal/pkg/otel/samples/linux/autoops_es.yml @elastic/opex
 /internal/pkg/otel/samples/windows/autoops_es.yml @elastic/opex
+/deploy/helm/elastic-agent/templates/integrations/_auto_ops @elastic.opex
