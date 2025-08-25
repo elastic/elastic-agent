@@ -27,8 +27,10 @@ import (
 	agentclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	agentruntime "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/version"
 )
 
@@ -518,196 +520,226 @@ func isPprof(input []byte) (bool, error) {
 	return true, nil
 }
 
-func TestRedactSecretPaths(t *testing.T) {
+func TestAddRedactionMarkers(t *testing.T) {
 	tests := []struct {
-		name   string
-		input  map[string]interface{}
-		expect map[string]interface{}
-	}{{
-		name: "no secret_paths",
-		input: map[string]interface{}{
-			"outputs": map[string]interface{}{
-				"default": map[string]interface{}{
-					"type":    "elasticsearch",
-					"api_key": "apikeyvalue",
+		name           string
+		input          map[string]interface{}
+		expectedConfig map[string]interface{}
+		expectedErrMsg string
+	}{
+		{
+			name: "no secret_paths",
+			input: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"api_key": "apikeyvalue",
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":   "example",
+						"secret": "secretvalue",
+					},
 				},
 			},
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"type":   "example",
-					"secret": "secretvalue",
+			expectedConfig: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"api_key": "apikeyvalue",
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":   "example",
+						"secret": "secretvalue",
+					},
+				},
+			},
+			expectedErrMsg: "",
+		},
+		{
+			name: "secret paths is not an array",
+			input: map[string]interface{}{
+				"secret_paths": "inputs.0.secret,outputs.default.api_key",
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"api_key": "apikeyvalue",
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":   "example",
+						"secret": "secretvalue",
+					},
+				},
+			},
+			expectedConfig: map[string]interface{}{
+				"secret_paths": "inputs.0.secret,outputs.default.api_key",
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"api_key": "apikeyvalue",
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":   "example",
+						"secret": "secretvalue",
+					},
+				},
+			},
+			expectedErrMsg: "failed to get secret_paths",
+		},
+		{
+			name: "secret_paths are redacted",
+			input: map[string]interface{}{
+				"secret_paths": []interface{}{
+					"inputs.0.secret",
+					"outputs.default.api_key",
+				},
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"api_key": "apikeyvalue",
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":   "example",
+						"secret": "secretvalue",
+					},
+				},
+			},
+			expectedConfig: map[string]interface{}{
+				"secret_paths": []interface{}{
+					"inputs.0.secret",
+					"outputs.default.api_key",
+				},
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":                            "elasticsearch",
+						"api_key":                         "apikeyvalue",
+						redactionMarkerPrefix + "api_key": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":                           "example",
+						"secret":                         "secretvalue",
+						redactionMarkerPrefix + "secret": true,
+					},
 				},
 			},
 		},
-		expect: map[string]interface{}{
-			"outputs": map[string]interface{}{
-				"default": map[string]interface{}{
-					"type":    "elasticsearch",
-					"api_key": "apikeyvalue",
+		{
+			name: "secret_paths contains extra keys",
+			input: map[string]interface{}{
+				"secret_paths": []interface{}{
+					"inputs.0.secret",
+					"outputs.default.api_key",
+					"inputs.1.secret",
+				},
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"api_key": "apikeyvalue",
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":   "example",
+						"secret": "secretvalue",
+					},
 				},
 			},
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"type":   "example",
-					"secret": "secretvalue",
+			expectedConfig: map[string]interface{}{
+				"secret_paths": []interface{}{
+					"inputs.0.secret",
+					"outputs.default.api_key",
+					"inputs.1.secret",
+				},
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":                            "elasticsearch",
+						"api_key":                         "apikeyvalue",
+						redactionMarkerPrefix + "api_key": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":                           "example",
+						"secret":                         "secretvalue",
+						redactionMarkerPrefix + "secret": true,
+					},
 				},
 			},
+			expectedErrMsg: "secret path inputs.1.secret does not exist",
 		},
-	}, {
-		name: "secret paths is not an array",
-		input: map[string]interface{}{
-			"secret_paths": "inputs.0.secret,outputs.default.api_key",
-			"outputs": map[string]interface{}{
-				"default": map[string]interface{}{
-					"type":    "elasticsearch",
-					"api_key": "apikeyvalue",
+		{
+			name: "secret_paths contains non string key",
+			input: map[string]interface{}{
+				"secret_paths": []interface{}{
+					"inputs.0.secret",
+					"outputs.default.api_key",
+					2,
+				},
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"api_key": "apikeyvalue",
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":   "example",
+						"secret": "secretvalue",
+					},
 				},
 			},
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"type":   "example",
-					"secret": "secretvalue",
+			expectedConfig: map[string]interface{}{
+				"secret_paths": []interface{}{
+					"inputs.0.secret",
+					"outputs.default.api_key",
+					uint64(2), // go-ucfg serializing/deserializing flattens types
+				},
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":                            "elasticsearch",
+						"api_key":                         "apikeyvalue",
+						redactionMarkerPrefix + "api_key": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":                           "example",
+						"secret":                         "secretvalue",
+						redactionMarkerPrefix + "secret": true,
+					},
 				},
 			},
+			expectedErrMsg: "secret path 2 does not exist",
 		},
-		expect: map[string]interface{}{
-			"secret_paths": "inputs.0.secret,outputs.default.api_key",
-			"outputs": map[string]interface{}{
-				"default": map[string]interface{}{
-					"type":    "elasticsearch",
-					"api_key": "apikeyvalue",
-				},
-			},
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"type":   "example",
-					"secret": "secretvalue",
-				},
-			},
-		},
-	}, {
-		name: "secret_paths are redacted",
-		input: map[string]interface{}{
-			"secret_paths": []interface{}{
-				"inputs.0.secret",
-				"outputs.default.api_key",
-			},
-			"outputs": map[string]interface{}{
-				"default": map[string]interface{}{
-					"type":    "elasticsearch",
-					"api_key": "apikeyvalue",
-				},
-			},
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"type":   "example",
-					"secret": "secretvalue",
-				},
-			},
-		},
-		expect: map[string]interface{}{
-			"secret_paths": []interface{}{
-				"inputs.0.secret",
-				"outputs.default.api_key",
-			},
-			"outputs": map[string]interface{}{
-				"default": map[string]interface{}{
-					"type":    "elasticsearch",
-					"api_key": REDACTED,
-				},
-			},
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"type":   "example",
-					"secret": REDACTED,
-				},
-			},
-		},
-	}, {
-		name: "secret_paths contains extra keys",
-		input: map[string]interface{}{
-			"secret_paths": []interface{}{
-				"inputs.0.secret",
-				"outputs.default.api_key",
-				"inputs.1.secret",
-			},
-			"outputs": map[string]interface{}{
-				"default": map[string]interface{}{
-					"type":    "elasticsearch",
-					"api_key": "apikeyvalue",
-				},
-			},
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"type":   "example",
-					"secret": "secretvalue",
-				},
-			},
-		},
-		expect: map[string]interface{}{
-			"secret_paths": []interface{}{
-				"inputs.0.secret",
-				"outputs.default.api_key",
-				"inputs.1.secret",
-			},
-			"outputs": map[string]interface{}{
-				"default": map[string]interface{}{
-					"type":    "elasticsearch",
-					"api_key": REDACTED,
-				},
-			},
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"type":   "example",
-					"secret": REDACTED,
-				},
-			},
-		},
-	}, {
-		name: "secret_paths contains non string key",
-		input: map[string]interface{}{
-			"secret_paths": []interface{}{
-				"inputs.0.secret",
-				"outputs.default.api_key",
-				2,
-			},
-			"outputs": map[string]interface{}{
-				"default": map[string]interface{}{
-					"type":    "elasticsearch",
-					"api_key": "apikeyvalue",
-				},
-			},
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"type":   "example",
-					"secret": "secretvalue",
-				},
-			},
-		},
-		expect: map[string]interface{}{
-			"secret_paths": []interface{}{
-				"inputs.0.secret",
-				"outputs.default.api_key",
-				uint64(2), // go-ucfg serializing/deserializing flattens types
-			},
-			"outputs": map[string]interface{}{
-				"default": map[string]interface{}{
-					"type":    "elasticsearch",
-					"api_key": REDACTED,
-				},
-			},
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"type":   "example",
-					"secret": REDACTED,
-				},
-			},
-		},
-	}}
+	}
+
+	log, _ := loggertest.New("test")
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := RedactSecretPaths(tc.input, io.Discard)
-			assert.Equal(t, tc.expect, result)
+			cfg := config.MustNewConfigFrom(tc.input)
+
+			err := AddSecretMarkers(log, cfg)
+			if tc.expectedErrMsg != "" {
+				assert.Error(t, err)
+				require.ErrorContains(t, err, tc.expectedErrMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			result, err := cfg.ToMapStr()
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expectedConfig, result)
 		})
 	}
 }
