@@ -421,8 +421,11 @@ func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
 	// we also want to use dynamic log ids
 	esConfig["logs_dynamic_id"] = map[string]any{"enabled": true}
 
-	// for compatibility with beats, we want bodymap mapping
-	esConfig["mapping"] = map[string]any{"mode": "bodymap"}
+	// logs failed documents at debug level
+	esConfig["telemetry"] = map[string]any{
+		"log_failed_docs_input": true,
+	}
+
 	return esConfig, nil
 }
 
