@@ -357,23 +357,50 @@ func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResu
 // the whole generic function here is out of paranoia. Although extremely unlikely,
 // we have no way of guaranteeing we'll get a "normal" map[string]interface{},
 // since the diagnostic interface is a bit of a free-for-all
-func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}) map[K]interface{} {
+func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, sliceElem bool) map[K]interface{} {
 	if inputMap == nil {
 		return nil
 	}
+
+	redactionMarkers := []string{}
 	for rootKey, rootValue := range inputMap {
 		if rootValue != nil {
 			switch cast := rootValue.(type) {
 			case map[string]interface{}:
-				rootValue = redactMap(errOut, cast)
+				rootValue = redactMap(errOut, cast, sliceElem)
 			case map[interface{}]interface{}:
-				rootValue = redactMap(errOut, cast)
+				rootValue = redactMap(errOut, cast, sliceElem)
 			case map[int]interface{}:
-				rootValue = redactMap(errOut, cast)
+				rootValue = redactMap(errOut, cast, sliceElem)
+			case []interface{}:
+				// Recursively process each element in the slice so that we also walk
+				// through lists (e.g. inputs[4].streams[0]). This is required to
+				// reach redaction markers that are inside slice items. Set SliceElem to true
+				// to avoid global redaction of slice elements.
+				for i, value := range cast {
+					switch m := value.(type) {
+					case map[string]interface{}:
+						cast[i] = redactMap(errOut, m, true)
+					case map[interface{}]interface{}:
+						cast[i] = redactMap(errOut, m, true)
+					case map[int]interface{}:
+						cast[i] = redactMap(errOut, m, true)
+					}
+				}
+				rootValue = cast
 			case string:
 				if keyString, ok := any(rootKey).(string); ok {
-					if redactKey(keyString) {
+					// Avoid global redaction of slice elements.
+					if redactKey(keyString) && !sliceElem {
 						rootValue = REDACTED
+					}
+				}
+			case bool: // redaction marker values are always going to be bool, process redaction markers in this case
+				if keyString, ok := any(rootKey).(string); ok {
+					// Find siblings that have the redaction marker.
+					if strings.HasPrefix(keyString, redactionMarkerPrefix) {
+						redactionMarkers = append(redactionMarkers, keyString)
+						delete(inputMap, rootKey)
 					}
 				}
 			default:
@@ -384,10 +411,20 @@ func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}) map[K
 
 			}
 		}
-
 		inputMap[rootKey] = rootValue
-
 	}
+
+	for _, redactionMarker := range redactionMarkers {
+		keyToRedact := strings.TrimPrefix(redactionMarker, "mark_redact_")
+		for rootKey := range inputMap {
+			if keyString, ok := any(rootKey).(string); ok {
+				if keyString == keyToRedact {
+					inputMap[rootKey] = REDACTED
+				}
+			}
+		}
+	}
+
 	return inputMap
 }
 
@@ -589,7 +626,7 @@ func saveLogs(name string, logPath string, zw *zip.Writer) error {
 
 // Redact redacts sensitive values from the passed mapStr.
 func Redact(mapStr map[string]any, errOut io.Writer) map[string]any {
-	return redactMap(errOut, RedactSecretPaths(mapStr, errOut))
+	return redactMap(errOut, mapStr, false)
 }
 
 // AddSecretMarkers adds secret redaction markers to the config by looking at the secret_paths field.
