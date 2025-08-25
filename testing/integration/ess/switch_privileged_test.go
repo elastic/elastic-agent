@@ -29,7 +29,14 @@ func TestSwitchPrivilegedWithoutBasePath(t *testing.T) {
 		// We require sudo for this test to run
 		// `elastic-agent install`.
 		Sudo: true,
-
+		// macOS excluded because this test fails: co.elastic.elastic-agent.err.log has world access
+		OS: []define.OS{
+			{
+				Type: define.Linux,
+			}, {
+				Type: define.Windows,
+			},
+		},
 		// It's not safe to run this test locally as it
 		// installs Elastic Agent.
 		Local: false,
@@ -75,7 +82,14 @@ func TestSwitchPrivilegedWithBasePath(t *testing.T) {
 		// We require sudo for this test to run
 		// `elastic-agent install`.
 		Sudo: true,
-
+		// macOS excluded because this test fails: failed to stat socket path ... no such file or directory
+		OS: []define.OS{
+			{
+				Type: define.Linux,
+			}, {
+				Type: define.Windows,
+			},
+		},
 		// It's not safe to run this test locally as it
 		// installs Elastic Agent.
 		Local: false,
