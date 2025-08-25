@@ -12,9 +12,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	otelcomponent "go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -216,6 +218,15 @@ func TestGetOtelConfig(t *testing.T) {
 		"password":         "password",
 		"preset":           "balanced",
 		"queue.mem.events": 3200,
+		"ssl.enabled":      true,
+	}
+
+	expectedExtensionConfig := map[string]any{
+		"beatsauth/_agent-component/default": map[string]any{
+			"tls": map[string]any{
+				"verification_mode": "full",
+			},
+		},
 	}
 
 	expectedESConfig := map[string]any{
@@ -246,6 +257,13 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 			"timeout":           90 * time.Second,
 			"idle_conn_timeout": 3 * time.Second,
+			"auth": map[string]any{
+				"authenticator": "beatsauth/_agent-component/default",
+			},
+			"tls": map[string]any{
+				"min_version": "1.2",
+				"max_version": "1.3",
+			},
 		},
 	}
 
@@ -366,7 +384,8 @@ func TestGetOtelConfig(t *testing.T) {
 				},
 			},
 			expectedConfig: confmap.NewFromStringMap(map[string]any{
-				"exporters": expectedESConfig,
+				"exporters":  expectedESConfig,
+				"extensions": expectedExtensionConfig,
 				"receivers": map[string]any{
 					"filebeatreceiver/_agent-component/filestream-default": map[string]any{
 						"filebeat": map[string]any{
@@ -432,6 +451,7 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 				"service": map[string]any{
+					"extensions": []interface{}{"beatsauth/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/filestream-default": map[string][]string{
 							"exporters": []string{"elasticsearch/_agent-component/default"},
@@ -473,7 +493,8 @@ func TestGetOtelConfig(t *testing.T) {
 				},
 			},
 			expectedConfig: confmap.NewFromStringMap(map[string]any{
-				"exporters": expectedESConfig,
+				"exporters":  expectedESConfig,
+				"extensions": expectedExtensionConfig,
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring": map[string]any{
 						"metricbeat": map[string]any{
@@ -525,6 +546,7 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 				"service": map[string]any{
+					"extensions": []interface{}{"beatsauth/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
 							"exporters": []string{"elasticsearch/_agent-component/default"},
@@ -566,7 +588,8 @@ func TestGetOtelConfig(t *testing.T) {
 				},
 			},
 			expectedConfig: confmap.NewFromStringMap(map[string]any{
-				"exporters": expectedESConfig,
+				"exporters":  expectedESConfig,
+				"extensions": expectedExtensionConfig,
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/system-metrics": map[string]any{
 						"metricbeat": map[string]any{
@@ -629,6 +652,7 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 				"service": map[string]any{
+					"extensions": []interface{}{"beatsauth/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/system-metrics": map[string][]string{
 							"exporters": []string{"elasticsearch/_agent-component/default"},
@@ -641,7 +665,7 @@ func TestGetOtelConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, getBeatMonitoringConfig)
+			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, getBeatMonitoringConfig, logp.NewNopLogger())
 			if actualConf == nil || tt.expectedConfig == nil {
 				assert.Equal(t, tt.expectedConfig, actualConf)
 			} else { // this gives a nicer diff
@@ -863,6 +887,135 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			if expectedMonitoringConfig != nil {
 				assert.Equal(t, expectedMonitoringConfig["http"], receiverConfig["http"])
 			}
+		})
+	}
+}
+
+func TestBeatsAuthExtension(t *testing.T) {
+	esInputConfig := map[string]any{
+		"type":     "elasticsearch",
+		"hosts":    []any{"localhost:9200"},
+		"username": "elastic",
+		"password": "password",
+		"preset":   "balanced",
+	}
+
+	extensionConfig := map[string]any{
+		"beatsauth/_agent-component/default": map[string]any{},
+	}
+
+	esOutputConfig := map[string]any{
+		"elasticsearch/_agent-component/default": map[string]any{
+			"batcher": map[string]any{
+				"enabled":  true,
+				"max_size": 1600,
+				"min_size": 0,
+			},
+			"compression": "gzip",
+			"compression_params": map[string]any{
+				"level": 1,
+			},
+			"mapping": map[string]any{
+				"mode": "bodymap",
+			},
+			"endpoints": []string{"http://localhost:9200"},
+			"password":  "password",
+			"user":      "elastic",
+			"retry": map[string]any{
+				"enabled":          true,
+				"initial_interval": 1 * time.Second,
+				"max_interval":     1 * time.Minute,
+				"max_retries":      3,
+			},
+			"logs_dynamic_id": map[string]any{
+				"enabled": true,
+			},
+			"timeout":           90 * time.Second,
+			"idle_conn_timeout": 3 * time.Second,
+			"auth": map[string]any{
+				"authenticator": "beatsauth/_agent-component/default",
+			},
+		},
+	}
+
+	testCases := []struct {
+		name                    string
+		inputSSLConfig          map[string]any
+		expectedES_TLSConfig    map[string]any
+		expectedBeatsAuthConfig map[string]any
+	}{
+		{
+			name: "when ssl.enabled is true",
+			inputSSLConfig: map[string]any{
+				"enabled": true,
+			},
+			expectedES_TLSConfig: map[string]any{
+				"min_version": "1.2",
+				"max_version": "1.3",
+			},
+			expectedBeatsAuthConfig: map[string]any{
+				"verification_mode": "full",
+			},
+		},
+		{
+			name: "when ca_trusted_fingerprint is set",
+			inputSSLConfig: map[string]any{
+				"verification_mode":      "full",
+				"ca_trusted_fingerprint": "a3:5f:bf:93:12:8f:bc:5c:ab:14:6d:bf:e4:2a:7f:98:9d:2f:16:92:76:c4:12:ab:67:89:fc:56:4b:8e:0c:43",
+			},
+			expectedES_TLSConfig: map[string]any{
+				"min_version": "1.2",
+				"max_version": "1.3",
+			},
+			expectedBeatsAuthConfig: map[string]any{
+				"verification_mode":      "full",
+				"ca_trusted_fingerprint": "a3:5f:bf:93:12:8f:bc:5c:ab:14:6d:bf:e4:2a:7f:98:9d:2f:16:92:76:c4:12:ab:67:89:fc:56:4b:8e:0c:43",
+			},
+		},
+		{
+			name: "when verification_mode is none",
+			inputSSLConfig: map[string]any{
+				"verification_mode": "none",
+			},
+			expectedES_TLSConfig: map[string]any{
+				"insecure_skip_verify": true,
+				"min_version":          "1.2",
+				"max_version":          "1.3",
+			},
+			expectedBeatsAuthConfig: map[string]any{
+				"verification_mode": "none",
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			tempMap := esInputConfig
+			tempMap["ssl"] = test.inputSSLConfig
+
+			units := []component.Unit{
+				{
+					ID:     "beat/metrics-default",
+					Type:   client.UnitTypeOutput,
+					Config: component.MustExpectedConfig(tempMap),
+				},
+			}
+
+			gotES, _, gotBeatsAuth, err := unitToExporterConfig(units[0], otelcomponent.MustNewType("elasticsearch"), "beat/metrics", logp.NewNopLogger())
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// add expected TLS config
+			expectedES := esOutputConfig
+			expectedES["elasticsearch/_agent-component/default"].(map[string]any)["tls"] = test.expectedES_TLSConfig
+			require.Equal(t, expectedES, gotES)
+
+			// check beats auth config
+			expectedBeatsAuth := extensionConfig
+			expectedBeatsAuth["beatsauth/_agent-component/default"].(map[string]any)["tls"] = test.expectedBeatsAuthConfig
+			require.Equal(t, expectedBeatsAuth, gotBeatsAuth)
+
 		})
 	}
 }
