@@ -42,34 +42,32 @@ func downloadFile(downloadRequest *downloadRequest) error {
 	exp := getExponentialBackoff(3)
 
 	retryCount := 1
-	var fileReader io.ReadCloser
 	download := func() error {
 		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, downloadRequest.URL, nil)
 		if err != nil {
 			return fmt.Errorf("creating request: %w", err)
 		}
-		resp, err := http.DefaultClient.Do(req) //nolint:bodyclose // we do close this outside of the function
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			retryCount++
 			return fmt.Errorf("downloading file %s: %w", downloadRequest.URL, err)
 		}
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+		_, err = io.Copy(targetFile, resp.Body)
+		if err != nil {
+			// try to drain the body before returning to ensure the connection can be reused
+			_, _ = io.Copy(io.Discard, resp.Body)
+			return fmt.Errorf("writing file %s: %w", targetFile.Name(), err)
+		}
 
-		fileReader = resp.Body
 		return nil
 	}
 
 	err = backoff.Retry(download, exp)
 	if err != nil {
 		return err
-	}
-
-	_, err = io.Copy(targetFile, fileReader)
-	if err != nil {
-		return fmt.Errorf("writing file %s: %w", targetFile.Name(), err)
-	}
-	err = fileReader.Close()
-	if err != nil {
-		return fmt.Errorf("closing reader: %w", err)
 	}
 
 	_ = os.Chmod(targetFile.Name(), 0666)
