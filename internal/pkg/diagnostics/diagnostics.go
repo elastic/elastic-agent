@@ -353,6 +353,8 @@ func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResu
 	return err
 }
 
+const redactionMarkerPrefix = "__mark_redact_"
+
 // redactMap sensitive values from the underlying map
 // the whole generic function here is out of paranoia. Although extremely unlikely,
 // we have no way of guaranteeing we'll get a "normal" map[string]interface{},
@@ -415,11 +417,15 @@ func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, slice
 	}
 
 	for _, redactionMarker := range redactionMarkers {
-		keyToRedact := strings.TrimPrefix(redactionMarker, "mark_redact_")
+		keyToRedact := strings.TrimPrefix(redactionMarker, redactionMarkerPrefix)
 		for rootKey := range inputMap {
 			if keyString, ok := any(rootKey).(string); ok {
 				if keyString == keyToRedact {
 					inputMap[rootKey] = REDACTED
+				}
+
+				if keyString == redactionMarker {
+					delete(inputMap, rootKey)
 				}
 			}
 		}
@@ -665,8 +671,6 @@ func getSecretPaths(logger *logger.Logger, cfg *config.Config) ([]string, error)
 
 	return res, nil
 }
-
-const redactionMarkerPrefix = "mark_redact_"
 
 func addSecretMarkers(cfg *config.Config, secretPaths []string) error {
 	var aggregateError error
