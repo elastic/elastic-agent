@@ -253,17 +253,15 @@ func TestRedactWithMarkers(t *testing.T) {
 			expect: map[string]any{
 				"inputs": []any{
 					map[string]any{
-						"type":                  "test_input",
-						"redactKey":             REDACTED,
-						"mark_redact_redactKey": true,
+						"type":      "test_input",
+						"redactKey": REDACTED,
 					},
 				},
 				"outputs": map[string]any{
 					"default": map[string]any{
-						"type":                "elasticsearch",
-						"api_key":             REDACTED,
-						"redactOtherKey":      REDACTED,
-						"mark_redact_api_key": true,
+						"type":           "elasticsearch",
+						"api_key":        REDACTED,
+						"redactOtherKey": REDACTED,
 					},
 				},
 			},
@@ -325,9 +323,8 @@ func TestRedactWithMarkers(t *testing.T) {
 									"transforms": []any{
 										map[string]any{
 											"set": map[string]any{
-												"target":            "header.Authorization",
-												"value":             REDACTED,
-												"mark_redact_value": true,
+												"target": "header.Authorization",
+												"value":  REDACTED,
 											},
 										},
 										map[string]any{
@@ -340,8 +337,7 @@ func TestRedactWithMarkers(t *testing.T) {
 								},
 							},
 							map[string]any{
-								"mock_stream_config":             REDACTED,
-								"mark_redact_mock_stream_config": true,
+								"mock_stream_config": REDACTED,
 							},
 						},
 					},
