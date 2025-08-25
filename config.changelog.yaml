@@ -1,0 +1,3 @@
+owner: elastic
+repo: elastic-agent
+rendered_changelog_destination: docs/release-notes/_snippets
