@@ -9,6 +9,7 @@ updates:
       - automation
       - skip-changelog
       - Team:Elastic-Agent-Control-Plane
+      - backport-active-all
     allow:
       # Only update internal dependencies for now while we evaluate this workflow.
       - dependency-name: "github.com/elastic/*"
@@ -29,4 +30,5 @@ updates:
       - automation
       - skip-changelog
       - Team:Elastic-Agent-Control-Plane
+      - backport-active-all
     open-pull-requests-limit: 10
