@@ -8,14 +8,19 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io/fs"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/gofrs/flock"
+	"github.com/otiai10/copy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -25,6 +30,8 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/common"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -37,6 +44,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
+	"github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/info"
 	mocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
 )
 
@@ -1291,4 +1299,419 @@ func (f *fakeAcker) Ack(ctx context.Context, action fleetapi.Action) error {
 func (f *fakeAcker) Commit(ctx context.Context) error {
 	args := f.Called(ctx)
 	return args.Error(0)
+}
+
+// archiveFilesWithArchiveDirName function is used to modify the archive files to
+// match the desired archive directory name for test cases. Modifies the file
+// paths. The archive files are based on the global variables in step_unpack_test.go.
+func archiveFilesWithArchiveDirName(archiveName string) func(file files) files {
+	archiveWithoutSuffix := strings.TrimSuffix(archiveName, ".tar.gz")
+	archiveWithoutSuffix = strings.TrimSuffix(archiveWithoutSuffix, ".zip")
+
+	return func(file files) files {
+		file.path = strings.Replace(file.path, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64", archiveWithoutSuffix, 1)
+
+		return file
+	}
+}
+
+// archiveFilesWithVersionedHome function is used to modify the archive files to
+// match the desired versioned home path for test cases. Modifies the manifest
+// and file paths. The archive files are based on the global variables in
+// step_unpack_test.go.
+func archiveFilesWithVersionedHome(version string, meta string) func(file files) files {
+	return func(file files) files {
+		if file.content == ea_123_manifest {
+			newContent := strings.ReplaceAll(file.content, "1.2.3", version)
+			newContent = strings.ReplaceAll(newContent, "abcdef", meta)
+
+			file.content = newContent
+		}
+		file.path = strings.ReplaceAll(file.path, "abcdef", meta)
+
+		return file
+	}
+}
+
+// ModifyArchiveFiles function is used to modify the archive files to match the
+// test scenarios. The archive files are based on the global variables in
+// step_unpack_test.go.
+func modifyArchiveFiles(archiveFiles []files, modFuncs ...func(file files) files) []files {
+	modifiedArchiveFiles := make([]files, len(archiveFiles))
+	for i, file := range archiveFiles {
+		for _, modFunc := range modFuncs {
+			file = modFunc(file)
+		}
+		modifiedArchiveFiles[i] = file
+	}
+
+	return modifiedArchiveFiles
+}
+
+// buildArchiveFiles is used to modify the archive files found in
+// step_unpack_test.go to fit the desired test scenarios by setting the archive
+// dir name and the versioned home path.
+func buildArchiveFiles(t *testing.T, archiveFiles []files, parsedVersion *agtversion.ParsedSemVer, metadata string) (string, []files) {
+	tempConfig := &artifact.Config{} // used only to get os and arch, runtime.GOARCH returns amd64 which is not a valid arch when used in GetArtifactName
+	archiveName, err := artifact.GetArtifactName(agentArtifact, *parsedVersion, tempConfig.OS(), tempConfig.Arch())
+	require.NoError(t, err)
+
+	modifiedArchiveFiles := modifyArchiveFiles(archiveFiles,
+		archiveFilesWithArchiveDirName(archiveName),
+		archiveFilesWithVersionedHome(parsedVersion.CoreVersion(), metadata),
+	)
+
+	return archiveName, modifiedArchiveFiles
+}
+
+// createArchive function is used to create mock archives for upgrade tests.
+// Uses the helpers in step_unpack_test.go to create the archive.
+func createArchive(t *testing.T, archiveName string, archiveFiles []files) (string, error) {
+	if runtime.GOOS == "windows" {
+		return createZipArchive(t, archiveName, archiveFiles)
+	}
+	return createTarArchive(t, archiveName, archiveFiles)
+}
+
+func TestCopyActionStoreFunc(t *testing.T) {
+	log, _ := loggertest.New("TestCoyActionStore")
+
+	actionStoreContent := "initial agent action_store.yml content"
+	actionStateStoreYamlContent := "initial agent state.yml content"
+	actionStateStoreFileContent := "initial agent state.enc content"
+
+	type testFile struct {
+		name    string
+		content string
+	}
+
+	type testCase struct {
+		files         []testFile
+		mockFuncName  common.MockStdLibFuncName
+		expectedError error
+	}
+
+	testError := errors.New("test error")
+
+	setMocks := common.PrepareStdLibMocks(common.StdLibMocks{
+		WriteFileMock: func(name string, data []byte, perm os.FileMode) error {
+			return testError
+		},
+		ReadFileMock: func(name string) ([]byte, error) {
+			return nil, testError
+		},
+	})
+
+	testCases := map[string]testCase{
+		"should copy all action store files": {
+			files: []testFile{
+				{name: "action_store", content: actionStoreContent},
+				{name: "state_yaml", content: actionStateStoreYamlContent},
+			},
+			expectedError: nil,
+		},
+		"should skip copying action store file that does not exist": {
+			files: []testFile{
+				{name: "action_store", content: actionStoreContent},
+				{name: "state_yaml", content: actionStateStoreYamlContent},
+			},
+			expectedError: nil,
+		},
+		"should return error if it cannot read the action store files": {
+			files: []testFile{
+				{name: "action_store", content: actionStoreContent},
+				{name: "state_yaml", content: actionStateStoreYamlContent},
+				{name: "state_enc", content: actionStateStoreFileContent},
+			},
+			mockFuncName:  common.ReadFileFuncName,
+			expectedError: testError,
+		},
+		"should return error if it cannot write the action store files": {
+			files: []testFile{
+				{name: "action_store", content: actionStoreContent},
+				{name: "state_yaml", content: actionStateStoreYamlContent},
+				{name: "state_enc", content: actionStateStoreFileContent},
+			},
+			mockFuncName:  common.WriteFileFuncName,
+			expectedError: testError,
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			baseDir := t.TempDir()
+			newHome := filepath.Join(baseDir, "new_home")
+			paths.SetTop(baseDir)
+
+			actionStorePath := paths.AgentActionStoreFile()
+			actionStateStoreYamlPath := paths.AgentStateStoreYmlFile()
+			actionStateStoreFilePath := paths.AgentStateStoreFile()
+
+			newActionStorePaths := []string{}
+
+			for _, file := range testCase.files {
+				path := ""
+
+				switch file.name {
+				case "action_store":
+					path = actionStorePath
+				case "state_yaml":
+					path = actionStateStoreYamlPath
+				case "state_enc":
+					path = actionStateStoreFilePath
+				}
+
+				// Create the action store directories and files
+				dir := filepath.Dir(path)
+				err := os.MkdirAll(dir, 0o755)
+				require.NoError(t, err, "error creating directory %s", dir)
+
+				err = os.WriteFile(path, []byte(file.content), 0o600)
+				require.NoError(t, err, "error writing to %s", path)
+
+				// Create the new action store directories
+				newActionStorePath := filepath.Join(newHome, filepath.Base(path))
+				newActionStorePaths = append(newActionStorePaths, newActionStorePath)
+				err = os.MkdirAll(filepath.Dir(newActionStorePath), 0o755)
+				require.NoError(t, err, "error creating directory %s", filepath.Dir(newActionStorePath))
+			}
+
+			if testCase.mockFuncName != "" {
+				setMocks(t, testCase.mockFuncName)
+			}
+
+			err := copyActionStoreFunc(log, newHome)
+			if testCase.expectedError != nil {
+				require.Error(t, err, "copyActionStoreFunc should return error")
+				require.ErrorIs(t, err, testCase.expectedError, "copyActionStoreFunc error mismatch")
+				return
+			}
+
+			require.NoError(t, err, "error copying action store")
+
+			for i, path := range newActionStorePaths {
+				require.FileExists(t, path, "file %s does not exist", path)
+
+				content, err := os.ReadFile(path)
+				require.NoError(t, err, "error reading from %s", path)
+				require.Equal(t, []byte(testCase.files[i].content), content, "content of %s is not as expected", path)
+			}
+		})
+	}
+}
+
+func TestCopyRunDirectory(t *testing.T) {
+	log, _ := loggertest.New("TestCopyRunDirectory")
+
+	type testCase struct {
+		expectedError   error
+		fileDirCopyMock func(src, dest string, opts ...copy.Options) error // mock for fileDirCopyFunc
+		stdLibMockName  common.MockStdLibFuncName
+	}
+
+	fileDirCopyMock := func(src, dest string, opts ...copy.Options) error {
+		return errors.New("test error")
+	}
+
+	setStdlibMock := common.PrepareStdLibMocks(common.StdLibMocks{
+		MkdirAllMock: func(path string, perm os.FileMode) error {
+			return fs.ErrPermission
+		},
+	})
+
+	testCases := map[string]testCase{
+		"should copy old run directory to new run directory": {
+			expectedError:   nil,
+			fileDirCopyMock: nil,
+		},
+		"should return error if it cannot create the new run directory": {
+			expectedError:   fs.ErrPermission,
+			fileDirCopyMock: nil,
+			stdLibMockName:  common.MkdirAllFuncName,
+		},
+		"should return error if it cannot copy the old run directory": {
+			expectedError:   errors.New("test error"),
+			fileDirCopyMock: fileDirCopyMock,
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			baseDir := t.TempDir()
+			paths.SetTop(baseDir)
+
+			oldRunPath := filepath.Join(baseDir, "old_dir", "run")
+			oldRunFile := filepath.Join(oldRunPath, "file.txt")
+
+			err := os.MkdirAll(oldRunPath, 0o700)
+			require.NoError(t, err, "error creating old run directory")
+
+			err = os.WriteFile(oldRunFile, []byte("content for old run file"), 0o600)
+			require.NoError(t, err, "error writing to %s", oldRunFile)
+
+			newRunPath := filepath.Join(baseDir, "new_dir", "run")
+
+			err = os.MkdirAll(newRunPath, 0o700)
+			require.NoError(t, err, "error creating new run directory")
+
+			if testCase.fileDirCopyMock != nil {
+				tmpFileDirCopyMock := fileDirCopyFunc
+				t.Cleanup(func() {
+					fileDirCopyFunc = tmpFileDirCopyMock
+				})
+
+				fileDirCopyFunc = fileDirCopyMock
+			}
+
+			if testCase.stdLibMockName != "" {
+				setStdlibMock(t, testCase.stdLibMockName)
+			}
+
+			err = copyRunDirectoryFunc(log, oldRunPath, newRunPath)
+			if testCase.expectedError != nil {
+				require.Error(t, err, "copyRunDirectoryFunc should return error")
+				require.ErrorIs(t, err, testCase.expectedError, "copyRunDirectoryFunc should return test error")
+				return
+			}
+
+			require.NoError(t, err, "error copying run directory")
+			require.DirExists(t, newRunPath, "new run directory does not exist")
+
+			require.FileExists(t, filepath.Join(newRunPath, "file.txt"), "file.txt does not exist in new run directory")
+
+			content, err := os.ReadFile(filepath.Join(newRunPath, "file.txt"))
+			require.NoError(t, err, "error reading from %s", filepath.Join(newRunPath, "file.txt"))
+			require.Equal(t, []byte("content for old run file"), content, "content of %s is not as expected", filepath.Join(newRunPath, "file.txt"))
+		})
+	}
+}
+
+func TestUpgradeDirectoryCopyErrors(t *testing.T) {
+	log, _ := loggertest.New("test")
+
+	initialVersion := agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")
+	initialArtifactName, initialArchiveFiles := buildArchiveFiles(t, archiveFilesWithMoreComponents, initialVersion, "abcdef")
+
+	targetVersion := agtversion.NewParsedSemVer(3, 4, 5, "SNAPSHOT", "")
+	targetArtifactName, targetArchiveFiles := buildArchiveFiles(t, archiveFilesWithMoreComponents, targetVersion, "ghijkl")
+
+	mockAgentInfo := info.NewAgent(t)
+	mockAgentInfo.On("Version").Return(targetVersion.String())
+
+	upgradeDetails := details.NewDetails(targetVersion.String(), details.StateRequested, "test")
+
+	tempUnpacker, err := NewUpgrader(log, &artifact.Config{}, mockAgentInfo) // used only to unpack the initial archive
+	require.NoError(t, err)
+
+	genericError := errors.New("test error")
+
+	testCases := map[string]struct {
+		mockReturnedError error
+		expectedError     error
+	}{
+		"should return error if run directory copy fails": {
+			mockReturnedError: genericError,
+			expectedError:     genericError,
+		},
+	}
+
+	for _, te := range upgradeErrors.OS_DiskSpaceErrors {
+		testCases[fmt.Sprintf("should return error if run directory copy fails with disk space error: %v", te)] = struct {
+			mockReturnedError error
+			expectedError     error
+		}{
+			mockReturnedError: te,
+			expectedError:     upgradeErrors.ErrInsufficientDiskSpace,
+		}
+	}
+
+	for _, copiedDir := range []string{"action_store", "run_directory"} {
+		for name, tc := range testCases {
+			t.Run(fmt.Sprintf("when copying %s: %s", copiedDir, name), func(t *testing.T) {
+				baseDir := t.TempDir()
+				paths.SetTop(baseDir)
+
+				initialArchive, err := createArchive(t, initialArtifactName, initialArchiveFiles)
+				require.NoError(t, err)
+
+				t.Logf("Created archive: %s", initialArchive)
+
+				initialUnpackRes, err := tempUnpacker.unpack(initialVersion.String(), initialArchive, paths.Data(), "")
+				require.NoError(t, err)
+
+				paths.SetDownloads(filepath.Join(baseDir, initialUnpackRes.VersionedHome, "downloads")) // ensure the upgrader uses a predictable path for downloads
+
+				// The archive file list does not contain the action store files, so we need to
+				// create them
+				actionStorePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile()}
+				for _, path := range actionStorePaths {
+					err := os.MkdirAll(filepath.Dir(path), 0o700)
+					require.NoError(t, err, "error creating directory %s", filepath.Dir(path))
+
+					err = os.WriteFile(path, []byte(fmt.Sprintf("initial agent %s content", filepath.Base(path))), 0o600)
+					require.NoError(t, err, "error writing to %s", path)
+				}
+
+				targetArchive, err := createArchive(t, targetArtifactName, targetArchiveFiles)
+				require.NoError(t, err)
+
+				t.Logf("Created archive: %s", targetArchive)
+
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					http.ServeFile(w, r, targetArchive)
+				}))
+				t.Cleanup(server.Close)
+
+				mockCalled := false
+
+				if copiedDir == "run_directory" {
+					initialRunPath := paths.Run()
+					require.NoError(t, os.MkdirAll(initialRunPath, 0o755))
+					// Archive files do not contain the run directory, so we need to
+					// create it and add some files
+					for i := 0; i < 3; i++ {
+						filePath := filepath.Join(initialRunPath, fmt.Sprintf("file%d.txt", i))
+						err := os.WriteFile(filePath, []byte(fmt.Sprintf("content for file %d", i)), 0o600)
+						require.NoError(t, err)
+					}
+
+					tmpCopyRunDirFunc := copyRunDirectoryFunc
+					t.Cleanup(func() {
+						copyRunDirectoryFunc = tmpCopyRunDirFunc
+					})
+
+					copyRunDirectoryFunc = func(log *logger.Logger, oldRunPath string, newRunPath string) error {
+						mockCalled = true
+						return tc.mockReturnedError
+					}
+				} else {
+					tmpCopyActionStoreFunc := copyActionStoreFunc
+					t.Cleanup(func() {
+						copyActionStoreFunc = tmpCopyActionStoreFunc
+					})
+
+					copyActionStoreFunc = func(log *logger.Logger, newHome string) error {
+						mockCalled = true
+						return tc.mockReturnedError
+					}
+				}
+
+				config := artifact.Config{
+					TargetDirectory:        paths.Downloads(),
+					SourceURI:              server.URL,
+					RetrySleepInitDuration: 1 * time.Second,
+					HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+						Timeout: 1 * time.Second,
+					},
+				}
+
+				upgrader, err := NewUpgrader(log, &config, mockAgentInfo)
+				require.NoError(t, err)
+
+				_, err = upgrader.Upgrade(context.Background(), targetVersion.String(), server.URL, nil, upgradeDetails, true, true)
+				require.True(t, mockCalled, "mock should be called")
+				require.ErrorIs(t, err, tc.expectedError, "expected error mismatch")
+			})
+		}
+	}
 }
