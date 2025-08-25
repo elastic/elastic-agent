@@ -41,7 +41,7 @@ func (u *Upgrader) unpack(version, archivePath, dataDir string, flavor string) (
 	// or the extraction will be double nested
 	var unpackRes UnpackResult
 	var err error
-	if runtime.GOOS == windows {
+	if runtime.GOOS == windowsOSName {
 		unpackRes, err = unzip(u.log, archivePath, dataDir, flavor)
 	} else {
 		unpackRes, err = untar(u.log, archivePath, dataDir, flavor)

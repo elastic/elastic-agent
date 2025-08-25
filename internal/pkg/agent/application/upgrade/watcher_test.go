@@ -8,16 +8,30 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"gopkg.in/yaml.v3"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
 func TestWatcher_CannotConnect(t *testing.T) {
@@ -622,4 +636,591 @@ func (s *mockDaemon) Client() client.Client {
 
 func (s *mockDaemon) StateWatch(_ *cproto.Empty, srv cproto.ElasticAgentControl_StateWatchServer) error {
 	return s.watch(srv)
+}
+
+func Test_selectWatcherExecutable(t *testing.T) {
+	type args struct {
+		previous agentInstall
+		current  agentInstall
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "Simple upgrade, we should launch the new (current) watcher",
+			args: args{
+				previous: agentInstall{
+					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-somehash"),
+				},
+				current: agentInstall{
+					parsedVersion: agtversion.NewParsedSemVer(4, 5, 6, "", ""),
+					versionedHome: filepath.Join("data", "elastic-agent-4.5.6-someotherhash"),
+				},
+			},
+			want: filepath.Join("data", "elastic-agent-4.5.6-someotherhash"),
+		},
+		{
+			name: "Simple downgrade, we should launch the currently installed (previous) watcher",
+			args: args{
+				previous: agentInstall{
+					parsedVersion: agtversion.NewParsedSemVer(4, 5, 6, "", ""),
+					versionedHome: filepath.Join("data", "elastic-agent-4.5.6-someotherhash"),
+				},
+				current: agentInstall{
+					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-somehash"),
+				},
+			},
+			want: filepath.Join("data", "elastic-agent-4.5.6-someotherhash"),
+		},
+		{
+			name: "Upgrade from snapshot to released version, we should launch the new (current) watcher",
+			args: args{
+				previous: agentInstall{
+					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", ""),
+					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-somehash"),
+				},
+				current: agentInstall{
+					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-someotherhash"),
+				},
+			},
+			want: filepath.Join("data", "elastic-agent-1.2.3-someotherhash"),
+		},
+		{
+			name: "Downgrade from released version to SNAPSHOT, we should launch the currently installed (previous) watcher",
+			args: args{
+				previous: agentInstall{
+					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "", ""),
+					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-somehash"),
+				},
+				current: agentInstall{
+					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", ""),
+					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-someotherhash"),
+				},
+			},
+
+			want: filepath.Join("data", "elastic-agent-1.2.3-somehash"),
+		},
+	}
+	// Just need a top dir path. This test does not make any operation on the filesystem, so a temp dir path is as good as any
+	fakeTopDir := filepath.Join(t.TempDir(), "Elastic", "Agent")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, paths.BinaryPath(filepath.Join(fakeTopDir, tt.want), agentName), selectWatcherExecutable(fakeTopDir, tt.args.previous, tt.args.current), "selectWatcherExecutable(%v, %v)", tt.args.previous, tt.args.current)
+		})
+	}
+}
+
+func TestWaitForWatcher(t *testing.T) {
+	wantErrWatcherNotStarted := func(t assert.TestingT, err error, i ...interface{}) bool {
+		return assert.ErrorIs(t, err, ErrWatcherNotStarted, i)
+	}
+
+	tests := []struct {
+		name                string
+		states              []details.State
+		stateChangeInterval time.Duration
+		cancelWaitContext   bool
+		wantErr             assert.ErrorAssertionFunc
+	}{
+		{
+			name:                "Happy path: watcher is watching already",
+			states:              []details.State{details.StateWatching},
+			stateChangeInterval: 1 * time.Millisecond,
+			wantErr:             assert.NoError,
+		},
+		{
+			name:                "Sad path: watcher is never starting",
+			states:              []details.State{details.StateReplacing},
+			stateChangeInterval: 1 * time.Millisecond,
+			cancelWaitContext:   true,
+			wantErr:             wantErrWatcherNotStarted,
+		},
+		{
+			name: "Runaround path: marker is jumping around and landing on watching",
+			states: []details.State{
+				details.StateRequested,
+				details.StateScheduled,
+				details.StateDownloading,
+				details.StateExtracting,
+				details.StateReplacing,
+				details.StateRestarting,
+				details.StateWatching,
+			},
+			stateChangeInterval: 1 * time.Millisecond,
+			wantErr:             assert.NoError,
+		},
+		{
+			name:                "Timeout: marker is never created",
+			states:              nil,
+			stateChangeInterval: 1 * time.Millisecond,
+			cancelWaitContext:   true,
+			wantErr:             wantErrWatcherNotStarted,
+		},
+		{
+			name: "Timeout2: state doesn't get there in time",
+			states: []details.State{
+				details.StateRequested,
+				details.StateScheduled,
+				details.StateDownloading,
+				details.StateExtracting,
+				details.StateReplacing,
+				details.StateRestarting,
+			},
+
+			stateChangeInterval: 1 * time.Millisecond,
+			cancelWaitContext:   true,
+			wantErr:             wantErrWatcherNotStarted,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			deadline, ok := t.Deadline()
+			if !ok {
+				deadline = time.Now().Add(5 * time.Second)
+			}
+			testCtx, testCancel := context.WithDeadline(context.Background(), deadline)
+			defer testCancel()
+
+			tmpDir := t.TempDir()
+			updMarkerFilePath := filepath.Join(tmpDir, markerFilename)
+
+			waitContext, waitCancel := context.WithCancel(testCtx)
+			defer waitCancel()
+
+			fakeTimeout := 30 * time.Second
+
+			// in order to take timing out of the equation provide a context that we can cancel manually
+			// still assert that the parent context and timeout passed are correct
+			var createContextFunc createContextWithTimeout = func(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+				assert.Same(t, testCtx, ctx, "parent context should be the same as the waitForWatcherCall")
+				assert.Equal(t, fakeTimeout, timeout, "timeout used in new context should be the same as testcase")
+
+				return waitContext, waitCancel
+			}
+
+			if len(tt.states) > 0 {
+				initialState := tt.states[0]
+				writeState(t, updMarkerFilePath, initialState)
+			}
+
+			wg := new(sync.WaitGroup)
+
+			var furtherStates []details.State
+			if len(tt.states) > 1 {
+				// we have more states to produce
+				furtherStates = tt.states[1:]
+			}
+
+			wg.Add(1)
+
+			// worker goroutine: writes out additional states while the test is blocked on waitOnWatcher() call and expires
+			// the wait context if cancelWaitContext is set to true. Timing of the goroutine is driven by stateChangeInterval.
+			go func() {
+				defer wg.Done()
+				tick := time.NewTicker(tt.stateChangeInterval)
+				defer tick.Stop()
+				for _, state := range furtherStates {
+					select {
+					case <-testCtx.Done():
+						return
+					case <-tick.C:
+						writeState(t, updMarkerFilePath, state)
+					}
+				}
+				if tt.cancelWaitContext {
+					<-tick.C
+					waitCancel()
+				}
+			}()
+
+			log, _ := loggertest.New(tt.name)
+
+			tt.wantErr(t, waitForWatcherWithTimeoutCreationFunc(testCtx, log, updMarkerFilePath, fakeTimeout, createContextFunc), fmt.Sprintf("waitForWatcher %s, %v, %s, %s)", updMarkerFilePath, tt.states, tt.stateChangeInterval, fakeTimeout))
+
+			// wait for goroutines to finish
+			wg.Wait()
+		})
+	}
+}
+
+func writeState(t *testing.T, path string, state details.State) {
+	ms := newMarkerSerializer(&UpdateMarker{
+		Version:           "version",
+		Hash:              "hash",
+		VersionedHome:     "versionedHome",
+		UpdatedOn:         time.Now(),
+		PrevVersion:       "prev_version",
+		PrevHash:          "prev_hash",
+		PrevVersionedHome: "prev_versionedhome",
+		Acked:             false,
+		Action:            nil,
+		Details: &details.Details{
+			TargetVersion: "version",
+			State:         state,
+			ActionID:      "",
+			Metadata:      details.Metadata{},
+		},
+	})
+
+	bytes, err := yaml.Marshal(ms)
+	if assert.NoError(t, err, "error marshaling the test upgrade marker") {
+		err = os.WriteFile(path, bytes, 0770)
+		assert.NoError(t, err, "error writing out the test upgrade marker")
+	}
+}
+
+// TestTakeOverWatcher verifies that takeOverWatcher behaves within expectations.
+// This test cannot run in parallel because it deals with launching test processes and verifying their state.
+// In case of aggressive PID reuse along with parallel execution, this test could kill "innocent" processes
+func TestTakeOverWatcher(t *testing.T) {
+
+	type setupFunc func(t *testing.T, workdir string, mockWatcherGrappler *mockWatcherGrappler)
+	type assertFunc func(t *testing.T, workdir string, appLocker *filelock.AppLocker)
+
+	testcases := []struct {
+		name               string
+		setup              setupFunc
+		wantErr            assert.ErrorAssertionFunc
+		assertPostTakeover assertFunc
+	}{
+		{
+			name: "no contention for watcher applocker",
+			setup: func(t *testing.T, workdir string, mockWatcherGrappler *mockWatcherGrappler) {
+				// nothing to do here
+			},
+			wantErr: assert.NoError,
+			assertPostTakeover: func(t *testing.T, workdir string, appLocker *filelock.AppLocker) {
+				assert.NotNil(t, appLocker, "appLocker should not be nil")
+				assert.FileExists(t, filepath.Join(workdir, watcherApplockerFileName))
+			},
+		},
+		{
+			name: "contention with a process that can be taken down: no error",
+			setup: func(t *testing.T, workdir string, mockWatcherGrappler *mockWatcherGrappler) {
+				// create and lock an applocker
+				locker := filelock.NewAppLocker(workdir, watcherApplockerFileName)
+				err := locker.TryLock()
+				require.NoError(t, err, "error setting up the applocker")
+				mockWatcherGrappler.EXPECT().TakeDownWatcher(mock.Anything, mock.Anything).Run(func(_ context.Context, _ *logp.Logger) {
+					unlockErr := locker.Unlock()
+					assert.NoError(t, unlockErr, "error unlocking the applocker")
+				}).Return(nil)
+
+				// add a cleanup to unlock the applocker at the end of the test anyway in case of failures
+				t.Cleanup(func() {
+					_ = locker.Unlock()
+				})
+			},
+			wantErr: assert.NoError,
+			assertPostTakeover: func(t *testing.T, workdir string, appLocker *filelock.AppLocker) {
+				assert.NotNil(t, appLocker, "appLocker should not be nil")
+				assert.FileExists(t, filepath.Join(workdir, watcherApplockerFileName))
+			},
+		},
+		{
+			name: "contention with a process that can be taken down with multiple attempts: no error",
+			setup: func(t *testing.T, workdir string, mockWatcherGrappler *mockWatcherGrappler) {
+				// create and lock an applocker
+				locker := filelock.NewAppLocker(workdir, watcherApplockerFileName)
+				err := locker.TryLock()
+				require.NoError(t, err, "error setting up the applocker")
+				mockWatcherGrappler.EXPECT().TakeDownWatcher(mock.Anything, mock.Anything).Return(fmt.Errorf("some takedown error")).Once()
+				mockWatcherGrappler.EXPECT().TakeDownWatcher(mock.Anything, mock.Anything).Run(func(_ context.Context, _ *logp.Logger) {
+					unlockErr := locker.Unlock()
+					assert.NoError(t, unlockErr, "error unlocking the applocker")
+				}).Return(nil)
+
+				// add a cleanup to unlock the applocker at the end of the test anyway in case of failures
+				t.Cleanup(func() {
+					_ = locker.Unlock()
+				})
+			},
+			wantErr: assert.NoError,
+			assertPostTakeover: func(t *testing.T, workdir string, appLocker *filelock.AppLocker) {
+				assert.NotNil(t, appLocker, "appLocker should not be nil")
+				assert.FileExists(t, filepath.Join(workdir, watcherApplockerFileName))
+			},
+		},
+		{
+			name: "contention with a process that cannot be taken down: error is returned by takeOverWatcher",
+			setup: func(t *testing.T, workdir string, mockWatcherGrappler *mockWatcherGrappler) {
+				// create and lock an applocker
+				locker := filelock.NewAppLocker(workdir, watcherApplockerFileName)
+				err := locker.TryLock()
+				require.NoError(t, err, "error setting up the applocker")
+
+				// Expect the calls to applocker but do not release the lock
+				mockWatcherGrappler.EXPECT().TakeDownWatcher(mock.Anything, mock.Anything).Return(nil)
+
+				// add a cleanup to unlock the applocker at the end of the test anyway
+				t.Cleanup(func() {
+					_ = locker.Unlock()
+				})
+			},
+			wantErr: assert.Error,
+			assertPostTakeover: func(t *testing.T, workdir string, appLocker *filelock.AppLocker) {
+				assert.Nil(t, appLocker, "appLocker should be nil")
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			workDir := t.TempDir()
+			logger, logs := loggertest.New(t.Name())
+
+			mockGrappler := newMockWatcherGrappler(t)
+			tc.setup(t, workDir, mockGrappler)
+
+			appLocker, err := takeOverWatcher(t.Context(), logger, mockGrappler, workDir, 10*time.Second, 500*time.Millisecond, 100*time.Millisecond)
+			loggertest.PrintObservedLogs(logs.TakeAll(), t.Log)
+
+			tc.wantErr(t, err)
+			if appLocker != nil {
+				defer func(appLocker *filelock.AppLocker) {
+					unlockErr := appLocker.Unlock()
+					assert.NoError(t, unlockErr, "error unlocking the app locker")
+				}(appLocker)
+			}
+			if tc.assertPostTakeover != nil {
+				tc.assertPostTakeover(t, workDir, appLocker)
+			}
+		})
+	}
+
+}
+
+func Test_takedownWatcher(t *testing.T) {
+
+	const applockerFileName = "mocklocker.lock"
+
+	testExecutablePath := filepath.Join("..", "filelock", "testlocker", "testlocker")
+	if runtime.GOOS == "windows" {
+		testExecutablePath += ".exe"
+	}
+	testExecutableAbsolutePath, err := filepath.Abs(testExecutablePath)
+	require.NoError(t, err, "error calculating absolute test executable part")
+
+	require.FileExists(t, testExecutableAbsolutePath,
+		"testlocker binary not found.\n"+
+			"Check that:\n"+
+			"- test binaries have been built with mage build:testbinaries\n"+
+			"- the path of the executable is correct")
+
+	returnCmdPIDsFetcher := func(cmds ...*exec.Cmd) watcherPIDsFetcher {
+		return func() ([]int, error) {
+			pids := make([]int, 0, len(cmds))
+			for _, c := range cmds {
+				if c.Process != nil {
+					pids = append(pids, c.Process.Pid)
+				}
+			}
+
+			return pids, nil
+		}
+	}
+
+	// create a struct with a *exec.Cmd and a channel that will be closed when Wait() returns for the exec.Cmd
+	// this should keep the data race detector happy.
+	type testProcess struct {
+		cmd      *exec.Cmd
+		waitChan chan struct{}
+	}
+
+	type setupFunc func(t *testing.T, log *logger.Logger, workdir string) (watcherPIDsFetcher, []testProcess)
+	type assertFunc func(t *testing.T, workdir string, cmds []testProcess)
+
+	tests := []struct {
+		name               string
+		setup              setupFunc
+		wantErr            assert.ErrorAssertionFunc
+		assertPostTakedown assertFunc
+	}{
+		{
+			name: "no contention for watcher applocker",
+			setup: func(_ *testing.T, _ *logger.Logger, _ string) (watcherPIDsFetcher, []testProcess) {
+				// nothing to do here, always return and empty list of pids
+				return func() ([]int, error) {
+					return nil, nil
+				}, nil
+			},
+			wantErr: assert.NoError,
+			assertPostTakedown: func(t *testing.T, workdir string, _ []testProcess) {
+				// we should be able to lock, no problem
+				locker := filelock.NewAppLocker(workdir, applockerFileName)
+				lockError := locker.TryLock()
+				t.Cleanup(func() {
+					_ = locker.Unlock()
+				})
+
+				assert.NoError(t, lockError)
+
+			},
+		},
+		{
+			name: "contention with test binary listening to signals: test binary is terminated gracefully",
+			setup: func(t *testing.T, log *logger.Logger, workdir string) (watcherPIDsFetcher, []testProcess) {
+				cmd, testChan := createTestlockerCommand(t, log.Named("testlocker"), applockerFileName, testExecutableAbsolutePath, workdir, false)
+				require.NoError(t, err, "error starting testlocker binary")
+
+				// wait for test binary to acquire lock
+				require.EventuallyWithT(t, func(collect *assert.CollectT) {
+					assert.FileExists(collect, filepath.Join(workdir, applockerFileName), "watcher applocker should have been created by the test binary")
+				}, 10*time.Second, 100*time.Millisecond)
+				require.NotNil(t, cmd.Process, "process details for testlocker should not be nil")
+
+				t.Logf("started testlocker process with PID %d", cmd.Process.Pid)
+
+				return returnCmdPIDsFetcher(cmd), []testProcess{{cmd: cmd, waitChan: testChan}}
+			},
+			wantErr: assert.NoError,
+			assertPostTakedown: func(t *testing.T, workdir string, cmds []testProcess) {
+
+				assert.Len(t, cmds, 1)
+				testlockerProcess := cmds[0]
+				require.NotNil(t, testlockerProcess, "test locker process info should have a not nil cmd")
+
+				require.Eventually(t, func() bool {
+					running, checkErr := isProcessRunning(t, testlockerProcess.cmd)
+					if checkErr != nil {
+						t.Logf("error checking for testlocker process running: %s", checkErr.Error())
+						return false
+					}
+					return !running
+				}, 30*time.Second, 100*time.Millisecond, "test locker process should have exited")
+
+				<-testlockerProcess.waitChan
+
+				assert.True(t, testlockerProcess.cmd.ProcessState.Exited(), "test locker process should have terminated")
+				assert.Equal(t, 0, testlockerProcess.cmd.ProcessState.ExitCode(), "test locker process should have a successful exit status")
+
+				assert.FileExists(t, filepath.Join(workdir, applockerFileName))
+				testApplocker := filelock.NewAppLocker(workdir, applockerFileName)
+				testApplockerError := testApplocker.TryLock()
+				t.Cleanup(func() {
+					_ = testApplocker.Unlock()
+				})
+				assert.NoError(t, testApplockerError, "error locking applocker")
+			},
+		},
+		{
+			name: "contention with test binary not listening to signals: test binary is not terminated",
+			setup: func(t *testing.T, log *logger.Logger, workdir string) (watcherPIDsFetcher, []testProcess) {
+				cmd, waitChan := createTestlockerCommand(t, log.Named("testlocker"), applockerFileName, testExecutableAbsolutePath, workdir, true)
+				require.NoError(t, err, "error starting testlocker binary")
+
+				// wait for test binary to acquire lock
+				require.EventuallyWithT(t, func(collect *assert.CollectT) {
+					assert.FileExists(collect, filepath.Join(workdir, applockerFileName), "watcher applocker should have been created by the test binary")
+				}, 10*time.Second, 100*time.Millisecond)
+				require.NotNil(t, cmd.Process, "process details for testlocker should not be nil")
+
+				t.Logf("started testlocker process with PID %d", cmd.Process.Pid)
+
+				return returnCmdPIDsFetcher(cmd), []testProcess{{cmd: cmd, waitChan: waitChan}}
+			},
+			wantErr: assert.NoError,
+			assertPostTakedown: func(t *testing.T, workdir string, cmds []testProcess) {
+
+				assert.Len(t, cmds, 1)
+				testlockerProcess := cmds[0]
+				require.NotNil(t, testlockerProcess, "test locker process info should have exec.Cmd set")
+
+				// check that the process is still running for a time
+				assert.Never(t, func() bool {
+					running, checkErr := isProcessRunning(t, testlockerProcess.cmd)
+					if checkErr != nil {
+						t.Logf("error checking for testlocker process running: %s", checkErr.Error())
+						return false
+					}
+					return !running
+				}, 1*time.Second, 100*time.Millisecond, "test locker process should still be running for some time")
+
+				// Kill the process explicitly
+				err = testlockerProcess.cmd.Process.Kill()
+				assert.NoError(t, err, "error killing testlocker process")
+
+				<-testlockerProcess.waitChan
+
+				if assert.NotNil(t, testlockerProcess.cmd.ProcessState, "test locker process should have been terminated") {
+					assert.NotEqual(t, 0, testlockerProcess.cmd.ProcessState.ExitCode(), "test locker process should not return a successful exit code")
+				}
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			workDir := t.TempDir()
+			log, obsLogs := loggertest.New(t.Name())
+			t.Cleanup(func() {
+				// however it ends, try to print out the logs of TakedownWatcher
+				loggertest.PrintObservedLogs(obsLogs.All(), t.Log)
+			})
+			pidFetcher, processInfos := tc.setup(t, log, workDir)
+			tc.wantErr(t, TakedownWatcher(t.Context(), log.Named("TakedownWatcher"), pidFetcher))
+			if tc.assertPostTakedown != nil {
+				tc.assertPostTakedown(t, workDir, processInfos)
+			}
+		})
+	}
+}
+
+func createTestlockerCommand(t *testing.T, log *logger.Logger, applockerFileName string, testExecutablePath string, workdir string, ignoreSignals bool) (*exec.Cmd, chan struct{}) {
+
+	watchTerminated := make(chan struct{})
+
+	args := []string{"-lockfile", filepath.Join(workdir, applockerFileName)}
+	if ignoreSignals {
+		args = append(args, "-ignoresignals")
+	}
+
+	// use the same invoke as the one used to launch a watcher
+	watcherCmd, err := StartWatcherCmd(log, func() *exec.Cmd {
+		cmd := InvokeCmdWithArgs(testExecutablePath, args...)
+
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd
+	},
+		WithWatcherPostWaitHook(func() {
+			close(watchTerminated)
+		}),
+	)
+
+	require.NoError(t, err, "error starting testlocker binary")
+	return watcherCmd, watchTerminated
+}
+
+func isProcessRunning(t *testing.T, cmd *exec.Cmd) (bool, error) {
+	if cmd.Process == nil {
+		return false, nil
+	}
+	t.Logf("checking if pid %d is still running", cmd.Process.Pid)
+	// search for the pid on the running processes
+	process, err := os.FindProcess(cmd.Process.Pid)
+	if err != nil {
+		t.Logf("error string: %q", err.Error())
+		if runtime.GOOS == "windows" && strings.Contains(err.Error(), "The parameter is incorrect") {
+			// in windows, noone can hear you scream
+			// invalid parameter means that the process object cannot be found
+			t.Logf("pid %d is not running because on windows we got an incorrect parameter error", cmd.Process.Pid)
+			return false, nil
+		}
+
+		t.Logf("error finding process: %T %v", err, err)
+		return false, err
+	}
+
+	if process == nil {
+		t.Logf("pid %d is not running because os.GetProcess returned a nil process", cmd.Process.Pid)
+		return false, nil
+	}
+
+	return isProcessLive(cmd.Process)
 }
