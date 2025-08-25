@@ -478,7 +478,14 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 		return "", err
 	}
 	if downloadSHAFile && downloadShaURL != "" {
-		downloadLocation, err = handleDownload(downloadShaURL)
+		checksumFileLocation, err := handleDownload(downloadShaURL)
+		if err != nil {
+			return "", err
+		}
+		err = verifyChecksum(checksumFileLocation)
+		if err != nil {
+			return "", err
+		}
 	}
 	return downloadLocation, err
 }
