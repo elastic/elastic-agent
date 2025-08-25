@@ -1093,7 +1093,7 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 		acker = &fakeActionAcker{}
 	}
 
-	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelMgr, acker)
+	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelMgr, acker, nil)
 	return coord, cfgMgr, varsMgr
 }
 
