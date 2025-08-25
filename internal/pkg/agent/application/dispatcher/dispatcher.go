@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -26,6 +27,7 @@ type actionHandlers map[reflect.Type]actions.Handler
 type priorityQueue interface {
 	Add(fleetapi.ScheduledAction, int64)
 	DequeueActions() []fleetapi.ScheduledAction
+	Actions() []fleetapi.ScheduledAction
 	CancelType(string) int
 	Save() error
 }
@@ -114,20 +116,36 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, detailsSetter details.
 		span.End()
 	}()
 
+	now := time.Now().UTC()
+
+	// remove any upgrade actions from the queue if there is an upgrade action in the actions
 	ad.removeQueuedUpgrades(actions)
-
-	// set scheduled action as soon as it's received
-	// report it before the scheduled actions go to the queue
-	ad.reportNextScheduledUpgrade(actions, detailsSetter, ad.log)
-
+	// add any scheduled actions to the queue (we don't check the start time here, as we will check it later)
+	// and remove them from the passed actions
 	actions = ad.queueScheduledActions(actions)
+	// dispatch any cancel actions now as they may remove items from the queue
 	actions = ad.dispatchCancelActions(ctx, actions, acker)
-	queued, expired := ad.gatherQueuedActions(time.Now().UTC())
+
+	// extract the scheduled upgrade details from the queue before calling gatherQueuedActions as
+	// the latter will dequeue actions that will be dispatched now or have expired
+	scheduledUpgradeDetails := GetScheduledUpgradeDetails(ad.log, ad.queue, now)
+
+	// gather queued actions that need to be dispatched and separate expired actions
+	queued, expired := ad.gatherQueuedActions(now)
 	ad.log.Debugf("Gathered %d actions from queue, %d actions expired", len(queued), len(expired))
 	ad.log.Debugf("Expired actions: %v", expired)
 
-	ad.handleExpired(expired, detailsSetter)
+	// merge the passed actions with queued actions that need to be dispatched
 	actions = append(actions, queued...)
+
+	// if there is an upgrade action in the ones to be dispatched there is no need set the scheduled upgrade
+	// details from the queue.
+	containsUpgradeAction := slices.ContainsFunc(actions, func(a fleetapi.Action) bool {
+		return a.Type() == fleetapi.ActionTypeUpgrade
+	})
+	if !containsUpgradeAction {
+		detailsSetter(scheduledUpgradeDetails)
+	}
 
 	if err := ad.queue.Save(); err != nil {
 		ad.log.Errorf("failed to persist action_queue: %v", err)
@@ -200,7 +218,12 @@ func (ad *ActionDispatcher) queueScheduledActions(input []fleetapi.Action) []fle
 		if ok {
 			start, err := sAction.StartTime()
 			if err != nil {
-				ad.log.Warnf("Skipping addition to action-queue, issue gathering start time from action id %s: %v", sAction.ID(), err)
+				if _, isUpgradeAction := sAction.(*fleetapi.ActionUpgrade); !isUpgradeAction {
+					// upgrade actions can be both scheduled and immediate actions, so
+					// they can appear without a start time
+					ad.log.Warnf("Skipping addition to action-queue, issue gathering start time from action id %s: %v", sAction.ID(), err)
+				}
+
 				actions = append(actions, action)
 				continue
 			}
@@ -290,86 +313,67 @@ func (ad *ActionDispatcher) scheduleRetry(ctx context.Context, action fleetapi.R
 	}
 }
 
-func (ad *ActionDispatcher) handleExpired(
-	expired []fleetapi.Action,
-	upgradeDetailsSetter details.Observer) {
+func GetScheduledUpgradeDetails(log *logger.Logger, queue priorityQueue, ts time.Time) *details.Details {
+	var nextUpgradeAction *fleetapi.ActionUpgrade
+	var nextUpgradeStartTime time.Time
+	var nextUpgradeExpirationTime time.Time
 
-	for _, e := range expired {
-		if e.Type() == fleetapi.ActionTypeUpgrade {
-			// there is a scheduled upgrade set, if it isn't the same actions as
-			// the expired, the current status take precedence
-			if ad.lastUpgradeDetails != nil &&
-				ad.lastUpgradeDetails.ActionID != e.ID() {
+	for _, queuedAction := range queue.Actions() {
+		scheduledAction, ok := queuedAction.(fleetapi.ScheduledAction)
+		if !ok {
+			continue
+		}
+
+		upgradeAction, ok := scheduledAction.(*fleetapi.ActionUpgrade)
+		if !ok {
+			continue
+		}
+
+		// all queued upgrade actions must have a start time
+		upgradeStartTime, err := upgradeAction.StartTime()
+		if err != nil {
+			log.Errorf("failed to get start time for scheduled upgrade action [id = %s]: %v", upgradeAction.ID(), err)
+			continue
+		}
+
+		// not all scheduled upgrade actions have an expiration, e.g. a scheduled retried upgrade because it failed
+		// does not have an expiration
+		upgradeExpirationTime, err := upgradeAction.Expiration()
+		if err != nil {
+			if !errors.Is(err, fleetapi.ErrNoExpiration) {
+				// this is not a non-expiring upgrade action
+				log.Errorf("failed to get expiration time for scheduled upgrade action [id = %s]: %v", upgradeAction.ID(), err)
 				continue
 			}
-
-			version := "unknown"
-			expiration := "unknown"
-			if upgrade, ok := e.(*fleetapi.ActionUpgrade); ok {
-				version = upgrade.Data.Version
-				expiration = upgrade.ActionExpiration
-			}
-			ad.lastUpgradeDetails = details.NewDetails(version, details.StateFailed, e.ID())
-			ad.lastUpgradeDetails.Fail(fmt.Errorf("upgrade action %q expired on %s",
-				e.ID(), expiration))
-
-			upgradeDetailsSetter(ad.lastUpgradeDetails)
-		}
-	}
-}
-
-func (ad *ActionDispatcher) reportNextScheduledUpgrade(input []fleetapi.Action, detailsSetter details.Observer, log *logger.Logger) {
-	var nextUpgrade *fleetapi.ActionUpgrade
-	for _, action := range input {
-		sAction, ok := action.(fleetapi.ScheduledAction)
-		if !ok {
-			continue
+			// this is a non-expiring upgrade action
 		}
 
-		uAction, ok := sAction.(*fleetapi.ActionUpgrade)
-		if !ok {
-			continue
-		}
-
-		start, err := uAction.StartTime()
-		if err != nil {
-			log.Errorf("failed to get start time for scheduled upgrade action [id = %s]", uAction.ID())
-			continue
-		}
-
-		if !start.After(time.Now()) {
-			continue
-		}
-
-		if nextUpgrade == nil {
-			nextUpgrade = uAction
-			continue
-		}
-
-		nextUpgradeStartTime, _ := nextUpgrade.StartTime()
-		if start.Before(nextUpgradeStartTime) {
-			nextUpgrade = uAction
+		if nextUpgradeAction == nil || !upgradeStartTime.After(nextUpgradeStartTime) {
+			nextUpgradeAction = upgradeAction
+			nextUpgradeStartTime = upgradeStartTime
+			nextUpgradeExpirationTime = upgradeExpirationTime
 		}
 	}
 
 	// If there is no scheduled upgrade, nothing to do.
-	if nextUpgrade == nil {
-		return
+	if nextUpgradeAction == nil {
+		return nil
+	}
+
+	nextUpgradeActionID := nextUpgradeAction.ID()
+	nextUpgradeActionVersion := nextUpgradeAction.Data.Version
+	if !nextUpgradeExpirationTime.IsZero() && ts.After(nextUpgradeExpirationTime) {
+		// upgrade has expired
+		expiration := nextUpgradeAction.ActionExpiration
+		upgradeDetails := details.NewDetails(nextUpgradeActionVersion, details.StateFailed, nextUpgradeActionID)
+		upgradeDetails.Fail(fmt.Errorf("upgrade action %q expired on %s", nextUpgradeActionID, expiration))
+		return upgradeDetails
 	}
 
 	upgradeDetails := details.NewDetails(
-		nextUpgrade.Data.Version,
+		nextUpgradeActionVersion,
 		details.StateScheduled,
-		nextUpgrade.ID())
-	startTime, err := nextUpgrade.StartTime()
-	if err != nil {
-		ad.log.Warnw(
-			fmt.Sprintf("could not get start time from action %s: %v",
-				nextUpgrade, err),
-			"error.message", err.Error())
-	}
-	upgradeDetails.Metadata.ScheduledAt = &startTime
-
-	detailsSetter(upgradeDetails)
-	ad.lastUpgradeDetails = upgradeDetails
+		nextUpgradeActionID)
+	upgradeDetails.Metadata.ScheduledAt = &nextUpgradeStartTime
+	return upgradeDetails
 }
