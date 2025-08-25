@@ -196,6 +196,20 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
+	cleanupPaths := []string{}
+	defer func() {
+		if err != nil {
+			// If there is an error, we need to clean up downloads and any
+			// extracted agent files.
+			for _, path := range cleanupPaths {
+				rmErr := os.RemoveAll(path)
+				if rmErr != nil {
+					u.log.Errorw("error removing path during upgrade cleanup", "error.message", rmErr, "path", path)
+					err = goerrors.Join(err, rmErr)
+				}
+			}
+		}
+	}()
 
 	currentVersion := agentVersion{
 		version:  release.Version(),
@@ -238,6 +252,15 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	archivePath, err := u.downloadArtifact(ctx, parsedVersion, sourceURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+
+	// If the artifactPath is not empty, then the artifact was downloaded.
+	// There may still be an error in the download process, so we need to add
+	// the archive and hash path to the cleanup slice.
+	if archivePath != "" {
+		archiveHashPath := archivePath + ".sha512"
+		cleanupPaths = append(cleanupPaths, archivePath, archiveHashPath)
+	}
+
 	if err != nil {
 		// Run the same pre-upgrade cleanup task to get rid of any newly downloaded files
 		// This may have an issue if users are upgrading to the same version number.
@@ -273,6 +296,20 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 	u.log.Debugf("detected used flavor: %q", detectedFlavor)
 	unpackRes, err := u.unpack(version, archivePath, paths.Data(), detectedFlavor)
+
+	// If VersionedHome is empty then unpack has not started unpacking the
+	// archive yet. There's nothing to clean up. Return the error.
+	if unpackRes.VersionedHome == "" {
+		return nil, goerrors.Join(err, fmt.Errorf("versionedhome is empty: %v", unpackRes))
+	}
+
+	// If VersionedHome is not empty, it means that the unpack function has
+	// started extracting the archive. It may have failed while extracting.
+	// Setup newHome to be cleanedup.
+	newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome)
+
+	cleanupPaths = append(cleanupPaths, newHome)
+
 	if err != nil {
 		return nil, err
 	}
@@ -282,13 +319,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, errors.New("unknown hash")
 	}
 
-	if unpackRes.VersionedHome == "" {
-		return nil, fmt.Errorf("versionedhome is empty: %v", unpackRes)
-	}
-
-	newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome)
-
-	if err := copyActionStore(u.log, newHome); err != nil {
+	if err := copyActionStoreFunc(u.log, newHome); err != nil {
 		return nil, errors.New(err, "failed to copy action store")
 	}
 
@@ -514,6 +545,8 @@ func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versio
 	}
 	return nil
 }
+
+var copyActionStoreFunc = copyActionStore // abstraction for testability
 
 func copyActionStore(log *logger.Logger, newHome string) error {
 	// copies legacy action_store.yml, state.yml and state.enc encrypted file if exists
