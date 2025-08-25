@@ -14,7 +14,7 @@ require (
 	github.com/docker/docker v28.2.2+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250819150457-13d682f4be81
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250822235231-d9d2860c7593
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.10.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
@@ -83,16 +83,16 @@ require (
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.130.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.130.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/crypto v0.39.0
+	golang.org/x/crypto v0.41.0
 	golang.org/x/exp v0.0.0-20250215185904-eff6e970281f
-	golang.org/x/mod v0.25.0
-	golang.org/x/net v0.41.0
-	golang.org/x/sync v0.15.0
-	golang.org/x/sys v0.34.0
-	golang.org/x/term v0.32.0
-	golang.org/x/text v0.26.0
+	golang.org/x/mod v0.27.0
+	golang.org/x/net v0.43.0
+	golang.org/x/sync v0.16.0
+	golang.org/x/sys v0.35.0
+	golang.org/x/term v0.34.0
+	golang.org/x/text v0.28.0
 	golang.org/x/time v0.12.0
-	golang.org/x/tools v0.34.0
+	golang.org/x/tools v0.36.0
 	google.golang.org/api v0.238.0
 	google.golang.org/grpc v1.73.0
 	google.golang.org/protobuf v1.36.6
