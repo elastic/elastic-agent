@@ -7,19 +7,22 @@ package dispatcher
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap/zapcore"
-
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions/handlers"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
+	"github.com/elastic/elastic-agent/internal/pkg/queue"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
@@ -88,25 +91,14 @@ func (m *mockRetryableAction) SetError(err error) {
 	m.Called(err)
 }
 
-type mockQueue struct {
+type mockSaver struct {
 	mock.Mock
 }
 
-func (m *mockQueue) Add(action fleetapi.ScheduledAction, n int64) {
-	m.Called(action, n)
+func (m *mockSaver) SetQueue(a []fleetapi.ScheduledAction) {
+	m.Called(a)
 }
-
-func (m *mockQueue) DequeueActions() []fleetapi.ScheduledAction {
-	args := m.Called()
-	return args.Get(0).([]fleetapi.ScheduledAction)
-}
-
-func (m *mockQueue) CancelType(t string) int {
-	args := m.Called(t)
-	return args.Int(0)
-}
-
-func (m *mockQueue) Save() error {
+func (m *mockSaver) Save() error {
 	args := m.Called()
 	return args.Error(0)
 }
@@ -114,14 +106,18 @@ func (m *mockQueue) Save() error {
 func TestActionDispatcher(t *testing.T) {
 	detailsSetter := func(upgradeDetails *details.Details) {}
 	ack := noop.New()
-
+	log, _ := loggertest.New("TestActionDispatcher")
 	t.Run("Success to dispatch multiples events", func(t *testing.T) {
 		ctx := context.Background()
 		def := &mockHandler{}
-		queue := &mockQueue{}
-		queue.On("Save").Return(nil).Once()
-		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
-		d, err := New(nil, t.TempDir(), def, queue)
+		saver := &mockSaver{}
+		saver.On("Save").Return(nil).Once()
+		saver.On("SetQueue", mock.Anything).Once()
+
+		actionQueue, err := queue.NewActionQueue([]fleetapi.ScheduledAction{}, saver)
+		require.NoError(t, err)
+
+		d, err := New(nil, t.TempDir(), def, actionQueue)
 		require.NoError(t, err)
 
 		success1 := &mockHandler{}
@@ -153,17 +149,21 @@ func TestActionDispatcher(t *testing.T) {
 		success1.AssertExpectations(t)
 		success2.AssertExpectations(t)
 		def.AssertNotCalled(t, "Handle", mock.Anything, mock.Anything, mock.Anything)
-		queue.AssertExpectations(t)
+		saver.AssertExpectations(t)
 	})
 
 	t.Run("Unknown action are caught by the unknown handler", func(t *testing.T) {
 		def := &mockHandler{}
 		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		ctx := context.Background()
-		queue := &mockQueue{}
-		queue.On("Save").Return(nil).Once()
-		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
-		d, err := New(nil, t.TempDir(), def, queue)
+
+		saver := &mockSaver{}
+		saver.On("Save").Return(nil).Once()
+		saver.On("SetQueue", mock.Anything).Once()
+
+		actionQueue, err := queue.NewActionQueue([]fleetapi.ScheduledAction{}, saver)
+		require.NoError(t, err)
+		d, err := New(nil, t.TempDir(), def, actionQueue)
 		require.NoError(t, err)
 
 		action := &mockOtherAction{}
@@ -178,7 +178,7 @@ func TestActionDispatcher(t *testing.T) {
 		}
 
 		def.AssertExpectations(t)
-		queue.AssertExpectations(t)
+		saver.AssertExpectations(t)
 	})
 
 	t.Run("Could not register two handlers on the same action", func(t *testing.T) {
@@ -186,8 +186,13 @@ func TestActionDispatcher(t *testing.T) {
 		success2 := &mockHandler{}
 
 		def := &mockHandler{}
-		queue := &mockQueue{}
-		d, err := New(nil, t.TempDir(), def, queue)
+
+		saver := &mockSaver{}
+
+		actionQueue, err := queue.NewActionQueue([]fleetapi.ScheduledAction{}, saver)
+		require.NoError(t, err)
+
+		d, err := New(nil, t.TempDir(), def, actionQueue)
 		require.NoError(t, err)
 
 		err = d.Register(&mockAction{}, success1)
@@ -195,19 +200,21 @@ func TestActionDispatcher(t *testing.T) {
 
 		err = d.Register(&mockAction{}, success2)
 		require.Error(t, err)
-		queue.AssertExpectations(t)
+		saver.AssertExpectations(t)
 	})
 
 	t.Run("Dispatched action is queued", func(t *testing.T) {
 		def := &mockHandler{}
 		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-		queue := &mockQueue{}
-		queue.On("Save").Return(nil).Once()
-		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
-		queue.On("Add", mock.Anything, mock.Anything).Once()
+		saver := &mockSaver{}
+		saver.On("Save").Return(nil).Once()
+		saver.On("SetQueue", mock.Anything).Once()
 
-		d, err := New(nil, t.TempDir(), def, queue)
+		actionQueue, err := queue.NewActionQueue([]fleetapi.ScheduledAction{}, saver)
+		require.NoError(t, err)
+
+		d, err := New(nil, t.TempDir(), def, actionQueue)
 		require.NoError(t, err)
 		err = d.Register(&mockAction{}, def)
 		require.NoError(t, err)
@@ -227,26 +234,45 @@ func TestActionDispatcher(t *testing.T) {
 			t.Fatalf("Unexpected error: %v", err)
 		}
 		def.AssertExpectations(t)
-		queue.AssertExpectations(t)
+		saver.AssertExpectations(t)
 	})
 
-	t.Run("Cancel queued action", func(t *testing.T) {
-		queue := &mockQueue{}
-		queue.On("Save").Return(nil).Once()
-		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
+	t.Run("Cancel queued upgrade action", func(t *testing.T) {
+		saver := &mockSaver{}
+		saver.On("Save").Return(nil).Once()
+		saver.On("SetQueue", mock.Anything).Once()
 
-		action := &mockAction{}
-		action.On("Type").Return(fleetapi.ActionTypeCancel)
-		action.On("ID").Return("id")
+		upgradeAction := &fleetapi.ActionUpgrade{
+			ActionID:         "upgrade-action-id",
+			ActionType:       fleetapi.ActionTypeUpgrade,
+			ActionStartTime:  time.Now().Add(2 * time.Minute).Format(time.RFC3339),
+			ActionExpiration: time.Now().Add(3 * time.Minute).Format(time.RFC3339),
+			Data: fleetapi.ActionUpgradeData{
+				Version: "9.3.0",
+			},
+		}
+
+		actionQueue, err := queue.NewActionQueue([]fleetapi.ScheduledAction{upgradeAction}, saver)
+		require.NoError(t, err)
+
+		action := &fleetapi.ActionCancel{
+			ActionType: fleetapi.ActionTypeCancel,
+			ActionID:   "id",
+			Data: fleetapi.ActionCancelData{
+				TargetID: "upgrade-action-id",
+			},
+		}
 
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
 
 		def := &mockHandler{}
-		def.On("Handle", dispatchCtx, action, ack).Return(nil).Once()
 
-		d, err := New(nil, t.TempDir(), def, queue)
+		d, err := New(nil, t.TempDir(), def, actionQueue)
 		require.NoError(t, err)
+
+		err = d.Register(&fleetapi.ActionCancel{}, handlers.NewCancel(log, actionQueue))
+		require.NoError(t, err, "error registering cancel handler")
 
 		dispatchCompleted := make(chan struct{})
 		go func() {
@@ -262,7 +288,7 @@ func TestActionDispatcher(t *testing.T) {
 		}
 
 		def.AssertExpectations(t)
-		queue.AssertExpectations(t)
+		saver.AssertExpectations(t)
 	})
 
 	t.Run("Retrieve actions from queue", func(t *testing.T) {
@@ -275,19 +301,22 @@ func TestActionDispatcher(t *testing.T) {
 		action1.On("Type").Return(fleetapi.ActionTypeCancel)
 		action1.On("ID").Return("id")
 
-		queue := &mockQueue{}
-		queue.On("Save").Return(nil).Once()
-		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{action1}).Once()
-
-		d, err := New(nil, t.TempDir(), def, queue)
+		saver := &mockSaver{}
+		saver.On("Save").Return(nil).Once()
+		saver.On("SetQueue", mock.Anything).Once()
+		actionQueue, err := queue.NewActionQueue([]fleetapi.ScheduledAction{}, saver)
 		require.NoError(t, err)
-		err = d.Register(&mockAction{}, def)
+		actionQueue.Add(action1, time.Now().UTC().Add(-time.Hour).Unix())
+
+		d, err := New(nil, t.TempDir(), def, actionQueue)
+		require.NoError(t, err)
+		err = d.Register(&fleetapi.ActionCancel{}, def)
 		require.NoError(t, err)
 
-		action2 := &mockAction{}
-		action2.On("Type").Return(fleetapi.ActionTypeCancel)
-		action2.On("ID").Return("id")
-
+		action2 := &fleetapi.ActionCancel{
+			ActionID:   "id",
+			ActionType: fleetapi.ActionTypeCancel,
+		}
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
 		go d.Dispatch(dispatchCtx, detailsSetter, ack, action2)
@@ -295,44 +324,52 @@ func TestActionDispatcher(t *testing.T) {
 			t.Fatalf("Unexpected error: %v", err)
 		}
 		def.AssertExpectations(t)
-		queue.AssertExpectations(t)
+		saver.AssertExpectations(t)
 	})
 
 	t.Run("Retrieve no actions from queue", func(t *testing.T) {
 		def := &mockHandler{}
 		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-		queue := &mockQueue{}
-		queue.On("Save").Return(nil).Once()
-		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
+		saver := &mockSaver{}
+		saver.On("Save").Return(nil).Once()
+		saver.On("SetQueue", mock.Anything).Once()
+		actionQueue, err := queue.NewActionQueue([]fleetapi.ScheduledAction{}, saver)
+		require.NoError(t, err)
 
-		d, err := New(nil, t.TempDir(), def, queue)
+		d, err := New(nil, t.TempDir(), def, actionQueue)
 		require.NoError(t, err)
 		err = d.Register(&mockAction{}, def)
 		require.NoError(t, err)
 
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
-		go d.Dispatch(dispatchCtx, detailsSetter, ack)
+
+		dispatchCompleted := make(chan struct{})
+		go func() {
+			d.Dispatch(dispatchCtx, detailsSetter, ack)
+			close(dispatchCompleted)
+		}()
 		select {
 		case err := <-d.Errors():
 			t.Fatalf("Unexpected error: %v", err)
-		case <-time.After(500 * time.Microsecond):
-			// we're not expecting any reset
+		case <-dispatchCompleted:
 		}
 		def.AssertNotCalled(t, "Handle", mock.Anything, mock.Anything, mock.Anything)
+		saver.AssertExpectations(t)
 	})
 
 	t.Run("Dispatch of a retryable action returns an error", func(t *testing.T) {
 		def := &mockHandler{}
 		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("test error")).Once()
 
-		queue := &mockQueue{}
-		queue.On("Save").Return(nil).Twice()
-		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
-		queue.On("Add", mock.Anything, mock.Anything).Once()
+		saver := &mockSaver{}
+		saver.On("Save").Return(nil).Times(2)
+		saver.On("SetQueue", mock.Anything).Times(2)
+		actionQueue, err := queue.NewActionQueue([]fleetapi.ScheduledAction{}, saver)
+		require.NoError(t, err)
 
-		d, err := New(nil, t.TempDir(), def, queue)
+		d, err := New(nil, t.TempDir(), def, actionQueue)
 		require.NoError(t, err)
 		err = d.Register(&mockRetryableAction{}, def)
 		require.NoError(t, err)
@@ -353,14 +390,16 @@ func TestActionDispatcher(t *testing.T) {
 			t.Fatalf("Unexpected error: %v", err)
 		}
 		def.AssertExpectations(t)
-		queue.AssertExpectations(t)
 		action.AssertExpectations(t)
+		saver.AssertExpectations(t)
 	})
 
 	t.Run("Dispatch multiple events returns one error", func(t *testing.T) {
-		queue := &mockQueue{}
-		queue.On("Save").Return(nil).Once()
-		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
+		saver := &mockSaver{}
+		saver.On("Save").Return(nil).Once()
+		saver.On("SetQueue", mock.Anything).Once()
+		actionQueue, err := queue.NewActionQueue([]fleetapi.ScheduledAction{}, saver)
+		require.NoError(t, err)
 
 		action1 := &mockAction{}
 		action1.On("Type").Return("action")
@@ -377,7 +416,7 @@ func TestActionDispatcher(t *testing.T) {
 		def.On("Handle", dispatchCtx, action1, ack).Return(errors.New("first error")).Once()
 		def.On("Handle", dispatchCtx, action2, ack).Return(errors.New("second error")).Once()
 
-		d, err := New(nil, t.TempDir(), def, queue)
+		d, err := New(nil, t.TempDir(), def, actionQueue)
 		require.NoError(t, err)
 
 		dispatchCompleted := make(chan struct{})
@@ -403,7 +442,6 @@ func TestActionDispatcher(t *testing.T) {
 		}
 
 		def.AssertExpectations(t)
-		queue.AssertExpectations(t)
 	})
 
 	t.Run("Dispatch multiples events in separate batch returns one error second one resets it", func(t *testing.T) {
@@ -411,11 +449,13 @@ func TestActionDispatcher(t *testing.T) {
 		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("test error")).Once()
 		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-		queue := &mockQueue{}
-		queue.On("Save").Return(nil).Times(2)
-		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Times(2)
+		saver := &mockSaver{}
+		saver.On("Save").Return(nil).Times(2)
+		saver.On("SetQueue", mock.Anything).Times(2)
+		actionQueue, err := queue.NewActionQueue([]fleetapi.ScheduledAction{}, saver)
+		require.NoError(t, err)
 
-		d, err := New(nil, t.TempDir(), def, queue)
+		d, err := New(nil, t.TempDir(), def, actionQueue)
 		require.NoError(t, err)
 		err = d.Register(&mockAction{}, def)
 		require.NoError(t, err)
@@ -452,7 +492,6 @@ func TestActionDispatcher(t *testing.T) {
 		}
 
 		def.AssertExpectations(t)
-		queue.AssertExpectations(t)
 	})
 
 	t.Run("report next scheduled upgrade", func(t *testing.T) {
@@ -460,26 +499,28 @@ func TestActionDispatcher(t *testing.T) {
 		def.On("Handle",
 			mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).Twice()
-
-		queue := &mockQueue{}
-		queue.On("Save").Return(nil).Once()
-		queue.On("Add", mock.Anything, mock.Anything).Once()
-		queue.On("DequeueActions").Return([]fleetapi.ScheduledAction{}).Once()
-		queue.On("CancelType", mock.Anything).Return(1).Once()
-
-		d, err := New(nil, t.TempDir(), def, queue)
-		require.NoError(t, err)
-
-		var gotDetails *details.Details
-		detailsSetter := func(upgradeDetails *details.Details) {
-			gotDetails = upgradeDetails
-		}
-
 		action := &fleetapi.ActionUpgrade{
 			ActionID:         "id",
 			ActionType:       fleetapi.ActionTypeUpgrade,
 			ActionStartTime:  time.Now().Add(2 * time.Minute).Format(time.RFC3339),
 			ActionExpiration: time.Now().Add(3 * time.Minute).Format(time.RFC3339),
+			Data: fleetapi.ActionUpgradeData{
+				Version: "9.3.0",
+			},
+		}
+
+		saver := &mockSaver{}
+		saver.On("Save").Return(nil).Once()
+		saver.On("SetQueue", mock.Anything).Once()
+		actionQueue, err := queue.NewActionQueue([]fleetapi.ScheduledAction{}, saver)
+		require.NoError(t, err)
+
+		d, err := New(nil, t.TempDir(), def, actionQueue)
+		require.NoError(t, err)
+
+		var gotDetails *details.Details
+		detailsSetter := func(upgradeDetails *details.Details) {
+			gotDetails = upgradeDetails
 		}
 
 		d.Dispatch(context.Background(), detailsSetter, ack, action)
@@ -509,15 +550,13 @@ func TestActionDispatcher(t *testing.T) {
 			ActionExpiration: time.Now().Add(-3 * time.Minute).Format(time.RFC3339),
 		}
 
-		queue := &mockQueue{}
-		queue.On("Save").Return(nil).Once()
-		queue.On("Add", mock.Anything, mock.Anything).Once()
-		queue.On("DequeueActions").
-			Return([]fleetapi.ScheduledAction{expiredAction}).
-			Once()
-		queue.On("CancelType", mock.Anything).Return(1).Once()
+		saver := &mockSaver{}
+		saver.On("Save").Return(nil).Once()
+		saver.On("SetQueue", mock.Anything).Once()
+		actionQueue, err := queue.NewActionQueue([]fleetapi.ScheduledAction{expiredAction}, saver)
+		require.NoError(t, err)
 
-		d, err := New(nil, t.TempDir(), def, queue)
+		d, err := New(nil, t.TempDir(), def, actionQueue)
 		require.NoError(t, err)
 
 		var gotDetails *details.Details
@@ -543,32 +582,39 @@ func TestActionDispatcher(t *testing.T) {
 
 		require.NotNilf(t, gotDetails, "upgrade details should have been set")
 		assert.Equal(t, gotDetails.State, details.StateScheduled)
+		assert.Equal(t, gotDetails.ActionID, "id")
 	})
 
-	t.Run("keep the report of scheduled upgrade if there is no new upgrade action", func(t *testing.T) {
+	t.Run("do not report upgrade details if there is no new upgrade action", func(t *testing.T) {
 		def := &mockHandler{}
 		def.On("Handle",
 			mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).Twice()
 
-		queue := &mockQueue{}
-		queue.On("Save").Return(nil).Once()
-		queue.On("Add", mock.Anything, mock.Anything).Once()
-		queue.On("DequeueActions").
-			Return([]fleetapi.ScheduledAction{}).
-			Once()
-		queue.On("CancelType", mock.Anything).Return(1).Once()
+		saver := &mockSaver{}
+		saver.On("Save").Return(nil).Once()
+		saver.On("SetQueue", mock.Anything).Once()
 
-		d, err := New(nil, t.TempDir(), def, queue)
+		actionStartTime := time.Now().UTC().Add(2 * time.Minute).Truncate(time.Second)
+		actionExpiration := time.Now().UTC().Add(3 * time.Minute).Truncate(time.Second)
+
+		actionQueue, err := queue.NewActionQueue([]fleetapi.ScheduledAction{
+			&fleetapi.ActionUpgrade{
+				ActionID:         "my action ID",
+				ActionType:       fleetapi.ActionTypeUpgrade,
+				ActionStartTime:  actionStartTime.Format(time.RFC3339),
+				ActionExpiration: actionExpiration.Format(time.RFC3339),
+			},
+		}, saver)
 		require.NoError(t, err)
 
-		wantDetail := &details.Details{
-			State:    details.StateScheduled,
-			ActionID: "my action ID"}
-		gotDetails := wantDetail
+		var gotDetails *details.Details
 		detailsSetter := func(upgradeDetails *details.Details) {
 			gotDetails = upgradeDetails
 		}
+
+		d, err := New(nil, t.TempDir(), def, actionQueue)
+		require.NoError(t, err)
 
 		d.Dispatch(context.Background(), detailsSetter, ack)
 		select {
@@ -579,7 +625,7 @@ func TestActionDispatcher(t *testing.T) {
 		default:
 		}
 
-		assert.Equalf(t, wantDetail, gotDetails, "upgrade details shoul not have been modified")
+		assert.Nil(t, gotDetails, "upgrade details should match")
 	})
 
 	t.Run("set upgrade to failed if the action expires", func(t *testing.T) {
@@ -593,15 +639,14 @@ func TestActionDispatcher(t *testing.T) {
 			ActionStartTime:  time.Now().Add(-5 * time.Minute).Format(time.RFC3339),
 			ActionExpiration: time.Now().Add(-3 * time.Minute).Format(time.RFC3339),
 		}
-		queue := &mockQueue{}
-		queue.On("Save").Return(nil).Once()
-		queue.On("Add", mock.Anything, mock.Anything).Once()
-		queue.On("DequeueActions").
-			Return([]fleetapi.ScheduledAction{expired}).
-			Once()
-		queue.On("CancelType", mock.Anything).Return(1).Once()
 
-		d, err := New(nil, t.TempDir(), def, queue)
+		saver := &mockSaver{}
+		saver.On("Save").Return(nil).Twice()
+		saver.On("SetQueue", mock.Anything).Twice()
+		actionQueue, err := queue.NewActionQueue([]fleetapi.ScheduledAction{expired}, saver)
+		require.NoError(t, err)
+
+		d, err := New(nil, t.TempDir(), def, actionQueue)
 		require.NoError(t, err)
 
 		var gotDetails *details.Details
@@ -622,6 +667,23 @@ func TestActionDispatcher(t *testing.T) {
 		assert.Equal(t, details.StateFailed, gotDetails.State)
 		assert.NotEmptyf(t, gotDetails.Metadata.ErrorMsg, "want an error message, got none")
 		assert.Equalf(t, expired.ActionID, gotDetails.ActionID, "action id must be the same")
+
+		// re-run dispatch and make sure that upgrade details do not clear (expired upgrade details should persist)
+		var shouldNotSetDetails error
+		detailsSetter = func(upgradeDetails *details.Details) {
+			shouldNotSetDetails = errors.New("detailsSetter called")
+		}
+
+		// at the next dispatch expired upgrade details should go away
+		d.Dispatch(context.Background(), detailsSetter, ack)
+		select {
+		case err := <-d.Errors():
+			if err != nil {
+				t.Errorf("Unexpected error from Dispatch: %v", err)
+			}
+		default:
+		}
+		require.NoError(t, shouldNotSetDetails, "set upgrade details should not be called")
 	})
 }
 
@@ -629,9 +691,13 @@ func Test_ActionDispatcher_scheduleRetry(t *testing.T) {
 	ack := noop.New()
 	def := &mockHandler{}
 
-	t.Run("no more attmpts", func(t *testing.T) {
-		queue := &mockQueue{}
-		d, err := New(nil, t.TempDir(), def, queue)
+	t.Run("no more attempts", func(t *testing.T) {
+		saver := &mockSaver{}
+
+		actionQueue, err := queue.NewActionQueue([]fleetapi.ScheduledAction{}, saver)
+		require.NoError(t, err)
+
+		d, err := New(nil, t.TempDir(), def, actionQueue)
 		require.NoError(t, err)
 
 		action := &mockRetryableAction{}
@@ -640,15 +706,19 @@ func Test_ActionDispatcher_scheduleRetry(t *testing.T) {
 		action.On("SetRetryAttempt", mock.Anything).Once()
 
 		d.scheduleRetry(context.Background(), action, ack)
-		queue.AssertExpectations(t)
+		saver.AssertExpectations(t)
 		action.AssertExpectations(t)
 	})
 
 	t.Run("schedule an attempt", func(t *testing.T) {
-		queue := &mockQueue{}
-		queue.On("Save").Return(nil).Once()
-		queue.On("Add", mock.Anything, mock.Anything).Once()
-		d, err := New(nil, t.TempDir(), def, queue)
+		saver := &mockSaver{}
+		saver.On("Save").Return(nil).Once()
+		saver.On("SetQueue", mock.Anything).Once()
+
+		actionQueue, err := queue.NewActionQueue([]fleetapi.ScheduledAction{}, saver)
+		require.NoError(t, err)
+
+		d, err := New(nil, t.TempDir(), def, actionQueue)
 		require.NoError(t, err)
 
 		action := &mockRetryableAction{}
@@ -658,24 +728,25 @@ func Test_ActionDispatcher_scheduleRetry(t *testing.T) {
 		action.On("SetStartTime", mock.Anything).Once()
 
 		d.scheduleRetry(context.Background(), action, ack)
-		queue.AssertExpectations(t)
+		saver.AssertExpectations(t)
 		action.AssertExpectations(t)
 	})
 }
 
-func TestReportNextScheduledUpgrade(t *testing.T) {
+func TestGetQueuedUpgradeDetails(t *testing.T) {
 	now := time.Now().UTC()
 	later := now.Add(3 * time.Hour)
 	laterTruncate := later.Truncate(time.Second)
 	muchLater := later.Add(3 * time.Hour)
+	before := now.Add(-3 * time.Hour)
 
 	cases := map[string]struct {
-		actions           []fleetapi.Action
+		actions           []fleetapi.ScheduledAction
 		expectedDetails   *details.Details
 		expectedErrLogMsg string
 	}{
 		"no_scheduled_upgrades": {
-			actions: []fleetapi.Action{
+			actions: []fleetapi.ScheduledAction{
 				&fleetapi.ActionUpgrade{
 					ActionID: "action1",
 					Data: fleetapi.ActionUpgradeData{
@@ -686,10 +757,11 @@ func TestReportNextScheduledUpgrade(t *testing.T) {
 			expectedErrLogMsg: "failed to get start time for scheduled upgrade action [id = action1]",
 		},
 		"one_scheduled_upgrade": {
-			actions: []fleetapi.Action{
+			actions: []fleetapi.ScheduledAction{
 				&fleetapi.ActionUpgrade{
-					ActionID:        "action2",
-					ActionStartTime: later.Format(time.RFC3339),
+					ActionID:         "action2",
+					ActionStartTime:  later.Format(time.RFC3339),
+					ActionExpiration: muchLater.Format(time.RFC3339),
 					Data: fleetapi.ActionUpgradeData{
 						Version: "8.13.0",
 					},
@@ -704,18 +776,40 @@ func TestReportNextScheduledUpgrade(t *testing.T) {
 				},
 			},
 		},
-		"many_scheduled_upgrades": {
-			actions: []fleetapi.Action{
+		"one_scheduled_upgrade_but_expired": {
+			actions: []fleetapi.ScheduledAction{
 				&fleetapi.ActionUpgrade{
-					ActionID:        "action3",
-					ActionStartTime: muchLater.Format(time.RFC3339),
+					ActionID:         "action1",
+					ActionStartTime:  before.Format(time.RFC3339),
+					ActionExpiration: before.Format(time.RFC3339),
+					Data: fleetapi.ActionUpgradeData{
+						Version: "8.13.0",
+					},
+				},
+			},
+			expectedDetails: &details.Details{
+				TargetVersion: "8.13.0",
+				State:         details.StateFailed,
+				ActionID:      "action1",
+				Metadata: details.Metadata{
+					ErrorMsg: fmt.Sprintf(`upgrade action "action1" expired on %s`, before.Format(time.RFC3339)),
+				},
+			},
+		},
+		"many_scheduled_upgrades": {
+			actions: []fleetapi.ScheduledAction{
+				&fleetapi.ActionUpgrade{
+					ActionID:         "action3",
+					ActionStartTime:  muchLater.Format(time.RFC3339),
+					ActionExpiration: muchLater.Format(time.RFC3339),
 					Data: fleetapi.ActionUpgradeData{
 						Version: "8.14.1",
 					},
 				},
 				&fleetapi.ActionUpgrade{
-					ActionID:        "action4",
-					ActionStartTime: later.Format(time.RFC3339),
+					ActionID:         "action4",
+					ActionStartTime:  later.Format(time.RFC3339),
+					ActionExpiration: muchLater.Format(time.RFC3339),
 					Data: fleetapi.ActionUpgradeData{
 						Version: "8.13.5",
 					},
@@ -730,8 +824,30 @@ func TestReportNextScheduledUpgrade(t *testing.T) {
 				},
 			},
 		},
+		"many_scheduled_actions_one_upgrade": {
+			actions: []fleetapi.ScheduledAction{
+				&mockScheduledAction{},
+				&fleetapi.ActionUpgrade{
+					ActionID:         "action4",
+					ActionStartTime:  later.Format(time.RFC3339),
+					ActionExpiration: muchLater.Format(time.RFC3339),
+					Data: fleetapi.ActionUpgradeData{
+						Version: "8.13.5",
+					},
+				},
+				&mockScheduledAction{},
+			},
+			expectedDetails: &details.Details{
+				TargetVersion: "8.13.5",
+				State:         details.StateScheduled,
+				ActionID:      "action4",
+				Metadata: details.Metadata{
+					ScheduledAt: &laterTruncate,
+				},
+			},
+		},
 		"invalid_time_scheduled_upgrade": {
-			actions: []fleetapi.Action{
+			actions: []fleetapi.ScheduledAction{
 				&fleetapi.ActionUpgrade{
 					ActionID:        "action1",
 					ActionStartTime: "invalid",
@@ -742,33 +858,70 @@ func TestReportNextScheduledUpgrade(t *testing.T) {
 			},
 			expectedErrLogMsg: "failed to get start time for scheduled upgrade action [id = action1]",
 		},
+		"invalid_expiration_time_upgrade": {
+			actions: []fleetapi.ScheduledAction{
+				&fleetapi.ActionUpgrade{
+					ActionID:         "action1",
+					ActionExpiration: "invalid",
+					ActionStartTime:  later.Format(time.RFC3339),
+					Data: fleetapi.ActionUpgradeData{
+						Version: "8.13.2",
+					},
+				},
+			},
+			expectedErrLogMsg: "failed to get expiration time for scheduled upgrade action [id = action1]",
+		},
+		"no_expiration_time_upgrade": {
+			actions: []fleetapi.ScheduledAction{
+				&fleetapi.ActionUpgrade{
+					ActionID:         "action1",
+					ActionExpiration: "",
+					ActionStartTime:  later.Format(time.RFC3339),
+					Data: fleetapi.ActionUpgradeData{
+						Version: "8.13.2",
+					},
+				},
+			},
+			expectedDetails: &details.Details{
+				TargetVersion: "8.13.2",
+				State:         details.StateScheduled,
+				ActionID:      "action1",
+				Metadata: details.Metadata{
+					ScheduledAt: &laterTruncate,
+				},
+			},
+		},
 	}
 
-	def := &mockHandler{}
-
-	queue := &mockQueue{}
-	d, err := New(nil, t.TempDir(), def, queue)
-	require.NoError(t, err, "could not create dispatcher")
+	saver := &mockSaver{}
+	saver.On("Save").Return(nil).Once()
+	saver.On("SetQueue", mock.Anything).Once()
 
 	for name, test := range cases {
 		t.Run(name, func(t *testing.T) {
-			var actualDetails *details.Details
-			detailsSetter := func(upgradeDetails *details.Details) {
-				actualDetails = upgradeDetails
+			actionQueue, err := queue.NewActionQueue([]fleetapi.ScheduledAction{}, saver)
+			require.NoError(t, err)
+
+			for _, action := range test.actions {
+				actionQueue.Add(action, now.UnixMilli())
 			}
+
 			log, obs := loggertest.New("report_next_upgrade_details")
+			actualDetails := GetScheduledUpgradeDetails(log, actionQueue.Actions(), now)
 
-			d.reportNextScheduledUpgrade(test.actions, detailsSetter, log)
-
-			require.True(t, test.expectedDetails.Equals(actualDetails))
+			if test.expectedDetails == nil {
+				assert.Nil(t, actualDetails)
+			} else {
+				assert.True(t, test.expectedDetails.Equals(actualDetails))
+			}
 
 			logs := obs.TakeAll()
 			if test.expectedErrLogMsg != "" {
-				require.Len(t, logs, 1)
-				require.Equal(t, zapcore.ErrorLevel, logs[0].Level)
-				require.Equal(t, test.expectedErrLogMsg, logs[0].Message)
+				assert.Len(t, logs, 1)
+				assert.Equal(t, zapcore.ErrorLevel, logs[0].Level)
+				assert.True(t, strings.HasPrefix(logs[0].Message, test.expectedErrLogMsg))
 			} else {
-				require.Empty(t, logs)
+				assert.Empty(t, logs)
 			}
 		})
 	}
