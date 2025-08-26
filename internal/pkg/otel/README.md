@@ -35,6 +35,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+<<<<<<< HEAD
 | [filelogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/filelogreceiver/v0.121.0/receiver/filelogreceiver/README.md) | v0.121.0 |
 | [hostmetricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/hostmetricsreceiver/v0.121.0/receiver/hostmetricsreceiver/README.md) | v0.121.0 |
 | [httpcheckreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/httpcheckreceiver/v0.121.0/receiver/httpcheckreceiver/README.md) | v0.121.0 |
@@ -51,6 +52,25 @@ This section provides a summary of components included in the Elastic Distributi
 | [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.121.0/receiver/receivercreator/README.md) | v0.121.0 |
 | [redisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/redisreceiver/v0.121.0/receiver/redisreceiver/README.md) | v0.121.0 |
 | [zipkinreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zipkinreceiver/v0.121.0/receiver/zipkinreceiver/README.md) | v0.121.0 |
+=======
+| [elasticapmintakereceiver](https://github.com/elastic/opentelemetry-collector-components/blob/receiver/elasticapmintakereceiver/v0.2.1/receiver/elasticapmintakereceiver/README.md) | v0.2.1 |
+| [filelogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/filelogreceiver/v0.130.0/receiver/filelogreceiver/README.md) | v0.130.0 |
+| [hostmetricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/hostmetricsreceiver/v0.130.0/receiver/hostmetricsreceiver/README.md) | v0.130.0 |
+| [httpcheckreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/httpcheckreceiver/v0.130.0/receiver/httpcheckreceiver/README.md) | v0.130.0 |
+| [jaegerreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/jaegerreceiver/v0.130.0/receiver/jaegerreceiver/README.md) | v0.130.0 |
+| [jmxreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/jmxreceiver/v0.130.0/receiver/jmxreceiver/README.md) | v0.130.0 |
+| [k8sclusterreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/k8sclusterreceiver/v0.130.0/receiver/k8sclusterreceiver/README.md) | v0.130.0 |
+| [k8sobjectsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/k8sobjectsreceiver/v0.130.0/receiver/k8sobjectsreceiver/README.md) | v0.130.0 |
+| [kafkareceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/kafkareceiver/v0.130.0/receiver/kafkareceiver/README.md) | v0.130.0 |
+| [kubeletstatsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/kubeletstatsreceiver/v0.130.0/receiver/kubeletstatsreceiver/README.md) | v0.130.0 |
+| [nginxreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/nginxreceiver/v0.130.0/receiver/nginxreceiver/README.md) | v0.130.0 |
+| [nopreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/nopreceiver/v0.130.0/receiver/nopreceiver/README.md) | v0.130.0 |
+| [otlpreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/otlpreceiver/v0.130.0/receiver/otlpreceiver/README.md) | v0.130.0 |
+| [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusreceiver/v0.130.0/receiver/prometheusreceiver/README.md) | v0.130.0 |
+| [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.130.0/receiver/receivercreator/README.md) | v0.130.0 |
+| [redisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/redisreceiver/v0.130.0/receiver/redisreceiver/README.md) | v0.130.0 |
+| [zipkinreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zipkinreceiver/v0.130.0/receiver/zipkinreceiver/README.md) | v0.130.0 |
+>>>>>>> 6060b9c81 (build(deps): bump github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver from 0.2.0 to 0.2.1 (#9575))
 
 ### Exporters
 
