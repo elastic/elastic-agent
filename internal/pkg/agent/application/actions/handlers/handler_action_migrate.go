@@ -27,7 +27,6 @@ const ()
 type migrateCoordinator interface {
 	Migrate(_ context.Context, _ *fleetapi.ActionMigrate, _ func(done <-chan struct{}) backoff.Backoff) error
 	ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string)
-	HasEndpoint() bool
 	Protection() protection.Config
 }
 
@@ -64,7 +63,7 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 	}
 
 	// if endpoint is present do not proceed
-	if h.tamperProtectionFn() && h.coord.HasEndpoint() {
+	if h.isAgentTamperProtected() {
 		err := errors.New("unsupported action: tamper protected agent")
 		h.ackFailure(ctx, err, action, ack)
 		return err
@@ -120,4 +119,8 @@ func (h *Migrate) ackFailure(ctx context.Context, err error, action *fleetapi.Ac
 			"error.message", err,
 			"action", action)
 	}
+}
+
+func (h *Migrate) isAgentTamperProtected() bool {
+	return h.tamperProtectionFn() && h.coord.Protection().Enabled
 }

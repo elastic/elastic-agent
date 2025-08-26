@@ -88,6 +88,12 @@ func TestVars_Replace(t *testing.T) {
 			false,
 		},
 		{
+			`${un-der_score.missing\|'fallback'}`,
+			NewStrVal(""),
+			true,
+			false,
+		},
+		{
 			"${un-der_score.missing|'fallback'}",
 			NewStrVal("fallback"),
 			false,
@@ -252,6 +258,36 @@ func TestVars_Replace(t *testing.T) {
 		{
 			`${special.key6}`,
 			NewStrVal("$${"),
+			false,
+			false,
+		},
+		{
+			"${missing.key:}",
+			NewStrVal(""),
+			false,
+			false,
+		},
+		{
+			`${missing.key\:constant_string}`,
+			NewStrVal(""),
+			true,
+			false,
+		},
+		{
+			"${missing.key:constant_string}",
+			NewStrVal("constant_string"),
+			false,
+			false,
+		},
+		{
+			"${missing.key|missing.key2:constant_string}",
+			NewStrVal("constant_string"),
+			false,
+			false,
+		},
+		{
+			"${un-der_score.with-dash:not_used}",
+			NewStrVal("dash-value"),
 			false,
 			false,
 		},

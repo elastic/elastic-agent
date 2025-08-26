@@ -49,29 +49,59 @@ func TestActionMigratelHandler(t *testing.T) {
 	})
 
 	t.Run("tamper protected agent", func(t *testing.T) {
-		mockAgentInfo := mockinfo.NewAgent(t)
-		action := &fleetapi.ActionMigrate{
-			ActionType: "MIGRATE",
+		tamperCases := []struct {
+			name              string
+			featureEnabled    bool
+			protectionEnabled bool
+			expectedRun       bool
+		}{
+			{"F1E1", true, true, false},
+			{"F0E1", false, true, true},
+			{"F0E0", false, false, true},
+			{"F1E0", false, false, true},
 		}
 
-		ack := &fakeAcker{}
-		ack.On("Ack", t.Context(), action).Return(nil)
-		ack.On("Commit", t.Context()).Return(nil)
+		for _, tc := range tamperCases {
+			t.Run("tamper protected agent - "+tc.name, func(t *testing.T) {
+				mockAgentInfo := mockinfo.NewAgent(t)
+				if tc.expectedRun {
+					mockAgentInfo.On("AgentID").Return("agent-id")
+				}
 
-		coord := &fakeMigrateCoordinator{}
-		coord.On("Migrate", mock.Anything, mock.Anything).Return(nil)
-		coord.On("ReExec", mock.Anything, mock.Anything)
-		coord.On("HasEndpoint").Return(true)
-		coord.On("Protection").Return(protection.Config{SignatureValidationKey: nil})
+				action := &fleetapi.ActionMigrate{
+					ActionType: "MIGRATE",
+				}
 
-		h := NewMigrate(log, mockAgentInfo, coord)
-		h.tamperProtectionFn = func() bool { return true }
+				ack := &fakeAcker{}
+				ack.On("Ack", t.Context(), action).Return(nil)
+				ack.On("Commit", t.Context()).Return(nil)
 
-		require.NotNil(t, h.Handle(t.Context(), action, ack))
-		coord.AssertNumberOfCalls(t, "Migrate", 0)
-		ack.AssertCalled(t, "Ack", t.Context(), action)
-		ack.AssertCalled(t, "Commit", t.Context())
-		coord.AssertNumberOfCalls(t, "ReExec", 0)
+				coord := &fakeMigrateCoordinator{}
+				coord.On("Migrate", mock.Anything, mock.Anything).Return(nil)
+				coord.On("ReExec", mock.Anything, mock.Anything)
+				coord.On("Protection").Return(protection.Config{SignatureValidationKey: nil, Enabled: tc.protectionEnabled})
+
+				h := NewMigrate(log, mockAgentInfo, coord)
+				h.tamperProtectionFn = func() bool { return tc.featureEnabled }
+
+				if !tc.expectedRun {
+					require.NotNil(t, h.Handle(t.Context(), action, ack))
+					coord.AssertNumberOfCalls(t, "Migrate", 0)
+					ack.AssertCalled(t, "Ack", t.Context(), action)
+					ack.AssertCalled(t, "Commit", t.Context())
+					coord.AssertNumberOfCalls(t, "ReExec", 0)
+				} else {
+
+					require.Nil(t, h.Handle(t.Context(), action, ack))
+					coord.AssertNumberOfCalls(t, "Migrate", 1)
+
+					// ack delegated to migrate coordinator
+					ack.AssertNumberOfCalls(t, "Ack", 0)
+					ack.AssertNumberOfCalls(t, "Commit", 0)
+					coord.AssertCalled(t, "ReExec", mock.Anything, mock.Anything)
+				}
+			})
+		}
 	})
 
 	t.Run("action propagated to coordinator", func(t *testing.T) {

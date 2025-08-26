@@ -239,9 +239,12 @@ func extractVars(i string, defaultProvider string) ([]varI, error) {
 	is := make([]rune, 0, len(i))
 	res := make([]varI, 0)
 	for _, r := range i {
-		if r == '|' {
+		if r == '|' || r == ':' {
 			if escape {
-				return nil, fmt.Errorf(`variable pipe cannot be escaped; remove \ before |`)
+				if r == '|' {
+					return nil, fmt.Errorf(`variable pipe cannot be escaped; remove '\' before '|'`)
+				}
+				return nil, fmt.Errorf(`default pipe cannot be escaped; remove '\' before ':'`)
 			}
 			if quote == out {
 				if constant {
@@ -252,22 +255,23 @@ func extractVars(i string, defaultProvider string) ([]varI, error) {
 					}
 					res = append(res, &varString{maybeAddDefaultProvider(string(is), defaultProvider)})
 				}
-				is = is[:0] // slice to zero length; to keep allocated memory
-				constant = false
+				is = is[:0]         // slice to zero length; to keep allocated memory
+				constant = r == ':' // not a constant when '|'
 			} else {
 				is = append(is, r)
 			}
 			continue
 		}
 		if !escape && (r == '"' || r == '\'') {
-			if quote == out {
+			switch quote {
+			case out:
 				// start of unescaped quote
 				quote = r
 				constant = true
-			} else if quote == r {
+			case r:
 				// end of unescaped quote
 				quote = out
-			} else {
+			default:
 				is = append(is, r)
 			}
 			continue
