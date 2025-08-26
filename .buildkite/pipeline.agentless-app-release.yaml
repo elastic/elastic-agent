@@ -10,7 +10,7 @@ steps:
     command: |
       .buildkite/scripts/steps/integration-package.sh
     artifact_paths:
-      - build/distributions/**
+      - "build/distributions/elastic-agent-service-git-*.docker.tar.gz"
     agents:
       provider: "gcp"
       machineType: "c2-standard-16"
@@ -25,7 +25,7 @@ steps:
     command: |
        .buildkite/scripts/steps/integration-package.sh
     artifact_paths:
-       - build/distributions/**
+      - "build/distributions/elastic-agent-service-git-*.docker.tar.gz"
     agents:
       provider: "aws"
       instanceType: "t4g.2xlarge"
