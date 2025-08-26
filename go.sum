@@ -489,7 +489,6 @@ github.com/elastic/lunes v0.1.0 h1:amRtLPjwkWtzDF/RKzcEPMvSsSseLDLW+bnhfNSLRe4=
 github.com/elastic/lunes v0.1.0/go.mod h1:xGphYIt3XdZRtyWosHQTErsQTd4OP1p9wsbVoHelrd4=
 github.com/elastic/mito v1.22.0 h1:DW4RkO+PLwSbKVF5ijYzi0ug+TKzLL+DVJRzbOPbzQ0=
 github.com/elastic/mito v1.22.0/go.mod h1:h1V+8B62+DXsu0TstJkjsTh5ewJIDJlwzxPkP3HBM9s=
-<<<<<<< HEAD
 github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015 h1:z8cC8GASpPo8yKlbnXI36HQ/BM9wYjhBPNbDjAWm0VU=
 github.com/elastic/mock-es v0.0.0-20240712014503-e5b47ece0015/go.mod h1:qH9DX/Dmflz6EAtaks/+2SsdQzecVAKE174Zl66hk7E=
 github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector v0.3.0 h1:5bEQRB73ZYYdZ1cRntygO8uAPajWLZCs1FOqWfq8JYg=
@@ -502,30 +501,6 @@ github.com/elastic/opentelemetry-collector-components/processor/lsmintervalproce
 github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.3.0/go.mod h1:9FNHYqG5Z+4jZTuEJUrgEYYPQm7J5XZYvH2eUHwTfRg=
 github.com/elastic/opentelemetry-lib v0.13.0 h1:XVVi09kADu5BNnylc+9c/2uYYErnm7UhnLZlsuYPqdE=
 github.com/elastic/opentelemetry-lib v0.13.0/go.mod h1:WqVSRgczt6XEwr6KJKxB/gxxLpCpfSKLAa1ahTtuc4Y=
-=======
-github.com/elastic/mock-es v0.0.0-20250324153755-573fc6c0ac4b h1:gaMtsr25lreEBrrVvZnztKJY3ywn3s3fHE+5f+Vg2tc=
-github.com/elastic/mock-es v0.0.0-20250324153755-573fc6c0ac4b/go.mod h1:cXqWcLnmu5y4QveTb2hjk7rgzkHMuZsqeXtbJpNAcu0=
-github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.6.0 h1:vOlC/pDdj4pj6iGMk4SQqECfzKrMtOauziGIRrpaDuw=
-github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.6.0/go.mod h1:SKo+rmzFdcSfLpucgSQWWsrqGO6FbEIGOyfwLEHfqD0=
-github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.3.0 h1:4n6DG66F/7Bo4yIvrvQdRjh9hxlQb5XT7Va12f0ynWg=
-github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.3.0/go.mod h1:PP7E4hAPU0u2rvfuwe1w2NDyJ5/JH7iziSPUdwxV5+4=
-github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.5.0 h1:ZMa57/H3ZXC1vkxoXAWP7zPW83NLi672LvxXI0p1fWM=
-github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.5.0/go.mod h1:7nkWdi3b6ncwuEFZzYmzqX56+V2Qzb5x6jX+DfnQSWI=
-github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced h1:XcWi/S3OoeE5Qwmj381AoO3nr3AVXl4Z4QO0mqyjlzU=
-github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced/go.mod h1:8e9NcGfE2xeor8r+WV9a+hKBEkzJEDnqZN7tqb3GUe8=
-github.com/elastic/opentelemetry-collector-components/internal/testutil v0.0.0-20250613082151-282de5af1c9b h1:NWuTKdMCJlU9ehRH8V0w1Kk1QI5Vn+9OcJWIO9wI+pE=
-github.com/elastic/opentelemetry-collector-components/internal/testutil v0.0.0-20250613082151-282de5af1c9b/go.mod h1:R1WWATZlmmkryuE5hLQNHj89rdPPi4ErobBZYx2LmGs=
-github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.16.0 h1:gYF93+rFhbl20lttJIO4GH38E6YOQShurBZt7hsSJNc=
-github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.16.0/go.mod h1:BH0yjGBnAxrQekOOq6ELiqA9VggIpFMP2pyQA4Z9bN8=
-github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.9.0 h1:iJjeJfIeTZz8KxRaXIwnq11beDqYfR/sLNwe/hJsbOs=
-github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.9.0/go.mod h1:abeJCmXXWoNdCqyIFkzgZAnvK9QkxAqyBLMonlKxAZ0=
-github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.8.0 h1:m2RieHXVTRykAd7VdpryuAV56Ia/eidgtlEutnG/m5w=
-github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.8.0/go.mod h1:uQHpGpKwGHhdO5fm2hx1mthiPMiScmFOp5XNwD0EqVw=
-github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.2.1 h1:kcwYI2wQVFYnZojkKtFky3lrFZB1BDmw6SivDffP+qs=
-github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.2.1/go.mod h1:6GD6slW/fYTxZkhBfjk2TaSJHmyevZfyuudIyqXAfwc=
-github.com/elastic/opentelemetry-lib v0.21.0 h1:aktZQ6hocz/yVMOikDrdcjWtl/qcK/AfMBundZJTCcQ=
-github.com/elastic/opentelemetry-lib v0.21.0/go.mod h1:mNcdHi6ivTn5w4bE18as43gzKt2rVmK4HCeJZ9JmFXk=
->>>>>>> 6060b9c81 (build(deps): bump github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver from 0.2.0 to 0.2.1 (#9575))
 github.com/elastic/pkcs8 v1.0.0 h1:HhitlUKxhN288kcNcYkjW6/ouvuwJWd9ioxpjnD9jVA=
 github.com/elastic/pkcs8 v1.0.0/go.mod h1:ipsZToJfq1MxclVTwpG7U/bgeDtf+0HkUiOxebk95+0=
 github.com/elastic/sarama v1.19.1-0.20220310193331-ebc2b0d8eef3 h1:FzA0/n4iMt8ojGDGRoiFPSHFvvdVIvxOxyLtiFnrLBM=
