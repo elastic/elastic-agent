@@ -332,6 +332,9 @@ type Coordinator struct {
 	// run a ticker that checks to see if we have a new PID.
 	componentPIDTicker         *time.Ticker
 	componentPidRequiresUpdate *atomic.Bool
+
+	// Abstraction for diagnostics AddSecretMarkers function for testability
+	secretMarkerFunc func(*logger.Logger, *config.Config) error
 }
 
 // The channels Coordinator reads to receive updates from the various managers.
@@ -433,7 +436,8 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		componentPIDTicker:         time.NewTicker(time.Second * 30),
 		componentPidRequiresUpdate: &atomic.Bool{},
 
-		fleetAcker: fleetAcker,
+		fleetAcker:       fleetAcker,
+		secretMarkerFunc: diagnostics.AddSecretMarkers,
 	}
 	// Setup communication channels for any non-nil components. This pattern
 	// lets us transparently accept nil managers / simulated events during
@@ -1352,7 +1356,25 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 		span.End()
 	}()
 
+<<<<<<< HEAD
 	err = c.generateAST(cfg)
+=======
+	if err = info.InjectAgentConfig(cfg); err != nil {
+		return err
+	}
+
+	if err = c.secretMarkerFunc(c.logger, cfg); err != nil {
+		c.logger.Errorf("failed to add secret markers: %v", err)
+	}
+
+	// perform and verify ast translation
+	m, err := cfg.ToMapStr()
+	if err != nil {
+		return fmt.Errorf("could not create the map from the configuration: %w", err)
+	}
+
+	err = c.generateAST(cfg, m)
+>>>>>>> a44e87a24 (Fix/5871 redact secrets in diagnostics (#9560))
 	c.setConfigError(err)
 	if err != nil {
 		return err
