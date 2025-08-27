@@ -1209,6 +1209,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.130
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.130.0/go.mod h1:LSII2PtNQrizYmbcpUl8b1zHF3+xPkJL3F+ITZ1j25Y=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.130.0 h1:UoR/xVnYwybPDA4FhJbuPwU7HvP00Tpgu0YaHEPIOaU=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.130.0/go.mod h1:85OEk8e0NURYWjBzmXxoNRlpLTxWA1YwFjcBll1uAFk=
+github.com/open-telemetry/opentelemetry-collector-contrib/internal/docker v0.130.0 h1:wkRGpP4jht7Dmboa/0ZKfVjfYzZU3BsySRfK3vblcUo=
+github.com/open-telemetry/opentelemetry-collector-contrib/internal/docker v0.130.0/go.mod h1:hbeMduPd1RYmljh9Z2/NgbKvFIfp7U4J3IGGOYLZE5c=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/exp/metrics v0.130.0 h1:uj6ai6KVAY0KFeXn0tTTfvnFCF+WCMM7jfSMk7uZa3g=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/exp/metrics v0.130.0/go.mod h1:vggHY5WvnwKCuPW0hEIkWtctseFY6MjRLC+x7C2eN4k=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/filter v0.130.0 h1:imJFA+dRC4qVtza0SL/UuYTrnc68zpt2uvUkh9QAXI4=
@@ -1285,6 +1287,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceproc
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.130.0/go.mod h1:wU38xs5JMy8FYLVDw5F1/ShVgN0nYauna5Wj0qyL/Vk=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.130.0 h1:/UagoKsz1+NAOkNIaoSiE5nW+7OiT/3tG91WsIDuHeU=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.130.0/go.mod h1:4VAXR5a89aHYFQYvNGkO/5yv1QYfF+sc8+fcMyWdRLE=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver v0.130.0 h1:c4YGI4SI5xZJbW23/SAoclPbpg/0v7qgugOs3rztRfM=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver v0.130.0/go.mod h1:2M2fJOvju5DAPgCceMDrX0xQwMipstgEbW6MrtwadhY=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.130.0 h1:44PeSCFt4J6i84dgB+Elme7YmC2PlL0Os0tMIx1gcFU=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.130.0/go.mod h1:3yzRJ95JrcxqLE9d6HnYIf9ONtTIeUIDP/A9EiKF1h4=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.130.0 h1:OuaYQSPAMuXGPyClRWk044zxQVlzOoAftqJs304vLB4=
