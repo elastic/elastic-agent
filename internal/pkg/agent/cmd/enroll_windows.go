@@ -53,3 +53,8 @@ func getSIDFromCmd(cmd *cobra.Command, param string) (*windows.SID, error) {
 	}
 	return nil, nil
 }
+
+func getOwnerFromPath(path string) (utils.FileOwner, error) {
+	// TODO: Implement this
+	return utils.FileOwner{}, nil
+}
