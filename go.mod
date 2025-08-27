@@ -31,7 +31,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.5.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.16.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.9.0
-	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.2.0
+	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.2.1
 	github.com/fatih/color v1.18.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-viper/mapstructure/v2 v2.3.0
