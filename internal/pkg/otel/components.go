@@ -13,6 +13,7 @@ import (
 	"go.opentelemetry.io/collector/receiver"
 
 	// Receivers:
+	dockerstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver"
 	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
 	hostmetricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver"
 	httpcheckreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver"
@@ -86,6 +87,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 
 		// Receivers
 		receivers := []receiver.Factory{
+			dockerstatsreceiver.NewFactory(),
 			elasticapmintakereceiver.NewFactory(),
 			otlpreceiver.NewFactory(),
 			filelogreceiver.NewFactory(),
