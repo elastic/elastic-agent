@@ -33,9 +33,15 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
+
+var testSecretMarkerFunc = func(*logger.Logger, *config.Config) error {
+	// no-op secret marker function for testing
+	return nil
+}
 
 func TestVarsManagerError(t *testing.T) {
 	// Set a one-second timeout -- nothing here should block, but if it
@@ -378,6 +384,7 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 		vars:               emptyVars(t),
 		ast:                emptyAST(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
 	}
 
 	// Send an invalid config update and confirm that Coordinator reports
@@ -493,6 +500,7 @@ func TestCoordinatorReportsComponentModelError(t *testing.T) {
 		vars:               emptyVars(t),
 		ast:                emptyAST(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
 	}
 
 	// This configuration produces a valid AST but its EQL condition is
@@ -561,7 +569,7 @@ func TestCoordinatorPolicyChangeUpdatesMonitorReloader(t *testing.T) {
 	// does let's report a failure instead of timing out the test runner.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	logger := logp.NewLogger("testing")
+	log := logp.NewLogger("testing")
 
 	configChan := make(chan ConfigChange, 1)
 
@@ -576,10 +584,16 @@ func TestCoordinatorPolicyChangeUpdatesMonitorReloader(t *testing.T) {
 	newServerFn := func(*monitoringCfg.MonitoringConfig) (reload.ServerController, error) {
 		return monitoringServer, nil
 	}
-	monitoringReloader := reload.NewServerReloader(newServerFn, logger, monitoringCfg.DefaultConfig())
+	monitoringReloader := reload.NewServerReloader(newServerFn, log, monitoringCfg.DefaultConfig())
+
+	secretMarkerCalled := false
+	mockSecretMarkerFunc := func(*logger.Logger, *config.Config) error {
+		secretMarkerCalled = true
+		return nil
+	}
 
 	coord := &Coordinator{
-		logger:           logger,
+		logger:           log,
 		agentInfo:        &info.AgentInfo{},
 		stateBroadcaster: broadcaster.New(State{}, 0, 0),
 		managerChans: managerChans{
@@ -588,6 +602,7 @@ func TestCoordinatorPolicyChangeUpdatesMonitorReloader(t *testing.T) {
 		runtimeMgr:         runtimeManager,
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   mockSecretMarkerFunc,
 	}
 	coord.RegisterMonitoringServer(monitoringReloader)
 
@@ -607,6 +622,8 @@ inputs:
 	configChan <- cfgChange
 	coord.runLoopIteration(ctx)
 	assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+
+	assert.True(t, secretMarkerCalled, "secret marker should be called")
 
 	// server is started by default
 	assert.True(t, monitoringServer.startTriggered)
@@ -717,6 +734,7 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeManager(t *testing.T) {
 		runtimeMgr:         runtimeManager,
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
 	}
 
 	// Create a policy with one input and one output
@@ -771,6 +789,149 @@ inputs:
 	assert.True(t, cfgChange.acked, "empty policy should be acknowledged")
 	assert.True(t, updated, "empty policy should cause runtime manager update")
 	assert.Empty(t, components, "empty policy should produce empty component model")
+<<<<<<< HEAD
+=======
+	assert.True(t, otelUpdated, "empty policy should cause otel manager update")
+	assert.Nil(t, otelConfig, "empty policy should cause otel manager to get nil config")
+}
+
+func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t *testing.T) {
+	// Send a test policy to the Coordinator as a Config Manager update,
+	// verify it generates the right component model and sends components
+	// to both the runtime manager and the otel manager.
+
+	// Set a one-second timeout -- nothing here should block, but if it
+	// does let's report a failure instead of timing out the test runner.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	logger := logp.NewLogger("testing")
+
+	configChan := make(chan ConfigChange, 1)
+
+	// Create a mocked runtime manager that will report the update call
+	var updated bool                     // Set by runtime manager callback
+	var components []component.Component // Set by runtime manager callback
+	runtimeManager := &fakeRuntimeManager{
+		updateCallback: func(comp []component.Component) error {
+			updated = true
+			components = comp
+			return nil
+		},
+	}
+	var otelUpdated bool         // Set by otel manager callback
+	var otelConfig *confmap.Conf // Set by otel manager callback
+	otelManager := &fakeOTelManager{
+		updateCollectorCallback: func(cfg *confmap.Conf) error {
+			otelUpdated = true
+			otelConfig = cfg
+			return nil
+		},
+	}
+
+	// we need the filestream spec to be able to convert to Otel config
+	componentSpec := component.InputRuntimeSpec{
+		InputType:  "filestream",
+		BinaryName: "agentbeat",
+		Spec: component.InputSpec{
+			Name: "filestream",
+			Command: &component.CommandSpec{
+				Args: []string{"filebeat"},
+			},
+			Platforms: []string{
+				"linux/amd64",
+				"linux/arm64",
+				"darwin/amd64",
+				"darwin/arm64",
+				"windows/amd64",
+				"container/amd64",
+				"container/arm64",
+			},
+		},
+	}
+
+	platform, err := component.LoadPlatformDetail()
+	require.NoError(t, err)
+	specs, err := component.NewRuntimeSpecs(platform, []component.InputRuntimeSpec{componentSpec})
+	require.NoError(t, err)
+
+	monitoringMgr := newTestMonitoringMgr()
+	coord := &Coordinator{
+		logger:           logger,
+		agentInfo:        &info.AgentInfo{},
+		stateBroadcaster: broadcaster.New(State{}, 0, 0),
+		managerChans: managerChans{
+			configManagerUpdate: configChan,
+		},
+		monitorMgr:         monitoringMgr,
+		runtimeMgr:         runtimeManager,
+		otelMgr:            otelManager,
+		specs:              specs,
+		vars:               emptyVars(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
+	}
+
+	// Create a policy with one input and one output (no otel configuration)
+	cfg := config.MustNewConfigFrom(`
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - localhost:9200
+inputs:
+  - id: test-input
+    type: filestream
+    use_output: default
+    _runtime_experimental: otel
+  - id: test-other-input
+    type: system/metrics
+    use_output: default
+receivers:
+  nop:
+exporters:
+  nop:
+service:
+  pipelines:
+    traces:
+      receivers:
+        - nop
+      exporters:
+        - nop
+`)
+
+	// Send the policy change and make sure it was acknowledged.
+	cfgChange := &configChange{cfg: cfg}
+	configChan <- cfgChange
+	coord.runLoopIteration(ctx)
+	assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+
+	// Make sure the runtime manager received the expected component update.
+	// An assert.Equal on the full component model doesn't play nice with
+	// the embedded proto structs, so instead we verify the important fields
+	// manually (sorry).
+	assert.True(t, updated, "Runtime manager should be updated after a policy change")
+	require.Equal(t, 1, len(components), "Test policy should generate one component")
+	assert.True(t, otelUpdated, "OTel manager should be updated after a policy change")
+	require.NotNil(t, otelConfig, "OTel manager should have config")
+
+	runtimeComponent := components[0]
+	assert.Equal(t, "system/metrics-default", runtimeComponent.ID)
+	require.NotNil(t, runtimeComponent.Err, "Input with no spec should produce a component error")
+	assert.Equal(t, "input not supported", runtimeComponent.Err.Error(), "Input with no spec should report 'input not supported'")
+	require.Equal(t, 2, len(runtimeComponent.Units))
+
+	units := runtimeComponent.Units
+	// Verify the input unit
+	assert.Equal(t, "system/metrics-default-test-other-input", units[0].ID)
+	assert.Equal(t, client.UnitTypeInput, units[0].Type)
+	assert.Equal(t, "test-other-input", units[0].Config.Id)
+	assert.Equal(t, "system/metrics", units[0].Config.Type)
+
+	// Verify the output unit
+	assert.Equal(t, "system/metrics-default", units[1].ID)
+	assert.Equal(t, client.UnitTypeOutput, units[1].Type)
+	assert.Equal(t, "elasticsearch", units[1].Config.Type)
+>>>>>>> a44e87a24 (Fix/5871 redact secrets in diagnostics (#9560))
 }
 
 func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
@@ -805,6 +966,7 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 		runtimeMgr:         runtimeManager,
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
 	}
 
 	// Send an empty policy which should forward an empty component model to
@@ -832,6 +994,71 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 	assert.Contains(t, state.Message, errorStr, "Failed policy update should be reported in Coordinator state message")
 }
 
+<<<<<<< HEAD
+=======
+func TestCoordinatorReportsOTelManagerUpdateFailure(t *testing.T) {
+	// Set a one-second timeout -- nothing here should block, but if it
+	// does let's report a failure instead of timing out the test runner.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	logger := logp.NewLogger("testing")
+
+	configChan := make(chan ConfigChange, 1)
+	updateErrChan := make(chan error, 1)
+
+	// Create a mocked otel manager that always reports an error
+	const errorStr = "update failed for testing reasons"
+	runtimeManager := &fakeRuntimeManager{}
+	otelManager := &fakeOTelManager{
+		updateCollectorCallback: func(retrieved *confmap.Conf) error {
+			return errors.New(errorStr)
+		},
+		errChan: updateErrChan,
+	}
+
+	coord := &Coordinator{
+		logger:           logger,
+		agentInfo:        &info.AgentInfo{},
+		stateBroadcaster: broadcaster.New(State{}, 0, 0),
+		managerChans: managerChans{
+			configManagerUpdate: configChan,
+			// Give coordinator the same error channel we set on the otel
+			// manager, so it receives the update result.
+			otelManagerError: updateErrChan,
+		},
+		runtimeMgr:         runtimeManager,
+		otelMgr:            otelManager,
+		vars:               emptyVars(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
+	}
+
+	// Send an empty policy which should forward an empty component model to
+	// the otel manager (which we have set up to report an error).
+	cfg := config.MustNewConfigFrom(nil)
+	configChange := &configChange{cfg: cfg}
+	configChan <- configChange
+	coord.runLoopIteration(ctx)
+
+	// Make sure the config change was acknowledged to the config manager
+	// (the failure is not reported here since it happens asynchronously; it
+	// will appear in the coordinator state afterwards.)
+	assert.True(t, configChange.acked, "Config change should be acknowledged to the config manager")
+	assert.NoError(t, configChange.err, "Config change with async error should succeed")
+
+	// Now do another run loop iteration to let the update error propagate,
+	// and make sure it is reported correctly.
+	coord.runLoopIteration(ctx)
+	require.Error(t, coord.otelErr, "OTel update failure should be saved in otelErr")
+	assert.Equal(t, errorStr, coord.otelErr.Error(), "otelErr should match the error reported by the otel manager")
+
+	// Make sure the error appears in the Coordinator state.
+	state := coord.State()
+	assert.Equal(t, agentclient.Failed, state.State, "Failed policy update should cause failed Coordinator")
+	assert.Contains(t, state.Message, errorStr, "Failed policy update should be reported in Coordinator state message")
+}
+
+>>>>>>> a44e87a24 (Fix/5871 redact secrets in diagnostics (#9560))
 func TestCoordinatorAppliesVarsToPolicy(t *testing.T) {
 	// Make sure:
 	// - An input unit that depends on an undefined variable is not created
@@ -868,6 +1095,7 @@ func TestCoordinatorAppliesVarsToPolicy(t *testing.T) {
 		runtimeMgr:         runtimeManager,
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
 	}
 
 	// Create a policy with one input and one output
