@@ -65,6 +65,12 @@ receivers:
           scrape_interval: 5s
           static_configs:
             - targets: ['0.0.0.0:8888']
+<<<<<<< HEAD
+=======
+  elasticapmintake:
+  docker_stats:
+
+>>>>>>> 77c5f511a (Add the dockerstats Otel receiver (#9364))
 
 connectors:
   spanmetrics:
