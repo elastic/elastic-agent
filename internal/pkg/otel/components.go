@@ -84,11 +84,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 
 		// Receivers
 		receivers := []receiver.Factory{
-<<<<<<< HEAD
-=======
 			dockerstatsreceiver.NewFactory(),
-			elasticapmintakereceiver.NewFactory(),
->>>>>>> 77c5f511a (Add the dockerstats Otel receiver (#9364))
 			otlpreceiver.NewFactory(),
 			filelogreceiver.NewFactory(),
 			kubeletstatsreceiver.NewFactory(),
