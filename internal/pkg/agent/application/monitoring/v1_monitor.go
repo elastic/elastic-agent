@@ -657,7 +657,7 @@ func (b *BeatsMonitor) getHttpStreams(
 		},
 		"metricsets": []interface{}{"json"},
 		"path":       "/stats",
-		"hosts":      []interface{}{HttpPlusAgentMonitoringEndpoint(b.operatingSystem, b.config.C)},
+		"hosts":      []interface{}{HttpPlusAgentMonitoringEndpoint(b.config.C)},
 		"namespace":  "agent",
 		"period":     metricsCollectionIntervalString,
 		"index":      indexName,
