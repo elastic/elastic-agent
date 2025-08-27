@@ -8,6 +8,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"syscall"
 
 	"github.com/spf13/cobra"
 
@@ -50,4 +52,17 @@ func getIDFromCmd(cmd *cobra.Command, param string) (int, error) {
 		return -1, fmt.Errorf("--%s has an invalid value of: %d", param, id)
 	}
 	return int(id), nil
+}
+
+// getFileOwnerFromPath returns the UID and GID owning the provided file path.
+func getFileOwnerFromPath(path string) (utils.FileOwner, error) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return utils.FileOwner{}, fmt.Errorf("failed to stat %q: %w", path, err)
+	}
+	stat, ok := fi.Sys().(*syscall.Stat_t)
+	if !ok {
+		return utils.FileOwner{}, fmt.Errorf("failed to get system-specific stat for %q", path)
+	}
+	return utils.FileOwner{UID: int(stat.Uid), GID: int(stat.Gid)}, nil
 }
