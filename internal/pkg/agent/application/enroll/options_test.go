@@ -305,6 +305,48 @@ func TestMergeOptionsWithMigrateAction(t *testing.T) {
 			},
 			false,
 		},
+		{
+			"id is not persisted by default",
+			&fleetapi.ActionMigrate{
+				Data: fleetapi.ActionMigrateData{
+					EnrollmentToken: "token",
+					TargetURI:       "uri",
+					Settings:        json.RawMessage(`{"insecure": true, "tags":["a","b"]}`),
+				},
+			},
+			EnrollOptions{
+				ID: "test-id",
+			},
+			EnrollOptions{
+				EnrollAPIKey: "token",
+				URL:          "uri",
+				Insecure:     true,
+				Tags:         []string{"a", "b"},
+			},
+			false,
+		},
+		{
+			"id from action is used when provided",
+			&fleetapi.ActionMigrate{
+				Data: fleetapi.ActionMigrateData{
+					EnrollmentToken: "token",
+					TargetURI:       "uri",
+					Settings:        json.RawMessage(`{"insecure": true, "id": "new-id", "replace_token": "replace-token", "tags":["a","b"]}`),
+				},
+			},
+			EnrollOptions{
+				ID: "test-id",
+			},
+			EnrollOptions{
+				EnrollAPIKey: "token",
+				ID:           "new-id",
+				Insecure:     true,
+				ReplaceToken: "replace-token",
+				Tags:         []string{"a", "b"},
+				URL:          "uri",
+			},
+			false,
+		},
 	}
 
 	for _, tc := range cases {

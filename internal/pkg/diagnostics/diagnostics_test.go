@@ -27,8 +27,10 @@ import (
 	agentclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	agentruntime "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/version"
 )
 
@@ -155,164 +157,212 @@ mapping:
 	require.Empty(t, errOut.String())
 }
 
-func TestRedactWithSecretPaths(t *testing.T) {
-	tests := []struct {
-		name   string
-		input  []byte
-		expect string
-	}{{
-		name: "no secret paths",
-		input: []byte(`id: test-policy
-inputs:
-  - type: test_input
-    redactKey: secretValue
-outputs:
-  default:
-    type: elasticsearch
-    api_key: secretKey
-    redactOtherKey: secretOutputValue
-`),
-		expect: `id: test-policy
-inputs:
-    - redactKey: secretValue
-      type: test_input
-outputs:
-    default:
-        api_key: <REDACTED>
-        redactOtherKey: <REDACTED>
-        type: elasticsearch
-`,
-	}, {
-		name: "uppercase fields are redacted",
-		input: []byte(`id: test-policy
-inputs:
-  - type: test_input
-outputs:
-  default:
-    type: elasticsearch
-    api_key: secretKey
-    Certificate: secretCert
-    PassPhrase: secretPassphrase
-    PASSWORD: secretPassword
-    tOkEn: secretToken
-`),
-		expect: `id: test-policy
-inputs:
-    - type: test_input
-outputs:
-    default:
-        Certificate: <REDACTED>
-        PASSWORD: <REDACTED>
-        PassPhrase: <REDACTED>
-        api_key: <REDACTED>
-        tOkEn: <REDACTED>
-        type: elasticsearch
-`,
-	}, {
-		name: "secret_paths are redacted",
-		input: []byte(`id: test-policy
-secret_paths:
-  - inputs.0.redactKey
-  - outputs.default.redactOtherKey
-inputs:
-  - type: test_input
-    redactKey: secretValue
-outputs:
-  default:
-    type: elasticsearch
-    api_key: secretKey
-    redactOtherKey: secretOutputValue
-`),
-		expect: `id: test-policy
-inputs:
-    - redactKey: <REDACTED>
-      type: test_input
-outputs:
-    default:
-        api_key: <REDACTED>
-        redactOtherKey: <REDACTED>
-        type: elasticsearch
-secret_paths:
-    - inputs.0.redactKey
-    - outputs.default.redactOtherKey
-`,
-	}, {
-		name: "secret_paths contains extra keys",
-		input: []byte(`id: test-policy
-secret_paths:
-  - inputs.0.redactKey
-  - inputs.1.missingKey
-  - outputs.default.redactOtherKey
-inputs:
-  - type: test_input
-    redactKey: secretValue
-outputs:
-  default:
-    type: elasticsearch
-    api_key: secretKey
-`),
-		expect: `id: test-policy
-inputs:
-    - redactKey: <REDACTED>
-      type: test_input
-outputs:
-    default:
-        api_key: <REDACTED>
-        type: elasticsearch
-secret_paths:
-    - inputs.0.redactKey
-    - inputs.1.missingKey
-    - outputs.default.redactOtherKey
-`,
-	}, {
-		name: "path in nested list",
-		input: []byte(`id: test-policy
-inputs:
-    - type: httpjson
-      data_stream:
-        namespace: default
-      streams:
-        - config_version: "2"
-          request.transforms:
-            - set:
-                target: header.Authorization
-                value: SSWS this-should-be-redacted
-            - set:
-                target: url.params.limit
-                value: "1000"
-secret_paths:
-    - inputs.0.streams.0.request.transforms.0.set.value
-`),
-		expect: `id: test-policy
-inputs:
-    - data_stream:
-        namespace: default
-      streams:
-        - config_version: "2"
-          request:
-            transforms:
-                - set:
-                    target: header.Authorization
-                    value: <REDACTED>
-                - set:
-                    target: url.params.limit
-                    value: "1000"
-      type: httpjson
-secret_paths:
-    - inputs.0.streams.0.request.transforms.0.set.value
-`,
-	}}
+func TestRedactWithMarkers(t *testing.T) {
+	type testCase struct {
+		input  map[string]any
+		expect map[string]any
+	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			file := client.DiagnosticFileResult{Content: tc.input, ContentType: "application/yaml"}
-			var out bytes.Buffer
-			var errOut bytes.Buffer
-			err := writeRedacted(&errOut, &out, "testPath", file)
+	tests := map[string]testCase{
+		"no markers": {
+			input: map[string]any{
+				"inputs": []any{
+					map[string]any{
+						"type":      "test_input",
+						"redactKey": "secretValue",
+					},
+				},
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type":           "elasticsearch",
+						"api_key":        "secretKey",
+						"redactOtherKey": "secretOutputValue",
+					},
+				},
+			},
+			expect: map[string]any{
+				"inputs": []any{
+					map[string]any{
+						"type":      "test_input",
+						"redactKey": "secretValue",
+					},
+				},
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type":           "elasticsearch",
+						"api_key":        REDACTED,
+						"redactOtherKey": REDACTED,
+					},
+				},
+			},
+		},
+		"uppercase fields are redacted": {
+			input: map[string]any{
+				"inputs": []any{
+					map[string]any{
+						"type": "test_input",
+					},
+				},
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type":        "elasticsearch",
+						"api_key":     "secretKey",
+						"Certificate": "secretCert",
+						"PassPhrase":  "secretPassphrase",
+						"PASSWORD":    "secretPassword",
+						"tOkEn":       "secretToken",
+					},
+				},
+			},
+			expect: map[string]any{
+				"inputs": []any{
+					map[string]any{
+						"type": "test_input",
+					},
+				},
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type":        "elasticsearch",
+						"api_key":     REDACTED,
+						"Certificate": REDACTED,
+						"PassPhrase":  REDACTED,
+						"PASSWORD":    REDACTED,
+						"tOkEn":       REDACTED,
+					},
+				},
+			},
+		},
+		"marked keys are redacted": {
+			input: map[string]any{
+				"inputs": []any{
+					map[string]any{
+						"type":                              "test_input",
+						"redactKey":                         "secretValue",
+						redactionMarkerPrefix + "redactKey": true,
+					},
+				},
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type":                            "elasticsearch",
+						"api_key":                         "secretKey",
+						"redactOtherKey":                  "secretOutputValue",
+						redactionMarkerPrefix + "api_key": true,
+					},
+				},
+			},
+			expect: map[string]any{
+				"inputs": []any{
+					map[string]any{
+						"type":      "test_input",
+						"redactKey": REDACTED,
+					},
+				},
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type":           "elasticsearch",
+						"api_key":        REDACTED,
+						"redactOtherKey": REDACTED,
+					},
+				},
+			},
+		},
+		"marked keys in nested lists are redacted": {
+			input: map[string]any{
+				"id": "test-policy",
+				"inputs": []any{
+					map[string]any{
+						"type": "httpjson",
+						"data_stream": map[string]any{
+							"namespace": "default",
+						},
+						"streams": []any{
+							map[string]any{
+								"config_version": "2",
+								"request": map[string]any{
+									"transforms": []any{
+										map[string]any{
+											"set": map[string]any{
+												"target":                        "header.Authorization",
+												"value":                         "SSWS this-should-be-redacted",
+												redactionMarkerPrefix + "value": true,
+											},
+										},
+										map[string]any{
+											"set": map[string]any{
+												"target": "url.params.limit",
+												"value":  "1000",
+											},
+										},
+									},
+								},
+							},
+							map[string]any{
+								"mock_stream_config": map[string]any{
+									"kind": map[string]any{
+										"string_value": "mock_stream_config_name",
+									},
+								},
+								redactionMarkerPrefix + "mock_stream_config": true,
+							},
+						},
+					},
+				},
+			},
+			expect: map[string]any{
+				"id": "test-policy",
+				"inputs": []any{
+					map[string]any{
+						"type": "httpjson",
+						"data_stream": map[string]any{
+							"namespace": "default",
+						},
+						"streams": []any{
+							map[string]any{
+								"config_version": "2",
+								"request": map[string]any{
+									"transforms": []any{
+										map[string]any{
+											"set": map[string]any{
+												"target": "header.Authorization",
+												"value":  REDACTED,
+											},
+										},
+										map[string]any{
+											"set": map[string]any{
+												"target": "url.params.limit",
+												"value":  "1000",
+											},
+										},
+									},
+								},
+							},
+							map[string]any{
+								"mock_stream_config": REDACTED,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			input, err := yaml.Marshal(tc.input)
 			require.NoError(t, err)
 
-			t.Logf("Error output: %s", errOut.String())
-			assert.Equal(t, tc.expect, out.String())
+			file := client.DiagnosticFileResult{Content: input, ContentType: "application/yaml"}
+			var out bytes.Buffer
+			var errOut bytes.Buffer
+
+			err = writeRedacted(&errOut, &out, "testPath", file)
+			require.NoError(t, err)
+
+			var actual map[string]any
+			err = yaml.Unmarshal(out.Bytes(), &actual)
+			require.NoError(t, err, "failed to unmarshal output")
+
+			assert.Equal(t, tc.expect, actual, "output does not match expected")
 		})
 	}
 }
@@ -518,196 +568,226 @@ func isPprof(input []byte) (bool, error) {
 	return true, nil
 }
 
-func TestRedactSecretPaths(t *testing.T) {
+func TestAddRedactionMarkers(t *testing.T) {
 	tests := []struct {
-		name   string
-		input  map[string]interface{}
-		expect map[string]interface{}
-	}{{
-		name: "no secret_paths",
-		input: map[string]interface{}{
-			"outputs": map[string]interface{}{
-				"default": map[string]interface{}{
-					"type":    "elasticsearch",
-					"api_key": "apikeyvalue",
+		name           string
+		input          map[string]interface{}
+		expectedConfig map[string]interface{}
+		expectedErrMsg string
+	}{
+		{
+			name: "no secret_paths",
+			input: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"api_key": "apikeyvalue",
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":   "example",
+						"secret": "secretvalue",
+					},
 				},
 			},
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"type":   "example",
-					"secret": "secretvalue",
+			expectedConfig: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"api_key": "apikeyvalue",
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":   "example",
+						"secret": "secretvalue",
+					},
+				},
+			},
+			expectedErrMsg: "",
+		},
+		{
+			name: "secret paths is not an array",
+			input: map[string]interface{}{
+				"secret_paths": "inputs.0.secret,outputs.default.api_key",
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"api_key": "apikeyvalue",
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":   "example",
+						"secret": "secretvalue",
+					},
+				},
+			},
+			expectedConfig: map[string]interface{}{
+				"secret_paths": "inputs.0.secret,outputs.default.api_key",
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"api_key": "apikeyvalue",
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":   "example",
+						"secret": "secretvalue",
+					},
+				},
+			},
+			expectedErrMsg: "failed to get secret_paths",
+		},
+		{
+			name: "secret_paths are redacted",
+			input: map[string]interface{}{
+				"secret_paths": []interface{}{
+					"inputs.0.secret",
+					"outputs.default.api_key",
+				},
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"api_key": "apikeyvalue",
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":   "example",
+						"secret": "secretvalue",
+					},
+				},
+			},
+			expectedConfig: map[string]interface{}{
+				"secret_paths": []interface{}{
+					"inputs.0.secret",
+					"outputs.default.api_key",
+				},
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":                            "elasticsearch",
+						"api_key":                         "apikeyvalue",
+						redactionMarkerPrefix + "api_key": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":                           "example",
+						"secret":                         "secretvalue",
+						redactionMarkerPrefix + "secret": true,
+					},
 				},
 			},
 		},
-		expect: map[string]interface{}{
-			"outputs": map[string]interface{}{
-				"default": map[string]interface{}{
-					"type":    "elasticsearch",
-					"api_key": "apikeyvalue",
+		{
+			name: "secret_paths contains extra keys",
+			input: map[string]interface{}{
+				"secret_paths": []interface{}{
+					"inputs.0.secret",
+					"outputs.default.api_key",
+					"inputs.1.secret",
+				},
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"api_key": "apikeyvalue",
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":   "example",
+						"secret": "secretvalue",
+					},
 				},
 			},
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"type":   "example",
-					"secret": "secretvalue",
+			expectedConfig: map[string]interface{}{
+				"secret_paths": []interface{}{
+					"inputs.0.secret",
+					"outputs.default.api_key",
+					"inputs.1.secret",
+				},
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":                            "elasticsearch",
+						"api_key":                         "apikeyvalue",
+						redactionMarkerPrefix + "api_key": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":                           "example",
+						"secret":                         "secretvalue",
+						redactionMarkerPrefix + "secret": true,
+					},
 				},
 			},
+			expectedErrMsg: "secret path inputs.1.secret does not exist",
 		},
-	}, {
-		name: "secret paths is not an array",
-		input: map[string]interface{}{
-			"secret_paths": "inputs.0.secret,outputs.default.api_key",
-			"outputs": map[string]interface{}{
-				"default": map[string]interface{}{
-					"type":    "elasticsearch",
-					"api_key": "apikeyvalue",
+		{
+			name: "secret_paths contains non string key",
+			input: map[string]interface{}{
+				"secret_paths": []interface{}{
+					"inputs.0.secret",
+					"outputs.default.api_key",
+					2,
+				},
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"api_key": "apikeyvalue",
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":   "example",
+						"secret": "secretvalue",
+					},
 				},
 			},
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"type":   "example",
-					"secret": "secretvalue",
+			expectedConfig: map[string]interface{}{
+				"secret_paths": []interface{}{
+					"inputs.0.secret",
+					"outputs.default.api_key",
+					uint64(2), // go-ucfg serializing/deserializing flattens types
+				},
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":                            "elasticsearch",
+						"api_key":                         "apikeyvalue",
+						redactionMarkerPrefix + "api_key": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":                           "example",
+						"secret":                         "secretvalue",
+						redactionMarkerPrefix + "secret": true,
+					},
 				},
 			},
+			expectedErrMsg: "secret path 2 does not exist",
 		},
-		expect: map[string]interface{}{
-			"secret_paths": "inputs.0.secret,outputs.default.api_key",
-			"outputs": map[string]interface{}{
-				"default": map[string]interface{}{
-					"type":    "elasticsearch",
-					"api_key": "apikeyvalue",
-				},
-			},
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"type":   "example",
-					"secret": "secretvalue",
-				},
-			},
-		},
-	}, {
-		name: "secret_paths are redacted",
-		input: map[string]interface{}{
-			"secret_paths": []interface{}{
-				"inputs.0.secret",
-				"outputs.default.api_key",
-			},
-			"outputs": map[string]interface{}{
-				"default": map[string]interface{}{
-					"type":    "elasticsearch",
-					"api_key": "apikeyvalue",
-				},
-			},
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"type":   "example",
-					"secret": "secretvalue",
-				},
-			},
-		},
-		expect: map[string]interface{}{
-			"secret_paths": []interface{}{
-				"inputs.0.secret",
-				"outputs.default.api_key",
-			},
-			"outputs": map[string]interface{}{
-				"default": map[string]interface{}{
-					"type":    "elasticsearch",
-					"api_key": REDACTED,
-				},
-			},
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"type":   "example",
-					"secret": REDACTED,
-				},
-			},
-		},
-	}, {
-		name: "secret_paths contains extra keys",
-		input: map[string]interface{}{
-			"secret_paths": []interface{}{
-				"inputs.0.secret",
-				"outputs.default.api_key",
-				"inputs.1.secret",
-			},
-			"outputs": map[string]interface{}{
-				"default": map[string]interface{}{
-					"type":    "elasticsearch",
-					"api_key": "apikeyvalue",
-				},
-			},
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"type":   "example",
-					"secret": "secretvalue",
-				},
-			},
-		},
-		expect: map[string]interface{}{
-			"secret_paths": []interface{}{
-				"inputs.0.secret",
-				"outputs.default.api_key",
-				"inputs.1.secret",
-			},
-			"outputs": map[string]interface{}{
-				"default": map[string]interface{}{
-					"type":    "elasticsearch",
-					"api_key": REDACTED,
-				},
-			},
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"type":   "example",
-					"secret": REDACTED,
-				},
-			},
-		},
-	}, {
-		name: "secret_paths contains non string key",
-		input: map[string]interface{}{
-			"secret_paths": []interface{}{
-				"inputs.0.secret",
-				"outputs.default.api_key",
-				2,
-			},
-			"outputs": map[string]interface{}{
-				"default": map[string]interface{}{
-					"type":    "elasticsearch",
-					"api_key": "apikeyvalue",
-				},
-			},
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"type":   "example",
-					"secret": "secretvalue",
-				},
-			},
-		},
-		expect: map[string]interface{}{
-			"secret_paths": []interface{}{
-				"inputs.0.secret",
-				"outputs.default.api_key",
-				uint64(2), // go-ucfg serializing/deserializing flattens types
-			},
-			"outputs": map[string]interface{}{
-				"default": map[string]interface{}{
-					"type":    "elasticsearch",
-					"api_key": REDACTED,
-				},
-			},
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"type":   "example",
-					"secret": REDACTED,
-				},
-			},
-		},
-	}}
+	}
+
+	log, _ := loggertest.New("test")
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := RedactSecretPaths(tc.input, io.Discard)
-			assert.Equal(t, tc.expect, result)
+			cfg := config.MustNewConfigFrom(tc.input)
+
+			err := AddSecretMarkers(log, cfg)
+			if tc.expectedErrMsg != "" {
+				assert.Error(t, err)
+				require.ErrorContains(t, err, tc.expectedErrMsg)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			result, err := cfg.ToMapStr()
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expectedConfig, result)
 		})
 	}
 }
