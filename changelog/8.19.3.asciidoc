@@ -1,0 +1,52 @@
+// begin 8.19.3 relnotes
+
+[[release-notes-8.19.3]]
+==  8.19.3
+
+Review important information about the  8.19.3 release.
+
+[discrete]
+[[security-updates-8.19.3]]
+=== Security updates
+
+
+elastic-agent::
+
+* Upgrade To Go 1.24.6. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9287[#https://github.com/elastic/elastic-agent/pull/9287] 
+
+
+[discrete]
+[[new-features-8.19.3]]
+=== New features
+
+The 8.19.3 release adds the following new and notable features.
+
+* Adjust The Timeout For Elastic Defend Check Command. {-pull}https://github.com/elastic/elastic-agent/pull/9560[#https://github.com/elastic/elastic-agent/pull/9560] {-pull}https://github.com/elastic/elastic-agent/pull/9608[#https://github.com/elastic/elastic-agent/pull/9608] {-pull}https://github.com/elastic/elastic-agent/pull/9609[#https://github.com/elastic/elastic-agent/pull/9609] {-pull}https://github.com/elastic/elastic-agent/pull/9546[#https://github.com/elastic/elastic-agent/pull/9546] {-pull}https://github.com/elastic/elastic-agent/pull/9213[#https://github.com/elastic/elastic-agent/pull/9213] 
+
+
+[discrete]
+[[enhancements-8.19.3]]
+=== Enhancements
+
+
+elastic-agent::
+
+* Update Otel Components To V0.130.0. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9560[#https://github.com/elastic/elastic-agent/pull/9560] {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9608[#https://github.com/elastic/elastic-agent/pull/9608] {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9609[#https://github.com/elastic/elastic-agent/pull/9609] {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9546[#https://github.com/elastic/elastic-agent/pull/9546] {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9343[#https://github.com/elastic/elastic-agent/pull/9343] 
+
+
+
+[discrete]
+[[bug-fixes-8.19.3]]
+=== Bug fixes
+
+
+elastic-agent::
+
+* On Windows, Retry Saving The Agent Information File To Disk. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9224[#https://github.com/elastic/elastic-agent/pull/9224] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/5862[#https://github.com/elastic/elastic-agent/issues/5862]
+* Correct Hints Annotations Parsing To Resolve Only `${Kubernetes.*}` Placeholders Instead Of Resolving All `${...}` Patterns. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9307[#https://github.com/elastic/elastic-agent/pull/9307] 
+* Treat Exit Code 28 From Endpoint Binary As Non-Fatal. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9320[#https://github.com/elastic/elastic-agent/pull/9320] 
+* Fixed Jitter Backoff Strategy Reset. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9342[#https://github.com/elastic/elastic-agent/pull/9342] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/8864[#https://github.com/elastic/elastic-agent/issues/8864]
+* Fix Docker Container Failing To Start With No Matching Vars: ${Env.elasticsearch_api_key:} And Similar Errors By Restoring Support For `:` To Set Default Values. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9451[#https://github.com/elastic/elastic-agent/pull/9451] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/9328[#https://github.com/elastic/elastic-agent/issues/9328]
+* Fix Deb Upgrade By Stopping Elastic-Agent Service Before Stopping Endpoint. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9462[#https://github.com/elastic/elastic-agent/pull/9462] 
+
+// end 8.19.3 relnotes
