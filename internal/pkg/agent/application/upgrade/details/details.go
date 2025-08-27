@@ -6,6 +6,7 @@ package details
 
 import (
 	"math"
+	"slices"
 	"sync"
 	"time"
 
@@ -244,7 +245,9 @@ func (m Metadata) Equals(otherM Metadata) bool {
 		m.DownloadPercent == otherM.DownloadPercent &&
 		m.DownloadRate == otherM.DownloadRate &&
 		equalTimePointers(m.RetryUntil, otherM.RetryUntil) &&
-		m.RetryErrorMsg == otherM.RetryErrorMsg
+		m.RetryErrorMsg == otherM.RetryErrorMsg &&
+		m.Reason == otherM.Reason &&
+		slices.Equal(m.RollbacksAvailable, otherM.RollbacksAvailable)
 }
 
 func equalTimePointers(t, otherT *time.Time) bool {
