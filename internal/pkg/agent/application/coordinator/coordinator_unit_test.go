@@ -1892,7 +1892,7 @@ func TestComputeEnrollOptions(t *testing.T) {
 	assert.NotNil(t, options)
 
 	assert.Equal(t, "123", options.EnrollAPIKey, "EnrollAPIKey mismatch")
-	assert.Equal(t, "localhost:1234", options.URL, "URL mismatch")
+	assert.Equal(t, "http://localhost:1234", options.URL, "URL mismatch")
 
 	assert.Equal(t, []string{"sha1", "sha2"}, options.CASha256, "CASha256 mismatch")
 	assert.Equal(t, true, options.Insecure, "Insecure mismatch")
