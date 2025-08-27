@@ -1,3 +1,6 @@
+:::{include} /release-notes/_snippets/9.1.3/deprecations.md
+:::
+
 :::{include} /release-notes/_snippets/9.1.2/deprecations.md
 :::
 
