@@ -25,14 +25,18 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/logp"
+	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -296,6 +300,19 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		return err
 	}
 	if shouldEnroll {
+		// pre-enroll in container uses a logger and default monitoring configuration
+		// once the enrollment has occurred then it will pick up the final configuration
+		monitoringServer, err := monitoring.NewServer(logp.L(), monitoringLib.GetNamespace, nil, nil, monitoringCfg.DefaultConfig())
+		if err != nil {
+			return fmt.Errorf("failed starting monitoring server: %w", err)
+		}
+		monitoringServer.Start()
+		defer func() {
+			if monitoringServer != nil {
+				_ = monitoringServer.Stop()
+			}
+		}()
+
 		var policy *kibanaPolicy
 		token := cfg.Fleet.EnrollmentToken
 		if token == "" && !cfg.FleetServer.Enable {
@@ -340,6 +357,9 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		if err != nil {
 			return errors.New("enrollment failed", err)
 		}
+
+		_ = monitoringServer.Stop()
+		monitoringServer = nil
 	}
 
 	return run(containerCfgOverrides, false, initTimeout, isContainer)
