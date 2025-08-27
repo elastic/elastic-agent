@@ -97,18 +97,18 @@ func TestHTTPReloadEnableBehavior(t *testing.T) {
 			t.Logf("starting server...")
 			serverReloader.Start()
 			if testCase.httpOnAtInit {
-				waitOnReturnCode(t, http.StatusOK, "liveness", "?failon=failed", serverReloader)
+				waitOnReturnCode(t, http.StatusOK, "processes", "", serverReloader)
 			} else {
-				waitOnReturnCode(t, http.StatusNotFound, "liveness", "?failon=failed", serverReloader)
+				waitOnReturnCode(t, http.StatusNotFound, "processes", "", serverReloader)
 			}
 
 			err = serverReloader.Reload(testCase.secondConfig)
 			require.NoError(t, err)
 
 			if testCase.httpOnAfterReload {
-				waitOnReturnCode(t, http.StatusOK, "liveness", "?failon=failed", serverReloader)
+				waitOnReturnCode(t, http.StatusOK, "processes", "", serverReloader)
 			} else {
-				waitOnReturnCode(t, http.StatusNotFound, "liveness", "?failon=failed", serverReloader)
+				waitOnReturnCode(t, http.StatusNotFound, "processes", "", serverReloader)
 			}
 
 		})
