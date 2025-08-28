@@ -5,11 +5,6 @@ entries:
       description: ""
       component: ""
       pr:
-        - https://github.com/elastic/elastic-agent/pull/8891
-        - https://github.com/elastic/elastic-agent/pull/9560
-        - https://github.com/elastic/elastic-agent/pull/9605
-        - https://github.com/elastic/elastic-agent/pull/9606
-        - https://github.com/elastic/elastic-agent/pull/9547
         - https://github.com/elastic/elastic-agent/pull/9213
       issue: []
       timestamp: 1753950420
