@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
 	"runtime"
 	"time"
 
@@ -35,6 +34,8 @@ import (
 const (
 	watcherName     = "elastic-agent-watcher"
 	watcherLockFile = "watcher.lock"
+
+	errorSettingParentSignalsExitCode = 6
 )
 
 var ErrWatchCancelled = errors.New("watch cancelled")
@@ -45,11 +46,6 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 		Short: "Watch the Elastic Agent for failures and initiate rollback",
 		Long:  `This command watches Elastic Agent for failures and initiates rollback if necessary.`,
 		Run: func(c *cobra.Command, _ []string) {
-
-			// Initially ignore all signals
-			ignoredSignalsChannel := make(chan os.Signal, 1)
-			signal.Notify(ignoredSignalsChannel)
-
 			cfg := getConfig(streams)
 			log, err := configuredLogger(cfg, watcherName)
 			if err != nil {
@@ -59,6 +55,12 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 
 			// Make sure to flush any buffered logs before we're done.
 			defer log.Sync() //nolint:errcheck // flushing buffered logs is best effort.
+
+			err = setupParentProcessSignals()
+			if err != nil {
+				fmt.Fprintf(streams.Err, "Error setting parent process signals: %v\n", err)
+				os.Exit(errorSettingParentSignalsExitCode)
+			}
 
 			takedown, _ := c.Flags().GetBool("takedown")
 			if takedown {
