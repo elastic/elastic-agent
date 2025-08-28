@@ -649,12 +649,13 @@ func AddSecretMarkers(logger *logger.Logger, cfg *config.Config) error {
 }
 
 func getSecretPaths(logger *logger.Logger, cfg *config.Config) ([]string, error) {
-	if !cfg.Agent.HasField("secret_paths") {
+	uc := (*ucfg.Config)(cfg)
+	if !uc.HasField("secret_paths") {
 		logger.Debugf("secret_paths field not found")
 		return nil, nil
 	}
 
-	secretPaths, err := cfg.Agent.Child("secret_paths", -1)
+	secretPaths, err := uc.Child("secret_paths", -1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get secret_paths: %w", err)
 	}
@@ -675,7 +676,8 @@ func addSecretMarkers(cfg *config.Config, secretPaths []string) error {
 	var aggregateError error
 
 	for _, sp := range secretPaths {
-		ok, err := cfg.Agent.Has(sp, -1, ucfg.PathSep("."))
+		uc := (*ucfg.Config)(cfg)
+		ok, err := uc.Has(sp, -1, ucfg.PathSep("."))
 		if err != nil {
 			aggregateError = errors.Join(aggregateError, fmt.Errorf("failed to check if %s exists: %w", sp, err))
 			continue
@@ -693,7 +695,7 @@ func addSecretMarkers(cfg *config.Config, secretPaths []string) error {
 		secretKeyName := redactionMarkerPrefix + keyName
 		secretKeyPath := parentPath + "." + secretKeyName
 
-		if err := cfg.Agent.SetBool(secretKeyPath, -1, true, ucfg.PathSep(".")); err != nil {
+		if err := uc.SetBool(secretKeyPath, -1, true, ucfg.PathSep(".")); err != nil {
 			aggregateError = errors.Join(aggregateError, fmt.Errorf("failed to set %s: %w", secretKeyPath, err))
 			continue
 		}
