@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 
@@ -68,7 +69,7 @@ func StartWatcherCmd(log *logger.Logger, createCmd cmdFactory, opts ...WatcherIn
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start Upgrade Watcher: %w", err)
 	}
-	list, consoleErr := GetConsoleProcessList()
+	list, consoleErr := getConsoleProcessList()
 	if consoleErr != nil {
 		log.Errorf("failed to get console process list: %v", consoleErr)
 	} else {
@@ -92,4 +93,23 @@ func StartWatcherCmd(log *logger.Logger, createCmd cmdFactory, opts ...WatcherIn
 	}()
 
 	return cmd, nil
+}
+
+// getConsoleProcessList retrieves the list of process IDs attached to the current console
+func getConsoleProcessList() ([]uint32, error) {
+	// Allocate a buffer for PIDs
+	const maxProcs = 64
+	pids := make([]uint32, maxProcs)
+
+	r1, _, err := procGetConsoleProcessList.Call(
+		uintptr(unsafe.Pointer(&pids[0])),
+		uintptr(maxProcs),
+	)
+
+	count := uint32(r1)
+	if count == 0 {
+		return nil, err
+	}
+
+	return pids[:count], nil
 }
