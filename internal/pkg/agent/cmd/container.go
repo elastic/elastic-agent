@@ -25,8 +25,6 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
-	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 
@@ -43,6 +41,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/crypto"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
