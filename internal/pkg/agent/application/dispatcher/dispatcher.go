@@ -307,9 +307,14 @@ func (ad *ActionDispatcher) mergeWithQueuedActions(ts time.Time, actions []fleet
 	ad.log.Debugf("Expired non-upgrade actions: %v", expired)
 	ad.log.Debugf("Expired upgrade actions (won't be removed from the queue): %v", expiredUpgradeActions)
 
+	// Put expired upgrade actions back onto the queue to persist them across restarts.
+	// These are handled the same as non-expired upgrade scheduled actions and are only removed when:
+	// 1) a cancel action is received (look at dispatchCancelActions func) or
+	// 2) a newer upgrade action (scheduled or not) removes them. (look at removeQueuedUpgrades func)
 	for _, expiredUpgradeAction := range expiredUpgradeActions {
 		startTime, err := expiredUpgradeAction.StartTime()
 		if err != nil {
+			// at this point expired upgrade action must have a valid start time set
 			ad.log.Warnf("failed to get start time of expired upgrade action [%s]: %v", expiredUpgradeAction.ID(), err)
 			continue
 		}
@@ -351,7 +356,7 @@ func (ad *ActionDispatcher) updateUpgradeDetails(ts time.Time, detailsSetter det
 	upgradeDetails := GetScheduledUpgradeDetails(ad.log, ad.queue.Actions(), ts)
 
 	if ad.lastUpgradeDetailsIsSet && ad.lastUpgradeDetails.Equals(upgradeDetails) {
-		// calculate
+		// already the same details; do nothing
 		return
 	}
 	ad.lastUpgradeDetailsIsSet = true
@@ -396,8 +401,8 @@ func (ad *ActionDispatcher) scheduleRetry(ctx context.Context, action fleetapi.R
 	}
 }
 
-// GetScheduledUpgradeDetails returns the upgrade details of the next upgrade action, if any. It also adjusts accordingly
-// the upgrade details if the action has expired.
+// GetScheduledUpgradeDetails returns the upgrade details of the next scheduled upgrade action, if any. It also adjusts
+// accordingly the upgrade details if the action has expired.
 func GetScheduledUpgradeDetails(log *logger.Logger, actions []fleetapi.ScheduledAction, ts time.Time) *details.Details {
 	var nextUpgradeAction *fleetapi.ActionUpgrade
 	var nextUpgradeStartTime time.Time
