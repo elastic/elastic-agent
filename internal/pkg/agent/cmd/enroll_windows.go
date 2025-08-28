@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/windows"
 
+	"github.com/elastic/elastic-agent/internal/pkg/acl"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -55,6 +56,32 @@ func getSIDFromCmd(cmd *cobra.Command, param string) (*windows.SID, error) {
 }
 
 func getOwnerFromPath(path string) (utils.FileOwner, error) {
-	// TODO: Implement this
-	return utils.FileOwner{}, nil
+	var ownerSID *windows.SID
+	var groupSID *windows.SID
+	var secDesc windows.Handle
+
+	if err := acl.GetNamedSecurityInfo(
+		path,
+		acl.SE_FILE_OBJECT,
+		acl.OWNER_SECURITY_INFORMATION|acl.GROUP_SECURITY_INFORMATION,
+		&ownerSID,
+		&groupSID,
+		nil,
+		nil,
+		&secDesc,
+	); err != nil {
+		return utils.FileOwner{}, fmt.Errorf("failed to get security info for %s: %w", path, err)
+	}
+
+	defer windows.LocalFree(secDesc) //nolint:errcheck // not much we can do
+
+	var ownership utils.FileOwner
+	if ownerSID == nil || groupSID == nil {
+		return utils.FileOwner{}, fmt.Errorf("failed to get owner or group SID for %s", path)
+	}
+
+	ownership.UID = ownerSID.String()
+	ownership.GID = groupSID.String()
+
+	return ownership, nil
 }
