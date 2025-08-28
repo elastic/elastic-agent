@@ -1273,25 +1273,11 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 		span.End()
 	}()
 
-<<<<<<< HEAD
-	err = c.generateAST(cfg)
-=======
-	if err = info.InjectAgentConfig(cfg); err != nil {
-		return err
-	}
-
 	if err = c.secretMarkerFunc(c.logger, cfg); err != nil {
 		c.logger.Errorf("failed to add secret markers: %v", err)
 	}
 
-	// perform and verify ast translation
-	m, err := cfg.ToMapStr()
-	if err != nil {
-		return fmt.Errorf("could not create the map from the configuration: %w", err)
-	}
-
-	err = c.generateAST(cfg, m)
->>>>>>> a44e87a24 (Fix/5871 redact secrets in diagnostics (#9560))
+	err = c.generateAST(cfg)
 	c.setConfigError(err)
 	if err != nil {
 		return err
