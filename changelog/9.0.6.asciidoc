@@ -12,7 +12,7 @@ Review important information about the  9.0.6 release.
 
 elastic-agent::
 
-* Upgrade To Go 1.24.6. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9287[#https://github.com/elastic/elastic-agent/pull/9287] 
+* Upgrade To Go 1.24.6. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9287[#https://github.com/elastic/elastic-agent/pull/9287]
 
 [discrete]
 [[new-features-9.0.6]]
@@ -20,7 +20,7 @@ elastic-agent::
 
 The 9.0.6 release adds the following new and notable features.
 
-* Adjust The Timeout For Elastic Defend Check Command. {-pull}https://github.com/elastic/elastic-agent/pull/9523[#https://github.com/elastic/elastic-agent/pull/9523] {-pull}https://github.com/elastic/elastic-agent/pull/9524[#https://github.com/elastic/elastic-agent/pull/9524] {-pull}https://github.com/elastic/elastic-agent/pull/9542[#https://github.com/elastic/elastic-agent/pull/9542] {-pull}https://github.com/elastic/elastic-agent/pull/9213[#https://github.com/elastic/elastic-agent/pull/9213] 
+* Adjust The Timeout For Elastic Defend Check Command. {-pull}https://github.com/elastic/elastic-agent/pull/9213[#https://github.com/elastic/elastic-agent/pull/9213]
 
 [discrete]
 [[bug-fixes-9.0.6]]
@@ -30,10 +30,10 @@ The 9.0.6 release adds the following new and notable features.
 elastic-agent::
 
 * On Windows, Retry Saving The Agent Information File To Disk. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9224[#https://github.com/elastic/elastic-agent/pull/9224] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/5862[#https://github.com/elastic/elastic-agent/issues/5862]
-* Correct Hints Annotations Parsing To Resolve Only `${Kubernetes.*}` Placeholders Instead Of Resolving All `${...}` Patterns. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9307[#https://github.com/elastic/elastic-agent/pull/9307] 
-* Treat Exit Code 28 From Endpoint Binary As Non-Fatal. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9320[#https://github.com/elastic/elastic-agent/pull/9320] 
+* Correct Hints Annotations Parsing To Resolve Only `${Kubernetes.*}` Placeholders Instead Of Resolving All `${...}` Patterns. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9307[#https://github.com/elastic/elastic-agent/pull/9307]
+* Treat Exit Code 28 From Endpoint Binary As Non-Fatal. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9320[#https://github.com/elastic/elastic-agent/pull/9320]
 * Fixed Jitter Backoff Strategy Reset. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9342[#https://github.com/elastic/elastic-agent/pull/9342] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/8864[#https://github.com/elastic/elastic-agent/issues/8864]
 * Fix Docker Container Failing To Start With No Matching Vars: ${Env.elasticsearch_api_key:} And Similar Errors By Restoring Support For `:` To Set Default Values. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9451[#https://github.com/elastic/elastic-agent/pull/9451] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/9328[#https://github.com/elastic/elastic-agent/issues/9328]
-* Fix Deb Upgrade By Stopping Elastic-Agent Service Before Upgrading. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9462[#https://github.com/elastic/elastic-agent/pull/9462] 
+* Fix Deb Upgrade By Stopping Elastic-Agent Service Before Upgrading. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9462[#https://github.com/elastic/elastic-agent/pull/9462]
 
 // end 9.0.6 relnotes
