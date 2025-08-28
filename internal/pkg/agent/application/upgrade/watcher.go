@@ -286,10 +286,6 @@ func (a AgentWatcherHelper) TakeOverWatcher(ctx context.Context, log *logger.Log
 	return takeOverWatcher(ctx, log, new(commandWatcherGrappler), topDir, 30*time.Second, 500*time.Millisecond, 100*time.Millisecond)
 }
 
-// watcherPIDsFetcher defines the type of function responsible for fetching watcher PIDs.
-// This will allow for easier testing of takeOverWatcher using fake binaries
-type watcherPIDsFetcher func() ([]int, error)
-
 // watcherGrappler is an abstraction over the way elastic-agent main process should take down (stop, gracefully if possible) a watcher process
 type watcherGrappler interface {
 	TakeDownWatcher(ctx context.Context, log *logger.Logger) error
