@@ -38,6 +38,10 @@ const (
 	errorSettingParentSignalsExitCode = 6
 )
 
+// watcherPIDsFetcher defines the type of function responsible for fetching watcher PIDs.
+// This will allow for easier testing of takeOverWatcher using fake binaries
+type watcherPIDsFetcher func() ([]int, error)
+
 var ErrWatchCancelled = errors.New("watch cancelled")
 
 func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
@@ -64,7 +68,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 
 			takedown, _ := c.Flags().GetBool("takedown")
 			if takedown {
-				err = upgrade.TakedownWatcher(context.Background(), log, utils.GetWatcherPIDs)
+				err = takedownWatcher(context.Background(), log, utils.GetWatcherPIDs)
 				if err != nil {
 					log.Errorf("error taking down watcher: %v", err)
 					os.Exit(5)
