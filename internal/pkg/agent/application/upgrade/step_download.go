@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/composed"
+	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/fs"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/http"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/localremote"
@@ -97,12 +98,12 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 	}
 
 	if err := os.MkdirAll(paths.Downloads(), 0750); err != nil {
-		return "", errors.New(err, fmt.Sprintf("failed to create download directory at %s", paths.Downloads()))
+		return "", fmt.Errorf("failed to create download directory at %s: %w", paths.Downloads(), err)
 	}
 
 	path, err := downloaderFunc(ctx, factory, parsedVersion, &settings, upgradeDetails)
 	if err != nil {
-		return "", errors.New(err, "failed download of agent binary")
+		return "", fmt.Errorf("failed download of agent binary: %w", err)
 	}
 
 	if skipVerifyOverride {
@@ -243,6 +244,10 @@ func (u *Upgrader) downloadWithRetries(
 		var err error
 		path, err = u.downloadOnce(cancelCtx, factory, version, settings, upgradeDetails)
 		if err != nil {
+			if downloadErrors.IsDiskSpaceError(err) {
+				u.log.Infof("insufficient disk space error detected, stopping retries")
+				return backoff.Permanent(err)
+			}
 			return err
 		}
 		return nil
