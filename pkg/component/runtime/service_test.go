@@ -435,11 +435,9 @@ func TestServiceStartRetry(t *testing.T) {
 		actionMode: actionStart,
 	}
 
-	// Expect 1 restart (== 2 start attempts) within serviceRestartDelay+1s
-	const expectedNumStartAttempts = 2
 	expectedRestartLogMsg := fmt.Sprintf(
-		"failed to start endpoint service, err: %s, restarting (%d/10) after waiting for %v",
-		"failed install endpoint service: exit status 99", expectedNumStartAttempts, serviceRestartDelay,
+		"failed to start endpoint service, err: %s, restarting after waiting for %v",
+		"failed install endpoint service: exit status 99", serviceRestartDelay,
 	)
 	require.Eventually(t, func() bool {
 		logs := logObs.TakeAll()

@@ -32,7 +32,6 @@ type actionModeSigned struct {
 
 const (
 	defaultCheckServiceStatusInterval = 30 * time.Second // 30 seconds default for now, consistent with the command check-in interval
-	maxServiceStartAttempts           = 10
 )
 
 var (
@@ -205,7 +204,6 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 		}
 	}
 
-	numStartAttempts := 0
 	for {
 		var err error
 		select {
@@ -245,8 +243,6 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 				}
 
 				// Start service
-				numStartAttempts++
-				s.log.Debugf("starting %s service, attempt %d/%d", s.name(), numStartAttempts, maxServiceStartAttempts)
 				err = s.start(ctx)
 				if err != nil {
 					// If the error is due to a non-fatal exit code, continue running the service
@@ -261,25 +257,15 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 						}
 					}
 
-					if numStartAttempts >= maxServiceStartAttempts {
-						cisStop()
-						break
-					}
-
-					// Schedule a restart of the service after a delay by resending the start action on the action channel
+					// Error is due to a fatal exit code. Schedule a restart of the service after a delay by resending
+					// the start action on the action channel
 					delay := getServiceRestartDelay()
-					s.log.Errorf(
-						"failed to start %s service, err: %v, restarting (%d/%d) after waiting for %v",
-						s.name(), err, numStartAttempts, maxServiceStartAttempts, delay,
-					)
+					s.log.Errorf("failed to start %s service, err: %v, restarting after waiting for %v", s.name(), err, delay)
 					time.AfterFunc(delay, func() {
 						s.actionCh <- as
 					})
 					continue
 				}
-
-				// Start succeeded, reset numStartAttempts
-				numStartAttempts = 0
 
 				// Start check-in timer
 				checkinTimer.Reset(s.checkinPeriod())
