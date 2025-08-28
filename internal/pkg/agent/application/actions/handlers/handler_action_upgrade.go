@@ -50,11 +50,9 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 		return fmt.Errorf("invalid type, expected ActionUpgrade and received %T", a)
 	}
 
-	asyncCtx, runAsync := h.getAsyncContext(ctx, a, ack)
-	if !runAsync {
-		return nil
-	}
-
+	// first send the action to any units that need to know of it
+	// and only when there is no error add the action in the h.bkgActions
+	// (through getAsyncContext) so it can be invoked
 	if h.tamperProtectionFn() {
 		// Find inputs that want to receive UPGRADE action
 		// Endpoint needs to receive a signed UPGRADE action in order to be able to uncontain itself
@@ -71,6 +69,11 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 			// Log and continue
 			h.log.Debugf("No components running for %v action type", a.Type())
 		}
+	}
+
+	asyncCtx, runAsync := h.getAsyncContext(ctx, a, ack)
+	if !runAsync {
+		return nil
 	}
 
 	go func() {
