@@ -71,13 +71,14 @@ func TestComputeFixPermissions(t *testing.T) {
 			expectOwnerFromCmdCalled:  false,
 			expectOwnerFromPathCalled: true,
 		},
-		"should skip fixing permissions when not from installer with root on windows": {
+		"should return owner from path when not from install and has root on windows": {
 			fromInstall:               false,
 			hasRoot:                   true,
 			goos:                      "windows",
-			wantOwner:                 nil,
+			ownerFromPathOwner:        owner,
+			wantOwner:                 &owner,
 			expectOwnerFromCmdCalled:  false,
-			expectOwnerFromPathCalled: false,
+			expectOwnerFromPathCalled: true,
 		},
 		"should skip fixing permissions when not from installer without root": {
 			fromInstall:               false,
@@ -140,7 +141,7 @@ func TestComputeFixPermissions(t *testing.T) {
 			require.Equal(t, tc.expectOwnerFromPathCalled, ownerFromPathCalled, "ownerFromPathCalled mismatch")
 
 			if tc.expectOwnerFromPathCalled {
-				require.Equal(t, paths.TopBinaryPath(), receivedPath, "received path mismatch")
+				require.Equal(t, paths.Top(), receivedPath, "received path mismatch")
 			}
 		})
 	}
