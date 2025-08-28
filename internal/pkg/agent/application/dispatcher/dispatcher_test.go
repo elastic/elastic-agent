@@ -297,7 +297,7 @@ func TestActionDispatcher(t *testing.T) {
 
 		action1 := &mockScheduledAction{}
 		action1.On("StartTime").Return(time.Time{}, fleetapi.ErrNoStartTime)
-		action1.On("Expiration").Return(time.Now().Add(time.Hour), fleetapi.ErrNoStartTime)
+		action1.On("Expiration").Return(time.Now().Add(time.Hour), fleetapi.ErrNoExpiration)
 		action1.On("Type").Return(fleetapi.ActionTypeCancel)
 		action1.On("ID").Return("id")
 
@@ -360,8 +360,9 @@ func TestActionDispatcher(t *testing.T) {
 	})
 
 	t.Run("Dispatch of a retryable action returns an error", func(t *testing.T) {
+		testError := errors.New("test error")
 		def := &mockHandler{}
-		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("test error")).Once()
+		def.On("Handle", mock.Anything, mock.Anything, mock.Anything).Return(testError).Once()
 
 		saver := &mockSaver{}
 		saver.On("Save").Return(nil).Times(2)
@@ -382,6 +383,7 @@ func TestActionDispatcher(t *testing.T) {
 		action.On("RetryAttempt").Return(0).Once()
 		action.On("SetRetryAttempt", 1).Once()
 		action.On("SetStartTime", mock.Anything).Once()
+		action.On("GetError").Return(testError).Once()
 
 		dispatchCtx, cancelFn := context.WithCancel(context.Background())
 		defer cancelFn()
@@ -685,6 +687,112 @@ func TestActionDispatcher(t *testing.T) {
 		}
 		require.NoError(t, shouldNotSetDetails, "set upgrade details should not be called")
 	})
+
+	t.Run("check that failed upgrade actions do not block newer ones from dispatching", func(t *testing.T) {
+		// we start by dispatching a scheduled upgrade action
+		ctx := t.Context()
+		handlerErr := errors.New("text handler error")
+
+		def := &mockHandler{}
+		def.On("Handle",
+			mock.Anything, mock.Anything, mock.Anything).
+			Return(handlerErr).Once()
+
+		saver := &mockSaver{}
+		saver.On("Save").Return(nil).Times(4)
+		saver.On("SetQueue", mock.Anything).Times(4)
+		actionQueue, err := queue.NewActionQueue([]fleetapi.ScheduledAction{}, saver)
+		require.NoError(t, err)
+
+		d, err := New(nil, t.TempDir(), def, actionQueue)
+		require.NoError(t, err)
+
+		err = d.Register(&fleetapi.ActionUpgrade{}, def)
+		require.NoError(t, err)
+
+		var gotDetails *details.Details
+		detailsSetter := func(upgradeDetails *details.Details) {
+			gotDetails = upgradeDetails
+		}
+
+		initialScheduledUpgradeAction := &fleetapi.ActionUpgrade{
+			ActionID:        "scheduled-action-id",
+			ActionType:      fleetapi.ActionTypeUpgrade,
+			ActionStartTime: time.Now().Add(1 * time.Hour).Format(time.RFC3339),
+			Data: fleetapi.ActionUpgradeData{
+				Version:   "9.3.0",
+				SourceURI: "https://test-uri.test.com",
+			},
+		}
+
+		dispatchDone := make(chan struct{})
+		go func() {
+			d.Dispatch(ctx, detailsSetter, ack, initialScheduledUpgradeAction)
+			close(dispatchDone)
+		}()
+		select {
+		case err := <-d.Errors():
+			t.Fatalf("Unexpected error from Dispatch: %v", err)
+		case <-dispatchDone:
+		}
+
+		// make sure that the upgrade details reported are matching our expectations
+		require.NotNilf(t, gotDetails, "upgrade details should not be nil")
+		assert.Equal(t, initialScheduledUpgradeAction.ActionID, gotDetails.ActionID)
+		assert.Equal(t, details.StateScheduled, gotDetails.State)
+		assert.Equal(t, initialScheduledUpgradeAction.Data.Version, gotDetails.TargetVersion)
+		assert.Empty(t, gotDetails.Metadata.ErrorMsg)
+
+		// affect directly the queue to get the dispatcher to actually dispatch our action
+		removedItems := actionQueue.Cancel(initialScheduledUpgradeAction.ActionID)
+		require.Equal(t, 1, removedItems)
+		actionNewStartTime := time.Now().Add(-5 * time.Minute).UTC()
+		initialScheduledUpgradeAction.ActionStartTime = actionNewStartTime.Format(time.RFC3339)
+		actionQueue.Add(initialScheduledUpgradeAction, actionNewStartTime.Unix())
+
+		go func() {
+			d.Dispatch(ctx, detailsSetter, ack)
+		}()
+		if err := <-d.Errors(); err != nil {
+			t.Fatalf("Unexpected error from Dispatch: %v", err)
+		}
+
+		// make sure that upgrade details are still reported as scheduled but with a non-empty error
+		require.NotNilf(t, gotDetails, "upgrade details should not be nil")
+		assert.Equal(t, initialScheduledUpgradeAction.ActionID, gotDetails.ActionID)
+		assert.Equal(t, details.StateScheduled, gotDetails.State)
+		assert.Equal(t, initialScheduledUpgradeAction.Data.Version, gotDetails.TargetVersion)
+		assert.NotEmpty(t, gotDetails.Metadata.ErrorMsg)
+
+		// issue a brand-new upgrade action
+		newUpgradeAction := &fleetapi.ActionUpgrade{
+			ActionID:   "upgrade-action-id",
+			ActionType: fleetapi.ActionTypeUpgrade,
+			Data: fleetapi.ActionUpgradeData{
+				Version:   "9.3.0",
+				SourceURI: "https://test-uri.test.com",
+			},
+		}
+		def.On("Handle",
+			mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).Once()
+
+		detailsSetter = func(upgradeDetails *details.Details) {
+			gotDetails = upgradeDetails
+		}
+		go func() {
+			d.Dispatch(ctx, detailsSetter, ack, newUpgradeAction)
+		}()
+		if err := <-d.Errors(); err != nil {
+			t.Fatalf("Unexpected error from Dispatch: %v", err)
+		}
+		require.Nil(t, gotDetails)
+
+		// make sure that the action queue doesn't have any actions
+		assert.Empty(t, actionQueue.Actions())
+		def.AssertExpectations(t)
+		saver.AssertExpectations(t)
+	})
 }
 
 func Test_ActionDispatcher_scheduleRetry(t *testing.T) {
@@ -704,8 +812,13 @@ func Test_ActionDispatcher_scheduleRetry(t *testing.T) {
 		action.On("ID").Return("id")
 		action.On("RetryAttempt").Return(len(d.rt.steps)).Once()
 		action.On("SetRetryAttempt", mock.Anything).Once()
+		action.On("Type").Return(fleetapi.ActionTypeUpgrade).Once()
+		action.On("GetError").Return(nil).Once()
 
-		d.scheduleRetry(context.Background(), action, ack)
+		upgradeDetailsNeedUpdate := false
+		d.scheduleRetry(context.Background(), action, ack, &upgradeDetailsNeedUpdate)
+		assert.False(t, upgradeDetailsNeedUpdate)
+
 		saver.AssertExpectations(t)
 		action.AssertExpectations(t)
 	})
@@ -726,8 +839,13 @@ func Test_ActionDispatcher_scheduleRetry(t *testing.T) {
 		action.On("RetryAttempt").Return(0).Once()
 		action.On("SetRetryAttempt", 1).Once()
 		action.On("SetStartTime", mock.Anything).Once()
+		action.On("Type").Return(fleetapi.ActionTypeUpgrade).Twice()
+		action.On("GetError").Return(nil).Once()
 
-		d.scheduleRetry(context.Background(), action, ack)
+		upgradeDetailsNeedUpdate := false
+		d.scheduleRetry(context.Background(), action, ack, &upgradeDetailsNeedUpdate)
+		assert.True(t, upgradeDetailsNeedUpdate)
+
 		saver.AssertExpectations(t)
 		action.AssertExpectations(t)
 	})

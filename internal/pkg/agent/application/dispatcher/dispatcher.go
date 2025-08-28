@@ -123,8 +123,8 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, detailsSetter details.
 
 	upgradeDetailsNeedUpdate := false
 
-	// remove any upgrade actions from the queue if there is an upgrade action in the actions
-	ad.removeQueuedUpgrades(actions, &upgradeDetailsNeedUpdate)
+	// remove duplicate upgrade actions from fleetgateway actions and remove all upgrade actions in the queue
+	actions = ad.compactAndRemoveQueuedUpgrades(actions, &upgradeDetailsNeedUpdate)
 
 	// add any scheduled actions to the queue (we don't check the start time here, as we will check it later)
 	// and remove them from the passed actions
@@ -137,6 +137,7 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, detailsSetter details.
 	actions = ad.mergeWithQueuedActions(now, actions, &upgradeDetailsNeedUpdate)
 
 	if upgradeDetailsNeedUpdate {
+		upgradeDetailsNeedUpdate = false
 		ad.updateUpgradeDetails(now, detailsSetter)
 	}
 
@@ -166,7 +167,7 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, detailsSetter details.
 			rAction, ok := action.(fleetapi.RetryableAction)
 			if ok {
 				rAction.SetError(err) // set the retryable action error to what the dispatcher returned
-				ad.scheduleRetry(ctx, rAction, acker)
+				ad.scheduleRetry(ctx, rAction, acker, &upgradeDetailsNeedUpdate)
 				continue
 			}
 			ad.log.Errorf("Failed to dispatch action id %q of type %q, error: %+v", action.ID(), action.Type(), err)
@@ -178,6 +179,10 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, detailsSetter details.
 
 	if err = acker.Commit(ctx); err != nil {
 		reportedErr = err
+	}
+
+	if upgradeDetailsNeedUpdate {
+		ad.updateUpgradeDetails(now, detailsSetter)
 	}
 
 	if len(actions) > 0 {
@@ -285,7 +290,17 @@ func (ad *ActionDispatcher) mergeWithQueuedActions(ts time.Time, actions []fleet
 	dequeuedActions := ad.queue.DequeueActions()
 
 	for _, action := range dequeuedActions {
-		exp, _ := action.Expiration()
+		exp, err := action.Expiration()
+		if err != nil {
+			if !errors.Is(err, fleetapi.ErrNoExpiration) {
+				// this is not a non-expiring scheduled action, e.g. there is a malformed expiration time set
+				ad.log.Warnf("failed to get expiration time for scheduled action [id = %s]: %v", action.ID(), err)
+				continue
+			}
+			// this is a non-expiring scheduled action
+			actions = append(actions, action)
+			continue
+		}
 		if ts.After(exp) {
 			if action.Type() == fleetapi.ActionTypeUpgrade {
 				// this is an expired upgrade action thus we need to recalculate the upgrade details
@@ -308,7 +323,7 @@ func (ad *ActionDispatcher) mergeWithQueuedActions(ts time.Time, actions []fleet
 	// Put expired upgrade actions back onto the queue to persist them across restarts.
 	// These are handled the same as non-expired upgrade scheduled actions and are only removed when:
 	// 1) a cancel action is received (look at dispatchCancelActions func) or
-	// 2) a newer upgrade action (scheduled or not) removes them. (look at removeQueuedUpgrades func)
+	// 2) a newer upgrade action (scheduled or not) removes them. (look at compactAndRemoveQueuedUpgrades func)
 	for _, expiredUpgradeAction := range expiredUpgradeActions {
 		startTime, err := expiredUpgradeAction.StartTime()
 		if err != nil {
@@ -320,31 +335,41 @@ func (ad *ActionDispatcher) mergeWithQueuedActions(ts time.Time, actions []fleet
 	}
 
 	// if an upgrade action is included in the immediate dispatchable actions
-	// mark upgradeDetailsNeedUpdate as false since the upgrade details will be set by it
+	// mark upgradeDetailsNeedUpdate as true
 	if slices.ContainsFunc(actions, func(action fleetapi.Action) bool {
 		return action.Type() == fleetapi.ActionTypeUpgrade
 	}) {
-		*upgradeDetailsNeedUpdate = false
+		*upgradeDetailsNeedUpdate = true
 	}
 
 	return actions
 }
 
-// removeQueuedUpgrades will scan the passed actions and if there is an upgrade action it will remove all upgrade actions
-// in the queue but not alter the passed list. This is done to try to only have the most recent upgrade action executed.
-// However, it does not eliminate duplicates in retrieved directly from the gateway. Also, if upgrade actions are removed
-// from the queue, upgradeDetailsNeedUpdate will be set to true.
-func (ad *ActionDispatcher) removeQueuedUpgrades(actions []fleetapi.Action, upgradeDetailsNeedUpdate *bool) {
-	for _, action := range actions {
+// compactAndRemoveQueuedUpgrades deduplicates *upgrade* actions from the given fleetgateway actions by keeping only the
+// first encountered upgrade in input order (dropping any subsequent upgrades from the returned slice). If an upgrade
+// action is found, it also removes any queued upgrade actions from the queue. When queued upgrade actions are removed,
+// upgradeDetailsNeedUpdate is set to true.
+func (ad *ActionDispatcher) compactAndRemoveQueuedUpgrades(input []fleetapi.Action, upgradeDetailsNeedUpdate *bool) []fleetapi.Action {
+	var actions []fleetapi.Action
+	var upgradeAction fleetapi.Action
+	for _, action := range input {
 		if action.Type() == fleetapi.ActionTypeUpgrade {
+			if upgradeAction == nil {
+				upgradeAction = action
+			} else {
+				ad.log.Warnf("Found extra upgrade action in fleetgateway actions [id = %s]", action.ID())
+				continue
+			}
 			if n := ad.queue.CancelType(fleetapi.ActionTypeUpgrade); n > 0 {
 				ad.log.Debugw("New upgrade action retrieved from gateway, removing queued upgrade actions", "actions_found", n)
 				// upgrade action(s) got removed from the queue so upgrade actions changed
 				*upgradeDetailsNeedUpdate = true
 			}
-			return
 		}
+		actions = append(actions, action)
 	}
+
+	return actions
 }
 
 // updateUpgradeDetails will construct the upgrade details based queue actions (assuming expired ones are still in the queue)
@@ -364,9 +389,11 @@ func (ad *ActionDispatcher) updateUpgradeDetails(ts time.Time, detailsSetter det
 }
 
 // scheduleRetry will schedule a retry for the passed action. Note that this adjusts the start time of the action
-// but doesn't affect expiration time.
-func (ad *ActionDispatcher) scheduleRetry(ctx context.Context, action fleetapi.RetryableAction, acker acker.Acker) {
+// but doesn't affect expiration time. If the action is scheduled to be retried and it is an upgrade action,
+// upgradeDetailsNeedUpdate will be set to true.
+func (ad *ActionDispatcher) scheduleRetry(ctx context.Context, action fleetapi.RetryableAction, acker acker.Acker, upgradeDetailsNeedUpdate *bool) {
 	attempt := action.RetryAttempt()
+	ad.log.Warnf("Re-scheduling action id %q of type %q, because it failed to dispatch with error: %+v", action.ID(), action.Type(), action.GetError())
 	d, err := ad.rt.GetWait(attempt)
 	if err != nil {
 		ad.log.Errorf("No more retries for action id %s: %v", action.ID(), err)
@@ -390,6 +417,11 @@ func (ad *ActionDispatcher) scheduleRetry(ctx context.Context, action fleetapi.R
 	if err != nil {
 		ad.log.Errorf("retry action id %s attempt %d failed to persist action_queue: %v", action.ID(), attempt, err)
 	}
+
+	if action.Type() == fleetapi.ActionTypeUpgrade {
+		*upgradeDetailsNeedUpdate = true
+	}
+
 	if err := acker.Ack(ctx, action); err != nil {
 		ad.log.Errorf("Unable to ack action retry (id %s) to fleet-server: %v", action.ID(), err)
 		return
@@ -458,5 +490,9 @@ func GetScheduledUpgradeDetails(log *logger.Logger, actions []fleetapi.Scheduled
 		details.StateScheduled,
 		nextUpgradeActionID)
 	upgradeDetails.Metadata.ScheduledAt = &nextUpgradeStartTime
+	// scheduled upgrade actions can have errors if retried
+	if err := nextUpgradeAction.GetError(); err != nil {
+		upgradeDetails.Metadata.ErrorMsg = fmt.Sprintf("A prior dispatch attempt failed with: %v", err)
+	}
 	return upgradeDetails
 }
