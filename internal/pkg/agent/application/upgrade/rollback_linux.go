@@ -32,7 +32,7 @@ func InvokeCmdWithArgs(executable string, args ...string) *exec.Cmd {
 	var sysproc = &syscall.SysProcAttr{
 		Credential: cred,
 		Setsid:     true,
-		// propagate sigint instead of sigkill so we can ignore it
+		// disable parent death signal for the watcher process
 		Pdeathsig: syscall.Signal(0x0),
 	}
 	cmd.SysProcAttr = sysproc
