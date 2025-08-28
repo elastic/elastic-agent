@@ -236,8 +236,6 @@ func (ad *ActionDispatcher) queueScheduledActions(input []fleetapi.Action, upgra
 			// there is an upgrade action added to the queue so we need to update the upgrade details
 			*upgradeDetailsNeedUpdate = true
 		}
-
-		continue
 	}
 	return actions
 }
