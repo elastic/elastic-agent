@@ -23,15 +23,6 @@ import (
 	"github.com/elastic/elastic-agent/testing/integration"
 )
 
-type AssertFunc func(*testing.T, *atesting.Fixture, string, error)
-
-type testCase struct {
-	description string
-	privileged  bool
-	os          []define.OS
-	assertion   AssertFunc
-}
-
 // Verifies that re-enrollment as a privileged user succeeds when the agent was
 // installed unprivileged. Windows implementation is a no-op and will be addressed
 // in a separate PR. Relevant issue: https://github.com/elastic/elastic-agent/issues/8544
@@ -40,10 +31,6 @@ func TestReEnrollUnprivileged(t *testing.T) {
 		Group: integration.Default,
 		Stack: &define.Stack{},
 		Sudo:  true,
-		OS: []define.OS{
-			{Type: define.Darwin},
-			{Type: define.Linux},
-		},
 	})
 
 	ctx := t.Context()
