@@ -46,7 +46,7 @@ type TestBinaryArgs struct {
 }
 
 func makeGoTestArgs(name string) GoTestArgs {
-	fileName := fmt.Sprintf("build/TEST-go-%s", strings.Replace(strings.ToLower(name), " ", "_", -1))
+	fileName := fmt.Sprintf("build/TEST-go-%s", strings.ReplaceAll(strings.ToLower(name), " ", "_"))
 	params := GoTestArgs{
 		LogName:         name,
 		Race:            RaceDetector,
@@ -63,8 +63,8 @@ func makeGoTestArgs(name string) GoTestArgs {
 
 func makeGoTestArgsForModule(name, module string) GoTestArgs {
 	fileName := fmt.Sprintf("build/TEST-go-%s-%s",
-		strings.Replace(strings.ToLower(name), " ", "_", -1),
-		strings.Replace(strings.ToLower(module), " ", "_", -1),
+		strings.ReplaceAll(strings.ToLower(name), " ", "_"),
+		strings.ReplaceAll(strings.ToLower(module), " ", "_"),
 	)
 	params := GoTestArgs{
 		LogName:         fmt.Sprintf("%s-%s", name, module),

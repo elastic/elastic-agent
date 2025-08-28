@@ -73,6 +73,7 @@ func DefaultBuildArgs() BuildArgs {
 	args := BuildArgs{
 		Name: BeatName,
 		CGO:  build.Default.CgoEnabled,
+		Env:  map[string]string{},
 		Vars: map[string]string{
 			elasticAgentModulePath + "/version.buildTime": "{{ date }}",
 			elasticAgentModulePath + "/version.commit":    "{{ commit }}",
@@ -85,11 +86,6 @@ func DefaultBuildArgs() BuildArgs {
 
 	if positionIndependentCodeSupported() {
 		args.ExtraFlags = append(args.ExtraFlags, "-buildmode", "pie")
-	}
-
-	if FIPSBuild {
-		args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips")
-		args.CGO = true
 	}
 
 	if DevBuild {
@@ -189,11 +185,6 @@ func Build(params BuildArgs) error {
 	cgoEnabled := "0"
 	if params.CGO {
 		cgoEnabled = "1"
-	}
-
-	if FIPSBuild {
-		cgoEnabled = "1"
-		env["GOEXPERIMENT"] = "systemcrypto"
 	}
 
 	env["CGO_ENABLED"] = cgoEnabled

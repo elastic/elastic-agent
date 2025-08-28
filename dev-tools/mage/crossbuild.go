@@ -30,11 +30,11 @@ const defaultCrossBuildTarget = "golangCrossBuild"
 var Platforms = BuildPlatforms.Defaults()
 
 // SelectedPackageTypes is the list of package types. If empty, all packages types
-// are considered to be selected (see isPackageTypeSelected).
+// are considered to be selected (see IsPackageTypeSelected).
 var SelectedPackageTypes []PackageType
 
 // SelectedDockerVariants is the list of docker variants. If empty, all docker variants
-// are considered to be selected (see isDockerVariantSelected).
+// are considered to be selected (see IsDockerVariantSelected).
 var SelectedDockerVariants []DockerVariant
 
 func init() {
@@ -249,10 +249,6 @@ func CrossBuildImage(platform string) (string, error) {
 		return "", err
 	}
 
-	if FIPSBuild {
-		tagSuffix += "-fips"
-	}
-
 	return BeatsCrossBuildImage + ":" + goVersion + "-" + tagSuffix, nil
 }
 
@@ -344,7 +340,6 @@ func (b GolangCrossBuilder) Build() error {
 		"--env", fmt.Sprintf("SNAPSHOT=%v", Snapshot),
 		"--env", fmt.Sprintf("DEV=%v", DevBuild),
 		"--env", fmt.Sprintf("EXTERNAL=%v", ExternalBuild),
-		"--env", fmt.Sprintf("FIPS=%v", FIPSBuild),
 		"-v", repoInfo.RootDir+":"+mountPoint,
 		"-w", workDir,
 		image,

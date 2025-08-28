@@ -2,6 +2,14 @@
 
 set -e
 
+# we need to stop the agent to have all components stopped as well
+if systemctl --quiet is-active elastic-agent; then
+  echo "elastic-agent is running, stopping it"
+  systemctl --quiet stop elastic-agent
+else
+  echo "elastic-agent is not running"
+fi
+
 commit_hash="{{ commit_short }}"
 version_dir="{{agent_package_version}}{{snapshot_suffix}}"
 symlink="/usr/share/elastic-agent/bin/elastic-agent"
