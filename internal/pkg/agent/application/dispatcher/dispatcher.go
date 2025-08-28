@@ -246,13 +246,13 @@ func (ad *ActionDispatcher) queueScheduledActions(input []fleetapi.Action, upgra
 // cancel actions are dispatched separately as they may remove items from the queue. If cancel actions remove upgrade actions
 // from the queue, upgradeDetailsNeedUpdate will be set to true.
 func (ad *ActionDispatcher) dispatchCancelActions(ctx context.Context, actions []fleetapi.Action, upgradeDetailsNeedUpdate *bool, acker acker.Acker) []fleetapi.Action {
-	queuedUpgradeActions := maps.Collect(func(yield func(K string, V fleetapi.Action) bool) {
+	queuedUpgradeActions := maps.Collect(func(yield func(K string, V struct{}) bool) {
 		for _, action := range ad.queue.Actions() {
 			if _, ok := action.(*fleetapi.ActionUpgrade); !ok {
 				continue
 			}
 
-			if !yield(action.ID(), action) {
+			if !yield(action.ID(), struct{}{}) {
 				return
 			}
 		}
