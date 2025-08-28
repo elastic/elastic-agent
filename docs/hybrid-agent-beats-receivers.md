@@ -133,7 +133,7 @@ service:
 ## OTel Mode
 
 The elastic agent can also be executed in "Otel mode" by executing the `elastic-agent otel` command. This immediately invokes
-the entrypoint of the EDOT OpenTelemetry collector bypassing all other Elatic Agent functionality. In this mode Fleet management is
+the entrypoint of the EDOT OpenTelemetry collector bypassing all other Elastic Agent functionality. In this mode Fleet management is
 not available and elastic-agent.yml configurations cannot be executed. Beat receivers are still usable in this mode, but they must be
 configured manually like any other receiver.
 
