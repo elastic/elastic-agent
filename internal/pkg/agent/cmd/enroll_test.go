@@ -70,13 +70,14 @@ func TestComputeFixPermissions(t *testing.T) {
 			expectOwnerFromCmdCalled:  false,
 			expectOwnerFromPathCalled: true,
 		},
-		"should skip fixing permissions when not from installer with root on windows": {
+		"should return owner from path when not from install and has root on windows": {
 			fromInstall:               false,
 			hasRoot:                   true,
 			goos:                      "windows",
-			wantOwner:                 nil,
+			ownerFromPathOwner:        owner,
+			wantOwner:                 &owner,
 			expectOwnerFromCmdCalled:  false,
-			expectOwnerFromPathCalled: false,
+			expectOwnerFromPathCalled: true,
 		},
 		"should skip fixing permissions when not from installer without root": {
 			fromInstall:               false,
