@@ -65,6 +65,8 @@ receivers:
           scrape_interval: 5s
           static_configs:
             - targets: ['0.0.0.0:8888']
+  docker_stats:
+
 
 connectors:
   spanmetrics:
