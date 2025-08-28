@@ -62,6 +62,12 @@ type serviceRuntime struct {
 	executeServiceCommandImpl executeServiceCommandFunc
 
 	isLocal bool // true if rpc is domain socket, or named pipe
+
+	// The most recent mode received on actionCh. The mode will be either
+	// actionStart (indicating the process should be running, and should be
+	// created if it is not), or actionStop or actionTeardown (indicating that
+	// it should terminate).
+	actionState actionModeSigned
 }
 
 // newServiceRuntime creates a new command runtime for the provided component.
@@ -212,6 +218,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 			return ctx.Err()
 		case as := <-s.actionCh:
 			s.log.Debugf("got action %v for %s service", as.actionMode, s.name())
+			s.actionState = as
 			switch as.actionMode {
 			case actionStart:
 				// Initial state on start
@@ -300,8 +307,19 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 				s.processCheckin(checkin, comm, &lastCheckin)
 			}
 		case <-checkinTimer.C:
-			s.checkStatus(s.checkinPeriod(), &lastCheckin, &missedCheckins)
-			checkinTimer.Reset(s.checkinPeriod())
+			if s.actionState.actionMode == actionStart {
+				if !s.isRunning() {
+					// not running, but should be running
+					if err := s.start(ctx); err != nil {
+						s.forceCompState(client.UnitStateFailed, fmt.Sprintf("service %s failed to start: %v", s.name(), err))
+						continue
+					}
+				} else {
+					// running and should be running
+					s.checkStatus(s.checkinPeriod(), &lastCheckin, &missedCheckins)
+					checkinTimer.Reset(s.checkinPeriod())
+				}
+			}
 		case <-teardownCheckinTimer.C:
 			s.log.Debugf("got tearing down timeout for %s service", s.name())
 			// Teardown timed out
