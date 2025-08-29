@@ -8,10 +8,10 @@
 # - security: impacts on the security of a product or a user’s deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
-kind: feature
+kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
-summary: Retry service start command upon failure, up to 10 times with 30s delay.
+summary: Retry service start command upon failure with 30-second delay.
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
