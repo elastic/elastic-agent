@@ -20,8 +20,7 @@ func readinessHandler(coord CoordinatorState) func(http.ResponseWriter, *http.Re
 
 		if coord != nil {
 			// to be ready the coordinator must be active
-			isUp := coord.IsActive(time.Second * 10)
-			if !isUp {
+			if !coord.IsActive(time.Second * 10) {
 				w.WriteHeader(http.StatusServiceUnavailable)
 				return nil
 			}
