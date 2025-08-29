@@ -342,6 +342,7 @@ func FetchBeatsBinary(ctx context.Context, artifactName string, artifact string,
 func FetchProjectBinary(ctx context.Context, project string, artifactName string, artifact string, version string, timeoutFactor int, xpack bool, downloadPath string, downloadSHAFile bool) (string, error) {
 	useCISnapshots := GithubCommitSha1 != ""
 
+	fmt.Print("XXX Fetch Binary for Snapshots\n")
 	return FetchProjectBinaryForSnapshots(ctx, useCISnapshots, project, artifactName, artifact, version, timeoutFactor, xpack, downloadPath, downloadSHAFile)
 }
 
@@ -354,7 +355,10 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 		return "", fmt.Errorf("⚠️ Beats local path usage is deprecated and not used to fetch the binaries. Please use the packaging job to generate the artifacts to be consumed by these tests")
 	}
 
+	fmt.Printf("XXX in FetchProjectBinaryForSnapshots project [%s] artifactName [%s]\n", project, artifactName)
+
 	handleDownload := func(URL string) (string, error) {
+		fmt.Print("XXX in handleDownload func\n")
 		name := artifactName
 		downloadRequest := downloadRequest{
 			DownloadPath: downloadPath,
@@ -377,6 +381,7 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 			return val, nil
 		}
 
+		fmt.Printf("XXX downloadFile: %s\n", downloadRequest)
 		err := downloadFile(&downloadRequest)
 		if err != nil {
 			return downloadRequest.UnsanitizedFilePath, err
@@ -406,7 +411,9 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 	var downloadURL, downloadShaURL string
 	var err error
 
+	fmt.Print("XXX Outside of useCISnapshots\n")
 	if useCISnapshots {
+		fmt.Print("XXX Inside of useCISnapshots\n")
 		span, _ := apm.StartSpanOptions(ctx, "Fetching Beats binary", "beats.gcp.fetch-binary", apm.SpanOptions{
 			Parent: apm.SpanFromContext(ctx).TraceContext(),
 		})
@@ -432,10 +439,12 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 			NewBeatsLegacyURLResolver(artifact, artifactName, variant),
 		}
 
+		fmt.Printf("XXX calling getObjectURLFromResolvers for %s\n", artifact)
 		downloadURL, err = getObjectURLFromResolvers(resolvers, maxTimeout)
 		if err != nil {
 			return "", err
 		}
+		fmt.Print("XXX downloadUrl: ", downloadURL)
 		downloadLocation, err := handleDownload(downloadURL)
 
 		// check if sha file should be downloaded, else return
@@ -479,11 +488,12 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 			NewArtifactSnapshotURLResolver(artifactName, artifact, project, version),
 		}
 	}
+	fmt.Printf("XXX pre getDownloadURLFromResolvers for artifact: %s\n", artifact)
 	downloadURL, downloadShaURL, err = getDownloadURLFromResolvers(downloadURLResolvers)
 	if err != nil {
 		return "", err
 	}
-	fmt.Printf("Downloading from %s\n", downloadURL)
+	fmt.Printf("XXX Downloading from %s\n", downloadURL)
 	downloadLocation, err := handleDownload(downloadURL)
 	if err != nil {
 		return "", err
@@ -520,8 +530,10 @@ func getDownloadURLFromResolvers(resolvers []DownloadURLResolver) (string, strin
 
 		attr := slog.String("kind", resolver.Kind())
 
+		fmt.Printf("XXX Trying resolver: %s\n", attr)
 		logger.Info("Trying resolver.", attr)
 		url, shaURL, err := resolver.Resolve()
+		fmt.Printf("XXX getDownloadURLFromResolvers: attr [%s] url [%s] err [%s]\n", attr, url, err)
 		if err != nil {
 			if i < len(resolvers)-1 {
 				logger.Warn("Object not found.", attr)
@@ -542,8 +554,10 @@ func getDownloadURLFromResolvers(resolvers []DownloadURLResolver) (string, strin
 // Google Cloud Storage bucket used by the CI to push snapshots
 func getObjectURLFromResolvers(resolvers []BucketURLResolver, maxtimeout time.Duration) (string, error) {
 	for i, resolver := range resolvers {
+		fmt.Print("XXX in getObjectURLFromResolvers\n")
 		bucket, prefix, object := resolver.Resolve()
 
+		fmt.Printf("XXX getObjectURLFromResolvers: bucket [%s] prefix [%s] object [%s]\n", bucket, prefix, object)
 		downloadURL, err := getObjectURLFromBucket(bucket, prefix, object, maxtimeout)
 		if err != nil {
 			if i < len(resolvers)-1 {

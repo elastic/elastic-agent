@@ -65,6 +65,8 @@ func (r *ArtifactURLResolver) Resolve() (string, string, error) {
 
 	body := []byte{}
 
+	fmt.Printf("XXX Resolve artifactName [%s] artifact [%s] version [%s]\n", artifactName, artifact, version)
+
 	tmpVersion := version
 	hasCommit := SnapshotHasCommit(version)
 	if hasCommit {
@@ -79,6 +81,7 @@ func (r *ArtifactURLResolver) Resolve() (string, string, error) {
 
 	apiStatus := func() error {
 		url := fmt.Sprintf("https://artifacts-api.elastic.co/v1/search/%s/%s?x-elastic-no-kpi=true", tmpVersion, artifact)
+		fmt.Printf("XXX apiStatus url: %s\n", url)
 		req := httpRequest{
 			URL: url,
 		}
@@ -119,6 +122,8 @@ func (r *ArtifactURLResolver) Resolve() (string, string, error) {
 		return "", "", err
 	}
 
+	fmt.Printf("XXX passed the backoff.Retry for %s\n", artifact)
+
 	jsonParsed, err := gabs.ParseJSON(body)
 	if err != nil {
 		logger.Error("Could not parse the response body for the artifact",
@@ -145,6 +150,7 @@ func (r *ArtifactURLResolver) Resolve() (string, string, error) {
 	}
 
 	packagesObject := jsonParsed.Path("packages")
+	//fmt.Printf("XXX packagesObject for %s: [%s]\n", packagesObject, artifact)
 	// we need to get keys with dots using Search instead of Path
 	downloadObject := packagesObject.Search(artifactName)
 	if downloadObject == nil {
@@ -185,6 +191,8 @@ func newArtifactsSnapshotCustom(host string) *ArtifactsSnapshotVersion {
 // i.e. GetSnapshotArtifactVersion("$VERSION-abcdef-SNAPSHOT")
 func (as *ArtifactsSnapshotVersion) GetSnapshotArtifactVersion(project string, version string) (string, error) {
 	cacheKey := fmt.Sprintf("%s/%s/latest/%s.json", as.Host, project, version)
+
+	fmt.Printf("XXX GetSnapshotArtifactVersion using cacheKey: %s\n", cacheKey)
 
 	elasticVersionsMutex.RLock()
 	val, ok := elasticVersionsCache[cacheKey]
@@ -279,6 +287,7 @@ func (as *ArtifactsSnapshotVersion) GetSnapshotArtifactVersion(project string, v
 	elasticVersionsCache[cacheKey] = latestVersion
 	elasticVersionsMutex.Unlock()
 
+	fmt.Printf("XXX GetSnapshotArtifactVersion returning project [%s] latestVersion: %s\n", project, latestVersion)
 	return latestVersion, nil
 }
 

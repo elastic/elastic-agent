@@ -1203,8 +1203,8 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	archivePath, dropPath, dependencies := collectPackageDependencies(platforms, dependenciesVersion, packageTypes, dependencies)
 
 	// cleanup after build
-	defer os.RemoveAll(archivePath)
-	defer os.RemoveAll(dropPath)
+	//	defer os.RemoveAll(archivePath)
+	//	defer os.RemoveAll(dropPath)
 	defer os.Unsetenv(agentDropPath)
 
 	// create flat dir
@@ -1302,6 +1302,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 						if mg.Verbose() {
 							log.Printf(">>> Downloading package %s component %s/%s", packageName, spec.BinaryName, platform)
 						}
+						fmt.Printf("XXX collectPackageDependencies: Downloading package %s component %s/%s", packageName, spec.BinaryName, platform)
 						errGroup.Go(downloadBinary(ctx, spec.ProjectName, packageName, spec.BinaryName, platform, packageVersion, targetPath, completedDownloads))
 					}
 				}
