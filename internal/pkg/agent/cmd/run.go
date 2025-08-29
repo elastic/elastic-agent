@@ -25,7 +25,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/elastic/elastic-agent-libs/api"
 	"github.com/elastic/elastic-agent-libs/logp"
 	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent-libs/service"
@@ -658,13 +657,7 @@ func setupMetrics(
 		return nil, err
 	}
 
-	// start server for stats
-	endpointConfig := api.Config{
-		Enabled: true,
-		Host:    monitoring.AgentMonitoringEndpoint(operatingSystem, cfg),
-	}
-
-	s, err := monitoring.NewServer(logger, endpointConfig, monitoringLib.GetNamespace, tracer, coord, operatingSystem, cfg)
+	s, err := monitoring.NewServer(logger, monitoringLib.GetNamespace, tracer, coord, cfg)
 	if err != nil {
 		return nil, errors.New(err, "could not start the HTTP server for the API")
 	}
