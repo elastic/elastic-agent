@@ -1075,6 +1075,634 @@ func (b *BeatsMonitor) injectMetricsInput(
 	return nil
 }
 
+<<<<<<< HEAD
+=======
+// getAgentFilestreamStream returns the filestream stream definition for collecting agent logs.
+func (b *BeatsMonitor) getAgentFilestreamStream(logsDrop string) any {
+	monitoringNamespace := b.monitoringNamespace()
+	return map[string]any{
+		idKey:  fmt.Sprintf("%s-agent", monitoringFilesUnitsID),
+		"type": "filestream",
+		"paths": []interface{}{
+			filepath.Join(logsDrop, agentName+"-*.ndjson"),
+			filepath.Join(logsDrop, agentName+"-watcher-*.ndjson"),
+		},
+		"data_stream": map[string]interface{}{
+			"type":      "logs",
+			"dataset":   "elastic_agent",
+			"namespace": monitoringNamespace,
+		},
+		"close": map[string]interface{}{
+			"on_state_change": map[string]interface{}{
+				"inactive": "5m",
+			},
+		},
+		"parsers": []interface{}{
+			map[string]interface{}{
+				"ndjson": map[string]interface{}{
+					"message_key":    "message",
+					"overwrite_keys": true,
+					"add_error_key":  true,
+					"target":         "",
+				},
+			},
+		},
+		"processors": processorsForAgentFilestream(),
+	}
+}
+
+// getServiceComponentFilestreamStreams returns filestream stream definitions for collecting logs of components running as
+// services.
+func (b *BeatsMonitor) getServiceComponentFilestreamStreams(componentInfos []componentInfo) []any {
+	streams := []any{}
+	monitoringNamespace := b.monitoringNamespace()
+	// service components that define a log path are monitored using its own stream in the monitor
+	for _, compInfo := range componentInfos {
+		if compInfo.InputSpec == nil || compInfo.InputSpec.Spec.Service == nil || compInfo.InputSpec.Spec.Service.Log == nil || compInfo.InputSpec.Spec.Service.Log.Path == "" {
+			// only monitor service inputs that define a log path
+			continue
+		}
+		sanitizedBinaryName := sanitizeName(compInfo.BinaryName) // conform with index naming policy
+		dataset := fmt.Sprintf("elastic_agent.%s", sanitizedBinaryName)
+		streams = append(streams, map[string]interface{}{
+			idKey:  fmt.Sprintf("%s-%s", monitoringFilesUnitsID, compInfo.ID),
+			"type": "filestream",
+			"paths": []interface{}{
+				compInfo.InputSpec.Spec.Service.Log.Path,
+			},
+			"data_stream": map[string]interface{}{
+				"type":      "logs",
+				"dataset":   dataset,
+				"namespace": monitoringNamespace,
+			},
+			"close": map[string]interface{}{
+				"on_state_change": map[string]interface{}{
+					"inactive": "5m",
+				},
+			},
+			"parsers": []interface{}{
+				map[string]interface{}{
+					"ndjson": map[string]interface{}{
+						"message_key":    "message",
+						"overwrite_keys": true,
+						"add_error_key":  true,
+						"target":         "",
+					},
+				},
+			},
+			"processors": processorsForServiceComponentFilestream(compInfo, dataset),
+		})
+	}
+	return streams
+}
+
+// getHttpStreams returns stream definitions for http/metrics inputs.
+// Note: The return type must be []any due to protobuf serialization quirks.
+func (b *BeatsMonitor) getHttpStreams(
+	componentInfos []componentInfo,
+	failureThreshold *uint,
+	metricsCollectionIntervalString string,
+) []any {
+	monitoringNamespace := b.monitoringNamespace()
+	sanitizedAgentName := sanitizeName(agentName)
+	indexName := fmt.Sprintf("metrics-elastic_agent.%s-%s", sanitizedAgentName, monitoringNamespace)
+	dataset := fmt.Sprintf("elastic_agent.%s", sanitizedAgentName)
+	httpStreams := make([]any, 0, len(componentInfos))
+
+	agentStream := map[string]any{
+		idKey: fmt.Sprintf("%s-agent", monitoringMetricsUnitID),
+		"data_stream": map[string]interface{}{
+			"type":      "metrics",
+			"dataset":   dataset,
+			"namespace": monitoringNamespace,
+		},
+		"metricsets": []interface{}{"json"},
+		"path":       "/stats",
+		"hosts":      []interface{}{HttpPlusAgentMonitoringEndpoint(b.config.C)},
+		"namespace":  "agent",
+		"period":     metricsCollectionIntervalString,
+		"index":      indexName,
+		"processors": processorsForAgentHttpStream(monitoringNamespace, dataset, b.agentInfo),
+	}
+	if failureThreshold != nil {
+		agentStream[failureThresholdKey] = *failureThreshold
+	}
+	httpStreams = append(httpStreams, agentStream)
+
+	for _, compInfo := range componentInfos {
+		binaryName := compInfo.BinaryName
+		if !isSupportedMetricsBinary(binaryName) {
+			continue
+		}
+
+		endpoints := []interface{}{PrefixedEndpoint(BeatsMonitoringEndpoint(compInfo.ID))}
+		name := sanitizeName(binaryName)
+
+		// Do not create http streams if runtime-manager is otel and binary is of beat type
+		if compInfo.RuntimeManager != component.OtelRuntimeManager || !strings.HasSuffix(binaryName, "beat") {
+			httpStream := map[string]interface{}{
+				idKey: fmt.Sprintf("%s-%s-1", monitoringMetricsUnitID, name),
+				"data_stream": map[string]interface{}{
+					"type":      "metrics",
+					"dataset":   dataset,
+					"namespace": monitoringNamespace,
+				},
+				"metricsets": []interface{}{"json"},
+				"hosts":      endpoints,
+				"path":       "/stats",
+				"namespace":  "agent",
+				"period":     metricsCollectionIntervalString,
+				"index":      indexName,
+				"processors": processorsForHttpStream(binaryName, compInfo.ID, dataset, b.agentInfo, compInfo.RuntimeManager),
+			}
+			if failureThreshold != nil {
+				httpStream[failureThresholdKey] = *failureThreshold
+			}
+			httpStreams = append(httpStreams, httpStream)
+		}
+		// specifically for filebeat, we include input metrics
+		if strings.EqualFold(name, "filebeat") {
+			fbDataStreamName := "filebeat_input"
+			fbDataset := fmt.Sprintf("elastic_agent.%s", fbDataStreamName)
+			fbIndexName := fmt.Sprintf("metrics-elastic_agent.%s-%s", fbDataStreamName, monitoringNamespace)
+			fbStream := map[string]any{
+				idKey: fmt.Sprintf("%s-%s-1", monitoringMetricsUnitID, name),
+				"data_stream": map[string]interface{}{
+					"type":      "metrics",
+					"dataset":   fbDataset,
+					"namespace": monitoringNamespace,
+				},
+				"metricsets":    []interface{}{"json"},
+				"hosts":         endpoints,
+				"path":          "/inputs/",
+				"namespace":     fbDataStreamName,
+				"json.is_array": true,
+				"period":        metricsCollectionIntervalString,
+				"index":         fbIndexName,
+				"processors":    processorsForHttpStream(binaryName, compInfo.ID, fbDataset, b.agentInfo, compInfo.RuntimeManager),
+			}
+			if failureThreshold != nil {
+				fbStream[failureThresholdKey] = *failureThreshold
+			}
+			httpStreams = append(httpStreams, fbStream)
+		}
+	}
+
+	return httpStreams
+}
+
+// getBeatsStreams returns stream definitions for beats inputs.
+// Note: The return type must be []any due to protobuf serialization quirks.
+func (b *BeatsMonitor) getBeatsStreams(
+	componentInfos []componentInfo,
+	failureThreshold *uint,
+	metricsCollectionIntervalString string,
+) []any {
+	monitoringNamespace := b.monitoringNamespace()
+	beatsStreams := make([]any, 0, len(componentInfos))
+
+	for _, compInfo := range componentInfos {
+		binaryName := compInfo.BinaryName
+		if !isSupportedBeatsBinary(binaryName) {
+			continue
+		}
+
+		endpoints := []interface{}{PrefixedEndpoint(utils.SocketURLWithFallback(compInfo.ID, paths.TempDir()))}
+		name := sanitizeName(binaryName)
+		dataset := fmt.Sprintf("elastic_agent.%s", name)
+		indexName := fmt.Sprintf("metrics-elastic_agent.%s-%s", name, monitoringNamespace)
+
+		beatsStream := map[string]interface{}{
+			idKey: fmt.Sprintf("%s-", monitoringMetricsUnitID) + name,
+			"data_stream": map[string]interface{}{
+				"type":      "metrics",
+				"dataset":   dataset,
+				"namespace": monitoringNamespace,
+			},
+			"metricsets": []interface{}{"stats"},
+			"hosts":      endpoints,
+			"period":     metricsCollectionIntervalString,
+			"index":      indexName,
+			"processors": processorsForBeatsStream(binaryName, compInfo.ID, monitoringNamespace, dataset, b.agentInfo, compInfo.RuntimeManager),
+		}
+
+		if failureThreshold != nil {
+			beatsStream[failureThresholdKey] = *failureThreshold
+		}
+
+		beatsStreams = append(beatsStreams, beatsStream)
+	}
+
+	return beatsStreams
+}
+
+// getServiceComponentProcessMetricInputs returns input definitions for collecting process metrics of components
+// running as services.
+// Note: The return type must be []any due to protobuf serialization quirks.
+func (b *BeatsMonitor) getServiceComponentProcessMetricInputs(
+	componentInfos []componentInfo,
+	metricsCollectionIntervalString string,
+) []any {
+	monitoringNamespace := b.monitoringNamespace()
+	inputs := []any{}
+	for _, compInfo := range componentInfos {
+		if compInfo.InputSpec == nil || compInfo.InputSpec.Spec.Service == nil || compInfo.Pid == 0 {
+			continue
+		}
+		// If there's a checkin PID and the corresponding component has a service spec section, add a system/process config
+		name := sanitizeName(compInfo.BinaryName)
+		dataset := fmt.Sprintf("elastic_agent.%s", name)
+		input := map[string]interface{}{
+			idKey:        fmt.Sprintf("%s-%s", monitoringMetricsUnitID, name),
+			"name":       fmt.Sprintf("%s-%s", monitoringMetricsUnitID, name),
+			"type":       "system/metrics",
+			useOutputKey: monitoringOutput,
+			"data_stream": map[string]interface{}{
+				"namespace": monitoringNamespace,
+			},
+			"streams": []interface{}{
+				map[string]interface{}{
+					idKey: fmt.Sprintf("%s-%s", monitoringMetricsUnitID, name),
+					"data_stream": map[string]interface{}{
+						"type":      "metrics",
+						"dataset":   dataset,
+						"namespace": monitoringNamespace,
+					},
+					"metricsets":              []interface{}{"process"},
+					"period":                  metricsCollectionIntervalString,
+					"index":                   fmt.Sprintf("metrics-elastic_agent.%s-%s", name, monitoringNamespace),
+					"process.pid":             compInfo.Pid,
+					"process.cgroups.enabled": false,
+					"processors":              processorsForProcessMetrics(name, compInfo.ID, monitoringNamespace, dataset, b.agentInfo),
+				},
+			},
+		}
+		inputs = append(inputs, input)
+	}
+	return inputs
+}
+
+// processorsForAgentFilestream returns processors used for agent logs in a filestream input.
+func processorsForAgentFilestream() []any {
+	processors := []any{
+		// drop all events from monitoring components (do it early)
+		// without dropping these events the filestream gets stuck in an infinite loop
+		// if filestream hits an issue publishing the events it logs an error which then filestream monitor
+		// will read from the logs and try to also publish that new log message (thus the infinite loop).
+		dropEventsFromMonitoringComponentsProcessor(),
+		// drop periodic metrics logs (those are useful mostly in diagnostic dumps where we collect log files)
+		dropPeriodicMetricsLogsProcessor(),
+		// drop event logs
+		dropEventLogs(),
+	}
+	// if the event is from a component, use the component's dataset
+	processors = append(processors, useComponentDatasetProcessors()...)
+	processors = append(processors,
+		// coming from logger, added by agent (drop)
+		dropEcsVersionFieldProcessor(),
+		// adjust destination data_stream based on the data_stream fields
+		addFormattedIndexProcessor(),
+	)
+	return processors
+}
+
+// processorsForServiceComponentFilestream returns processors used for filestream streams for components running as
+// Services.
+func processorsForServiceComponentFilestream(compInfo componentInfo, dataset string) []any {
+	return []interface{}{
+		map[string]interface{}{
+			// component information must be injected because it's not a subprocess
+			"add_fields": map[string]interface{}{
+				"target": "component",
+				"fields": map[string]interface{}{
+					"id":      compInfo.ID,
+					"type":    compInfo.InputSpec.InputType,
+					"binary":  compInfo.BinaryName,
+					"dataset": dataset,
+				},
+			},
+		},
+		map[string]interface{}{
+			// injecting component log source to stay aligned with command runtime logs
+			"add_fields": map[string]interface{}{
+				"target": "log",
+				"fields": map[string]interface{}{
+					"source": compInfo.ID,
+				},
+			},
+		},
+	}
+}
+
+// processorsForProcessMetrics returns processors used for process metrics.
+func processorsForProcessMetrics(binaryName, unitID, namespace, dataset string, agentInfo info.Agent) []any {
+	return []any{
+		addDataStreamFieldsProcessor(dataset, namespace),
+		addEventFieldsProcessor(dataset),
+		addElasticAgentFieldsProcessor(binaryName, agentInfo),
+		addAgentFieldsProcessor(agentInfo.AgentID()),
+		addComponentFieldsProcessor(binaryName, unitID),
+	}
+}
+
+// processorsForBeatsStream returns the processors used for metric streams in the beats input.
+func processorsForBeatsStream(
+	binaryName, unitID, namespace, dataset string,
+	agentInfo info.Agent,
+	runtimeManager component.RuntimeManager,
+) []any {
+	processors := []any{
+		addDataStreamFieldsProcessor(dataset, namespace),
+		addEventFieldsProcessor(dataset),
+		addElasticAgentFieldsProcessor(binaryName, agentInfo),
+		addAgentFieldsProcessor(agentInfo.AgentID()),
+		addComponentFieldsProcessor(binaryName, unitID),
+	}
+	if runtimeManager == component.OtelRuntimeManager { // we don't want process metrics for beats receivers
+		fieldsToDrop := []any{
+			"beat.stats.cgroup",
+			"beat.stats.cpu",
+			"beat.stats.handles",
+			"beat.stats.memstats",
+			"beat.stats.runtime",
+		}
+		processors = append(processors, map[string]interface{}{
+			"drop_fields": map[string]interface{}{
+				"fields":         fieldsToDrop,
+				"ignore_missing": true,
+			},
+		})
+	}
+	return processors
+}
+
+// processorsForBeatsStream returns the processors used for metric streams in the beats input.
+func processorsForHttpStream(binaryName, unitID, dataset string, agentInfo info.Agent, runtimeManager component.RuntimeManager) []any {
+	sanitizedName := sanitizeName(binaryName)
+	fieldsToDrop := []any{"http"}
+	if runtimeManager == component.OtelRuntimeManager { // we don't want process metrics for beats receivers
+		fieldsToDrop = append(fieldsToDrop, "system")
+	}
+	return []interface{}{
+		addEventFieldsProcessor(dataset),
+		addElasticAgentFieldsProcessor(sanitizedName, agentInfo),
+		addAgentFieldsProcessor(agentInfo.AgentID()),
+		addCopyFieldsProcessor(httpCopyRules(), true, false),
+		dropFieldsProcessor(fieldsToDrop, true),
+		addComponentFieldsProcessor(binaryName, unitID),
+	}
+}
+
+// processorsForAgentHttpStream returns the processors used for the agent metric stream in the beats input.
+func processorsForAgentHttpStream(namespace, dataset string, agentInfo info.Agent) []any {
+	return []interface{}{
+		addDataStreamFieldsProcessor(dataset, namespace),
+		addEventFieldsProcessor(dataset),
+		addElasticAgentFieldsProcessor(agentName, agentInfo),
+		addAgentFieldsProcessor(agentInfo.AgentID()),
+		addCopyFieldsProcessor(httpCopyRules(), true, false),
+		dropFieldsProcessor([]any{"http"}, true),
+		addComponentFieldsProcessor(agentName, agentName),
+	}
+}
+
+// addElasticAgentFieldsProcessor returns a processor definition that adds agent information in an `elastic_agent` field.
+func addElasticAgentFieldsProcessor(binaryName string, agentInfo info.Agent) map[string]any {
+	return map[string]any{
+		"add_fields": map[string]any{
+			"target": "elastic_agent",
+			"fields": map[string]any{
+				"id":       agentInfo.AgentID(),
+				"version":  agentInfo.Version(),
+				"snapshot": agentInfo.Snapshot(),
+				"process":  binaryName,
+			},
+		},
+	}
+}
+
+// addAgentFieldsProcessor returns a processor definition that adds the agent ID under an `agent.id` field.
+func addAgentFieldsProcessor(agentID string) map[string]any {
+	return map[string]interface{}{
+		"add_fields": map[string]interface{}{
+			"target": "agent",
+			"fields": map[string]interface{}{
+				"id": agentID,
+			},
+		},
+	}
+}
+
+// addComponentFieldsProcessor returns a processor definition that adds component information.
+func addComponentFieldsProcessor(binaryName, unitID string) map[string]any {
+	return map[string]interface{}{
+		"add_fields": map[string]interface{}{
+			"target": "component",
+			"fields": map[string]interface{}{
+				"id":     unitID,
+				"binary": binaryName,
+			},
+		},
+	}
+}
+
+// addDataStreamFieldsProcessor returns a processor definition that adds datastream information.
+func addDataStreamFieldsProcessor(dataset, namespace string) map[string]any {
+	return map[string]interface{}{
+		"add_fields": map[string]interface{}{
+			"target": "data_stream",
+			"fields": map[string]interface{}{
+				"type":      "metrics",
+				"dataset":   dataset,
+				"namespace": namespace,
+			},
+		},
+	}
+}
+
+// addEventFieldsProcessor returns a processor definition that adds an `event.dataset` field.
+func addEventFieldsProcessor(dataset string) map[string]any {
+	return map[string]interface{}{
+		"add_fields": map[string]interface{}{
+			"target": "event",
+			"fields": map[string]interface{}{
+				"dataset": dataset,
+			},
+		},
+	}
+}
+
+// addCopyRulesProcessor returns a processor that copies fields according to the provided rules.
+func addCopyFieldsProcessor(copyRules []any, ignoreMissing bool, failOnError bool) map[string]any {
+	return map[string]interface{}{
+		"copy_fields": map[string]interface{}{
+			"fields":         copyRules,
+			"ignore_missing": ignoreMissing,
+			"fail_on_error":  failOnError,
+		},
+	}
+}
+
+// dropFieldsProcessor returns a processor which drops the provided fields.
+func dropFieldsProcessor(fields []any, ignoreMissing bool) map[string]any {
+	return map[string]interface{}{
+		"drop_fields": map[string]interface{}{
+			"fields":         fields,
+			"ignore_missing": ignoreMissing,
+		},
+	}
+}
+
+// dropEventLogs returns a processor which drops all event that contains log.type:event field
+func dropEventLogs() map[string]any {
+	return map[string]interface{}{
+		"drop_event": map[string]interface{}{
+			"when": map[string]interface{}{
+				"equals": map[string]interface{}{
+					"log.type": "event",
+				},
+			},
+		},
+	}
+}
+
+// dropEventsFromMonitoringComponentsProcessor returns a processor which drops all events from monitoring components.
+// We identify a monitoring component by looking at their ID. They all end in `-monitoring`, e.g:
+// - "beat/metrics-monitoring"
+// - "filestream-monitoring"
+// - "http/metrics-monitoring"
+func dropEventsFromMonitoringComponentsProcessor() map[string]any {
+	return map[string]interface{}{
+		"drop_event": map[string]interface{}{
+			"when": map[string]interface{}{
+				"regexp": map[string]interface{}{
+					"component.id": ".*-monitoring$",
+				},
+			},
+		},
+	}
+}
+
+// dropPeriodicMetricsLogsProcessor returns a processor which drops logs about periodic metrics. This is done by
+// matching on the start of the log message.
+func dropPeriodicMetricsLogsProcessor() map[string]any {
+	return map[string]interface{}{
+		"drop_event": map[string]interface{}{
+			"when": map[string]interface{}{
+				"regexp": map[string]interface{}{
+					"message": "^Non-zero metrics in the last",
+				},
+			},
+		},
+	}
+}
+
+// useComponentDatasetProcessors returns a list of processors which replace data_stream.dataset with component.dataset
+// if the latter is set. It also sets event.dataset to the same value. This is used to ensure logs from components
+// routed to the elastic-agent logger get sent to the component-specific dataset.
+func useComponentDatasetProcessors() []any {
+	return []any{
+		// copy original dataset so we can drop the dataset field
+		map[string]any{
+			"copy_fields": map[string]any{
+				"fields": []any{
+					map[string]any{
+						"from": "data_stream.dataset",
+						"to":   "data_stream.dataset_original",
+					},
+				},
+			},
+		},
+		// drop the dataset field so following copy_field can copy to it
+		map[string]any{
+			"drop_fields": map[string]any{
+				"fields": []any{
+					"data_stream.dataset",
+				},
+			},
+		},
+		// copy component.dataset as the real dataset
+		map[string]any{
+			"copy_fields": map[string]any{
+				"fields": []any{
+					map[string]any{
+						"from": "component.dataset",
+						"to":   "data_stream.dataset",
+					},
+				},
+				"fail_on_error":  false,
+				"ignore_missing": true,
+			},
+		},
+		// possible it's a log message from agent itself (doesn't have component.dataset)
+		map[string]any{
+			"copy_fields": map[string]any{
+				"when": map[string]any{
+					"not": map[string]any{
+						"has_fields": []any{
+							"data_stream.dataset",
+						},
+					},
+				},
+				"fields": []any{
+					map[string]any{
+						"from": "data_stream.dataset_original",
+						"to":   "data_stream.dataset",
+					},
+				},
+				"fail_on_error": false,
+			},
+		},
+		// drop the original dataset copied and the event.dataset (as it will be updated)
+		map[string]any{
+			"drop_fields": map[string]any{
+				"fields": []any{
+					"data_stream.dataset_original",
+					"event.dataset",
+				},
+			},
+		},
+		// update event.dataset with the now used data_stream.dataset
+		map[string]any{
+			"copy_fields": map[string]any{
+				"fields": []any{
+					map[string]any{
+						"from": "data_stream.dataset",
+						"to":   "event.dataset",
+					},
+				},
+			},
+		},
+	}
+}
+
+// dropEcsVersionFieldProcessor returns a processor which drops the ecs.version field from the event.
+func dropEcsVersionFieldProcessor() map[string]any {
+	return map[string]any{
+		"drop_fields": map[string]any{
+			"fields": []any{
+				"ecs.version",
+			},
+			"ignore_missing": true,
+		},
+	}
+}
+
+// addFormattedIndexProcessor returns a processor which sets the destination index for an event based on a format string.
+func addFormattedIndexProcessor() map[string]any {
+	return map[string]any{
+		"add_formatted_index": map[string]any{
+			"index": "%{[data_stream.type]}-%{[data_stream.dataset]}-%{[data_stream.namespace]}",
+		},
+	}
+}
+
+// sanitizeName sanitizes the input name to make it a valid part of ES index names.
+func sanitizeName(name string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(name, "-", "_"), "/", "_")
+}
+
+>>>>>>> c028f68fa (Add /readiness and /liveness when enrolling with the container (#9612))
 func loggingPath(id, operatingSystem string) string {
 	id = strings.ReplaceAll(id, string(filepath.Separator), "-")
 	if operatingSystem == windowsOS {
@@ -1141,17 +1769,22 @@ func changeOwner(path string, uid, gid int) error {
 }
 
 // HttpPlusAgentMonitoringEndpoint provides an agent monitoring endpoint path with a `http+` prefix.
+<<<<<<< HEAD
 func HttpPlusAgentMonitoringEndpoint(operatingSystem string, cfg *monitoringCfg.MonitoringConfig) string {
 	return prefixedEndpoint(AgentMonitoringEndpoint(operatingSystem, cfg))
+=======
+func HttpPlusAgentMonitoringEndpoint(cfg *monitoringCfg.MonitoringConfig) string {
+	return PrefixedEndpoint(AgentMonitoringEndpoint(cfg))
+>>>>>>> c028f68fa (Add /readiness and /liveness when enrolling with the container (#9612))
 }
 
 // AgentMonitoringEndpoint provides an agent monitoring endpoint path.
-func AgentMonitoringEndpoint(operatingSystem string, cfg *monitoringCfg.MonitoringConfig) string {
+func AgentMonitoringEndpoint(cfg *monitoringCfg.MonitoringConfig) string {
 	if cfg != nil && cfg.Enabled {
 		return fmt.Sprintf(agentMbEndpointHTTP, cfg.HTTP.Host, cfg.HTTP.Port)
 	}
 
-	if operatingSystem == windowsOS {
+	if runtime.GOOS == windowsOS {
 		return agentMbEndpointFileFormatWin
 	}
 	// unix socket path must be less than 104 characters
