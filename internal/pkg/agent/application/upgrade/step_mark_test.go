@@ -552,17 +552,16 @@ func TestMarkUpgrade(t *testing.T) {
 						TargetVersion: "9.2.0-SNAPSHOT",
 						State:         "UPG_REPLACING",
 						ActionID:      "",
-						Metadata: details.Metadata{
-							RollbacksAvailable: []details.RollbackAvailable{
-								{
-									Version:    "1.2.3-SNAPSHOT",
-									Home:       filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
-									ValidUntil: updatedOnNow.Add(7 * 24 * time.Hour),
-								},
-							},
-						},
+						Metadata:      details.Metadata{},
 					},
 					DesiredOutcome: OUTCOME_UPGRADE,
+					RollbacksAvailable: []RollbackAvailable{
+						{
+							Version:    "1.2.3-SNAPSHOT",
+							Home:       filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
+							ValidUntil: updatedOnNow.Add(7 * 24 * time.Hour),
+						},
+					},
 				}
 				assert.Equal(t, expectedMarker, actualMarker)
 			},

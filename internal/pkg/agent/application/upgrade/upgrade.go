@@ -511,11 +511,11 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 			return ErrNilUpdateMarker
 		}
 
-		if updateMarker.Details == nil || len(updateMarker.Details.Metadata.RollbacksAvailable) == 0 {
+		if len(updateMarker.RollbacksAvailable) == 0 {
 			return ErrNoRollbacksAvailable
 		}
-		var selectedRollback *details.RollbackAvailable
-		for _, rollback := range updateMarker.Details.Metadata.RollbacksAvailable {
+		var selectedRollback *RollbackAvailable
+		for _, rollback := range updateMarker.RollbacksAvailable {
 			if rollback.Version == version && now.Before(rollback.ValidUntil) {
 				selectedRollback = &rollback
 				break

@@ -32,6 +32,13 @@ const (
 	OUTCOME_ROLLBACK
 )
 
+// RollbackAvailable identifies an elastic-agent install available for rollback
+type RollbackAvailable struct {
+	Version    string    `json:"version" yaml:"version"`
+	Home       string    `json:"home" yaml:"home"`
+	ValidUntil time.Time `json:"valid_until" yaml:"valid_until"`
+}
+
 // UpdateMarker is a marker holding necessary information about ongoing upgrade.
 type UpdateMarker struct {
 	// Version represents the version the agent is upgraded to
@@ -58,6 +65,8 @@ type UpdateMarker struct {
 	Details *details.Details `json:"details,omitempty" yaml:"details,omitempty"`
 
 	DesiredOutcome UpgradeOutcome `json:"desired_outcome" yaml:"desired_outcome"`
+
+	RollbacksAvailable []RollbackAvailable `json:"rollbacks_available,omitempty" yaml:"rollbacks_available,omitempty"`
 }
 
 // GetActionID returns the Fleet Action ID associated with the
@@ -104,32 +113,34 @@ func convertToActionUpgrade(a *MarkerActionUpgrade) *fleetapi.ActionUpgrade {
 }
 
 type updateMarkerSerializer struct {
-	Version           string               `yaml:"version"`
-	Hash              string               `yaml:"hash"`
-	VersionedHome     string               `yaml:"versioned_home"`
-	UpdatedOn         time.Time            `yaml:"updated_on"`
-	PrevVersion       string               `yaml:"prev_version"`
-	PrevHash          string               `yaml:"prev_hash"`
-	PrevVersionedHome string               `yaml:"prev_versioned_home"`
-	Acked             bool                 `yaml:"acked"`
-	Action            *MarkerActionUpgrade `yaml:"action"`
-	Details           *details.Details     `yaml:"details"`
-	DesiredOutcome    UpgradeOutcome       `yaml:"desired_outcome"`
+	Version            string               `yaml:"version"`
+	Hash               string               `yaml:"hash"`
+	VersionedHome      string               `yaml:"versioned_home"`
+	UpdatedOn          time.Time            `yaml:"updated_on"`
+	PrevVersion        string               `yaml:"prev_version"`
+	PrevHash           string               `yaml:"prev_hash"`
+	PrevVersionedHome  string               `yaml:"prev_versioned_home"`
+	Acked              bool                 `yaml:"acked"`
+	Action             *MarkerActionUpgrade `yaml:"action"`
+	Details            *details.Details     `yaml:"details"`
+	DesiredOutcome     UpgradeOutcome       `yaml:"desired_outcome"`
+	RollbacksAvailable []RollbackAvailable  `yaml:"rollbacks_available,omitempty"`
 }
 
 func newMarkerSerializer(m *UpdateMarker) *updateMarkerSerializer {
 	return &updateMarkerSerializer{
-		Version:           m.Version,
-		Hash:              m.Hash,
-		VersionedHome:     m.VersionedHome,
-		UpdatedOn:         m.UpdatedOn,
-		PrevVersion:       m.PrevVersion,
-		PrevHash:          m.PrevHash,
-		PrevVersionedHome: m.PrevVersionedHome,
-		Acked:             m.Acked,
-		Action:            convertToMarkerAction(m.Action),
-		Details:           m.Details,
-		DesiredOutcome:    m.DesiredOutcome,
+		Version:            m.Version,
+		Hash:               m.Hash,
+		VersionedHome:      m.VersionedHome,
+		UpdatedOn:          m.UpdatedOn,
+		PrevVersion:        m.PrevVersion,
+		PrevHash:           m.PrevHash,
+		PrevVersionedHome:  m.PrevVersionedHome,
+		Acked:              m.Acked,
+		Action:             convertToMarkerAction(m.Action),
+		Details:            m.Details,
+		DesiredOutcome:     m.DesiredOutcome,
+		RollbacksAvailable: m.RollbacksAvailable,
 	}
 }
 
@@ -224,7 +235,7 @@ func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile wr
 			// if we have a not empty rollback window, write the prev version in the rollbacks_available field
 			// we also need to check the destination version because the manual rollback and delayed cleanup will be
 			// handled by that version of agent, so it needs to be recent enough
-			upgradeDetails.Metadata.RollbacksAvailable = []details.RollbackAvailable{
+			marker.RollbacksAvailable = []RollbackAvailable{
 				{
 					Version:    previousAgent.version,
 					Home:       previousAgent.versionedHome,
@@ -296,17 +307,18 @@ func loadMarker(markerFile string) (*UpdateMarker, error) {
 	}
 
 	return &UpdateMarker{
-		Version:           marker.Version,
-		Hash:              marker.Hash,
-		VersionedHome:     marker.VersionedHome,
-		UpdatedOn:         marker.UpdatedOn,
-		PrevVersion:       marker.PrevVersion,
-		PrevHash:          marker.PrevHash,
-		PrevVersionedHome: marker.PrevVersionedHome,
-		Acked:             marker.Acked,
-		Action:            convertToActionUpgrade(marker.Action),
-		Details:           marker.Details,
-		DesiredOutcome:    marker.DesiredOutcome,
+		Version:            marker.Version,
+		Hash:               marker.Hash,
+		VersionedHome:      marker.VersionedHome,
+		UpdatedOn:          marker.UpdatedOn,
+		PrevVersion:        marker.PrevVersion,
+		PrevHash:           marker.PrevHash,
+		PrevVersionedHome:  marker.PrevVersionedHome,
+		Acked:              marker.Acked,
+		Action:             convertToActionUpgrade(marker.Action),
+		Details:            marker.Details,
+		DesiredOutcome:     marker.DesiredOutcome,
+		RollbacksAvailable: marker.RollbacksAvailable,
 	}, nil
 }
 
@@ -319,17 +331,18 @@ func SaveMarker(dataDirPath string, marker *UpdateMarker, shouldFsync bool) erro
 
 func saveMarkerToPath(marker *UpdateMarker, markerFile string, shouldFsync bool) error {
 	makerSerializer := &updateMarkerSerializer{
-		Version:           marker.Version,
-		Hash:              marker.Hash,
-		VersionedHome:     marker.VersionedHome,
-		UpdatedOn:         marker.UpdatedOn,
-		PrevVersion:       marker.PrevVersion,
-		PrevHash:          marker.PrevHash,
-		PrevVersionedHome: marker.PrevVersionedHome,
-		Acked:             marker.Acked,
-		Action:            convertToMarkerAction(marker.Action),
-		Details:           marker.Details,
-		DesiredOutcome:    marker.DesiredOutcome,
+		Version:            marker.Version,
+		Hash:               marker.Hash,
+		VersionedHome:      marker.VersionedHome,
+		UpdatedOn:          marker.UpdatedOn,
+		PrevVersion:        marker.PrevVersion,
+		PrevHash:           marker.PrevHash,
+		PrevVersionedHome:  marker.PrevVersionedHome,
+		Acked:              marker.Acked,
+		Action:             convertToMarkerAction(marker.Action),
+		Details:            marker.Details,
+		DesiredOutcome:     marker.DesiredOutcome,
+		RollbacksAvailable: marker.RollbacksAvailable,
 	}
 	markerBytes, err := yaml.Marshal(makerSerializer)
 	if err != nil {

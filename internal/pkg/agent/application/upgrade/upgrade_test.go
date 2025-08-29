@@ -1076,11 +1076,11 @@ func TestManualRollback(t *testing.T) {
         state: UPG_WATCHING
         metadata:
             retry_until: null
-            rollbacks_available:
-                - version: 1.2.3
-                  home: data/elastic-agent-1.2.3-oldver
-                  valid_until: 2025-07-18T10:11:12.131415Z
     desired_outcome: UPGRADE
+    rollbacks_available:
+        - version: 1.2.3
+          home: data/elastic-agent-1.2.3-oldver
+          valid_until: 2025-07-18T10:11:12.131415Z
     `
 
 	parsed123Version, err := agtversion.ParseVersion("1.2.3")
@@ -1282,7 +1282,7 @@ func TestManualRollback(t *testing.T) {
 
 				assert.Equal(t, OUTCOME_ROLLBACK, marker.DesiredOutcome)
 				require.NotNil(t, marker.Details)
-				assert.NotEmpty(t, marker.Details.Metadata.RollbacksAvailable)
+				assert.NotEmpty(t, marker.RollbacksAvailable)
 			},
 		},
 	}
