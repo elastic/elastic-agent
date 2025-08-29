@@ -280,7 +280,7 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 	log, logObs := loggertest.New("test")
 	const nonFatalExitCode = 99
 	const cisPort = 9999
-	const cisSocket = ".teaci.sock"
+	const cisSocket = ".steaci.sock"
 
 	// Make an Endpoint component for testing
 	endpoint := makeEndpointComponent(t, map[string]interface{}{})
@@ -376,7 +376,7 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 func TestServiceStartRetry(t *testing.T) {
 	log, logObs := loggertest.New("test")
 	const cisPort = 9999
-	const cisSocket = ".teaci.sock"
+	const cisSocket = ".rteaci.sock"
 
 	// Make an Endpoint component for testing
 	endpoint := makeEndpointComponent(t, map[string]interface{}{})
