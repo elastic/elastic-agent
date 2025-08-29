@@ -1296,6 +1296,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedete
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor v0.130.0/go.mod h1:iRpASfcgyq/kmWWLfecD7pml29Wrz6jCHc8t1n6WcL8=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.130.0 h1:KBazTsji1uatVXMATsvJ0/QoMRsVE5J77pZopEB4PyM=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.130.0/go.mod h1:wU38xs5JMy8FYLVDw5F1/ShVgN0nYauna5Wj0qyL/Vk=
+github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.130.0 h1:PmFFuvYcbQHDzNwkK176SbV3+FcdZUk1N2Aa/tdPs5A=
+github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.130.0/go.mod h1:4EGQ5jHqIkI0EHua348PNU70PTQhT90J9Xh/pERn/y0=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.130.0 h1:/UagoKsz1+NAOkNIaoSiE5nW+7OiT/3tG91WsIDuHeU=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.130.0/go.mod h1:4VAXR5a89aHYFQYvNGkO/5yv1QYfF+sc8+fcMyWdRLE=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver v0.130.0 h1:c4YGI4SI5xZJbW23/SAoclPbpg/0v7qgugOs3rztRfM=
