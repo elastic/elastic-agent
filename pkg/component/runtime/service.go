@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"runtime"
 	"slices"
-	"sync"
 	"time"
 
 	"github.com/kardianos/service"
@@ -39,9 +38,6 @@ var (
 	ErrOperationSpecUndefined = errors.New("operation spec undefined")
 	// ErrInvalidServiceSpec error invalid service specification.
 	ErrInvalidServiceSpec = errors.New("invalid service spec")
-
-	serviceRestartDelay   = 30 * time.Second // variable so it can be shortened in tests
-	serviceRestartDelayMu sync.RWMutex       // needed to avoid data race in tests
 )
 
 type executeServiceCommandFunc func(ctx context.Context, log *logger.Logger, binaryPath string, spec *component.ServiceOperationsCommandSpec) error
@@ -68,6 +64,10 @@ type serviceRuntime struct {
 	// created if it is not), or actionStop or actionTeardown (indicating that
 	// it should terminate).
 	actionState actionModeSigned
+
+	// serviceRestartDelay is the time duration the service runtime will wait before
+	// attempting to restart a service that failed to start.
+	serviceRestartDelay time.Duration
 }
 
 // newServiceRuntime creates a new command runtime for the provided component.
@@ -91,6 +91,7 @@ func newServiceRuntime(comp component.Component, logger *logger.Logger, isLocal 
 		state:                     state,
 		executeServiceCommandImpl: executeServiceCommand,
 		isLocal:                   isLocal,
+		serviceRestartDelay:       30 * time.Second,
 	}
 
 	// Set initial state as STOPPED
@@ -266,7 +267,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 
 					// Error is due to a fatal exit code. Schedule a restart of the service after a delay by resending
 					// the start action on the action channel
-					delay := getServiceRestartDelay()
+					delay := s.serviceRestartDelay
 					s.log.Errorf("failed to start %s service, err: %v, restarting after waiting for %v", s.name(), err, delay)
 					time.AfterFunc(delay, func() {
 						s.actionCh <- as
@@ -751,16 +752,4 @@ func uninstallService(ctx context.Context, log *logger.Logger, comp component.Co
 
 	log.Debugf("uninstall %s service", comp.BinaryName())
 	return executeServiceCommandImpl(ctx, log, comp.InputSpec.BinaryPath, uninstallSpec)
-}
-
-func getServiceRestartDelay() time.Duration {
-	serviceRestartDelayMu.RLock()
-	defer serviceRestartDelayMu.RUnlock()
-	return serviceRestartDelay
-}
-
-func setServiceRestartDelay(delay time.Duration) {
-	serviceRestartDelayMu.Lock()
-	defer serviceRestartDelayMu.Unlock()
-	serviceRestartDelay = delay
 }

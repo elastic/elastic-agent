@@ -374,13 +374,6 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 // TestServiceStartRetry tests that the service runtime will
 // retry the service start command if it fails
 func TestServiceStartRetry(t *testing.T) {
-	// Shorten service restart delay for testing
-	origServiceRestartDelay := getServiceRestartDelay()
-	setServiceRestartDelay(2 * time.Second)
-	t.Cleanup(func() {
-		setServiceRestartDelay(origServiceRestartDelay)
-	})
-
 	log, logObs := loggertest.New("test")
 	const cisPort = 9999
 	const cisSocket = ".teaci.sock"
@@ -408,6 +401,9 @@ func TestServiceStartRetry(t *testing.T) {
 	// Create new service runtime with component
 	service, err := newServiceRuntime(endpoint, log, true)
 	require.NoError(t, err)
+
+	// Shorten service restart delay for testing
+	service.serviceRestartDelay = 2 * time.Second
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -437,7 +433,7 @@ func TestServiceStartRetry(t *testing.T) {
 
 	expectedRestartLogMsg := fmt.Sprintf(
 		"failed to start endpoint service, err: %s, restarting after waiting for %v",
-		"failed install endpoint service: exit status 99", serviceRestartDelay,
+		"failed install endpoint service: exit status 99", service.serviceRestartDelay,
 	)
 	require.Eventually(t, func() bool {
 		logs := logObs.TakeAll()
@@ -448,7 +444,7 @@ func TestServiceStartRetry(t *testing.T) {
 			}
 		}
 		return false
-	}, getServiceRestartDelay()+1*time.Second, 500*time.Millisecond)
+	}, service.serviceRestartDelay+1*time.Second, 500*time.Millisecond)
 }
 
 func mockEndpointBinary(t *testing.T, exitCode int) string {
