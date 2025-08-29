@@ -24,6 +24,7 @@ import (
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	manifestutils "github.com/elastic/elastic-agent/pkg/utils/manifest"
 )
 
 // UnpackResult contains the location and hash of the unpacked agent files
@@ -115,7 +116,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string, copy 
 
 	fileNamePrefix := strings.TrimSuffix(filepath.Base(archivePath), ".zip") + "/" // omitting `elastic-agent-{version}-{os}-{arch}/` in filename
 
-	pm := pathMapper{}
+	var pm *manifestutils.PathMapper
 	var versionedHome string
 
 	metadata, err := getPackageMetadataFromZipReader(r, fileNamePrefix)
@@ -126,10 +127,11 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string, copy 
 	hash = metadata.hash[:hashLen]
 	var registry map[string][]string
 	if metadata.manifest != nil {
-		pm.mappings = metadata.manifest.Package.PathMappings
+		pm = manifestutils.NewPathMapper(metadata.manifest.Package.PathMappings)
 		versionedHome = filepath.FromSlash(pm.Map(metadata.manifest.Package.VersionedHome))
 		registry = metadata.manifest.Package.Flavors
 	} else {
+		pm = manifestutils.NewPathMapper(nil)
 		// if at this point we didn't load the manifest, set the versioned to the backup value
 		versionedHome = createVersionedHomeFromHash(hash)
 	}
@@ -361,7 +363,7 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string, copy 
 	var hash string
 
 	// Look up manifest in the archive and prepare path mappings, if any
-	pm := pathMapper{}
+	var pm *manifestutils.PathMapper
 
 	metadata, err := getPackageMetadataFromTar(archivePath)
 	if err != nil {
@@ -373,10 +375,11 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string, copy 
 
 	if metadata.manifest != nil {
 		// set the path mappings
-		pm.mappings = metadata.manifest.Package.PathMappings
+		pm = manifestutils.NewPathMapper(metadata.manifest.Package.PathMappings)
 		versionedHome = filepath.FromSlash(pm.Map(metadata.manifest.Package.VersionedHome))
 		registry = metadata.manifest.Package.Flavors
 	} else {
+		pm = manifestutils.NewPathMapper(nil)
 		// set default value of versioned home if it wasn't set by reading the manifest
 		versionedHome = createVersionedHomeFromHash(metadata.hash)
 	}
@@ -659,21 +662,6 @@ func validFileName(p string) bool {
 		return false
 	}
 	return true
-}
-
-type pathMapper struct {
-	mappings []map[string]string
-}
-
-func (pm pathMapper) Map(packagePath string) string {
-	for _, mapping := range pm.mappings {
-		for pkgPath, mappedPath := range mapping {
-			if strings.HasPrefix(packagePath, pkgPath) {
-				return path.Join(mappedPath, packagePath[len(pkgPath):])
-			}
-		}
-	}
-	return packagePath
 }
 
 type tarCloser struct {
