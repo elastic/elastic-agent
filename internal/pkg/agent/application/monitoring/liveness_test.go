@@ -33,7 +33,7 @@ func (mc mockCoordinator) IsActive(_ time.Duration) bool {
 	return mc.isUp
 }
 
-func TestProcessHTTPHandler(t *testing.T) {
+func TestLivenessProcessHTTPHandler(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	testCases := []struct {
@@ -43,6 +43,12 @@ func TestProcessHTTPHandler(t *testing.T) {
 		liveness     bool
 		failon       string
 	}{
+		{
+			name:         "healthy-nocoord",
+			expectedCode: 200,
+			liveness:     true,
+			failon:       "heartbeat",
+		},
 		{
 			name: "default-failed",
 			coord: mockCoordinator{

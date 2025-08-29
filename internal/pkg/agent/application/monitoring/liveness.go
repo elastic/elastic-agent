@@ -52,6 +52,13 @@ func livenessHandler(coord CoordinatorState) func(http.ResponseWriter, *http.Req
 	return func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
+		if coord == nil {
+			// no coordinator, then that means we are in the container enrollment mode
+			// at this point the container is healthy and trying to enroll, so return 200
+			w.WriteHeader(http.StatusOK)
+			return nil
+		}
+
 		state := coord.State()
 		isUp := coord.IsActive(time.Second * 10)
 		// the coordinator check is always on, so if that fails, always return false

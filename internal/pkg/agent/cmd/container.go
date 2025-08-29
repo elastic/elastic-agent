@@ -26,13 +26,27 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/logp"
+	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+<<<<<<< HEAD
+=======
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
+>>>>>>> c028f68fa (Add /readiness and /liveness when enrolling with the container (#9612))
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+<<<<<<< HEAD
+=======
+	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent/internal/pkg/crypto"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/remote"
+>>>>>>> c028f68fa (Add /readiness and /liveness when enrolling with the container (#9612))
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -293,7 +307,29 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 			return err
 		}
 	}
+<<<<<<< HEAD
 	if cfg.Fleet.Enroll {
+=======
+
+	shouldEnroll, err := shouldFleetEnroll(cfg)
+	if err != nil {
+		return err
+	}
+	if shouldEnroll {
+		// pre-enroll in container uses a logger and default monitoring configuration
+		// once the enrollment has occurred then it will pick up the final configuration
+		monitoringServer, err := monitoring.NewServer(logp.L(), monitoringLib.GetNamespace, nil, nil, monitoringCfg.DefaultConfig())
+		if err != nil {
+			return fmt.Errorf("failed starting monitoring server: %w", err)
+		}
+		monitoringServer.Start()
+		defer func() {
+			if monitoringServer != nil {
+				_ = monitoringServer.Stop()
+			}
+		}()
+
+>>>>>>> c028f68fa (Add /readiness and /liveness when enrolling with the container (#9612))
 		var policy *kibanaPolicy
 		token := cfg.Fleet.EnrollmentToken
 		if token == "" && !cfg.FleetServer.Enable {
@@ -335,6 +371,9 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		if err != nil {
 			return errors.New("enrollment failed", err)
 		}
+
+		_ = monitoringServer.Stop()
+		monitoringServer = nil
 	}
 
 	return run(logToStderr, false, initTimeout, isContainer)
