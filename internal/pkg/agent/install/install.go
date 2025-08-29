@@ -17,6 +17,7 @@ import (
 	"github.com/kardianos/service"
 	"github.com/otiai10/copy"
 	"github.com/schollz/progressbar/v3"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -25,6 +26,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/utils"
+	manifestutils "github.com/elastic/elastic-agent/pkg/utils/manifest"
 )
 
 const (
@@ -61,17 +63,20 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 		}
 	}
 
-	err = setupInstallPath(topPath, ownership)
-	if err != nil {
-		return utils.FileOwner{}, fmt.Errorf("error setting up install path: %w", err)
-	}
-
 	manifest, err := readPackageManifest(dir)
 	if err != nil {
 		return utils.FileOwner{}, fmt.Errorf("reading package manifest: %w", err)
 	}
 
 	pathMappings := manifest.Package.PathMappings
+	pathMapper := manifestutils.NewPathMapper(pathMappings)
+
+	targetVersionedHome := filepath.FromSlash(pathMapper.Map(manifest.Package.VersionedHome))
+
+	err = setupInstallPath(topPath, ownership, targetVersionedHome, manifest.Package.Version)
+	if err != nil {
+		return utils.FileOwner{}, fmt.Errorf("error setting up install path: %w", err)
+	}
 
 	pt.Describe("Copying install files")
 	copyConcurrency := calculateCopyConcurrency(streams)
@@ -184,7 +189,7 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 }
 
 // setup the basic topPath, and the .installed file
-func setupInstallPath(topPath string, ownership utils.FileOwner) error {
+func setupInstallPath(topPath string, ownership utils.FileOwner, versionedHome string, version string) error {
 	// ensure parent directory exists
 	err := os.MkdirAll(filepath.Dir(topPath), 0755)
 	if err != nil {
@@ -198,7 +203,7 @@ func setupInstallPath(topPath string, ownership utils.FileOwner) error {
 	}
 
 	// create the install marker
-	if err := CreateInstallMarker(topPath, ownership); err != nil {
+	if err := CreateInstallMarker(topPath, ownership, versionedHome, version); err != nil {
 		return fmt.Errorf("failed to create install marker: %w", err)
 	}
 	return nil
@@ -516,14 +521,30 @@ func hasAllSSDs(block ghw.BlockInfo) bool {
 
 // CreateInstallMarker creates a `.installed` file at the given install path,
 // and then calls fixInstallMarkerPermissions to set the ownership provided by `ownership`
-func CreateInstallMarker(topPath string, ownership utils.FileOwner) error {
+func CreateInstallMarker(topPath string, ownership utils.FileOwner, home string, version string) error {
 	markerFilePath := filepath.Join(topPath, paths.MarkerFileName)
+	err := createInstallMarkerFile(markerFilePath, version, home)
+	if err != nil {
+		return fmt.Errorf("creating install marker: %w", err)
+	}
+	return fixInstallMarkerPermissions(markerFilePath, ownership)
+}
+
+func createInstallMarkerFile(markerFilePath string, version string, home string) error {
 	handle, err := os.Create(markerFilePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("creating destination file %q : %w", markerFilePath, err)
 	}
-	_ = handle.Close()
-	return fixInstallMarkerPermissions(markerFilePath, ownership)
+	defer func() {
+		_ = handle.Close()
+	}()
+	installDescriptor := v1.NewInstallDescriptor()
+	installDescriptor.AgentInstalls = []v1.AgentInstallDesc{{Version: version, VersionedHome: home}}
+	err = yaml.NewEncoder(handle).Encode(installDescriptor)
+	if err != nil {
+		return fmt.Errorf("writing install descriptor: %w", err)
+	}
+	return nil
 }
 
 func UnprivilegedUser(username, password string) (string, string) {
