@@ -231,7 +231,8 @@ func (m Metadata) Equals(otherM Metadata) bool {
 		m.DownloadPercent == otherM.DownloadPercent &&
 		m.DownloadRate == otherM.DownloadRate &&
 		equalTimePointers(m.RetryUntil, otherM.RetryUntil) &&
-		m.RetryErrorMsg == otherM.RetryErrorMsg
+		m.RetryErrorMsg == otherM.RetryErrorMsg &&
+		m.Reason == otherM.Reason
 }
 
 func equalTimePointers(t, otherT *time.Time) bool {
