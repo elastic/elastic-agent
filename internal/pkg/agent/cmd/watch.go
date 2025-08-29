@@ -290,11 +290,7 @@ func getConfig(streams *cli.IOStreams) *configuration.Configuration {
 }
 
 func initUpgradeDetails(marker *upgrade.UpdateMarker, saveMarker func(*upgrade.UpdateMarker, bool) error, log *logp.Logger) *details.Details {
-	// FIXME this should edit details not rewrite them
 	upgradeDetails := details.NewDetails(version.GetAgentPackageVersion(), details.StateWatching, marker.GetActionID())
-	if marker.Details != nil {
-		upgradeDetails.Metadata.RollbacksAvailable = marker.Details.Metadata.RollbacksAvailable
-	}
 	upgradeDetails.RegisterObserver(func(details *details.Details) {
 		marker.Details = details
 		if err := saveMarker(marker, true); err != nil {
