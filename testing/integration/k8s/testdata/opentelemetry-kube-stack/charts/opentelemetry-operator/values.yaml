@@ -2,6 +2,9 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# Top level field indicating an override for the namespace
+namespaceOverride: ""
+
 replicaCount: 1
 
 ## The number of old history to retain to allow rollback.
@@ -47,7 +50,7 @@ manager:
     imagePullPolicy: IfNotPresent
   collectorImage:
     repository: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s
-    tag: 0.127.0
+    tag: 0.131.1
   opampBridgeImage:
     repository: ""
     tag: ""
@@ -75,6 +78,9 @@ manager:
     go:
       repository: ""
       tag: ""
+  # If ignoreMissingCollectorCRDs is set to true, the manager will not raise errors
+  # if the collector CRDs are not present.
+  ignoreMissingCollectorCRDs: false
   # Feature Gates are a comma-delimited list of feature gate identifiers.
   # Prefix a gate with '-' to disable support.
   # Prefixing a gate with '+' or no prefix will enable support.
@@ -384,3 +390,11 @@ testFramework:
     runAsNonRoot: true
     seccompProfile:
       type: RuntimeDefault
+  resources: {}
+  # resources:
+  #   limits:
+  #     cpu: 100m
+  #     memory: 128Mi
+  #   requests:
+  #     cpu: 10m
+  #     memory: 64Mi
