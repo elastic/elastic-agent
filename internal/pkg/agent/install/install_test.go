@@ -224,7 +224,19 @@ func TestSetupInstallPath(t *testing.T) {
 	tmpdir := t.TempDir()
 	ownership, err := utils.CurrentFileOwner()
 	require.NoError(t, err)
-	err = setupInstallPath(tmpdir, ownership)
+	err = setupInstallPath(tmpdir, ownership, "data/elastic-agent-1.2.3-SNAPSHOT", "1.2.3-SNAPSHOT")
 	require.NoError(t, err)
-	require.FileExists(t, filepath.Join(tmpdir, paths.MarkerFileName))
+	markerFilePath := filepath.Join(tmpdir, paths.MarkerFileName)
+	require.FileExists(t, markerFilePath)
+
+	const expectedInstallDescriptor = `
+        version: co.elastic.agent/v1
+        kind: InstallDescriptor
+        agentInstalls:
+            - version: 1.2.3-SNAPSHOT
+              versioned-home: data/elastic-agent-1.2.3-SNAPSHOT
+    `
+	actualInstallDescriptorBytes, err := os.ReadFile(markerFilePath)
+	require.NoError(t, err, "error reading actual install descriptor")
+	assert.YAMLEq(t, expectedInstallDescriptor, string(actualInstallDescriptorBytes), "expected and actual install descriptor do not match")
 }
