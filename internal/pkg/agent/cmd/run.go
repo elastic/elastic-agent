@@ -65,6 +65,14 @@ const (
 	flagRunDevelopment   = "develop"
 )
 
+var (
+	stopBeatChan chan bool
+)
+
+func init() {
+	go service.ProcessWindowsControlEvents(stopBeat)
+}
+
 func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
@@ -119,6 +127,12 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	return cmd
 }
 
+func stopBeat() {
+	if stopBeatChan != nil {
+		close(stopBeatChan)
+	}
+}
+
 func run(override application.CfgOverrider, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
 	// Windows: Mark service as stopped.
 	// After this is run, the service is considered by the OS to be stopped.
@@ -132,14 +146,10 @@ func run(override application.CfgOverrider, testingMode bool, fleetInitTimeout t
 	defer service.Cleanup()
 
 	// register as a service
-	stop := make(chan bool)
+	stopBeatChan = make(chan bool)
 	ctx, cancel := context.WithCancel(context.Background())
-	stopBeat := func() {
-		close(stop)
-	}
 
 	defer cancel()
-	go service.ProcessWindowsControlEvents(stopBeat)
 
 	if err := handleUpgrade(); err != nil {
 		return fmt.Errorf("error checking for and handling upgrade: %w", err)
@@ -153,7 +163,7 @@ func run(override application.CfgOverrider, testingMode bool, fleetInitTimeout t
 		_ = locker.Unlock()
 	}()
 
-	return runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, modifiers...)
+	return runElasticAgent(ctx, cancel, override, stopBeatChan, testingMode, fleetInitTimeout, modifiers...)
 }
 
 func logReturn(l *logger.Logger, err error) error {
