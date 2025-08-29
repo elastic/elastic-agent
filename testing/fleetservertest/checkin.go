@@ -87,7 +87,9 @@ const actionTemplate = `{
       "data": {{.Data}},
       "id": "{{.ActionID}}",
       "input_type": "",
-      "type": "{{.Type}}"
+      "type": "{{.Type}}",
+      "start_time": "{{.StartTime}}",
+      "expiration": "{{.Expiration}}"
     }`
 
 func NewAction(data ActionTmpl) (AckableAction, error) {

@@ -423,6 +423,7 @@ func New(
 	isManaged bool,
 	otelMgr OTelManager,
 	fleetAcker acker.Acker,
+	initialUpgradeDetails *details.Details,
 	modifiers ...ComponentsModifier,
 ) *Coordinator {
 	var fleetState cproto.State
@@ -433,11 +434,12 @@ func New(
 		fleetMessage = "Not enrolled into Fleet"
 	}
 	state := State{
-		State:        agentclient.Starting,
-		Message:      "Starting",
-		FleetState:   fleetState,
-		FleetMessage: fleetMessage,
-		LogLevel:     logLevel,
+		State:          agentclient.Starting,
+		Message:        "Starting",
+		FleetState:     fleetState,
+		FleetMessage:   fleetMessage,
+		LogLevel:       logLevel,
+		UpgradeDetails: initialUpgradeDetails,
 	}
 	c := &Coordinator{
 		logger:     logger,

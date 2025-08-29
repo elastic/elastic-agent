@@ -64,6 +64,7 @@ func TestLimitsLog(t *testing.T) {
 		time.Millisecond,  // fleetInitTimeout
 		true,              // disable monitoring
 		nil,               // no configuration overrides
+		nil,
 	)
 	require.NoError(t, err)
 
