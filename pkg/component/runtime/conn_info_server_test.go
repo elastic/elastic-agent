@@ -73,7 +73,7 @@ func (c *mockCommunicator) CheckinObserved() <-chan *proto.CheckinObserved {
 const testPort = 6788
 
 // Test Elastic Agent Connection Info sock
-const testSock = ".teaci.sock"
+const testSock = ".cteaci.sock"
 
 func getAddress(dir string, isLocal bool) string {
 	if isLocal {
