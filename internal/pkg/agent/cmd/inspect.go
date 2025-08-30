@@ -145,6 +145,11 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		if err != nil {
 			return fmt.Errorf("error loading agent config: %w", err)
 		}
+		// Ensure secret markers are injected based on secret_paths before redaction.
+		if err := diagnostics.AddSecretMarkers(l, fullCfg); err != nil {
+			fmt.Fprintf(streams.Err, "failed to add secret markers: %v\n", err)
+		}
+
 		err = printConfig(fullCfg, streams)
 		if err != nil {
 			return fmt.Errorf("error printing config: %w", err)
@@ -226,6 +231,16 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 
 		}
 
+	}
+
+	// Ensure secret markers are injected based on secret_paths before redaction.
+	rawCfg := config.MustNewConfigFrom(cfg)
+	if err := diagnostics.AddSecretMarkers(l, rawCfg); err != nil {
+		fmt.Fprintf(streams.Err, "failed to add secret markers: %v\n", err)
+	}
+	cfg, err = rawCfg.ToMapStr()
+	if err != nil {
+		return fmt.Errorf("failed to convert config with secret markers: %w", err)
 	}
 
 	return printMapStringConfig(cfg, streams)
