@@ -9,6 +9,7 @@ package ess
 import (
 	"archive/zip"
 	"context"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -275,24 +276,51 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 	t.Log("Check if config files have been redacted.")
 	extractionDir := t.TempDir()
 	extractZipArchive(t, diagZip, extractionDir)
-	path := filepath.Join(extractionDir, "computed-config.yaml")
-	stat, err = os.Stat(path)
-	require.NoErrorf(t, err, "stat file %q failed", path)
-	require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", path)
-	f, err := os.Open(path)
-	require.NoErrorf(t, err, "open file %q failed", path)
-	defer f.Close()
-	var yObj struct {
-		SecretPaths []string `yaml:"secret_paths"`
-		Inputs      []struct {
-			CustomAttr string `yaml:"custom_attr"`
-		} `yaml:"inputs"`
+	fileNames := []string{
+		"pre-config.yaml",
+		"computed-config.yaml",
+		"components-expected.yaml",
+		"components-actual.yaml",
 	}
-	err = yaml.NewDecoder(f).Decode(&yObj)
-	require.NoError(t, err)
-	assert.ElementsMatch(t, []string{"inputs.0.custom_attr"}, yObj.SecretPaths)
-	require.Len(t, yObj.Inputs, 1)
-	assert.Equal(t, "<REDACTED>", yObj.Inputs[0].CustomAttr)
+
+	var checkRedacted func(any) error
+	checkRedacted = func(root any) error {
+		switch root := root.(type) {
+		case map[string]any:
+			for rootKey, value := range root {
+				if rootKey == "custom_attr" {
+					if value != "<REDACTED>" {
+						return fmt.Errorf("found non-redacted value in %q", rootKey)
+					}
+				}
+				return checkRedacted(value)
+			}
+		case []any:
+			for _, value := range root {
+				return checkRedacted(value)
+			}
+		default:
+			// ignore other types
+		}
+		return nil
+	}
+
+	for _, fileName := range fileNames {
+		path := filepath.Join(extractionDir, fileName)
+		stat, err := os.Stat(path)
+		require.NoErrorf(t, err, "stat file %q failed", path)
+		require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", path)
+		f, err := os.Open(path)
+		require.NoErrorf(t, err, "open file %q failed", path)
+		defer f.Close()
+
+		var yObj map[string]any
+		err = yaml.NewDecoder(f).Decode(&yObj)
+		require.NoError(t, err)
+
+		err = checkRedacted(yObj)
+		require.NoError(t, err, "file %q has non-redacted values", path)
+	}
 }
 
 func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string) func(ctx context.Context) error {
