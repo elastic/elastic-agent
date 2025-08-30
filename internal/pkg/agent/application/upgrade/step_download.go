@@ -102,22 +102,25 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 
 	path, err := downloaderFunc(ctx, factory, parsedVersion, &settings, upgradeDetails)
 	if err != nil {
+		// If downloaderFunc fails then the path is not set, so we return an empty string.
 		return "", errors.New(err, "failed download of agent binary")
 	}
 
+	// If there are errors in the following steps, we return the path so that we
+	// can cleanup the downloaded files.
 	if skipVerifyOverride {
 		return path, nil
 	}
 
 	if verifier == nil {
-		verifier, err = newVerifier(parsedVersion, u.log, &settings)
+		verifier, err = newVerifierFunc(parsedVersion, u.log, &settings)
 		if err != nil {
-			return "", errors.New(err, "initiating verifier")
+			return path, errors.New(err, "initiating verifier")
 		}
 	}
 
 	if err := verifier.Verify(ctx, agentArtifact, *parsedVersion, skipDefaultPgp, pgpBytes...); err != nil {
-		return "", errors.New(err, "failed verification of agent binary")
+		return path, errors.New(err, "failed verification of agent binary")
 	}
 	return path, nil
 }
@@ -168,6 +171,8 @@ func newDownloader(version *agtversion.ParsedSemVer, log *logger.Logger, setting
 
 	return composed.NewDownloader(fs.NewDownloader(settings), snapDownloader, httpDownloader), nil
 }
+
+var newVerifierFunc = newVerifier // abstraction for testability
 
 func newVerifier(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
 	pgp := release.PGP()

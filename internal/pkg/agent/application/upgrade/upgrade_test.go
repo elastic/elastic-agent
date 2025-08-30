@@ -8,9 +8,12 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -23,8 +26,10 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -1291,4 +1296,211 @@ func (f *fakeAcker) Ack(ctx context.Context, action fleetapi.Action) error {
 func (f *fakeAcker) Commit(ctx context.Context) error {
 	args := f.Called(ctx)
 	return args.Error(0)
+}
+
+// archiveFilesWithArchiveDirName function is used to modify the archive files to
+// match the desired archive directory name for test cases. Modifies the file
+// paths. The archive files are based on the global variables in step_unpack_test.go.
+func archiveFilesWithArchiveDirName(archiveName string) func(file files) files {
+	archiveWithoutSuffix := strings.TrimSuffix(archiveName, ".tar.gz")
+	archiveWithoutSuffix = strings.TrimSuffix(archiveWithoutSuffix, ".zip")
+
+	return func(file files) files {
+		file.path = strings.Replace(file.path, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64", archiveWithoutSuffix, 1)
+
+		return file
+	}
+}
+
+// archiveFilesWithVersionedHome function is used to modify the archive files to
+// match the desired versioned home path for test cases. Modifies the manifest
+// and file paths. The archive files are based on the global variables in
+// step_unpack_test.go.
+func archiveFilesWithVersionedHome(version string, meta string) func(file files) files {
+	return func(file files) files {
+		if file.content == ea_123_manifest {
+			newContent := strings.ReplaceAll(file.content, "1.2.3", version)
+			newContent = strings.ReplaceAll(newContent, "abcdef", meta)
+
+			file.content = newContent
+		}
+		file.path = strings.ReplaceAll(file.path, "abcdef", meta)
+
+		return file
+	}
+}
+
+// ModifyArchiveFiles function is used to modify the archive files to match the
+// test scenarios. The archive files are based on the global variables in
+// step_unpack_test.go.
+func modifyArchiveFiles(archiveFiles []files, modFuncs ...func(file files) files) []files {
+	modifiedArchiveFiles := make([]files, len(archiveFiles))
+	for i, file := range archiveFiles {
+		for _, modFunc := range modFuncs {
+			file = modFunc(file)
+		}
+		modifiedArchiveFiles[i] = file
+	}
+
+	return modifiedArchiveFiles
+}
+
+// buildArchiveFiles is used to modify the archive files found in
+// step_unpack_test.go to fit the desired test scenarios by setting the archive
+// dir name and the versioned home path.
+func buildArchiveFiles(t *testing.T, archiveFiles []files, parsedVersion *agtversion.ParsedSemVer, metadata string) (string, []files) {
+	tempConfig := &artifact.Config{} // used only to get os and arch, runtime.GOARCH returns amd64 which is not a valid arch when used in GetArtifactName
+	archiveName, err := artifact.GetArtifactName(agentArtifact, *parsedVersion, tempConfig.OS(), tempConfig.Arch())
+	require.NoError(t, err)
+
+	modifiedArchiveFiles := modifyArchiveFiles(archiveFiles,
+		archiveFilesWithArchiveDirName(archiveName),
+		archiveFilesWithVersionedHome(parsedVersion.CoreVersion(), metadata),
+	)
+
+	return archiveName, modifiedArchiveFiles
+}
+
+// createArchive function is used to create mock archives for upgrade tests.
+// Uses the helpers in step_unpack_test.go to create the archive.
+func createArchive(t *testing.T, archiveName string, archiveFiles []files) (string, error) {
+	if runtime.GOOS == "windows" {
+		return createZipArchive(t, archiveName, archiveFiles)
+	}
+	return createTarArchive(t, archiveName, archiveFiles)
+}
+
+func TestUpgradeErrorCleanup(t *testing.T) {
+
+	log, _ := loggertest.New("test")
+	tempConfig := &artifact.Config{} // used only to get os and arch, runtime.GOARCH returns amd64 which is not a valid arch when used in GetArtifactName
+
+	initialVersion := agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")
+	initialArtifactName, initialArchiveFiles := buildArchiveFiles(t, archiveFilesWithMoreComponents, initialVersion, "abcdef")
+
+	targetVersion := agtversion.NewParsedSemVer(3, 4, 5, "SNAPSHOT", "")
+	targetArtifactName, targetArchiveFiles := buildArchiveFiles(t, archiveFilesWithMoreComponents, targetVersion, "ghijkl")
+
+	initialArchive, err := createArchive(t, initialArtifactName, initialArchiveFiles)
+	require.NoError(t, err)
+
+	targetArchive, err := createArchive(t, targetArtifactName, targetArchiveFiles)
+	require.NoError(t, err)
+
+	// Ensure the hash file exists so the HTTP server can serve it
+	targetArchiveHashPath := targetArchive + ".sha512"
+	require.NoError(t, os.WriteFile(targetArchiveHashPath, []byte("dummy-hash"), 0o600))
+
+	tempUnpacker, err := NewUpgrader(log, tempConfig, &info.AgentInfo{}) // used only to unpack the initial archive
+	require.NoError(t, err)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, ".sha512") {
+			http.ServeFile(w, r, targetArchiveHashPath)
+			return
+		}
+		http.ServeFile(w, r, targetArchive)
+	}))
+	t.Cleanup(server.Close)
+
+	testError := errors.New("test error")
+
+	type testCase struct {
+		errorFrom     string
+		expectedError error
+		skipVerify    bool
+	}
+
+	testCases := map[string]testCase{
+		"should return error and cleanup downloads if the download step fails": {
+			errorFrom:     "downloadArtifact",
+			expectedError: testError,
+			skipVerify:    false, // we are triggering error in the verifier to simulate download failure, so we should not skip verify
+		},
+		"should return error, cleanup downloads and extracted archive if copyActionStore fails": {
+			errorFrom:     "copyActionStore",
+			expectedError: testError,
+			skipVerify:    true, // skip verify, we don't want to trigger error in the verifier
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			paths.SetTop(t.TempDir())
+			initialUnpackRes, err := tempUnpacker.unpack(initialVersion.String(), initialArchive, paths.Data(), "")
+			require.NoError(t, err)
+
+			targetVersionedHome := filepath.Join(paths.Data(), "elastic-agent-3.4.5-SNAPSHOT-ghijkl")
+
+			// Set the downloads dir in the initial versioned home path (VersionedHome already includes 'data/')
+			initialVersionedHome := filepath.Join(paths.Top(), initialUnpackRes.VersionedHome)
+			paths.SetDownloads(filepath.Join(initialVersionedHome, "downloads"))
+
+			settings := artifact.Config{
+				TargetDirectory:        paths.Downloads(),
+				SourceURI:              server.URL,
+				RetrySleepInitDuration: 1 * time.Second,
+				HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+					Timeout: 1 * time.Second,
+				},
+			}
+
+			tmpNewVerifier := newVerifierFunc
+			t.Cleanup(func() {
+				newVerifierFunc = tmpNewVerifier
+			})
+
+			newVerifierFunc = func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
+				// Assert that the artifact and hash are downloaded
+				archivePath, err := artifact.GetArtifactPath(agentArtifact, *targetVersion, settings.OS(), settings.Arch(), settings.TargetDirectory)
+				require.NoError(t, err)
+				require.FileExists(t, archivePath)
+
+				archiveHashPath := archivePath + ".sha512"
+				require.FileExists(t, archiveHashPath)
+
+				// Only return error if we want to simulate download failure
+				if tc.errorFrom == "downloadArtifact" {
+					return nil, tc.expectedError
+				}
+
+				return tmpNewVerifier(version, log, settings)
+			}
+
+			tmpCopyActionStore := copyActionStoreFunc
+			t.Cleanup(func() {
+				copyActionStoreFunc = tmpCopyActionStore
+			})
+			copyActionStoreFunc = func(log *logger.Logger, newHome string) error {
+				require.DirExists(t, targetVersionedHome, "target versioned home path should exist")
+
+				files, err := os.ReadDir(newHome)
+				require.NoError(t, err, "failed to read target versioned home directory")
+				require.NotEmpty(t, files, "target versioned home directory should not be empty")
+
+				// no need to check for the errorFrom field, this will only get executed if the download step succeeds
+				return tc.expectedError
+			}
+
+			upgradeDetails := details.NewDetails(targetVersion.String(), details.StateRequested, "")
+
+			upgrader, err := NewUpgrader(log, &settings, &info.AgentInfo{})
+			require.NoError(t, err)
+
+			_, err = upgrader.Upgrade(context.Background(), targetVersion.String(), server.URL, nil, upgradeDetails, tc.skipVerify, true)
+			require.ErrorIs(t, err, tc.expectedError)
+
+			require.DirExists(t, initialVersionedHome, "initial versioned home path should not be cleaned up")
+			if tc.errorFrom == "copyActionStore" {
+				require.NoDirExists(t, targetVersionedHome, "target versioned home path should be cleaned up")
+			}
+
+			// Ensure that downloaded artifact files have been removed.
+			targetArchivePath, err := artifact.GetArtifactPath(agentArtifact, *targetVersion, tempConfig.OS(), tempConfig.Arch(), paths.Downloads())
+			require.NoError(t, err)
+			require.NoFileExists(t, targetArchivePath, "downloaded archive should be removed during cleanup")
+			require.NoFileExists(t, targetArchivePath+".sha512", "downloaded archive hash should be removed during cleanup")
+		})
+	}
+
 }
