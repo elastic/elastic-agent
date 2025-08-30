@@ -124,7 +124,7 @@ func (p *dynamicProvider) watchResource(
 		}
 		p.config.Node, err = kubernetes.DiscoverKubernetesNode(p.logger, nd)
 		if err != nil {
-			p.logger.Debugf("Kubernetes provider skipped, unable to discover node: %w", err)
+			p.logger.Debugf("Kubernetes provider skipped, unable to discover node: %s", err.Error())
 			return nil, nil
 		}
 
