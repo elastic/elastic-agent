@@ -76,14 +76,6 @@ func livenessHandler(coord CoordinatorState) func(http.ResponseWriter, *http.Req
 			return fmt.Errorf("error handling form values: %w", err)
 		}
 
-		// if user has requested `coordinator` mode, just revert to that, skip everything else
-		if !failConfig.Degraded && !failConfig.Failed && failConfig.Heartbeat {
-			if !isUp {
-				w.WriteHeader(http.StatusServiceUnavailable)
-				return nil
-			}
-		}
-
 		unhealthyComponent := false
 		for _, comp := range state.Components {
 			if (failConfig.Failed && comp.State.State == client.UnitStateFailed) || (failConfig.Degraded && comp.State.State == client.UnitStateDegraded) {
