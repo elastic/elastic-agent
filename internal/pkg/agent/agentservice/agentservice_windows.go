@@ -60,15 +60,15 @@ func processWindowsControlEvents(stopCallback func()) {
 	defer close(serviceInstance.executeFinished)
 
 	//nolint:staticcheck // keep using the deprecated method in order to maintain the existing behavior
-	isWindowsService, err := svc.IsWindowsService()
+	isInteractive, err := svc.IsAnInteractiveSession()
 	if err != nil {
 		logp.Err("IsAnInteractiveSession: %v", err)
 		return
 	}
-	logp.Debug("service", "Windows is interactive: %v", isWindowsService)
+	logp.Debug("service", "Windows is interactive: %v", isInteractive)
 
 	run := svc.Run
-	if isWindowsService {
+	if isInteractive {
 		run = debug.Run
 	}
 
