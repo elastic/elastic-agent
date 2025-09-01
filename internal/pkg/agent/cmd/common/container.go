@@ -21,11 +21,7 @@ import (
 )
 
 const (
-	requestRetrySleepEnv     = "KIBANA_REQUEST_RETRY_SLEEP"
-	maxRequestRetriesEnv     = "KIBANA_REQUEST_RETRY_COUNT"
-	defaultRequestRetrySleep = "1s"                       // sleep 1 sec between retries for HTTP requests
-	defaultMaxRequestRetries = "30"                       // maximum number of retries for HTTP requests
-	agentBaseDirectory       = "/usr/share/elastic-agent" // directory that holds all elastic-agent related files
+	agentBaseDirectory = "/usr/share/elastic-agent" // directory that holds all elastic-agent related files
 
 	logsPathPerms = 0775
 )

@@ -22,7 +22,12 @@ import (
 
 	"kernel.org/pub/linux/libs/security/libcap/cap"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/common"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+)
+
+const (
+	agentBaseDirectory = "/usr/share/elastic-agent" // directory that holds all elastic-agent related files
 )
 
 type capProc interface {
@@ -219,11 +224,11 @@ func chownPaths(agentBaseDirectory string) error {
 		agentBaseDirectory: {},
 	}
 
-	pathsToChown.addPath(envWithDefault("", "LOGS_PATH"))
-	pathsToChown.addPath(envWithDefault("", "STATE_PATH"))
-	pathsToChown.addPath(envWithDefault("", "CONFIG_PATH"))
-	pathsToChown.addPath(envWithDefault("", "DATA_PATH"))
-	pathsToChown.addPath(envWithDefault("", "HOME_PATH"))
+	pathsToChown.addPath(common.EnvWithDefault("", "LOGS_PATH"))
+	pathsToChown.addPath(common.EnvWithDefault("", "STATE_PATH"))
+	pathsToChown.addPath(common.EnvWithDefault("", "CONFIG_PATH"))
+	pathsToChown.addPath(common.EnvWithDefault("", "DATA_PATH"))
+	pathsToChown.addPath(common.EnvWithDefault("", "HOME_PATH"))
 	return pathsToChown.chown(uid, gid)
 }
 
