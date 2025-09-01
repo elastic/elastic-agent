@@ -341,7 +341,7 @@
                 },
                 "autoops_token": {
                     "type": "string",
-                    "description": "Token to register into AutOps"
+                    "description": "Token to register into AutoOps"
                 },
                 "autoops_otel_url": {
                     "type": "string",
@@ -349,7 +349,7 @@
                 },
                 "autoops_temp_resource_id": {
                     "type": "string",
-                    "description": "..."
+                    "description": "Temporary resource ID"
                 },
                 "es_password": {
                     "type": "string",
@@ -371,6 +371,26 @@
                     "type": "string",
                     "description": "Cloud connected api url"
                 }
+            },
+            "if": {
+                "properties": {
+                    "enabled": { "const": true }
+                }
+            },
+            "then": {
+                "required": [
+                    "autoops_token",
+                    "autoops_otel_url",
+                    "autoops_temp_resource_id"
+                ],
+                "oneOf": [
+                    {
+                        "required": ["es_api_key"]
+                    },
+                    {
+                        "required": ["es_username", "es_password"]
+                    }
+                ]
             }
         },
         "extraIntegrations": {
