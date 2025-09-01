@@ -41,6 +41,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
@@ -131,7 +132,8 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 		service.WaitExecutionDone()
 	}()
 
-	if err := handleUpgrade(); err != nil {
+	upgradeDetailsFromMarker, err := handleUpgrade()
+	if err != nil {
 		return fmt.Errorf("error checking for and handling upgrade: %w", err)
 	}
 
@@ -156,7 +158,7 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	defer cancel()
 	go service.ProcessWindowsControlEvents(stopBeat)
 
-	return runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, modifiers...)
+	return runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, upgradeDetailsFromMarker, modifiers...)
 }
 
 func logReturn(l *logger.Logger, err error) error {
@@ -166,7 +168,16 @@ func logReturn(l *logger.Logger, err error) error {
 	return err
 }
 
-func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cfgOverrider, stop chan bool, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
+func runElasticAgent(
+	ctx context.Context,
+	cancel context.CancelFunc,
+	override cfgOverrider,
+	stop chan bool,
+	testingMode bool,
+	fleetInitTimeout time.Duration,
+	upgradeDetailsFromMarker *details.Details,
+	modifiers ...component.PlatformModifier,
+) error {
 	cfg, err := loadConfig(ctx, override)
 	if err != nil {
 		return err
@@ -286,7 +297,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cf
 		l.Info("APM instrumentation disabled")
 	}
 
-	coord, configMgr, composable, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, fleetInitTimeout, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
+	coord, configMgr, composable, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, fleetInitTimeout, configuration.IsFleetServerBootstrap(cfg.Fleet), upgradeDetailsFromMarker, modifiers...)
 	if err != nil {
 		return logReturn(l, err)
 	}
@@ -681,26 +692,26 @@ func setupMetrics(
 // handleUpgrade checks if agent is being run as part of an
 // ongoing upgrade operation, i.e. being re-exec'd and performs
 // any upgrade-specific work, if needed.
-func handleUpgrade() error {
+func handleUpgrade() (*details.Details, error) {
 	upgradeMarker, err := upgrade.LoadMarker(paths.Data())
 	if err != nil {
-		return fmt.Errorf("unable to load upgrade marker to check if Agent is being upgraded: %w", err)
+		return nil, fmt.Errorf("unable to load upgrade marker to check if Agent is being upgraded: %w", err)
 	}
 
 	if upgradeMarker == nil {
 		// We're not being upgraded. Nothing more to do.
-		return nil
+		return nil, nil
 	}
 
 	if err := ensureInstallMarkerPresent(); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := upgrade.EnsureServiceConfigUpToDate(); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return upgradeMarker.Details, nil
 }
 
 func ensureInstallMarkerPresent() error {
