@@ -132,7 +132,8 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 		service.WaitExecutionDone()
 	}()
 
-	if err := handleUpgrade(); err != nil {
+	upgradeDetailsFromMarker, err := handleUpgrade()
+	if err != nil {
 		return fmt.Errorf("error checking for and handling upgrade: %w", err)
 	}
 
@@ -157,24 +158,7 @@ func run(override cfgOverrider, testingMode bool, fleetInitTimeout time.Duration
 	defer cancel()
 	go service.ProcessWindowsControlEvents(stopBeat)
 
-<<<<<<< HEAD
-	return runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, modifiers...)
-=======
-	upgradeDetailsFromMarker, err := handleUpgrade()
-	if err != nil {
-		return fmt.Errorf("error checking for and handling upgrade: %w", err)
-	}
-
-	locker := filelock.NewAppLocker(paths.Data(), paths.AgentLockFileName)
-	if err := locker.TryLock(); err != nil {
-		return err
-	}
-	defer func() {
-		_ = locker.Unlock()
-	}()
-
 	return runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, upgradeDetailsFromMarker, modifiers...)
->>>>>>> ff8047180 (fix: scheduled upgrade details state (#9562))
 }
 
 func logReturn(l *logger.Logger, err error) error {
@@ -184,25 +168,16 @@ func logReturn(l *logger.Logger, err error) error {
 	return err
 }
 
-<<<<<<< HEAD
-func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override cfgOverrider, stop chan bool, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
-=======
 func runElasticAgent(
 	ctx context.Context,
 	cancel context.CancelFunc,
-	override application.CfgOverrider,
+	override cfgOverrider,
 	stop chan bool,
 	testingMode bool,
 	fleetInitTimeout time.Duration,
 	upgradeDetailsFromMarker *details.Details,
 	modifiers ...component.PlatformModifier,
 ) error {
-	err := coordinator.RestoreConfig()
-	if err != nil {
-		return err
-	}
-
->>>>>>> ff8047180 (fix: scheduled upgrade details state (#9562))
 	cfg, err := loadConfig(ctx, override)
 	if err != nil {
 		return err
@@ -322,13 +297,7 @@ func runElasticAgent(
 		l.Info("APM instrumentation disabled")
 	}
 
-<<<<<<< HEAD
-	coord, configMgr, composable, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, fleetInitTimeout, configuration.IsFleetServerBootstrap(cfg.Fleet), modifiers...)
-=======
-	isBootstrap := configuration.IsFleetServerBootstrap(cfg.Fleet)
-	coord, configMgr, _, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode,
-		fleetInitTimeout, isBootstrap, override, upgradeDetailsFromMarker, modifiers...)
->>>>>>> ff8047180 (fix: scheduled upgrade details state (#9562))
+	coord, configMgr, composable, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, fleetInitTimeout, configuration.IsFleetServerBootstrap(cfg.Fleet), upgradeDetailsFromMarker, modifiers...)
 	if err != nil {
 		return logReturn(l, err)
 	}

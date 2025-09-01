@@ -1016,11 +1016,7 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 		acker = &fakeActionAcker{}
 	}
 
-<<<<<<< HEAD
-	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, acker)
-=======
-	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelMgr, acker, nil)
->>>>>>> ff8047180 (fix: scheduled upgrade details state (#9562))
+	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, acker, nil)
 	return coord, cfgMgr, varsMgr
 }
 
