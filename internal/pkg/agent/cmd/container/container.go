@@ -29,9 +29,11 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/logp"
+	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/agentrun"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/common"
@@ -40,6 +42,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/crypto"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
@@ -295,6 +298,19 @@ func runContainerCmd(streams *cli.IOStreams, cfg common.SetupConfig) error {
 		return err
 	}
 	if shouldEnroll {
+		// pre-enroll in container uses a logger and default monitoring configuration
+		// once the enrollment has occurred then it will pick up the final configuration
+		monitoringServer, err := monitoring.NewServer(logp.L(), monitoringLib.GetNamespace, nil, nil, monitoringCfg.DefaultConfig())
+		if err != nil {
+			return fmt.Errorf("failed starting monitoring server: %w", err)
+		}
+		monitoringServer.Start()
+		defer func() {
+			if monitoringServer != nil {
+				_ = monitoringServer.Stop()
+			}
+		}()
+
 		var policy *kibanaPolicy
 		token := cfg.Fleet.EnrollmentToken
 		if token == "" && !cfg.FleetServer.Enable {
@@ -339,6 +355,9 @@ func runContainerCmd(streams *cli.IOStreams, cfg common.SetupConfig) error {
 		if err != nil {
 			return errors.New("enrollment failed", err)
 		}
+
+		_ = monitoringServer.Stop()
+		monitoringServer = nil
 	}
 
 	return agentrun.Run(containerCfgOverrides, false, initTimeout, isContainer)
