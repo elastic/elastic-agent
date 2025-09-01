@@ -223,9 +223,24 @@ func TestGetOtelConfig(t *testing.T) {
 
 	expectedExtensionConfig := map[string]any{
 		"beatsauth/_agent-component/default": map[string]any{
-			"tls": map[string]any{
-				"verification_mode": "full",
+			"idle_connection_timeout": "3s",
+			"proxy_disable":           false,
+			"ssl": map[string]interface{}{
+				"ca_sha256":               []interface{}{},
+				"ca_trusted_fingerprint":  "",
+				"certificate":             "",
+				"certificate_authorities": []interface{}{},
+				"cipher_suites":           []interface{}{},
+				"curve_types":             []interface{}{},
+				"enabled":                 true,
+				"key":                     "",
+				"key_passphrase":          "",
+				"key_passphrase_path":     "",
+				"renegotiation":           int64(0),
+				"supported_protocols":     []interface{}{},
+				"verification_mode":       int64(0),
 			},
+			"timeout": "1m30s",
 		},
 	}
 

@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 
@@ -23,6 +22,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	elasticsearchtranslate "github.com/elastic/beats/v7/libbeat/otelbeat/oteltranslate/outputs/elasticsearch"
+	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
 	"github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
 	"github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
@@ -391,7 +391,7 @@ func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, 
 		extensionID := getExtensionID(outputName)
 		extensionConfig, err := getBeatsAuthExtensionConfig(outputCfgC)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("error supporting ssl parameters for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
+			return nil, nil, nil, fmt.Errorf("error supporting http parameters for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
 		}
 
 		// sets extensionCfg
@@ -475,41 +475,25 @@ func BeatDataPath(componentId string) string {
 	return filepath.Join(paths.Run(), componentId)
 }
 
-// getBeatsAuthExtensionConfig sets following ssl parameters on beatsauth
-// verification_mode
-// ca_trusted_fingerprint
-// ca_sha256
+// getBeatsAuthExtensionConfig sets following http parameters on beatsauth
+// currently this should only be called for elasticsearch output
 func getBeatsAuthExtensionConfig(cfg *config.C) (map[string]any, error) {
-	var sslConfig httpcommon.HTTPTransportSettings
+	sslConfig := elasticsearch.ESDefaultTransportSettings()
 	err := cfg.Unpack(&sslConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	var finalConfig map[string]any
-
-	if sslConfig.TLS == nil {
-		finalConfig = map[string]any{
-			"tls": map[string]any{
-				"verification_mode": "full",
-			},
-		}
-		return finalConfig, nil
+	newConfig, err := config.NewConfigFrom(sslConfig)
+	if err != nil {
+		return nil, err
 	}
 
-	finalConfig = map[string]any{
-		"tls": map[string]any{
-			"verification_mode": sslConfig.TLS.VerificationMode.String(),
-		},
+	var newMap map[string]any
+	err = newConfig.Unpack(&newMap)
+	if err != nil {
+		return nil, err
 	}
 
-	if len(sslConfig.TLS.CASha256) != 0 {
-		finalConfig["tls"].(map[string]any)["ca_sha256"] = sslConfig.TLS.CASha256
-	}
-
-	if sslConfig.TLS.CATrustedFingerprint != "" {
-		finalConfig["tls"].(map[string]any)["ca_trusted_fingerprint"] = sslConfig.TLS.CATrustedFingerprint
-	}
-
-	return finalConfig, nil
+	return newMap, nil
 }
