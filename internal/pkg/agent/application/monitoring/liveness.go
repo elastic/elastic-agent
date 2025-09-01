@@ -44,7 +44,7 @@ func handleFormValues(req *http.Request) (LivenessFailConfig, error) {
 	case "failed":
 		return LivenessFailConfig{Degraded: false, Failed: true, Heartbeat: true}, nil
 	case "degraded":
-		return LivenessFailConfig{Failed: true, Degraded: true, Heartbeat: true}, nil
+		return LivenessFailConfig{Degraded: true, Failed: true, Heartbeat: true}, nil
 	case "heartbeat", "":
 		return defaultUserCfg, nil
 	default:
