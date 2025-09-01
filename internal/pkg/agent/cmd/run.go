@@ -164,9 +164,6 @@ func logReturn(l *logger.Logger, err error) error {
 	return err
 }
 
-<<<<<<< HEAD
-func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override application.CfgOverrider, stop chan bool, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
-=======
 func runElasticAgent(
 	ctx context.Context,
 	cancel context.CancelFunc,
@@ -177,12 +174,6 @@ func runElasticAgent(
 	upgradeDetailsFromMarker *details.Details,
 	modifiers ...component.PlatformModifier,
 ) error {
-	err := coordinator.RestoreConfig()
-	if err != nil {
-		return err
-	}
-
->>>>>>> ff8047180 (fix: scheduled upgrade details state (#9562))
 	cfg, err := loadConfig(ctx, override)
 	if err != nil {
 		return err
