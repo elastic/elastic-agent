@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 )
 
 type mockCoordinator struct {
@@ -344,6 +345,39 @@ func TestLivenessProcessHTTPHandler(t *testing.T) {
 							},
 						},
 					},
+				},
+			},
+			expectedCode: 500,
+			failon:       "degraded",
+		},
+		{
+			name: "unhealthy-failed-coordinator",
+			coord: mockCoordinator{
+				isUp: true,
+				state: coordinator.State{
+					State: agentclient.Failed,
+				},
+			},
+			expectedCode: 500,
+			failon:       "failed",
+		},
+		{
+			name: "unhealthy-degraded-coordinator",
+			coord: mockCoordinator{
+				isUp: true,
+				state: coordinator.State{
+					State: agentclient.Degraded,
+				},
+			},
+			expectedCode: 500,
+			failon:       "degraded",
+		},
+		{
+			name: "healthy-degraded-coordinator",
+			coord: mockCoordinator{
+				isUp: true,
+				state: coordinator.State{
+					State: agentclient.Failed,
 				},
 			},
 			expectedCode: 500,

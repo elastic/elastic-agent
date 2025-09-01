@@ -14,6 +14,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel/otelhelpers"
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 )
 
 const formValueKey = "failon"
@@ -74,6 +75,12 @@ func livenessHandler(coord CoordinatorState) func(http.ResponseWriter, *http.Req
 		failConfig, err := handleFormValues(r)
 		if err != nil {
 			return fmt.Errorf("error handling form values: %w", err)
+		}
+
+		unhealthyState := (failConfig.Failed && state.State == agentclient.Failed) || (failConfig.Degraded && state.State == agentclient.Degraded)
+		if unhealthyState {
+			w.WriteHeader(http.StatusInternalServerError)
+			return nil
 		}
 
 		unhealthyComponent := false
