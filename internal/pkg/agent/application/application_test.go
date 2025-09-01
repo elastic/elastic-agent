@@ -63,6 +63,11 @@ func TestLimitsLog(t *testing.T) {
 		true,              // testingMode
 		time.Millisecond,  // fleetInitTimeout
 		true,              // disable monitoring
+<<<<<<< HEAD
+=======
+		nil,               // no configuration overrides
+		nil,
+>>>>>>> ff8047180 (fix: scheduled upgrade details state (#9562))
 	)
 	require.NoError(t, err)
 

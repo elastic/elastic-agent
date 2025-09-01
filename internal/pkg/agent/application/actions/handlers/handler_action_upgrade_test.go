@@ -115,7 +115,11 @@ func TestUpgradeHandler(t *testing.T) {
 				return nil, nil
 			},
 		},
+<<<<<<< HEAD
 		nil, nil, nil, nil, nil, false, nil)
+=======
+		nil, nil, nil, nil, nil, false, nil, nil, nil)
+>>>>>>> ff8047180 (fix: scheduled upgrade details state (#9562))
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 
@@ -174,7 +178,11 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 				return nil, err
 			},
 		},
+<<<<<<< HEAD
 		nil, nil, nil, nil, nil, false, nil)
+=======
+		nil, nil, nil, nil, nil, false, nil, nil, nil)
+>>>>>>> ff8047180 (fix: scheduled upgrade details state (#9562))
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 
@@ -233,7 +241,11 @@ func TestDuplicateActionsHandled(t *testing.T) {
 				return nil, nil
 			},
 		},
+<<<<<<< HEAD
 		nil, nil, nil, nil, nil, false, acker)
+=======
+		nil, nil, nil, nil, nil, false, nil, acker, nil)
+>>>>>>> ff8047180 (fix: scheduled upgrade details state (#9562))
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 
@@ -327,7 +339,11 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 				return nil, nil
 			},
 		},
+<<<<<<< HEAD
 		nil, nil, nil, nil, nil, false, nil)
+=======
+		nil, nil, nil, nil, nil, false, nil, nil, nil)
+>>>>>>> ff8047180 (fix: scheduled upgrade details state (#9562))
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 

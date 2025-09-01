@@ -343,7 +343,29 @@ type UpdateComponentChange struct {
 }
 
 // New creates a new coordinator.
+<<<<<<< HEAD
 func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo info.Agent, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capabilities, monitorMgr MonitorManager, isManaged bool, fleetAcker acker.Acker, modifiers ...ComponentsModifier) *Coordinator {
+=======
+func New(
+	logger *logger.Logger,
+	cfg *configuration.Configuration,
+	logLevel logp.Level,
+	agentInfo info.Agent,
+	specs component.RuntimeSpecs,
+	reexecMgr ReExecManager,
+	upgradeMgr UpgradeManager,
+	runtimeMgr RuntimeManager,
+	configMgr ConfigManager,
+	varsMgr VarsManager,
+	caps capabilities.Capabilities,
+	monitorMgr MonitorManager,
+	isManaged bool,
+	otelMgr OTelManager,
+	fleetAcker acker.Acker,
+	initialUpgradeDetails *details.Details,
+	modifiers ...ComponentsModifier,
+) *Coordinator {
+>>>>>>> ff8047180 (fix: scheduled upgrade details state (#9562))
 	var fleetState cproto.State
 	var fleetMessage string
 	if !isManaged {
@@ -352,11 +374,12 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		fleetMessage = "Not enrolled into Fleet"
 	}
 	state := State{
-		State:        agentclient.Starting,
-		Message:      "Starting",
-		FleetState:   fleetState,
-		FleetMessage: fleetMessage,
-		LogLevel:     logLevel,
+		State:          agentclient.Starting,
+		Message:        "Starting",
+		FleetState:     fleetState,
+		FleetMessage:   fleetMessage,
+		LogLevel:       logLevel,
+		UpgradeDetails: initialUpgradeDetails,
 	}
 	c := &Coordinator{
 		logger:     logger,

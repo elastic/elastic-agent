@@ -18,10 +18,12 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/dispatcher"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -34,6 +36,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+<<<<<<< HEAD
+=======
+	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
+	"github.com/elastic/elastic-agent/internal/pkg/queue"
+>>>>>>> ff8047180 (fix: scheduled upgrade details state (#9562))
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -52,6 +59,11 @@ func New(
 	testingMode bool,
 	fleetInitTimeout time.Duration,
 	disableMonitoring bool,
+<<<<<<< HEAD
+=======
+	override CfgOverrider,
+	initialUpgradeDetails *details.Details,
+>>>>>>> ff8047180 (fix: scheduled upgrade details state (#9562))
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
@@ -131,7 +143,6 @@ func New(
 	var compModifiers = []coordinator.ComponentsModifier{InjectAPMConfig}
 	var composableManaged bool
 	var isManaged bool
-
 	var actionAcker acker.Acker
 	if testingMode {
 		log.Info("Elastic Agent has been started in testing mode and is managed through the control protocol")
@@ -195,8 +206,19 @@ func New(
 			batchedAcker := lazy.NewAcker(fleetAcker, log, lazy.WithRetrier(retrier))
 			actionAcker = stateStore.NewStateStoreActionAcker(batchedAcker, stateStorage)
 
+			actionQueue, err := queue.NewActionQueue(stateStorage.Queue(), stateStorage)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("unable to initialize action queue: %w", err)
+			}
+
+			if initialUpgradeDetails == nil {
+				// initial upgrade details  are nil (normally the caller supplies the ones from the marker file at this point),
+				// hence, extract any scheduled upgrade details from the action queue.
+				initialUpgradeDetails = dispatcher.GetScheduledUpgradeDetails(log, actionQueue.Actions(), time.Now())
+			}
+
 			// TODO: stop using global state
-			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, paths.Top(), client, fleetAcker, actionAcker, retrier, stateStorage, upgrader)
+			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, paths.Top(), client, fleetAcker, actionAcker, retrier, stateStorage, actionQueue, upgrader)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -210,7 +232,15 @@ func New(
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
+<<<<<<< HEAD
 	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, actionAcker, compModifiers...)
+=======
+	otelManager, err := otelmanager.NewOTelManager(log.Named("otel_manager"), logLevel, baseLogger, otelmanager.EmbeddedExecutionMode, agentInfo, monitor.ComponentMonitoringConfig)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)
+	}
+	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelManager, actionAcker, initialUpgradeDetails, compModifiers...)
+>>>>>>> ff8047180 (fix: scheduled upgrade details state (#9562))
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created
