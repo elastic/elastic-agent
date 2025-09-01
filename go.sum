@@ -972,8 +972,8 @@ github.com/karrick/godirwalk v1.16.1 h1:DynhcF+bztK8gooS0+NDJFrdNZjJ3gzVzC545UNA
 github.com/karrick/godirwalk v1.16.1/go.mod h1:j4mkqPuvaLI8mp1DroR3P6ad7cyYd4c1qeJ3RV7ULlk=
 github.com/keybase/go-keychain v0.0.1 h1:way+bWYa6lDppZoZcgMbYsvC7GxljxrskdNInRtuthU=
 github.com/keybase/go-keychain v0.0.1/go.mod h1:PdEILRW3i9D8JcdM+FmY6RwkHGnhHxXwkPPMeUgOK1k=
-github.com/khushijain21/opentelemetry-collector-components/extension/beatsauthextension v0.0.0-20250901101407-7ced08da100d h1:xpWg8RVVuE21p3Rt2RM2OVskTz73+feERZRsWzAMtOE=
-github.com/khushijain21/opentelemetry-collector-components/extension/beatsauthextension v0.0.0-20250901101407-7ced08da100d/go.mod h1:7EPLYwse0In2R+NDLElnHJFMKEFFc+eLRhqyBa3uqlA=
+github.com/khushijain21/opentelemetry-collector-components/extension/beatsauthextension v0.0.0-20250901134904-90a34ae77613 h1:DSYCUY/cquHMM+XL1c7xlS7LHhdbuAw3twdH2uqyzbg=
+github.com/khushijain21/opentelemetry-collector-components/extension/beatsauthextension v0.0.0-20250901134904-90a34ae77613/go.mod h1:ZQmsSZScCAltjvwh4kxjHuokc7V2+WFLYbNMTAY9wrE=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/klauspost/asmfmt v1.3.2 h1:4Ri7ox3EwapiOjCki+hw14RyKk201CN4rzyCJRFLpK4=
