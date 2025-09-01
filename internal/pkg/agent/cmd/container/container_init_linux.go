@@ -277,7 +277,7 @@ func (u distinctPaths) chown(uid int, gid int) error {
 				return nil
 			}
 
-			if sysInfo.Gid == uint32(gid) && sysInfo.Uid == uint32(uid) {
+			if sysInfo.Gid == uint32(gid) && sysInfo.Uid == uint32(uid) { //nolint:gosec // G115 always under 32-bit
 				// already owned
 				return nil
 			}

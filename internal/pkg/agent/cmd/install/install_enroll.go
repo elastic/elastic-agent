@@ -32,8 +32,8 @@ func enrollCmdExtras(cmd *exec.Cmd, ownership utils.FileOwner) error {
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Credential: &syscall.Credential{
-			Uid: uint32(ownership.UID),
-			Gid: uint32(ownership.GID),
+			Uid: uint32(ownership.UID), //nolint:gosec // G115 always under 32-bit
+			Gid: uint32(ownership.GID), //nolint:gosec // G115 always under 32-bit
 		},
 	}
 	return nil
