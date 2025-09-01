@@ -213,7 +213,7 @@ func runElasticAgent(
 	pathConfigFile := paths.AgentConfigFile()
 
 	// agent ID needs to stay empty in bootstrap mode
-	createAgentID := true
+	createAgentID := true //nolint:staticcheck // keep createAgentID assignment explicit
 	if cfg.Fleet != nil && cfg.Fleet.Server != nil && cfg.Fleet.Server.Bootstrap {
 		createAgentID = false
 	}
