@@ -10,7 +10,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/otel"
 )
 
 func main() {
@@ -28,7 +28,7 @@ func main() {
 		})
 	}
 
-	err := cmd.RunCollector(ctx, nil, true, "debug")
+	err := otel.RunCollector(ctx, nil, true, "debug")
 	if err == nil || errors.Is(err, context.Canceled) {
 		os.Exit(0)
 	}

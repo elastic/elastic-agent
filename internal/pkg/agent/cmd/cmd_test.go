@@ -18,7 +18,7 @@ func TestAgent(t *testing.T) {
 
 	// t.Run("test run subcommand", func(t *testing.T) {
 	// 	streams, _, out, _ := cli.NewTestingIOStreams()
-	// 	cmd := newRunCommandWithArgs(globalFlags{
+	// 	cmd := NewRunCommandWithArgs(globalFlags{
 	// 		PathConfigFile: filepath.Join("build", "elastic-agent.yml"),
 	// 	}, []string{}, streams)
 	// 	cmd.SetOutput(streams.Out)
