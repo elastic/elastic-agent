@@ -1,5 +1,5 @@
 ---
-name: Bump golang-version to latest version
+name: Bump EDOT SDKs to latest versions
 
 scms:
   elastic-agent:
