@@ -1234,13 +1234,8 @@ func changeOwner(path string, uid, gid int) error {
 }
 
 // HttpPlusAgentMonitoringEndpoint provides an agent monitoring endpoint path with a `http+` prefix.
-<<<<<<< HEAD
-func HttpPlusAgentMonitoringEndpoint(operatingSystem string, cfg *monitoringCfg.MonitoringConfig) string {
-	return prefixedEndpoint(AgentMonitoringEndpoint(operatingSystem, cfg))
-=======
 func HttpPlusAgentMonitoringEndpoint(cfg *monitoringCfg.MonitoringConfig) string {
-	return PrefixedEndpoint(AgentMonitoringEndpoint(cfg))
->>>>>>> c028f68fa (Add /readiness and /liveness when enrolling with the container (#9612))
+	return prefixedEndpoint(AgentMonitoringEndpoint(cfg))
 }
 
 // AgentMonitoringEndpoint provides an agent monitoring endpoint path.
