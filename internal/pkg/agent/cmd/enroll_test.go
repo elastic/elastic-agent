@@ -48,9 +48,8 @@ func TestComputeFixPermissions(t *testing.T) {
 			fromInstall:               true,
 			hasRoot:                   true,
 			goos:                      "darwin",
-			ownerFromCmdOwner:         owner,
 			wantOwner:                 nil,
-			expectOwnerFromCmdCalled:  true,
+			expectOwnerFromCmdCalled:  false,
 			expectOwnerFromPathCalled: false,
 		},
 		"should return error when getting owner from cmd fails during installer enroll": {

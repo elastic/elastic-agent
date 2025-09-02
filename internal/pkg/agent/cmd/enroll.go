@@ -377,28 +377,26 @@ func computeFixPermissions(fromInstall bool, hasRoot bool, os string, getFileOwn
 	// Error: failed to fix permissions: chown /Library/Elastic/Agent/data/elastic-agent-c13f91/elastic-agent.app: operation not permitted
 	// This is because we are fixing permissions twice, once during installation and again during the enrollment step.
 	// When we are enrolling as part of installation on MacOS, skip the second attempt to fix permissions.
-	var fixPermissions *utils.FileOwner
 	if fromInstall {
+		if os == "darwin" {
+			return nil, nil
+		}
 		perms, err := getFileOwnerFromCmd(cmd)
 		if err != nil {
 			// no context is added because the error is clear and user facing
 			return nil, err
 		}
-		fixPermissions = &perms
-
-		if os == "darwin" {
-			fixPermissions = nil
-		}
+		return &perms, nil
 	} else {
 		if hasRoot && os != "windows" { // windows is a no-op, will be addressed in a separate PR
 			perms, err := getOwnerFromPath(paths.Top())
 			if err != nil {
 				return nil, fmt.Errorf("failed to get owner from path %s: %w", paths.Top(), err)
 			}
-			fixPermissions = &perms
+			return &perms, nil
 		}
 	}
-	return fixPermissions, nil
+	return nil, nil
 }
 
 func doEnroll(streams *cli.IOStreams, cmd *cobra.Command) error {
