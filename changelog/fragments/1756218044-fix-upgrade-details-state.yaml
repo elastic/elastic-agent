@@ -1,0 +1,5 @@
+kind: bug-fix
+summary: fix reporting of scheduled upgrade details across restarts and cancels
+component: elastic-agent
+pr: https://github.com/elastic/elastic-agent/pull/9562
+issue: https://github.com/elastic/elastic-agent/issues/8778
