@@ -54,6 +54,9 @@ var (
 					"level":   "none",
 					"readers": []any{},
 				},
+				"logs": map[string]interface{}{
+					"level": "info",
+				},
 			},
 			"pipelines": map[string]interface{}{
 				"traces": map[string]interface{}{
@@ -312,8 +315,10 @@ func TestOTelManager_Run(t *testing.T) {
 				m.Update(cfg, nil)
 				e.EnsureHealthy(t, updateTime)
 
-				// trigger update (no config compare is due externally to otel collector)
+				// trigger update
 				updateTime = time.Now()
+				ok := cfg.Delete("service::telemetry::logs::level") // modify the config
+				require.True(t, ok)
 				m.Update(cfg, nil)
 				e.EnsureHealthy(t, updateTime)
 
@@ -337,8 +342,10 @@ func TestOTelManager_Run(t *testing.T) {
 				m.Update(cfg, nil)
 				e.EnsureHealthy(t, updateTime)
 
-				// trigger update (no config compare is due externally to otel collector)
+				// trigger update
 				updateTime = time.Now()
+				ok := cfg.Delete("service::telemetry::logs::level") // modify the config
+				require.True(t, ok)
 				m.Update(cfg, nil)
 				e.EnsureHealthy(t, updateTime)
 
@@ -1360,4 +1367,163 @@ func assertOtelStatusesEqualIgnoringTimestamps(t require.TestingT, a, b *status.
 	}
 
 	return true
+}
+
+func TestCalculateConfmapHash(t *testing.T) {
+	t.Run("nil config returns zero", func(t *testing.T) {
+		hash, err := calculateConfmapHash(nil)
+		require.NoError(t, err)
+		assert.Equal(t, uint64(0), hash)
+	})
+
+	t.Run("same value gives same result", func(t *testing.T) {
+		conf := confmap.NewFromStringMap(map[string]any{
+			"key1": "value1",
+			"key2": 123,
+		})
+		hash1, err := calculateConfmapHash(conf)
+		require.NoError(t, err)
+		hash2, err := calculateConfmapHash(conf)
+		require.NoError(t, err)
+		assert.Equal(t, hash1, hash2)
+	})
+
+	t.Run("different values give different results", func(t *testing.T) {
+		conf1 := confmap.NewFromStringMap(map[string]any{
+			"key1": "value1",
+		})
+		hash1, err := calculateConfmapHash(conf1)
+		require.NoError(t, err)
+
+		conf2 := confmap.NewFromStringMap(map[string]any{
+			"key1": "value2",
+		})
+		hash2, err := calculateConfmapHash(conf2)
+		require.NoError(t, err)
+
+		assert.NotEqual(t, hash1, hash2)
+	})
+
+	t.Run("list of maps is processed correctly", func(t *testing.T) {
+		conf1 := confmap.NewFromStringMap(map[string]any{
+			"items": []any{
+				map[string]any{"name": "A", "value": 1},
+				map[string]any{"name": "B", "value": 2},
+			},
+		})
+		hash1, err := calculateConfmapHash(conf1)
+		require.NoError(t, err)
+
+		t.Run("same list of maps gives same hash", func(t *testing.T) {
+			conf2 := confmap.NewFromStringMap(map[string]any{
+				"items": []any{
+					map[string]any{"name": "A", "value": 1},
+					map[string]any{"name": "B", "value": 2},
+				},
+			})
+			hash2, err := calculateConfmapHash(conf2)
+			require.NoError(t, err)
+			assert.Equal(t, hash1, hash2)
+		})
+
+		t.Run("different order in list gives different hash", func(t *testing.T) {
+			conf3 := confmap.NewFromStringMap(map[string]any{
+				"items": []any{
+					map[string]any{"name": "B", "value": 2},
+					map[string]any{"name": "A", "value": 1},
+				},
+			})
+			hash3, err := calculateConfmapHash(conf3)
+			require.NoError(t, err)
+			assert.NotEqual(t, hash1, hash3)
+		})
+	})
+}
+
+func TestOTelManager_maybeUpdateMergedConfig(t *testing.T) {
+	t.Run("initial config", func(t *testing.T) {
+		m := &OTelManager{}
+		conf := confmap.NewFromStringMap(map[string]any{"key": "value"})
+
+		updated, err := m.maybeUpdateMergedConfig(conf)
+
+		require.NoError(t, err)
+		assert.True(t, updated)
+		assert.Equal(t, conf, m.mergedCollectorCfg)
+		assert.NotEqual(t, uint64(0), m.mergedCollectorCfgHash)
+	})
+
+	t.Run("same config", func(t *testing.T) {
+		conf := confmap.NewFromStringMap(map[string]any{"key": "value"})
+		hash, err := calculateConfmapHash(conf)
+		require.NoError(t, err)
+
+		m := &OTelManager{
+			mergedCollectorCfg:     conf,
+			mergedCollectorCfgHash: hash,
+		}
+
+		updated, err := m.maybeUpdateMergedConfig(conf)
+
+		require.NoError(t, err)
+		assert.False(t, updated)
+		assert.Equal(t, conf, m.mergedCollectorCfg)
+		assert.Equal(t, hash, m.mergedCollectorCfgHash)
+	})
+
+	t.Run("different config", func(t *testing.T) {
+		conf1 := confmap.NewFromStringMap(map[string]any{"key": "value1"})
+		hash1, err := calculateConfmapHash(conf1)
+		require.NoError(t, err)
+
+		m := &OTelManager{
+			mergedCollectorCfg:     conf1,
+			mergedCollectorCfgHash: hash1,
+		}
+
+		conf2 := confmap.NewFromStringMap(map[string]any{"key": "value2"})
+		hash2, err := calculateConfmapHash(conf2)
+		require.NoError(t, err)
+
+		updated, err := m.maybeUpdateMergedConfig(conf2)
+
+		require.NoError(t, err)
+		assert.True(t, updated)
+		assert.Equal(t, conf2, m.mergedCollectorCfg)
+		assert.Equal(t, hash2, m.mergedCollectorCfgHash)
+		assert.NotEqual(t, hash1, m.mergedCollectorCfgHash)
+	})
+
+	t.Run("hashing error with previous config", func(t *testing.T) {
+		conf1 := confmap.NewFromStringMap(map[string]any{"key": "value1"})
+		hash1, err := calculateConfmapHash(conf1)
+		require.NoError(t, err)
+
+		m := &OTelManager{
+			mergedCollectorCfg:     conf1,
+			mergedCollectorCfgHash: hash1,
+		}
+
+		badConf := confmap.NewFromStringMap(map[string]any{"bad": make(chan int)})
+		updated, err := m.maybeUpdateMergedConfig(badConf)
+
+		require.Error(t, err)
+		assert.True(t, updated, "update should proceed on hashing error")
+		assert.Equal(t, badConf, m.mergedCollectorCfg)
+		assert.Equal(t, uint64(0), m.mergedCollectorCfgHash)
+	})
+
+	t.Run("hashing error with no previous config", func(t *testing.T) {
+		m := &OTelManager{}
+
+		badConf := confmap.NewFromStringMap(map[string]any{"bad": make(chan int)})
+		updated, err := m.maybeUpdateMergedConfig(badConf)
+
+		require.Error(t, err)
+		// The current implementation will return false for updated, because previous and current hashes are both 0.
+		// A robust implementation should return true to ensure the configuration is applied.
+		assert.True(t, updated, "update should proceed on hashing error, even with no previous config")
+		assert.Equal(t, badConf, m.mergedCollectorCfg)
+		assert.Equal(t, uint64(0), m.mergedCollectorCfgHash)
+	})
 }
