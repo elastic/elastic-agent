@@ -119,15 +119,9 @@ func isProcessRedirectable(componentID string) bool {
 	return false
 }
 
-<<<<<<< HEAD
-func redirectToPath(w http.ResponseWriter, r *http.Request, id, path, operatingSystem string) error {
+func redirectToPath(w http.ResponseWriter, r *http.Request, id, path string) error {
 	endpoint := prefixedEndpoint(utils.SocketURLWithFallback(id, paths.TempDir()))
 	metricsBytes, statusCode, metricsErr := processMetrics(r.Context(), endpoint, path)
-=======
-func redirectToPath(w http.ResponseWriter, r *http.Request, id, path string) error {
-	endpoint := PrefixedEndpoint(utils.SocketURLWithFallback(id, paths.TempDir()))
-	metricsBytes, statusCode, metricsErr := GetProcessMetrics(r.Context(), endpoint, path)
->>>>>>> c028f68fa (Add /readiness and /liveness when enrolling with the container (#9612))
 	if metricsErr != nil {
 		return metricsErr
 	}
