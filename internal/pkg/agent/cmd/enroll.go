@@ -387,15 +387,16 @@ func computeFixPermissions(fromInstall bool, hasRoot bool, os string, getFileOwn
 			return nil, err
 		}
 		return &perms, nil
-	} else {
-		if hasRoot && os != "windows" { // windows is a no-op, will be addressed in a separate PR
-			perms, err := getOwnerFromPath(paths.Top())
-			if err != nil {
-				return nil, fmt.Errorf("failed to get owner from path %s: %w", paths.Top(), err)
-			}
-			return &perms, nil
-		}
 	}
+
+	if hasRoot && os != "windows" { // windows is a no-op, will be addressed in a separate PR
+		perms, err := getOwnerFromPath(paths.Top())
+		if err != nil {
+			return nil, fmt.Errorf("failed to get owner from path %s: %w", paths.Top(), err)
+		}
+		return &perms, nil
+	}
+
 	return nil, nil
 }
 
