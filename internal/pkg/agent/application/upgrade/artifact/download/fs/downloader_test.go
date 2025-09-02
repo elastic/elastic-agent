@@ -164,6 +164,9 @@ func TestDownloader_Download(t *testing.T) {
 			e := &Downloader{
 				dropPath: dropPath,
 				config:   config,
+				copy:     io.Copy,
+				mkdirAll: os.MkdirAll,
+				openFile: os.OpenFile,
 			}
 			got, err := e.Download(context.TODO(), tt.args.a, tt.args.version)
 			if !tt.wantErr(t, err, fmt.Sprintf("Download(%v, %v)", tt.args.a, tt.args.version)) {
@@ -285,6 +288,9 @@ func TestDownloader_DownloadAsc(t *testing.T) {
 			e := &Downloader{
 				dropPath: dropPath,
 				config:   config,
+				copy:     io.Copy,
+				mkdirAll: os.MkdirAll,
+				openFile: os.OpenFile,
 			}
 			got, err := e.DownloadAsc(context.TODO(), tt.args.a, tt.args.version)
 			if !tt.wantErr(t, err, fmt.Sprintf("DownloadAsc(%v, %v)", tt.args.a, tt.args.version)) {
