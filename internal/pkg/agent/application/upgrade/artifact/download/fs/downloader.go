@@ -8,6 +8,7 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -15,7 +16,6 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/common"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
@@ -28,6 +28,10 @@ const (
 type Downloader struct {
 	dropPath string
 	config   *artifact.Config
+	// The following are abstractions for stdlib functions so that we can mock them in tests.
+	copy     func(dst io.Writer, src io.Reader) (int64, error)
+	mkdirAll func(name string, perm os.FileMode) error
+	openFile func(name string, flag int, perm os.FileMode) (*os.File, error)
 }
 
 // NewDownloader creates and configures Elastic Downloader
@@ -35,6 +39,9 @@ func NewDownloader(config *artifact.Config) *Downloader {
 	return &Downloader{
 		config:   config,
 		dropPath: getDropPath(config),
+		copy:     io.Copy,
+		mkdirAll: os.MkdirAll,
+		openFile: os.OpenFile,
 	}
 }
 
@@ -109,21 +116,18 @@ func (e *Downloader) downloadFile(filename, fullPath string) (string, error) {
 	defer sourceFile.Close()
 
 	if destinationDir := filepath.Dir(fullPath); destinationDir != "" && destinationDir != "." {
-		// using common.MkdirAll here for testability
-		if err := common.MkdirAll(destinationDir, 0755); err != nil {
+		if err := e.mkdirAll(destinationDir, 0755); err != nil {
 			return "", err
 		}
 	}
 
-	// using common.OpenFile here for testability
-	destinationFile, err := common.OpenFile(fullPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
+	destinationFile, err := e.openFile(fullPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
 	if err != nil {
 		return "", goerrors.Join(errors.New("creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath)), err)
 	}
 	defer destinationFile.Close()
 
-	// using common.Copy here for testability
-	_, err = common.Copy(destinationFile, sourceFile)
+	_, err = e.copy(destinationFile, sourceFile)
 	if err != nil {
 		return "", err
 	}
