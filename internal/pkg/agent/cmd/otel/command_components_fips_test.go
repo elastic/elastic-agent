@@ -42,7 +42,7 @@ func TestComponentsCommand(t *testing.T) {
 	cmd := &cobra.Command{}
 	cmd.SetArgs([]string{"components"})
 
-	expectedOutput, err := os.ReadFile(filepath.Join("../", "testdata", "otel/components-output-fips.yml"))
+	expectedOutput, err := os.ReadFile(filepath.Join("testdata", "otel/components-output-fips.yml"))
 	require.NoError(t, err)
 	expectedComponents := &componentsOutput{}
 	err = yaml.Unmarshal(expectedOutput, expectedComponents)

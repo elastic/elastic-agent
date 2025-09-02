@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/install"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
@@ -55,7 +55,7 @@ func TestReEnrollUnprivileged(t *testing.T) {
 
 	out, err := fixture.Exec(ctx, enrollArgs)
 	require.Error(t, err)
-	require.Contains(t, string(out), cmd.UserOwnerMismatchError.Error())
+	require.Contains(t, string(out), install.UserOwnerMismatchError.Error())
 
 	assert.Eventuallyf(t, func() bool {
 		err := fixture.IsHealthy(t.Context())
