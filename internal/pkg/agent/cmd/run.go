@@ -40,6 +40,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
@@ -139,7 +140,8 @@ func run(override application.CfgOverrider, testingMode bool, fleetInitTimeout t
 	defer cancel()
 	go service.ProcessWindowsControlEvents(stopBeat)
 
-	if err := handleUpgrade(); err != nil {
+	upgradeDetailsFromMarker, err := handleUpgrade()
+	if err != nil {
 		return fmt.Errorf("error checking for and handling upgrade: %w", err)
 	}
 
@@ -151,7 +153,7 @@ func run(override application.CfgOverrider, testingMode bool, fleetInitTimeout t
 		_ = locker.Unlock()
 	}()
 
-	return runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, modifiers...)
+	return runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, upgradeDetailsFromMarker, modifiers...)
 }
 
 func logReturn(l *logger.Logger, err error) error {
@@ -161,7 +163,16 @@ func logReturn(l *logger.Logger, err error) error {
 	return err
 }
 
-func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override application.CfgOverrider, stop chan bool, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
+func runElasticAgent(
+	ctx context.Context,
+	cancel context.CancelFunc,
+	override application.CfgOverrider,
+	stop chan bool,
+	testingMode bool,
+	fleetInitTimeout time.Duration,
+	upgradeDetailsFromMarker *details.Details,
+	modifiers ...component.PlatformModifier,
+) error {
 	cfg, err := loadConfig(ctx, override)
 	if err != nil {
 		return err
@@ -201,7 +212,7 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override ap
 	pathConfigFile := paths.AgentConfigFile()
 
 	// agent ID needs to stay empty in bootstrap mode
-	createAgentID := true
+	createAgentID := true //nolint:staticcheck // keep createAgentID assignment explicit
 	if cfg.Fleet != nil && cfg.Fleet.Server != nil && cfg.Fleet.Server.Bootstrap {
 		createAgentID = false
 	}
@@ -282,7 +293,8 @@ func runElasticAgent(ctx context.Context, cancel context.CancelFunc, override ap
 	}
 
 	isBootstrap := configuration.IsFleetServerBootstrap(cfg.Fleet)
-	coord, configMgr, _, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode, fleetInitTimeout, isBootstrap, override, modifiers...)
+	coord, configMgr, _, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode,
+		fleetInitTimeout, isBootstrap, override, upgradeDetailsFromMarker, modifiers...)
 	if err != nil {
 		return logReturn(l, err)
 	}
@@ -666,26 +678,26 @@ func setupMetrics(
 // handleUpgrade checks if agent is being run as part of an
 // ongoing upgrade operation, i.e. being re-exec'd and performs
 // any upgrade-specific work, if needed.
-func handleUpgrade() error {
+func handleUpgrade() (*details.Details, error) {
 	upgradeMarker, err := upgrade.LoadMarker(paths.Data())
 	if err != nil {
-		return fmt.Errorf("unable to load upgrade marker to check if Agent is being upgraded: %w", err)
+		return nil, fmt.Errorf("unable to load upgrade marker to check if Agent is being upgraded: %w", err)
 	}
 
 	if upgradeMarker == nil {
 		// We're not being upgraded. Nothing more to do.
-		return nil
+		return nil, nil
 	}
 
 	if err := ensureInstallMarkerPresent(); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := upgrade.EnsureServiceConfigUpToDate(); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return upgradeMarker.Details, nil
 }
 
 func ensureInstallMarkerPresent() error {
