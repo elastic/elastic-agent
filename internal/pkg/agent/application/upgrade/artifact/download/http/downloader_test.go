@@ -24,8 +24,8 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/common"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -552,57 +552,72 @@ func TestDownloadDiskSpaceError(t *testing.T) {
 		},
 	}
 
-	errorTestCase := []struct {
-		funcName          common.MockStdLibFuncName
-		mockReturnedError error
-		expectedError     error
-	}{}
+	testError := errors.New("test error")
 
-	funcNames := []common.MockStdLibFuncName{common.CopyFuncName, common.OpenFileFuncName, common.MkdirAllFuncName}
-	for _, osErr := range downloadErrors.OS_DiskSpaceErrors {
-		for _, funcName := range funcNames {
-
-			errorTestCase = append(errorTestCase, struct {
-				funcName          common.MockStdLibFuncName
-				mockReturnedError error
-				expectedError     error
-			}{
-				funcName:          funcName,
-				mockReturnedError: osErr,
-				expectedError:     osErr,
-			})
-		}
+	type errorHandlingTestCase struct {
+		mockStdlibFuncs        func(downloader *Downloader)
+		isDiskSpaceErrorResult bool
+		expectedError          error
 	}
-	for _, testCase := range testCases {
-		for _, etc := range errorTestCase {
-			testName := fmt.Sprintf("%s-binary-%s-%s", testCase.system, testCase.arch, etc.funcName)
-			t.Run(testName, func(t *testing.T) {
-				stdLibMocker := common.PrepareStdLibMocks(common.StdLibMocks{
-					CopyMock: func(dst io.Writer, src io.Reader) (int64, error) {
-						return 0, etc.mockReturnedError
-					},
-					OpenFileMock: func(name string, flag int, perm os.FileMode) (*os.File, error) {
-						return nil, etc.mockReturnedError
-					},
-					MkdirAllMock: func(path string, perm os.FileMode) error {
-						return etc.mockReturnedError
-					},
-				})
-				stdLibMocker(t, etc.funcName)
 
+	errorHandlingTestCases := map[string]errorHandlingTestCase{
+		"when io.Copy runs into an error, the downloader should return the error and clean up the downloaded files": {
+			mockStdlibFuncs: func(downloader *Downloader) {
+				downloader.copy = func(dst io.Writer, src io.Reader) (int64, error) {
+					return 0, testError
+				}
+			},
+			expectedError: testError,
+		},
+		"when io.Copy runs into disk space error, the downloader should report the error and clean up the downloaded files": {
+			mockStdlibFuncs: func(downloader *Downloader) {
+				downloader.copy = func(dst io.Writer, src io.Reader) (int64, error) {
+					return 0, testError
+				}
+			},
+			isDiskSpaceErrorResult: true,
+			expectedError:          testError,
+		},
+		"when os.OpenFile runs into an error, the downloader should return the error and clean up the downloaded files": {
+			mockStdlibFuncs: func(downloader *Downloader) {
+				downloader.openFile = func(name string, flag int, perm os.FileMode) (*os.File, error) {
+					return nil, testError
+				}
+			},
+			expectedError: testError,
+		},
+		"when os.MkdirAll runs into an error, the downloader should return the error and clean up the downloaded files": {
+			mockStdlibFuncs: func(downloader *Downloader) {
+				downloader.mkdirAll = func(name string, perm os.FileMode) error {
+					return testError
+				}
+			},
+			expectedError: testError,
+		},
+	}
+
+	for _, testCase := range testCases {
+		for name, etc := range errorHandlingTestCases {
+
+			testName := fmt.Sprintf("%s-binary-%s-%s", testCase.system, testCase.arch, name)
+			t.Run(testName, func(t *testing.T) {
 				config.OperatingSystem = testCase.system
 				config.Architecture = testCase.arch
 
 				upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
 				testClient := NewDownloaderWithClient(log, config, elasticClient, upgradeDetails)
+				etc.mockStdlibFuncs(testClient)
+				testClient.isDiskSpaceErrorFunc = func(err error) bool {
+					return etc.isDiskSpaceErrorResult
+				}
 				artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
 
 				require.ErrorIs(t, err, etc.expectedError, "expected error mismatch")
 				require.NoFileExists(t, artifactPath)
 
-				if etc.funcName == common.CopyFuncName {
+				if etc.isDiskSpaceErrorResult {
 					require.Equal(t, details.StateFailed, upgradeDetails.State)
-					require.Equal(t, "insufficient disk space", upgradeDetails.Metadata.ErrorMsg)
+					require.Equal(t, downloadErrors.ErrInsufficientDiskSpace.Error(), upgradeDetails.Metadata.ErrorMsg)
 				}
 
 				os.Remove(artifactPath)
