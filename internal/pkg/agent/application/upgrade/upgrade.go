@@ -69,14 +69,21 @@ func init() {
 	}
 }
 
+type artifactDownloadHandler interface {
+	downloadArtifact(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error)
+	withFleetServerURI(fleetServerURI string)
+}
+
 // Upgrader performs an upgrade
 type Upgrader struct {
-	log            *logger.Logger
-	settings       *artifact.Config
-	agentInfo      info.Agent
-	upgradeable    bool
-	fleetServerURI string
-	markerWatcher  MarkerWatcher
+	log                  *logger.Logger
+	settings             *artifact.Config
+	agentInfo            info.Agent
+	upgradeable          bool
+	fleetServerURI       string
+	markerWatcher        MarkerWatcher
+	artifactDownloader   artifactDownloadHandler
+	isDiskSpaceErrorFunc func(err error) bool
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -89,11 +96,13 @@ func IsUpgradeable() bool {
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
 func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.Agent) (*Upgrader, error) {
 	return &Upgrader{
-		log:           log,
-		settings:      settings,
-		agentInfo:     agentInfo,
-		upgradeable:   IsUpgradeable(),
-		markerWatcher: newMarkerFileWatcher(markerFilePath(paths.Data()), log),
+		log:                  log,
+		settings:             settings,
+		agentInfo:            agentInfo,
+		upgradeable:          IsUpgradeable(),
+		markerWatcher:        newMarkerFileWatcher(markerFilePath(paths.Data()), log),
+		artifactDownloader:   newArtifactDownloader(settings, log),
+		isDiskSpaceErrorFunc: upgradeErrors.IsDiskSpaceError,
 	}, nil
 }
 
@@ -102,10 +111,12 @@ func (u *Upgrader) SetClient(c fleetclient.Sender) {
 	if c == nil {
 		u.log.Debug("client nil, resetting Fleet Server URI")
 		u.fleetServerURI = ""
+		u.artifactDownloader.withFleetServerURI("")
 	}
 
 	u.fleetServerURI = c.URI()
 	u.log.Debugf("Set client changed URI to %s", u.fleetServerURI)
+	u.artifactDownloader.withFleetServerURI(u.fleetServerURI)
 }
 
 // Reload reloads the artifact configuration for the upgrader.
@@ -202,7 +213,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		if err != nil {
 			// Add the disk space error to the error chain if it is a disk space error
 			// so that we can use errors.Is to check for it
-			if upgradeErrors.IsDiskSpaceError(err) {
+			if u.isDiskSpaceErrorFunc(err) {
 				err = goerrors.Join(err, upgradeErrors.ErrInsufficientDiskSpace)
 			}
 		}
@@ -248,7 +259,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, fmt.Errorf("error parsing version %q: %w", version, err)
 	}
 
-	archivePath, err := u.downloadArtifact(ctx, parsedVersion, sourceURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+	archivePath, err := u.artifactDownloader.downloadArtifact(ctx, parsedVersion, sourceURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
 	if err != nil {
 		// Run the same pre-upgrade cleanup task to get rid of any newly downloaded files
 		// This may have an issue if users are upgrading to the same version number.
