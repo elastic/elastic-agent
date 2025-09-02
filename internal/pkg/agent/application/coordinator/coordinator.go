@@ -322,6 +322,9 @@ type Coordinator struct {
 	// run a ticker that checks to see if we have a new PID.
 	componentPIDTicker         *time.Ticker
 	componentPidRequiresUpdate *atomic.Bool
+
+	// Abstraction for diagnostics AddSecretMarkers function for testability
+	secretMarkerFunc func(*logger.Logger, *config.Config) error
 }
 
 // The channels Coordinator reads to receive updates from the various managers.
@@ -368,7 +371,25 @@ type UpdateComponentChange struct {
 }
 
 // New creates a new coordinator.
-func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.Level, agentInfo info.Agent, specs component.RuntimeSpecs, reexecMgr ReExecManager, upgradeMgr UpgradeManager, runtimeMgr RuntimeManager, configMgr ConfigManager, varsMgr VarsManager, caps capabilities.Capabilities, monitorMgr MonitorManager, isManaged bool, otelMgr OTelManager, fleetAcker acker.Acker, modifiers ...ComponentsModifier) *Coordinator {
+func New(
+	logger *logger.Logger,
+	cfg *configuration.Configuration,
+	logLevel logp.Level,
+	agentInfo info.Agent,
+	specs component.RuntimeSpecs,
+	reexecMgr ReExecManager,
+	upgradeMgr UpgradeManager,
+	runtimeMgr RuntimeManager,
+	configMgr ConfigManager,
+	varsMgr VarsManager,
+	caps capabilities.Capabilities,
+	monitorMgr MonitorManager,
+	isManaged bool,
+	otelMgr OTelManager,
+	fleetAcker acker.Acker,
+	initialUpgradeDetails *details.Details,
+	modifiers ...ComponentsModifier,
+) *Coordinator {
 	var fleetState cproto.State
 	var fleetMessage string
 	if !isManaged {
@@ -377,11 +398,12 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		fleetMessage = "Not enrolled into Fleet"
 	}
 	state := State{
-		State:        agentclient.Starting,
-		Message:      "Starting",
-		FleetState:   fleetState,
-		FleetMessage: fleetMessage,
-		LogLevel:     logLevel,
+		State:          agentclient.Starting,
+		Message:        "Starting",
+		FleetState:     fleetState,
+		FleetMessage:   fleetMessage,
+		LogLevel:       logLevel,
+		UpgradeDetails: initialUpgradeDetails,
 	}
 	c := &Coordinator{
 		logger:     logger,
@@ -423,7 +445,8 @@ func New(logger *logger.Logger, cfg *configuration.Configuration, logLevel logp.
 		componentPIDTicker:         time.NewTicker(time.Second * 30),
 		componentPidRequiresUpdate: &atomic.Bool{},
 
-		fleetAcker: fleetAcker,
+		fleetAcker:       fleetAcker,
+		secretMarkerFunc: diagnostics.AddSecretMarkers,
 	}
 	// Setup communication channels for any non-nil components. This pattern
 	// lets us transparently accept nil managers / simulated events during
@@ -1275,6 +1298,10 @@ func (c *Coordinator) generateAST(cfg *config.Config) (err error) {
 
 	if err = info.InjectAgentConfig(cfg); err != nil {
 		return err
+	}
+
+	if err = c.secretMarkerFunc(c.logger, cfg); err != nil {
+		c.logger.Errorf("failed to add secret markers: %v", err)
 	}
 
 	// perform and verify ast translation
