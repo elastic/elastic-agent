@@ -96,7 +96,7 @@ targets:
       files:
         - "deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"
         - "deploy/helm/edot-collector/kube-stack/values.yaml"
-      key: "instrumentation.dotnet.image"
+      key: "$.instrumentation.dotnet.image"
     transformers:
       - addprefix: "docker.elastic.co/observability/elastic-otel-dotnet:"
 
@@ -110,7 +110,7 @@ targets:
       files:
         - "deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"
         - "deploy/helm/edot-collector/kube-stack/values.yaml"
-      key: "instrumentation.java.image"
+      key: "$.instrumentation.java.image"
     transformers:
       - trimprefix: "v"
       - addprefix: "docker.elastic.co/observability/elastic-otel-javaagent:"
@@ -124,7 +124,7 @@ targets:
       files:
         - "deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"
         - "deploy/helm/edot-collector/kube-stack/values.yaml"
-      key: "instrumentation.nodejs.image"
+      key: "$.instrumentation.nodejs.image"
     transformers:
       - trimprefix: "v"
       - addprefix: "docker.elastic.co/observability/elastic-otel-node:"
@@ -138,7 +138,7 @@ targets:
       files:
         - "deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"
         - "deploy/helm/edot-collector/kube-stack/values.yaml"
-      key: "instrumentation.python.image"
+      key: "$.instrumentation.python.image"
     transformers:
       - trimprefix: "v"
       - addprefix: "docker.elastic.co/observability/elastic-otel-python:"
@@ -152,6 +152,6 @@ targets:
       files:
         - "deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"
         - "deploy/helm/edot-collector/kube-stack/values.yaml"
-      key: "instrumentation.go.image"
+      key: "$.instrumentation.go.image"
     transformers:
       - addprefix: "ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:"
