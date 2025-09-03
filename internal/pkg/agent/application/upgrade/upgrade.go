@@ -91,6 +91,8 @@ type Upgrader struct {
 	artifactDownloader   artifactDownloadHandler
 	unpacker             unpackHandler
 	isDiskSpaceErrorFunc func(err error) bool
+	extractAgentVersion  func(metadata packageMetadata, upgradeVersion string) agentVersion
+	detectFlavor         func(topDir string, defaultFlavor string) (string, error)
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -111,6 +113,8 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.A
 		artifactDownloader:   newArtifactDownloader(settings, log),
 		unpacker:             newUnpacker(log),
 		isDiskSpaceErrorFunc: upgradeErrors.IsDiskSpaceError,
+		extractAgentVersion:  extractAgentVersion,
+		detectFlavor:         install.UsedFlavor,
 	}, nil
 }
 
@@ -285,7 +289,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, fmt.Errorf("reading metadata for elastic agent version %s package %q: %w", version, archivePath, err)
 	}
 
-	newVersion := extractAgentVersion(metadata, version)
+	newVersion := u.extractAgentVersion(metadata, version)
 	if err := checkUpgrade(u.log, currentVersion, newVersion, metadata); err != nil {
 		return nil, fmt.Errorf("cannot upgrade the agent: %w", err)
 	}
@@ -297,7 +301,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	// no default flavor, keep everything in case flavor is not specified
 	// in case of error fallback to keep-all
-	detectedFlavor, err := install.UsedFlavor(paths.Top(), "")
+	detectedFlavor, err := u.detectFlavor(paths.Top(), "")
 	if err != nil {
 		u.log.Warnf("error encountered when detecting used flavor with top path %q: %w", paths.Top(), err)
 	}
