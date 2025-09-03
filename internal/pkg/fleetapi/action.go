@@ -266,7 +266,7 @@ type ActionUpgradeData struct {
 	Retry int `json:"retry_attempt,omitempty" yaml:"retry_attempt,omitempty" mapstructure:"-"`
 }
 
-func (a ActionUpgrade) String() string {
+func (a *ActionUpgrade) String() string {
 	var s strings.Builder
 	s.WriteString("id: ")
 	s.WriteString(a.ActionID)
@@ -275,7 +275,7 @@ func (a ActionUpgrade) String() string {
 	return s.String()
 }
 
-func (a ActionUpgrade) AckEvent() AckEvent {
+func (a *ActionUpgrade) AckEvent() AckEvent {
 	event := newAckEvent(a.ActionID, a.ActionType)
 	if a.Err != nil {
 		// FIXME Do we want to change EventType/SubType here?
@@ -296,17 +296,17 @@ func (a ActionUpgrade) AckEvent() AckEvent {
 }
 
 // Type returns the type of the Action.
-func (a ActionUpgrade) Type() string {
+func (a *ActionUpgrade) Type() string {
 	return a.ActionType
 }
 
 // ID returns the ID of the Action.
-func (a ActionUpgrade) ID() string {
+func (a *ActionUpgrade) ID() string {
 	return a.ActionID
 }
 
 // StartTime returns the start_time as a UTC time.Time or ErrNoStartTime if there is no start time
-func (a ActionUpgrade) StartTime() (time.Time, error) {
+func (a *ActionUpgrade) StartTime() (time.Time, error) {
 	if a.ActionStartTime == "" {
 		return time.Time{}, ErrNoStartTime
 	}
@@ -318,7 +318,7 @@ func (a ActionUpgrade) StartTime() (time.Time, error) {
 }
 
 // Expiration returns the expiration as a UTC time.Time or ErrExpiration if there is no expiration
-func (a ActionUpgrade) Expiration() (time.Time, error) {
+func (a *ActionUpgrade) Expiration() (time.Time, error) {
 	if a.ActionExpiration == "" {
 		return time.Time{}, ErrNoExpiration
 	}
@@ -330,7 +330,7 @@ func (a ActionUpgrade) Expiration() (time.Time, error) {
 }
 
 // RetryAttempt will return the retry_attempt of the action
-func (a ActionUpgrade) RetryAttempt() int {
+func (a *ActionUpgrade) RetryAttempt() int {
 	return a.Data.Retry
 }
 
