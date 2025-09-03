@@ -25,10 +25,20 @@ require (
 	github.com/elastic/go-licenser v0.4.2
 	github.com/elastic/go-sysinfo v1.15.4
 	github.com/elastic/go-ucfg v0.8.9-0.20250307075119-2a22403faaea
+<<<<<<< HEAD
 	github.com/elastic/mock-es v0.0.0-20241101195702-0a41fa3d30d9
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.2.1
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.13.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.4.1
+=======
+	github.com/elastic/mock-es v0.0.0-20250324153755-573fc6c0ac4b
+	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.6.0
+	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.3.0
+	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.6.0
+	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.16.0
+	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.9.0
+	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.2.1
+>>>>>>> 53d19014e (build(deps): bump github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension from 0.5.0 to 0.6.0 (#9596))
 	github.com/fatih/color v1.18.0
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/go-viper/mapstructure/v2 v2.3.0
