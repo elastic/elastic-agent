@@ -5,3 +5,7 @@
 //go:build !windows
 
 package agentservice
+
+func NotifyTermination() {}
+
+func WaitExecutionDone() {}

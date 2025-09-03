@@ -14,6 +14,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/service"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/agentservice"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/common"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
@@ -81,8 +82,8 @@ func runService(testingMode bool, fleetInitTimeout time.Duration) error {
 	// After this is run, the service is considered by the OS to be stopped.
 	// This must be the first deferred cleanup task (last to execute).
 	defer func() {
-		service.NotifyTermination()
-		service.WaitExecutionDone()
+		agentservice.NotifyTermination()
+		agentservice.WaitExecutionDone()
 	}()
 
 	service.BeforeRun()

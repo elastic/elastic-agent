@@ -51,7 +51,13 @@ func init() {
 
 func stopBeat() {
 	if StopChanBeat != nil {
+		// making sure select catches it by sending
+		select {
+		case StopChanBeat <- true:
+		default:
+		}
 		close(StopChanBeat)
+
 	}
 }
 
@@ -66,10 +72,10 @@ func processWindowsControlEvents(stopCallback func()) {
 	//nolint:staticcheck // keep using the deprecated method in order to maintain the existing behavior
 	isInteractive, err := svc.IsAnInteractiveSession()
 	if err != nil {
-		logp.Err("IsAnInteractiveSession: %v", err)
+		logp.L().Errorf("IsAnInteractiveSession: %v", err)
 		return
 	}
-	logp.Debug("service", "Windows is interactive: %v", isInteractive)
+	logp.L().Debug("service", "Windows is interactive: %v", isInteractive)
 
 	run := svc.Run
 	if isInteractive {
@@ -98,11 +104,11 @@ func processWindowsControlEvents(stopCallback func()) {
 			  If the program will be run as a console application for debugging purposes, structure it such that
 				service-specific code is not called when this error is returned."
 		*/
-		logp.Info("Attempted to register Windows service handlers, but this is not a service. No action necessary")
+		logp.L().Info("Attempted to register Windows service handlers, but this is not a service. No action necessary")
 		return
 	}
 
-	logp.Err("Windows service setup failed: %+v", err)
+	logp.L().Errorf("Windows service setup failed: %+v", err)
 }
 
 // Execute runs the beat service with the arguments and manages changes that
@@ -112,8 +118,7 @@ func (m *beatService) Execute(args []string, r <-chan svc.ChangeRequest, changes
 	changes <- svc.Status{State: svc.StartPending}
 	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 
-	log := logp.NewLogger("service_windows")
-	log.Info("reported Running to Service manager")
+	logp.L().Info("reported Running to Service manager")
 	combinedChan := make(chan svc.ChangeRequest)
 	go func() {
 		for {
@@ -140,34 +145,56 @@ loop:
 		// The svc.Cmd tye does not implement the Stringer interface and its
 		// underlying type is an integer, therefore it's needed to manually log them.
 		case svc.Stop:
-			log.Info("received state change 'svc.Stop' from windows service manager")
+			logp.L().Info("received state change 'svc.Stop' from windows service manager")
 			break loop
 		case svc.Shutdown:
-			log.Info("received state change 'svc.Shutdown' from windows service manager")
+			logp.L().Info("received state change 'svc.Shutdown' from windows service manager")
 			break loop
 
 		default:
-			log.Errorf("Unexpected control request: $%d. Ignored.", c)
+			logp.L().Errorf("Unexpected control request: $%d. Ignored.", c)
 		}
 	}
 
 	trySendState(svc.StopPending, changes)
 	defer trySendState(svc.Stopped, changes)
 
-	log.Info("changed windows service state to svc.StopPending, invoking stopCallback")
+	logp.L().Info("changed windows service state to svc.StopPending, invoking stopCallback")
 	m.stopCallback()
 
 	// Block until notifyWindowsServiceStopped below is called. This is required
 	// as the windows/svc package will transition the service to STOPPED state
 	// once this function returns.
 	<-m.done
-	log.Debug("windows service state changed to svc.Stopped")
+	logp.L().Debug("windows service state changed to svc.Stopped")
 	return ssec, errno
+}
+
+func (m *beatService) stop() {
+	close(m.done)
+}
+
+func NotifyTermination() {
+	serviceInstance.stop()
 }
 
 func trySendState(s svc.State, changes chan<- svc.Status) {
 	select {
 	case changes <- svc.Status{State: s}:
 	case <-time.After(500 * time.Millisecond): // should never happen, but don't make this blocking
+	}
+}
+
+// WaitExecutionDone returns only after stop was reported to service manager.
+// If response is not retrieved within 500 millisecond wait is aborted.
+func WaitExecutionDone() {
+	if isWinService, err := svc.IsWindowsService(); err != nil || !isWinService {
+		// not a service, don't wait
+		return
+	}
+
+	select {
+	case <-serviceInstance.executeFinished:
+	case <-time.After(500 * time.Millisecond):
 	}
 }
