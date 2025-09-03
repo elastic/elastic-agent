@@ -76,12 +76,14 @@ type artifactDownloadHandler interface {
 
 // Upgrader performs an upgrade
 type Upgrader struct {
-	log                  *logger.Logger
-	settings             *artifact.Config
-	agentInfo            info.Agent
-	upgradeable          bool
-	fleetServerURI       string
-	markerWatcher        MarkerWatcher
+	log            *logger.Logger
+	settings       *artifact.Config
+	agentInfo      info.Agent
+	upgradeable    bool
+	fleetServerURI string
+	markerWatcher  MarkerWatcher
+
+	// The following are abstractions for testability
 	artifactDownloader   artifactDownloadHandler
 	isDiskSpaceErrorFunc func(err error) bool
 }
