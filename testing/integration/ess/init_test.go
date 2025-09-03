@@ -84,6 +84,7 @@ func TestInitOrderNotDegraded(t *testing.T) {
 	}
 
 	relativeExec, pointInTimeMs := getAgentServiceStats(output.String())
+	require.NotEqual(t, relativeExec, 0, "agent service not initialized")
 	require.Less(t, pointInTimeMs, 200, "init took more than 200 ms")
 	require.Less(t, relativeExec, 70, "init moved past 70%")
 }
@@ -93,6 +94,11 @@ func getAgentServiceStats(output string) (int, int) {
 	var pointInTimeMs int
 
 	for line := range strings.Lines(output) {
+		if !strings.HasPrefix(line, "init ") {
+			// we only count initializations
+			continue
+		}
+
 		if strings.HasPrefix(line, "init github.com/elastic/elastic-agent/internal/pkg/agent/agentservice") {
 			re := regexp.MustCompile(`@(\d+)\s*ms`)
 			match := re.FindStringSubmatch(line)
