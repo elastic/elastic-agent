@@ -84,7 +84,7 @@ type copyRunDirectoryFunc func(log *logger.Logger, oldRunPath, newRunPath string
 type fileDirCopyFunc func(from, to string, opts ...copy.Options) error
 
 // Types used to abstract stdlib functions
-
+type mkdirAllFunc func(name string, perm fs.FileMode) error
 type readFileFunc func(name string) ([]byte, error)
 type writeFileFunc func(name string, data []byte, perm fs.FileMode) error
 
