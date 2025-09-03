@@ -33,6 +33,7 @@ collectors:
   #  Cluster is a K8s deployment EDOT collector focused on gathering telemetry
   #  at the cluster level (Kubernetes Events and cluster metrics).
   cluster:
+    enabled: true
     fullnameOverride: "opentelemetry-kube-stack-cluster-stats"
     env:
       - name: ELASTIC_AGENT_OTEL
@@ -175,6 +176,10 @@ collectors:
       logsCollection:
         enabled: true # Enable/disable the collection of node's logs.
         storeCheckpoints: true # Store checkpoints for log collection, allowing for resumption from the last processed log.
+      kubernetesEvents:
+        enabled: false
+      clusterMetrics:
+        enabled: false
     hostNetwork: true # Use the host's network namespace. This allows the daemon to access the network interfaces of the host directly.
     securityContext: # Run the daemon as the root user and group for proper metrics collection.
       runAsUser: 0
@@ -427,6 +432,10 @@ collectors:
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
         pipelines:
+          # Disable default non used kube-stack Helm Chart pipelines
+          logs: null
+          metrics: null
+          traces: null
           logs/node:
             receivers:
               - filelog
