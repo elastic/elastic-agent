@@ -1311,27 +1311,6 @@ func (m *mockArtifactDownloader) withFleetServerURI(fleetServerURI string) {
 	m.fleetServerURI = fleetServerURI
 }
 
-type mockSender struct{}
-
-func (m *mockSender) Send(ctx context.Context, method, path string, params url.Values, headers http.Header, body io.Reader) (*http.Response, error) {
-	return nil, nil
-}
-
-func (m *mockSender) URI() string {
-	return "mockURI"
-}
-
-func TestSetClient(t *testing.T) {
-	log, _ := loggertest.New("test")
-	upgrader := &Upgrader{
-		log:                log,
-		artifactDownloader: &mockArtifactDownloader{},
-	}
-
-	upgrader.SetClient(&mockSender{})
-	require.Equal(t, "mockURI", upgrader.artifactDownloader.(*mockArtifactDownloader).fleetServerURI)
-}
-
 func TestUpgradeErrorHandling(t *testing.T) {
 	log, _ := loggertest.New("test")
 	testError := errors.New("test error")
@@ -1372,4 +1351,25 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			require.ErrorIs(t, err, tc.expectedError)
 		})
 	}
+}
+
+type mockSender struct{}
+
+func (m *mockSender) Send(ctx context.Context, method, path string, params url.Values, headers http.Header, body io.Reader) (*http.Response, error) {
+	return nil, nil
+}
+
+func (m *mockSender) URI() string {
+	return "mockURI"
+}
+
+func TestSetClient(t *testing.T) {
+	log, _ := loggertest.New("test")
+	upgrader := &Upgrader{
+		log:                log,
+		artifactDownloader: &mockArtifactDownloader{},
+	}
+
+	upgrader.SetClient(&mockSender{})
+	require.Equal(t, "mockURI", upgrader.artifactDownloader.(*mockArtifactDownloader).fleetServerURI)
 }
