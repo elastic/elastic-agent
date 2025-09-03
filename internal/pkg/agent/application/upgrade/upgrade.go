@@ -91,6 +91,7 @@ type Upgrader struct {
 	artifactDownloader   artifactDownloadHandler
 	unpacker             unpackHandler
 	isDiskSpaceErrorFunc func(err error) bool
+	extractAgentVersion  func(metadata packageMetadata, upgradeVersion string) agentVersion
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -111,6 +112,7 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.A
 		artifactDownloader:   newArtifactDownloader(settings, log),
 		unpacker:             newUnpacker(log),
 		isDiskSpaceErrorFunc: upgradeErrors.IsDiskSpaceError,
+		extractAgentVersion:  extractAgentVersion,
 	}, nil
 }
 
@@ -285,7 +287,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		return nil, fmt.Errorf("reading metadata for elastic agent version %s package %q: %w", version, archivePath, err)
 	}
 
-	newVersion := extractAgentVersion(metadata, version)
+	newVersion := u.extractAgentVersion(metadata, version)
 	if err := checkUpgrade(u.log, currentVersion, newVersion, metadata); err != nil {
 		return nil, fmt.Errorf("cannot upgrade the agent: %w", err)
 	}
