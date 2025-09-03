@@ -1,0 +1,54 @@
+// begin 9.1.3 relnotes
+
+[[release-notes-9.1.3]]
+==  9.1.3
+
+Review important information about the  9.1.3 release.
+
+[discrete]
+[[security-updates-9.1.3]]
+=== Security updates
+
+
+elastic-agent::
+
+* Upgrade To Go to version 1.24.6. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9287[#https://github.com/elastic/elastic-agent/pull/9287]
+
+
+[discrete]
+[[new-features-9.1.3]]
+=== New features
+
+The 9.1.3 release adds the following new and notable features.
+
+
+* Adjust The Timeout For Elastic Defend Check Command. {-pull}https://github.com/elastic/elastic-agent/pull/9213[#https://github.com/elastic/elastic-agent/pull/9213]
+
+
+[discrete]
+[[enhancements-9.1.3]]
+=== Enhancements
+
+
+elastic-agent::
+
+* Update Otel Components To V0.130.0. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9329[#https://github.com/elastic/elastic-agent/pull/9329]
+
+
+
+
+[discrete]
+[[bug-fixes-9.1.3]]
+=== Bug fixes
+
+
+elastic-agent::
+
+* On Windows, Retry Saving The Agent Information File To Disk. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9224[#https://github.com/elastic/elastic-agent/pull/9224] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/5862[#https://github.com/elastic/elastic-agent/issues/5862]
+* Correct Hints Annotations Parsing To Resolve Only `${Kubernetes.*}` Placeholders Instead Of Resolving All `${...}` Patterns. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9307[#https://github.com/elastic/elastic-agent/pull/9307]
+* Treat Exit Code 28 From Endpoint Binary As Non-Fatal. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9320[#https://github.com/elastic/elastic-agent/pull/9320]
+* Fixed Jitter Backoff Strategy Reset. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9342[#https://github.com/elastic/elastic-agent/pull/9342] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/8864[#https://github.com/elastic/elastic-agent/issues/8864]
+* Fix Docker Container Failing To Start With No Matching Vars: ${Env.elasticsearch_api_key:} And Similar Errors By Restoring Support For `:` To Set Default Values. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9451[#https://github.com/elastic/elastic-agent/pull/9451] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/9328[#https://github.com/elastic/elastic-agent/issues/9328]
+* Fix Deb Upgrade By Stopping Elastic-Agent Service Before Stopping Endpoint. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9462[#https://github.com/elastic/elastic-agent/pull/9462]
+
+// end 9.1.3 relnotes
