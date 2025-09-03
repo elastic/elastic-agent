@@ -19,7 +19,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/common"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
@@ -36,16 +35,43 @@ type UnpackResult struct {
 	VersionedHome string `json:"versioned-home" yaml:"versioned-home"`
 }
 
+type copyFunc func(dst io.Writer, src io.Reader) (written int64, err error)
+type mkdirAllFunc func(name string, perm fs.FileMode) error
+type openFileFunc func(name string, flag int, perm fs.FileMode) (*os.File, error)
+type unarchiveFunc func(log *logger.Logger, archivePath, dataDir string, flavor string, copy copyFunc, mkdirAll mkdirAllFunc, openFile openFileFunc) (UnpackResult, error)
+
+type unpacker struct {
+	log *logger.Logger
+	// Abstractsions for testability
+	unzip unarchiveFunc
+	untar unarchiveFunc
+	// stdlib abstractions for testability
+	copy     copyFunc
+	mkdirAll mkdirAllFunc
+	openFile openFileFunc
+}
+
+func newUnpacker(log *logger.Logger) *unpacker {
+	return &unpacker{
+		log:      log,
+		unzip:    unzip,
+		untar:    untar,
+		copy:     io.Copy,
+		mkdirAll: os.MkdirAll,
+		openFile: os.OpenFile,
+	}
+}
+
 // unpack unpacks archive correctly, skips root (symlink, config...) unpacks data/*
-func (u *Upgrader) unpack(version, archivePath, dataDir string, flavor string) (UnpackResult, error) {
+func (u *unpacker) unpack(version, archivePath, dataDir string, flavor string) (UnpackResult, error) {
 	// unpack must occur in directory that holds the installation directory
 	// or the extraction will be double nested
 	var unpackRes UnpackResult
 	var err error
 	if runtime.GOOS == windows {
-		unpackRes, err = unzip(u.log, archivePath, dataDir, flavor)
+		unpackRes, err = u.unzip(u.log, archivePath, dataDir, flavor, u.copy, u.mkdirAll, u.openFile)
 	} else {
-		unpackRes, err = untar(u.log, archivePath, dataDir, flavor)
+		unpackRes, err = u.untar(u.log, archivePath, dataDir, flavor, u.copy, u.mkdirAll, u.openFile)
 	}
 
 	if err != nil {
@@ -79,7 +105,8 @@ func (u *Upgrader) getPackageMetadata(archivePath string) (packageMetadata, erro
 	}
 }
 
-func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (UnpackResult, error) {
+// injecting copy, mkdirAll and openFile for testability
+func unzip(log *logger.Logger, archivePath, dataDir string, flavor string, copy copyFunc, mkdirAll mkdirAllFunc, openFile openFileFunc) (UnpackResult, error) {
 	var hash, rootDir string
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
@@ -151,9 +178,8 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 			if errors.Is(err, fs.ErrNotExist) {
 				// the directory does not exist, create it and any non-existing
 				// parent directory with the same permissions.
-				// Using common.MkdirAll instead of os.MkdirAll so that we can
-				// mock it in tests.
-				if err := common.MkdirAll(dstPath, f.Mode().Perm()&0770); err != nil {
+				// Using mkdirAll instead of os.MkdirAll so that we can mock it in tests.
+				if err := mkdirAll(dstPath, f.Mode().Perm()&0770); err != nil {
 					return fmt.Errorf("creating directory %q: %w", dstPath, err)
 				}
 			} else if err != nil {
@@ -166,15 +192,23 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 				}
 			}
 
-			_ = os.MkdirAll(dstPath, f.Mode()&0770)
+			// Using mkdirAll instead of os.MkdirAll so that we can mock it in tests.
+			err = mkdirAll(dstPath, f.Mode()&0770)
+			if err != nil {
+				return fmt.Errorf("creating directory %q: %w", dstPath, err)
+			}
 		} else {
 			log.Debugw("Unpacking file", "archive", "zip", "file.path", dstPath)
 			// create non-existing containing folders with 0770 permissions right now, we'll fix the permission of each
-			// directory as we come across them while processing the other package entries
-			_ = os.MkdirAll(filepath.Dir(dstPath), 0770)
-			// Using common.OpenFile instead of os.OpenFile so that we can
-			// mock it in tests.
-			f, err := common.OpenFile(dstPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode()&0770)
+			// directory as we come across them while processing the other
+			// package entries
+			// Using mkdirAll instead of os.MkdirAll so that we can mock it in tests.
+			err = mkdirAll(filepath.Dir(dstPath), 0770)
+			if err != nil {
+				return fmt.Errorf("creating directory %q: %w", dstPath, err)
+			}
+			// Using openFile instead of os.OpenFile so that we can mock it in tests.
+			f, err := openFile(dstPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode()&0770)
 			if err != nil {
 				return err
 			}
@@ -184,9 +218,9 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 				}
 			}()
 
-			// Using common.Copy instead of io.Copy so that we can
+			// Using copy instead of io.Copy so that we can
 			// mock it in tests.
-			if _, err = common.Copy(f, rc); err != nil {
+			if _, err = copy(f, rc); err != nil {
 				return err
 			}
 		}
@@ -321,7 +355,8 @@ func getPackageMetadataFromZipReader(r *zip.ReadCloser, fileNamePrefix string) (
 	return ret, nil
 }
 
-func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (UnpackResult, error) {
+// injecting copy, mkdirAll and openFile for testability
+func untar(log *logger.Logger, archivePath, dataDir string, flavor string, copy copyFunc, mkdirAll mkdirAllFunc, openFile openFileFunc) (UnpackResult, error) {
 	var versionedHome string
 	var rootDir string
 	var hash string
@@ -421,23 +456,23 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 			log.Debugw("Unpacking file", "archive", "tar", "file.path", abs)
 			// create non-existing containing folders with 0750 permissions right now, we'll fix the permission of each
 			// directory as we come across them while processing the other package entries
-			// Using common.MkdirAll instead of os.MkdirAll so that we can
+			// Using mkdirAll instead of os.MkdirAll so that we can
 			// mock it in tests.
-			if err = common.MkdirAll(filepath.Dir(abs), 0750); err != nil {
+			if err = mkdirAll(filepath.Dir(abs), 0750); err != nil {
 				return UnpackResult{}, goerrors.Join(err, errors.New("TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs)))
 			}
 
 			// remove any world permissions from the file
-			// Using common.OpenFile instead of os.OpenFile so that we can
+			// Using openFile instead of os.OpenFile so that we can
 			// mock it in tests.
-			wf, err := common.OpenFile(abs, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode.Perm()&0770)
+			wf, err := openFile(abs, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode.Perm()&0770)
 			if err != nil {
 				return UnpackResult{}, goerrors.Join(err, errors.New("TarInstaller: creating file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs)))
 			}
 
-			// Using common.Copy instead of io.Copy so that we can
+			// Using copy instead of io.Copy so that we can
 			// mock it in tests.
-			_, err = common.Copy(wf, tr)
+			_, err = copy(wf, tr)
 			if closeErr := wf.Close(); closeErr != nil && err == nil {
 				err = closeErr
 			}
@@ -451,9 +486,9 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string) (Unpa
 			if errors.Is(err, fs.ErrNotExist) {
 				// the directory does not exist, create it and any non-existing
 				// parent directory with the same permissions.
-				// Using common.MkdirAll instead of os.MkdirAll so that we can
+				// Using mkdirAll instead of os.MkdirAll so that we can
 				// mock it in tests.
-				if err := common.MkdirAll(abs, mode.Perm()&0770); err != nil {
+				if err := mkdirAll(abs, mode.Perm()&0770); err != nil {
 					return UnpackResult{}, goerrors.Join(err, errors.New("TarInstaller: creating directory for file "+abs, errors.TypeFilesystem, errors.M(errors.MetaKeyPath, abs)))
 				}
 			} else if err != nil {
