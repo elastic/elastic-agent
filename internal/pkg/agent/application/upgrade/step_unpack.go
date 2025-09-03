@@ -35,6 +35,7 @@ type UnpackResult struct {
 	VersionedHome string `json:"versioned-home" yaml:"versioned-home"`
 }
 
+// Types used to abstract copy, mkdirAll and openFile functions
 type copyFunc func(dst io.Writer, src io.Reader) (written int64, err error)
 type mkdirAllFunc func(name string, perm fs.FileMode) error
 type openFileFunc func(name string, flag int, perm fs.FileMode) (*os.File, error)
