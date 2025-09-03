@@ -41,9 +41,10 @@ import (
 	geoipprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/geoipprocessor"                 // for adding geographical metadata associated to an IP address
 	k8sattributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor" // for adding k8s metadata
 	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor"
-	resourceprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor"   // for modifying resource attributes
-	transformprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor" // for OTTL processing on logs
-	"go.opentelemetry.io/collector/processor/batchprocessor"                                                    // for batching events
+	resourceprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor"         // for modifying resource attributes
+	tailsamplingprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor" // for tail-based sampling
+	transformprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor"       // for OTTL processing on logs
+	"go.opentelemetry.io/collector/processor/batchprocessor"                                                          // for batching events
 	"go.opentelemetry.io/collector/processor/memorylimiterprocessor"
 
 	"github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor"
@@ -128,6 +129,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			resourcedetectionprocessor.NewFactory(),
 			memorylimiterprocessor.NewFactory(),
 			elastictraceprocessor.NewFactory(),
+			tailsamplingprocessor.NewFactory(),
 		)
 		if err != nil {
 			return otelcol.Factories{}, err
