@@ -318,7 +318,7 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	}
 
 	// persist configuration
-	err = saveConfig(h.agentInfo, h.config, h.store)
+	err = saveConfig(h.agentInfo, h.config, h.store, h.log)
 	if err != nil {
 		return fmt.Errorf("saving config: %w", err)
 	}
@@ -406,7 +406,7 @@ func (h *PolicyChangeHandler) applyLoggingConfig(ctx context.Context, loggingCon
 	return h.policyLogLevelSetter.SetLogLevel(ctx, policyLogLevel)
 }
 
-func saveConfig(agentInfo info.Agent, validatedConfig *configuration.Configuration, store storage.Store) error {
+func saveConfig(agentInfo info.Agent, validatedConfig *configuration.Configuration, store storage.Store, log *logger.Logger) error {
 	if validatedConfig == nil {
 		// nothing to do for fleet hosts
 		return nil
@@ -418,8 +418,7 @@ func saveConfig(agentInfo info.Agent, validatedConfig *configuration.Configurati
 			errors.TypeUnexpected, errors.M("hosts", validatedConfig.Fleet.Client.Hosts))
 	}
 
-	err = store.Save(reader)
-	if err != nil {
+	if err := saveConfigToStore(store, reader, log); err != nil {
 		return errors.New(
 			err, "fail to persist new Fleet Server API client hosts",
 			errors.TypeFilesystem, errors.M("hosts", validatedConfig.Fleet.Client.Hosts))
@@ -475,7 +474,7 @@ func clientEqual(k1 remote.Config, k2 remote.Config) bool {
 	return true
 }
 
-func fleetToReader(agentID string, headers map[string]string, cfg *configuration.Configuration) (io.Reader, error) {
+func fleetToReader(agentID string, headers map[string]string, cfg *configuration.Configuration) (io.ReadSeeker, error) {
 	configToStore := map[string]interface{}{
 		"fleet": cfg.Fleet,
 		"agent": map[string]interface{}{ // Add event logging configuration here!
