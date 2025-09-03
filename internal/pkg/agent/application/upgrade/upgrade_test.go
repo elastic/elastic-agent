@@ -11,7 +11,6 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -1381,6 +1380,64 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				}
 			},
 		},
+		"should return error if copyActionStore fails": {
+			isDiskSpaceErrorResult: false,
+			expectedError:          testError,
+			upgraderMocker: func(upgrader *Upgrader) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{}
+				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
+					return agentVersion{
+						version:  upgradeVersion,
+						snapshot: false,
+						hash:     metadata.hash,
+					}
+				}
+				upgrader.unpacker = &mockUnpacker{
+					returnPackageMetadata: packageMetadata{
+						manifest: &v1.PackageManifest{},
+						hash:     "hash",
+					},
+					returnUnpackResult: UnpackResult{
+						Hash:          "hash",
+						VersionedHome: "versionedHome",
+					},
+				}
+				upgrader.copyActionStore = func(log *logger.Logger, newHome string) error {
+					return testError
+				}
+			},
+		},
+		"should return error if copyRunDirectory fails": {
+			isDiskSpaceErrorResult: false,
+			expectedError:          testError,
+			upgraderMocker: func(upgrader *Upgrader) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{}
+				upgrader.artifactDownloader = &mockArtifactDownloader{}
+				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
+					return agentVersion{
+						version:  upgradeVersion,
+						snapshot: false,
+						hash:     metadata.hash,
+					}
+				}
+				upgrader.unpacker = &mockUnpacker{
+					returnPackageMetadata: packageMetadata{
+						manifest: &v1.PackageManifest{},
+						hash:     "hash",
+					},
+					returnUnpackResult: UnpackResult{
+						Hash:          "hash",
+						VersionedHome: "versionedHome",
+					},
+				}
+				upgrader.copyActionStore = func(log *logger.Logger, newHome string) error {
+					return nil
+				}
+				upgrader.copyRunDirectory = func(log *logger.Logger, oldRunPath, newRunPath string) error {
+					return testError
+				}
+			},
+		},
 		"should add disk space error to the error chain if downloadArtifact fails with disk space error": {
 			isDiskSpaceErrorResult: true,
 			expectedError:          upgradeErrors.ErrInsufficientDiskSpace,
@@ -1432,7 +1489,7 @@ func TestSetClient(t *testing.T) {
 	require.Equal(t, "mockURI", upgrader.artifactDownloader.(*mockArtifactDownloader).fleetServerURI)
 }
 
-func TestCopyActionStoreFunc(t *testing.T) {
+func TestCopyActionStore(t *testing.T) {
 	log, _ := loggertest.New("TestCoyActionStore")
 
 	actionStoreContent := "initial agent action_store.yml content"
@@ -1445,21 +1502,12 @@ func TestCopyActionStoreFunc(t *testing.T) {
 	}
 
 	type testCase struct {
-		files         []testFile
-		mockFuncName  common.MockStdLibFuncName
-		expectedError error
+		files           []testFile
+		copyActionStore copyActionStoreFunc
+		expectedError   error
 	}
 
 	testError := errors.New("test error")
-
-	setMocks := common.PrepareStdLibMocks(common.StdLibMocks{
-		WriteFileMock: func(name string, data []byte, perm os.FileMode) error {
-			return testError
-		},
-		ReadFileMock: func(name string) ([]byte, error) {
-			return nil, testError
-		},
-	})
 
 	testCases := map[string]testCase{
 		"should copy all action store files": {
@@ -1467,14 +1515,16 @@ func TestCopyActionStoreFunc(t *testing.T) {
 				{name: "action_store", content: actionStoreContent},
 				{name: "state_yaml", content: actionStateStoreYamlContent},
 			},
-			expectedError: nil,
+			copyActionStore: copyActionStoreProvider(os.ReadFile, os.WriteFile),
+			expectedError:   nil,
 		},
 		"should skip copying action store file that does not exist": {
 			files: []testFile{
 				{name: "action_store", content: actionStoreContent},
 				{name: "state_yaml", content: actionStateStoreYamlContent},
 			},
-			expectedError: nil,
+			copyActionStore: copyActionStoreProvider(os.ReadFile, os.WriteFile),
+			expectedError:   nil,
 		},
 		"should return error if it cannot read the action store files": {
 			files: []testFile{
@@ -1482,7 +1532,9 @@ func TestCopyActionStoreFunc(t *testing.T) {
 				{name: "state_yaml", content: actionStateStoreYamlContent},
 				{name: "state_enc", content: actionStateStoreFileContent},
 			},
-			mockFuncName:  common.ReadFileFuncName,
+			copyActionStore: copyActionStoreProvider(func(name string) ([]byte, error) {
+				return nil, testError
+			}, os.WriteFile),
 			expectedError: testError,
 		},
 		"should return error if it cannot write the action store files": {
@@ -1491,7 +1543,9 @@ func TestCopyActionStoreFunc(t *testing.T) {
 				{name: "state_yaml", content: actionStateStoreYamlContent},
 				{name: "state_enc", content: actionStateStoreFileContent},
 			},
-			mockFuncName:  common.WriteFileFuncName,
+			copyActionStore: copyActionStoreProvider(os.ReadFile, func(name string, data []byte, perm os.FileMode) error {
+				return testError
+			}),
 			expectedError: testError,
 		},
 	}
@@ -1535,11 +1589,7 @@ func TestCopyActionStoreFunc(t *testing.T) {
 				require.NoError(t, err, "error creating directory %s", filepath.Dir(newActionStorePath))
 			}
 
-			if testCase.mockFuncName != "" {
-				setMocks(t, testCase.mockFuncName)
-			}
-
-			err := copyActionStoreFunc(log, newHome)
+			err := testCase.copyActionStore(log, newHome)
 			if testCase.expectedError != nil {
 				require.Error(t, err, "copyActionStoreFunc should return error")
 				require.ErrorIs(t, err, testCase.expectedError, "copyActionStoreFunc error mismatch")
@@ -1563,34 +1613,26 @@ func TestCopyRunDirectory(t *testing.T) {
 	log, _ := loggertest.New("TestCopyRunDirectory")
 
 	type testCase struct {
-		expectedError   error
-		fileDirCopyMock func(src, dest string, opts ...copy.Options) error // mock for fileDirCopyFunc
-		stdLibMockName  common.MockStdLibFuncName
+		expectedError    error
+		copyRunDirectory copyRunDirectoryFunc
 	}
-
-	fileDirCopyMock := func(src, dest string, opts ...copy.Options) error {
-		return errors.New("test error")
-	}
-
-	setStdlibMock := common.PrepareStdLibMocks(common.StdLibMocks{
-		MkdirAllMock: func(path string, perm os.FileMode) error {
-			return fs.ErrPermission
-		},
-	})
 
 	testCases := map[string]testCase{
 		"should copy old run directory to new run directory": {
-			expectedError:   nil,
-			fileDirCopyMock: nil,
+			expectedError:    nil,
+			copyRunDirectory: copyRunDirectoryProvider(os.MkdirAll, copy.Copy),
 		},
 		"should return error if it cannot create the new run directory": {
-			expectedError:   fs.ErrPermission,
-			fileDirCopyMock: nil,
-			stdLibMockName:  common.MkdirAllFuncName,
+			expectedError: fs.ErrPermission,
+			copyRunDirectory: copyRunDirectoryProvider(func(path string, perm os.FileMode) error {
+				return fs.ErrPermission
+			}, copy.Copy),
 		},
 		"should return error if it cannot copy the old run directory": {
-			expectedError:   errors.New("test error"),
-			fileDirCopyMock: fileDirCopyMock,
+			expectedError: errors.New("test error"),
+			copyRunDirectory: copyRunDirectoryProvider(os.MkdirAll, func(src, dest string, opts ...copy.Options) error {
+				return errors.New("test error")
+			}),
 		},
 	}
 
@@ -1613,20 +1655,7 @@ func TestCopyRunDirectory(t *testing.T) {
 			err = os.MkdirAll(newRunPath, 0o700)
 			require.NoError(t, err, "error creating new run directory")
 
-			if testCase.fileDirCopyMock != nil {
-				tmpFileDirCopyMock := fileDirCopyFunc
-				t.Cleanup(func() {
-					fileDirCopyFunc = tmpFileDirCopyMock
-				})
-
-				fileDirCopyFunc = fileDirCopyMock
-			}
-
-			if testCase.stdLibMockName != "" {
-				setStdlibMock(t, testCase.stdLibMockName)
-			}
-
-			err = copyRunDirectoryFunc(log, oldRunPath, newRunPath)
+			err = testCase.copyRunDirectory(log, oldRunPath, newRunPath)
 			if testCase.expectedError != nil {
 				require.Error(t, err, "copyRunDirectoryFunc should return error")
 				require.ErrorIs(t, err, testCase.expectedError, "copyRunDirectoryFunc should return test error")
@@ -1642,135 +1671,5 @@ func TestCopyRunDirectory(t *testing.T) {
 			require.NoError(t, err, "error reading from %s", filepath.Join(newRunPath, "file.txt"))
 			require.Equal(t, []byte("content for old run file"), content, "content of %s is not as expected", filepath.Join(newRunPath, "file.txt"))
 		})
-	}
-}
-
-func TestUpgradeDirectoryCopyErrors(t *testing.T) {
-	log, _ := loggertest.New("test")
-
-	initialVersion := agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")
-	initialArtifactName, initialArchiveFiles := buildArchiveFiles(t, archiveFilesWithMoreComponents, initialVersion, "abcdef")
-
-	targetVersion := agtversion.NewParsedSemVer(3, 4, 5, "SNAPSHOT", "")
-	targetArtifactName, targetArchiveFiles := buildArchiveFiles(t, archiveFilesWithMoreComponents, targetVersion, "ghijkl")
-
-	mockAgentInfo := info.NewAgent(t)
-	mockAgentInfo.On("Version").Return(targetVersion.String())
-
-	upgradeDetails := details.NewDetails(targetVersion.String(), details.StateRequested, "test")
-
-	tempUnpacker, err := NewUpgrader(log, &artifact.Config{}, mockAgentInfo) // used only to unpack the initial archive
-	require.NoError(t, err)
-
-	genericError := errors.New("test error")
-
-	testCases := map[string]struct {
-		mockReturnedError error
-		expectedError     error
-	}{
-		"should return error if run directory copy fails": {
-			mockReturnedError: genericError,
-			expectedError:     genericError,
-		},
-	}
-
-	for _, te := range upgradeErrors.OS_DiskSpaceErrors {
-		testCases[fmt.Sprintf("should return error if run directory copy fails with disk space error: %v", te)] = struct {
-			mockReturnedError error
-			expectedError     error
-		}{
-			mockReturnedError: te,
-			expectedError:     upgradeErrors.ErrInsufficientDiskSpace,
-		}
-	}
-
-	for _, copiedDir := range []string{"action_store", "run_directory"} {
-		for name, tc := range testCases {
-			t.Run(fmt.Sprintf("when copying %s: %s", copiedDir, name), func(t *testing.T) {
-				baseDir := t.TempDir()
-				paths.SetTop(baseDir)
-
-				initialArchive, err := createArchive(t, initialArtifactName, initialArchiveFiles)
-				require.NoError(t, err)
-
-				t.Logf("Created archive: %s", initialArchive)
-
-				initialUnpackRes, err := tempUnpacker.unpack(initialVersion.String(), initialArchive, paths.Data(), "")
-				require.NoError(t, err)
-
-				paths.SetDownloads(filepath.Join(baseDir, initialUnpackRes.VersionedHome, "downloads")) // ensure the upgrader uses a predictable path for downloads
-
-				// The archive file list does not contain the action store files, so we need to
-				// create them
-				actionStorePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile()}
-				for _, path := range actionStorePaths {
-					err := os.MkdirAll(filepath.Dir(path), 0o700)
-					require.NoError(t, err, "error creating directory %s", filepath.Dir(path))
-
-					err = os.WriteFile(path, []byte(fmt.Sprintf("initial agent %s content", filepath.Base(path))), 0o600)
-					require.NoError(t, err, "error writing to %s", path)
-				}
-
-				targetArchive, err := createArchive(t, targetArtifactName, targetArchiveFiles)
-				require.NoError(t, err)
-
-				t.Logf("Created archive: %s", targetArchive)
-
-				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					http.ServeFile(w, r, targetArchive)
-				}))
-				t.Cleanup(server.Close)
-
-				mockCalled := false
-
-				if copiedDir == "run_directory" {
-					initialRunPath := paths.Run()
-					require.NoError(t, os.MkdirAll(initialRunPath, 0o755))
-					// Archive files do not contain the run directory, so we need to
-					// create it and add some files
-					for i := 0; i < 3; i++ {
-						filePath := filepath.Join(initialRunPath, fmt.Sprintf("file%d.txt", i))
-						err := os.WriteFile(filePath, []byte(fmt.Sprintf("content for file %d", i)), 0o600)
-						require.NoError(t, err)
-					}
-
-					tmpCopyRunDirFunc := copyRunDirectoryFunc
-					t.Cleanup(func() {
-						copyRunDirectoryFunc = tmpCopyRunDirFunc
-					})
-
-					copyRunDirectoryFunc = func(log *logger.Logger, oldRunPath string, newRunPath string) error {
-						mockCalled = true
-						return tc.mockReturnedError
-					}
-				} else {
-					tmpCopyActionStoreFunc := copyActionStoreFunc
-					t.Cleanup(func() {
-						copyActionStoreFunc = tmpCopyActionStoreFunc
-					})
-
-					copyActionStoreFunc = func(log *logger.Logger, newHome string) error {
-						mockCalled = true
-						return tc.mockReturnedError
-					}
-				}
-
-				config := artifact.Config{
-					TargetDirectory:        paths.Downloads(),
-					SourceURI:              server.URL,
-					RetrySleepInitDuration: 1 * time.Second,
-					HTTPTransportSettings: httpcommon.HTTPTransportSettings{
-						Timeout: 1 * time.Second,
-					},
-				}
-
-				upgrader, err := NewUpgrader(log, &config, mockAgentInfo)
-				require.NoError(t, err)
-
-				_, err = upgrader.Upgrade(context.Background(), targetVersion.String(), server.URL, nil, upgradeDetails, true, true)
-				require.True(t, mockCalled, "mock should be called")
-				require.ErrorIs(t, err, tc.expectedError, "expected error mismatch")
-			})
-		}
 	}
 }
