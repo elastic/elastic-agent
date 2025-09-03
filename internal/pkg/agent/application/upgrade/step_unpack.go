@@ -88,7 +88,7 @@ type packageMetadata struct {
 	hash     string
 }
 
-func (u *Upgrader) getPackageMetadata(archivePath string) (packageMetadata, error) {
+func (u *unpacker) getPackageMetadata(archivePath string) (packageMetadata, error) {
 	ext := filepath.Ext(archivePath)
 	if ext == ".gz" {
 		// if we got gzip extension we need another extension before last

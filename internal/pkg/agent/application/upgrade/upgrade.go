@@ -75,6 +75,7 @@ type artifactDownloadHandler interface {
 }
 type unpackHandler interface {
 	unpack(version, archivePath, dataDir string, flavor string) (UnpackResult, error)
+	getPackageMetadata(archivePath string) (packageMetadata, error)
 }
 
 // Upgrader performs an upgrade
