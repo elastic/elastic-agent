@@ -8,7 +8,6 @@ package ess
 
 import (
 	"context"
-	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -65,14 +64,10 @@ func TestInitOrderNotDegraded(t *testing.T) {
 	// Check that Agent was installed in default base path in unprivileged mode
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Privileged: true}))
 
-	var withEnv process.CmdOption = func(c *exec.Cmd) error {
-		c.Env = append(c.Env, `GODEBUG="inittrace=1"`)
-		return nil
-	}
-
 	// Switch to privileged mode
-	out, err = fixture.Exec(ctx, []string{"version"}, withEnv)
-	if err != nil {
+	out, err = fixture.Exec(ctx, []string{"version"}, process.WithEnv(`GODEBUG=inittrace=1`))
+	if err != nil && !strings.Contains(string(out), "Binary: ") {
+		// error of not communicating with not running agent is ok
 		t.Logf("version output: %s", out)
 		require.NoError(t, err)
 	}
