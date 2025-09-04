@@ -28,7 +28,7 @@ require (
 	github.com/elastic/mock-es v0.0.0-20250324153755-573fc6c0ac4b
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.6.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.3.0
-	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.5.0
+	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.6.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.16.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.9.0
 	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.2.1
