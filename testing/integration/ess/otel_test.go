@@ -1968,8 +1968,8 @@ func TestOtelBeatsAuthExtension(t *testing.T) {
 
 	// we pass an incorrect CA to es-exporter
 	// but we expect beatsauthextension to replace the exporter's
-	// roundtripper with beats' implementation of it
-	// hence expect events to be indexed to elasticsearch
+	// roundtripper with how beats implements it (with given http configuration block)
+	// hence we expect events to be indexed to elasticsearch
 	// if authextension is not used - this test fails
 	otelConfigTemplate := `
 extensions:
