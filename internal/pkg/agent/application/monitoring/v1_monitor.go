@@ -657,7 +657,7 @@ func (b *BeatsMonitor) getHttpStreams(
 		},
 		"metricsets": []interface{}{"json"},
 		"path":       "/stats",
-		"hosts":      []interface{}{HttpPlusAgentMonitoringEndpoint(b.operatingSystem, b.config.C)},
+		"hosts":      []interface{}{HttpPlusAgentMonitoringEndpoint(b.config.C)},
 		"namespace":  "agent",
 		"period":     metricsCollectionIntervalString,
 		"index":      indexName,
@@ -1234,17 +1234,17 @@ func changeOwner(path string, uid, gid int) error {
 }
 
 // HttpPlusAgentMonitoringEndpoint provides an agent monitoring endpoint path with a `http+` prefix.
-func HttpPlusAgentMonitoringEndpoint(operatingSystem string, cfg *monitoringCfg.MonitoringConfig) string {
-	return prefixedEndpoint(AgentMonitoringEndpoint(operatingSystem, cfg))
+func HttpPlusAgentMonitoringEndpoint(cfg *monitoringCfg.MonitoringConfig) string {
+	return prefixedEndpoint(AgentMonitoringEndpoint(cfg))
 }
 
 // AgentMonitoringEndpoint provides an agent monitoring endpoint path.
-func AgentMonitoringEndpoint(operatingSystem string, cfg *monitoringCfg.MonitoringConfig) string {
+func AgentMonitoringEndpoint(cfg *monitoringCfg.MonitoringConfig) string {
 	if cfg != nil && cfg.Enabled {
 		return "http://" + net.JoinHostPort(cfg.HTTP.Host, strconv.Itoa(cfg.HTTP.Port))
 	}
 
-	if operatingSystem == windowsOS {
+	if runtime.GOOS == windowsOS {
 		return agentMbEndpointFileFormatWin
 	}
 	// unix socket path must be less than 104 characters

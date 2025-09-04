@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-libs/api"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/reload"
@@ -92,24 +91,24 @@ func TestHTTPReloadEnableBehavior(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
-			serverReloader, err := NewServer(logp.L(), api.Config{}, nil, nil, fakeCoordCfg, "linux", testCase.initConfig)
+			serverReloader, err := NewServer(logp.L(), nil, nil, fakeCoordCfg, testCase.initConfig)
 			require.NoError(t, err)
 
 			t.Logf("starting server...")
 			serverReloader.Start()
 			if testCase.httpOnAtInit {
-				waitOnReturnCode(t, http.StatusOK, "liveness", "?failon=failed", serverReloader)
+				waitOnReturnCode(t, http.StatusOK, "processes", "", serverReloader)
 			} else {
-				waitOnReturnCode(t, http.StatusNotFound, "liveness", "?failon=failed", serverReloader)
+				waitOnReturnCode(t, http.StatusNotFound, "processes", "", serverReloader)
 			}
 
 			err = serverReloader.Reload(testCase.secondConfig)
 			require.NoError(t, err)
 
 			if testCase.httpOnAfterReload {
-				waitOnReturnCode(t, http.StatusOK, "liveness", "?failon=failed", serverReloader)
+				waitOnReturnCode(t, http.StatusOK, "processes", "", serverReloader)
 			} else {
-				waitOnReturnCode(t, http.StatusNotFound, "liveness", "?failon=failed", serverReloader)
+				waitOnReturnCode(t, http.StatusNotFound, "processes", "", serverReloader)
 			}
 
 		})
@@ -117,8 +116,6 @@ func TestHTTPReloadEnableBehavior(t *testing.T) {
 }
 
 func TestBasicLivenessConfig(t *testing.T) {
-	_ = logp.DevelopmentSetup()
-	testAPIConfig := api.Config{}
 	testConfig := config.MonitoringConfig{
 		Enabled: true,
 		HTTP: &config.MonitoringHTTPConfig{
@@ -126,7 +123,9 @@ func TestBasicLivenessConfig(t *testing.T) {
 			Port:    0,
 		},
 	}
-	serverReloader, err := NewServer(logp.L(), testAPIConfig, nil, nil, fakeCoordCfg, "linux", &testConfig)
+	logger, err := logp.NewDevelopmentLogger("")
+	require.NoError(t, err)
+	serverReloader, err := NewServer(logger, nil, nil, fakeCoordCfg, &testConfig)
 	require.NoError(t, err)
 
 	t.Logf("starting server...")
@@ -143,8 +142,6 @@ func TestBasicLivenessConfig(t *testing.T) {
 }
 
 func TestPprofEnabled(t *testing.T) {
-	_ = logp.DevelopmentSetup()
-	testAPIConfig := api.Config{}
 	testConfig := config.MonitoringConfig{
 		Enabled: true,
 		HTTP: &config.MonitoringHTTPConfig{
@@ -155,7 +152,9 @@ func TestPprofEnabled(t *testing.T) {
 			Enabled: true,
 		},
 	}
-	serverReloader, err := NewServer(logp.L(), testAPIConfig, nil, nil, fakeCoordCfg, "linux", &testConfig)
+	logger, err := logp.NewDevelopmentLogger("")
+	require.NoError(t, err)
+	serverReloader, err := NewServer(logger, nil, nil, fakeCoordCfg, &testConfig)
 	require.NoError(t, err)
 
 	t.Logf("starting server...")
