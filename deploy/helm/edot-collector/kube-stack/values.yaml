@@ -33,6 +33,7 @@ collectors:
   #  Cluster is a K8s deployment EDOT collector focused on gathering telemetry
   #  at the cluster level (Kubernetes Events and cluster metrics).
   cluster:
+    enabled: true
     fullnameOverride: "opentelemetry-kube-stack-cluster-stats"
     env:
       - name: ELASTIC_AGENT_OTEL
@@ -175,6 +176,10 @@ collectors:
       logsCollection:
         enabled: true # Enable/disable the collection of node's logs.
         storeCheckpoints: true # Store checkpoints for log collection, allowing for resumption from the last processed log.
+      kubernetesEvents:
+        enabled: false
+      clusterMetrics:
+        enabled: false
     hostNetwork: true # Use the host's network namespace. This allows the daemon to access the network interfaces of the host directly.
     securityContext: # Run the daemon as the root user and group for proper metrics collection.
       runAsUser: 0
@@ -428,6 +433,10 @@ collectors:
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
         pipelines:
+          # Disable default non used kube-stack Helm Chart pipelines
+          logs: null
+          metrics: null
+          traces: null
           logs/node:
             receivers:
               - filelog
@@ -517,13 +526,6 @@ collectors:
         value: "1025MiB"
     config:
       connectors:
-        routing:
-          default_pipelines: [metrics/otel]
-          error_mode: ignore
-          table:
-            - context: metric
-              statement: route() where instrumentation_scope.name == "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver" or IsMatch(instrumentation_scope.name, "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal/scraper/*")
-              pipelines: [metrics/infra/ecs, metrics/otel]
         # [Elastic APM Connector](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector)
         elasticapm: {}
       receivers:
@@ -534,24 +536,6 @@ collectors:
             http:
               endpoint: ${env:MY_POD_IP}:4318
       processors:
-        # [Elastic Infra Metrics Processor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticinframetricsprocessor)
-        # DEPRECATED: The elasticinframetrics processor is deprecated and will be removed in 9.2.0.
-        elasticinframetrics:
-          add_system_metrics: true
-          add_k8s_metrics: true
-          drop_original: true
-        # [Attributes Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/attributesprocessor)
-        attributes/dataset:
-          actions:
-            - key: event.dataset
-              from_attribute: data_stream.dataset
-              action: upsert
-        resource/process:
-          attributes:
-            - key: process.executable.name
-              action: delete
-            - key: process.executable.path
-              action: delete
         batch:
           send_batch_size: 1000
           timeout: 1s
@@ -574,28 +558,11 @@ collectors:
           #   insecure_skip_verify: true
           mapping:
             mode: otel
-        elasticsearch/ecs:
-          endpoints:
-            - ${env:ELASTIC_ENDPOINT}
-          api_key: ${env:ELASTIC_API_KEY}
-          mapping:
-            mode: ecs
       service:
         pipelines:
           metrics:
             receivers: [otlp]
-            exporters: [routing]
-          metrics/infra/ecs:
-            receivers: [routing]
-            processors:
-              - elasticinframetrics
-              - attributes/dataset
-              - resource/process
-              - batch/metrics
-            exporters: [debug, elasticsearch/ecs]
-          metrics/otel:
-            receivers: [routing]
-            processors: [batch]
+            processors: [batch/metrics]
             exporters: [debug, elasticsearch/otel]
           logs:
             receivers: [otlp]

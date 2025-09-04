@@ -326,6 +326,8 @@ github.com/blang/semver/v4 v4.0.0 h1:1PFHFE6yCCTv8C1TeyNNarDzntLi7wMI5i/pzqYIsAM
 github.com/blang/semver/v4 v4.0.0/go.mod h1:IbckMUScFkM3pff0VJDNKRiT6TG/YpiHIM2yvyW5YoQ=
 github.com/bmatcuk/doublestar/v4 v4.8.1 h1:54Bopc5c2cAvhLRAzqOGCYHYyhcDHsFF4wWIR5wKP38=
 github.com/bmatcuk/doublestar/v4 v4.8.1/go.mod h1:xBQ8jztBU6kakFMg+8WGxn0c6z1fTSPVIjEY1Wr7jzc=
+github.com/brianvoe/gofakeit v3.18.0+incompatible h1:wDOmHc9DLG4nRjUVVaxA+CEglKOW72Y5+4WNxUIkjM8=
+github.com/brianvoe/gofakeit v3.18.0+incompatible/go.mod h1:kfwdRA90vvNhPutZWfH7WPaDzUjz+CZFqG+rPkOjGOc=
 github.com/bshuster-repo/logrus-logstash-hook v1.0.0 h1:e+C0SB5R1pu//O4MQ3f9cFuPGoOVeF2fE4Og9otCc70=
 github.com/bshuster-repo/logrus-logstash-hook v1.0.0/go.mod h1:zsTqEiSzDgAa/8GZR7E1qaXrhYNDKBYy5/dWPTIflbk=
 github.com/bsm/ginkgo/v2 v2.12.0 h1:Ny8MWAHyOepLGlLKYmXG4IEkioBysk6GpaRTLC8zwWs=
@@ -449,8 +451,8 @@ github.com/docker/cli v27.5.0+incompatible h1:aMphQkcGtpHixwwhAXJT1rrK/detk2JIvD
 github.com/docker/cli v27.5.0+incompatible/go.mod h1:JLrzqnKDaYBop7H2jaqPtU4hHvMKP+vjCwu2uszcLI8=
 github.com/docker/distribution v2.8.3+incompatible h1:AtKxIZ36LoNK51+Z6RpzLpddBirtxJnzDrHLEKxTAYk=
 github.com/docker/distribution v2.8.3+incompatible/go.mod h1:J2gT2udsDAN96Uj4KfcMRqY0/ypR+oyYUYmja8H+y+w=
-github.com/docker/docker v28.2.2+incompatible h1:CjwRSksz8Yo4+RmQ339Dp/D2tGO5JxwYeqtMOEe0LDw=
-github.com/docker/docker v28.2.2+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
+github.com/docker/docker v28.3.3+incompatible h1:Dypm25kh4rmk49v1eiVbsAtpAsYURjYkaKubwuBdxEI=
+github.com/docker/docker v28.3.3+incompatible/go.mod h1:eEKB0N0r5NX/I1kEveEz05bcu8tLC/8azJZsviup8Sk=
 github.com/docker/docker-credential-helpers v0.8.2 h1:bX3YxiGzFP5sOXWc3bTPEXdEaZSeVMrFgOr3T+zrFAo=
 github.com/docker/docker-credential-helpers v0.8.2/go.mod h1:P3ci7E3lwkZg6XiHdRKft1KckHiO9a2rNtyFbZ/ry9M=
 github.com/docker/go-connections v0.5.0 h1:USnMq7hx7gwdVZq1L49hLXaFtUdTADjXGp+uj1Br63c=
@@ -487,8 +489,8 @@ github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumpti
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic/go.mod h1:0vCBR1wgGwZeGmloJ+eCWIZF2S47grTXRzj2mftg2Nk=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
 github.com/elastic/bayeux v1.0.5/go.mod h1:CSI4iP7qeo5MMlkznGvYKftp8M7qqP/3nzmVZoXHY68=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250819200614-fd21452b165d h1:eArFghj6Q7r/7dhb8h9G3jQARBMBUkaWVc9cjYfrdqQ=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250819200614-fd21452b165d/go.mod h1:pkd9sbgefnW9S/YlGBo79EoWZiohxbECjHE35fpUf94=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250828145559-1a67f9e0a3e8 h1:b0iGt9qetj0hGwPp2yxMONBAeBedDW1vxLknWNHJzWQ=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250828145559-1a67f9e0a3e8/go.mod h1:IThpxJYXUYsJZ/XjllGJ1rUp64/c6ii/sM1FE+G2ieI=
 github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae h1:OiShmbWAyGU0MS0ADJWr1/QgeLIZliMk9xsrFicR3/s=
 github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae/go.mod h1:D2IckZVXARugvikE4fv1glvaJMohKSZRzrPsxCjo9O0=
 github.com/elastic/elastic-agent-autodiscover v0.10.0 h1:WJ4zl9uSfk1kHmn2B/0byQBLIL607Zt4LNfOgV7+XN0=
@@ -545,8 +547,8 @@ github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnec
 github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.6.0/go.mod h1:SKo+rmzFdcSfLpucgSQWWsrqGO6FbEIGOyfwLEHfqD0=
 github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.3.0 h1:4n6DG66F/7Bo4yIvrvQdRjh9hxlQb5XT7Va12f0ynWg=
 github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.3.0/go.mod h1:PP7E4hAPU0u2rvfuwe1w2NDyJ5/JH7iziSPUdwxV5+4=
-github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.5.0 h1:ZMa57/H3ZXC1vkxoXAWP7zPW83NLi672LvxXI0p1fWM=
-github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.5.0/go.mod h1:7nkWdi3b6ncwuEFZzYmzqX56+V2Qzb5x6jX+DfnQSWI=
+github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.6.0 h1:UBAq2kilCpYBKkRQovA8AG5N5AAnQY5IA3ZEhv4vMAo=
+github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.6.0/go.mod h1:E1uPMjGeBL8PbYCqX4WHMHGqZ3Oo+gK1OKe5Mp1146M=
 github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced h1:XcWi/S3OoeE5Qwmj381AoO3nr3AVXl4Z4QO0mqyjlzU=
 github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced/go.mod h1:8e9NcGfE2xeor8r+WV9a+hKBEkzJEDnqZN7tqb3GUe8=
 github.com/elastic/opentelemetry-collector-components/internal/testutil v0.0.0-20250613082151-282de5af1c9b h1:NWuTKdMCJlU9ehRH8V0w1Kk1QI5Vn+9OcJWIO9wI+pE=
@@ -557,8 +559,8 @@ github.com/elastic/opentelemetry-collector-components/processor/elastictraceproc
 github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.9.0/go.mod h1:abeJCmXXWoNdCqyIFkzgZAnvK9QkxAqyBLMonlKxAZ0=
 github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.8.0 h1:m2RieHXVTRykAd7VdpryuAV56Ia/eidgtlEutnG/m5w=
 github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.8.0/go.mod h1:uQHpGpKwGHhdO5fm2hx1mthiPMiScmFOp5XNwD0EqVw=
-github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.2.0 h1:h1gGRol15HQupkhVW+x5GSI9DcZrjEqPlJCTmf5A9kg=
-github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.2.0/go.mod h1:6GD6slW/fYTxZkhBfjk2TaSJHmyevZfyuudIyqXAfwc=
+github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.2.1 h1:kcwYI2wQVFYnZojkKtFky3lrFZB1BDmw6SivDffP+qs=
+github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.2.1/go.mod h1:6GD6slW/fYTxZkhBfjk2TaSJHmyevZfyuudIyqXAfwc=
 github.com/elastic/opentelemetry-lib v0.21.0 h1:aktZQ6hocz/yVMOikDrdcjWtl/qcK/AfMBundZJTCcQ=
 github.com/elastic/opentelemetry-lib v0.21.0/go.mod h1:mNcdHi6ivTn5w4bE18as43gzKt2rVmK4HCeJZ9JmFXk=
 github.com/elastic/pkcs8 v1.0.0 h1:HhitlUKxhN288kcNcYkjW6/ouvuwJWd9ioxpjnD9jVA=
@@ -1220,6 +1222,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.130
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.130.0/go.mod h1:LSII2PtNQrizYmbcpUl8b1zHF3+xPkJL3F+ITZ1j25Y=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.130.0 h1:UoR/xVnYwybPDA4FhJbuPwU7HvP00Tpgu0YaHEPIOaU=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.130.0/go.mod h1:85OEk8e0NURYWjBzmXxoNRlpLTxWA1YwFjcBll1uAFk=
+github.com/open-telemetry/opentelemetry-collector-contrib/internal/docker v0.130.0 h1:wkRGpP4jht7Dmboa/0ZKfVjfYzZU3BsySRfK3vblcUo=
+github.com/open-telemetry/opentelemetry-collector-contrib/internal/docker v0.130.0/go.mod h1:hbeMduPd1RYmljh9Z2/NgbKvFIfp7U4J3IGGOYLZE5c=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/exp/metrics v0.130.0 h1:uj6ai6KVAY0KFeXn0tTTfvnFCF+WCMM7jfSMk7uZa3g=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/exp/metrics v0.130.0/go.mod h1:vggHY5WvnwKCuPW0hEIkWtctseFY6MjRLC+x7C2eN4k=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/filter v0.130.0 h1:imJFA+dRC4qVtza0SL/UuYTrnc68zpt2uvUkh9QAXI4=
@@ -1294,8 +1298,12 @@ github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedete
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor v0.130.0/go.mod h1:iRpASfcgyq/kmWWLfecD7pml29Wrz6jCHc8t1n6WcL8=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.130.0 h1:KBazTsji1uatVXMATsvJ0/QoMRsVE5J77pZopEB4PyM=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.130.0/go.mod h1:wU38xs5JMy8FYLVDw5F1/ShVgN0nYauna5Wj0qyL/Vk=
+github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.130.0 h1:PmFFuvYcbQHDzNwkK176SbV3+FcdZUk1N2Aa/tdPs5A=
+github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.130.0/go.mod h1:4EGQ5jHqIkI0EHua348PNU70PTQhT90J9Xh/pERn/y0=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.130.0 h1:/UagoKsz1+NAOkNIaoSiE5nW+7OiT/3tG91WsIDuHeU=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.130.0/go.mod h1:4VAXR5a89aHYFQYvNGkO/5yv1QYfF+sc8+fcMyWdRLE=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver v0.130.0 h1:c4YGI4SI5xZJbW23/SAoclPbpg/0v7qgugOs3rztRfM=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver v0.130.0/go.mod h1:2M2fJOvju5DAPgCceMDrX0xQwMipstgEbW6MrtwadhY=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.130.0 h1:44PeSCFt4J6i84dgB+Elme7YmC2PlL0Os0tMIx1gcFU=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.130.0/go.mod h1:3yzRJ95JrcxqLE9d6HnYIf9ONtTIeUIDP/A9EiKF1h4=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.130.0 h1:OuaYQSPAMuXGPyClRWk044zxQVlzOoAftqJs304vLB4=
