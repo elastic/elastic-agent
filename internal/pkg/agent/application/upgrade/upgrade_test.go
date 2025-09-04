@@ -1369,6 +1369,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 						hash:     metadata.hash,
 					}
 				}
+				upgrader.detectFlavor = func(topDir string, defaultFlavor string) (string, error) {
+					return "flavor", nil
+				}
 				upgrader.unpacker = &mockUnpacker{
 					returnPackageMetadata: packageMetadata{
 						manifest: &v1.PackageManifest{},
