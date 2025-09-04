@@ -1438,6 +1438,42 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				}
 			},
 		},
+		"should return error if changeSymlink fails": {
+			isDiskSpaceErrorResult: false,
+			expectedError:          testError,
+			upgraderMocker: func(upgrader *Upgrader) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{}
+				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
+					return agentVersion{
+						version:  upgradeVersion,
+						snapshot: false,
+						hash:     metadata.hash,
+					}
+				}
+				upgrader.unpacker = &mockUnpacker{
+					returnPackageMetadata: packageMetadata{
+						manifest: &v1.PackageManifest{},
+						hash:     "hash",
+					},
+					returnUnpackResult: UnpackResult{
+						Hash:          "hash",
+						VersionedHome: "versionedHome",
+					},
+				}
+				upgrader.copyActionStore = func(log *logger.Logger, newHome string) error {
+					return nil
+				}
+				upgrader.copyRunDirectory = func(log *logger.Logger, oldRunPath, newRunPath string) error {
+					return nil
+				}
+				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {
+					return nil
+				}
+				upgrader.changeSymlink = func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
+					return testError
+				}
+			},
+		},
 		"should return error if markUpgrade fails": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
