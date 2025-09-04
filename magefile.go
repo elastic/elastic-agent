@@ -1297,6 +1297,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 							continue
 						}
 						targetPath := filepath.Join(archivePath, manifest.PlatformPackages[platform])
+						fmt.Printf("XXX collectPackageDependencies: targetPath [%s]\n", targetPath)
 						os.MkdirAll(targetPath, 0o755)
 						packageName := spec.GetPackageName(packageVersion, platform)
 						if mg.Verbose() {
@@ -1908,6 +1909,7 @@ func movePackagesToArchive(dropPath string, platforms []string, packageVersion s
 				log.Printf("--- Evaluating moving dependency %s to archive path %s\n", f, archivePath)
 			}
 			// if the matched file name does not contain the platform suffix and it's not a platform-independent package, skip it
+			log.Printf("XXX Checking file [%s] and packageSuffix [%s]\n", f, packageSuffix)
 			if !strings.Contains(f, packageSuffix) && !isPlatformIndependentPackage(f, packageVersion, dependencies) {
 				if mg.Verbose() {
 					log.Printf("--- Skipped moving dependency %s to archive path\n", f)
