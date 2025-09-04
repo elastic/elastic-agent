@@ -70,20 +70,14 @@ func TestInitOrderNotDegraded(t *testing.T) {
 		return nil
 	}
 
-	output := strings.Builder{}
-	var redirectOutput process.CmdOption = func(c *exec.Cmd) error {
-		c.Stderr = &output
-		return nil
-	}
-
 	// Switch to privileged mode
-	out, err = fixture.Exec(ctx, []string{"version"}, withEnv, redirectOutput)
+	out, err = fixture.Exec(ctx, []string{"version"}, withEnv)
 	if err != nil {
 		t.Logf("version output: %s", out)
 		require.NoError(t, err)
 	}
 
-	relativeExec, pointInTimeMs := getAgentServiceStats(output.String())
+	relativeExec, pointInTimeMs := getAgentServiceStats(string(out))
 	require.NotEqual(t, relativeExec, 0, "agent service not initialized")
 	require.Less(t, pointInTimeMs, 200, "init took more than 200 ms")
 	require.Less(t, relativeExec, 70, "init moved past 70%")
