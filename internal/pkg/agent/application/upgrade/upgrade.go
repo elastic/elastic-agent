@@ -82,6 +82,7 @@ type unpackHandler interface {
 type copyActionStoreFunc func(log *logger.Logger, newHome string) error
 type copyRunDirectoryFunc func(log *logger.Logger, oldRunPath, newRunPath string) error
 type fileDirCopyFunc func(from, to string, opts ...copy.Options) error
+type markUpgradeFunc func(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, desiredOutcome UpgradeOutcome) error
 
 // Types used to abstract stdlib functions
 type mkdirAllFunc func(name string, perm fs.FileMode) error
@@ -105,6 +106,7 @@ type Upgrader struct {
 	detectFlavor         func(topDir string, defaultFlavor string) (string, error)
 	copyActionStore      copyActionStoreFunc
 	copyRunDirectory     copyRunDirectoryFunc
+	markUpgrade          markUpgradeFunc
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -129,6 +131,7 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.A
 		detectFlavor:         install.UsedFlavor,
 		copyActionStore:      copyActionStoreProvider(os.ReadFile, os.WriteFile),
 		copyRunDirectory:     copyRunDirectoryProvider(os.MkdirAll, copy.Copy),
+		markUpgrade:          markUpgradeProvider(UpdateActiveCommit, os.WriteFile),
 	}, nil
 }
 
@@ -230,8 +233,6 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 
 	return nil
 }
-
-var markUpgradeFunc = markUpgrade
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
@@ -389,7 +390,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		versionedHome: currentVersionedHome,
 	}
 
-	if err := markUpgradeFunc(u.log,
+	if err := u.markUpgrade(u.log,
 		paths.Data(), // data dir to place the marker in
 		current,      // new agent version data
 		previous,     // old agent version data
