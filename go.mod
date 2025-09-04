@@ -11,7 +11,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/cenkalti/backoff/v5 v5.0.2
 	github.com/cespare/xxhash/v2 v2.3.0
-	github.com/docker/docker v28.2.2+incompatible
+	github.com/docker/docker v28.3.3+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250828145559-1a67f9e0a3e8
