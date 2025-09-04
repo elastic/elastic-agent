@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent
 
-go 1.24.6
+go 1.24.7
 
 require (
 	github.com/Jeffail/gabs/v2 v2.6.0
@@ -11,7 +11,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/cenkalti/backoff/v5 v5.0.2
 	github.com/cespare/xxhash/v2 v2.3.0
-	github.com/docker/docker v28.2.2+incompatible
+	github.com/docker/docker v28.3.3+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250903162354-d399159b94ed
@@ -28,7 +28,7 @@ require (
 	github.com/elastic/mock-es v0.0.0-20250324153755-573fc6c0ac4b
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.6.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.3.0
-	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.5.0
+	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.6.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.16.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.9.0
 	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.2.1
@@ -57,6 +57,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.130.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.130.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.130.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.130.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.130.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver v0.130.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver v0.130.0
