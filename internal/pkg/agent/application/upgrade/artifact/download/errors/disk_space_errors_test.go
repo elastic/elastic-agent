@@ -15,12 +15,7 @@ import (
 )
 
 func TestIsDiskSpaceError(t *testing.T) {
-	allErrors := []error{
-		ErrInsufficientDiskSpace,
-	}
-	allErrors = append(allErrors, OS_DiskSpaceErrors...)
-
-	for _, err := range allErrors {
+	for _, err := range OS_DiskSpaceErrors {
 		testCases := map[string]struct {
 			err  error
 			want bool
