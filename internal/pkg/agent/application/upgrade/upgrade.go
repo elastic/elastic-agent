@@ -263,7 +263,20 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	u.log.Infow("Unpacking agent package", "version", newVersion)
 
 	// Nice to have: add check that no archive files end up in the current versioned home
+<<<<<<< HEAD
 	unpackRes, err := u.unpack(version, archivePath, paths.Data())
+=======
+	// default to no flavor to avoid breaking behavior
+
+	// no default flavor, keep everything in case flavor is not specified
+	// in case of error fallback to keep-all
+	detectedFlavor, err := install.UsedFlavor(paths.Top(), "")
+	if err != nil {
+		u.log.Warnf("error encountered when detecting used flavor with top path %q: %v", paths.Top(), err)
+	}
+	u.log.Debugf("detected used flavor: %q", detectedFlavor)
+	unpackRes, err := u.unpack(version, archivePath, paths.Data(), detectedFlavor)
+>>>>>>> b646814d6 (chore: fix formatting issues in logp printf-style calls (#9732))
 	if err != nil {
 		return nil, err
 	}
