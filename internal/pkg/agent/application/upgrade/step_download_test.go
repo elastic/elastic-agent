@@ -17,7 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
@@ -342,19 +341,19 @@ func TestDownloadArtifact(t *testing.T) {
 	testError := errors.New("test error")
 
 	type testCase struct {
-		mockVerifierConstructor func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error)
-		expectedError           error
+		mockNewVerifierFactory verifierFactory
+		expectedError          error
 	}
 
 	testCases := map[string]testCase{
 		"should return path if verifier constructor fails": {
-			mockVerifierConstructor: func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
+			mockNewVerifierFactory: func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
 				return nil, testError
 			},
 			expectedError: testError,
 		},
 		"should return path if verifier fails": {
-			mockVerifierConstructor: func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
+			mockNewVerifierFactory: func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
 				return &mockVerifier{returnError: testError}, nil
 			},
 			expectedError: testError,
@@ -377,17 +376,10 @@ func TestDownloadArtifact(t *testing.T) {
 				TargetDirectory: paths.Downloads(),
 			}
 
-			tmpVerifierConstructor := newVerifierFunc
-			defer func() {
-				newVerifierFunc = tmpVerifierConstructor
-			}()
+			a := newArtifactDownloader(&settings, testLogger)
+			a.newVerifier = tc.mockNewVerifierFactory
 
-			newVerifierFunc = tc.mockVerifierConstructor
-
-			upgrader, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
-			require.NoError(t, err)
-
-			path, err := upgrader.artifactDownloader.downloadArtifact(t.Context(), parsedVersion, testServer.URL, upgradeDeatils, false, true)
+			path, err := a.downloadArtifact(t.Context(), parsedVersion, testServer.URL, upgradeDeatils, false, true)
 			require.ErrorIs(t, err, tc.expectedError)
 			require.Equal(t, artifactPath, path)
 		})
