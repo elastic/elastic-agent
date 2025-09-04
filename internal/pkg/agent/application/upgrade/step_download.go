@@ -130,7 +130,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, parsedVersion
 	}
 
 	if verifier == nil {
-		verifier, err = newVerifierFunc(parsedVersion, u.log, &settings)
+		verifier, err = newVerifierFunc(parsedVersion, a.log, &settings)
 		if err != nil {
 			return path, errors.New(err, "initiating verifier")
 		}
