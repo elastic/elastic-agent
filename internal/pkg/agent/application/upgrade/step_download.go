@@ -41,16 +41,21 @@ type downloaderFactory func(*agtversion.ParsedSemVer, *logger.Logger, *artifact.
 
 type downloader func(context.Context, downloaderFactory, *agtversion.ParsedSemVer, *artifact.Config, *details.Details) (string, error)
 
+// abstraction for testability for newVerifier
+type verifierFactory func(*agtversion.ParsedSemVer, *logger.Logger, *artifact.Config) (download.Verifier, error)
+
 type artifactDownloader struct {
 	log            *logger.Logger
 	settings       *artifact.Config
 	fleetServerURI string
+	newVerifier    verifierFactory
 }
 
 func newArtifactDownloader(settings *artifact.Config, log *logger.Logger) *artifactDownloader {
 	return &artifactDownloader{
-		log:      log,
-		settings: settings,
+		log:         log,
+		settings:    settings,
+		newVerifier: newVerifier,
 	}
 }
 
@@ -130,7 +135,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, parsedVersion
 	}
 
 	if verifier == nil {
-		verifier, err = newVerifierFunc(parsedVersion, a.log, &settings)
+		verifier, err = a.newVerifier(parsedVersion, a.log, &settings)
 		if err != nil {
 			return path, errors.New(err, "initiating verifier")
 		}
@@ -188,8 +193,6 @@ func newDownloader(version *agtversion.ParsedSemVer, log *logger.Logger, setting
 
 	return composed.NewDownloader(fs.NewDownloader(settings), snapDownloader, httpDownloader), nil
 }
-
-var newVerifierFunc = newVerifier // abstraction for testability
 
 func newVerifier(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
 	pgp := release.PGP()
