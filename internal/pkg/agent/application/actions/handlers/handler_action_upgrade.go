@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -26,15 +28,17 @@ type Upgrade struct {
 	bkgCancel  context.CancelFunc
 	bkgMutex   sync.Mutex
 
-	tamperProtectionFn func() bool // allows to inject the flag for tests, defaults to features.TamperProtection
+	tamperProtectionFn         func() bool                                                                                                                            // allows to inject the flag for tests, defaults to features.TamperProtection
+	notifyUnitsOfProxiedAction func(ctx context.Context, log *logp.Logger, action dispatchableAction, ucs []unitWithComponent, performAction performActionFunc) error // allows to inject the function for tests, defaults to notifyUnitsOfProxiedAction
 }
 
 // NewUpgrade creates a new Upgrade handler.
 func NewUpgrade(log *logger.Logger, coord upgradeCoordinator) *Upgrade {
 	return &Upgrade{
-		log:                log,
-		coord:              coord,
-		tamperProtectionFn: features.TamperProtection,
+		log:                        log,
+		coord:                      coord,
+		tamperProtectionFn:         features.TamperProtection,
+		notifyUnitsOfProxiedAction: notifyUnitsOfProxiedAction,
 	}
 }
 
@@ -55,18 +59,23 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 		return nil
 	}
 
+	var uOpts []coordinator.UpgradeOpt
 	if h.tamperProtectionFn() {
 		// Find inputs that want to receive UPGRADE action
 		// Endpoint needs to receive a signed UPGRADE action in order to be able to uncontain itself
 		state := h.coord.State()
 		ucs := findMatchingUnitsByActionType(state, a.Type())
 		if len(ucs) > 0 {
-			h.log.Debugf("handlerUpgrade: proxy/dispatch action '%+v'", a)
-			err := notifyUnitsOfProxiedAction(ctx, h.log, action, ucs, h.coord.PerformAction)
-			h.log.Debugf("handlerUpgrade: after action dispatched '%+v', err: %v", a, err)
-			if err != nil {
-				return err
-			}
+			h.log.Debugf("Found %d components running for %v action type", len(ucs), a.Type())
+			uOpts = append(uOpts, coordinator.WithPreUpgradeCallback(func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error {
+				log.Debugf("handlerUpgrade: proxy/dispatch action '%+v'", a)
+				err := h.notifyUnitsOfProxiedAction(ctx, log, action, ucs, h.coord.PerformAction)
+				log.Debugf("handlerUpgrade: after action dispatched '%+v', err: %v", a, err)
+				if err != nil {
+					return fmt.Errorf("failed to notify units of proxied action: %w", err)
+				}
+				return nil
+			}))
 		} else {
 			// Log and continue
 			h.log.Debugf("No components running for %v action type", a.Type())
@@ -75,7 +84,7 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 
 	go func() {
 		h.log.Infof("starting upgrade to version %s in background", action.Data.Version)
-		if err := h.coord.Upgrade(asyncCtx, action.Data.Version, action.Data.SourceURI, action, false, false); err != nil {
+		if err := h.coord.Upgrade(asyncCtx, action.Data.Version, action.Data.SourceURI, action, uOpts...); err != nil {
 			h.log.Errorf("upgrade to version %s failed: %v", action.Data.Version, err)
 			// If context is cancelled in getAsyncContext, the actions are acked there
 			if !errors.Is(asyncCtx.Err(), context.Canceled) {

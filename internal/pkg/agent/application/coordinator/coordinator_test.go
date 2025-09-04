@@ -535,7 +535,7 @@ func TestUpgradeSameErrorAcked(t *testing.T) {
 
 	acker.On("Ack", mock.Anything, actionUpgrade).Return(nil)
 
-	require.NoError(t, coord.Upgrade(t.Context(), "9.0", "http://localhost", actionUpgrade, true, true))
+	require.NoError(t, coord.Upgrade(t.Context(), "9.0", "http://localhost", actionUpgrade, WithSkipVerifyOverride(true), WithSkipDefaultPgp(true)))
 
 	acker.AssertCalled(t, "Ack", mock.Anything, actionUpgrade)
 }
@@ -917,7 +917,7 @@ func TestCoordinator_Upgrade(t *testing.T) {
 	require.NoError(t, err)
 	cfgMgr.Config(ctx, cfg)
 
-	err = coord.Upgrade(ctx, "9.0.0", "", nil, true, false)
+	err = coord.Upgrade(ctx, "9.0.0", "", nil, WithSkipVerifyOverride(true), WithSkipDefaultPgp(false))
 	require.ErrorIs(t, err, ErrNotUpgradable)
 	cancel()
 
@@ -954,7 +954,7 @@ func TestCoordinator_UpgradeDetails(t *testing.T) {
 	require.NoError(t, err)
 	cfgMgr.Config(ctx, cfg)
 
-	err = coord.Upgrade(ctx, "9.0.0", "", nil, true, false)
+	err = coord.Upgrade(ctx, "9.0.0", "", nil, WithSkipVerifyOverride(true), WithSkipDefaultPgp(false))
 	require.ErrorIs(t, expectedErr, err)
 	cancel()
 
