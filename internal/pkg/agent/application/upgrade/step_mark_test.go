@@ -5,6 +5,7 @@
 package upgrade
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,9 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/common"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
@@ -264,8 +265,7 @@ desired_outcome: true
 	}
 }
 
-// Test asserting that errors from os.WriteFile are wrapped and returned
-func TestMarkUpgradeWriteFileError(t *testing.T) {
+func TestMarkUpgrade(t *testing.T) {
 	log, _ := loggertest.New("test")
 	agent := agentInstall{
 		version:       "8.5.0",
@@ -288,19 +288,32 @@ func TestMarkUpgradeWriteFileError(t *testing.T) {
 	upgradeDetails := details.NewDetails("8.5.0", details.StateScheduled, "action-123")
 	desiredOutcome := OUTCOME_UPGRADE
 
+	testError := errors.New("test error")
+
 	type testCase struct {
 		fileName      string
 		expectedError error
+		markUpgrade   markUpgradeFunc
 	}
 
 	testCases := map[string]testCase{
-		"should return error if it fails writing to top dir": {
+		"should return error if it fails updating the active commit file": {
 			fileName:      "commit",
-			expectedError: os.ErrPermission,
+			expectedError: testError,
+			markUpgrade: markUpgradeProvider(func(log *logger.Logger, topDirPath, hash string, writeFile writeFileFunc) error {
+				return testError
+			}, func(name string, data []byte, perm os.FileMode) error {
+				return nil
+			}),
 		},
-		"should return error if it fails writing to data dir": {
+		"should return error if it fails writing to marker file": {
 			fileName:      "marker",
-			expectedError: os.ErrPermission,
+			expectedError: testError,
+			markUpgrade: markUpgradeProvider(func(log *logger.Logger, topDirPath, hash string, writeFile writeFileFunc) error {
+				return nil
+			}, func(name string, data []byte, perm os.FileMode) error {
+				return testError
+			}),
 		},
 	}
 
@@ -309,22 +322,38 @@ func TestMarkUpgradeWriteFileError(t *testing.T) {
 			baseDir := t.TempDir()
 			paths.SetTop(baseDir)
 
-			markerPath := markerFilePath(paths.Data())
-
-			setStdlibMock := common.PrepareStdLibMocks(common.StdLibMocks{
-				WriteFileMock: func(name string, data []byte, perm os.FileMode) error {
-					if tc.fileName == "marker" && name == markerPath {
-						return tc.expectedError
-					}
-					return tc.expectedError
-				},
-			})
-
-			setStdlibMock(t, common.WriteFileFuncName)
-
-			err := markUpgrade(log, paths.Data(), agent, previousAgent, action, upgradeDetails, desiredOutcome)
+			err := tc.markUpgrade(log, paths.Data(), agent, previousAgent, action, upgradeDetails, desiredOutcome)
 			require.Error(t, err)
-			require.ErrorIs(t, err, os.ErrPermission)
+			require.ErrorIs(t, err, tc.expectedError)
 		})
 	}
+}
+
+func TestUpdateActiveCommit(t *testing.T) {
+	log, _ := loggertest.New("test")
+	testError := errors.New("test error")
+	testCases := map[string]struct {
+		expectedError error
+		writeFileFunc writeFileFunc
+	}{
+		"should return error if it fails writing to file": {
+			expectedError: testError,
+			writeFileFunc: func(name string, data []byte, perm os.FileMode) error {
+				return testError
+			},
+		},
+		"should not return error if it writes to file": {
+			expectedError: nil,
+			writeFileFunc: func(name string, data []byte, perm os.FileMode) error {
+				return nil
+			},
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			err := UpdateActiveCommit(log, paths.Top(), "hash", tc.writeFileFunc)
+			require.ErrorIs(t, err, tc.expectedError)
+		})
+	}
+
 }
