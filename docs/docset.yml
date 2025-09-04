@@ -1,0 +1,9 @@
+project: Elastic Agent docs
+products:
+  - id: elastic-agent
+exclude:
+  - "*.md"
+  - "manifests/kustomize-autosharding/README.md"
+toc:
+  - toc: release-notes
+
