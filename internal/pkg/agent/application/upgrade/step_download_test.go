@@ -275,9 +275,10 @@ func TestDownloadWithRetries(t *testing.T) {
 
 	t.Run("insufficient disk space stops retries", func(t *testing.T) {
 		numberOfAttempts := 0
+		diskSpaceError := downloadErrors.OS_DiskSpaceErrors[0]
 		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
 			numberOfAttempts++
-			return &mockDownloader{"", downloadErrors.ErrInsufficientDiskSpace}, nil
+			return &mockDownloader{"", diskSpaceError}, nil
 		}
 
 		a := newArtifactDownloader(&settings, testLogger)
@@ -293,7 +294,7 @@ func TestDownloadWithRetries(t *testing.T) {
 		require.Equal(t, "", path)
 
 		require.Equal(t, 1, numberOfAttempts)
-		require.ErrorIs(t, err, downloadErrors.ErrInsufficientDiskSpace)
+		require.ErrorIs(t, err, diskSpaceError)
 
 		require.NotZero(t, *upgradeDetailsRetryUntil)
 		require.False(t, *upgradeDetailsRetryUntilWasUnset)
