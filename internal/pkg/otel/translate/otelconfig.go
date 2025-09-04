@@ -121,9 +121,9 @@ func getExporterID(exporterType otelcomponent.Type, outputName string) otelcompo
 	return otelcomponent.NewIDWithName(exporterType, exporterName)
 }
 
-// getExtensionID returns the id for beatsauth extension
+// getBeatsAuthExtensionID returns the id for beatsauth extension
 // outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
-func getExtensionID(outputName string) otelcomponent.ID {
+func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
 	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("beatsauth"), extensionName)
 }
@@ -388,7 +388,7 @@ func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, 
 	// This extension is used to support ssl parameters
 	if exporterType.String() == "elasticsearch" {
 		// get extension ID
-		extensionID := getExtensionID(outputName)
+		extensionID := getBeatsAuthExtensionID(outputName)
 		extensionConfig, err := getBeatsAuthExtensionConfig(outputCfgC)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("error supporting http parameters for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
