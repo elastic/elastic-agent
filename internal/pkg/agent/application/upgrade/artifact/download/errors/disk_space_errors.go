@@ -9,11 +9,6 @@ import "errors"
 var ErrInsufficientDiskSpace = errors.New("insufficient disk space")
 
 func IsDiskSpaceError(err error) bool {
-
-	if errors.Is(err, ErrInsufficientDiskSpace) {
-		return true
-	}
-
 	for _, osErr := range OS_DiskSpaceErrors {
 		if errors.Is(err, osErr) {
 			return true
