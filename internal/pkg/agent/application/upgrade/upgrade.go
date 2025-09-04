@@ -244,6 +244,11 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	cleanupPaths := []string{}
 	defer func() {
 		if err != nil {
+			// Add the disk space error to the error chain if it is a disk space error
+			// so that we can use errors.Is to check for it
+			if u.isDiskSpaceErrorFunc(err) {
+				err = goerrors.Join(err, upgradeErrors.ErrInsufficientDiskSpace)
+			}
 			// If there is an error, we need to clean up downloads and any
 			// extracted agent files.
 			for _, path := range cleanupPaths {
@@ -252,16 +257,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 					u.log.Errorw("error removing path during upgrade cleanup", "error.message", rmErr, "path", path)
 					err = goerrors.Join(err, rmErr)
 				}
-			}
-		}
-	}()
-
-	defer func() {
-		if err != nil {
-			// Add the disk space error to the error chain if it is a disk space error
-			// so that we can use errors.Is to check for it
-			if u.isDiskSpaceErrorFunc(err) {
-				err = goerrors.Join(err, upgradeErrors.ErrInsufficientDiskSpace)
 			}
 		}
 	}()
