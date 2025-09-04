@@ -387,7 +387,7 @@ func TestDownloadArtifact(t *testing.T) {
 			upgrader, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
 			require.NoError(t, err)
 
-			path, err := upgrader.downloadArtifact(t.Context(), parsedVersion, testServer.URL, upgradeDeatils, false, true)
+			path, err := upgrader.artifactDownloader.downloadArtifact(t.Context(), parsedVersion, testServer.URL, upgradeDeatils, false, true)
 			require.ErrorIs(t, err, tc.expectedError)
 			require.Equal(t, artifactPath, path)
 		})
