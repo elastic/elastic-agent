@@ -48,6 +48,10 @@ collectors:
       logsCollection:
         enabled: true # Enable/disable the collection of node's logs.
         storeCheckpoints: true # Store checkpoints for log collection, allowing for resumption from the last processed log.
+      kubernetesEvents:
+        enabled: false
+      clusterMetrics:
+        enabled: false
     scrape_configs_file: "" # [Prometheus metrics](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-kube-stack#scrape_configs_file-details)
     config:
       exporters:
