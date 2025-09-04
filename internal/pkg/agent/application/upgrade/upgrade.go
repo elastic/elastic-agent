@@ -259,7 +259,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	// in case of error fallback to keep-all
 	detectedFlavor, err := install.UsedFlavor(paths.Top(), "")
 	if err != nil {
-		u.log.Warnf("error encountered when detecting used flavor with top path %q: %w", paths.Top(), err)
+		u.log.Warnf("error encountered when detecting used flavor with top path %q: %v", paths.Top(), err)
 	}
 	u.log.Debugf("detected used flavor: %q", detectedFlavor)
 	unpackRes, err := u.unpack(version, archivePath, paths.Data(), detectedFlavor)

@@ -217,7 +217,7 @@ func (c *Client) Send(
 			errs = append(errs, fmt.Errorf("%s: %w", msg, err))
 
 			// Using debug level as the error is only relevant if all clients fail.
-			c.log.With("error", err).Debugf(msg)
+			c.log.With("error", err).Debug(msg)
 			continue
 		}
 		c.checkApiVersionHeaders(req, resp)
