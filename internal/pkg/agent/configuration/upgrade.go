@@ -15,7 +15,9 @@ const (
 
 	// period during which an upgraded Agent can be asked to rollback to the previous
 	// Agent version on disk.
-	defaultRollbackWindowDuration = 7 * 24 * time.Hour // 7 days
+	// this is temporarily set to 0 to disable the rollback window until manual rollback functionality is complete.
+	// defaultRollbackWindowDuration = 7 * 24 * time.Hour // 7 days
+	defaultRollbackWindowDuration = 0
 )
 
 // UpgradeConfig is the configuration related to Agent upgrades.
