@@ -7,6 +7,7 @@ package fs
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,7 +15,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -161,6 +164,9 @@ func TestDownloader_Download(t *testing.T) {
 			e := &Downloader{
 				dropPath: dropPath,
 				config:   config,
+				copy:     io.Copy,
+				mkdirAll: os.MkdirAll,
+				openFile: os.OpenFile,
 			}
 			got, err := e.Download(context.TODO(), tt.args.a, tt.args.version)
 			if !tt.wantErr(t, err, fmt.Sprintf("Download(%v, %v)", tt.args.a, tt.args.version)) {
@@ -282,12 +288,88 @@ func TestDownloader_DownloadAsc(t *testing.T) {
 			e := &Downloader{
 				dropPath: dropPath,
 				config:   config,
+				copy:     io.Copy,
+				mkdirAll: os.MkdirAll,
+				openFile: os.OpenFile,
 			}
 			got, err := e.DownloadAsc(context.TODO(), tt.args.a, tt.args.version)
 			if !tt.wantErr(t, err, fmt.Sprintf("DownloadAsc(%v, %v)", tt.args.a, tt.args.version)) {
 				return
 			}
 			assert.Equalf(t, filepath.Join(targetDirPath, tt.want), got, "DownloadAsc(%v, %v)", tt.args.a, tt.args.version)
+		})
+	}
+}
+
+func TestDownloadDiskSpaceError(t *testing.T) {
+	testError := errors.New("test error")
+
+	testCases := map[string]struct {
+		mockStdlibFuncs func(downloader *Downloader)
+		expectedError   error
+	}{
+		"when io.Copy runs into an error, the downloader should return the error and clean up the downloaded files": {
+			mockStdlibFuncs: func(downloader *Downloader) {
+				downloader.copy = func(dst io.Writer, src io.Reader) (int64, error) {
+					return 0, testError
+				}
+			},
+			expectedError: testError,
+		},
+		"when os.OpenFile runs into an error, the downloader should return the error and clean up the downloaded files": {
+			mockStdlibFuncs: func(downloader *Downloader) {
+				downloader.openFile = func(name string, flag int, perm os.FileMode) (*os.File, error) {
+					return nil, testError
+				}
+			},
+			expectedError: testError,
+		},
+		"when os.MkdirAll runs into an error, the downloader should return the error and clean up the downloaded files": {
+			mockStdlibFuncs: func(downloader *Downloader) {
+				downloader.mkdirAll = func(name string, perm os.FileMode) error {
+					return testError
+				}
+			},
+			expectedError: testError,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			baseDir := t.TempDir()
+			paths.SetTop(baseDir)
+			config := &artifact.Config{
+				DropPath:        filepath.Join(baseDir, "drop"),
+				TargetDirectory: filepath.Join(baseDir, "target"),
+			}
+
+			err := os.MkdirAll(config.DropPath, 0o755)
+			require.NoError(t, err)
+
+			err = os.MkdirAll(config.TargetDirectory, 0o755)
+			require.NoError(t, err)
+
+			parsedVersion := agtversion.NewParsedSemVer(1, 2, 3, "", "")
+
+			artifactName, err := artifact.GetArtifactName(agentSpec, *parsedVersion, config.OS(), config.Arch())
+			require.NoError(t, err)
+
+			sourceArtifactPath := filepath.Join(config.DropPath, artifactName)
+			sourceArtifactHashPath := sourceArtifactPath + ".sha512"
+
+			err = os.WriteFile(sourceArtifactPath, []byte("test"), 0o666)
+			require.NoError(t, err, "failed to create source artifact file")
+
+			err = os.WriteFile(sourceArtifactHashPath, []byte("test"), 0o666)
+			require.NoError(t, err, "failed to create source artifact hash file")
+
+			downloader := NewDownloader(config)
+			tc.mockStdlibFuncs(downloader)
+			targetArtifactPath, err := downloader.Download(context.Background(), agentSpec, parsedVersion)
+
+			require.ErrorIs(t, err, tc.expectedError)
+
+			require.NoFileExists(t, targetArtifactPath)
 		})
 	}
 }

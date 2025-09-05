@@ -8,6 +8,9 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -25,6 +28,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -37,6 +41,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
+	"github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/info"
 	mocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
 )
 
@@ -1291,4 +1296,80 @@ func (f *fakeAcker) Ack(ctx context.Context, action fleetapi.Action) error {
 func (f *fakeAcker) Commit(ctx context.Context) error {
 	args := f.Called(ctx)
 	return args.Error(0)
+}
+
+type mockArtifactDownloader struct {
+	returnError    error
+	fleetServerURI string
+}
+
+func (m *mockArtifactDownloader) downloadArtifact(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
+	return "", m.returnError
+}
+
+func (m *mockArtifactDownloader) withFleetServerURI(fleetServerURI string) {
+	m.fleetServerURI = fleetServerURI
+}
+
+func TestUpgradeErrorHandling(t *testing.T) {
+	log, _ := loggertest.New("test")
+	testError := errors.New("test error")
+
+	type testCase struct {
+		isDiskSpaceErrorResult bool
+		expectedError          error
+	}
+
+	testCases := map[string]testCase{
+		"should return error if downloadArtifact fails": {
+			isDiskSpaceErrorResult: false,
+			expectedError:          testError,
+		},
+		"should add disk space error to the error chain if downloadArtifact fails with disk space error": {
+			isDiskSpaceErrorResult: true,
+			expectedError:          upgradeErrors.ErrInsufficientDiskSpace,
+		},
+	}
+
+	mockAgentInfo := info.NewAgent(t)
+	mockAgentInfo.On("Version").Return("9.0.0")
+
+	upgrader, err := NewUpgrader(log, &artifact.Config{}, mockAgentInfo)
+	require.NoError(t, err)
+
+	upgrader.artifactDownloader = &mockArtifactDownloader{
+		returnError: testError,
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			upgrader.isDiskSpaceErrorFunc = func(err error) bool {
+				return tc.isDiskSpaceErrorResult
+			}
+
+			_, err = upgrader.Upgrade(context.Background(), "9.0.0", "", nil, details.NewDetails("9.0.0", details.StateRequested, "test"), true, true)
+			require.ErrorIs(t, err, tc.expectedError)
+		})
+	}
+}
+
+type mockSender struct{}
+
+func (m *mockSender) Send(ctx context.Context, method, path string, params url.Values, headers http.Header, body io.Reader) (*http.Response, error) {
+	return nil, nil
+}
+
+func (m *mockSender) URI() string {
+	return "mockURI"
+}
+
+func TestSetClient(t *testing.T) {
+	log, _ := loggertest.New("test")
+	upgrader := &Upgrader{
+		log:                log,
+		artifactDownloader: &mockArtifactDownloader{},
+	}
+
+	upgrader.SetClient(&mockSender{})
+	require.Equal(t, "mockURI", upgrader.artifactDownloader.(*mockArtifactDownloader).fleetServerURI)
 }
