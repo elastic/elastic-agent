@@ -18,9 +18,9 @@ import (
 
 func TestGetOwnerFromPathWindows(t *testing.T) {
 
-	ownerSID, err := windows.StringToSid("1000")
+	ownerSID, err := windows.StringToSid(utils.AdministratorSID)
 	require.NoError(t, err)
-	groupSID, err := windows.StringToSid("1000")
+	groupSID, err := windows.StringToSid(utils.AdministratorSID)
 	require.NoError(t, err)
 
 	testError := errors.New("test error")
@@ -47,7 +47,7 @@ func TestGetOwnerFromPathWindows(t *testing.T) {
 		"returns owner when getNamedSecurityInfo succeeds": {
 			mockGetNamedSecurityInfo: mockGetNamedSecurityInfoFactory(nil),
 			mockLocalFree:            mockLocalFree,
-			wantOwner:                utils.FileOwner{UID: "1000", GID: "1000"},
+			wantOwner:                utils.FileOwner{UID: utils.AdministratorSID, GID: utils.AdministratorSID},
 			wantErr:                  false,
 		},
 		"returns error when getNamedSecurityInfo fails": {
