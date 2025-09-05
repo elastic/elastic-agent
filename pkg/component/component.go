@@ -443,6 +443,21 @@ func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *feature
 			}
 		}
 	}
+	for _, unrenderedInput := range output.unrenderedInputs {
+		// sTODO: Check if I'm correct regarding this assumption
+		// Add a failed component for each unrendered input caused by a failed variable substitution.
+		// There is no need to declare all the Component fields here. We just need to provide the error since
+		// that is going to be used as the reason for the failed status of the component.
+		for _, input := range unrenderedInput {
+			components = append(components, Component{
+				ID:             fmt.Sprintf("%s-%s", input.inputType, output.name),
+				Err:            ErrInputNotRendered,
+				InputType:      input.inputType,
+				OutputType:     output.outputType,
+				RuntimeManager: input.runtimeManager,
+			})
+		}
+	}
 	return components
 }
 
@@ -528,13 +543,14 @@ func injectInputPolicyID(fleetPolicy map[string]interface{}, inputConfig map[str
 // of components.
 func toIntermediate(policy map[string]interface{}, aliasMapping map[string]string, ll logp.Level, headers HeadersProvider) (map[string]outputI, error) {
 	const (
-		outputsKey        = "outputs"
-		enabledKey        = "enabled"
-		inputsKey         = "inputs"
-		typeKey           = "type"
-		idKey             = "id"
-		useOutputKey      = "use_output"
-		runtimeManagerKey = "_runtime_experimental"
+		outputsKey          = "outputs"
+		enabledKey          = "enabled"
+		inputsKey           = "inputs"
+		unrenderedInputsKey = "unrendered_inputs"
+		typeKey             = "type"
+		idKey               = "id"
+		useOutputKey        = "use_output"
+		runtimeManagerKey   = "_runtime_experimental"
 	)
 
 	// intermediate structure for output to input mapping (this structure allows different input types per output)
@@ -602,12 +618,13 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 		}
 
 		outputsMap[name] = outputI{
-			name:       name,
-			enabled:    enabled,
-			logLevel:   logLevel,
-			outputType: t,
-			config:     output,
-			inputs:     make(map[string][]inputI),
+			name:             name,
+			enabled:          enabled,
+			logLevel:         logLevel,
+			outputType:       t,
+			config:           output,
+			inputs:           make(map[string][]inputI),
+			unrenderedInputs: make(map[string][]inputI),
 		}
 	}
 
@@ -709,6 +726,81 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 			runtimeManager: runtimeManager,
 		})
 	}
+
+	// sTODO: handle unrendered_inputs
+	unrenderedInputsRaw, ok := policy[unrenderedInputsKey]
+	if ok {
+		unrenderedInputs, ok := unrenderedInputsRaw.([]interface{})
+		if !ok {
+			return nil, fmt.Errorf("invalid '%s', expected an array not a %T", unrenderedInputsKey, unrenderedInputsRaw)
+		}
+		for idx, inputRaw := range unrenderedInputs {
+			// sTODO: What details do we need to keep for unrendered inputs?
+			input, ok := inputRaw.(map[string]interface{})
+			if !ok {
+				return nil, fmt.Errorf("invalid 'inputs.%d', expected a map not a %T", idx, inputRaw)
+			}
+			typeRaw, ok := input[typeKey]
+			if !ok {
+				return nil, fmt.Errorf("invalid 'inputs.%d', 'type' missing", idx)
+			}
+			t, ok := typeRaw.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid 'inputs.%d.type', expected a string not a %T", idx, typeRaw)
+			}
+			idRaw, ok := input[idKey]
+			if !ok {
+				// no ID; fallback to type
+				idRaw = t
+			}
+			id, ok := idRaw.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid 'inputs.%d.id', expected a string not a %T", idx, idRaw)
+			}
+
+			outputName := "default"
+			if outputRaw, ok := input[useOutputKey]; ok {
+				outputNameVal, ok := outputRaw.(string)
+				if !ok {
+					return nil, fmt.Errorf("invalid 'inputs.%d.use_output', expected a string not a %T", idx, outputRaw)
+				}
+				outputName = outputNameVal
+				delete(input, useOutputKey)
+			}
+			output, ok := outputsMap[outputName]
+			if !ok {
+				return nil, fmt.Errorf("invalid 'inputs.%d.use_output', references an unknown output '%s'", idx, outputName)
+			}
+			// sTODO: Do we need to determine the runtime manager or can we just use the default every time?
+			//runtimeManager := DefaultRuntimeManager
+			// determine the runtime manager for the input
+			//if runtimeManagerRaw, ok := input[runtimeManagerKey]; ok {
+			//	runtimeManagerStr, ok := runtimeManagerRaw.(string)
+			//	if !ok {
+			//		return nil, fmt.Errorf("invalid 'inputs.%d.runtime', expected a string, not a %T", idx, runtimeManagerRaw)
+			//	}
+			//	runtimeManagerVal := RuntimeManager(runtimeManagerStr)
+			//	switch runtimeManagerVal {
+			//	case OtelRuntimeManager, ProcessRuntimeManager:
+			//	default:
+			//		return nil, fmt.Errorf("invalid 'inputs.%d.runtime', valid values are: %s, %s", idx, OtelRuntimeManager, ProcessRuntimeManager)
+			//	}
+			//	runtimeManager = runtimeManagerVal
+			//	delete(input, runtimeManagerKey)
+			//}
+
+			output.unrenderedInputs[t] = append(output.unrenderedInputs[t], inputI{
+				idx: idx,
+				id:  id,
+				//enabled:        true,
+				//logLevel:       defaultUnitLogLevel,
+				inputType: t,
+				//config:         input,
+				runtimeManager: DefaultRuntimeManager,
+			})
+		}
+	}
+
 	if len(outputsMap) == 0 {
 		return nil, nil
 	}
@@ -744,6 +836,8 @@ type outputI struct {
 
 	// inputs directed at this output, keyed by canonical (non-alias) type.
 	inputs map[string][]inputI
+
+	unrenderedInputs map[string][]inputI
 }
 
 // varsForPlatform sets the runtime variables that are available in the

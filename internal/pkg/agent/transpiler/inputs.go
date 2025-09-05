@@ -19,13 +19,15 @@ const (
 )
 
 // RenderInputs renders dynamic inputs section
-func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
+func RenderInputs(inputs Node, varsArray []*Vars) (Node, Node, error) {
 	l, ok := inputs.Value().(*List)
 	if !ok {
-		return nil, fmt.Errorf("inputs must be an array")
+		return nil, nil, fmt.Errorf("inputs must be an array")
 	}
 	var nodes []varIDMap
 	nodesMap := map[uint64]*Dict{}
+	var unrenderedNodes []varIDMap
+	unrenderedNodesMap := map[uint64]*Dict{}
 	hasher := xxhash.New()
 	for _, vars := range varsArray {
 		for _, node := range l.Value().([]Node) {
@@ -41,11 +43,23 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 			n, err := dict.Apply(vars)
 			if errors.Is(err, ErrNoMatch) {
 				// has a variable that didn't exist, so we ignore it
+
+				// sTODO: This change will no longer ignore these inputs.
+				// Are there cases where ignoring an input is valid? If so, this change will create false positives.
+				// How to differentiate between a variable that is truly missing vs a variable that is intentionally left out?
+				hasher.Reset()
+				_ = dict.Hash64With(hasher)
+				hash := hasher.Sum64()
+				_, exists := unrenderedNodesMap[hash]
+				if !exists {
+					unrenderedNodesMap[hash] = dict
+					unrenderedNodes = append(unrenderedNodes, varIDMap{vars.ID(), dict})
+				}
 				continue
 			}
 			if err != nil {
 				// another error that needs to be reported
-				return nil, err
+				return nil, nil, err
 			}
 			if n == nil {
 				// condition removed it
@@ -69,6 +83,16 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 			}
 		}
 	}
+
+	// sTODO: delete prints
+	for _, node := range nodes {
+		fmt.Printf("-- rendered input: [%s][%s]\n", node.id, node.d.String())
+	}
+
+	for _, node := range unrenderedNodes {
+		fmt.Printf("--- unrendered input: [%s][%s]\n", node.id, node.d.String())
+	}
+
 	var nInputs []Node
 	for _, node := range nodes {
 		if node.id != "" {
@@ -93,7 +117,7 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 				case *FloatVal:
 					idKey.value = NewStrVal(fmt.Sprintf("%f-%s", idVal.value, node.id))
 				default:
-					return nil, fmt.Errorf("id field type invalid, expected string, int, uint, or float got: %T", idKey.value)
+					return nil, nil, fmt.Errorf("id field type invalid, expected string, int, uint, or float got: %T", idKey.value)
 				}
 			} else {
 				node.d.Insert(NewKey("id", NewStrVal(node.id)))
@@ -101,7 +125,41 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 		}
 		nInputs = append(nInputs, promoteProcessors(node.d))
 	}
-	return NewList(nInputs), nil
+
+	var unrenderedInputs []Node
+	for _, node := range unrenderedNodes {
+		if node.id != "" {
+			// vars has unique ID, concat ID onto existing ID
+			idNode, ok := node.d.Find("id")
+			if ok {
+				idKey, _ := idNode.(*Key) // always a Key
+
+				// clone original and update its key to 'original_id'
+				origKey, _ := idKey.Clone().(*Key) // always a Key
+				origKey.name = "original_id"
+				node.d.Insert(origKey)
+
+				// update id field to concat the id of the variable context set
+				switch idVal := idKey.value.(type) {
+				case *StrVal:
+					idVal.value = fmt.Sprintf("%s-%s", idVal.value, node.id)
+				case *IntVal:
+					idKey.value = NewStrVal(fmt.Sprintf("%d-%s", idVal.value, node.id))
+				case *UIntVal:
+					idKey.value = NewStrVal(fmt.Sprintf("%d-%s", idVal.value, node.id))
+				case *FloatVal:
+					idKey.value = NewStrVal(fmt.Sprintf("%f-%s", idVal.value, node.id))
+				default:
+					return nil, nil, fmt.Errorf("id field type invalid, expected string, int, uint, or float got: %T", idKey.value)
+				}
+			} else {
+				node.d.Insert(NewKey("id", NewStrVal(node.id)))
+			}
+		}
+		unrenderedInputs = append(unrenderedInputs, promoteProcessors(node.d))
+	}
+
+	return NewList(nInputs), NewList(unrenderedInputs), nil
 }
 
 type varIDMap struct {

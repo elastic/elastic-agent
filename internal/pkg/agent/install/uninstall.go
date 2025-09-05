@@ -456,7 +456,8 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 			return nil, err
 		}
 
-		renderedInputs, err := transpiler.RenderInputs(inputs, varsArray)
+		// sTODO: Should probably use the unrendered inputs to keep things consistent with the coordinator logic.
+		renderedInputs, _, err := transpiler.RenderInputs(inputs, varsArray)
 		if err != nil {
 			return nil, err
 		}

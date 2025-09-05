@@ -13,10 +13,11 @@ import (
 
 func TestRenderInputs(t *testing.T) {
 	testcases := map[string]struct {
-		input     Node
-		expected  Node
-		varsArray []*Vars
-		err       bool
+		input                       Node
+		expected                    Node
+		expectedUnrenderedInputsLen int // sTODO: use the actual expected output
+		varsArray                   []*Vars
+		err                         bool
 	}{
 		"inputs not list": {
 			input: NewKey("inputs", NewStrVal("not list")),
@@ -51,6 +52,7 @@ func TestRenderInputs(t *testing.T) {
 					NewKey("key", NewStrVal("value1")),
 				}),
 			}),
+			expectedUnrenderedInputsLen: 0,
 			varsArray: []*Vars{
 				mustMakeVars(map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -70,6 +72,7 @@ func TestRenderInputs(t *testing.T) {
 					NewKey("key", NewStrVal("value1")),
 				}),
 			}),
+			expectedUnrenderedInputsLen: 0,
 			varsArray: []*Vars{
 				mustMakeVarsWithDefault(map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -92,6 +95,7 @@ func TestRenderInputs(t *testing.T) {
 					NewKey("key", NewStrVal("value1")),
 				}),
 			}),
+			expectedUnrenderedInputsLen: 0,
 			varsArray: []*Vars{
 				mustMakeVars(map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -105,6 +109,7 @@ func TestRenderInputs(t *testing.T) {
 			input: NewKey("inputs", NewList([]Node{
 				NewDict([]Node{
 					NewKey("key", NewStrVal("${var1.name}")),
+					NewKey("key2", NewStrVal("${var2.name}")),
 				}),
 				NewDict([]Node{
 					NewKey("key", NewStrVal("${var1.missing|var1.diff}")),
@@ -118,11 +123,18 @@ func TestRenderInputs(t *testing.T) {
 					NewKey("key", NewStrVal("value1")),
 				}),
 			}),
+			expectedUnrenderedInputsLen: 3,
 			varsArray: []*Vars{
 				mustMakeVars(map[string]interface{}{
 					"var1": map[string]interface{}{
 						"name": "value1",
 						"diff": "value1",
+					},
+				}),
+				mustMakeVars(map[string]interface{}{
+					"var2": map[string]interface{}{
+						"name": "var2_name",
+						"diff": "var2_diff",
 					},
 				}),
 			},
@@ -148,6 +160,7 @@ func TestRenderInputs(t *testing.T) {
 					NewKey("unique", NewStrVal("1")),
 				}),
 			}),
+			expectedUnrenderedInputsLen: 0,
 			varsArray: []*Vars{
 				mustMakeVars(map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -180,6 +193,7 @@ func TestRenderInputs(t *testing.T) {
 					NewKey("key", NewStrVal("value4")),
 				}),
 			}),
+			expectedUnrenderedInputsLen: 0,
 			varsArray: []*Vars{
 				mustMakeVars(map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -268,6 +282,7 @@ func TestRenderInputs(t *testing.T) {
 					})),
 				}),
 			}),
+			expectedUnrenderedInputsLen: 1,
 			varsArray: []*Vars{
 				mustMakeVars(map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -366,6 +381,7 @@ func TestRenderInputs(t *testing.T) {
 					})),
 				}),
 			}),
+			expectedUnrenderedInputsLen: 0,
 			varsArray: []*Vars{
 				mustMakeVars(map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -465,6 +481,7 @@ func TestRenderInputs(t *testing.T) {
 					NewKey("original_id", NewStrVal("initial")),
 				}),
 			}),
+			expectedUnrenderedInputsLen: 0,
 			varsArray: []*Vars{
 				mustMakeVarsP("value1", map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -557,6 +574,7 @@ func TestRenderInputs(t *testing.T) {
 					})),
 				}),
 			}),
+			expectedUnrenderedInputsLen: 0,
 			varsArray: []*Vars{
 				mustMakeVarsP("value1", map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -644,6 +662,7 @@ func TestRenderInputs(t *testing.T) {
 					NewKey("id", NewStrVal("value2")),
 				}),
 			}),
+			expectedUnrenderedInputsLen: 0,
 			varsArray: []*Vars{
 				mustMakeVarsP("value1", map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -715,6 +734,7 @@ func TestRenderInputs(t *testing.T) {
 					})),
 				}),
 			}),
+			expectedUnrenderedInputsLen: 0,
 			varsArray: []*Vars{
 				mustMakeVarsP("value1", map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -770,7 +790,8 @@ func TestRenderInputs(t *testing.T) {
 					})),
 				}),
 			})),
-			expected: NewList([]Node{}),
+			expected:                    NewList([]Node{}),
+			expectedUnrenderedInputsLen: 0,
 			varsArray: []*Vars{
 				mustMakeVarsP("value1", map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -788,16 +809,135 @@ func TestRenderInputs(t *testing.T) {
 					nil),
 			},
 		},
+		// sTODO: The normal scenario
+		// In this case the input has a var that cannot be rendered
+		// So we will have 0 rendered inputs and 1 unrendered input
+		// The result will be a component created with Error to show the issue in agent status
+		"input render error - 1 bad var": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("key", NewStrVal("${var1.name}")),
+				}),
+			})),
+			expected:                    NewList([]Node{}),
+			expectedUnrenderedInputsLen: 1,
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"test": "value1",
+					},
+				}),
+			},
+		},
+		// sTODO: This is the scenario I am unsure about
+		// In this case we have multiple vars but only 1 is used in the input
+		// So we will have 1 successful render and 1 unrendered input
+		// The question is do we want to error in this case or just return the rendered?
+		"input render error - multiple vars, only 1 used": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("key", NewStrVal("${var1.name}")),
+				}),
+			})),
+			expected: NewList([]Node{
+				NewDict([]Node{
+					NewKey("key", NewStrVal("value1")),
+				}),
+			}),
+			expectedUnrenderedInputsLen: 1,
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "value1",
+					},
+				}),
+				mustMakeVars(map[string]interface{}{
+					"var2": map[string]interface{}{
+						"name": "value2",
+					},
+				}),
+			},
+		},
+		// sTODO: Not sure if this can happen?
+		// We will have only 1 unrendered input because we hash the input before rendering so we don't add it twice
+		"input render error - multiple vars in the same input": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("key", NewStrVal("${var1.name}")),
+					NewKey("key", NewStrVal("${var2.name}")),
+				}),
+			})),
+			expected:                    NewList([]Node{}),
+			expectedUnrenderedInputsLen: 1,
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "value1",
+					},
+				}),
+				mustMakeVars(map[string]interface{}{
+					"var2": map[string]interface{}{
+						"name": "value2",
+					},
+				}),
+			},
+		},
+		"input rendered correctly - multiple vars in the same array(provider?) for the same input": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("key", NewStrVal("${var1.name}")),
+					NewKey("key", NewStrVal("${var2.name}")),
+				}),
+			})),
+			expected: NewList([]Node{
+				NewDict([]Node{
+					NewKey("key", NewStrVal("value1")),
+					NewKey("key", NewStrVal("value2")),
+				}),
+			}),
+			expectedUnrenderedInputsLen: 0,
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "value1",
+					},
+					"var2": map[string]interface{}{
+						"name": "value2",
+					},
+				}),
+			},
+		},
 	}
 
 	for name, test := range testcases {
 		t.Run(name, func(t *testing.T) {
-			v, err := RenderInputs(test.input, test.varsArray)
+			v, u, err := RenderInputs(test.input, test.varsArray)
+			// sTODO: delete prints
+			if v != nil {
+				for _, in := range u.Value().([]Node) {
+					dict, ok := in.(*Dict)
+					if !ok {
+						continue
+					}
+					t.Logf("-- final unrendered input: %s\n", dict.String())
+				}
+			}
+			if u != nil {
+				for _, in := range v.Value().([]Node) {
+					dict, ok := in.(*Dict)
+					if !ok {
+						continue
+					}
+					t.Logf("-- final rendered input: %s\n", dict.String())
+				}
+			}
+
 			if test.err {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, test.expected.String(), v.String())
+				assert.Equal(t, test.expectedUnrenderedInputsLen, len(u.Value().([]Node)))
 			}
 		})
 	}

@@ -441,7 +441,8 @@ func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath strin
 	// Render the inputs using the discovered inputs.
 	inputs, ok := transpiler.Lookup(ast, "inputs")
 	if ok {
-		renderedInputs, err := transpiler.RenderInputs(inputs, vars)
+		// sTODO: Should probably use the unrendered inputs to keep things consistent with the coordinator logic.
+		renderedInputs, _, err := transpiler.RenderInputs(inputs, vars)
 		if err != nil {
 			return nil, lvl, fmt.Errorf("rendering inputs failed: %w", err)
 		}
