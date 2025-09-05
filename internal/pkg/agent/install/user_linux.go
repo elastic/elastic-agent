@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"math"
 )
 
 // FindGID returns the group's GID on the machine.
@@ -89,6 +90,9 @@ func getentGetID(database string, key string) (int, error) {
 	val, err := strconv.Atoi(split[2])
 	if err != nil {
 		return -1, fmt.Errorf("failed to convert %s to int: %w", split[2], err)
+	}
+	if val < 0 || val > int(math.MaxUint32) {
+		return -1, fmt.Errorf("ID value %d out of range [0, %d]", val, uint32(math.MaxUint32))
 	}
 	return val, nil
 }
