@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/otiai10/copy"
+	filecopy "github.com/otiai10/copy"
 	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
@@ -33,6 +33,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -312,6 +313,9 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, err
 	}
 
+	//FIXME make it nicer
+	err = addInstallDesc(version, unpackRes.VersionedHome, unpackRes.Hash, detectedFlavor)
+
 	newHash := unpackRes.Hash
 	if newHash == "" {
 		return nil, errors.New("unknown hash")
@@ -409,6 +413,65 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	}
 
 	return cb, nil
+}
+
+func addInstallDesc(version string, home string, hash string, flavor string) error {
+	installMarkerFilePath := filepath.Join(paths.Top(), paths.MarkerFileName)
+	installDescriptor, err := readInstallMarker(installMarkerFilePath)
+	if err != nil {
+		return err
+	}
+
+	if installDescriptor == nil {
+		return fmt.Errorf("no install descriptor found at %q")
+	}
+
+	existingInstalls := installDescriptor.AgentInstalls
+	installDescriptor.AgentInstalls = make([]v1.AgentInstallDesc, len(existingInstalls)+1)
+	newInstall := v1.AgentInstallDesc{
+		Version:       version,
+		Hash:          hash,
+		VersionedHome: home,
+		Flavor:        flavor,
+	}
+	installDescriptor.AgentInstalls[0] = newInstall
+	copied := copy(installDescriptor.AgentInstalls[1:], existingInstalls)
+	if copied != len(existingInstalls) {
+		return fmt.Errorf("error adding new install %v to existing installs %v", newInstall, existingInstalls)
+	}
+
+	err = writeInstallMarker(installMarkerFilePath, installDescriptor)
+	if err != nil {
+		return fmt.Errorf("writing updated install marker: %w", err)
+	}
+
+	return nil
+}
+
+func writeInstallMarker(markerFilePath string, descriptor *v1.InstallDescriptor) error {
+	installMarkerFile, err := os.Create(markerFilePath)
+	if err != nil {
+		return fmt.Errorf("opening install marker file: %w", err)
+	}
+	defer func(installMarkerFile *os.File) {
+		_ = installMarkerFile.Close()
+	}(installMarkerFile)
+	return v1.WriteInstallDescriptor(installMarkerFile, descriptor)
+}
+
+func readInstallMarker(markerFilePath string) (*v1.InstallDescriptor, error) {
+	installMarkerFile, err := os.Open(markerFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("opening install marker file: %w", err)
+	}
+	defer func(installMarkerFile *os.File) {
+		_ = installMarkerFile.Close()
+	}(installMarkerFile)
+	installDescriptor, err := v1.ParseInstallDescriptor(installMarkerFile)
+	if err != nil {
+		return nil, fmt.Errorf("parsing install marker file: %w", err)
+	}
+	return installDescriptor, nil
 }
 
 func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string, now time.Time, version string, action *fleetapi.ActionUpgrade) (reexec.ShutdownCallbackFn, error) {
@@ -773,9 +836,9 @@ func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
 		copyConcurrency = runtime.NumCPU() * 4
 	}
 
-	return copy.Copy(from, to, copy.Options{
-		OnSymlink: func(_ string) copy.SymlinkAction {
-			return copy.Shallow
+	return filecopy.Copy(from, to, filecopy.Options{
+		OnSymlink: func(_ string) filecopy.SymlinkAction {
+			return filecopy.Shallow
 		},
 		Sync:         true,
 		OnError:      onErr,
