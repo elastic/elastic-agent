@@ -18,7 +18,7 @@ import (
 )
 
 func dialContext(ctx context.Context) (*grpc.ClientConn, error) {
-	return grpc.DialContext( //nolint:staticcheck // Only the deprecated version allows this call to be blocking
+	return control.DialContextBlocking(
 		ctx,
 		strings.TrimPrefix(control.Address(), "unix://"),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
