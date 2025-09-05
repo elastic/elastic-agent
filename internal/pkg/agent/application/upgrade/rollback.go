@@ -35,6 +35,36 @@ const (
 
 // Rollback rollbacks to previous version which was functioning before upgrade.
 func Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string) error {
+	return RollbackWithOpts(ctx, log, c, topDirPath, prevVersionedHome, prevHash)
+}
+
+var FatalRollbackError = errors.New("Fatal rollback error")
+
+type RollbackHook func(ctx context.Context, log *logger.Logger, topDirPath string) error
+type rollbackSettings struct {
+	preRestartHook RollbackHook
+}
+
+func newRollbackSettings(opts ...RollbackOpt) *rollbackSettings {
+	rs := new(rollbackSettings)
+	for _, opt := range opts {
+		opt(rs)
+	}
+	return rs
+}
+
+type RollbackOpt func(*rollbackSettings)
+
+func WithPreRestartHook(h RollbackHook) RollbackOpt {
+	return func(s *rollbackSettings) {
+		s.preRestartHook = h
+	}
+}
+
+func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, topDirPath string, prevVersionedHome string, prevHash string, opts ...RollbackOpt) error {
+
+	settings := newRollbackSettings(opts...)
+
 	symlinkPath := filepath.Join(topDirPath, agentName)
 
 	var symlinkTarget string
@@ -54,6 +84,18 @@ func Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPa
 	// revert active commit
 	if err := UpdateActiveCommit(log, topDirPath, prevHash); err != nil {
 		return err
+	}
+
+	// Hook
+	if settings.preRestartHook != nil {
+		hookErr := settings.preRestartHook(ctx, log, topDirPath)
+		if hookErr != nil {
+			if errors.Is(hookErr, FatalRollbackError) {
+				return fmt.Errorf("pre-restart hook failed: %w", hookErr)
+			} else {
+				log.Warnf("pre-restart hook failed: %v", hookErr)
+			}
+		}
 	}
 
 	// Restart
@@ -149,26 +191,50 @@ func InvokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error
 		log.Info("agent is not upgradable, not starting watcher")
 		return nil, nil
 	}
-
-	cmd := invokeCmd(agentExecutable)
-	log.Infow("Starting upgrade watcher", "path", cmd.Path, "args", cmd.Args, "env", cmd.Env, "dir", cmd.Dir)
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start Upgrade Watcher: %w", err)
+	// invokeWatcherCmd and StartWatcherCmd are platform-specific functions dealing with process launching details.
+	cmd, err := StartWatcherCmd(log, func() *exec.Cmd { return invokeWatcherCmd(agentExecutable) })
+	if err != nil {
+		return nil, fmt.Errorf("starting watcher process: %w", err)
 	}
 
 	upgradeWatcherPID := cmd.Process.Pid
 	agentPID := os.Getpid()
-
-	go func() {
-		if err := cmd.Wait(); err != nil {
-			log.Infow("Upgrade Watcher exited with error", "agent.upgrade.watcher.process.pid", "agent.process.pid", agentPID, upgradeWatcherPID, "error.message", err)
-		}
-	}()
-
 	log.Infow("Upgrade Watcher invoked", "agent.upgrade.watcher.process.pid", upgradeWatcherPID, "agent.process.pid", agentPID)
 
 	return cmd, nil
 
+}
+
+type WatcherInvocationOpt func(opts *watcherInvocationOptions)
+type watcherHook func()
+
+type watcherInvocationOptions struct {
+	postWatchHook watcherHook
+}
+
+func WithWatcherPostWaitHook(h watcherHook) WatcherInvocationOpt {
+	return func(opts *watcherInvocationOptions) {
+		opts.postWatchHook = h
+	}
+}
+
+func applyWatcherInvocationOpts(opts ...WatcherInvocationOpt) *watcherInvocationOptions {
+	invocationOpts := new(watcherInvocationOptions)
+	for _, opt := range opts {
+		opt(invocationOpts)
+	}
+	return invocationOpts
+}
+
+type cmdFactory func() *exec.Cmd
+
+func invokeWatcherCmd(agentExecutable string) *exec.Cmd {
+	return InvokeCmdWithArgs(
+		agentExecutable,
+		watcherSubcommand,
+		"--path.config", paths.Config(),
+		"--path.home", paths.Top(),
+	)
 }
 
 func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) error {

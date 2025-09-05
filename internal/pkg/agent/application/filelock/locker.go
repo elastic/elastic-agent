@@ -39,6 +39,7 @@ func (a *AppLocker) TryLock() error {
 	if !locked {
 		return ErrAppAlreadyRunning
 	}
+
 	return nil
 }
 
