@@ -1,0 +1,157 @@
+---
+name: Bump EDOT SDKs to latest versions
+
+scms:
+  elastic-agent:
+    kind: github
+    spec:
+      user: '{{ requiredEnv "GITHUB_ACTOR" }}'
+      username: '{{ requiredEnv "GITHUB_ACTOR" }}'
+      owner: '{{ .scm.owner }}'
+      repository: '{{ .scm.repository }}'
+      token: '{{ requiredEnv "GITHUB_TOKEN" }}'
+      commitusingapi: true
+      branch: '{{ .scm.branch }}'
+      force: false
+
+actions:
+  elastic-agent:
+    kind: github/pullrequest
+    scmid: elastic-agent
+    spec:
+      automerge: false
+      labels:
+        - backport-active-8
+        - backport-active-9
+        - dependencies
+        - skip-changelog
+        - Team:Elastic-Agent-Control-Plane
+      title: '[otel/kube-stack] Update EDOT SDK k8s auto-instrumentation images to their latest versions'
+      description: |
+        Update the versions of the EDOT language SDK images being used with the OTel Operator.
+
+sources:
+  elastic-otel-dotnet:
+    name: "Get latest Elastic OTEL .NET release"
+    kind: githubrelease
+    spec:
+      owner: "elastic"
+      repository: "elastic-otel-dotnet"
+      token: '{{ requiredEnv "GITHUB_TOKEN" }}'
+      username: '{{ requiredEnv "GITHUB_ACTOR" }}'
+      versionfilter:
+        kind: semver
+
+  elastic-otel-java:
+    name: "Get latest Elastic OTEL Java release"
+    kind: githubrelease
+    spec:
+      owner: "elastic"
+      repository: "elastic-otel-java"
+      token: '{{ requiredEnv "GITHUB_TOKEN" }}'
+      username: '{{ requiredEnv "GITHUB_ACTOR" }}'
+      versionfilter:
+        kind: semver
+
+  elastic-otel-node:
+    name: "Get latest Elastic OTEL Node.js release"
+    kind: githubrelease
+    spec:
+      owner: "elastic"
+      repository: "elastic-otel-node"
+      token: '{{ requiredEnv "GITHUB_TOKEN" }}'
+      username: '{{ requiredEnv "GITHUB_ACTOR" }}'
+      versionfilter:
+        kind: semver
+
+  elastic-otel-python:
+    name: "Get latest Elastic OTEL Python release"
+    kind: githubrelease
+    spec:
+      owner: "elastic"
+      repository: "elastic-otel-python"
+      token: '{{ requiredEnv "GITHUB_TOKEN" }}'
+      username: '{{ requiredEnv "GITHUB_ACTOR" }}'
+      versionfilter:
+        kind: semver
+
+  otel-go-instrumentation:
+    name: "Get latest OpenTelemetry Go Instrumentation release"
+    kind: githubrelease
+    spec:
+      owner: "open-telemetry"
+      repository: "opentelemetry-go-instrumentation"
+      token: '{{ requiredEnv "GITHUB_TOKEN" }}'
+      username: '{{ requiredEnv "GITHUB_ACTOR" }}'
+      versionfilter:
+        kind: semver
+
+targets:
+  update-dotnet-managed-otlp:
+    name: "Update Elastic OTEL .NET image in values.yaml"
+    kind: yaml
+    scmid: elastic-agent
+    sourceid: elastic-otel-dotnet
+    spec:
+      files:
+        - "deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"
+        - "deploy/helm/edot-collector/kube-stack/values.yaml"
+      key: "$.instrumentation.dotnet.image"
+    transformers:
+      - addprefix: "docker.elastic.co/observability/elastic-otel-dotnet:"
+
+  # Update Java image in managed_otlp/values.yaml
+  update-java-managed-otlp:
+    name: "Update Elastic OTEL Java image in values.yaml"
+    kind: yaml
+    scmid: elastic-agent
+    sourceid: elastic-otel-java
+    spec:
+      files:
+        - "deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"
+        - "deploy/helm/edot-collector/kube-stack/values.yaml"
+      key: "$.instrumentation.java.image"
+    transformers:
+      - trimprefix: "v"
+      - addprefix: "docker.elastic.co/observability/elastic-otel-javaagent:"
+
+  update-nodejs-managed-otlp:
+    name: "Update Elastic OTEL Node.js image in values.yaml"
+    kind: yaml
+    scmid: elastic-agent
+    sourceid: elastic-otel-node
+    spec:
+      files:
+        - "deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"
+        - "deploy/helm/edot-collector/kube-stack/values.yaml"
+      key: "$.instrumentation.nodejs.image"
+    transformers:
+      - trimprefix: "v"
+      - addprefix: "docker.elastic.co/observability/elastic-otel-node:"
+
+  update-python-managed-otlp:
+    name: "Update Elastic OTEL Python image in managed_otlp/values.yaml"
+    kind: yaml
+    scmid: elastic-agent
+    sourceid: elastic-otel-python
+    spec:
+      files:
+        - "deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"
+        - "deploy/helm/edot-collector/kube-stack/values.yaml"
+      key: "$.instrumentation.python.image"
+    transformers:
+      - trimprefix: "v"
+      - addprefix: "docker.elastic.co/observability/elastic-otel-python:"
+
+  update-go-main:
+    name: "Update OpenTelemetry Go Instrumentation image in values.yaml"
+    kind: yaml
+    scmid: elastic-agent
+    sourceid: otel-go-instrumentation
+    spec:
+      files:
+        - "deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"
+        - "deploy/helm/edot-collector/kube-stack/values.yaml"
+      key: "$.instrumentation.go.image"
+    transformers:
+      - addprefix: "ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:"
