@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -216,6 +217,30 @@ func TestGetOtelConfig(t *testing.T) {
 		"password":         "password",
 		"preset":           "balanced",
 		"queue.mem.events": 3200,
+		"ssl.enabled":      true,
+	}
+
+	expectedExtensionConfig := map[string]any{
+		"beatsauth/_agent-component/default": map[string]any{
+			"idle_connection_timeout": "3s",
+			"proxy_disable":           false,
+			"ssl": map[string]interface{}{
+				"ca_sha256":               []interface{}{},
+				"ca_trusted_fingerprint":  "",
+				"certificate":             "",
+				"certificate_authorities": []interface{}{},
+				"cipher_suites":           []interface{}{},
+				"curve_types":             []interface{}{},
+				"enabled":                 true,
+				"key":                     "",
+				"key_passphrase":          "",
+				"key_passphrase_path":     "",
+				"renegotiation":           int64(0),
+				"supported_protocols":     []interface{}{},
+				"verification_mode":       uint64(0),
+			},
+			"timeout": "1m30s",
+		},
 	}
 
 	expectedESConfig := map[string]any{
@@ -246,6 +271,13 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 			"timeout":           90 * time.Second,
 			"idle_conn_timeout": 3 * time.Second,
+			"auth": map[string]any{
+				"authenticator": "beatsauth/_agent-component/default",
+			},
+			"tls": map[string]any{
+				"min_version": "1.2",
+				"max_version": "1.3",
+			},
 		},
 	}
 
@@ -366,7 +398,8 @@ func TestGetOtelConfig(t *testing.T) {
 				},
 			},
 			expectedConfig: confmap.NewFromStringMap(map[string]any{
-				"exporters": expectedESConfig,
+				"exporters":  expectedESConfig,
+				"extensions": expectedExtensionConfig,
 				"receivers": map[string]any{
 					"filebeatreceiver/_agent-component/filestream-default": map[string]any{
 						"filebeat": map[string]any{
@@ -432,6 +465,7 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 				"service": map[string]any{
+					"extensions": []interface{}{"beatsauth/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/filestream-default": map[string][]string{
 							"exporters": []string{"elasticsearch/_agent-component/default"},
@@ -473,7 +507,8 @@ func TestGetOtelConfig(t *testing.T) {
 				},
 			},
 			expectedConfig: confmap.NewFromStringMap(map[string]any{
-				"exporters": expectedESConfig,
+				"exporters":  expectedESConfig,
+				"extensions": expectedExtensionConfig,
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring": map[string]any{
 						"metricbeat": map[string]any{
@@ -525,6 +560,7 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 				"service": map[string]any{
+					"extensions": []interface{}{"beatsauth/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
 							"exporters": []string{"elasticsearch/_agent-component/default"},
@@ -566,7 +602,8 @@ func TestGetOtelConfig(t *testing.T) {
 				},
 			},
 			expectedConfig: confmap.NewFromStringMap(map[string]any{
-				"exporters": expectedESConfig,
+				"exporters":  expectedESConfig,
+				"extensions": expectedExtensionConfig,
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/system-metrics": map[string]any{
 						"metricbeat": map[string]any{
@@ -629,6 +666,7 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 				"service": map[string]any{
+					"extensions": []interface{}{"beatsauth/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/system-metrics": map[string][]string{
 							"exporters": []string{"elasticsearch/_agent-component/default"},
@@ -641,7 +679,7 @@ func TestGetOtelConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, getBeatMonitoringConfig)
+			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, getBeatMonitoringConfig, logp.NewNopLogger())
 			if actualConf == nil || tt.expectedConfig == nil {
 				assert.Equal(t, tt.expectedConfig, actualConf)
 			} else { // this gives a nicer diff
@@ -866,5 +904,3 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 		})
 	}
 }
-
-// TODO: Add unit tests for other config generation functions
