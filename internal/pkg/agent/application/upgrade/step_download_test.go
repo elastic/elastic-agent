@@ -8,6 +8,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -15,9 +17,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -55,11 +58,11 @@ func TestFallbackIsAppended(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			l, _ := loggertest.New(tc.name)
-			u := Upgrader{
+			a := artifactDownloader{
 				fleetServerURI: tc.fleetServerURI,
 				log:            l,
 			}
-			res := u.appendFallbackPGP(tc.targetVersion, tc.passedBytes)
+			res := a.appendFallbackPGP(tc.targetVersion, tc.passedBytes)
 			// check default fallback is passed and is very last
 			require.NotNil(t, res)
 			require.Equal(t, tc.expectedLen, len(res))
@@ -91,8 +94,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return &mockDownloader{expectedDownloadPath, nil}, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
-		require.NoError(t, err)
+		a := newArtifactDownloader(&settings, testLogger)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
@@ -100,7 +102,7 @@ func TestDownloadWithRetries(t *testing.T) {
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(settings.Timeout)
 
-		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
 		require.NoError(t, err)
 		require.Equal(t, expectedDownloadPath, path)
 
@@ -141,8 +143,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return nil, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
-		require.NoError(t, err)
+		a := newArtifactDownloader(&settings, testLogger)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
@@ -150,7 +151,7 @@ func TestDownloadWithRetries(t *testing.T) {
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(settings.Timeout)
 
-		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
 		require.NoError(t, err)
 		require.Equal(t, expectedDownloadPath, path)
 
@@ -196,8 +197,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return nil, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
-		require.NoError(t, err)
+		a := newArtifactDownloader(&settings, testLogger)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
@@ -205,7 +205,7 @@ func TestDownloadWithRetries(t *testing.T) {
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(settings.Timeout)
 
-		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
 		require.NoError(t, err)
 		require.Equal(t, expectedDownloadPath, path)
 
@@ -241,8 +241,7 @@ func TestDownloadWithRetries(t *testing.T) {
 			return &mockDownloader{"", errors.New("download failed")}, nil
 		}
 
-		u, err := NewUpgrader(testLogger, &settings, &info.AgentInfo{})
-		require.NoError(t, err)
+		a := newArtifactDownloader(&settings, testLogger)
 
 		parsedVersion, err := agtversion.ParseVersion("8.9.0")
 		require.NoError(t, err)
@@ -250,7 +249,7 @@ func TestDownloadWithRetries(t *testing.T) {
 		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
 		minRetryDeadline := time.Now().Add(testCaseSettings.Timeout)
 
-		path, err := u.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &testCaseSettings, upgradeDetails)
+		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &testCaseSettings, upgradeDetails)
 		require.Equal(t, "context deadline exceeded", err.Error())
 		require.Equal(t, "", path)
 
@@ -276,6 +275,115 @@ func TestDownloadWithRetries(t *testing.T) {
 		require.NotEmpty(t, *upgradeDetailsRetryErrorMsg)
 		require.Equal(t, *upgradeDetailsRetryErrorMsg, upgradeDetails.Metadata.RetryErrorMsg)
 	})
+
+	t.Run("insufficient disk space stops retries", func(t *testing.T) {
+		numberOfAttempts := 0
+		diskSpaceError := downloadErrors.OS_DiskSpaceErrors[0]
+		mockDownloaderCtor := func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config, upgradeDetails *details.Details) (download.Downloader, error) {
+			numberOfAttempts++
+			return &mockDownloader{"", diskSpaceError}, nil
+		}
+
+		a := newArtifactDownloader(&settings, testLogger)
+
+		parsedVersion, err := agtversion.ParseVersion("8.9.0")
+		require.NoError(t, err)
+
+		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(parsedVersion)
+
+		path, err := a.downloadWithRetries(context.Background(), mockDownloaderCtor, parsedVersion, &settings, upgradeDetails)
+
+		require.Error(t, err)
+		require.Equal(t, "", path)
+
+		require.Equal(t, 1, numberOfAttempts)
+		require.ErrorIs(t, err, diskSpaceError)
+
+		require.NotZero(t, *upgradeDetailsRetryUntil)
+		require.False(t, *upgradeDetailsRetryUntilWasUnset)
+
+		require.Empty(t, *upgradeDetailsRetryErrorMsg)
+	})
+}
+
+type mockVerifier struct {
+	called      bool
+	returnError error
+}
+
+func (mv *mockVerifier) Name() string {
+	return ""
+}
+
+func (mv *mockVerifier) Verify(ctx context.Context, a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
+	mv.called = true
+	return mv.returnError
+}
+
+func TestDownloadArtifact(t *testing.T) {
+	testLogger, _ := loggertest.New("TestDownloadArtifact")
+	tempConfig := &artifact.Config{} // used only to get os and arch, runtime.GOARCH returns amd64 which is not a valid arch when used in GetArtifactName
+
+	parsedVersion, err := agtversion.ParseVersion("8.9.0")
+	require.NoError(t, err)
+
+	upgradeDeatils := details.NewDetails(parsedVersion.String(), details.StateRequested, "")
+
+	mockContent := []byte("mock content")
+
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write(mockContent)
+		require.NoError(t, err)
+	}))
+	defer testServer.Close()
+
+	testError := errors.New("test error")
+
+	type testCase struct {
+		mockNewVerifierFactory verifierFactory
+		expectedError          error
+	}
+
+	testCases := map[string]testCase{
+		"should return path if verifier constructor fails": {
+			mockNewVerifierFactory: func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
+				return nil, testError
+			},
+			expectedError: testError,
+		},
+		"should return path if verifier fails": {
+			mockNewVerifierFactory: func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
+				return &mockVerifier{returnError: testError}, nil
+			},
+			expectedError: testError,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			paths.SetTop(t.TempDir())
+
+			artifactPath, err := artifact.GetArtifactPath(agentArtifact, *parsedVersion, tempConfig.OS(), tempConfig.Arch(), paths.Downloads())
+			require.NoError(t, err)
+
+			settings := artifact.Config{
+				RetrySleepInitDuration: 20 * time.Millisecond,
+				HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+					Timeout: 2 * time.Second,
+				},
+				SourceURI:       testServer.URL,
+				TargetDirectory: paths.Downloads(),
+			}
+
+			a := newArtifactDownloader(&settings, testLogger)
+			a.newVerifier = tc.mockNewVerifierFactory
+
+			path, err := a.downloadArtifact(t.Context(), parsedVersion, testServer.URL, upgradeDeatils, false, true)
+			require.ErrorIs(t, err, tc.expectedError)
+			require.Equal(t, artifactPath, path)
+		})
+	}
 }
 
 // mockUpgradeDetails returns a *details.Details value that has an observer registered on it for inspecting
@@ -306,4 +414,10 @@ func mockUpgradeDetails(parsedVersion *agtversion.ParsedSemVer) (*details.Detail
 	return upgradeDetails,
 		&upgradeDetailsRetryUntil, &upgradeDetailsRetryUntilWasUnset,
 		&upgradeDetailsRetryErrorMsg
+}
+
+func TestWithFleetServerURI(t *testing.T) {
+	a := &artifactDownloader{}
+	a.withFleetServerURI("mockURI")
+	require.Equal(t, "mockURI", a.fleetServerURI)
 }
