@@ -29,9 +29,9 @@ func (h *PolicyReassign) Handle(ctx context.Context, a fleetapi.Action, acker ac
 	h.log.Debugf("handlerPolicyReassign: action '%+v' received", a)
 
 	if err := acker.Ack(ctx, a); err != nil {
-		h.log.Errorf("failed to acknowledge POLICY_REASSIGN action with id '%s'", a.ID)
+		h.log.Errorf("failed to acknowledge POLICY_REASSIGN action with id '%s'", a.ID())
 	} else if err := acker.Commit(ctx); err != nil {
-		h.log.Errorf("failed to commit acker after acknowledging action with id '%s'", a.ID)
+		h.log.Errorf("failed to commit acker after acknowledging action with id '%s'", a.ID())
 	}
 
 	return nil
