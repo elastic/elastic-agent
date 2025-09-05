@@ -23,70 +23,42 @@ import (
 	"github.com/elastic/elastic-agent/testing/integration"
 )
 
-type AssertFunc func(*testing.T, *atesting.Fixture, string, error)
-
-type testCase struct {
-	description string
-	privileged  bool
-	os          []define.OS
-	assertion   AssertFunc
-}
-
-// Verifies that re-enrollment as a privileged user succeeds when the agent was
-// installed unprivileged. Windows implementation is a no-op and will be addressed
-// in a separate PR. Relevant issue: https://github.com/elastic/elastic-agent/issues/8544
+// Verifies that re-enrolling agent as a privileged user succeeds when the agent
+// is both unprivileged and privileged.
 func TestReEnrollUnprivileged(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: integration.Default,
 		Stack: &define.Stack{},
 		Sudo:  true,
-		OS: []define.OS{
-			{Type: define.Darwin},
-			{Type: define.Linux},
-		},
 	})
 
 	ctx := t.Context()
 
-	fixture, enrollArgs := prepareAgentforReEnroll(t, ctx, info, false)
-
-	out, err := fixture.Exec(ctx, enrollArgs)
-	if out != nil {
-		t.Log(string(out))
+	testCases := map[string]bool{
+		"unprivileged agent with privileged user": false,
+		"privileged agent with privileged user":   true,
 	}
-	require.NoError(t, err)
 
-	assert.Eventuallyf(t, func() bool {
-		err := fixture.IsHealthy(t.Context())
-		return err == nil
-	},
-		2*time.Minute, time.Second,
-		"Elastic-Agent did not report healthy. Agent status error: \"%v\"",
-		err,
-	)
-}
+	for name, privileged := range testCases {
+		t.Run(name, func(t *testing.T) {
+			fixture, enrollArgs := prepareAgentforReEnroll(t, ctx, info, privileged)
 
-func TestReEnrollPrivileged(t *testing.T) {
-	info := define.Require(t, define.Requirements{
-		Group: integration.Default,
-		Stack: &define.Stack{},
-		Sudo:  true,
-	})
+			out, err := fixture.Exec(ctx, enrollArgs)
+			if out != nil {
+				t.Log(string(out))
+			}
+			require.NoError(t, err)
 
-	ctx := t.Context()
-
-	fixture, enrollArgs := prepareAgentforReEnroll(t, ctx, info, true)
-	_, err := fixture.Exec(ctx, enrollArgs)
-	require.NoError(t, err)
-
-	assert.Eventuallyf(t, func() bool {
-		err := fixture.IsHealthy(t.Context())
-		return err == nil
-	},
-		2*time.Minute, time.Second,
-		"Elastic-Agent did not report healthy. Agent status error: \"%v\"",
-		err,
-	)
+			assert.Eventuallyf(t, func() bool {
+				err := fixture.IsHealthy(t.Context())
+				return err == nil
+			},
+				2*time.Minute, time.Second,
+				"Elastic-Agent did not report healthy. Agent status error: \"%v\"",
+				err,
+			)
+		})
+	}
 }
 
 func prepareAgentforReEnroll(t *testing.T, ctx context.Context, info *define.Info, privileged bool) (*atesting.Fixture, []string) {
