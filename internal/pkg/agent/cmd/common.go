@@ -6,26 +6,33 @@ package cmd
 
 import (
 	"flag"
-	"fmt"
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 
 	// import logp flags
 	_ "github.com/elastic/elastic-agent-libs/logp/configure"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/agentrun"
+	applyflavor "github.com/elastic/elastic-agent/internal/pkg/agent/cmd/apply_flavor"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/common"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/component"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/container"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/diagnostics"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/inspect"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/install"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/logs"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/otel"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/reexec"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/status"
+	switchcmd "github.com/elastic/elastic-agent/internal/pkg/agent/cmd/switch"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/uninstall"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/upgrade"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/watch"
 	"github.com/elastic/elastic-agent/internal/pkg/basecmd"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/version"
 )
-
-func troubleshootMessage() string {
-	v := strings.Split(release.Version(), ".")
-	version := strings.Join(v[:2], ".")
-	return fmt.Sprintf("For help, please see our troubleshooting guide at https://www.elastic.co/guide/en/fleet/%s/fleet-troubleshooting.html", version)
-}
 
 // NewCommand returns the default command for the agent.
 func NewCommand() *cobra.Command {
@@ -42,10 +49,10 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 				// before tryContainerLoadPaths as this will try to read/write from
 				// the agent state dir which might not have proper permissions when
 				// running inside a container
-				initContainer(streams)
+				container.InitContainer(streams)
 			}
 
-			return tryContainerLoadPaths()
+			return common.TryContainerLoadPaths()
 		},
 	}
 
@@ -76,28 +83,28 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("environment"))
 
 	// sub-commands
-	run := newRunCommandWithArgs(args, streams)
+	run := agentrun.NewRunCommandWithArgs(args, streams)
 	cmd.AddCommand(basecmd.NewDefaultCommandsWithArgs(args, streams)...)
 	cmd.AddCommand(run)
 
-	cmd.AddCommand(newInstallCommandWithArgs(args, streams))
-	cmd.AddCommand(newUninstallCommandWithArgs(args, streams))
-	cmd.AddCommand(newUpgradeCommandWithArgs(args, streams))
-	cmd.AddCommand(newEnrollCommandWithArgs(args, streams))
-	cmd.AddCommand(newInspectCommandWithArgs(args, streams))
-	cmd.AddCommand(newPrivilegedCommandWithArgs(args, streams))
-	cmd.AddCommand(newUnprivilegedCommandWithArgs(args, streams))
-	cmd.AddCommand(newWatchCommandWithArgs(args, streams))
-	cmd.AddCommand(newContainerCommand(args, streams))
-	cmd.AddCommand(newStatusCommand(args, streams))
-	cmd.AddCommand(newDiagnosticsCommand(args, streams))
-	cmd.AddCommand(newComponentCommandWithArgs(args, streams))
-	cmd.AddCommand(newLogsCommandWithArgs(args, streams))
-	cmd.AddCommand(newOtelCommandWithArgs(args, streams))
-	cmd.AddCommand(newApplyFlavorCommandWithArgs(args, streams))
+	cmd.AddCommand(install.NewInstallCommandWithArgs(args, streams))
+	cmd.AddCommand(uninstall.NewUninstallCommandWithArgs(args, streams))
+	cmd.AddCommand(upgrade.NewUpgradeCommandWithArgs(args, streams))
+	cmd.AddCommand(install.NewEnrollCommandWithArgs(args, streams))
+	cmd.AddCommand(inspect.NewInspectCommandWithArgs(args, streams))
+	cmd.AddCommand(switchcmd.NewPrivilegedCommandWithArgs(args, streams))
+	cmd.AddCommand(switchcmd.NewUnprivilegedCommandWithArgs(args, streams))
+	cmd.AddCommand(watch.NewWatchCommandWithArgs(args, streams))
+	cmd.AddCommand(container.NewContainerCommand(args, streams))
+	cmd.AddCommand(status.NewStatusCommand(args, streams))
+	cmd.AddCommand(diagnostics.NewDiagnosticsCommand(args, streams))
+	cmd.AddCommand(component.NewComponentCommandWithArgs(args, streams))
+	cmd.AddCommand(logs.NewLogsCommandWithArgs(args, streams))
+	cmd.AddCommand(otel.NewOtelCommandWithArgs(args, streams))
+	cmd.AddCommand(applyflavor.NewApplyFlavorCommandWithArgs(args, streams))
 
 	// windows special hidden sub-command (only added on Windows)
-	reexec := newReExecWindowsCommand(args, streams)
+	reexec := reexec.NewReExecWindowsCommand(args, streams)
 	if reexec != nil {
 		cmd.AddCommand(reexec)
 	}
