@@ -365,9 +365,6 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	return args
 }
 
-<<<<<<< HEAD
-func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
-=======
 // getFileOwnFromCmdFunc, getOwnerFromPathFunc and computeFixPermissions are for
 // testability. Instead of directly executing the code block in doEnroll, we
 // are calling computeFixPermissions. computeFixPermissions is tested on its own.
@@ -402,8 +399,7 @@ func computeFixPermissions(fromInstall bool, hasRoot bool, os string, getFileOwn
 	return nil, nil
 }
 
-func doEnroll(streams *cli.IOStreams, cmd *cobra.Command) error {
->>>>>>> 08444d400 (Fix/8544 mac linux unprivileged reenroll (#9604))
+func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	err := validateEnrollFlags(cmd)
 	if err != nil {
 		return err
