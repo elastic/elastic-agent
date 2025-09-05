@@ -52,7 +52,7 @@ func Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPa
 	}
 
 	// revert active commit
-	if err := UpdateActiveCommit(log, topDirPath, prevHash); err != nil {
+	if err := UpdateActiveCommit(log, topDirPath, prevHash, os.WriteFile); err != nil {
 		return err
 	}
 
