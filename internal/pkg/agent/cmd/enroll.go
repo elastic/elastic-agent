@@ -358,9 +358,6 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	return args
 }
 
-<<<<<<< HEAD
-func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
-=======
 // getFileOwnFromCmdFunc, getOwnerFromPathFunc and computeFixPermissions are for
 // testability. Instead of directly executing the code block in doEnroll, we
 // are calling computeFixPermissions. computeFixPermissions is tested on its own.
@@ -395,8 +392,7 @@ func computeFixPermissions(fromInstall bool, hasRoot bool, os string, getFileOwn
 	return nil, nil
 }
 
-func doEnroll(streams *cli.IOStreams, cmd *cobra.Command) error {
->>>>>>> 08444d400 (Fix/8544 mac linux unprivileged reenroll (#9604))
+func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	err := validateEnrollFlags(cmd)
 	if err != nil {
 		return err
@@ -497,30 +493,9 @@ func doEnroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	ctx := handleSignal(context.Background())
 
-<<<<<<< HEAD
-	// On MacOS Ventura and above, fixing the permissions on enrollment during installation fails with the error:
-	//  Error: failed to fix permissions: chown /Library/Elastic/Agent/data/elastic-agent-c13f91/elastic-agent.app: operation not permitted
-	// This is because we are fixing permissions twice, once during installation and again during the enrollment step.
-	// When we are enrolling as part of installation on MacOS, skip the second attempt to fix permissions.
-	var fixPermissions *utils.FileOwner
-	if fromInstall {
-		perms, err := getFileOwnerFromCmd(cmd)
-		if err != nil {
-			// no context is added because the error is clear and user facing
-			return err
-		}
-		fixPermissions = &perms
-=======
-	if enrollTimeout > 0 {
-		eCtx, cancel := context.WithTimeout(ctx, enrollTimeout)
-		defer cancel()
-		ctx = eCtx
-	}
-
 	hasRoot, err := utils.HasRoot()
 	if err != nil {
 		return fmt.Errorf("checking if running with root/Administrator privileges: %w", err)
->>>>>>> 08444d400 (Fix/8544 mac linux unprivileged reenroll (#9604))
 	}
 
 	fixPermissions, err := computeFixPermissions(fromInstall, hasRoot, runtime.GOOS, getFileOwnerFromCmd, getOwnerFromPath, cmd)
