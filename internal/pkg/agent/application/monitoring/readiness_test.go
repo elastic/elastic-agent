@@ -19,24 +19,27 @@ func TestReadinessProcessHTTPHandler(t *testing.T) {
 	defer cancel()
 	testCases := []struct {
 		name         string
-		coord        mockCoordinator
+		coord        CoordinatorState
 		expectedCode int
-		liveness     bool
 	}{
 		{
 			name:         "healthy-nocoord",
+			coord:        nil,
 			expectedCode: 200,
-			liveness:     true,
 		},
 		{
-			name:         "healthy",
+			name: "healthy",
+			coord: mockCoordinator{
+				isUp: true,
+			},
 			expectedCode: 200,
-			liveness:     true,
 		},
 		{
-			name:         "unhealthy",
+			name: "unhealthy",
+			coord: mockCoordinator{
+				isUp: false,
+			},
 			expectedCode: 503,
-			liveness:     false,
 		},
 	}
 
@@ -50,7 +53,9 @@ func TestReadinessProcessHTTPHandler(t *testing.T) {
 			require.NoError(t, err)
 			res, err := http.DefaultClient.Do(req)
 			require.NoError(t, err)
-			res.Body.Close()
+			defer res.Body.Close()
+
+			require.Equal(t, test.expectedCode, res.StatusCode)
 		})
 	}
 
