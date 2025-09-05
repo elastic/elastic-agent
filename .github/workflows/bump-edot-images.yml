@@ -1,0 +1,36 @@
+---
+name: bump-edot-images
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 20 * * 1-6"
+
+permissions:
+  contents: read
+
+env:
+  JOB_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+jobs:
+  bump:
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: elastic/oblt-actions/updatecli/run@v1
+        with:
+          command: apply --config .ci/updatecli/updatecli-bump-edot.yml --values .ci/updatecli/values.d/scm.yml
+          version-file: .updatecli-version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - if: ${{ failure()  }}
+        uses: elastic/oblt-actions/slack/send@v1
+        with:
+          bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel-id: "#ingest-notifications"
+          message: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@agent-team` please look what's going on <${{ env.JOB_URL }}|here>"
