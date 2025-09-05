@@ -55,12 +55,21 @@ func getSIDFromCmd(cmd *cobra.Command, param string) (*windows.SID, error) {
 	return nil, nil
 }
 
+// getOwnerFromPath calls getOwnerFromPathWindows for testability. This way we
+// can inject the windows specific functions.
 func getOwnerFromPath(path string) (utils.FileOwner, error) {
+	return getOwnerFromPathWindows(path, acl.GetNamedSecurityInfo, windows.LocalFree)
+}
+
+type getNamedSecurityInfo func(objectName string, objectType int32, secInfo uint32, owner, group **windows.SID, dacl, sacl, secDesc *windows.Handle) error
+type localFree func(handle windows.Handle) (windows.Handle, error)
+
+func getOwnerFromPathWindows(path string, getNamedSecurityInfo getNamedSecurityInfo, localFree localFree) (utils.FileOwner, error) {
 	var ownerSID *windows.SID
 	var groupSID *windows.SID
 	var secDesc windows.Handle
 
-	if err := acl.GetNamedSecurityInfo(
+	if err := getNamedSecurityInfo(
 		path,
 		acl.SE_FILE_OBJECT,
 		acl.OWNER_SECURITY_INFORMATION|acl.GROUP_SECURITY_INFORMATION,
@@ -73,7 +82,7 @@ func getOwnerFromPath(path string) (utils.FileOwner, error) {
 		return utils.FileOwner{}, fmt.Errorf("failed to get security info for %s: %w", path, err)
 	}
 
-	defer windows.LocalFree(secDesc) //nolint:errcheck // not much we can do
+	defer localFree(secDesc) //nolint:errcheck // not much we can do
 
 	var ownership utils.FileOwner
 	if ownerSID == nil || groupSID == nil {
