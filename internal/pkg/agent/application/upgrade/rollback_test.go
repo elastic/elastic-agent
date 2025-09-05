@@ -504,6 +504,8 @@ func createUpdateMarker(t *testing.T, log *logger.Logger, topDir, newAgentVersio
 		hash:          oldAgentHash,
 		versionedHome: oldAgentVersionedHome,
 	}
+
+	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile)
 	err := markUpgrade(log,
 		paths.DataFrom(topDir),
 		newAgentInstall,

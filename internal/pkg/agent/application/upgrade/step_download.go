@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/composed"
+	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/fs"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/http"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/localremote"
@@ -40,17 +41,39 @@ type downloaderFactory func(*agtversion.ParsedSemVer, *logger.Logger, *artifact.
 
 type downloader func(context.Context, downloaderFactory, *agtversion.ParsedSemVer, *artifact.Config, *details.Details) (string, error)
 
-func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
+// abstraction for testability for newVerifier
+type verifierFactory func(*agtversion.ParsedSemVer, *logger.Logger, *artifact.Config) (download.Verifier, error)
+
+type artifactDownloader struct {
+	log            *logger.Logger
+	settings       *artifact.Config
+	fleetServerURI string
+	newVerifier    verifierFactory
+}
+
+func newArtifactDownloader(settings *artifact.Config, log *logger.Logger) *artifactDownloader {
+	return &artifactDownloader{
+		log:         log,
+		settings:    settings,
+		newVerifier: newVerifier,
+	}
+}
+
+func (a *artifactDownloader) withFleetServerURI(fleetServerURI string) {
+	a.fleetServerURI = fleetServerURI
+}
+
+func (a *artifactDownloader) downloadArtifact(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
 	span, ctx := apm.StartSpan(ctx, "downloadArtifact", "app.internal")
 	defer func() {
 		apm.CaptureError(ctx, err).Send()
 		span.End()
 	}()
 
-	pgpBytes = u.appendFallbackPGP(parsedVersion, pgpBytes)
+	pgpBytes = a.appendFallbackPGP(parsedVersion, pgpBytes)
 
 	// do not update source config
-	settings := *u.settings
+	settings := *a.settings
 	var downloaderFunc downloader
 	var factory downloaderFactory
 	var verifier download.Verifier
@@ -62,7 +85,7 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 
 			// use specific function that doesn't perform retries on download as its
 			// local and no retry should be performed
-			downloaderFunc = u.downloadOnce
+			downloaderFunc = a.downloadOnce
 
 			// set specific downloader, local file just uses the fs.NewDownloader
 			// no fallback is allowed because it was requested that this specific source be used
@@ -71,13 +94,13 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 			}
 
 			// set specific verifier, local file verifies locally only
-			verifier, err = fs.NewVerifier(u.log, &settings, release.PGP())
+			verifier, err = fs.NewVerifier(a.log, &settings, release.PGP())
 			if err != nil {
 				return "", errors.New(err, "initiating verifier")
 			}
 
 			// log that a local upgrade artifact is being used
-			u.log.Infow("Using local upgrade artifact", "version", parsedVersion,
+			a.log.Infow("Using local upgrade artifact", "version", parsedVersion,
 				"drop_path", settings.DropPath,
 				"target_path", settings.TargetDirectory, "install_path", settings.InstallPath)
 		} else {
@@ -88,41 +111,43 @@ func (u *Upgrader) downloadArtifact(ctx context.Context, parsedVersion *agtversi
 	if factory == nil {
 		// set the factory to the newDownloader factory
 		factory = newDownloader
-		u.log.Infow("Downloading upgrade artifact", "version", parsedVersion,
+		a.log.Infow("Downloading upgrade artifact", "version", parsedVersion,
 			"source_uri", settings.SourceURI, "drop_path", settings.DropPath,
 			"target_path", settings.TargetDirectory, "install_path", settings.InstallPath)
 	}
 	if downloaderFunc == nil {
-		downloaderFunc = u.downloadWithRetries
+		downloaderFunc = a.downloadWithRetries
 	}
 
 	if err := os.MkdirAll(paths.Downloads(), 0750); err != nil {
-		return "", errors.New(err, fmt.Sprintf("failed to create download directory at %s", paths.Downloads()))
+		return "", fmt.Errorf("failed to create download directory at %s: %w", paths.Downloads(), err)
 	}
 
 	path, err := downloaderFunc(ctx, factory, parsedVersion, &settings, upgradeDetails)
 	if err != nil {
-		return "", errors.New(err, "failed download of agent binary")
+		return "", fmt.Errorf("failed download of agent binary: %w", err)
 	}
 
+	// If there are errors in the following steps, we return the path so that we
+	// can cleanup the downloaded files.
 	if skipVerifyOverride {
 		return path, nil
 	}
 
 	if verifier == nil {
-		verifier, err = newVerifier(parsedVersion, u.log, &settings)
+		verifier, err = a.newVerifier(parsedVersion, a.log, &settings)
 		if err != nil {
-			return "", errors.New(err, "initiating verifier")
+			return path, errors.New(err, "initiating verifier")
 		}
 	}
 
 	if err := verifier.Verify(ctx, agentArtifact, *parsedVersion, skipDefaultPgp, pgpBytes...); err != nil {
-		return "", errors.New(err, "failed verification of agent binary")
+		return path, errors.New(err, "failed verification of agent binary")
 	}
 	return path, nil
 }
 
-func (u *Upgrader) appendFallbackPGP(targetVersion *agtversion.ParsedSemVer, pgpBytes []string) []string {
+func (a *artifactDownloader) appendFallbackPGP(targetVersion *agtversion.ParsedSemVer, pgpBytes []string) []string {
 	if pgpBytes == nil {
 		pgpBytes = make([]string, 0, 1)
 	}
@@ -131,14 +156,14 @@ func (u *Upgrader) appendFallbackPGP(targetVersion *agtversion.ParsedSemVer, pgp
 	pgpBytes = append(pgpBytes, fallbackPGP)
 
 	// add a secondary fallback if fleet server is configured
-	u.log.Debugf("Considering fleet server uri for pgp check fallback %q", u.fleetServerURI)
-	if u.fleetServerURI != "" {
+	a.log.Debugf("Considering fleet server uri for pgp check fallback %q", a.fleetServerURI)
+	if a.fleetServerURI != "" {
 		secondaryPath, err := url.JoinPath(
-			u.fleetServerURI,
+			a.fleetServerURI,
 			fmt.Sprintf(fleetUpgradeFallbackPGPFormat, targetVersion.Major(), targetVersion.Minor(), targetVersion.Patch()),
 		)
 		if err != nil {
-			u.log.Warnf("failed to compose Fleet Server URI: %v", err)
+			a.log.Warnf("failed to compose Fleet Server URI: %v", err)
 		} else {
 			secondaryFallback := download.PgpSourceURIPrefix + secondaryPath
 			pgpBytes = append(pgpBytes, secondaryFallback)
@@ -194,14 +219,14 @@ func newVerifier(version *agtversion.ParsedSemVer, log *logger.Logger, settings 
 	return composed.NewVerifier(log, fsVerifier, snapshotVerifier, remoteVerifier), nil
 }
 
-func (u *Upgrader) downloadOnce(
+func (a *artifactDownloader) downloadOnce(
 	ctx context.Context,
 	factory downloaderFactory,
 	version *agtversion.ParsedSemVer,
 	settings *artifact.Config,
 	upgradeDetails *details.Details,
 ) (string, error) {
-	downloader, err := factory(version, u.log, settings, upgradeDetails)
+	downloader, err := factory(version, a.log, settings, upgradeDetails)
 	if err != nil {
 		return "", fmt.Errorf("unable to create fetcher: %w", err)
 	}
@@ -217,7 +242,7 @@ func (u *Upgrader) downloadOnce(
 	return path, nil
 }
 
-func (u *Upgrader) downloadWithRetries(
+func (a *artifactDownloader) downloadWithRetries(
 	ctx context.Context,
 	factory downloaderFactory,
 	version *agtversion.ParsedSemVer,
@@ -239,17 +264,21 @@ func (u *Upgrader) downloadWithRetries(
 
 	opFn := func() error {
 		attempt++
-		u.log.Infof("download attempt %d", attempt)
+		a.log.Infof("download attempt %d", attempt)
 		var err error
-		path, err = u.downloadOnce(cancelCtx, factory, version, settings, upgradeDetails)
+		path, err = a.downloadOnce(cancelCtx, factory, version, settings, upgradeDetails)
 		if err != nil {
+			if downloadErrors.IsDiskSpaceError(err) {
+				a.log.Infof("insufficient disk space error detected, stopping retries")
+				return backoff.Permanent(err)
+			}
 			return err
 		}
 		return nil
 	}
 
 	opFailureNotificationFn := func(err error, retryAfter time.Duration) {
-		u.log.Warnf("download attempt %d failed: %s; retrying in %s.",
+		a.log.Warnf("download attempt %d failed: %s; retrying in %s.",
 			attempt, err.Error(), retryAfter)
 		upgradeDetails.SetRetryableError(err)
 	}
