@@ -51,7 +51,8 @@ collectors:
       processors:
         # [Resource Detection Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor)
         resourcedetection/eks:
-          detectors: [env, eks] # Detects resources from environment variables and EKS (Elastic Kubernetes Service).
+          # Detects resources from environment variables and EKS (Elastic Kubernetes Service).
+          detectors: [env, eks]
           timeout: 15s
           override: true
           eks:
@@ -59,11 +60,13 @@ collectors:
               k8s.cluster.name:
                 enabled: true
         resourcedetection/gcp:
-          detectors: [env, gcp] # Detects resources from environment variables and GCP (Google Cloud Platform).
+          # Detects resources from environment variables and GCP (Google Cloud Platform).
+          detectors: [env, gcp]
           timeout: 2s
           override: true
         resourcedetection/aks:
-          detectors: [env, aks] # Detects resources from environment variables and AKS (Azure Kubernetes Service).
+          # Detects resources from environment variables and AKS (Azure Kubernetes Service).
+          detectors: [env, aks]
           timeout: 2s
           override: true
           aks:
@@ -196,14 +199,16 @@ collectors:
             insecure: true
       processors:
         # [Batch Processor](https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor/batchprocessor)
-        batch: {} # inherit any values from helm chart
+        # inherit any values from helm chart
+        batch: {}
         batch/metrics:
           # explicitly set send_batch_max_size to 0, as splitting metrics requests may cause version_conflict_engine_exception in TSDB
           send_batch_max_size: 0
           timeout: 1s
         # [Resource Detection Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor)
         resourcedetection/eks:
-          detectors: [env, eks] # Detects resources from environment variables and EKS (Elastic Kubernetes Service).
+          # Detects resources from environment variables and EKS (Elastic Kubernetes Service).
+          detectors: [env, eks]
           timeout: 15s
           override: true
           eks:
@@ -211,11 +216,13 @@ collectors:
               k8s.cluster.name:
                 enabled: true
         resourcedetection/gcp:
-          detectors: [env, gcp] # Detects resources from environment variables and GCP (Google Cloud Platform).
+          # Detects resources from environment variables and GCP (Google Cloud Platform).
+          detectors: [env, gcp]
           timeout: 2s
           override: true
         resourcedetection/aks:
-          detectors: [env, aks] # Detects resources from environment variables and AKS (Azure Kubernetes Service).
+          # Detects resources from environment variables and AKS (Azure Kubernetes Service).
+          detectors: [env, aks]
           timeout: 2s
           override: true
           aks:
@@ -228,7 +235,8 @@ collectors:
               from_attribute: k8s.node.name
               action: upsert
         resourcedetection/system:
-          detectors: ["system", "ec2"] # Detects resources from the system and EC2 instances.
+          # Detects resources from the system and EC2 instances.
+          detectors: ["system", "ec2"]
           system:
             hostname_sources: ["os"]
             resource_attributes:
@@ -545,7 +553,8 @@ collectors:
           send_batch_max_size: 0
           timeout: 1s
         # [Elastic Trace Processor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elastictraceprocessor)
-        elastictrace: {} # The processor enriches traces with elastic specific requirements.
+        # The processor enriches traces with elastic specific requirements.
+        elastictrace: {}
       exporters:
         debug: {}
         # [Elasticsearch exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/README.md)
