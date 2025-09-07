@@ -1,4 +1,0 @@
-kind: bug-fix
-summary: Fix deb upgrade by stopping elastic-agent service before upgrading
-component: elastic-agent
-pr: https://github.com/elastic/elastic-agent/pull/9462

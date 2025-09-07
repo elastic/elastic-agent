@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 )
 
 // =============================================================================
@@ -117,6 +119,8 @@ type CheckinRequest struct {
 
 	// An optional timeout value that informs fleet-server of when a client will time out on it's checkin request. If not specified fleet-server will use the timeout values specified in the config (defaults to 5m polling and a 10m write timeout). The value, if specified is expected to be a string that is parsable by [time.ParseDuration](https://pkg.go.dev/time#ParseDuration). If specified fleet-server will set its poll timeout to `max(1m, poll_timeout-2m)` and its write timeout to `max(2m, poll_timout-1m)`.
 	PollTimeout string `json:"poll_timeout,omitempty"`
+
+	UpgradeDetails *details.Details `json:"upgrade_details,omitempty"`
 }
 type CheckinResponse struct {
 
