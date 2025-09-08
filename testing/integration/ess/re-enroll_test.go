@@ -16,10 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
-<<<<<<< HEAD
-	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/install"
-=======
->>>>>>> 134b3deb761a56ae5e556f9c1a07705ea4f76500
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
@@ -43,15 +39,9 @@ func TestReEnrollUnprivileged(t *testing.T) {
 		"privileged agent with privileged user":   true,
 	}
 
-<<<<<<< HEAD
-	out, err := fixture.Exec(ctx, enrollArgs)
-	require.Error(t, err)
-	require.Contains(t, string(out), install.UserOwnerMismatchError.Error())
-=======
 	for name, privileged := range testCases {
 		t.Run(name, func(t *testing.T) {
 			fixture, enrollArgs := prepareAgentforReEnroll(t, ctx, info, privileged)
->>>>>>> 134b3deb761a56ae5e556f9c1a07705ea4f76500
 
 			out, err := fixture.Exec(ctx, enrollArgs)
 			if out != nil {
