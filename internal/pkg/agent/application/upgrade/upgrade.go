@@ -61,20 +61,11 @@ var (
 	ErrFipsNotUpgradedToFips = errors.New("cannot upgrade from a fips compliant agent to a non-compliant one")
 )
 
-<<<<<<< HEAD
-=======
-func init() {
-	if release.FIPSDistribution() {
-		agentArtifact.Cmd += fipsPrefix
-	}
-}
-
 type artifactDownloadHandler interface {
 	downloadArtifact(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error)
 	withFleetServerURI(fleetServerURI string)
 }
 
->>>>>>> 134b3deb7 (Enhancement/5235 insufficient disk handling retry shows underlying error (#9122))
 // Upgrader performs an upgrade
 type Upgrader struct {
 	log            *logger.Logger
