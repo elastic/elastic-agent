@@ -4,7 +4,7 @@
 
 //go:build windows
 
-package cmd
+package install
 
 import (
 	"errors"
