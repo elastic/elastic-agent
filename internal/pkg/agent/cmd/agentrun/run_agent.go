@@ -230,7 +230,7 @@ func runElasticAgent(
 		return logReturn(l, err)
 	}
 
-	monitoringServer, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
+	monitoringServer, err := setupMetrics(l, cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {
 		return logReturn(l, err)
 	}
@@ -589,7 +589,6 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 
 func setupMetrics(
 	logger *logger.Logger,
-	operatingSystem string,
 	cfg *monitoringCfg.MonitoringConfig,
 	tracer *apm.Tracer,
 	coord *coordinator.Coordinator,
