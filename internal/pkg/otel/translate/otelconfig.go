@@ -384,8 +384,7 @@ func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, 
 		}
 	}
 
-	// beatsauth extension is not tested with other output types yet
-	// This extension is used to support ssl parameters
+	// beatsauth extension is not tested with output other than elasticsearch
 	if exporterType.String() == "elasticsearch" {
 		// get extension ID
 		extensionID := getBeatsAuthExtensionID(outputName)
