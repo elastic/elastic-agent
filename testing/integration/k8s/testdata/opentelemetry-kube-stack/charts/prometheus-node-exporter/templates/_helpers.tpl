@@ -43,8 +43,8 @@ app.kubernetes.io/part-of: {{ include "prometheus-node-exporter.name" . }}
 {{- with .Chart.AppVersion }}
 app.kubernetes.io/version: {{ . | quote }}
 {{- end }}
-{{- with .Values.podLabels }}
-{{ toYaml . }}
+{{- with .Values.commonLabels }}
+{{ tpl (toYaml .) $ }}
 {{- end }}
 {{- if .Values.releaseLabel }}
 release: {{ .Release.Name }}
@@ -200,3 +200,38 @@ labelValueLengthLimit: {{ . }}
 {{- end }}
 {{- end }}
 {{- end }}
+
+{{/*
+The default node affinity to exclude 
+- AWS Fargate 
+- Azure virtual nodes
+*/}}
+{{- define "prometheus-node-exporter.defaultAffinity" -}}
+nodeAffinity:
+  requiredDuringSchedulingIgnoredDuringExecution:
+    nodeSelectorTerms:
+    - matchExpressions:
+      - key: eks.amazonaws.com/compute-type
+        operator: NotIn
+        values:
+        - fargate
+      - key: type
+        operator: NotIn
+        values:
+        - virtual-kubelet
+{{- end -}}
+{{- define "prometheus-node-exporter.mergedAffinities" -}}
+{{- $defaultAffinity := include "prometheus-node-exporter.defaultAffinity" . | fromYaml -}}
+{{- with .Values.affinity -}}
+  {{- if .nodeAffinity -}}
+    {{- $_ := set $defaultAffinity "nodeAffinity" (mergeOverwrite $defaultAffinity.nodeAffinity .nodeAffinity) -}}
+  {{- end -}}
+  {{- if .podAffinity -}}
+    {{- $_ := set $defaultAffinity "podAffinity" .podAffinity -}}
+  {{- end -}}
+  {{- if .podAntiAffinity -}}
+    {{- $_ := set $defaultAffinity "podAntiAffinity" .podAntiAffinity -}}
+  {{- end -}}
+{{- end -}}
+{{- toYaml $defaultAffinity -}}
+{{- end -}}
