@@ -14,7 +14,9 @@
             "skip_ci_labels": [ "skip-ci" ],
             "skip_target_branches": [ ],
             "skip_ci_on_only_changed": [ "^.ci/", "^.github/", "catalog-info.yaml", "^updatecli-compose.yaml", "^changelog", "^docs/", "\\.md$", "^docker-compose.yml", "^.mergify.yml", "^.pre-commit-config.yaml", "skaffold.yaml", "^Dockerfile.skaffold", "^Dockerfile"],
-            "always_require_ci_on_changed": [ ]
+            "always_require_ci_on_changed": [ ],
+            "use_merge_commit": true,
+            "fail_on_not_mergeable": true
         },
         {
             "enabled": true,
@@ -30,7 +32,9 @@
             "skip_ci_labels": [  ],
             "skip_target_branches": [ ],
             "skip_ci_on_only_changed": [ ],
-            "always_require_ci_on_changed": [ ]
+            "always_require_ci_on_changed": [ ],
+            "use_merge_commit": true,
+            "fail_on_not_mergeable": true
         },
         {
             "enabled": true,
@@ -46,7 +50,9 @@
             "skip_ci_labels": [  ],
             "skip_target_branches": [ ],
             "skip_ci_on_only_changed": [ ],
-            "always_require_ci_on_changed": [ ]
+            "always_require_ci_on_changed": [ ],
+            "use_merge_commit": true,
+            "fail_on_not_mergeable": true
         }
     ]
 }
