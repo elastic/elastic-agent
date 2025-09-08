@@ -154,6 +154,9 @@ func checkUpgradable(cond upgradeCond) error {
 }
 
 func upgradeCmdWithClient(input *upgradeInput) error {
+
+	upgradeOperation := "Upgrade"
+
 	cmd := input.cmd
 	c := input.c
 	version := input.args[0]
@@ -167,6 +170,10 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 	rollback, err := cmd.Flags().GetBool(flagRollback)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve command flag information %q while trying to upgrade the agent: %w", flagRollback, err)
+	}
+
+	if rollback {
+		upgradeOperation = "Rollback"
 	}
 
 	skipVerification, err := cmd.Flags().GetBool(flagSkipVerify)
@@ -233,6 +240,8 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 			return errors.New(err, "Failed trigger upgrade of daemon")
 		}
 	}
-	fmt.Fprintf(input.streams.Out, "Upgrade triggered to version %s, Elastic Agent is currently restarting\n", version)
+
+	fmt.Fprintf(input.streams.Out, "%s triggered to version %s, Elastic Agent is currently restarting\n", upgradeOperation, version)
+
 	return nil
 }
