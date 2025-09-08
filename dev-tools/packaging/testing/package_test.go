@@ -133,10 +133,15 @@ func TestDocker(t *testing.T) {
 		return
 	}
 
+	// NOTE: "elastic-otel-collector" and "elastic-otel-collector-wolfi" variants were part of the
+	// following size comparisons test. However, by including them we cannot guarantee the order as
+	// they exclude some components but include dependencies that differentiate them from the other variants.
+	// As a result, the size comparison becomes non-deterministic.
+
 	// expected variants size order ascending
 	for _, variantsExpectedSizeOrder := range [][]string{
-		{"elastic-otel-collector", "elastic-agent-slim", "elastic-agent"},
-		{"elastic-otel-collector-wolfi", "elastic-agent-slim-wolfi", "elastic-agent-wolfi"},
+		{"elastic-agent-slim", "elastic-agent"},
+		{"elastic-agent-slim-wolfi", "elastic-agent-wolfi"},
 	} {
 		var builtVariantsExpectedOrder []string
 		builtVariantSizes := make(map[string]int64)
