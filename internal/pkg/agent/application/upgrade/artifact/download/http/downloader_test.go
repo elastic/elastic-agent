@@ -23,7 +23,13 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+<<<<<<< HEAD
+=======
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
+>>>>>>> 134b3deb7 (Enhancement/5235 insufficient disk handling retry shows underlying error (#9122))
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
@@ -524,5 +530,100 @@ func TestDownloadVersion(t *testing.T) {
 
 			assert.Equalf(t, filepath.Join(targetDirPath, tt.want), got, "Download(%v, %v)", tt.args.a, tt.args.version)
 		})
+	}
+}
+
+func TestDownloadDiskSpaceError(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "elastic.co test server generates an OpenPGP key which results in a SHA-1 violation.")
+	targetDir, err := os.MkdirTemp(os.TempDir(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	log, _ := loggertest.New("downloader")
+	timeout := 30 * time.Second
+	testCases := getTestCases()
+	server, _, _ := getElasticCoServer(t)
+	elasticClient := getElasticCoClient(server)
+
+	config := &artifact.Config{
+		SourceURI:       source,
+		TargetDirectory: targetDir,
+		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+			Timeout: timeout,
+		},
+	}
+
+	testError := errors.New("test error")
+
+	type errorHandlingTestCase struct {
+		mockStdlibFuncs        func(downloader *Downloader)
+		isDiskSpaceErrorResult bool
+		expectedError          error
+	}
+
+	errorHandlingTestCases := map[string]errorHandlingTestCase{
+		"when io.Copy runs into an error, the downloader should return the error and clean up the downloaded files": {
+			mockStdlibFuncs: func(downloader *Downloader) {
+				downloader.copy = func(dst io.Writer, src io.Reader) (int64, error) {
+					return 0, testError
+				}
+			},
+			expectedError: testError,
+		},
+		"when io.Copy runs into disk space error, the downloader should report the error and clean up the downloaded files": {
+			mockStdlibFuncs: func(downloader *Downloader) {
+				downloader.copy = func(dst io.Writer, src io.Reader) (int64, error) {
+					return 0, testError
+				}
+			},
+			isDiskSpaceErrorResult: true,
+			expectedError:          testError,
+		},
+		"when os.OpenFile runs into an error, the downloader should return the error and clean up the downloaded files": {
+			mockStdlibFuncs: func(downloader *Downloader) {
+				downloader.openFile = func(name string, flag int, perm os.FileMode) (*os.File, error) {
+					return nil, testError
+				}
+			},
+			expectedError: testError,
+		},
+		"when os.MkdirAll runs into an error, the downloader should return the error and clean up the downloaded files": {
+			mockStdlibFuncs: func(downloader *Downloader) {
+				downloader.mkdirAll = func(name string, perm os.FileMode) error {
+					return testError
+				}
+			},
+			expectedError: testError,
+		},
+	}
+
+	for _, testCase := range testCases {
+		for name, etc := range errorHandlingTestCases {
+
+			testName := fmt.Sprintf("%s-binary-%s-%s", testCase.system, testCase.arch, name)
+			t.Run(testName, func(t *testing.T) {
+				config.OperatingSystem = testCase.system
+				config.Architecture = testCase.arch
+
+				upgradeDetails := details.NewDetails("8.12.0", details.StateRequested, "")
+				testClient := NewDownloaderWithClient(log, config, elasticClient, upgradeDetails)
+				etc.mockStdlibFuncs(testClient)
+				testClient.isDiskSpaceErrorFunc = func(err error) bool {
+					return etc.isDiskSpaceErrorResult
+				}
+				artifactPath, err := testClient.Download(context.Background(), beatSpec, version)
+
+				require.ErrorIs(t, err, etc.expectedError, "expected error mismatch")
+				require.NoFileExists(t, artifactPath)
+
+				if etc.isDiskSpaceErrorResult {
+					require.Equal(t, details.StateFailed, upgradeDetails.State)
+					require.Equal(t, downloadErrors.ErrInsufficientDiskSpace.Error(), upgradeDetails.Metadata.ErrorMsg)
+				}
+
+				os.Remove(artifactPath)
+			})
+		}
 	}
 }
