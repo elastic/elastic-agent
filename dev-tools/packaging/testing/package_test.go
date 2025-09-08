@@ -133,9 +133,10 @@ func TestDocker(t *testing.T) {
 		return
 	}
 
-	// NOTE: "elastic-otel-collector" and "elastic-otel-collector-wolfi" variants were part of the
+	// NOTE: "elastic-otel-collector" and "elastic-otel-collector-wolfi" variants used to be part of the
 	// following size comparisons test. However, by including them we cannot guarantee the order as
-	// they exclude some components but include dependencies that differentiate them from the other variants.
+	// they exclude some agent components but include additional external dependencies that makes them
+	// diverge from the other variants.
 	// As a result, the size comparison becomes non-deterministic.
 
 	// expected variants size order ascending
