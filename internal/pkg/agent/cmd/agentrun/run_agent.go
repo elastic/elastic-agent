@@ -19,6 +19,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/agentservice"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
+	"github.com/gofrs/uuid/v5"
 
 	"go.elastic.co/apm/v2"
 	apmtransport "go.elastic.co/apm/v2/transport"
@@ -593,7 +594,15 @@ func setupMetrics(
 	tracer *apm.Tracer,
 	coord *coordinator.Coordinator,
 ) (*reload.ServerReloader, error) {
-	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil {
+	ephemeralID, _ := uuid.NewV4()
+	if err := report.SetupMetricsOptions(report.MetricOptions{
+		Name:           agentName,
+		Version:        version.GetDefaultVersion(),
+		EphemeralID:    ephemeralID.String(),
+		Logger:         logger,
+		SystemMetrics:  monitoringLib.Default.GetOrCreateRegistry("system"),
+		ProcessMetrics: monitoringLib.Default.GetOrCreateRegistry("beat"),
+	}); err != nil {
 		return nil, err
 	}
 
