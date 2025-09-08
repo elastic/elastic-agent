@@ -118,6 +118,13 @@ func (h *Upgrade) ackAction(ctx context.Context, ack acker.Acker, action fleetap
 func (h *Upgrade) getAsyncContext(ctx context.Context, action fleetapi.Action, ack acker.Acker) (context.Context, bool) {
 	h.bkgMutex.Lock()
 	defer h.bkgMutex.Unlock()
+
+	// Log current upgrade actions queue for debugging
+	h.log.Debugf("Current upgrade actions queue: %d actions", len(h.bkgActions))
+	for i, bkgAction := range h.bkgActions {
+		h.log.Debugf("Queue[%d]: ActionID=%s, Version=%s", i, bkgAction.ActionID, bkgAction.Data.Version)
+	}
+
 	// If no existing actions, run this one
 	if len(h.bkgActions) == 0 {
 		h.bkgActions = append(h.bkgActions, action)
@@ -146,6 +153,9 @@ func (h *Upgrade) getAsyncContext(ctx context.Context, action fleetapi.Action, a
 	if upgradeAction.Data.Version == bkgAction.Data.Version &&
 		upgradeAction.Data.SourceURI == bkgAction.Data.SourceURI {
 		// not the same action this one needs to be acked
+		h.log.Infof("Duplicate upgrade request to same version %s and sourceURI %s, acknowledging new action (ActionID: %s) while keeping existing upgrade running (ActionID: %s)",
+			upgradeAction.Data.Version, upgradeAction.Data.SourceURI, upgradeAction.ActionID, bkgAction.ActionID)
+
 		go func() {
 			// kick it off and don't block, lock to prevent race with ackActions from finished upgrade
 			h.bkgMutex.Lock()
@@ -157,8 +167,8 @@ func (h *Upgrade) getAsyncContext(ctx context.Context, action fleetapi.Action, a
 	}
 
 	// Versions must be different, cancel the first upgrade and run the new one
-	h.log.Infof("Canceling upgrade to version %s received",
-		bkgAction.Data.Version)
+	h.log.Infof("Canceling upgrade to version %s and starting upgrade to version %s",
+		bkgAction.Data.Version, upgradeAction.Data.Version)
 	h.bkgCancel()
 
 	// Ack here because we have the lock, and we need to clear out the saved actions
