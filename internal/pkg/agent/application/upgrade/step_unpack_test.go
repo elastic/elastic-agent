@@ -390,10 +390,10 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 
 			got, err := untar(log, archiveFile, testDataDir, tt.flavor, tt.copy, tt.mkdirAll, tt.openFile)
 			if tt.expectedError != nil {
-				assert.ErrorIs(t, err, tt.expectedError, fmt.Sprintf("untar(%v, %v, %v)", tt.args.version, archiveFile, testDataDir))
+				assert.ErrorIsf(t, err, tt.expectedError, "untar(%v, %v, %v)", tt.args.version, archiveFile, testDataDir)
 				return
 			}
-			assert.NoError(t, err, fmt.Sprintf("untar(%v, %v, %v)", tt.args.version, archiveFile, testDataDir))
+			assert.NoErrorf(t, err, "untar(%v, %v, %v)", tt.args.version, archiveFile, testDataDir)
 			assert.Equalf(t, tt.want, got, "untar(%v, %v, %v)", tt.args.version, archiveFile, testDataDir)
 			if tt.checkFiles != nil {
 				tt.checkFiles(t, testDataDir)
@@ -583,7 +583,7 @@ func TestUpgrader_unpackZip(t *testing.T) {
 				assert.ErrorIs(t, err, tt.expectedError, "error mismatch")
 				return
 			}
-			assert.NoError(t, err, fmt.Sprintf("unzip(%v, %v)", archiveFile, testDataDir))
+			assert.NoErrorf(t, err, "unzip(%v, %v)", archiveFile, testDataDir)
 			assert.Equalf(t, tt.want, got, "unzip(%v, %v)", archiveFile, testDataDir)
 			if tt.checkFiles != nil {
 				tt.checkFiles(t, testDataDir)
