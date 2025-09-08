@@ -18,6 +18,7 @@ type Info struct {
 	Process *os.Process
 	Stdin   io.WriteCloser
 	Stderr  io.ReadCloser
+	Cmd     *exec.Cmd
 }
 
 // CmdOption is an option func to change the underlying command
@@ -170,5 +171,11 @@ func startContext(ctx context.Context, path string, uid, gid int, args []string,
 		Process: cmd.Process,
 		Stdin:   stdin,
 		Stderr:  stderr,
+		Cmd:     cmd,
 	}, err
+}
+
+// Terminate is a utility function to gracefully shutdown a process
+func Terminate(proc *os.Process) error {
+	return terminateCmd(proc)
 }

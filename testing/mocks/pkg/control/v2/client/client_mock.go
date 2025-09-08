@@ -539,14 +539,14 @@ func (_c *Client_StateWatch_Call) RunAndReturn(run func(context.Context) (client
 	return _c
 }
 
-// Upgrade provides a mock function with given fields: ctx, version, sourceURI, skipVerify, skipDefaultPgp, pgpBytes
-func (_m *Client) Upgrade(ctx context.Context, version string, sourceURI string, skipVerify bool, skipDefaultPgp bool, pgpBytes ...string) (string, error) {
+// Upgrade provides a mock function with given fields: ctx, version, rollback, sourceURI, skipVerify, skipDefaultPgp, pgpBytes
+func (_m *Client) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, skipVerify bool, skipDefaultPgp bool, pgpBytes ...string) (string, error) {
 	_va := make([]interface{}, len(pgpBytes))
 	for _i := range pgpBytes {
 		_va[_i] = pgpBytes[_i]
 	}
 	var _ca []interface{}
-	_ca = append(_ca, ctx, version, sourceURI, skipVerify, skipDefaultPgp)
+	_ca = append(_ca, ctx, version, rollback, sourceURI, skipVerify, skipDefaultPgp)
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
@@ -556,17 +556,17 @@ func (_m *Client) Upgrade(ctx context.Context, version string, sourceURI string,
 
 	var r0 string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, bool, bool, ...string) (string, error)); ok {
-		return rf(ctx, version, sourceURI, skipVerify, skipDefaultPgp, pgpBytes...)
+	if rf, ok := ret.Get(0).(func(context.Context, string, bool, string, bool, bool, ...string) (string, error)); ok {
+		return rf(ctx, version, rollback, sourceURI, skipVerify, skipDefaultPgp, pgpBytes...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, bool, bool, ...string) string); ok {
-		r0 = rf(ctx, version, sourceURI, skipVerify, skipDefaultPgp, pgpBytes...)
+	if rf, ok := ret.Get(0).(func(context.Context, string, bool, string, bool, bool, ...string) string); ok {
+		r0 = rf(ctx, version, rollback, sourceURI, skipVerify, skipDefaultPgp, pgpBytes...)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string, bool, bool, ...string) error); ok {
-		r1 = rf(ctx, version, sourceURI, skipVerify, skipDefaultPgp, pgpBytes...)
+	if rf, ok := ret.Get(1).(func(context.Context, string, bool, string, bool, bool, ...string) error); ok {
+		r1 = rf(ctx, version, rollback, sourceURI, skipVerify, skipDefaultPgp, pgpBytes...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -582,24 +582,25 @@ type Client_Upgrade_Call struct {
 // Upgrade is a helper method to define mock.On call
 //   - ctx context.Context
 //   - version string
+//   - rollback bool
 //   - sourceURI string
 //   - skipVerify bool
 //   - skipDefaultPgp bool
 //   - pgpBytes ...string
-func (_e *Client_Expecter) Upgrade(ctx interface{}, version interface{}, sourceURI interface{}, skipVerify interface{}, skipDefaultPgp interface{}, pgpBytes ...interface{}) *Client_Upgrade_Call {
+func (_e *Client_Expecter) Upgrade(ctx interface{}, version interface{}, rollback interface{}, sourceURI interface{}, skipVerify interface{}, skipDefaultPgp interface{}, pgpBytes ...interface{}) *Client_Upgrade_Call {
 	return &Client_Upgrade_Call{Call: _e.mock.On("Upgrade",
-		append([]interface{}{ctx, version, sourceURI, skipVerify, skipDefaultPgp}, pgpBytes...)...)}
+		append([]interface{}{ctx, version, rollback, sourceURI, skipVerify, skipDefaultPgp}, pgpBytes...)...)}
 }
 
-func (_c *Client_Upgrade_Call) Run(run func(ctx context.Context, version string, sourceURI string, skipVerify bool, skipDefaultPgp bool, pgpBytes ...string)) *Client_Upgrade_Call {
+func (_c *Client_Upgrade_Call) Run(run func(ctx context.Context, version string, rollback bool, sourceURI string, skipVerify bool, skipDefaultPgp bool, pgpBytes ...string)) *Client_Upgrade_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]string, len(args)-5)
-		for i, a := range args[5:] {
+		variadicArgs := make([]string, len(args)-6)
+		for i, a := range args[6:] {
 			if a != nil {
 				variadicArgs[i] = a.(string)
 			}
 		}
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(bool), args[4].(bool), variadicArgs...)
+		run(args[0].(context.Context), args[1].(string), args[2].(bool), args[3].(string), args[4].(bool), args[5].(bool), variadicArgs...)
 	})
 	return _c
 }
@@ -609,7 +610,7 @@ func (_c *Client_Upgrade_Call) Return(_a0 string, _a1 error) *Client_Upgrade_Cal
 	return _c
 }
 
-func (_c *Client_Upgrade_Call) RunAndReturn(run func(context.Context, string, string, bool, bool, ...string) (string, error)) *Client_Upgrade_Call {
+func (_c *Client_Upgrade_Call) RunAndReturn(run func(context.Context, string, bool, string, bool, bool, ...string) (string, error)) *Client_Upgrade_Call {
 	_c.Call.Return(run)
 	return _c
 }
