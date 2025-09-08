@@ -324,6 +324,12 @@ func (b GolangCrossBuilder) Build() error {
 		args = append(args, "-v", hostDir+":/go/pkg/mod:ro")
 	}
 
+	// necessary mount because in Buildkite CI as .git/objects/info/alternates points to /opt/git-mirrors/
+	// the way a PR branch is checked out
+	if _, err := os.Stat("/opt/git-mirrors"); err == nil {
+		args = append(args, "-v", "/opt/git-mirrors:/opt/git-mirrors:ro")
+	}
+
 	if !ExternalBuild {
 		beatsPath, err := filepath.Abs(filepath.Join("../beats"))
 		if err != nil {
