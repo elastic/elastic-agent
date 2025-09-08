@@ -57,7 +57,7 @@ func securityDescriptor(log *logger.Logger) (string, error) {
 	isAdmin, err := utils.HasRoot()
 	if err != nil {
 		// do not fail, agent would end up in a loop, continue with limited permissions
-		log.Warnf("failed to detect Administrator: %w", err)
+		log.Warnf("failed to detect Administrator: %v", err)
 		isAdmin = false // just in-case to ensure that in error case that its always false
 	}
 	// SYSTEM/Administrators can always talk over the pipe, even when not running as privileged
@@ -73,7 +73,7 @@ func securityDescriptor(log *logger.Logger) (string, error) {
 		gid, err := pathGID(paths.Top())
 		if err != nil {
 			// do not fail, agent would end up in a loop, continue with limited permissions
-			log.Warnf("failed to detect group: %w", err)
+			log.Warnf("failed to detect group: %v", err)
 		} else {
 			descriptor += "(A;;GA;;;" + gid + ")"
 		}
