@@ -46,7 +46,7 @@ func downloadFile(downloadRequest *downloadRequest) error {
 			req.Header.Add("If-Modified-Since", stat.ModTime().Format(http.TimeFormat))
 		}
 
-		resp, err := http.DefaultClient.Do(req) //nolint:bodyclose // we do close this outside of the function
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			retryCount++
 			return fmt.Errorf("downloading file %s: %w", downloadRequest.URL, err)
