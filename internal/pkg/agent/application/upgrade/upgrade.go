@@ -73,6 +73,10 @@ type artifactDownloadHandler interface {
 	downloadArtifact(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error)
 	withFleetServerURI(fleetServerURI string)
 }
+type unpackHandler interface {
+	unpack(version, archivePath, dataDir string, flavor string) (UnpackResult, error)
+	getPackageMetadata(archivePath string) (packageMetadata, error)
+}
 
 // Upgrader performs an upgrade
 type Upgrader struct {
@@ -85,7 +89,9 @@ type Upgrader struct {
 
 	// The following are abstractions for testability
 	artifactDownloader   artifactDownloadHandler
+	unpacker             unpackHandler
 	isDiskSpaceErrorFunc func(err error) bool
+	extractAgentVersion  func(metadata packageMetadata, upgradeVersion string) agentVersion
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -104,7 +110,9 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.A
 		upgradeable:          IsUpgradeable(),
 		markerWatcher:        newMarkerFileWatcher(markerFilePath(paths.Data()), log),
 		artifactDownloader:   newArtifactDownloader(settings, log),
+		unpacker:             newUnpacker(log),
 		isDiskSpaceErrorFunc: upgradeErrors.IsDiskSpaceError,
+		extractAgentVersion:  extractAgentVersion,
 	}, nil
 }
 
@@ -274,12 +282,12 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	det.SetState(details.StateExtracting)
 
-	metadata, err := u.getPackageMetadata(archivePath)
+	metadata, err := u.unpacker.getPackageMetadata(archivePath)
 	if err != nil {
 		return nil, fmt.Errorf("reading metadata for elastic agent version %s package %q: %w", version, archivePath, err)
 	}
 
-	newVersion := extractAgentVersion(metadata, version)
+	newVersion := u.extractAgentVersion(metadata, version)
 	if err := checkUpgrade(u.log, currentVersion, newVersion, metadata); err != nil {
 		return nil, fmt.Errorf("cannot upgrade the agent: %w", err)
 	}
@@ -296,7 +304,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 		u.log.Warnf("error encountered when detecting used flavor with top path %q: %v", paths.Top(), err)
 	}
 	u.log.Debugf("detected used flavor: %q", detectedFlavor)
-	unpackRes, err := u.unpack(version, archivePath, paths.Data(), detectedFlavor)
+	unpackRes, err := u.unpacker.unpack(version, archivePath, paths.Data(), detectedFlavor)
 	if err != nil {
 		return nil, err
 	}
