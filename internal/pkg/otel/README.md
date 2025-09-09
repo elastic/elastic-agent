@@ -92,7 +92,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [apikeyauthextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apikeyauthextension/v0.3.0/extension/apikeyauthextension/README.md) | v0.3.0 |
 | [apmconfigextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apmconfigextension/v0.6.0/extension/apmconfigextension/README.md) | v0.6.0 |
 | [bearertokenauthextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/bearertokenauthextension/v0.130.0/extension/bearertokenauthextension/README.md) | v0.130.0 |
-| [beatsauthextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/beatsauthextension/v0.1.0/extension/beatsauthextension/README.md) | v0.1.0 |
+| [beatsauthextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/beatsauthextension/v0.2.0/extension/beatsauthextension/README.md) | v0.2.0 |
 | [filestorage](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/storage/filestorage/v0.130.0/extension/storage/filestorage/README.md) | v0.130.0 |
 | [healthcheckextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckextension/v0.130.0/extension/healthcheckextension/README.md) | v0.130.0 |
 | [healthcheckv2extension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckv2extension/v0.130.0/extension/healthcheckv2extension/README.md) | v0.130.0 |

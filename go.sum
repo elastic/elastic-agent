@@ -549,6 +549,8 @@ github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextens
 github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.3.0/go.mod h1:PP7E4hAPU0u2rvfuwe1w2NDyJ5/JH7iziSPUdwxV5+4=
 github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.6.0 h1:UBAq2kilCpYBKkRQovA8AG5N5AAnQY5IA3ZEhv4vMAo=
 github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.6.0/go.mod h1:E1uPMjGeBL8PbYCqX4WHMHGqZ3Oo+gK1OKe5Mp1146M=
+github.com/elastic/opentelemetry-collector-components/extension/beatsauthextension v0.2.0 h1:cQ4Bu5iyJn5jk68OdwpGIifqVwAZUCoYpN3ZVbVRGBA=
+github.com/elastic/opentelemetry-collector-components/extension/beatsauthextension v0.2.0/go.mod h1:aG7w7AA2CydjMxGG6zUZggXCPa+jVRhVYo/92wiDx4Q=
 github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced h1:XcWi/S3OoeE5Qwmj381AoO3nr3AVXl4Z4QO0mqyjlzU=
 github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced/go.mod h1:8e9NcGfE2xeor8r+WV9a+hKBEkzJEDnqZN7tqb3GUe8=
 github.com/elastic/opentelemetry-collector-components/internal/testutil v0.0.0-20250613082151-282de5af1c9b h1:NWuTKdMCJlU9ehRH8V0w1Kk1QI5Vn+9OcJWIO9wI+pE=
@@ -974,8 +976,6 @@ github.com/karrick/godirwalk v1.16.1 h1:DynhcF+bztK8gooS0+NDJFrdNZjJ3gzVzC545UNA
 github.com/karrick/godirwalk v1.16.1/go.mod h1:j4mkqPuvaLI8mp1DroR3P6ad7cyYd4c1qeJ3RV7ULlk=
 github.com/keybase/go-keychain v0.0.1 h1:way+bWYa6lDppZoZcgMbYsvC7GxljxrskdNInRtuthU=
 github.com/keybase/go-keychain v0.0.1/go.mod h1:PdEILRW3i9D8JcdM+FmY6RwkHGnhHxXwkPPMeUgOK1k=
-github.com/khushijain21/opentelemetry-collector-components/extension/beatsauthextension v0.0.0-20250902040834-316a18b416a5 h1:aDznzPuScsl7F6Xp88GZYQAnWUYj01ICRdr9pxtkNbI=
-github.com/khushijain21/opentelemetry-collector-components/extension/beatsauthextension v0.0.0-20250902040834-316a18b416a5/go.mod h1:ZQmsSZScCAltjvwh4kxjHuokc7V2+WFLYbNMTAY9wrE=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/klauspost/asmfmt v1.3.2 h1:4Ri7ox3EwapiOjCki+hw14RyKk201CN4rzyCJRFLpK4=
