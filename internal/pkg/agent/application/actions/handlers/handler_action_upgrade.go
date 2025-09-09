@@ -22,7 +22,7 @@ import (
 type Upgrade struct {
 	log        *logger.Logger
 	coord      upgradeCoordinator
-	bkgActions []fleetapi.Action
+	bkgActions []*fleetapi.ActionUpgrade
 	bkgCancel  context.CancelFunc
 	bkgMutex   sync.Mutex
 
@@ -50,7 +50,7 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 		return fmt.Errorf("invalid type, expected ActionUpgrade and received %T", a)
 	}
 
-	asyncCtx, runAsync := h.getAsyncContext(ctx, a, ack)
+	asyncCtx, runAsync := h.getAsyncContext(ctx, action, ack)
 	if !runAsync {
 		return nil
 	}
@@ -115,7 +115,7 @@ func (h *Upgrade) ackAction(ctx context.Context, ack acker.Acker, action fleetap
 }
 
 // getAsyncContext returns a cancelContext and whether or not to run the upgrade
-func (h *Upgrade) getAsyncContext(ctx context.Context, action fleetapi.Action, ack acker.Acker) (context.Context, bool) {
+func (h *Upgrade) getAsyncContext(ctx context.Context, upgradeAction *fleetapi.ActionUpgrade, ack acker.Acker) (context.Context, bool) {
 	h.bkgMutex.Lock()
 	defer h.bkgMutex.Unlock()
 
@@ -127,23 +127,14 @@ func (h *Upgrade) getAsyncContext(ctx context.Context, action fleetapi.Action, a
 
 	// If no existing actions, run this one
 	if len(h.bkgActions) == 0 {
-		h.bkgActions = append(h.bkgActions, action)
+		h.bkgActions = append(h.bkgActions, upgradeAction)
 		c, cancel := context.WithCancel(ctx)
 		h.bkgCancel = cancel
 		return c, true
 	}
 	// If upgrade to same version, save action to ack when first upgrade completes
-	upgradeAction, ok := action.(*fleetapi.ActionUpgrade)
-	if !ok {
-		h.log.Errorf("invalid type, expected ActionUpgrade and received %T", action)
-		return nil, false
-	}
 	// only need to check first action since all actions must be upgrades to same version
-	bkgAction, ok := h.bkgActions[0].(*fleetapi.ActionUpgrade)
-	if !ok {
-		h.log.Errorf("invalid type, expected ActionUpgrade and received %T", action)
-		return nil, false
-	}
+	bkgAction := h.bkgActions[0]
 	if upgradeAction.ActionID == bkgAction.ActionID {
 		h.log.Infof("Duplicate upgrade to version %s received",
 			bkgAction.Data.Version)
@@ -174,7 +165,7 @@ func (h *Upgrade) getAsyncContext(ctx context.Context, action fleetapi.Action, a
 	// Ack here because we have the lock, and we need to clear out the saved actions
 	h.ackActions(ctx, ack)
 
-	h.bkgActions = append(h.bkgActions, action)
+	h.bkgActions = append(h.bkgActions, upgradeAction)
 	c, cancel := context.WithCancel(ctx)
 	h.bkgCancel = cancel
 	return c, true
