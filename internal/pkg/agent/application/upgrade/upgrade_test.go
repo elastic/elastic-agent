@@ -1311,38 +1311,94 @@ func (m *mockArtifactDownloader) withFleetServerURI(fleetServerURI string) {
 	m.fleetServerURI = fleetServerURI
 }
 
+type mockUnpacker struct {
+	returnPackageMetadata      packageMetadata
+	returnPackageMetadataError error
+	returnUnpackResult         UnpackResult
+	returnUnpackError          error
+}
+
+func (m *mockUnpacker) getPackageMetadata(archivePath string) (packageMetadata, error) {
+	return m.returnPackageMetadata, m.returnPackageMetadataError
+}
+
+func (m *mockUnpacker) unpack(version, archivePath, dataDir string, flavor string) (UnpackResult, error) {
+	return m.returnUnpackResult, m.returnUnpackError
+}
+
 func TestUpgradeErrorHandling(t *testing.T) {
 	log, _ := loggertest.New("test")
 	testError := errors.New("test error")
+	type upgraderMocker func(upgrader *Upgrader)
 
 	type testCase struct {
 		isDiskSpaceErrorResult bool
 		expectedError          error
+		upgraderMocker         upgraderMocker
 	}
 
 	testCases := map[string]testCase{
 		"should return error if downloadArtifact fails": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
+			upgraderMocker: func(upgrader *Upgrader) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{
+					returnError: testError,
+				}
+			},
+		},
+		"should return error if getPackageMetadata fails": {
+			isDiskSpaceErrorResult: false,
+			expectedError:          testError,
+			upgraderMocker: func(upgrader *Upgrader) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{}
+				upgrader.unpacker = &mockUnpacker{
+					returnPackageMetadataError: testError,
+				}
+			},
+		},
+		"should return error if unpack fails": {
+			isDiskSpaceErrorResult: false,
+			expectedError:          testError,
+			upgraderMocker: func(upgrader *Upgrader) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{}
+				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
+					return agentVersion{
+						version:  upgradeVersion,
+						snapshot: false,
+						hash:     metadata.hash,
+					}
+				}
+				upgrader.unpacker = &mockUnpacker{
+					returnPackageMetadata: packageMetadata{
+						manifest: &v1.PackageManifest{},
+						hash:     "hash",
+					},
+					returnUnpackError: testError,
+				}
+			},
 		},
 		"should add disk space error to the error chain if downloadArtifact fails with disk space error": {
 			isDiskSpaceErrorResult: true,
 			expectedError:          upgradeErrors.ErrInsufficientDiskSpace,
+			upgraderMocker: func(upgrader *Upgrader) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{
+					returnError: upgradeErrors.ErrInsufficientDiskSpace,
+				}
+			},
 		},
 	}
 
 	mockAgentInfo := info.NewAgent(t)
 	mockAgentInfo.On("Version").Return("9.0.0")
 
-	upgrader, err := NewUpgrader(log, &artifact.Config{}, mockAgentInfo)
-	require.NoError(t, err)
-
-	upgrader.artifactDownloader = &mockArtifactDownloader{
-		returnError: testError,
-	}
-
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			upgrader, err := NewUpgrader(log, &artifact.Config{}, mockAgentInfo)
+			require.NoError(t, err)
+
+			tc.upgraderMocker(upgrader)
+
 			upgrader.isDiskSpaceErrorFunc = func(err error) bool {
 				return tc.isDiskSpaceErrorResult
 			}
@@ -1362,7 +1418,6 @@ func (m *mockSender) Send(ctx context.Context, method, path string, params url.V
 func (m *mockSender) URI() string {
 	return "mockURI"
 }
-
 func TestSetClient(t *testing.T) {
 	log, _ := loggertest.New("test")
 	upgrader := &Upgrader{
