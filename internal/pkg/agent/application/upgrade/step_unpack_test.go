@@ -8,6 +8,7 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -23,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
@@ -130,6 +132,7 @@ type createArchiveFunc func(t *testing.T, archiveFiles []files) (string, error)
 type checkExtractedPath func(t *testing.T, testDataDir string)
 
 func TestUpgrader_unpackTarGz(t *testing.T) {
+	testError := errors.New("test error")
 	type args struct {
 		version          string
 		archiveGenerator createArchiveFunc
@@ -137,11 +140,23 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 	}
 
 	tests := []struct {
+<<<<<<< HEAD
 		name       string
 		args       args
 		want       UnpackResult
 		wantErr    assert.ErrorAssertionFunc
 		checkFiles checkExtractedPath
+=======
+		name          string
+		args          args
+		want          UnpackResult
+		expectedError error
+		checkFiles    checkExtractedPath
+		flavor        string
+		copy          copyFunc
+		mkdirAll      mkdirAllFunc
+		openFile      openFileFunc
+>>>>>>> f70ff023f (Enhancement/5235 handle insufficient disk space errors in artifact unpack (#9322))
 	}{
 		{
 			name: "file before containing folder",
@@ -156,11 +171,14 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-abcdef"),
 			},
-			wantErr: assert.NoError,
+			expectedError: nil,
 			checkFiles: func(t *testing.T, testDataDir string) {
 				versionedHome := filepath.Join(testDataDir, "elastic-agent-abcdef")
 				checkExtractedFilesOutOfOrder(t, versionedHome)
 			},
+			copy:     io.Copy,
+			mkdirAll: os.MkdirAll,
+			openFile: os.OpenFile,
 		},
 		{
 			name: "package with manifest file",
@@ -175,9 +193,120 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
-			wantErr:    assert.NoError,
-			checkFiles: checkExtractedFilesWithManifest,
+			expectedError: nil,
+			checkFiles:    checkExtractedFilesWithManifest,
+			copy:          io.Copy,
+			mkdirAll:      os.MkdirAll,
+			openFile:      os.OpenFile,
 		},
+<<<<<<< HEAD
+=======
+		{
+			name: "package with basic flavor",
+			args: args{
+				version:      "1.2.3",
+				archiveFiles: append(archiveFilesWithMoreComponents, agentArchiveSymLink),
+				archiveGenerator: func(t *testing.T, i []files) (string, error) {
+					return createTarArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.tar.gz", i)
+				},
+			},
+			want: UnpackResult{
+				Hash:          "abcdef",
+				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
+			},
+			expectedError: nil,
+			flavor:        "basic",
+			checkFiles: func(t *testing.T, testDataDir string) {
+				checkFilesPresence(t, testDataDir,
+					[]string{
+						filepath.Join("components", "comp1"+binarySuffix), filepath.Join("components", "comp1.spec.yml"),
+						filepath.Join("components", "comp2"+binarySuffix), filepath.Join("components", "comp2.spec.yml"),
+						filepath.Join("components", "component_dir", "inner_file"),
+					},
+					[]string{filepath.Join("components", "comp3"), filepath.Join("components", "comp3.spec.yml"), filepath.Join("components", "component.zip")})
+			},
+			copy:     io.Copy,
+			mkdirAll: os.MkdirAll,
+			openFile: os.OpenFile,
+		},
+		{
+			name: "package with servers flavor",
+			args: args{
+				version:      "1.2.3",
+				archiveFiles: append(archiveFilesWithMoreComponents, agentArchiveSymLink),
+				archiveGenerator: func(t *testing.T, i []files) (string, error) {
+					return createTarArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.tar.gz", i)
+				},
+			},
+			want: UnpackResult{
+				Hash:          "abcdef",
+				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
+			},
+			expectedError: nil,
+			flavor:        "servers",
+			checkFiles: func(t *testing.T, testDataDir string) {
+				checkFilesPresence(t, testDataDir,
+					[]string{
+						filepath.Join("components", "comp1"+binarySuffix), filepath.Join("components", "comp1.spec.yml"),
+						filepath.Join("components", "comp2"+binarySuffix), filepath.Join("components", "comp2.spec.yml"),
+						filepath.Join("components", "component_dir", "inner_file"),
+						filepath.Join("components", "comp3"+binarySuffix), filepath.Join("components", "comp3.spec.yml"), filepath.Join("components", "component.zip"),
+					},
+					[]string{})
+			},
+			copy:     io.Copy,
+			mkdirAll: os.MkdirAll,
+			openFile: os.OpenFile,
+		},
+		{
+			name: "copying file fails",
+			args: args{
+				version:      "1.2.3",
+				archiveFiles: append(archiveFilesWithMoreComponents, agentArchiveSymLink),
+				archiveGenerator: func(t *testing.T, i []files) (string, error) {
+					return createTarArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.tar.gz", i)
+				},
+			},
+			expectedError: testError,
+			copy: func(dst io.Writer, src io.Reader) (written int64, err error) {
+				return 0, testError
+			},
+			mkdirAll: os.MkdirAll,
+			openFile: os.OpenFile,
+		},
+		{
+			name: "opening file fails",
+			args: args{
+				version:      "1.2.3",
+				archiveFiles: append(archiveFilesWithMoreComponents, agentArchiveSymLink),
+				archiveGenerator: func(t *testing.T, i []files) (string, error) {
+					return createTarArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.tar.gz", i)
+				},
+			},
+			expectedError: testError,
+			openFile: func(name string, flag int, perm os.FileMode) (*os.File, error) {
+				return nil, testError
+			},
+			mkdirAll: os.MkdirAll,
+			copy:     io.Copy,
+		},
+		{
+			name: "creating directory fails",
+			args: args{
+				version:      "1.2.3",
+				archiveFiles: append(archiveFilesWithMoreComponents, agentArchiveSymLink),
+				archiveGenerator: func(t *testing.T, i []files) (string, error) {
+					return createTarArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.tar.gz", i)
+				},
+			},
+			expectedError: testError,
+			mkdirAll: func(name string, perm os.FileMode) error {
+				return testError
+			},
+			openFile: os.OpenFile,
+			copy:     io.Copy,
+		},
+>>>>>>> f70ff023f (Enhancement/5235 handle insufficient disk space errors in artifact unpack (#9322))
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -190,10 +319,17 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 			archiveFile, err := tt.args.archiveGenerator(t, tt.args.archiveFiles)
 			require.NoError(t, err, "creation of test archive file failed")
 
+<<<<<<< HEAD
 			got, err := untar(log, archiveFile, testDataDir)
 			if !tt.wantErr(t, err, fmt.Sprintf("untar(%v, %v, %v)", tt.args.version, archiveFile, testDataDir)) {
+=======
+			got, err := untar(log, archiveFile, testDataDir, tt.flavor, tt.copy, tt.mkdirAll, tt.openFile)
+			if tt.expectedError != nil {
+				assert.ErrorIsf(t, err, tt.expectedError, "untar(%v, %v, %v)", tt.args.version, archiveFile, testDataDir)
+>>>>>>> f70ff023f (Enhancement/5235 handle insufficient disk space errors in artifact unpack (#9322))
 				return
 			}
+			assert.NoErrorf(t, err, "untar(%v, %v, %v)", tt.args.version, archiveFile, testDataDir)
 			assert.Equalf(t, tt.want, got, "untar(%v, %v, %v)", tt.args.version, archiveFile, testDataDir)
 			if tt.checkFiles != nil {
 				tt.checkFiles(t, testDataDir)
@@ -203,17 +339,30 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 }
 
 func TestUpgrader_unpackZip(t *testing.T) {
+	testError := errors.New("test error")
 	type args struct {
 		archiveGenerator createArchiveFunc
 		archiveFiles     []files
 	}
 
 	tests := []struct {
+<<<<<<< HEAD
 		name       string
 		args       args
 		want       UnpackResult
 		wantErr    assert.ErrorAssertionFunc
 		checkFiles checkExtractedPath
+=======
+		name          string
+		args          args
+		want          UnpackResult
+		expectedError error
+		checkFiles    checkExtractedPath
+		flavor        string
+		copy          copyFunc
+		mkdirAll      mkdirAllFunc
+		openFile      openFileFunc
+>>>>>>> f70ff023f (Enhancement/5235 handle insufficient disk space errors in artifact unpack (#9322))
 	}{
 		{
 			name: "file before containing folder",
@@ -227,11 +376,14 @@ func TestUpgrader_unpackZip(t *testing.T) {
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-abcdef"),
 			},
-			wantErr: assert.NoError,
+			expectedError: nil,
 			checkFiles: func(t *testing.T, testDataDir string) {
 				versionedHome := filepath.Join(testDataDir, "elastic-agent-abcdef")
 				checkExtractedFilesOutOfOrder(t, versionedHome)
 			},
+			copy:     io.Copy,
+			mkdirAll: os.MkdirAll,
+			openFile: os.OpenFile,
 		},
 		{
 			name: "package with manifest file",
@@ -245,9 +397,116 @@ func TestUpgrader_unpackZip(t *testing.T) {
 				Hash:          "abcdef",
 				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
 			},
-			wantErr:    assert.NoError,
-			checkFiles: checkExtractedFilesWithManifest,
+			expectedError: nil,
+			checkFiles:    checkExtractedFilesWithManifest,
+			copy:          io.Copy,
+			mkdirAll:      os.MkdirAll,
+			openFile:      os.OpenFile,
 		},
+<<<<<<< HEAD
+=======
+
+		{
+			name: "package with basic flavor",
+			args: args{
+				archiveFiles: archiveFilesWithMoreComponents,
+				archiveGenerator: func(t *testing.T, i []files) (string, error) {
+					return createZipArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.zip", i)
+				},
+			},
+			want: UnpackResult{
+				Hash:          "abcdef",
+				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
+			},
+			expectedError: nil,
+			flavor:        "basic",
+			checkFiles: func(t *testing.T, testDataDir string) {
+				checkFilesPresence(t, testDataDir,
+					[]string{
+						filepath.Join("components", "comp1"+binarySuffix), filepath.Join("components", "comp1.spec.yml"),
+						filepath.Join("components", "comp2"+binarySuffix), filepath.Join("components", "comp2.spec.yml"),
+						filepath.Join("components", "component_dir", "inner_file"),
+					},
+					[]string{filepath.Join("components", "comp3"+binarySuffix), filepath.Join("components", "comp3.spec.yml"), filepath.Join("components", "component.zip")})
+			},
+			copy:     io.Copy,
+			mkdirAll: os.MkdirAll,
+			openFile: os.OpenFile,
+		},
+		{
+			name: "package with servers flavor",
+			args: args{
+				archiveFiles: archiveFilesWithMoreComponents,
+				archiveGenerator: func(t *testing.T, i []files) (string, error) {
+					return createZipArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.zip", i)
+				},
+			},
+			want: UnpackResult{
+				Hash:          "abcdef",
+				VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"),
+			},
+			expectedError: nil,
+			flavor:        "servers",
+			checkFiles: func(t *testing.T, testDataDir string) {
+				checkFilesPresence(t, testDataDir,
+					[]string{
+						filepath.Join("components", "comp1"+binarySuffix), filepath.Join("components", "comp1.spec.yml"),
+						filepath.Join("components", "comp2"+binarySuffix), filepath.Join("components", "comp2.spec.yml"),
+						filepath.Join("components", "component_dir", "inner_file"),
+						filepath.Join("components", "comp3"+binarySuffix), filepath.Join("components", "comp3.spec.yml"), filepath.Join("components", "component.zip"),
+					},
+					[]string{})
+			},
+			copy:     io.Copy,
+			mkdirAll: os.MkdirAll,
+			openFile: os.OpenFile,
+		},
+		{
+			name: "copying file fails",
+			args: args{
+				archiveFiles: archiveFilesWithMoreComponents,
+				archiveGenerator: func(t *testing.T, i []files) (string, error) {
+					return createZipArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.zip", i)
+				},
+			},
+			expectedError: testError,
+			copy: func(dst io.Writer, src io.Reader) (written int64, err error) {
+				return 0, testError
+			},
+			mkdirAll: os.MkdirAll,
+			openFile: os.OpenFile,
+		},
+		{
+			name: "opening file fails",
+			args: args{
+				archiveFiles: archiveFilesWithMoreComponents,
+				archiveGenerator: func(t *testing.T, i []files) (string, error) {
+					return createZipArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.zip", i)
+				},
+			},
+			expectedError: testError,
+			openFile: func(name string, flag int, perm os.FileMode) (*os.File, error) {
+				return nil, testError
+			},
+			mkdirAll: os.MkdirAll,
+			copy:     io.Copy,
+		},
+		{
+			name: "creating directory fails",
+			args: args{
+				archiveFiles: archiveFilesWithMoreComponents,
+				archiveGenerator: func(t *testing.T, i []files) (string, error) {
+					return createZipArchive(t, "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64.zip", i)
+				},
+			},
+			expectedError: testError,
+			mkdirAll: func(name string, perm os.FileMode) error {
+				return testError
+			},
+			openFile: os.OpenFile,
+			copy:     io.Copy,
+		},
+>>>>>>> f70ff023f (Enhancement/5235 handle insufficient disk space errors in artifact unpack (#9322))
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -261,10 +520,17 @@ func TestUpgrader_unpackZip(t *testing.T) {
 			archiveFile, err := tt.args.archiveGenerator(t, tt.args.archiveFiles)
 			require.NoError(t, err, "creation of test archive file failed")
 
+<<<<<<< HEAD
 			got, err := unzip(log, archiveFile, testDataDir)
 			if !tt.wantErr(t, err, fmt.Sprintf("unzip(%v, %v)", archiveFile, testDataDir)) {
+=======
+			got, err := unzip(log, archiveFile, testDataDir, tt.flavor, tt.copy, tt.mkdirAll, tt.openFile)
+			if tt.expectedError != nil {
+				assert.ErrorIs(t, err, tt.expectedError, "error mismatch")
+>>>>>>> f70ff023f (Enhancement/5235 handle insufficient disk space errors in artifact unpack (#9322))
 				return
 			}
+			assert.NoErrorf(t, err, "unzip(%v, %v)", archiveFile, testDataDir)
 			assert.Equalf(t, tt.want, got, "unzip(%v, %v)", archiveFile, testDataDir)
 			if tt.checkFiles != nil {
 				tt.checkFiles(t, testDataDir)
@@ -442,4 +708,50 @@ func TestGetFileNamePrefix(t *testing.T) {
 		})
 	}
 
+}
+
+func TestUnpack(t *testing.T) {
+	log, _ := loggertest.New("TestUnpack")
+
+	unarchiveSetup := func(unpackResult UnpackResult, err error) unarchiveFunc {
+		return func(log *logger.Logger, archivePath, dataDir string, flavor string, copy copyFunc, mkdirAll mkdirAllFunc, openFile openFileFunc) (UnpackResult, error) {
+			return unpackResult, err
+		}
+	}
+
+	type testCase struct {
+		expectedUnpackResult UnpackResult
+		expectedErr          error
+		unarchiveFunc        unarchiveFunc
+	}
+
+	testCases := map[string]testCase{
+		"when unarchiving succeeds it should return the unpack result": {
+			expectedUnpackResult: UnpackResult{
+				Hash:          "abcdef",
+				VersionedHome: filepath.Join("data", "elastic-agent-abcdef"),
+			},
+			expectedErr: nil,
+			unarchiveFunc: unarchiveSetup(UnpackResult{
+				Hash:          "abcdef",
+				VersionedHome: filepath.Join("data", "elastic-agent-abcdef"),
+			}, nil),
+		},
+		"when unarchiving fails it should return an error": {
+			expectedUnpackResult: UnpackResult{},
+			expectedErr:          errors.New("unarchiving failed"),
+			unarchiveFunc:        unarchiveSetup(UnpackResult{}, errors.New("unarchiving failed")),
+		},
+	}
+
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			unpacker := newUnpacker(log)
+			unpacker.untar = test.unarchiveFunc
+			unpacker.unzip = test.unarchiveFunc
+			unpackResult, unpackErr := unpacker.unpack("mockVersion", "mockArchivePath", "mockDataDir", "mockFlavor")
+			assert.Equal(t, test.expectedUnpackResult, unpackResult)
+			assert.Equal(t, test.expectedErr, unpackErr)
+		})
+	}
 }
