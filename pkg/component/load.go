@@ -29,6 +29,8 @@ var (
 	ErrInputNotSupportedOnPlatform = newError("input not supported on this platform")
 	// ErrOutputNotSupported is returned when the output is not supported on any platform
 	ErrOutputNotSupported = newError("output not supported")
+	// ErrInputNotRendered is used as component error for inputs that failed variable substitution
+	ErrInputNotRendered = newError("input variable substitution failed")
 )
 
 // InputRuntimeSpec returns the specification for running this input on the current platform.

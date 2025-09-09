@@ -792,7 +792,7 @@ func TestRenderInputs(t *testing.T) {
 
 	for name, test := range testcases {
 		t.Run(name, func(t *testing.T) {
-			v, err := RenderInputs(test.input, test.varsArray)
+			v, _, err := RenderInputs(test.input, test.varsArray)
 			if test.err {
 				require.Error(t, err)
 			} else {

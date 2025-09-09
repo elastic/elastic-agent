@@ -443,6 +443,21 @@ func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *feature
 			}
 		}
 	}
+	for _, unrenderedInput := range output.unrenderedInputs {
+		// sTODO: Check if I'm correct regarding this assumption
+		// Add a failed component for each unrendered input caused by a failed variable substitution.
+		// There is no need to declare all the Component fields here. We just need to provide the error since
+		// that is going to be used as the reason for the failed status of the component.
+		for _, input := range unrenderedInput {
+			components = append(components, Component{
+				ID:             fmt.Sprintf("%s-%s", input.inputType, output.name),
+				Err:            ErrInputNotRendered,
+				InputType:      input.inputType,
+				OutputType:     output.outputType,
+				RuntimeManager: input.runtimeManager,
+			})
+		}
+	}
 	return components
 }
 
@@ -528,13 +543,14 @@ func injectInputPolicyID(fleetPolicy map[string]interface{}, inputConfig map[str
 // of components.
 func toIntermediate(policy map[string]interface{}, aliasMapping map[string]string, ll logp.Level, headers HeadersProvider) (map[string]outputI, error) {
 	const (
-		outputsKey        = "outputs"
-		enabledKey        = "enabled"
-		inputsKey         = "inputs"
-		typeKey           = "type"
-		idKey             = "id"
-		useOutputKey      = "use_output"
-		runtimeManagerKey = "_runtime_experimental"
+		outputsKey          = "outputs"
+		enabledKey          = "enabled"
+		inputsKey           = "inputs"
+		unrenderedInputsKey = "unrendered_inputs"
+		typeKey             = "type"
+		idKey               = "id"
+		useOutputKey        = "use_output"
+		runtimeManagerKey   = "_runtime_experimental"
 	)
 
 	// intermediate structure for output to input mapping (this structure allows different input types per output)
@@ -602,113 +618,136 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 		}
 
 		outputsMap[name] = outputI{
-			name:       name,
-			enabled:    enabled,
-			logLevel:   logLevel,
-			outputType: t,
-			config:     output,
-			inputs:     make(map[string][]inputI),
+			name:             name,
+			enabled:          enabled,
+			logLevel:         logLevel,
+			outputType:       t,
+			config:           output,
+			inputs:           make(map[string][]inputI),
+			unrenderedInputs: make(map[string][]inputI),
 		}
+	}
+
+	// maps an input to an output
+	mapInputs := func(aliasMapping map[string]string, outputsMap map[string]outputI, policy map[string]any, ll logp.Level, key string) error {
+		var inputs []any
+		inputsRaw, ok := policy[key]
+		if ok {
+			inputs, ok = inputsRaw.([]any)
+			if !ok {
+				return fmt.Errorf("invalid '%s', expected an array not a %T", key, inputsRaw)
+			}
+		}
+		for idx, inputRaw := range inputs {
+			input, ok := inputRaw.(map[string]any)
+			if !ok {
+				return fmt.Errorf("invalid '%s.%d', expected a map not a %T", key, idx, inputRaw)
+			}
+			typeRaw, ok := input[typeKey]
+			if !ok {
+				return fmt.Errorf("invalid '%s.%d', 'type' missing", key, idx)
+			}
+			t, ok := typeRaw.(string)
+			if !ok {
+				return fmt.Errorf("invalid '%s.%d.type', expected a string not a %T", key, idx, typeRaw)
+			}
+			if realInputType, found := aliasMapping[t]; found {
+				t = realInputType
+				// by replacing type we make sure component understands aliasing
+				input[typeKey] = t
+			}
+			idRaw, ok := input[idKey]
+			if !ok {
+				// no ID; fallback to type
+				idRaw = t
+			}
+			id, ok := idRaw.(string)
+			if !ok {
+				return fmt.Errorf("invalid '%s.%d.id', expected a string not a %T", key, idx, idRaw)
+			}
+			if hasDuplicate(outputsMap, id) {
+				return fmt.Errorf("invalid '%s.%d.id', has a duplicate id %q. Please add a unique value for the 'id' key to each input in the agent policy", key, idx, id)
+			}
+			outputName := "default"
+			if outputRaw, ok := input[useOutputKey]; ok {
+				outputNameVal, ok := outputRaw.(string)
+				if !ok {
+					return fmt.Errorf("invalid '%s.%d.use_output', expected a string not a %T", key, idx, outputRaw)
+				}
+				outputName = outputNameVal
+				delete(input, useOutputKey)
+			}
+			output, ok := outputsMap[outputName]
+			if !ok {
+				return fmt.Errorf("invalid '%s.%d.use_output', references an unknown output '%s'", key, idx, outputName)
+			}
+			enabled := true
+			if enabledRaw, ok := input[enabledKey]; ok {
+				enabledVal, ok := enabledRaw.(bool)
+				if !ok {
+					return fmt.Errorf("invalid '%s.%d.enabled', expected a bool not a %T", key, idx, enabledRaw)
+				}
+				enabled = enabledVal
+				delete(input, enabledKey)
+			}
+			logLevel, err := getLogLevel(input, ll)
+			if err != nil {
+				return fmt.Errorf("invalid '%s.%d.log_level', %w", key, idx, err)
+			}
+
+			runtimeManager := DefaultRuntimeManager
+			// determine the runtime manager for the input
+			if runtimeManagerRaw, ok := input[runtimeManagerKey]; ok {
+				runtimeManagerStr, ok := runtimeManagerRaw.(string)
+				if !ok {
+					return fmt.Errorf("invalid '%s.%d.runtime', expected a string, not a %T", key, idx, runtimeManagerRaw)
+				}
+				runtimeManagerVal := RuntimeManager(runtimeManagerStr)
+				switch runtimeManagerVal {
+				case OtelRuntimeManager, ProcessRuntimeManager:
+				default:
+					return fmt.Errorf("invalid '%s.%d.runtime', valid values are: %s, %s", key, idx, OtelRuntimeManager, ProcessRuntimeManager)
+				}
+				runtimeManager = runtimeManagerVal
+				delete(input, runtimeManagerKey)
+			}
+
+			// Inject the top level fleet policy revision into each input configuration. This
+			// allows individual inputs (like endpoint) to detect policy changes more easily.
+			injectInputPolicyID(policy, input)
+
+			ii := inputI{
+				idx:            idx,
+				id:             id,
+				enabled:        enabled,
+				logLevel:       logLevel,
+				inputType:      t,
+				config:         input,
+				runtimeManager: runtimeManager,
+			}
+
+			switch key {
+			case inputsKey:
+				output.inputs[ii.inputType] = append(output.inputs[ii.inputType], ii)
+			case unrenderedInputsKey:
+				output.unrenderedInputs[ii.inputType] = append(output.unrenderedInputs[ii.inputType], ii)
+			}
+		}
+		return nil
 	}
 
 	// map the inputs to the outputs
-	inputsRaw, ok := policy[inputsKey]
-	if !ok {
-		// no inputs; no components then
-		return nil, nil
+	err := mapInputs(aliasMapping, outputsMap, policy, ll, inputsKey)
+	if err != nil {
+		return nil, err
 	}
-	inputs, ok := inputsRaw.([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid 'inputs', expected an array not a %T", inputsRaw)
+
+	// map the unrendered_inputs to the outputs
+	err = mapInputs(aliasMapping, outputsMap, policy, ll, unrenderedInputsKey)
+	if err != nil {
+		return nil, err
 	}
-	for idx, inputRaw := range inputs {
-		input, ok := inputRaw.(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("invalid 'inputs.%d', expected a map not a %T", idx, inputRaw)
-		}
-		typeRaw, ok := input[typeKey]
-		if !ok {
-			return nil, fmt.Errorf("invalid 'inputs.%d', 'type' missing", idx)
-		}
-		t, ok := typeRaw.(string)
-		if !ok {
-			return nil, fmt.Errorf("invalid 'inputs.%d.type', expected a string not a %T", idx, typeRaw)
-		}
-		if realInputType, found := aliasMapping[t]; found {
-			t = realInputType
-			// by replacing type we make sure component understands aliasing
-			input[typeKey] = t
-		}
-		idRaw, ok := input[idKey]
-		if !ok {
-			// no ID; fallback to type
-			idRaw = t
-		}
-		id, ok := idRaw.(string)
-		if !ok {
-			return nil, fmt.Errorf("invalid 'inputs.%d.id', expected a string not a %T", idx, idRaw)
-		}
-		if hasDuplicate(outputsMap, id) {
-			return nil, fmt.Errorf("invalid 'inputs.%d.id', has a duplicate id %q. Please add a unique value for the 'id' key to each input in the agent policy", idx, id)
-		}
-		outputName := "default"
-		if outputRaw, ok := input[useOutputKey]; ok {
-			outputNameVal, ok := outputRaw.(string)
-			if !ok {
-				return nil, fmt.Errorf("invalid 'inputs.%d.use_output', expected a string not a %T", idx, outputRaw)
-			}
-			outputName = outputNameVal
-			delete(input, useOutputKey)
-		}
-		output, ok := outputsMap[outputName]
-		if !ok {
-			return nil, fmt.Errorf("invalid 'inputs.%d.use_output', references an unknown output '%s'", idx, outputName)
-		}
-		enabled := true
-		if enabledRaw, ok := input[enabledKey]; ok {
-			enabledVal, ok := enabledRaw.(bool)
-			if !ok {
-				return nil, fmt.Errorf("invalid 'inputs.%d.enabled', expected a bool not a %T", idx, enabledRaw)
-			}
-			enabled = enabledVal
-			delete(input, enabledKey)
-		}
-		logLevel, err := getLogLevel(input, ll)
-		if err != nil {
-			return nil, fmt.Errorf("invalid 'inputs.%d.log_level', %w", idx, err)
-		}
 
-		runtimeManager := DefaultRuntimeManager
-		// determine the runtime manager for the input
-		if runtimeManagerRaw, ok := input[runtimeManagerKey]; ok {
-			runtimeManagerStr, ok := runtimeManagerRaw.(string)
-			if !ok {
-				return nil, fmt.Errorf("invalid 'inputs.%d.runtime', expected a string, not a %T", idx, runtimeManagerRaw)
-			}
-			runtimeManagerVal := RuntimeManager(runtimeManagerStr)
-			switch runtimeManagerVal {
-			case OtelRuntimeManager, ProcessRuntimeManager:
-			default:
-				return nil, fmt.Errorf("invalid 'inputs.%d.runtime', valid values are: %s, %s", idx, OtelRuntimeManager, ProcessRuntimeManager)
-			}
-			runtimeManager = runtimeManagerVal
-			delete(input, runtimeManagerKey)
-		}
-
-		// Inject the top level fleet policy revision into each input configuration. This
-		// allows individual inputs (like endpoint) to detect policy changes more easily.
-		injectInputPolicyID(policy, input)
-
-		output.inputs[t] = append(output.inputs[t], inputI{
-			idx:            idx,
-			id:             id,
-			enabled:        enabled,
-			logLevel:       logLevel,
-			inputType:      t,
-			config:         input,
-			runtimeManager: runtimeManager,
-		})
-	}
 	if len(outputsMap) == 0 {
 		return nil, nil
 	}
@@ -743,7 +782,8 @@ type outputI struct {
 	config map[string]interface{}
 
 	// inputs directed at this output, keyed by canonical (non-alias) type.
-	inputs map[string][]inputI
+	inputs           map[string][]inputI
+	unrenderedInputs map[string][]inputI
 }
 
 // varsForPlatform sets the runtime variables that are available in the

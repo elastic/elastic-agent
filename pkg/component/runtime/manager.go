@@ -757,12 +757,26 @@ func (m *Manager) update(model component.Model, teardown bool) error {
 		existing, ok := m.current[comp.ID]
 		m.currentMx.RUnlock()
 		if ok {
-			// existing component; send runtime updated value
-			existing.setCurrent(comp)
-			if err := existing.runtime.Update(comp); err != nil {
-				return fmt.Errorf("failed to update component %s: %w", comp.ID, err)
+			// existing component;
+			_, isFailed := existing.runtime.(*failedRuntime)
+			if isFailed && comp.Err == nil {
+				// previously failed component, but now is not in failed state; recreate it
+				// sTODO: Change to Debugf after testing
+				m.logger.Infof("----- Existing component %s has a failed runtime, but the updated model has no error; recreating runtime", comp.ID)
+				touched[comp.ID] = false
+			} else if !isFailed && comp.Err != nil {
+				// component now in failed state; stop existing runtime and recreate as failed
+				// sTODO: Change to Debugf after testing
+				m.logger.Infof("----- Existing component %s is not in a failed state, but the updated model has an error; recreating as failed runtime", comp.ID)
+				touched[comp.ID] = false
+			} else {
+				//send runtime updated value
+				existing.setCurrent(comp)
+				if err := existing.runtime.Update(comp); err != nil {
+					return fmt.Errorf("failed to update component %s: %w", comp.ID, err)
+				}
+				continue
 			}
-			continue
 		}
 		newComponents = append(newComponents, comp)
 	}
