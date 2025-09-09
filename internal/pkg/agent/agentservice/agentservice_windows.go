@@ -166,7 +166,7 @@ loop:
 	// as the windows/svc package will transition the service to STOPPED state
 	// once this function returns.
 	<-m.done
-	logp.L().Debug("windows service state changed to svc.Stopped")
+	logp.L().Debug("windows service state changing to svc.Stopped")
 	return ssec, errno
 }
 
