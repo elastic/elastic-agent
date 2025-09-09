@@ -3,4 +3,6 @@ set -euo pipefail
 
 source .buildkite/scripts/steps/ess.sh
 
-ess_down
+ESS_REGION="${ESS_REGION:-gcp-us-west2}"
+
+ess_down "$ESS_REGION"
