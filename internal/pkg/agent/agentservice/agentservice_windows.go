@@ -162,7 +162,7 @@ loop:
 	logp.L().Info("changed windows service state to svc.StopPending, invoking stopCallback")
 	m.stopCallback()
 
-	// Block until notifyWindowsServiceStopped below is called. This is required
+	// Block until NotifyTermination below is called. This is required
 	// as the windows/svc package will transition the service to STOPPED state
 	// once this function returns.
 	<-m.done
