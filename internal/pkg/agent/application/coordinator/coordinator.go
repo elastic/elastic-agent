@@ -568,19 +568,150 @@ func (c *Coordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ..
 	c.reexecMgr.ReExec(callback, argOverrides...)
 }
 
-// Upgrade runs the upgrade process.
-// Called from external goroutines.
-func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) error {
-	// early check outside of upgrader before overriding the state
-	if !c.upgradeMgr.Upgradeable() {
-		return ErrNotUpgradable
+<<<<<<< HEAD
+=======
+// Migrate migrates agent to a new cluster and ACKs success to the old one.
+// In case of failure no ack is performed and error is returned.
+func (c *Coordinator) Migrate(ctx context.Context, action *fleetapi.ActionMigrate, backoffFactory func(done <-chan struct{}) backoff.Backoff) error {
+	if !c.isManaged {
+		return ErrNotManaged
 	}
 
-	// early check capabilities to ensure this upgrade actions is allowed
-	if c.caps != nil {
-		if !c.caps.AllowUpgrade(version, sourceURI) {
-			return ErrNotUpgradable
-		}
+	// check if agent is FS, fail if so
+	if c.isFleetServer() {
+		return ErrFleetServer
+	}
+
+	// Keeping all enrollment options that are not overridden via action
+	originalOptions, err := computeEnrollOptions(ctx, paths.ConfigFile(), paths.AgentConfigFile())
+	if err != nil {
+		return fmt.Errorf("failed to compute enroll options: %w", err)
+	}
+
+	persistentConfig, err := enroll.LoadPersistentConfig(paths.ConfigFile())
+	if err != nil {
+		return err
+	}
+
+	// merge with options coming from action
+	options, err := enroll.MergeOptionsWithMigrateAction(action, originalOptions)
+	if err != nil {
+		return fmt.Errorf("failed to merge options with migrate action: %w", err)
+	}
+
+	newRemoteConfig, err := options.RemoteConfig(true)
+	if err != nil {
+		return fmt.Errorf("failed to construct new remote config: %w", err)
+	}
+	newFleetClient, err := fleetapiClient.NewAuthWithConfig(
+		c.logger, options.EnrollAPIKey, newRemoteConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create new fleet client: %w", err)
+	}
+
+	// Target is checked prior to enroll
+	if err := fleetapiClient.CheckRemote(ctx, newFleetClient); err != nil {
+		return err
+	}
+
+	// Backing up config
+	if err := backupConfig(); err != nil {
+		return err
+	}
+
+	encStore, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile())
+	if err != nil {
+		return fmt.Errorf("failed to create encrypted disk store: %w", err)
+	}
+	store := storage.NewReplaceOnSuccessStore(
+		paths.ConfigFile(),
+		info.DefaultAgentFleetConfig,
+		encStore,
+	)
+
+	// Agent enrolls to target cluster
+	err = enroll.EnrollWithBackoff(ctx, c.logger,
+		persistentConfig,
+		enrollDelay,
+		options,
+		store,
+		backoffFactory,
+	)
+	if err != nil {
+		restoreErr := RestoreConfig()
+		return errors.Join(fmt.Errorf("failed to enroll: %w", err), restoreErr)
+	}
+
+	// ACK success to source fleet server
+	if err := c.ackMigration(ctx, action, c.fleetAcker); err != nil {
+		c.logger.Warnf("failed to ACK success: %v", err)
+	}
+
+	if err := cleanBackupConfig(); err != nil {
+		// when backup is present, it will be restored on next start.
+		// do not ack success
+		return fmt.Errorf("failed to clean backup config: %w", err)
+	}
+
+	originalRemoteConfig, err := originalOptions.RemoteConfig(false)
+	if err != nil {
+		return fmt.Errorf("failed to construct original remote config: %w", err)
+	}
+
+	originalClient, err := fleetapiClient.NewAuthWithConfig(
+		c.logger, originalOptions.EnrollAPIKey, originalRemoteConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create original fleet client: %w", err)
+	}
+
+	// Best effort: call unenroll on source cluster once done
+	if err := c.unenroll(ctx, originalClient); err != nil {
+		c.logger.Warnf("failed to unenroll from original cluster: %v", err)
+	}
+
+	return nil
+}
+
+type upgradeOpts struct {
+	skipVerifyOverride bool
+	skipDefaultPgp     bool
+	pgpBytes           []string
+	preUpgradeCallback func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error
+}
+
+type UpgradeOpt func(*upgradeOpts)
+
+func WithSkipVerifyOverride(skipVerifyOverride bool) UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.skipVerifyOverride = skipVerifyOverride
+	}
+}
+
+func WithSkipDefaultPgp(skipDefaultPgp bool) UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.skipDefaultPgp = skipDefaultPgp
+	}
+}
+
+func WithPgpBytes(pgpBytes []string) UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.pgpBytes = pgpBytes
+	}
+}
+
+func WithPreUpgradeCallback(preUpgradeCallback func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error) UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.preUpgradeCallback = preUpgradeCallback
+	}
+}
+
+>>>>>>> bb98f2a12 (fix: send upgrade action to units before adding it to bkgActions (#9634))
+// Upgrade runs the upgrade process.
+// Called from external goroutines.
+func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, opts ...UpgradeOpt) error {
+	var uOpts upgradeOpts
+	for _, opt := range opts {
+		opt(&uOpts)
 	}
 
 	// A previous upgrade may be cancelled and needs some time to
@@ -610,7 +741,29 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	det := details.NewDetails(version, details.StateRequested, actionID)
 	det.RegisterObserver(c.SetUpgradeDetails)
 
-	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+	// early check outside of upgrader before overriding the state
+	if !c.upgradeMgr.Upgradeable() {
+		det.Fail(ErrNotUpgradable)
+		return ErrNotUpgradable
+	}
+
+	// early check capabilities to ensure this upgrade actions is allowed
+	if c.caps != nil {
+		if !c.caps.AllowUpgrade(version, sourceURI) {
+			det.Fail(ErrNotUpgradable)
+			return ErrNotUpgradable
+		}
+	}
+
+	// run any pre upgrade callback
+	if uOpts.preUpgradeCallback != nil {
+		if err := uOpts.preUpgradeCallback(ctx, c.logger, action); err != nil {
+			det.Fail(err)
+			return err
+		}
+	}
+
+	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, uOpts.skipVerifyOverride, uOpts.skipDefaultPgp, uOpts.pgpBytes...)
 	if err != nil {
 		c.ClearOverrideState()
 		if errors.Is(err, upgrade.ErrUpgradeSameVersion) {
