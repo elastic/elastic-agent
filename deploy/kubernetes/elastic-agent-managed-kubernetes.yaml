@@ -24,10 +24,10 @@ spec:
           effect: NoSchedule
       serviceAccountName: elastic-agent
       hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
       # The following setting is needed for Universal Profiling to allow to set procMount to "Unmasked".
       # If you are using the Universal Profiling integration, please uncomment the following line before applying.
       # hostUsers: false
+      dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: elastic-agent
           image: docker.elastic.co/elastic-agent/elastic-agent:9.2.0
