@@ -568,19 +568,45 @@ func (c *Coordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ..
 	c.reexecMgr.ReExec(callback, argOverrides...)
 }
 
+type upgradeOpts struct {
+	skipVerifyOverride bool
+	skipDefaultPgp     bool
+	pgpBytes           []string
+	preUpgradeCallback func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error
+}
+
+type UpgradeOpt func(*upgradeOpts)
+
+func WithSkipVerifyOverride(skipVerifyOverride bool) UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.skipVerifyOverride = skipVerifyOverride
+	}
+}
+
+func WithSkipDefaultPgp(skipDefaultPgp bool) UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.skipDefaultPgp = skipDefaultPgp
+	}
+}
+
+func WithPgpBytes(pgpBytes []string) UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.pgpBytes = pgpBytes
+	}
+}
+
+func WithPreUpgradeCallback(preUpgradeCallback func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error) UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.preUpgradeCallback = preUpgradeCallback
+	}
+}
+
 // Upgrade runs the upgrade process.
 // Called from external goroutines.
-func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) error {
-	// early check outside of upgrader before overriding the state
-	if !c.upgradeMgr.Upgradeable() {
-		return ErrNotUpgradable
-	}
-
-	// early check capabilities to ensure this upgrade actions is allowed
-	if c.caps != nil {
-		if !c.caps.AllowUpgrade(version, sourceURI) {
-			return ErrNotUpgradable
-		}
+func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, opts ...UpgradeOpt) error {
+	var uOpts upgradeOpts
+	for _, opt := range opts {
+		opt(&uOpts)
 	}
 
 	// A previous upgrade may be cancelled and needs some time to
@@ -610,7 +636,29 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	det := details.NewDetails(version, details.StateRequested, actionID)
 	det.RegisterObserver(c.SetUpgradeDetails)
 
-	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+	// early check outside of upgrader before overriding the state
+	if !c.upgradeMgr.Upgradeable() {
+		det.Fail(ErrNotUpgradable)
+		return ErrNotUpgradable
+	}
+
+	// early check capabilities to ensure this upgrade actions is allowed
+	if c.caps != nil {
+		if !c.caps.AllowUpgrade(version, sourceURI) {
+			det.Fail(ErrNotUpgradable)
+			return ErrNotUpgradable
+		}
+	}
+
+	// run any pre upgrade callback
+	if uOpts.preUpgradeCallback != nil {
+		if err := uOpts.preUpgradeCallback(ctx, c.logger, action); err != nil {
+			det.Fail(err)
+			return err
+		}
+	}
+
+	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, uOpts.skipVerifyOverride, uOpts.skipDefaultPgp, uOpts.pgpBytes...)
 	if err != nil {
 		c.ClearOverrideState()
 		if errors.Is(err, upgrade.ErrUpgradeSameVersion) {
