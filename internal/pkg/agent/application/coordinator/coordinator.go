@@ -748,7 +748,8 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	var err error
 	for i := 0; i < 5; i++ {
 		s := c.State()
-		if s.State != agentclient.Upgrading {
+		// if we are not already upgrading or if the incoming is a rollback request we can continue processing
+		if s.State != agentclient.Upgrading || uOpts.rollback {
 			err = nil
 			break
 		}

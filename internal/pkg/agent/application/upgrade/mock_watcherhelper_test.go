@@ -31,9 +31,16 @@ func (_m *MockWatcherHelper) EXPECT() *MockWatcherHelper_Expecter {
 	return &MockWatcherHelper_Expecter{mock: &_m.Mock}
 }
 
-// InvokeWatcher provides a mock function with given fields: log, agentExecutable
-func (_m *MockWatcherHelper) InvokeWatcher(log *logp.Logger, agentExecutable string) (*exec.Cmd, error) {
-	ret := _m.Called(log, agentExecutable)
+// InvokeWatcher provides a mock function with given fields: log, agentExecutable, additionalWatchArgs
+func (_m *MockWatcherHelper) InvokeWatcher(log *logp.Logger, agentExecutable string, additionalWatchArgs ...string) (*exec.Cmd, error) {
+	_va := make([]interface{}, len(additionalWatchArgs))
+	for _i := range additionalWatchArgs {
+		_va[_i] = additionalWatchArgs[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, log, agentExecutable)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
 		panic("no return value specified for InvokeWatcher")
@@ -41,19 +48,19 @@ func (_m *MockWatcherHelper) InvokeWatcher(log *logp.Logger, agentExecutable str
 
 	var r0 *exec.Cmd
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*logp.Logger, string) (*exec.Cmd, error)); ok {
-		return rf(log, agentExecutable)
+	if rf, ok := ret.Get(0).(func(*logp.Logger, string, ...string) (*exec.Cmd, error)); ok {
+		return rf(log, agentExecutable, additionalWatchArgs...)
 	}
-	if rf, ok := ret.Get(0).(func(*logp.Logger, string) *exec.Cmd); ok {
-		r0 = rf(log, agentExecutable)
+	if rf, ok := ret.Get(0).(func(*logp.Logger, string, ...string) *exec.Cmd); ok {
+		r0 = rf(log, agentExecutable, additionalWatchArgs...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*exec.Cmd)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*logp.Logger, string) error); ok {
-		r1 = rf(log, agentExecutable)
+	if rf, ok := ret.Get(1).(func(*logp.Logger, string, ...string) error); ok {
+		r1 = rf(log, agentExecutable, additionalWatchArgs...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -69,13 +76,21 @@ type MockWatcherHelper_InvokeWatcher_Call struct {
 // InvokeWatcher is a helper method to define mock.On call
 //   - log *logp.Logger
 //   - agentExecutable string
-func (_e *MockWatcherHelper_Expecter) InvokeWatcher(log interface{}, agentExecutable interface{}) *MockWatcherHelper_InvokeWatcher_Call {
-	return &MockWatcherHelper_InvokeWatcher_Call{Call: _e.mock.On("InvokeWatcher", log, agentExecutable)}
+//   - additionalWatchArgs ...string
+func (_e *MockWatcherHelper_Expecter) InvokeWatcher(log interface{}, agentExecutable interface{}, additionalWatchArgs ...interface{}) *MockWatcherHelper_InvokeWatcher_Call {
+	return &MockWatcherHelper_InvokeWatcher_Call{Call: _e.mock.On("InvokeWatcher",
+		append([]interface{}{log, agentExecutable}, additionalWatchArgs...)...)}
 }
 
-func (_c *MockWatcherHelper_InvokeWatcher_Call) Run(run func(log *logp.Logger, agentExecutable string)) *MockWatcherHelper_InvokeWatcher_Call {
+func (_c *MockWatcherHelper_InvokeWatcher_Call) Run(run func(log *logp.Logger, agentExecutable string, additionalWatchArgs ...string)) *MockWatcherHelper_InvokeWatcher_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*logp.Logger), args[1].(string))
+		variadicArgs := make([]string, len(args)-2)
+		for i, a := range args[2:] {
+			if a != nil {
+				variadicArgs[i] = a.(string)
+			}
+		}
+		run(args[0].(*logp.Logger), args[1].(string), variadicArgs...)
 	})
 	return _c
 }
@@ -85,7 +100,7 @@ func (_c *MockWatcherHelper_InvokeWatcher_Call) Return(_a0 *exec.Cmd, _a1 error)
 	return _c
 }
 
-func (_c *MockWatcherHelper_InvokeWatcher_Call) RunAndReturn(run func(*logp.Logger, string) (*exec.Cmd, error)) *MockWatcherHelper_InvokeWatcher_Call {
+func (_c *MockWatcherHelper_InvokeWatcher_Call) RunAndReturn(run func(*logp.Logger, string, ...string) (*exec.Cmd, error)) *MockWatcherHelper_InvokeWatcher_Call {
 	_c.Call.Return(run)
 	return _c
 }

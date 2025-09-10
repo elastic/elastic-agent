@@ -35,7 +35,17 @@ const (
 	watcherName     = "elastic-agent-watcher"
 	watcherLockFile = "watcher.lock"
 
+	// flag names
+	takedownFlagName      = "takedown"
+	takedownFlagShorthand = "t"
+
+	rollbackFlagName      = "rollback"
+	rollbackFlagShorthand = "r"
+
+	// error exit codes
 	errorSettingParentSignalsExitCode = 6
+	errorRollbackToValue              = 7
+	errorRollbackFailed               = 8
 )
 
 // watcherPIDsFetcher defines the type of function responsible for fetching watcher PIDs.
@@ -66,7 +76,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 				os.Exit(errorSettingParentSignalsExitCode)
 			}
 
-			takedown, _ := c.Flags().GetBool("takedown")
+			takedown, _ := c.Flags().GetBool(takedownFlagName)
 			if takedown {
 				err = takedownWatcher(context.Background(), log, utils.GetWatcherPIDs)
 				if err != nil {
@@ -76,15 +86,35 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 				return
 			}
 
-			if err := watchCmd(log, paths.Top(), cfg.Settings.Upgrade.Watcher, new(upgradeAgentWatcher), new(upgradeInstallationModifier)); err != nil {
+			if c.Flags().Changed(rollbackFlagName) {
+				// rollback-to has been specified on command line
+				rollbackTo, _ := c.Flags().GetString(rollbackFlagName)
+				if rollbackTo == "" {
+					fmt.Fprintf(streams.Err, "%s flag value cannot be empty", rollbackFlagName)
+					os.Exit(errorRollbackToValue)
+				}
+				if err = withAppLocker(log, func() error {
+					return rollback(log, paths.Top(), client.New(), new(upgradeInstallationModifier), rollbackTo)
+				}); err != nil {
+					log.Errorw("Rollback command failed", "error.message", err)
+					fmt.Fprintf(streams.Err, "Rollback command failed: %v\n", err)
+					os.Exit(errorRollbackFailed)
+				}
+			}
+
+			if err = withAppLocker(log, func() error {
+				return watchCmd(log, paths.Top(), cfg.Settings.Upgrade.Watcher, new(upgradeAgentWatcher), new(upgradeInstallationModifier))
+			}); err != nil {
 				log.Errorw("Watch command failed", "error.message", err)
 				fmt.Fprintf(streams.Err, "Watch command failed: %v\n%s\n", err, troubleshootMessage())
 				os.Exit(4)
 			}
 		},
 	}
-	cmd.Flags().BoolP("takedown", "t", false, "Take down the running watcher")
-	cmd.Flags().MarkHidden("takedown") //nolint:errcheck // not required
+	cmd.Flags().BoolP(takedownFlagName, takedownFlagShorthand, false, "Take down the running watcher")
+	cmd.Flags().MarkHidden(takedownFlagName) //nolint:errcheck // not required
+	cmd.Flags().StringP(rollbackFlagName, rollbackFlagShorthand, "", "Versioned home to roll back to")
+	cmd.Flags().MarkHidden(rollbackFlagName)
 	return cmd
 }
 
@@ -92,11 +122,45 @@ type agentWatcher interface {
 	Watch(ctx context.Context, tilGrace, errorCheckInterval time.Duration, log *logp.Logger) error
 }
 
-type rollbackHook func(ctx context.Context, log *logger.Logger, topDirPath string) error
+func WithPreRestartHook(preRestartHook upgrade.RollbackHook) upgrade.RollbackOption {
+	return func(ros upgrade.RollbackOptionSetter) {
+		ros.SetPreRestartHook(preRestartHook)
+	}
+}
+
+func WithSkipCleanup(skipCleanup bool) upgrade.RollbackOption {
+	return func(ros upgrade.RollbackOptionSetter) {
+		ros.SetSkipCleanup(skipCleanup)
+	}
+}
+
+func WithSkipRestart(skipRestart bool) upgrade.RollbackOption {
+	return func(ros upgrade.RollbackOptionSetter) {
+		ros.SetSkipRestart(skipRestart)
+	}
+}
 
 type installationModifier interface {
 	Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool) error
-	Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string, preRestart rollbackHook) error
+	Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string, opts ...upgrade.RollbackOption) error
+}
+
+func withAppLocker(log *logp.Logger, f func() error) error {
+	locker := filelock.NewAppLocker(paths.Top(), watcherLockFile)
+	if err := locker.TryLock(); err != nil {
+		if errors.Is(err, filelock.ErrAppAlreadyRunning) {
+			log.Info("exiting, lock already exists")
+			return nil
+		}
+
+		log.Error("failed to acquire lock", err)
+		return err
+	}
+	defer func() {
+		_ = locker.Unlock()
+	}()
+
+	return f()
 }
 
 func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcherConfig, watcher agentWatcher, installModifier installationModifier) error {
@@ -114,47 +178,6 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	}
 
 	log.With("marker", marker, "details", marker.Details).Info("Loaded update marker")
-	locker := filelock.NewAppLocker(paths.Top(), watcherLockFile)
-	if err := locker.TryLock(); err != nil {
-		if errors.Is(err, filelock.ErrAppAlreadyRunning) {
-			log.Info("exiting, lock already exists")
-			return nil
-		}
-
-		log.Error("failed to acquire lock", err)
-		return err
-	}
-	defer func() {
-		_ = locker.Unlock()
-	}()
-
-	if marker.DesiredOutcome == upgrade.OUTCOME_ROLLBACK && marker.Details != nil && marker.Details.State != details.StateRollback {
-		// TODO: there should be some sanity check in rollback functions like the installation we are going back to should exist and work
-		log.Infof("rolling back because of DesiredOutcome=%s", marker.DesiredOutcome.String())
-
-		updateMarkerAndDetails := func(_ context.Context, _ *logger.Logger, _ string) error {
-			if marker.Details == nil {
-				actionID := ""
-				if marker.Action != nil {
-					actionID = marker.Action.ActionID
-				}
-				marker.Details = details.NewDetails(marker.Version, details.StateRollback, actionID)
-			}
-			marker.Details.SetStateWithReason(details.StateRollback, details.ReasonManualRollback)
-			err = upgrade.SaveMarker(dataDir, marker, true)
-			if err != nil {
-				return fmt.Errorf("saving marker after rolling back: %w", err)
-			}
-			return nil
-		}
-
-		err = installModifier.Rollback(context.Background(), log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash, updateMarkerAndDetails)
-		if err != nil {
-			return fmt.Errorf("rolling back: %w", err)
-		}
-
-		return nil
-	}
 
 	isWithinGrace, tilGrace := gracePeriod(marker, cfg.GracePeriod)
 	if isTerminalState(marker) || !isWithinGrace {
@@ -192,7 +215,7 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		log.Error("Error detected, proceeding to rollback: %v", err)
 
 		upgradeDetails.SetStateWithReason(details.StateRollback, details.ReasonWatchFailed)
-		err = installModifier.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash, nil)
+		err = installModifier.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash)
 		if err != nil {
 			log.Error("rollback failed", err)
 			upgradeDetails.Fail(err)
@@ -215,6 +238,50 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		log.Error("cleanup after successful watch failed", err)
 	}
 	return err
+}
+
+func rollback(log *logp.Logger, topDir string, client client.Client, installModifier installationModifier, versionedHome string) error {
+	// TODO: there should be some sanity check in rollback functions like the installation we are going back to should exist and work
+	log.Infof("rolling back to %s", versionedHome)
+	dataDir := paths.DataFrom(topDir)
+	marker, err := upgrade.LoadMarker(dataDir)
+	if err != nil {
+		log.Error("failed to load marker", err)
+		return err
+	}
+	if marker == nil {
+		// no marker found we're not in upgrade process, recreate one marker to track the rollback
+		marker = &upgrade.UpdateMarker{}
+		log.Info("No update marker found, recreating an empty one to track the rollback")
+	} else {
+		log.With("marker", marker, "details", marker.Details).Info("Loaded update marker")
+	}
+
+	updateMarkerAndDetails := func(_ context.Context, _ *logger.Logger, _ string) error {
+		if marker.Details == nil {
+			actionID := ""
+			if marker.Action != nil {
+				actionID = marker.Action.ActionID
+			}
+			marker.Details = details.NewDetails(marker.Version, details.StateRollback, actionID)
+		}
+		marker.Details.SetStateWithReason(details.StateRollback, details.ReasonManualRollback)
+		err = upgrade.SaveMarker(dataDir, marker, true)
+		if err != nil {
+			return fmt.Errorf("saving marker after rolling back: %w", err)
+		}
+		return nil
+	}
+
+	// FIXME get the hash from the list of installs or the manifest or the versioned home
+	// This is only a placeholder in case there is no versionedHome defined (which we always have)
+	hash := ""
+	err = installModifier.Rollback(context.Background(), log, client, topDir, versionedHome, hash, WithPreRestartHook(updateMarkerAndDetails))
+	if err != nil {
+		return fmt.Errorf("rolling back: %w", err)
+	}
+
+	return nil
 }
 
 // isTerminalState returns true if the state in the upgrade marker contains details and the upgrade details state is a

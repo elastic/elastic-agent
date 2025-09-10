@@ -512,6 +512,6 @@ func createUpdateMarker(t *testing.T, log *logger.Logger, topDir, newAgentVersio
 		time.Now(),
 		newAgentInstall,
 		oldAgentInstall,
-		nil, nil, OUTCOME_UPGRADE, 0)
+		nil, nil, 0)
 	require.NoError(t, err, "error writing fake update marker")
 }
