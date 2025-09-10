@@ -331,14 +331,19 @@ func (b GolangCrossBuilder) Build() error {
 		hostDir := filepath.Join(build.Default.GOPATH, "pkg", "mod")
 		args = append(args, "-v", hostDir+":/go/pkg/mod:ro")
 	}
-	// Mount the go build cache into the container.
-	out, err := exec.Command("go", "env", "GOCACHE").Output()
-	if err != nil {
-		return fmt.Errorf("failed to get GOCACHE: %w", err)
+
+	buildCacheLocation := "/tmp/.cache/go-build"
+	if CrossBuildMountBuildCache {
+		// Mount the go build cache into the container.
+		out, err := exec.Command("go", "env", "GOCACHE").Output()
+		if err != nil {
+			return fmt.Errorf("failed to get GOCACHE: %w", err)
+		}
+		cacheDir := strings.TrimSpace(string(out))
+		args = append(args,
+			"-v", fmt.Sprintf("%s:%s", cacheDir, buildCacheLocation),
+		)
 	}
-	cacheDir := strings.TrimSpace(string(out))
-	buildCacheMountPoint := "/tmp/.cache/go-build"
-	args = append(args, "-v", fmt.Sprintf("%s:%s", cacheDir, buildCacheMountPoint))
 
 	// Mount /opt/git-mirrors (if present) to resolve git alternates in CI
 	if _, err := os.Stat("/opt/git-mirrors"); err == nil {
@@ -356,7 +361,7 @@ func (b GolangCrossBuilder) Build() error {
 	args = append(args,
 		"--rm",
 		"--env", "GOFLAGS=-mod=readonly",
-		"--env", fmt.Sprintf("GOCACHE=%s", buildCacheMountPoint),
+		"--env", fmt.Sprintf("GOCACHE=%s", buildCacheLocation), // ensure this is writable by the user
 		"--env", "MAGEFILE_VERBOSE="+verbose,
 		"--env", "MAGEFILE_TIMEOUT="+EnvOr("MAGEFILE_TIMEOUT", ""),
 		"--env", fmt.Sprintf("SNAPSHOT=%v", Snapshot),
