@@ -162,17 +162,18 @@ func initGlobals() {
 
 	versionQualifier, versionQualified = os.LookupEnv("VERSION_QUALIFIER")
 
-	agentPackageVersion = EnvOr(agentPackageVersionEnvVar, "")
-
-	ManifestURL = EnvOr(ManifestUrlEnvVar, "")
-	PackagingFromManifest = ManifestURL != ""
-
 	// order matters this must be called last as it will override some of the
 	// values above
 	err = initPackageVersion()
 	if err != nil {
 		panic(fmt.Errorf("failed to init package version: %w", err))
 	}
+
+	agentPackageVersion = EnvOr(agentPackageVersionEnvVar, agentPackageVersion)
+
+	ManifestURL = EnvOr(ManifestUrlEnvVar, ManifestURL)
+	PackagingFromManifest = ManifestURL != ""
+
 }
 
 // ProjectType specifies the type of project (OSS vs X-Pack).
