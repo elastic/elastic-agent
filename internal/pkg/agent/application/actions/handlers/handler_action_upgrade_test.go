@@ -495,6 +495,8 @@ func TestEndpointPreUpgradeCallback(t *testing.T) {
 				t.Fatal("mockCoordinator.Upgrade was not called in time")
 			}
 
+			// notifyUnitsOfProxiedActionFn should only ever be passed as a PreUpgradeCallback to the coordinator upgrader.
+			// This assertion guards against it being called directly in this context.
 			assert.False(t, notifyUnitsCalled.Load(), "notifyUnitsOfProxiedActionFn should not be called")
 
 			assert.Eventually(t, func() bool {
