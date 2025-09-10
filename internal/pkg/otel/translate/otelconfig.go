@@ -477,7 +477,7 @@ func BeatDataPath(componentId string) string {
 // getBeatsAuthExtensionConfig sets following http parameters on beatsauth
 // currently this is only supported for elasticsearch output
 func getBeatsAuthExtensionConfig(cfg *config.C) (map[string]any, error) {
-	sslConfig := elasticsearch.ESDefaultTransportSettings()
+	defaultTransportSettings := elasticsearch.ESDefaultTransportSettings()
 	err := cfg.Unpack(&sslConfig)
 	if err != nil {
 		return nil, err
