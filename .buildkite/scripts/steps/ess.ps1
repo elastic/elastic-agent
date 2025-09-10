@@ -38,7 +38,14 @@ function ess_up {
   Pop-Location
 }
 
+<<<<<<< HEAD
 function ess_down {  
+=======
+function ess_down {
+  param (
+      [string]$EssRegion = "gcp-us-west2"
+  )
+>>>>>>> 6918b7b07 (fix: ESS stack clean up steps (#9832))
   $Workspace = & git rev-parse --show-toplevel
   $TfDir = Join-Path -Path $Workspace -ChildPath "test_infra/ess/"
   $stateFilePath = Join-Path -Path $TfDir -ChildPath "terraform.tfstate"
@@ -51,7 +58,8 @@ function ess_down {
   try {
     Push-Location -Path $TfDir
     & terraform init
-    & terraform destroy -auto-approve
+    & terraform destroy -auto-approve `
+      -var="ess_region=$EssRegion"
     Pop-Location
   } catch {
     Write-Output "Error: Failed to destroy ESS stack(it will be auto-deleted later): $_"

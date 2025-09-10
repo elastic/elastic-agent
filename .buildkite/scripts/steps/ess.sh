@@ -39,13 +39,15 @@ function ess_up() {
 }
 
 function ess_down() {
-  echo "~~~ Tearing down the ESS Stack"  
+  echo "~~~ Tearing down the ESS Stack"
+  local ESS_REGION=${1:-"gcp-us-west2"}
   local WORKSPACE=$(git rev-parse --show-toplevel)
   local TF_DIR="${WORKSPACE}/test_infra/ess/"
   
   pushd "${TF_DIR}"
   terraform init
-  terraform destroy -auto-approve
+  terraform destroy -auto-approve \
+    -var="ess_region=${ESS_REGION}"
   popd
 }
 
