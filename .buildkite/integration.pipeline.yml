@@ -119,7 +119,7 @@ steps:
             limit: 1
         agents:
           provider: "aws"
-          machineType: "c6g.4xlarge"
+          instanceType: "c6g.4xlarge"
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
       - label: "Packaging: Containers linux/amd64"
