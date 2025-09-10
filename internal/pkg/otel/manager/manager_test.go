@@ -290,14 +290,16 @@ func TestOTelManager_Run(t *testing.T) {
 
 	for _, tc := range []struct {
 		name                string
-		exec                *testExecution
+		exec                func() (collectorExecution, error)
 		restarter           collectorRecoveryTimer
 		skipListeningErrors bool
 		testFn              func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution)
 	}{
 		{
-			name:      "embedded collector config updates",
-			exec:      &testExecution{exec: newExecutionEmbedded()},
+			name: "embedded collector config updates",
+			exec: func() (collectorExecution, error) {
+				return newExecutionEmbedded(), nil
+			},
 			restarter: newRestarterNoop(),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
 				// ensure that it got healthy
@@ -319,8 +321,10 @@ func TestOTelManager_Run(t *testing.T) {
 			},
 		},
 		{
-			name:      "subprocess collector config updates",
-			exec:      &testExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
+			name: "subprocess collector config updates",
+			exec: func() (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary)
+			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
 				// ensure that it got healthy
@@ -343,8 +347,10 @@ func TestOTelManager_Run(t *testing.T) {
 			},
 		},
 		{
-			name:      "embedded collector stopped gracefully outside manager",
-			exec:      &testExecution{exec: newExecutionEmbedded()},
+			name: "embedded collector stopped gracefully outside manager",
+			exec: func() (collectorExecution, error) {
+				return newExecutionEmbedded(), nil
+			},
 			restarter: newRestarterNoop(),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
 				// ensure that it got healthy
@@ -367,8 +373,10 @@ func TestOTelManager_Run(t *testing.T) {
 			},
 		},
 		{
-			name:      "subprocess collector stopped gracefully outside manager",
-			exec:      &testExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
+			name: "subprocess collector stopped gracefully outside manager",
+			exec: func() (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary)
+			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
 				// ensure that it got healthy
@@ -393,8 +401,10 @@ func TestOTelManager_Run(t *testing.T) {
 			},
 		},
 		{
-			name:      "subprocess collector killed outside manager",
-			exec:      &testExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
+			name: "subprocess collector killed outside manager",
+			exec: func() (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary)
+			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
 				// ensure that it got healthy
@@ -434,8 +444,10 @@ func TestOTelManager_Run(t *testing.T) {
 			},
 		},
 		{
-			name:      "subprocess collector panics",
-			exec:      &testExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
+			name: "subprocess collector panics",
+			exec: func() (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary)
+			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
 				err := os.Setenv("TEST_SUPERVISED_COLLECTOR_PANIC", (3 * time.Second).String())
@@ -468,8 +480,10 @@ func TestOTelManager_Run(t *testing.T) {
 			},
 		},
 		{
-			name:                "embedded collector invalid config",
-			exec:                &testExecution{exec: newExecutionEmbedded()},
+			name: "embedded collector invalid config",
+			exec: func() (collectorExecution, error) {
+				return newExecutionEmbedded(), nil
+			},
 			restarter:           newRestarterNoop(),
 			skipListeningErrors: true,
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
@@ -507,8 +521,10 @@ func TestOTelManager_Run(t *testing.T) {
 			},
 		},
 		{
-			name:                "subprocess collector invalid config",
-			exec:                &testExecution{exec: newSubprocessExecution(logp.DebugLevel, testBinary)},
+			name: "subprocess collector invalid config",
+			exec: func() (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary)
+			},
 			restarter:           newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			skipListeningErrors: true,
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
@@ -551,6 +567,11 @@ func TestOTelManager_Run(t *testing.T) {
 			defer cancel()
 			l, _ := loggertest.New("otel")
 			base, obs := loggertest.New("otel")
+
+			executionMode, err := tc.exec()
+			require.NoError(t, err, "failed to create execution mode")
+			testExecutionMode := &testExecution{exec: executionMode}
+
 			m := &OTelManager{
 				logger:            l,
 				baseLogger:        base,
@@ -560,7 +581,7 @@ func TestOTelManager_Run(t *testing.T) {
 				componentStateCh:  make(chan []runtime.ComponentComponentState, 1),
 				doneChan:          make(chan struct{}),
 				recoveryTimer:     tc.restarter,
-				execution:         tc.exec,
+				execution:         testExecutionMode,
 			}
 
 			eListener := &EventListener{}
@@ -593,7 +614,7 @@ func TestOTelManager_Run(t *testing.T) {
 				runErr = m.Run(ctx)
 			}()
 
-			tc.testFn(t, m, eListener, tc.exec)
+			tc.testFn(t, m, eListener, testExecutionMode)
 
 			cancel()
 			runWg.Wait()
