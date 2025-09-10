@@ -2,7 +2,12 @@ version: 9.0.2
 entries:
     - kind: bug-fix
       summary: Preserve agent run state on DEB and RPM upgrades
+<<<<<<< HEAD
       description: ""
+=======
+      description: |
+        Improves the upgrade process for Elastic Agent installed using DEB or RPM packages by copying the run directory from the previous installation into the new version's folder
+>>>>>>> 86fd0df04 ([docs] Add Markdown release notes (#9440))
       component: elastic-agent
       pr:
         - https://github.com/elastic/elastic-agent/pull/7999

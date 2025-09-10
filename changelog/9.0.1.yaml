@@ -4,7 +4,12 @@ entries:
       summary: Update OTel components to v0.121.0
       description: ""
       component: elastic-agent
+<<<<<<< HEAD
       pr: []
+=======
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7686
+>>>>>>> 86fd0df04 ([docs] Add Markdown release notes (#9440))
       issue: []
       timestamp: 1743783374
       file:
@@ -14,7 +19,12 @@ entries:
       summary: Add nopexporter to EDOT Collector
       description: ""
       component: elastic-agent
+<<<<<<< HEAD
       pr: []
+=======
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7788
+>>>>>>> 86fd0df04 ([docs] Add Markdown release notes (#9440))
       issue: []
       timestamp: 1744198660
       file:
@@ -36,7 +46,12 @@ entries:
       summary: Fix Managed OTLP Helm config to use current image repo.
       description: ""
       component: elastic-agent
+<<<<<<< HEAD
       pr: []
+=======
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7882
+>>>>>>> 86fd0df04 ([docs] Add Markdown release notes (#9440))
       issue: []
       timestamp: 1744839123
       file:
