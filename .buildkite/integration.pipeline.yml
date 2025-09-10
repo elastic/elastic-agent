@@ -120,7 +120,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
-          image: "${IMAGE_UBUNTU_2204_X86_64}"
+          image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
       - label: "Packaging: Containers linux/amd64"
         key: packaging-containers-x86-64
