@@ -1017,7 +1017,10 @@ func processorsForAgentHttpStream(namespace, dataset string, agentInfo info.Agen
 func processorsForCollectorPrometheusStream(namespace, dataset string, agentInfo info.Agent) []any {
 	return []interface{}{
 		addDataStreamFieldsProcessor(dataset, namespace),
+		addEventFieldsProcessor(dataset),
+		addElasticAgentFieldsProcessor(agentName, agentInfo),
 		addAgentFieldsProcessor(agentInfo.AgentID()),
+		addComponentFieldsProcessor(agentName, agentName),
 	}
 }
 
