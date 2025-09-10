@@ -11,6 +11,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -264,6 +265,22 @@ func (t *EventTime[T]) Time() time.Time {
 	return t.time
 }
 
+func countHealthCheckExtensionStatuses(status *status.AggregateStatus) uint {
+	extensions, ok := status.ComponentStatusMap["extensions"]
+	if !ok {
+		return 0
+	}
+
+	count := uint(0)
+	for key := range extensions.ComponentStatusMap {
+		if strings.HasPrefix(key, "extension:healthcheckv2/") {
+			count++
+		}
+	}
+
+	return count
+}
+
 func TestOTelManager_Run(t *testing.T) {
 	wd, erWd := os.Getwd()
 	require.NoError(t, erWd, "cannot get working directory")
@@ -365,6 +382,7 @@ func TestOTelManager_Run(t *testing.T) {
 				require.NotNil(t, exec.handle, "exec handle should not be nil")
 				exec.handle.Stop(t.Context())
 				e.EnsureHealthy(t, updateTime)
+				assert.EqualValues(t, 1, countHealthCheckExtensionStatuses(e.getStatus()), "health check extension status count should be 1")
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
@@ -384,6 +402,7 @@ func TestOTelManager_Run(t *testing.T) {
 				updateTime := time.Now()
 				m.Update(cfg, nil)
 				e.EnsureHealthy(t, updateTime)
+				assert.EqualValues(t, 1, countHealthCheckExtensionStatuses(e.getStatus()), "health check extension status count should be 1")
 
 				var oldPHandle *procHandle
 				// repeatedly kill the collector
@@ -401,6 +420,7 @@ func TestOTelManager_Run(t *testing.T) {
 					// the collector should restart and report healthy
 					updateTime = time.Now()
 					e.EnsureHealthy(t, updateTime)
+					assert.EqualValues(t, 1, countHealthCheckExtensionStatuses(e.getStatus()), "health check extension status count should be 1")
 				}
 
 				seenRecoveredTimes := m.recoveryRetries.Load()
