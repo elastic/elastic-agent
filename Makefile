@@ -16,7 +16,7 @@ mage:
 install-go-cache-plugin:
 	@echo Installing go-cache-plugin
 	go install github.com/tailscale/go-cache-plugin/cmd/go-cache-plugin@latest
-	@-go-cache-plugin help
+	@-go-cache-plugin version
 
 ## install-gotestsum : Install gotestsum
 .PHONY: install-gotestsum
