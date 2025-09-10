@@ -26,13 +26,12 @@ func TestDownloadFile(t *testing.T) {
 	var dRequest = downloadRequest{
 		URL: fmt.Sprintf("http://%s/some-file.txt",
 			s.Listener.Addr().String()),
-		DownloadPath: "",
+		TargetPath: filepath.Join(t.TempDir(), "some-file.txt"),
 	}
 
 	err := downloadFile(&dRequest)
 	assert.Nil(t, err)
-	assert.NotEmpty(t, dRequest.UnsanitizedFilePath)
-	defer os.Remove(filepath.Dir(dRequest.UnsanitizedFilePath))
+	assert.FileExistsf(t, dRequest.TargetPath, "file should exist")
 }
 
 func TestVerifyChecksum(t *testing.T) {
