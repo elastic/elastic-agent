@@ -118,8 +118,8 @@ steps:
           automatic:
             limit: 1
         agents:
-          provider: "gcp"
-          machineType: "n2-standard-8"
+          provider: "aws"
+          machineType: "c6g.4xlarge"
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
       - label: "Packaging: Containers linux/amd64"
