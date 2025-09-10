@@ -63,6 +63,8 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
+        plugins:
+          - *aws_oidc
         retry:
           automatic:
             limit: 1
@@ -83,6 +85,8 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
+        plugins:
+          - *aws_oidc
         retry:
           automatic:
             limit: 1
@@ -102,6 +106,8 @@ steps:
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
           diskSizeGb: 200
           instanceType: "m6g.xlarge"
+        plugins:
+          - *aws_oidc
         retry:
           automatic:
             limit: 1
@@ -161,6 +167,8 @@ steps:
         agents:
           provider: orka
           imagePrefix: generic-base-15-arm-002
+        plugins:
+          - *aws_oidc
         retry:
           automatic:
             limit: 1
@@ -179,6 +187,8 @@ steps:
         agents:
           provider: orka
           imagePrefix: generic-13-ventura-x64
+        plugins:
+          - *aws_oidc
         retry:
           automatic:
             limit: 1
