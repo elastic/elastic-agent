@@ -28,17 +28,17 @@ type Upgrade struct {
 	bkgCancel  context.CancelFunc
 	bkgMutex   sync.Mutex
 
-	tamperProtectionFn         func() bool                                                                                                                            // allows to inject the flag for tests, defaults to features.TamperProtection
-	notifyUnitsOfProxiedAction func(ctx context.Context, log *logp.Logger, action dispatchableAction, ucs []unitWithComponent, performAction performActionFunc) error // allows to inject the function for tests, defaults to notifyUnitsOfProxiedAction
+	tamperProtectionFn           func() bool                                                                                                                            // allows to inject the flag for tests, defaults to features.TamperProtection
+	notifyUnitsOfProxiedActionFn func(ctx context.Context, log *logp.Logger, action dispatchableAction, ucs []unitWithComponent, performAction performActionFunc) error // allows to inject the function for tests, defaults to notifyUnitsOfProxiedAction
 }
 
 // NewUpgrade creates a new Upgrade handler.
 func NewUpgrade(log *logger.Logger, coord upgradeCoordinator) *Upgrade {
 	return &Upgrade{
-		log:                        log,
-		coord:                      coord,
-		tamperProtectionFn:         features.TamperProtection,
-		notifyUnitsOfProxiedAction: notifyUnitsOfProxiedAction,
+		log:                          log,
+		coord:                        coord,
+		tamperProtectionFn:           features.TamperProtection,
+		notifyUnitsOfProxiedActionFn: notifyUnitsOfProxiedAction,
 	}
 }
 
@@ -69,7 +69,7 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 			h.log.Debugf("Found %d components running for %v action type", len(ucs), a.Type())
 			uOpts = append(uOpts, coordinator.WithPreUpgradeCallback(func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error {
 				log.Debugf("handlerUpgrade: proxy/dispatch action '%+v'", a)
-				err := h.notifyUnitsOfProxiedAction(ctx, log, action, ucs, h.coord.PerformAction)
+				err := h.notifyUnitsOfProxiedActionFn(ctx, log, action, ucs, h.coord.PerformAction)
 				log.Debugf("handlerUpgrade: after action dispatched '%+v', err: %v", a, err)
 				if err != nil {
 					return fmt.Errorf("failed to notify units of proxied action: %w", err)

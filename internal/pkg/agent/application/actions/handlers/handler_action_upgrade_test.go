@@ -472,7 +472,7 @@ func TestEndpointPreUpgradeCallback(t *testing.T) {
 			u.tamperProtectionFn = func() bool { return tc.shouldProxyToEndpoint }
 
 			notifyUnitsCalled := atomic.Bool{}
-			u.notifyUnitsOfProxiedAction = func(ctx context.Context, log *logp.Logger, action dispatchableAction, ucs []unitWithComponent, performAction performActionFunc) error {
+			u.notifyUnitsOfProxiedActionFn = func(ctx context.Context, log *logp.Logger, action dispatchableAction, ucs []unitWithComponent, performAction performActionFunc) error {
 				notifyUnitsCalled.Store(true)
 				return nil
 			}
@@ -495,7 +495,7 @@ func TestEndpointPreUpgradeCallback(t *testing.T) {
 				t.Fatal("mockCoordinator.Upgrade was not called in time")
 			}
 
-			assert.False(t, notifyUnitsCalled.Load(), "notifyUnitsOfProxiedAction should not be called")
+			assert.False(t, notifyUnitsCalled.Load(), "notifyUnitsOfProxiedActionFn should not be called")
 
 			assert.Eventually(t, func() bool {
 				u.bkgMutex.Lock()
