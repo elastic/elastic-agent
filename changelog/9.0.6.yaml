@@ -1,17 +1,13 @@
-version: 9.1.3
+version: 9.0.6
 entries:
     - kind: feature
       summary: Adjust the timeout for Elastic Defend check command
       description: ""
       component: ""
       pr:
-<<<<<<< HEAD
-=======
-        - https://github.com/elastic/elastic-agent/pull/9329
-        - https://github.com/elastic/elastic-agent/pull/9521
-        - https://github.com/elastic/elastic-agent/pull/9522
-        - https://github.com/elastic/elastic-agent/pull/9545
->>>>>>> 86fd0df04 ([docs] Add Markdown release notes (#9440))
+        - https://github.com/elastic/elastic-agent/pull/9523
+        - https://github.com/elastic/elastic-agent/pull/9524
+        - https://github.com/elastic/elastic-agent/pull/9542
         - https://github.com/elastic/elastic-agent/pull/9213
       issue: []
       timestamp: 1753950420
@@ -65,24 +61,6 @@ entries:
       file:
         name: 1755076749-fix-jitter-backoff-strategy-reset.yaml
         checksum: 1969a9a0221227c476f94e27a4ef3946b3853416
-    - kind: enhancement
-      summary: Update OTel components to v0.130.0
-      description: ""
-      component: elastic-agent
-      pr:
-        - https://github.com/elastic/elastic-agent/pull/9329
-<<<<<<< HEAD
-=======
-        - https://github.com/elastic/elastic-agent/pull/9521
-        - https://github.com/elastic/elastic-agent/pull/9522
-        - https://github.com/elastic/elastic-agent/pull/9545
-        - https://github.com/elastic/elastic-agent/pull/9362
->>>>>>> 86fd0df04 ([docs] Add Markdown release notes (#9440))
-      issue: []
-      timestamp: 1755149089
-      file:
-        name: 1755149089-update-otel-components-to-v0.130.0.yaml
-        checksum: b3e16c76d7df9bc7724df86777bcc67bc88f8691
     - kind: bug-fix
       summary: 'Fix Docker container failing to start with no matching vars: ${env.ELASTICSEARCH_API_KEY:} and similar errors by restoring support for `:` to set default values.'
       description: ""
@@ -107,7 +85,7 @@ entries:
         name: 1755547590-Upgrade-to-Go-1.24.6..yaml
         checksum: e2f37c3bfe8bda55a0ec6c32cf604e44dc4f5d43
     - kind: bug-fix
-      summary: Fix deb upgrade by stopping elastic-agent service before stopping endpoint
+      summary: Fix deb upgrade by stopping elastic-agent service before upgrading
       description: ""
       component: elastic-agent
       pr:
@@ -116,4 +94,4 @@ entries:
       timestamp: 1755601979
       file:
         name: 1755601979-deb-upgrade-stop-agent-service.yaml
-        checksum: fff4e813c33f7eccb8ebf9a49698781df5734b79
+        checksum: 047a0f95507e83bc95ce969f6ea443abf55c521f
