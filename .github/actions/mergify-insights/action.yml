@@ -25,6 +25,3 @@ runs:
         token: ${{ inputs.token }}
         report_path: junit.xml
         job_name: ${{ inputs.job_name }}
-      # NOTE: only for testing Mergify CI insights
-      env:
-        GITHUB_REF_NAME: main
