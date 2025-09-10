@@ -106,6 +106,22 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
 
+      - label: "Packaging: windows/arm64 zip"
+        key: packaging-windows
+        env:
+          PACKAGES: "zip"
+          PLATFORMS: "windows/arm64"
+        command: ".buildkite/scripts/steps/integration-package.sh"
+        artifact_paths:
+          - build/distributions/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
+
       - label: "Packaging: Containers linux/amd64"
         key: packaging-containers-x86-64
         env:
