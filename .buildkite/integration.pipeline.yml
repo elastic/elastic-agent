@@ -91,7 +91,7 @@ steps:
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
       - label: "Packaging: windows/amd64 zip"
-        key: packaging-windows
+        key: packaging-windows-amd64
         env:
           PACKAGES: "zip"
           PLATFORMS: "windows/amd64"
@@ -107,7 +107,7 @@ steps:
           image: "${IMAGE_UBUNTU_2204_X86_64}"
 
       - label: "Packaging: windows/arm64 zip"
-        key: packaging-windows
+        key: packaging-windows-arm64
         env:
           PACKAGES: "zip"
           PLATFORMS: "windows/arm64"
