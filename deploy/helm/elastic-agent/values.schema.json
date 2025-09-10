@@ -335,60 +335,43 @@
             "type": "object",
             "description": "Configuration for AutoOps integration.",
             "properties": {
-                "enabled": {
-                    "type": "boolean",
-                    "description": "Enable AutoOps integration."
-                },
-                "autoops_token": {
-                    "type": "string",
-                    "description": "Token to register into AutoOps"
-                },
-                "autoops_otel_url": {
-                    "type": "string",
-                    "description": "Otel server URL"
-                },
-                "autoops_temp_resource_id": {
-                    "type": "string",
-                    "description": "Temporary resource ID"
-                },
-                "es_password": {
-                    "type": "string",
-                    "description": "Monitored ES cluster password"
-                },
-                "es_username": {
-                    "type": "string",
-                    "description": "Monitored ES cluster username"
-                },
-                "es_api_key": {
-                    "type": "string",
-                    "description": "Monitored ES cluster api key"
-                },
-                "elastic_cloud_connected_mode_api_key": {
-                    "type": "string",
-                    "description": "Cloud connected api key"
-                },
-                "elastic_cloud_connected_mode_api_url": {
-                    "type": "string",
-                    "description": "Cloud connected api url"
-                }
+                "enabled": { "type": "boolean", "description": "Enable AutoOps integration." },
+
+                "autoops_token": { "type": "string", "description": "Token to register into AutoOps", "minLength": 1 },
+                "autoops_otel_url": { "type": "string", "description": "Otel server URL", "minLength": 1 },
+                "autoops_temp_resource_id": { "type": "string", "description": "Temporary resource ID", "minLength": 1 },
+
+                "es_password": { "type": ["string","null"], "description": "Monitored ES cluster password" },
+                "es_username": { "type": ["string","null"], "description": "Monitored ES cluster username" },
+                "es_api_key":  { "type": ["string","null"], "description": "Monitored ES cluster api key" },
+
+                "elastic_cloud_connected_mode_api_key": { "type": ["string","null"], "description": "Cloud connected api key" },
+                "elastic_cloud_connected_mode_api_url": { "type": ["string","null"], "description": "Cloud connected api url" }
             },
-            "if": {
-                "properties": {
-                    "enabled": { "const": true }
-                }
-            },
+
+            "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },
             "then": {
-                "required": [
-                    "autoops_token",
-                    "autoops_otel_url",
-                    "autoops_temp_resource_id"
-                ],
+                "required": ["autoops_token", "autoops_otel_url", "autoops_temp_resource_id"],
                 "oneOf": [
                     {
-                        "required": ["es_api_key"]
+                        "required": ["es_api_key"],
+                        "properties": {
+                            "es_api_key": { "type": "string", "minLength": 1 }
+                        },
+                        "not": {
+                            "anyOf": [
+                                { "required": ["es_username"] },
+                                { "required": ["es_password"] }
+                            ]
+                        }
                     },
                     {
-                        "required": ["es_username", "es_password"]
+                        "required": ["es_username", "es_password"],
+                        "properties": {
+                            "es_username": { "type": "string", "minLength": 1 },
+                            "es_password": { "type": "string", "minLength": 1 }
+                        },
+                        "not": { "required": ["es_api_key"] }
                     }
                 ]
             }

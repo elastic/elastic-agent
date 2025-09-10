@@ -302,15 +302,15 @@ kubernetes:
       vars: {}
 autoOps:
   enabled: false
-  autoops_token: ""
-  autoops_es_url: ""
-  es_password: ""
-  es_username: ""
-  temp_resource_id: ""
-  otel_url: ""
-  es_api_key: ""
-  cloud_connected_mode_api_key: ""
-  cloud_connected_mode_api_url: ""
+  autoops_token: null
+  autoops_es_url: null
+  es_password: null
+  es_username: null
+  temp_resource_id: null
+  otel_url: null
+  es_api_key: null
+  cloud_connected_mode_api_key: null
+  cloud_connected_mode_api_url: null
 system:
   # -- enable System integration.
   # @section -- 4 - System integration
