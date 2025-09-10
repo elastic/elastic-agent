@@ -170,9 +170,11 @@ func CrossBuild(options ...CrossBuildOption) error {
 		return err
 	}
 
-	// Make sure the module dependencies are downloaded on the host,
-	// as they will be mounted into the container read-only.
-	mg.Deps(func() error { return gotool.Mod.Download() })
+	if CrossBuildMountModcache {
+		// Make sure the module dependencies are downloaded on the host,
+		// as they will be mounted into the container read-only.
+		mg.Deps(func() error { return gotool.Mod.Download() })
+	}
 
 	// Build the magefile for Linux, so we can run it inside the container.
 	mg.Deps(buildMage)
@@ -324,11 +326,11 @@ func (b GolangCrossBuilder) Build() error {
 	if versionQualified {
 		args = append(args, "--env", "VERSION_QUALIFIER="+versionQualifier)
 	}
-
-	// Mount $GOPATH/pkg/mod into the container, read-only.
-	hostDir := filepath.Join(build.Default.GOPATH, "pkg", "mod")
-	args = append(args, "-v", fmt.Sprintf("%s:/go/pkg/mod:ro", hostDir))
-
+	if CrossBuildMountModcache {
+		// Mount $GOPATH/pkg/mod into the container, read-only.
+		hostDir := filepath.Join(build.Default.GOPATH, "pkg", "mod")
+		args = append(args, "-v", hostDir+":/go/pkg/mod:ro")
+	}
 	// Mount the go build cache into the container.
 	out, err := exec.Command("go", "env", "GOCACHE").Output()
 	if err != nil {
