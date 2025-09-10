@@ -60,6 +60,7 @@ const (
 	agentName                  = "elastic-agent"
 	metricBeatName             = "metricbeat"
 	fileBeatName               = "filebeat"
+	collectorName              = "collector"
 
 	monitoringMetricsUnitID = "metrics-monitoring"
 	monitoringFilesUnitsID  = "filestream-monitoring"
@@ -349,6 +350,16 @@ func (b *BeatsMonitor) Prepare(unit string) error {
 	return nil
 }
 
+// Returns true if any component in the list uses the otel runtime.
+func usingOtelRuntime(componentInfos []componentInfo) bool {
+	for _, ci := range componentInfos {
+		if ci.RuntimeManager == component.OtelRuntimeManager {
+			return true
+		}
+	}
+	return false
+}
+
 // Cleanup removes files that were created for monitoring.
 func (b *BeatsMonitor) Cleanup(unit string) error {
 	if !b.Enabled() {
@@ -434,6 +445,16 @@ func (b *BeatsMonitor) getComponentInfos(components []component.Component, compo
 			BinaryName:     fileBeatName,
 			RuntimeManager: component.RuntimeManager(b.config.C.RuntimeManager),
 		})
+	}
+	// If any other component uses the Otel runtime, also add a component to monitor
+	// its telemetry.
+	if b.config.C.MonitorMetrics && usingOtelRuntime(componentInfos) {
+		componentInfos = append(componentInfos,
+			componentInfo{
+				ID:             fmt.Sprintf("prometheus/%s", monitoringMetricsUnitID),
+				BinaryName:     metricBeatName,
+				RuntimeManager: component.RuntimeManager(b.config.C.RuntimeManager),
+			})
 	}
 	// sort the components to ensure a consistent order of inputs in the configuration
 	slices.SortFunc(componentInfos, func(a, b componentInfo) int {
@@ -527,6 +548,20 @@ func (b *BeatsMonitor) injectMetricsInput(
 			},
 			"streams": httpStreams,
 		},
+	}
+
+	if usingOtelRuntime(componentInfos) {
+		prometheusStream := b.getPrometheusStream(failureThreshold, metricsCollectionIntervalString)
+		inputs = append(inputs, map[string]interface{}{
+			idKey:        fmt.Sprintf("%s-collector", monitoringMetricsUnitID),
+			"name":       fmt.Sprintf("%s-collector", monitoringMetricsUnitID),
+			"type":       "prometheus/metrics",
+			useOutputKey: monitoringOutput,
+			"data_stream": map[string]interface{}{
+				"namespace": monitoringNamespace,
+			},
+			"streams": []any{prometheusStream},
+		})
 	}
 
 	// Make sure we don't set anything until the configuration is stable if the otel manager isn't enabled
@@ -728,6 +763,38 @@ func (b *BeatsMonitor) getHttpStreams(
 	}
 
 	return httpStreams
+}
+
+// getPrometheusStream returns the stream definition for prometheus/metrics input.
+// Note: The return type must be []any due to protobuf serialization quirks.
+func (b *BeatsMonitor) getPrometheusStream(
+	failureThreshold *uint,
+	metricsCollectionIntervalString string,
+) any {
+	// want metricset "collector"
+	monitoringNamespace := b.monitoringNamespace()
+	indexName := fmt.Sprintf("metrics-elastic_agent.collector-%s", monitoringNamespace)
+	dataset := "elastic_agent.collector"
+
+	otelStream := map[string]any{
+		idKey: fmt.Sprintf("%s-otel", monitoringMetricsUnitID),
+		"data_stream": map[string]interface{}{
+			"type":      "metrics",
+			"dataset":   dataset,
+			"namespace": monitoringNamespace,
+		},
+		"metricsets":   []interface{}{"collector"},
+		"metrics_path": "/metrics",
+		"hosts":        []interface{}{"localhost:8888"},
+		"namespace":    monitoringNamespace,
+		"period":       metricsCollectionIntervalString,
+		"index":        indexName,
+		"processors":   processorsForCollectorPrometheusStream(monitoringNamespace, dataset, b.agentInfo),
+	}
+	if failureThreshold != nil {
+		otelStream[failureThresholdKey] = *failureThreshold
+	}
+	return otelStream
 }
 
 // getBeatsStreams returns stream definitions for beats inputs.
@@ -942,6 +1009,15 @@ func processorsForAgentHttpStream(namespace, dataset string, agentInfo info.Agen
 		addCopyFieldsProcessor(httpCopyRules(), true, false),
 		dropFieldsProcessor([]any{"http"}, true),
 		addComponentFieldsProcessor(agentName, agentName),
+	}
+}
+
+// processorsForCollectorPrometheusStream returns the processors used for the OTel
+// collector prometheus metrics
+func processorsForCollectorPrometheusStream(namespace, dataset string, agentInfo info.Agent) []any {
+	return []interface{}{
+		addDataStreamFieldsProcessor(dataset, namespace),
+		addAgentFieldsProcessor(agentInfo.AgentID()),
 	}
 }
 
