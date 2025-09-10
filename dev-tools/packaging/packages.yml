@@ -3,22 +3,22 @@
 # This file contains the package specifications for Elastic Agent
 
 # List all the available platforms
-platforms: &all-platforms-no-windows-arm64
-  - &linux-amd64
-    os: linux
-    arch: x86_64
-  - &linux-arm64
-    os: linux
-    arch: arm64
-  - &windows-amd64
-    os: windows
-    arch: x86_64
-  - &darwin-amd64
-    os: darwin
-    arch: x86_64
-  - &darwin-arm64
-    os: darwin
-    arch: aarch64
+#platforms: &all-platforms-no-windows-arm64
+#  - &linux-amd64
+#    os: linux
+#    arch: x86_64
+#  - &linux-arm64
+#    os: linux
+#    arch: arm64
+#  - &windows-amd64
+#    os: windows
+#    arch: x86_64
+#  - &darwin-amd64
+#    os: darwin
+#    arch: x86_64
+#  - &darwin-arm64
+#    os: darwin
+#    arch: aarch64
 
 platforms: &all-platforms
   - &linux-amd64
@@ -39,7 +39,6 @@ platforms: &all-platforms
   - &darwin-arm64
     os: darwin
     arch: aarch64
-
 
 # List all the package type constants (see dev-tools/mage/pkgcommon/pkgcommon-types.go)
 packageTypes: &all-package-types
@@ -88,7 +87,14 @@ components:
     rootDir: agentbeat-{{.Version}}-{{.Platform}}
     binaryName: agentbeat
     fips: false
-    platforms: *all-platforms-no-windows-arm64
+#    platforms: *all-platforms
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+      - *windows-amd64
+      - *darwin-amd64
+      - *darwin-arm64
+
     packageTypes: *all-package-types
   - &comp-apm_server
     projectName: apm-server
@@ -141,7 +147,13 @@ components:
     rootDir: fleet-server-{{.Version}}-{{.Platform}}
     binaryName: fleet-server
     fips: false
-    platforms: *all-platforms-no-windows-arm64
+#    platforms: *all-platforms-no-windows-arm64
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+      - *windows-amd64
+      - *darwin-amd64
+      - *darwin-arm64
     packageTypes: *all-package-types
   - &comp-pf-elastic-collector
     projectName: prodfiler
@@ -180,7 +192,13 @@ components:
     rootDir: elastic-agent-core-{{.Version}}-{{.Platform}}
     binaryName: elastic-agent
     fips: false
-    platforms: *all-platforms
+#    platforms: *all-platforms
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+      - *windows-amd64
+      - *darwin-amd64
+      - *darwin-arm64
     packageTypes: *all-package-types
   - &comp-agentbeat-fips
     projectName: beats
