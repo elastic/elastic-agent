@@ -11,6 +11,12 @@ mage:
 	@go install github.com/magefile/mage
 	@-mage -clean
 
+## install-go-cache-plugin : Install go-cache-plugin
+.PHONY: install-go-cache-plugin
+install-go-cache-plugin:
+	@echo Installing go-cache-plugin
+	go install github.com/tailscale/go-cache-plugin/cmd/go-cache-plugin@latest
+	@-go-cache-plugin help
 
 ## install-gotestsum : Install gotestsum
 .PHONY: install-gotestsum
