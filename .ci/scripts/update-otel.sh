@@ -19,7 +19,7 @@ next_stable_core=${2:-}
 next_contrib=${3:-$next_beta_core}
 
 # Get current versions from go.mod
-current_beta_core=$(grep 'go\.opentelemetry\.io/collector/receiver/otlpreceiver ' go.mod | cut -d' ' -f 2 || true)
+current_beta_core=$(grep 'go\.opentelemetry\.io/collector/exporter/debugexporter ' go.mod | cut -d' ' -f 2 || true)
 current_stable_core=$(grep 'go\.opentelemetry\.io/collector/confmap/provider/fileprovider ' go.mod | cut -d' ' -f 2 || true)
 current_contrib=$(grep 'github\.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver ' go.mod | cut -d' ' -f 2 || true)
 
