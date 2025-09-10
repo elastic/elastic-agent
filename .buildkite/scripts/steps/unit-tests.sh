@@ -5,7 +5,7 @@ set +euo pipefail
 echo "--- Install dependencies"
 # See https://github.com/tailscale/go-cache-plugin
 make install-go-cache-plugin
-export GOCACHEPROG="go-cache-plugin --cache-dir=/tmp/gocache --bucket=elastic-agent-ci-go-cache"
+export GOCACHEPROG="go-cache-plugin --cache-dir=/tmp/gocache --bucket=elastic-agent-ci-go-cache --region=us-east-1"
 export GOEXPERIMENT=cacheprog
 
 echo "--- Unit tests"
