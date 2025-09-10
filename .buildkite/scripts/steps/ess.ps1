@@ -38,14 +38,10 @@ function ess_up {
   Pop-Location
 }
 
-<<<<<<< HEAD
-function ess_down {  
-=======
 function ess_down {
   param (
       [string]$EssRegion = "gcp-us-west2"
   )
->>>>>>> 6918b7b07 (fix: ESS stack clean up steps (#9832))
   $Workspace = & git rev-parse --show-toplevel
   $TfDir = Join-Path -Path $Workspace -ChildPath "test_infra/ess/"
   $stateFilePath = Join-Path -Path $TfDir -ChildPath "terraform.tfstate"
