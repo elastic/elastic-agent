@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -107,49 +106,9 @@ func CheckPRVersion(version string, fallbackVersion string) string {
 	return version
 }
 
-// FetchElasticArtifact fetches an artifact from the right repository, returning binary name, path and error
-func FetchElasticArtifact(ctx context.Context, artifact string, version string, os string, arch string, extension string, isDocker bool, xpack bool) (string, string, error) {
-	useCISnapshots := GithubCommitSha1 != ""
-
-	return FetchElasticArtifactForSnapshots(ctx, useCISnapshots, artifact, version, os, arch, extension, isDocker, xpack)
-}
-
-// FetchElasticArtifactForSnapshots fetches an artifact from the right repository, returning binary name, path and error
-func FetchElasticArtifactForSnapshots(ctx context.Context, useCISnapshots bool, artifact string, version string, os string, arch string, extension string, isDocker bool, xpack bool) (string, string, error) {
-	binaryName := buildArtifactName(artifact, version, os, arch, extension, isDocker)
-	binaryPath, err := FetchProjectBinaryForSnapshots(ctx, useCISnapshots, artifact, binaryName, artifact, version, timeoutFactor, xpack, "", false)
-	if err != nil {
-		logger.Error("Could not download the binary for the Elastic artifact",
-			slog.String("artifact", artifact),
-			slog.String("version", version),
-			slog.String("os", os),
-			slog.String("arch", arch),
-			slog.String("extension", extension),
-			slog.String("error", err.Error()),
-		)
-		return "", "", err
-	}
-
-	return binaryName, binaryPath, nil
-}
-
 // GetCommitVersion returns a version including the version and the git commit, if it exists
 func GetCommitVersion(version string) string {
 	return newElasticVersion(version).HashedVersion
-}
-
-// GetElasticArtifactURL returns the URL of a released artifact, which its full name is defined in the first argument,
-// from Elastic's artifact repository, building the JSON path query based on the full name
-// It also returns the URL of the sha512 file of the released artifact.
-// i.e. GetElasticArtifactURL("elastic-agent-$VERSION-$ARCH.deb", "elastic-agent", "$VERSION")
-// i.e. GetElasticArtifactURL("elastic-agent-$VERSION-x86_64.rpm", "elastic-agent","$VERSION")
-// i.e. GetElasticArtifactURL("elastic-agent-$VERSION-linux-$ARCH.tar.gz", "elastic-agent","$VERSION")
-func GetElasticArtifactURL(artifactName string, artifact string, version string) (string, string, error) {
-	resolver := NewArtifactURLResolver(artifactName, artifact, version)
-	if resolver == nil {
-		return "", "", errors.New("nil resolver returned")
-	}
-	return resolver.Resolve()
 }
 
 // GetElasticArtifactVersion returns the current version:
@@ -355,14 +314,22 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 		return "", fmt.Errorf("⚠️ Beats local path usage is deprecated and not used to fetch the binaries. Please use the packaging job to generate the artifacts to be consumed by these tests")
 	}
 
+	if downloadPath == "" {
+		return "", errors.New("downloadPath cannot be empty")
+	}
+
 	fmt.Printf("XXX in FetchProjectBinaryForSnapshots project [%s] artifactName [%s]\n", project, artifactName)
 
 	handleDownload := func(URL string) (string, error) {
 		fmt.Print("XXX in handleDownload func\n")
 		name := artifactName
+		if strings.HasSuffix(URL, ".sha512") {
+			name = fmt.Sprintf("%s.sha512", name)
+		}
+		downloadFilePath := filepath.Join(downloadPath, name)
 		downloadRequest := downloadRequest{
-			DownloadPath: downloadPath,
-			URL:          URL,
+			TargetPath: downloadFilePath,
+			URL:        URL,
 		}
 		span, _ := apm.StartSpanOptions(ctx, "Fetching Project binary", "project.url.fetch-binary", apm.SpanOptions{
 			Parent: apm.SpanFromContext(ctx).TraceContext(),
@@ -384,28 +351,14 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 		fmt.Printf("XXX downloadFile: %s\n", downloadRequest)
 		err := downloadFile(&downloadRequest)
 		if err != nil {
-			return downloadRequest.UnsanitizedFilePath, err
-		}
-
-		if strings.HasSuffix(URL, ".sha512") {
-			name = fmt.Sprintf("%s.sha512", name)
-		}
-		// use artifact name as file name to avoid having URL params in the name
-		sanitizedFilePath := filepath.Join(path.Dir(downloadRequest.UnsanitizedFilePath), name)
-		err = os.Rename(downloadRequest.UnsanitizedFilePath, sanitizedFilePath)
-		if err != nil {
-			logger.Warn("Could not sanitize downloaded file name. Keeping old name",
-				slog.String("fileName", downloadRequest.UnsanitizedFilePath),
-				slog.String("sanitizedFileName", sanitizedFilePath),
-			)
-			sanitizedFilePath = downloadRequest.UnsanitizedFilePath
+			return "", err
 		}
 
 		binariesMutex.Lock()
-		binariesCache[URL] = sanitizedFilePath
+		binariesCache[URL] = downloadFilePath
 		binariesMutex.Unlock()
 
-		return sanitizedFilePath, nil
+		return downloadFilePath, nil
 	}
 
 	var downloadURL, downloadShaURL string
