@@ -270,8 +270,8 @@ var _ WatcherHelper = &AgentWatcherHelper{}
 type AgentWatcherHelper struct {
 }
 
-func (a AgentWatcherHelper) InvokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error) {
-	return InvokeWatcher(log, agentExecutable)
+func (a AgentWatcherHelper) InvokeWatcher(log *logger.Logger, agentExecutable string, additionalWatchArgs ...string) (*exec.Cmd, error) {
+	return InvokeWatcher(log, agentExecutable, additionalWatchArgs...)
 }
 
 func (a AgentWatcherHelper) SelectWatcherExecutable(topDir string, previous agentInstall, current agentInstall) string {

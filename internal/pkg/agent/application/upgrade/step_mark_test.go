@@ -47,7 +47,6 @@ func TestSaveAndLoadMarker_NoLoss(t *testing.T) {
 			"8.5.0",
 			details.StateScheduled,
 			"action-123"),
-		DesiredOutcome: OUTCOME_UPGRADE,
 	}
 
 	// Save the marker to the temporary file
@@ -80,191 +79,6 @@ func TestSaveAndLoadMarker_NoLoss(t *testing.T) {
 	require.NoError(t, err, "Failed to clean up marker file")
 }
 
-func TestDesiredOutcome_Serialization(t *testing.T) {
-	tempDir := t.TempDir()
-
-	testCases := []struct {
-		name           string
-		desiredOutcome UpgradeOutcome
-		expectError    bool
-	}{
-		{
-			name:           "OUTCOME_UPGRADE",
-			desiredOutcome: OUTCOME_UPGRADE,
-			expectError:    false,
-		},
-		{
-			name:           "OUTCOME_ROLLBACK",
-			desiredOutcome: OUTCOME_ROLLBACK,
-			expectError:    false,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			markerFile := filepath.Join(tempDir, tc.name+"-marker.yaml")
-
-			// Create marker with specific DesiredOutcome
-
-			originalMarker := &UpdateMarker{
-				Version:           "8.5.0",
-				Hash:              "abc123",
-				VersionedHome:     "home/v8.5.0",
-				UpdatedOn:         time.Now(),
-				PrevVersion:       "8.4.0",
-				PrevHash:          "xyz789",
-				PrevVersionedHome: "home/v8.4.0",
-				Acked:             true,
-				Action: &fleetapi.ActionUpgrade{
-					ActionID:   "action-123",
-					ActionType: "UPGRADE",
-					Data: fleetapi.ActionUpgradeData{
-						Version:   "8.5.0",
-						SourceURI: "https://example.com/upgrade",
-					},
-				},
-				Details: details.NewDetails(
-					"8.5.0",
-					details.StateScheduled,
-					"action-123"),
-				DesiredOutcome: tc.desiredOutcome,
-			}
-
-			// Save the marker
-			err := saveMarkerToPath(originalMarker, markerFile, true)
-			if tc.expectError {
-				require.Error(t, err, "Expected error during save for %s", tc.name)
-				return
-			}
-			require.NoError(t, err, "Failed to save marker for %s", tc.name)
-
-			// Load the marker
-			loadedMarker, err := loadMarker(markerFile)
-			require.NoError(t, err, "Failed to load marker for %s", tc.name)
-			require.NotNil(t, loadedMarker, "loaded marker should not be nil")
-
-			// For valid values, also check they match expected constants
-			switch tc.desiredOutcome {
-			case OUTCOME_UPGRADE:
-				require.Equal(t, OUTCOME_UPGRADE, loadedMarker.DesiredOutcome, "OUTCOME_UPGRADE mismatch")
-			case OUTCOME_ROLLBACK:
-				require.Equal(t, OUTCOME_ROLLBACK, loadedMarker.DesiredOutcome, "OUTCOME_ROLLBACK mismatch")
-			default:
-				require.Equal(t, OUTCOME_UPGRADE, loadedMarker.DesiredOutcome,
-					"DesiredOutcome not preserved during serialization for %s (expected: %d, got: %d)",
-					tc.name, originalMarker.DesiredOutcome, loadedMarker.DesiredOutcome)
-			}
-
-			// Clean up
-			err = os.Remove(markerFile)
-			require.NoError(t, err, "Failed to clean up marker file for %s", tc.name)
-		})
-	}
-}
-
-func TestDesiredOutcome_InvalidYAMLContent(t *testing.T) {
-	tempDir := t.TempDir()
-	markerFile := filepath.Join(tempDir, "invalid-marker.yaml")
-
-	// Test cases with invalid YAML content for DesiredOutcome
-	testCases := []struct {
-		name          string
-		yamlContent   string
-		expectError   bool
-		expectedValue UpgradeOutcome
-	}{
-		{
-			name: "Missing value",
-			yamlContent: `
-version: "8.5.0"
-hash: "abc123"
-versioned_home: "home/v8.5.0"
-updated_on: 2023-01-01T00:00:00Z
-`,
-			expectError:   false,
-			expectedValue: OUTCOME_UPGRADE,
-		},
-		{
-			name: "ProperValue",
-			yamlContent: `
-version: "8.5.0"
-hash: "abc123"
-versioned_home: "home/v8.5.0"
-updated_on: 2023-01-01T00:00:00Z
-desired_outcome: "UPGRADE"
-`,
-			expectError:   false,
-			expectedValue: OUTCOME_UPGRADE,
-		},
-		{
-			name: "RollbackValue",
-			yamlContent: `
-version: "8.5.0"
-hash: "abc123"
-versioned_home: "home/v8.5.0"
-updated_on: 2023-01-01T00:00:00Z
-desired_outcome: "ROLLBACK"
-`,
-			expectError:   false,
-			expectedValue: OUTCOME_ROLLBACK,
-		},
-		{
-			name: "StringValue",
-			yamlContent: `
-version: "8.5.0"
-hash: "abc123"
-versioned_home: "home/v8.5.0"
-updated_on: 2023-01-01T00:00:00Z
-desired_outcome: "invalid_string"
-`,
-			expectError: true,
-		},
-		{
-			name: "FloatValue",
-			yamlContent: `
-version: "8.5.0"
-hash: "abc123"
-versioned_home: "home/v8.5.0"
-updated_on: 2023-01-01T00:00:00Z
-desired_outcome: 1.5
-`,
-			expectError: true,
-		},
-		{
-			name: "BooleanValue",
-			yamlContent: `
-version: "8.5.0"
-hash: "abc123"
-versioned_home: "home/v8.5.0"
-updated_on: 2023-01-01T00:00:00Z
-desired_outcome: true
-`,
-			expectError: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Write invalid YAML content to file
-			err := os.WriteFile(markerFile, []byte(tc.yamlContent), 0644)
-			require.NoError(t, err, "Failed to write test YAML file")
-
-			// Try to load the marker
-			marker, err := loadMarker(markerFile)
-			if tc.expectError {
-				require.Error(t, err, "Expected error when loading invalid YAML for %s", tc.name)
-			} else {
-				require.NoError(t, err, "Unexpected error when loading YAML for %s", tc.name)
-				require.Equal(t, tc.expectedValue, marker.DesiredOutcome)
-			}
-
-			// Clean up
-			err = os.Remove(markerFile)
-			require.NoError(t, err, "Failed to clean up marker file")
-		})
-	}
-}
-
 func TestMarkUpgrade(t *testing.T) {
 	var parsed123SNAPSHOT = agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", "")
 	var parsed456SNAPSHOT = agtversion.NewParsedSemVer(4, 5, 6, "SNAPSHOT", "")
@@ -278,7 +92,6 @@ func TestMarkUpgrade(t *testing.T) {
 		previousAgent  agentInstall
 		action         *fleetapi.ActionUpgrade
 		details        *details.Details
-		desiredOutcome UpgradeOutcome
 		rollbackWindow time.Duration
 	}
 	type workingDirHook func(t *testing.T, dataDir string)
@@ -318,7 +131,6 @@ func TestMarkUpgrade(t *testing.T) {
 				},
 				action:         nil,
 				details:        details.NewDetails("4.5.6-SNAPSHOT", details.StateReplacing, ""),
-				desiredOutcome: OUTCOME_UPGRADE,
 				rollbackWindow: 0,
 			},
 			wantErr: assert.Error,
@@ -341,7 +153,6 @@ func TestMarkUpgrade(t *testing.T) {
 				},
 				action:         nil,
 				details:        details.NewDetails("4.5.6-SNAPSHOT", details.StateReplacing, ""),
-				desiredOutcome: OUTCOME_UPGRADE,
 				rollbackWindow: 0,
 			},
 			wantErr: assert.NoError,
@@ -365,7 +176,6 @@ func TestMarkUpgrade(t *testing.T) {
 						ActionID:      "",
 						Metadata:      details.Metadata{},
 					},
-					DesiredOutcome: OUTCOME_UPGRADE,
 				}
 				assert.Equal(t, expectedMarker, actualMarker)
 			},
@@ -388,7 +198,6 @@ func TestMarkUpgrade(t *testing.T) {
 				},
 				action:         nil,
 				details:        details.NewDetails("4.5.6-SNAPSHOT", details.StateReplacing, ""),
-				desiredOutcome: OUTCOME_UPGRADE,
 				rollbackWindow: 7 * 24 * time.Hour,
 			},
 			wantErr: assert.NoError,
@@ -411,7 +220,6 @@ func TestMarkUpgrade(t *testing.T) {
 						State:         "UPG_REPLACING",
 						ActionID:      "",
 					},
-					DesiredOutcome: OUTCOME_UPGRADE,
 				}
 				assert.Equal(t, expectedMarker, actualMarker)
 			},
@@ -434,7 +242,6 @@ func TestMarkUpgrade(t *testing.T) {
 				},
 				action:         nil,
 				details:        details.NewDetails("9.2.0-SNAPSHOT", details.StateReplacing, ""),
-				desiredOutcome: OUTCOME_UPGRADE,
 				rollbackWindow: 7 * 24 * time.Hour,
 			},
 			wantErr: assert.NoError,
@@ -458,7 +265,6 @@ func TestMarkUpgrade(t *testing.T) {
 						ActionID:      "",
 						Metadata:      details.Metadata{},
 					},
-					DesiredOutcome: OUTCOME_UPGRADE,
 					RollbacksAvailable: []RollbackAvailable{
 						{
 							Version:    "1.2.3-SNAPSHOT",
@@ -481,7 +287,7 @@ func TestMarkUpgrade(t *testing.T) {
 				tc.setupBeforeMark(t, dataDir)
 			}
 
-			err := markUpgrade(log, dataDir, tc.args.updatedOn, tc.args.currentAgent, tc.args.previousAgent, tc.args.action, tc.args.details, tc.args.desiredOutcome, tc.args.rollbackWindow)
+			err := markUpgrade(log, dataDir, tc.args.updatedOn, tc.args.currentAgent, tc.args.previousAgent, tc.args.action, tc.args.details, tc.args.rollbackWindow)
 			tc.wantErr(t, err)
 			if tc.assertAfterMark != nil {
 				tc.assertAfterMark(t, dataDir)

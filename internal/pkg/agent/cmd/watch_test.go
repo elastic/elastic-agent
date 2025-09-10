@@ -27,6 +27,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 
@@ -91,7 +92,8 @@ func TestInitUpgradeDetails(t *testing.T) {
 
 func Test_watchCmd(t *testing.T) {
 	type args struct {
-		cfg *configuration.UpgradeWatcherConfig
+		cfg            *configuration.UpgradeWatcherConfig
+		extraWatchArgs []string
 	}
 	tests := []struct {
 		name               string
@@ -130,7 +132,6 @@ func Test_watchCmd(t *testing.T) {
 						Acked:             false,
 						Action:            nil,
 						Details:           nil, //details.NewDetails("4.5.6", details.StateReplacing, ""),
-						DesiredOutcome:    upgrade.OUTCOME_UPGRADE,
 					},
 					true,
 				)
@@ -171,7 +172,6 @@ func Test_watchCmd(t *testing.T) {
 						Acked:             false,
 						Action:            nil,
 						Details:           nil, //details.NewDetails("4.5.6", details.StateReplacing, ""),
-						DesiredOutcome:    upgrade.OUTCOME_UPGRADE,
 					},
 					true,
 				)
@@ -181,7 +181,7 @@ func Test_watchCmd(t *testing.T) {
 					Watch(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(errors.New("some watch error due to agent misbehaving"))
 				installModifier.EXPECT().
-					Rollback(mock.Anything, mock.Anything, mock.Anything, paths.Top(), "elastic-agent-prvver", "prvver", mock.MatchedBy(func(hook rollbackHook) bool { return hook == nil })).
+					Rollback(mock.Anything, mock.Anything, mock.Anything, paths.Top(), "elastic-agent-prvver", "prvver", mock.Anything).
 					Return(nil)
 			},
 			args: args{
@@ -214,7 +214,6 @@ func Test_watchCmd(t *testing.T) {
 								Reason: details.ReasonWatchFailed,
 							},
 						},
-						DesiredOutcome: upgrade.OUTCOME_UPGRADE,
 					},
 					true,
 				)
@@ -250,7 +249,6 @@ func Test_watchCmd(t *testing.T) {
 						Acked:             false,
 						Action:            nil,
 						Details:           nil,
-						DesiredOutcome:    upgrade.OUTCOME_UPGRADE,
 					},
 					true,
 				)
@@ -269,47 +267,6 @@ func Test_watchCmd(t *testing.T) {
 						Interval: time.Second,
 					},
 				},
-			},
-			wantErr: assert.NoError,
-		},
-		{
-			name: "Desired outcome is rollback, rollback immediately",
-			setupUpgradeMarker: func(t *testing.T, tmpDir string, watcher *mockAgentWatcher, installModifier *mockInstallationModifier) {
-				dataDirPath := paths.DataFrom(tmpDir)
-				err := os.MkdirAll(dataDirPath, 0755)
-				require.NoError(t, err)
-				// upgrade started yesterday ;)
-				updatedOn := time.Now().Add(-1 * 24 * time.Hour)
-				err = upgrade.SaveMarker(
-					dataDirPath,
-					&upgrade.UpdateMarker{
-						Version:           "4.5.6",
-						Hash:              "newver",
-						VersionedHome:     "elastic-agent-4.5.6-newver",
-						UpdatedOn:         updatedOn,
-						PrevVersion:       "1.2.3",
-						PrevHash:          "prvver",
-						PrevVersionedHome: "elastic-agent-prvver",
-						Acked:             false,
-						Action:            nil,
-						Details: &details.Details{
-							TargetVersion: "4.5.6",
-							State:         details.StateWatching,
-							ActionID:      "",
-							Metadata:      details.Metadata{},
-						},
-						DesiredOutcome: upgrade.OUTCOME_ROLLBACK,
-					},
-					true,
-				)
-				require.NoError(t, err)
-
-				installModifier.EXPECT().
-					Rollback(mock.Anything, mock.Anything, mock.Anything, paths.Top(), "elastic-agent-prvver", "prvver", mock.Anything).
-					Return(nil)
-			},
-			args: args{
-				cfg: configuration.DefaultUpgradeConfig().Watcher,
 			},
 			wantErr: assert.NoError,
 		},
@@ -337,8 +294,7 @@ func Test_watchCmd(t *testing.T) {
 							ActionType: fleetapi.ActionTypeUpgrade,
 							Data:       fleetapi.ActionUpgradeData{Version: "4.5.6"},
 						},
-						Details:        nil,
-						DesiredOutcome: upgrade.OUTCOME_ROLLBACK,
+						Details: nil,
 					},
 					true,
 				)
@@ -368,6 +324,47 @@ func Test_watchCmd(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_rollback(t *testing.T) {
+
+	type args struct {
+		versionedHome string
+	}
+
+	tests := []struct {
+		name               string
+		setupUpgradeMarker func(t *testing.T, tmpDir string, watcher *mockAgentWatcher, installModifier *mockInstallationModifier)
+		args               args
+		wantErr            assert.ErrorAssertionFunc
+	}{
+		{
+			name: "passing rollback option, rollback immediately",
+			setupUpgradeMarker: func(t *testing.T, tmpDir string, watcher *mockAgentWatcher, installModifier *mockInstallationModifier) {
+				installModifier.EXPECT().
+					Rollback(mock.Anything, mock.Anything, mock.Anything, tmpDir, "data/elastic-agent-prvver", "", mock.Anything).
+					Return(nil)
+			},
+			args:    args{versionedHome: "data/elastic-agent-prvver"},
+			wantErr: assert.NoError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			log, obs := loggertest.New(t.Name())
+			tmpDir := t.TempDir()
+			mockWatcher := newMockAgentWatcher(t)
+			mockInstallModifier := newMockInstallationModifier(t)
+			tt.setupUpgradeMarker(t, tmpDir, mockWatcher, mockInstallModifier)
+			tt.wantErr(t, rollback(log, tmpDir, client.New(), mockInstallModifier, tt.args.versionedHome))
+			t.Log("watchCmd logs:\n")
+			for _, osbLog := range obs.All() {
+				t.Logf("\t%s - %s - %v\n", osbLog.Level, osbLog.Message, osbLog.Context)
+			}
+		})
+	}
+
 }
 
 func Test_takedownWatcher(t *testing.T) {

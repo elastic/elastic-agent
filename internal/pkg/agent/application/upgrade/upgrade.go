@@ -99,7 +99,7 @@ type writeFileFunc func(name string, data []byte, perm fs.FileMode) error
 // This is defined to help with Upgrader testing and verify interactions with elastic-agent watcher
 type WatcherHelper interface {
 	// InvokeWatcher invokes an elastic-agent watcher using the agentExecutable passed as argument
-	InvokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error)
+	InvokeWatcher(log *logger.Logger, agentExecutable string, additionalWatchArgs ...string) (*exec.Cmd, error)
 	// SelectWatcherExecutable will return the path to the newer elastic-agent executable that will be used to invoke the
 	// more recent watcher between the previous (the agent that started the upgrade) and current (the agent that will run after restart)
 	// agent installation
@@ -423,7 +423,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	if u.upgradeSettings != nil && u.upgradeSettings.Rollback != nil {
 		rollbackWindow = u.upgradeSettings.Rollback.Window
 	}
-	if err := markUpgrade(u.log, paths.Data(), time.Now(), current, previous, action, det, OUTCOME_UPGRADE, rollbackWindow); err != nil {
+	if err := markUpgrade(u.log, paths.Data(), time.Now(), current, previous, action, det, rollbackWindow); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
 		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
 		return nil, goerrors.Join(err, rollbackErr)
@@ -511,22 +511,21 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 			return fmt.Errorf("version %q not listed among the available rollbacks: %w", version, ErrNoRollbacksAvailable)
 		}
 
-		// write the desired outcome of the upgrade
-		err = u.persistManualRollback(topDir, updateMarker)
+		// rollback
+		_, err = u.watcherHelper.InvokeWatcher(u.log, watcherExecutable, "watch", "--rollback", updateMarker.PrevVersionedHome)
 		if err != nil {
-			return fmt.Errorf("persisting rollback in update marker: %w", err)
+			return fmt.Errorf("starting rollback command: %w", err)
 		}
-
+		u.log.Debug("rollback command started successfully, PID")
 		return nil
 	})
 
-	// Invoke watcher again (now that we released the watcher applocks)
-	_, invokeWatcherErr := u.watcherHelper.InvokeWatcher(u.log, watcherExecutable)
-	if invokeWatcherErr != nil {
-		return nil, goerrors.Join(err, fmt.Errorf("invoking watcher: %w", invokeWatcherErr))
-	}
-
 	if err != nil {
+		// Invoke watcher again (now that we released the watcher applocks)
+		_, invokeWatcherErr := u.watcherHelper.InvokeWatcher(u.log, watcherExecutable)
+		if invokeWatcherErr != nil {
+			return nil, goerrors.Join(err, fmt.Errorf("invoking watcher: %w", invokeWatcherErr))
+		}
 		return nil, err
 	}
 
@@ -573,16 +572,6 @@ func extractAgentInstallsFromMarker(updateMarker *UpdateMarker) (previous agentI
 	}
 
 	return previous, current, nil
-}
-
-func (u *Upgrader) persistManualRollback(topDir string, updateMarker *UpdateMarker) error {
-	updateMarker.DesiredOutcome = OUTCOME_ROLLBACK
-	err := SaveMarker(paths.DataFrom(topDir), updateMarker, true)
-	if err != nil {
-		return fmt.Errorf("saving marker: %w", err)
-	}
-
-	return nil
 }
 
 // Ack acks last upgrade action

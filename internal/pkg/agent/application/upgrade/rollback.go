@@ -40,25 +40,32 @@ func Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPa
 
 var FatalRollbackError = errors.New("Fatal rollback error")
 
-type RollbackHook func(ctx context.Context, log *logger.Logger, topDirPath string) error
-type rollbackSettings struct {
+type RollbackSettings struct {
+	skipCleanup    bool
+	skipRestart    bool
 	preRestartHook RollbackHook
 }
 
-func newRollbackSettings(opts ...RollbackOpt) *rollbackSettings {
-	rs := new(rollbackSettings)
+func newRollbackSettings(opts ...RollbackOpt) *RollbackSettings {
+	rs := new(RollbackSettings)
 	for _, opt := range opts {
 		opt(rs)
 	}
 	return rs
 }
 
-type RollbackOpt func(*rollbackSettings)
+type RollbackOpt func(*RollbackSettings)
 
-func WithPreRestartHook(h RollbackHook) RollbackOpt {
-	return func(s *rollbackSettings) {
-		s.preRestartHook = h
-	}
+func (r *RollbackSettings) SetSkipCleanup(skipCleanup bool) {
+	r.skipCleanup = skipCleanup
+}
+
+func (r *RollbackSettings) SetSkipRestart(skipRestart bool) {
+	r.skipRestart = skipRestart
+}
+
+func (r *RollbackSettings) SetPreRestartHook(preRestartHook RollbackHook) {
+	r.preRestartHook = preRestartHook
 }
 
 func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, topDirPath string, prevVersionedHome string, prevHash string, opts ...RollbackOpt) error {
@@ -98,10 +105,20 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 		}
 	}
 
+	if settings.skipRestart {
+		log.Info("Skipping restart")
+		return nil
+	}
+
 	// Restart
 	log.Info("Restarting the agent after rollback")
 	if err := restartAgent(ctx, log, c); err != nil {
 		return err
+	}
+
+	if settings.skipCleanup {
+		log.Info("Skipping cleanup")
+		return nil
 	}
 
 	// cleanup everything except version we're rolling back into
@@ -186,13 +203,13 @@ func cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash s
 
 // InvokeWatcher invokes an agent instance using watcher argument for watching behavior of
 // agent during upgrade period.
-func InvokeWatcher(log *logger.Logger, agentExecutable string) (*exec.Cmd, error) {
+func InvokeWatcher(log *logger.Logger, agentExecutable string, additionalWatchArgs ...string) (*exec.Cmd, error) {
 	if !IsUpgradeable() {
 		log.Info("agent is not upgradable, not starting watcher")
 		return nil, nil
 	}
 	// invokeWatcherCmd and StartWatcherCmd are platform-specific functions dealing with process launching details.
-	cmd, err := StartWatcherCmd(log, func() *exec.Cmd { return invokeWatcherCmd(agentExecutable) })
+	cmd, err := StartWatcherCmd(log, func() *exec.Cmd { return invokeWatcherCmd(agentExecutable, additionalWatchArgs...) })
 	if err != nil {
 		return nil, fmt.Errorf("starting watcher process: %w", err)
 	}
@@ -228,12 +245,18 @@ func applyWatcherInvocationOpts(opts ...WatcherInvocationOpt) *watcherInvocation
 
 type cmdFactory func() *exec.Cmd
 
-func invokeWatcherCmd(agentExecutable string) *exec.Cmd {
-	return InvokeCmdWithArgs(
-		agentExecutable,
+func invokeWatcherCmd(agentExecutable string, additionalWatchArgs ...string) *exec.Cmd {
+	watchArgs := []string{
 		watcherSubcommand,
 		"--path.config", paths.Config(),
 		"--path.home", paths.Top(),
+	}
+
+	watchArgs = append(watchArgs, additionalWatchArgs...)
+
+	return InvokeCmdWithArgs(
+		agentExecutable,
+		watchArgs...,
 	)
 }
 

@@ -1268,7 +1268,9 @@ func TestManualRollback(t *testing.T) {
 				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(locker, nil)
 				newerWatcherExecutable := filepath.Join(topDir, "data", "elastic-agent-4.5.6-newver", "elastic-agent")
 				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstall456).Return(newerWatcherExecutable)
-				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable).Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for realsies"}}, nil)
+				watcherHelper.EXPECT().
+					InvokeWatcher(mock.Anything, newerWatcherExecutable, watcherSubcommand, "--rollback", "data/elastic-agent-1.2.3-oldver").
+					Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for rollbacksies"}}, nil)
 			},
 			artifactSettings: artifact.DefaultConfig(),
 			upgradeSettings:  configuration.DefaultUpgradeConfig(),
@@ -1280,7 +1282,6 @@ func TestManualRollback(t *testing.T) {
 				require.NoError(t, loadMarkerErr, "error loading marker")
 				require.NotNil(t, marker, "marker is nil")
 
-				assert.Equal(t, OUTCOME_ROLLBACK, marker.DesiredOutcome)
 				require.NotNil(t, marker.Details)
 				assert.NotEmpty(t, marker.RollbacksAvailable)
 			},

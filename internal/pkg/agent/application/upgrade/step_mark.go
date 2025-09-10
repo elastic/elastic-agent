@@ -5,8 +5,6 @@
 package upgrade
 
 import (
-	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -22,14 +20,6 @@ import (
 )
 
 const markerFilename = ".update-marker"
-
-// UpgradeOutcome can have 2 values, UPGRADE by default and ROLLBACK when rollback was initiated manually
-type UpgradeOutcome int
-
-const (
-	OUTCOME_UPGRADE UpgradeOutcome = iota
-	OUTCOME_ROLLBACK
-)
 
 // RollbackAvailable identifies an elastic-agent install available for rollback
 type RollbackAvailable struct {
@@ -62,8 +52,6 @@ type UpdateMarker struct {
 	Action *fleetapi.ActionUpgrade `json:"action" yaml:"action"`
 
 	Details *details.Details `json:"details,omitempty" yaml:"details,omitempty"`
-
-	DesiredOutcome UpgradeOutcome `json:"desired_outcome" yaml:"desired_outcome"`
 
 	RollbacksAvailable []RollbackAvailable `json:"rollbacks_available,omitempty" yaml:"rollbacks_available,omitempty"`
 }
@@ -122,7 +110,6 @@ type updateMarkerSerializer struct {
 	Acked              bool                 `yaml:"acked"`
 	Action             *MarkerActionUpgrade `yaml:"action"`
 	Details            *details.Details     `yaml:"details"`
-	DesiredOutcome     UpgradeOutcome       `yaml:"desired_outcome"`
 	RollbacksAvailable []RollbackAvailable  `yaml:"rollbacks_available,omitempty"`
 }
 
@@ -138,66 +125,8 @@ func newMarkerSerializer(m *UpdateMarker) *updateMarkerSerializer {
 		Acked:              m.Acked,
 		Action:             convertToMarkerAction(m.Action),
 		Details:            m.Details,
-		DesiredOutcome:     m.DesiredOutcome,
 		RollbacksAvailable: m.RollbacksAvailable,
 	}
-}
-
-func (o UpgradeOutcome) String() string {
-	switch o {
-	case OUTCOME_UPGRADE:
-		return "UPGRADE"
-	case OUTCOME_ROLLBACK:
-		return "ROLLBACK"
-	default:
-		return ""
-	}
-}
-
-// JSON marshaling
-func (o UpgradeOutcome) MarshalJSON() ([]byte, error) {
-	return json.Marshal(o.String())
-}
-
-func (o *UpgradeOutcome) UnmarshalJSON(data []byte) error {
-	var s string
-	if err := json.Unmarshal(data, &s); err != nil {
-		return err
-	}
-	switch s {
-	case "UPGRADE":
-		*o = OUTCOME_UPGRADE
-	case "ROLLBACK":
-		*o = OUTCOME_ROLLBACK
-	case "":
-		*o = OUTCOME_UPGRADE
-	default:
-		return fmt.Errorf("invalid Operation: %s", s)
-	}
-	return nil
-}
-
-// YAML marshaling
-func (o UpgradeOutcome) MarshalYAML() (interface{}, error) {
-	return o.String(), nil
-}
-
-func (o *UpgradeOutcome) UnmarshalYAML(value *yaml.Node) error {
-	var s string
-	if err := value.Decode(&s); err != nil {
-		return err
-	}
-	switch s {
-	case "UPGRADE":
-		*o = OUTCOME_UPGRADE
-	case "ROLLBACK":
-		*o = OUTCOME_ROLLBACK
-	case "":
-		*o = OUTCOME_UPGRADE
-	default:
-		return fmt.Errorf("invalid UpgradeOutcome: %s", s)
-	}
-	return nil
 }
 
 type agentInstall struct {
@@ -208,7 +137,7 @@ type agentInstall struct {
 }
 
 // markUpgrade marks update happened so we can handle grace period
-func markUpgrade(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, desiredOutcome UpgradeOutcome, rollbackWindow time.Duration) error {
+func markUpgrade(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, rollbackWindow time.Duration) error {
 
 	if len(previousAgent.hash) > hashLen {
 		previousAgent.hash = previousAgent.hash[:hashLen]
@@ -224,7 +153,6 @@ func markUpgrade(log *logger.Logger, dataDirPath string, updatedOn time.Time, ag
 		PrevVersionedHome: previousAgent.versionedHome,
 		Action:            action,
 		Details:           upgradeDetails,
-		DesiredOutcome:    desiredOutcome,
 	}
 
 	if rollbackWindow > 0 && agent.parsedVersion != nil && !agent.parsedVersion.Less(*Version_9_2_0_SNAPSHOT) {
@@ -312,7 +240,6 @@ func loadMarker(markerFile string) (*UpdateMarker, error) {
 		Acked:              marker.Acked,
 		Action:             convertToActionUpgrade(marker.Action),
 		Details:            marker.Details,
-		DesiredOutcome:     marker.DesiredOutcome,
 		RollbacksAvailable: marker.RollbacksAvailable,
 	}, nil
 }
@@ -336,7 +263,6 @@ func saveMarkerToPath(marker *UpdateMarker, markerFile string, shouldFsync bool)
 		Acked:              marker.Acked,
 		Action:             convertToMarkerAction(marker.Action),
 		Details:            marker.Details,
-		DesiredOutcome:     marker.DesiredOutcome,
 		RollbacksAvailable: marker.RollbacksAvailable,
 	}
 	markerBytes, err := yaml.Marshal(makerSerializer)
