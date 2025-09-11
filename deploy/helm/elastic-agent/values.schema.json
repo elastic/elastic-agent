@@ -363,7 +363,8 @@
                         "properties": {
                             "autoops_token": { "type": "string", "minLength": 1 },
                             "autoops_otel_url": { "type": "string", "minLength": 1 },
-                            "autoops_temp_resource_id": { "type": "string", "minLength": 1 }
+                            "autoops_temp_resource_id": { "type": "string", "minLength": 1 },
+                            "autoops_es_url": { "type": "string", "description": "Monitored ES cluster URL" }
                         }
                     }
                 ],
