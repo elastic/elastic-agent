@@ -1,0 +1,26 @@
+# Turn off everything except the AutoOps preset
+kubernetes:
+  enabled: false
+kube-state-metrics:
+  enabled: false
+
+agent:
+  presets:
+    autoOps:
+      mode: deployment
+      serviceAccount:
+        create: true
+      clusterRole:
+        create: false
+      nodeSelector:
+        kubernetes.io/os: linux
+
+autoOps:
+  enabled: true
+  autoops_token: "REPLACE_ME_TOKEN"
+  autoops_otel_url: "https://otel.example.com:4318"
+  autoops_temp_resource_id: "REPLACE_ME_RESOURCE_ID"
+  es_api_key: "REPLACE_ME_API_KEY"
+  es_username: ""
+  es_password: ""
+
