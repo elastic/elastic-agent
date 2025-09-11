@@ -12,12 +12,14 @@ import (
 	prometheusreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver"
 	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/receiver"
+	profilingreceiver "go.opentelemetry.io/ebpf-profiler/collector"
 )
 
 func addNonFipsReceivers(receivers []receiver.Factory) []receiver.Factory {
 	receivers = append(receivers,
 		kafkareceiver.NewFactory(),
 		prometheusreceiver.NewFactory(),
+		profilingreceiver.NewFactory(),
 	)
 
 	return receivers
