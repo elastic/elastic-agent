@@ -142,13 +142,13 @@ func IsUpgradeable() bool {
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
 func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *configuration.UpgradeConfig, agentInfo info.Agent, watcherHelper WatcherHelper) (*Upgrader, error) {
 	return &Upgrader{
-		log:             log,
-		settings:        settings,
-		upgradeSettings: upgradeConfig,
-		agentInfo:       agentInfo,
-		upgradeable:     IsUpgradeable(),
-		markerWatcher:   newMarkerFileWatcher(markerFilePath(paths.Data()), log),
-		watcherHelper:   watcherHelper,
+		log:                  log,
+		settings:             settings,
+		upgradeSettings:      upgradeConfig,
+		agentInfo:            agentInfo,
+		upgradeable:          IsUpgradeable(),
+		markerWatcher:        newMarkerFileWatcher(markerFilePath(paths.Data()), log),
+		watcherHelper:        watcherHelper,
 		artifactDownloader:   newArtifactDownloader(settings, log),
 		unpacker:             newUnpacker(log),
 		isDiskSpaceErrorFunc: upgradeErrors.IsDiskSpaceError,
