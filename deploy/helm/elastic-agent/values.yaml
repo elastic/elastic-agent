@@ -302,15 +302,15 @@ kubernetes:
       vars: {}
 autoOps:
   enabled: false
-  autoops_token: null
-  autoops_es_url: null
-  es_password: null
-  es_username: null
-  temp_resource_id: null
-  otel_url: null
-  es_api_key: null
-  cloud_connected_mode_api_key: null
-  cloud_connected_mode_api_url: null
+  autoops_token: ""
+  autoops_otel_url: ""            # was: otel_url
+  autoops_temp_resource_id: ""    # was: temp_resource_id
+  es_api_key: ""
+  es_username: ""
+  es_password: ""
+  elastic_cloud_connected_mode_api_key: ""   # was: cloud_connected_mode_api_key
+  elastic_cloud_connected_mode_api_url: ""   # was: cloud_connected_mode_api_url
+  autoops_es_url: ""              # add only if your templates actually use it
 system:
   # -- enable System integration.
   # @section -- 4 - System integration
