@@ -207,7 +207,7 @@ func Build(params BuildArgs) error {
 	// Spec
 	args := []string{
 		"build",
-		"-x",
+		//"-x",
 		"-o",
 		filepath.Join(params.OutputDir, binaryName),
 	}
