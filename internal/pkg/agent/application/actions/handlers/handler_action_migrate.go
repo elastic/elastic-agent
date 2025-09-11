@@ -104,9 +104,8 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 
 	// action is all rigth we can notify endpoint
 	if err := h.notifyComponents(ctx, action); err != nil {
-		h.ackFailure(ctx, err, action, ack)
-
-		return fmt.Errorf("failed to notify components, aborting: %w", err)
+		// config is cleaned up already we cannot revert
+		h.log.Warnf("failed to notify components, aborting: %v", err)
 	}
 
 	// reexec and load new config
