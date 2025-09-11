@@ -14,6 +14,13 @@ import (
 )
 
 func main() {
+	var shutdownDelay time.Duration
+	var err error
+	shutdownDelayEnvVar := os.Getenv("TEST_SUPERVISED_COLLECTOR_DELAY")
+	if shutdownDelayEnvVar != "" {
+		shutdownDelay, _ = time.ParseDuration(shutdownDelayEnvVar)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -28,9 +35,15 @@ func main() {
 		})
 	}
 
-	err := cmd.RunCollector(ctx, nil, true, "debug")
+	err = cmd.RunCollector(ctx, nil, true, "debug")
 	if err == nil || errors.Is(err, context.Canceled) {
+		if shutdownDelay > 0 {
+			<-time.After(shutdownDelay)
+		}
 		os.Exit(0)
+	}
+	if shutdownDelay > 0 {
+		<-time.After(shutdownDelay)
 	}
 	os.Exit(1)
 }
