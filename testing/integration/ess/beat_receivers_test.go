@@ -688,6 +688,9 @@ func TestBeatsReceiverLogs(t *testing.T) {
 		},
 		Stack: nil,
 	})
+
+	t.Skip("Skip this test as it's flaky. See https://github.com/elastic/elastic-agent/issues/9890")
+
 	type configOptions struct {
 		RuntimeExperimental string
 	}
