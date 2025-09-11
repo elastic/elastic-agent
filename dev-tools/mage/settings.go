@@ -162,7 +162,7 @@ func initGlobals() {
 
 	versionQualifier, versionQualified = os.LookupEnv("VERSION_QUALIFIER")
 
-	// order matters: this will override some of the values. Those values can be used 
+	// order matters: this will override some of the values. Those values can be used
 	// as fallback for the variables below (mainly agentPackageVersion and ManifestURL)
 	err = initPackageVersion()
 	if err != nil {
