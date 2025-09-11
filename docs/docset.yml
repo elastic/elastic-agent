@@ -4,6 +4,16 @@ products:
 exclude:
   - "*.md"
   - "manifests/kustomize-autosharding/README.md"
+cross_links:
+  - docs-content
+  - beats
 toc:
   - toc: release-notes
-
+subs:
+  agent:          "Elastic Agent"
+  agent-issue:    "https://github.com/elastic/elastic-agent/issues/"
+  agent-pull:     "https://github.com/elastic/elastic-agent/pull/"
+  agents:         "Elastic Agents"
+  beats:          "Beats"
+  es:             "Elasticsearch"
+  fleet:          "Fleet"

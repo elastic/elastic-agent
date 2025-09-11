@@ -123,7 +123,10 @@ func NewOTelManager(
 			return nil, fmt.Errorf("failed to get the path to the collector executable: %w", err)
 		}
 		recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
-		exec = newSubprocessExecution(logLevel, executable)
+		exec, err = newSubprocessExecution(logLevel, executable)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create subprocess execution: %w", err)
+		}
 	case EmbeddedExecutionMode:
 		recoveryTimer = newRestarterNoop()
 		exec = newExecutionEmbedded()
