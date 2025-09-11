@@ -674,7 +674,7 @@ outputs:
 				stripNondeterminism(agentDoc, tt.metricset)
 				stripNondeterminism(otelDoc, tt.metricset)
 
-				AssertMapstrKeysEqual(t, agentDoc, otelDoc, nil, "expected documents keys to be equal for metricset "+tt.metricset)
+				AssertMapstrKeysEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents keys to be equal for metricset "+tt.metricset)
 				AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for metricset "+tt.metricset)
 			})
 		}
