@@ -28,6 +28,7 @@ import (
 	zipkinreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver"
 	nopreceiver "go.opentelemetry.io/collector/receiver/nopreceiver"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
+	profilingreceiver "go.opentelemetry.io/ebpf-profiler/collector"
 
 	elasticapmintakereceiver "github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver" // for collecting APM data from Elastic APM agents
 
@@ -79,6 +80,7 @@ import (
 	forwardconnector "go.opentelemetry.io/collector/connector/forwardconnector"
 
 	elasticapmconnector "github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector"
+	profilingmetricsconnector "github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector"
 )
 
 func components(extensionFactories ...extension.Factory) func() (otelcol.Factories, error) {
@@ -106,6 +108,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			mbreceiver.NewFactory(),
 			jmxreceiver.NewFactory(),
 			nopreceiver.NewFactory(),
+			profilingreceiver.NewFactory(),
 		}
 		// some receivers should only be available when
 		// not in fips mode due to restrictions on crypto usage
@@ -157,6 +160,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			routingconnector.NewFactory(),
 			spanmetricsconnector.NewFactory(),
 			elasticapmconnector.NewFactory(),
+			profilingmetricsconnector.NewFactory(),
 			forwardconnector.NewFactory(),
 		)
 		if err != nil {
