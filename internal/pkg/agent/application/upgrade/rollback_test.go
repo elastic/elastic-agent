@@ -6,6 +6,7 @@ package upgrade
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,6 +17,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -208,7 +211,7 @@ func TestCleanup(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			testLogger, _ := loggertest.New(t.Name())
 			testTop := t.TempDir()
-			setupAgents(t, testLogger, testTop, tt.agentInstallsSetup)
+			setupAgents(t, testLogger, testTop, tt.agentInstallsSetup, true)
 			if tt.additionalSetup != nil {
 				tt.additionalSetup(t, testTop)
 			}
@@ -303,7 +306,7 @@ func TestRollback(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			testLogger, _ := loggertest.New(t.Name())
 			testTop := t.TempDir()
-			setupAgents(t, testLogger, testTop, tt.agentInstallsSetup)
+			setupAgents(t, testLogger, testTop, tt.agentInstallsSetup, true)
 			if tt.additionalSetup != nil {
 				tt.additionalSetup(t, testTop)
 			}
@@ -327,6 +330,210 @@ func TestRollback(t *testing.T) {
 			tt.checkAfterRollback(t, testTop)
 		})
 	}
+}
+
+func TestRollbackWithOpts(t *testing.T) {
+	type hookFuncWithLogs func(t *testing.T, logs *observer.ObservedLogs, topDir string)
+
+	agentExecutableName := agentName
+	if runtime.GOOS == "windows" {
+		agentExecutableName += ".exe"
+	}
+
+	type args struct {
+		prevVersionedHome string
+		prevHash          string
+		rollbackOptions   []RollbackOpt
+	}
+
+	tests := map[string]struct {
+		agentInstallsSetup setupAgentInstallations
+		setupMocks         func(*mocks.Client)
+		args               args
+		wantErr            assert.ErrorAssertionFunc
+		checkAfterRollback hookFuncWithLogs
+	}{
+		"SkipCleanup: leave the current installation intact": {
+			agentInstallsSetup: setupAgentInstallations{
+				installedAgents: []testAgentInstall{
+					{
+						version:          version123Snapshot,
+						useVersionInPath: true,
+					},
+					{
+						version:          version456Snapshot,
+						useVersionInPath: true,
+					},
+				},
+			},
+			setupMocks: func(mockClient *mocks.Client) {
+				mockClient.EXPECT().Connect(
+					mock.AnythingOfType("*context.timerCtx"),
+					mock.AnythingOfType("*grpc.funcDialOption"),
+					mock.AnythingOfType("*grpc.funcDialOption"),
+				).Return(nil)
+				mockClient.EXPECT().Disconnect().Return()
+				mockClient.EXPECT().Restart(mock.Anything).Return(nil).Once()
+			},
+			args: args{
+				prevVersionedHome: "data/elastic-agent-1.2.3-SNAPSHOT-abcdef",
+				prevHash:          "abcdef",
+				rollbackOptions: []RollbackOpt{
+					func(rs *RollbackSettings) { rs.SetSkipCleanup(true) },
+				},
+			},
+			wantErr: assert.NoError,
+			checkAfterRollback: func(t *testing.T, _ *observer.ObservedLogs, topDir string) {
+				assertAgentInstallExists(t, filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName)
+				assertAgentInstallExists(t, filepath.Join(topDir, "data", "elastic-agent-4.5.6-SNAPSHOT-ghijkl"), agentExecutableName)
+				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
+				assert.NoError(t, err, "reading topPath elastic-agent link")
+				assert.Equal(t, linkTarget, filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef", agentExecutableName))
+			},
+		},
+		"SkipRestart: no cleanup, no restart": {
+			agentInstallsSetup: setupAgentInstallations{
+				installedAgents: []testAgentInstall{
+					{
+						version:          version123Snapshot,
+						useVersionInPath: true,
+					},
+					{
+						version:          version456Snapshot,
+						useVersionInPath: true,
+					},
+				},
+			},
+			setupMocks: func(mockClient *mocks.Client) {
+				// nothing to do here, no restart will be issued
+			},
+			args: args{
+				prevVersionedHome: "data/elastic-agent-1.2.3-SNAPSHOT-abcdef",
+				prevHash:          "abcdef",
+				rollbackOptions: []RollbackOpt{
+					func(rs *RollbackSettings) { rs.SetSkipRestart(true) },
+				},
+			},
+			wantErr: assert.NoError,
+			checkAfterRollback: func(t *testing.T, _ *observer.ObservedLogs, topDir string) {
+				assertAgentInstallExists(t, filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName)
+				assertAgentInstallExists(t, filepath.Join(topDir, "data", "elastic-agent-4.5.6-SNAPSHOT-ghijkl"), agentExecutableName)
+				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
+				assert.NoError(t, err, "reading topPath elastic-agent link")
+				assert.Equal(t, linkTarget, filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef", agentExecutableName))
+			},
+		},
+		"Prerestart hook not fatal error: rollback, cleanup and restart as normal": {
+			agentInstallsSetup: setupAgentInstallations{
+				installedAgents: []testAgentInstall{
+					{
+						version:          version123Snapshot,
+						useVersionInPath: true,
+					},
+					{
+						version:          version456Snapshot,
+						useVersionInPath: true,
+					},
+				},
+			},
+			setupMocks: func(mockClient *mocks.Client) {
+				mockClient.EXPECT().Connect(
+					mock.AnythingOfType("*context.timerCtx"),
+					mock.AnythingOfType("*grpc.funcDialOption"),
+					mock.AnythingOfType("*grpc.funcDialOption"),
+				).Return(nil)
+				mockClient.EXPECT().Disconnect().Return()
+				mockClient.EXPECT().Restart(mock.Anything).Return(nil).Once()
+			},
+			args: args{
+				prevVersionedHome: "data/elastic-agent-1.2.3-SNAPSHOT-abcdef",
+				prevHash:          "abcdef",
+				rollbackOptions: []RollbackOpt{
+					func(rs *RollbackSettings) {
+						rs.SetPreRestartHook(func(ctx context.Context, log *logger.Logger, topDirPath string) error {
+							return errors.New("pre-restart hook error, not fatal")
+						})
+					},
+				},
+			},
+			wantErr: assert.NoError,
+			checkAfterRollback: func(t *testing.T, logs *observer.ObservedLogs, topDir string) {
+				assertAgentInstallExists(t, filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName)
+				assertAgentInstallCleaned(t, filepath.Join(topDir, "data", "elastic-agent-4.5.6-SNAPSHOT-ghijkl"), agentExecutableName)
+				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
+				assert.NoError(t, err, "reading topPath elastic-agent link")
+				assert.Equal(t, linkTarget, filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef", agentExecutableName))
+				snippetLogs := logs.FilterMessageSnippet("pre-restart hook error, not fatal").All()
+				if assert.Len(t, snippetLogs, 1) {
+					assert.Equal(t, zapcore.WarnLevel, snippetLogs[0].Level)
+				}
+			},
+		},
+		"Prerestart hook fatal error: rollback then return the error (no restart, no cleanup)": {
+			agentInstallsSetup: setupAgentInstallations{
+				installedAgents: []testAgentInstall{
+					{
+						version:          version123Snapshot,
+						useVersionInPath: true,
+					},
+					{
+						version:          version456Snapshot,
+						useVersionInPath: true,
+					},
+				},
+			},
+			setupMocks: func(mockClient *mocks.Client) {
+				// no restart request should be made
+			},
+			args: args{
+				prevVersionedHome: "data/elastic-agent-1.2.3-SNAPSHOT-abcdef",
+				prevHash:          "abcdef",
+				rollbackOptions: []RollbackOpt{
+					func(rs *RollbackSettings) {
+						rs.SetPreRestartHook(func(ctx context.Context, log *logger.Logger, topDirPath string) error {
+							return fmt.Errorf("fatal pre-restart hook error: %w", FatalRollbackError)
+						})
+					},
+				},
+			},
+			wantErr: assert.Error,
+			checkAfterRollback: func(t *testing.T, logs *observer.ObservedLogs, topDir string) {
+				assertAgentInstallExists(t, filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName)
+				assertAgentInstallExists(t, filepath.Join(topDir, "data", "elastic-agent-4.5.6-SNAPSHOT-ghijkl"), agentExecutableName)
+				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
+				assert.NoError(t, err, "reading topPath elastic-agent link")
+				assert.Equal(t, linkTarget, filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef", agentExecutableName))
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			testLogger, obsLogs := loggertest.New(t.Name())
+			testTop := t.TempDir()
+			setupAgents(t, testLogger, testTop, tt.agentInstallsSetup, false)
+
+			// mock client
+			mockClient := mocks.NewClient(t)
+			tt.setupMocks(mockClient)
+
+			tt.wantErr(t, RollbackWithOpts(t.Context(), testLogger, mockClient, testTop, tt.args.prevVersionedHome, tt.args.prevHash, tt.args.rollbackOptions...))
+			tt.checkAfterRollback(t, obsLogs, testTop)
+		})
+	}
+}
+
+func assertAgentInstallExists(t *testing.T, versionedHome string, agentExecutableName string) {
+	assert.DirExists(t, versionedHome)
+	assert.FileExists(t, filepath.Join(versionedHome, agentExecutableName))
+	assert.DirExists(t, filepath.Join(versionedHome, "logs"))
+	assert.DirExists(t, filepath.Join(versionedHome, "run"))
+}
+
+func assertAgentInstallCleaned(t *testing.T, versionedHome string, agentExecutableName string) {
+	assert.DirExists(t, versionedHome)
+	assert.DirExists(t, filepath.Join(versionedHome, "logs"))
+	assert.NoDirExists(t, filepath.Join(versionedHome, "run"))
+	assert.NoFileExists(t, filepath.Join(versionedHome, agentExecutableName))
 }
 
 // checkFilesAfterCleanup is a convenience function to check the file structure within topDir.
@@ -395,7 +602,7 @@ func checkFilesAfterRollback(t *testing.T, topDir, oldAgentHome, newAgentHome st
 }
 
 // setupAgents create fake agent installs, update marker file and symlink pointing to one of the installations' elastic-agent placeholder
-func setupAgents(t *testing.T, log *logger.Logger, topDir string, installations setupAgentInstallations) {
+func setupAgents(t *testing.T, log *logger.Logger, topDir string, installations setupAgentInstallations, writeUpdateMarker bool) {
 
 	var (
 		oldAgentVersion       testAgentVersion
@@ -426,8 +633,11 @@ func setupAgents(t *testing.T, log *logger.Logger, topDir string, installations 
 		}
 	}
 
-	t.Logf("Creating upgrade marker from %+v located at %q to %+v located at %q", oldAgentVersion, oldAgentVersionedHome, newAgentVersion, newAgentVersionedHome)
-	createUpdateMarker(t, log, topDir, newAgentVersion.version, newAgentVersion.hash, newAgentVersionedHome, oldAgentVersion.version, oldAgentVersion.hash, oldAgentVersionedHome, useNewMarker)
+	if writeUpdateMarker {
+		t.Logf("Creating upgrade marker from %+v located at %q to %+v located at %q", oldAgentVersion, oldAgentVersionedHome, newAgentVersion, newAgentVersionedHome)
+		createUpdateMarker(t, log, topDir, newAgentVersion.version, newAgentVersion.hash, newAgentVersionedHome, oldAgentVersion.version, oldAgentVersion.hash, oldAgentVersionedHome, useNewMarker)
+	}
+
 }
 
 // createFakeAgentInstall will create a mock agent install within topDir, possibly using the version in the directory name, depending on useVersionInPath
