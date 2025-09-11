@@ -17,11 +17,15 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	mockinfo "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/info"
 )
@@ -77,6 +81,7 @@ func TestActionMigratelHandler(t *testing.T) {
 				ack.On("Commit", t.Context()).Return(nil)
 
 				coord := &fakeMigrateCoordinator{}
+				coord.On("State").Return(coordinator.State{})
 				coord.On("Migrate", mock.Anything, mock.Anything).Return(nil)
 				coord.On("ReExec", mock.Anything, mock.Anything)
 				coord.On("Protection").Return(protection.Config{SignatureValidationKey: nil, Enabled: tc.protectionEnabled})
@@ -114,6 +119,7 @@ func TestActionMigratelHandler(t *testing.T) {
 		ack.On("Commit", t.Context()).Return(nil)
 
 		coord := &fakeMigrateCoordinator{}
+		coord.On("State").Return(coordinator.State{})
 		coord.On("Migrate", mock.Anything, mock.Anything).Return(nil)
 		coord.On("ReExec", mock.Anything, mock.Anything)
 		coord.On("Protection").Return(protection.Config{SignatureValidationKey: nil})
@@ -163,6 +169,7 @@ func TestActionMigratelHandler(t *testing.T) {
 		ack.On("Commit", t.Context()).Return(nil)
 
 		coord := &fakeMigrateCoordinator{}
+		coord.On("State").Return(coordinator.State{})
 		coord.On("Migrate", mock.Anything, mock.Anything).Return(nil)
 		coord.On("ReExec", mock.Anything, mock.Anything)
 		coord.On("Protection").Return(protection.Config{SignatureValidationKey: signatureValidationKey})
@@ -248,6 +255,7 @@ func TestActionMigratelHandler(t *testing.T) {
 		ack.On("Commit", t.Context()).Return(nil)
 
 		coord := &fakeMigrateCoordinator{}
+		coord.On("State").Return(coordinator.State{})
 		coord.On("Migrate", mock.Anything, mock.Anything).Return(nil)
 		coord.On("ReExec", mock.Anything, mock.Anything)
 		coord.On("Protection").Return(protection.Config{SignatureValidationKey: nil})
@@ -322,6 +330,7 @@ func TestActionMigratelHandler(t *testing.T) {
 		ack.On("Commit", t.Context()).Return(nil)
 
 		coord := &fakeMigrateCoordinator{}
+		coord.On("State").Return(coordinator.State{})
 		coord.On("Migrate", mock.Anything, mock.Anything).Return(coordinator.ErrFleetServer)
 		coord.On("ReExec", mock.Anything, mock.Anything)
 		coord.On("Protection").Return(protection.Config{SignatureValidationKey: nil})
@@ -337,6 +346,57 @@ func TestActionMigratelHandler(t *testing.T) {
 		ack.AssertNumberOfCalls(t, "Commit", 1)
 		coord.AssertNotCalled(t, "ReExec", mock.Anything, mock.Anything)
 	})
+
+	t.Run("endpoint notified", func(t *testing.T) {
+		mockAgentInfo := mockinfo.NewAgent(t)
+		mockAgentInfo.On("AgentID").Return("agent-id")
+		action := &fleetapi.ActionMigrate{
+			ActionType: fleetapi.ActionTypeMigrate,
+		}
+
+		ack := &fakeAcker{}
+		ack.On("Ack", t.Context(), action).Return(nil)
+		ack.On("Commit", t.Context()).Return(nil)
+
+		coord := &fakeMigrateCoordinator{}
+		coord.On("State").Return(coordinator.State{
+			Components: []runtime.ComponentComponentState{
+				runtime.ComponentComponentState{
+					Component: component.Component{
+						InputSpec: &component.InputRuntimeSpec{
+							Spec: component.InputSpec{
+								ProxiedActions: []string{fleetapi.ActionTypeMigrate},
+							},
+						},
+						Units: []component.Unit{
+							component.Unit{
+								Type: client.UnitTypeInput,
+								Config: &proto.UnitExpectedConfig{
+									Type: "migrate-sensitive-input",
+								},
+							},
+						},
+						InputType: "migrate-sensitive-input",
+					},
+				},
+			},
+		})
+		coord.On("PerformAction", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(map[string]interface{}{}, nil)
+		coord.On("Migrate", mock.Anything, mock.Anything).Return(nil)
+		coord.On("ReExec", mock.Anything, mock.Anything)
+		coord.On("Protection").Return(protection.Config{SignatureValidationKey: nil})
+
+		h := NewMigrate(log, mockAgentInfo, coord)
+		h.tamperProtectionFn = func() bool { return false }
+
+		require.NoError(t, h.Handle(t.Context(), action, ack))
+		coord.AssertNumberOfCalls(t, "Migrate", 1)
+
+		// ack not delegated to migrate coordinator, failure is reported
+		ack.AssertNumberOfCalls(t, "Ack", 0)
+		ack.AssertNumberOfCalls(t, "Commit", 0)
+		coord.AssertNumberOfCalls(t, "ReExec", 1)
+	})
 }
 
 type fakeMigrateCoordinator struct {
@@ -346,6 +406,16 @@ type fakeMigrateCoordinator struct {
 func (f *fakeMigrateCoordinator) Migrate(ctx context.Context, a *fleetapi.ActionMigrate, _ func(done <-chan struct{}) backoff.Backoff) error {
 	args := f.Called(ctx, a)
 	return args.Error(0)
+}
+
+func (f *fakeMigrateCoordinator) State() coordinator.State {
+	args := f.Called()
+	return args.Get(0).(coordinator.State)
+}
+
+func (f *fakeMigrateCoordinator) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
+	args := f.Called(ctx, comp, unit, name, params)
+	return args.Get(0).(map[string]interface{}), args.Error(1)
 }
 
 func (f *fakeMigrateCoordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string) {
