@@ -366,8 +366,8 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 
 	// 7. Compare both documents are equivalent
 	for _, tc := range tests[:3] {
-		agent := agentDocs[tc.dsType+"-"+tc.dsDataset+"-"+processNamespace].Hits.Hits[0].Source
-		otel := otelDocs[tc.dsType+"-"+tc.dsDataset+"-"+receiverNamespace].Hits.Hits[0].Source
+		agent := mapstr.M(agentDocs[tc.dsType+"-"+tc.dsDataset+"-"+processNamespace].Hits.Hits[0].Source).Flatten()
+		otel := mapstr.M(otelDocs[tc.dsType+"-"+tc.dsDataset+"-"+receiverNamespace].Hits.Hits[0].Source).Flatten()
 		ignoredFields := []string{
 			// Expected to change between agentDocs and OtelDocs
 			"@timestamp",
