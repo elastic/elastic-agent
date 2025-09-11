@@ -75,7 +75,8 @@ var (
 	CrossBuildMountModcache = EnvOr("CROSSBUILD_MOUNT_MODCACHE", "true") == "true"
 
 	// CrossBuildMountBuildCache mounts the Go build cache into golang-crossbuild containers
-	CrossBuildMountBuildCache = EnvOr("CROSSBUILD_MOUNT_GOCACHE", "true") == "true"
+	CrossBuildMountBuildCache      = EnvOr("CROSSBUILD_MOUNT_GOCACHE", "true") == "true"
+	CrossBuildBuildCacheVolumeName = "elastic-agent-crossbuild-build-cache"
 
 	BeatName        = EnvOr("BEAT_NAME", defaultName)
 	BeatServiceName = EnvOr("BEAT_SERVICE_NAME", BeatName)

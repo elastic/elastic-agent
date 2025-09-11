@@ -9,7 +9,6 @@ import (
 	"go/build"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -334,14 +333,9 @@ func (b GolangCrossBuilder) Build() error {
 
 	buildCacheLocation := "/tmp/.cache/go-build"
 	if CrossBuildMountBuildCache {
-		// Mount the go build cache into the container.
-		out, err := exec.Command("go", "env", "GOCACHE").Output()
-		if err != nil {
-			return fmt.Errorf("failed to get GOCACHE: %w", err)
-		}
-		cacheDir := strings.TrimSpace(string(out))
+		// Mount the go build cache volume into the container.
 		args = append(args,
-			"-v", fmt.Sprintf("%s:%s", cacheDir, buildCacheLocation),
+			"-v", fmt.Sprintf("%s:%s", CrossBuildBuildCacheVolumeName, buildCacheLocation),
 		)
 	}
 
@@ -368,7 +362,6 @@ func (b GolangCrossBuilder) Build() error {
 		"--env", fmt.Sprintf("DEV=%v", DevBuild),
 		"--env", fmt.Sprintf("EXTERNAL=%v", ExternalBuild),
 		"--env", fmt.Sprintf("FIPS=%v", FIPSBuild),
-		"--user", fmt.Sprintf("%d:%d", uid, gid),
 		"-v", repoInfo.RootDir+":"+mountPoint,
 		"-w", workDir,
 		image,
