@@ -50,6 +50,7 @@ import (
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	mockAcker "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/fleetapi/acker"
 )
 
 const (
@@ -535,9 +536,53 @@ func TestUpgradeSameErrorAcked(t *testing.T) {
 
 	acker.On("Ack", mock.Anything, actionUpgrade).Return(nil)
 
-	require.NoError(t, coord.Upgrade(t.Context(), "9.0", "http://localhost", actionUpgrade, true, true))
+	require.NoError(t, coord.Upgrade(t.Context(), "9.0", "http://localhost", actionUpgrade, WithSkipVerifyOverride(true), WithSkipDefaultPgp(true)))
 
 	acker.AssertCalled(t, "Ack", mock.Anything, actionUpgrade)
+}
+
+func TestPreUpgradeCallback(t *testing.T) {
+	coordCh := make(chan error)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	upgradeManager := &fakeUpgradeManager{
+		upgradeable: true,
+		upgradeErr:  upgrade.ErrUpgradeSameVersion,
+	}
+
+	acker := mockAcker.NewAcker(t)
+	coord, _, _ := createCoordinator(t, ctx,
+		ManagedCoordinator(true),
+		WithUpgradeManager(upgradeManager),
+		WithActionAcker(acker))
+
+	go func() {
+		err := coord.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			// allowed error
+			err = nil
+		}
+		coordCh <- err
+	}()
+
+	action := fleetapi.NewAction(fleetapi.ActionTypeUpgrade)
+	actionUpgrade, ok := action.(*fleetapi.ActionUpgrade)
+	require.True(t, ok)
+
+	preUpgradeCallbackErr := errors.New("pre upgrade callback error")
+
+	upgradeErr := coord.Upgrade(t.Context(), "9.0", "http://localhost", actionUpgrade,
+		WithSkipVerifyOverride(true), WithSkipDefaultPgp(true),
+		WithPreUpgradeCallback(func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error {
+			return preUpgradeCallbackErr
+		}))
+
+	assert.ErrorIs(t, preUpgradeCallbackErr, upgradeErr)
+	assert.Equal(t, preUpgradeCallbackErr, upgradeErr, "expected pre upgrade callback error")
+	assert.Eventually(t, func() bool {
+		return coord.State().UpgradeDetails.State == details.StateFailed
+	}, 10*time.Second, 100*time.Millisecond, "upgrade details are not set to failed")
 }
 
 func TestCoordinator_State_ConfigError_Managed(t *testing.T) {
@@ -917,7 +962,7 @@ func TestCoordinator_Upgrade(t *testing.T) {
 	require.NoError(t, err)
 	cfgMgr.Config(ctx, cfg)
 
-	err = coord.Upgrade(ctx, "9.0.0", "", nil, true, false)
+	err = coord.Upgrade(ctx, "9.0.0", "", nil, WithSkipVerifyOverride(true), WithSkipDefaultPgp(false))
 	require.ErrorIs(t, err, ErrNotUpgradable)
 	cancel()
 
@@ -954,7 +999,7 @@ func TestCoordinator_UpgradeDetails(t *testing.T) {
 	require.NoError(t, err)
 	cfgMgr.Config(ctx, cfg)
 
-	err = coord.Upgrade(ctx, "9.0.0", "", nil, true, false)
+	err = coord.Upgrade(ctx, "9.0.0", "", nil, WithSkipVerifyOverride(true), WithSkipDefaultPgp(false))
 	require.ErrorIs(t, expectedErr, err)
 	cancel()
 
