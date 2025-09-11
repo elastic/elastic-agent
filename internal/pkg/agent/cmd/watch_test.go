@@ -92,8 +92,7 @@ func TestInitUpgradeDetails(t *testing.T) {
 
 func Test_watchCmd(t *testing.T) {
 	type args struct {
-		cfg            *configuration.UpgradeWatcherConfig
-		extraWatchArgs []string
+		cfg *configuration.UpgradeWatcherConfig
 	}
 	tests := []struct {
 		name               string
