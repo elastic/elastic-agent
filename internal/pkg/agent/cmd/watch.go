@@ -112,9 +112,9 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 		},
 	}
 	cmd.Flags().BoolP(takedownFlagName, takedownFlagShorthand, false, "Take down the running watcher")
-	cmd.Flags().MarkHidden(takedownFlagName) //nolint:errcheck // not required
+	_ = cmd.Flags().MarkHidden(takedownFlagName) //nolint:errcheck // not required
 	cmd.Flags().StringP(rollbackFlagName, rollbackFlagShorthand, "", "Versioned home to roll back to")
-	cmd.Flags().MarkHidden(rollbackFlagName)
+	_ = cmd.Flags().MarkHidden(rollbackFlagName)
 	return cmd
 }
 
