@@ -713,6 +713,122 @@ outputs:
 	})
 }
 
+<<<<<<< HEAD
+=======
+// TestBeatsReceiverLogs is a test that compares logs emitted by beats processes to those emitted by beats receivers.
+func TestBeatsReceiverLogs(t *testing.T) {
+	_ = define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: nil,
+	})
+
+	t.Skip("Skip this test as it's flaky. See https://github.com/elastic/elastic-agent/issues/9890")
+
+	type configOptions struct {
+		RuntimeExperimental string
+	}
+	configTemplate := `agent.logging.level: info
+agent.logging.to_stderr: true
+agent.logging.to_files: false
+inputs:
+  # Collecting system metrics
+  - type: system/metrics
+    id: unique-system-metrics-input
+    _runtime_experimental: {{.RuntimeExperimental}}
+    streams:
+      - metricsets:
+        - cpu
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [http://localhost:9200]
+    api_key: placeholder
+agent.monitoring.enabled: false
+`
+
+	var configBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			configOptions{
+				RuntimeExperimental: "process",
+			}))
+	processConfig := configBuffer.Bytes()
+	require.NoError(t,
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			configOptions{
+				RuntimeExperimental: "otel",
+			}))
+	receiverConfig := configBuffer.Bytes()
+	// this is the context for the whole test, with a global timeout defined
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	// use a subcontext for the agent
+	agentProcessCtx, agentProcessCancel := context.WithCancel(ctx)
+	fixture, cmd, output := prepareAgentCmd(t, agentProcessCtx, processConfig)
+
+	require.NoError(t, cmd.Start())
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(agentProcessCtx)
+		assert.NoError(collect, statusErr)
+		assertBeatsHealthy(collect, &status, component.ProcessRuntimeManager, 1)
+		return
+	}, 1*time.Minute, 1*time.Second)
+
+	agentProcessCancel()
+	require.Error(t, cmd.Wait())
+	processLogsString := output.String()
+	output.Reset()
+
+	// use a subcontext for the agent
+	agentReceiverCtx, agentReceiverCancel := context.WithCancel(ctx)
+	fixture, cmd, output = prepareAgentCmd(t, agentReceiverCtx, receiverConfig)
+
+	require.NoError(t, cmd.Start())
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(agentReceiverCtx)
+		assert.NoError(collect, statusErr)
+		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 1)
+		return
+	}, 1*time.Minute, 1*time.Second)
+	agentReceiverCancel()
+	require.Error(t, cmd.Wait())
+	receiverLogsString := output.String()
+
+	processLog := getBeatStartLogRecord(processLogsString)
+	assert.NotEmpty(t, processLog)
+	receiverLog := getBeatStartLogRecord(receiverLogsString)
+	assert.NotEmpty(t, receiverLog)
+
+	// Check that the process log is a subset of the receiver log
+	for key, value := range processLog {
+		assert.Contains(t, receiverLog, key)
+		if key == "@timestamp" { // the timestamp value will be different
+			continue
+		}
+		assert.Equal(t, value, receiverLog[key])
+	}
+}
+
+>>>>>>> ba9c15651 (Disable flaky test TestBeatsReceiverLogs (#9891))
 func assertCollectorComponentsHealthy(t *assert.CollectT, status *atesting.AgentStatusCollectorOutput) {
 	assert.Equal(t, int(cproto.CollectorComponentStatus_StatusOK), status.Status, "component status should be ok")
 	assert.Equal(t, "", status.Error, "component status should not have an error")
