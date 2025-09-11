@@ -3,24 +3,24 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: agent-autoops-elastic-agent
-  namespace: "kube-system"
+  name: agent-autoops-example
+  namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-9.2.0-beta
     app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: elastic-agent
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.2.0
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
 kind: Secret
 metadata:
-  name: agent-autoops-elastic-agent
-  namespace: "kube-system"
+  name: agent-autoops-example
+  namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-9.2.0-beta
     app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: elastic-agent
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.2.0
 stringData:
 
@@ -76,119 +76,119 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: agent-autoops-elastic-agent-autoops
-  namespace: "kube-system"
+  name: agent-autoops-example-autoops
+  namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-9.2.0-beta
     app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: elastic-agent
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.2.0
 stringData:
   autoops-token: "REPLACE_ME_TOKEN"
   autoops-es-url: "https://ccm-test-eu-west-1.es.us-east-2.aws.elastic-cloud.com"
-  temp-resource-id:
-  otel-url:
+  temp-resource-id: 
+  otel-url: 
   es-api-key: "REPLACE_ME_API_KEY"
-  cloud-connected-mode-api-key:
+  cloud-connected-mode-api-key: 
   cloud-connected-mode-api-url:
 ---
 # Source: elastic-agent/templates/agent/k8s/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: agent-autoops-elastic-agent
-  namespace: "kube-system"
+  name: agent-autoops-example
+  namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-9.2.0-beta
     app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: elastic-agent
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.2.0
 spec:
   selector:
     matchLabels:
-      name: agent-autoops-elastic-agent
+      name: agent-autoops-example
   template:
     metadata:
       labels:
-        name: agent-autoops-elastic-agent
+        name: agent-autoops-example
       annotations:
         checksum/config: e89ad87aab4abdf0b266914a815ddd71744340acbec3678f63b018cfe85334df
     spec:
       automountServiceAccountToken: true
       containers:
-        - args:
-            - otel
-            - --config
-            - /etc/elastic-agent/agent.yml
-          command:
-            - elastic-agent
-          env:
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: STATE_PATH
-              value: /usr/share/elastic-agent/state
-            - name: AUTOOPS_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  key: autoops-token
-                  name: agent-autoops-elastic-agent-autoops
-            - name: AUTOOPS_TEMP_RESOURCE_ID
-              valueFrom:
-                secretKeyRef:
-                  key: temp-resource-id
-                  name: agent-autoops-elastic-agent-autoops
-            - name: AUTOOPS_OTEL_URL
-              valueFrom:
-                secretKeyRef:
-                  key: otel-url
-                  name: agent-autoops-elastic-agent-autoops
-            - name: AUTOOPS_ES_URL
-              valueFrom:
-                secretKeyRef:
-                  key: autoops-es-url
-                  name: agent-autoops-elastic-agent-autoops
-            - name: ELASTICSEARCH_READ_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  key: es-api-key
-                  name: agent-autoops-elastic-agent-autoops
-            - name: ELASTIC_CLOUD_CONNECTED_MODE_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  key: cloud-connected-mode-api-key
-                  name: agent-autoops-elastic-agent-autoops
-            - name: ELASTIC_CLOUD_CONNECTED_MODE_API_URL
-              valueFrom:
-                secretKeyRef:
-                  key: cloud-connected-mode-api-url
-                  name: agent-autoops-elastic-agent-autoops
-                  optional: true
-          image: docker.elastic.co/elastic-agent/elastic-agent:9.2.0-SNAPSHOT
-          imagePullPolicy: IfNotPresent
-          name: agent
-          securityContext:
-            runAsUser: 0
-          volumeMounts:
-            - mountPath: /usr/share/elastic-agent/state
-              name: agent-data
-            - mountPath: /etc/elastic-agent/agent.yml
-              name: config
-              readOnly: true
-              subPath: agent.yml
+      - args:
+        - otel
+        - --config
+        - /etc/elastic-agent/agent.yml
+        command:
+        - elastic-agent
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: STATE_PATH
+          value: /usr/share/elastic-agent/state
+        - name: AUTOOPS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: autoops-token
+              name: agent-autoops-example-autoops
+        - name: AUTOOPS_TEMP_RESOURCE_ID
+          valueFrom:
+            secretKeyRef:
+              key: temp-resource-id
+              name: agent-autoops-example-autoops
+        - name: AUTOOPS_OTEL_URL
+          valueFrom:
+            secretKeyRef:
+              key: otel-url
+              name: agent-autoops-example-autoops
+        - name: AUTOOPS_ES_URL
+          valueFrom:
+            secretKeyRef:
+              key: autoops-es-url
+              name: agent-autoops-example-autoops
+        - name: ELASTICSEARCH_READ_API_KEY
+          valueFrom:
+            secretKeyRef:
+              key: es-api-key
+              name: agent-autoops-example-autoops
+        - name: ELASTIC_CLOUD_CONNECTED_MODE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              key: cloud-connected-mode-api-key
+              name: agent-autoops-example-autoops
+        - name: ELASTIC_CLOUD_CONNECTED_MODE_API_URL
+          valueFrom:
+            secretKeyRef:
+              key: cloud-connected-mode-api-url
+              name: agent-autoops-example-autoops
+              optional: true
+        image: docker.elastic.co/elastic-agent/elastic-agent:9.2.0-SNAPSHOT
+        imagePullPolicy: IfNotPresent
+        name: agent
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /usr/share/elastic-agent/state
+          name: agent-data
+        - mountPath: /etc/elastic-agent/agent.yml
+          name: config
+          readOnly: true
+          subPath: agent.yml
       dnsPolicy: ClusterFirstWithHostNet
       nodeSelector:
         kubernetes.io/os: linux
-      serviceAccountName: agent-autoops-elastic-agent
+      serviceAccountName: agent-autoops-example
       volumes:
-        - emptyDir: {}
-          name: agent-data
-        - name: config
-          secret:
-            defaultMode: 292
-            secretName: agent-autoops-elastic-agent
+      - emptyDir: {}
+        name: agent-data
+      - name: config
+        secret:
+          defaultMode: 292
+          secretName: agent-autoops-example
