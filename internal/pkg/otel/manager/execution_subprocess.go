@@ -13,6 +13,8 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
+	"go.opentelemetry.io/collector/component"
 	"gopkg.in/yaml.v3"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -34,7 +36,17 @@ const (
 	OtelSupervisedLoggingLevelFlagName = "supervised.logging.level"
 )
 
-func newSubprocessExecution(logLevel logp.Level, collectorPath string) *subprocessExecution {
+func newSubprocessExecution(logLevel logp.Level, collectorPath string) (*subprocessExecution, error) {
+	nsUUID, err := uuid.NewV4()
+	if err != nil {
+		return nil, fmt.Errorf("cannot generate UUID: %w", err)
+	}
+	componentType, err := component.NewType(healthCheckExtensionName)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create component type: %w", err)
+	}
+	healthCheckExtensionID := component.NewIDWithName(componentType, nsUUID.String()).String()
+
 	return &subprocessExecution{
 		collectorPath: collectorPath,
 		collectorArgs: []string{
@@ -42,14 +54,16 @@ func newSubprocessExecution(logLevel logp.Level, collectorPath string) *subproce
 			fmt.Sprintf("--%s", OtelSetSupervisedFlagName),
 			fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, logLevel.String()),
 		},
-		logLevel: logLevel,
-	}
+		logLevel:               logLevel,
+		healthCheckExtensionID: healthCheckExtensionID,
+	}, nil
 }
 
 type subprocessExecution struct {
-	collectorPath string
-	collectorArgs []string
-	logLevel      logp.Level
+	collectorPath          string
+	collectorArgs          []string
+	logLevel               logp.Level
+	healthCheckExtensionID string
 }
 
 // startCollector starts a supervised collector and monitors its health. Process exit errors are sent to the
@@ -75,7 +89,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 		return nil, fmt.Errorf("could not find port for http health check: %w", err)
 	}
 
-	if err := injectHeathCheckV2Extension(cfg, httpHealthCheckPort); err != nil {
+	if err := injectHeathCheckV2Extension(cfg, r.healthCheckExtensionID, httpHealthCheckPort); err != nil {
 		return nil, fmt.Errorf("failed to inject health check extension: %w", err)
 	}
 
