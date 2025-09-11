@@ -86,11 +86,11 @@ metadata:
 stringData:
   autoops-token: "REPLACE_ME_TOKEN"
   autoops-es-url: "https://ccm-test-eu-west-1.es.us-east-2.aws.elastic-cloud.com"
-  temp-resource-id: 
-  otel-url: 
+  temp-resource-id: "REPLACE_ME_RESOURCE_ID"
+  otel-url: "https://otel.example.com:4318"
   es-api-key: "REPLACE_ME_API_KEY"
-  cloud-connected-mode-api-key: 
-  cloud-connected-mode-api-url:
+  cloud-connected-mode-api-key: "CCM-API-KEY"
+  cloud-connected-mode-api-url: "CCM-API-URL"
 ---
 # Source: elastic-agent/templates/agent/k8s/deployment.yaml
 apiVersion: apps/v1

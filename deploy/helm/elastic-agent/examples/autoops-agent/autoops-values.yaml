@@ -10,3 +10,5 @@ autoOps:
   autoops_otel_url: "https://otel.example.com:4318"
   autoops_temp_resource_id: "REPLACE_ME_RESOURCE_ID"
   es_api_key: "REPLACE_ME_API_KEY"
+  elastic_cloud_connected_mode_api_key: "CCM-API-KEY"
+  elastic_cloud_connected_mode_api_url: "CCM-API-URL"
