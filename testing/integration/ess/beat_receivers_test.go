@@ -379,6 +379,10 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 			"data_stream.namespace",
 			"elastic_agent.id",
 			"event.ingested",
+
+			// only in receiver doc
+			"agent.otelcol.component.id",
+			"agent.otelcol.component.kind",
 		}
 		switch tc.onlyCompareKeys {
 		case true:
@@ -583,6 +587,10 @@ outputs:
 			"data_stream.namespace",
 			"event.ingested",
 			"event.duration",
+
+			// only in receiver doc
+			"agent.otelcol.component.id",
+			"agent.otelcol.component.kind",
 		}
 
 		stripNondeterminism := func(m mapstr.M, mset string) {
