@@ -5,7 +5,7 @@ In this example we deploy an Elastic AutoOps Agent that is managed by Opex team 
 
 ## Run:
 
-There 2 kind of installations, related to auth method
+There are 2 kinds of installations, related to auth method
 
 ### for API_KEY installation
 
