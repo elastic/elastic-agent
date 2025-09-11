@@ -9,6 +9,12 @@ package manager
 import (
 	"context"
 	"errors"
+<<<<<<< HEAD
+=======
+	"os"
+	"path/filepath"
+	"strings"
+>>>>>>> d8ea9a02e (fix: load healthcheck v2 once when edot is running as subprocess (#9848))
 	"sync"
 	"testing"
 	"time"
@@ -64,7 +70,561 @@ var (
 	}
 )
 
+<<<<<<< HEAD
 func TestOTelManager_Run(t *testing.T) {
+=======
+type testExecution struct {
+	mtx    sync.Mutex
+	exec   collectorExecution
+	handle collectorHandle
+}
+
+func (e *testExecution) startCollector(ctx context.Context, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus) (collectorHandle, error) {
+	e.mtx.Lock()
+	defer e.mtx.Unlock()
+
+	var err error
+	e.handle, err = e.exec.startCollector(ctx, logger, cfg, errCh, statusCh)
+	return e.handle, err
+}
+
+func (e *testExecution) getProcessHandle() collectorHandle {
+	e.mtx.Lock()
+	defer e.mtx.Unlock()
+
+	return e.handle
+}
+
+var _ collectorExecution = &mockExecution{}
+
+type mockExecution struct {
+	errCh            chan error
+	statusCh         chan *status.AggregateStatus
+	cfg              *confmap.Conf
+	collectorStarted chan struct{}
+}
+
+func (e *mockExecution) startCollector(
+	ctx context.Context,
+	_ *logger.Logger,
+	cfg *confmap.Conf,
+	errCh chan error,
+	statusCh chan *status.AggregateStatus,
+) (collectorHandle, error) {
+	e.errCh = errCh
+	e.statusCh = statusCh
+	e.cfg = cfg
+	stopCh := make(chan struct{})
+	collectorCtx, collectorCancel := context.WithCancel(ctx)
+	go func() {
+		<-collectorCtx.Done()
+		close(stopCh)
+		reportErr(ctx, errCh, nil)
+	}()
+	handle := &mockCollectorHandle{
+		stopCh: stopCh,
+		cancel: collectorCancel,
+	}
+	e.collectorStarted <- struct{}{}
+	return handle, nil
+}
+
+var _ collectorHandle = &mockCollectorHandle{}
+
+type mockCollectorHandle struct {
+	stopCh chan struct{}
+	cancel context.CancelFunc
+}
+
+func (h *mockCollectorHandle) Stop(ctx context.Context) {
+	h.cancel()
+	select {
+	case <-ctx.Done():
+	case <-h.stopCh:
+	}
+}
+
+// EventListener listens to the events from the OTelManager and stores the latest error and status.
+type EventListener struct {
+	mtx    sync.Mutex
+	err    *EventTime[error]
+	status *EventTime[*status.AggregateStatus]
+}
+
+// Listen starts listening to the error and status channels. It updates the latest error and status in the
+// EventListener.
+func (e *EventListener) Listen(ctx context.Context, errorCh <-chan error, statusCh <-chan *status.AggregateStatus) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case c := <-statusCh:
+			e.mtx.Lock()
+			e.status = &EventTime[*status.AggregateStatus]{val: c, time: time.Now()}
+			e.mtx.Unlock()
+		case c := <-errorCh:
+			e.mtx.Lock()
+			e.err = &EventTime[error]{val: c, time: time.Now()}
+			e.mtx.Unlock()
+		}
+	}
+}
+
+// getError retrieves the latest error from the EventListener.
+func (e *EventListener) getError() error {
+	e.mtx.Lock()
+	defer e.mtx.Unlock()
+	return e.err.Value()
+}
+
+// getStatus retrieves the latest status from the EventListener.
+func (e *EventListener) getStatus() *status.AggregateStatus {
+	e.mtx.Lock()
+	defer e.mtx.Unlock()
+	return e.status.Value()
+}
+
+// EnsureHealthy ensures that the OTelManager is healthy by checking the latest error and status.
+func (e *EventListener) EnsureHealthy(t *testing.T, u time.Time) {
+	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+		e.mtx.Lock()
+		latestErr := e.err
+		latestStatus := e.status
+		e.mtx.Unlock()
+
+		// we expect to have a reported error which is nil and a reported status which is StatusOK
+		require.NotNil(collect, latestErr)
+		assert.Nil(collect, latestErr.Value())
+		assert.False(collect, latestErr.Before(u))
+		require.NotNil(collect, latestStatus)
+		require.NotNil(collect, latestStatus.Value())
+		assert.False(collect, latestStatus.Before(u))
+		require.Equal(collect, componentstatus.StatusOK, latestStatus.Value().Status())
+	}, 60*time.Second, 1*time.Second, "otel collector never got healthy")
+}
+
+// EnsureOffWithoutError ensures that the OTelManager is off without an error by checking the latest error and status.
+func (e *EventListener) EnsureOffWithoutError(t *testing.T, u time.Time) {
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		e.mtx.Lock()
+		latestErr := e.err
+		latestStatus := e.status
+		e.mtx.Unlock()
+
+		// we expect to have a reported error which is nil and a reported status which is nil
+		require.NotNil(collect, latestErr)
+		assert.Nil(collect, latestErr.Value())
+		assert.False(collect, latestErr.Before(u))
+		require.NotNil(collect, latestStatus)
+		assert.Nil(collect, latestStatus.Value())
+		assert.False(collect, latestStatus.Before(u))
+	}, 60*time.Second, 1*time.Second, "otel collector never stopped without an error")
+}
+
+// EnsureOffWithError ensures that the OTelManager is off with an error by checking the latest error and status.
+func (e *EventListener) EnsureOffWithError(t *testing.T, u time.Time) {
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		e.mtx.Lock()
+		latestErr := e.err
+		latestStatus := e.status
+		e.mtx.Unlock()
+
+		// we expect to have a reported error which is not nil and a reported status which is nil
+		require.False(collect, latestErr == nil || latestErr.Before(u) || latestErr.Value() == nil)
+		require.False(collect, latestStatus == nil || latestStatus.Before(u) || latestStatus.Value() != nil)
+	}, 60*time.Second, 1*time.Second, "otel collector never errored with an error")
+}
+
+// EventTime is a wrapper around a time.Time and a value of type T. It provides methods to compare the time and retrieve the value.
+type EventTime[T interface{}] struct {
+	time time.Time
+	val  T
+}
+
+// Before checks if the EventTime's time is before the given time u.
+func (t *EventTime[T]) Before(u time.Time) bool {
+	return t != nil && t.time.Before(u)
+}
+
+// Value retrieves the value of type T from the EventTime. If the EventTime is nil, it returns the zero value of T.
+func (t *EventTime[T]) Value() T {
+	if t == nil {
+		var zero T
+		return zero
+	}
+	return t.val
+}
+
+// Time retrieves the time associated with the EventTime. If the EventTime is nil, it returns the zero value of time.Time.
+func (t *EventTime[T]) Time() time.Time {
+	if t == nil {
+		return time.Time{}
+	}
+	return t.time
+}
+
+func countHealthCheckExtensionStatuses(status *status.AggregateStatus) uint {
+	extensions, ok := status.ComponentStatusMap["extensions"]
+	if !ok {
+		return 0
+	}
+
+	count := uint(0)
+	for key := range extensions.ComponentStatusMap {
+		if strings.HasPrefix(key, "extension:healthcheckv2/") {
+			count++
+		}
+	}
+
+	return count
+}
+
+func TestOTelManager_Run(t *testing.T) {
+	wd, erWd := os.Getwd()
+	require.NoError(t, erWd, "cannot get working directory")
+
+	testBinary := filepath.Join(wd, "testing", "testing")
+	require.FileExists(t, testBinary, "testing binary not found")
+
+	for _, tc := range []struct {
+		name                string
+		exec                func() (collectorExecution, error)
+		restarter           collectorRecoveryTimer
+		skipListeningErrors bool
+		testFn              func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution)
+	}{
+		{
+			name: "embedded collector config updates",
+			exec: func() (collectorExecution, error) {
+				return newExecutionEmbedded(), nil
+			},
+			restarter: newRestarterNoop(),
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
+				// ensure that it got healthy
+				cfg := confmap.NewFromStringMap(testConfig)
+				updateTime := time.Now()
+				m.Update(cfg, nil)
+				e.EnsureHealthy(t, updateTime)
+
+				// trigger update (no config compare is due externally to otel collector)
+				updateTime = time.Now()
+				m.Update(cfg, nil)
+				e.EnsureHealthy(t, updateTime)
+
+				// no configuration should stop the runner
+				updateTime = time.Now()
+				m.Update(nil, nil)
+				e.EnsureOffWithoutError(t, updateTime)
+				require.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
+			},
+		},
+		{
+			name: "subprocess collector config updates",
+			exec: func() (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary)
+			},
+			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
+				// ensure that it got healthy
+				cfg := confmap.NewFromStringMap(testConfig)
+				updateTime := time.Now()
+				m.Update(cfg, nil)
+				e.EnsureHealthy(t, updateTime)
+
+				// trigger update (no config compare is due externally to otel collector)
+				updateTime = time.Now()
+				m.Update(cfg, nil)
+				e.EnsureHealthy(t, updateTime)
+
+				// no configuration should stop the runner
+				updateTime = time.Now()
+				m.Update(nil, nil)
+				e.EnsureOffWithoutError(t, updateTime)
+				assert.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
+				assert.Equal(t, uint32(0), m.recoveryRetries.Load(), "recovery retries should be 0")
+			},
+		},
+		{
+			name: "embedded collector stopped gracefully outside manager",
+			exec: func() (collectorExecution, error) {
+				return newExecutionEmbedded(), nil
+			},
+			restarter: newRestarterNoop(),
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
+				// ensure that it got healthy
+				cfg := confmap.NewFromStringMap(testConfig)
+				updateTime := time.Now()
+				m.Update(cfg, nil)
+				e.EnsureHealthy(t, updateTime)
+
+				// stop it, this should be restarted by the manager
+				updateTime = time.Now()
+				require.NotNil(t, exec.handle, "exec handle should not be nil")
+				exec.handle.Stop(t.Context())
+				e.EnsureHealthy(t, updateTime)
+
+				// no configuration should stop the runner
+				updateTime = time.Now()
+				m.Update(nil, nil)
+				e.EnsureOffWithoutError(t, updateTime)
+				require.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
+			},
+		},
+		{
+			name: "subprocess collector stopped gracefully outside manager",
+			exec: func() (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary)
+			},
+			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
+				// ensure that it got healthy
+				cfg := confmap.NewFromStringMap(testConfig)
+				updateTime := time.Now()
+				m.Update(cfg, nil)
+				e.EnsureHealthy(t, updateTime)
+
+				// stop it, this should be restarted by the manager
+				updateTime = time.Now()
+				require.NotNil(t, exec.handle, "exec handle should not be nil")
+				exec.handle.Stop(t.Context())
+				e.EnsureHealthy(t, updateTime)
+				assert.EqualValues(t, 1, countHealthCheckExtensionStatuses(e.getStatus()), "health check extension status count should be 1")
+
+				// no configuration should stop the runner
+				updateTime = time.Now()
+				m.Update(nil, nil)
+				e.EnsureOffWithoutError(t, updateTime)
+				assert.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
+				assert.Equal(t, uint32(0), m.recoveryRetries.Load(), "recovery retries should be 0")
+			},
+		},
+		{
+			name: "subprocess collector killed outside manager",
+			exec: func() (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary)
+			},
+			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
+				// ensure that it got healthy
+				cfg := confmap.NewFromStringMap(testConfig)
+				updateTime := time.Now()
+				m.Update(cfg, nil)
+				e.EnsureHealthy(t, updateTime)
+				assert.EqualValues(t, 1, countHealthCheckExtensionStatuses(e.getStatus()), "health check extension status count should be 1")
+
+				var oldPHandle *procHandle
+				// repeatedly kill the collector
+				for i := 0; i < 3; i++ {
+					// kill it
+					handle := exec.getProcessHandle()
+					require.NotNil(t, handle, "exec handle should not be nil, iteration ", i)
+					pHandle, ok := handle.(*procHandle)
+					require.True(t, ok, "exec handle should be of type procHandle, iteration ", i)
+					if oldPHandle != nil {
+						require.NotEqual(t, pHandle.processInfo.PID, oldPHandle.processInfo.PID, "processes PIDs should be different, iteration ", i)
+					}
+					oldPHandle = pHandle
+					require.NoError(t, pHandle.processInfo.Kill(), "failed to kill collector process, iteration ", i)
+					// the collector should restart and report healthy
+					updateTime = time.Now()
+					e.EnsureHealthy(t, updateTime)
+					assert.EqualValues(t, 1, countHealthCheckExtensionStatuses(e.getStatus()), "health check extension status count should be 1")
+				}
+
+				seenRecoveredTimes := m.recoveryRetries.Load()
+
+				// no configuration should stop the runner
+				updateTime = time.Now()
+				m.Update(nil, nil)
+				e.EnsureOffWithoutError(t, updateTime)
+				assert.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
+				assert.Equal(t, uint32(3), seenRecoveredTimes, "recovery retries should be 3")
+			},
+		},
+		{
+			name: "subprocess collector panics",
+			exec: func() (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary)
+			},
+			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
+				err := os.Setenv("TEST_SUPERVISED_COLLECTOR_PANIC", (3 * time.Second).String())
+				require.NoError(t, err, "failed to set TEST_SUPERVISED_COLLECTOR_PANIC env var")
+				t.Cleanup(func() {
+					_ = os.Unsetenv("TEST_SUPERVISED_COLLECTOR_PANIC")
+				})
+
+				// ensure that it got healthy
+				cfg := confmap.NewFromStringMap(testConfig)
+				m.Update(cfg, nil)
+
+				seenRecoveredTimes := uint32(0)
+				require.Eventually(t, func() bool {
+					seenRecoveredTimes = m.recoveryRetries.Load()
+					return seenRecoveredTimes > 2
+				}, time.Minute, time.Second, "expected recovered times to be at least 3, got %d", seenRecoveredTimes)
+
+				err = os.Unsetenv("TEST_SUPERVISED_COLLECTOR_PANIC")
+				require.NoError(t, err, "failed to unset TEST_SUPERVISED_COLLECTOR_PANIC env var")
+				updateTime := time.Now()
+				e.EnsureHealthy(t, updateTime)
+
+				// no configuration should stop the runner
+				updateTime = time.Now()
+				m.Update(nil, nil)
+				e.EnsureOffWithoutError(t, updateTime)
+				require.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
+				assert.GreaterOrEqual(t, uint32(3), seenRecoveredTimes, "recovery retries should be 3")
+			},
+		},
+		{
+			name: "embedded collector invalid config",
+			exec: func() (collectorExecution, error) {
+				return newExecutionEmbedded(), nil
+			},
+			restarter:           newRestarterNoop(),
+			skipListeningErrors: true,
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
+				// Errors channel is non-blocking, should be able to send an Update that causes an error multiple
+				// times without it blocking on sending over the errCh.
+				for range 3 {
+					cfg := confmap.New() // invalid config
+					m.Update(cfg, nil)
+
+					// delay between updates to ensure the collector will have to fail
+					<-time.After(100 * time.Millisecond)
+				}
+
+				// because of the retry logic and timing we need to ensure
+				// that this keeps retrying to see the error and only store
+				// an actual error
+				//
+				// a nil error just means that the collector is trying to restart
+				// which clears the error on the restart loop
+				timeoutCh := time.After(time.Second * 5)
+				var err error
+			outer:
+				for {
+					select {
+					case e := <-m.Errors():
+						if e != nil {
+							err = e
+							break outer
+						}
+					case <-timeoutCh:
+						break outer
+					}
+				}
+				assert.Error(t, err, "otel manager should have returned an error")
+			},
+		},
+		{
+			name: "subprocess collector invalid config",
+			exec: func() (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary)
+			},
+			restarter:           newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
+			skipListeningErrors: true,
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
+				// Errors channel is non-blocking, should be able to send an Update that causes an error multiple
+				// times without it blocking on sending over the errCh.
+				for range 3 {
+					cfg := confmap.New() // invalid config
+					m.Update(cfg, nil)
+
+					// delay between updates to ensure the collector will have to fail
+					<-time.After(100 * time.Millisecond)
+				}
+
+				// because of the retry logic and timing we need to ensure
+				// that this keeps retrying to see the error and only store
+				// an actual error
+				//
+				// a nil error just means that the collector is trying to restart
+				// which clears the error on the restart loop
+				timeoutCh := time.After(time.Second * 5)
+				var err error
+			outer:
+				for {
+					select {
+					case e := <-m.Errors():
+						if e != nil {
+							err = e
+							break outer
+						}
+					case <-timeoutCh:
+						break outer
+					}
+				}
+				assert.Error(t, err, "otel manager should have returned an error")
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			l, _ := loggertest.New("otel")
+			base, obs := loggertest.New("otel")
+
+			executionMode, err := tc.exec()
+			require.NoError(t, err, "failed to create execution mode")
+			testExecutionMode := &testExecution{exec: executionMode}
+
+			m := &OTelManager{
+				logger:            l,
+				baseLogger:        base,
+				errCh:             make(chan error, 1), // holds at most one error
+				updateCh:          make(chan configUpdate),
+				collectorStatusCh: make(chan *status.AggregateStatus),
+				componentStateCh:  make(chan []runtime.ComponentComponentState, 1),
+				doneChan:          make(chan struct{}),
+				recoveryTimer:     tc.restarter,
+				execution:         testExecutionMode,
+			}
+
+			eListener := &EventListener{}
+			defer func() {
+				if !t.Failed() {
+					return
+				}
+				t.Logf("latest received err: %s", eListener.getError())
+				t.Logf("latest received status: %s", statusToYaml(eListener.getStatus()))
+				for _, entry := range obs.All() {
+					t.Logf("%+v", entry)
+				}
+			}()
+
+			runWg := sync.WaitGroup{}
+			runWg.Add(1)
+			go func() {
+				defer runWg.Done()
+				if !tc.skipListeningErrors {
+					eListener.Listen(ctx, m.Errors(), m.WatchCollector())
+				} else {
+					eListener.Listen(ctx, nil, m.WatchCollector())
+				}
+			}()
+
+			var runErr error
+			runWg.Add(1)
+			go func() {
+				defer runWg.Done()
+				runErr = m.Run(ctx)
+			}()
+
+			tc.testFn(t, m, eListener, testExecutionMode)
+
+			cancel()
+			runWg.Wait()
+			if !errors.Is(runErr, context.Canceled) {
+				t.Errorf("otel manager returned unexpected error: %v", runErr)
+			}
+		})
+	}
+}
+
+func TestOTelManager_Logging(t *testing.T) {
+>>>>>>> d8ea9a02e (fix: load healthcheck v2 once when edot is running as subprocess (#9848))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	l, _ := loggertest.New("otel")

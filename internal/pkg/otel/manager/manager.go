@@ -42,7 +42,42 @@ type OTelManager struct {
 }
 
 // NewOTelManager returns a OTelManager.
+<<<<<<< HEAD
 func NewOTelManager(logger *logger.Logger) *OTelManager {
+=======
+func NewOTelManager(
+	logger *logger.Logger,
+	logLevel logp.Level,
+	baseLogger *logger.Logger,
+	mode ExecutionMode,
+	agentInfo info.Agent,
+	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter,
+) (*OTelManager, error) {
+	var exec collectorExecution
+	var recoveryTimer collectorRecoveryTimer
+	switch mode {
+	case SubprocessExecutionMode:
+		// NOTE: if we stop embedding the collector binary in elastic-agent, we need to
+		// change this
+		executable, err := os.Executable()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get the path to the collector executable: %w", err)
+		}
+		recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
+		exec, err = newSubprocessExecution(logLevel, executable)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create subprocess execution: %w", err)
+		}
+	case EmbeddedExecutionMode:
+		recoveryTimer = newRestarterNoop()
+		exec = newExecutionEmbedded()
+	default:
+		return nil, errors.New("unknown otel collector exec")
+	}
+
+	logger.Debugf("Using collector execution mode: %s", mode)
+
+>>>>>>> d8ea9a02e (fix: load healthcheck v2 once when edot is running as subprocess (#9848))
 	return &OTelManager{
 		logger:   logger,
 		errCh:    make(chan error, 1), // holds at most one error
