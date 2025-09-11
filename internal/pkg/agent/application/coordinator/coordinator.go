@@ -360,6 +360,11 @@ type Coordinator struct {
 
 	// Abstraction for diagnostics AddSecretMarkers function for testability
 	secretMarkerFunc func(*logger.Logger, *config.Config) error
+
+	// migrationProgressWg is used to block processing of incoming policies after enroll is done
+	// incomming policies are blocked until we reboot so components receiving proxied MIGRATE action
+	// are not confused
+	isMigrationProgress bool
 }
 
 // The channels Coordinator reads to receive updates from the various managers.
@@ -676,23 +681,31 @@ func (c *Coordinator) Migrate(ctx context.Context, action *fleetapi.ActionMigrat
 		return fmt.Errorf("failed to clean backup config: %w", err)
 	}
 
+	c.bestEffortUnenroll(ctx, originalOptions)
+	c.isMigrationProgress = true
+
+	return nil
+}
+
+func (c *Coordinator) bestEffortUnenroll(ctx context.Context, originalOptions enroll.EnrollOptions) {
 	originalRemoteConfig, err := originalOptions.RemoteConfig(false)
 	if err != nil {
-		return fmt.Errorf("failed to construct original remote config: %w", err)
+		c.logger.Warnf("failed to construct original remote config: %v", err)
+		return
 	}
 
 	originalClient, err := fleetapiClient.NewAuthWithConfig(
 		c.logger, originalOptions.EnrollAPIKey, originalRemoteConfig)
 	if err != nil {
-		return fmt.Errorf("failed to create original fleet client: %w", err)
+		c.logger.Warnf("failed to create original fleet client: %v", err)
+		return
 	}
 
 	// Best effort: call unenroll on source cluster once done
 	if err := c.unenroll(ctx, originalClient); err != nil {
 		c.logger.Warnf("failed to unenroll from original cluster: %v", err)
+		return
 	}
-
-	return nil
 }
 
 type upgradeOpts struct {
@@ -1511,6 +1524,10 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 
 // Always called on the main Coordinator goroutine.
 func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (err error) {
+	if c.isMigrationProgress {
+		return nil
+	}
+
 	if c.otelMgr != nil {
 		c.otelCfg = cfg.OTel
 	}
