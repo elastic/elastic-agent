@@ -89,8 +89,8 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| [apikeyauthextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apikeyauthextension/v0.3.0/extension/apikeyauthextension/README.md) | v0.3.0 |
-| [apmconfigextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apmconfigextension/v0.5.0/extension/apmconfigextension/README.md) | v0.5.0 |
+| [apikeyauthextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apikeyauthextension/v0.4.1/extension/apikeyauthextension/README.md) | v0.4.1 |
+| [apmconfigextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apmconfigextension/v0.6.0/extension/apmconfigextension/README.md) | v0.6.0 |
 | [bearertokenauthextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/bearertokenauthextension/v0.130.0/extension/bearertokenauthextension/README.md) | v0.130.0 |
 | [filestorage](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/storage/filestorage/v0.130.0/extension/storage/filestorage/README.md) | v0.130.0 |
 | [headerssetterextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/headerssetterextension/v0.130.0/extension/headerssetterextension/README.md) | v0.130.0 |
