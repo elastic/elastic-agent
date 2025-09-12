@@ -75,7 +75,10 @@ func GetOtelConfig(
 		if componentConfig.IsSet("service::extensions") {
 			extensionList = append(extensionList, componentConfig.Get("service::extensions").([]interface{})...)
 			extensions := confmap.NewFromStringMap(map[string]any{"service::extensions": extensionList})
-			componentConfig.Merge(extensions)
+			err := componentConfig.Merge(extensions)
+			if err != nil {
+				return nil, fmt.Errorf("error merging otel extensions for component %s: %w", comp.ID, err)
+			}
 		}
 
 		// the assumption here is that each component will define its own receivers, and the shared exporters
