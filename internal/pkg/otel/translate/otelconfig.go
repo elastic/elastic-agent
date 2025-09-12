@@ -63,13 +63,21 @@ func GetOtelConfig(
 	if len(components) == 0 {
 		return nil, nil
 	}
-	otelConfig := confmap.New() // base config, nothing here for now
+	otelConfig := confmap.New()      // base config, nothing here for now
+	extensionList := []interface{}{} // we have to maintain a list because otel does not merge lists, it overrides them. This is a known issue: see https://github.com/open-telemetry/opentelemetry-collector/issues/8754
 
 	for _, comp := range components {
 		componentConfig, compErr := getCollectorConfigForComponent(comp, info, beatMonitoringConfigGetter, logger)
 		if compErr != nil {
 			return nil, compErr
 		}
+
+		if componentConfig.IsSet("service::extensions") {
+			extensionList = append(extensionList, componentConfig.Get("service::extensions").([]interface{})...)
+			extensions := confmap.NewFromStringMap(map[string]any{"service::extensions": extensionList})
+			componentConfig.Merge(extensions)
+		}
+
 		// the assumption here is that each component will define its own receivers, and the shared exporters
 		// will be merged
 		mergeErr := otelConfig.Merge(componentConfig)
@@ -130,6 +138,7 @@ func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
 
 // getCollectorConfigForComponent returns the Otel collector config required to run the given component.
 // This function returns a full, valid configuration that can then be merged with configurations for other components.
+// Note: Lists are not merged and should be handled by the caller of the method
 func getCollectorConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
