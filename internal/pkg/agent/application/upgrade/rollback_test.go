@@ -388,7 +388,7 @@ func TestRollbackWithOpts(t *testing.T) {
 				assertAgentInstallExists(t, filepath.Join(topDir, "data", "elastic-agent-4.5.6-SNAPSHOT-ghijkl"), agentExecutableName)
 				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
 				assert.NoError(t, err, "reading topPath elastic-agent link")
-				assert.Equal(t, linkTarget, filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef", agentExecutableName))
+				assert.Equal(t, paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName), linkTarget)
 			},
 		},
 		"SkipRestart: no cleanup, no restart": {
@@ -420,7 +420,7 @@ func TestRollbackWithOpts(t *testing.T) {
 				assertAgentInstallExists(t, filepath.Join(topDir, "data", "elastic-agent-4.5.6-SNAPSHOT-ghijkl"), agentExecutableName)
 				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
 				assert.NoError(t, err, "reading topPath elastic-agent link")
-				assert.Equal(t, linkTarget, filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef", agentExecutableName))
+				assert.Equal(t, paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName), linkTarget)
 			},
 		},
 		"Prerestart hook not fatal error: rollback, cleanup and restart as normal": {
@@ -462,7 +462,7 @@ func TestRollbackWithOpts(t *testing.T) {
 				assertAgentInstallCleaned(t, filepath.Join(topDir, "data", "elastic-agent-4.5.6-SNAPSHOT-ghijkl"), agentExecutableName)
 				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
 				assert.NoError(t, err, "reading topPath elastic-agent link")
-				assert.Equal(t, linkTarget, filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef", agentExecutableName))
+				assert.Equal(t, paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName), linkTarget)
 				snippetLogs := logs.FilterMessageSnippet("pre-restart hook error, not fatal").All()
 				if assert.Len(t, snippetLogs, 1) {
 					assert.Equal(t, zapcore.WarnLevel, snippetLogs[0].Level)
