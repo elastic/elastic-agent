@@ -38,7 +38,7 @@ func Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPa
 	return RollbackWithOpts(ctx, log, c, topDirPath, prevVersionedHome, prevHash)
 }
 
-var FatalRollbackError = errors.New("Fatal rollback error")
+var FatalRollbackError = errors.New("fatal rollback error")
 
 type RollbackSettings struct {
 	skipCleanup    bool
@@ -99,9 +99,9 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 		if hookErr != nil {
 			if errors.Is(hookErr, FatalRollbackError) {
 				return fmt.Errorf("pre-restart hook failed: %w", hookErr)
-			} else {
-				log.Warnf("pre-restart hook failed: %v", hookErr)
 			}
+
+			log.Warnf("pre-restart hook failed: %v", hookErr)
 		}
 	}
 

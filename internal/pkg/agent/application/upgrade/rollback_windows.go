@@ -44,7 +44,8 @@ func InvokeCmdWithArgs(executable string, args ...string) *exec.Cmd {
 		//
 		// Watcher process will also need a console in order to receive CTRL_BREAK_EVENT on windows.
 		// Elastic Agent main process running as a service does not have a console allocated and the watcher process will also
-		// outlive its parent during an upgrade operation so we add the CREATE_NEW_CONSOLE flag.
+		// outlive its parent during an upgrade operation so we add the CREATE_NEW_PROCESS_GROUP flag and allocate a new console
+		// to be inherited by the watcher process in StartWatcherCommand.
 		CreationFlags: windows.CREATE_NEW_PROCESS_GROUP,
 	}
 	return cmd
@@ -59,10 +60,8 @@ func StartWatcherCmd(log *logger.Logger, createCmd cmdFactory, opts ...WatcherIn
 	if r1 == 0 {
 		if !errors.Is(consoleErr, windows.ERROR_ACCESS_DENIED) {
 			return nil, fmt.Errorf("error allocating console: %w", consoleErr)
-		} else {
-			log.Warnf("Already possessing a console")
 		}
-
+		log.Warnf("Already possessing a console")
 	}
 	cmd := createCmd()
 	log.Infow("Starting upgrade watcher", "path", cmd.Path, "args", cmd.Args, "env", cmd.Env, "dir", cmd.Dir)
