@@ -1,0 +1,4 @@
+kind: enhancement
+summary: add headersetter extension to EDOT
+component: elastic-agent
+issue: https://github.com/elastic/elastic-agent/issues/9889
