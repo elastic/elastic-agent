@@ -30,7 +30,7 @@ extensions:
     directory: ${env:STATE_PATH}
 
 service:
-  extensions: [health_check, memory_limiter, file_storage/filelogreceiver, headers_setter]
+  extensions: [health_check, memory_limiter, file_storage/filelogreceiver]
   pipelines:
     logs:
       receivers: [filelog]
