@@ -25,7 +25,7 @@ var DefaultCleanPaths = []string{
 	"_meta/kibana/7/index-pattern/{{.BeatName}}.json",
 }
 
-// Clean clean generated build artifacts.
+// Clean clean generated build artifacts and caches.
 func Clean(pathLists ...[]string) error {
 	if len(pathLists) == 0 {
 		pathLists = [][]string{DefaultCleanPaths}
@@ -37,6 +37,9 @@ func Clean(pathLists ...[]string) error {
 				return err
 			}
 		}
+	}
+	if CrossBuildMountBuildCache {
+		return sh.Run("docker", "volume", "rm", "-f", CrossBuildBuildCacheVolumeName)
 	}
 	return nil
 }
