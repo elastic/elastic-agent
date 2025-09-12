@@ -502,7 +502,7 @@ func TestRollbackWithOpts(t *testing.T) {
 				assertAgentInstallExists(t, filepath.Join(topDir, "data", "elastic-agent-4.5.6-SNAPSHOT-ghijkl"), agentExecutableName)
 				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
 				assert.NoError(t, err, "reading topPath elastic-agent link")
-				assert.Equal(t, linkTarget, filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef", agentExecutableName))
+				assert.Equal(t, paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef", agentExecutableName), linkTarget)
 			},
 		},
 	}
@@ -524,7 +524,7 @@ func TestRollbackWithOpts(t *testing.T) {
 
 func assertAgentInstallExists(t *testing.T, versionedHome string, agentExecutableName string) {
 	assert.DirExists(t, versionedHome)
-	assert.FileExists(t, filepath.Join(versionedHome, agentExecutableName))
+	assert.FileExists(t, paths.BinaryPath(versionedHome, agentExecutableName))
 	assert.DirExists(t, filepath.Join(versionedHome, "logs"))
 	assert.DirExists(t, filepath.Join(versionedHome, "run"))
 }
@@ -533,7 +533,7 @@ func assertAgentInstallCleaned(t *testing.T, versionedHome string, agentExecutab
 	assert.DirExists(t, versionedHome)
 	assert.DirExists(t, filepath.Join(versionedHome, "logs"))
 	assert.NoDirExists(t, filepath.Join(versionedHome, "run"))
-	assert.NoFileExists(t, filepath.Join(versionedHome, agentExecutableName))
+	assert.NoFileExists(t, paths.BinaryPath(versionedHome, agentExecutableName))
 }
 
 // checkFilesAfterCleanup is a convenience function to check the file structure within topDir.
