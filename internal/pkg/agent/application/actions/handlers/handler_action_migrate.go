@@ -25,6 +25,8 @@ import (
 const ()
 
 type migrateCoordinator interface {
+	actionCoordinator
+
 	Migrate(_ context.Context, _ *fleetapi.ActionMigrate, _ func(done <-chan struct{}) backoff.Backoff) error
 	ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string)
 	Protection() protection.Config
@@ -100,8 +102,30 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 		return fmt.Errorf("migration of agent to a new cluster failed: %w", err)
 	}
 
+	// action is all rigth we can notify endpoint
+	if err := h.notifyComponents(ctx, action); err != nil {
+		// config is cleaned up already we cannot revert
+		h.log.Warnf("failed to notify components, aborting: %v", err)
+	}
+
 	// reexec and load new config
 	h.coord.ReExec(nil)
+	return nil
+}
+
+func (h *Migrate) notifyComponents(ctx context.Context, migrateAction *fleetapi.ActionMigrate) error {
+	state := h.coord.State()
+	ucs := findMatchingUnitsByActionType(state, fleetapi.ActionTypeMigrate)
+	if len(ucs) > 0 {
+		err := notifyUnitsOfProxiedAction(ctx, h.log, migrateAction, ucs, h.coord.PerformAction)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Log and continue
+		h.log.Debugf("No components running for %v action type", fleetapi.ActionTypeMigrate)
+	}
+
 	return nil
 }
 
