@@ -1,0 +1,41 @@
+// begin 8.18.6 relnotes
+
+[[release-notes-8.18.6]]
+==  8.18.6
+
+Review important information about the  8.18.6 release.
+
+[discrete]
+[[security-updates-8.18.6]]
+=== Security updates
+
+
+elastic-agent::
+
+* Upgrade To Go 1.24.6. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9287[#https://github.com/elastic/elastic-agent/pull/9287]
+
+
+[discrete]
+[[new-features-8.18.6]]
+=== New features
+
+The 8.18.6 release adds the following new and notable features.
+
+
+* Adjust The Timeout For Elastic Defend Check Command. {-pull}https://github.com/elastic/elastic-agent/pull/9213[#https://github.com/elastic/elastic-agent/pull/9213]
+
+
+[discrete]
+[[bug-fixes-8.18.6]]
+=== Bug fixes
+
+
+elastic-agent::
+
+* On Windows, Retry Saving The Agent Information File To Disk. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9224[#https://github.com/elastic/elastic-agent/pull/9224] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/5862[#https://github.com/elastic/elastic-agent/issues/5862]
+* Correct Hints Annotations Parsing To Resolve Only `${Kubernetes.*}` Placeholders Instead Of Resolving All `${...}` Patterns. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9307[#https://github.com/elastic/elastic-agent/pull/9307]
+* Treat Exit Code 28 From Endpoint Binary As Non-Fatal. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9320[#https://github.com/elastic/elastic-agent/pull/9320]
+* Fixed Jitter Backoff Strategy Reset. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9342[#https://github.com/elastic/elastic-agent/pull/9342] {elastic-agent-issue}https://github.com/elastic/elastic-agent/issues/8864[#https://github.com/elastic/elastic-agent/issues/8864]
+* Fix Deb Upgrade By Stopping Elastic-Agent Service Before Upgrading. {elastic-agent-pull}https://github.com/elastic/elastic-agent/pull/9462[#https://github.com/elastic/elastic-agent/pull/9462]
+
+// end 8.18.6 relnotes

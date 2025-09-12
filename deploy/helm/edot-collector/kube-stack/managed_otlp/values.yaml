@@ -17,7 +17,7 @@ crds:
 defaultCRConfig:
   image:
     repository: "docker.elastic.co/beats/elastic-agent"
-    tag: "8.18.6"
+    tag: "8.18.7"
   targetAllocator:
     enabled: false # Enable/disable the Operator's Target allocator.
     # Refer to: https://github.com/open-telemetry/opentelemetry-operator/tree/main/cmd/otel-allocator
@@ -33,6 +33,7 @@ collectors:
   #  Cluster is a K8s deployment EDOT collector focused on gathering telemetry
   #  at the cluster level (Kubernetes Events and cluster metrics).
   cluster:
+    enabled: true
     fullnameOverride: "opentelemetry-kube-stack-cluster-stats"
     env:
       - name: ELASTIC_AGENT_OTEL
@@ -50,7 +51,8 @@ collectors:
       processors:
         # [Resource Detection Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor)
         resourcedetection/eks:
-          detectors: [env, eks] # Detects resources from environment variables and EKS (Elastic Kubernetes Service).
+          # Detects resources from environment variables and EKS (Elastic Kubernetes Service).
+          detectors: [env, eks]
           timeout: 15s
           override: true
           eks:
@@ -58,11 +60,13 @@ collectors:
               k8s.cluster.name:
                 enabled: true
         resourcedetection/gcp:
-          detectors: [env, gcp] # Detects resources from environment variables and GCP (Google Cloud Platform).
+          # Detects resources from environment variables and GCP (Google Cloud Platform).
+          detectors: [env, gcp]
           timeout: 2s
           override: true
         resourcedetection/aks:
-          detectors: [env, aks] # Detects resources from environment variables and AKS (Azure Kubernetes Service).
+          # Detects resources from environment variables and AKS (Azure Kubernetes Service).
+          detectors: [env, aks]
           timeout: 2s
           override: true
           aks:
@@ -196,6 +200,10 @@ collectors:
       logsCollection:
         enabled: true # Enable/disable the collection of node's logs.
         storeCheckpoints: true # Store checkpoints for log collection, allowing for resumption from the last processed log.
+      kubernetesEvents:
+        enabled: false
+      clusterMetrics:
+        enabled: false
     hostNetwork: true # Use the host's network namespace. This allows the daemon to access the network interfaces of the host directly.
     securityContext: # Run the daemon as the root user and group for proper metrics collection.
       runAsUser: 0
@@ -219,7 +227,8 @@ collectors:
           timeout: 1s
         # [Resource Detection Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor)
         resourcedetection/eks:
-          detectors: [env, eks] # Detects resources from environment variables and EKS (Elastic Kubernetes Service).
+          # Detects resources from environment variables and EKS (Elastic Kubernetes Service).
+          detectors: [env, eks]
           timeout: 15s
           override: true
           eks:
@@ -227,11 +236,13 @@ collectors:
               k8s.cluster.name:
                 enabled: true
         resourcedetection/gcp:
-          detectors: [env, gcp] # Detects resources from environment variables and GCP (Google Cloud Platform).
+          # Detects resources from environment variables and GCP (Google Cloud Platform).
+          detectors: [env, gcp]
           timeout: 2s
           override: true
         resourcedetection/aks:
-          detectors: [env, aks] # Detects resources from environment variables and AKS (Azure Kubernetes Service).
+          # Detects resources from environment variables and AKS (Azure Kubernetes Service).
+          detectors: [env, aks]
           timeout: 2s
           override: true
           aks:
@@ -244,7 +255,8 @@ collectors:
               from_attribute: k8s.node.name
               action: upsert
         resourcedetection/system:
-          detectors: ["system", "ec2"] # Detects resources from the system and EC2 instances.
+          # Detects resources from the system and EC2 instances.
+          detectors: ["system", "ec2"]
           system:
             hostname_sources: ["os"]
             resource_attributes:
@@ -468,6 +480,10 @@ collectors:
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
         pipelines:
+          # Disable default non used kube-stack Helm Chart pipelines
+          logs: null
+          metrics: null
+          traces: null
           logs/node:
             receivers:
               - filelog
@@ -608,12 +624,12 @@ instrumentation:
     type: parentbased_traceidratio # Sampler type
     argument: "1.0" # Sampling rate set to 100% (all traces are sampled).
   java:
-    image: docker.elastic.co/observability/elastic-otel-javaagent:1.4.1
+    image: docker.elastic.co/observability/elastic-otel-javaagent:1.5.0
   nodejs:
-    image: docker.elastic.co/observability/elastic-otel-node:1.1.1
+    image: docker.elastic.co/observability/elastic-otel-node:1.3.0
   dotnet:
     image: docker.elastic.co/observability/elastic-otel-dotnet:1.0.2
   python:
-    image: docker.elastic.co/observability/elastic-otel-python:1.3.0
+    image: docker.elastic.co/observability/elastic-otel-python:1.7.0
   go:
-    image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.22.0
+    image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.22.1
