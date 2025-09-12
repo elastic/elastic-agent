@@ -683,8 +683,6 @@ func readDirs(dir string) ([]string, error) {
 	return dirs, nil
 }
 
-// var fileDirCopyFunc = copy.Copy // abstraction for testability
-
 func copyDir(l *logger.Logger, from, to string, ignoreErrs bool, fileDirCopy fileDirCopyFunc) error {
 	var onErr func(src, dst string, err error) error
 
