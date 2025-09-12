@@ -22,6 +22,7 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/utils"
+	"go.opentelemetry.io/collector/confmap"
 
 	koanfmaps "github.com/knadh/koanf/maps"
 
@@ -52,6 +53,7 @@ const (
 	idKey                      = "id"
 	agentKey                   = "agent"
 	monitoringKey              = "monitoring"
+	serviceKey                 = "service"
 	useOutputKey               = "use_output"
 	monitoringMetricsPeriodKey = "metrics_period"
 	failureThresholdKey        = "failure_threshold"
@@ -87,6 +89,7 @@ var (
 type BeatsMonitor struct {
 	enabled         bool // feature flag disabling whole v1 monitoring story
 	config          *monitoringConfig
+	otelConfig      *confmap.Conf
 	operatingSystem string
 	agentInfo       info.Agent
 }
@@ -107,12 +110,13 @@ type monitoringConfig struct {
 }
 
 // New creates a new BeatsMonitor instance.
-func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, agentInfo info.Agent) *BeatsMonitor {
+func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, otelCfg *confmap.Conf, agentInfo info.Agent) *BeatsMonitor {
 	return &BeatsMonitor{
 		enabled: enabled,
 		config: &monitoringConfig{
 			C: cfg,
 		},
+		otelConfig:      otelCfg,
 		operatingSystem: operatingSystem,
 		agentInfo:       agentInfo,
 	}
@@ -139,6 +143,7 @@ func (b *BeatsMonitor) Reload(rawConfig *config.Config) error {
 	}
 
 	b.config = &newConfig
+	b.otelConfig = rawConfig.OTel
 	return nil
 }
 
@@ -507,6 +512,47 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 	return defaultMonitoringNamespace
 }
 
+func (b *BeatsMonitor) getCollectorTelemetryEndpoint() string {
+	type metricsReaderConfig struct {
+		Pull struct {
+			Exporter struct {
+				Prometheus struct {
+					Host string `mapstructure:"host"`
+					Port int    `mapstructure:"port"`
+				} `mapstructure:"prometheus"`
+			} `mapstructure:"exporter"`
+		} `mapstructure:"pull"`
+	}
+	var otel struct {
+		Service struct {
+			Telemetry struct {
+				Metrics struct {
+					Readers []metricsReaderConfig `mapstructure:"readers"`
+				} `mapstructure:"metrics"`
+			} `mapstructure:"telemetry"`
+		} `mapstructure:"service"`
+	}
+	if err := b.otelConfig.Unmarshal(&otel, confmap.WithIgnoreUnused()); err == nil {
+		for _, reader := range otel.Service.Telemetry.Metrics.Readers {
+			p := reader.Pull.Exporter.Prometheus
+			if p.Host != "" || p.Port != 0 {
+				host := "localhost"
+				port := 8888
+				if p.Host != "" {
+					host = p.Host
+				}
+				if p.Port != 0 {
+					port = p.Port
+				}
+				return host + ":" + strconv.Itoa(port)
+			}
+
+		}
+	}
+	// If there is no explicit configuration, the collector publishes its telemetry on port 8888.
+	return "localhost:8888"
+}
+
 // injectMetricsInput injects monitoring config for agent monitoring to the `cfg` object.
 func (b *BeatsMonitor) injectMetricsInput(
 	cfg map[string]interface{},
@@ -771,6 +817,8 @@ func (b *BeatsMonitor) getPrometheusStream(
 	failureThreshold *uint,
 	metricsCollectionIntervalString string,
 ) any {
+	prometheusHost := b.getCollectorTelemetryEndpoint()
+
 	// want metricset "collector"
 	monitoringNamespace := b.monitoringNamespace()
 	indexName := fmt.Sprintf("metrics-elastic_agent.collector-%s", monitoringNamespace)
@@ -785,7 +833,7 @@ func (b *BeatsMonitor) getPrometheusStream(
 		},
 		"metricsets":   []interface{}{"collector"},
 		"metrics_path": "/metrics",
-		"hosts":        []interface{}{"localhost:8888"},
+		"hosts":        []interface{}{prometheusHost},
 		"namespace":    monitoringNamespace,
 		"period":       metricsCollectionIntervalString,
 		"index":        indexName,
