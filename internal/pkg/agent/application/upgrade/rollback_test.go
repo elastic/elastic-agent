@@ -679,8 +679,9 @@ func createFakeAgentInstall(t *testing.T, topDir, version, hash string, useVersi
 	}
 	err = os.WriteFile(paths.BinaryPath(absVersionedHomePath, agentExecutableName), []byte(fmt.Sprintf("Placeholder for agent %s", version)), 0o750)
 	require.NoErrorf(t, err, "error writing elastic agent binary placeholder %q", agentExecutableName)
-	err = os.WriteFile(filepath.Join(absLogsDirPath, "fakelog.ndjson"), []byte(fmt.Sprintf("Sample logs for agent %s", version)), 0o750)
-	require.NoErrorf(t, err, "error writing fake log placeholder %q")
+	fakeLogPath := filepath.Join(absLogsDirPath, "fakelog.ndjson")
+	err = os.WriteFile(fakeLogPath, []byte(fmt.Sprintf("Sample logs for agent %s", version)), 0o750)
+	require.NoErrorf(t, err, "error writing fake log placeholder %q", fakeLogPath)
 
 	// return the path relative to top exactly like the step_unpack does
 	return relVersionedHomePath
