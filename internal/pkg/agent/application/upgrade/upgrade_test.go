@@ -1160,7 +1160,7 @@ func (m *mockUnpacker) getPackageMetadata(archivePath string) (packageMetadata, 
 	return m.returnPackageMetadata, m.returnPackageMetadataError
 }
 
-func (m *mockUnpacker) unpack(version, archivePath, dataDir string, flavor string) (UnpackResult, error) {
+func (m *mockUnpacker) unpack(version, archivePath, dataDir string) (UnpackResult, error) {
 	return m.returnUnpackResult, m.returnUnpackError
 }
 

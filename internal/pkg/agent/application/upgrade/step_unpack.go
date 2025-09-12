@@ -36,7 +36,7 @@ type UnpackResult struct {
 type copyFunc func(dst io.Writer, src io.Reader) (written int64, err error)
 type mkdirAllFunc func(name string, perm fs.FileMode) error
 type openFileFunc func(name string, flag int, perm fs.FileMode) (*os.File, error)
-type unarchiveFunc func(log *logger.Logger, archivePath, dataDir string, flavor string, copy copyFunc, mkdirAll mkdirAllFunc, openFile openFileFunc) (UnpackResult, error)
+type unarchiveFunc func(log *logger.Logger, archivePath, dataDir string, copy copyFunc, mkdirAll mkdirAllFunc, openFile openFileFunc) (UnpackResult, error)
 
 type unpacker struct {
 	log *logger.Logger
@@ -61,25 +61,15 @@ func newUnpacker(log *logger.Logger) *unpacker {
 }
 
 // unpack unpacks archive correctly, skips root (symlink, config...) unpacks data/*
-<<<<<<< HEAD
-func (u *Upgrader) unpack(version, archivePath, dataDir string) (UnpackResult, error) {
-=======
-func (u *unpacker) unpack(version, archivePath, dataDir string, flavor string) (UnpackResult, error) {
->>>>>>> f70ff023f (Enhancement/5235 handle insufficient disk space errors in artifact unpack (#9322))
+func (u *unpacker) unpack(version, archivePath, dataDir string) (UnpackResult, error) {
 	// unpack must occur in directory that holds the installation directory
 	// or the extraction will be double nested
 	var unpackRes UnpackResult
 	var err error
 	if runtime.GOOS == windows {
-<<<<<<< HEAD
-		unpackRes, err = unzip(u.log, archivePath, dataDir)
+		unpackRes, err = u.unzip(u.log, archivePath, dataDir, u.copy, u.mkdirAll, u.openFile)
 	} else {
-		unpackRes, err = untar(u.log, archivePath, dataDir)
-=======
-		unpackRes, err = u.unzip(u.log, archivePath, dataDir, flavor, u.copy, u.mkdirAll, u.openFile)
-	} else {
-		unpackRes, err = u.untar(u.log, archivePath, dataDir, flavor, u.copy, u.mkdirAll, u.openFile)
->>>>>>> f70ff023f (Enhancement/5235 handle insufficient disk space errors in artifact unpack (#9322))
+		unpackRes, err = u.untar(u.log, archivePath, dataDir, u.copy, u.mkdirAll, u.openFile)
 	}
 
 	if err != nil {
@@ -113,12 +103,8 @@ func (u *unpacker) getPackageMetadata(archivePath string) (packageMetadata, erro
 	}
 }
 
-<<<<<<< HEAD
-func unzip(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error) {
-=======
 // injecting copy, mkdirAll and openFile for testability
-func unzip(log *logger.Logger, archivePath, dataDir string, flavor string, copy copyFunc, mkdirAll mkdirAllFunc, openFile openFileFunc) (UnpackResult, error) {
->>>>>>> f70ff023f (Enhancement/5235 handle insufficient disk space errors in artifact unpack (#9322))
+func unzip(log *logger.Logger, archivePath, dataDir string, copy copyFunc, mkdirAll mkdirAllFunc, openFile openFileFunc) (UnpackResult, error) {
 	var hash, rootDir string
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
@@ -296,13 +282,8 @@ func getPackageMetadataFromZipReader(r *zip.ReadCloser, fileNamePrefix string) (
 	return ret, nil
 }
 
-<<<<<<< HEAD
-func untar(log *logger.Logger, archivePath, dataDir string) (UnpackResult, error) {
-
-=======
 // injecting copy, mkdirAll and openFile for testability
-func untar(log *logger.Logger, archivePath, dataDir string, flavor string, copy copyFunc, mkdirAll mkdirAllFunc, openFile openFileFunc) (UnpackResult, error) {
->>>>>>> f70ff023f (Enhancement/5235 handle insufficient disk space errors in artifact unpack (#9322))
+func untar(log *logger.Logger, archivePath, dataDir string, copy copyFunc, mkdirAll mkdirAllFunc, openFile openFileFunc) (UnpackResult, error) {
 	var versionedHome string
 	var rootDir string
 	var hash string
