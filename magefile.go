@@ -1199,12 +1199,16 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 		log.Printf("dependencies extracted from package specs: %v", dependencies)
 	}
 
+	keepArchive := os.Getenv("KEEP_ARCHIVE") != ""
+
 	// download/copy all the necessary dependencies for packaging elastic-agent
 	archivePath, dropPath, dependencies := collectPackageDependencies(platforms, dependenciesVersion, packageTypes, dependencies)
 
 	// cleanup after build
-	//	defer os.RemoveAll(archivePath)
-	//	defer os.RemoveAll(dropPath)
+	if !keepArchive {
+		//defer os.RemoveAll(archivePath)
+		//defer os.RemoveAll(dropPath)
+	}
 	defer os.Unsetenv(agentDropPath)
 
 	// create flat dir
