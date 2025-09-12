@@ -473,7 +473,6 @@ type policyChange struct {
 	cfg        *config.Config
 	action     fleetapi.Action
 	acker      acker.Acker
-	commit     bool
 	ackWatcher chan struct{}
 }
 
@@ -482,9 +481,9 @@ func newPolicyChange(
 	config *config.Config,
 	action fleetapi.Action,
 	acker acker.Acker,
-	commit bool) *policyChange {
+	makeCh bool) *policyChange {
 	var ackWatcher chan struct{}
-	if commit {
+	if makeCh {
 		// we don't need it otherwise
 		ackWatcher = make(chan struct{})
 	}
@@ -493,7 +492,6 @@ func newPolicyChange(
 		cfg:        config,
 		action:     action,
 		acker:      acker,
-		commit:     true,
 		ackWatcher: ackWatcher,
 	}
 }
@@ -502,22 +500,21 @@ func (l *policyChange) Config() *config.Config {
 	return l.cfg
 }
 
+// Ack sends an ack for the associated action if the results are expected.
+// An ack will not be sent for a POLICY_CHANGE action, but will be when this method is used by UNENROLL actions.
 func (l *policyChange) Ack() error {
-	if l.action == nil {
+	if l.action == nil || l.ackWatcher == nil {
 		return nil
 	}
 	err := l.acker.Ack(l.ctx, l.action)
 	if err != nil {
 		return err
 	}
-	if l.commit {
-		err := l.acker.Commit(l.ctx)
-		if l.ackWatcher != nil && err == nil {
-			close(l.ackWatcher)
-		}
-		return err
+	err = l.acker.Commit(l.ctx)
+	if err == nil {
+		close(l.ackWatcher)
 	}
-	return nil
+	return err
 }
 
 // WaitAck waits for policy change to be acked.
@@ -525,7 +522,7 @@ func (l *policyChange) Ack() error {
 // Caller is responsible to use any reasonable deadline otherwise
 // function call can be endlessly blocking.
 func (l *policyChange) WaitAck(ctx context.Context) {
-	if !l.commit || l.ackWatcher == nil {
+	if l.ackWatcher == nil {
 		return
 	}
 
