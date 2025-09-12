@@ -72,6 +72,7 @@ func GetOtelConfig(
 			return nil, compErr
 		}
 
+		// logic to merge extension list
 		if componentConfig.IsSet("service::extensions") {
 			extensionList = append(extensionList, componentConfig.Get("service::extensions").([]interface{})...)
 			extensions := confmap.NewFromStringMap(map[string]any{"service::extensions": extensionList})
