@@ -582,7 +582,7 @@ func copyActionStoreProvider(readFile readFileFunc, writeFile writeFileFunc) cop
 
 			// using writeFile instead of os.WriteFile for testability
 			if err := writeFile(newActionStorePath, currentActionStore, 0o600); err != nil {
-				return err
+				return fmt.Errorf("failed to write action store at %q: %w", newActionStorePath, err)
 			}
 		}
 
