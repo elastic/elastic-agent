@@ -346,11 +346,8 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	return args
 }
 
-<<<<<<< HEAD
-func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
-=======
 // getFileOwnFromCmdFunc, getOwnerFromPathFunc and computeFixPermissions are for
-// testability. Instead of directly executing the code block in doEnroll, we
+// testability. Instead of directly executing the code block in enroll, we
 // are calling computeFixPermissions. computeFixPermissions is tested on its own.
 type getFileOwnerFromCmdFunc func(*cobra.Command) (utils.FileOwner, error)
 type getOwnerFromPathFunc func(string) (utils.FileOwner, error)
@@ -383,8 +380,7 @@ func computeFixPermissions(fromInstall bool, hasRoot bool, os string, getFileOwn
 	return nil, nil
 }
 
-func doEnroll(streams *cli.IOStreams, cmd *cobra.Command) error {
->>>>>>> 113e6ad14 (Fix/8544 windows unprivileged reenroll (#9623))
+func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	err := validateEnrollFlags(cmd)
 	if err != nil {
 		return err

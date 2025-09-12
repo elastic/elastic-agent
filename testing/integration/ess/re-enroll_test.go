@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
@@ -24,25 +23,8 @@ import (
 	"github.com/elastic/elastic-agent/testing/integration"
 )
 
-<<<<<<< HEAD
-type AssertFunc func(*testing.T, *atesting.Fixture, string, error)
-
-type testCase struct {
-	description string
-	privileged  bool
-	os          []define.OS
-	assertion   AssertFunc
-}
-
-// TestReEnrollUnprivileged verifies that re-enrollment as a privileged user fails
-// when the agent was installed unprivileged. This enforces the file ownership check
-// on Unix platforms. On Windows, this check is a no-op as of PR #8503, so this test
-// is not run for windows. See the discussion in PR #8503 (https://github.com/elastic/elastic-agent/pull/8503)
-// and comment (https://github.com/elastic/elastic-agent/pull/8503#discussion_r2152603141) for context.
-=======
 // Verifies that re-enrolling agent as a privileged user succeeds when the agent
 // is both unprivileged and privileged.
->>>>>>> 113e6ad14 (Fix/8544 windows unprivileged reenroll (#9623))
 func TestReEnrollUnprivileged(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: integration.Default,
@@ -52,18 +34,10 @@ func TestReEnrollUnprivileged(t *testing.T) {
 
 	ctx := t.Context()
 
-<<<<<<< HEAD
-	fixture, enrollArgs := prepareAgentforReEnroll(t, ctx, info, false)
-
-	out, err := fixture.Exec(ctx, enrollArgs)
-	require.Error(t, err)
-	require.Contains(t, string(out), cmd.UserOwnerMismatchError.Error())
-=======
 	testCases := map[string]bool{
 		"unprivileged agent with privileged user": false,
 		"privileged agent with privileged user":   true,
 	}
->>>>>>> 113e6ad14 (Fix/8544 windows unprivileged reenroll (#9623))
 
 	for name, privileged := range testCases {
 		t.Run(name, func(t *testing.T) {

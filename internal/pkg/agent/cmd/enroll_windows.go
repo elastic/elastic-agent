@@ -54,8 +54,6 @@ func getSIDFromCmd(cmd *cobra.Command, param string) (*windows.SID, error) {
 	}
 	return nil, nil
 }
-<<<<<<< HEAD
-=======
 
 // getOwnerFromPath calls getOwnerFromPathWindows for testability. This way we
 // can inject the windows specific functions.
@@ -96,4 +94,3 @@ func getOwnerFromPathWindows(path string, getNamedSecurityInfo getNamedSecurityI
 
 	return ownership, nil
 }
->>>>>>> 113e6ad14 (Fix/8544 windows unprivileged reenroll (#9623))
