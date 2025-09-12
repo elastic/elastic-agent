@@ -73,7 +73,7 @@ require (
 	github.com/schollz/progressbar/v3 v3.13.1
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/winlabs/gowin32 v0.0.0-20240930213947-f504d7e14639
 	go.elastic.co/apm/module/apmgorilla/v2 v2.6.0
 	go.elastic.co/apm/module/apmgrpc/v2 v2.6.0
@@ -337,7 +337,7 @@ require (
 	github.com/elastic/apm-data v1.19.3 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
-	github.com/elastic/go-docappender/v2 v2.11.0 // indirect
+	github.com/elastic/go-docappender/v2 v2.11.1 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect
 	github.com/elastic/go-grok v0.3.1 // indirect
 	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
