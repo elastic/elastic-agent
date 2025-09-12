@@ -657,7 +657,7 @@ func TestOTelManager_Logging(t *testing.T) {
 		logs := obs.All()
 		require.NotEmpty(collect, logs, "Logs should not be empty")
 		firstMessage := logs[0].Message
-		assert.Equal(collect, firstMessage, "Setting up own telemetry...")
+		assert.Equal(collect, "Internal metrics telemetry disabled", firstMessage)
 	}, time.Second*10, time.Second)
 }
 
