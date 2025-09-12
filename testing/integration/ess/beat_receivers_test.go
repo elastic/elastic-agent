@@ -381,8 +381,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 			"event.ingested",
 
 			// only in receiver doc
-			"agent.otelcol.component.id",
-			"agent.otelcol.component.kind",
+			"agent.otelcol",
 		}
 		switch tc.onlyCompareKeys {
 		case true:
