@@ -146,6 +146,7 @@ var OSArchNames = map[string]map[PackageType]map[string]string{
 		Zip: {
 			"386":   "x86",
 			"amd64": "x86_64",
+			"arm64": "arm64",
 		},
 	},
 	"darwin": {
