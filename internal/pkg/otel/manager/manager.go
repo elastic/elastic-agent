@@ -136,7 +136,7 @@ func NewOTelManager(
 		recoveryTimer = newRestarterNoop()
 		exec = newExecutionEmbedded()
 	default:
-		return nil, errors.New("unknown otel collector execModeFn")
+		return nil, fmt.Errorf("unknown otel collector execution mode: %q", mode)
 	}
 
 	logger.Debugf("Using collector execution mode: %s", mode)
