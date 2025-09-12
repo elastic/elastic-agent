@@ -756,32 +756,6 @@ func addEntryToZipArchive(af files, writer *zip.Writer) error {
 
 	return nil
 }
-<<<<<<< HEAD
-=======
-
-func TestGetFileNamePrefix(t *testing.T) {
-	tests := map[string]struct {
-		archivePath    string
-		expectedPrefix string
-	}{
-		"fips": {
-			archivePath:    "/foo/bar/elastic-agent-fips-9.1.0-SNAPSHOT-linux-arm64.tar.gz",
-			expectedPrefix: "elastic-agent-9.1.0-SNAPSHOT-linux-arm64/",
-		},
-		"no_fips": {
-			archivePath:    "/foo/bar/elastic-agent-9.1.0-SNAPSHOT-linux-arm64.tar.gz",
-			expectedPrefix: "elastic-agent-9.1.0-SNAPSHOT-linux-arm64/",
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			prefix := getFileNamePrefix(test.archivePath)
-			require.Equal(t, test.expectedPrefix, prefix)
-		})
-	}
-
-}
 
 func TestUnpack(t *testing.T) {
 	log, _ := loggertest.New("TestUnpack")
@@ -828,4 +802,3 @@ func TestUnpack(t *testing.T) {
 		})
 	}
 }
->>>>>>> f70ff023f (Enhancement/5235 handle insufficient disk space errors in artifact unpack (#9322))
