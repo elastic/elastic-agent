@@ -74,7 +74,7 @@ type artifactDownloadHandler interface {
 	withFleetServerURI(fleetServerURI string)
 }
 type unpackHandler interface {
-	unpack(version, archivePath, dataDir string, flavor string) (UnpackResult, error)
+	unpack(version, archivePath, dataDir string) (UnpackResult, error)
 	getPackageMetadata(archivePath string) (packageMetadata, error)
 }
 
@@ -294,21 +294,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	u.log.Infow("Unpacking agent package", "version", newVersion)
 
-	// Nice to have: add check that no archive files end up in the current versioned home
-<<<<<<< HEAD
-	unpackRes, err := u.unpack(version, archivePath, paths.Data())
-=======
-	// default to no flavor to avoid breaking behavior
-
-	// no default flavor, keep everything in case flavor is not specified
-	// in case of error fallback to keep-all
-	detectedFlavor, err := install.UsedFlavor(paths.Top(), "")
-	if err != nil {
-		u.log.Warnf("error encountered when detecting used flavor with top path %q: %v", paths.Top(), err)
-	}
-	u.log.Debugf("detected used flavor: %q", detectedFlavor)
-	unpackRes, err := u.unpacker.unpack(version, archivePath, paths.Data(), detectedFlavor)
->>>>>>> f70ff023f (Enhancement/5235 handle insufficient disk space errors in artifact unpack (#9322))
+	unpackRes, err := u.unpacker.unpack(version, archivePath, paths.Data())
 	if err != nil {
 		return nil, err
 	}
