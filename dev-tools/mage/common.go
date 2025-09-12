@@ -490,6 +490,14 @@ func untar(sourceFile, destinationDir string) error {
 			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 				return err
 			}
+			// Check that creating a symlink at 'path' pointing to 'header.Linkname' is safe (stays in destinationDir)
+			safe, err := isSafeSymlink(path, header.Linkname, destinationDir)
+			if err != nil {
+				return fmt.Errorf("error evaluating symlink %s -> %s: %w", path, header.Linkname, err)
+			}
+			if !safe {
+				return fmt.Errorf("refusing to create unsafe symlink %s -> %s (outside extraction dir)", path, header.Linkname)
+			}
 			if err := os.Symlink(header.Linkname, path); err != nil {
 				return fmt.Errorf("error creating symlink %s pointing to %s: %w", path, header.Linkname, err)
 			}
