@@ -502,7 +502,7 @@ func TestRollbackWithOpts(t *testing.T) {
 				assertAgentInstallExists(t, filepath.Join(topDir, "data", "elastic-agent-4.5.6-SNAPSHOT-ghijkl"), agentExecutableName)
 				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
 				assert.NoError(t, err, "reading topPath elastic-agent link")
-				assert.Equal(t, paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef", agentExecutableName), linkTarget)
+				assert.Equal(t, paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName), linkTarget)
 			},
 		},
 	}
