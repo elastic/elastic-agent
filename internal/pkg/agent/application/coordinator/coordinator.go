@@ -1463,23 +1463,7 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 			c.logger.Errorf("applying new policy: %s", err.Error())
 			change.Fail(err)
 		} else {
-			if err := change.Ack(); err != nil {
-				err = fmt.Errorf("failed to ack configuration change: %w", err)
-				// Workaround: setConfigManagerError is usually used by the config
-				// manager to report failed ACKs / etc when communicating with Fleet.
-				// We need to report a failed ACK here, but the policy change has
-				// already been successfully applied so we don't want to report it as
-				// a general Coordinator or policy failure.
-				// This arises uniquely here because this is the only case where an
-				// action is responsible for reporting the failure of its own ACK
-				// call. The "correct" fix is to make this Ack() call unfailable
-				// and handle ACK retries and reporting in the config manager like
-				// with other action types -- this error would then end up invoking
-				// setConfigManagerError "organically" via the config manager's
-				// reporting channel. In the meantime, we do it manually.
-				c.setConfigManagerError(err)
-				c.logger.Errorf("%s", err.Error())
-			}
+			_ = change.Ack() // will not return errors
 		}
 
 	case vars := <-c.managerChans.varsManagerUpdate:

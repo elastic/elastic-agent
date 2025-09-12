@@ -377,6 +377,74 @@ func TestFleetGateway(t *testing.T) {
 		default:
 		}
 	})
+
+	t.Run("sends agent_policy_id and policy_revision_idx", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		scheduler := scheduler.NewStepper()
+		client := newTestingClient()
+
+		log, _ := loggertest.New("fleet_gateway")
+
+		stateStore := newStateStore(t, log)
+		stateStore.SetAction(&fleetapi.ActionPolicyChange{
+			ActionID:   "test-action-id",
+			ActionType: fleetapi.ActionTypePolicyChange,
+			Data: fleetapi.ActionPolicyChangeData{
+				Policy: map[string]interface{}{
+					"policy_id":           "test-policy-id",
+					"policy_revision_idx": 1,
+				},
+			},
+		})
+		err := stateStore.Save()
+		require.NoError(t, err)
+
+		gateway, err := newFleetGatewayWithScheduler(
+			log,
+			settings,
+			agentInfo,
+			client,
+			scheduler,
+			noop.New(),
+			emptyStateFetcher,
+			stateStore,
+		)
+		require.NoError(t, err)
+
+		waitFn := ackSeq(
+			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
+				data, err := io.ReadAll(body)
+				require.NoError(t, err)
+
+				var checkinRequest fleetapi.CheckinRequest
+				err = json.Unmarshal(data, &checkinRequest)
+				require.NoError(t, err)
+
+				require.Equal(t, "test-policy-id", checkinRequest.AgentPolicyID)
+				require.Equal(t, int64(1), checkinRequest.PolicyRevisionIDX)
+
+				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
+				return resp, nil
+			}),
+		)
+
+		errCh := runFleetGateway(ctx, gateway)
+
+		// Synchronize scheduler and acking of calls from the worker go routine.
+		scheduler.Next()
+		waitFn()
+
+		cancel()
+		err = <-errCh
+		require.NoError(t, err)
+		select {
+		case actions := <-gateway.Actions():
+			t.Errorf("Expected no actions, got %v", actions)
+		default:
+		}
+	})
 }
 
 func TestRetriesOnFailures(t *testing.T) {

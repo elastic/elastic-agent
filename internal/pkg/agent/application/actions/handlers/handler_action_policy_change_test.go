@@ -105,7 +105,7 @@ func TestPolicyAcked(t *testing.T) {
 	agentInfo := &info.AgentInfo{}
 	nullStore := &storage.NullStore{}
 
-	t.Run("Config change should ACK", func(t *testing.T) {
+	t.Run("Config change shouldn't ACK", func(t *testing.T) {
 		ch := make(chan coordinator.ConfigChange, 1)
 		tacker := &testAcker{}
 
@@ -129,8 +129,7 @@ func TestPolicyAcked(t *testing.T) {
 		require.NoError(t, change.Ack())
 
 		actions := tacker.Items()
-		assert.EqualValues(t, 1, len(actions))
-		assert.Equal(t, actionID, actions[0])
+		assert.Empty(t, actions)
 	})
 }
 
