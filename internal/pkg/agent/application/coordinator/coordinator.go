@@ -1795,13 +1795,21 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	// perform variable substitution for inputs
 	inputs, ok := transpiler.Lookup(ast, "inputs")
 	if ok {
-		renderedInputs, err := transpiler.RenderInputs(inputs, c.vars)
+		renderedInputs, unrenderedInputs, err := transpiler.RenderInputs(inputs, c.vars)
 		if err != nil {
 			return fmt.Errorf("rendering inputs failed: %w", err)
+		}
+		if unrenderedInputs != nil {
+			// sTODO: Change to Debugf after testing
+			c.logger.Infof("--- Unrendered inputs after variable substitution ---\n%s", unrenderedInputs.String())
 		}
 		err = transpiler.Insert(ast, renderedInputs, "inputs")
 		if err != nil {
 			return fmt.Errorf("inserting rendered inputs failed: %w", err)
+		}
+		err = transpiler.Insert(ast, unrenderedInputs, "unrendered_inputs")
+		if err != nil {
+			return fmt.Errorf("inserting unrendered inputs failed: %w", err)
 		}
 	}
 
