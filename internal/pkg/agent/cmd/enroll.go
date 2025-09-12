@@ -388,24 +388,6 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	fromInstall, _ := cmd.Flags().GetBool(fromInstallArg)
 
-	hasRoot, err := utils.HasRoot()
-	if err != nil {
-		return fmt.Errorf("checking if running with root/Administrator privileges: %w", err)
-	}
-	if hasRoot && !fromInstall {
-		binPath, err := os.Executable()
-		if err != nil {
-			return fmt.Errorf("error while getting executable path: %w", err)
-		}
-		isOwner, err := isOwnerExec(binPath)
-		if err != nil {
-			return fmt.Errorf("ran into an error while figuring out if user is allowed to execute the enroll command: %w", err)
-		}
-		if !isOwner {
-			return UserOwnerMismatchError
-		}
-	}
-
 	pathConfigFile := paths.ConfigFile()
 	rawConfig, err := config.LoadFile(pathConfigFile)
 	if err != nil {
@@ -497,21 +479,14 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	ctx := handleSignal(context.Background())
 
-	// On MacOS Ventura and above, fixing the permissions on enrollment during installation fails with the error:
-	//  Error: failed to fix permissions: chown /Library/Elastic/Agent/data/elastic-agent-c13f91/elastic-agent.app: operation not permitted
-	// This is because we are fixing permissions twice, once during installation and again during the enrollment step.
-	// When we are enrolling as part of installation on MacOS, skip the second attempt to fix permissions.
-	var fixPermissions *utils.FileOwner
-	if fromInstall {
-		perms, err := getFileOwnerFromCmd(cmd)
-		if err != nil {
-			// no context is added because the error is clear and user facing
-			return err
-		}
-		fixPermissions = &perms
+	hasRoot, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("checking if running with root/Administrator privileges: %w", err)
 	}
-	if runtime.GOOS == "darwin" {
-		fixPermissions = nil
+
+	fixPermissions, err := computeFixPermissions(fromInstall, hasRoot, runtime.GOOS, getFileOwnerFromCmd, getOwnerFromPath, cmd)
+	if err != nil {
+		return err
 	}
 
 	options := enrollCmdOption{
