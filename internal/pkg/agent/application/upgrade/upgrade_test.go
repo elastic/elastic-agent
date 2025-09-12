@@ -1490,7 +1490,7 @@ func TestSetClient(t *testing.T) {
 }
 
 func TestCopyActionStore(t *testing.T) {
-	log, _ := loggertest.New("TestCoyActionStore")
+	log, _ := loggertest.New("TestCopyActionStore")
 
 	actionStoreContent := "initial agent action_store.yml content"
 	actionStateStoreYamlContent := "initial agent state.yml content"
