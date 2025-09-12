@@ -347,7 +347,7 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 }
 
 // getFileOwnFromCmdFunc, getOwnerFromPathFunc and computeFixPermissions are for
-// testability. Instead of directly executing the code block in doEnroll, we
+// testability. Instead of directly executing the code block in enroll, we
 // are calling computeFixPermissions. computeFixPermissions is tested on its own.
 type getFileOwnerFromCmdFunc func(*cobra.Command) (utils.FileOwner, error)
 type getOwnerFromPathFunc func(string) (utils.FileOwner, error)
@@ -369,7 +369,7 @@ func computeFixPermissions(fromInstall bool, hasRoot bool, os string, getFileOwn
 		return &perms, nil
 	}
 
-	if hasRoot && os != "windows" { // windows is a no-op, will be addressed in a separate PR
+	if hasRoot {
 		perms, err := getOwnerFromPath(paths.Top())
 		if err != nil {
 			return nil, fmt.Errorf("failed to get owner from path %s: %w", paths.Top(), err)
