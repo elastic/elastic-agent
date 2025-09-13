@@ -262,31 +262,7 @@ func (Dev) RegenerateMocks() error {
 		return fmt.Errorf("generating mocks: %w", err)
 	}
 
-	// change CWD
-	workingDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("retrieving CWD: %w", err)
-	}
-	// restore the working directory when exiting the function
-	defer func() {
-		err := os.Chdir(workingDir)
-		if err != nil {
-			panic(fmt.Errorf("failed to restore working dir %q: %w", workingDir, err))
-		}
-	}()
-
-	mPath, err := mocksPath()
-	if err != nil {
-		return fmt.Errorf("retrieving mocks path: %w", err)
-	}
-
-	err = os.Chdir(mPath)
-	if err != nil {
-		return fmt.Errorf("changing current directory to %q: %w", mPath, err)
-	}
-
-	mg.Deps(devtools.AddLicenseHeaders)
-	mg.Deps(devtools.GoImports)
+	mg.Deps(devtools.Format)
 	return nil
 }
 
@@ -438,6 +414,7 @@ func getTestBinariesPath() ([]string, error) {
 		filepath.Join(wd, "internal", "pkg", "agent", "install", "testblocking"),
 		filepath.Join(wd, "pkg", "core", "process", "testsignal"),
 		filepath.Join(wd, "internal", "pkg", "otel", "manager", "testing"),
+		filepath.Join(wd, "internal", "pkg", "agent", "application", "filelock", "testlocker"),
 	}
 	return testBinaryPkgs, nil
 }
