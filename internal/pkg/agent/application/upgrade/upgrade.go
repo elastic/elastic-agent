@@ -70,6 +70,16 @@ type unpackHandler interface {
 	getPackageMetadata(archivePath string) (packageMetadata, error)
 }
 
+// Types used to abstract copyActionStore, copyRunDirectory and github.com/otiai10/copy.Copy
+type copyActionStoreFunc func(log *logger.Logger, newHome string) error
+type copyRunDirectoryFunc func(log *logger.Logger, oldRunPath, newRunPath string) error
+type fileDirCopyFunc func(from, to string, opts ...copy.Options) error
+
+// Types used to abstract stdlib functions
+type mkdirAllFunc func(name string, perm fs.FileMode) error
+type readFileFunc func(name string) ([]byte, error)
+type writeFileFunc func(name string, data []byte, perm fs.FileMode) error
+
 // Upgrader performs an upgrade
 type Upgrader struct {
 	log            *logger.Logger
@@ -84,6 +94,8 @@ type Upgrader struct {
 	unpacker             unpackHandler
 	isDiskSpaceErrorFunc func(err error) bool
 	extractAgentVersion  func(metadata packageMetadata, upgradeVersion string) agentVersion
+	copyActionStore      copyActionStoreFunc
+	copyRunDirectory     copyRunDirectoryFunc
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -105,6 +117,8 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.A
 		unpacker:             newUnpacker(log),
 		isDiskSpaceErrorFunc: upgradeErrors.IsDiskSpaceError,
 		extractAgentVersion:  extractAgentVersion,
+		copyActionStore:      copyActionStoreProvider(os.ReadFile, os.WriteFile),
+		copyRunDirectory:     copyRunDirectoryProvider(os.MkdirAll, copy.Copy),
 	}, nil
 }
 
@@ -310,15 +324,15 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome)
 
-	if err := copyActionStore(u.log, newHome); err != nil {
-		return nil, errors.New(err, "failed to copy action store")
+	if err := u.copyActionStore(u.log, newHome); err != nil {
+		return nil, fmt.Errorf("failed to copy action store: %w", err)
 	}
 
 	newRunPath := filepath.Join(newHome, "run")
 	oldRunPath := filepath.Join(paths.Run())
 
-	if err := copyRunDirectory(u.log, oldRunPath, newRunPath); err != nil {
-		return nil, errors.New(err, "failed to copy run directory")
+	if err := u.copyRunDirectory(u.log, oldRunPath, newRunPath); err != nil {
+		return nil, fmt.Errorf("failed to copy run directory: %w", err)
 	}
 
 	det.SetState(details.StateReplacing)
@@ -537,49 +551,55 @@ func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versio
 	return nil
 }
 
-func copyActionStore(log *logger.Logger, newHome string) error {
-	// copies legacy action_store.yml, state.yml and state.enc encrypted file if exists
-	storePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile()}
-	log.Infow("Copying action store", "new_home_path", newHome)
+func copyActionStoreProvider(readFile readFileFunc, writeFile writeFileFunc) copyActionStoreFunc {
+	return func(log *logger.Logger, newHome string) error {
+		// copies legacy action_store.yml, state.yml and state.enc encrypted file if exists
+		storePaths := []string{paths.AgentActionStoreFile(), paths.AgentStateStoreYmlFile(), paths.AgentStateStoreFile()}
+		log.Infow("Copying action store", "new_home_path", newHome)
 
-	for _, currentActionStorePath := range storePaths {
-		newActionStorePath := filepath.Join(newHome, filepath.Base(currentActionStorePath))
-		log.Infow("Copying action store path", "from", currentActionStorePath, "to", newActionStorePath)
-		currentActionStore, err := os.ReadFile(currentActionStorePath)
-		if os.IsNotExist(err) {
-			// nothing to copy
-			continue
+		for _, currentActionStorePath := range storePaths {
+			newActionStorePath := filepath.Join(newHome, filepath.Base(currentActionStorePath))
+			log.Infow("Copying action store path", "from", currentActionStorePath, "to", newActionStorePath)
+			// using readfile instead of os.ReadFile for testability
+			currentActionStore, err := readFile(currentActionStorePath)
+			if os.IsNotExist(err) {
+				// nothing to copy
+				continue
+			}
+			if err != nil {
+				return err
+			}
+
+			// using writeFile instead of os.WriteFile for testability
+			if err := writeFile(newActionStorePath, currentActionStore, 0o600); err != nil {
+				return fmt.Errorf("failed to write action store at %q: %w", newActionStorePath, err)
+			}
 		}
-		if err != nil {
-			return err
-		}
 
-		if err := os.WriteFile(newActionStorePath, currentActionStore, 0o600); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error {
-	log.Infow("Copying run directory", "new_run_path", newRunPath, "old_run_path", oldRunPath)
-
-	if err := os.MkdirAll(newRunPath, runDirMod); err != nil {
-		return errors.New(err, "failed to create run directory")
-	}
-
-	err := copyDir(log, oldRunPath, newRunPath, true)
-	if os.IsNotExist(err) {
-		// nothing to copy, operation ok
-		log.Infow("Run directory not present", "old_run_path", oldRunPath)
 		return nil
 	}
-	if err != nil {
-		return errors.New(err, "failed to copy %q to %q", oldRunPath, newRunPath)
-	}
+}
 
-	return nil
+func copyRunDirectoryProvider(mkdirAll mkdirAllFunc, fileDirCopy fileDirCopyFunc) copyRunDirectoryFunc {
+	return func(log *logger.Logger, oldRunPath, newRunPath string) error {
+		log.Infow("Copying run directory", "new_run_path", newRunPath, "old_run_path", oldRunPath)
+
+		if err := mkdirAll(newRunPath, runDirMod); err != nil {
+			return fmt.Errorf("failed to create run directory: %w", err)
+		}
+
+		err := copyDir(log, oldRunPath, newRunPath, true, fileDirCopy)
+		if os.IsNotExist(err) {
+			// nothing to copy, operation ok
+			log.Infow("Run directory not present", "old_run_path", oldRunPath)
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("failed to copy %q to %q: %w", oldRunPath, newRunPath, err)
+		}
+
+		return nil
+	}
 }
 
 // shutdownCallback returns a callback function to be executing during shutdown once all processes are closed.
@@ -607,7 +627,7 @@ func shutdownCallback(l *logger.Logger, homePath, prevVersion, newVersion, newHo
 			newRelPath = strings.ReplaceAll(newRelPath, oldHome, newHome)
 			newDir := filepath.Join(newHome, newRelPath)
 			l.Debugf("copying %q -> %q", processDir, newDir)
-			if err := copyDir(l, processDir, newDir, true); err != nil {
+			if err := copyDir(l, processDir, newDir, true, copy.Copy); err != nil {
 				return err
 			}
 		}
@@ -653,7 +673,7 @@ func readDirs(dir string) ([]string, error) {
 	return dirs, nil
 }
 
-func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
+func copyDir(l *logger.Logger, from, to string, ignoreErrs bool, fileDirCopy fileDirCopyFunc) error {
 	var onErr func(src, dst string, err error) error
 
 	if ignoreErrs {
@@ -679,7 +699,7 @@ func copyDir(l *logger.Logger, from, to string, ignoreErrs bool) error {
 		copyConcurrency = runtime.NumCPU() * 4
 	}
 
-	return copy.Copy(from, to, copy.Options{
+	return fileDirCopy(from, to, copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
 		},
