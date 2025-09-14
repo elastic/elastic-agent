@@ -96,8 +96,8 @@ Initialise input templates if we are not deploying as managed
 {{- $customInputPresetName := ($customInputVal).preset -}}
 {{- $presetVal := get $.Values.agent.presets $customInputPresetName -}}
 {{- $_ := required (printf "preset with name \"%s\" of customInput \"%s\" not defined" $customInputPresetName $customInputName) $customInputVal -}}
-{{- $customInputOuput := ($customInputVal).use_output -}}
-{{- include "elasticagent.preset.mutate.outputs.byname" (list $ $presetVal $customInputOuput) -}}
+{{- $customInputOutput := ($customInputVal).use_output -}}
+{{- include "elasticagent.preset.mutate.outputs.byname" (list $ $presetVal $customInputOutput) -}}
 {{- include "elasticagent.preset.mutate.inputs" (list $ $presetVal (list $customInputVal)) -}}
 {{- end -}}
 {{- end -}}
@@ -459,9 +459,9 @@ app.kubernetes.io/version: {{ .Values.agent.version}}
 {{- $ := index . 0 -}}
 {{- $preset := index . 1 -}}
 {{- $outputName := index . 2 -}}
-{{- $ouputVal := get $.Values.outputs $outputName }}
-{{- $_ := required (printf "output \"%s\" is not defined" $outputName) $ouputVal -}}
-{{- $outputCopy := deepCopy $ouputVal -}}
+{{- $outputVal := get $.Values.outputs $outputName }}
+{{- $_ := required (printf "output \"%s\" is not defined" $outputName) $outputVal -}}
+{{- $outputCopy := deepCopy $outputVal -}}
 {{- $presetOutputs := dig "outputs" (dict) $preset -}}
 {{- if not (hasKey $presetOutputs $outputName) -}}
 {{- $_ := set $presetOutputs $outputName $outputCopy}}

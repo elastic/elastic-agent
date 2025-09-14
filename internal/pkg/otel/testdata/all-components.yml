@@ -39,6 +39,7 @@ processors:
     limit_mib: 4000
     spike_limit_mib: 800
   elastictrace:
+  tail_sampling:
 
 receivers:
   nop:
@@ -66,7 +67,8 @@ receivers:
           static_configs:
             - targets: ['0.0.0.0:8888']
   elasticapmintake:
-    
+  docker_stats:
+
 
 connectors:
   spanmetrics:
