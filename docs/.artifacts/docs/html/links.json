@@ -1,0 +1,270 @@
+{
+  "origin": {
+    "branch": "add-collector-docs",
+    "remote": " git@github.com:theletterf/elastic-agent",
+    "ref": "7728d8a6733ba8c4e76c09cb54b665e21042f8f6",
+    "name": "elastic-agent"
+  },
+  "url_path_prefix": "",
+  "links": {
+    "release-notes/known-issues.md": {},
+    "release-notes/breaking-changes.md": {
+      "anchors": [
+        "elastic-agent-9.1.3-breaking-changes",
+        "elastic-agent-9.1.2-breaking-changes",
+        "elastic-agent-9.1.1-breaking-changes",
+        "elastic-agent-9.1.0-breaking-changes",
+        "elastic-agent-9.0.6-breaking-changes",
+        "elastic-agent-9.0.5-breaking-changes",
+        "elastic-agent-9.0.4-breaking-changes",
+        "elastic-agent-9.0.3-breaking-changes",
+        "elastic-agent-9.0.2-breaking-changes",
+        "elastic-agent-9.0.1-breaking-changes",
+        "elastic-agent-9.0.0-breaking-changes"
+      ]
+    },
+    "release-notes/deprecations.md": {
+      "anchors": [
+        "elastic-agent-9.1.3-deprecations",
+        "elastic-agent-9.1.2-deprecations",
+        "elastic-agent-9.1.1-deprecations",
+        "elastic-agent-9.1.0-deprecations",
+        "elastic-agent-9.0.6-deprecations",
+        "elastic-agent-9.0.5-deprecations",
+        "elastic-agent-9.0.4-deprecations",
+        "elastic-agent-9.0.3-deprecations",
+        "elastic-agent-9.0.2-deprecations",
+        "elastic-agent-9.0.1-deprecations",
+        "elastic-agent-9.0.0-deprecations"
+      ]
+    },
+    "reference/edot-collector/download.md": {},
+    "reference/edot-collector/modes.md": {
+      "anchors": [
+        "edot-collector-as-agent",
+        "edot-collector-as-gateway",
+        "gateway-requirements-for-self-managed-environments",
+        "required-components-for-apm-functionality-in-self-managed-elastic",
+        "deployment-in-kubernetes-environments",
+        "agent-mode-in-kubernetes",
+        "gateway-mode-in-kubernetes",
+        "direct-edot-sdk-to-managed-otlp-no-collector"
+      ]
+    },
+    "reference/edot-collector/config/default-config-standalone.md": {
+      "anchors": [
+        "agent-mode",
+        "direct-ingestion-into-elasticsearch",
+        "logs-collection-pipeline",
+        "application-and-traces-collection-pipeline",
+        "host-metrics-collection-pipeline",
+        "using-the-managed-otlp-endpoint",
+        "gateway-mode",
+        "example-configuration",
+        "data-collection-and-processing",
+        "data-processing-and-transformation",
+        "data-export",
+        "pipeline-configuration",
+        "central-configuration",
+        "secure-connection",
+        "tls-configuration",
+        "authentication-settings"
+      ]
+    },
+    "reference/edot-collector/config/default-config-k8s.md": {
+      "anchors": [
+        "cluster-collector-pipeline",
+        "daemonset-collectors-pipeline",
+        "host-metrics-and-container-logs",
+        "application-telemetry-through-otlp-from-otel-sdks",
+        "gateway-collectors-pipeline",
+        "direct-ingestion-into-elasticsearch",
+        "managed-otlp-endpoint"
+      ]
+    },
+    "reference/edot-collector/config/configure-logs-collection.md": {
+      "anchors": [
+        "parse-json-logs",
+        "parse-multiline-logs",
+        "parse-otlp-logs-in-json-format",
+        "parse-apache-logs",
+        "customize-logs-parsing-on-kubernetes",
+        "collect-apache-logs-using-annotations-discovery",
+        "use-processors-and-ottl-for-logs-processing",
+        "parse-json-logs-using-ottl",
+        "parse-apache-logs-using-ottl",
+        "exclude-logs-paths"
+      ]
+    },
+    "reference/edot-collector/config/configure-metrics-collection.md": {
+      "anchors": [
+        "otlp-metrics",
+        "host-metrics",
+        "process-metrics",
+        "kubernetes-metrics",
+        "kubelet-metrics",
+        "cluster-metrics",
+        "other-metrics"
+      ]
+    },
+    "reference/edot-collector/config/authentication-methods.md": {
+      "anchors": [
+        "overview",
+        "available-authentication-extensions",
+        "elastic-api-key-authentication-apikeyauth",
+        "bearer-token-authentication-bearertokenauth",
+        "configuration-examples",
+        "elastic-api-key-authentication",
+        "configuration-options",
+        "bearer-token-authentication",
+        "file-based-token-storage",
+        "use-cases",
+        "authenticating-edot-sdks",
+        "securing-collector-to-collector-communication",
+        "multi-tenant-authentication",
+        "security-considerations",
+        "api-key-security",
+        "token-security",
+        "troubleshooting"
+      ]
+    },
+    "reference/edot-collector/config/proxy.md": {
+      "anchors": [
+        "available-proxy-variables",
+        "configure-proxy-settings-for-the-edot-collector",
+        "resources"
+      ]
+    },
+    "reference/edot-collector/components/elasticsearchexporter.md": {
+      "anchors": [
+        "get-started",
+        "configuration",
+        "connection-settings",
+        "authentication-settings",
+        "tls-and-security-settings",
+        "mapping-modes",
+        "otel-mapping-mode",
+        "ecs-mapping-mode",
+        "bodymap-mapping-mode",
+        "none-mapping-mode",
+        "raw-mapping-mode",
+        "document-routing",
+        "static-mode",
+        "dynamic-mode-index-attribute",
+        "dynamic-mode-data-stream-routing",
+        "document-routing-settings",
+        "document-routing-exceptions",
+        "performance-and-batching",
+        "internal-batching-default",
+        "using-sending-queue",
+        "bulk-indexing",
+        "ingest-pipeline-support",
+        "elasticsearch-node-discovery",
+        "known-limitations",
+        "known-issues",
+        "troubleshooting"
+      ]
+    },
+    "reference/edot-collector/components/elasticapmintakereceiver.md": {
+      "anchors": [
+        "get-started",
+        "configuration",
+        "tls-and-mtls-settings",
+        "authentication-settings",
+        "agent-environment-variables"
+      ]
+    },
+    "reference/edot-collector/custom-collector.md": {
+      "anchors": [
+        "build-a-custom-collector",
+        "install-the-opentelemetry-collector-builder",
+        "create-a-builder-configuration-file",
+        "build-the-collector"
+      ]
+    },
+    "reference/edot-collector/upstream-collector.md": {
+      "anchors": [
+        "overview",
+        "deployment-scenarios",
+        "elastic-cloud-serverless",
+        "elastic-cloud-hosted-ech",
+        "self-managed-elastic-stack",
+        "configuration-best-practices",
+        "resource-detection",
+        "attribute-processing",
+        "batching",
+        "security",
+        "limitations-and-considerations",
+        "next-steps"
+      ]
+    },
+    "release-notes/index.md": {
+      "anchors": [
+        "elastic-agent-release-notes-9.1.3",
+        "elastic-agent-9.1.3-features-enhancements",
+        "elastic-agent-9.1.3-fixes",
+        "elastic-agent-release-notes-9.1.2",
+        "elastic-agent-release-notes-9.1.1",
+        "elastic-agent-9.1.1-features-enhancements",
+        "elastic-agent-9.1.1-fixes",
+        "elastic-agent-release-notes-9.1.0",
+        "elastic-agent-9.1.0-features-enhancements",
+        "elastic-agent-9.1.0-fixes",
+        "elastic-agent-release-notes-9.0.6",
+        "elastic-agent-9.0.6-features-enhancements",
+        "elastic-agent-9.0.6-fixes",
+        "elastic-agent-release-notes-9.0.5",
+        "elastic-agent-release-notes-9.0.4",
+        "elastic-agent-9.0.4-features-enhancements",
+        "elastic-agent-9.0.4-fixes",
+        "elastic-agent-release-notes-9.0.3",
+        "elastic-agent-9.0.3-features-enhancements",
+        "elastic-agent-9.0.3-fixes",
+        "elastic-agent-release-notes-9.0.2",
+        "elastic-agent-9.0.2-fixes",
+        "elastic-agent-release-notes-9.0.1",
+        "elastic-agent-9.0.1-features-enhancements",
+        "elastic-agent-9.0.1-fixes",
+        "elastic-agent-9.0.0-release-notes",
+        "elastic-agent-9.0.0-features-enhancements",
+        "elastic-agent-9.0.0-fixes"
+      ]
+    },
+    "reference/edot-collector/index.md": {
+      "anchors": [
+        "get-started",
+        "deployment-modes",
+        "configure-the-collector",
+        "collector-components",
+        "limitations",
+        "license"
+      ]
+    },
+    "reference/edot-collector/config/index.md": {},
+    "reference/edot-collector/components.md": {},
+    "reference/edot-collector/customization.md": {}
+  },
+  "cross_links": [
+    "docs-content://deploy-manage/api-keys/elasticsearch-api-keys.md",
+    "opentelemetry://reference/central-configuration.md",
+    "docs-content://solutions/observability/apm/apm-agent-central-configuration.md",
+    "opentelemetry://reference/motlp.md",
+    "docs-content://solutions/observability/get-started/opentelemetry/quickstart/quickstart/serverless/index.md",
+    "docs-content://troubleshoot/ingest/opentelemetry/edot-collector/metadata.md",
+    "opentelemetry://reference/edot-sdks/proxy.mdproxy.md",
+    "opentelemetry://reference/architecture/index.md",
+    "opentelemetry://reference/compatibility/edot-vs-upstream.md",
+    "docs-content://solutions/observability/get-started/opentelemetry/quickstart/index.md",
+    "opentelemetry://reference/architecture/k8s.md",
+    "ecs://reference/ecs-data_stream.md",
+    "ecs://reference/ecs-opentelemetry.md",
+    "docs-content://deploy-manage/deploy/elastic-cloud/find-cloud-id.md",
+    "opentelemetry://reference/compatibility//nomenclature.md#core-components",
+    "opentelemetry://reference/compatibility/nomenclature.md#extended-components",
+    "opentelemetry://reference/compatibility/limitations.md",
+    "docs-content://deploy-manage/upgrade.md",
+    "beats://release-notes/index.md",
+    "docs-content://solutions/observability/get-started/opentelemetry/quickstart/quickstart/index.md"
+  ],
+  "redirects": null
+}
