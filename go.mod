@@ -14,7 +14,7 @@ require (
 	github.com/docker/docker v28.3.3+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250909200115-6de60d5f9d88
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250911220149-afc53c0479ac
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.10.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
@@ -102,7 +102,7 @@ require (
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
-	gotest.tools/gotestsum v1.12.2
+	gotest.tools/gotestsum v1.7.0
 	helm.sh/helm/v3 v3.15.4
 	howett.net/plist v1.0.1
 	k8s.io/api v0.32.3
@@ -284,7 +284,6 @@ require (
 	github.com/beevik/ntp v1.4.3 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/bitfield/gotestdox v0.2.2 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.9.1 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
