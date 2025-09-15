@@ -270,11 +270,6 @@ func TestGetOtelConfig(t *testing.T) {
 
 	expectedESConfig := func(outputName string) map[string]any {
 		return map[string]any{
-			"batcher": map[string]any{
-				"enabled":  true,
-				"max_size": 1600,
-				"min_size": 0,
-			},
 			"compression": "gzip",
 			"compression_params": map[string]any{
 				"level": 1,
