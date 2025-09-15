@@ -82,7 +82,7 @@ type unpackHandler interface {
 type copyActionStoreFunc func(log *logger.Logger, newHome string) error
 type copyRunDirectoryFunc func(log *logger.Logger, oldRunPath, newRunPath string) error
 type fileDirCopyFunc func(from, to string, opts ...copy.Options) error
-type markUpgradeFunc func(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, desiredOutcome UpgradeOutcome) error
+type markUpgradeFunc func(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details) error
 type changeSymlinkFunc func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error
 type rollbackInstallFunc func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error
 
