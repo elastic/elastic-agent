@@ -210,35 +210,62 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 		},
 	}
-	esOutputConfig := map[string]any{
-		"type":             "elasticsearch",
-		"hosts":            []any{"localhost:9200"},
-		"username":         "elastic",
-		"password":         "password",
-		"preset":           "balanced",
-		"queue.mem.events": 3200,
-		"ssl.enabled":      true,
+
+	type extraParams struct {
+		key   string
+		value any
+	}
+	// pass ssl params as extra args to this method
+	esOutputConfig := func(extra ...extraParams) map[string]any {
+		finalOutput := map[string]any{
+			"type":             "elasticsearch",
+			"hosts":            []any{"localhost:9200"},
+			"username":         "elastic",
+			"password":         "password",
+			"preset":           "balanced",
+			"queue.mem.events": 3200,
+			"ssl.enabled":      true,
+		}
+
+		for _, v := range extra {
+			finalOutput[v.key] = v.value
+		}
+		return finalOutput
 	}
 
-	expectedExtensionConfig := map[string]any{
-		"idle_connection_timeout": "3s",
-		"proxy_disable":           false,
-		"ssl": map[string]interface{}{
-			"ca_sha256":               []interface{}{},
-			"ca_trusted_fingerprint":  "",
-			"certificate":             "",
-			"certificate_authorities": []interface{}{},
-			"cipher_suites":           []interface{}{},
-			"curve_types":             []interface{}{},
-			"enabled":                 true,
-			"key":                     "",
-			"key_passphrase":          "",
-			"key_passphrase_path":     "",
-			"renegotiation":           int64(0),
-			"supported_protocols":     []interface{}{},
-			"verification_mode":       uint64(0),
-		},
-		"timeout": "1m30s",
+	expectedExtensionConfig := func(extra ...extraParams) map[string]any {
+		finalOutput := map[string]any{
+			"idle_connection_timeout": "3s",
+			"proxy_disable":           false,
+			"ssl": map[string]interface{}{
+				"ca_sha256":               []interface{}{},
+				"ca_trusted_fingerprint":  "",
+				"certificate":             "",
+				"certificate_authorities": []interface{}{},
+				"cipher_suites":           []interface{}{},
+				"curve_types":             []interface{}{},
+				"enabled":                 true,
+				"key":                     "",
+				"key_passphrase":          "",
+				"key_passphrase_path":     "",
+				"renegotiation":           int64(0),
+				"supported_protocols":     []interface{}{},
+				"verification_mode":       uint64(0),
+			},
+			"timeout": "1m30s",
+		}
+		for _, v := range extra {
+			// accepts one level deep parameters to replace
+			if _, ok := v.value.(map[string]any); ok {
+				for newkey, newvalue := range v.value.(map[string]any) {
+					// this is brittle - it is expected that developers will pass expected params correctly here
+					finalOutput[v.key].(map[string]any)[newkey] = newvalue
+				}
+				continue
+			}
+			finalOutput[v.key] = v.value
+		}
+		return finalOutput
 	}
 
 	expectedESConfig := func(outputName string) map[string]any {
@@ -456,7 +483,7 @@ func TestGetOtelConfig(t *testing.T) {
 							{
 								ID:     "filestream-default",
 								Type:   client.UnitTypeOutput,
-								Config: component.MustExpectedConfig(esOutputConfig),
+								Config: component.MustExpectedConfig(esOutputConfig()),
 							},
 						},
 					},
@@ -467,7 +494,7 @@ func TestGetOtelConfig(t *testing.T) {
 					"elasticsearch/_agent-component/default": expectedESConfig("default"),
 				},
 				"extensions": map[string]any{
-					"beatsauth/_agent-component/default": expectedExtensionConfig,
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
 				"receivers": map[string]any{
 					"filebeatreceiver/_agent-component/filestream-default": expectedFilestreamConfig("filestream-default"),
@@ -508,7 +535,7 @@ func TestGetOtelConfig(t *testing.T) {
 							{
 								ID:     "filestream-primaryOutput",
 								Type:   client.UnitTypeOutput,
-								Config: component.MustExpectedConfig(esOutputConfig),
+								Config: component.MustExpectedConfig(esOutputConfig(extraParams{"ssl.verification_mode", "certificate"})),
 							},
 						},
 					},
@@ -533,7 +560,7 @@ func TestGetOtelConfig(t *testing.T) {
 							{
 								ID:     "filestream-secondaryOutput",
 								Type:   client.UnitTypeOutput,
-								Config: component.MustExpectedConfig(esOutputConfig),
+								Config: component.MustExpectedConfig(esOutputConfig(extraParams{"ssl.ca_trusted_fingerprint", "b9a10bbe64ee9826abeda6546fc988c8bf798b41957c33d05db736716513dc9c"})),
 							},
 						},
 					},
@@ -545,8 +572,8 @@ func TestGetOtelConfig(t *testing.T) {
 					"elasticsearch/_agent-component/secondaryOutput": expectedESConfig("secondaryOutput"),
 				},
 				"extensions": map[string]any{
-					"beatsauth/_agent-component/primaryOutput":   expectedExtensionConfig,
-					"beatsauth/_agent-component/secondaryOutput": expectedExtensionConfig,
+					"beatsauth/_agent-component/primaryOutput":   expectedExtensionConfig(extraParams{"ssl", map[string]any{"verification_mode": uint64(2)}}),
+					"beatsauth/_agent-component/secondaryOutput": expectedExtensionConfig(extraParams{"ssl", map[string]any{"ca_trusted_fingerprint": "b9a10bbe64ee9826abeda6546fc988c8bf798b41957c33d05db736716513dc9c"}}),
 				},
 				"receivers": map[string]any{
 					"filebeatreceiver/_agent-component/filestream-primaryOutput":   expectedFilestreamConfig("filestream-primaryOutput"),
@@ -592,7 +619,7 @@ func TestGetOtelConfig(t *testing.T) {
 							{
 								ID:     "beat/metrics-default",
 								Type:   client.UnitTypeOutput,
-								Config: component.MustExpectedConfig(esOutputConfig),
+								Config: component.MustExpectedConfig(esOutputConfig()),
 							},
 						},
 					},
@@ -603,7 +630,7 @@ func TestGetOtelConfig(t *testing.T) {
 					"elasticsearch/_agent-component/default": expectedESConfig("default"),
 				},
 				"extensions": map[string]any{
-					"beatsauth/_agent-component/default": expectedExtensionConfig,
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring": map[string]any{
@@ -691,7 +718,7 @@ func TestGetOtelConfig(t *testing.T) {
 							{
 								ID:     "system/metrics-default",
 								Type:   client.UnitTypeOutput,
-								Config: component.MustExpectedConfig(esOutputConfig),
+								Config: component.MustExpectedConfig(esOutputConfig()),
 							},
 						},
 					},
@@ -702,7 +729,7 @@ func TestGetOtelConfig(t *testing.T) {
 					"elasticsearch/_agent-component/default": expectedESConfig("default"),
 				},
 				"extensions": map[string]any{
-					"beatsauth/_agent-component/default": expectedExtensionConfig,
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/system-metrics": map[string]any{
