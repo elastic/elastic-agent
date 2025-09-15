@@ -73,7 +73,7 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 
 	targetVersionedHome := filepath.FromSlash(pathMapper.Map(manifest.Package.VersionedHome))
 
-	err = setupInstallPath(topPath, ownership, targetVersionedHome, manifest.Package.Version)
+	err = setupInstallPath(topPath, ownership, targetVersionedHome, manifest.Package.Version, flavor)
 	if err != nil {
 		return utils.FileOwner{}, fmt.Errorf("error setting up install path: %w", err)
 	}
@@ -189,7 +189,7 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 }
 
 // setup the basic topPath, and the .installed file
-func setupInstallPath(topPath string, ownership utils.FileOwner, versionedHome string, version string) error {
+func setupInstallPath(topPath string, ownership utils.FileOwner, versionedHome string, version string, flavor string) error {
 	// ensure parent directory exists
 	err := os.MkdirAll(filepath.Dir(topPath), 0755)
 	if err != nil {
@@ -203,7 +203,7 @@ func setupInstallPath(topPath string, ownership utils.FileOwner, versionedHome s
 	}
 
 	// create the install marker
-	if err := CreateInstallMarker(topPath, ownership, versionedHome, version); err != nil {
+	if err := CreateInstallMarker(topPath, ownership, versionedHome, version, flavor); err != nil {
 		return fmt.Errorf("failed to create install marker: %w", err)
 	}
 	return nil
@@ -521,16 +521,16 @@ func hasAllSSDs(block ghw.BlockInfo) bool {
 
 // CreateInstallMarker creates a `.installed` file at the given install path,
 // and then calls fixInstallMarkerPermissions to set the ownership provided by `ownership`
-func CreateInstallMarker(topPath string, ownership utils.FileOwner, home string, version string) error {
+func CreateInstallMarker(topPath string, ownership utils.FileOwner, home string, version string, flavor string) error {
 	markerFilePath := filepath.Join(topPath, paths.MarkerFileName)
-	err := createInstallMarkerFile(markerFilePath, version, home)
+	err := createInstallMarkerFile(markerFilePath, version, home, flavor)
 	if err != nil {
 		return fmt.Errorf("creating install marker: %w", err)
 	}
 	return fixInstallMarkerPermissions(markerFilePath, ownership)
 }
 
-func createInstallMarkerFile(markerFilePath string, version string, home string) error {
+func createInstallMarkerFile(markerFilePath string, version string, home string, flavor string) error {
 	handle, err := os.Create(markerFilePath)
 	if err != nil {
 		return fmt.Errorf("creating destination file %q : %w", markerFilePath, err)
@@ -539,7 +539,7 @@ func createInstallMarkerFile(markerFilePath string, version string, home string)
 		_ = handle.Close()
 	}()
 	installDescriptor := v1.NewInstallDescriptor()
-	installDescriptor.AgentInstalls = []v1.AgentInstallDesc{{Version: version, VersionedHome: home}}
+	installDescriptor.AgentInstalls = []v1.AgentInstallDesc{{Version: version, VersionedHome: home, Flavor: flavor, Active: true}}
 	err = yaml.NewEncoder(handle).Encode(installDescriptor)
 	if err != nil {
 		return fmt.Errorf("writing install descriptor: %w", err)

@@ -25,6 +25,7 @@ type AgentInstallDesc struct {
 	Hash            string `yaml:"hash,omitempty" json:"hash,omitempty"`
 	VersionedHome   string `yaml:"versionedHome,omitempty" json:"versionedHome,omitempty"`
 	Flavor          string `yaml:"flavor,omitempty" json:"flavor,omitempty"`
+	Active          bool   `yaml:"active,omitempty" json:"active,omitempty"`
 }
 
 type InstallDescriptor struct {
