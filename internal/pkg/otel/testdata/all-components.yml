@@ -16,7 +16,7 @@ extensions:
   memory_limiter:
     check_interval: 5s
     limit_mib: 100
-  header_setter:
+  headers_setter:
     headers:
       - action: insert
         key: X-Scope-OrgID
@@ -108,7 +108,7 @@ service:
   extensions:
     - memory_limiter
     - health_check
-    - header_setter
+    - headers_setter
   pipelines:
     logs:
       exporters:
