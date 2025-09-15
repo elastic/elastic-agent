@@ -45,15 +45,15 @@ func main() {
 		})
 	}
 
+	exitCode := 0
 	err = cmd.RunCollector(ctx, nil, true, "debug")
-	if err == nil || errors.Is(err, context.Canceled) {
-		if shutdownDelay > 0 {
-			<-time.After(shutdownDelay)
-		}
-		os.Exit(0)
+	if err != nil && !errors.Is(err, context.Canceled) {
+		exitCode = 1
 	}
+
 	if shutdownDelay > 0 {
 		<-time.After(shutdownDelay)
 	}
-	os.Exit(1)
+
+	os.Exit(exitCode)
 }
