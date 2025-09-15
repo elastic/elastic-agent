@@ -27,6 +27,14 @@ const (
 	statusFailureFlipFlopsAllowed = 3 // no more than three failure flip-flops allowed
 
 	watcherApplockerFileName = "watcher.lock"
+
+	// Takeover constants
+	// defaultTakeoverWatcherTimeout defines the global timeout for the takeover operation before giving up
+	defaultTakeoverWatcherTimeout = 30 * time.Second
+	// watcherSweepInterval defines the interval for searching for other watcher processes and signaling them for graceful termination
+	watcherSweepInterval = 500 * time.Millisecond
+	// takeoverAttemptInterval defines the interval between filelock takeover attempts
+	takeoverAttemptInterval = 100 * time.Millisecond
 )
 
 var (
@@ -283,7 +291,7 @@ func (a AgentWatcherHelper) WaitForWatcher(ctx context.Context, log *logger.Logg
 }
 
 func (a AgentWatcherHelper) TakeOverWatcher(ctx context.Context, log *logger.Logger, topDir string) (*filelock.AppLocker, error) {
-	return takeOverWatcher(ctx, log, new(commandWatcherGrappler), topDir, 30*time.Second, 500*time.Millisecond, 100*time.Millisecond)
+	return takeOverWatcher(ctx, log, new(commandWatcherGrappler), topDir, defaultTakeoverWatcherTimeout, watcherSweepInterval, takeoverAttemptInterval)
 }
 
 // watcherGrappler is an abstraction over the way elastic-agent main process should take down (stop, gracefully if possible) a watcher process
