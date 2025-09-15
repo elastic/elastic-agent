@@ -502,11 +502,7 @@ func TestOTelManager_Run(t *testing.T) {
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
 				delayDuration := 40 * time.Second // the otel manager stop timeout is waitTimeForStop (30 seconds)
-				err := os.Setenv("TEST_SUPERVISED_COLLECTOR_DELAY", delayDuration.String())
-				require.NoError(t, err, "failed to set TEST_SUPERVISED_COLLECTOR_DELAY env var")
-				t.Cleanup(func() {
-					_ = os.Unsetenv("TEST_SUPERVISED_COLLECTOR_DELAY")
-				})
+				t.Setenv("TEST_SUPERVISED_COLLECTOR_DELAY", delayDuration.String())
 
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
@@ -559,11 +555,7 @@ func TestOTelManager_Run(t *testing.T) {
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
 				delayDuration := 5 * time.Second // the otel manager stop timeout is waitTimeForStop (30 seconds)
-				err := os.Setenv("TEST_SUPERVISED_COLLECTOR_DELAY", delayDuration.String())
-				require.NoError(t, err, "failed to set TEST_SUPERVISED_COLLECTOR_DELAY env var")
-				t.Cleanup(func() {
-					_ = os.Unsetenv("TEST_SUPERVISED_COLLECTOR_DELAY")
-				})
+				t.Setenv("TEST_SUPERVISED_COLLECTOR_DELAY", delayDuration.String())
 
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
