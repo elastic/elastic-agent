@@ -131,9 +131,9 @@ processors:
 
 exporters:
   debugexporter :
-    gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.130.0
+    gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.132.0
   elasticsearchexporter :
-    gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.130.0
+    gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.132.0
   fileexporter :
     gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.130.0
   kafkaexporter :
@@ -183,13 +183,13 @@ providers:
   envprovider :
     gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.36.0
   fileprovider :
-    gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.36.0
+    gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.38.0
   httpprovider :
     gomod: go.opentelemetry.io/collector/confmap/provider/httpprovider v1.36.0
   httpsprovider :
     gomod: go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.35.0
   yamlprovider :
-    gomod: go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.36.0
+    gomod: go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.38.0
 ```
 % end:edot-collector-components-ocb
 

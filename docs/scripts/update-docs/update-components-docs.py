@@ -114,14 +114,15 @@ def get_collector_version():
                 version_match = re.search(r'"([^"]+)"', line)
                 if version_match:
                     return version_match.group(1)
+        
+        # If we get here, the version line was not found
+        raise ValueError(f"Could not find 'const defaultBeatVersion =' in {version_file_path}")
     except FileNotFoundError:
-        print(f"Could not find version file at {version_file_path}")
+        print(f"Error: Could not find version file at {version_file_path}")
+        raise
     except Exception as e:
         print(f"Error reading version file: {e}")
-    
-    # If no specific version is found, use a default version that we know works
-    # This should match the version used in the Elastic Agent repository
-    return '9.2.0'
+        raise
     
 def get_otel_components(version='main', component_docs_mapping=None):
     """Read OpenTelemetry components from the local go.mod file"""
