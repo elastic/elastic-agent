@@ -1,0 +1,5 @@
+kind: bug-fix
+summary: ensure failed upgrade actions are removed from queue and details are set
+component: elastic-agent
+pr: https://github.com/elastic/elastic-agent/pull/9634
+issue: https://github.com/elastic/elastic-agent/issues/9629

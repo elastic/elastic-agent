@@ -11,8 +11,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	mockhandlers "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/actions/handlers"
+	mockAcker "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/fleetapi/acker"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -115,7 +123,7 @@ func TestUpgradeHandler(t *testing.T) {
 				return nil, nil
 			},
 		},
-		nil, nil, nil, nil, nil, false, nil, nil)
+		nil, nil, nil, nil, nil, false, nil, nil, nil)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 
@@ -174,7 +182,7 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 				return nil, err
 			},
 		},
-		nil, nil, nil, nil, nil, false, nil, nil)
+		nil, nil, nil, nil, nil, false, nil, nil, nil)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 
@@ -233,7 +241,7 @@ func TestDuplicateActionsHandled(t *testing.T) {
 				return nil, nil
 			},
 		},
-		nil, nil, nil, nil, nil, false, nil, acker)
+		nil, nil, nil, nil, nil, false, nil, acker, nil)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 
@@ -327,7 +335,7 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 				return nil, nil
 			},
 		},
-		nil, nil, nil, nil, nil, false, nil, nil)
+		nil, nil, nil, nil, nil, false, nil, nil, nil)
 	//nolint:errcheck // We don't need the termination state of the Coordinator
 	go c.Run(ctx)
 
@@ -366,6 +374,146 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 	err2 := u.Handle(ctx, &a2, ack)
 	require.NoError(t, err2)
 	checkMsg(upgradeCalledChan, "8.5.0", "second call to Upgrade must be with version 8.5.0")
+}
+
+func TestEndpointPreUpgradeCallback(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	for _, tc := range []struct {
+		name                  string
+		upgradeAction         *fleetapi.ActionUpgrade
+		shouldProxyToEndpoint bool
+		coordUpgradeErr       error
+	}{
+		{
+			name: "error from coordinator upgrade with notify endpoint",
+			upgradeAction: &fleetapi.ActionUpgrade{
+				ActionType: fleetapi.ActionTypeUpgrade,
+				Data: fleetapi.ActionUpgradeData{
+					Version:   "255.0.0",
+					SourceURI: "http://localhost",
+				},
+			},
+			shouldProxyToEndpoint: true,
+			coordUpgradeErr:       errors.New("test error"),
+		},
+		{
+			name: "no error from coordinator upgrade with notify endpoint",
+			upgradeAction: &fleetapi.ActionUpgrade{
+				ActionType: fleetapi.ActionTypeUpgrade,
+				Data: fleetapi.ActionUpgradeData{
+					Version:   "255.0.0",
+					SourceURI: "http://localhost",
+				},
+			},
+			shouldProxyToEndpoint: true,
+		},
+		{
+			name: "error from coordinator upgrade without notify endpoint",
+			upgradeAction: &fleetapi.ActionUpgrade{
+				ActionType: fleetapi.ActionTypeUpgrade,
+				Data: fleetapi.ActionUpgradeData{
+					Version:   "255.0.0",
+					SourceURI: "http://localhost",
+				},
+			},
+			coordUpgradeErr: errors.New("test error"),
+		},
+		{
+			name: "no error from coordinator upgrade without notify endpoint",
+			upgradeAction: &fleetapi.ActionUpgrade{
+				ActionType: fleetapi.ActionTypeUpgrade,
+				Data: fleetapi.ActionUpgradeData{
+					Version:   "255.0.0",
+					SourceURI: "http://localhost",
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCoordinator := mockhandlers.NewUpgradeCoordinator(t)
+
+			var coordState coordinator.State
+			if tc.shouldProxyToEndpoint {
+				coordState.Components = []runtime.ComponentComponentState{
+					{
+						Component: component.Component{
+							InputSpec: &component.InputRuntimeSpec{
+								Spec: component.InputSpec{
+									ProxiedActions: []string{fleetapi.ActionTypeUpgrade},
+								},
+							},
+							InputType: "endpoint",
+							Units: []component.Unit{
+								{
+									Type: client.UnitTypeInput,
+									Config: &proto.UnitExpectedConfig{
+										Type: "endpoint",
+									},
+								},
+							},
+						},
+					},
+				}
+
+				mockCoordinator.EXPECT().State().Return(coordState)
+			}
+
+			upgradeCalledChan := make(chan struct{})
+			mockCoordinator.EXPECT().Upgrade(mock.Anything, tc.upgradeAction.Data.Version, tc.upgradeAction.Data.SourceURI, mock.Anything, mock.Anything).
+				RunAndReturn(func(ctx context.Context, s string, s2 string, actionUpgrade *fleetapi.ActionUpgrade, opt ...coordinator.UpgradeOpt) error {
+					upgradeCalledChan <- struct{}{}
+					return tc.coordUpgradeErr
+				})
+
+			log, _ := logger.New("", false)
+			u := NewUpgrade(log, mockCoordinator)
+			u.tamperProtectionFn = func() bool { return tc.shouldProxyToEndpoint }
+
+			notifyUnitsCalled := atomic.Bool{}
+			u.notifyUnitsOfProxiedActionFn = func(ctx context.Context, log *logp.Logger, action dispatchableAction, ucs []unitWithComponent, performAction performActionFunc) error {
+				notifyUnitsCalled.Store(true)
+				return nil
+			}
+
+			ack := mockAcker.NewAcker(t)
+
+			if tc.coordUpgradeErr != nil {
+				// on a coordinator upgrade error we should ack and commit all the bkg actions
+				ack.EXPECT().Ack(mock.Anything, mock.Anything).Return(nil)
+				ack.EXPECT().Commit(mock.Anything).Return(nil)
+			}
+
+			err := u.Handle(ctx, tc.upgradeAction, ack)
+			require.NoError(t, err, "Handle should not return an error")
+
+			select {
+			case <-upgradeCalledChan:
+				break
+			case <-time.After(10 * time.Second):
+				t.Fatal("mockCoordinator.Upgrade was not called in time")
+			}
+
+			// notifyUnitsOfProxiedActionFn should only ever be passed as a PreUpgradeCallback to the coordinator upgrader.
+			// This assertion guards against it being called directly in this context.
+			assert.False(t, notifyUnitsCalled.Load(), "notifyUnitsOfProxiedActionFn should not be called")
+
+			assert.Eventually(t, func() bool {
+				u.bkgMutex.Lock()
+				defer u.bkgMutex.Unlock()
+				if tc.coordUpgradeErr == nil {
+					// yes this is counter-intuitive but when the coordinator upgrade returns a nil error
+					// actions are not cleaned from bkgActions. This is most likely because after a successful upgrade
+					// the expectation is for an agent to restart and thus the bkgActions will be lost.
+					// NOTE if bkgActions gets to be persisted in the future this logic needs to change.
+					return len(u.bkgActions) == 1
+				} else {
+					return len(u.bkgActions) == 0
+				}
+			}, 10*time.Second, 100*time.Millisecond)
+		})
+	}
 }
 
 type fakeAcker struct {

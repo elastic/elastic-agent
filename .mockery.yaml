@@ -23,6 +23,9 @@ packages:
       logLevelSetter:
         config:
           mockname: "LogLevelSetter"
+      upgradeCoordinator:
+        config:
+          mockname: "UpgradeCoordinator"
   github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker:
     interfaces:
       Acker:

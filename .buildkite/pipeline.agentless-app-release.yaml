@@ -1,13 +1,45 @@
 env:
   VERSION: "${BUILDKITE_COMMIT:0:12}"
 steps:
-  - label: "Mirror Elastic-Agent Snapshot DRA to internal registry"
+  - label: "Packaging: Service Container linux/amd64"
+    key: packaging-service-container-amd64
+    env:
+      PACKAGES: "docker"
+      PLATFORMS: "linux/amd64"
+      DOCKER_VARIANTS: "service"
+    command: |
+      .buildkite/scripts/steps/integration-package.sh
+    artifact_paths:
+      - "build/distributions/elastic-agent-service-git-*.docker.tar.gz"
+    agents:
+      provider: "gcp"
+      machineType: "c2-standard-16"
+      diskSizeGb: 400
+
+  - label: "Packaging: Service Container linux/arm64"
+    key: packaging-service-container-arm64
+    env:
+      PACKAGES: "docker"
+      PLATFORMS: "linux/arm64"
+      DOCKER_VARIANTS: "service"
+    command: |
+       .buildkite/scripts/steps/integration-package.sh
+    artifact_paths:
+      - "build/distributions/elastic-agent-service-git-*.docker.tar.gz"
+    agents:
+      provider: "aws"
+      instanceType: "t4g.2xlarge"
+      imagePrefix: "core-ubuntu-2204-aarch64"
+      diskSizeGb: 400
+
+  # wait for packaging to be done
+  - wait: ~
+
+  - label: "Publish to internal registry"
     key: "mirror-elastic-agent"
     command: ".buildkite/scripts/steps/ecp-internal-release.sh"
     agents:
       image: docker.elastic.co/ci-agent-images/serverless-helm-builder:0.0.2@sha256:d00e8a7a0ab3618cfaacb0a7b1e1b06ee29728eb2b44de602374bd8f6b9b92ac
-
-
 
   # wait for metadata to be set
   - wait: ~

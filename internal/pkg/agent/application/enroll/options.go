@@ -7,6 +7,7 @@ package enroll
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
@@ -138,6 +139,10 @@ func MergeOptionsWithMigrateAction(action *fleetapi.ActionMigrate, options Enrol
 		return EnrollOptions{}, fmt.Errorf("failed to decode enroll options: %w", err)
 	}
 
+	// do not preserve ID by default
+	delete(configMap, "id")
+	options.ID = ""
+
 	// overwriting what's needed
 	if len(action.Data.Settings) > 0 {
 		if err := json.Unmarshal(action.Data.Settings, &configMap); err != nil {
@@ -171,6 +176,12 @@ func FromFleetConfig(cfg *configuration.FleetAgentConfig) EnrollOptions {
 
 	if len(cfg.Client.Hosts) > 0 {
 		options.URL = cfg.Client.Hosts[0]
+	}
+
+	// URL at this point may not be parsable by url.Parse (missing protocol)
+	if host := options.URL; len(host) > 0 && !strings.HasPrefix(host, string(remote.ProtocolHTTPS)+"://") &&
+		!strings.HasPrefix(host, string(remote.ProtocolHTTP)+"://") {
+		options.URL = string(cfg.Client.Protocol) + "://" + host
 	}
 
 	if cfg.Client.Transport.TLS != nil {

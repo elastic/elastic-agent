@@ -7,17 +7,23 @@ package handlers
 import (
 	"context"
 	"math"
+	"math/rand/v2"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/logp"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/pkg/component"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 type testAction struct {
@@ -214,4 +220,37 @@ func TestProxiedActionsNotifier(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSaveConfigToStore(t *testing.T) {
+	// Create destination file
+	tmpDir := t.TempDir()
+	dest := filepath.Join(tmpDir, "dest.txt")
+	err := os.WriteFile(dest, []byte("existing content"), 0644)
+	require.NoError(t, err)
+
+	// Open handle on destination file and keep it open for a random duration
+	// between [200ms, 1800ms).
+	openDuration := time.Duration(200+rand.Int64N(1800-200)) * time.Millisecond
+	destFile, err := os.Open(dest)
+	require.NoError(t, err)
+	time.AfterFunc(openDuration, func() {
+		destFile.Close()
+	})
+	defer destFile.Close()
+
+	// Create disk store
+	store, err := storage.NewDiskStore(dest)
+	require.NoError(t, err)
+
+	// Try to save content to store
+	reader := strings.NewReader("new content")
+	log, _ := loggertest.New("test")
+	err = saveConfigToStore(store, reader, log)
+	require.NoError(t, err)
+
+	// Check that dest file has been replaced with new file
+	data, err := os.ReadFile(dest)
+	require.NoError(t, err)
+	require.Equal(t, "new content", string(data))
 }

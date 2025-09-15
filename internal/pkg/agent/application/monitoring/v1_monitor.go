@@ -78,7 +78,7 @@ const (
 )
 
 var (
-	errNoOuputPresent          = errors.New("outputs not part of the config")
+	errNoOutputPresent         = errors.New("outputs not part of the config")
 	supportedMetricsComponents = []string{"filebeat", "metricbeat", "apm-server", "auditbeat", "cloudbeat", "fleet-server", "heartbeat", "osquerybeat", "packetbeat", "pf-elastic-collector", "pf-elastic-symbolizer"}
 	supportedBeatsComponents   = []string{"filebeat", "metricbeat", "apm-server", "fleet-server", "auditbeat", "cloudbeat", "heartbeat", "osquerybeat", "packetbeat", "pf-elastic-collector", "pf-elastic-symbolizer"}
 )
@@ -246,9 +246,9 @@ func (b *BeatsMonitor) MonitoringConfig(
 
 	componentInfos := b.getComponentInfos(components, componentIDPidMap)
 
-	if err := b.injectMonitoringOutput(policy, cfg, monitoringOutputName); err != nil && !errors.Is(err, errNoOuputPresent) {
+	if err := b.injectMonitoringOutput(policy, cfg, monitoringOutputName); err != nil && !errors.Is(err, errNoOutputPresent) {
 		return nil, errors.New(err, "failed to inject monitoring output")
-	} else if errors.Is(err, errNoOuputPresent) {
+	} else if errors.Is(err, errNoOutputPresent) {
 		// nothing to inject, no monitoring output
 		return nil, nil
 	}
@@ -402,7 +402,7 @@ func (b *BeatsMonitor) initInputs(cfg map[string]interface{}) {
 func (b *BeatsMonitor) injectMonitoringOutput(source, dest map[string]interface{}, monitoringOutputName string) error {
 	outputsNode, found := source[outputsKey]
 	if !found {
-		return errNoOuputPresent
+		return errNoOutputPresent
 	}
 
 	outputs, ok := outputsNode.(map[string]interface{})
@@ -683,7 +683,7 @@ func (b *BeatsMonitor) getHttpStreams(
 		},
 		"metricsets": []interface{}{"json"},
 		"path":       "/stats",
-		"hosts":      []interface{}{HttpPlusAgentMonitoringEndpoint(b.operatingSystem, b.config.C)},
+		"hosts":      []interface{}{HttpPlusAgentMonitoringEndpoint(b.config.C)},
 		"namespace":  "agent",
 		"period":     metricsCollectionIntervalString,
 		"index":      indexName,
@@ -1273,17 +1273,17 @@ func changeOwner(path string, uid, gid int) error {
 }
 
 // HttpPlusAgentMonitoringEndpoint provides an agent monitoring endpoint path with a `http+` prefix.
-func HttpPlusAgentMonitoringEndpoint(operatingSystem string, cfg *monitoringCfg.MonitoringConfig) string {
-	return PrefixedEndpoint(AgentMonitoringEndpoint(operatingSystem, cfg))
+func HttpPlusAgentMonitoringEndpoint(cfg *monitoringCfg.MonitoringConfig) string {
+	return PrefixedEndpoint(AgentMonitoringEndpoint(cfg))
 }
 
 // AgentMonitoringEndpoint provides an agent monitoring endpoint path.
-func AgentMonitoringEndpoint(operatingSystem string, cfg *monitoringCfg.MonitoringConfig) string {
+func AgentMonitoringEndpoint(cfg *monitoringCfg.MonitoringConfig) string {
 	if cfg != nil && cfg.Enabled {
 		return "http://" + net.JoinHostPort(cfg.HTTP.Host, strconv.Itoa(cfg.HTTP.Port))
 	}
 
-	if operatingSystem == windowsOS {
+	if runtime.GOOS == windowsOS {
 		return agentMbEndpointFileFormatWin
 	}
 	// unix socket path must be less than 104 characters
