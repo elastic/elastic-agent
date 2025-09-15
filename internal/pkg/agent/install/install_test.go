@@ -224,7 +224,7 @@ func TestSetupInstallPath(t *testing.T) {
 	tmpdir := t.TempDir()
 	ownership, err := utils.CurrentFileOwner()
 	require.NoError(t, err)
-	err = setupInstallPath(tmpdir, ownership, "data/elastic-agent-1.2.3-SNAPSHOT", "1.2.3-SNAPSHOT")
+	err = setupInstallPath(tmpdir, ownership, "data/elastic-agent-1.2.3-SNAPSHOT", "1.2.3-SNAPSHOT", "")
 	require.NoError(t, err)
 	markerFilePath := filepath.Join(tmpdir, paths.MarkerFileName)
 	require.FileExists(t, markerFilePath)
