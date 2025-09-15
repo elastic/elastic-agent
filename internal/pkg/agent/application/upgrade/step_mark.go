@@ -21,6 +21,7 @@ import (
 )
 
 const markerFilename = ".update-marker"
+const disableRollbackWindow = time.Duration(0)
 
 // RollbackAvailable identifies an elastic-agent install available for rollback
 type RollbackAvailable struct {
@@ -159,7 +160,7 @@ func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile wr
 			Details:           upgradeDetails,
 		}
 
-		if rollbackWindow > 0 && agent.parsedVersion != nil && !agent.parsedVersion.Less(*Version_9_2_0_SNAPSHOT) {
+		if rollbackWindow > disableRollbackWindow && agent.parsedVersion != nil && !agent.parsedVersion.Less(*Version_9_2_0_SNAPSHOT) {
 			// if we have a not empty rollback window, write the prev version in the rollbacks_available field
 			// we also need to check the destination version because the manual rollback and delayed cleanup will be
 			// handled by that version of agent, so it needs to be recent enough

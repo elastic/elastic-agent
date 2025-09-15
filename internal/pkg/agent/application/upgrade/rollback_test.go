@@ -717,12 +717,14 @@ func createUpdateMarker(t *testing.T, log *logger.Logger, topDir, newAgentVersio
 		versionedHome: oldAgentVersionedHome,
 	}
 
+	// use a rollback window value that disables the creation of the available_rollbacks field in the upgrade marker
+	// to create a backward compatible marker
 	markUpgrade := markUpgradeProvider(UpdateActiveCommit, os.WriteFile)
 	err := markUpgrade(log,
 		paths.DataFrom(topDir),
 		time.Now(),
 		newAgentInstall,
 		oldAgentInstall,
-		nil, nil, 0)
+		nil, nil, disableRollbackWindow)
 	require.NoError(t, err, "error writing fake update marker")
 }
