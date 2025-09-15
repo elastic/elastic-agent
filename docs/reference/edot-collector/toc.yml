@@ -19,3 +19,5 @@ toc:
         children:
           - file: custom-collector.md
       - file: upstream-collector.md
+      - title: Troubleshooting
+        crosslink: docs-content://troubleshoot/ingest/opentelemetry/edot-collector/index.md
