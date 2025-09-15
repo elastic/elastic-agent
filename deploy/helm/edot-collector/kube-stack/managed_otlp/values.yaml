@@ -160,6 +160,19 @@ collectors:
               enabled: true
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
+        telemetry:
+          resource:
+            k8s.pod.ip: ${env:OTEL_K8S_POD_IP}
+            k8s.node.name: ${env:OTEL_K8S_NODE_NAME}
+            k8s.pod.name: ${env:OTEL_K8S_POD_NAME}
+            host.name: ${env:OTEL_K8S_NODE_NAME}
+          metrics:
+            readers:
+              - periodic:
+                  exporter:
+                    otlp:
+                      protocol: grpc
+                      endpoint: http://opentelemetry-kube-stack-gateway-collector:4317
         pipelines:
           metrics:
             exporters:
@@ -480,6 +493,19 @@ collectors:
             - container.id
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
+        telemetry:
+          resource:
+            k8s.pod.ip: ${env:OTEL_K8S_POD_IP}
+            k8s.node.name: ${env:OTEL_K8S_NODE_NAME}
+            k8s.pod.name: ${env:OTEL_K8S_POD_NAME}
+            host.name: ${env:OTEL_K8S_NODE_NAME}
+          metrics:
+            readers:
+              - periodic:
+                  exporter:
+                    otlp:
+                      protocol: grpc
+                      endpoint: http://opentelemetry-kube-stack-gateway-collector:4317
         pipelines:
           # Disable default non used kube-stack Helm Chart pipelines
           logs: null
@@ -598,6 +624,19 @@ collectors:
             Authorization: ApiKey ${env:ELASTIC_API_KEY}
           timeout: 15s
       service:
+        telemetry:
+          resource:
+            k8s.pod.ip: ${env:OTEL_K8S_POD_IP}
+            k8s.node.name: ${env:OTEL_K8S_NODE_NAME}
+            k8s.pod.name: ${env:OTEL_K8S_POD_NAME}
+            host.name: ${env:OTEL_K8S_NODE_NAME}
+          metrics:
+            readers:
+              - periodic:
+                  exporter:
+                    otlp:
+                      protocol: grpc
+                      endpoint: ${env:MY_POD_IP}:4317
         pipelines:
           metrics:
             receivers: [otlp]
