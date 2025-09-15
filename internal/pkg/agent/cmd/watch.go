@@ -265,7 +265,8 @@ func rollback(log *logp.Logger, topDir string, client client.Client, installModi
 			}
 			marker.Details = details.NewDetails(marker.Version, details.StateRollback, actionID)
 		}
-		marker.Details.SetStateWithReason(details.StateRollback, details.ReasonManualRollback)
+		// use the previous version from the marker
+		marker.Details.SetStateWithReason(details.StateRollback, fmt.Sprintf(details.ReasonManualRollbackPattern, marker.PrevVersion))
 		err = upgrade.SaveMarker(dataDir, marker, true)
 		if err != nil {
 			return fmt.Errorf("saving marker after rolling back: %w", err)
