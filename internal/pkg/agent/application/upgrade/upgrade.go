@@ -90,7 +90,6 @@ type Upgrader struct {
 	artifactDownloader   artifactDownloadHandler
 	unpacker             unpackHandler
 	isDiskSpaceErrorFunc func(err error) bool
-	extractAgentVersion  func(metadata packageMetadata, upgradeVersion string) agentVersion
 	copyActionStore      copyActionStoreFunc
 	copyRunDirectory     copyRunDirectoryFunc
 }
@@ -113,12 +112,8 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.A
 		artifactDownloader:   newArtifactDownloader(settings, log),
 		unpacker:             newUnpacker(log),
 		isDiskSpaceErrorFunc: upgradeErrors.IsDiskSpaceError,
-<<<<<<< HEAD
-=======
-		extractAgentVersion:  extractAgentVersion,
 		copyActionStore:      copyActionStoreProvider(os.ReadFile, os.WriteFile),
 		copyRunDirectory:     copyRunDirectoryProvider(os.MkdirAll, copy.Copy),
->>>>>>> 96e047675 (Enhancement/5235 correctly wrap errors from copyActionDir and copyRunDirectory (#9349))
 	}, nil
 }
 
@@ -546,29 +541,6 @@ func copyActionStoreProvider(readFile readFileFunc, writeFile writeFileFunc) cop
 			}
 		}
 
-<<<<<<< HEAD
-		if err := os.WriteFile(newActionStorePath, currentActionStore, 0o600); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func copyRunDirectory(log *logger.Logger, oldRunPath, newRunPath string) error {
-
-	log.Infow("Copying run directory", "new_run_path", newRunPath, "old_run_path", oldRunPath)
-
-	if err := os.MkdirAll(newRunPath, runDirMod); err != nil {
-		return errors.New(err, "failed to create run directory")
-	}
-
-	err := copyDir(log, oldRunPath, newRunPath, true)
-	if os.IsNotExist(err) {
-		// nothing to copy, operation ok
-		log.Infow("Run directory not present", "old_run_path", oldRunPath)
-=======
->>>>>>> 96e047675 (Enhancement/5235 correctly wrap errors from copyActionDir and copyRunDirectory (#9349))
 		return nil
 	}
 }

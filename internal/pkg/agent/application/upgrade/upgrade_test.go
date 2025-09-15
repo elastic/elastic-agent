@@ -1202,13 +1202,6 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			expectedError:          testError,
 			upgraderMocker: func(upgrader *Upgrader) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{}
-				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
-					return agentVersion{
-						version:  upgradeVersion,
-						snapshot: false,
-						hash:     metadata.hash,
-					}
-				}
 				upgrader.unpacker = &mockUnpacker{
 					returnPackageMetadata: packageMetadata{
 						manifest: &v1.PackageManifest{},
@@ -1223,13 +1216,6 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			expectedError:          testError,
 			upgraderMocker: func(upgrader *Upgrader) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{}
-				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
-					return agentVersion{
-						version:  upgradeVersion,
-						snapshot: false,
-						hash:     metadata.hash,
-					}
-				}
 				upgrader.unpacker = &mockUnpacker{
 					returnPackageMetadata: packageMetadata{
 						manifest: &v1.PackageManifest{},
@@ -1251,13 +1237,6 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			upgraderMocker: func(upgrader *Upgrader) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{}
 				upgrader.artifactDownloader = &mockArtifactDownloader{}
-				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
-					return agentVersion{
-						version:  upgradeVersion,
-						snapshot: false,
-						hash:     metadata.hash,
-					}
-				}
 				upgrader.unpacker = &mockUnpacker{
 					returnPackageMetadata: packageMetadata{
 						manifest: &v1.PackageManifest{},
