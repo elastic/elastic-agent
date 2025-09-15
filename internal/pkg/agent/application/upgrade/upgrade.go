@@ -67,7 +67,7 @@ var (
 	ErrNilUpdateMarker      = errors.New("loaded a nil update marker")
 	ErrEmptyRollbackVersion = errors.New("rollback version is empty")
 	ErrNoRollbacksAvailable = errors.New("no rollbacks available")
-
+	ErrAgentInstallNotFound = errors.New("agent install descriptor not found")
 	// Version_9_2_0_SNAPSHOT is the minimum version for manual rollback and rollback reason
 	Version_9_2_0_SNAPSHOT = agtversion.NewParsedSemVer(9, 2, 0, "SNAPSHOT", "")
 )
@@ -401,8 +401,22 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, err
 	}
 
+	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
+	if err != nil {
+		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
+	}
+
 	//FIXME make it nicer
-	err = addInstallDesc(version, unpackRes.VersionedHome, unpackRes.Hash, detectedFlavor)
+	err = addInstallDesc(version, unpackRes.VersionedHome, unpackRes.Hash, detectedFlavor, false)
+	if err != nil {
+		err = fmt.Errorf("error encountered when adding install description: %w", err)
+
+		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), unpackRes.VersionedHome, currentVersionedHome)
+		if rollbackErr != nil {
+			return nil, goerrors.Join(err, rollbackErr)
+		}
+		return nil, err
+	}
 
 	newHash := unpackRes.Hash
 	if newHash == "" {
@@ -430,15 +444,31 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
 	newPath := paths.BinaryPath(filepath.Join(paths.Top(), hashedDir), agentName)
 
-	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
-	if err != nil {
-		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
-	}
-
 	if err := u.changeSymlink(u.log, paths.Top(), symlinkPath, newPath); err != nil {
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
 		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
 		return nil, goerrors.Join(err, rollbackErr)
+	}
+
+	//FIXME make it nicer
+	err = modifyInstallDesc(func(desc *v1.AgentInstallDesc) error {
+		if desc.VersionedHome == unpackRes.VersionedHome {
+			desc.Active = true
+			return nil
+		}
+
+		desc.Active = false
+		return nil
+	})
+
+	if err != nil {
+		err = fmt.Errorf("error encountered when adding install description: %w", err)
+
+		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), unpackRes.VersionedHome, currentVersionedHome)
+		if rollbackErr != nil {
+			return nil, goerrors.Join(err, rollbackErr)
+		}
+		return nil, err
 	}
 
 	// We rotated the symlink successfully: prepare the current and previous agent installation details for the update marker
@@ -502,7 +532,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	return cb, nil
 }
 
-func addInstallDesc(version string, home string, hash string, flavor string) error {
+func addInstallDesc(version string, home string, hash string, flavor string, active bool) error {
 	installMarkerFilePath := filepath.Join(paths.Top(), paths.MarkerFileName)
 	installDescriptor, err := readInstallMarker(installMarkerFilePath)
 	if err != nil {
@@ -520,6 +550,7 @@ func addInstallDesc(version string, home string, hash string, flavor string) err
 		Hash:          hash,
 		VersionedHome: home,
 		Flavor:        flavor,
+		Active:        active,
 	}
 	installDescriptor.AgentInstalls[0] = newInstall
 	copied := copy(installDescriptor.AgentInstalls[1:], existingInstalls)
@@ -533,6 +564,36 @@ func addInstallDesc(version string, home string, hash string, flavor string) err
 	}
 
 	return nil
+}
+
+func modifyInstallDesc(modifierFunc func(desc *v1.AgentInstallDesc) error) error {
+	installMarkerFilePath := filepath.Join(paths.Top(), paths.MarkerFileName)
+	installDescriptor, err := readInstallMarker(installMarkerFilePath)
+	if err != nil {
+		return err
+	}
+
+	if installDescriptor == nil {
+		return fmt.Errorf("no install descriptor found at %q")
+	}
+
+	for i := range installDescriptor.AgentInstalls {
+		err = modifierFunc(&installDescriptor.AgentInstalls[i])
+		if err != nil {
+			return fmt.Errorf("modifying agent install %s: %w", installDescriptor.AgentInstalls[i].VersionedHome, err)
+		}
+	}
+
+	err = writeInstallMarker(installMarkerFilePath, installDescriptor)
+	if err != nil {
+		return fmt.Errorf("writing updated install marker: %w", err)
+	}
+
+	return nil
+}
+
+func removeAgentInstallDesc(versionedHome string) error {
+	
 }
 
 func writeInstallMarker(markerFilePath string, descriptor *v1.InstallDescriptor) error {
@@ -766,6 +827,10 @@ func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versio
 	err = os.RemoveAll(newAgentInstallPath)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("rolling back install: removing new agent install at %q failed: %w", newAgentInstallPath, err)
+	}
+	err = removeAgentInstallDesc(versionedHome)
+	if err != nil && !errors.Is(err, ErrAgentInstallNotFound) {
+		return fmt.Errorf("rolling back install: removing agent install descriptor at %q failed: %w", versionedHome, err)
 	}
 	return nil
 }
