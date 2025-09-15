@@ -497,7 +497,7 @@ func standaloneRollbackRestartTest(ctx context.Context, t *testing.T, startFixtu
 }
 
 func standaloneManualRollbackTest(ctx context.Context, t *testing.T, startFixture *atesting.Fixture, endFixture *atesting.Fixture) {
-	standaloneRollbackTest(ctx, t, startFixture, endFixture, fastWatcherCfgWithRollbackWindow, details.ReasonManualRollback,
+	standaloneRollbackTest(ctx, t, startFixture, endFixture, fastWatcherCfgWithRollbackWindow, fmt.Sprintf(details.ReasonManualRollbackPattern, startFixture.Version()),
 		func(t *testing.T, client client.Client) {
 			t.Logf("sending version=%s rollback=%v upgrade to agent", startFixture.Version(), true)
 			retVal, err := client.Upgrade(ctx, startFixture.Version(), true, "", false, false)
