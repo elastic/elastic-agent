@@ -27,8 +27,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f .ci/scripts/update-docs/requirements.txt ]; then
-            pip install -r .ci/scripts/update-docs/requirements.txt
+          if [ -f docs/scripts/update-docs/requirements.txt ]; then
+            pip install -r docs/scripts/update-docs/requirements.txt
           else
             # Install minimum required packages if no requirements.txt exists
             pip install jinja2 pyyaml
@@ -36,7 +36,7 @@ jobs:
       
       - name: Run documentation generator
         run: |
-          cd .ci/scripts/update-docs
+          cd docs/scripts/update-docs
           python update-components-docs.py
       
       - name: Check for changes
