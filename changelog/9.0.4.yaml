@@ -1,0 +1,72 @@
+version: 9.0.4
+entries:
+    - kind: other
+      summary: Upgrade Synthetics NodeJS version to latest LTS v20.
+      description: ""
+      component: heartbeat
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8712
+      issue: []
+      timestamp: 1751029489
+      file:
+        name: 1751029489-synth-upgra-node-v20.yaml
+        checksum: 26a735a19317db577652eea4bb1f3e863212da81
+    - kind: bug-fix
+      summary: Remove incorrect logging that unprivileged installations are in beta.
+      description: 'Unprivileged installations went GA in 8.15.0: https://www.elastic.co/docs/reference/fleet/elastic-agent-unprivileged'
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8715
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/8689
+      timestamp: 1751037802
+      file:
+        name: 1751037802-Stop-logging-that-unprivileged-installations-are-in-beta.yaml
+        checksum: 2c2f731f90638eaf61e8ec021ce3c4dd8885ff3a
+    - kind: feature
+      summary: Add file logs only managed OTLP input kube-stack configuration.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8785
+      issue: []
+      timestamp: 1751444462
+      file:
+        name: 1751444462-add_logs_only_motel_config.yaml
+        checksum: a7768ce2ec6de109e7a9efae7793231f4965cf00
+    - kind: bug-fix
+      summary: Ensure standalone Elastic Agent uses log level from configuration instead of persisted state.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8784
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/8137
+      timestamp: 1751455886
+      file:
+        name: 1751455886-correct-log-level-for-standalone-agents.yaml
+        checksum: e954db0ba6e1738e3d425cf3c8110a40c296a013
+    - kind: bug-fix
+      summary: Resolve deadlocks in runtime checkin communication.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8881
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/7944
+      timestamp: 1751960319
+      file:
+        name: 1751960319-fix-blocking-issues-inside-runtime-communicator.yaml
+        checksum: d288cc7474997883bc2a9118b2abf150126c9d8c
+    - kind: bug-fix
+      summary: Removed init.d support from RPM packages.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8896
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/8840
+      timestamp: 1752049251
+      file:
+        name: 1752049251-Fixed-SUSE-installation-from-RPM.yaml
+        checksum: bb9eba27e2dfa5885a2abd6140ea506d143b21f5

@@ -34,7 +34,7 @@ func (log *defaultLogger) Logf(format string, args ...any) {
 	if len(args) == 0 {
 
 	} else {
-		log.wrapped.Infof(format, args)
+		log.wrapped.Infof(format, args...)
 	}
 
 }
