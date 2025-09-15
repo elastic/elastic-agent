@@ -34,8 +34,6 @@ type ExecutionMode string
 const (
 	SubprocessExecutionMode ExecutionMode = "subprocess"
 	EmbeddedExecutionMode   ExecutionMode = "embedded"
-	// waitTimeForStop is the time to wait for the collector to stop before killing it.
-	waitTimeForStop = 30 * time.Second
 )
 
 type collectorRecoveryTimer interface {
@@ -106,6 +104,9 @@ type OTelManager struct {
 
 	// collectorRunErr is used to signal that the collector has exited.
 	collectorRunErr chan error
+
+	// stopTimeout is the timeout to wait for the collector to stop.
+	stopTimeout time.Duration
 }
 
 // NewOTelManager returns a OTelManager.
@@ -116,6 +117,7 @@ func NewOTelManager(
 	mode ExecutionMode,
 	agentInfo info.Agent,
 	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter,
+	stopTimeout time.Duration,
 ) (*OTelManager, error) {
 	var exec collectorExecution
 	var recoveryTimer collectorRecoveryTimer
@@ -154,6 +156,7 @@ func NewOTelManager(
 		execution:                  exec,
 		recoveryTimer:              recoveryTimer,
 		collectorRunErr:            make(chan error),
+		stopTimeout:                stopTimeout,
 	}, nil
 }
 
@@ -176,7 +179,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			// our caller context is cancelled so stop the collector and return
 			// has exited.
 			if m.proc != nil {
-				m.proc.Stop(waitTimeForStop)
+				m.proc.Stop(m.stopTimeout)
 			}
 			return ctx.Err()
 		case <-m.recoveryTimer.C():
@@ -205,7 +208,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			if err == nil {
 				// err is nil means that the collector has exited cleanly without an error
 				if m.proc != nil {
-					m.proc.Stop(waitTimeForStop)
+					m.proc.Stop(m.stopTimeout)
 					m.proc = nil
 					updateErr := m.reportOtelStatusUpdate(ctx, nil)
 					if updateErr != nil {
@@ -248,7 +251,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				// in the case that the configuration is invalid there is no reason to
 				// try again as it will keep failing so we do not trigger a restart
 				if m.proc != nil {
-					m.proc.Stop(waitTimeForStop)
+					m.proc.Stop(m.stopTimeout)
 					m.proc = nil
 					// don't wait here for <-collectorRunErr, already occurred
 					// clear status, no longer running
@@ -343,7 +346,7 @@ func buildMergedConfig(cfgUpdate configUpdate, agentInfo info.Agent, monitoringC
 
 func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh chan *status.AggregateStatus, collectorRunErr chan error) error {
 	if m.proc != nil {
-		m.proc.Stop(waitTimeForStop)
+		m.proc.Stop(m.stopTimeout)
 		m.proc = nil
 		select {
 		case <-collectorRunErr:

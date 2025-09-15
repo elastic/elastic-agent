@@ -289,6 +289,8 @@ func TestOTelManager_Run(t *testing.T) {
 	testBinary := filepath.Join(wd, "testing", "testing")
 	require.FileExists(t, testBinary, "testing binary not found")
 
+	const waitTimeForStop = 30 * time.Second
+
 	for _, tc := range []struct {
 		name                string
 		execModeFn          func(collectorRunErr chan error) (collectorExecution, error)
@@ -685,6 +687,7 @@ func TestOTelManager_Run(t *testing.T) {
 				doneChan:          make(chan struct{}),
 				collectorRunErr:   make(chan error),
 				recoveryTimer:     tc.restarter,
+				stopTimeout:       waitTimeForStop,
 			}
 
 			executionMode, err := tc.execModeFn(m.collectorRunErr)
@@ -737,9 +740,11 @@ func TestOTelManager_Run(t *testing.T) {
 func TestOTelManager_Logging(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	const waitTimeForStop = 30 * time.Second
+
 	base, obs := loggertest.New("otel")
 	l, _ := loggertest.New("otel-manager")
-	m, err := NewOTelManager(l, logp.DebugLevel, base, EmbeddedExecutionMode, nil, nil)
+	m, err := NewOTelManager(l, logp.DebugLevel, base, EmbeddedExecutionMode, nil, nil, waitTimeForStop)
 	require.NoError(t, err, "could not create otel manager")
 
 	go func() {
