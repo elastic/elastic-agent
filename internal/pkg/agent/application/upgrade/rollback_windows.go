@@ -70,9 +70,9 @@ func StartWatcherCmd(log *logger.Logger, createCmd cmdFactory, opts ...WatcherIn
 	}
 	list, consoleErr := getConsoleProcessList()
 	if consoleErr != nil {
-		log.Errorf("failed to get console process list: %v", consoleErr)
+		log.Warnf("failed to get console process list: %v", consoleErr)
 	} else {
-		log.Infof("Found console processes %v", list)
+		log.Debugf("Found console processes %v", list)
 	}
 	// free console
 	r1, _, consoleErr = freeConsoleProc.Call()
