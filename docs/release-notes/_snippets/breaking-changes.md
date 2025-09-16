@@ -1,15 +1,3 @@
-:::{include} /release-notes/_snippets/9.1.3/breaking.md
-:::
-
-:::{include} /release-notes/_snippets/9.1.2/breaking.md
-:::
-
-:::{include} /release-notes/_snippets/9.1.1/breaking.md
-:::
-
-:::{include} /release-notes/_snippets/9.1.0/breaking.md
-:::
-
 :::{include} /release-notes/_snippets/9.0.6/breaking.md
 :::
 
