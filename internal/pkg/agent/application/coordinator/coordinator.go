@@ -748,8 +748,8 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	var err error
 	for i := 0; i < 5; i++ {
 		s := c.State()
-		// if we are not already upgrading or if the incoming is a rollback request we can continue processing
-		if s.State != agentclient.Upgrading || uOpts.rollback {
+		// if we are not already upgrading or if the incoming is a rollback request while the watcher is running, we can continue processing
+		if s.State != agentclient.Upgrading || (uOpts.rollback && s.UpgradeDetails != nil && s.UpgradeDetails.State == details.StateWatching) {
 			err = nil
 			break
 		}
