@@ -80,6 +80,7 @@ import (
 	forwardconnector "go.opentelemetry.io/collector/connector/forwardconnector"
 
 	elasticapmconnector "github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector"
+	beatsauthextension "github.com/elastic/opentelemetry-collector-components/extension/beatsauthextension"
 )
 
 func components(extensionFactories ...extension.Factory) func() (otelcol.Factories, error) {
@@ -176,6 +177,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			apikeyauthextension.NewFactory(),
 			apmconfigextension.NewFactory(),
 			headersetterextension.NewFactory(),
+			beatsauthextension.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)
 		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)
