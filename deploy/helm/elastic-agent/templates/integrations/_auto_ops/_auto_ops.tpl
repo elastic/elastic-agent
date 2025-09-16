@@ -81,11 +81,13 @@ extraEnvs:
         name: {{ $agentName }}-autoops
         key: otel-url
 
+  {{- if $.Values.autoOps.autoops_es_url }}
   - name: AUTOOPS_ES_URL
     valueFrom:
       secretKeyRef:
         name: {{ $agentName }}-autoops
         key: autoops-es-url
+ {{- end }}
 
   # Only if API key provided
   {{- if $.Values.autoOps.es_api_key }}
