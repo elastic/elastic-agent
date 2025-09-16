@@ -79,7 +79,7 @@ Environment="NO_PROXY=<address1>,<address2>"
 :::{{note}}
 For the EDOT Collector, proxy support applies to all exporters, including those using gRPC. No special configuration is needed beyond the environment variables.
 
-If you're using an SDK that doesn't support proxy variables directly, consider routing telemetry through an EDOT Collector configured with proxy settings. This ensures consistent proxy handling. For more information, refer to [Proxy settings for EDOT SDKs](opentelemetry://reference/edot-sdks/proxy.mdproxy.md).
+If you're using an SDK that doesn't support proxy variables directly, consider routing telemetry through an EDOT Collector configured with proxy settings. This ensures consistent proxy handling. For more information, refer to [Proxy settings for EDOT SDKs](docs-content://troubleshoot/ingest/opentelemetry/edot-sdks/proxy.md).
 :::
 
 
