@@ -5,13 +5,6 @@ entries:
       description: ""
       component: ""
       pr:
-<<<<<<< HEAD
-=======
-        - https://github.com/elastic/elastic-agent/pull/9329
-        - https://github.com/elastic/elastic-agent/pull/9521
-        - https://github.com/elastic/elastic-agent/pull/9522
-        - https://github.com/elastic/elastic-agent/pull/9545
->>>>>>> 86fd0df04 ([docs] Add Markdown release notes (#9440))
         - https://github.com/elastic/elastic-agent/pull/9213
       issue: []
       timestamp: 1753950420
@@ -71,13 +64,6 @@ entries:
       component: elastic-agent
       pr:
         - https://github.com/elastic/elastic-agent/pull/9329
-<<<<<<< HEAD
-=======
-        - https://github.com/elastic/elastic-agent/pull/9521
-        - https://github.com/elastic/elastic-agent/pull/9522
-        - https://github.com/elastic/elastic-agent/pull/9545
-        - https://github.com/elastic/elastic-agent/pull/9362
->>>>>>> 86fd0df04 ([docs] Add Markdown release notes (#9440))
       issue: []
       timestamp: 1755149089
       file:

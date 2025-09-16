@@ -1,6 +1,5 @@
 version: 9.1.0
 entries:
-<<<<<<< HEAD
     - kind: enhancement
       summary: Improve kubernetes_secrets provider secret logging
       description: ""
@@ -81,88 +80,6 @@ entries:
       file:
         name: 1740713597-support-agent-monitoring-ipv6.yaml
         checksum: b0b76e19a1b8637eb247611ad302d47eab9db6bc
-=======
-    # - kind: enhancement
-    #   summary: Improve kubernetes_secrets provider secret logging
-    #   description: ""
-    #   component: elastic-agent
-    #   pr:
-    #     - https://github.com/elastic/elastic-agent/pull/6841
-    #   issue:
-    #     - https://github.com/elastic/elastic-agent/issues/6187
-    #   timestamp: 1739437836
-    #   file:
-    #     name: 1739437836-Improve-kubernetes_secrets-provider-secret-logging.yaml
-    #     checksum: 0c4b850fae555d18f7a8ba5292f668a28483eaf2
-    # - kind: bug-fix
-    #   summary: Fix deadlock in OTelManager
-    #   description: |
-    #     Fixes a deadlock case in the OTelManager where an Update can occur while an error is also being reported
-    #     which causes the communication with the OTelManager to hit a deadlock.
-    #   component: ""
-    #   pr:
-    #     - https://github.com/elastic/elastic-agent/pull/6927
-    #   issue: []
-    #   timestamp: 1739981369
-    #   file:
-    #     name: 1739981369-Fix-deadlock-in-OTelManager.yaml
-    #     checksum: 333d2fd898e8b4b3f5108f270562f41554bb974a
-    # - kind: bug-fix
-    #   summary: Fix TSDB version_conflict_engine_exception caused by incorrect kube-stack Helm values
-    #   description: Setting non-zero send_batch_max_size for metrics risks TSDB version_conflict_engine_exception as it causes metrics grouping in es exporter to not work properly.
-    #   component: elastic-agent
-    #   pr: []
-    #   issue: []
-    #   timestamp: 1740054191
-    #   file:
-    #     name: 1740054191-kube-stack-helm-chart-metrics-batch.yaml
-    #     checksum: bd3f5c4ea20a4714a84dca8e9c8875c57c53368d
-    # - kind: enhancement
-    #   summary: Allow upgrading deb or rpm agents when using Elastic Defend with tamper protection.
-    #   description: ""
-    #   component: elastic-agent
-    #   pr:
-    #     - https://github.com/elastic/elastic-agent/pull/6907
-    #   issue:
-    #     - https://github.com/elastic/elastic-agent/issues/6394
-    #   timestamp: 1740166208
-    #   file:
-    #     name: 1740166208-allow-deb-rpm-upgrade-with-tamper-protected-endpoint.yaml
-    #     checksum: e1124b779230d456de615b055b3d2c2f2ead20e1
-    # - kind: feature
-    #   summary: set replicas for gateway collector
-    #   description: ""
-    #   component: edot-collector
-    #   pr:
-    #     - https://github.com/elastic/elastic-agent/pull/7011
-    #   issue: []
-    #   timestamp: 1740492672
-    #   file:
-    #     name: 1740492672-set-replicas-for-gateway-collector.yaml
-    #     checksum: 4fbd8a8622214c18b656e9ecab4034a17d21535d
-    # - kind: enhancement
-    #   summary: add ApiKey prefix to MOTel host configurations
-    #   description: ""
-    #   component: elastic-agent
-    #   pr:
-    #     - https://github.com/elastic/elastic-agent/pull/7063
-    #   issue: []
-    #   timestamp: 1740674973
-    #   file:
-    #     name: 1740674973-add-ApiKey-prefix-to-MOTel-host-configurations.yaml
-    #     checksum: 23aaa12620e5149b642235c310fbf957682d7a7d
-    # - kind: bug-fix
-    #   summary: support ipv6 host in agent monitoring http config
-    #   description: ""
-    #   component: elastic-agent
-    #   pr:
-    #     - https://github.com/elastic/elastic-agent/pull/7073
-    #   issue: []
-    #   timestamp: 1740713597
-    #   file:
-    #     name: 1740713597-support-agent-monitoring-ipv6.yaml
-    #     checksum: b0b76e19a1b8637eb247611ad302d47eab9db6bc
->>>>>>> 86fd0df04 ([docs] Add Markdown release notes (#9440))
     - kind: enhancement
       summary: Add elastic.agent.fips to local_metadata
       description: |
@@ -201,7 +118,6 @@ entries:
       file:
         name: 1741808763-FIPS-Compliant-agent-file-vault.yaml
         checksum: f20a224aeebd7585e36b202a452f74a485232286
-<<<<<<< HEAD
     - kind: bug-fix
       summary: Fix elasticsearch exporter configuration in kube-stack values
       description: ""
@@ -212,18 +128,6 @@ entries:
       file:
         name: 1741865161-fix-otel-kube-stack-config.yaml
         checksum: 469274d8e4bbe2cf8fd3eb02e6c5220ef1c1bdc8
-=======
-    # - kind: bug-fix
-    #   summary: Fix elasticsearch exporter configuration in kube-stack values
-    #   description: ""
-    #   component: elastic-agent
-    #   pr: []
-    #   issue: []
-    #   timestamp: 1741865161
-    #   file:
-    #     name: 1741865161-fix-otel-kube-stack-config.yaml
-    #     checksum: 469274d8e4bbe2cf8fd3eb02e6c5220ef1c1bdc8
->>>>>>> 86fd0df04 ([docs] Add Markdown release notes (#9440))
     - kind: enhancement
       summary: With this change FIPS-capable agents will only be able to upgrade to other FIPS-capable agents. This change also restricts non-fips to fips upgrades as well.
       description: ""
@@ -259,7 +163,6 @@ entries:
       file:
         name: 1744059162-send-correct-signal-on-windows.yaml
         checksum: e6708089ece83e111bac8c85b20975ef5e877652
-<<<<<<< HEAD
     - kind: feature
       summary: Add nopexporter to EDOT Collector
       description: ""
@@ -295,43 +198,6 @@ entries:
       file:
         name: 1745609163-journalctl-on-all-docker-variants.yaml
         checksum: a125369f2991dde7206d0e39ba90b37fb80ec9be
-=======
-    # - kind: feature
-    #   summary: Add nopexporter to EDOT Collector
-    #   description: ""
-    #   component: edot-collector
-    #   pr: []
-    #   issue: []
-    #   timestamp: 1744198660
-    #   file:
-    #     name: 1744198660-add-nopexporter.yaml
-    #     checksum: 9f989be89459d35a8fdc48362a0dad19880fa4e1
-    # - kind: bug-fix
-    #   summary: Fix Managed OTLP Helm config to use current image repo.
-    #   description: ""
-    #   component: elastic-agent
-    #   pr: []
-    #   issue: []
-    #   timestamp: 1744839123
-    #   file:
-    #     name: 1744839123-fix-MOtel-config-image-value.yaml
-    #     checksum: cd9cb5f75e1b3983a48ee156e478e0a62051ffb6
-    # - kind: bug-fix
-    #   summary: |
-    #     Ship journalctl in the elastic-agent, elastic-agent-complete, and
-    #     elastic-otel-collector Docker images to enable reading journald
-    #     logs. Journalctl is not present on *-slim and all Wolfi images.
-    #   description: ""
-    #   component: elastic-agent
-    #   pr:
-    #     - https://github.com/elastic/elastic-agent/pull/7995
-    #   issue:
-    #     - https://github.com/elastic/beats/issues/44040
-    #   timestamp: 1745609163
-    #   file:
-    #     name: 1745609163-journalctl-on-all-docker-variants.yaml
-    #     checksum: a125369f2991dde7206d0e39ba90b37fb80ec9be
->>>>>>> 86fd0df04 ([docs] Add Markdown release notes (#9440))
     - kind: bug-fix
       summary: Preserve agent run state on DEB and RPM upgrades
       description: ""
@@ -436,7 +302,6 @@ entries:
       file:
         name: 1747938268-fix-diag-race-condition.yaml
         checksum: 25e4883c6751a854d4a2f0897fb83848416c855e
-<<<<<<< HEAD
     - kind: feature
       summary: add cumulativetodeltaprocessor to EDOT collector
       description: ""
@@ -447,18 +312,6 @@ entries:
       file:
         name: 1749176965-add-cumulativetodeltaprocessor.yaml
         checksum: 6c4bc7565ed8fb801a1b02a01ee085488ae960e8
-=======
-    # - kind: feature
-    #   summary: add cumulativetodeltaprocessor to EDOT collector
-    #   description: ""
-    #   component: elastic-agent
-    #   pr: []
-    #   issue: []
-    #   timestamp: 1749176965
-    #   file:
-    #     name: 1749176965-add-cumulativetodeltaprocessor.yaml
-    #     checksum: 6c4bc7565ed8fb801a1b02a01ee085488ae960e8
->>>>>>> 86fd0df04 ([docs] Add Markdown release notes (#9440))
     - kind: bug-fix
       summary: Use paths.TempDir for diagnostics actions
       description: ""
@@ -470,7 +323,6 @@ entries:
       file:
         name: 1749742685-Use-paths.TempDir-for-diagnostics-actions.yaml
         checksum: 1357d25b03d628ff7234a15a51e5dba89459d340
-<<<<<<< HEAD
     - kind: feature
       summary: Add apmconfig and apikeyauth OTel extensions
       description: ""
@@ -481,18 +333,6 @@ entries:
       file:
         name: 1749824071-add-apmconfig-apikeyauth-extension.yaml
         checksum: 2b92ba7906ac2c955bf32a47f46eb363c77ca323
-=======
-    # - kind: feature
-    #   summary: Add apmconfig and apikeyauth OTel extensions
-    #   description: ""
-    #   component: elastic-agent
-    #   pr: []
-    #   issue: []
-    #   timestamp: 1749824071
-    #   file:
-    #     name: 1749824071-add-apmconfig-apikeyauth-extension.yaml
-    #     checksum: 2b92ba7906ac2c955bf32a47f46eb363c77ca323
->>>>>>> 86fd0df04 ([docs] Add Markdown release notes (#9440))
     - kind: bug-fix
       summary: Use Debian 11 to build linux/arm to match linux/amd64. Upgrades linux/arm64's statically linked glibc from 2.28 to 2.31.
       description: ""
@@ -517,7 +357,6 @@ entries:
       file:
         name: 1749923633-Windows-relax-file-ownership-check-for-re-enrollment.yaml
         checksum: 650d0f58770863722ed75c0b092c4578f420e1fe
-<<<<<<< HEAD
     - kind: feature
       summary: Add bearertokenauth Otel extension
       description: ""
@@ -528,18 +367,6 @@ entries:
       file:
         name: 1750329445-add-bearertokenauth-extension.yaml
         checksum: 321fc367b896aed8b01c802a75bd628ab149a608
-=======
-    # - kind: feature
-    #   summary: Add bearertokenauth Otel extension
-    #   description: ""
-    #   component: elastic-agent
-    #   pr: []
-    #   issue: []
-    #   timestamp: 1750329445
-    #   file:
-    #     name: 1750329445-add-bearertokenauth-extension.yaml
-    #     checksum: 321fc367b896aed8b01c802a75bd628ab149a608
->>>>>>> 86fd0df04 ([docs] Add Markdown release notes (#9440))
     - kind: enhancement
       summary: Remove deprecated otel elasticsearch exporter config `*_dynamic_index` from code and samples
       description: ""
@@ -568,7 +395,6 @@ entries:
       file:
         name: 1750408426-kube-stack-service-attrs.yaml
         checksum: 4376b5e7140c31f3330fd7e7f69cf9bee8006bfb
-<<<<<<< HEAD
     - kind: upgrade
       summary: Bump apmconfig extension to v0.3.0
       description: ""
@@ -582,21 +408,6 @@ entries:
     - kind: deprecation
       summary: Deprecate the elasticinframetrics processor. It will be removed in 9.2.0.
       description: ""
-=======
-    # - kind: upgrade
-    #   summary: Bump apmconfig extension to v0.3.0
-    #   description: ""
-    #   component: elastic-agent
-    #   pr: []
-    #   issue: []
-    #   timestamp: 1750412496
-    #   file:
-    #     name: 1750412496-bump-apmconfig-extension.yaml
-    #     checksum: 824f9b5a0bf1f70a6be92e916efbdcb6399fef86
-    - kind: deprecation
-      summary: Deprecate the elasticinframetrics processor. It will be removed in 9.2.0.
-      description: The elasticinframetrics processor is no longer necessary and is deprecated in EDOT Collector 9.1.0. It is scheduled for removal in 9.2.0.
->>>>>>> 86fd0df04 ([docs] Add Markdown release notes (#9440))
       component: edot
       pr:
         - https://github.com/elastic/elastic-agent/pull/8659
@@ -639,7 +450,6 @@ entries:
       file:
         name: 1751317599-edot-collector-include-forwardconnector.yaml
         checksum: 04412e4d8553807149ec868f1f5493441ea8e2cb
-<<<<<<< HEAD
     - kind: feature
       summary: Add file logs only mOTEL kube-stack configuration
       description: ""
@@ -650,18 +460,6 @@ entries:
       file:
         name: 1751444462-add_logs_only_motel_config.yaml
         checksum: a7768ce2ec6de109e7a9efae7793231f4965cf00
-=======
-    # - kind: feature
-    #   summary: Add file logs only mOTEL kube-stack configuration
-    #   description: ""
-    #   component: elastic-agent
-    #   pr: []
-    #   issue: []
-    #   timestamp: 1751444462
-    #   file:
-    #     name: 1751444462-add_logs_only_motel_config.yaml
-    #     checksum: a7768ce2ec6de109e7a9efae7793231f4965cf00
->>>>>>> 86fd0df04 ([docs] Add Markdown release notes (#9440))
     - kind: bug-fix
       summary: Ensure standalone Elastic Agent uses log level from configuration instead of persisted state
       description: ""
