@@ -628,6 +628,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 
 	// early check outside of upgrader before overriding the state
 	if !c.upgradeMgr.Upgradeable() {
+		c.ClearOverrideState()
 		det.Fail(ErrNotUpgradable)
 		return ErrNotUpgradable
 	}
@@ -635,6 +636,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	// early check capabilities to ensure this upgrade actions is allowed
 	if c.caps != nil {
 		if !c.caps.AllowUpgrade(version, sourceURI) {
+			c.ClearOverrideState()
 			det.Fail(ErrNotUpgradable)
 			return ErrNotUpgradable
 		}
@@ -643,6 +645,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	// run any pre upgrade callback
 	if uOpts.preUpgradeCallback != nil {
 		if err := uOpts.preUpgradeCallback(ctx, c.logger, action); err != nil {
+			c.ClearOverrideState()
 			det.Fail(err)
 			return err
 		}
