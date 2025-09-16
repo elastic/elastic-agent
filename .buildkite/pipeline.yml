@@ -359,7 +359,9 @@ steps:
 
               config:
                 label: ":pipeline: Upload extended testing Pipeline"
-                command: "buildkite-agent pipeline upload .buildkite/integration.pipeline.yml"
+                command: |
+                  echo '${GITHUB_PR_LABELS}'
+                  buildkite-agent pipeline upload .buildkite/integration.pipeline.yml
                 env:
                   - BUILDKITE_PULL_REQUEST=${BUILDKITE_PULL_REQUEST}
                   - BUILDKITE_PULL_REQUEST_BASE_BRANCH=${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
