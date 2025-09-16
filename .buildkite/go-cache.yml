@@ -1,0 +1,138 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+
+env:
+  VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
+
+common:
+  - aws_oidc: &aws_oidc
+      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-aws-buildkite-oidc.tf
+      elastic/oblt-aws-auth#v0.2.0:
+
+steps:
+  - label: "Unit tests - {{matrix.os}}"
+    command: ".buildkite/scripts/steps/unit-tests.sh"
+    agents:
+      provider: "gcp"
+      image: "{{matrix.os}}"
+    plugins:
+      - *aws_oidc
+    matrix:
+      setup:
+        os:
+          - "platform-ingest-elastic-agent-ubuntu-2004-1757120457"
+          - "platform-ingest-elastic-agent-ubuntu-2204-1757120457"
+          - "platform-ingest-elastic-agent-ubuntu-2404-1757120457"
+          - "platform-ingest-elastic-agent-ubuntu-2004-1755910857"
+          - "platform-ingest-elastic-agent-ubuntu-2204-1755910857"
+          - "platform-ingest-elastic-agent-ubuntu-2404-1755910857"
+          - "platform-ingest-elastic-agent-ubuntu-2004-1755306060"
+          - "platform-ingest-elastic-agent-ubuntu-2204-1755306060"
+          - "platform-ingest-elastic-agent-ubuntu-2404-1755306060"
+
+  - label: "Unit tests - {{matrix.os}} with requirefips build tag"
+    command: ".buildkite/scripts/steps/unit-tests.sh"
+    agents:
+      provider: "gcp"
+      image: "{{matrix.os}}"
+    plugins:
+      - *aws_oidc
+    env:
+      FIPS: "true"
+    matrix:
+      setup:
+        os:
+          - "platform-ingest-elastic-agent-ubuntu-2004-1757120457"
+          - "platform-ingest-elastic-agent-ubuntu-2204-1757120457"
+          - "platform-ingest-elastic-agent-ubuntu-2404-1757120457"
+          - "platform-ingest-elastic-agent-ubuntu-2004-1755910857"
+          - "platform-ingest-elastic-agent-ubuntu-2204-1755910857"
+          - "platform-ingest-elastic-agent-ubuntu-2404-1755910857"
+          - "platform-ingest-elastic-agent-ubuntu-2004-1755306060"
+          - "platform-ingest-elastic-agent-ubuntu-2204-1755306060"
+          - "platform-ingest-elastic-agent-ubuntu-2404-1755306060"
+
+  - label: "Unit tests - {{matrix.os}} with fips140=only"
+    command: ".buildkite/scripts/steps/unit-tests.sh"
+    agents:
+      provider: "gcp"
+      image: "{{matrix.os}}"
+    plugins:
+      - *aws_oidc
+    env:
+      FIPS: "true"
+      GODEBUG: "fips140=only"
+    matrix:
+      setup:
+        os:
+          - "platform-ingest-elastic-agent-ubuntu-2004-1757120457"
+          - "platform-ingest-elastic-agent-ubuntu-2204-1757120457"
+          - "platform-ingest-elastic-agent-ubuntu-2404-1757120457"
+          - "platform-ingest-elastic-agent-ubuntu-2004-1755910857"
+          - "platform-ingest-elastic-agent-ubuntu-2204-1755910857"
+          - "platform-ingest-elastic-agent-ubuntu-2404-1755910857"
+          - "platform-ingest-elastic-agent-ubuntu-2004-1755306060"
+          - "platform-ingest-elastic-agent-ubuntu-2204-1755306060"
+          - "platform-ingest-elastic-agent-ubuntu-2404-1755306060"
+
+  - label: "Unit tests - {{matrix.os}} with fips140=only"
+    command: ".buildkite/scripts/steps/unit-tests.sh"
+    agents:
+      provider: "gcp"
+      image: "{{matrix.os}}"
+    plugins:
+      - *aws_oidc
+    env:
+      FIPS: "true"
+      GODEBUG: "fips140=only"
+    matrix:
+      setup:
+        os:
+          - "platform-ingest-elastic-agent-ubuntu-2004-1757120457"
+          - "platform-ingest-elastic-agent-ubuntu-2204-1757120457"
+          - "platform-ingest-elastic-agent-ubuntu-2404-1757120457"
+          - "platform-ingest-elastic-agent-ubuntu-2004-1755910857"
+          - "platform-ingest-elastic-agent-ubuntu-2204-1755910857"
+          - "platform-ingest-elastic-agent-ubuntu-2404-1755910857"
+          - "platform-ingest-elastic-agent-ubuntu-2004-1755306060"
+          - "platform-ingest-elastic-agent-ubuntu-2204-1755306060"
+          - "platform-ingest-elastic-agent-ubuntu-2404-1755306060"
+
+  - label: "Unit tests - {{matrix.os}} ARM"
+    command: ".buildkite/scripts/steps/unit-tests.sh"
+    artifact_paths:
+      - "build/TEST-*.html"
+      - "build/TEST-*.xml"
+      - "build/diagnostics/*"
+      - "coverage-*.out"
+    agents:
+      provider: "aws"
+      image: "{{matrix.os}}"
+      diskSizeGb: 200
+      instanceType: "m6g.xlarge"
+    plugins:
+      - *aws_oidc
+    matrix:
+      setup:
+        os:
+          - "platform-ingest-elastic-agent-ubuntu-2004-aarch64-1757120457"
+          - "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1757120457"
+          - "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1757120457"
+          - "platform-ingest-elastic-agent-ubuntu-2004-aarch64-1755910857"
+          - "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1755910857"
+          - "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1755910857"
+          - "platform-ingest-elastic-agent-ubuntu-2004-aarch64-1755306060"
+          - "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1755306060"
+          - "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1755306060"
+
+  - label: "Unit tests - macOS 15 ARM"
+    command: ".buildkite/scripts/steps/unit-tests.sh"
+    artifact_paths:
+      - "build/TEST-*.html"
+      - "build/TEST-*.xml"
+      - "build/diagnostics/*"
+      - "coverage-*.out"
+    agents:
+      provider: orka
+      imagePrefix: generic-base-15-arm-002
+    plugins:
+      - *aws_oidc
