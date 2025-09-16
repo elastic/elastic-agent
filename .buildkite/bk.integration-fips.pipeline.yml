@@ -118,7 +118,6 @@ steps:
           FIPS: "true"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          echo '${GITHUB_PR_LABELS}'
           .buildkite/scripts/buildkite-integration-tests.sh ech-deployment false
         artifact_paths:
           - build/**
