@@ -91,4 +91,4 @@ The components included in the EDOT Collector are categorized into **[Core]** an
 % end:edot-collector-components-table
 
 [Extended]: opentelemetry://reference/compatibility/nomenclature.md#extended-components
-[Core]: opentelemetry://reference/compatibility//nomenclature.md#core-components
+[Core]: opentelemetry://reference/compatibility/nomenclature.md#core-components

@@ -15,7 +15,7 @@ products:
 
 # Default configuration of the EDOT Collector (Kubernetes)
 
-The [Kubernetes setup](docs-content://solutions/observability/get-started/opentelemetry/quickstart/quickstart/index.md) uses the OpenTelemetry Operator to automate orchestration of EDOT Collectors:
+The [Kubernetes setup](docs-content://solutions/observability/get-started/opentelemetry/quickstart/index.md) uses the OpenTelemetry Operator to automate orchestration of EDOT Collectors:
 
 * [EDOT Collector Cluster](#cluster-collector-pipeline): Collection of cluster metrics.
 * [EDOT Collector Daemon](#daemonset-collectors-pipeline): Collection of node metrics, logs and application telemetry.
