@@ -74,7 +74,7 @@ Both components, `elastictrace` and `elasticapm` are required for Elastic APM UI
 
 * Use the EDOT Collector with the available configuration to ingest data into {{es}}.
 * [Build a custom, EDOT-like Collector](/reference/edot-collector/custom-collector.md) for ingesting data into {{es}}.
-* Use Elastic's [managed OTLP endpoint](docs-content://solutions/observability/get-started/opentelemetry/quickstart/quickstart/serverless/index.md) that does the enrichment for you.
+* Use Elastic's [managed OTLP endpoint](docs-content://solutions/observability/get-started/opentelemetry/quickstart/serverless/index.md) that does the enrichment for you.
 :::
 
 #### Host metrics collection pipeline
