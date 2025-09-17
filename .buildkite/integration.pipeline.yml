@@ -182,7 +182,7 @@ steps:
 # Temporarily disabled FIPS integration tests while we're encountering deployment creation
 # issues in the FRH GovCloud Staging environment.
 # Example: https://buildkite.com/elastic/elastic-agent-extended-testing/builds/10211#01995752-0966-4c21-874c-0894305ac091
-  - if: false
+  - if: false != false
     label: "Triggering custom FIPS integration tests"
     depends_on:
       - int-packaging
