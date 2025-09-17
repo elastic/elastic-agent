@@ -101,6 +101,12 @@ type OTelManager struct {
 	execution collectorExecution
 
 	proc collectorHandle
+
+	// collectorRunErr is used to signal that the collector has exited.
+	collectorRunErr chan error
+
+	// stopTimeout is the timeout to wait for the collector to stop.
+	stopTimeout time.Duration
 }
 
 // NewOTelManager returns a OTelManager.
@@ -111,6 +117,7 @@ func NewOTelManager(
 	mode ExecutionMode,
 	agentInfo info.Agent,
 	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter,
+	stopTimeout time.Duration,
 ) (*OTelManager, error) {
 	var exec collectorExecution
 	var recoveryTimer collectorRecoveryTimer
@@ -131,7 +138,7 @@ func NewOTelManager(
 		recoveryTimer = newRestarterNoop()
 		exec = newExecutionEmbedded()
 	default:
-		return nil, errors.New("unknown otel collector exec")
+		return nil, fmt.Errorf("unknown otel collector execution mode: %q", mode)
 	}
 
 	logger.Debugf("Using collector execution mode: %s", mode)
@@ -144,10 +151,12 @@ func NewOTelManager(
 		errCh:                      make(chan error, 1), // holds at most one error
 		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
 		componentStateCh:           make(chan []runtime.ComponentComponentState, 1),
-		updateCh:                   make(chan configUpdate),
+		updateCh:                   make(chan configUpdate, 1),
 		doneChan:                   make(chan struct{}),
 		execution:                  exec,
 		recoveryTimer:              recoveryTimer,
+		collectorRunErr:            make(chan error),
+		stopTimeout:                stopTimeout,
 	}, nil
 }
 
@@ -156,12 +165,6 @@ func (m *OTelManager) Run(ctx context.Context) error {
 	var err error
 	m.proc = nil
 
-	// signal that the run loop is ended to unblock any incoming update calls
-	defer close(m.doneChan)
-
-	// collectorRunErr is used to signal that the collector has exited.
-	collectorRunErr := make(chan error)
-
 	// collectorStatusCh is used internally by the otel collector to send status updates to the manager
 	// this channel is buffered because it's possible for the collector to send a status update while the manager is
 	// waiting for the collector to exit
@@ -169,11 +172,14 @@ func (m *OTelManager) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			// signal that the run loop is ended to unblock any incoming update calls
+			close(m.doneChan)
+
 			m.recoveryTimer.Stop()
 			// our caller context is cancelled so stop the collector and return
 			// has exited.
 			if m.proc != nil {
-				m.proc.Stop(ctx)
+				m.proc.Stop(m.stopTimeout)
 			}
 			return ctx.Err()
 		case <-m.recoveryTimer.C():
@@ -187,7 +193,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 			newRetries := m.recoveryRetries.Add(1)
 			m.logger.Infof("collector recovery restarting, total retries: %d", newRetries)
-			m.proc, err = m.execution.startCollector(ctx, m.baseLogger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh)
+			m.proc, err = m.execution.startCollector(ctx, m.baseLogger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh)
 			if err != nil {
 				reportErr(ctx, m.errCh, err)
 				// reset the restart timer to the next backoff
@@ -197,12 +203,12 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				reportErr(ctx, m.errCh, nil)
 			}
 
-		case err = <-collectorRunErr:
+		case err = <-m.collectorRunErr:
 			m.recoveryTimer.Stop()
 			if err == nil {
 				// err is nil means that the collector has exited cleanly without an error
 				if m.proc != nil {
-					m.proc.Stop(ctx)
+					m.proc.Stop(m.stopTimeout)
 					m.proc = nil
 					updateErr := m.reportOtelStatusUpdate(ctx, nil)
 					if updateErr != nil {
@@ -223,7 +229,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 				// in this rare case the collector stopped running but a configuration was
 				// provided and the collector stopped with a clean exit
-				m.proc, err = m.execution.startCollector(ctx, m.baseLogger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh)
+				m.proc, err = m.execution.startCollector(ctx, m.baseLogger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh)
 				if err != nil {
 					// failed to create the collector (this is different then
 					// it's failing to run). we do not retry creation on failure
@@ -245,7 +251,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				// in the case that the configuration is invalid there is no reason to
 				// try again as it will keep failing so we do not trigger a restart
 				if m.proc != nil {
-					m.proc.Stop(ctx)
+					m.proc.Stop(m.stopTimeout)
 					m.proc = nil
 					// don't wait here for <-collectorRunErr, already occurred
 					// clear status, no longer running
@@ -281,7 +287,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			m.components = cfgUpdate.components
 			m.mx.Unlock()
 
-			err = m.applyMergedConfig(ctx, collectorStatusCh, collectorRunErr)
+			err = m.applyMergedConfig(ctx, collectorStatusCh, m.collectorRunErr)
 			// report the error unconditionally to indicate that the config was applied
 			reportErr(ctx, m.errCh, err)
 
@@ -340,7 +346,7 @@ func buildMergedConfig(cfgUpdate configUpdate, agentInfo info.Agent, monitoringC
 
 func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh chan *status.AggregateStatus, collectorRunErr chan error) error {
 	if m.proc != nil {
-		m.proc.Stop(ctx)
+		m.proc.Stop(m.stopTimeout)
 		m.proc = nil
 		select {
 		case <-collectorRunErr:
@@ -402,6 +408,15 @@ func (m *OTelManager) Update(cfg *confmap.Conf, components []component.Component
 		collectorCfg: cfg,
 		components:   components,
 	}
+
+	// we care only about the latest config update
+	select {
+	case <-m.updateCh:
+	case <-m.doneChan:
+		return
+	default:
+	}
+
 	select {
 	case m.updateCh <- cfgUpdate:
 	case <-m.doneChan:

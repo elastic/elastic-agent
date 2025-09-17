@@ -579,6 +579,7 @@ func TestPreUpgradeCallback(t *testing.T) {
 		}))
 
 	assert.ErrorIs(t, preUpgradeCallbackErr, upgradeErr)
+	assert.Nil(t, coord.overrideState)
 	assert.Equal(t, preUpgradeCallbackErr, upgradeErr, "expected pre upgrade callback error")
 	assert.Eventually(t, func() bool {
 		return coord.State().UpgradeDetails.State == details.StateFailed

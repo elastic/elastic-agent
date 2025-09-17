@@ -1,0 +1,5 @@
+kind: bug-fix
+summary: Fix stuck upgrade state by clearing coordinator overridden state after failed upgrade
+component: elastic-agent
+pr: https://github.com/elastic/elastic-agent/pull/9992
+#issue: https://github.com/owner/repo/1234
