@@ -12,6 +12,10 @@ env:
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
 common:
+#  We are temporarily using the Production CFT environment API key instead of the
+#  Staging GovCloud one.  This is being done until issues with creating deployments in
+#  Staging GovCloud are fixed.  Once those are fixed, uncomment the `vault_ec_key_staging_frh_gov`
+#  section and delete the `vault_ec_key_prod` section below.
 #  - vault_ec_key_staging_frh_gov: &vault_ec_key_staging_frh_gov
 #      elastic/vault-secrets#v0.1.0:
 #        path: "kv/ci-shared/platform-ingest/platform-ingest-ec-staging-gov"
