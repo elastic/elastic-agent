@@ -694,8 +694,6 @@ func TestBeatsReceiverLogs(t *testing.T) {
 		Stack: nil,
 	})
 
-	t.Skip("Skip this test as it's flaky. See https://github.com/elastic/elastic-agent/issues/9890")
-
 	type configOptions struct {
 		RuntimeExperimental string
 	}
@@ -737,9 +735,17 @@ agent.monitoring.enabled: false
 
 	// use a subcontext for the agent
 	agentProcessCtx, agentProcessCancel := context.WithCancel(ctx)
-	fixture, cmd, output := prepareAgentCmd(t, agentProcessCtx, processConfig)
+	fixture, cmd, processOutput := prepareAgentCmd(t, agentProcessCtx, processConfig)
 
 	require.NoError(t, cmd.Start())
+	t.Cleanup(func() {
+		agentProcessCancel()
+		_ = cmd.Wait() // second wait returns an error, which we ignore
+		if t.Failed() {
+			t.Log("Elastic-Agent beats process output:")
+			t.Log(processOutput.String())
+		}
+	})
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error
@@ -751,19 +757,21 @@ agent.monitoring.enabled: false
 
 	agentProcessCancel()
 	require.Error(t, cmd.Wait())
-	processLogsString := output.String()
-	output.Reset()
+	processLogsString := processOutput.String()
+	uninstallOutput, err := fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+	require.NoError(t, err, "error uninstalling agent: %s", string(uninstallOutput))
 
 	// use a subcontext for the agent
 	agentReceiverCtx, agentReceiverCancel := context.WithCancel(ctx)
-	fixture, cmd, output = prepareAgentCmd(t, agentReceiverCtx, receiverConfig)
+	fixture, cmd, receiverOutput := prepareAgentCmd(t, agentReceiverCtx, receiverConfig)
 
 	require.NoError(t, cmd.Start())
-
 	t.Cleanup(func() {
+		agentReceiverCancel()
+		_ = cmd.Wait() // second wait returns an error, which we ignore
 		if t.Failed() {
-			t.Log("Elastic-Agent output:")
-			t.Log(output.String())
+			t.Log("Elastic-Agent beats receiver output:")
+			t.Log(receiverOutput.String())
 		}
 	})
 
@@ -774,9 +782,7 @@ agent.monitoring.enabled: false
 		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 1)
 		return
 	}, 1*time.Minute, 1*time.Second)
-	agentReceiverCancel()
-	require.Error(t, cmd.Wait())
-	receiverLogsString := output.String()
+	receiverLogsString := receiverOutput.String()
 
 	processLog := getBeatStartLogRecord(processLogsString)
 	assert.NotEmpty(t, processLog)
@@ -856,6 +862,9 @@ func prepareAgentCmd(t *testing.T, ctx context.Context, config []byte) (*atestin
 	require.NoError(t, err)
 	err = fixture.Configure(ctx, config)
 	require.NoError(t, err)
+
+	out, err := fixture.Install(ctx, &atesting.InstallOpts{Force: true, Privileged: true})
+	require.NoError(t, err, "error installing agent, got output %s", string(out))
 
 	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
 	require.NoError(t, err)
