@@ -13,10 +13,7 @@
 /deploy/helm/edot-collector @elastic/ingest-otel-data
 /deploy/kubernetes @elastic/elastic-agent-control-plane
 /dev-tools/kubernetes @elastic/elastic-agent-control-plane
-<<<<<<< HEAD
-/internal/pkg/agent/application/configuration_embed_changed_test.go @elastic/cloudbeat
-=======
 /docs/release-notes @elastic/ingest-docs
 /docs/docset.yml @elastic/ingest-docs
->>>>>>> c8f5f631f (add ingest-docs team as CODEOWNERS for release notes and docset.yml (#9865))
+/internal/pkg/agent/application/configuration_embed_changed_test.go @elastic/cloudbeat
 /internal/pkg/composable/providers/kubernetes @elastic/elastic-agent-control-plane
