@@ -23,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -307,7 +308,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	// There may still be an error in the download process, so we need to add
 	// the archive and hash path to the cleanup slice.
 	if archivePath != "" {
-		archiveHashPath := archivePath + ".sha512"
+		archiveHashPath := download.AddHashExtension(archivePath)
 		cleanupPaths = append(cleanupPaths, archivePath, archiveHashPath)
 	}
 
