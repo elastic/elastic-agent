@@ -67,8 +67,6 @@ type unpackHandler interface {
 	getPackageMetadata(archivePath string) (packageMetadata, error)
 }
 
-<<<<<<< HEAD
-=======
 // Types used to abstract copyActionStore, copyRunDirectory and github.com/otiai10/copy.Copy
 type copyActionStoreFunc func(log *logger.Logger, newHome string) error
 type copyRunDirectoryFunc func(log *logger.Logger, oldRunPath, newRunPath string) error
@@ -82,7 +80,6 @@ type mkdirAllFunc func(name string, perm fs.FileMode) error
 type readFileFunc func(name string) ([]byte, error)
 type writeFileFunc func(name string, data []byte, perm fs.FileMode) error
 
->>>>>>> 2e4e77731 (Enhancement/5235 wrap errors when marking upgrade (#9366))
 // Upgrader performs an upgrade
 type Upgrader struct {
 	log            *logger.Logger
@@ -97,14 +94,11 @@ type Upgrader struct {
 	unpacker             unpackHandler
 	isDiskSpaceErrorFunc func(err error) bool
 	extractAgentVersion  func(metadata packageMetadata, upgradeVersion string) agentVersion
-<<<<<<< HEAD
-=======
 	copyActionStore      copyActionStoreFunc
 	copyRunDirectory     copyRunDirectoryFunc
 	markUpgrade          markUpgradeFunc
 	changeSymlink        changeSymlinkFunc
 	rollbackInstall      rollbackInstallFunc
->>>>>>> 2e4e77731 (Enhancement/5235 wrap errors when marking upgrade (#9366))
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -125,15 +119,11 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, agentInfo info.A
 		artifactDownloader:   newArtifactDownloader(settings, log),
 		unpacker:             newUnpacker(log),
 		isDiskSpaceErrorFunc: upgradeErrors.IsDiskSpaceError,
-<<<<<<< HEAD
-=======
-		extractAgentVersion:  extractAgentVersion,
 		copyActionStore:      copyActionStoreProvider(os.ReadFile, os.WriteFile),
 		copyRunDirectory:     copyRunDirectoryProvider(os.MkdirAll, copy.Copy),
 		markUpgrade:          markUpgradeProvider(UpdateActiveCommit, os.WriteFile),
 		changeSymlink:        changeSymlink,
 		rollbackInstall:      rollbackInstall,
->>>>>>> 2e4e77731 (Enhancement/5235 wrap errors when marking upgrade (#9366))
 	}, nil
 }
 

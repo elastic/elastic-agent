@@ -1216,8 +1216,6 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				}
 			},
 		},
-<<<<<<< HEAD
-=======
 		"should return error if copyActionStore fails": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
@@ -1351,7 +1349,6 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				}
 			},
 		},
->>>>>>> 2e4e77731 (Enhancement/5235 wrap errors when marking upgrade (#9366))
 		"should add disk space error to the error chain if downloadArtifact fails with disk space error": {
 			isDiskSpaceErrorResult: true,
 			expectedError:          upgradeErrors.ErrInsufficientDiskSpace,
