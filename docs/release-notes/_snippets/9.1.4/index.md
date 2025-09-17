@@ -3,9 +3,9 @@
 
 ### Features and enhancements [elastic-agent-9.1.4-features-enhancements]
 
-* Add the dockerstats OpenTelemetry receiver. [#9913](https://github.com/elastic/elastic-agent/pull/9913) [#9924](https://github.com/elastic/elastic-agent/pull/9924) [#9925](https://github.com/elastic/elastic-agent/pull/9925) [#9873](https://github.com/elastic/elastic-agent/pull/9873) [#9364](https://github.com/elastic/elastic-agent/pull/9364)
-* Bump kube-stack Helm Chart to 0.9.1 and enable the cluster collector. [#9913](https://github.com/elastic/elastic-agent/pull/9913) [#9924](https://github.com/elastic/elastic-agent/pull/9924) [#9925](https://github.com/elastic/elastic-agent/pull/9925) [#9873](https://github.com/elastic/elastic-agent/pull/9873) [#9535](https://github.com/elastic/elastic-agent/pull/9535)
-* Enhanced loggers for easier debugging of upgrade related issues. [#9913](https://github.com/elastic/elastic-agent/pull/9913) [#9924](https://github.com/elastic/elastic-agent/pull/9924) [#9925](https://github.com/elastic/elastic-agent/pull/9925) [#9873](https://github.com/elastic/elastic-agent/pull/9873) [#9689](https://github.com/elastic/elastic-agent/pull/9689) [#9536](https://github.com/elastic/elastic-agent/issues/9536)
+* Add the dockerstats OpenTelemetry receiver. [#9364](https://github.com/elastic/elastic-agent/pull/9364)
+* Bump kube-stack Helm Chart to 0.9.1 and enable the cluster collector. [#9535](https://github.com/elastic/elastic-agent/pull/9535)
+* Enhanced loggers for easier debugging of upgrade related issues. [#9536](https://github.com/elastic/elastic-agent/issues/9536)
 
 
 ### Fixes [elastic-agent-9.1.4-fixes]
