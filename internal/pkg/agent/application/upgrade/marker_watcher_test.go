@@ -126,6 +126,9 @@ details:
 			expectedDetails: &details.Details{
 				TargetVersion: "8.9.2",
 				State:         details.StateRollback,
+				Metadata: details.Metadata{
+					Reason: details.ReasonWatchFailed,
+				},
 			},
 		},
 		"same_version_with_details_some_state": {

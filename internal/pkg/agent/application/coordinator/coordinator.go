@@ -85,7 +85,7 @@ type UpgradeManager interface {
 	Reload(rawConfig *config.Config) error
 
 	// Upgrade upgrades running agent.
-	Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error)
+	Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error)
 
 	// Ack is used on startup to check if the agent has upgraded and needs to send an ack for the action
 	Ack(ctx context.Context, acker acker.Acker) error
@@ -700,6 +700,7 @@ type upgradeOpts struct {
 	skipDefaultPgp     bool
 	pgpBytes           []string
 	preUpgradeCallback func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error
+	rollback           bool
 }
 
 type UpgradeOpt func(*upgradeOpts)
@@ -728,6 +729,12 @@ func WithPreUpgradeCallback(preUpgradeCallback func(ctx context.Context, log *lo
 	}
 }
 
+func WithRollback(rollback bool) UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.rollback = rollback
+	}
+}
+
 // Upgrade runs the upgrade process.
 // Called from external goroutines.
 func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, opts ...UpgradeOpt) error {
@@ -741,7 +748,8 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	var err error
 	for i := 0; i < 5; i++ {
 		s := c.State()
-		if s.State != agentclient.Upgrading {
+		// if we are not already upgrading or if the incoming is a rollback request while the watcher is running, we can continue processing
+		if s.State != agentclient.Upgrading || (uOpts.rollback && s.UpgradeDetails != nil && s.UpgradeDetails.State == details.StateWatching) {
 			err = nil
 			break
 		}
@@ -788,7 +796,7 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		}
 	}
 
-	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, uOpts.skipVerifyOverride, uOpts.skipDefaultPgp, uOpts.pgpBytes...)
+	cb, err := c.upgradeMgr.Upgrade(ctx, version, uOpts.rollback, sourceURI, action, det, uOpts.skipVerifyOverride, uOpts.skipDefaultPgp, uOpts.pgpBytes...)
 	if err != nil {
 		c.ClearOverrideState()
 		if errors.Is(err, upgrade.ErrUpgradeSameVersion) {
