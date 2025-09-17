@@ -3,8 +3,8 @@
 
 ### Features and enhancements [-8.18.7-features-enhancements]
 
-* Bump kube-stack Helm Chart to 0.9.1 and enable the cluster collector. [#8891](https://github.com/elastic/elastic-agent/pull/8891) [#9322](https://github.com/elastic/elastic-agent/pull/9322) [#9913](https://github.com/elastic/elastic-agent/pull/9913) [#9904](https://github.com/elastic/elastic-agent/pull/9904) [#9905](https://github.com/elastic/elastic-agent/pull/9905) [#9535](https://github.com/elastic/elastic-agent/pull/9535) 
-* Enhanced loggers for easier debugging of upgrade related issues. [#8891](https://github.com/elastic/elastic-agent/pull/8891) [#9913](https://github.com/elastic/elastic-agent/pull/9913) [#9904](https://github.com/elastic/elastic-agent/pull/9904) [#9905](https://github.com/elastic/elastic-agent/pull/9905) [#9689](https://github.com/elastic/elastic-agent/pull/9689) [#9536](https://github.com/elastic/elastic-agent/issues/9536)
+* Bump kube-stack Helm Chart to 0.9.1 and enable the cluster collector. [#9535](https://github.com/elastic/elastic-agent/pull/9535) 
+* Enhanced loggers for easier debugging of upgrade related issues. [#9536](https://github.com/elastic/elastic-agent/issues/9536)
 
 
 ### Fixes [-8.18.7-fixes]
