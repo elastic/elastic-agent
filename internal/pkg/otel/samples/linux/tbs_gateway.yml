@@ -1,0 +1,67 @@
+receivers:
+  # Receives data from other Collectors in Agent mode
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317 # Listen on all interfaces
+      http:
+        endpoint: 0.0.0.0:4318 # Listen on all interfaces
+
+connectors:
+  elasticapm: {} # Elastic APM Connector
+
+processors:
+  batch:
+    send_batch_size: 1000
+    timeout: 1s
+    send_batch_max_size: 1500
+  batch/metrics:
+    send_batch_max_size: 0 # Explicitly set to 0 to avoid splitting metrics requests
+    timeout: 1s
+  elastictrace: {} # Elastic Trace Processor
+  tail_sampling:
+    decision_wait: 5s
+    num_traces: 50000
+    expected_new_traces_per_sec: 10
+    policies:
+      - name: sample_10_percent
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 10
+
+exporters:
+  debug: {}
+  elasticsearch/otel:
+    endpoints:
+      - ${ELASTIC_ENDPOINT} # Will be populated from environment variable
+    api_key: ${ELASTIC_API_KEY} # Will be populated from environment variable
+    # tls:
+    #   insecure_skip_verify: true
+    mapping:
+      mode: otel
+
+service:
+  pipelines:
+    metrics:
+      receivers: [ otlp ]
+      processors: [ batch/metrics ]
+      exporters: [ debug, elasticsearch/otel ]
+    logs:
+      receivers: [ otlp ]
+      processors: [ batch ]
+      exporters: [ debug, elasticapm, elasticsearch/otel ]
+    traces/1:
+      receivers: [ otlp ]
+      processors: [ batch, elastictrace ]
+      exporters: [ debug, elasticapm, forward ]
+    traces/2:
+      receivers: [ forward ]
+      processors: [ tail_sampling ]
+      exporters: [ debug, elasticsearch/otel ]
+    metrics/aggregated-otel-metrics:
+      receivers:
+        - elasticapm
+      processors: [] # No processors defined in the original for this pipeline
+      exporters:
+        - debug
+        - elasticsearch/otel
