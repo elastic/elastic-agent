@@ -18,13 +18,13 @@ summary: reduce-default-telemetry-frequency
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-description: Reduce the default telemetry frequency to 60 seconds.
-
-# REQUIRED for breaking-change, deprecation, known-issue
-# impact:
-
-# REQUIRED for breaking-change, deprecation, known-issue
-# action:
+description: 
+    Reduce the default telemetry frequency to 60 seconds.
+    This change aims to lower infrastructure costs and reduce label churn in
+    time-series storage. High-cardinality labels sampled too frequently inflate
+    storage and index size, and increase query latency with limited added
+    value.  
+    Environments that require higher resolution can change the `collection_interval` for `hostmetrics`, `kubeletstats` and `k8s_cluster` receivers to a lower value.
 
 # REQUIRED for all kinds
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
@@ -36,7 +36,7 @@ component: elastic-agent
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
 # NOTE: the tooling supports backports, so it's able to fill the original PR number instead of the backport PR number.
 # Please provide it if you are adding a fragment for a different PR.
-# pr: https://github.com/owner/repo/1234
+pr: https://github.com/elastic/elastic-agent/pull/9987
 
 # AUTOMATED
 # OPTIONAL to manually add other issue URLs
