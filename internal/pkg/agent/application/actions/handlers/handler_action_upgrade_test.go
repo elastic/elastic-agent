@@ -56,15 +56,7 @@ func (u *mockUpgradeManager) Reload(rawConfig *config.Config) error {
 	return nil
 }
 
-func (u *mockUpgradeManager) Upgrade(
-	ctx context.Context,
-	version string,
-	sourceURI string,
-	action *fleetapi.ActionUpgrade,
-	details *details.Details,
-	skipVerifyOverride bool,
-	skipDefaultPgp bool,
-	pgpBytes ...string) (reexec.ShutdownCallbackFn, error) {
+func (u *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (reexec.ShutdownCallbackFn, error) {
 
 	return u.UpgradeFn(
 		ctx,
