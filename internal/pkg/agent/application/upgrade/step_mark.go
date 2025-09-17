@@ -130,7 +130,7 @@ type updateActiveCommitFunc func(log *logger.Logger, topDirPath, hash string, wr
 
 // markUpgrade marks update happened so we can handle grace period
 func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile writeFileFunc) markUpgradeFunc {
-	return func(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, desiredOutcome UpgradeOutcome) error {
+	return func(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details) error {
 
 		if len(previousAgent.hash) > hashLen {
 			previousAgent.hash = previousAgent.hash[:hashLen]
@@ -146,7 +146,6 @@ func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile wr
 			PrevVersionedHome: previousAgent.versionedHome,
 			Action:            action,
 			Details:           upgradeDetails,
-			DesiredOutcome:    desiredOutcome,
 		}
 
 		markerBytes, err := yaml.Marshal(newMarkerSerializer(marker))
