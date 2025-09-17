@@ -7,10 +7,7 @@
 package ess
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -140,8 +137,6 @@ func (runner *MonitoringTextRunner) TestMonitoringLiveness() {
 	defer cancel()
 
 	runner.AllComponentsHealthy(ctx)
-	agent, err := runner.info.KibanaClient.GetAgent(ctx, kibana.GetAgentRequest{ID: runner.agentID})
-	require.NoError(runner.T(), err)
 
 	client := http.Client{Timeout: time.Second * 4}
 	endpoint := "http://localhost:6791/processes"
@@ -154,10 +149,10 @@ func (runner *MonitoringTextRunner) TestMonitoringLiveness() {
 	require.Equal(runner.T(), http.StatusOK, initResp.StatusCode)
 
 	// use the fleet override API to change the port that we're running on.
-	override := map[string]interface{}{
-		"name":      runner.policyName,
-		"namespace": "default",
-		"overrides": map[string]interface{}{
+	overrideUpdateRequest := kibana.AgentPolicyUpdateRequest{
+		Name:      runner.policyName,
+		Namespace: "default",
+		Overrides: map[string]interface{}{
 			"agent": map[string]interface{}{
 				"monitoring": map[string]interface{}{
 					"http": map[string]interface{}{
@@ -170,19 +165,13 @@ func (runner *MonitoringTextRunner) TestMonitoringLiveness() {
 		},
 	}
 
-	raw, err := json.Marshal(override)
+	policyResponse, err := runner.info.KibanaClient.UpdatePolicy(ctx, runner.policyID, overrideUpdateRequest)
 	require.NoError(runner.T(), err)
-	reader := bytes.NewBuffer(raw)
-	overrideEndpoint := fmt.Sprintf("/api/fleet/agent_policies/%s", runner.policyID)
-	statusCode, overrideResp, err := runner.info.KibanaClient.Request("PUT", overrideEndpoint, nil, nil, reader)
-	require.NoError(runner.T(), err)
-	require.Equal(runner.T(), http.StatusOK, statusCode, "non-200 status code; got response: %s", string(overrideResp))
 
 	// verify the new policy revision was applied
-	newPolicyRevision := agent.PolicyRevision + 1
 	require.Eventually(
 		runner.T(),
-		tools.IsPolicyRevision(ctx, runner.T(), runner.info.KibanaClient, runner.policyID, newPolicyRevision),
+		tools.IsPolicyRevision(ctx, runner.T(), runner.info.KibanaClient, runner.agentID, policyResponse.Revision),
 		5*time.Minute, time.Second)
 
 	runner.AllComponentsHealthy(ctx)
