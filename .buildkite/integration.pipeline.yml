@@ -179,7 +179,10 @@ steps:
       - int-packaging
     command: "buildkite-agent pipeline upload .buildkite/bk.integration.pipeline.yml"
 
-  - label: "Triggering custom FIPS integration tests"
-    depends_on:
-      - int-packaging
-    command: "buildkite-agent pipeline upload .buildkite/bk.integration-fips.pipeline.yml"
+# Temporarily disabled FIPS integration tests while we're encountering deployment creation
+# issues in the FRH GovCloud Staging environment.
+# Example: https://buildkite.com/elastic/elastic-agent-extended-testing/builds/10211#01995752-0966-4c21-874c-0894305ac091
+#  - label: "Triggering custom FIPS integration tests"
+#    depends_on:
+#      - int-packaging
+#    command: "buildkite-agent pipeline upload .buildkite/bk.integration-fips.pipeline.yml"
