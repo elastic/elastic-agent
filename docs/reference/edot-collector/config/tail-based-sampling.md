@@ -54,7 +54,7 @@ service:
 
 ## Configuration for a load-balancing Collector
 
-All traces must go to the same collector in order for the sampling decision to be made. Therefore, when using a load-balancing collector with downstream collectors, the `traceID` should be set as the routing key in the load-balancing collector and tail-sampling should be applied in the downstream collectors.
+When using a load-balancing Collector with downstream collectors, all traces must go to the load-balancing Collector for the sampling decision to happen. Set the `traceID` as the routing key in the load-balancing Collector so that tail-sampling is applied to the downstream collectors.
 
 ::::{tab-set}
 
