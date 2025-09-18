@@ -738,6 +738,7 @@ agent.monitoring.enabled: false
 	fixture, cmd, processOutput := prepareAgentCmd(t, agentProcessCtx, processConfig)
 
 	require.NoError(t, cmd.Start())
+	fixture.RegisterCleanup()
 	t.Cleanup(func() {
 		agentProcessCancel()
 		_ = cmd.Wait() // second wait returns an error, which we ignore
@@ -758,14 +759,13 @@ agent.monitoring.enabled: false
 	agentProcessCancel()
 	require.Error(t, cmd.Wait())
 	processLogsString := processOutput.String()
-	uninstallOutput, err := fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
-	require.NoError(t, err, "error uninstalling agent: %s", string(uninstallOutput))
 
 	// use a subcontext for the agent
 	agentReceiverCtx, agentReceiverCancel := context.WithCancel(ctx)
 	fixture, cmd, receiverOutput := prepareAgentCmd(t, agentReceiverCtx, receiverConfig)
 
 	require.NoError(t, cmd.Start())
+	fixture.RegisterCleanup()
 	t.Cleanup(func() {
 		agentReceiverCancel()
 		_ = cmd.Wait() // second wait returns an error, which we ignore
@@ -782,6 +782,10 @@ agent.monitoring.enabled: false
 		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 1)
 		return
 	}, 1*time.Minute, 1*time.Second)
+
+	agentReceiverCancel()
+	require.Error(t, cmd.Wait())
+
 	receiverLogsString := receiverOutput.String()
 
 	processLog := getBeatStartLogRecord(processLogsString)
@@ -862,9 +866,6 @@ func prepareAgentCmd(t *testing.T, ctx context.Context, config []byte) (*atestin
 	require.NoError(t, err)
 	err = fixture.Configure(ctx, config)
 	require.NoError(t, err)
-
-	out, err := fixture.Install(ctx, &atesting.InstallOpts{Force: true, Privileged: true})
-	require.NoError(t, err, "error installing agent, got output %s", string(out))
 
 	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
 	require.NoError(t, err)
