@@ -21,7 +21,7 @@ Tail-based sampling is where the decision to sample a trace takes place by consi
 Because metrics are calculated and aggregations are performed on trace data in the EDOT collector, some specific configuration is required to ensure that the tail sampling decisions are made after these calculations.
 Otherwise, the metrics and aggregations would be incorrect due to the partial representation of traces.
 
-Enforcing a specific order of calculations and sampling decisions can be accomplished in the EDOT Collector using the [forward connector](https://github.com/open-telemetry/opentelemetry-collector/tree/main/connector/forwardconnector). The traces pipeline should be split into two parts using the forward connector, with the first part applying calculations and the second part applying the tail-based sampling decision.
+To enforce a specific order of calculations and sampling decisions in the EDOT Collector, you can use the [Forward connector](https://github.com/open-telemetry/opentelemetry-collector/tree/main/connector/forwardconnector). Split the traces pipeline in two steps using the connector, with the first part applying calculations and the second part applying the tail-based sampling decision.
 
 ## Configure the EDOT Collector to have a two-part trace pipeline
 
