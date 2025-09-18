@@ -56,7 +56,9 @@ service:
 
 All traces must go to the same collector in order for the sampling decision to be made. Therefore, when using a load-balancing collector with downstream collectors, the `traceID` should be set as the routing key in the load-balancing collector and tail-sampling should be applied in the downstream collectors.
 
-:::{tab-item} Load-balancing EDOT Collector config
+::::{tab-set}
+
+:::{tab-item} Load-balancing Collector
 ```yaml
 exporters:
   loadbalancing:
@@ -64,7 +66,7 @@ exporters:
 ```
 :::
 
-:::{tab-item} Downstream EDOT Collector config
+:::{tab-item} Downstream Collector
 ```yaml
 processors:
   tail_sampling:
@@ -88,6 +90,7 @@ service:
       exporters: [ elasticsearch/otel ]
 ```
 :::
+::::
 
 ## Resources
 
