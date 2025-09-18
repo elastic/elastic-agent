@@ -23,6 +23,37 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+
+:::{dropdown} Failed upgrades leave {{agent}} stuck until restart
+
+**Applies to: {{agent}} 8.18.7, 9.0.7** 
+
+On September 17, 2025, a known issue was discovered that can cause {{agent}} upgrades to get stuck if an upgrade attempt fails early. This happens because the coordinator’s overrideState remains set, leaving the agent in a state that appears to be upgrading.
+
+**Conditions**
+
+This issue is triggered if the upgrade fails during one of the early checks inside Coordinator.Upgrade, for example:
+
+- The agent is not upgradeable
+- Capabilities check denies the upgrade
+- Most commonly: When {{agent}} is tamper-protected and Endpoint returns an error during action proxying, for example, because the upgrade action signature is invalid, missing, or fails verification. This causes the coordinator’s override state to be stuck.
+
+**Symptoms**
+
+- {{fleet}} shows the upgrade action in progress, even though the upgrade remains stuck
+- No further upgrade attempts succeed 
+- Elastic-agent status shows an override state indicating upgrade 
+
+**Workaround**
+
+Restart the {{agent}} to clear the coordinator’s overrideState and allow new upgrade attempts to proceed.
+
+**Resolution**
+This issue was fixed in [#9992](https://github.com/elastic/elastic-agent/pull/9992), which ensures that the coordinator clears its override state whenever an early failure occurs.
+
+The fix will be included in versions 9.1.4, 8.19.4, 9.0.8, and 8.18.8.
+:::
+
 :::{dropdown} [Windows] {{agent}} does not process Windows security events
 
 **Applies to: {{agent}} 8.19.0, 9.1.0 (Windows only)**
