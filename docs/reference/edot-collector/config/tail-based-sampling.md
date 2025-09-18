@@ -1,5 +1,5 @@
 ---
-navigation_title: Tail-based Sampling
+navigation_title: Tail-based sampling
 description: Configuration of the EDOT Collector for Tail-based sampling.
 applies_to:
 stack:
