@@ -52,7 +52,7 @@ service:
 ```
 :::
 
-## Configure a load-balancing EDOT Collector with downstream collectors
+## Configuration for a load-balancing Collector
 
 All traces must go to the same collector in order for the sampling decision to be made. Therefore, when using a load-balancing collector with downstream collectors, the `traceID` should be set as the routing key in the load-balancing collector and tail-sampling should be applied in the downstream collectors.
 
