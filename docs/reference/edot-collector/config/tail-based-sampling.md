@@ -25,7 +25,6 @@ To enforce a specific order of calculations and sampling decisions in the EDOT C
 
 Configure a two-step trace pipeline, ensuring that the first step includes the `elasticapm` exporter and `forward` exporter, and that the second step includes the `tail_sampling` processor.
 
-:::{tab-item} EDOT Collector config
 ```yaml
 processors:
   tail_sampling:
@@ -39,16 +38,15 @@ processors:
           sampling_percentage: 10
 service:
   pipelines:
-    traces/1:
+    traces/1-process-elastic:
       receivers: [ otlp ]
       processors: [ elastictrace ]
       exporters: [ elasticapm, forward ]
-    traces/2:
+    traces/2-process-tbs:
       receivers: [ forward ]
       processors: [ tail_sampling ]
       exporters: [ elasticsearch/otel ]
 ```
-:::
 
 ## Configuration for a load-balancing Collector
 
