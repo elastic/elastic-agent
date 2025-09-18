@@ -768,12 +768,7 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 				collectorCfg: tt.collectorCfg,
 				components:   tt.components,
 			}
-<<<<<<< HEAD
-			l := newTestLogger()
-			result, err := buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter, l)
-=======
 			result, err := buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter, logptest.NewTestingLogger(t, ""))
->>>>>>> 779fafdcd ([beatreceivers] Integrate beatsauthextension (#9257))
 
 			if tt.expectedErrorString != "" {
 				assert.Error(t, err)

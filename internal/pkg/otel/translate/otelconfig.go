@@ -12,7 +12,6 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	koanfmaps "github.com/knadh/koanf/maps"
 
@@ -40,11 +39,7 @@ const OtelNamePrefix = "_agent-component/"
 
 // BeatMonitoringConfigGetter is a function that returns the monitoring configuration for a beat receiver.
 type BeatMonitoringConfigGetter func(unitID, binary string) map[string]any
-<<<<<<< HEAD
-type exporterConfigTranslationFunc func(*config.C, *logger.Logger) (map[string]any, error)
-=======
 type exporterConfigTranslationFunc func(*config.C, *logp.Logger) (map[string]any, error)
->>>>>>> 779fafdcd ([beatreceivers] Integrate beatsauthextension (#9257))
 
 var (
 	OtelSupportedOutputTypes         = []string{"elasticsearch"}
@@ -151,16 +146,10 @@ func getCollectorConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
 	beatMonitoringConfigGetter BeatMonitoringConfigGetter,
-<<<<<<< HEAD
-	logger *logger.Logger,
-) (*confmap.Conf, error) {
-	exportersConfig, outputQueueConfig, err := getExportersConfigForComponent(comp, logger)
-=======
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
 
 	exportersConfig, outputQueueConfig, extensionConfig, err := getExportersConfigForComponent(comp, logger)
->>>>>>> 779fafdcd ([beatreceivers] Integrate beatsauthextension (#9257))
 	if err != nil {
 		return nil, err
 	}
@@ -298,11 +287,7 @@ func getReceiversConfigForComponent(
 
 // getReceiversConfigForComponent returns the exporters configuration and queue settings for a component. Usually this will be a single
 // exporter, but in principle it could be more.
-<<<<<<< HEAD
-func getExportersConfigForComponent(comp *component.Component, logger *logger.Logger) (exporterCfg map[string]any, queueCfg map[string]any, err error) {
-=======
 func getExportersConfigForComponent(comp *component.Component, logger *logp.Logger) (exporterCfg map[string]any, queueCfg map[string]any, extensionCfg map[string]any, err error) {
->>>>>>> 779fafdcd ([beatreceivers] Integrate beatsauthextension (#9257))
 	exportersConfig := map[string]any{}
 	extensionConfig := map[string]any{}
 	exporterType, err := getExporterTypeForComponent(comp)
@@ -313,12 +298,8 @@ func getExportersConfigForComponent(comp *component.Component, logger *logp.Logg
 	for _, unit := range comp.Units {
 		if unit.Type == client.UnitTypeOutput {
 			var unitExportersConfig map[string]any
-<<<<<<< HEAD
-			unitExportersConfig, queueSettings, err = unitToExporterConfig(unit, exporterType, comp.InputType, logger)
-=======
 			var unitExtensionConfig map[string]any
 			unitExportersConfig, queueSettings, unitExtensionConfig, err = unitToExporterConfig(unit, exporterType, comp.InputType, logger)
->>>>>>> 779fafdcd ([beatreceivers] Integrate beatsauthextension (#9257))
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -378,11 +359,7 @@ func getExporterTypeForComponent(comp *component.Component) (otelcomponent.Type,
 }
 
 // unitToExporterConfig translates a component.Unit to return an otel exporter configuration and output queue settings
-<<<<<<< HEAD
-func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, inputType string, logger *logger.Logger) (exportersCfg map[string]any, queueSettings map[string]any, err error) {
-=======
 func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, inputType string, logger *logp.Logger) (exportersCfg map[string]any, queueSettings map[string]any, extensionCfg map[string]any, err error) {
->>>>>>> 779fafdcd ([beatreceivers] Integrate beatsauthextension (#9257))
 	if unit.Type == client.UnitTypeInput {
 		return nil, nil, nil, fmt.Errorf("unit type is an input, expected output: %v", unit)
 	}
@@ -399,16 +376,7 @@ func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, 
 	unitConfigMap := unit.Config.GetSource().AsMap() // this is what beats do in libbeat/management/generate.go
 	outputCfgC, err := config.NewConfigFrom(unitConfigMap)
 	if err != nil {
-<<<<<<< HEAD
-		return nil, nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
-	}
-	// Config translation function can mutate queue settings defined under output config
-	exporterConfig, err := configTranslationFunc(outputCfgC, logger)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
-=======
 		return nil, nil, nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
->>>>>>> 779fafdcd ([beatreceivers] Integrate beatsauthextension (#9257))
 	}
 
 	// Config translation function can mutate queue settings defined under output config
@@ -499,11 +467,7 @@ func getDefaultDatastreamTypeForComponent(comp *component.Component) (string, er
 }
 
 // translateEsOutputToExporter translates an elasticsearch output configuration to an elasticsearch exporter configuration.
-<<<<<<< HEAD
-func translateEsOutputToExporter(cfg *config.C, logger *logger.Logger) (map[string]any, error) {
-=======
 func translateEsOutputToExporter(cfg *config.C, logger *logp.Logger) (map[string]any, error) {
->>>>>>> 779fafdcd ([beatreceivers] Integrate beatsauthextension (#9257))
 	esConfig, err := elasticsearchtranslate.ToOTelConfig(cfg, logger)
 	if err != nil {
 		return nil, err

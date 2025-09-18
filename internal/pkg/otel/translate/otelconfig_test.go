@@ -12,8 +12,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
-
 	"go.opentelemetry.io/collector/confmap"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -234,15 +232,6 @@ func TestGetOtelConfig(t *testing.T) {
 		return finalOutput
 	}
 
-<<<<<<< HEAD
-	expectedESConfig := map[string]any{
-		"elasticsearch/_agent-component/default": map[string]any{
-			"batcher": map[string]any{
-				"enabled":  true,
-				"max_size": 1600,
-				"min_size": 0,
-			},
-=======
 	expectedExtensionConfig := func(extra ...extraParams) map[string]any {
 		finalOutput := map[string]any{
 			"idle_connection_timeout": "3s",
@@ -280,7 +269,6 @@ func TestGetOtelConfig(t *testing.T) {
 
 	expectedESConfig := func(outputName string) map[string]any {
 		return map[string]any{
->>>>>>> 779fafdcd ([beatreceivers] Integrate beatsauthextension (#9257))
 			"compression": "gzip",
 			"compression_params": map[string]any{
 				"level": 1,
@@ -812,12 +800,7 @@ func TestGetOtelConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-<<<<<<< HEAD
-			l, _ := loggertest.New("test")
-			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, getBeatMonitoringConfig, l)
-=======
 			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, getBeatMonitoringConfig, logp.NewNopLogger())
->>>>>>> 779fafdcd ([beatreceivers] Integrate beatsauthextension (#9257))
 			if actualConf == nil || tt.expectedConfig == nil {
 				assert.Equal(t, tt.expectedConfig, actualConf)
 			} else { // this gives a nicer diff
