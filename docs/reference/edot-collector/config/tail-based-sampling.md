@@ -1,6 +1,6 @@
 ---
 navigation_title: Tail-based sampling
-description: Configuration of the EDOT Collector for Tail-based sampling.
+description: Configure the EDOT Collector for tail-based sampling (TBS).
 applies_to:
 stack:
 serverless:
