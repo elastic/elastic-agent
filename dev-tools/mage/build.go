@@ -202,16 +202,11 @@ func Build(params BuildArgs) error {
 		cgoEnabled = "1"
 	}
 
-	if Platform.GOOS == "windows" {
-		cgoEnabled = "1"
-	}
-
 	env["CGO_ENABLED"] = cgoEnabled
 
 	// Spec
 	args := []string{
 		"build",
-		//"-x",
 		"-o",
 		filepath.Join(params.OutputDir, binaryName),
 	}
