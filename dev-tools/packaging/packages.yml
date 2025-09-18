@@ -3,23 +3,6 @@
 # This file contains the package specifications for Elastic Agent
 
 # List all the available platforms
-#platforms: &all-platforms-no-windows-arm64
-#  - &linux-amd64
-#    os: linux
-#    arch: x86_64
-#  - &linux-arm64
-#    os: linux
-#    arch: arm64
-#  - &windows-amd64
-#    os: windows
-#    arch: x86_64
-#  - &darwin-amd64
-#    os: darwin
-#    arch: x86_64
-#  - &darwin-arm64
-#    os: darwin
-#    arch: aarch64
-
 platforms: &all-platforms
   - &linux-amd64
     os: linux
@@ -147,7 +130,6 @@ components:
     rootDir: fleet-server-{{.Version}}-{{.Platform}}
     binaryName: fleet-server
     fips: false
-#    platforms: *all-platforms-no-windows-arm64
     platforms:
       - *linux-amd64
       - *linux-arm64
