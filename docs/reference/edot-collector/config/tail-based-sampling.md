@@ -2,8 +2,6 @@
 navigation_title: Tail-based sampling
 description: Configure the EDOT Collector for tail-based sampling (TBS).
 applies_to:
-  deployment:
-      ess: ga 9.2
   stack: ga 9.2
   serverless:
     observability:
@@ -19,6 +17,7 @@ products:
 Tail-based sampling analyzes a complete trace before deciding whether to keep it, enabling intelligent decisions based on factors like errors or high latency. This is different from head-based sampling, which makes an early decision at the start of a trace.
 
 Within the OpenTelemetry Collector, any processor that generates metrics from traces must run before the tail-sampling processor. If sampling happens first, metrics will be calculated on an incomplete data set, leading to inaccurate and misleading reporting.
+
 To enforce a specific order of calculations and sampling decisions in the EDOT Collector, you can use the [Forward connector](https://github.com/open-telemetry/opentelemetry-collector/tree/main/connector/forwardconnector). Split the traces pipeline in two steps using the connector, with the first part applying calculations and the second part applying the tail-based sampling decision.
 
 ## Create a two-step trace pipeline
