@@ -1276,8 +1276,6 @@ github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometh
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheusremotewrite v0.130.0/go.mod h1:CA8rwF6bdjQbAYsAtbxRzOiLxn3wgFe+6XV18/c1u3s=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/zipkin v0.130.0 h1:It833BGhN5XUsSJhbMn5GY2aaopFOM33loUNcfJvDY4=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/zipkin v0.130.0/go.mod h1:o71D9/9Wbd9FXUMhNB/7drfpSOFLrAGR294KHXEQuXc=
-github.com/open-telemetry/opentelemetry-collector-contrib/pkg/winperfcounters v0.130.0 h1:gtJzZAoxbkD77AGNW+U9QET7En3zRn5lM2ViDD99jgM=
-github.com/open-telemetry/opentelemetry-collector-contrib/pkg/winperfcounters v0.130.0/go.mod h1:vufFRE/gELlkk0VJbbfYxNtMUoW+P2AbBDlLZ6VoMbk=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/winperfcounters v0.135.0 h1:4zhubjz9qqR3fMXSlQKIQUuiZX0i3I14xWLq5eT8cU8=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/winperfcounters v0.135.0/go.mod h1:lGykC2pk/kYKzyg20jITts0X4geyQe1DVXCCXngt6bw=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/xk8stest v0.130.0 h1:3XBIyAYAkGvPMaHd6LFEGMvO9Fph+ARKd2fFSWeq3ZE=
@@ -1514,8 +1512,6 @@ github.com/stretchr/testify v1.8.1/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o
 github.com/stretchr/testify v1.8.2/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=
 github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
-github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOfJA=
-github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/testcontainers/testcontainers-go v0.37.0 h1:L2Qc0vkTw2EHWQ08djon0D2uw7Z/PtHS/QzZZ5Ra/hg=
@@ -2037,8 +2033,6 @@ golang.org/x/sys v0.17.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
 golang.org/x/sys v0.19.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
 golang.org/x/sys v0.20.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
 golang.org/x/sys v0.28.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
-golang.org/x/sys v0.35.0 h1:vz1N37gP5bs89s7He8XuIYXpyY0+QlsKmzipCbUtyxI=
-golang.org/x/sys v0.35.0/go.mod h1:BJP2sWEmIv4KK5OTEluFJCKSidICx8ciO85XgH3Ak8k=
 golang.org/x/sys v0.36.0 h1:KVRy2GtZBrk1cBYA7MKu5bEZFxQk4NIDV6RLVcC8o0k=
 golang.org/x/sys v0.36.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=
 golang.org/x/telemetry v0.0.0-20240228155512-f48c80bd79b2/go.mod h1:TeRTkGYfJXctD9OcfyVLyj2J3IxLnKwHJR8f4D8a3YE=
