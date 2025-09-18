@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 :::{include} /release-notes/_snippets/9.1.3/deprecations.md
 :::
 
@@ -9,9 +8,9 @@
 :::
 
 :::{include} /release-notes/_snippets/9.1.0/deprecations.md
-=======
+:::
+
 :::{include} /release-notes/_snippets/9.0.7/deprecations.md
->>>>>>> f8e1a28b1 (Changelog for 9.0.7 (#9926))
 :::
 
 :::{include} /release-notes/_snippets/9.0.6/deprecations.md
