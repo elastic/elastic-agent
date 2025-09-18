@@ -352,6 +352,7 @@ steps:
 
                 - .buildkite/integration.pipeline.yml
                 - .buildkite/bk.integration.pipeline.yml
+                - .buildkite/bk.integration-fips.pipeline.yml
                 - .buildkite/pipeline.yml
                 - .buildkite/scripts/
                 - .buildkite/hooks/
