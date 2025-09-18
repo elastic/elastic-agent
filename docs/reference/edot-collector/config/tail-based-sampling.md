@@ -79,7 +79,7 @@ service:
   pipelines:
     traces/1:
       receivers: [ otlp ]
-      processors: [elastictrace]
+      processors: [ elastictrace ]
       exporters: [ elasticapm, forward ]
     traces/2:
       receivers: [ forward ]
