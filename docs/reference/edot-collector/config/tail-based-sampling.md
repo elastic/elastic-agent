@@ -16,11 +16,9 @@ products:
 
 # Configure tail-based sampling
 
-Tail-based sampling is where the decision to sample a trace takes place by considering all or most of the spans within the trace. This is in contrast to Head-based sampling, which is on the client-side where traces are created.
+Tail-based sampling analyzes a complete trace before deciding whether to keep it, enabling intelligent decisions based on factors like errors or high latency. This is different from head-based sampling, which makes an early decision at the start of a trace.
 
-Because metrics are calculated and aggregations are performed on trace data in the EDOT collector, some specific configuration is required to ensure that the tail sampling decisions are made after these calculations.
-Otherwise, the metrics and aggregations would be incorrect due to the partial representation of traces.
-
+Within the OpenTelemetry Collector, any processor that generates metrics from traces must run before the tail-sampling processor. If sampling happens first, metrics will be calculated on an incomplete data set, leading to inaccurate and misleading reporting.
 To enforce a specific order of calculations and sampling decisions in the EDOT Collector, you can use the [Forward connector](https://github.com/open-telemetry/opentelemetry-collector/tree/main/connector/forwardconnector). Split the traces pipeline in two steps using the connector, with the first part applying calculations and the second part applying the tail-based sampling decision.
 
 ## Configure the EDOT Collector to have a two-part trace pipeline
