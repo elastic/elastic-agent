@@ -32,3 +32,16 @@ updates:
       - Team:Elastic-Agent-Control-Plane
       - backport-active-all
     open-pull-requests-limit: 10
+
+  - package-ecosystem: "pip"
+    directory: "/docs/scripts/update-docs"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+    labels:
+      - automation
+      - skip-changelog
+      - Team:Docs
+      - documentation
+    open-pull-requests-limit: 5

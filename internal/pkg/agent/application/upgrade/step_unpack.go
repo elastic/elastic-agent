@@ -36,7 +36,6 @@ type UnpackResult struct {
 }
 
 type copyFunc func(dst io.Writer, src io.Reader) (written int64, err error)
-type mkdirAllFunc func(name string, perm fs.FileMode) error
 type openFileFunc func(name string, flag int, perm fs.FileMode) (*os.File, error)
 type unarchiveFunc func(log *logger.Logger, archivePath, dataDir string, flavor string, copy copyFunc, mkdirAll mkdirAllFunc, openFile openFileFunc) (UnpackResult, error)
 
@@ -68,7 +67,7 @@ func (u *unpacker) unpack(version, archivePath, dataDir string, flavor string) (
 	// or the extraction will be double nested
 	var unpackRes UnpackResult
 	var err error
-	if runtime.GOOS == windows {
+	if runtime.GOOS == windowsOSName {
 		unpackRes, err = u.unzip(u.log, archivePath, dataDir, flavor, u.copy, u.mkdirAll, u.openFile)
 	} else {
 		unpackRes, err = u.untar(u.log, archivePath, dataDir, flavor, u.copy, u.mkdirAll, u.openFile)
