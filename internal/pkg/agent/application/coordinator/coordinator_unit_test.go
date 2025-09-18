@@ -57,9 +57,15 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
+
+var testSecretMarkerFunc = func(*logger.Logger, *config.Config) error {
+	// no-op secret marker function for testing
+	return nil
+}
 
 func TestVarsManagerError(t *testing.T) {
 	// Set a one-second timeout -- nothing here should block, but if it
@@ -456,11 +462,7 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 		}
 	}()
 
-	upgradeMgr, err := upgrade.NewUpgrader(
-		log,
-		&artifact.Config{},
-		&info.AgentInfo{},
-	)
+	upgradeMgr, err := upgrade.NewUpgrader(log, &artifact.Config{}, nil, &info.AgentInfo{}, new(upgrade.AgentWatcherHelper))
 	require.NoError(t, err, "errored when creating a new upgrader")
 
 	// Channels have buffer length 1, so we don't have to run on multiple
@@ -491,6 +493,7 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 		vars:               emptyVars(t),
 		ast:                emptyAST(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
 	}
 
 	// Send an invalid config update and confirm that Coordinator reports
@@ -607,6 +610,7 @@ func TestCoordinatorReportsComponentModelError(t *testing.T) {
 		vars:               emptyVars(t),
 		ast:                emptyAST(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
 	}
 
 	// This configuration produces a valid AST but its EQL condition is
@@ -675,7 +679,7 @@ func TestCoordinatorPolicyChangeUpdatesMonitorReloader(t *testing.T) {
 	// does let's report a failure instead of timing out the test runner.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	logger := logp.NewLogger("testing")
+	log := logp.NewLogger("testing")
 
 	configChan := make(chan ConfigChange, 1)
 
@@ -690,10 +694,16 @@ func TestCoordinatorPolicyChangeUpdatesMonitorReloader(t *testing.T) {
 	newServerFn := func(*monitoringCfg.MonitoringConfig) (reload.ServerController, error) {
 		return monitoringServer, nil
 	}
-	monitoringReloader := reload.NewServerReloader(newServerFn, logger, monitoringCfg.DefaultConfig())
+	monitoringReloader := reload.NewServerReloader(newServerFn, log, monitoringCfg.DefaultConfig())
+
+	secretMarkerCalled := false
+	mockSecretMarkerFunc := func(*logger.Logger, *config.Config) error {
+		secretMarkerCalled = true
+		return nil
+	}
 
 	coord := &Coordinator{
-		logger:           logger,
+		logger:           log,
 		agentInfo:        &info.AgentInfo{},
 		stateBroadcaster: broadcaster.New(State{}, 0, 0),
 		managerChans: managerChans{
@@ -703,6 +713,7 @@ func TestCoordinatorPolicyChangeUpdatesMonitorReloader(t *testing.T) {
 		otelMgr:            &fakeOTelManager{},
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   mockSecretMarkerFunc,
 	}
 	coord.RegisterMonitoringServer(monitoringReloader)
 
@@ -722,6 +733,8 @@ inputs:
 	configChan <- cfgChange
 	coord.runLoopIteration(ctx)
 	assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+
+	assert.True(t, secretMarkerCalled, "secret marker should be called")
 
 	// server is started by default
 	assert.True(t, monitoringServer.startTriggered)
@@ -842,6 +855,7 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManager(t *testing.T) {
 		otelMgr:            otelManager,
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
 	}
 
 	// Create a policy with one input and one output (no otel configuration)
@@ -1014,6 +1028,7 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 		specs:              specs,
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
 	}
 
 	// Create a policy with one input and one output (no otel configuration)
@@ -1112,6 +1127,7 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
 	}
 
 	// Send an empty policy which should forward an empty component model to
@@ -1173,6 +1189,7 @@ func TestCoordinatorReportsOTelManagerUpdateFailure(t *testing.T) {
 		otelMgr:            otelManager,
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
 	}
 
 	// Send an empty policy which should forward an empty component model to
@@ -1237,6 +1254,7 @@ func TestCoordinatorAppliesVarsToPolicy(t *testing.T) {
 		otelMgr:            &fakeOTelManager{},
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
 	}
 
 	// Create a policy with one input and one output
@@ -1504,7 +1522,7 @@ func TestCoordinatorInitiatesUpgrade(t *testing.T) {
 	}
 
 	// Call upgrade and make sure the upgrade manager receives an Upgrade call
-	err := coord.Upgrade(ctx, "1.2.3", "", nil, false, false)
+	err := coord.Upgrade(ctx, "1.2.3", "", nil, WithSkipVerifyOverride(false), WithSkipDefaultPgp(false))
 	assert.True(t, upgradeMgr.upgradeCalled, "Coordinator Upgrade should call upgrade manager Upgrade")
 	assert.Equal(t, upgradeMgr.upgradeErr, err, "Upgrade should report upgrade manager error")
 
@@ -1892,7 +1910,7 @@ func TestComputeEnrollOptions(t *testing.T) {
 	assert.NotNil(t, options)
 
 	assert.Equal(t, "123", options.EnrollAPIKey, "EnrollAPIKey mismatch")
-	assert.Equal(t, "localhost:1234", options.URL, "URL mismatch")
+	assert.Equal(t, "http://localhost:1234", options.URL, "URL mismatch")
 
 	assert.Equal(t, []string{"sha1", "sha2"}, options.CASha256, "CASha256 mismatch")
 	assert.Equal(t, true, options.Insecure, "Insecure mismatch")

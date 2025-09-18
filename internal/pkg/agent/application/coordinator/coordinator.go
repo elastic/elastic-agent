@@ -85,7 +85,7 @@ type UpgradeManager interface {
 	Reload(rawConfig *config.Config) error
 
 	// Upgrade upgrades running agent.
-	Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error)
+	Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error)
 
 	// Ack is used on startup to check if the agent has upgraded and needs to send an ack for the action
 	Ack(ctx context.Context, acker acker.Acker) error
@@ -357,6 +357,9 @@ type Coordinator struct {
 	// run a ticker that checks to see if we have a new PID.
 	componentPIDTicker         *time.Ticker
 	componentPidRequiresUpdate *atomic.Bool
+
+	// Abstraction for diagnostics AddSecretMarkers function for testability
+	secretMarkerFunc func(*logger.Logger, *config.Config) error
 }
 
 // The channels Coordinator reads to receive updates from the various managers.
@@ -420,6 +423,7 @@ func New(
 	isManaged bool,
 	otelMgr OTelManager,
 	fleetAcker acker.Acker,
+	initialUpgradeDetails *details.Details,
 	modifiers ...ComponentsModifier,
 ) *Coordinator {
 	var fleetState cproto.State
@@ -430,11 +434,12 @@ func New(
 		fleetMessage = "Not enrolled into Fleet"
 	}
 	state := State{
-		State:        agentclient.Starting,
-		Message:      "Starting",
-		FleetState:   fleetState,
-		FleetMessage: fleetMessage,
-		LogLevel:     logLevel,
+		State:          agentclient.Starting,
+		Message:        "Starting",
+		FleetState:     fleetState,
+		FleetMessage:   fleetMessage,
+		LogLevel:       logLevel,
+		UpgradeDetails: initialUpgradeDetails,
 	}
 	c := &Coordinator{
 		logger:     logger,
@@ -476,7 +481,8 @@ func New(
 		componentPIDTicker:         time.NewTicker(time.Second * 30),
 		componentPidRequiresUpdate: &atomic.Bool{},
 
-		fleetAcker: fleetAcker,
+		fleetAcker:       fleetAcker,
+		secretMarkerFunc: diagnostics.AddSecretMarkers,
 	}
 	// Setup communication channels for any non-nil components. This pattern
 	// lets us transparently accept nil managers / simulated events during
@@ -689,19 +695,52 @@ func (c *Coordinator) Migrate(ctx context.Context, action *fleetapi.ActionMigrat
 	return nil
 }
 
+type upgradeOpts struct {
+	skipVerifyOverride bool
+	skipDefaultPgp     bool
+	pgpBytes           []string
+	preUpgradeCallback func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error
+	rollback           bool
+}
+
+type UpgradeOpt func(*upgradeOpts)
+
+func WithSkipVerifyOverride(skipVerifyOverride bool) UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.skipVerifyOverride = skipVerifyOverride
+	}
+}
+
+func WithSkipDefaultPgp(skipDefaultPgp bool) UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.skipDefaultPgp = skipDefaultPgp
+	}
+}
+
+func WithPgpBytes(pgpBytes []string) UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.pgpBytes = pgpBytes
+	}
+}
+
+func WithPreUpgradeCallback(preUpgradeCallback func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error) UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.preUpgradeCallback = preUpgradeCallback
+	}
+}
+
+func WithRollback(rollback bool) UpgradeOpt {
+	return func(opts *upgradeOpts) {
+		opts.rollback = rollback
+	}
+}
+
 // Upgrade runs the upgrade process.
 // Called from external goroutines.
-func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) error {
-	// early check outside of upgrader before overriding the state
-	if !c.upgradeMgr.Upgradeable() {
-		return ErrNotUpgradable
-	}
-
-	// early check capabilities to ensure this upgrade actions is allowed
-	if c.caps != nil {
-		if !c.caps.AllowUpgrade(version, sourceURI) {
-			return ErrNotUpgradable
-		}
+func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, opts ...UpgradeOpt) error {
+	var uOpts upgradeOpts
+	for _, opt := range opts {
+		opt(&uOpts)
 	}
 
 	// A previous upgrade may be cancelled and needs some time to
@@ -709,7 +748,8 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	var err error
 	for i := 0; i < 5; i++ {
 		s := c.State()
-		if s.State != agentclient.Upgrading {
+		// if we are not already upgrading or if the incoming is a rollback request while the watcher is running, we can continue processing
+		if s.State != agentclient.Upgrading || (uOpts.rollback && s.UpgradeDetails != nil && s.UpgradeDetails.State == details.StateWatching) {
 			err = nil
 			break
 		}
@@ -731,7 +771,32 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 	det := details.NewDetails(version, details.StateRequested, actionID)
 	det.RegisterObserver(c.SetUpgradeDetails)
 
-	cb, err := c.upgradeMgr.Upgrade(ctx, version, sourceURI, action, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+	// early check outside of upgrader before overriding the state
+	if !c.upgradeMgr.Upgradeable() {
+		c.ClearOverrideState()
+		det.Fail(ErrNotUpgradable)
+		return ErrNotUpgradable
+	}
+
+	// early check capabilities to ensure this upgrade actions is allowed
+	if c.caps != nil {
+		if !c.caps.AllowUpgrade(version, sourceURI) {
+			c.ClearOverrideState()
+			det.Fail(ErrNotUpgradable)
+			return ErrNotUpgradable
+		}
+	}
+
+	// run any pre upgrade callback
+	if uOpts.preUpgradeCallback != nil {
+		if err := uOpts.preUpgradeCallback(ctx, c.logger, action); err != nil {
+			c.ClearOverrideState()
+			det.Fail(err)
+			return err
+		}
+	}
+
+	cb, err := c.upgradeMgr.Upgrade(ctx, version, uOpts.rollback, sourceURI, action, det, uOpts.skipVerifyOverride, uOpts.skipDefaultPgp, uOpts.pgpBytes...)
 	if err != nil {
 		c.ClearOverrideState()
 		if errors.Is(err, upgrade.ErrUpgradeSameVersion) {
@@ -1473,6 +1538,10 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 
 	if err = info.InjectAgentConfig(cfg); err != nil {
 		return err
+	}
+
+	if err = c.secretMarkerFunc(c.logger, cfg); err != nil {
+		c.logger.Errorf("failed to add secret markers: %v", err)
 	}
 
 	// perform and verify ast translation

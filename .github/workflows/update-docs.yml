@@ -1,0 +1,56 @@
+name: Update documentation
+
+on:
+  schedule:
+    # Run weekly on Monday at 8:00 AM UTC
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+    # Allow manual triggering
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+      
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r docs/scripts/update-docs/requirements.txt
+      
+      - name: Run documentation generator
+        run: |
+          cd docs/scripts/update-docs
+          python update-components-docs.py
+      
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "docs: update generated documentation"
+          title: "Update generated documentation"
+          body: |
+            This PR updates the generated documentation based on the latest local repository data.
+            
+            - Updates EDOT Collector component tables
+            - Updates OpenTelemetry Collector Builder (OCB) configuration
+            - Uses local version from version.go file
+            
+            This is an automated PR created by the documentation update workflow.
+          branch: update-docs
+          base: main
+          delete-branch: true
+          labels: |
+            documentation
+            automated-pr

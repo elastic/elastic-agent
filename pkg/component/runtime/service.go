@@ -9,7 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os/exec"
 	"runtime"
+	"slices"
 	"time"
 
 	"github.com/kardianos/service"
@@ -56,6 +58,16 @@ type serviceRuntime struct {
 	executeServiceCommandImpl executeServiceCommandFunc
 
 	isLocal bool // true if rpc is domain socket, or named pipe
+
+	// The most recent mode received on actionCh. The mode will be either
+	// actionStart (indicating the process should be running, and should be
+	// created if it is not), or actionStop or actionTeardown (indicating that
+	// it should terminate).
+	actionState actionModeSigned
+
+	// serviceRestartDelay is the time duration the service runtime will wait before
+	// attempting to restart a service that failed to start.
+	serviceRestartDelay time.Duration
 }
 
 // newServiceRuntime creates a new command runtime for the provided component.
@@ -79,6 +91,7 @@ func newServiceRuntime(comp component.Component, logger *logger.Logger, isLocal 
 		state:                     state,
 		executeServiceCommandImpl: executeServiceCommand,
 		isLocal:                   isLocal,
+		serviceRestartDelay:       30 * time.Second,
 	}
 
 	// Set initial state as STOPPED
@@ -206,6 +219,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 			return ctx.Err()
 		case as := <-s.actionCh:
 			s.log.Debugf("got action %v for %s service", as.actionMode, s.name())
+			s.actionState = as
 			switch as.actionMode {
 			case actionStart:
 				// Initial state on start
@@ -239,8 +253,26 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 				// Start service
 				err = s.start(ctx)
 				if err != nil {
-					cisStop()
-					break
+					// If the error is due to a non-fatal exit code, continue running the service
+					var exitErr *exec.ExitError
+					if errors.As(err, &exitErr) {
+						exitCode := exitErr.ExitCode()
+						s.log.Debugf("service %s start failed with exit code %d, err = %s", s.name(), exitCode, err)
+						if s.comp.InputSpec.Spec.Service.Operations.Install != nil &&
+							slices.Contains(s.comp.InputSpec.Spec.Service.Operations.Install.NonFatalExitCodes, exitCode) {
+							s.log.Warnf("exit code %d is non-fatal, continuing to run...", exitCode)
+							continue
+						}
+					}
+
+					// Error is due to a fatal exit code. Schedule a restart of the service after a delay by resending
+					// the start action on the action channel
+					delay := s.serviceRestartDelay
+					s.log.Errorf("failed to start %s service, err: %v, restarting after waiting for %v", s.name(), err, delay)
+					time.AfterFunc(delay, func() {
+						s.actionCh <- as
+					})
+					continue
 				}
 
 				// Start check-in timer
@@ -276,8 +308,19 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 				s.processCheckin(checkin, comm, &lastCheckin)
 			}
 		case <-checkinTimer.C:
-			s.checkStatus(s.checkinPeriod(), &lastCheckin, &missedCheckins)
-			checkinTimer.Reset(s.checkinPeriod())
+			if s.actionState.actionMode == actionStart {
+				if !s.isRunning() {
+					// not running, but should be running
+					if err := s.start(ctx); err != nil {
+						s.forceCompState(client.UnitStateFailed, fmt.Sprintf("service %s failed to start: %v", s.name(), err))
+						continue
+					}
+				} else {
+					// running and should be running
+					s.checkStatus(s.checkinPeriod(), &lastCheckin, &missedCheckins)
+					checkinTimer.Reset(s.checkinPeriod())
+				}
+			}
 		case <-teardownCheckinTimer.C:
 			s.log.Debugf("got tearing down timeout for %s service", s.name())
 			// Teardown timed out
@@ -612,9 +655,10 @@ func (s *serviceRuntime) sendObserved() {
 func (s *serviceRuntime) compState(state client.UnitState, missedCheckins int) {
 	name := s.name()
 	msg := stateUnknownMessage
-	if state == client.UnitStateHealthy {
+	switch state {
+	case client.UnitStateHealthy:
 		msg = fmt.Sprintf("Healthy: communicating with %s service", name)
-	} else if state == client.UnitStateDegraded {
+	case client.UnitStateDegraded:
 		if missedCheckins == 1 {
 			msg = fmt.Sprintf("Degraded: %s service missed 1 check-in", name)
 		} else {

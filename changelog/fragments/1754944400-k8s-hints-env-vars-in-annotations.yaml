@@ -1,0 +1,4 @@
+kind: bug-fix
+summary: Correct hints annotations parsing to resolve only `${kubernetes.*}` placeholders instead of resolving all `${...}` patterns.
+component: elastic-agent
+pr: https://github.com/elastic/elastic-agent/pull/9307

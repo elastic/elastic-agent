@@ -25,6 +25,11 @@ fi
 # This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
 STACK_VERSION="$(jq -r '.version' .package-version)"
 STACK_BUILD_ID="$(jq -r '.stack_build_id' .package-version)"
+if [[ "${FIPS:-false}" == "true" ]]; then
+  # FRH testing environment does not have same stack build IDs as CFT environment so
+  # we just go with the STACK_VERSION.
+  STACK_BUILD_ID=""
+fi
 
 echo "~~~ Building test binaries"
 mage build:testBinaries

@@ -14,6 +14,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel/otelhelpers"
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 )
 
 const formValueKey = "failon"
@@ -44,7 +45,7 @@ func handleFormValues(req *http.Request) (LivenessFailConfig, error) {
 	case "failed":
 		return LivenessFailConfig{Degraded: false, Failed: true, Heartbeat: true}, nil
 	case "degraded":
-		return LivenessFailConfig{Failed: true, Degraded: true, Heartbeat: true}, nil
+		return LivenessFailConfig{Degraded: true, Failed: true, Heartbeat: true}, nil
 	case "heartbeat", "":
 		return defaultUserCfg, nil
 	default:
@@ -55,6 +56,13 @@ func handleFormValues(req *http.Request) (LivenessFailConfig, error) {
 func livenessHandler(coord CoordinatorState) func(http.ResponseWriter, *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+		if coord == nil {
+			// no coordinator, then that means we are in the container enrollment mode
+			// at this point the container is healthy and trying to enroll, so return 200
+			w.WriteHeader(http.StatusOK)
+			return nil
+		}
 
 		state := coord.State()
 		isUp := coord.IsActive(time.Second * 10)
@@ -69,12 +77,10 @@ func livenessHandler(coord CoordinatorState) func(http.ResponseWriter, *http.Req
 			return fmt.Errorf("error handling form values: %w", err)
 		}
 
-		// if user has requested `coordinator` mode, just revert to that, skip everything else
-		if !failConfig.Degraded && !failConfig.Failed && failConfig.Heartbeat {
-			if !isUp {
-				w.WriteHeader(http.StatusServiceUnavailable)
-				return nil
-			}
+		unhealthyState := (failConfig.Failed && state.State == agentclient.Failed) || (failConfig.Degraded && state.State == agentclient.Degraded)
+		if unhealthyState {
+			w.WriteHeader(http.StatusInternalServerError)
+			return nil
 		}
 
 		unhealthyComponent := false
