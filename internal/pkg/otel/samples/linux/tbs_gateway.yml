@@ -50,11 +50,11 @@ service:
       receivers: [ otlp ]
       processors: [ batch ]
       exporters: [ debug, elasticapm, elasticsearch/otel ]
-    traces/1:
+    traces/1-process-elastic:
       receivers: [ otlp ]
       processors: [ batch, elastictrace ]
       exporters: [ debug, elasticapm, forward ]
-    traces/2:
+    traces/2-process-tbs:
       receivers: [ forward ]
       processors: [ tail_sampling ]
       exporters: [ debug, elasticsearch/otel ]
