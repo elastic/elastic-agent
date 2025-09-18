@@ -5,7 +5,7 @@ go 1.24.7
 require (
 	github.com/Jeffail/gabs/v2 v2.6.0
 	github.com/Microsoft/go-winio v0.6.2
-	github.com/antlr4-go/antlr/v4 v4.13.0
+	github.com/antlr4-go/antlr/v4 v4.13.1
 	github.com/blakesmith/ar v0.0.0-20150311145944-8bd4349a67f2
 	github.com/cavaliergopher/rpm v1.2.0
 	github.com/cenkalti/backoff/v4 v4.3.0
@@ -14,7 +14,7 @@ require (
 	github.com/docker/docker v28.3.3+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250911220149-afc53c0479ac
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250917123039-1dc4d7a6380e
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.10.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
@@ -25,7 +25,7 @@ require (
 	github.com/elastic/go-licenser v0.4.2
 	github.com/elastic/go-sysinfo v1.15.4
 	github.com/elastic/go-ucfg v0.8.9-0.20250307075119-2a22403faaea
-	github.com/elastic/mock-es v0.0.0-20250324153755-573fc6c0ac4b
+	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.6.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.4.1
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.6.0
@@ -37,7 +37,7 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/gofrs/flock v0.12.1
-	github.com/gofrs/uuid/v5 v5.3.1
+	github.com/gofrs/uuid/v5 v5.3.2
 	github.com/google/go-cmp v0.7.0
 	github.com/google/pprof v0.0.0-20250607225305-033d6d78b36a
 	github.com/gorilla/mux v1.8.1
@@ -93,7 +93,7 @@ require (
 	golang.org/x/mod v0.27.0
 	golang.org/x/net v0.43.0
 	golang.org/x/sync v0.16.0
-	golang.org/x/sys v0.35.0
+	golang.org/x/sys v0.36.0
 	golang.org/x/term v0.34.0
 	golang.org/x/text v0.28.0
 	golang.org/x/time v0.12.0
@@ -164,7 +164,7 @@ require (
 require (
 	aqwari.net/xml v0.0.0-20210331023308-d9421b293817 // indirect
 	cel.dev/expr v0.24.0 // indirect
-	cloud.google.com/go v0.120.0 // indirect
+	cloud.google.com/go v0.121.0 // indirect
 	cloud.google.com/go/auth v0.16.2 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/bigquery v1.67.0 // indirect
@@ -175,7 +175,7 @@ require (
 	cloud.google.com/go/monitoring v1.24.2 // indirect
 	cloud.google.com/go/pubsub v1.49.0 // indirect
 	cloud.google.com/go/redis v1.18.2 // indirect
-	cloud.google.com/go/storage v1.50.0 // indirect
+	cloud.google.com/go/storage v1.52.0 // indirect
 	code.cloudfoundry.org/go-diodes v0.0.0-20190809170250-f77fb823c7ee // indirect
 	code.cloudfoundry.org/go-loggregator v7.4.0+incompatible // indirect
 	code.cloudfoundry.org/gofileutils v0.0.0-20170111115228-4d0c80011a0f // indirect
@@ -217,10 +217,9 @@ require (
 	github.com/Code-Hex/go-generics-cache v1.5.1 // indirect
 	github.com/DataDog/zstd v1.5.6 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.29.0 // indirect
-	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.50.0 // indirect
-	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.50.0 // indirect
+	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.51.0 // indirect
+	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.51.0 // indirect
 	github.com/IBM/sarama v1.45.2 // indirect
-	github.com/JohnCGriffin/overflow v0.0.0-20211019200055-46fa312c352c // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
@@ -234,15 +233,16 @@ require (
 	github.com/PaloAltoNetworks/pango v0.10.2 // indirect
 	github.com/Showmax/go-fqdn v1.0.0 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
+	github.com/VictoriaMetrics/easyproto v0.1.4 // indirect
 	github.com/aerospike/aerospike-client-go/v7 v7.7.1 // indirect
 	github.com/akavel/rsrc v0.10.2 // indirect
 	github.com/alecthomas/participle/v2 v2.1.4 // indirect
 	github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b // indirect
-	github.com/andybalholm/brotli v1.1.0 // indirect
+	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/antchfx/xmlquery v1.4.4 // indirect
 	github.com/antchfx/xpath v1.3.4 // indirect
+	github.com/apache/arrow-go/v18 v18.4.1 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
-	github.com/apache/arrow/go/v17 v17.0.0 // indirect
 	github.com/apache/thrift v0.22.0 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
@@ -399,8 +399,8 @@ require (
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/goccy/go-yaml v1.18.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
-	github.com/godror/godror v0.33.2 // indirect
-	github.com/godror/knownpb v0.1.1 // indirect
+	github.com/godror/godror v0.49.0 // indirect
+	github.com/godror/knownpb v0.3.0 // indirect
 	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/gohugoio/hashstructure v0.5.0 // indirect
@@ -411,7 +411,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
-	github.com/gomodule/redigo v1.8.3 // indirect
+	github.com/gomodule/redigo v1.9.2 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/cel-go v0.25.0 // indirect
 	github.com/google/flatbuffers v25.2.10+incompatible // indirect
@@ -470,7 +470,7 @@ require (
 	github.com/kamstrup/intmap v0.5.1 // indirect
 	github.com/klauspost/asmfmt v1.3.2 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
-	github.com/klauspost/cpuid/v2 v2.2.8 // indirect
+	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/knadh/koanf/providers/confmap v1.0.0 // indirect
 	github.com/knadh/koanf/v2 v2.2.2 // indirect
 	github.com/kolo/xmlrpc v0.0.0-20220921171641-a4b6fa1dd06b // indirect
@@ -491,14 +491,14 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-ieproxy v0.0.1 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-runewidth v0.0.15 // indirect
+	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mdlayher/socket v0.4.1 // indirect
 	github.com/mdlayher/vsock v1.2.1 // indirect
 	github.com/meraki/dashboard-api-go/v3 v3.0.9 // indirect
 	github.com/microsoft/go-mssqldb v1.9.2 // indirect
 	github.com/microsoft/wmi v0.34.0 // indirect
 	github.com/miekg/dns v1.1.66 // indirect
-	github.com/mileusna/useragent v1.3.4 // indirect
+	github.com/mileusna/useragent v1.3.5 // indirect
 	github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8 // indirect
 	github.com/minio/c2goasm v0.0.0-20190812172519-36a3d3bbc4f3 // indirect
 	github.com/minio/sha256-simd v1.0.1 // indirect
@@ -585,8 +585,8 @@ require (
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
 	github.com/redis/go-redis/v9 v9.12.1 // indirect
 	github.com/relvacode/iso8601 v1.6.0 // indirect
-	github.com/rivo/uniseg v0.4.4 // indirect
-	github.com/rogpeppe/go-internal v1.13.1 // indirect
+	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/rs/cors v1.11.1 // indirect
 	github.com/rubenv/sql-migrate v1.5.2 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
@@ -600,7 +600,7 @@ require (
 	github.com/spf13/cast v1.9.2 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
 	github.com/stackitcloud/stackit-sdk-go/core v0.17.2 // indirect
-	github.com/stoewer/go-strcase v1.3.0 // indirect
+	github.com/stoewer/go-strcase v1.3.1 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/tilinna/clock v1.1.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.15 // indirect
@@ -615,7 +615,7 @@ require (
 	github.com/ugorji/go/codec v1.2.7 // indirect
 	github.com/urfave/cli/v2 v2.27.4 // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
-	github.com/vmware/govmomi v0.51.0 // indirect
+	github.com/vmware/govmomi v0.52.0 // indirect
 	github.com/vultr/govultr/v2 v2.17.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
@@ -640,7 +640,7 @@ require (
 	go.etcd.io/bbolt v1.4.2 // indirect
 	go.mongodb.org/mongo-driver v1.17.4 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
+	go.opentelemetry.io/auto/sdk v1.2.0 // indirect
 	go.opentelemetry.io/collector v0.132.0 // indirect
 	go.opentelemetry.io/collector/client v1.38.0 // indirect
 	go.opentelemetry.io/collector/component/componenttest v0.132.0 // indirect
