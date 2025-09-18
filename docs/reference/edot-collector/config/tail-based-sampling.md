@@ -94,4 +94,4 @@ service:
 
 ## Resources
 
-[Tail sampling OTel documentation](https://opentelemetry.io/docs/concepts/sampling/#tail-sampling)
+To learn more about tail-based sampling in the OpenTelemetry Collector, refer to the [Tail sampling OTel documentation](https://opentelemetry.io/docs/concepts/sampling/#tail-sampling).
