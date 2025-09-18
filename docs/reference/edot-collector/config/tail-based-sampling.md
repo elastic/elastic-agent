@@ -2,15 +2,16 @@
 navigation_title: Tail-based sampling
 description: Configure the EDOT Collector for tail-based sampling (TBS).
 applies_to:
-stack:
-serverless:
-observability:
-product:
-edot_collector: ga
+  deployment:
+      ess: ga 9.2
+  stack: ga 9.2
+  serverless:
+    observability:
+  product:
+    edot_collector: ga
 products:
-- id: cloud-serverless
-- id: observability
-- id: edot-collector
+  - id: observability
+  - id: edot-collector
 ---
 
 # Configure tail-based sampling
