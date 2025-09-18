@@ -21,7 +21,7 @@ Tail-based sampling analyzes a complete trace before deciding whether to keep it
 Within the OpenTelemetry Collector, any processor that generates metrics from traces must run before the tail-sampling processor. If sampling happens first, metrics will be calculated on an incomplete data set, leading to inaccurate and misleading reporting.
 To enforce a specific order of calculations and sampling decisions in the EDOT Collector, you can use the [Forward connector](https://github.com/open-telemetry/opentelemetry-collector/tree/main/connector/forwardconnector). Split the traces pipeline in two steps using the connector, with the first part applying calculations and the second part applying the tail-based sampling decision.
 
-## Configure the EDOT Collector to have a two-part trace pipeline
+## Create a two-step trace pipeline
 
 Configure a two-part trace pipeline, ensuring that the first one includes the `elasticapm` exporter and `forward` exporter and the second one includes the `tail_sampling` processor.
 
