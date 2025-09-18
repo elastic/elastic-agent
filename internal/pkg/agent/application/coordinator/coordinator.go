@@ -1630,7 +1630,7 @@ func (c *Coordinator) updateOtelManagerConfig(model *component.Model) error {
 	if len(model.Components) > 0 {
 		var err error
 		c.logger.With("components", model.Components).Debug("Updating otel manager model")
-		componentOtelCfg, err = translate.GetOtelConfig(model, c.agentInfo, c.monitorMgr.ComponentMonitoringConfig)
+		componentOtelCfg, err = translate.GetOtelConfig(model, c.agentInfo, c.monitorMgr.ComponentMonitoringConfig, logp.NewLogger(""))
 		if err != nil {
 			c.logger.Errorf("failed to generate otel config: %v", err)
 		}
