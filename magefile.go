@@ -312,8 +312,9 @@ func (Build) WindowsArchiveRootBinary() error {
 			"main.CommitSHA": hashShort,
 		},
 		Env: map[string]string{
-			"GOOS":   "windows",
-			"GOARCH": "amd64",
+			"GOOS": "windows",
+			//"GOARCH": "amd64",
+			"GOARCH": devtools.GOARCH,
 		},
 		LDFlags: []string{
 			"-s", // Strip all debug symbols from binary (does not affect Go stack traces).
@@ -1205,7 +1206,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	mg.Deps(agentBinaryTarget)
 
 	// compile the elastic-agent.exe proxy binary for the windows archive
-	if slices.Contains(platforms, "windows/amd64") {
+	if slices.Contains(platforms, "windows/amd64") || slices.Contains(platforms, "windows/arm64") {
 		mg.Deps(Build.WindowsArchiveRootBinary)
 	}
 
@@ -1278,13 +1279,11 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 							continue
 						}
 						targetPath := filepath.Join(archivePath, manifest.PlatformPackages[platform])
-						fmt.Printf("XXX collectPackageDependencies: targetPath [%s]\n", targetPath)
 						os.MkdirAll(targetPath, 0o755)
 						packageName := spec.GetPackageName(packageVersion, platform)
 						if mg.Verbose() {
 							log.Printf(">>> Downloading package %s component %s/%s", packageName, spec.BinaryName, platform)
 						}
-						fmt.Printf("XXX collectPackageDependencies: Downloading package %s component %s/%s", packageName, spec.BinaryName, platform)
 						errGroup.Go(downloadBinary(ctx, spec.ProjectName, packageName, spec.BinaryName, platform, packageVersion, targetPath, completedDownloads))
 					}
 				}
@@ -1890,7 +1889,6 @@ func movePackagesToArchive(dropPath string, platforms []string, packageVersion s
 				log.Printf("--- Evaluating moving dependency %s to archive path %s\n", f, archivePath)
 			}
 			// if the matched file name does not contain the platform suffix and it's not a platform-independent package, skip it
-			log.Printf("XXX Checking file [%s] and packageSuffix [%s]\n", f, packageSuffix)
 			if !strings.Contains(f, packageSuffix) && !isPlatformIndependentPackage(f, packageVersion, dependencies) {
 				if mg.Verbose() {
 					log.Printf("--- Skipped moving dependency %s to archive path\n", f)
