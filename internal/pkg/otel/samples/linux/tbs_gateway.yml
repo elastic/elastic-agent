@@ -9,6 +9,7 @@ receivers:
 
 connectors:
   elasticapm: {} # Elastic APM Connector
+  forward: # Forward connector necessary for tail-based sampling
 
 processors:
   batch:

@@ -25,6 +25,10 @@ To enforce a specific order of calculations and sampling decisions in the EDOT C
 Configure a two-step trace pipeline, ensuring that the first step includes the `elasticapm` connector and `forward` connector under `exporters` section, and that the second step includes the `tail_sampling` processor.
 
 ```yaml
+connectors:
+  elasticapm: {} # Elastic APM Connector
+  forward: # Forward connector necessary for tail-based sampling
+
 processors:
   tail_sampling:
     decision_wait: 5s
@@ -63,6 +67,10 @@ exporters:
 
 :::{tab-item} Downstream Collector
 ```yaml
+connectors:
+  elasticapm: {} # Elastic APM Connector
+  forward: # Forward connector necessary for tail-based sampling
+
 processors:
   tail_sampling:
     decision_wait: 5s
