@@ -22,7 +22,7 @@ To enforce a specific order of calculations and sampling decisions in the EDOT C
 
 ## Create a two-step trace pipeline
 
-Configure a two-step trace pipeline, ensuring that the first step includes the `elasticapm` exporter and `forward` exporter, and that the second step includes the `tail_sampling` processor.
+Configure a two-step trace pipeline, ensuring that the first step includes the `elasticapm` connector and `forward` connector under `exporters` section, and that the second step includes the `tail_sampling` processor.
 
 ```yaml
 processors:
