@@ -5,6 +5,7 @@
 package upgrade
 
 import (
+	goerrors "errors"
 	"os"
 	"path/filepath"
 	"time"
@@ -125,49 +126,53 @@ type agentInstall struct {
 	versionedHome string
 }
 
+type updateActiveCommitFunc func(log *logger.Logger, topDirPath, hash string, writeFile writeFileFunc) error
+
 // markUpgrade marks update happened so we can handle grace period
-func markUpgrade(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details) error {
+func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile writeFileFunc) markUpgradeFunc {
+	return func(log *logger.Logger, dataDirPath string, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details) error {
 
-	if len(previousAgent.hash) > hashLen {
-		previousAgent.hash = previousAgent.hash[:hashLen]
+		if len(previousAgent.hash) > hashLen {
+			previousAgent.hash = previousAgent.hash[:hashLen]
+		}
+
+		marker := &UpdateMarker{
+			Version:           agent.version,
+			Hash:              agent.hash,
+			VersionedHome:     agent.versionedHome,
+			UpdatedOn:         time.Now(),
+			PrevVersion:       previousAgent.version,
+			PrevHash:          previousAgent.hash,
+			PrevVersionedHome: previousAgent.versionedHome,
+			Action:            action,
+			Details:           upgradeDetails,
+		}
+
+		markerBytes, err := yaml.Marshal(newMarkerSerializer(marker))
+		if err != nil {
+			return errors.New(err, errors.TypeConfig, "failed to parse marker file")
+		}
+
+		markerPath := markerFilePath(dataDirPath)
+		log.Infow("Writing upgrade marker file", "file.path", markerPath, "hash", marker.Hash, "prev_hash", marker.PrevHash)
+		if err := writeFile(markerPath, markerBytes, 0600); err != nil {
+			return goerrors.Join(err, errors.New(errors.TypeFilesystem, "failed to create update marker file", errors.M(errors.MetaKeyPath, markerPath)))
+		}
+
+		if err := updateActiveCommit(log, paths.Top(), agent.hash, writeFile); err != nil {
+			return err
+		}
+
+		return nil
 	}
-
-	marker := &UpdateMarker{
-		Version:           agent.version,
-		Hash:              agent.hash,
-		VersionedHome:     agent.versionedHome,
-		UpdatedOn:         time.Now(),
-		PrevVersion:       previousAgent.version,
-		PrevHash:          previousAgent.hash,
-		PrevVersionedHome: previousAgent.versionedHome,
-		Action:            action,
-		Details:           upgradeDetails,
-	}
-
-	markerBytes, err := yaml.Marshal(newMarkerSerializer(marker))
-	if err != nil {
-		return errors.New(err, errors.TypeConfig, "failed to parse marker file")
-	}
-
-	markerPath := markerFilePath(dataDirPath)
-	log.Infow("Writing upgrade marker file", "file.path", markerPath, "hash", marker.Hash, "prev_hash", marker.PrevHash)
-	if err := os.WriteFile(markerPath, markerBytes, 0600); err != nil {
-		return errors.New(err, errors.TypeFilesystem, "failed to create update marker file", errors.M(errors.MetaKeyPath, markerPath))
-	}
-
-	if err := UpdateActiveCommit(log, paths.Top(), agent.hash); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // UpdateActiveCommit updates active.commit file to point to active version.
-func UpdateActiveCommit(log *logger.Logger, topDirPath, hash string) error {
+func UpdateActiveCommit(log *logger.Logger, topDirPath, hash string, writeFile writeFileFunc) error {
 	activeCommitPath := filepath.Join(topDirPath, agentCommitFile)
 	log.Infow("Updating active commit", "file.path", activeCommitPath, "hash", hash)
-	if err := os.WriteFile(activeCommitPath, []byte(hash), 0600); err != nil {
-		return errors.New(err, errors.TypeFilesystem, "failed to update active commit", errors.M(errors.MetaKeyPath, activeCommitPath))
+	if err := writeFile(activeCommitPath, []byte(hash), 0600); err != nil {
+		return goerrors.Join(err, errors.New(errors.TypeFilesystem, "failed to update active commit", errors.M(errors.MetaKeyPath, activeCommitPath)))
 	}
 
 	return nil
