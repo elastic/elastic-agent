@@ -76,11 +76,11 @@ processors:
           sampling_percentage: 10
 service:
   pipelines:
-    traces/1:
+    traces/1-process-elastic:
       receivers: [ otlp ]
       processors: [ elastictrace ]
       exporters: [ elasticapm, forward ]
-    traces/2:
+    traces/2-process-tbs:
       receivers: [ forward ]
       processors: [ tail_sampling ]
       exporters: [ elasticsearch/otel ]
