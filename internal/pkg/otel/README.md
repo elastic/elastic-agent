@@ -89,25 +89,14 @@ This section provides a summary of components included in the Elastic Distributi
 |---|---|
 | [apikeyauthextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apikeyauthextension/v0.4.1/extension/apikeyauthextension/README.md) | v0.4.1 |
 | [apmconfigextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apmconfigextension/v0.6.0/extension/apmconfigextension/README.md) | v0.6.0 |
-<<<<<<< HEAD
 | [bearertokenauthextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/bearertokenauthextension/v0.130.0/extension/bearertokenauthextension/README.md) | v0.130.0 |
+| [beatsauthextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/beatsauthextension/v0.2.0/extension/beatsauthextension/README.md) | v0.2.0 |
 | [filestorage](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/storage/filestorage/v0.130.0/extension/storage/filestorage/README.md) | v0.130.0 |
 | [healthcheckextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckextension/v0.130.0/extension/healthcheckextension/README.md) | v0.130.0 |
 | [k8sleaderelector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/k8sleaderelector/v0.130.0/extension/k8sleaderelector/README.md) | v0.130.0 |
 | [k8sobserver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/observer/k8sobserver/v0.130.0/extension/observer/k8sobserver/README.md) | v0.130.0 |
 | [memorylimiterextension](https://github.com/open-telemetry/opentelemetry-collector/blob/extension/memorylimiterextension/v0.130.0/extension/memorylimiterextension/README.md) | v0.130.0 |
 | [pprofextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/pprofextension/v0.130.0/extension/pprofextension/README.md) | v0.130.0 |
-=======
-| [bearertokenauthextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/bearertokenauthextension/v0.132.0/extension/bearertokenauthextension/README.md) | v0.132.0 |
-| [beatsauthextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/beatsauthextension/v0.2.0/extension/beatsauthextension/README.md) | v0.2.0 |
-| [filestorage](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/storage/filestorage/v0.132.0/extension/storage/filestorage/README.md) | v0.132.0 |
-| [healthcheckextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckextension/v0.132.0/extension/healthcheckextension/README.md) | v0.132.0 |
-| [healthcheckv2extension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckv2extension/v0.132.0/extension/healthcheckv2extension/README.md) | v0.132.0 |
-| [k8sleaderelector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/k8sleaderelector/v0.132.0/extension/k8sleaderelector/README.md) | v0.132.0 |
-| [k8sobserver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/observer/k8sobserver/v0.132.0/extension/observer/k8sobserver/README.md) | v0.132.0 |
-| [memorylimiterextension](https://github.com/open-telemetry/opentelemetry-collector/blob/extension/memorylimiterextension/v0.132.0/extension/memorylimiterextension/README.md) | v0.132.0 |
-| [pprofextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/pprofextension/v0.132.0/extension/pprofextension/README.md) | v0.132.0 |
->>>>>>> 779fafdcd ([beatreceivers] Integrate beatsauthextension (#9257))
 
 ### Connectors
 

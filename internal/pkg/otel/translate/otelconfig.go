@@ -455,13 +455,8 @@ func getDefaultDatastreamTypeForComponent(comp *component.Component) (string, er
 }
 
 // translateEsOutputToExporter translates an elasticsearch output configuration to an elasticsearch exporter configuration.
-<<<<<<< HEAD
-func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
-	esConfig, err := elasticsearchtranslate.ToOTelConfig(cfg, logp.NewLogger(""))
-=======
 func translateEsOutputToExporter(cfg *config.C, logger *logp.Logger) (map[string]any, error) {
 	esConfig, err := elasticsearchtranslate.ToOTelConfig(cfg, logger)
->>>>>>> 779fafdcd ([beatreceivers] Integrate beatsauthextension (#9257))
 	if err != nil {
 		return nil, err
 	}
@@ -473,12 +468,6 @@ func translateEsOutputToExporter(cfg *config.C, logger *logp.Logger) (map[string
 	// for compatibility with beats, we want bodymap mapping
 	esConfig["mapping"] = map[string]any{"mode": "bodymap"}
 	return esConfig, nil
-}
-<<<<<<< HEAD
-=======
-
-func BeatDataPath(componentId string) string {
-	return filepath.Join(paths.Run(), componentId)
 }
 
 // getBeatsAuthExtensionConfig sets http transport settings on beatsauth
@@ -503,4 +492,3 @@ func getBeatsAuthExtensionConfig(cfg *config.C) (map[string]any, error) {
 
 	return newMap, nil
 }
->>>>>>> 779fafdcd ([beatreceivers] Integrate beatsauthextension (#9257))
