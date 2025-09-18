@@ -9,7 +9,7 @@ linters:
     - errcheck
     - errorlint
     - forbidigo
-    # - gomoddirectives
+    - gomoddirectives
     - gomodguard
     - gosec
     - govet
