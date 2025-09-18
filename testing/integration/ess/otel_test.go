@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"os"
@@ -29,6 +30,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
+	"github.com/elastic/elastic-agent-libs/transport/tlscommontest"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	aTesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -1029,7 +1031,8 @@ func TestOtelFilestreamInput(t *testing.T) {
 	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
 	decodedApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err)
-	configTemplate := `inputs:
+	configTemplate := `
+inputs:
   - type: filestream
     id: filestream-e2e
     use_output: default
@@ -1048,6 +1051,8 @@ outputs:
     hosts: [{{.ESEndpoint}}]
     api_key: "{{.ESApiKey}}"
     preset: "balanced"
+    ssl.enabled: true
+    ssl.verification_mode: full
   monitoring:
     type: elasticsearch
     hosts: [{{.ESEndpoint}}]
@@ -1903,4 +1908,161 @@ service:
 	cancel()
 	fixtureWg.Wait()
 	require.True(t, err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded), "Retrieved unexpected error: %s", err.Error())
+}
+
+func TestOtelBeatsAuthExtension(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			// {Type: define.Windows}, we don't support otel on Windows yet
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	// Create the otel configuration file
+	type otelConfigOptions struct {
+		ESEndpoint string
+		ESApiKey   string
+		Index      string
+		CAFile     string
+	}
+	esEndpoint, err := integration.GetESHost()
+	require.NoError(t, err, "error getting elasticsearch endpoint")
+	esApiKey, err := createESApiKey(info.ESClient)
+	require.NoError(t, err, "error creating API key")
+	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	index := "logs-integration-" + info.Namespace
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	// create ca-cert
+	caCert, err := tlscommontest.GenCA()
+	if err != nil {
+		t.Fatalf("could not generate root CA certificate: %s", err)
+	}
+
+	caFilePath := filepath.Join(t.TempDir(), "ca.pem")
+	os.WriteFile(caFilePath, pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: caCert.Leaf.Raw}), 0o777)
+
+	// we pass an incorrect CA to es-exporter
+	// but we expect beatsauthextension to replace the exporter's
+	// roundtripper with how beats implements it (with given http configuration block)
+	// hence we expect events to be indexed to elasticsearch
+	// if authextension is not used - this test fails
+	otelConfigTemplate := `
+extensions:
+  beatsauth:
+    ssl:
+     enabled: true
+     verification_mode: none
+receivers:
+  metricbeatreceiver:
+    metricbeat:
+      modules:
+        - module: system
+          enabled: true
+          period: 1s
+          processes:
+            - '.*'
+          metricsets:
+            - cpu
+    output:
+      otelconsumer:
+    queue.mem.flush.timeout: 0s	  
+exporters:
+  elasticsearch/log:
+    endpoints:
+      - {{.ESEndpoint}}
+    api_key: {{.ESApiKey}}
+    logs_index: {{.Index}}
+    batcher:
+      enabled: true
+      flush_timeout: 1s
+      min_size: 1
+    tls:
+      ca_file: {{ .CAFile }}
+    auth:
+      authenticator: beatsauth
+    mapping:
+      mode: bodymap
+service:
+  extensions: [beatsauth]
+  pipelines:
+    logs:
+      receivers:
+        - metricbeatreceiver
+      exporters:
+        - elasticsearch/log
+`
+	var otelConfigBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("otelConfig").Parse(otelConfigTemplate)).Execute(&otelConfigBuffer,
+			otelConfigOptions{
+				ESEndpoint: esEndpoint,
+				ESApiKey:   esApiKey.Encoded,
+				Index:      index,
+				CAFile:     caFilePath,
+			}))
+
+	// configure elastic-agent.yml
+	err = fixture.Configure(ctx, otelConfigBuffer.Bytes())
+
+	// prepare agent command
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err, "cannot prepare Elastic-Agent command: %w", err)
+
+	output := strings.Builder{}
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	// start elastic-agent
+	err = cmd.Start()
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 30*time.Second, 1*time.Second)
+
+	// Make sure find the logs
+	actualHits := &struct{ Hits int }{}
+	require.Eventually(t,
+		func() bool {
+			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer findCancel()
+
+			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]interface{}{
+				"metricset.name": "cpu",
+			})
+			require.NoError(t, err)
+
+			actualHits.Hits = docs.Hits.Total.Value
+			return actualHits.Hits >= 1
+		},
+		2*time.Minute, 1*time.Second,
+		"Expected at least %d logs, got %v", 1, actualHits)
+
+	cancel()
 }
