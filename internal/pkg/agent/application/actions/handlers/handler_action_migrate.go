@@ -27,7 +27,7 @@ const ()
 type migrateCoordinator interface {
 	actionCoordinator
 
-	Migrate(_ context.Context, _ *fleetapi.ActionMigrate, _ func(done <-chan struct{}) backoff.Backoff) error
+	Migrate(_ context.Context, _ *fleetapi.ActionMigrate, _ func(done <-chan struct{}) backoff.Backoff, _ func(context.Context, *fleetapi.ActionMigrate) error) error
 	ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string)
 	Protection() protection.Config
 }
@@ -85,7 +85,7 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 		}
 	}
 
-	if err := h.coord.Migrate(ctx, action, fleetgateway.RequestBackoff); err != nil {
+	if err := h.coord.Migrate(ctx, action, fleetgateway.RequestBackoff, h.notifyComponents); err != nil {
 		// this should not happen, unmanaged agent should not receive the action
 		// defensive coding to avoid misbehavior
 		if errors.Is(err, coordinator.ErrNotManaged) {
@@ -100,12 +100,6 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 		}
 
 		return fmt.Errorf("migration of agent to a new cluster failed: %w", err)
-	}
-
-	// action is all rigth we can notify endpoint
-	if err := h.notifyComponents(ctx, action); err != nil {
-		// config is cleaned up already we cannot revert
-		h.log.Warnf("failed to notify components, aborting: %v", err)
 	}
 
 	// reexec and load new config
