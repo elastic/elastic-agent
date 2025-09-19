@@ -41,12 +41,14 @@ type CheckinComponent struct {
 
 // CheckinRequest consists of multiple events reported to fleet ui.
 type CheckinRequest struct {
-	Status         string             `json:"status"`
-	AckToken       string             `json:"ack_token,omitempty"`
-	Metadata       *info.ECSMeta      `json:"local_metadata,omitempty"`
-	Message        string             `json:"message"`    // V2 Agent message
-	Components     []CheckinComponent `json:"components"` // V2 Agent components
-	UpgradeDetails *details.Details   `json:"upgrade_details,omitempty"`
+	Status            string             `json:"status"`
+	AckToken          string             `json:"ack_token,omitempty"`
+	Metadata          *info.ECSMeta      `json:"local_metadata,omitempty"`
+	Message           string             `json:"message"`    // V2 Agent message
+	Components        []CheckinComponent `json:"components"` // V2 Agent components
+	UpgradeDetails    *details.Details   `json:"upgrade_details,omitempty"`
+	AgentPolicyID     string             `json:"agent_policy_id,omitempty"`
+	PolicyRevisionIDX int64              `json:"policy_revision_idx,omitempty"`
 }
 
 // SerializableEvent is a representation of the event to be send to the Fleet Server API via the checkin
