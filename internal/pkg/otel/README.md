@@ -94,6 +94,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [bearertokenauthextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/bearertokenauthextension/v0.135.0/extension/bearertokenauthextension/README.md) | v0.135.0 |
 | [beatsauthextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/beatsauthextension/v0.3.0/extension/beatsauthextension/README.md) | v0.3.0 |
 | [filestorage](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/storage/filestorage/v0.135.0/extension/storage/filestorage/README.md) | v0.135.0 |
+| [headerssetterextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/headerssetterextension/v0.135.0/extension/headerssetterextension/README.md) | v0.135.0 |
 | [healthcheckextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckextension/v0.135.0/extension/healthcheckextension/README.md) | v0.135.0 |
 | [healthcheckv2extension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckv2extension/v0.135.0/extension/healthcheckv2extension/README.md) | v0.135.0 |
 | [k8sleaderelector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/k8sleaderelector/v0.135.0/extension/k8sleaderelector/README.md) | v0.135.0 |

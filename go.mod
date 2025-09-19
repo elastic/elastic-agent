@@ -52,6 +52,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/headerssetterextension v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.135.0

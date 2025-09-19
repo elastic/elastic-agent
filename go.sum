@@ -1193,6 +1193,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding v0.
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding v0.135.0/go.mod h1:VlfmANOeR9zLIUOeBotuT26iGHnFJlx7ts68sgyqHAc=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/otlpencodingextension v0.135.0 h1:VmQogXTCe5IWQhTKGLrglDLnYJC3pojmWjNwE9Vd58k=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/otlpencodingextension v0.135.0/go.mod h1:cV2MJoxTXonAbSh7G4RdcS6r31zI++Xkjq+L+5IP2N4=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/headerssetterextension v0.135.0 h1:yQ381LND2I1KoYY1BOgiUpYhotfA12wnsT+TuQw+r7Q=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/headerssetterextension v0.135.0/go.mod h1:nfBZN7QCOF3+K/+xrGfncMKXKBtTgzNZvKo3UT6x8GM=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.135.0 h1:AqZzw3bTjUbQ2AEPWzh0ZKb3N3hZKH+oqS5SiHcLKrc=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.135.0/go.mod h1:U0+ROuUJmSuQEPU8Hy1d0IZBVGiYaBUS3ZFvKdOv1xM=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.135.0 h1:iIDUJBDwN4PWyc18LACTQVzPN9waRRMhMzupj9kG7Io=
