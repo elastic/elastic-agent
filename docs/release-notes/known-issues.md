@@ -28,7 +28,7 @@ Known issues are significant defects or limitations that may impact your impleme
 
 **Applies to: {{agent}} 8.18.7, 9.0.7** 
 
-On September 17, 2025, a known issue was discovered that can cause {{agent}} upgrades to get stuck if an upgrade attempt fails early. This happens because the coordinator’s `overrideState` remains set, leaving the agent in a state that appears to be upgrading.
+On September 17, 2025, a known issue was discovered that can cause {{agent}} upgrades to get stuck if an upgrade attempt fails under specific conditions. This happens because the coordinator’s `overrideState` remains set, leaving the agent in a state that appears to be upgrading.
 
 **Conditions**
 
