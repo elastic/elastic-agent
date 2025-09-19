@@ -194,8 +194,12 @@ func (s *Server) Upgrade(ctx context.Context, request *cproto.UpgradeRequest) (*
 
 // DiagnosticAgent returns diagnostic information for this running Elastic Agent.
 func (s *Server) DiagnosticAgent(ctx context.Context, req *cproto.DiagnosticAgentRequest) (*cproto.DiagnosticAgentResponse, error) {
-	res := make([]*cproto.DiagnosticFileResult, 0, len(s.diagHooks))
-	for _, h := range s.diagHooks {
+
+	// DiagnosticHooks() is called on every DiagnosticAgent request,
+	// since otelMgr retrieves the hook list from diagnosticsExtension.
+	diagHooks := append(s.diagHooks, s.coord.DiagnosticHooks()...)
+	res := make([]*cproto.DiagnosticFileResult, 0, len(diagHooks))
+	for _, h := range diagHooks {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}

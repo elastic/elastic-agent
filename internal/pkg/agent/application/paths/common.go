@@ -33,6 +33,12 @@ const (
 	// ControlSocketName is the control socket name.
 	ControlSocketName = "elastic-agent.sock"
 
+	// EDOTSocketName is the control socket resposible for otel diagnsotis <=> otel process/service communication.
+	EDOTSocketName = "edot.sock"
+
+	// Our DiagnosticsExtension will use DiagnosticsExtensionSocketName to listen and serve diagnostic requests.
+	DiagnosticsExtensionSocketName = "edot-diagnostics-extension.sock"
+
 	// WindowsControlSocketInstalledPath is the control socket path used when installed on Windows.
 	WindowsControlSocketInstalledPath = `npipe:///elastic-agent-system`
 
@@ -60,6 +66,7 @@ var (
 	componentsPath    string
 	installPath       string
 	controlSocketPath string
+	edotSocketPath    string
 	unversionedHome   bool
 	tmpCreator        sync.Once
 )
@@ -70,6 +77,7 @@ func init() {
 	configPath = topPath
 	logsPath = topPath
 	controlSocketPath = initialControlSocketPath(topPath)
+	edotSocketPath = EDOTSocketFromPath(runtime.GOOS, topPath)
 	unversionedHome = false // only versioned by container subcommand
 
 	// these should never change
@@ -254,6 +262,11 @@ func ControlSocket() string {
 	return controlSocketPath
 }
 
+// ControlSocket returns the control socket directory for Agent
+func EDOTSocket() string {
+	return edotSocketPath
+}
+
 // SetControlSocket overrides the ControlSocket path.
 //
 // Used by the container subcommand to adjust the control socket path.
@@ -353,6 +366,29 @@ func ControlSocketFromPath(platform string, path string) string {
 	// place in global /tmp to ensure that its small enough to fit; current path is way to long
 	// for it to be used, but needs to be unique per Agent (in the case that multiple are running)
 	return utils.SocketURLWithFallback(socketPath, path)
+}
+
+// EDOTSocketFromPath returns the EDOT socket path for an Elastic Agent running
+// on the defined platform, and its executing directory.
+func EDOTSocketFromPath(platform string, path string) string {
+	// socket should be inside this directory
+	socketPath := filepath.Join(path, EDOTSocketName)
+	if platform == "windows" {
+		// on windows the control socket always uses the fallback
+		return utils.SocketURLWithFallback(socketPath, path)
+	}
+	unixSocket := fmt.Sprintf("unix://%s", socketPath)
+	if len(unixSocket) < 104 {
+		// small enough to fit
+		return unixSocket
+	}
+	// place in global /tmp to ensure that its small enough to fit; current path is way to long
+	// for it to be used, but needs to be unique per Agent (in the case that multiple are running)
+	return utils.SocketURLWithFallback(socketPath, path)
+}
+
+func DiagnosticsExtensionSocket() string {
+	return filepath.Join(topPath, DiagnosticsExtensionSocketName)
 }
 
 func pathSplit(path string) []string {

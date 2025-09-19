@@ -173,6 +173,9 @@ type OTelManager interface {
 	// PerformComponentDiagnostics executes the diagnostic action for the provided components. If no components are provided,
 	// then it performs the diagnostics for all current units.
 	PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error)
+
+	// DiagnosticHooks returns the list of "global hooks" for the EDOT process.
+	DiagnosticHooks() diagnostics.Hooks
 }
 
 // ConfigChange provides an interface for receiving a new configuration.
@@ -1301,6 +1304,9 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			},
 		},
 	}
+
+	hooks = append(hooks, c.otelMgr.DiagnosticHooks()...)
+
 	return hooks
 }
 

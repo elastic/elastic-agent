@@ -19,9 +19,11 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/service"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/agentprovider"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/elasticdiagnosticsextension"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -66,6 +68,7 @@ func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Comman
 	setupOtelFlags(cmd.Flags())
 	cmd.AddCommand(newValidateCommandWithArgs(args, streams))
 	cmd.AddCommand(newComponentsCommandWithArgs(args, streams))
+	cmd.AddCommand(newOtelDiagnosticsCommand(streams))
 
 	return cmd
 }
@@ -81,6 +84,16 @@ func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool,
 	if err != nil {
 		return fmt.Errorf("failed to prepare collector settings: %w", err)
 	}
+
+	// create and start a new server that will listen for the diagnostics requests.
+	server := otel.NewServer()
+	if err := server.Start(); err != nil {
+		return fmt.Errorf("failed to start new server: %w", err)
+	}
+	defer func() {
+		server.Stop()
+	}()
+
 	// Windows: Mark service as stopped.
 	// After this is run, the service is considered by the OS to be stopped.
 	// This must be the first deferred cleanup task (last to execute).
@@ -151,7 +164,11 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 
 		settings.DisableGracefulShutdown = false
 	} else {
-		settings = otel.NewSettings(release.Version(), configFiles)
+		conf := map[string]any{
+			"host":    paths.DiagnosticsExtensionSocket(),
+			"network": "unix",
+		}
+		settings = otel.NewSettings(release.Version(), configFiles, otel.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnosticsextension.DiagnosticsExtensionID.String(), conf)))
 	}
 	return settings, nil
 }

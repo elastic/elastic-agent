@@ -16,6 +16,10 @@ func Address() string {
 	return paths.ControlSocket()
 }
 
+func AdressEDOT() string {
+	return paths.EDOTSocket()
+}
+
 // AddressFromPath returns the connection address for an Elastic Agent running on the defined platform, and its
 // executing directory.
 func AddressFromPath(platform string, path string) (string, error) {

@@ -312,10 +312,8 @@ func runElasticAgent(
 		}
 	}()
 
-	diagHooks := diagnostics.GlobalHooks()
-	diagHooks = append(diagHooks, coord.DiagnosticHooks()...)
 	controlLog := l.Named("control")
-	control := server.New(controlLog, agentInfo, coord, tracer, diagHooks, cfg.Settings.GRPC)
+	control := server.New(controlLog, agentInfo, coord, tracer, diagnostics.GlobalHooks(), cfg.Settings.GRPC)
 
 	// if the configMgr implements the TestModeConfigSetter in means that Elastic Agent is in testing mode and
 	// the configuration will come in over the control protocol, so we set the config setting on the control protocol

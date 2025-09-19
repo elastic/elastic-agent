@@ -29,6 +29,7 @@ import (
 	nopreceiver "go.opentelemetry.io/collector/receiver/nopreceiver"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
 
+	elasticdiagnosticsextension "github.com/elastic/elastic-agent/internal/pkg/otel/elasticdiagnosticsextension"
 	elasticapmintakereceiver "github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver" // for collecting APM data from Elastic APM agents
 
 	fbreceiver "github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
@@ -176,6 +177,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			apikeyauthextension.NewFactory(),
 			apmconfigextension.NewFactory(),
 			beatsauthextension.NewFactory(),
+			elasticdiagnosticsextension.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)
 		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)

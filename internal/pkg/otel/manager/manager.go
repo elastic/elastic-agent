@@ -17,6 +17,7 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -268,7 +269,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			// and reset the retry count
 			m.recoveryTimer.Stop()
 			m.recoveryRetries.Store(0)
-			mergedCfg, err := buildMergedConfig(cfgUpdate, m.agentInfo, m.beatMonitoringConfigGetter, m.baseLogger)
+			mergedCfg, err := m.buildMergedConfig(cfgUpdate)
 			if err != nil {
 				reportErr(ctx, m.errCh, err)
 				continue
@@ -300,7 +301,7 @@ func (m *OTelManager) Errors() <-chan error {
 }
 
 // buildMergedConfig combines collector configuration with component-derived configuration.
-func buildMergedConfig(cfgUpdate configUpdate, agentInfo info.Agent, monitoringConfigGetter translate.BeatMonitoringConfigGetter, logger *logp.Logger) (*confmap.Conf, error) {
+func (m *OTelManager) buildMergedConfig(cfgUpdate configUpdate) (*confmap.Conf, error) {
 	mergedOtelCfg := confmap.New()
 
 	// Generate component otel config if there are components
@@ -308,7 +309,7 @@ func buildMergedConfig(cfgUpdate configUpdate, agentInfo info.Agent, monitoringC
 	if len(cfgUpdate.components) > 0 {
 		model := &component.Model{Components: cfgUpdate.components}
 		var err error
-		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, monitoringConfigGetter, logger)
+		componentOtelCfg, err = translate.GetOtelConfig(model, m.agentInfo, m.beatMonitoringConfigGetter, m.baseLogger)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}
@@ -335,7 +336,30 @@ func buildMergedConfig(cfgUpdate configUpdate, agentInfo info.Agent, monitoringC
 		}
 	}
 
+	if err := m.injectDiagnosticsExtension(mergedOtelCfg); err != nil {
+		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
+	}
+	m.logger.Warnf("Here's complete config: %v", mergedOtelCfg.ToStringMap())
+
 	return mergedOtelCfg, nil
+}
+
+func (m *OTelManager) injectDiagnosticsExtension(config *confmap.Conf) error {
+	extensionCfg := map[string]any{
+		"extensions": map[string]any{
+			"elastic_diagnsotics": map[string]any{
+				"network": "unix",
+				"host":    paths.DiagnosticsExtensionSocket(),
+			},
+		},
+	}
+	if config.IsSet("service::extensions") {
+		extensionList := config.Get("service::extensions").([]interface{})
+		extensionList = append(extensionList, "elastic_diagnsotics")
+		extensionCfg["service::extensions"] = extensionList
+	}
+
+	return config.Merge(confmap.NewFromStringMap(extensionCfg))
 }
 
 func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh chan *status.AggregateStatus, collectorRunErr chan error) error {

@@ -41,7 +41,7 @@ func (r *embeddedExecution) startCollector(ctx context.Context, logger *logger.L
 	settings := otel.NewSettings(
 		release.Version(), []string{ap.URI()},
 		otel.WithConfigProviderFactory(ap.NewFactory()),
-		otel.WithConfigConvertorFactory(NewForceExtensionConverterFactory(AgentStatusExtensionType.String())),
+		otel.WithConfigConvertorFactory(NewForceExtensionConverterFactory(AgentStatusExtensionType.String(), nil)),
 		otel.WithExtensionFactory(NewAgentStatusFactory(statusCh)))
 	settings.DisableGracefulShutdown = true // managed by this manager
 	settings.LoggingOptions = []zap.Option{zap.WrapCore(func(zapcore.Core) zapcore.Core {
