@@ -21,14 +21,17 @@ processors:
     timeout: 1s
   elastictrace: {} # Elastic Trace Processor
   tail_sampling:
-    decision_wait: 5s
-    num_traces: 50000
+    decision_wait: 10s
+    num_traces: 100
     expected_new_traces_per_sec: 10
     policies:
-      - name: sample_10_percent
-        type: probabilistic
-        probabilistic:
-          sampling_percentage: 10
+      [
+        {
+          name: latency-5000ms-10000ms,
+          type: latency,
+          latency: {threshold_ms: 5000, upper_threshold_ms: 10000}
+        }
+      ]
 
 exporters:
   debug: {}
