@@ -405,6 +405,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 			"event.ingested",
 
 			// only in receiver doc
+			"agent.otelcol",
 			"agent.otelcol.component.id",
 			"agent.otelcol.component.kind",
 		}
@@ -629,6 +630,7 @@ outputs:
 			"event.duration",
 
 			// only in receiver doc
+			"agent.otelcol",
 			"agent.otelcol.component.id",
 			"agent.otelcol.component.kind",
 		}
