@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
+	component2 "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -208,7 +209,7 @@ func GetBeatInputMetricsDiagnostics(ctx context.Context, componentID string) (*p
 }
 
 func GetBeatMetricsPayload(ctx context.Context, componentID string, path string) ([]byte, error) {
-	endpoint := monitoring.PrefixedEndpoint(monitoring.BeatsMonitoringEndpoint(componentID))
+	endpoint := component2.PrefixedEndpoint(component2.BeatsMonitoringEndpoint(componentID))
 	metricBytes, statusCode, err := monitoring.GetProcessMetrics(ctx, endpoint, path)
 	if err != nil {
 		return nil, err

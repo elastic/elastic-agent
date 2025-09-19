@@ -11,8 +11,7 @@ import (
 	"strings"
 
 	"github.com/elastic/elastic-agent-libs/logp"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
 	koanfmaps "github.com/knadh/koanf/maps"
 
@@ -271,7 +270,7 @@ func getReceiversConfigForComponent(
 	// agent self-monitoring is disabled
 	monitoringConfig := beatMonitoringConfigGetter(comp.ID, beatName)
 	if monitoringConfig == nil {
-		endpoint := monitoring.BeatsMonitoringEndpoint(comp.ID)
+		endpoint := componentmonitoring.BeatsMonitoringEndpoint(comp.ID)
 		monitoringConfig = map[string]any{
 			"http": map[string]any{
 				"enabled": true,
