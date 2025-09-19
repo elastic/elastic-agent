@@ -58,17 +58,18 @@ const (
 var ExternalInputsPattern = filepath.Join("inputs.d", "*.yml")
 
 var (
-	topPath           string
-	configPath        string
-	configFilePath    string
-	logsPath          string
-	downloadsPath     string
-	componentsPath    string
-	installPath       string
-	controlSocketPath string
-	edotSocketPath    string
-	unversionedHome   bool
-	tmpCreator        sync.Once
+	topPath                    string
+	configPath                 string
+	configFilePath             string
+	logsPath                   string
+	downloadsPath              string
+	componentsPath             string
+	installPath                string
+	controlSocketPath          string
+	edotSocketPath             string
+	diagnosticsExtensionSocket string
+	unversionedHome            bool
+	tmpCreator                 sync.Once
 )
 
 func init() {
@@ -77,7 +78,8 @@ func init() {
 	configPath = topPath
 	logsPath = topPath
 	controlSocketPath = initialControlSocketPath(topPath)
-	edotSocketPath = EDOTSocketFromPath(runtime.GOOS, topPath)
+	edotSocketPath = SocketFromPath(runtime.GOOS, topPath, EDOTSocketName)
+	diagnosticsExtensionSocket = SocketFromPath(runtime.GOOS, topPath, DiagnosticsExtensionSocketName)
 	unversionedHome = false // only versioned by container subcommand
 
 	// these should never change
@@ -93,6 +95,7 @@ func init() {
 	fs.StringVar(&configFilePath, "c", DefaultConfigName, "Configuration file, relative to path.config")
 	fs.StringVar(&logsPath, "path.logs", logsPath, "Logs path contains Agent log output")
 	fs.StringVar(&controlSocketPath, "path.socket", controlSocketPath, "Control protocol socket path for the Agent")
+	fs.StringVar(&edotSocketPath, "path.edot_socket", edotSocketPath, "Control protocol socket path for the EDOT")
 
 	// enable user to download update artifacts to alternative place
 	// TODO: remove path.downloads support on next major (this can be configured using `agent.download.targetDirectory`)
@@ -352,27 +355,14 @@ func RunningInstalled() bool {
 // ControlSocketFromPath returns the control socket path for an Elastic Agent running
 // on the defined platform, and its executing directory.
 func ControlSocketFromPath(platform string, path string) string {
-	// socket should be inside this directory
-	socketPath := filepath.Join(path, ControlSocketName)
-	if platform == "windows" {
-		// on windows the control socket always uses the fallback
-		return utils.SocketURLWithFallback(socketPath, path)
-	}
-	unixSocket := fmt.Sprintf("unix://%s", socketPath)
-	if len(unixSocket) < 104 {
-		// small enough to fit
-		return unixSocket
-	}
-	// place in global /tmp to ensure that its small enough to fit; current path is way to long
-	// for it to be used, but needs to be unique per Agent (in the case that multiple are running)
-	return utils.SocketURLWithFallback(socketPath, path)
+	return SocketFromPath(platform, path, ControlSocketName)
 }
 
-// EDOTSocketFromPath returns the EDOT socket path for an Elastic Agent running
-// on the defined platform, and its executing directory.
-func EDOTSocketFromPath(platform string, path string) string {
+// SocketFromPath returns the socket path for an Elastic Agent running
+// on the defined platform for a given socket, and its executing directory.
+func SocketFromPath(platform string, path string, socketName string) string {
 	// socket should be inside this directory
-	socketPath := filepath.Join(path, EDOTSocketName)
+	socketPath := filepath.Join(path, socketName)
 	if platform == "windows" {
 		// on windows the control socket always uses the fallback
 		return utils.SocketURLWithFallback(socketPath, path)
@@ -388,7 +378,11 @@ func EDOTSocketFromPath(platform string, path string) string {
 }
 
 func DiagnosticsExtensionSocket() string {
-	return filepath.Join(topPath, DiagnosticsExtensionSocketName)
+	return diagnosticsExtensionSocket
+}
+
+func SetDiagnosticsExtensionSocket(socket string) {
+	diagnosticsExtensionSocket = SocketFromPath(runtime.GOOS, topPath, socket)
 }
 
 func pathSplit(path string) []string {

@@ -62,7 +62,7 @@ func (s *server) Stop() error {
 }
 
 func (s *server) DiagnosticAgent(ctx context.Context, _ *cproto.DiagnosticAgentRequest) (*cproto.DiagnosticAgentResponse, error) {
-	resp, err := s.performDiagnosticsExt()
+	resp, err := PerformDiagnosticsExt()
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func (s *server) DiagnosticAgent(ctx context.Context, _ *cproto.DiagnosticAgentR
 }
 
 func (s *server) DiagnosticComponents(req *cproto.DiagnosticComponentsRequest, respServ cproto.ElasticAgentControl_DiagnosticComponentsServer) error {
-	resp, err := s.performDiagnosticsExt()
+	resp, err := PerformDiagnosticsExt()
 	if err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func (s *server) DiagnosticComponents(req *cproto.DiagnosticComponentsRequest, r
 	return nil
 }
 
-func (s *server) performDiagnosticsExt() (*elasticdiagnosticsextension.Response, error) {
+func PerformDiagnosticsExt() (*elasticdiagnosticsextension.Response, error) {
 	tr := &http.Transport{
 		DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
 			return net.Dial("unix", paths.DiagnosticsExtensionSocket())

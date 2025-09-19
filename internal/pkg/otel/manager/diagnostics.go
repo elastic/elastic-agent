@@ -14,22 +14,18 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"net"
-	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
+	"github.com/elastic/elastic-agent/internal/pkg/otel"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
-	"github.com/elastic/elastic-agent/internal/pkg/otel/elasticdiagnosticsextension"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 
@@ -39,26 +35,6 @@ import (
 )
 
 var fileBeatRegistryPathRegExps = getRegexpsForRegistryFiles()
-
-func (m *OTelManager) DiagnosticHooks() (hooks diagnostics.Hooks) {
-	extDiagnostics, err := m.performDiagnosticsExt()
-	if err != nil {
-		m.logger.Errorf("error fetchign diagnostics: %v", err)
-		return
-	}
-	for _, hook := range extDiagnostics.GlobalDiagnostics {
-		hooks = append(hooks, diagnostics.Hook{
-			Name:        hook.Name,
-			Filename:    hook.Filename,
-			Description: hook.Description,
-			ContentType: hook.ContentType,
-			Hook: func(ctx context.Context) []byte {
-				return hook.Content
-			},
-		})
-	}
-	return
-}
 
 // PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
 // it performs diagnostics for all current units. If a given unit does not exist in the manager, then a warning
@@ -185,7 +161,7 @@ func (m *OTelManager) PerformComponentDiagnostics(
 		diagnostics[idx].Err = errors.Join(errs...)
 	}
 
-	extDiagnostics, err := m.performDiagnosticsExt()
+	extDiagnostics, err := otel.PerformDiagnosticsExt()
 	if err != nil {
 		m.logger.Errorf("error fetchign diagnostics: %v", err)
 		return nil, err
@@ -434,30 +410,4 @@ func matchRegistryFiles(registryFileRegExps []*regexp.Regexp, path string) bool 
 		}
 	}
 	return false
-}
-
-func (m *OTelManager) performDiagnosticsExt() (*elasticdiagnosticsextension.Response, error) {
-	tr := &http.Transport{
-		DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
-			return net.Dial("unix", paths.DiagnosticsExtensionSocket())
-		},
-	}
-	client := &http.Client{Transport: tr}
-	resp, err := client.Get("http://localhost/diagnostics")
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	respBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var respSerialized elasticdiagnosticsextension.Response
-
-	if err := json.Unmarshal(respBytes, &respSerialized); err != nil {
-		return nil, err
-	}
-
-	return &respSerialized, nil
 }

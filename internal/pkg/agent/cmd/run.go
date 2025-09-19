@@ -18,6 +18,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
+	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 
 	"go.elastic.co/apm/v2"
 	apmtransport "go.elastic.co/apm/v2/transport"
@@ -50,7 +51,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/server"
@@ -312,8 +312,10 @@ func runElasticAgent(
 		}
 	}()
 
+	diagHooks := diagnostics.GlobalHooks()
+	diagHooks = append(diagHooks, coord.DiagnosticHooks()...)
 	controlLog := l.Named("control")
-	control := server.New(controlLog, agentInfo, coord, tracer, diagnostics.GlobalHooks(), cfg.Settings.GRPC)
+	control := server.New(controlLog, agentInfo, coord, tracer, diagHooks, cfg.Settings.GRPC)
 
 	// if the configMgr implements the TestModeConfigSetter in means that Elastic Agent is in testing mode and
 	// the configuration will come in over the control protocol, so we set the config setting on the control protocol

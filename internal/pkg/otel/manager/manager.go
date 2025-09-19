@@ -339,12 +339,16 @@ func (m *OTelManager) buildMergedConfig(cfgUpdate configUpdate) (*confmap.Conf, 
 	if err := m.injectDiagnosticsExtension(mergedOtelCfg); err != nil {
 		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
 	}
-	m.logger.Warnf("Here's complete config: %v", mergedOtelCfg.ToStringMap())
 
 	return mergedOtelCfg, nil
 }
 
 func (m *OTelManager) injectDiagnosticsExtension(config *confmap.Conf) error {
+	if _, err := os.Stat(paths.DiagnosticsExtensionSocket()); !os.IsNotExist(err) {
+		// socket already exists. User is most likely using "development" namespace.
+		// generate a unique socket name by fetching current timestamp
+		paths.SetDiagnosticsExtensionSocket(fmt.Sprintf("%s-edot-diagnostics-extension.sock", time.Now().UnixMilli()))
+	}
 	extensionCfg := map[string]any{
 		"extensions": map[string]any{
 			"elastic_diagnsotics": map[string]any{
