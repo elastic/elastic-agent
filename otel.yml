@@ -1,20 +1,8 @@
 receivers:
-  filebeatreceiver:
-    management.otel.enabled: true
-    filebeat:
-      inputs:
-        - type: filestream
-          id: bb-filestream-id
-          paths:
-            /var/log/system.log
-    output:
-      otelconsumer:
-    logging:
-      level: debug
-      selectors:
-        - '*'
-    path:
-      home: ./build
+  filelog:
+    include: [ /var/log/system.log ]
+    start_at: beginning
+    storage: file_storage/filelogreceiver
 
 processors:
   resource:
@@ -40,20 +28,12 @@ extensions:
   file_storage/filelogreceiver:
     create_directory: true
     directory: ${env:STATE_PATH}
-  # elastic_diagnsotics:
-  #   host: localhost:8001
-  #   network: tcp
-    # host: /Users/vihas/Desktop/Vihas/Elastic/elastic-agent/build/edot-diagnostics-extension.sock
-    # network: unix
 
 service:
-  extensions: [health_check, memory_limiter]
-  telemetry:
-    logs:
-      level: debug
+  extensions: [health_check, memory_limiter, file_storage/filelogreceiver]
   pipelines:
     logs:
-      receivers: [filebeatreceiver]
+      receivers: [filelog]
       processors: [resource]
       exporters:
         - debug
