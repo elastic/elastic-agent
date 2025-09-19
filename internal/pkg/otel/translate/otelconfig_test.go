@@ -221,11 +221,6 @@ func TestGetOtelConfig(t *testing.T) {
 
 	expectedESConfig := map[string]any{
 		"elasticsearch/_agent-component/default": map[string]any{
-			"batcher": map[string]any{
-				"enabled":  true,
-				"max_size": 1600,
-				"min_size": 0,
-			},
 			"compression": "gzip",
 			"compression_params": map[string]any{
 				"level": 1,
@@ -233,14 +228,27 @@ func TestGetOtelConfig(t *testing.T) {
 			"mapping": map[string]any{
 				"mode": "bodymap",
 			},
-			"endpoints": []string{"http://localhost:9200"},
-			"password":  "password",
-			"user":      "elastic",
+			"endpoints":          []string{"http://localhost:9200"},
+			"password":           "password",
+			"user":               "elastic",
+			"max_conns_per_host": 1,
 			"retry": map[string]any{
 				"enabled":          true,
 				"initial_interval": 1 * time.Second,
 				"max_interval":     1 * time.Minute,
 				"max_retries":      3,
+			},
+			"sending_queue": map[string]any{
+				"enabled":           true,
+				"num_consumers":     1,
+				"queue_size":        3200,
+				"block_on_overflow": true,
+				"wait_for_result":   true,
+				"batch": map[string]any{
+					"max_size": 1600,
+					"min_size": 0,
+					"sizer":    "items",
+				},
 			},
 			"logs_dynamic_id": map[string]any{
 				"enabled": true,

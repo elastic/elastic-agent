@@ -379,6 +379,11 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 			"data_stream.namespace",
 			"elastic_agent.id",
 			"event.ingested",
+
+			// only in receiver doc
+			"agent.otelcol",
+			"agent.otelcol.component.id",
+			"agent.otelcol.component.kind",
 		}
 		switch tc.onlyCompareKeys {
 		case true:
@@ -585,6 +590,10 @@ outputs:
 			"data_stream.namespace",
 			"event.ingested",
 			"event.duration",
+
+			// only in receiver doc
+			"agent.otelcol.component.id",
+			"agent.otelcol.component.kind",
 		}
 
 		stripNondeterminism := func(m mapstr.M, mset string) {
@@ -668,7 +677,7 @@ outputs:
 				stripNondeterminism(agentDoc, tt.metricset)
 				stripNondeterminism(otelDoc, tt.metricset)
 
-				AssertMapstrKeysEqual(t, agentDoc, otelDoc, nil, "expected documents keys to be equal for metricset "+tt.metricset)
+				AssertMapstrKeysEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents keys to be equal for metricset "+tt.metricset)
 				AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for metricset "+tt.metricset)
 			})
 		}
