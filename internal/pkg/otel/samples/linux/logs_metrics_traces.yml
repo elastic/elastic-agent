@@ -10,7 +10,7 @@ receivers:
 
   # Receiver for CPU, Disk, Memory, and Filesystem metrics
   hostmetrics/system:
-    collection_interval: 30s
+    collection_interval: 60s
     scrapers:
       disk:
       filesystem:
