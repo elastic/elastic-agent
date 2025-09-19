@@ -93,8 +93,8 @@ env:
     value: "/usr/share/elastic-agent/state"
 {{- if eq $.Values.agent.fleet.enabled false -}}
 {{- $outputName := $.Values.kubernetes.output -}}
-{{- $ouputVal := get $.Values.outputs $.Values.kubernetes.output }}
-{{- (include (printf "elasticagent.output.%s.preset.envvars" ($ouputVal).type) (list $ $outputName $ouputVal)) | nindent 2 }}
+{{- $outputVal := get $.Values.outputs $.Values.kubernetes.output }}
+{{- (include (printf "elasticagent.output.%s.preset.envvars" ($outputVal).type) (list $ $outputName $outputVal)) | nindent 2 }}
 {{- else -}}
 {{- with ($fleetMutations).extraEnvs -}}
 {{- . | toYaml | nindent 2 }}
@@ -125,9 +125,9 @@ providers:
 {{- $agentName := index . 1 -}}
 {{- $streams := index . 2 -}}
 {{- $outputName := $.Values.kubernetes.output -}}
-{{- $ouputVal := get $.Values.outputs $outputName }}
+{{- $outputVal := get $.Values.outputs $outputName }}
 {{- $presetVal := dict }}
-{{- $_ := set $presetVal "outputs" (dict $outputName $ouputVal) }}
+{{- $_ := set $presetVal "outputs" (dict $outputName $outputVal) }}
 {{- with (include "elasticagent.presets.ksm.sidecar.providers" $ | fromYaml).providers }}
 {{- $_ := set $presetVal "providers" . }}
 {{- end }}

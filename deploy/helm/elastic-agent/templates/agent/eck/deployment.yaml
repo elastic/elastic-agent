@@ -22,15 +22,15 @@ spec:
   configRef:
     secretName: {{ $agentName }}
   {{- with ($presetVal).outputs }}
-  {{- $eckOuputs := list }}
+  {{- $eckOutputs := list }}
   {{- range $outputName, $outputVal := . -}}
   {{- if eq ($outputVal).type "ESECKRef" -}}
-  {{- $eckOuputs = append $eckOuputs (include "elasticagent.output.ESECKRef.preset.config" (list $ $outputName $outputVal) | fromYaml) -}}
+  {{- $eckOutputs = append $eckOutputs (include "elasticagent.output.ESECKRef.preset.config" (list $ $outputName $outputVal) | fromYaml) -}}
   {{- end -}}
   {{- end -}}
-  {{- if gt (len $eckOuputs) 0 }}
+  {{- if gt (len $eckOutputs) 0 }}
   elasticsearchRefs:
-  {{- $eckOuputs | toYaml | nindent 4 -}}
+  {{- $eckOutputs | toYaml | nindent 4 -}}
   {{- end -}}
   {{- end }}
   deployment:
