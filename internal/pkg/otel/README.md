@@ -36,6 +36,7 @@ This section provides a summary of components included in the Elastic Distributi
 | Component | Version |
 |---|---|
 | [apachereceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/apachereceiver/v0.132.0/receiver/apachereceiver/README.md) | v0.132.0 |
+| [awss3receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/awss3receiver/v0.132.0/receiver/awss3receiver/README.md) | v0.132.0 |
 | [dockerstatsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/dockerstatsreceiver/v0.132.0/receiver/dockerstatsreceiver/README.md) | v0.132.0 |
 | [elasticapmintakereceiver](https://github.com/elastic/opentelemetry-collector-components/blob/receiver/elasticapmintakereceiver/v0.2.1/receiver/elasticapmintakereceiver/README.md) | v0.2.1 |
 | [filelogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/filelogreceiver/v0.132.0/receiver/filelogreceiver/README.md) | v0.132.0 |
@@ -56,6 +57,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusreceiver/v0.132.0/receiver/prometheusreceiver/README.md) | v0.132.0 |
 | [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.132.0/receiver/receivercreator/README.md) | v0.132.0 |
 | [redisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/redisreceiver/v0.132.0/receiver/redisreceiver/README.md) | v0.132.0 |
+| [sqlserverreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/sqlserverreceiver/v0.132.0/receiver/sqlserverreceiver/README.md) | v0.132.0 |
 | [zipkinreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zipkinreceiver/v0.132.0/receiver/zipkinreceiver/README.md) | v0.132.0 |
 
 ### Exporters
