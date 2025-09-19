@@ -120,6 +120,10 @@ func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool,
 
 func prepareCollectorSettings(configFiles []string, supervised bool, supervisedLoggingLevel string) (*otelcol.CollectorSettings, error) {
 	var settings *otelcol.CollectorSettings
+	conf := map[string]any{
+		"host":    paths.DiagnosticsExtensionSocket(),
+		"network": "unix",
+	}
 	if supervised {
 		// add stdin config provider
 		configProvider, err := agentprovider.NewBufferProvider(os.Stdin)
@@ -128,6 +132,7 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 		}
 		settings = otel.NewSettings(release.Version(), []string{configProvider.URI()},
 			otel.WithConfigProviderFactory(configProvider.NewFactory()),
+			otel.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnosticsextension.DiagnosticsExtensionID.String(), conf)),
 		)
 
 		// setup logger
@@ -164,10 +169,6 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 
 		settings.DisableGracefulShutdown = false
 	} else {
-		conf := map[string]any{
-			"host":    paths.DiagnosticsExtensionSocket(),
-			"network": "unix",
-		}
 		settings = otel.NewSettings(release.Version(), configFiles, otel.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnosticsextension.DiagnosticsExtensionID.String(), conf)))
 	}
 	return settings, nil
