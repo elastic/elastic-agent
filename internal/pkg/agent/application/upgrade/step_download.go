@@ -41,16 +41,21 @@ type downloaderFactory func(*agtversion.ParsedSemVer, *logger.Logger, *artifact.
 
 type downloader func(context.Context, downloaderFactory, *agtversion.ParsedSemVer, *artifact.Config, *details.Details) (string, error)
 
+// abstraction for testability for newVerifier
+type verifierFactory func(*agtversion.ParsedSemVer, *logger.Logger, *artifact.Config) (download.Verifier, error)
+
 type artifactDownloader struct {
 	log            *logger.Logger
 	settings       *artifact.Config
 	fleetServerURI string
+	newVerifier    verifierFactory
 }
 
 func newArtifactDownloader(settings *artifact.Config, log *logger.Logger) *artifactDownloader {
 	return &artifactDownloader{
-		log:      log,
-		settings: settings,
+		log:         log,
+		settings:    settings,
+		newVerifier: newVerifier,
 	}
 }
 
@@ -123,19 +128,21 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, parsedVersion
 		return "", fmt.Errorf("failed download of agent binary: %w", err)
 	}
 
+	// If there are errors in the following steps, we return the path so that we
+	// can cleanup the downloaded files.
 	if skipVerifyOverride {
 		return path, nil
 	}
 
 	if verifier == nil {
-		verifier, err = newVerifier(parsedVersion, a.log, &settings)
+		verifier, err = a.newVerifier(parsedVersion, a.log, &settings)
 		if err != nil {
-			return "", errors.New(err, "initiating verifier")
+			return path, errors.New(err, "initiating verifier")
 		}
 	}
 
 	if err := verifier.Verify(ctx, agentArtifact, *parsedVersion, skipDefaultPgp, pgpBytes...); err != nil {
-		return "", errors.New(err, "failed verification of agent binary")
+		return path, errors.New(err, "failed verification of agent binary")
 	}
 	return path, nil
 }
