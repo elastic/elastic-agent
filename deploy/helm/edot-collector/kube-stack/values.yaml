@@ -139,6 +139,7 @@ collectors:
                 - "DELETED"
         # [K8s Cluster Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sclusterreceiver)
         k8s_cluster:
+          collection_interval: 60s
           auth_type: serviceAccount # Determines how to authenticate to the K8s API server. This can be one of none (for no auth), serviceAccount (to use the standard service account token provided to the agent pod), or kubeConfig to use credentials from ~/.kube/config.
           node_conditions_to_report:
             - Ready
@@ -376,7 +377,7 @@ collectors:
               type: container
         # [Hostmetrics Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/hostmetricsreceiver)
         hostmetrics:
-          collection_interval: 10s
+          collection_interval: 60s
           root_path: /hostfs # Mounted node's root file system
           scrapers:
             cpu:
@@ -447,7 +448,7 @@ collectors:
         # [Kubelet Stats Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/kubeletstatsreceiver)
         kubeletstats:
           auth_type: serviceAccount # Authentication mechanism with the Kubelet endpoint, refer to: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/kubeletstatsreceiver#configuration
-          collection_interval: 20s
+          collection_interval: 60s
           endpoint: ${env:OTEL_K8S_NODE_NAME}:10250
           node: '${env:OTEL_K8S_NODE_NAME}'
           # Required to work for all CSPs without an issue
