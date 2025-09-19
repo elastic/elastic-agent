@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 
 	"go.opentelemetry.io/collector/component/componentstatus"
 
@@ -1749,6 +1750,7 @@ func (c *Coordinator) updateManagersWithConfig(model *component.Model) {
 func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtimeModel *component.Model, otelModel *component.Model) {
 	var otelComponents, runtimeComponents []component.Component
 	for _, comp := range model.Components {
+		c.maybeOverrideRuntimeForComponent(&comp)
 		switch comp.RuntimeManager {
 		case component.OtelRuntimeManager:
 			otelComponents = append(otelComponents, comp)
@@ -1768,6 +1770,25 @@ func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtime
 		Signed:     model.Signed,
 	}
 	return
+}
+
+// maybeOverrideRuntimeForComponent sets the correct runtime for the given component.
+// Normally, we use the runtime set in the component itself via the configuration, but
+// we may also fall back to the process runtime if the otel runtime is unsupported for
+// some reason. One example is the output using unsupported config options.
+func (c *Coordinator) maybeOverrideRuntimeForComponent(comp *component.Component) {
+	if comp.RuntimeManager == component.ProcessRuntimeManager {
+		// do nothing, the process runtime can handle any component
+		return
+	}
+	if comp.RuntimeManager == component.OtelRuntimeManager {
+		// check if the component is actually supported
+		err := translate.VerifyComponentIsOtelSupported(comp)
+		if err != nil {
+			c.logger.Warnf("otel runtime is not supported for component %s, switching to process runtime, reason: %v", comp.ID, err)
+			comp.RuntimeManager = component.ProcessRuntimeManager
+		}
+	}
 }
 
 func (c *Coordinator) isFleetServer() bool {

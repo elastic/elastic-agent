@@ -1036,8 +1036,9 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 		secretMarkerFunc:   testSecretMarkerFunc,
 	}
 
-	// Create a policy with one input and one output (no otel configuration)
-	cfg := config.MustNewConfigFrom(`
+	t.Run("mixed policy", func(t *testing.T) {
+		// Create a policy with one input and one output (no otel configuration)
+		cfg := config.MustNewConfigFrom(`
 outputs:
   default:
     type: elasticsearch
@@ -1064,38 +1065,87 @@ service:
         - nop
 `)
 
-	// Send the policy change and make sure it was acknowledged.
-	cfgChange := &configChange{cfg: cfg}
-	configChan <- cfgChange
-	coord.runLoopIteration(ctx)
-	assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+		// Send the policy change and make sure it was acknowledged.
+		cfgChange := &configChange{cfg: cfg}
+		configChan <- cfgChange
+		coord.runLoopIteration(ctx)
+		assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
 
-	// Make sure the runtime manager received the expected component update.
-	// An assert.Equal on the full component model doesn't play nice with
-	// the embedded proto structs, so instead we verify the important fields
-	// manually (sorry).
-	assert.True(t, updated, "Runtime manager should be updated after a policy change")
-	require.Equal(t, 1, len(components), "Test policy should generate one component")
-	assert.True(t, otelUpdated, "OTel manager should be updated after a policy change")
-	require.NotNil(t, otelConfig, "OTel manager should have config")
+		// Make sure the runtime manager received the expected component update.
+		// An assert.Equal on the full component model doesn't play nice with
+		// the embedded proto structs, so instead we verify the important fields
+		// manually (sorry).
+		assert.True(t, updated, "Runtime manager should be updated after a policy change")
+		require.Equal(t, 1, len(components), "Test policy should generate one component")
+		assert.True(t, otelUpdated, "OTel manager should be updated after a policy change")
+		require.NotNil(t, otelConfig, "OTel manager should have config")
 
-	runtimeComponent := components[0]
-	assert.Equal(t, "system/metrics-default", runtimeComponent.ID)
-	require.NotNil(t, runtimeComponent.Err, "Input with no spec should produce a component error")
-	assert.Equal(t, "input not supported", runtimeComponent.Err.Error(), "Input with no spec should report 'input not supported'")
-	require.Equal(t, 2, len(runtimeComponent.Units))
+		runtimeComponent := components[0]
+		assert.Equal(t, "system/metrics-default", runtimeComponent.ID)
+		require.NotNil(t, runtimeComponent.Err, "Input with no spec should produce a component error")
+		assert.Equal(t, "input not supported", runtimeComponent.Err.Error(), "Input with no spec should report 'input not supported'")
+		require.Equal(t, 2, len(runtimeComponent.Units))
 
-	units := runtimeComponent.Units
-	// Verify the input unit
-	assert.Equal(t, "system/metrics-default-test-other-input", units[0].ID)
-	assert.Equal(t, client.UnitTypeInput, units[0].Type)
-	assert.Equal(t, "test-other-input", units[0].Config.Id)
-	assert.Equal(t, "system/metrics", units[0].Config.Type)
+		units := runtimeComponent.Units
+		// Verify the input unit
+		assert.Equal(t, "system/metrics-default-test-other-input", units[0].ID)
+		assert.Equal(t, client.UnitTypeInput, units[0].Type)
+		assert.Equal(t, "test-other-input", units[0].Config.Id)
+		assert.Equal(t, "system/metrics", units[0].Config.Type)
 
-	// Verify the output unit
-	assert.Equal(t, "system/metrics-default", units[1].ID)
-	assert.Equal(t, client.UnitTypeOutput, units[1].Type)
-	assert.Equal(t, "elasticsearch", units[1].Config.Type)
+		// Verify the output unit
+		assert.Equal(t, "system/metrics-default", units[1].ID)
+		assert.Equal(t, client.UnitTypeOutput, units[1].Type)
+		assert.Equal(t, "elasticsearch", units[1].Config.Type)
+	})
+
+	t.Run("unsupported otel output option", func(t *testing.T) {
+		// Create a policy with one input and one output (no otel configuration)
+		cfg := config.MustNewConfigFrom(`
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - localhost:9200
+    allow_older_versions: false # not supported by the elasticsearch exporter
+inputs:
+  - id: test-input
+    type: filestream
+    use_output: default
+    _runtime_experimental: otel
+  - id: test-other-input
+    type: system/metrics
+    use_output: default
+receivers:
+  nop:
+exporters:
+  nop:
+service:
+  pipelines:
+    traces:
+      receivers:
+        - nop
+      exporters:
+        - nop
+`)
+
+		// Send the policy change and make sure it was acknowledged.
+		cfgChange := &configChange{cfg: cfg}
+		configChan <- cfgChange
+		coord.runLoopIteration(ctx)
+		assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+
+		// Make sure the runtime manager received the expected component update.
+		// An assert.Equal on the full component model doesn't play nice with
+		// the embedded proto structs, so instead we verify the important fields
+		// manually (sorry).
+		assert.True(t, updated, "Runtime manager should be updated after a policy change")
+		assert.True(t, otelUpdated, "OTel manager should be updated after a policy change")
+		require.NotNil(t, otelConfig, "OTel manager should have config")
+
+		assert.Len(t, components, 2, "both components should be assigned to the runtime manager")
+	})
+
 }
 
 func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
