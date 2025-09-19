@@ -84,9 +84,17 @@ func livenessHandler(coord CoordinatorState) func(http.ResponseWriter, *http.Req
 		}
 
 		unhealthyComponent := false
+	componentsLoop:
 		for _, comp := range state.Components {
 			if (failConfig.Failed && comp.State.State == client.UnitStateFailed) || (failConfig.Degraded && comp.State.State == client.UnitStateDegraded) {
 				unhealthyComponent = true
+				break componentsLoop
+			}
+			for _, unit := range comp.State.Units {
+				if (failConfig.Failed && unit.State == client.UnitStateFailed) || (failConfig.Degraded && unit.State == client.UnitStateDegraded) {
+					unhealthyComponent = true
+					break componentsLoop
+				}
 			}
 		}
 		if state.Collector != nil {
