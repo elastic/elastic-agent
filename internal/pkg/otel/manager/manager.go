@@ -6,6 +6,7 @@ package manager
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cespare/xxhash/v2"
 	"go.uber.org/zap"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -70,7 +72,8 @@ type OTelManager struct {
 
 	// The current configuration that the OTel collector is using. In the case that
 	// the mergedCollectorCfg is nil then the collector is not running.
-	mergedCollectorCfg *confmap.Conf
+	mergedCollectorCfg     *confmap.Conf
+	mergedCollectorCfgHash uint64
 
 	currentCollectorStatus *status.AggregateStatus
 	currentComponentStates map[string]runtime.ComponentComponentState
@@ -282,14 +285,22 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 			// this is the only place where we mutate the internal config attributes, take a write lock for the duration
 			m.mx.Lock()
-			m.mergedCollectorCfg = mergedCfg
+			configChanged, configUpdateErr := m.maybeUpdateMergedConfig(mergedCfg)
 			m.collectorCfg = cfgUpdate.collectorCfg
 			m.components = cfgUpdate.components
 			m.mx.Unlock()
 
-			err = m.applyMergedConfig(ctx, collectorStatusCh, m.collectorRunErr)
-			// report the error unconditionally to indicate that the config was applied
-			reportErr(ctx, m.errCh, err)
+			if configUpdateErr != nil {
+				m.logger.Warn("failed to calculate hash of merged config, proceeding with update", zap.Error(configUpdateErr))
+			}
+
+			if configChanged {
+				applyErr := m.applyMergedConfig(ctx, collectorStatusCh, m.collectorRunErr)
+				// only report the error if we actually apply the update
+				// otherwise, we could override an actual error with a nil in the channel when the collector
+				// state doesn't actually change
+				reportErr(ctx, m.errCh, applyErr)
+			}
 
 		case otelStatus := <-collectorStatusCh:
 			err = m.reportOtelStatusUpdate(ctx, otelStatus)
@@ -513,6 +524,19 @@ func (m *OTelManager) processComponentStates(componentStates []runtime.Component
 	return componentStates
 }
 
+// maybeUpdateMergedConfig updates the merged config if it's different from the current value. It checks this by
+// calculating a hash and comparing. It returns a value indicating if the configuration was updated.
+// If an error is encountered when calculating the hash, this will always be true.
+func (m *OTelManager) maybeUpdateMergedConfig(mergedCfg *confmap.Conf) (updated bool, err error) {
+	// if we get an error here, we just proceed with the update, worst that can happen is that we reload unnecessarily
+	mergedCfgHash, err := calculateConfmapHash(mergedCfg)
+	previousConfigHash := m.mergedCollectorCfgHash
+
+	m.mergedCollectorCfg = mergedCfg
+	m.mergedCollectorCfgHash = mergedCfgHash
+	return previousConfigHash != mergedCfgHash || err != nil, err
+}
+
 // reportComponentStateUpdates sends component state updates to the component watch channel. It first drains
 // the channel to ensure that only the most recent status is kept, as intermediate statuses can be safely discarded.
 // This ensures the receiver always observes the latest reported status.
@@ -531,4 +555,26 @@ func (m *OTelManager) reportComponentStateUpdates(ctx context.Context, component
 		// Manager is shutting down, ignore the update
 		return
 	}
+}
+
+// calculateConfmapHash calculates a hash of a given configuration. It's optimized for speed, which is why it
+// json encodes the values directly into a xxhash instance, instead of converting to a map[string]any first.
+func calculateConfmapHash(conf *confmap.Conf) (uint64, error) {
+	if conf == nil {
+		return 0, nil
+	}
+
+	h := xxhash.New()
+	encoder := json.NewEncoder(h)
+
+	for _, key := range conf.AllKeys() { // this is a sorted list, so the output is consistent
+		if err := encoder.Encode(key); err != nil {
+			return 0, err
+		}
+		if err := encoder.Encode(conf.Get(key)); err != nil {
+			return 0, err
+		}
+	}
+
+	return h.Sum64(), nil
 }
