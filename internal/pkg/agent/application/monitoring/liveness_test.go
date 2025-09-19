@@ -383,6 +383,102 @@ func TestLivenessProcessHTTPHandler(t *testing.T) {
 			expectedCode: 500,
 			failon:       "degraded",
 		},
+		{
+			name: "component healthy and unit degraded",
+			coord: mockCoordinator{
+				isUp: true,
+				state: coordinator.State{
+					Components: []runtime.ComponentComponentState{
+						{
+							LegacyPID: "2",
+							State: runtime.ComponentState{
+								State: client.UnitStateHealthy,
+								Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+									{
+										UnitType: client.UnitTypeInput,
+										UnitID:   "some-input-unit",
+									}: {
+										State: client.UnitStateDegraded,
+									},
+								},
+							},
+							Component: component.Component{
+								ID: "test-component",
+								InputSpec: &component.InputRuntimeSpec{
+									BinaryName: "testbeat",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCode: 500,
+			failon:       "degraded",
+		},
+		{
+			name: "component healthy and unit failed",
+			coord: mockCoordinator{
+				isUp: true,
+				state: coordinator.State{
+					Components: []runtime.ComponentComponentState{
+						{
+							LegacyPID: "2",
+							State: runtime.ComponentState{
+								State: client.UnitStateHealthy,
+								Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+									{
+										UnitType: client.UnitTypeInput,
+										UnitID:   "some-input-unit",
+									}: {
+										State: client.UnitStateFailed,
+									},
+								},
+							},
+							Component: component.Component{
+								ID: "test-component",
+								InputSpec: &component.InputRuntimeSpec{
+									BinaryName: "testbeat",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCode: 500,
+			failon:       "failed",
+		},
+		{
+			name: "component healthy and unit healty",
+			coord: mockCoordinator{
+				isUp: true,
+				state: coordinator.State{
+					Components: []runtime.ComponentComponentState{
+						{
+							LegacyPID: "2",
+							State: runtime.ComponentState{
+								State: client.UnitStateHealthy,
+								Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+									{
+										UnitType: client.UnitTypeInput,
+										UnitID:   "some-input-unit",
+									}: {
+										State: client.UnitStateHealthy,
+									},
+								},
+							},
+							Component: component.Component{
+								ID: "test-component",
+								InputSpec: &component.InputRuntimeSpec{
+									BinaryName: "testbeat",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCode: 200,
+			failon:       "failed",
+		},
 	}
 
 	// test with processesHandler
