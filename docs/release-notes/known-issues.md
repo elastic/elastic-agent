@@ -36,7 +36,7 @@ This issue is triggered if the upgrade fails during one of the early checks insi
 
 - The agent is not upgradeable
 - Capabilities check denies the upgrade
-- When {agent} is tamper-protected, Endpoint must validate that the upgrade action was correctly signed by Kibana to allow the upgrade. If the signature is missing, invalid, or the connection between {agent} and Endpoint was interrupted, the validation fails. This causes the agent coordinator's override state to become stuck until the agent is restarted.
+- When {{agent}} is tamper-protected, Endpoint must validate that the upgrade action was correctly signed by Kibana to allow the upgrade. If the signature is missing, invalid, or the connection between {{agent}} and Endpoint was interrupted, the validation fails. This causes the agent coordinator's override state to become stuck until the agent is restarted.
 
 **Symptoms**
 
