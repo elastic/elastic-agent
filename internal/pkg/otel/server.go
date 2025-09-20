@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -109,7 +110,7 @@ func (s *server) DiagnosticComponents(req *cproto.DiagnosticComponentsRequest, r
 func PerformDiagnosticsExt() (*elasticdiagnosticsextension.Response, error) {
 	tr := &http.Transport{
 		DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
-			return net.Dial("unix", paths.DiagnosticsExtensionSocket())
+			return net.Dial("unix", strings.TrimPrefix(paths.DiagnosticsExtensionSocket(), "unix://"))
 		},
 	}
 	client := &http.Client{Transport: tr}

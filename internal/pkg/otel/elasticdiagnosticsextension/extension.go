@@ -1,12 +1,14 @@
 package elasticdiagnosticsextension
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"runtime/pprof"
 	"strconv"
 	"sync"
 
@@ -70,7 +72,7 @@ func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) e
 
 	d.globalHooks["collector_config"] = &diagHook{
 		description: "full collector configuration",
-		filename:    "otel-merged.yaml",
+		filename:    "edot/otel-merged.yaml",
 		contentType: "application/yaml",
 		hook: func() []byte {
 			if d.collectorConfig == nil {
@@ -86,7 +88,7 @@ func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) e
 
 	d.globalHooks["collector_telemetry"] = &diagHook{
 		description: "internal telemetry of the collector",
-		filename:    "edot-telemetry.txt",
+		filename:    "edot/edot-telemetry.txt",
 		contentType: "text/plain",
 		hook: func() []byte {
 			serviceCfg := serviceConfig{}
@@ -113,6 +115,22 @@ func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) e
 		},
 	}
 
+	// return basic profiles.
+	for _, profile := range []string{"goroutine", "heap", "allocs", "mutex", "threadcreate", "block"} {
+		d.globalHooks[profile] = &diagHook{
+			description: fmt.Sprintf("%s profile of the collector", profile),
+			filename:    fmt.Sprintf("edot/%s.profile.gz", profile),
+			contentType: "application/octet-stream",
+			hook: func() []byte {
+				var buf bytes.Buffer
+				err := pprof.Lookup(profile).WriteTo(&buf, 0)
+				if err != nil {
+					return fmt.Appendf(nil, "error: failed to get %s profile: %v", profile, err)
+				}
+				return buf.Bytes()
+			},
+		}
+	}
 	return nil
 }
 

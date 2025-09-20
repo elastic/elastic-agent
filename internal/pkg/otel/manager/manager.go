@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -353,7 +354,7 @@ func (m *OTelManager) injectDiagnosticsExtension(config *confmap.Conf) error {
 		"extensions": map[string]any{
 			"elastic_diagnsotics": map[string]any{
 				"network": "unix",
-				"host":    paths.DiagnosticsExtensionSocket(),
+				"host":    strings.TrimPrefix(paths.DiagnosticsExtensionSocket(), "unix://"),
 			},
 		},
 	}

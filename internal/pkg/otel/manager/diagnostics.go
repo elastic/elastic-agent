@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
@@ -162,8 +163,11 @@ func (m *OTelManager) PerformComponentDiagnostics(
 	}
 
 	extDiagnostics, err := otel.PerformDiagnosticsExt()
+	if errors.Is(err, syscall.ENOENT) || errors.Is(err, syscall.ECONNREFUSED) {
+		return diagnostics, nil
+	}
 	if err != nil {
-		m.logger.Errorf("error fetchign diagnostics: %v", err)
+		m.logger.Errorf("error fetching diagnostics: %v", err)
 		return nil, err
 	}
 
