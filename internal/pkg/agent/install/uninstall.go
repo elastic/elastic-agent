@@ -456,13 +456,17 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 			return nil, err
 		}
 
-		renderedInputs, err := transpiler.RenderInputs(inputs, varsArray)
+		renderedInputs, unrenderedInputs, err := transpiler.RenderInputs(inputs, varsArray)
 		if err != nil {
 			return nil, err
 		}
 		err = transpiler.Insert(ast, renderedInputs, "inputs")
 		if err != nil {
 			return nil, aerrors.New("inserting rendered inputs failed", err)
+		}
+		err = transpiler.Insert(ast, unrenderedInputs, "unrendered_inputs")
+		if err != nil {
+			return nil, aerrors.New("inserting unrendered inputs failed", err)
 		}
 	}
 

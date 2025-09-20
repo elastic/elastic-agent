@@ -1280,7 +1280,8 @@ inputs:
 	coord.runLoopIteration(ctx)
 	assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
 	assert.True(t, updated, "Runtime manager should receive a component model update")
-	assert.Empty(t, components, "Input with missing variable shouldn't create a component")
+	assert.Equal(t, len(components), 1, "Policy should produce one component from the input")
+	assert.NotNil(t, components[0].Err, "Input with missing variable should produce a failed error")
 
 	// Send a vars update adding the undefined variable
 	updated = false
