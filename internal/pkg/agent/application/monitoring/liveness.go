@@ -84,10 +84,7 @@ func livenessHandler(coord CoordinatorState) func(http.ResponseWriter, *http.Req
 			return nil
 		}
 
-		unhealthyComponent := false
-		if (failConfig.Failed && monitoringhelpers.HaveState(state.Components, client.UnitStateFailed)) || (failConfig.Degraded && monitoringhelpers.HaveState(state.Components, client.UnitStateDegraded)) {
-			unhealthyComponent = true
-		}
+		unhealthyComponent := (failConfig.Failed && monitoringhelpers.HaveState(state.Components, client.UnitStateFailed)) || (failConfig.Degraded && monitoringhelpers.HaveState(state.Components, client.UnitStateDegraded))
 		if !unhealthyComponent && state.Collector != nil {
 			if (failConfig.Failed && (otelhelpers.HasStatus(state.Collector, componentstatus.StatusFatalError) || otelhelpers.HasStatus(state.Collector, componentstatus.StatusPermanentError))) || (failConfig.Degraded && otelhelpers.HasStatus(state.Collector, componentstatus.StatusRecoverableError)) {
 				unhealthyComponent = true
