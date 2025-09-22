@@ -7,6 +7,8 @@
 package otel
 
 import (
+	"runtime"
+
 	kafkaexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter"
 	kafkareceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver"
 	prometheusreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver"
@@ -19,8 +21,12 @@ func addNonFipsReceivers(receivers []receiver.Factory) []receiver.Factory {
 	receivers = append(receivers,
 		kafkareceiver.NewFactory(),
 		prometheusreceiver.NewFactory(),
-		profilingreceiver.NewFactory(),
 	)
+
+	if runtime.GOOS == "linux" {
+		receivers = append(receivers,
+			profilingreceiver.NewFactory())
+	}
 
 	return receivers
 }
