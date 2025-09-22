@@ -1520,8 +1520,6 @@ func TestOTelManager_maybeUpdateMergedConfig(t *testing.T) {
 		updated, err := m.maybeUpdateMergedConfig(badConf)
 
 		require.Error(t, err)
-		// The current implementation will return false for updated, because previous and current hashes are both 0.
-		// A robust implementation should return true to ensure the configuration is applied.
 		assert.True(t, updated, "update should proceed on hashing error, even with no previous config")
 		assert.Equal(t, badConf, m.mergedCollectorCfg)
 		assert.Equal(t, uint64(0), m.mergedCollectorCfgHash)
