@@ -13,6 +13,10 @@ import (
 	"go.opentelemetry.io/collector/receiver"
 
 	// Receivers:
+<<<<<<< HEAD
+=======
+	dockerstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver"
+>>>>>>> d79d422cd (internal/pkg/otel/components.go: put import of headersetterextension to the right section (#10079))
 	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
 	hostmetricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver"
 	httpcheckreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver"
