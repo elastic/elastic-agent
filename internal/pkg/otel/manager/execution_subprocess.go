@@ -30,8 +30,6 @@ import (
 )
 
 const (
-	processKillAfter = 5 * time.Second
-
 	OtelSetSupervisedFlagName          = "supervised"
 	OtelSupervisedLoggingLevelFlagName = "supervised.logging.level"
 )
@@ -56,6 +54,7 @@ func newSubprocessExecution(logLevel logp.Level, collectorPath string) (*subproc
 		},
 		logLevel:               logLevel,
 		healthCheckExtensionID: healthCheckExtensionID,
+		reportErrFn:            reportErr,
 	}, nil
 }
 
@@ -64,6 +63,7 @@ type subprocessExecution struct {
 	collectorArgs          []string
 	logLevel               logp.Level
 	healthCheckExtensionID string
+	reportErrFn            func(ctx context.Context, errCh chan error, err error) // required for testing
 }
 
 // startCollector starts a supervised collector and monitors its health. Process exit errors are sent to the
@@ -106,7 +106,6 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 	procCtx, procCtxCancel := context.WithCancel(ctx)
 	processInfo, err := process.Start(r.collectorPath,
 		process.WithArgs(r.collectorArgs),
-		process.WithContext(procCtx),
 		process.WithEnv(os.Environ()),
 		process.WithCmdOptions(func(c *exec.Cmd) error {
 			c.Stdin = bytes.NewReader(confBytes)
@@ -130,6 +129,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 	ctl := &procHandle{
 		processDoneCh: make(chan struct{}),
 		processInfo:   processInfo,
+		log:           logger,
 	}
 
 	healthCheckDone := make(chan struct{})
@@ -196,14 +196,14 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 		if procErr == nil {
 			if procState.Success() {
 				// report nil error so that the caller can be notified that the process has exited without error
-				reportErr(ctx, processErrCh, nil)
+				r.reportErrFn(ctx, processErrCh, nil)
 			} else {
-				reportErr(ctx, processErrCh, fmt.Errorf("supervised collector (pid: %d) exited with error: %s", procState.Pid(), procState.String()))
+				r.reportErrFn(ctx, processErrCh, fmt.Errorf("supervised collector (pid: %d) exited with error: %s", procState.Pid(), procState.String()))
 			}
 			return
 		}
 
-		reportErr(ctx, processErrCh, fmt.Errorf("failed to wait supervised collector process: %w", procErr))
+		r.reportErrFn(ctx, processErrCh, fmt.Errorf("failed to wait supervised collector process: %w", procErr))
 	}()
 
 	return ctl, nil
@@ -212,11 +212,12 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 type procHandle struct {
 	processDoneCh chan struct{}
 	processInfo   *process.Info
+	log           *logger.Logger
 }
 
 // Stop stops the process. If the process is already stopped, it does nothing. If the process does not stop within
 // processKillAfter or due to an error, it will be killed.
-func (s *procHandle) Stop(ctx context.Context) {
+func (s *procHandle) Stop(waitTime time.Duration) {
 	select {
 	case <-s.processDoneCh:
 		// process has already exited
@@ -225,19 +226,18 @@ func (s *procHandle) Stop(ctx context.Context) {
 	}
 
 	if err := s.processInfo.Stop(); err != nil {
+		s.log.Warnf("failed to send stop signal to the supervised collector: %v", err)
 		// we failed to stop the process just kill it and return
 		_ = s.processInfo.Kill()
 		return
 	}
 
 	select {
-	case <-ctx.Done():
+	case <-time.After(waitTime):
+		s.log.Warnf("timeout waiting (%s) for the supervised collector to stop, killing it", waitTime.String())
 		// our caller ctx is Done; kill the process just in case
 		_ = s.processInfo.Kill()
 	case <-s.processDoneCh:
 		// process has already exited
-	case <-time.After(processKillAfter):
-		// process is still running kill it
-		_ = s.processInfo.Kill()
 	}
 }

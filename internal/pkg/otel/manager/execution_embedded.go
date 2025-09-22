@@ -6,6 +6,7 @@ package manager
 
 import (
 	"context"
+	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/confmap"
@@ -66,7 +67,7 @@ type ctxHandle struct {
 }
 
 // Stop stops the collector
-func (s *ctxHandle) Stop(ctx context.Context) {
+func (s *ctxHandle) Stop(waitTime time.Duration) {
 	if s.cancel == nil {
 		return
 	}
@@ -74,7 +75,8 @@ func (s *ctxHandle) Stop(ctx context.Context) {
 	s.cancel()
 
 	select {
-	case <-ctx.Done():
+	case <-time.After(waitTime):
+		return
 	case <-s.collectorDoneCh:
 	}
 }

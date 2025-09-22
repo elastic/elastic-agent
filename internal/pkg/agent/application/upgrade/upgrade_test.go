@@ -9,31 +9,33 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/gofrs/flock"
+	"github.com/otiai10/copy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -41,8 +43,9 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
-	"github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/info"
-	mocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
+	infomocks "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/info"
+	ackermocks "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/fleetapi/acker"
+	clientmocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
 )
 
 func Test_CopyFile(t *testing.T) {
@@ -117,7 +120,7 @@ func Test_CopyFile(t *testing.T) {
 
 			}
 
-			err := copyDir(l, tc.From, tc.To, tc.IgnoreErr)
+			err := copyDir(l, tc.From, tc.To, tc.IgnoreErr, copy.Copy)
 			require.Equal(t, tc.ExpectedErr, err != nil, err)
 		})
 	}
@@ -244,7 +247,7 @@ func TestIsInProgress(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// Expect client.State() call to be made only if no Upgrade Watcher PIDs
 			// are returned (i.e. no Upgrade Watcher is found to be running).
-			mc := mocks.NewClient(t)
+			mc := clientmocks.NewClient(t)
 			if test.watcherPIDsFetcher != nil {
 				pids, _ := test.watcherPIDsFetcher()
 				if len(pids) == 0 {
@@ -298,37 +301,31 @@ func TestUpgraderAckAction(t *testing.T) {
 		require.Nil(t, u.AckAction(t.Context(), nil, action))
 	})
 	t.Run("AckAction with acker", func(t *testing.T) {
-		acker := &fakeAcker{}
-		acker.On("Ack", mock.Anything, action).Return(nil)
-		acker.On("Commit", mock.Anything).Return(nil)
+		mockAcker := ackermocks.NewAcker(t)
+		mockAcker.EXPECT().Ack(mock.Anything, action).Return(nil)
+		mockAcker.EXPECT().Commit(mock.Anything).Return(nil)
 
-		require.Nil(t, u.AckAction(t.Context(), acker, action))
-		acker.AssertCalled(t, "Ack", mock.Anything, action)
-		acker.AssertCalled(t, "Commit", mock.Anything)
+		require.Nil(t, u.AckAction(t.Context(), mockAcker, action))
 	})
 
 	t.Run("AckAction with acker - failing commit", func(t *testing.T) {
-		acker := &fakeAcker{}
+		mockAcker := ackermocks.NewAcker(t)
 
 		errCommit := errors.New("failed commit")
-		acker.On("Ack", mock.Anything, action).Return(nil)
-		acker.On("Commit", mock.Anything).Return(errCommit)
+		mockAcker.EXPECT().Ack(mock.Anything, action).Return(nil)
+		mockAcker.EXPECT().Commit(mock.Anything).Return(errCommit)
 
-		require.ErrorIs(t, u.AckAction(t.Context(), acker, action), errCommit)
-		acker.AssertCalled(t, "Ack", mock.Anything, action)
-		acker.AssertCalled(t, "Commit", mock.Anything)
+		require.ErrorIs(t, u.AckAction(t.Context(), mockAcker, action), errCommit)
 	})
 
 	t.Run("AckAction with acker - failed ack", func(t *testing.T) {
-		acker := &fakeAcker{}
+		mockAcker := ackermocks.NewAcker(t)
 
 		errAck := errors.New("ack error")
-		acker.On("Ack", mock.Anything, action).Return(errAck)
-		acker.On("Commit", mock.Anything).Return(nil)
+		mockAcker.EXPECT().Ack(mock.Anything, action).Return(errAck)
+		// no expectation on Commit() since it shouldn't be called after an error during Ack()
 
-		require.ErrorIs(t, u.AckAction(t.Context(), acker, action), errAck)
-		acker.AssertCalled(t, "Ack", mock.Anything, action)
-		acker.AssertNotCalled(t, "Commit", mock.Anything)
+		require.ErrorIs(t, u.AckAction(t.Context(), mockAcker, action), errAck)
 	})
 }
 
@@ -964,242 +961,6 @@ func TestCheckUpgrade(t *testing.T) {
 	}
 }
 
-func TestWaitForWatcher(t *testing.T) {
-	wantErrWatcherNotStarted := func(t assert.TestingT, err error, i ...interface{}) bool {
-		return assert.ErrorIs(t, err, ErrWatcherNotStarted, i)
-	}
-
-	tests := []struct {
-		name                string
-		states              []details.State
-		stateChangeInterval time.Duration
-		cancelWaitContext   bool
-		wantErr             assert.ErrorAssertionFunc
-	}{
-		{
-			name:                "Happy path: watcher is watching already",
-			states:              []details.State{details.StateWatching},
-			stateChangeInterval: 1 * time.Millisecond,
-			wantErr:             assert.NoError,
-		},
-		{
-			name:                "Sad path: watcher is never starting",
-			states:              []details.State{details.StateReplacing},
-			stateChangeInterval: 1 * time.Millisecond,
-			cancelWaitContext:   true,
-			wantErr:             wantErrWatcherNotStarted,
-		},
-		{
-			name: "Runaround path: marker is jumping around and landing on watching",
-			states: []details.State{
-				details.StateRequested,
-				details.StateScheduled,
-				details.StateDownloading,
-				details.StateExtracting,
-				details.StateReplacing,
-				details.StateRestarting,
-				details.StateWatching,
-			},
-			stateChangeInterval: 1 * time.Millisecond,
-			wantErr:             assert.NoError,
-		},
-		{
-			name:                "Timeout: marker is never created",
-			states:              nil,
-			stateChangeInterval: 1 * time.Millisecond,
-			cancelWaitContext:   true,
-			wantErr:             wantErrWatcherNotStarted,
-		},
-		{
-			name: "Timeout2: state doesn't get there in time",
-			states: []details.State{
-				details.StateRequested,
-				details.StateScheduled,
-				details.StateDownloading,
-				details.StateExtracting,
-				details.StateReplacing,
-				details.StateRestarting,
-			},
-
-			stateChangeInterval: 1 * time.Millisecond,
-			cancelWaitContext:   true,
-			wantErr:             wantErrWatcherNotStarted,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			deadline, ok := t.Deadline()
-			if !ok {
-				deadline = time.Now().Add(5 * time.Second)
-			}
-			testCtx, testCancel := context.WithDeadline(context.Background(), deadline)
-			defer testCancel()
-
-			tmpDir := t.TempDir()
-			updMarkerFilePath := filepath.Join(tmpDir, markerFilename)
-
-			waitContext, waitCancel := context.WithCancel(testCtx)
-			defer waitCancel()
-
-			fakeTimeout := 30 * time.Second
-
-			// in order to take timing out of the equation provide a context that we can cancel manually
-			// still assert that the parent context and timeout passed are correct
-			var createContextFunc createContextWithTimeout = func(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
-				assert.Same(t, testCtx, ctx, "parent context should be the same as the waitForWatcherCall")
-				assert.Equal(t, fakeTimeout, timeout, "timeout used in new context should be the same as testcase")
-
-				return waitContext, waitCancel
-			}
-
-			if len(tt.states) > 0 {
-				initialState := tt.states[0]
-				writeState(t, updMarkerFilePath, initialState)
-			}
-
-			wg := new(sync.WaitGroup)
-
-			var furtherStates []details.State
-			if len(tt.states) > 1 {
-				// we have more states to produce
-				furtherStates = tt.states[1:]
-			}
-
-			wg.Add(1)
-
-			// worker goroutine: writes out additional states while the test is blocked on waitOnWatcher() call and expires
-			// the wait context if cancelWaitContext is set to true. Timing of the goroutine is driven by stateChangeInterval.
-			go func() {
-				defer wg.Done()
-				tick := time.NewTicker(tt.stateChangeInterval)
-				defer tick.Stop()
-				for _, state := range furtherStates {
-					select {
-					case <-testCtx.Done():
-						return
-					case <-tick.C:
-						writeState(t, updMarkerFilePath, state)
-					}
-				}
-				if tt.cancelWaitContext {
-					<-tick.C
-					waitCancel()
-				}
-			}()
-
-			log, _ := loggertest.New(tt.name)
-
-			tt.wantErr(t, waitForWatcherWithTimeoutCreationFunc(testCtx, log, updMarkerFilePath, fakeTimeout, createContextFunc), fmt.Sprintf("waitForWatcher %s, %v, %s, %s)", updMarkerFilePath, tt.states, tt.stateChangeInterval, fakeTimeout))
-
-			// wait for goroutines to finish
-			wg.Wait()
-		})
-	}
-}
-
-func writeState(t *testing.T, path string, state details.State) {
-	ms := newMarkerSerializer(&UpdateMarker{
-		Version:           "version",
-		Hash:              "hash",
-		VersionedHome:     "versionedHome",
-		UpdatedOn:         time.Now(),
-		PrevVersion:       "prev_version",
-		PrevHash:          "prev_hash",
-		PrevVersionedHome: "prev_versionedhome",
-		Acked:             false,
-		Action:            nil,
-		Details: &details.Details{
-			TargetVersion: "version",
-			State:         state,
-			ActionID:      "",
-			Metadata:      details.Metadata{},
-		},
-	})
-
-	bytes, err := yaml.Marshal(ms)
-	if assert.NoError(t, err, "error marshaling the test upgrade marker") {
-		err = os.WriteFile(path, bytes, 0770)
-		assert.NoError(t, err, "error writing out the test upgrade marker")
-	}
-}
-
-func Test_selectWatcherExecutable(t *testing.T) {
-	type args struct {
-		previous agentInstall
-		current  agentInstall
-	}
-	tests := []struct {
-		name string
-		args args
-		want string
-	}{
-		{
-			name: "Simple upgrade, we should launch the new (current) watcher",
-			args: args{
-				previous: agentInstall{
-					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "", ""),
-					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-somehash"),
-				},
-				current: agentInstall{
-					parsedVersion: agtversion.NewParsedSemVer(4, 5, 6, "", ""),
-					versionedHome: filepath.Join("data", "elastic-agent-4.5.6-someotherhash"),
-				},
-			},
-			want: filepath.Join("data", "elastic-agent-4.5.6-someotherhash"),
-		},
-		{
-			name: "Simple downgrade, we should launch the currently installed (previous) watcher",
-			args: args{
-				previous: agentInstall{
-					parsedVersion: agtversion.NewParsedSemVer(4, 5, 6, "", ""),
-					versionedHome: filepath.Join("data", "elastic-agent-4.5.6-someotherhash"),
-				},
-				current: agentInstall{
-					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "", ""),
-					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-somehash"),
-				},
-			},
-			want: filepath.Join("data", "elastic-agent-4.5.6-someotherhash"),
-		},
-		{
-			name: "Upgrade from snapshot to released version, we should launch the new (current) watcher",
-			args: args{
-				previous: agentInstall{
-					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", ""),
-					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-somehash"),
-				},
-				current: agentInstall{
-					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "", ""),
-					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-someotherhash"),
-				},
-			},
-			want: filepath.Join("data", "elastic-agent-1.2.3-someotherhash"),
-		},
-		{
-			name: "Downgrade from released version to SNAPSHOT, we should launch the currently installed (previous) watcher",
-			args: args{
-				previous: agentInstall{
-					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "", ""),
-					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-somehash"),
-				},
-				current: agentInstall{
-					parsedVersion: agtversion.NewParsedSemVer(1, 2, 3, "SNAPSHOT", ""),
-					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-someotherhash"),
-				},
-			},
-
-			want: filepath.Join("data", "elastic-agent-1.2.3-somehash"),
-		},
-	}
-	// Just need a top dir path. This test does not make any operation on the filesystem, so a temp dir path is as good as any
-	fakeTopDir := filepath.Join(t.TempDir(), "Elastic", "Agent")
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, paths.BinaryPath(filepath.Join(fakeTopDir, tt.want), agentName), selectWatcherExecutable(fakeTopDir, tt.args.previous, tt.args.current), "selectWatcherExecutable(%v, %v)", tt.args.previous, tt.args.current)
-		})
-	}
-}
-
 func TestIsSameReleaseVersion(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -1282,29 +1043,283 @@ func TestIsSameReleaseVersion(t *testing.T) {
 	}
 }
 
-var _ acker.Acker = &fakeAcker{}
+func TestManualRollback(t *testing.T) {
+	const updatemarkerwatching456NoRollbackAvailable = `
+    version: 4.5.6
+    hash: newver
+    versioned_home: data/elastic-agent-4.5.6-newver
+    updated_on: 2025-07-11T10:11:12.131415Z
+    prev_version: 1.2.3
+    prev_hash: oldver
+    prev_versioned_home: data/elastic-agent-1.2.3-oldver
+    acked: false
+    action: null
+    details:
+        target_version: 4.5.6
+        state: UPG_WATCHING
+        metadata:
+            retry_until: null
+    desired_outcome: UPGRADE
+    `
+	const updatemarkerwatching456 = `
+    version: 4.5.6
+    hash: newver
+    versioned_home: data/elastic-agent-4.5.6-newver
+    updated_on: 2025-07-11T10:11:12.131415Z
+    prev_version: 1.2.3
+    prev_hash: oldver
+    prev_versioned_home: data/elastic-agent-1.2.3-oldver
+    acked: false
+    action: null
+    details:
+        target_version: 4.5.6
+        state: UPG_WATCHING
+        metadata:
+            retry_until: null
+    desired_outcome: UPGRADE
+    rollbacks_available:
+        - version: 1.2.3
+          home: data/elastic-agent-1.2.3-oldver
+          valid_until: 2025-07-18T10:11:12.131415Z
+    `
 
-type fakeAcker struct {
-	mock.Mock
-}
+	parsed123Version, err := agtversion.ParseVersion("1.2.3")
+	require.NoError(t, err)
+	parsed456Version, err := agtversion.ParseVersion("4.5.6")
+	require.NoError(t, err)
 
-func (f *fakeAcker) Ack(ctx context.Context, action fleetapi.Action) error {
-	args := f.Called(ctx, action)
-	return args.Error(0)
-}
+	agentInstall123 := agentInstall{
+		parsedVersion: parsed123Version,
+		version:       "1.2.3",
+		hash:          "oldver",
+		versionedHome: "data/elastic-agent-1.2.3-oldver",
+	}
 
-func (f *fakeAcker) Commit(ctx context.Context) error {
-	args := f.Called(ctx)
-	return args.Error(0)
+	agentInstall456 := agentInstall{
+		parsedVersion: parsed456Version,
+		version:       "4.5.6",
+		hash:          "newver",
+		versionedHome: "data/elastic-agent-4.5.6-newver",
+	}
+
+	// this is the updated_on timestamp in the example
+	nowBeforeTTL, err := time.Parse(time.RFC3339, `2025-07-11T10:11:12Z`)
+	require.NoError(t, err, "error parsing nowBeforeTTL")
+
+	// the update marker yaml assume 7d TLL for rollbacks, let's make an extra day pass
+	nowAfterTTL := nowBeforeTTL.Add(8 * 24 * time.Hour)
+
+	type setupF func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper)
+	type postRollbackAssertionsF func(t *testing.T, topDir string)
+	type testcase struct {
+		name              string
+		setup             setupF
+		artifactSettings  *artifact.Config
+		upgradeSettings   *configuration.UpgradeConfig
+		now               time.Time
+		version           string
+		wantErr           assert.ErrorAssertionFunc
+		additionalAsserts postRollbackAssertionsF
+	}
+
+	testcases := []testcase{
+		{
+			name: "no rollback version - rollback fails",
+			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
+				//do not setup anything here, let the rollback fail
+			},
+			artifactSettings: artifact.DefaultConfig(),
+			upgradeSettings:  configuration.DefaultUpgradeConfig(),
+			version:          "",
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, ErrEmptyRollbackVersion)
+			},
+			additionalAsserts: nil,
+		},
+		{
+			name: "no update marker - rollback fails",
+			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
+				//do not setup anything here, let the rollback fail
+			},
+			artifactSettings: artifact.DefaultConfig(),
+			upgradeSettings:  configuration.DefaultUpgradeConfig(),
+			version:          "1.2.3",
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, fs.ErrNotExist)
+			},
+			additionalAsserts: nil,
+		},
+		{
+			name: "update marker is malformed - rollback fails",
+			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
+				err := os.WriteFile(markerFilePath(paths.DataFrom(topDir)), []byte("this is not a proper YAML file"), 0600)
+				require.NoError(t, err, "error setting up update marker")
+				locker := filelock.NewAppLocker(topDir, "watcher.lock")
+				err = locker.TryLock()
+				require.NoError(t, err, "error locking initial watcher AppLocker")
+				// there's no takeover watcher so no expectation on that or InvokeWatcher
+				t.Cleanup(func() {
+					unlockErr := locker.Unlock()
+					assert.NoError(t, unlockErr, "error unlocking initial watcher AppLocker")
+				})
+			},
+			artifactSettings:  artifact.DefaultConfig(),
+			upgradeSettings:   configuration.DefaultUpgradeConfig(),
+			version:           "1.2.3",
+			wantErr:           assert.Error,
+			additionalAsserts: nil,
+		},
+		{
+			name: "update marker ok but rollback available is empty - error",
+			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
+				err := os.WriteFile(markerFilePath(paths.DataFrom(topDir)), []byte(updatemarkerwatching456NoRollbackAvailable), 0600)
+				require.NoError(t, err, "error setting up update marker")
+				locker := filelock.NewAppLocker(topDir, "watcher.lock")
+				err = locker.TryLock()
+				require.NoError(t, err, "error locking initial watcher AppLocker")
+				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(locker, nil)
+				newerWatcherExecutable := filepath.Join(topDir, "data", "elastic-agent-4.5.6-newver", "elastic-agent")
+				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstall456).Return(newerWatcherExecutable)
+				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable).Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for realsies"}}, nil)
+			},
+			artifactSettings: artifact.DefaultConfig(),
+			upgradeSettings:  configuration.DefaultUpgradeConfig(),
+			version:          "2.3.4-unknown",
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, ErrNoRollbacksAvailable)
+			},
+			additionalAsserts: func(t *testing.T, topDir string) {
+				// marker should be untouched
+				filePath := markerFilePath(paths.DataFrom(topDir))
+				require.FileExists(t, filePath)
+				markerFileBytes, readMarkerErr := os.ReadFile(filePath)
+				require.NoError(t, readMarkerErr)
+
+				assert.YAMLEq(t, updatemarkerwatching456NoRollbackAvailable, string(markerFileBytes), "update marker should be untouched")
+			},
+		},
+		{
+			name: "update marker ok but version is not available for rollback - error",
+			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
+				err := os.WriteFile(markerFilePath(paths.DataFrom(topDir)), []byte(updatemarkerwatching456), 0600)
+				require.NoError(t, err, "error setting up update marker")
+				locker := filelock.NewAppLocker(topDir, "watcher.lock")
+				err = locker.TryLock()
+				require.NoError(t, err, "error locking initial watcher AppLocker")
+				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(locker, nil)
+				newerWatcherExecutable := filepath.Join(topDir, "data", "elastic-agent-4.5.6-newver", "elastic-agent")
+				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstall456).Return(newerWatcherExecutable)
+				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable).Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for realsies"}}, nil)
+			},
+			artifactSettings: artifact.DefaultConfig(),
+			upgradeSettings:  configuration.DefaultUpgradeConfig(),
+			version:          "2.3.4-unknown",
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, ErrNoRollbacksAvailable)
+			},
+			additionalAsserts: func(t *testing.T, topDir string) {
+				// marker should be untouched
+				filePath := markerFilePath(paths.DataFrom(topDir))
+				require.FileExists(t, filePath)
+				markerFileBytes, readMarkerErr := os.ReadFile(filePath)
+				require.NoError(t, readMarkerErr)
+
+				assert.YAMLEq(t, updatemarkerwatching456, string(markerFileBytes), "update marker should be untouched")
+			},
+		},
+		{
+			name: "update marker ok but rollback is expired - error",
+			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
+				err := os.WriteFile(markerFilePath(paths.DataFrom(topDir)), []byte(updatemarkerwatching456), 0600)
+				require.NoError(t, err, "error setting up update marker")
+				locker := filelock.NewAppLocker(topDir, "watcher.lock")
+				err = locker.TryLock()
+				require.NoError(t, err, "error locking initial watcher AppLocker")
+				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(locker, nil)
+				newerWatcherExecutable := filepath.Join(topDir, "data", "elastic-agent-4.5.6-newver", "elastic-agent")
+				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstall456).Return(newerWatcherExecutable)
+				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable).Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for realsies"}}, nil)
+			},
+			artifactSettings: artifact.DefaultConfig(),
+			upgradeSettings:  configuration.DefaultUpgradeConfig(),
+			now:              nowAfterTTL,
+			version:          "1.2.3",
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, ErrNoRollbacksAvailable)
+			},
+			additionalAsserts: func(t *testing.T, topDir string) {
+				// marker should be untouched
+				filePath := markerFilePath(paths.DataFrom(topDir))
+				require.FileExists(t, filePath)
+				markerFileBytes, readMarkerErr := os.ReadFile(filePath)
+				require.NoError(t, readMarkerErr)
+
+				assert.YAMLEq(t, updatemarkerwatching456, string(markerFileBytes), "update marker should be untouched")
+			},
+		},
+		{
+			name: "update marker ok - takeover watcher, persist rollback and restart most recent watcher",
+			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
+				err := os.WriteFile(markerFilePath(paths.DataFrom(topDir)), []byte(updatemarkerwatching456), 0600)
+				require.NoError(t, err, "error setting up update marker")
+				locker := filelock.NewAppLocker(topDir, "watcher.lock")
+				err = locker.TryLock()
+				require.NoError(t, err, "error locking initial watcher AppLocker")
+				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(locker, nil)
+				newerWatcherExecutable := filepath.Join(topDir, "data", "elastic-agent-4.5.6-newver", "elastic-agent")
+				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstall456).Return(newerWatcherExecutable)
+				watcherHelper.EXPECT().
+					InvokeWatcher(mock.Anything, newerWatcherExecutable, watcherSubcommand, "--rollback", "data/elastic-agent-1.2.3-oldver").
+					Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for rollbacksies"}}, nil)
+			},
+			artifactSettings: artifact.DefaultConfig(),
+			upgradeSettings:  configuration.DefaultUpgradeConfig(),
+			now:              nowBeforeTTL,
+			version:          "1.2.3",
+			wantErr:          assert.NoError,
+			additionalAsserts: func(t *testing.T, topDir string) {
+				marker, loadMarkerErr := LoadMarker(paths.DataFrom(topDir))
+				require.NoError(t, loadMarkerErr, "error loading marker")
+				require.NotNil(t, marker, "marker is nil")
+
+				require.NotNil(t, marker.Details)
+				assert.NotEmpty(t, marker.RollbacksAvailable)
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			log, _ := loggertest.New(t.Name())
+			mockAgentInfo := infomocks.NewAgent(t)
+			mockWatcherHelper := NewMockWatcherHelper(t)
+			topDir := t.TempDir()
+			err := os.MkdirAll(paths.DataFrom(topDir), 0777)
+			require.NoError(t, err, "error creating data directory in topDir %q", topDir)
+
+			if tc.setup != nil {
+				tc.setup(t, topDir, mockAgentInfo, mockWatcherHelper)
+			}
+
+			upgrader, err := NewUpgrader(log, tc.artifactSettings, tc.upgradeSettings, mockAgentInfo, mockWatcherHelper)
+			require.NoError(t, err, "error instantiating upgrader")
+			_, err = upgrader.rollbackToPreviousVersion(t.Context(), topDir, tc.now, tc.version, nil)
+			tc.wantErr(t, err, "unexpected error returned by rollbackToPreviousVersion()")
+			if tc.additionalAsserts != nil {
+				tc.additionalAsserts(t, topDir)
+			}
+		})
+	}
 }
 
 type mockArtifactDownloader struct {
-	returnError    error
-	fleetServerURI string
+	returnError       error
+	returnArchivePath string
+	fleetServerURI    string
 }
 
 func (m *mockArtifactDownloader) downloadArtifact(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
-	return "", m.returnError
+	return m.returnArchivePath, m.returnError
 }
 
 func (m *mockArtifactDownloader) withFleetServerURI(fleetServerURI string) {
@@ -1329,39 +1344,49 @@ func (m *mockUnpacker) unpack(version, archivePath, dataDir string, flavor strin
 func TestUpgradeErrorHandling(t *testing.T) {
 	log, _ := loggertest.New("test")
 	testError := errors.New("test error")
-	type upgraderMocker func(upgrader *Upgrader)
+
+	type upgraderMocker func(upgrader *Upgrader, archivePath string, versionedHome string)
 
 	type testCase struct {
-		isDiskSpaceErrorResult bool
-		expectedError          error
-		upgraderMocker         upgraderMocker
+		isDiskSpaceErrorResult    bool
+		expectedError             error
+		upgraderMocker            upgraderMocker
+		checkArchiveCleanup       bool
+		checkVersionedHomeCleanup bool
 	}
 
 	testCases := map[string]testCase{
-		"should return error if downloadArtifact fails": {
+		"should return error and cleanup downloaded archive if downloadArtifact fails after download is complete": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-			upgraderMocker: func(upgrader *Upgrader) {
+			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
-					returnError: testError,
+					returnError:       testError,
+					returnArchivePath: archivePath,
 				}
 			},
+			checkArchiveCleanup: true,
 		},
 		"should return error if getPackageMetadata fails": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-			upgraderMocker: func(upgrader *Upgrader) {
-				upgrader.artifactDownloader = &mockArtifactDownloader{}
+			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{
+					returnArchivePath: archivePath,
+				}
 				upgrader.unpacker = &mockUnpacker{
 					returnPackageMetadataError: testError,
 				}
 			},
+			checkArchiveCleanup: true,
 		},
-		"should return error if unpack fails": {
+		"should return error and cleanup downloaded archive if unpack fails before extracting": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-			upgraderMocker: func(upgrader *Upgrader) {
-				upgrader.artifactDownloader = &mockArtifactDownloader{}
+			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{
+					returnArchivePath: archivePath,
+				}
 				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
 					return agentVersion{
 						version:  upgradeVersion,
@@ -1377,34 +1402,423 @@ func TestUpgradeErrorHandling(t *testing.T) {
 					returnUnpackError: testError,
 				}
 			},
+			checkArchiveCleanup: true,
+		},
+		"should return error and cleanup downloaded archive if unpack fails after extracting": {
+			isDiskSpaceErrorResult: false,
+			expectedError:          testError,
+			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{
+					returnArchivePath: archivePath,
+				}
+				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
+					return agentVersion{
+						version:  upgradeVersion,
+						snapshot: false,
+						hash:     metadata.hash,
+					}
+				}
+				upgrader.unpacker = &mockUnpacker{
+					returnPackageMetadata: packageMetadata{
+						manifest: &v1.PackageManifest{},
+						hash:     "hash",
+					},
+					returnUnpackError: testError,
+					returnUnpackResult: UnpackResult{
+						Hash:          "hash",
+						VersionedHome: versionedHome,
+					},
+				}
+			},
+			checkArchiveCleanup:       true,
+			checkVersionedHomeCleanup: true,
+		},
+		"should return error and cleanup downloaded artifact and extracted archive if copyActionStore fails": {
+			isDiskSpaceErrorResult: false,
+			expectedError:          testError,
+			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{
+					returnArchivePath: archivePath,
+				}
+				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
+					return agentVersion{
+						version:  upgradeVersion,
+						snapshot: false,
+						hash:     metadata.hash,
+					}
+				}
+				upgrader.unpacker = &mockUnpacker{
+					returnPackageMetadata: packageMetadata{
+						manifest: &v1.PackageManifest{},
+						hash:     "hash",
+					},
+					returnUnpackResult: UnpackResult{
+						Hash:          "hash",
+						VersionedHome: versionedHome,
+					},
+				}
+				upgrader.copyActionStore = func(log *logger.Logger, newHome string) error {
+					return testError
+				}
+			},
+			checkArchiveCleanup:       true,
+			checkVersionedHomeCleanup: true,
+		},
+		"should return error and cleanup downloaded artifact and extracted archive if copyRunDirectory fails": {
+			isDiskSpaceErrorResult: false,
+			expectedError:          testError,
+			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{}
+				upgrader.artifactDownloader = &mockArtifactDownloader{
+					returnArchivePath: archivePath,
+				}
+				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
+					return agentVersion{
+						version:  upgradeVersion,
+						snapshot: false,
+						hash:     metadata.hash,
+					}
+				}
+				upgrader.unpacker = &mockUnpacker{
+					returnPackageMetadata: packageMetadata{
+						manifest: &v1.PackageManifest{},
+						hash:     "hash",
+					},
+					returnUnpackResult: UnpackResult{
+						Hash:          "hash",
+						VersionedHome: versionedHome,
+					},
+				}
+				upgrader.copyActionStore = func(log *logger.Logger, newHome string) error {
+					return nil
+				}
+				upgrader.copyRunDirectory = func(log *logger.Logger, oldRunPath, newRunPath string) error {
+					return testError
+				}
+			},
+			checkArchiveCleanup:       true,
+			checkVersionedHomeCleanup: true,
+		},
+		"should return error and cleanup downloaded artifact and extracted archive if changeSymlink fails": {
+			isDiskSpaceErrorResult: false,
+			expectedError:          testError,
+			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{
+					returnArchivePath: archivePath,
+				}
+				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
+					return agentVersion{
+						version:  upgradeVersion,
+						snapshot: false,
+						hash:     metadata.hash,
+					}
+				}
+				upgrader.unpacker = &mockUnpacker{
+					returnPackageMetadata: packageMetadata{
+						manifest: &v1.PackageManifest{},
+						hash:     "hash",
+					},
+					returnUnpackResult: UnpackResult{
+						Hash:          "hash",
+						VersionedHome: versionedHome,
+					},
+				}
+				upgrader.copyActionStore = func(log *logger.Logger, newHome string) error {
+					return nil
+				}
+				upgrader.copyRunDirectory = func(log *logger.Logger, oldRunPath, newRunPath string) error {
+					return nil
+				}
+				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {
+					return nil
+				}
+				upgrader.changeSymlink = func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
+					return testError
+				}
+			},
+			checkArchiveCleanup:       true,
+			checkVersionedHomeCleanup: true,
+		},
+		"should return error and cleanup downloaded artifact and extracted archive if markUpgrade fails": {
+			isDiskSpaceErrorResult: false,
+			expectedError:          testError,
+			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{
+					returnArchivePath: archivePath,
+				}
+				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
+					return agentVersion{
+						version:  upgradeVersion,
+						snapshot: false,
+						hash:     metadata.hash,
+					}
+				}
+				upgrader.unpacker = &mockUnpacker{
+					returnPackageMetadata: packageMetadata{
+						manifest: &v1.PackageManifest{},
+						hash:     "hash",
+					},
+					returnUnpackResult: UnpackResult{
+						Hash:          "hash",
+						VersionedHome: versionedHome,
+					},
+				}
+				upgrader.copyActionStore = func(log *logger.Logger, newHome string) error {
+					return nil
+				}
+				upgrader.copyRunDirectory = func(log *logger.Logger, oldRunPath, newRunPath string) error {
+					return nil
+				}
+				upgrader.changeSymlink = func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
+					return nil
+				}
+				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {
+					return nil
+				}
+				upgrader.markUpgrade = func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, rollbackWindow time.Duration) error {
+					return testError
+				}
+			},
+			checkArchiveCleanup:       true,
+			checkVersionedHomeCleanup: true,
 		},
 		"should add disk space error to the error chain if downloadArtifact fails with disk space error": {
 			isDiskSpaceErrorResult: true,
 			expectedError:          upgradeErrors.ErrInsufficientDiskSpace,
-			upgraderMocker: func(upgrader *Upgrader) {
+			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
-					returnError: upgradeErrors.ErrInsufficientDiskSpace,
+					returnError: testError,
 				}
 			},
 		},
 	}
 
-	mockAgentInfo := info.NewAgent(t)
+	mockAgentInfo := infomocks.NewAgent(t)
 	mockAgentInfo.On("Version").Return("9.0.0")
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			upgrader, err := NewUpgrader(log, &artifact.Config{}, mockAgentInfo)
+			baseDir := t.TempDir()
+			paths.SetTop(baseDir)
+
+			mockWatcherHelper := NewMockWatcherHelper(t)
+			upgrader, err := NewUpgrader(log, &artifact.Config{}, nil, mockAgentInfo, mockWatcherHelper)
 			require.NoError(t, err)
 
-			tc.upgraderMocker(upgrader)
+			tc.upgraderMocker(upgrader, filepath.Join(baseDir, "mockArchive"), "versionedHome")
+
+			// Create the test files for all the cases
+			err = os.WriteFile(filepath.Join(baseDir, "mockArchive"), []byte("test"), 0o600)
+			require.NoError(t, err)
+
+			err = os.WriteFile(filepath.Join(baseDir, "versionedHome"), []byte("test"), 0o600)
+			require.NoError(t, err)
 
 			upgrader.isDiskSpaceErrorFunc = func(err error) bool {
 				return tc.isDiskSpaceErrorResult
 			}
 
-			_, err = upgrader.Upgrade(context.Background(), "9.0.0", "", nil, details.NewDetails("9.0.0", details.StateRequested, "test"), true, true)
+			_, err = upgrader.Upgrade(context.Background(), "9.0.0", false, "", nil, details.NewDetails("9.0.0", details.StateRequested, "test"), true, true)
 			require.ErrorIs(t, err, tc.expectedError)
+
+			// If the downloaded archive needs to be cleaned up assert that it is indeed cleaned up, if not assert that it still exists. The downloaded archive is a mock file that is created for all tests cases.
+			if tc.checkArchiveCleanup {
+				require.NoFileExists(t, filepath.Join(baseDir, "mockArchive"))
+			} else {
+				require.FileExists(t, filepath.Join(baseDir, "mockArchive"))
+			}
+
+			// If the extracted agent needs to be cleaned up assert that it is indeed cleaned up, if not assert that it still exists. Versioned home is a mock file that is created for all test cases.
+			if tc.checkVersionedHomeCleanup {
+				require.NoFileExists(t, filepath.Join(baseDir, "versionedHome"))
+			} else {
+				require.FileExists(t, filepath.Join(baseDir, "versionedHome"))
+			}
+		})
+	}
+}
+
+func TestCopyActionStore(t *testing.T) {
+	log, _ := loggertest.New("TestCopyActionStore")
+
+	actionStoreContent := "initial agent action_store.yml content"
+	actionStateStoreYamlContent := "initial agent state.yml content"
+	actionStateStoreFileContent := "initial agent state.enc content"
+
+	type testFile struct {
+		name    string
+		content string
+	}
+
+	type testCase struct {
+		files           []testFile
+		copyActionStore copyActionStoreFunc
+		expectedError   error
+	}
+
+	testError := errors.New("test error")
+
+	testCases := map[string]testCase{
+		"should copy all action store files": {
+			files: []testFile{
+				{name: "action_store", content: actionStoreContent},
+				{name: "state_yaml", content: actionStateStoreYamlContent},
+			},
+			copyActionStore: copyActionStoreProvider(os.ReadFile, os.WriteFile),
+			expectedError:   nil,
+		},
+		"should skip copying action store file that does not exist": {
+			files: []testFile{
+				{name: "action_store", content: actionStoreContent},
+				{name: "state_yaml", content: actionStateStoreYamlContent},
+			},
+			copyActionStore: copyActionStoreProvider(os.ReadFile, os.WriteFile),
+			expectedError:   nil,
+		},
+		"should return error if it cannot read the action store files": {
+			files: []testFile{
+				{name: "action_store", content: actionStoreContent},
+				{name: "state_yaml", content: actionStateStoreYamlContent},
+				{name: "state_enc", content: actionStateStoreFileContent},
+			},
+			copyActionStore: copyActionStoreProvider(func(name string) ([]byte, error) {
+				return nil, testError
+			}, os.WriteFile),
+			expectedError: testError,
+		},
+		"should return error if it cannot write the action store files": {
+			files: []testFile{
+				{name: "action_store", content: actionStoreContent},
+				{name: "state_yaml", content: actionStateStoreYamlContent},
+				{name: "state_enc", content: actionStateStoreFileContent},
+			},
+			copyActionStore: copyActionStoreProvider(os.ReadFile, func(name string, data []byte, perm os.FileMode) error {
+				return testError
+			}),
+			expectedError: testError,
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			baseDir := t.TempDir()
+			newHome := filepath.Join(baseDir, "new_home")
+			paths.SetTop(baseDir)
+
+			actionStorePath := paths.AgentActionStoreFile()
+			actionStateStoreYamlPath := paths.AgentStateStoreYmlFile()
+			actionStateStoreFilePath := paths.AgentStateStoreFile()
+
+			newActionStorePaths := []string{}
+
+			for _, file := range testCase.files {
+				path := ""
+
+				switch file.name {
+				case "action_store":
+					path = actionStorePath
+				case "state_yaml":
+					path = actionStateStoreYamlPath
+				case "state_enc":
+					path = actionStateStoreFilePath
+				}
+
+				// Create the action store directories and files
+				dir := filepath.Dir(path)
+				err := os.MkdirAll(dir, 0o755)
+				require.NoError(t, err, "error creating directory %s", dir)
+
+				err = os.WriteFile(path, []byte(file.content), 0o600)
+				require.NoError(t, err, "error writing to %s", path)
+
+				// Create the new action store directories
+				newActionStorePath := filepath.Join(newHome, filepath.Base(path))
+				newActionStorePaths = append(newActionStorePaths, newActionStorePath)
+				err = os.MkdirAll(filepath.Dir(newActionStorePath), 0o755)
+				require.NoError(t, err, "error creating directory %s", filepath.Dir(newActionStorePath))
+			}
+
+			err := testCase.copyActionStore(log, newHome)
+			if testCase.expectedError != nil {
+				require.Error(t, err, "copyActionStoreFunc should return error")
+				require.ErrorIs(t, err, testCase.expectedError, "copyActionStoreFunc error mismatch")
+				return
+			}
+
+			require.NoError(t, err, "error copying action store")
+
+			for i, path := range newActionStorePaths {
+				require.FileExists(t, path, "file %s does not exist", path)
+
+				content, err := os.ReadFile(path)
+				require.NoError(t, err, "error reading from %s", path)
+				require.Equal(t, []byte(testCase.files[i].content), content, "content of %s is not as expected", path)
+			}
+		})
+	}
+}
+
+func TestCopyRunDirectory(t *testing.T) {
+	log, _ := loggertest.New("TestCopyRunDirectory")
+
+	type testCase struct {
+		expectedError    error
+		copyRunDirectory copyRunDirectoryFunc
+	}
+
+	testCases := map[string]testCase{
+		"should copy old run directory to new run directory": {
+			expectedError:    nil,
+			copyRunDirectory: copyRunDirectoryProvider(os.MkdirAll, copy.Copy),
+		},
+		"should return error if it cannot create the new run directory": {
+			expectedError: fs.ErrPermission,
+			copyRunDirectory: copyRunDirectoryProvider(func(path string, perm os.FileMode) error {
+				return fs.ErrPermission
+			}, copy.Copy),
+		},
+		"should return error if it cannot copy the old run directory": {
+			expectedError: errors.New("test error"),
+			copyRunDirectory: copyRunDirectoryProvider(os.MkdirAll, func(src, dest string, opts ...copy.Options) error {
+				return errors.New("test error")
+			}),
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			baseDir := t.TempDir()
+			paths.SetTop(baseDir)
+
+			oldRunPath := filepath.Join(baseDir, "old_dir", "run")
+			oldRunFile := filepath.Join(oldRunPath, "file.txt")
+
+			err := os.MkdirAll(oldRunPath, 0o700)
+			require.NoError(t, err, "error creating old run directory")
+
+			err = os.WriteFile(oldRunFile, []byte("content for old run file"), 0o600)
+			require.NoError(t, err, "error writing to %s", oldRunFile)
+
+			newRunPath := filepath.Join(baseDir, "new_dir", "run")
+
+			err = os.MkdirAll(newRunPath, 0o700)
+			require.NoError(t, err, "error creating new run directory")
+
+			err = testCase.copyRunDirectory(log, oldRunPath, newRunPath)
+			if testCase.expectedError != nil {
+				require.Error(t, err, "copyRunDirectoryFunc should return error")
+				require.ErrorIs(t, err, testCase.expectedError, "copyRunDirectoryFunc should return test error")
+				return
+			}
+
+			require.NoError(t, err, "error copying run directory")
+			require.DirExists(t, newRunPath, "new run directory does not exist")
+
+			require.FileExists(t, filepath.Join(newRunPath, "file.txt"), "file.txt does not exist in new run directory")
+
+			content, err := os.ReadFile(filepath.Join(newRunPath, "file.txt"))
+			require.NoError(t, err, "error reading from %s", filepath.Join(newRunPath, "file.txt"))
+			require.Equal(t, []byte("content for old run file"), content, "content of %s is not as expected", filepath.Join(newRunPath, "file.txt"))
 		})
 	}
 }
