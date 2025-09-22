@@ -52,6 +52,6 @@ else
 fi
 elastic-agent-changelog-tool new "$changelog_fragment_name"
 sed -i.bak "s/^kind:.*$/kind: enhancement/" ./changelog/fragments/*-"${changelog_fragment_name}".yaml
-sed -i.bak "s/^summary:.*$/summary: Update OTel components to ${next_contrib}/" ./changelog/fragments/*-"${changelog_fragment_name}".yaml
+sed -i.bak "s/^summary:.*$/summary: Update OTel Collector components to ${next_contrib}/" ./changelog/fragments/*-"${changelog_fragment_name}".yaml
 sed -i.bak "s/^component:.*$/component: elastic-agent/" ./changelog/fragments/*-"${changelog_fragment_name}".yaml
 rm ./changelog/fragments/*-"${changelog_fragment_name}".yaml.bak
