@@ -1373,7 +1373,7 @@ func TestCalculateConfmapHash(t *testing.T) {
 	t.Run("nil config returns zero", func(t *testing.T) {
 		hash, err := calculateConfmapHash(nil)
 		require.NoError(t, err)
-		assert.Equal(t, uint64(0), hash)
+		assert.Equal(t, []byte(nil), hash)
 	})
 
 	t.Run("same value gives same result", func(t *testing.T) {
@@ -1510,7 +1510,7 @@ func TestOTelManager_maybeUpdateMergedConfig(t *testing.T) {
 		require.Error(t, err)
 		assert.True(t, updated, "update should proceed on hashing error")
 		assert.Equal(t, badConf, m.mergedCollectorCfg)
-		assert.Equal(t, uint64(0), m.mergedCollectorCfgHash)
+		assert.Equal(t, []byte(nil), m.mergedCollectorCfgHash)
 	})
 
 	t.Run("hashing error with no previous config", func(t *testing.T) {
@@ -1522,6 +1522,6 @@ func TestOTelManager_maybeUpdateMergedConfig(t *testing.T) {
 		require.Error(t, err)
 		assert.True(t, updated, "update should proceed on hashing error, even with no previous config")
 		assert.Equal(t, badConf, m.mergedCollectorCfg)
-		assert.Equal(t, uint64(0), m.mergedCollectorCfgHash)
+		assert.Equal(t, []byte(nil), m.mergedCollectorCfgHash)
 	})
 }

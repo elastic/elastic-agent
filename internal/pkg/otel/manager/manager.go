@@ -5,16 +5,17 @@
 package manager
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/cespare/xxhash/v2"
 	"go.uber.org/zap"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -73,7 +74,7 @@ type OTelManager struct {
 	// The current configuration that the OTel collector is using. In the case that
 	// the mergedCollectorCfg is nil then the collector is not running.
 	mergedCollectorCfg     *confmap.Conf
-	mergedCollectorCfgHash uint64
+	mergedCollectorCfgHash []byte
 
 	currentCollectorStatus *status.AggregateStatus
 	currentComponentStates map[string]runtime.ComponentComponentState
@@ -542,7 +543,7 @@ func (m *OTelManager) maybeUpdateMergedConfig(mergedCfg *confmap.Conf) (updated 
 
 	m.mergedCollectorCfg = mergedCfg
 	m.mergedCollectorCfgHash = mergedCfgHash
-	return previousConfigHash != mergedCfgHash || err != nil, err
+	return bytes.Compare(mergedCfgHash, previousConfigHash) != 0 || err != nil, err
 }
 
 // reportComponentStateUpdates sends component state updates to the component watch channel. It first drains
@@ -567,12 +568,12 @@ func (m *OTelManager) reportComponentStateUpdates(ctx context.Context, component
 
 // calculateConfmapHash calculates a hash of a given configuration. It's optimized for speed, which is why it
 // json encodes the values directly into a xxhash instance, instead of converting to a map[string]any first.
-func calculateConfmapHash(conf *confmap.Conf) (uint64, error) {
+func calculateConfmapHash(conf *confmap.Conf) ([]byte, error) {
 	if conf == nil {
-		return 0, nil
+		return nil, nil
 	}
 
-	h := xxhash.New()
+	h := fnv.New128()
 	// We encode the configuration to json instead of yaml, because it's simpler and more performant.
 	// In general otel configuration can be marshalled to any format supported by koanf, but the confmap
 	// API doesn't expose this. This is why the small workaround below to avoid converting to a Go map is necessary.
@@ -580,12 +581,12 @@ func calculateConfmapHash(conf *confmap.Conf) (uint64, error) {
 
 	for _, key := range conf.AllKeys() { // this is a sorted list, so the output is consistent
 		if err := encoder.Encode(key); err != nil {
-			return 0, err
+			return nil, err
 		}
 		if err := encoder.Encode(conf.Get(key)); err != nil {
-			return 0, err
+			return nil, err
 		}
 	}
 
-	return h.Sum64(), nil
+	return h.Sum(nil), nil
 }
