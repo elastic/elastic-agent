@@ -285,6 +285,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 			// this is the only place where we mutate the internal config attributes, take a write lock for the duration
 			m.mx.Lock()
+			previousConfigHash := m.mergedCollectorCfgHash
 			configChanged, configUpdateErr := m.maybeUpdateMergedConfig(mergedCfg)
 			m.collectorCfg = cfgUpdate.collectorCfg
 			m.components = cfgUpdate.components
@@ -295,11 +296,18 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			}
 
 			if configChanged {
+				m.logger.Debugf(
+					"new config hash (%d) is different than the old config hash (%d), applying update",
+					m.mergedCollectorCfgHash, previousConfigHash)
 				applyErr := m.applyMergedConfig(ctx, collectorStatusCh, m.collectorRunErr)
 				// only report the error if we actually apply the update
 				// otherwise, we could override an actual error with a nil in the channel when the collector
 				// state doesn't actually change
 				reportErr(ctx, m.errCh, applyErr)
+			} else {
+				m.logger.Debugf(
+					"new config hash (%d) is identical to the old config hash (%d), skipping update",
+					m.mergedCollectorCfgHash, previousConfigHash)
 			}
 
 		case otelStatus := <-collectorStatusCh:
