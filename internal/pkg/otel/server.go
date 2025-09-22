@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"strings"
 
+	"google.golang.org/grpc"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -20,7 +22,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/ipc"
-	"google.golang.org/grpc"
 )
 
 type server struct {
