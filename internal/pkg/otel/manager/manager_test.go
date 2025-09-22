@@ -1086,6 +1086,7 @@ func TestOTelManager_PortConflict(t *testing.T) {
 
 	m.Update(cfg, nil)
 
+<<<<<<< HEAD
 	// wait until status reflects the config update
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		select {
@@ -1096,6 +1097,14 @@ func TestOTelManager_PortConflict(t *testing.T) {
 		case <-ctx.Done():
 			require.NoError(collect, ctx.Err())
 		}
+=======
+	// the collector should log to the base logger
+	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+		logs := obs.All()
+		require.NotEmpty(collect, logs, "Logs should not be empty")
+		firstMessage := logs[0].Message
+		assert.Equal(collect, "Internal metrics telemetry disabled", firstMessage)
+>>>>>>> ecb0e0644 (feat: Update OTel Collector components to v0.135.0 (#9858))
 	}, time.Second*10, time.Second)
 
 	// collector must have retried exactly once
