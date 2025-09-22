@@ -35,3 +35,14 @@
     2. At component-level:
         - When `otelMgr.PerformComponentsDiagnostics()` is called in [coordinator.go](https://github.com/elastic/elastic-agent/blob/710c49f45433e2f136a6e41cae980c1aa37dabdd/internal/pkg/agent/application/coordinator/coordinator.go#L863).
         - Diagnostics are added per component and stored under the `components/{comp}/*` directory in the resulting ZIP archive.
+
+#### Diagram
+
+```mermaid
+graph LR
+    A[elastic-agent install ...] --> B[Runs the service in hybrid mode<br/>and we inject agentdiagnosticsextension]
+    B -->|listens to| D[edot-diagnostics-extension.sock]
+    
+    C[elastic-agent diagnostics] --> E[Extracts diagnostics socket path via the binary]
+    E -->|requests OTeL diagnostics| D
+```
