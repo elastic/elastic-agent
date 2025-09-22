@@ -8,6 +8,8 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
+	"runtime"
 	"runtime/pprof"
 	"strconv"
 	"sync"
@@ -53,7 +55,19 @@ type serviceConfig struct {
 
 func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) error {
 	var err error
-	d.listener, err = net.Listen(d.diagnosticsConfig.Network, d.diagnosticsConfig.Host)
+	path := d.diagnosticsConfig.Host
+	if d.diagnosticsConfig.Network == "unix" {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			if err := os.Remove(path); err != nil {
+				return fmt.Errorf(
+					"cannot remove existing unix socket file at location %s: %w",
+					path, err,
+				)
+			}
+		}
+	}
+
+	d.listener, err = net.Listen(d.diagnosticsConfig.Network, path)
 	if err != nil {
 		return fmt.Errorf("error creating listener: %w", err)
 	}
@@ -222,4 +236,13 @@ func extractMetricAddress(readers []otelconf.MetricReader) string {
 		}
 	}
 	return ""
+}
+
+func changeOwner(path string, uid, gid int) error {
+	if runtime.GOOS == "windows" {
+		// on windows it always returns the syscall.EWINDOWS error, wrapped in *PathError
+		return nil
+	}
+
+	return os.Chown(path, uid, gid)
 }

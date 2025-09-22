@@ -6,6 +6,7 @@ package manager
 
 import (
 	"context"
+	"strings"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/confmap"
@@ -13,8 +14,10 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/agentprovider"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/elasticdiagnosticsextension"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -35,13 +38,17 @@ func (r *embeddedExecution) startCollector(ctx context.Context, logger *logger.L
 		collectorDoneCh: make(chan struct{}),
 		cancel:          collectorCancel,
 	}
-
+	extConf := map[string]any{
+		"host":    strings.TrimPrefix(paths.DiagnosticsExtensionSocket(), "unix://"),
+		"network": "unix",
+	}
 	// NewForceExtensionConverterFactory is used to ensure that the agent_status extension is always enabled.
 	// It is required for the Elastic Agent to extract the status out of the OTel collector.
 	settings := otel.NewSettings(
 		release.Version(), []string{ap.URI()},
 		otel.WithConfigProviderFactory(ap.NewFactory()),
 		otel.WithConfigConvertorFactory(NewForceExtensionConverterFactory(AgentStatusExtensionType.String(), nil)),
+		otel.WithConfigConvertorFactory(NewForceExtensionConverterFactory(elasticdiagnosticsextension.DiagnosticsExtensionID.String(), extConf)),
 		otel.WithExtensionFactory(NewAgentStatusFactory(statusCh)))
 	settings.DisableGracefulShutdown = true // managed by this manager
 	settings.LoggingOptions = []zap.Option{zap.WrapCore(func(zapcore.Core) zapcore.Core {

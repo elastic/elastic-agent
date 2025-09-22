@@ -7,8 +7,7 @@ import (
 )
 
 var (
-	Type      = component.MustNewType("elastic_diagnsotics")
-	ScopeName = "github.com/elastic/opentelemetry-collector-components/extension/elasticdiagnosticsextension"
+	Type = component.MustNewType("elastic_diagnostics")
 )
 
 const (

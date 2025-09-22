@@ -352,7 +352,7 @@ func (m *OTelManager) injectDiagnosticsExtension(config *confmap.Conf) error {
 	}
 	extensionCfg := map[string]any{
 		"extensions": map[string]any{
-			"elastic_diagnsotics": map[string]any{
+			"elastic_diagnostics": map[string]any{
 				"network": "unix",
 				"host":    strings.TrimPrefix(paths.DiagnosticsExtensionSocket(), "unix://"),
 			},
@@ -360,7 +360,7 @@ func (m *OTelManager) injectDiagnosticsExtension(config *confmap.Conf) error {
 	}
 	if config.IsSet("service::extensions") {
 		extensionList := config.Get("service::extensions").([]interface{})
-		extensionList = append(extensionList, "elastic_diagnsotics")
+		extensionList = append(extensionList, "elastic_diagnostics")
 		extensionCfg["service::extensions"] = extensionList
 	}
 
