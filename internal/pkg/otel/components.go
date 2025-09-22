@@ -58,6 +58,7 @@ import (
 
 	// Extensions
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension"
+	headersetterextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/headerssetterextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension"
 	healthcheckv2extension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector"
@@ -167,6 +168,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			k8sobserver.NewFactory(),
 			apikeyauthextension.NewFactory(),
 			apmconfigextension.NewFactory(),
+			headersetterextension.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)
 		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)
