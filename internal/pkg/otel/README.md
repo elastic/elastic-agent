@@ -91,6 +91,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [apmconfigextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apmconfigextension/v0.6.0/extension/apmconfigextension/README.md) | v0.6.0 |
 | [bearertokenauthextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/bearertokenauthextension/v0.132.0/extension/bearertokenauthextension/README.md) | v0.132.0 |
 | [filestorage](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/storage/filestorage/v0.132.0/extension/storage/filestorage/README.md) | v0.132.0 |
+| [headerssetterextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/headerssetterextension/v0.132.0/extension/headerssetterextension/README.md) | v0.132.0 |
 | [healthcheckextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckextension/v0.132.0/extension/healthcheckextension/README.md) | v0.132.0 |
 | [k8sleaderelector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/k8sleaderelector/v0.132.0/extension/k8sleaderelector/README.md) | v0.132.0 |
 | [k8sobserver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/observer/k8sobserver/v0.132.0/extension/observer/k8sobserver/README.md) | v0.132.0 |
