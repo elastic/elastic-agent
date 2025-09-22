@@ -54,3 +54,4 @@ packages:
     interfaces:
       WatcherHelper:
       watcherGrappler:
+      installDescriptorSource:
