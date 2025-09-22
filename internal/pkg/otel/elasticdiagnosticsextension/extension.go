@@ -68,6 +68,8 @@ func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) e
 		}
 	}
 
+	d.registerGlobalDiagnostics()
+
 	d.listener, err = net.Listen(d.diagnosticsConfig.Network, path)
 	if err != nil {
 		return fmt.Errorf("error creating listener: %w", err)
@@ -84,7 +86,11 @@ func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) e
 			d.logger.Error("HTTP server error", zap.Error(err))
 		}
 	}()
+	d.logger.Info("Diagnostics extension started", zap.String("address", d.listener.Addr().String()))
+	return nil
+}
 
+func (d *diagnosticsExtension) registerGlobalDiagnostics() {
 	d.globalHooks["collector_config"] = &diagHook{
 		description: "full collector configuration",
 		filename:    "edot/otel-merged.yaml",
@@ -146,7 +152,6 @@ func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) e
 			},
 		}
 	}
-	return nil
 }
 
 func (d *diagnosticsExtension) Shutdown(ctx context.Context) error {
