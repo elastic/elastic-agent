@@ -543,7 +543,7 @@ func (m *OTelManager) maybeUpdateMergedConfig(mergedCfg *confmap.Conf) (updated 
 
 	m.mergedCollectorCfg = mergedCfg
 	m.mergedCollectorCfgHash = mergedCfgHash
-	return bytes.Compare(mergedCfgHash, previousConfigHash) != 0 || err != nil, err
+	return !bytes.Equal(mergedCfgHash, previousConfigHash) || err != nil, err
 }
 
 // reportComponentStateUpdates sends component state updates to the component watch channel. It first drains
