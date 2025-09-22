@@ -1443,7 +1443,7 @@ func TestCalculateConfmapHash(t *testing.T) {
 func TestOTelManager_maybeUpdateMergedConfig(t *testing.T) {
 	t.Run("initial config", func(t *testing.T) {
 		m := &OTelManager{}
-		conf := confmap.NewFromStringMap(map[string]any{"key": "value"})
+		conf := confmap.NewFromStringMap(testConfig)
 
 		updated, err := m.maybeUpdateMergedConfig(conf)
 
@@ -1454,7 +1454,7 @@ func TestOTelManager_maybeUpdateMergedConfig(t *testing.T) {
 	})
 
 	t.Run("same config", func(t *testing.T) {
-		conf := confmap.NewFromStringMap(map[string]any{"key": "value"})
+		conf := confmap.NewFromStringMap(testConfig)
 		hash, err := calculateConfmapHash(conf)
 		require.NoError(t, err)
 
