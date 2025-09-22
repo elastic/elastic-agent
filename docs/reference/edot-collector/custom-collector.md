@@ -44,6 +44,8 @@ Create a builder configuration file,`builder-config.yml`, to define the custom C
 The following example, `builder-config.yml`, contains the components needed to send your telemetry data to Elastic Observability. For more information on these components, refer to the [components](/reference/edot-collector/components.md) documentation. Keep or remove components from the example configuration file to fit your needs.
 
 % start:edot-collector-components-ocb
+This OCB configuration is for EDOT Collector version 9.1.4.
+
 ```yaml
 dist:
   otelcol_edot:
@@ -66,8 +68,6 @@ dist:
 receivers:
   dockerstatsreceiver :
     gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver v0.130.0
-  elasticapmintakereceiver :
-    gomod: github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.2.1
   filelogreceiver :
     gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.130.0
   hostmetricsreceiver :
@@ -124,16 +124,14 @@ processors:
     gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor v0.130.0
   resourceprocessor :
     gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.130.0
-  tailsamplingprocessor :
-    gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.130.0
   transformprocessor :
     gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.130.0
 
 exporters:
   debugexporter :
-    gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.132.0
+    gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.130.0
   elasticsearchexporter :
-    gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.132.0
+    gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.130.0
   fileexporter :
     gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.130.0
   kafkaexporter :
@@ -168,8 +166,6 @@ extensions:
     gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.130.0
   healthcheckextension :
     gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.130.0
-  healthcheckv2extension :
-    gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.130.0
   k8sleaderelector :
     gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.130.0
   k8sobserver :
@@ -183,13 +179,13 @@ providers:
   envprovider :
     gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.36.0
   fileprovider :
-    gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.38.0
+    gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.36.0
   httpprovider :
     gomod: go.opentelemetry.io/collector/confmap/provider/httpprovider v1.36.0
   httpsprovider :
-    gomod: go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.35.0
+    gomod: go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.36.0
   yamlprovider :
-    gomod: go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.38.0
+    gomod: go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.36.0
 ```
 % end:edot-collector-components-ocb
 
