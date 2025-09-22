@@ -53,9 +53,9 @@ type cfg struct {
 			TamperProtection *struct {
 				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
 			} `json:"tamper_protection,omitempty" yaml:"tamper_protection,omitempty" config:"tamper_protection,omitempty"`
-			DisablePolicyChangeAcks struct {
+			DisablePolicyChangeAcks *struct {
 				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
-			} `json:"disable_policy_change_acks" toml: "disable_policy_change_acks" config:"disable_policy_change_acks"`
+			} `json:"disable_policy_change_acks" yaml:"disable_policy_change_acks" config:"disable_policy_change_acks"`
 		} `json:"features" yaml:"features" config:"features"`
 	} `json:"agent" yaml:"agent" config:"agent"`
 }
