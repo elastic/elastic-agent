@@ -181,12 +181,14 @@ steps:
             allowed: true
 
   - label: ":junit: Junit annotate"
+    agents:
+      # requires at least "bash", "curl" and "git"
+      image: "docker.elastic.co/ci-agent-images/buildkite-junit-annotate:1.0"
     plugins:
-      - junit-annotate#v2.5.0:
+      - junit-annotate#v2.7.0:
           artifacts: "**TEST-*.xml"
           always-annotate: true
-    agents:
-      provider: "gcp"
+          run-in-docker: false
     depends_on:
       - step: "unit-tests-2204"
         allow_failure: true
