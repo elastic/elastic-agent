@@ -29,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 // PolicyChangeHandler is a handler for POLICY_CHANGE action.
@@ -41,6 +42,7 @@ type PolicyChangeHandler struct {
 	setters              []actions.ClientSetter
 	policyLogLevelSetter logLevelSetter
 	coordinator          *coordinator.Coordinator
+	forceAckFn           func() bool
 	// Disabled for 8.8.0 release in order to limit the surface
 	// https://github.com/elastic/security-team/issues/6501
 	// // Last known valid signature validation key
@@ -67,6 +69,7 @@ func NewPolicyChangeHandler(
 		setters:              setters,
 		coordinator:          coordinator,
 		policyLogLevelSetter: policyLogLevelSetter,
+		forceAckFn:           features.ForcePolicyChangeAcks,
 	}
 }
 
@@ -111,7 +114,7 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 		return err
 	}
 
-	h.ch <- newPolicyChange(ctx, c, a, acker, false)
+	h.ch <- newPolicyChange(ctx, c, a, acker, false, h.forceAckFn())
 	return nil
 }
 
@@ -474,6 +477,7 @@ type policyChange struct {
 	action     fleetapi.Action
 	acker      acker.Acker
 	ackWatcher chan struct{}
+	forceAck   bool
 }
 
 func newPolicyChange(
@@ -481,7 +485,8 @@ func newPolicyChange(
 	config *config.Config,
 	action fleetapi.Action,
 	acker acker.Acker,
-	makeCh bool) *policyChange {
+	makeCh bool,
+	forceAck bool) *policyChange {
 	var ackWatcher chan struct{}
 	if makeCh {
 		// we don't need it otherwise
@@ -493,6 +498,7 @@ func newPolicyChange(
 		action:     action,
 		acker:      acker,
 		ackWatcher: ackWatcher,
+		forceAck:   forceAck,
 	}
 }
 
@@ -503,7 +509,7 @@ func (l *policyChange) Config() *config.Config {
 // Ack sends an ack for the associated action if the results are expected.
 // An ack will not be sent for a POLICY_CHANGE action, but will be when this method is used by UNENROLL actions.
 func (l *policyChange) Ack() error {
-	if l.action == nil || l.ackWatcher == nil {
+	if !l.forceAck || l.action == nil {
 		return nil
 	}
 	err := l.acker.Ack(l.ctx, l.action)
@@ -511,7 +517,7 @@ func (l *policyChange) Ack() error {
 		return err
 	}
 	err = l.acker.Commit(l.ctx)
-	if err == nil {
+	if err == nil && l.ackWatcher != nil {
 		close(l.ackWatcher)
 	}
 	return err

@@ -131,6 +131,34 @@ func TestPolicyAcked(t *testing.T) {
 		actions := tacker.Items()
 		assert.Empty(t, actions)
 	})
+	t.Run("Config change acks when forced", func(t *testing.T) {
+		ch := make(chan coordinator.ConfigChange, 1)
+		tacker := &testAcker{}
+
+		config := map[string]interface{}{"hello": "world"}
+		actionID := "abc123"
+		action := &fleetapi.ActionPolicyChange{
+			ActionID:   actionID,
+			ActionType: "POLICY_CHANGE",
+			Data: fleetapi.ActionPolicyChangeData{
+				Policy: config,
+			},
+		}
+
+		cfg := configuration.DefaultConfiguration()
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
+		handler.forceAckFn = func() bool { return true }
+
+		err := handler.Handle(context.Background(), action, tacker)
+		require.NoError(t, err)
+
+		change := <-ch
+		require.NoError(t, change.Ack())
+
+		actions := tacker.Items()
+		assert.Len(t, actions, 1)
+		assert.Equal(t, actionID, actions[0])
+	})
 }
 
 func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T) {

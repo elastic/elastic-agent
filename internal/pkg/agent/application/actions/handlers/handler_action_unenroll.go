@@ -93,7 +93,7 @@ func (h *Unenroll) handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 	}
 
 	// Generate empty policy change, this removing all the running components
-	unenrollPolicy := newPolicyChange(ctx, config.New(), a, acker, true)
+	unenrollPolicy := newPolicyChange(ctx, config.New(), a, acker, true, true)
 	h.ch <- unenrollPolicy
 
 	// backup action for future start to avoid starting fleet gateway loop
