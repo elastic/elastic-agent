@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+
+# Removes stale EC2 instances having matching labels, name prefixes and older than 24 hours
+env:
+  VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
+steps:
+  - label: "EC2 Cleanup"
+    key: "ec2-cleanup"
+    command: ".buildkite/scripts/steps/ec2-cleanup.sh"
+    agents:
+      provider: "ec2"
