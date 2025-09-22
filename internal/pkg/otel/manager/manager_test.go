@@ -882,7 +882,12 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 				collectorCfg: tt.collectorCfg,
 				components:   tt.components,
 			}
-			result, err := buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter, logptest.NewTestingLogger(t, ""))
+			mgr := &OTelManager{
+				logger:                     logptest.NewTestingLogger(t, ""),
+				beatMonitoringConfigGetter: commonBeatMonitoringConfigGetter,
+				agentInfo:                  commonAgentInfo,
+			}
+			result, err := mgr.buildMergedConfig(cfgUpdate)
 
 			if tt.expectedErrorString != "" {
 				assert.Error(t, err)
