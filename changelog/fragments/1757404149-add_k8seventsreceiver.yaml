@@ -8,15 +8,15 @@
 # - security: impacts on the security of a product or a user’s deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
-kind: enhancement
+kind: feature
 
 # Change summary; a 80ish characters long description of the change.
-summary: Enhanced loggers for easier debugging of upgrade related issues.
+summary: add_k8seventsreceiver
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-#description:
+description: Adds k8seventsreceiver otel component
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
@@ -29,4 +29,4 @@ component: elastic-agent
 
 # Issue URL; optional; the GitHub issue related to this changeset (either closes or is part of).
 # If not present is automatically filled by the tooling with the issue linked to the PR number.
-issue: https://github.com/elastic/elastic-agent/issues/9536
+issue: https://github.com/elastic/elastic-agent/issues/9791

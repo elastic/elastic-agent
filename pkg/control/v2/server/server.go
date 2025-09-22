@@ -180,6 +180,7 @@ func (s *Server) Upgrade(ctx context.Context, request *cproto.UpgradeRequest) (*
 		coordinator.WithSkipVerifyOverride(request.SkipVerify),
 		coordinator.WithSkipDefaultPgp(request.SkipDefaultPgp),
 		coordinator.WithPgpBytes(request.PgpBytes),
+		coordinator.WithRollback(request.Rollback),
 	)
 	if err != nil {
 		//nolint:nilerr // ignore the error, return a failure upgrade response
