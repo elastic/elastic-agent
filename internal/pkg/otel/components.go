@@ -21,6 +21,7 @@ import (
 	jaegerreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver"
 	jmxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver"
 	k8sclusterreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver"
+	k8seventsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver"
 	k8sobjectsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver"
 	kubeletstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver"
 	nginxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver"
@@ -96,6 +97,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			filelogreceiver.NewFactory(),
 			kubeletstatsreceiver.NewFactory(),
 			k8sclusterreceiver.NewFactory(),
+			k8seventsreceiver.NewFactory(),
 			hostmetricsreceiver.NewFactory(),
 			httpcheckreceiver.NewFactory(),
 			k8sobjectsreceiver.NewFactory(),

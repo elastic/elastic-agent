@@ -62,6 +62,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.135.0

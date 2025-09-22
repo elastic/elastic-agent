@@ -1313,6 +1313,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver v
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver v0.135.0/go.mod h1:w5grABNVDkjgQ4pRtPzwtn50T0rm54F4iZG+RrAAhjI=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver v0.135.0 h1:34rKPOohZ8alsPEEnq2A2nUBbiGxPzd4Ww3Gr11G/Xg=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver v0.135.0/go.mod h1:Pq+lGrXOGPl11YmPyi5EAp0AsvPVxtQKcNCRB+3IscA=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver v0.135.0 h1:gnp5isKvuGcQ0HGGzSA5wLIAvKfKykE5L+c/7pnjvuw=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver v0.135.0/go.mod h1:z0HXbPItedYFHR/0QliKeG7Lj4bzV95n0z8k/VPkWQo=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.135.0 h1:ds05uUvVu3Xh0MbUzoUCHA9ojD3Q4CYXl1wK3nuziE8=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.135.0/go.mod h1:2LtPqiZUJ+C+//hKzB9k09XDEa6H5caqaC7wxw7y8R8=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver v0.135.0 h1:iJtdS7+cPRGPmfXNrQUweBabZNlxcn1ZY7ySfI+kweM=
