@@ -21,6 +21,10 @@ The {{edot}} (EDOT) Collector includes embedded Collector components from the [O
 The components included in the EDOT Collector are categorized into **[Core]** and **[Extended]** components. The following table describes the current components included in the EDOT Collector, their source, and support status.
 
 % start:edot-collector-components-table
+## List of components
+
+These components are included in EDOT Collector version 9.1.4.
+
 | Component | GitHub Repo | Support status | Version |
 |:---|:---|:---|:---|
 |***Receivers***||||

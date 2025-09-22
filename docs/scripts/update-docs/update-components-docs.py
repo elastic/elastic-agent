@@ -287,7 +287,10 @@ def check_markdown():
     otel_col_version = get_otel_col_upstream_version()
     data = {
         'grouped_components': components,
-        'otel_col_version': otel_col_version
+        'otel_col_version': otel_col_version,
+        'version': {
+            'edot_collector': col_version
+        }
     }
     tables = check_markdown_generation(EDOT_COLLECTOR_DIR, data, TEMPLATE_COLLECTOR_COMPONENTS_TABLE, TABLE_TAG) 
     ocb = check_markdown_generation(EDOT_COLLECTOR_DIR, data, TEMPLATE_COLLECTOR_OCB_FILE, DEPS_TAG)
@@ -312,7 +315,10 @@ def generate_markdown():
     otel_col_version = get_otel_col_upstream_version()
     data = {
         'grouped_components': components,
-        'otel_col_version': otel_col_version
+        'otel_col_version': otel_col_version,
+        'version': {
+            'edot_collector': col_version
+        }
     }
     render_components_into_file(EDOT_COLLECTOR_DIR, data, TEMPLATE_COLLECTOR_COMPONENTS_TABLE, TABLE_TAG)
     render_components_into_file(EDOT_COLLECTOR_DIR, data, TEMPLATE_COLLECTOR_OCB_FILE, DEPS_TAG)
