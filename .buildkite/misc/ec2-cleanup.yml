@@ -7,14 +7,13 @@ accounts:
     options:
       key: "${ACCOUNT_KEY}"
       secret: "${ACCOUNT_SECRET}"
-      project: "${ACCOUNT_PROJECT}"
 
 scanners:
   - account_name: "${ACCOUNT_PROJECT}"
     resources:
       - type: "node"
         regions:
-          - "us-central1"
+          - "us-west-2"
         filters:
           - type: "<"
             pointer: "/extra/creationTimestamp"
