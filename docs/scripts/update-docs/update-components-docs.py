@@ -16,6 +16,9 @@ from collections import defaultdict
 import yaml
 import re
 from pathlib import Path
+import subprocess
+import os
+import tempfile
 
 TABLE_TAG = 'edot-collector-components-table'
 DEPS_TAG = 'edot-collector-components-ocb'
@@ -26,28 +29,62 @@ TEMPLATE_COLLECTOR_OCB_FILE = 'templates/ocb.jinja2'
 COMPONENT_DOCS_YAML = '../../../docs/reference/edot-collector/component-docs.yml'
 
 
-def get_core_components(version='main'):
-    """Read and parse the local core-components.yaml file to determine support status"""
-    # Use local file path instead of GitHub URL
-    core_components_path = '../../../internal/pkg/otel/core-components.yaml'
-    print(f"Reading core components from local file: {core_components_path}")
-    
+def read_file_from_git_tag(file_path, tag):
+    """Read a file from a specific Git tag"""
     try:
-        with open(core_components_path, 'r', encoding='utf-8') as file:
-            content = file.read()
-    except FileNotFoundError:
-        print(f"Could not find core components file at {core_components_path}")
-        return []
-    except Exception as e:
-        print(f"Error reading core components file: {e}")
-        return []
+        result = subprocess.run(
+            ['git', 'show', f'{tag}:{file_path}'],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        print(f"Error reading {file_path} from tag {tag}: {e}")
+        return None
+
+def get_latest_version():
+    """Get the latest version from environment variable or discover from Git tags"""
+    # Check if we have a version specified via environment variable (from GitHub Actions)
+    env_version = os.environ.get('LATEST_VERSION')
+    if env_version:
+        return env_version.lstrip('v')  # Remove 'v' prefix if present
+    
+    # Discover latest version from Git tags
+    try:
+        cmd = "git tag --list | grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+$' | sort -V | tail -1"
+        result = subprocess.run(
+            cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        latest_tag = result.stdout.strip()
+        if latest_tag:
+            return latest_tag.lstrip('v')
+        else:
+            raise ValueError("No semantic version tags found")
+    except subprocess.CalledProcessError as e:
+        raise ValueError(f"Failed to discover latest version from Git tags: {e}")
+
+def get_core_components(version='main'):
+    """Read and parse the core-components.yaml file to determine support status"""
+    latest_version = get_latest_version()
+    version_tag = f"v{latest_version}"
+    
+    # Always read from Git tag
+    core_components_path = 'internal/pkg/otel/core-components.yaml'
+    print(f"Reading core components from tag {version_tag}: {core_components_path}")
+    content = read_file_from_git_tag(core_components_path, version_tag)
+    if content is None:
+        raise ValueError(f"Could not read core components file from tag {version_tag}. Ensure the tag exists and contains the file.")
         
     try:
         data = yaml.safe_load(content)
         return data.get('components', [])
     except yaml.YAMLError as e:
-        print(f"Error parsing core-components.yaml: {e}")
-        return []
+        raise ValueError(f"Error parsing core-components.yaml from tag {version_tag}: {e}")
 
 def dep_to_component(dep):
     url = dep[:dep.rfind(' v')].strip()
@@ -77,67 +114,39 @@ def dep_to_component(dep):
     return comp
     
 def get_otel_col_upstream_version():
-    """Read the OpenTelemetry Collector version from the local go.mod file"""
-    go_mod_path = '../../../go.mod'
-    print(f"Reading go.mod from local file: {go_mod_path}")
+    """Read the OpenTelemetry Collector version from go.mod file"""
+    latest_version = get_latest_version()
+    version_tag = f"v{latest_version}"
     
-    try:
-        with open(go_mod_path, 'r', encoding='utf-8') as file:
-            content = file.read()
-    except FileNotFoundError:
-        print(f"Could not find go.mod file at {go_mod_path}")
-        return '<OTEL_COL_VERSION>'
-    except Exception as e:
-        print(f"Error reading go.mod file: {e}")
-        return '<OTEL_COL_VERSION>'
+    # Always read from Git tag
+    go_mod_path = 'go.mod'
+    print(f"Reading go.mod from tag {version_tag}: {go_mod_path}")
+    content = read_file_from_git_tag(go_mod_path, version_tag)
+    if content is None:
+        raise ValueError(f"Could not read go.mod from tag {version_tag}. Ensure the tag exists and contains the file.")
     
     lines = content.splitlines()
     for line in lines:
         if 'go.opentelemetry.io/collector/otelcol ' in line:
             return line[(line.rfind('v')+1):]
     
-    return '<OTEL_COL_VERSION>'
+    raise ValueError(f"Could not find OpenTelemetry Collector version in go.mod from tag {version_tag}")
             
 def get_collector_version():
-    """Read the version from the local version.go file"""
-    version_file_path = '../../../version/version.go'
-    print(f"Reading version from local file: {version_file_path}")
-    
-    try:
-        with open(version_file_path, 'r', encoding='utf-8') as file:
-            content = file.read()
-            
-        lines = content.splitlines()
-        for line in lines:
-            if line.strip().startswith('const defaultBeatVersion ='):
-                # Extract version from line like: const defaultBeatVersion = "9.2.0"
-                version_match = re.search(r'"([^"]+)"', line)
-                if version_match:
-                    return version_match.group(1)
-        
-        # If we get here, the version line was not found
-        raise ValueError(f"Could not find 'const defaultBeatVersion =' in {version_file_path}")
-    except FileNotFoundError:
-        print(f"Error: Could not find version file at {version_file_path}")
-        raise
-    except Exception as e:
-        print(f"Error reading version file: {e}")
-        raise
+    """Get the collector version from latest release tag"""
+    return get_latest_version()
     
 def get_otel_components(version='main', component_docs_mapping=None):
-    """Read OpenTelemetry components from the local go.mod file"""
-    go_mod_path = '../../../go.mod'
-    print(f"Reading go.mod from local file: {go_mod_path}")
+    """Read OpenTelemetry components from go.mod file"""
+    latest_version = get_latest_version()
+    version_tag = f"v{latest_version}"
     
-    try:
-        with open(go_mod_path, 'r', encoding='utf-8') as file:
-            elastic_agent_go_mod = file.read()
-    except FileNotFoundError:
-        print(f"Could not find go.mod file at {go_mod_path}")
-        return None
-    except Exception as e:
-        print(f"Error reading go.mod file: {e}")
-        return None
+    # Always read from Git tag
+    go_mod_path = 'go.mod'
+    print(f"Reading go.mod from tag {version_tag}: {go_mod_path}")
+    elastic_agent_go_mod = read_file_from_git_tag(go_mod_path, version_tag)
+    if elastic_agent_go_mod is None:
+        raise ValueError(f"Could not read go.mod from tag {version_tag}. Ensure the tag exists and contains the file.")
 
     # Get the list of core components
     core_components = get_core_components(version)
