@@ -93,7 +93,7 @@ type copyRunDirectoryFunc func(log *logger.Logger, oldRunPath, newRunPath string
 type fileDirCopyFunc func(from, to string, opts ...filecopy.Options) error
 type markUpgradeFunc func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, rollbackWindow time.Duration) error
 type changeSymlinkFunc func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error
-type rollbackInstallFunc func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error
+type rollbackInstallFunc func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, ids installDescriptorSource) error
 
 // Types used to abstract stdlib functions
 type mkdirAllFunc func(name string, perm fs.FileMode) error
@@ -117,16 +117,23 @@ type WatcherHelper interface {
 	TakeOverWatcher(ctx context.Context, log *logger.Logger, topDir string) (*filelock.AppLocker, error)
 }
 
+type installDescriptorSource interface {
+	AddInstallDesc(desc v1.AgentInstallDesc) (*v1.InstallDescriptor, error)
+	ModifyInstallDesc(modifierFunc func(desc *v1.AgentInstallDesc) error) (*v1.InstallDescriptor, error)
+	RemoveAgentInstallDesc(versionedHome string) (*v1.InstallDescriptor, error)
+}
+
 // Upgrader performs an upgrade
 type Upgrader struct {
-	log             *logger.Logger
-	settings        *artifact.Config
-	upgradeSettings *configuration.UpgradeConfig
-	agentInfo       info.Agent
-	upgradeable     bool
-	fleetServerURI  string
-	markerWatcher   MarkerWatcher
-	watcherHelper   WatcherHelper
+	log                     *logger.Logger
+	settings                *artifact.Config
+	upgradeSettings         *configuration.UpgradeConfig
+	agentInfo               info.Agent
+	upgradeable             bool
+	fleetServerURI          string
+	markerWatcher           MarkerWatcher
+	watcherHelper           WatcherHelper
+	installDescriptorSource installDescriptorSource
 
 	// The following are abstractions for testability
 	artifactDownloader   artifactDownloadHandler
@@ -148,24 +155,25 @@ func IsUpgradeable() bool {
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
-func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *configuration.UpgradeConfig, agentInfo info.Agent, watcherHelper WatcherHelper) (*Upgrader, error) {
+func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *configuration.UpgradeConfig, agentInfo info.Agent, watcherHelper WatcherHelper, ids installDescriptorSource) (*Upgrader, error) {
 	return &Upgrader{
-		log:                  log,
-		settings:             settings,
-		upgradeSettings:      upgradeConfig,
-		agentInfo:            agentInfo,
-		upgradeable:          IsUpgradeable(),
-		markerWatcher:        newMarkerFileWatcher(markerFilePath(paths.Data()), log),
-		watcherHelper:        watcherHelper,
-		artifactDownloader:   newArtifactDownloader(settings, log),
-		unpacker:             newUnpacker(log),
-		isDiskSpaceErrorFunc: upgradeErrors.IsDiskSpaceError,
-		extractAgentVersion:  extractAgentVersion,
-		copyActionStore:      copyActionStoreProvider(os.ReadFile, os.WriteFile),
-		copyRunDirectory:     copyRunDirectoryProvider(os.MkdirAll, filecopy.Copy),
-		markUpgrade:          markUpgradeProvider(UpdateActiveCommit, os.WriteFile),
-		changeSymlink:        changeSymlink,
-		rollbackInstall:      rollbackInstall,
+		log:                     log,
+		settings:                settings,
+		upgradeSettings:         upgradeConfig,
+		agentInfo:               agentInfo,
+		upgradeable:             IsUpgradeable(),
+		markerWatcher:           newMarkerFileWatcher(markerFilePath(paths.Data()), log),
+		watcherHelper:           watcherHelper,
+		installDescriptorSource: ids,
+		artifactDownloader:      newArtifactDownloader(settings, log),
+		unpacker:                newUnpacker(log),
+		isDiskSpaceErrorFunc:    upgradeErrors.IsDiskSpaceError,
+		extractAgentVersion:     extractAgentVersion,
+		copyActionStore:         copyActionStoreProvider(os.ReadFile, os.WriteFile),
+		copyRunDirectory:        copyRunDirectoryProvider(os.MkdirAll, filecopy.Copy),
+		markUpgrade:             markUpgradeProvider(UpdateActiveCommit, os.WriteFile),
+		changeSymlink:           changeSymlink,
+		rollbackInstall:         rollbackInstall,
 	}, nil
 }
 
@@ -407,11 +415,13 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	}
 
 	//FIXME make it nicer
-	err = addInstallDesc(version, unpackRes.VersionedHome, unpackRes.Hash, detectedFlavor, false)
+	_, err = u.installDescriptorSource.AddInstallDesc(
+		v1.AgentInstallDesc{Version: version, VersionedHome: unpackRes.VersionedHome, Hash: unpackRes.Hash, Flavor: detectedFlavor, Active: false},
+	)
 	if err != nil {
 		err = fmt.Errorf("error encountered when adding install description: %w", err)
 
-		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), unpackRes.VersionedHome, currentVersionedHome)
+		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), unpackRes.VersionedHome, currentVersionedHome, u.installDescriptorSource)
 		if rollbackErr != nil {
 			return nil, goerrors.Join(err, rollbackErr)
 		}
@@ -446,25 +456,27 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 
 	if err := u.changeSymlink(u.log, paths.Top(), symlinkPath, newPath); err != nil {
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
-		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
+		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.installDescriptorSource)
 		return nil, goerrors.Join(err, rollbackErr)
 	}
 
 	//FIXME make it nicer
-	err = modifyInstallDesc(func(desc *v1.AgentInstallDesc) error {
-		if desc.VersionedHome == unpackRes.VersionedHome {
-			desc.Active = true
-			return nil
-		}
+	_, err = u.installDescriptorSource.ModifyInstallDesc(
+		func(desc *v1.AgentInstallDesc) error {
+			if desc.VersionedHome == unpackRes.VersionedHome {
+				desc.Active = true
+				return nil
+			}
 
-		desc.Active = false
-		return nil
-	})
+			desc.Active = false
+			return nil
+		},
+	)
 
 	if err != nil {
 		err = fmt.Errorf("error encountered when adding install description: %w", err)
 
-		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), unpackRes.VersionedHome, currentVersionedHome)
+		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), unpackRes.VersionedHome, currentVersionedHome, u.installDescriptorSource)
 		if rollbackErr != nil {
 			return nil, goerrors.Join(err, rollbackErr)
 		}
@@ -500,7 +512,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		previous, // old agent version data
 		action, det, rollbackWindow); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
-		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
+		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.installDescriptorSource)
 		return nil, goerrors.Join(err, rollbackErr)
 	}
 
@@ -509,14 +521,14 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	var watcherCmd *exec.Cmd
 	if watcherCmd, err = u.watcherHelper.InvokeWatcher(u.log, watcherExecutable); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
-		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
+		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.installDescriptorSource)
 		return nil, goerrors.Join(err, rollbackErr)
 	}
 
 	watcherWaitErr := u.watcherHelper.WaitForWatcher(ctx, u.log, markerFilePath(paths.Data()), watcherMaxWaitTime)
 	if watcherWaitErr != nil {
 		killWatcherErr := watcherCmd.Process.Kill()
-		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
+		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.installDescriptorSource)
 		return nil, goerrors.Join(watcherWaitErr, killWatcherErr, rollbackErr)
 	}
 
@@ -530,96 +542,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	}
 
 	return cb, nil
-}
-
-func addInstallDesc(version string, home string, hash string, flavor string, active bool) error {
-	installMarkerFilePath := filepath.Join(paths.Top(), paths.MarkerFileName)
-	installDescriptor, err := readInstallMarker(installMarkerFilePath)
-	if err != nil {
-		return err
-	}
-
-	if installDescriptor == nil {
-		return fmt.Errorf("no install descriptor found at %q")
-	}
-
-	existingInstalls := installDescriptor.AgentInstalls
-	installDescriptor.AgentInstalls = make([]v1.AgentInstallDesc, len(existingInstalls)+1)
-	newInstall := v1.AgentInstallDesc{
-		Version:       version,
-		Hash:          hash,
-		VersionedHome: home,
-		Flavor:        flavor,
-		Active:        active,
-	}
-	installDescriptor.AgentInstalls[0] = newInstall
-	copied := copy(installDescriptor.AgentInstalls[1:], existingInstalls)
-	if copied != len(existingInstalls) {
-		return fmt.Errorf("error adding new install %v to existing installs %v", newInstall, existingInstalls)
-	}
-
-	err = writeInstallMarker(installMarkerFilePath, installDescriptor)
-	if err != nil {
-		return fmt.Errorf("writing updated install marker: %w", err)
-	}
-
-	return nil
-}
-
-func modifyInstallDesc(modifierFunc func(desc *v1.AgentInstallDesc) error) error {
-	installMarkerFilePath := filepath.Join(paths.Top(), paths.MarkerFileName)
-	installDescriptor, err := readInstallMarker(installMarkerFilePath)
-	if err != nil {
-		return err
-	}
-
-	if installDescriptor == nil {
-		return fmt.Errorf("no install descriptor found at %q")
-	}
-
-	for i := range installDescriptor.AgentInstalls {
-		err = modifierFunc(&installDescriptor.AgentInstalls[i])
-		if err != nil {
-			return fmt.Errorf("modifying agent install %s: %w", installDescriptor.AgentInstalls[i].VersionedHome, err)
-		}
-	}
-
-	err = writeInstallMarker(installMarkerFilePath, installDescriptor)
-	if err != nil {
-		return fmt.Errorf("writing updated install marker: %w", err)
-	}
-
-	return nil
-}
-
-func removeAgentInstallDesc(versionedHome string) error {
-	
-}
-
-func writeInstallMarker(markerFilePath string, descriptor *v1.InstallDescriptor) error {
-	installMarkerFile, err := os.Create(markerFilePath)
-	if err != nil {
-		return fmt.Errorf("opening install marker file: %w", err)
-	}
-	defer func(installMarkerFile *os.File) {
-		_ = installMarkerFile.Close()
-	}(installMarkerFile)
-	return v1.WriteInstallDescriptor(installMarkerFile, descriptor)
-}
-
-func readInstallMarker(markerFilePath string) (*v1.InstallDescriptor, error) {
-	installMarkerFile, err := os.Open(markerFilePath)
-	if err != nil {
-		return nil, fmt.Errorf("opening install marker file: %w", err)
-	}
-	defer func(installMarkerFile *os.File) {
-		_ = installMarkerFile.Close()
-	}(installMarkerFile)
-	installDescriptor, err := v1.ParseInstallDescriptor(installMarkerFile)
-	if err != nil {
-		return nil, fmt.Errorf("parsing install marker file: %w", err)
-	}
-	return installDescriptor, nil
 }
 
 func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string, now time.Time, version string, action *fleetapi.ActionUpgrade) (reexec.ShutdownCallbackFn, error) {
@@ -816,7 +738,7 @@ func isSameVersion(log *logger.Logger, current agentVersion, newVersion agentVer
 	return current == newVersion
 }
 
-func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {
+func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, ids installDescriptorSource) error {
 	oldAgentPath := paths.BinaryPath(filepath.Join(topDirPath, oldVersionedHome), agentName)
 	err := changeSymlink(log, topDirPath, filepath.Join(topDirPath, agentName), oldAgentPath)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -828,7 +750,7 @@ func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versio
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("rolling back install: removing new agent install at %q failed: %w", newAgentInstallPath, err)
 	}
-	err = removeAgentInstallDesc(versionedHome)
+	_, err = ids.RemoveAgentInstallDesc(versionedHome)
 	if err != nil && !errors.Is(err, ErrAgentInstallNotFound) {
 		return fmt.Errorf("rolling back install: removing agent install descriptor at %q failed: %w", versionedHome, err)
 	}
