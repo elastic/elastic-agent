@@ -565,6 +565,9 @@ func calculateConfmapHash(conf *confmap.Conf) (uint64, error) {
 	}
 
 	h := xxhash.New()
+	// We encode the configuration to json instead of yaml, because it's simpler and more performant.
+	// In general otel configuration can be marshalled to any format supported by koanf, but the confmap
+	// API doesn't expose this. This is why the small workaround below to avoid converting to a Go map is necessary.
 	encoder := json.NewEncoder(h)
 
 	for _, key := range conf.AllKeys() { // this is a sorted list, so the output is consistent
