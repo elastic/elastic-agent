@@ -224,7 +224,7 @@ func TestSetupInstallPath(t *testing.T) {
 	tmpdir := t.TempDir()
 	ownership, err := utils.CurrentFileOwner()
 	require.NoError(t, err)
-	err = setupInstallPath(tmpdir, ownership, "data/elastic-agent-1.2.3-SNAPSHOT", "1.2.3-SNAPSHOT", "")
+	err = setupInstallPath(tmpdir, ownership, "data/elastic-agent-1.2.3-SNAPSHOT", "1.2.3-SNAPSHOT", "flavor")
 	require.NoError(t, err)
 	markerFilePath := filepath.Join(tmpdir, paths.MarkerFileName)
 	require.FileExists(t, markerFilePath)
@@ -234,7 +234,9 @@ func TestSetupInstallPath(t *testing.T) {
         kind: InstallDescriptor
         agentInstalls:
             - version: 1.2.3-SNAPSHOT
-              versioned-home: data/elastic-agent-1.2.3-SNAPSHOT
+              versionedHome: data/elastic-agent-1.2.3-SNAPSHOT
+              active: true
+              flavor: flavor
     `
 	actualInstallDescriptorBytes, err := os.ReadFile(markerFilePath)
 	require.NoError(t, err, "error reading actual install descriptor")

@@ -18,6 +18,7 @@ packages:
     interfaces:
       WatcherHelper: {}
       watcherGrappler: {}
+      installDescriptorSource: {}
   github.com/elastic/elastic-agent/internal/pkg/agent/cmd:
     interfaces:
       agentWatcher: {}

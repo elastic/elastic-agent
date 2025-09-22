@@ -1292,6 +1292,7 @@ func TestManualRollback(t *testing.T) {
 			log, _ := loggertest.New(t.Name())
 			mockAgentInfo := info.NewMockAgent(t)
 			mockWatcherHelper := NewMockWatcherHelper(t)
+			mockInstallSource := newMockInstallDescriptorSource(t)
 			topDir := t.TempDir()
 			err := os.MkdirAll(paths.DataFrom(topDir), 0777)
 			require.NoError(t, err, "error creating data directory in topDir %q", topDir)
@@ -1300,7 +1301,7 @@ func TestManualRollback(t *testing.T) {
 				tc.setup(t, topDir, mockAgentInfo, mockWatcherHelper)
 			}
 
-			upgrader, err := NewUpgrader(log, tc.artifactSettings, tc.upgradeSettings, mockAgentInfo, mockWatcherHelper)
+			upgrader, err := NewUpgrader(log, tc.artifactSettings, tc.upgradeSettings, mockAgentInfo, mockWatcherHelper, mockInstallSource)
 			require.NoError(t, err, "error instantiating upgrader")
 			_, err = upgrader.rollbackToPreviousVersion(t.Context(), topDir, tc.now, tc.version, nil)
 			tc.wantErr(t, err, "unexpected error returned by rollbackToPreviousVersion()")
@@ -1352,6 +1353,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		upgraderMocker            upgraderMocker
 		checkArchiveCleanup       bool
 		checkVersionedHomeCleanup bool
+		setupMocks                func(t *testing.T, mockAgentInfo *info.MockAgent, mockInstallSrc *mockInstallDescriptorSource, mockWatcherHelper *MockWatcherHelper)
 	}
 
 	testCases := map[string]testCase{
@@ -1365,6 +1367,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				}
 			},
 			checkArchiveCleanup: true,
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockInstallSrc *mockInstallDescriptorSource, mockWatcherHelper *MockWatcherHelper) {
+				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+			},
 		},
 		"should return error if getPackageMetadata fails": {
 			isDiskSpaceErrorResult: false,
@@ -1378,6 +1383,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				}
 			},
 			checkArchiveCleanup: true,
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockInstallSrc *mockInstallDescriptorSource, mockWatcherHelper *MockWatcherHelper) {
+				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+			},
 		},
 		"should return error and cleanup downloaded archive if unpack fails before extracting": {
 			isDiskSpaceErrorResult: false,
@@ -1402,6 +1410,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				}
 			},
 			checkArchiveCleanup: true,
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockInstallSrc *mockInstallDescriptorSource, mockWatcherHelper *MockWatcherHelper) {
+				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+			},
 		},
 		"should return error and cleanup downloaded archive if unpack fails after extracting": {
 			isDiskSpaceErrorResult: false,
@@ -1431,6 +1442,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 			checkArchiveCleanup:       true,
 			checkVersionedHomeCleanup: true,
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockInstallSrc *mockInstallDescriptorSource, mockWatcherHelper *MockWatcherHelper) {
+				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+			},
 		},
 		"should return error and cleanup downloaded artifact and extracted archive if copyActionStore fails": {
 			isDiskSpaceErrorResult: false,
@@ -1462,6 +1476,14 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 			checkArchiveCleanup:       true,
 			checkVersionedHomeCleanup: true,
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockInstallSrc *mockInstallDescriptorSource, mockWatcherHelper *MockWatcherHelper) {
+				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+				mockInstallSrc.EXPECT().AddInstallDesc(mock.AnythingOfType("v1.AgentInstallDesc")).RunAndReturn(
+					func(desc v1.AgentInstallDesc) (*v1.InstallDescriptor, error) {
+						return &v1.InstallDescriptor{}, nil
+					},
+				)
+			},
 		},
 		"should return error and cleanup downloaded artifact and extracted archive if copyRunDirectory fails": {
 			isDiskSpaceErrorResult: false,
@@ -1497,6 +1519,15 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 			checkArchiveCleanup:       true,
 			checkVersionedHomeCleanup: true,
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockInstallSrc *mockInstallDescriptorSource, mockWatcherHelper *MockWatcherHelper) {
+				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+
+				mockInstallSrc.EXPECT().AddInstallDesc(mock.AnythingOfType("v1.AgentInstallDesc")).RunAndReturn(
+					func(desc v1.AgentInstallDesc) (*v1.InstallDescriptor, error) {
+						return &v1.InstallDescriptor{}, nil
+					},
+				)
+			},
 		},
 		"should return error and cleanup downloaded artifact and extracted archive if changeSymlink fails": {
 			isDiskSpaceErrorResult: false,
@@ -1528,7 +1559,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				upgrader.copyRunDirectory = func(log *logger.Logger, oldRunPath, newRunPath string) error {
 					return nil
 				}
-				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {
+				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, ids installDescriptorSource) error {
 					return nil
 				}
 				upgrader.changeSymlink = func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
@@ -1537,6 +1568,10 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 			checkArchiveCleanup:       true,
 			checkVersionedHomeCleanup: true,
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockInstallSrc *mockInstallDescriptorSource, mockWatcherHelper *MockWatcherHelper) {
+				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+				mockInstallSrc.EXPECT().AddInstallDesc(mock.AnythingOfType("v1.AgentInstallDesc")).Return(&v1.InstallDescriptor{}, nil)
+			},
 		},
 		"should return error and cleanup downloaded artifact and extracted archive if markUpgrade fails": {
 			isDiskSpaceErrorResult: false,
@@ -1571,7 +1606,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				upgrader.changeSymlink = func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
 					return nil
 				}
-				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {
+				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, ids installDescriptorSource) error {
 					return nil
 				}
 				upgrader.markUpgrade = func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, rollbackWindow time.Duration) error {
@@ -1580,6 +1615,11 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 			checkArchiveCleanup:       true,
 			checkVersionedHomeCleanup: true,
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockInstallSrc *mockInstallDescriptorSource, mockWatcherHelper *MockWatcherHelper) {
+				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+				mockInstallSrc.EXPECT().AddInstallDesc(mock.AnythingOfType("v1.AgentInstallDesc")).Return(&v1.InstallDescriptor{}, nil)
+				mockInstallSrc.EXPECT().ModifyInstallDesc(mock.Anything).Return(&v1.InstallDescriptor{}, nil)
+			},
 		},
 		"should add disk space error to the error chain if downloadArtifact fails with disk space error": {
 			isDiskSpaceErrorResult: true,
@@ -1589,19 +1629,29 @@ func TestUpgradeErrorHandling(t *testing.T) {
 					returnError: testError,
 				}
 			},
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockInstallSrc *mockInstallDescriptorSource, mockWatcherHelper *MockWatcherHelper) {
+				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+			},
 		},
 	}
-
-	mockAgentInfo := info.NewMockAgent(t)
-	mockAgentInfo.On("Version").Return("9.0.0")
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			baseDir := t.TempDir()
 			paths.SetTop(baseDir)
 
+			mockAgentInfo := info.NewMockAgent(t)
+			mockInstallSource := newMockInstallDescriptorSource(t)
 			mockWatcherHelper := NewMockWatcherHelper(t)
-			upgrader, err := NewUpgrader(log, &artifact.Config{}, nil, mockAgentInfo, mockWatcherHelper)
+
+			if tc.setupMocks != nil {
+				// setup mocks
+				tc.setupMocks(t, mockAgentInfo, mockInstallSource, mockWatcherHelper)
+			} else {
+				t.Log("skipping mocks setup as the testcase does not define a setupMocks()")
+			}
+
+			upgrader, err := NewUpgrader(log, &artifact.Config{}, nil, mockAgentInfo, mockWatcherHelper, mockInstallSource)
 			require.NoError(t, err)
 
 			tc.upgraderMocker(upgrader, filepath.Join(baseDir, "mockArchive"), "versionedHome")
