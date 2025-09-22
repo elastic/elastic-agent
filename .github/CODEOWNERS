@@ -7,6 +7,7 @@
 # Sub-directories/files ownership. Remember that order matters; the last matching pattern takes the most precedence.
 /.buildkite @elastic/elastic-agent-control-plane @elastic/observablt-ci
 /.ci @elastic/elastic-agent-control-plane @elastic/observablt-ci
+/.ci/scripts/update-otel.sh @elastic/elastic-agent-control-plane
 /.github @elastic/elastic-agent-control-plane @elastic/observablt-ci
 /.github/CODEOWNERS @elastic/ingest-tech-lead
 /deploy/helm @elastic/elastic-agent-control-plane
