@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"runtime"
 	"runtime/pprof"
 	"strconv"
 	"sync"
@@ -45,7 +44,9 @@ type diagnosticsExtension struct {
 	collectorConfig   *confmap.Conf
 	componentHooks    map[string][]*diagHook
 	globalHooks       map[string]*diagHook
-	hooksMtx          sync.Mutex
+
+	hooksMtx sync.Mutex
+	confgMtx sync.Mutex
 }
 
 type serviceConfig struct {
@@ -156,6 +157,8 @@ func (d *diagnosticsExtension) Shutdown(ctx context.Context) error {
 }
 
 func (d *diagnosticsExtension) NotifyConfig(ctx context.Context, conf *confmap.Conf) error {
+	d.confgMtx.Lock()
+	defer d.confgMtx.Unlock()
 	d.collectorConfig = conf
 	return nil
 }
@@ -236,13 +239,4 @@ func extractMetricAddress(readers []otelconf.MetricReader) string {
 		}
 	}
 	return ""
-}
-
-func changeOwner(path string, uid, gid int) error {
-	if runtime.GOOS == "windows" {
-		// on windows it always returns the syscall.EWINDOWS error, wrapped in *PathError
-		return nil
-	}
-
-	return os.Chown(path, uid, gid)
 }
