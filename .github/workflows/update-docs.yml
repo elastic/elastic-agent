@@ -53,7 +53,20 @@ jobs:
           cd docs/scripts/update-docs
           python update-components-docs.py
       
+      - name: Check if branch already exists
+        id: check_branch
+        run: |
+          BRANCH_NAME="update-docs-${{ steps.get_version.outputs.version }}"
+          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+            echo "Branch $BRANCH_NAME already exists. Documentation for this version has already been updated."
+            echo "branch_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Branch $BRANCH_NAME does not exist. Proceeding with PR creation."
+            echo "branch_exists=false" >> $GITHUB_OUTPUT
+          fi
+      
       - name: Create Pull Request
+        if: steps.check_branch.outputs.branch_exists == 'false'
         uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -73,9 +86,16 @@ jobs:
             - **Release tag**: https://github.com/elastic/elastic-agent/tree/${{ steps.get_version.outputs.version }}
             
             This is an automated PR created by the documentation update workflow.
-          branch: update-docs
+          branch: update-docs-${{ steps.get_version.outputs.version }}
           base: main
           delete-branch: true
           labels: |
             documentation
             automated-pr
+      
+      - name: Skip PR creation (branch exists)
+        if: steps.check_branch.outputs.branch_exists == 'true'
+        run: |
+          echo "✅ Documentation for version ${{ steps.get_version.outputs.version }} has already been updated."
+          echo "Branch update-docs-${{ steps.get_version.outputs.version }} already exists."
+          echo "Workflow completed successfully - no action needed."
