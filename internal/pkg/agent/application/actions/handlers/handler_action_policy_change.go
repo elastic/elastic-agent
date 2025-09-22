@@ -42,7 +42,7 @@ type PolicyChangeHandler struct {
 	setters              []actions.ClientSetter
 	policyLogLevelSetter logLevelSetter
 	coordinator          *coordinator.Coordinator
-	forceAckFn           func() bool
+	disableAckFn         func() bool
 	// Disabled for 8.8.0 release in order to limit the surface
 	// https://github.com/elastic/security-team/issues/6501
 	// // Last known valid signature validation key
@@ -69,7 +69,7 @@ func NewPolicyChangeHandler(
 		setters:              setters,
 		coordinator:          coordinator,
 		policyLogLevelSetter: policyLogLevelSetter,
-		forceAckFn:           features.ForcePolicyChangeAcks,
+		disableAckFn:         features.DisablePolicyChangeAcks,
 	}
 }
 
@@ -114,7 +114,7 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 		return err
 	}
 
-	h.ch <- newPolicyChange(ctx, c, a, acker, false, h.forceAckFn())
+	h.ch <- newPolicyChange(ctx, c, a, acker, false, h.disableAckFn())
 	return nil
 }
 
@@ -477,7 +477,7 @@ type policyChange struct {
 	action     fleetapi.Action
 	acker      acker.Acker
 	ackWatcher chan struct{}
-	forceAck   bool
+	disableAck bool
 }
 
 func newPolicyChange(
@@ -486,7 +486,7 @@ func newPolicyChange(
 	action fleetapi.Action,
 	acker acker.Acker,
 	makeCh bool,
-	forceAck bool) *policyChange {
+	disableAck bool) *policyChange {
 	var ackWatcher chan struct{}
 	if makeCh {
 		// we don't need it otherwise
@@ -498,7 +498,7 @@ func newPolicyChange(
 		action:     action,
 		acker:      acker,
 		ackWatcher: ackWatcher,
-		forceAck:   forceAck,
+		disableAck: disableAck,
 	}
 }
 
@@ -507,9 +507,9 @@ func (l *policyChange) Config() *config.Config {
 }
 
 // Ack sends an ack for the associated action if the results are expected.
-// An ack will not be sent for a POLICY_CHANGE action, but will be when this method is used by UNENROLL actions.
+// An ack will be sent for UNENROLL actions, or by POLICY_CHANGE actions if it has not been explicitly disabled.
 func (l *policyChange) Ack() error {
-	if !l.forceAck || l.action == nil {
+	if l.disableAck || l.action == nil {
 		return nil
 	}
 	err := l.acker.Ack(l.ctx, l.action)

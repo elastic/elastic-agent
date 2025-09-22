@@ -21,6 +21,10 @@ import (
 // 8.11+ - default is enabled
 const defaultTamperProtection = true
 
+// The default value of the disable policy change acks flag if the flag is missing.
+// 9.2 - disabled (acks are sent)
+const defaultDisablePolicyChangeAcks = false
+
 var (
 	current = Flags{
 		tamperProtection: defaultTamperProtection,
@@ -36,8 +40,8 @@ type Flags struct {
 	fqdn          bool
 	fqdnCallbacks map[string]BoolValueOnChangeCallback
 
-	tamperProtection      bool
-	forcePolicyChangeAcks bool
+	tamperProtection        bool
+	disablePolicyChangeAcks bool
 }
 
 type cfg struct {
@@ -49,9 +53,9 @@ type cfg struct {
 			TamperProtection *struct {
 				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
 			} `json:"tamper_protection,omitempty" yaml:"tamper_protection,omitempty" config:"tamper_protection,omitempty"`
-			ForcePolicyChangeAcks struct {
+			DisablePolicyChangeAcks struct {
 				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
-			} `json:"force_policy_change_acks" toml: "force_policy_change_acks" config:"force_policy_change_acks"`
+			} `json:"disable_policy_change_acks" toml: "disable_policy_change_acks" config:"disable_policy_change_acks"`
 		} `json:"features" yaml:"features" config:"features"`
 	} `json:"agent" yaml:"agent" config:"agent"`
 }
@@ -70,11 +74,11 @@ func (f *Flags) TamperProtection() bool {
 	return f.tamperProtection
 }
 
-func (f *Flags) ForcePolicyChangeAcks() bool {
+func (f *Flags) DisablePolicyChangeAcks() bool {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
-	return f.forcePolicyChangeAcks
+	return f.disablePolicyChangeAcks
 }
 
 func (f *Flags) AsProto() *proto.Features {
@@ -132,11 +136,11 @@ func (f *Flags) setTamperProtection(newValue bool) {
 	f.tamperProtection = newValue
 }
 
-func (f *Flags) setForcePolicyChangeAcks(newValue bool) {
+func (f *Flags) setDisablePolicyChangeAcks(newValue bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	f.forcePolicyChangeAcks = newValue
+	f.disablePolicyChangeAcks = newValue
 }
 
 // setSource sets the source from he given cfg.
@@ -204,6 +208,12 @@ func Parse(policy any) (*Flags, error) {
 		flags.setTamperProtection(defaultTamperProtection)
 	}
 
+	if parsedFlags.Agent.Features.DisablePolicyChangeAcks != nil {
+		flags.setDisablePolicyChangeAcks(parsedFlags.Agent.Features.DisablePolicyChangeAcks.Enabled)
+	} else {
+		flags.setDisablePolicyChangeAcks(defaultDisablePolicyChangeAcks)
+	}
+
 	if err := flags.setSource(parsedFlags); err != nil {
 		return nil, fmt.Errorf("error creating feature flags source: %w", err)
 	}
@@ -226,7 +236,7 @@ func Apply(c *config.Config) error {
 
 	current.setFQDN(parsed.FQDN())
 	current.setTamperProtection(parsed.TamperProtection())
-	current.setForcePolicyChangeAcks(parsed.ForcePolicyChangeAcks())
+	current.setDisablePolicyChangeAcks(parsed.DisablePolicyChangeAcks())
 	return err
 }
 
@@ -240,7 +250,7 @@ func TamperProtection() bool {
 	return current.TamperProtection()
 }
 
-// ForcePolicyChangeAcks reports if the agent should force sending an ACK for POLICY_CHANGE actions.
-func ForcePolicyChangeAcks() bool {
-	return current.ForcePolicyChangeAcks()
+// DisablePolicyChangeAcks reports if the agent will stop using ACKs for POLICY_CHANGE actions.
+func DisablePolicyChangeAcks() bool {
+	return current.DisablePolicyChangeAcks()
 }
