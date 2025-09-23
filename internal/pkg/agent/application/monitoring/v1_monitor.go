@@ -30,6 +30,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	otelMonitoring "github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
 )
 
 const (
@@ -58,7 +59,6 @@ const (
 	monitoringOutput           = "monitoring"
 	defaultMonitoringNamespace = "default"
 	agentName                  = "elastic-agent"
-	edotCollectorName          = "elastic-agent/collector"
 	metricBeatName             = "metricbeat"
 	fileBeatName               = "filebeat"
 
@@ -74,9 +74,6 @@ const (
 	// metricset stream failure threshold before the stream is marked as DEGRADED
 	// to avoid marking the agent degraded for transient errors, we set the default threshold to 5
 	defaultMetricsStreamFailureThreshold = uint(5)
-
-	beatsMonitoringComponentInfoID = "beat/" + monitoringMetricsUnitID
-	httpMonitoringComponentInfoID  = "http/" + monitoringMetricsUnitID
 )
 
 var (
@@ -355,6 +352,16 @@ func (b *BeatsMonitor) Prepare(unit string) error {
 	return nil
 }
 
+// Returns true if any component in the list uses the otel runtime.
+func usingOtelRuntime(componentInfos []componentInfo) bool {
+	for _, ci := range componentInfos {
+		if ci.RuntimeManager == component.OtelRuntimeManager {
+			return true
+		}
+	}
+	return false
+}
+
 // Cleanup removes files that were created for monitoring.
 func (b *BeatsMonitor) Cleanup(unit string) error {
 	if !b.Enabled() {
@@ -424,12 +431,12 @@ func (b *BeatsMonitor) getComponentInfos(components []component.Component, compo
 	if b.config.C.MonitorMetrics {
 		componentInfos = append(componentInfos,
 			componentInfo{
-				ID:             beatsMonitoringComponentInfoID,
+				ID:             fmt.Sprintf("beat/%s", monitoringMetricsUnitID),
 				BinaryName:     metricBeatName,
 				RuntimeManager: component.RuntimeManager(b.config.C.RuntimeManager),
 			},
 			componentInfo{
-				ID:             httpMonitoringComponentInfoID,
+				ID:             fmt.Sprintf("http/%s", monitoringMetricsUnitID),
 				BinaryName:     metricBeatName,
 				RuntimeManager: component.RuntimeManager(b.config.C.RuntimeManager),
 			})
@@ -674,7 +681,27 @@ func (b *BeatsMonitor) getHttpStreams(
 	}
 	httpStreams = append(httpStreams, agentStream)
 
-	var edotSubprocessEndpoints []interface{}
+	if usingOtelRuntime(componentInfos) && b.isOtelRuntimeSubprocess {
+		edotSubprocessStream := map[string]any{
+			idKey: fmt.Sprintf("%s-edot-collector", monitoringMetricsUnitID),
+			"data_stream": map[string]interface{}{
+				"type":      "metrics",
+				"dataset":   dataset,
+				"namespace": monitoringNamespace,
+			},
+			"metricsets": []interface{}{"json"},
+			"path":       "/stats",
+			"hosts":      []interface{}{PrefixedEndpoint(otelMonitoring.EDOTMonitoringEndpoint())},
+			"namespace":  "agent",
+			"period":     metricsCollectionIntervalString,
+			"index":      indexName,
+			"processors": processorsForAgentHttpStream(agentName, otelMonitoring.EDOTComponentID, otelMonitoring.EDOTComponentID, monitoringNamespace, dataset, b.agentInfo),
+		}
+		if failureThreshold != nil {
+			edotSubprocessStream[failureThresholdKey] = *failureThreshold
+		}
+		httpStreams = append(httpStreams, edotSubprocessStream)
+	}
 
 	for _, compInfo := range componentInfos {
 		binaryName := compInfo.BinaryName
@@ -683,12 +710,6 @@ func (b *BeatsMonitor) getHttpStreams(
 		}
 
 		endpoints := []interface{}{PrefixedEndpoint(BeatsMonitoringEndpoint(compInfo.ID))}
-		if compInfo.RuntimeManager == component.OtelRuntimeManager && compInfo.ID == httpMonitoringComponentInfoID && b.isOtelRuntimeSubprocess {
-			// when Otel runtime is running as subprocess, we need to monitor it as a separate stream, thus we utilise the already
-			// exposed endpoint of httpMonitoringComponentInfoID.
-			edotSubprocessEndpoints = endpoints
-		}
-
 		name := sanitizeName(binaryName)
 
 		// Do not create http streams if runtime-manager is otel and binary is of beat type
@@ -739,30 +760,6 @@ func (b *BeatsMonitor) getHttpStreams(
 			}
 			httpStreams = append(httpStreams, fbStream)
 		}
-	}
-
-	if edotSubprocessEndpoints != nil {
-		// Otel runtime subprocess metrics are collected using the same processors as the elastic-agent since we want only the
-		// system resources.
-		edotSubprocessStream := map[string]any{
-			idKey: fmt.Sprintf("%s-edot-collector", monitoringMetricsUnitID),
-			"data_stream": map[string]interface{}{
-				"type":      "metrics",
-				"dataset":   dataset,
-				"namespace": monitoringNamespace,
-			},
-			"metricsets": []interface{}{"json"},
-			"path":       "/stats",
-			"hosts":      edotSubprocessEndpoints,
-			"namespace":  "agent",
-			"period":     metricsCollectionIntervalString,
-			"index":      indexName,
-			"processors": processorsForAgentHttpStream(agentName, edotCollectorName, edotCollectorName, monitoringNamespace, dataset, b.agentInfo),
-		}
-		if failureThreshold != nil {
-			edotSubprocessStream[failureThresholdKey] = *failureThreshold
-		}
-		httpStreams = append(httpStreams, edotSubprocessStream)
 	}
 
 	return httpStreams

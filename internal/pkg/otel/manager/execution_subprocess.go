@@ -24,14 +24,16 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
+	"github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
 	runtimeLogger "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
 const (
-	OtelSetSupervisedFlagName          = "supervised"
-	OtelSupervisedLoggingLevelFlagName = "supervised.logging.level"
+	OtelSetSupervisedFlagName           = "supervised"
+	OtelSupervisedLoggingLevelFlagName  = "supervised.logging.level"
+	OtelSupervisedMonitoringURLFlagName = "supervised.monitoring.url"
 )
 
 func newSubprocessExecution(logLevel logp.Level, collectorPath string) (*subprocessExecution, error) {
@@ -51,6 +53,7 @@ func newSubprocessExecution(logLevel logp.Level, collectorPath string) (*subproc
 			"otel",
 			fmt.Sprintf("--%s", OtelSetSupervisedFlagName),
 			fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, logLevel.String()),
+			fmt.Sprintf("--%s=%s", OtelSupervisedMonitoringURLFlagName, monitoring.EDOTMonitoringEndpoint()),
 		},
 		logLevel:               logLevel,
 		healthCheckExtensionID: healthCheckExtensionID,
