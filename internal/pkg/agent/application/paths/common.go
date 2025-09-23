@@ -33,9 +33,6 @@ const (
 	// ControlSocketName is the control socket name.
 	ControlSocketName = "elastic-agent.sock"
 
-	// EDOTSocketName is the control socket resposible for otel diagnsotis <=> otel process/service communication.
-	EDOTSocketName = "edot.sock"
-
 	// Our DiagnosticsExtension will use DiagnosticsExtensionSocketName to listen and serve diagnostic requests.
 	DiagnosticsExtensionSocketName = "edot-diagnostics-extension.sock"
 
@@ -66,7 +63,6 @@ var (
 	componentsPath             string
 	installPath                string
 	controlSocketPath          string
-	edotSocketPath             string
 	diagnosticsExtensionSocket string
 	unversionedHome            bool
 	tmpCreator                 sync.Once
@@ -78,7 +74,6 @@ func init() {
 	configPath = topPath
 	logsPath = topPath
 	controlSocketPath = initialControlSocketPath(topPath)
-	edotSocketPath = SocketFromPath(runtime.GOOS, topPath, EDOTSocketName)
 	diagnosticsExtensionSocket = SocketFromPath(runtime.GOOS, topPath, DiagnosticsExtensionSocketName)
 	unversionedHome = false // only versioned by container subcommand
 
@@ -95,7 +90,6 @@ func init() {
 	fs.StringVar(&configFilePath, "c", DefaultConfigName, "Configuration file, relative to path.config")
 	fs.StringVar(&logsPath, "path.logs", logsPath, "Logs path contains Agent log output")
 	fs.StringVar(&controlSocketPath, "path.socket", controlSocketPath, "Control protocol socket path for the Agent")
-	fs.StringVar(&edotSocketPath, "path.edot_socket", edotSocketPath, "Control protocol socket path for the EDOT")
 
 	// enable user to download update artifacts to alternative place
 	// TODO: remove path.downloads support on next major (this can be configured using `agent.download.targetDirectory`)
@@ -263,11 +257,6 @@ func SetInstall(path string) {
 // ControlSocket returns the control socket directory for Agent
 func ControlSocket() string {
 	return controlSocketPath
-}
-
-// ControlSocket returns the control socket directory for Agent
-func EDOTSocket() string {
-	return edotSocketPath
 }
 
 // SetControlSocket overrides the ControlSocket path.

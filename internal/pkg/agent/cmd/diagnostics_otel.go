@@ -17,8 +17,8 @@ import (
 func newOtelDiagnosticsCommand(streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "diagnostics",
-		Short: "Start the Elastic Agent in otel mode",
-		Long:  "This command starts the Elastic Agent in otel mode.",
+		Short: "Gather diagnostics information from the EDOT and write it to a zip archive",
+		Long:  "This command gathers diagnostics information from the EDOT and writes it to a zip archive",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := otelDiagnosticCmd(streams, cmd); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())

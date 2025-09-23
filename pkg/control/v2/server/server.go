@@ -233,7 +233,7 @@ func (s *Server) DiagnosticAgent(ctx context.Context, req *cproto.DiagnosticAgen
 		}
 	}
 
-	resp, err := otel.PerformDiagnosticsExt()
+	resp, err := otel.PerformDiagnosticsExt(ctx)
 	if errors.Is(err, syscall.ENOENT) || errors.Is(err, syscall.ECONNREFUSED) {
 		// We're not running the EDOT if:
 		//  1. Either the socket doesn't exist
