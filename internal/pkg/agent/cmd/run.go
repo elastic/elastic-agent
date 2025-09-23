@@ -209,11 +209,41 @@ func runElasticAgent(
 
 	// fix permissions
 	if isRoot {
-		topPath := paths.Top()
-		err = perms.FixPermissions(topPath)
+		userName, groupName, err := getDesiredUser()
 		if err != nil {
+			l.Errorf("failed to determine target user: %w", err)
+			return fmt.Errorf("failed to determine target user: %w", err)
+		}
+
+		var ownership utils.FileOwner
+		if userName != "" || groupName != "" {
+			ownership, err = install.EnsureUserAndGroup(userName, groupName, &debugDescriber{l}, true)
+			if err != nil {
+				l.Errorf("failed to setup user: %w", err)
+				return fmt.Errorf("failed to setup user: %w", err)
+			}
+		}
+
+		topPath := paths.Top()
+		err = perms.FixPermissions(topPath, perms.WithOwnership(ownership))
+		if err != nil {
+			l.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
 			return fmt.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
 		}
+
+		if err := dropRootPrivileges(ownership); err != nil {
+			l.Errorf("failed to drop permissions to user %q(%v):%q(%v): %w",
+				userName, ownership.UID,
+				groupName, ownership.GID,
+				err,
+			)
+			return fmt.Errorf("failed to drop permissions to user %q(%v):%q(%v): %w",
+				userName, ownership.UID,
+				groupName, ownership.GID,
+				err,
+			)
+		}
+
 	}
 
 	l.Infow("Elastic Agent started",
@@ -748,4 +778,12 @@ func ensureInstallMarkerPresent() error {
 	paths.ResolveControlSocket(true)
 
 	return nil
+}
+
+type debugDescriber struct {
+	l *logger.Logger
+}
+
+func (d *debugDescriber) Describe(a string) {
+	d.l.Debug(a)
 }

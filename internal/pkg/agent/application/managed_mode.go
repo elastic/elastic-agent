@@ -390,6 +390,11 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 	)
 
 	m.dispatcher.MustRegister(
+		&fleetapi.ActionPrivilegeLevelChange{},
+		handlers.NewPrivilegeLevelChange(m.log, m.coord, m.ch),
+	)
+
+	m.dispatcher.MustRegister(
 		&fleetapi.ActionUnknown{},
 		handlers.NewUnknown(m.log),
 	)

@@ -19,6 +19,7 @@ func EnsureUserAndGroup(username string, groupName string, pt Describer, forceCr
 
 	// ensure required group
 	ownership.GID, err = FindGID(groupName)
+	pt.Describe(fmt.Sprintf("finding group: %q(%v): %v", groupName, ownership.GID, err))
 	if err != nil && !errors.Is(err, ErrGroupNotFound) {
 		return utils.FileOwner{}, fmt.Errorf("failed finding group %s: %w", groupName, err)
 	}
@@ -37,6 +38,7 @@ func EnsureUserAndGroup(username string, groupName string, pt Describer, forceCr
 	if err != nil && !errors.Is(err, ErrUserNotFound) {
 		return utils.FileOwner{}, fmt.Errorf("failed finding username %s: %w", username, err)
 	}
+	pt.Describe(fmt.Sprintf("finding user with forceCreate set to %v: %q(%v): %v", forceCreate, username, ownership.UID, err))
 	if forceCreate && errors.Is(err, ErrUserNotFound) {
 		pt.Describe(fmt.Sprintf("Creating user %s", username))
 		ownership.UID, err = CreateUser(username, ownership.GID)

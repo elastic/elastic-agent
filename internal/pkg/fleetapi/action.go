@@ -36,6 +36,8 @@ const (
 	ActionTypeDiagnostics = "REQUEST_DIAGNOSTICS"
 	// ActionTypeDiagnostics specifies a diagnostics action.
 	ActionTypeMigrate = "MIGRATE"
+	// ActionTypeDiagnostics specifies a diagnostics action.
+	ActionTypePrivilegeLevelChange = "PRIVILEGE_LEVEL_CHANGE"
 )
 
 // Error values that the Action interface can return
@@ -119,6 +121,8 @@ func NewAction(actionType string) Action {
 		action = &ActionUpgrade{}
 	case ActionTypeMigrate:
 		action = &ActionMigrate{}
+	case ActionTypePrivilegeLevelChange:
+		action = &ActionPrivilegeLevelChange{}
 	default:
 		action = &ActionUnknown{OriginalType: actionType}
 	}

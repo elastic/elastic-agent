@@ -55,6 +55,7 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 
 	defer func() {
 		if rerr != nil {
+			h.log.Debugf("handlerPrivilegeLevelChange: acking failure: %v", rerr)
 			h.ackFailure(ctx, rerr, action, acker)
 		}
 	}()
@@ -67,6 +68,7 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 	// ensure no component issues
 	err := service.EnsureNoServiceComponentIssues()
 	if err != nil {
+		h.log.Debugf("handlerPrivilegeLevelChange: found issues with components: %v", err)
 		return err
 	}
 
@@ -79,6 +81,8 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 	username, password = install.UnprivilegedUser(username, password)
 	groupname = install.UnprivilegedGroup(groupname)
 
+	h.log.Debugf("handlerPrivilegeLevelChange: proceeding with user %q and group %q", username, groupname)
+
 	// apply empty config to stop processing
 	unenrollPolicy := newPolicyChange(ctx, config.New(), a, acker, true)
 	h.ch <- unenrollPolicy
@@ -86,13 +90,16 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 	unenrollCtx, cancel := context.WithTimeout(ctx, unenrollTimeout)
 	defer cancel()
 
+	h.log.Debugf("handlerPrivilegeLevelChange: waiting for empty policy to take place")
 	unenrollPolicy.WaitAck(unenrollCtx)
 
 	// fix permissions
 	topPath := paths.Top()
-	err = install.SwitchExecutingMode(topPath, &noopDescriber{}, username, groupname, password)
+	h.log.Debugf("handlerPrivilegeLevelChange: fixing permissions from %v", topPath)
+	_, err = install.SwitchServiceUser(topPath, &debugDescriber{h.log}, username, groupname, password)
 	if err != nil {
 		// error already adds context
+		h.log.Debugf("handlerPrivilegeLevelChange: fixing failed with error: %v", err)
 		return err
 	}
 
@@ -128,3 +135,11 @@ func (h *PrivilegeLevelChange) ackFailure(ctx context.Context, err error, action
 type noopDescriber struct{}
 
 func (*noopDescriber) Describe(string) {}
+
+type debugDescriber struct {
+	l *logger.Logger
+}
+
+func (d *debugDescriber) Describe(a string) {
+	d.l.Debug(a)
+}

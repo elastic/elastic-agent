@@ -97,7 +97,8 @@ func SwitchExecutingMode(topPath string, pt Describer, username string, groupNam
 func SwitchServiceUser(topPath string, pt Describer, username string, groupName string, password string) (utils.FileOwner, error) {
 	var ownership utils.FileOwner
 	if username != "" && groupName != "" {
-		ownership, err := EnsureUserAndGroup(username, groupName, pt, username == ElasticUsername)
+		var err error
+		ownership, err = EnsureUserAndGroup(username, groupName, pt, username == ElasticUsername)
 		if err != nil {
 			// context for the error already provided in the EnsureUserAndGroup function
 			return ownership, err
@@ -115,7 +116,7 @@ func SwitchServiceUser(topPath string, pt Describer, username string, groupName 
 	}
 
 	// fix all permissions to use the new ownership
-	pt.Describe("Adjusting permissions")
+	pt.Describe(fmt.Sprintf("Adjusting permissions with ownership %v", ownership))
 	err = perms.FixPermissions(topPath, perms.WithOwnership(ownership))
 	if err != nil {
 		return ownership, fmt.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
