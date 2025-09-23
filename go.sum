@@ -549,8 +549,8 @@ github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnec
 github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.7.0/go.mod h1:HPkMY+YddFD5GhpCpSNAcH7KskuiLHYNhIsFHuynb9s=
 github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.0.0-20250922093401-a76a7ba0448a h1:gkxFYAatjV7EJBrW/NN9g0RoB2aFhUF+3RT2s3YyCKs=
 github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.0.0-20250922093401-a76a7ba0448a/go.mod h1:32oxXjqEB3/otYGIkQq6fXirtlG87ZgDxriCrcii2z4=
-github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.7.0 h1:2mZ3qPXzftdYaocx94nzOQMQ6Iya2h0hbEXBpgc/9fs=
-github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.7.0/go.mod h1:8sLN47JFvWEpPlMNOPWSPonQ4BAlK4xc0U0trNfIKbA=
+github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.5.0 h1:d2EAQ8x4wsOrXG/I1+UU+/+I54Ul7XzoUZIxnqvxE/A=
+github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.5.0/go.mod h1:cFYEgKv+BsimfqeeyfRTTGP/AoHbhwhhJH44W9S/x5Y=
 github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.7.0 h1:QdBoEpDp5PKVlrQ7n+eTDG+tDpBmLBppcVhsuvKyXik=
 github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.7.0/go.mod h1:CnfDctsjylpmo2yYJfQVZn8U7EXy7hmTnvdApiUL680=
 github.com/elastic/opentelemetry-collector-components/extension/beatsauthextension v0.3.0 h1:0+WK9lHE5HflQFUSghnpBAto7jQItDw5o+uTSGKHMlo=
