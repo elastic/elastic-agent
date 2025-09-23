@@ -722,3 +722,49 @@ func TestFleetGatewaySchedulerSwitch(t *testing.T) {
 		require.Equal(t, ms.Duration, defaultGatewaySettings.Duration)
 	}))
 }
+
+func TestFastCheckinStateFetcher(t *testing.T) {
+	init := func(t *testing.T) *FastCheckinStateFetcher {
+		log, _ := logger.New("state_fetcher_"+t.Name(), false)
+		ch := make(chan coordinator.State, 10)
+		s := NewFastCheckinStateFetcher(log, emptyStateFetcher, ch)
+
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+
+		ctx, cnl := context.WithCancel(t.Context())
+		go func() {
+			defer wg.Done()
+			s.StartStateWatch(ctx)
+		}()
+
+		t.Cleanup(func() {
+			cnl()
+			wg.Wait()
+		})
+
+		return s
+	}
+
+	t.Run("calling done with empty state should be noop", func(t *testing.T) {
+		s := init(t)
+		assert.Nil(t, s.cancel)
+		s.Done()
+		assert.Nil(t, s.cancel)
+	})
+
+	t.Run("state change should invalidate context", func(t *testing.T) {
+		s := init(t)
+		assert.Nil(t, s.cancel)
+
+		_, ctx := s.FetchState(t.Context())
+		assert.NoError(t, ctx.Err())
+		assert.NotNil(t, s.cancel)
+
+		s.stateChan <- coordinator.State{}
+
+		<-ctx.Done()
+		assert.ErrorIs(t, context.Cause(ctx), errComponentStateChanged)
+		assert.ErrorIs(t, ctx.Err(), context.Canceled)
+	})
+}
