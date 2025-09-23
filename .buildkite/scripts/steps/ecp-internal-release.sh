@@ -51,9 +51,19 @@ skopeo login --username "${DOCKER_USERNAME_SECRET}" --password "${DOCKER_PASSWOR
 buildkite-agent artifact download "build/distributions/**" . --step "packaging-service-container-amd64"
 buildkite-agent artifact download "build/distributions/**" . --step "packaging-service-container-arm64"
 
-# copy the images into the private image location
-skopeo copy --all "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-amd64.docker.tar.gz" "docker://$PRIVATE_IMAGE"
-skopeo copy --all "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-arm64.docker.tar.gz" "docker://$PRIVATE_IMAGE"
+# get the digest information so the manifest reference the images
+AMD64_DIGEST=$(skopeo inspect --format "{{.Digest}}" "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-amd64.docker.tar.gz")
+ARM64_DIGEST=$(skopeo inspect --format "{{.Digest}}" "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-arm64.docker.tar.gz")
+
+# copy the images into the private image location with digest (not tag)
+skopeo copy --all "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-amd64.docker.tar.gz" "docker://$PRIVATE_REPO@$AMD64_DIGEST"
+skopeo copy --all "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-arm64.docker.tar.gz" "docker://$PRIVATE_REPO@$ARM64_DIGEST"
+
+# create a new manifest image referencing the source images
+docker buildx imagetools create -t "$PRIVATE_IMAGE" \
+  "$PRIVATE_REPO@$AMD64_DIGEST" \
+  "$PRIVATE_REPO@$ARM64_DIGEST"
+skopeo copy --all "docker-daemon:$PRIVATE_IMAGE" "docker://$PRIVATE_IMAGE"
 
 annotate "* Image: $PRIVATE_IMAGE"
 annotate "* Short commit: $VERSION"
