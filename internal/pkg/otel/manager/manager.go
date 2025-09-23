@@ -17,11 +17,9 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
-	"github.com/elastic/elastic-agent/pkg/features"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/confmap"
@@ -109,25 +107,6 @@ type OTelManager struct {
 
 	// stopTimeout is the timeout to wait for the collector to stop.
 	stopTimeout time.Duration
-}
-
-// IsSubprocessExecution returns true if the OTel runtime is running in subprocess mode.
-func IsSubprocessExecution(cfg *config.Config) bool {
-	return GetExecutionModeFromConfig(cfg) == SubprocessExecutionMode
-}
-
-// GetExecutionModeFromConfig sets the execution mode of the OTel runtime based on the config.
-func GetExecutionModeFromConfig(cfg *config.Config) ExecutionMode {
-	flags, err := features.Parse(cfg)
-	if err != nil {
-		return EmbeddedExecutionMode
-	}
-
-	if flags.OtelSubprocessExecution() {
-		return SubprocessExecutionMode
-	} else {
-		return EmbeddedExecutionMode
-	}
 }
 
 // NewOTelManager returns a OTelManager.

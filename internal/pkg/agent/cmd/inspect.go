@@ -29,7 +29,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
-	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
+	otelconfig "github.com/elastic/elastic-agent/internal/pkg/otel/config"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -180,7 +180,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 			return fmt.Errorf("failed to detect inputs and outputs: %w", err)
 		}
 
-		monitorFn, err := getMonitoringFn(ctx, cfg)
+		monitorFn, err := getMonitoringFn(ctx, l, cfg)
 		if err != nil {
 			return fmt.Errorf("failed to get monitoring: %w", err)
 		}
@@ -375,7 +375,7 @@ func getComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath stri
 		return nil, err
 	}
 
-	monitorFn, err := getMonitoringFn(ctx, m)
+	monitorFn, err := getMonitoringFn(ctx, l, m)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get monitoring: %w", err)
 	}
@@ -394,7 +394,7 @@ func getComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath stri
 	return comps, nil
 }
 
-func getMonitoringFn(ctx context.Context, cfg map[string]interface{}) (component.GenerateMonitoringCfgFn, error) {
+func getMonitoringFn(ctx context.Context, logger *logger.Logger, cfg map[string]interface{}) (component.GenerateMonitoringCfgFn, error) {
 	config, err := config.NewConfigFrom(cfg)
 	if err != nil {
 		return nil, err
@@ -409,9 +409,8 @@ func getMonitoringFn(ctx context.Context, cfg map[string]interface{}) (component
 	if err != nil {
 		return nil, fmt.Errorf("could not load agent info: %w", err)
 	}
-
-	isOtelSubprocessExecution := otelmanager.IsSubprocessExecution(config)
-	monitor := monitoring.New(agentCfg.Settings.V1MonitoringEnabled, agentCfg.Settings.DownloadConfig.OS(), agentCfg.Settings.MonitoringConfig, agentInfo, isOtelSubprocessExecution)
+	otelconfig.SetExecutionModeFromConfig(logger, config)
+	monitor := monitoring.New(agentCfg.Settings.V1MonitoringEnabled, agentCfg.Settings.DownloadConfig.OS(), agentCfg.Settings.MonitoringConfig, agentInfo, otelconfig.IsSubprocessExecution())
 	return monitor.MonitoringConfig, nil
 }
 

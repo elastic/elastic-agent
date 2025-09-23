@@ -21,13 +21,9 @@ import (
 // 8.11+ - default is enabled
 const defaultTamperProtection = true
 
-// The default value of otel runtime subprocess execution mode if the flag is missing
-const defaultOtelSubprocessMode = false
-
 var (
 	current = Flags{
-		tamperProtection:        defaultTamperProtection,
-		otelSubprocessExecution: defaultOtelSubprocessMode,
+		tamperProtection: defaultTamperProtection,
 	}
 )
 
@@ -40,8 +36,7 @@ type Flags struct {
 	fqdn          bool
 	fqdnCallbacks map[string]BoolValueOnChangeCallback
 
-	tamperProtection        bool
-	otelSubprocessExecution bool
+	tamperProtection bool
 }
 
 type cfg struct {
@@ -53,9 +48,6 @@ type cfg struct {
 			TamperProtection *struct {
 				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
 			} `json:"tamper_protection,omitempty" yaml:"tamper_protection,omitempty" config:"tamper_protection,omitempty"`
-			Otel *struct {
-				SubprocessExecution bool `json:"subprocess_execution" yaml:"subprocess_execution" config:"subprocess_execution"`
-			} `json:"otel,omitempty" yaml:"otel,omitempty" config:"otel,omitempty"`
 		} `json:"features" yaml:"features" config:"features"`
 	} `json:"agent" yaml:"agent" config:"agent"`
 }
@@ -72,13 +64,6 @@ func (f *Flags) TamperProtection() bool {
 	defer f.mu.RUnlock()
 
 	return f.tamperProtection
-}
-
-func (f *Flags) OtelSubprocessExecution() bool {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
-
-	return f.otelSubprocessExecution
 }
 
 func (f *Flags) AsProto() *proto.Features {
@@ -134,14 +119,6 @@ func (f *Flags) setTamperProtection(newValue bool) {
 	defer f.mu.Unlock()
 
 	f.tamperProtection = newValue
-}
-
-// setOtelSubprocessExecution sets the value of the OtelSubprocessExecution flag in Flags.
-func (f *Flags) setOtelSubprocessExecution(newValue bool) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	f.otelSubprocessExecution = newValue
 }
 
 // setSource sets the source from he given cfg.
@@ -209,12 +186,6 @@ func Parse(policy any) (*Flags, error) {
 		flags.setTamperProtection(defaultTamperProtection)
 	}
 
-	if parsedFlags.Agent.Features.Otel != nil {
-		flags.setOtelSubprocessExecution(parsedFlags.Agent.Features.Otel.SubprocessExecution)
-	} else {
-		flags.setOtelSubprocessExecution(defaultOtelSubprocessMode)
-	}
-
 	if err := flags.setSource(parsedFlags); err != nil {
 		return nil, fmt.Errorf("error creating feature flags source: %w", err)
 	}
@@ -237,7 +208,6 @@ func Apply(c *config.Config) error {
 
 	current.setFQDN(parsed.FQDN())
 	current.setTamperProtection(parsed.TamperProtection())
-	current.setOtelSubprocessExecution(parsed.OtelSubprocessExecution())
 	return err
 }
 
@@ -249,9 +219,4 @@ func FQDN() bool {
 // TamperProtection reports if tamper protection feature is enabled
 func TamperProtection() bool {
 	return current.TamperProtection()
-}
-
-// OtelSubprocessExecution reports if otel subprocess execution feature is enabled
-func OtelSubprocessExecution() bool {
-	return current.OtelSubprocessExecution()
 }
