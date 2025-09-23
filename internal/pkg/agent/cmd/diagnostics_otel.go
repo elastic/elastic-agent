@@ -10,7 +10,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
-	"github.com/elastic/elastic-agent/pkg/control"
+	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 )
 
@@ -34,19 +34,38 @@ func newOtelDiagnosticsCommand(streams *cli.IOStreams) *cobra.Command {
 }
 
 func otelDiagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
-	daemon := client.New(client.WithAddress(control.AdressEDOT()))
-	if err := daemon.Connect(cmd.Context()); err != nil {
-		return err
-	}
-	agentDiag, err := daemon.DiagnosticAgent(cmd.Context(), nil)
+	resp, err := otel.PerformDiagnosticsExt(cmd.Context())
 	if err != nil {
-		return fmt.Errorf("failed to get edot agent diagnostics: %v", err)
+		return fmt.Errorf("failed to get edot diagnostics: %v", err)
 	}
 
-	componentDiag, err := daemon.DiagnosticComponents(cmd.Context(), nil)
-	if err != nil {
-		return fmt.Errorf("failed to get edot componen diagnostics: %v", err)
+	agentDiag := make([]client.DiagnosticFileResult, 0)
+	for _, r := range resp.GlobalDiagnostics {
+		agentDiag = append(agentDiag, client.DiagnosticFileResult{
+			Name:        r.Name,
+			Filename:    r.Filename,
+			ContentType: r.ContentType,
+			Content:     r.Content,
+			Description: r.Description,
+		})
 	}
+
+	componentDiag := make([]client.DiagnosticComponentResult, 0)
+	for _, r := range resp.ComponentDiagnostics {
+		res := client.DiagnosticComponentResult{
+			Results: make([]client.DiagnosticFileResult, 0),
+		}
+		res.Results = append(res.Results, client.DiagnosticFileResult{
+			Name:        r.Name,
+			Filename:    r.Filename,
+			ContentType: r.ContentType,
+			Content:     r.Content,
+			Description: r.Description,
+		})
+		res.ComponentID = r.Name
+		componentDiag = append(componentDiag, res)
+	}
+
 	filepath, _ := cmd.Flags().GetString("file")
 	if filepath == "" {
 		ts := time.Now().UTC()

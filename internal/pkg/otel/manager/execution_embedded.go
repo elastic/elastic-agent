@@ -6,7 +6,6 @@ package manager
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -40,8 +39,7 @@ func (r *embeddedExecution) startCollector(ctx context.Context, logger *logger.L
 		cancel:          collectorCancel,
 	}
 	extConf := map[string]any{
-		"host":    strings.TrimPrefix(paths.DiagnosticsExtensionSocket(), "unix://"),
-		"network": "unix",
+		"endpoint": paths.DiagnosticsExtensionSocket(),
 	}
 	// NewForceExtensionConverterFactory is used to ensure that the agent_status extension is always enabled.
 	// It is required for the Elastic Agent to extract the status out of the OTel collector.

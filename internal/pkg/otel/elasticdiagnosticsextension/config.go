@@ -11,19 +11,16 @@ import (
 )
 
 type Config struct {
-	Host    string `mapstructure:"host"`
-	Network string `mapstructure:"network"`
+	Endpoint string `mapstructure:"endpoint"`
 }
 
 func createDefaultConfig() component.Config {
-	return &Config{
-		Network: "unix",
-	}
+	return &Config{}
 }
 
 func (c *Config) Validate() error {
-	if c.Host == "" {
-		return errors.New("hosts is a required field")
+	if c.Endpoint == "" {
+		return errors.New("endpoint is a required field")
 	}
 	return nil
 }

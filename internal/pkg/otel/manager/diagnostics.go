@@ -162,7 +162,7 @@ func (m *OTelManager) PerformComponentDiagnostics(
 		diagnostics[idx].Err = errors.Join(errs...)
 	}
 
-	extDiagnostics, err := otel.PerformDiagnosticsExt()
+	extDiagnostics, err := otel.PerformDiagnosticsExt(ctx)
 	if errors.Is(err, syscall.ENOENT) || errors.Is(err, syscall.ECONNREFUSED) {
 		// We're not running the EDOT if:
 		//  1. Either the socket doesn't exist

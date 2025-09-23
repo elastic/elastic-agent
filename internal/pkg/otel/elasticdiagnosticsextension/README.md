@@ -1,6 +1,13 @@
 # elasticdiagnosticsextension
 
-`elasticdiagnosticsextension` is an internal package for peforming diagnostics and is used in conjunction with EDOT:
+`elasticdiagnosticsextension` is an internal package for peforming diagnostics and is used in conjunction with EDOT.
+
+## Configuration
+
+The extension accepts the `endpoint` as a sole parameter. The endpoint should begin with a valid protocol and it valid values are `unix` and `npipe` for now. Here are a few examples:
+
+- `unix:///tmp/elastic-agent/xyz.soc`
+- `npipe:///elastic-agent`
 
 ## Features
 

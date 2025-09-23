@@ -12,7 +12,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os"
 	"runtime/pprof"
 	"strconv"
 	"sync"
@@ -27,6 +26,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/pkg/ipc"
 )
 
 var (
@@ -55,27 +56,22 @@ type diagnosticsExtension struct {
 }
 
 type serviceConfig struct {
-	Service    service.Config         `mapstructure:"service"`
-	Beatconfig map[string]interface{} `mapstructure:",remain"`
+	Service    service.Config `mapstructure:"service"`
+	Beatconfig map[string]any `mapstructure:",remain"`
 }
 
 func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) error {
 	var err error
-	path := d.diagnosticsConfig.Host
-	if d.diagnosticsConfig.Network == "unix" {
-		if _, err := os.Stat(path); !os.IsNotExist(err) {
-			if err := os.Remove(path); err != nil {
-				return fmt.Errorf(
-					"cannot remove existing unix socket file at location %s: %w",
-					path, err,
-				)
-			}
-		}
+
+	l, err := logp.NewZapLogger(d.logger)
+	if err != nil {
+		// NewZapLogger always returns nil eror, so this shouldn't happen.
+		return fmt.Errorf("failed to create logp.Logger from zap logger: %w", err)
 	}
 
 	d.registerGlobalDiagnostics()
 
-	d.listener, err = net.Listen(d.diagnosticsConfig.Network, path)
+	d.listener, err = ipc.CreateListener(l, d.diagnosticsConfig.Endpoint)
 	if err != nil {
 		return fmt.Errorf("error creating listener: %w", err)
 	}

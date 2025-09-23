@@ -85,15 +85,6 @@ func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool,
 		return fmt.Errorf("failed to prepare collector settings: %w", err)
 	}
 
-	// create and start a new server that will listen for the diagnostics requests.
-	server := otel.NewServer()
-	if err := server.Start(); err != nil {
-		return fmt.Errorf("failed to start new server: %w", err)
-	}
-	defer func() {
-		server.Stop()
-	}()
-
 	// Windows: Mark service as stopped.
 	// After this is run, the service is considered by the OS to be stopped.
 	// This must be the first deferred cleanup task (last to execute).
@@ -121,8 +112,7 @@ func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool,
 func prepareCollectorSettings(configFiles []string, supervised bool, supervisedLoggingLevel string) (*otelcol.CollectorSettings, error) {
 	var settings *otelcol.CollectorSettings
 	conf := map[string]any{
-		"host":    paths.DiagnosticsExtensionSocket(),
-		"network": "unix",
+		"endpoint": paths.DiagnosticsExtensionSocket(),
 	}
 	if supervised {
 		// add stdin config provider
