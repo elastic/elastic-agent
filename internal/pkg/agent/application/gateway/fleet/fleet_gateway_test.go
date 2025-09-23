@@ -89,9 +89,8 @@ func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGat
 			client,
 			scheduler,
 			noop.New(),
-			emptyStateFetcher,
 			stateStore,
-			make(chan coordinator.State),
+			NewCheckinStateFetcher(emptyStateFetcher),
 		)
 
 		require.NoError(t, err)
@@ -229,9 +228,8 @@ func TestFleetGateway(t *testing.T) {
 			client,
 			scheduler,
 			noop.New(),
-			emptyStateFetcher,
 			stateStore,
-			make(chan coordinator.State),
+			NewCheckinStateFetcher(emptyStateFetcher),
 		)
 		require.NoError(t, err)
 
@@ -282,9 +280,8 @@ func TestFleetGateway(t *testing.T) {
 			client,
 			scheduler,
 			noop.New(),
-			emptyStateFetcher,
 			stateStore,
-			make(chan coordinator.State),
+			NewCheckinStateFetcher(emptyStateFetcher),
 		)
 		require.NoError(t, err)
 
@@ -342,9 +339,8 @@ func TestFleetGateway(t *testing.T) {
 			client,
 			scheduler,
 			noop.New(),
-			stateFetcher,
 			stateStore,
-			make(chan coordinator.State),
+			NewCheckinStateFetcher(stateFetcher),
 		)
 
 		require.NoError(t, err)
@@ -393,6 +389,8 @@ func TestFleetGateway(t *testing.T) {
 
 		stateChannel := make(chan coordinator.State, 10)
 
+		stateFetcher := NewFastCheckinStateFetcher(log, emptyStateFetcher, stateChannel)
+
 		gateway, err := newFleetGatewayWithScheduler(
 			log,
 			settings,
@@ -400,9 +398,8 @@ func TestFleetGateway(t *testing.T) {
 			client,
 			scheduler,
 			noop.New(),
-			emptyStateFetcher,
 			stateStore,
-			stateChannel,
+			stateFetcher,
 		)
 		require.NoError(t, err)
 
@@ -420,7 +417,7 @@ func TestFleetGateway(t *testing.T) {
 		errCh := runFleetGateway(ctx, gateway)
 		// start state watcher
 		go func() {
-			err := gateway.StateWatch(ctx)
+			err := stateFetcher.StartStateWatch(ctx)
 			assert.ErrorIs(t, err, context.Canceled)
 		}()
 		scheduler.Next()

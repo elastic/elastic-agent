@@ -7,6 +7,8 @@ package application
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -168,16 +170,22 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		}
 	}
 
-	gatewayStateSub := m.coord.StateSubscribe(ctx, 32)
+	agentlessFastCheckin, _ := strconv.ParseBool(os.Getenv("AGENTLESS_FAST_LOGIN"))
+	var stateFetcher fleetgateway.StateFetcher
+	if agentlessFastCheckin {
+		gatewayStateSub := m.coord.StateSubscribe(ctx, 32)
+		stateFetcher = fleetgateway.NewFastCheckinStateFetcher(m.log, m.coord.State, gatewayStateSub)
+	} else {
+		stateFetcher = fleetgateway.NewCheckinStateFetcher(m.coord.State)
+	}
 
 	gateway, err := fleetgateway.New(
 		m.log,
 		m.agentInfo,
 		m.client,
 		m.actionAcker,
-		m.coord.State,
 		m.stateStore,
-		gatewayStateSub,
+		stateFetcher,
 	)
 	if err != nil {
 		return err
@@ -211,12 +219,13 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		}
 	})
 
-	gatewayStateWatch := runner.Start(context.Background(), gateway.StateWatch)
-
 	// Run the gateway.
 	gatewayRunner := runner.Start(gatewayCtx, func(ctx context.Context) error {
 		defer gatewayErrorsRunner.Stop()
-		defer gatewayStateWatch.Stop()
+		if agentlessFastCheckin {
+			stateWatch := runner.Start(context.Background(), stateFetcher.StartStateWatch)
+			defer stateWatch.Stop()
+		}
 		return gateway.Run(ctx)
 	})
 

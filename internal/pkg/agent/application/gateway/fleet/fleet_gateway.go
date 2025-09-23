@@ -83,11 +83,8 @@ type FleetGateway struct {
 	acker              acker.Acker
 	unauthCounter      int
 	checkinFailCounter int
-	stateFetcher       func() coordinator.State
 	stateStore         stateStore
-	stateChan          chan coordinator.State
-	checkinCancel      context.CancelCauseFunc
-	checkinStateMutex  sync.Mutex
+	stateFetcher       StateFetcher
 	errCh              chan error
 	actionCh           chan []fleetapi.Action
 }
@@ -98,9 +95,8 @@ func New(
 	agentInfo agentInfo,
 	client client.Sender,
 	acker acker.Acker,
-	stateFetcher func() coordinator.State,
 	stateStore stateStore,
-	stateChan chan coordinator.State,
+	stateFetcher StateFetcher,
 ) (*FleetGateway, error) {
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	return newFleetGatewayWithScheduler(
@@ -110,9 +106,8 @@ func New(
 		client,
 		scheduler,
 		acker,
-		stateFetcher,
 		stateStore,
-		stateChan,
+		stateFetcher,
 	)
 }
 
@@ -123,9 +118,8 @@ func newFleetGatewayWithScheduler(
 	client client.Sender,
 	scheduler scheduler.Scheduler,
 	acker acker.Acker,
-	stateFetcher func() coordinator.State,
 	stateStore stateStore,
-	stateChan chan coordinator.State,
+	stateFetcher StateFetcher,
 ) (*FleetGateway, error) {
 	return &FleetGateway{
 		log:          log,
@@ -136,7 +130,6 @@ func newFleetGatewayWithScheduler(
 		acker:        acker,
 		stateFetcher: stateFetcher,
 		stateStore:   stateStore,
-		stateChan:    stateChan,
 		errCh:        make(chan error),
 		actionCh:     make(chan []fleetapi.Action, 1),
 	}, nil
@@ -358,8 +351,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// get current state
-	var state coordinator.State
-	state, ctx = f.initCheckIn(ctx)
+	state, stateCTX := f.stateFetcher.FetchState(ctx)
 
 	// convert components into checkin components structure
 	components := f.convertToCheckinComponents(state.Components, state.Collector)
@@ -379,8 +371,8 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 		UpgradeDetails: state.UpgradeDetails,
 	}
 
-	resp, took, err := cmd.Execute(ctx, req)
-	f.endCheckIn()
+	resp, took, err := cmd.Execute(stateCTX, req)
+	f.stateFetcher.Done()
 	if isUnauth(err) {
 		f.unauthCounter++
 		if f.shouldUseLongSched() {
@@ -409,57 +401,6 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	return resp, took, nil
-}
-
-func (f *FleetGateway) StateWatch(ctx context.Context) error {
-	f.log.Info("FleetGateway state watching started")
-	for {
-		select {
-		case <-ctx.Done():
-			f.log.Info("FleetGateway state watching stopped")
-			return ctx.Err()
-		case st := <-f.stateChan:
-			f.log.Infof("FleetGateway state change notification %#v", st)
-			// TODO: check for specific changes?
-			f.cancelCheckIn()
-		}
-	}
-}
-
-// initCheckIn wraps the state fetching to send in the check-in request under the checkin state mutex.
-// After the state is fetched the checkin cancellation function has be initialized and the new context
-// is returned.
-func (f *FleetGateway) initCheckIn(ctx context.Context) (coordinator.State, context.Context) {
-	f.checkinStateMutex.Lock()
-	defer f.checkinStateMutex.Unlock()
-
-	if f.checkinCancel != nil {
-		f.checkinCancel(nil) // ensure ctx cleanup
-	}
-
-	ctx2, ctxCancel := context.WithCancelCause(ctx)
-	state := f.stateFetcher()
-	f.checkinCancel = ctxCancel
-	return state, ctx2
-}
-
-func (f *FleetGateway) endCheckIn() {
-	f.checkinStateMutex.Lock()
-	defer f.checkinStateMutex.Unlock()
-
-	if f.checkinCancel != nil {
-		f.checkinCancel(nil) // ensure ctx cleanup
-		f.checkinCancel = nil
-	}
-}
-
-func (f *FleetGateway) cancelCheckIn() {
-	f.checkinStateMutex.Lock()
-	defer f.checkinStateMutex.Unlock()
-
-	if f.checkinCancel != nil {
-		f.checkinCancel(errComponentStateChanged)
-	}
 }
 
 // shouldUseLongSched checks if the max number of trying an invalid key is reached
@@ -513,3 +454,99 @@ func RequestBackoff(done <-chan struct{}) backoff.Backoff {
 }
 
 var errComponentStateChanged = errors.New("error component state changed")
+
+type StateFetcher interface {
+	// FetchState returns the current state and a context that is valid as long as the returned state is valid to use.
+	FetchState(ctx context.Context) (coordinator.State, context.Context)
+	// Done should be called once the checkin call is complete.
+	Done()
+	StartStateWatch(ctx context.Context) error
+}
+
+type FastCheckinStateFetcher struct {
+	log       *logger.Logger
+	fetcher   func() coordinator.State
+	stateChan chan coordinator.State
+
+	cancel context.CancelCauseFunc
+	mutex  sync.Mutex
+}
+
+func NewFastCheckinStateFetcher(log *logger.Logger, fetcher func() coordinator.State, stateChan chan coordinator.State) *FastCheckinStateFetcher {
+	return &FastCheckinStateFetcher{
+		log:       log,
+		fetcher:   fetcher,
+		stateChan: stateChan,
+		cancel:    nil,
+		mutex:     sync.Mutex{},
+	}
+}
+
+// Fetch wraps the state fetching to send in the check-in request under the checkin state mutex.
+// After the state is fetched the checkin cancellation function has be initialized and the new context
+// is returned.
+func (s *FastCheckinStateFetcher) FetchState(ctx context.Context) (coordinator.State, context.Context) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.cancel != nil {
+		s.cancel(nil) // ensure ctx cleanup
+	}
+
+	ctx2, ctxCancel := context.WithCancelCause(ctx)
+	state := s.fetcher()
+	s.cancel = ctxCancel
+	return state, ctx2
+}
+
+func (s *FastCheckinStateFetcher) Done() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.cancel != nil {
+		s.cancel(nil) // ensure ctx cleanup
+		s.cancel = nil
+	}
+}
+
+func (s *FastCheckinStateFetcher) invalidateState() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.cancel != nil {
+		s.cancel(errComponentStateChanged)
+	}
+}
+
+func (s *FastCheckinStateFetcher) StartStateWatch(ctx context.Context) error {
+	s.log.Info("FleetGateway state watching started")
+	for {
+		select {
+		case <-ctx.Done():
+			s.log.Info("FleetGateway state watching stopped")
+			return ctx.Err()
+		case st := <-s.stateChan:
+			s.log.Infof("FleetGateway state change notification %#v", st)
+			// TODO: consider check for specific changes e.g. degraded?
+			s.invalidateState()
+		}
+	}
+}
+
+// CheckinStateFetcher implements the simple state fetching without any invalidation or fast checkin logic.
+type CheckinStateFetcher struct {
+	fetcher func() coordinator.State
+}
+
+func NewCheckinStateFetcher(fetcher func() coordinator.State) *CheckinStateFetcher {
+	return &CheckinStateFetcher{fetcher: fetcher}
+}
+
+// FetchState returns the current state and the given ctx because the current state is always valid to use.
+func (s *CheckinStateFetcher) FetchState(ctx context.Context) (coordinator.State, context.Context) {
+	state := s.fetcher()
+	return state, ctx
+}
+
+func (s *CheckinStateFetcher) Done()                                     {}
+func (s *CheckinStateFetcher) StartStateWatch(ctx context.Context) error { return nil }
