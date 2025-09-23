@@ -48,7 +48,7 @@ import (
 	"go.opentelemetry.io/collector/processor/batchprocessor"                                                          // for batching events
 	"go.opentelemetry.io/collector/processor/memorylimiterprocessor"
 
-	"github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor"
+	elasticapmprocessor "github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor"
 
 	"github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor"
 
@@ -132,7 +132,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			elasticinframetricsprocessor.NewFactory(),
 			resourcedetectionprocessor.NewFactory(),
 			memorylimiterprocessor.NewFactory(),
-			elastictraceprocessor.NewFactory(),
+			elasticapmprocessor.NewFactory(),
 			tailsamplingprocessor.NewFactory(),
 		)
 		if err != nil {
