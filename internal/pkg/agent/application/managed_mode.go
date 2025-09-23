@@ -170,9 +170,9 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		}
 	}
 
-	agentlessFastCheckin, _ := strconv.ParseBool(os.Getenv("AGENTLESS_FAST_LOGIN"))
+	fastCheckin, _ := strconv.ParseBool(os.Getenv("FAST_CHECKIN"))
 	var stateFetcher fleetgateway.StateFetcher
-	if agentlessFastCheckin {
+	if fastCheckin {
 		gatewayStateSub := m.coord.StateSubscribe(ctx, 32)
 		stateFetcher = fleetgateway.NewFastCheckinStateFetcher(m.log, m.coord.State, gatewayStateSub)
 	} else {
@@ -222,7 +222,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	// Run the gateway.
 	gatewayRunner := runner.Start(gatewayCtx, func(ctx context.Context) error {
 		defer gatewayErrorsRunner.Stop()
-		if agentlessFastCheckin {
+		if fastCheckin {
 			stateWatch := runner.Start(context.Background(), stateFetcher.StartStateWatch)
 			defer stateWatch.Stop()
 		}
