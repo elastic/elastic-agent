@@ -6,6 +6,8 @@ package fleet
 
 import (
 	"context"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -551,3 +553,15 @@ func (s *CheckinStateFetcher) FetchState(ctx context.Context) (coordinator.State
 
 func (s *CheckinStateFetcher) Done()                                     {}
 func (s *CheckinStateFetcher) StartStateWatch(ctx context.Context) error { return nil }
+
+func FastCheckinEnabled(log *logger.Logger) bool {
+	if v, exists := os.LookupEnv("FAST_CHECKIN"); exists {
+		if b, err := strconv.ParseBool(v); err != nil {
+			log.Warnf("invalid AST_CHECKIN=%q; fast checkin is disabled.", v)
+		} else {
+			return b
+		}
+	}
+
+	return false
+}

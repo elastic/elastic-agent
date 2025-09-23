@@ -7,8 +7,6 @@ package application
 import (
 	"context"
 	"fmt"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -170,7 +168,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		}
 	}
 
-	fastCheckin, _ := strconv.ParseBool(os.Getenv("FAST_CHECKIN"))
+	fastCheckin := fleetgateway.FastCheckinEnabled(m.log)
 	var stateFetcher fleetgateway.StateFetcher
 	if fastCheckin {
 		gatewayStateSub := m.coord.StateSubscribe(ctx, 32)
