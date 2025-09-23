@@ -736,7 +736,7 @@ func TestFastCheckinStateFetcher(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			err := s.StartStateWatch(ctx)
-			assert.NoError(t, err, "error on StartStateWatch")
+			assert.ErrorIs(t, err, context.Canceled, "error on StartStateWatch")
 		}()
 
 		t.Cleanup(func() {
