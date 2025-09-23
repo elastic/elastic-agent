@@ -307,7 +307,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"authenticator": "beatsauth/_agent-component/" + outputName,
 			},
 			"tls": map[string]any{
-				"min_version": "1.1",
+				"min_version": "1.2",
 				"max_version": "1.3",
 			},
 		}
