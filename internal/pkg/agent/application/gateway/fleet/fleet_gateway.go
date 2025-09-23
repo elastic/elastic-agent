@@ -515,6 +515,7 @@ func (s *FastCheckinStateFetcher) invalidateState() {
 
 	if s.cancel != nil {
 		s.cancel(errComponentStateChanged)
+		s.cancel = nil
 	}
 }
 

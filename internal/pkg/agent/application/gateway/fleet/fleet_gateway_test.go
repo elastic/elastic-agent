@@ -753,6 +753,20 @@ func TestFastCheckinStateFetcher(t *testing.T) {
 		assert.Nil(t, s.cancel)
 	})
 
+	t.Run("fetch state and then done", func(t *testing.T) {
+		s := init(t)
+		assert.Nil(t, s.cancel)
+
+		_, ctx := s.FetchState(t.Context())
+		assert.NoError(t, ctx.Err())
+		assert.NotNil(t, s.cancel)
+
+		s.Done()
+		assert.Nil(t, s.cancel)
+		assert.NotErrorIs(t, context.Cause(ctx), errComponentStateChanged)
+		assert.ErrorIs(t, ctx.Err(), context.Canceled)
+	})
+
 	t.Run("state change should invalidate context", func(t *testing.T) {
 		s := init(t)
 		assert.Nil(t, s.cancel)
@@ -764,6 +778,7 @@ func TestFastCheckinStateFetcher(t *testing.T) {
 		s.stateChan <- coordinator.State{}
 
 		<-ctx.Done()
+		assert.Nil(t, s.cancel)
 		assert.ErrorIs(t, context.Cause(ctx), errComponentStateChanged)
 		assert.ErrorIs(t, ctx.Err(), context.Canceled)
 	})
