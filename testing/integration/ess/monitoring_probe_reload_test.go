@@ -7,15 +7,14 @@
 package ess
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -31,6 +30,7 @@ type MonitoringRunner struct {
 	suite.Suite
 	info         *define.Info
 	agentFixture *atesting.Fixture
+	agentID      string
 
 	ESHost string
 
@@ -81,11 +81,12 @@ func (runner *MonitoringRunner) SetupSuite() {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
-	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
+	policyResp, agentID, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
 
 	runner.policyID = policyResp.ID
 	runner.policyName = basePolicy.Name
+	runner.agentID = agentID
 
 	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "system",
 		integration.PreinstalledPackages["system"], "testdata/system_integration_setup.json", uuid.Must(uuid.NewV4()).String(), policyResp.ID)
@@ -107,12 +108,10 @@ func (runner *MonitoringRunner) TestMonitoringLiveness() {
 	_, err = client.Do(req)
 	require.Error(runner.T(), err)
 
-	// use the fleet override API to enable http monitoring.
-	// This tests both the http server itself, and tests that the agent reloader actually reloads the agent config.
-	override := map[string]interface{}{
-		"name":      runner.policyName,
-		"namespace": "default",
-		"overrides": map[string]interface{}{
+	overrideUpdateRequest := kibana.AgentPolicyUpdateRequest{
+		Name:      runner.policyName,
+		Namespace: "default",
+		Overrides: map[string]interface{}{
 			"agent": map[string]interface{}{
 				"monitoring": map[string]interface{}{
 					"http": map[string]interface{}{
@@ -125,19 +124,22 @@ func (runner *MonitoringRunner) TestMonitoringLiveness() {
 		},
 	}
 
-	raw, err := json.Marshal(override)
+	policyResponse, err := runner.info.KibanaClient.UpdatePolicy(ctx, runner.policyID, overrideUpdateRequest)
 	require.NoError(runner.T(), err)
-	reader := bytes.NewBuffer(raw)
-	overrideEndpoint := fmt.Sprintf("/api/fleet/agent_policies/%s", runner.policyID)
-	statusCode, overrideResp, err := runner.info.KibanaClient.Request("PUT", overrideEndpoint, nil, nil, reader)
-	require.NoError(runner.T(), err)
-	require.Equal(runner.T(), http.StatusOK, statusCode, "non-200 status code; got response: %s", string(overrideResp))
+
+	// verify the new policy revision was applied
+	require.Eventually(
+		runner.T(),
+		tools.IsPolicyRevision(ctx, runner.T(), runner.info.KibanaClient, runner.agentID, policyResponse.Revision),
+		5*time.Minute, time.Second)
 
 	runner.AllComponentsHealthy(ctx)
 
 	// check to make sure that we now have a liveness probe response
-	req, err = http.NewRequestWithContext(ctx, "GET", endpoint, nil)
-	require.NoError(runner.T(), err)
+	require.EventuallyWithT(runner.T(), func(collect *assert.CollectT) {
+		req, err = http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+		require.NoError(collect, err)
+	}, time.Minute, time.Second)
 
 	// second check: the /liveness endpoint should now be responding
 	runner.CheckResponse(ctx, endpoint)
