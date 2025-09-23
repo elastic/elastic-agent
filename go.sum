@@ -485,8 +485,8 @@ github.com/eclipse/paho.mqtt.golang v1.3.5 h1:sWtmgNxYM9P2sP+xEItMozsR3w0cqZFlqn
 github.com/eclipse/paho.mqtt.golang v1.3.5/go.mod h1:eTzb4gxwwyWpqBUHGQZ4ABAV7+Jgm1PklsYT/eo8Hcc=
 github.com/edsrzf/mmap-go v1.2.0 h1:hXLYlkbaPzt1SaQk+anYwKSRNhufIDCchSPkUD6dD84=
 github.com/edsrzf/mmap-go v1.2.0/go.mod h1:19H/e8pUPLicwkyNgOykDXkJ9F0MHE+Z52B8EIth78Q=
-github.com/elastic/apm-data v1.19.3 h1:0YRRl959sJ3JSnC1q+VHYWA8OB2oJyH3/CccuW7ZKy4=
-github.com/elastic/apm-data v1.19.3/go.mod h1:BwJ24/gSmDI006SfilOoeDSvm9p9tQ9M9NAZ6zbX2GE=
+github.com/elastic/apm-data v1.18.0 h1:GaWnrIoh7+UPmsbkQGls3tSCVk54sJng2v2YCYGpwyM=
+github.com/elastic/apm-data v1.18.0/go.mod h1:Bm4VpGkWHwVRAA32kVyVk1f9urv0dnh86DGFdOIiewk=
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic h1:fxOiGmMPr1dVDAKRGOkp9MV2amPmaZrWPtWJygFxcG0=
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic/go.mod h1:0vCBR1wgGwZeGmloJ+eCWIZF2S47grTXRzj2mftg2Nk=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
@@ -549,6 +549,8 @@ github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6 h1:JVNuBrmOoqLJgp9
 github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6/go.mod h1:cXqWcLnmu5y4QveTb2hjk7rgzkHMuZsqeXtbJpNAcu0=
 github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.7.0 h1:3ybnA6XiknHVMvBEveg9A9EdEZdwomSPPNNMBoGJNeY=
 github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.7.0/go.mod h1:HPkMY+YddFD5GhpCpSNAcH7KskuiLHYNhIsFHuynb9s=
+github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.0.0-20250922093401-a76a7ba0448a h1:gkxFYAatjV7EJBrW/NN9g0RoB2aFhUF+3RT2s3YyCKs=
+github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.0.0-20250922093401-a76a7ba0448a/go.mod h1:32oxXjqEB3/otYGIkQq6fXirtlG87ZgDxriCrcii2z4=
 github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.5.0 h1:d2EAQ8x4wsOrXG/I1+UU+/+I54Ul7XzoUZIxnqvxE/A=
 github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.5.0/go.mod h1:cFYEgKv+BsimfqeeyfRTTGP/AoHbhwhhJH44W9S/x5Y=
 github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.7.0 h1:QdBoEpDp5PKVlrQ7n+eTDG+tDpBmLBppcVhsuvKyXik=

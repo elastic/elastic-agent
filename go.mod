@@ -27,6 +27,7 @@ require (
 	github.com/elastic/go-ucfg v0.8.9-0.20250307075119-2a22403faaea
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.7.0
+	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.0.0-20250922093401-a76a7ba0448a
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.5.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.7.0
 	github.com/elastic/opentelemetry-collector-components/extension/beatsauthextension v0.3.0
@@ -49,6 +50,9 @@ require (
 	github.com/magefile/mage v1.15.0
 	github.com/oklog/ulid/v2 v2.1.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.135.0
@@ -58,12 +62,28 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/cumulativetodeltaprocessor v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/geoipprocessor v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.135.0
@@ -85,9 +105,16 @@ require (
 	go.elastic.co/go-licence-detector v0.7.0
 	go.opentelemetry.io/collector/component/componentstatus v0.135.0
 	go.opentelemetry.io/collector/connector/forwardconnector v0.135.0
+	go.opentelemetry.io/collector/exporter/debugexporter v0.135.0
+	go.opentelemetry.io/collector/exporter/nopexporter v0.135.0
+	go.opentelemetry.io/collector/exporter/otlpexporter v0.135.0
+	go.opentelemetry.io/collector/exporter/otlphttpexporter v0.135.0
+	go.opentelemetry.io/collector/extension/memorylimiterextension v0.135.0
 	go.opentelemetry.io/collector/pipeline v1.41.0
+	go.opentelemetry.io/collector/processor/batchprocessor v0.135.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.135.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.135.0
+	go.opentelemetry.io/collector/receiver/otlpreceiver v0.135.0
 	go.opentelemetry.io/ebpf-profiler v0.0.202536
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.41.0
@@ -121,25 +148,6 @@ require (
 
 require (
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.135.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.135.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.135.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.135.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.135.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/processor/cumulativetodeltaprocessor v0.135.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.135.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/processor/geoipprocessor v0.135.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor v0.135.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor v0.135.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.135.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.135.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver v0.135.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.135.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.135.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver v0.135.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver v0.135.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.135.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver v0.135.0
 	go.opentelemetry.io/collector/component v1.41.0
 	go.opentelemetry.io/collector/confmap v1.41.0
 	go.opentelemetry.io/collector/confmap/provider/envprovider v1.41.0
@@ -149,18 +157,11 @@ require (
 	go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.41.0
 	go.opentelemetry.io/collector/connector v0.135.0
 	go.opentelemetry.io/collector/exporter v0.135.0
-	go.opentelemetry.io/collector/exporter/debugexporter v0.135.0
-	go.opentelemetry.io/collector/exporter/nopexporter v0.135.0
-	go.opentelemetry.io/collector/exporter/otlpexporter v0.135.0
-	go.opentelemetry.io/collector/exporter/otlphttpexporter v0.135.0
 	go.opentelemetry.io/collector/extension v1.41.0
-	go.opentelemetry.io/collector/extension/memorylimiterextension v0.135.0
 	go.opentelemetry.io/collector/featuregate v1.41.0
 	go.opentelemetry.io/collector/otelcol v0.135.0
 	go.opentelemetry.io/collector/processor v1.41.0
-	go.opentelemetry.io/collector/processor/batchprocessor v0.135.0
 	go.opentelemetry.io/collector/receiver v1.41.0
-	go.opentelemetry.io/collector/receiver/otlpreceiver v0.135.0
 )
 
 require (
@@ -338,7 +339,7 @@ require (
 	github.com/ebitengine/purego v0.9.0-alpha.3.0.20250507171635-5047c08daa38 // indirect
 	github.com/eclipse/paho.mqtt.golang v1.3.5 // indirect
 	github.com/edsrzf/mmap-go v1.2.0 // indirect
-	github.com/elastic/apm-data v1.19.3 // indirect
+	github.com/elastic/apm-data v1.18.0 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
 	github.com/elastic/go-docappender/v2 v2.11.0 // indirect
