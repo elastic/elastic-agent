@@ -208,11 +208,45 @@ func (d *Dict) Vars(vars []string, defaultProvider string) []string {
 // Apply applies the vars to all the nodes in the dictionary. This does not modify the original dictionary.
 func (d *Dict) Apply(vars *Vars) (Node, error) {
 	nodes := make([]Node, 0, len(d.value))
+
+	// First, check if the dictionary contains a "condition" key and evaluate it before processing other fields.
+	// This ensures that if the "condition" evaluates to false, the entire dictionary is removed early,
+	// which prevents errors from undefined variables in other fields, since those fields are not evaluated.
+	// For example: {other_key: "${env.UNDEF}", condition: "exists(${env.UNDEF})"}
 	for _, v := range d.value {
 		if v == nil {
 			continue
 		}
 		k := v.(*Key)
+		if k.name == conditionKey {
+			n, err := k.Apply(vars)
+			if err != nil {
+				return nil, err
+			}
+			if n == nil {
+				// should not happen, because the value of a condition should be a StrVal
+				return nil, fmt.Errorf("condition key evaluated to nil after variable substitution")
+			}
+			b := n.Value().(*BoolVal)
+			if !b.value {
+				// condition failed; whole dictionary should be removed
+				return nil, nil
+			}
+			// condition successful, but don't include condition in result
+			break
+		}
+	}
+
+	// Now process the rest of the nodes
+	for _, v := range d.value {
+		if v == nil {
+			continue
+		}
+		k := v.(*Key)
+		if k.name == conditionKey {
+			// already processed above
+			continue
+		}
 		n, err := k.Apply(vars)
 		if err != nil {
 			return nil, err
@@ -220,17 +254,9 @@ func (d *Dict) Apply(vars *Vars) (Node, error) {
 		if n == nil {
 			continue
 		}
-		if k.name == conditionKey {
-			b := n.Value().(*BoolVal)
-			if !b.value {
-				// condition failed; whole dictionary should be removed
-				return nil, nil
-			}
-			// condition successful, but don't include condition in result
-			continue
-		}
 		nodes = append(nodes, n)
 	}
+
 	return &Dict{nodes, nil}, nil
 }
 
