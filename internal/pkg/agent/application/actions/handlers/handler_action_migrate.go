@@ -77,11 +77,16 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 		return err
 	}
 
+	// signed data contains secret reference
+	enrollmentToken := action.Data.EnrollmentToken
+
 	if signedData != nil {
 		if err := json.Unmarshal(signedData, &action.Data); err != nil {
 			return fmt.Errorf("failed to convert signed data to action data: %w", err)
 		}
 	}
+
+	action.Data.EnrollmentToken = enrollmentToken
 
 	if err := h.coord.Migrate(ctx, action, fleetgateway.RequestBackoff); err != nil {
 		// this should not happen, unmanaged agent should not receive the action
