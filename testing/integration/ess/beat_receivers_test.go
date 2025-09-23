@@ -851,26 +851,37 @@ agent.monitoring.enabled: false
 		assertBeatsHealthy(collect, &status, component.ProcessRuntimeManager, 1)
 		return
 	}, 1*time.Minute, 1*time.Second)
-	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000"})
+	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
+	require.NoError(t, err)
 
 	// verify we've logged a warning about using the process runtime
-	var logRecord map[string]any
+	var unsupportedLogRecord map[string]any
 	for _, line := range strings.Split(string(logsBytes), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
+		var logRecord map[string]any
 		if unmarshalErr := json.Unmarshal([]byte(line), &logRecord); unmarshalErr != nil {
 			continue
 		}
 
-		if message, ok := logRecord["message"].(string); !ok || !strings.HasPrefix(message, "otel runtime is not supported") {
-			continue
+		if message, ok := logRecord["message"].(string); ok && strings.HasPrefix(message, "otel runtime is not supported") {
+			unsupportedLogRecord = logRecord
+			break
 		}
 	}
-	assert.NotNil(t, logRecord)
-	message, ok := logRecord["message"].(string)
-	require.True(t, ok)
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent logs seen by the test:")
+			t.Log(string(logsBytes))
+		}
+	})
+
+	require.NotNil(t, unsupportedLogRecord, "unsupported log message should be present")
+	message, ok := unsupportedLogRecord["message"].(string)
+	require.True(t, ok, "log message field should be a string")
 	expectedMessage := "otel runtime is not supported for component system/metrics-default, switching to process runtime, reason: unsupported configuration for system/metrics-default: error translating config for output: default, unit: system/metrics-default, error: allow_older_versions:false is currently not supported: unsupported operation"
 	assert.Equal(t, expectedMessage, message)
 }
