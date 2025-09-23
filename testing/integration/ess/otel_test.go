@@ -1640,6 +1640,10 @@ service:
 		"elastic_agent.id",
 		"elastic_agent.snapshot",
 		"elastic_agent.version",
+
+		// only in fbreceiver doc
+		"agent.otelcol.component.id",
+		"agent.otelcol.component.kind",
 	}
 
 	AssertMapsEqual(t, doc1, doc2, ignoredFields, "expected documents to be equal")
