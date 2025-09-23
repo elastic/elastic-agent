@@ -779,8 +779,11 @@ func TestFastCheckinStateFetcher(t *testing.T) {
 		s.stateChan <- coordinator.State{}
 
 		<-ctx.Done()
-		assert.Nil(t, s.cancel)
 		assert.ErrorIs(t, context.Cause(ctx), errComponentStateChanged)
 		assert.ErrorIs(t, ctx.Err(), context.Canceled)
+
+		s.mutex.Lock()
+		assert.Nil(t, s.cancel)
+		s.mutex.Unlock()
 	})
 }
