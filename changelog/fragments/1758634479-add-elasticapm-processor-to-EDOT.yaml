@@ -18,10 +18,6 @@ summary: Replacing the elastictrace processor with the elasticapm processor in E
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-description: T
-    The `elasticapm` processor provides similar functionality to the `elastictrace` processor, but with improved performance and additional features.
-    Users are encouraged to update their configurations to use the `elasticapm` processor instead of the `elastictrace` processor to take advantage of these improvements.  
-
 description: 
     The `elastictrace` processor has been deprecated and replaced with the `elasticapm` processor in the Elastic Distribution of OpenTelemetry (EDOT).
     The `elasticapm` processor has all the functionality of the `elastictrace` processor, plus it also supports logs and metrics in addition to traces.
