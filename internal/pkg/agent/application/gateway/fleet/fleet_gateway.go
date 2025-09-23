@@ -557,7 +557,7 @@ func (s *CheckinStateFetcher) StartStateWatch(ctx context.Context) error { retur
 func FastCheckinEnabled(log *logger.Logger) bool {
 	if v, exists := os.LookupEnv("FAST_CHECKIN"); exists {
 		if b, err := strconv.ParseBool(v); err != nil {
-			log.Warnf("invalid AST_CHECKIN=%q; fast checkin is disabled.", v)
+			log.Warnf("invalid FAST_CHECKIN=%q; fast checkin is disabled.", v)
 		} else {
 			return b
 		}
