@@ -77,8 +77,8 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 		return err
 	}
 
-	// signed data contains secret reference in a form of $co.elastic.secret{secret_id}
-	// this is replaced by fleet server on serve
+	// signed data contains secret reference to the enrollment token so we extract the cleartext value 
+	// out of action.Data and replace it after unmarshalling the signed data into action.Data
 	// see: https://github.com/elastic/fleet-server/blob/22f1f7a0474080d3f56c7148a6505cff0957f549/internal/pkg/secret/secret.go#L75
 	enrollmentToken := action.Data.EnrollmentToken
 
