@@ -1,3 +1,6 @@
+:::{include} /release-notes/_snippets/9.1.4/index.md
+:::
+
 :::{include} /release-notes/_snippets/9.1.3/index.md
 :::
 
@@ -8,6 +11,9 @@
 :::
 
 :::{include} /release-notes/_snippets/9.1.0/index.md
+:::
+
+:::{include} /release-notes/_snippets/9.0.7/index.md
 :::
 
 :::{include} /release-notes/_snippets/9.0.6/index.md

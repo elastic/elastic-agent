@@ -1,3 +1,4 @@
+# REQUIRED
 # Kind can be one of:
 # - breaking-change: a change to previously-documented behavior
 # - deprecation: functionality that is being removed in a later release
@@ -8,25 +9,37 @@
 # - security: impacts on the security of a product or a user’s deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
-kind: enhancement
+kind: bug-fix
 
+# REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: Bump kube-stack Helm Chart to 0.9.1 and enable the cluster collector
+summary: reduce-default-telemetry-frequency
 
+# REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-# NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-#description:
+description: 
+    Reduce the default telemetry frequency to 60 seconds.
+    This change aims to lower infrastructure costs and reduce label churn in
+    time-series storage. High-cardinality labels sampled too frequently inflate
+    storage and index size, and increase query latency with limited added
+    value.  
+    Environments that require higher resolution can change the `collection_interval` for `hostmetrics`, `kubeletstats` and `k8s_cluster` receivers to a lower value.
 
+# REQUIRED for all kinds
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
 
-# PR URL; optional; the PR number that added the changeset.
+# AUTOMATED
+# OPTIONAL to manually add other PR URLs
+# PR URL: A link the PR that added the changeset.
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
 # NOTE: the tooling supports backports, so it's able to fill the original PR number instead of the backport PR number.
 # Please provide it if you are adding a fragment for a different PR.
-#pr: https://github.com/owner/repo/1234
+pr: https://github.com/elastic/elastic-agent/pull/9987
 
+# AUTOMATED
+# OPTIONAL to manually add other issue URLs
 # Issue URL; optional; the GitHub issue related to this changeset (either closes or is part of).
 # If not present is automatically filled by the tooling with the issue linked to the PR number.
-#issue: https://github.com/owner/repo/1234
+# issue: https://github.com/owner/repo/1234

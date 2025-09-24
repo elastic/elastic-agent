@@ -1,0 +1,24 @@
+receivers:
+  # Receives data from other Collectors in Agent mode
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317 # Listen on all interfaces
+      http:
+        endpoint: 0.0.0.0:4318 # Listen on all interfaces
+
+exporters:
+  loadbalancing:
+    protocol:
+      otlp:
+    resolver:
+      static:
+        hostnames: [ http://localhost:4320, http://localhost:4321 ]
+    routing_key: traceID
+
+service:
+  pipelines:
+    traces:
+      receivers: [ otlp ]
+      processors: []
+      exporters: [ loadbalancing ]
