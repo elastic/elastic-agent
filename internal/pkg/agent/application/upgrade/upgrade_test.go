@@ -1586,15 +1586,10 @@ func TestUpgradeErrorHandling(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-<<<<<<< HEAD
-			upgrader, err := NewUpgrader(log, &artifact.Config{}, mockAgentInfo)
-=======
 			baseDir := t.TempDir()
 			paths.SetTop(baseDir)
 
-			mockWatcherHelper := NewMockWatcherHelper(t)
-			upgrader, err := NewUpgrader(log, &artifact.Config{}, nil, mockAgentInfo, mockWatcherHelper)
->>>>>>> ab23962a0 (Enhancement/5235 upgrade cleans up downloads and extracted agent (#9386))
+			upgrader, err := NewUpgrader(log, &artifact.Config{}, mockAgentInfo)
 			require.NoError(t, err)
 
 			tc.upgraderMocker(upgrader, filepath.Join(baseDir, "mockArchive"), "versionedHome")
