@@ -15,6 +15,7 @@ import (
 	"runtime/pprof"
 	"strconv"
 	"sync"
+	"time"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config/configtelemetry"
@@ -43,7 +44,7 @@ type diagHook struct {
 
 type diagnosticsExtension struct {
 	listener net.Listener
-	server   http.Server
+	server   *http.Server
 	logger   *zap.Logger
 
 	diagnosticsConfig *Config
@@ -65,7 +66,7 @@ func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) e
 
 	l, err := logp.NewZapLogger(d.logger)
 	if err != nil {
-		// NewZapLogger always returns nil eror, so this shouldn't happen.
+		// NewZapLogger always returns nil error, so this shouldn't happen.
 		return fmt.Errorf("failed to create logp.Logger from zap logger: %w", err)
 	}
 
@@ -79,7 +80,7 @@ func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) e
 	mux := http.NewServeMux()
 	mux.Handle("/diagnostics", d)
 
-	d.server = http.Server{
+	d.server = &http.Server{
 		Handler: mux,
 	}
 	go func() {
@@ -123,7 +124,18 @@ func (d *diagnosticsExtension) registerGlobalDiagnostics() {
 			}
 			addr := extractMetricAddress(serviceCfg.Service.Telemetry.Metrics.Readers)
 
-			resp, err := http.Get(fmt.Sprintf("http://%s/metrics", addr))
+			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s/metrics", addr), nil)
+			if err != nil {
+				return fmt.Appendf(nil, "error: failed to create request: %v", err)
+			}
+
+			// Create an HTTP client with a timeout.
+			// 10 seconds should be enough for now, but we can make it configurable later if needed.
+			client := &http.Client{
+				Timeout: 10 * time.Second,
+			}
+
+			resp, err := client.Do(req.WithContext(context.Background()))
 			if err != nil {
 				return fmt.Appendf(nil, "error: failed to get internal telemetry: %v", err)
 			}
@@ -137,7 +149,7 @@ func (d *diagnosticsExtension) registerGlobalDiagnostics() {
 		},
 	}
 
-	// return basic profiles.
+	// register basic profiles.
 	for _, profile := range []string{"goroutine", "heap", "allocs", "mutex", "threadcreate", "block"} {
 		d.globalHooks[profile] = &diagHook{
 			description: fmt.Sprintf("%s profile of the collector", profile),
@@ -156,6 +168,9 @@ func (d *diagnosticsExtension) registerGlobalDiagnostics() {
 }
 
 func (d *diagnosticsExtension) Shutdown(ctx context.Context) error {
+	if d.server == nil {
+		return nil
+	}
 	if err := d.server.Shutdown(ctx); err != nil {
 		return err
 	}
