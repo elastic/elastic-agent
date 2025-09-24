@@ -106,12 +106,12 @@ func VerifySHA512HashWithCleanup(log infoWarnLogger, filename string) error {
 			}
 		} else if err != nil && !errors.Is(err, os.ErrNotExist) {
 			// it's not a simple hash mismatch, probably something is wrong with the hash file
-			hashFileName := getHashFileName(filename)
+			hashFileName := AddHashExtension(filename)
 			hashFileBytes, readErr := os.ReadFile(hashFileName)
 			if readErr != nil {
-				log.Warnf("error verifying the package using hash file %q, unable do read contents for logging: %v", getHashFileName(filename), readErr)
+				log.Warnf("error verifying the package using hash file %q, unable do read contents for logging: %v", AddHashExtension(filename), readErr)
 			} else {
-				log.Warnf("error verifying the package using hash file %q, contents: %q", getHashFileName(filename), string(hashFileBytes))
+				log.Warnf("error verifying the package using hash file %q, contents: %q", AddHashExtension(filename), string(hashFileBytes))
 			}
 		}
 
@@ -121,12 +121,12 @@ func VerifySHA512HashWithCleanup(log infoWarnLogger, filename string) error {
 	return nil
 }
 
-func getHashFileName(filename string) string {
+func AddHashExtension(file string) string {
 	const hashFileExt = ".sha512"
-	if strings.HasSuffix(filename, hashFileExt) {
-		return filename
+	if strings.HasSuffix(file, hashFileExt) {
+		return file
 	}
-	return filename + hashFileExt
+	return file + hashFileExt
 }
 
 // VerifySHA512Hash checks that a sidecar file containing a sha512 checksum
@@ -134,7 +134,7 @@ func getHashFileName(filename string) string {
 // the file. It returns an error if validation fails.
 func VerifySHA512Hash(filename string) error {
 	hasher := sha512.New()
-	checksumFileName := getHashFileName(filename)
+	checksumFileName := AddHashExtension(filename)
 	return VerifyChecksum(hasher, filename, checksumFileName)
 }
 
