@@ -5,7 +5,7 @@ receivers:
         - type: journald
           id: journald-input
           paths:
-            - /opt/journal/*/*
+            - /opt/journal/
     output:
       otelconsumer:
     logging:
