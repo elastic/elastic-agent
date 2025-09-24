@@ -16,7 +16,7 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -122,7 +122,7 @@ func isProcessRedirectable(componentID string) bool {
 }
 
 func redirectToPath(w http.ResponseWriter, r *http.Request, id, path string) error {
-	endpoint := component.PrefixedEndpoint(utils.SocketURLWithFallback(id, paths.TempDir()))
+	endpoint := componentmonitoring.PrefixedEndpoint(utils.SocketURLWithFallback(id, paths.TempDir()))
 	metricsBytes, statusCode, metricsErr := GetProcessMetrics(r.Context(), endpoint, path)
 	if metricsErr != nil {
 		return metricsErr

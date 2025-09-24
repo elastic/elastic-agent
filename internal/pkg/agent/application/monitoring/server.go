@@ -18,7 +18,7 @@ import (
 	"go.elastic.co/apm/module/apmgorilla/v2"
 	"go.elastic.co/apm/v2"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
 	"github.com/elastic/elastic-agent-libs/api"
 	"github.com/elastic/elastic-agent-libs/monitoring"
@@ -76,7 +76,7 @@ func NewServer(
 
 		srvCfg := api.DefaultConfig()
 		srvCfg.Enabled = cfg.Enabled
-		srvCfg.Host = component.AgentMonitoringEndpoint(cfg)
+		srvCfg.Host = componentmonitoring.AgentMonitoringEndpoint(cfg)
 		srvCfg.Port = cfg.HTTP.Port
 		log.Infof("creating monitoring API with cfg %#v", srvCfg)
 		if err := createAgentMonitoringDrop(srvCfg.Host); err != nil {
