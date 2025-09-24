@@ -15,7 +15,7 @@
 # this material is strictly forbidden unless prior written
 # permission is obtained from Elasticsearch B.V.
 
-set -eu
+set -eux
 
 _SELF=$(dirname $0)
 source "${_SELF}/../common.sh"
@@ -44,6 +44,8 @@ buildkite-agent artifact download "build/distributions/**" . --step "packaging-s
 # AMD64
 docker load -i ./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-amd64.docker.tar.gz
 docker image tag "elastic-agent-service:$DOCKER_TAG" "$PRIVATE_IMAGE"
+# DEBUG STATEMENT
+docker image inspect "$PRIVATE_IMAGE"
 AMD64_DIGEST=$(docker image inspect --format "{{index .RepoDigests 0}}" "$PRIVATE_IMAGE")
 docker push "$AMD64_DIGEST"
 
