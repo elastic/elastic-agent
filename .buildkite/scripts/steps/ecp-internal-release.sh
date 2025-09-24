@@ -37,33 +37,27 @@ DOCKER_TAG="git-${VERSION}"
 PRIVATE_REPO="docker.elastic.co/observability-ci/ecp-elastic-agent-service"
 PRIVATE_IMAGE="${PRIVATE_REPO}:${DOCKER_TAG}"
 
-# TODO: let's avoid accessing vault directly but use the vault plugin itself
-#       https://github.com/elastic/vault-docker-login-buildkite-plugin does not support
-#       the `skopeo` command by default but looks for the current installed tools in the runner
-#       Let's contribute in a follow-up PR to support `skopeo` as well.
-DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
-DOCKER_REGISTRY="docker.elastic.co"
-DOCKER_USERNAME_SECRET=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
-DOCKER_PASSWORD_SECRET=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
-skopeo login --username "${DOCKER_USERNAME_SECRET}" --password "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}"
-
 # download the amd64 and arm64 builds of the image from the previous steps
 buildkite-agent artifact download "build/distributions/**" . --step "packaging-service-container-amd64"
 buildkite-agent artifact download "build/distributions/**" . --step "packaging-service-container-arm64"
 
-# get the digest information so the manifest reference the images
-AMD64_DIGEST=$(skopeo inspect --format "{{.Digest}}" "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-amd64.docker.tar.gz")
-ARM64_DIGEST=$(skopeo inspect --format "{{.Digest}}" "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-arm64.docker.tar.gz")
+# AMD64
+docker load -i ./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-amd64.docker.tar.gz
+docker image tag "elastic-agent-service:$DOCKER_TAG" "$PRIVATE_IMAGE"
+AMD64_DIGEST=$(docker image inspect --format "{{index .RepoDigests 0}}" "$PRIVATE_IMAGE")
+docker push "$AMD64_DIGEST"
 
-# copy the images into the private image location with digest (not tag)
-skopeo copy --all "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-amd64.docker.tar.gz" "docker://$PRIVATE_REPO@$AMD64_DIGEST"
-skopeo copy --all "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-arm64.docker.tar.gz" "docker://$PRIVATE_REPO@$ARM64_DIGEST"
+# ARM64 (overwrites AMD64 tags)
+docker load -i ./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-arm64.docker.tar.gz
+docker image tag "elastic-agent-service:$DOCKER_TAG" "$PRIVATE_IMAGE"
+ARM64_DIGEST=$(docker image inspect --format "{{index .RepoDigests 0}}" "$PRIVATE_IMAGE")
+docker push "$ARM64_DIGEST"
 
 # create a new manifest image referencing the source images
 docker buildx imagetools create -t "$PRIVATE_IMAGE" \
-  "$PRIVATE_REPO@$AMD64_DIGEST" \
-  "$PRIVATE_REPO@$ARM64_DIGEST"
-skopeo copy --all "docker-daemon:$PRIVATE_IMAGE" "docker://$PRIVATE_IMAGE"
+  "$AMD64_DIGEST" \
+  "$ARM64_DIGEST"
+docker push "$PRIVATE_IMAGE"
 
 annotate "* Image: $PRIVATE_IMAGE"
 annotate "* Short commit: $VERSION"
