@@ -47,36 +47,33 @@ DOCKER_USERNAME_SECRET=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SEC
 DOCKER_PASSWORD_SECRET=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
 skopeo login --username "${DOCKER_USERNAME_SECRET}" --password "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}"
 
+# workaround: installing podman here to create a multi-arch image
+echo "--- Installing Podman"
+apt-get update
+apt-get install --no-install-recommends -y podman
+podman login --username "${DOCKER_USERNAME_SECRET}" --password "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}"
+
 # download the amd64 and arm64 builds of the image from the previous steps
+echo "--- Downloading amd64 and arm64 builds"
 buildkite-agent artifact download "build/distributions/**" . --step "packaging-service-container-amd64"
 buildkite-agent artifact download "build/distributions/**" . --step "packaging-service-container-arm64"
 
 # get the digest information so the manifest reference the images
+echo "--- Finding digests"
 AMD64_DIGEST=$(skopeo inspect --format "{{.Digest}}" "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-amd64.docker.tar.gz")
 ARM64_DIGEST=$(skopeo inspect --format "{{.Digest}}" "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-arm64.docker.tar.gz")
 
 # copy the images into the private image location with digest (not tag)
+echo "--- Copying images to private image location"
 skopeo copy --all "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-amd64.docker.tar.gz" "docker://$PRIVATE_REPO@$AMD64_DIGEST"
 skopeo copy --all "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-arm64.docker.tar.gz" "docker://$PRIVATE_REPO@$ARM64_DIGEST"
 
-# attempt to just install docker here
-apt-get update
-apt-get install --no-install-recommends -y docker.io
-
-# Create a multi-arch manifest
-docker manifest create "$PRIVATE_IMAGE" \
+# Create a multi-arch manifest and push it
+echo "--- Creating multi-arch manifest"
+podman manifest create "$PRIVATE_IMAGE" \
   "$PRIVATE_REPO@$AMD64_DIGEST" \
   "$PRIVATE_REPO@$ARM64_DIGEST"
-
-docker login --username "${DOCKER_USERNAME_SECRET}" --password "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}"
-docker manifest push $PRIVATE_IMAGE
-
-# create a new manifest image referencing the source images
-#docker buildx imagetools create -t "$PRIVATE_IMAGE" \
-#  "$PRIVATE_REPO@$AMD64_DIGEST" \
-#  "$PRIVATE_REPO@$ARM64_DIGEST"
-
-#skopeo copy --all "docker-daemon:$PRIVATE_IMAGE" "docker://$PRIVATE_IMAGE"
+podman manifest push $PRIVATE_IMAGE
 
 annotate "* Image: $PRIVATE_IMAGE"
 annotate "* Short commit: $VERSION"
