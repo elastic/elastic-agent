@@ -23,6 +23,7 @@ import (
 	jaegerreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver"
 	jmxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver"
 	k8sclusterreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver"
+	k8seventsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver"
 	k8sobjectsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver"
 	kubeletstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver"
 	mysqlreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/mysqlreceiver"
@@ -86,6 +87,7 @@ import (
 	forwardconnector "go.opentelemetry.io/collector/connector/forwardconnector"
 
 	elasticapmconnector "github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector"
+	profilingmetricsconnector "github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector"
 	beatsauthextension "github.com/elastic/opentelemetry-collector-components/extension/beatsauthextension"
 )
 
@@ -102,6 +104,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			filelogreceiver.NewFactory(),
 			kubeletstatsreceiver.NewFactory(),
 			k8sclusterreceiver.NewFactory(),
+			k8seventsreceiver.NewFactory(),
 			hostmetricsreceiver.NewFactory(),
 			httpcheckreceiver.NewFactory(),
 			k8sobjectsreceiver.NewFactory(),
@@ -121,6 +124,10 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			awss3receiver.NewFactory(),
 			sqlserverreceiver.NewFactory(),
 		}
+
+		// some receivers are only available on certain OS.
+		receivers = addOsSpecificReceivers(receivers)
+
 		// some receivers should only be available when
 		// not in fips mode due to restrictions on crypto usage
 		receivers = addNonFipsReceivers(receivers)
@@ -171,6 +178,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			routingconnector.NewFactory(),
 			spanmetricsconnector.NewFactory(),
 			elasticapmconnector.NewFactory(),
+			profilingmetricsconnector.NewFactory(),
 			forwardconnector.NewFactory(),
 		)
 		if err != nil {
