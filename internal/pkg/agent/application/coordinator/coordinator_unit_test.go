@@ -15,16 +15,19 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -41,9 +44,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/reload"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -462,11 +467,7 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 		}
 	}()
 
-	upgradeMgr, err := upgrade.NewUpgrader(
-		log,
-		&artifact.Config{},
-		&info.AgentInfo{},
-	)
+	upgradeMgr, err := upgrade.NewUpgrader(log, &artifact.Config{}, nil, &info.AgentInfo{}, new(upgrade.AgentWatcherHelper))
 	require.NoError(t, err, "errored when creating a new upgrader")
 
 	// Channels have buffer length 1, so we don't have to run on multiple
@@ -1526,7 +1527,7 @@ func TestCoordinatorInitiatesUpgrade(t *testing.T) {
 	}
 
 	// Call upgrade and make sure the upgrade manager receives an Upgrade call
-	err := coord.Upgrade(ctx, "1.2.3", "", nil, false, false)
+	err := coord.Upgrade(ctx, "1.2.3", "", nil, WithSkipVerifyOverride(false), WithSkipDefaultPgp(false))
 	assert.True(t, upgradeMgr.upgradeCalled, "Coordinator Upgrade should call upgrade manager Upgrade")
 	assert.Equal(t, upgradeMgr.upgradeErr, err, "Upgrade should report upgrade manager error")
 
@@ -1914,7 +1915,7 @@ func TestComputeEnrollOptions(t *testing.T) {
 	assert.NotNil(t, options)
 
 	assert.Equal(t, "123", options.EnrollAPIKey, "EnrollAPIKey mismatch")
-	assert.Equal(t, "localhost:1234", options.URL, "URL mismatch")
+	assert.Equal(t, "http://localhost:1234", options.URL, "URL mismatch")
 
 	assert.Equal(t, []string{"sha1", "sha2"}, options.CASha256, "CASha256 mismatch")
 	assert.Equal(t, true, options.Insecure, "Insecure mismatch")
@@ -1980,4 +1981,101 @@ func TestHasEndpoint(t *testing.T) {
 			assert.Equal(t, tc.expected, result, "HasEndpoint result mismatch")
 		})
 	}
+}
+
+type mockUpgradeManager struct {
+	upgradeErr error
+}
+
+func (m *mockUpgradeManager) Upgradeable() bool {
+	return true
+}
+
+func (m *mockUpgradeManager) Reload(cfg *config.Config) error {
+	return nil
+}
+
+func (m *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+	return nil, m.upgradeErr
+}
+
+func (m *mockUpgradeManager) Ack(ctx context.Context, acker acker.Acker) error {
+	return nil
+}
+
+func (m *mockUpgradeManager) AckAction(ctx context.Context, acker acker.Acker, action fleetapi.Action) error {
+	return nil
+}
+
+func (m *mockUpgradeManager) MarkerWatcher() upgrade.MarkerWatcher {
+	return nil
+}
+
+func TestCoordinator_Upgrade_InsufficientDiskSpaceError(t *testing.T) {
+	log, _ := loggertest.New("coordinator-insufficient-disk-space-test")
+
+	mockUpgradeManager := &mockUpgradeManager{
+		upgradeErr: fmt.Errorf("wrapped: %w", upgradeErrors.ErrInsufficientDiskSpace),
+	}
+
+	initialState := State{
+		CoordinatorState:   agentclient.Healthy,
+		CoordinatorMessage: "Running",
+	}
+
+	coord := &Coordinator{
+		state:              initialState,
+		logger:             log,
+		upgradeMgr:         mockUpgradeManager,
+		stateBroadcaster:   broadcaster.New(initialState, 64, 32),
+		overrideStateChan:  make(chan *coordinatorOverrideState),
+		upgradeDetailsChan: make(chan *details.Details),
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+
+	overrideStates := []agentclient.State{}
+	go func() {
+		state1 := <-coord.overrideStateChan
+		overrideStates = append(overrideStates, state1.state)
+
+		state2 := <-coord.overrideStateChan
+		if state2 != nil {
+			overrideStates = append(overrideStates, state2.state)
+		}
+
+		wg.Done()
+	}()
+
+	upgradeDetails := []*details.Details{}
+	go func() {
+		upgradeDetails = append(upgradeDetails, <-coord.upgradeDetailsChan)
+		upgradeDetails = append(upgradeDetails, <-coord.upgradeDetailsChan)
+		wg.Done()
+	}()
+
+	err := coord.Upgrade(t.Context(), "", "", nil)
+	require.Error(t, err)
+	require.Equal(t, err, upgradeErrors.ErrInsufficientDiskSpace)
+
+	wg.Wait()
+
+	require.Equal(t, []agentclient.State{agentclient.Upgrading}, overrideStates)
+
+	require.Equal(t, []*details.Details{
+		{
+			TargetVersion: "",
+			State:         details.StateRequested,
+			ActionID:      "",
+		},
+		{
+			TargetVersion: "",
+			State:         details.StateFailed,
+			Metadata: details.Metadata{
+				FailedState: details.StateRequested,
+				ErrorMsg:    upgradeErrors.ErrInsufficientDiskSpace.Error(),
+			},
+		},
+	}, upgradeDetails)
 }

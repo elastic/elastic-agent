@@ -1,0 +1,27 @@
+version: 9.1.1
+entries:
+    - kind: feature
+      summary: Add k8s leader elector Otel extension
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9261
+        - https://github.com/elastic/elastic-agent/pull/9262
+        - https://github.com/elastic/elastic-agent/pull/9065
+      issue: []
+      timestamp: 1752827328
+      file:
+        name: 1752827328-add_k8sleaderelector_extension.yaml
+        checksum: 2dae784245fbcf96055c2a2898fe911ce2eeaea9
+    - kind: bug-fix
+      summary: Don't overwrite elasticsearch output headers from enrollment --headers flag
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9199
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/9197
+      timestamp: 1753906482
+      file:
+        name: 1753906482-Don't-overwrite-elasticsearch-output-headers-from-enrollment---headers-flag.yaml
+        checksum: 4f8875518a619395bdb606081ee392ea2b76f70f
