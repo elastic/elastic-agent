@@ -17,5 +17,6 @@
 {{- include "elasticagent.kubernetes.config.kubelet.volumes.init" $ -}}
 {{- include "elasticagent.kubernetes.config.kube_proxy.init" $ -}}
 {{- include "elasticagent.kubernetes.config.kube_scheduler.init" $ -}}
+{{- include "elasticagent.kubernetes.config.kube_event.init" $ -}}
 {{- end -}}
 {{- end -}}
