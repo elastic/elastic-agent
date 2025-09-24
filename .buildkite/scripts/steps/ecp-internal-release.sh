@@ -109,7 +109,7 @@ echo "Using manifest spec:"
 cat manifest-spec.yaml
 
 # Create and push the multi-arch manifest
-$MANIFEST_TOOL_CMD push from-spec manifest-spec.yaml
+$MANIFEST_TOOL_CMD --username ${DOCKER_USERNAME_SECRET} --password ${DOCKER_PASSWORD_SECRET} push from-spec manifest-spec.yaml
 
 annotate "* Image: $PRIVATE_IMAGE"
 annotate "* Short commit: $VERSION"
