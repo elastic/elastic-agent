@@ -59,10 +59,20 @@ ARM64_DIGEST=$(skopeo inspect --format "{{.Digest}}" "docker-archive:./build/dis
 skopeo copy --all "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-amd64.docker.tar.gz" "docker://$PRIVATE_REPO@$AMD64_DIGEST"
 skopeo copy --all "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-arm64.docker.tar.gz" "docker://$PRIVATE_REPO@$ARM64_DIGEST"
 
-# create a new manifest image referencing the source images
-docker buildx imagetools create -t "$PRIVATE_IMAGE" \
+# attempt to just install docker here
+apt-get update
+apt-get install docker.io
+
+# Create a multi-arch manifest
+docker manifest create "$PRIVATE_IMAGE" \
   "$PRIVATE_REPO@$AMD64_DIGEST" \
   "$PRIVATE_REPO@$ARM64_DIGEST"
+
+# create a new manifest image referencing the source images
+#docker buildx imagetools create -t "$PRIVATE_IMAGE" \
+#  "$PRIVATE_REPO@$AMD64_DIGEST" \
+#  "$PRIVATE_REPO@$ARM64_DIGEST"
+
 skopeo copy --all "docker-daemon:$PRIVATE_IMAGE" "docker://$PRIVATE_IMAGE"
 
 annotate "* Image: $PRIVATE_IMAGE"
