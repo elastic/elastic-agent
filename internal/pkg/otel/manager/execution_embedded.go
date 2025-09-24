@@ -17,7 +17,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/agentprovider"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/elasticdiagnosticsextension"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -47,7 +47,7 @@ func (r *embeddedExecution) startCollector(ctx context.Context, logger *logger.L
 		release.Version(), []string{ap.URI()},
 		otel.WithConfigProviderFactory(ap.NewFactory()),
 		otel.WithConfigConvertorFactory(NewForceExtensionConverterFactory(AgentStatusExtensionType.String(), nil)),
-		otel.WithConfigConvertorFactory(NewForceExtensionConverterFactory(elasticdiagnosticsextension.DiagnosticsExtensionID.String(), extConf)),
+		otel.WithConfigConvertorFactory(NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), extConf)),
 		otel.WithExtensionFactory(NewAgentStatusFactory(statusCh)))
 	settings.DisableGracefulShutdown = true // managed by this manager
 	settings.LoggingOptions = []zap.Option{zap.WrapCore(func(zapcore.Core) zapcore.Core {

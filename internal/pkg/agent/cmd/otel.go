@@ -23,7 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/agentprovider"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/elasticdiagnosticsextension"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -122,7 +122,7 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 		}
 		settings = otel.NewSettings(release.Version(), []string{configProvider.URI()},
 			otel.WithConfigProviderFactory(configProvider.NewFactory()),
-			otel.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnosticsextension.DiagnosticsExtensionID.String(), conf)),
+			otel.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)),
 		)
 
 		// setup logger
@@ -159,7 +159,7 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 
 		settings.DisableGracefulShutdown = false
 	} else {
-		settings = otel.NewSettings(release.Version(), configFiles, otel.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnosticsextension.DiagnosticsExtensionID.String(), conf)))
+		settings = otel.NewSettings(release.Version(), configFiles, otel.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)))
 	}
 	return settings, nil
 }
