@@ -6,19 +6,13 @@ components:
 #
 
 # Receivers
-  - apachereceiver
-  - awss3receiver
   - elasticapmintakereceiver
   - filelogreceiver
   - hostmetricsreceiver
-  - iisreceiver
   - k8sclusterreceiver
   - k8sobjectsreceiver
   - kubeletstatsreceiver
-  - mysqlreceiver
   - otlpreceiver
-  - postgresqlreceiver
-  - sqlserverreceiver
 
 # Exporters
   - elasticsearchexporter
