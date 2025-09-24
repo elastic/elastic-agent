@@ -45,16 +45,12 @@ buildkite-agent artifact download "build/distributions/**" . --step "packaging-s
 docker load -i ./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-amd64.docker.tar.gz
 docker image tag "elastic-agent-service:$DOCKER_TAG" "$PRIVATE_IMAGE"
 docker push "$PRIVATE_IMAGE"
-# DEBUG
-docker image inspect "$PRIVATE_IMAGE"
-ARM64_DIGEST=$(docker image inspect --format "{{index .RepoDigests 0}}" "$PRIVATE_IMAGE")
+AMD64_DIGEST=$(docker image inspect --format "{{index .RepoDigests 0}}" "$PRIVATE_IMAGE")
 
 # ARM64 (overwrites AMD64 tags)
 docker load -i ./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-arm64.docker.tar.gz
 docker image tag "elastic-agent-service:$DOCKER_TAG" "$PRIVATE_IMAGE"
 docker push "$PRIVATE_IMAGE"
-# DEBUG
-docker image inspect "$PRIVATE_IMAGE"
 ARM64_DIGEST=$(docker image inspect --format "{{index .RepoDigests 0}}" "$PRIVATE_IMAGE")
 
 # at this point the $PRIVATE_IMAGE is pointing to only the arm64 based image, we need the image to
