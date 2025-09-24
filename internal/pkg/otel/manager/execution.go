@@ -6,6 +6,7 @@ package manager
 
 import (
 	"context"
+	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/confmap"
@@ -18,5 +19,5 @@ type collectorExecution interface {
 }
 
 type collectorHandle interface {
-	Stop(ctx context.Context)
+	Stop(waitTime time.Duration)
 }

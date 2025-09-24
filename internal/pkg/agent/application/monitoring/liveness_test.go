@@ -13,14 +13,14 @@ import (
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
-	"go.opentelemetry.io/collector/component/componentstatus"
-
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/collector/component/componentstatus"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 )
 
 type mockCoordinator struct {
@@ -41,15 +41,19 @@ func TestLivenessProcessHTTPHandler(t *testing.T) {
 	defer cancel()
 	testCases := []struct {
 		name         string
-		coord        mockCoordinator
+		coord        CoordinatorState
 		expectedCode int
-		liveness     bool
 		failon       string
 	}{
 		{
 			name:         "healthy-nocoord",
+			coord:        nil,
 			expectedCode: 200,
-			liveness:     true,
+			failon:       "heartbeat",
+		},
+		{
+			name:         "healthy",
+			expectedCode: 200,
 			failon:       "heartbeat",
 		},
 		{
@@ -72,7 +76,6 @@ func TestLivenessProcessHTTPHandler(t *testing.T) {
 				},
 			},
 			expectedCode: 200,
-			liveness:     true,
 			failon:       "heartbeat",
 		},
 		{
@@ -95,7 +98,6 @@ func TestLivenessProcessHTTPHandler(t *testing.T) {
 				},
 			},
 			expectedCode: 200,
-			liveness:     true,
 			failon:       "heartbeat",
 		},
 		{
@@ -118,7 +120,6 @@ func TestLivenessProcessHTTPHandler(t *testing.T) {
 				},
 			},
 			expectedCode: 500,
-			liveness:     true,
 			failon:       "degraded",
 		},
 		{
@@ -141,34 +142,10 @@ func TestLivenessProcessHTTPHandler(t *testing.T) {
 				},
 			},
 			expectedCode: 200,
-			liveness:     true,
 			failon:       "failed",
 		},
 		{
-			name: "degraded-liveness-off",
-			coord: mockCoordinator{
-				isUp: true,
-				state: coordinator.State{
-					Components: []runtime.ComponentComponentState{
-						{
-							LegacyPID: "2",
-							State:     runtime.ComponentState{State: client.UnitStateDegraded},
-							Component: component.Component{
-								ID: "test-component",
-								InputSpec: &component.InputRuntimeSpec{
-									BinaryName: "testbeat",
-								},
-							},
-						},
-					},
-				},
-			},
-			expectedCode: 200,
-			liveness:     false,
-			failon:       "degraded",
-		},
-		{
-			name: "healthy",
+			name: "healthy-components",
 			coord: mockCoordinator{
 				isUp: true,
 				state: coordinator.State{
@@ -187,7 +164,6 @@ func TestLivenessProcessHTTPHandler(t *testing.T) {
 				},
 			},
 			expectedCode: 200,
-			liveness:     true,
 			failon:       "degraded",
 		},
 		{
@@ -210,7 +186,6 @@ func TestLivenessProcessHTTPHandler(t *testing.T) {
 				},
 			},
 			expectedCode: 503,
-			liveness:     true,
 			failon:       "heartbeat",
 		},
 		{
@@ -233,7 +208,6 @@ func TestLivenessProcessHTTPHandler(t *testing.T) {
 				},
 			},
 			expectedCode: 503,
-			liveness:     true,
 			failon:       "heartbeat",
 		},
 		{
@@ -256,7 +230,6 @@ func TestLivenessProcessHTTPHandler(t *testing.T) {
 				},
 			},
 			expectedCode: 503,
-			liveness:     true,
 			failon:       "degraded",
 		},
 		{
@@ -279,7 +252,6 @@ func TestLivenessProcessHTTPHandler(t *testing.T) {
 				},
 			},
 			expectedCode: 503,
-			liveness:     true,
 			failon:       "degraded",
 		},
 		{
@@ -302,30 +274,6 @@ func TestLivenessProcessHTTPHandler(t *testing.T) {
 				},
 			},
 			expectedCode: 503,
-			liveness:     true,
-			failon:       "degraded",
-		},
-		{
-			name: "healthy-liveness-off",
-			coord: mockCoordinator{
-				isUp: true,
-				state: coordinator.State{
-					Components: []runtime.ComponentComponentState{
-						{
-							LegacyPID: "5",
-							State:     runtime.ComponentState{State: client.UnitStateHealthy},
-							Component: component.Component{
-								ID: "test-component3",
-								InputSpec: &component.InputRuntimeSpec{
-									BinaryName: "testbeat",
-								},
-							},
-						},
-					},
-				},
-			},
-			expectedCode: 200,
-			liveness:     false,
 			failon:       "degraded",
 		},
 		{
@@ -358,11 +306,10 @@ func TestLivenessProcessHTTPHandler(t *testing.T) {
 				},
 			},
 			expectedCode: 500,
-			liveness:     true,
 			failon:       "degraded",
 		},
 		{
-			name: "healthy-liveness-off-otel",
+			name: "healthy-otel",
 			coord: mockCoordinator{
 				isUp: true,
 				state: coordinator.State{
@@ -380,7 +327,6 @@ func TestLivenessProcessHTTPHandler(t *testing.T) {
 				},
 			},
 			expectedCode: 200,
-			liveness:     false,
 			failon:       "degraded",
 		},
 		{
@@ -402,8 +348,136 @@ func TestLivenessProcessHTTPHandler(t *testing.T) {
 				},
 			},
 			expectedCode: 500,
-			liveness:     true,
 			failon:       "degraded",
+		},
+		{
+			name: "unhealthy-failed-coordinator",
+			coord: mockCoordinator{
+				isUp: true,
+				state: coordinator.State{
+					State: agentclient.Failed,
+				},
+			},
+			expectedCode: 500,
+			failon:       "failed",
+		},
+		{
+			name: "unhealthy-degraded-coordinator",
+			coord: mockCoordinator{
+				isUp: true,
+				state: coordinator.State{
+					State: agentclient.Degraded,
+				},
+			},
+			expectedCode: 500,
+			failon:       "degraded",
+		},
+		{
+			name: "healthy-degraded-coordinator",
+			coord: mockCoordinator{
+				isUp: true,
+				state: coordinator.State{
+					State: agentclient.Failed,
+				},
+			},
+			expectedCode: 500,
+			failon:       "degraded",
+		},
+		{
+			name: "component healthy and unit degraded",
+			coord: mockCoordinator{
+				isUp: true,
+				state: coordinator.State{
+					Components: []runtime.ComponentComponentState{
+						{
+							LegacyPID: "2",
+							State: runtime.ComponentState{
+								State: client.UnitStateHealthy,
+								Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+									{
+										UnitType: client.UnitTypeInput,
+										UnitID:   "some-input-unit",
+									}: {
+										State: client.UnitStateDegraded,
+									},
+								},
+							},
+							Component: component.Component{
+								ID: "test-component",
+								InputSpec: &component.InputRuntimeSpec{
+									BinaryName: "testbeat",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCode: 500,
+			failon:       "degraded",
+		},
+		{
+			name: "component healthy and unit failed",
+			coord: mockCoordinator{
+				isUp: true,
+				state: coordinator.State{
+					Components: []runtime.ComponentComponentState{
+						{
+							LegacyPID: "2",
+							State: runtime.ComponentState{
+								State: client.UnitStateHealthy,
+								Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+									{
+										UnitType: client.UnitTypeInput,
+										UnitID:   "some-input-unit",
+									}: {
+										State: client.UnitStateFailed,
+									},
+								},
+							},
+							Component: component.Component{
+								ID: "test-component",
+								InputSpec: &component.InputRuntimeSpec{
+									BinaryName: "testbeat",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCode: 500,
+			failon:       "failed",
+		},
+		{
+			name: "component healthy and unit healty",
+			coord: mockCoordinator{
+				isUp: true,
+				state: coordinator.State{
+					Components: []runtime.ComponentComponentState{
+						{
+							LegacyPID: "2",
+							State: runtime.ComponentState{
+								State: client.UnitStateHealthy,
+								Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+									{
+										UnitType: client.UnitTypeInput,
+										UnitID:   "some-input-unit",
+									}: {
+										State: client.UnitStateHealthy,
+									},
+								},
+							},
+							Component: component.Component{
+								ID: "test-component",
+								InputSpec: &component.InputRuntimeSpec{
+									BinaryName: "testbeat",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedCode: 200,
+			failon:       "failed",
 		},
 	}
 
@@ -418,8 +492,9 @@ func TestLivenessProcessHTTPHandler(t *testing.T) {
 			require.NoError(t, err)
 			res, err := http.DefaultClient.Do(req)
 			require.NoError(t, err)
-			res.Body.Close()
+			defer res.Body.Close()
 
+			require.Equal(t, test.expectedCode, res.StatusCode)
 		})
 	}
 

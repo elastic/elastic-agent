@@ -8,9 +8,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
 	"runtime"
-	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -18,6 +16,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/configure"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/utils"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -35,14 +34,32 @@ import (
 const (
 	watcherName     = "elastic-agent-watcher"
 	watcherLockFile = "watcher.lock"
+
+	// flag names
+	takedownFlagName      = "takedown"
+	takedownFlagShorthand = "t"
+
+	rollbackFlagName      = "rollback"
+	rollbackFlagShorthand = "r"
+
+	// error exit codes
+	errorSettingParentSignalsExitCode = 6
+	errorRollbackToValue              = 7
+	errorRollbackFailed               = 8
 )
+
+// watcherPIDsFetcher defines the type of function responsible for fetching watcher PIDs.
+// This will allow for easier testing of takeOverWatcher using fake binaries
+type watcherPIDsFetcher func() ([]int, error)
+
+var ErrWatchCancelled = errors.New("watch cancelled")
 
 func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "watch",
 		Short: "Watch the Elastic Agent for failures and initiate rollback",
 		Long:  `This command watches Elastic Agent for failures and initiates rollback if necessary.`,
-		Run: func(_ *cobra.Command, _ []string) {
+		Run: func(c *cobra.Command, _ []string) {
 			cfg := getConfig(streams)
 			log, err := configuredLogger(cfg, watcherName)
 			if err != nil {
@@ -53,14 +70,51 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 			// Make sure to flush any buffered logs before we're done.
 			defer log.Sync() //nolint:errcheck // flushing buffered logs is best effort.
 
-			if err := watchCmd(log, paths.Top(), cfg.Settings.Upgrade.Watcher, new(upgradeAgentWatcher), new(upgradeInstallationModifier)); err != nil {
+			err = setupParentProcessSignals()
+			if err != nil {
+				fmt.Fprintf(streams.Err, "Error setting parent process signals: %v\n", err)
+				os.Exit(errorSettingParentSignalsExitCode)
+			}
+
+			takedown, _ := c.Flags().GetBool(takedownFlagName)
+			if takedown {
+				err = takedownWatcher(context.Background(), log, utils.GetWatcherPIDs)
+				if err != nil {
+					log.Errorf("error taking down watcher: %v", err)
+					os.Exit(5)
+				}
+				return
+			}
+
+			if c.Flags().Changed(rollbackFlagName) {
+				// rollback-to has been specified on command line
+				rollbackTo, _ := c.Flags().GetString(rollbackFlagName)
+				if rollbackTo == "" {
+					fmt.Fprintf(streams.Err, "%s flag value cannot be empty", rollbackFlagName)
+					os.Exit(errorRollbackToValue)
+				}
+				if err = withAppLocker(log, func() error {
+					return rollback(log, paths.Top(), client.New(), new(upgradeInstallationModifier), rollbackTo)
+				}); err != nil {
+					log.Errorw("Rollback command failed", "error.message", err)
+					fmt.Fprintf(streams.Err, "Rollback command failed: %v\n", err)
+					os.Exit(errorRollbackFailed)
+				}
+			}
+
+			if err = withAppLocker(log, func() error {
+				return watchCmd(log, paths.Top(), cfg.Settings.Upgrade.Watcher, new(upgradeAgentWatcher), new(upgradeInstallationModifier))
+			}); err != nil {
 				log.Errorw("Watch command failed", "error.message", err)
 				fmt.Fprintf(streams.Err, "Watch command failed: %v\n%s\n", err, troubleshootMessage())
 				os.Exit(4)
 			}
 		},
 	}
-
+	cmd.Flags().BoolP(takedownFlagName, takedownFlagShorthand, false, "Take down the running watcher")
+	_ = cmd.Flags().MarkHidden(takedownFlagName)
+	cmd.Flags().StringP(rollbackFlagName, rollbackFlagShorthand, "", "Versioned home to roll back to")
+	_ = cmd.Flags().MarkHidden(rollbackFlagName)
 	return cmd
 }
 
@@ -68,9 +122,45 @@ type agentWatcher interface {
 	Watch(ctx context.Context, tilGrace, errorCheckInterval time.Duration, log *logp.Logger) error
 }
 
+func WithPreRestartHook(preRestartHook upgrade.RollbackHook) upgrade.RollbackOption {
+	return func(ros upgrade.RollbackOptionSetter) {
+		ros.SetPreRestartHook(preRestartHook)
+	}
+}
+
+func WithSkipCleanup(skipCleanup bool) upgrade.RollbackOption {
+	return func(ros upgrade.RollbackOptionSetter) {
+		ros.SetSkipCleanup(skipCleanup)
+	}
+}
+
+func WithSkipRestart(skipRestart bool) upgrade.RollbackOption {
+	return func(ros upgrade.RollbackOptionSetter) {
+		ros.SetSkipRestart(skipRestart)
+	}
+}
+
 type installationModifier interface {
 	Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool) error
-	Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string) error
+	Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string, opts ...upgrade.RollbackOption) error
+}
+
+func withAppLocker(log *logp.Logger, f func() error) error {
+	locker := filelock.NewAppLocker(paths.Top(), watcherLockFile)
+	if err := locker.TryLock(); err != nil {
+		if errors.Is(err, filelock.ErrAppAlreadyRunning) {
+			log.Info("exiting, lock already exists")
+			return nil
+		}
+
+		log.Error("failed to acquire lock", err)
+		return err
+	}
+	defer func() {
+		_ = locker.Unlock()
+	}()
+
+	return f()
 }
 
 func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcherConfig, watcher agentWatcher, installModifier installationModifier) error {
@@ -88,19 +178,6 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	}
 
 	log.With("marker", marker, "details", marker.Details).Info("Loaded update marker")
-	locker := filelock.NewAppLocker(paths.Top(), watcherLockFile)
-	if err := locker.TryLock(); err != nil {
-		if errors.Is(err, filelock.ErrAppAlreadyRunning) {
-			log.Info("exiting, lock already exists")
-			return nil
-		}
-
-		log.Error("failed to acquire lock", err)
-		return err
-	}
-	defer func() {
-		_ = locker.Unlock()
-	}()
 
 	isWithinGrace, tilGrace := gracePeriod(marker, cfg.GracePeriod)
 	if isTerminalState(marker) || !isWithinGrace {
@@ -130,6 +207,11 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	errorCheckInterval := cfg.ErrorCheck.Interval
 	ctx := context.Background()
 	if err := watcher.Watch(ctx, tilGrace, errorCheckInterval, log); err != nil {
+		if errors.Is(err, ErrWatchCancelled) {
+			// the watch has been cancelled prematurely, don't clean or rollback just yet
+			return nil
+		}
+
 		log.Error("Error detected, proceeding to rollback: %v", err)
 
 		upgradeDetails.SetStateWithReason(details.StateRollback, details.ReasonWatchFailed)
@@ -158,6 +240,51 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	return err
 }
 
+func rollback(log *logp.Logger, topDir string, client client.Client, installModifier installationModifier, versionedHome string) error {
+	// TODO: there should be some sanity check in rollback functions like the installation we are going back to should exist and work
+	log.Infof("rolling back to %s", versionedHome)
+	dataDir := paths.DataFrom(topDir)
+	marker, err := upgrade.LoadMarker(dataDir)
+	if err != nil {
+		log.Error("failed to load marker", err)
+		return err
+	}
+	if marker == nil {
+		// no marker found we're not in upgrade process, recreate one marker to track the rollback
+		marker = &upgrade.UpdateMarker{}
+		log.Info("No update marker found, recreating an empty one to track the rollback")
+	} else {
+		log.With("marker", marker, "details", marker.Details).Info("Loaded update marker")
+	}
+
+	updateMarkerAndDetails := func(_ context.Context, _ *logger.Logger, _ string) error {
+		if marker.Details == nil {
+			actionID := ""
+			if marker.Action != nil {
+				actionID = marker.Action.ActionID
+			}
+			marker.Details = details.NewDetails(marker.Version, details.StateRollback, actionID)
+		}
+		// use the previous version from the marker
+		marker.Details.SetStateWithReason(details.StateRollback, fmt.Sprintf(details.ReasonManualRollbackPattern, marker.PrevVersion))
+		err = upgrade.SaveMarker(dataDir, marker, true)
+		if err != nil {
+			return fmt.Errorf("saving marker after rolling back: %w", err)
+		}
+		return nil
+	}
+
+	// FIXME get the hash from the list of installs or the manifest or the versioned home
+	// This is only a placeholder in case there is no versionedHome defined (which we always have)
+	hash := ""
+	err = installModifier.Rollback(context.Background(), log, client, topDir, versionedHome, hash, WithPreRestartHook(updateMarkerAndDetails))
+	if err != nil {
+		return fmt.Errorf("rolling back: %w", err)
+	}
+
+	return nil
+}
+
 // isTerminalState returns true if the state in the upgrade marker contains details and the upgrade details state is a
 // terminal one: UPG_COMPLETE, UPG_ROLLBACK and UPG_FAILED
 // If the upgrade marker or the upgrade marker details are nil the function will return false: as
@@ -178,48 +305,6 @@ func isTerminalState(marker *upgrade.UpdateMarker) bool {
 
 func isWindows() bool {
 	return runtime.GOOS == "windows"
-}
-
-func watch(ctx context.Context, tilGrace time.Duration, errorCheckInterval time.Duration, log *logger.Logger) error {
-	errChan := make(chan error)
-
-	ctx, cancel := context.WithCancel(ctx)
-
-	//cleanup
-	defer func() {
-		cancel()
-		close(errChan)
-	}()
-
-	agentWatcher := upgrade.NewAgentWatcher(errChan, log, errorCheckInterval)
-	go agentWatcher.Run(ctx)
-
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
-
-	t := time.NewTimer(tilGrace)
-	defer t.Stop()
-
-WATCHLOOP:
-	for {
-		select {
-		case <-signals:
-			// ignore
-			continue
-		case <-ctx.Done():
-			break WATCHLOOP
-		// grace period passed, agent is considered stable
-		case <-t.C:
-			log.Info("Grace period passed, not watching")
-			break WATCHLOOP
-		// Agent in degraded state.
-		case err := <-errChan:
-			log.Errorf("Agent Error detected: %s", err.Error())
-			return err
-		}
-	}
-
-	return nil
 }
 
 // gracePeriod returns true if it is within grace period and time until grace period ends.
