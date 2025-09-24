@@ -22,6 +22,7 @@ import (
 
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/utils"
+	"go.opentelemetry.io/collector/confmap"
 
 	koanfmaps "github.com/knadh/koanf/maps"
 
@@ -52,6 +53,7 @@ const (
 	idKey                      = "id"
 	agentKey                   = "agent"
 	monitoringKey              = "monitoring"
+	serviceKey                 = "service"
 	useOutputKey               = "use_output"
 	monitoringMetricsPeriodKey = "metrics_period"
 	failureThresholdKey        = "failure_threshold"
@@ -60,6 +62,7 @@ const (
 	agentName                  = "elastic-agent"
 	metricBeatName             = "metricbeat"
 	fileBeatName               = "filebeat"
+	collectorName              = "collector"
 
 	monitoringMetricsUnitID = "metrics-monitoring"
 	monitoringFilesUnitsID  = "filestream-monitoring"
@@ -86,6 +89,7 @@ var (
 type BeatsMonitor struct {
 	enabled         bool // feature flag disabling whole v1 monitoring story
 	config          *monitoringConfig
+	otelConfig      *confmap.Conf
 	operatingSystem string
 	agentInfo       info.Agent
 }
@@ -106,12 +110,13 @@ type monitoringConfig struct {
 }
 
 // New creates a new BeatsMonitor instance.
-func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, agentInfo info.Agent) *BeatsMonitor {
+func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, otelCfg *confmap.Conf, agentInfo info.Agent) *BeatsMonitor {
 	return &BeatsMonitor{
 		enabled: enabled,
 		config: &monitoringConfig{
 			C: cfg,
 		},
+		otelConfig:      otelCfg,
 		operatingSystem: operatingSystem,
 		agentInfo:       agentInfo,
 	}
@@ -138,6 +143,7 @@ func (b *BeatsMonitor) Reload(rawConfig *config.Config) error {
 	}
 
 	b.config = &newConfig
+	b.otelConfig = rawConfig.OTel
 	return nil
 }
 
@@ -349,6 +355,16 @@ func (b *BeatsMonitor) Prepare(unit string) error {
 	return nil
 }
 
+// Returns true if any component in the list uses the otel runtime.
+func usingOtelRuntime(componentInfos []componentInfo) bool {
+	for _, ci := range componentInfos {
+		if ci.RuntimeManager == component.OtelRuntimeManager {
+			return true
+		}
+	}
+	return false
+}
+
 // Cleanup removes files that were created for monitoring.
 func (b *BeatsMonitor) Cleanup(unit string) error {
 	if !b.Enabled() {
@@ -435,6 +451,16 @@ func (b *BeatsMonitor) getComponentInfos(components []component.Component, compo
 			RuntimeManager: component.RuntimeManager(b.config.C.RuntimeManager),
 		})
 	}
+	// If any other component uses the Otel runtime, also add a component to monitor
+	// its telemetry.
+	if b.config.C.MonitorMetrics && usingOtelRuntime(componentInfos) {
+		componentInfos = append(componentInfos,
+			componentInfo{
+				ID:             fmt.Sprintf("prometheus/%s", monitoringMetricsUnitID),
+				BinaryName:     metricBeatName,
+				RuntimeManager: component.RuntimeManager(b.config.C.RuntimeManager),
+			})
+	}
 	// sort the components to ensure a consistent order of inputs in the configuration
 	slices.SortFunc(componentInfos, func(a, b componentInfo) int {
 		return strings.Compare(a.ID, b.ID)
@@ -486,6 +512,47 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 	return defaultMonitoringNamespace
 }
 
+func (b *BeatsMonitor) getCollectorTelemetryEndpoint() string {
+	type metricsReaderConfig struct {
+		Pull struct {
+			Exporter struct {
+				Prometheus struct {
+					Host string `mapstructure:"host"`
+					Port int    `mapstructure:"port"`
+				} `mapstructure:"prometheus"`
+			} `mapstructure:"exporter"`
+		} `mapstructure:"pull"`
+	}
+	var otel struct {
+		Service struct {
+			Telemetry struct {
+				Metrics struct {
+					Readers []metricsReaderConfig `mapstructure:"readers"`
+				} `mapstructure:"metrics"`
+			} `mapstructure:"telemetry"`
+		} `mapstructure:"service"`
+	}
+	if err := b.otelConfig.Unmarshal(&otel, confmap.WithIgnoreUnused()); err == nil {
+		for _, reader := range otel.Service.Telemetry.Metrics.Readers {
+			p := reader.Pull.Exporter.Prometheus
+			if p.Host != "" || p.Port != 0 {
+				host := "localhost"
+				port := 8888
+				if p.Host != "" {
+					host = p.Host
+				}
+				if p.Port != 0 {
+					port = p.Port
+				}
+				return host + ":" + strconv.Itoa(port)
+			}
+
+		}
+	}
+	// If there is no explicit configuration, the collector publishes its telemetry on port 8888.
+	return "localhost:8888"
+}
+
 // injectMetricsInput injects monitoring config for agent monitoring to the `cfg` object.
 func (b *BeatsMonitor) injectMetricsInput(
 	cfg map[string]interface{},
@@ -527,6 +594,20 @@ func (b *BeatsMonitor) injectMetricsInput(
 			},
 			"streams": httpStreams,
 		},
+	}
+
+	if usingOtelRuntime(componentInfos) {
+		prometheusStream := b.getPrometheusStream(failureThreshold, metricsCollectionIntervalString)
+		inputs = append(inputs, map[string]interface{}{
+			idKey:        fmt.Sprintf("%s-collector", monitoringMetricsUnitID),
+			"name":       fmt.Sprintf("%s-collector", monitoringMetricsUnitID),
+			"type":       "prometheus/metrics",
+			useOutputKey: monitoringOutput,
+			"data_stream": map[string]interface{}{
+				"namespace": monitoringNamespace,
+			},
+			"streams": []any{prometheusStream},
+		})
 	}
 
 	// Make sure we don't set anything until the configuration is stable if the otel manager isn't enabled
@@ -728,6 +809,40 @@ func (b *BeatsMonitor) getHttpStreams(
 	}
 
 	return httpStreams
+}
+
+// getPrometheusStream returns the stream definition for prometheus/metrics input.
+// Note: The return type must be []any due to protobuf serialization quirks.
+func (b *BeatsMonitor) getPrometheusStream(
+	failureThreshold *uint,
+	metricsCollectionIntervalString string,
+) any {
+	prometheusHost := b.getCollectorTelemetryEndpoint()
+
+	// want metricset "collector"
+	monitoringNamespace := b.monitoringNamespace()
+	indexName := fmt.Sprintf("metrics-elastic_agent.collector-%s", monitoringNamespace)
+	dataset := "elastic_agent.collector"
+
+	otelStream := map[string]any{
+		idKey: fmt.Sprintf("%s-otel", monitoringMetricsUnitID),
+		"data_stream": map[string]interface{}{
+			"type":      "metrics",
+			"dataset":   dataset,
+			"namespace": monitoringNamespace,
+		},
+		"metricsets":   []interface{}{"collector"},
+		"metrics_path": "/metrics",
+		"hosts":        []interface{}{prometheusHost},
+		"namespace":    monitoringNamespace,
+		"period":       metricsCollectionIntervalString,
+		"index":        indexName,
+		"processors":   processorsForCollectorPrometheusStream(monitoringNamespace, dataset, b.agentInfo),
+	}
+	if failureThreshold != nil {
+		otelStream[failureThresholdKey] = *failureThreshold
+	}
+	return otelStream
 }
 
 // getBeatsStreams returns stream definitions for beats inputs.
@@ -941,6 +1056,18 @@ func processorsForAgentHttpStream(namespace, dataset string, agentInfo info.Agen
 		addAgentFieldsProcessor(agentInfo.AgentID()),
 		addCopyFieldsProcessor(httpCopyRules(), true, false),
 		dropFieldsProcessor([]any{"http"}, true),
+		addComponentFieldsProcessor(agentName, agentName),
+	}
+}
+
+// processorsForCollectorPrometheusStream returns the processors used for the OTel
+// collector prometheus metrics
+func processorsForCollectorPrometheusStream(namespace, dataset string, agentInfo info.Agent) []any {
+	return []interface{}{
+		addDataStreamFieldsProcessor(dataset, namespace),
+		addEventFieldsProcessor(dataset),
+		addElasticAgentFieldsProcessor(agentName, agentInfo),
+		addAgentFieldsProcessor(agentInfo.AgentID()),
 		addComponentFieldsProcessor(agentName, agentName),
 	}
 }
