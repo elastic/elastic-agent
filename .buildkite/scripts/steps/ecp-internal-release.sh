@@ -44,18 +44,22 @@ buildkite-agent artifact download "build/distributions/**" . --step "packaging-s
 # AMD64
 docker load -i ./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-amd64.docker.tar.gz
 docker image tag "elastic-agent-service:$DOCKER_TAG" "$PRIVATE_IMAGE"
-# DEBUG STATEMENT
+docker push "$PRIVATE_IMAGE"
+# DEBUG
 docker image inspect "$PRIVATE_IMAGE"
-AMD64_DIGEST=$(docker image inspect --format "{{index .RepoDigests 0}}" "$PRIVATE_IMAGE")
-docker push "$AMD64_DIGEST"
+ARM64_DIGEST=$(docker image inspect --format "{{index .RepoDigests 0}}" "$PRIVATE_IMAGE")
 
 # ARM64 (overwrites AMD64 tags)
 docker load -i ./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-arm64.docker.tar.gz
 docker image tag "elastic-agent-service:$DOCKER_TAG" "$PRIVATE_IMAGE"
+docker push "$PRIVATE_IMAGE"
+# DEBUG
+docker image inspect "$PRIVATE_IMAGE"
 ARM64_DIGEST=$(docker image inspect --format "{{index .RepoDigests 0}}" "$PRIVATE_IMAGE")
-docker push "$ARM64_DIGEST"
 
-# create a new manifest image referencing the source images
+# at this point the $PRIVATE_IMAGE is pointing to only the arm64 based image, we need the image to
+# be a multi-architecture based image so we create an image from the digests and tag it the same and
+# push it to the registry (aka. make the tag now a multi-architecture based image)
 docker buildx imagetools create -t "$PRIVATE_IMAGE" \
   "$AMD64_DIGEST" \
   "$ARM64_DIGEST"
