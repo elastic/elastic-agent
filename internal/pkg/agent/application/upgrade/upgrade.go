@@ -336,20 +336,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	u.log.Infow("Unpacking agent package", "version", newVersion)
 
-<<<<<<< HEAD
-	unpackRes, err := u.unpacker.unpack(version, archivePath, paths.Data())
-=======
 	// Nice to have: add check that no archive files end up in the current versioned home
-	// default to no flavor to avoid breaking behavior
-
-	// no default flavor, keep everything in case flavor is not specified
-	// in case of error fallback to keep-all
-	detectedFlavor, err := install.UsedFlavor(paths.Top(), "")
-	if err != nil {
-		u.log.Warnf("error encountered when detecting used flavor with top path %q: %v", paths.Top(), err)
-	}
-	u.log.Debugf("detected used flavor: %q", detectedFlavor)
-	unpackRes, err := u.unpacker.unpack(version, archivePath, paths.Data(), detectedFlavor)
+	unpackRes, err := u.unpacker.unpack(version, archivePath, paths.Data())
 
 	// If VersionedHome is empty then unpack has not started unpacking the
 	// archive yet. There's nothing to clean up. Return the error.
@@ -364,7 +352,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	cleanupPaths = append(cleanupPaths, newHome)
 
->>>>>>> ab23962a0 (Enhancement/5235 upgrade cleans up downloads and extracted agent (#9386))
 	if err != nil {
 		return nil, err
 	}
