@@ -61,6 +61,8 @@ import (
 	"go.opentelemetry.io/collector/exporter/otlpexporter"
 	otlphttpexporter "go.opentelemetry.io/collector/exporter/otlphttpexporter"
 
+	"github.com/elastic/beats/v7/x-pack/otel/exporter/logstashexporter"
+
 	// Extensions
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension"
 	headersetterextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/headerssetterextension"
@@ -148,6 +150,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			loadbalancingexporter.NewFactory(),
 			otlphttpexporter.NewFactory(),
 			nopexporter.NewFactory(),
+			logstashexporter.NewFactory(),
 		}
 		// some exporters should only be available when
 		// not in fips mode due to restrictions on crypto usage
