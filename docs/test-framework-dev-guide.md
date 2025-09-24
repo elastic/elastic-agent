@@ -39,6 +39,18 @@ If necessary, you can create a new serverless deployment manually; the previous 
 
 Credentials for these deployments are securely stored in Google and can only be accessed by Buildkite pipelines. The access control is set using [OpenID Connect in Google Cloud Platform](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-google-cloud-platform). And that's managed by the Robots team.
 
+### Helm & Helm charts
+To run the Kubernets integration tests you need to install
+[helm](https://helm.sh/). Then add and update some helm charts
+repositories:
+
+```
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+```
+
+
+
 ## Running tests
 
 Some integration and E2E tests are safe to run locally. These tests set
