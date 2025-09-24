@@ -380,7 +380,7 @@ func TestFromFleetConfig(t *testing.T) {
 			"default config",
 			defaultFleetAgentCfg,
 			EnrollOptions{
-				URL:          defaultFleetAgentCfg.Client.Host,
+				URL:          string(defaultFleetAgentCfg.Client.Protocol) + "://" + defaultFleetAgentCfg.Client.Host,
 				EnrollAPIKey: defaultFleetAgentCfg.AccessAPIKey,
 				ProxyHeaders: make(map[string]string),
 			},

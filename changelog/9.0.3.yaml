@@ -1,0 +1,63 @@
+version: 9.0.3
+entries:
+    - kind: bug-fix
+      summary: Address a race condition that can occur in Agent diagnostics if log rotation runs while logs are being zipped.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8215
+      issue: []
+      timestamp: 1747938268
+      file:
+        name: 1747938268-fix-diag-race-condition.yaml
+        checksum: 25e4883c6751a854d4a2f0897fb83848416c855e
+    - kind: feature
+      summary: add cumulativetodeltaprocessor to EDOT collector
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8352
+        - https://github.com/elastic/elastic-agent/pull/8573
+        - https://github.com/elastic/elastic-agent/pull/8575
+        - https://github.com/elastic/elastic-agent/pull/8616
+        - https://github.com/elastic/elastic-agent/pull/8372
+      issue: []
+      timestamp: 1749176965
+      file:
+        name: 1749176965-add-cumulativetodeltaprocessor.yaml
+        checksum: 6c4bc7565ed8fb801a1b02a01ee085488ae960e8
+    - kind: bug-fix
+      summary: Use paths.TempDir for diagnostics actions
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8472
+      issue: []
+      timestamp: 1749742685
+      file:
+        name: 1749742685-Use-paths.TempDir-for-diagnostics-actions.yaml
+        checksum: 1357d25b03d628ff7234a15a51e5dba89459d340
+    # - kind: bug-fix
+    #   summary: Use Debian 11 to build linux/arm to match linux/amd64. Upgrades linux/arm64's statically linked glibc from 2.28 to 2.31.
+    #   description: ""
+    #   component: elastic-agent
+    #   pr:
+    #     - https://github.com/elastic/elastic-agent/pull/8497
+    #   issue: []
+    #   timestamp: 1749844873
+    #   file:
+    #     name: 1749844873-Use-Debian-11-for-linux-arm-to-match-linux-amd64.yaml
+    #     checksum: ddd1264b76219193cfed89ccc87e65b0144e4074
+    - kind: bug-fix
+      summary: relax file ownership check to allow admin re-enrollment on Windows
+      description: |
+        On Windows, the agent previously enforced a strict file ownership (SID) check during re-enrollment, which prevented legitimate admin users from re-enrolling the agent if the owner did not match. This PR changes the Windows-specific logic to a no-op, allowing any admin to re-enroll the agent. This restores usability for admin users, but reintroduces the risk that privileged re-enrollment can break unprivileged installs. The Unix-specific ownership check remains unchanged.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/8503
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/7794
+      timestamp: 1749923633
+      file:
+        name: 1749923633-Windows-relax-file-ownership-check-for-re-enrollment.yaml
+        checksum: 650d0f58770863722ed75c0b092c4578f420e1fe

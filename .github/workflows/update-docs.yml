@@ -1,0 +1,101 @@
+name: Update documentation
+
+on:
+  schedule:
+    # Run weekly on Monday at 8:00 AM UTC
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+    # Allow manual triggering
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # Fetch all history including tags
+      
+      - name: Add upstream remote and fetch tags
+        run: |
+          git remote add upstream https://github.com/elastic/elastic-agent.git || true
+          git fetch upstream --tags
+      
+      - name: Find latest semantic version
+        id: get_version
+        run: |
+          # Get the latest semantic version tag (excluding pre-release versions)
+          LATEST_VERSION=$(git tag --list | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | sort -V | tail -1)
+          echo "Latest version: $LATEST_VERSION"
+          echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Pass version to script
+        run: |
+          echo "LATEST_VERSION=${{ steps.get_version.outputs.version }}" >> $GITHUB_ENV
+      
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r docs/scripts/update-docs/requirements.txt
+      
+      - name: Run documentation generator
+        run: |
+          cd docs/scripts/update-docs
+          python update-components-docs.py
+      
+      - name: Check if branch already exists
+        id: check_branch
+        run: |
+          BRANCH_NAME="update-docs-${{ steps.get_version.outputs.version }}"
+          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+            echo "Branch $BRANCH_NAME already exists. Documentation for this version has already been updated."
+            echo "branch_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Branch $BRANCH_NAME does not exist. Proceeding with PR creation."
+            echo "branch_exists=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Create Pull Request
+        if: steps.check_branch.outputs.branch_exists == 'false'
+        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "docs: update generated documentation for ${{ steps.get_version.outputs.version }}"
+          title: "Update generated documentation for ${{ steps.get_version.outputs.version }}"
+          body: |
+            This PR updates the generated documentation based on the latest released version **${{ steps.get_version.outputs.version }}**.
+            
+            ## Changes
+            - Updates EDOT Collector component tables
+            - Updates OpenTelemetry Collector Builder (OCB) configuration
+            - Uses data from the latest released version tag: `${{ steps.get_version.outputs.version }}`
+            
+            ## References
+            - **Source go.mod**: https://github.com/elastic/elastic-agent/blob/${{ steps.get_version.outputs.version }}/go.mod
+            - **Source core-components.yaml**: https://github.com/elastic/elastic-agent/blob/${{ steps.get_version.outputs.version }}/internal/pkg/otel/core-components.yaml
+            - **Release tag**: https://github.com/elastic/elastic-agent/tree/${{ steps.get_version.outputs.version }}
+            
+            This is an automated PR created by the documentation update workflow.
+          branch: update-docs-${{ steps.get_version.outputs.version }}
+          base: main
+          delete-branch: true
+          labels: |
+            documentation
+            automated-pr
+      
+      - name: Skip PR creation (branch exists)
+        if: steps.check_branch.outputs.branch_exists == 'true'
+        run: |
+          echo "✅ Documentation for version ${{ steps.get_version.outputs.version }} has already been updated."
+          echo "Branch update-docs-${{ steps.get_version.outputs.version }} already exists."
+          echo "Workflow completed successfully - no action needed."
