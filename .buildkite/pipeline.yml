@@ -374,3 +374,29 @@ steps:
     build:
       commit: "${BUILDKITE_COMMIT}"
       branch: "${BUILDKITE_BRANCH}"
+
+  - label: "Trigger DRA (SNAPSHOT)"
+    if: build.pull_request.id != null
+    plugins:
+      - monorepo-diff#v1.2.0:
+          diff: "git diff --name-only origin/${GITHUB_PR_TARGET_BRANCH}...HEAD"
+          interpolation: false
+          watch:
+            - path:
+                - .go-version
+                - .buildkite/pipeline.elastic-agent-binary-dra.yml
+                - .buildkite/pipeline.yml
+                - .buildkite/scripts/steps/build-agent-core.sh
+                - .buildkite/scripts/steps/dra-publish.sh
+                - dev-tools/packaging/
+              config:
+                label: ":pipeline: Upload packaging Elastic Agent core binary and publish it to DRA Pipeline"
+                command: "buildkite-agent pipeline upload .buildkite/pipeline.elastic-agent-binary-dra.yml"
+                env:
+                    - BUILDKITE_PULL_REQUEST=${BUILDKITE_PULL_REQUEST}
+                    - BUILDKITE_PULL_REQUEST_BASE_BRANCH=${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
+                    - GITHUB_PR_LABELS=${GITHUB_PR_LABELS}
+                    - ELASTIC_SLACK_NOTIFICATIONS_ENABLED=false
+                    - DRA_BRANCH=${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
+                    - DRA_DRY_RUN=true
+                    - RUN_SNAPSHOT=true
