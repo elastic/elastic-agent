@@ -59,7 +59,7 @@ func GetOtelConfig(
 	beatMonitoringConfigGetter BeatMonitoringConfigGetter,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
-	components := getSupportedComponents(model)
+	components := getSupportedComponents(model, logger)
 	if len(components) == 0 {
 		return nil, nil
 	}
@@ -116,12 +116,14 @@ func VerifyComponentIsOtelSupported(comp *component.Component) error {
 }
 
 // getSupportedComponents returns components from the given model that can be run in an Otel Collector.
-func getSupportedComponents(model *component.Model) []*component.Component {
+func getSupportedComponents(model *component.Model, logger *logp.Logger) []*component.Component {
 	var supportedComponents []*component.Component
 
 	for _, comp := range model.Components {
-		if VerifyComponentIsOtelSupported(&comp) == nil {
+		if err := VerifyComponentIsOtelSupported(&comp); err == nil {
 			supportedComponents = append(supportedComponents, &comp)
+		} else {
+			logger.Errorf("unsupported component %s submitted to otel manager, skipping: %v", comp.ID, err)
 		}
 	}
 
