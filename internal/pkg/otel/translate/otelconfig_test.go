@@ -1141,14 +1141,14 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 						ID:   "filestream-default",
 						Type: client.UnitTypeOutput,
 						Config: component.MustExpectedConfig(map[string]any{
-							"type":                 "elasticsearch",
-							"hosts":                []any{"localhost:9200"},
-							"allow_older_versions": false,
+							"type":    "elasticsearch",
+							"hosts":   []any{"localhost:9200"},
+							"indices": []any{},
 						}),
 					},
 				},
 			},
-			expectedError: "unsupported configuration for unsupported-config: error translating config for output: default, unit: filestream-default, error: allow_older_versions:false is currently not supported: unsupported operation",
+			expectedError: "unsupported configuration for unsupported-config: error translating config for output: default, unit: filestream-default, error: indices is currently not supported: unsupported operation",
 		},
 	}
 

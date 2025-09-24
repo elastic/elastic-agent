@@ -1107,7 +1107,7 @@ outputs:
     type: elasticsearch
     hosts:
       - localhost:9200
-    allow_older_versions: false # not supported by the elasticsearch exporter
+    indices: [] # not supported by the elasticsearch exporter
 inputs:
   - id: test-input
     type: filestream

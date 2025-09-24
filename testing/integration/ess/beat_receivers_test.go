@@ -823,7 +823,7 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
-    allow_older_versions: false # not supported by the elasticsearch exporter
+    indices: [] # not supported by the elasticsearch exporter
 agent.monitoring.enabled: false
 `
 
@@ -882,7 +882,7 @@ agent.monitoring.enabled: false
 	require.NotNil(t, unsupportedLogRecord, "unsupported log message should be present")
 	message, ok := unsupportedLogRecord["message"].(string)
 	require.True(t, ok, "log message field should be a string")
-	expectedMessage := "otel runtime is not supported for component system/metrics-default, switching to process runtime, reason: unsupported configuration for system/metrics-default: error translating config for output: default, unit: system/metrics-default, error: allow_older_versions:false is currently not supported: unsupported operation"
+	expectedMessage := "otel runtime is not supported for component system/metrics-default, switching to process runtime, reason: unsupported configuration for system/metrics-default: error translating config for output: default, unit: system/metrics-default, error: indices is currently not supported: unsupported operation"
 	assert.Equal(t, expectedMessage, message)
 }
 
