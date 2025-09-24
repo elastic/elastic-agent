@@ -69,7 +69,7 @@ docker manifest create "$PRIVATE_IMAGE" \
   "$PRIVATE_REPO@$ARM64_DIGEST"
 
 docker login --username "${DOCKER_USERNAME_SECRET}" --password "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}"
-docker push $PRIVATE_IMAGE
+docker manifest push $PRIVATE_IMAGE
 
 # create a new manifest image referencing the source images
 #docker buildx imagetools create -t "$PRIVATE_IMAGE" \
