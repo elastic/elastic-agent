@@ -77,5 +77,5 @@ func otelDiagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 	defer f.Close()
 
-	return diagnostics.ZipArchiveEDOT(streams.Err, f, paths.Top(), agentDiag, componentDiag)
+	return diagnostics.ZipArchive(streams.Err, f, paths.Top(), agentDiag, nil, componentDiag, false)
 }

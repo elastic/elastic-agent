@@ -226,8 +226,9 @@ func ZipArchive(
 	if err != nil {
 		return fmt.Errorf("error creating .zip header for components/ directory: %w", err)
 	}
+
 	// iterate over components
-	for dirName, units := range compDirs {
+	for dirName, comp := range componentResults {
 		_, err := zw.CreateHeader(&zip.FileHeader{
 			Name:     fmt.Sprintf("components/%s/", dirName),
 			Method:   zip.Deflate,
@@ -236,111 +237,15 @@ func ZipArchive(
 		if err != nil {
 			return fmt.Errorf("error creating .zip header for component directory: %w", err)
 		}
-		// create component diags
-		if comp, ok := componentResults[dirName]; ok {
-			// check for component-level errors
-			if comp.Err != nil {
-				err = writeErrorResult(zw, fmt.Sprintf("components/%s/error.txt", dirName), comp.Err.Error())
-				if err != nil {
-					return fmt.Errorf("error while writing error result for component %s: %w", comp.ComponentID, err)
-				}
-			} else {
-				for _, res := range comp.Results {
-
-					filePath := fmt.Sprintf("components/%s/%s", dirName, res.Filename)
-					resFileWriter, err := zw.CreateHeader(&zip.FileHeader{
-						Name:     filePath,
-						Method:   zip.Deflate,
-						Modified: ts,
-					})
-					if err != nil {
-						return fmt.Errorf("error creating .zip header for %s: %w", res.Filename, err)
-					}
-					err = writeRedacted(errOut, resFileWriter, filePath, res)
-					if err != nil {
-						return fmt.Errorf("error writing %s in zip file: %w", res.Filename, err)
-					}
-				}
-			}
-
-		}
-		// create unit diags
-		for _, ud := range units {
-			unitDir := strings.ReplaceAll(strings.TrimPrefix(ud.UnitID, ud.ComponentID+"-"), "/", "-")
-			_, err := zw.CreateHeader(&zip.FileHeader{
-				Name:     fmt.Sprintf("components/%s/%s/", dirName, unitDir),
-				Method:   zip.Deflate,
-				Modified: ts,
-			})
-			if err != nil {
-				return fmt.Errorf("error creating .zip header for unit directory: %w", err)
-			}
-			// check for unit-level errors
-			if ud.Err != nil {
-				err = writeErrorResult(zw, fmt.Sprintf("components/%s/%s/error.txt", dirName, unitDir), ud.Err.Error())
-				if err != nil {
-					return fmt.Errorf("error while writing error result for unit %s: %w", ud.UnitID, err)
-				}
-				continue
-			}
-			for _, fr := range ud.Results {
-				filePath := fmt.Sprintf("components/%s/%s/%s", dirName, unitDir, fr.Filename)
-				w, err := zw.CreateHeader(&zip.FileHeader{
-					Name:     filePath,
-					Method:   zip.Deflate,
-					Modified: fr.Generated,
-				})
-				if err != nil {
-					return err
-				}
-				err = writeRedacted(errOut, w, filePath, fr)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	}
-
-	// Gather Logs:
-	return zipLogs(zw, ts, topPath, excludeEvents)
-}
-
-func ZipArchiveEDOT(
-	errOut,
-	w io.Writer,
-	topPath string,
-	agentDiag []client.DiagnosticFileResult,
-	compDiags []client.DiagnosticComponentResult,
-) error {
-	ts := time.Now().UTC()
-	zw := zip.NewWriter(w)
-	defer zw.Close()
-	// Write the global diagnostics content
-	for _, ad := range agentDiag {
-		zf, err := zw.CreateHeader(&zip.FileHeader{
-			Name:     ad.Filename,
-			Method:   zip.Deflate,
-			Modified: ad.Generated,
-		})
-		if err != nil {
-			return fmt.Errorf("error creating header for agent diagnostics: %w", err)
-		}
-		err = writeRedacted(errOut, zf, ad.Filename, ad)
-		if err != nil {
-			return fmt.Errorf("error writing file for agent diagnostics: %w", err)
-		}
-	}
-	for _, comp := range compDiags {
-		// check for component-level diagnostics
 		if comp.Err != nil {
-			err := writeErrorResult(zw, fmt.Sprintf("components/%s/error.txt", comp.ComponentID), comp.Err.Error())
+			err = writeErrorResult(zw, fmt.Sprintf("components/%s/error.txt", dirName), comp.Err.Error())
 			if err != nil {
 				return fmt.Errorf("error while writing error result for component %s: %w", comp.ComponentID, err)
 			}
 		} else {
 			for _, res := range comp.Results {
 
-				filePath := fmt.Sprintf("components/%s/%s", comp.ComponentID, res.Filename)
+				filePath := fmt.Sprintf("components/%s/%s", dirName, res.Filename)
 				resFileWriter, err := zw.CreateHeader(&zip.FileHeader{
 					Name:     filePath,
 					Method:   zip.Deflate,
@@ -355,8 +260,49 @@ func ZipArchiveEDOT(
 				}
 			}
 		}
+		// create unit diags
+		if units, ok := compDirs[dirName]; ok {
+			// check for component-level errors
+			// create unit diags
+			for _, ud := range units {
+				unitDir := strings.ReplaceAll(strings.TrimPrefix(ud.UnitID, ud.ComponentID+"-"), "/", "-")
+				_, err := zw.CreateHeader(&zip.FileHeader{
+					Name:     fmt.Sprintf("components/%s/%s/", dirName, unitDir),
+					Method:   zip.Deflate,
+					Modified: ts,
+				})
+				if err != nil {
+					return fmt.Errorf("error creating .zip header for unit directory: %w", err)
+				}
+				// check for unit-level errors
+				if ud.Err != nil {
+					err = writeErrorResult(zw, fmt.Sprintf("components/%s/%s/error.txt", dirName, unitDir), ud.Err.Error())
+					if err != nil {
+						return fmt.Errorf("error while writing error result for unit %s: %w", ud.UnitID, err)
+					}
+					continue
+				}
+				for _, fr := range ud.Results {
+					filePath := fmt.Sprintf("components/%s/%s/%s", dirName, unitDir, fr.Filename)
+					w, err := zw.CreateHeader(&zip.FileHeader{
+						Name:     filePath,
+						Method:   zip.Deflate,
+						Modified: fr.Generated,
+					})
+					if err != nil {
+						return err
+					}
+					err = writeRedacted(errOut, w, filePath, fr)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
 	}
-	return nil
+
+	// Gather Logs:
+	return zipLogs(zw, ts, topPath, excludeEvents)
 }
 
 func writeErrorResult(zw *zip.Writer, path string, errBody string) error {
