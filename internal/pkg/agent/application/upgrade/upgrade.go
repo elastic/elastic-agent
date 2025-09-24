@@ -460,15 +460,30 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, goerrors.Join(err, rollbackErr)
 	}
 
-	//FIXME make it nicer
+	rollbackWindow := time.Duration(0)
+	if u.upgradeSettings != nil && u.upgradeSettings.Rollback != nil {
+		rollbackWindow = u.upgradeSettings.Rollback.Window
+	}
+
+	var currentInstallTTL *time.Time = nil
+	if rollbackWindow > 0 {
+		currentInstallTTLVar := time.Now().Add(rollbackWindow)
+		currentInstallTTL = &currentInstallTTLVar
+	}
+
 	_, err = u.installDescriptorSource.ModifyInstallDesc(
 		func(desc *v1.AgentInstallDesc) error {
 			if desc.VersionedHome == unpackRes.VersionedHome {
 				desc.Active = true
 				return nil
+			} else {
+				desc.Active = false
 			}
 
-			desc.Active = false
+			if desc.VersionedHome == currentVersionedHome {
+				desc.TTL = currentInstallTTL
+			}
+
 			return nil
 		},
 	)
@@ -501,10 +516,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		hash:          release.Commit(),
 		versionedHome: currentVersionedHome,
 	}
-	rollbackWindow := time.Duration(0)
-	if u.upgradeSettings != nil && u.upgradeSettings.Rollback != nil {
-		rollbackWindow = u.upgradeSettings.Rollback.Window
-	}
+
 	if err := u.markUpgrade(u.log,
 		paths.Data(), // data dir to place the marker in
 		time.Now(),

@@ -73,7 +73,7 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 
 	targetVersionedHome := filepath.FromSlash(pathMapper.Map(manifest.Package.VersionedHome))
 
-	err = setupInstallPath(topPath, ownership, targetVersionedHome, manifest.Package.Version, flavor)
+	err = setupInstallPath(topPath, ownership, targetVersionedHome, manifestutils.GetFullVersion(manifest), flavor)
 	if err != nil {
 		return utils.FileOwner{}, fmt.Errorf("error setting up install path: %w", err)
 	}
