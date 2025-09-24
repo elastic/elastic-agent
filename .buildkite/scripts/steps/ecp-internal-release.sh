@@ -61,19 +61,22 @@ skopeo copy --all "docker-archive:./build/distributions/elastic-agent-service-$D
 
 # attempt to just install docker here
 apt-get update
-apt-get install docker.io
+apt-get install --no-install-recommends -y docker.io
 
 # Create a multi-arch manifest
 docker manifest create "$PRIVATE_IMAGE" \
   "$PRIVATE_REPO@$AMD64_DIGEST" \
   "$PRIVATE_REPO@$ARM64_DIGEST"
 
+docker login --username "${DOCKER_USERNAME_SECRET}" --password "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}"
+docker push $PRIVATE_IMAGE
+
 # create a new manifest image referencing the source images
 #docker buildx imagetools create -t "$PRIVATE_IMAGE" \
 #  "$PRIVATE_REPO@$AMD64_DIGEST" \
 #  "$PRIVATE_REPO@$ARM64_DIGEST"
 
-skopeo copy --all "docker-daemon:$PRIVATE_IMAGE" "docker://$PRIVATE_IMAGE"
+#skopeo copy --all "docker-daemon:$PRIVATE_IMAGE" "docker://$PRIVATE_IMAGE"
 
 annotate "* Image: $PRIVATE_IMAGE"
 annotate "* Short commit: $VERSION"
