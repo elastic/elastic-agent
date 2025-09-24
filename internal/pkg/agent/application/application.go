@@ -123,9 +123,8 @@ func New(
 		override(cfg)
 	}
 
-	otelconfig.SetExecutionModeFromConfig(log, rawConfig)
-	otelExecMode := otelconfig.GetExecutionMode()
-	isOtelSubprocessExecution := otelExecMode == otelmanager.SubprocessExecutionMode
+	otelExecMode := otelconfig.GetExecutionModeFromConfig(log, rawConfig)
+	isOtelExecModeSubprocess := otelExecMode == otelmanager.SubprocessExecutionMode
 
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
 	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled
@@ -133,7 +132,7 @@ func New(
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create upgrader: %w", err)
 	}
-	monitor := monitoring.New(isMonitoringSupported, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, agentInfo, isOtelSubprocessExecution)
+	monitor := monitoring.New(isMonitoringSupported, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, agentInfo, isOtelExecModeSubprocess)
 
 	runtime, err := runtime.NewManager(
 		log,
