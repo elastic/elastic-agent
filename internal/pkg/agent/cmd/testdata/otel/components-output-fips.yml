@@ -74,10 +74,10 @@ processors:
       logs: Undefined
       metrics: Alpha
       traces: Undefined
-  - name: elastictrace
+  - name: elasticapm
     stability:
-      logs: Undefined
-      metrics: Undefined
+      logs: Alpha
+      metrics: Alpha
       traces: Alpha
   - name: filter
     stability:
