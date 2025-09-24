@@ -47,11 +47,29 @@ DOCKER_USERNAME_SECRET=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SEC
 DOCKER_PASSWORD_SECRET=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
 skopeo login --username "${DOCKER_USERNAME_SECRET}" --password "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}"
 
-# workaround: installing podman here to create a multi-arch image
-echo "--- Installing Podman"
-apt-get update
-apt-get install --no-install-recommends -y podman
-podman login --username "${DOCKER_USERNAME_SECRET}" --password "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}"
+# download manifest-tool if not available (lightweight manifest creation tool)
+echo "--- Downloading manifest-tool"
+if ! command -v manifest-tool &> /dev/null; then
+    MANIFEST_TOOL_VERSION="2.2.0"
+    
+    # Detect current architecture
+    case "$(uname -m)" in
+        x86_64) MANIFEST_TOOL_ARCH="amd64" ;;
+        aarch64|arm64) MANIFEST_TOOL_ARCH="arm64" ;;
+        armv7l) MANIFEST_TOOL_ARCH="armv7" ;;
+        *) echo "Unsupported architecture: $(uname -m)"; exit 1 ;;
+    esac
+    
+    echo "--- Downloading manifest-tool v${MANIFEST_TOOL_VERSION} for ${MANIFEST_TOOL_ARCH}"
+    curl -L "https://github.com/estesp/manifest-tool/releases/download/v${MANIFEST_TOOL_VERSION}/binaries-manifest-tool-${MANIFEST_TOOL_VERSION}.tar.gz" | tar -xz "manifest-tool-linux-${MANIFEST_TOOL_ARCH}"
+    mv "manifest-tool-linux-${MANIFEST_TOOL_ARCH}" manifest-tool
+    chmod +x manifest-tool
+    MANIFEST_TOOL_CMD="./manifest-tool"
+else
+    MANIFEST_TOOL_CMD="manifest-tool"
+fi
+
+manifest-tool --version
 
 # download the amd64 and arm64 builds of the image from the previous steps
 echo "--- Downloading amd64 and arm64 builds"
@@ -68,12 +86,30 @@ echo "--- Copying images to private image location"
 skopeo copy --all "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-amd64.docker.tar.gz" "docker://$PRIVATE_REPO@$AMD64_DIGEST"
 skopeo copy --all "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-arm64.docker.tar.gz" "docker://$PRIVATE_REPO@$ARM64_DIGEST"
 
-# Create a multi-arch manifest and push it
+# Create a multi-arch manifest using manifest-tool
 echo "--- Creating multi-arch manifest"
-podman manifest create "$PRIVATE_IMAGE" \
-  "$PRIVATE_REPO@$AMD64_DIGEST" \
-  "$PRIVATE_REPO@$ARM64_DIGEST"
-podman manifest push $PRIVATE_IMAGE
+
+# Create a temporary YAML spec file for manifest-tool
+cat > manifest-spec.yaml << EOF
+image: $PRIVATE_IMAGE
+manifests:
+  -
+    image: $PRIVATE_REPO@$AMD64_DIGEST
+    platform:
+      architecture: amd64
+      os: linux
+  -
+    image: $PRIVATE_REPO@$ARM64_DIGEST
+    platform:
+      architecture: arm64
+      os: linux
+EOF
+
+echo "Using manifest spec:"
+cat manifest-spec.yaml
+
+# Create and push the multi-arch manifest
+$MANIFEST_TOOL_CMD push from-spec manifest-spec.yaml
 
 annotate "* Image: $PRIVATE_IMAGE"
 annotate "* Short commit: $VERSION"
