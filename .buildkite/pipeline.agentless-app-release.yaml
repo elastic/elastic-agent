@@ -6,7 +6,7 @@ env:
 common:
   - docker_login_plugin: &docker_login_plugin
       elastic/vault-docker-login#v0.5.2:
-        secret_path: 'kv/ci-shared/platform-ingest/docker_registry_prod'
+        secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
 
 steps:
   - label: "Packaging: Service Container linux/amd64"
