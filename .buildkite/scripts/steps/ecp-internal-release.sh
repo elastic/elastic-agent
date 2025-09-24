@@ -51,6 +51,7 @@ skopeo login --username "${DOCKER_USERNAME_SECRET}" --password "${DOCKER_PASSWOR
 echo "--- Downloading manifest-tool"
 if ! command -v manifest-tool &> /dev/null; then
     MANIFEST_TOOL_VERSION="2.2.0"
+    MANIFEST_TOOL_SHA256="64600fe0cb9cd26fe50a63e4ad53f39f36b60384ce8426ec3990a5ebd9f8267f"
     
     # Detect current architecture
     case "$(uname -m)" in
@@ -60,16 +61,31 @@ if ! command -v manifest-tool &> /dev/null; then
         *) echo "Unsupported architecture: $(uname -m)"; exit 1 ;;
     esac
     
-    echo "--- Downloading manifest-tool v${MANIFEST_TOOL_VERSION} for ${MANIFEST_TOOL_ARCH}"
-    curl -L "https://github.com/estesp/manifest-tool/releases/download/v${MANIFEST_TOOL_VERSION}/binaries-manifest-tool-${MANIFEST_TOOL_VERSION}.tar.gz" | tar -xz "manifest-tool-linux-${MANIFEST_TOOL_ARCH}"
+    TARBALL_NAME="binaries-manifest-tool-${MANIFEST_TOOL_VERSION}.tar.gz"
+    curl -L "https://github.com/estesp/manifest-tool/releases/download/v${MANIFEST_TOOL_VERSION}/${TARBALL_NAME}" -o "${TARBALL_NAME}"
+    
+    # Verify SHA256 sum
+    echo "--- Verifying SHA256 checksum"
+    echo "${MANIFEST_TOOL_SHA256}  ${TARBALL_NAME}" | sha256sum --check --strict
+    if [ $? -ne 0 ]; then
+        echo "ERROR: SHA256 checksum verification failed for ${TARBALL_NAME}"
+        rm -f "${TARBALL_NAME}"
+        exit 1
+    fi
+    
+    # Extract the correct architecture binary
+    tar -xzf "${TARBALL_NAME}" "manifest-tool-linux-${MANIFEST_TOOL_ARCH}"
     mv "manifest-tool-linux-${MANIFEST_TOOL_ARCH}" manifest-tool
     chmod +x manifest-tool
+    
+    # Clean up tarball
+    rm -f "${TARBALL_NAME}"
     MANIFEST_TOOL_CMD="./manifest-tool"
 else
     MANIFEST_TOOL_CMD="manifest-tool"
 fi
 
-manifest-tool --version
+${MANIFEST_TOOL_CMD} --version
 
 # download the amd64 and arm64 builds of the image from the previous steps
 echo "--- Downloading amd64 and arm64 builds"
@@ -109,7 +125,7 @@ echo "Using manifest spec:"
 cat manifest-spec.yaml
 
 # Create and push the multi-arch manifest
-$MANIFEST_TOOL_CMD --username ${DOCKER_USERNAME_SECRET} --password ${DOCKER_PASSWORD_SECRET} push from-spec manifest-spec.yaml
+${MANIFEST_TOOL_CMD} --username ${DOCKER_USERNAME_SECRET} --password ${DOCKER_PASSWORD_SECRET} push from-spec manifest-spec.yaml
 
 annotate "* Image: $PRIVATE_IMAGE"
 annotate "* Short commit: $VERSION"
