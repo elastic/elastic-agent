@@ -81,6 +81,7 @@ import (
 	forwardconnector "go.opentelemetry.io/collector/connector/forwardconnector"
 
 	elasticapmconnector "github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector"
+	profilingmetricsconnector "github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector"
 	beatsauthextension "github.com/elastic/opentelemetry-collector-components/extension/beatsauthextension"
 )
 
@@ -111,6 +112,10 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			jmxreceiver.NewFactory(),
 			nopreceiver.NewFactory(),
 		}
+
+		// some receivers are only available on certain OS.
+		receivers = addOsSpecificReceivers(receivers)
+
 		// some receivers should only be available when
 		// not in fips mode due to restrictions on crypto usage
 		receivers = addNonFipsReceivers(receivers)
@@ -161,6 +166,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			routingconnector.NewFactory(),
 			spanmetricsconnector.NewFactory(),
 			elasticapmconnector.NewFactory(),
+			profilingmetricsconnector.NewFactory(),
 			forwardconnector.NewFactory(),
 		)
 		if err != nil {
