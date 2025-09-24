@@ -1085,13 +1085,22 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			},
 		},
 		{
-			name: "unsupported output type",
+			name: "unsupported output type - kafka",
 			component: &component.Component{
 				ID:         "unsupported-output",
 				InputType:  "filestream",
 				OutputType: "kafka", // unsupported
 			},
 			expectedError: "unsupported output type: kafka",
+		},
+		{
+			name: "unsupported output type - logstash",
+			component: &component.Component{
+				ID:         "unsupported-output",
+				InputType:  "filestream",
+				OutputType: "logstash", // unsupported
+			},
+			expectedError: "unsupported output type: logstash",
 		},
 		{
 			name: "unsupported input type",
