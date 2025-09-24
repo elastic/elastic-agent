@@ -1209,22 +1209,10 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		"should return error and cleanup downloaded archive if unpack fails before extracting": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-<<<<<<< HEAD
-			upgraderMocker: func(upgrader *Upgrader) {
-				upgrader.artifactDownloader = &mockArtifactDownloader{}
-=======
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
 				}
-				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
-					return agentVersion{
-						version:  upgradeVersion,
-						snapshot: false,
-						hash:     metadata.hash,
-					}
-				}
->>>>>>> ab23962a0 (Enhancement/5235 upgrade cleans up downloads and extracted agent (#9386))
 				upgrader.unpacker = &mockUnpacker{
 					returnPackageMetadata: packageMetadata{
 						manifest: &v1.PackageManifest{},
@@ -1238,20 +1226,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		"should return error and cleanup downloaded archive if unpack fails after extracting": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-<<<<<<< HEAD
-			upgraderMocker: func(upgrader *Upgrader) {
-				upgrader.artifactDownloader = &mockArtifactDownloader{}
-=======
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
-				}
-				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
-					return agentVersion{
-						version:  upgradeVersion,
-						snapshot: false,
-						hash:     metadata.hash,
-					}
 				}
 				upgrader.unpacker = &mockUnpacker{
 					returnPackageMetadata: packageMetadata{
@@ -1275,14 +1252,6 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
 				}
-				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
-					return agentVersion{
-						version:  upgradeVersion,
-						snapshot: false,
-						hash:     metadata.hash,
-					}
-				}
->>>>>>> ab23962a0 (Enhancement/5235 upgrade cleans up downloads and extracted agent (#9386))
 				upgrader.unpacker = &mockUnpacker{
 					returnPackageMetadata: packageMetadata{
 						manifest: &v1.PackageManifest{},
@@ -1305,19 +1274,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			expectedError:          testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{}
-<<<<<<< HEAD
-=======
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
 				}
-				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
-					return agentVersion{
-						version:  upgradeVersion,
-						snapshot: false,
-						hash:     metadata.hash,
-					}
-				}
->>>>>>> ab23962a0 (Enhancement/5235 upgrade cleans up downloads and extracted agent (#9386))
 				upgrader.unpacker = &mockUnpacker{
 					returnPackageMetadata: packageMetadata{
 						manifest: &v1.PackageManifest{},
@@ -1341,22 +1300,10 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		"should return error and cleanup downloaded artifact and extracted archive if changeSymlink fails": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-<<<<<<< HEAD
-			upgraderMocker: func(upgrader *Upgrader) {
-				upgrader.artifactDownloader = &mockArtifactDownloader{}
-=======
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
 				}
-				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
-					return agentVersion{
-						version:  upgradeVersion,
-						snapshot: false,
-						hash:     metadata.hash,
-					}
-				}
->>>>>>> ab23962a0 (Enhancement/5235 upgrade cleans up downloads and extracted agent (#9386))
 				upgrader.unpacker = &mockUnpacker{
 					returnPackageMetadata: packageMetadata{
 						manifest: &v1.PackageManifest{},
@@ -1386,22 +1333,10 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		"should return error and cleanup downloaded artifact and extracted archive if markUpgrade fails": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-<<<<<<< HEAD
-			upgraderMocker: func(upgrader *Upgrader) {
-				upgrader.artifactDownloader = &mockArtifactDownloader{}
-=======
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
 				}
-				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
-					return agentVersion{
-						version:  upgradeVersion,
-						snapshot: false,
-						hash:     metadata.hash,
-					}
-				}
->>>>>>> ab23962a0 (Enhancement/5235 upgrade cleans up downloads and extracted agent (#9386))
 				upgrader.unpacker = &mockUnpacker{
 					returnPackageMetadata: packageMetadata{
 						manifest: &v1.PackageManifest{},
@@ -1447,15 +1382,10 @@ func TestUpgradeErrorHandling(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-<<<<<<< HEAD
-			upgrader, err := NewUpgrader(log, &artifact.Config{}, mockAgentInfo)
-=======
 			baseDir := t.TempDir()
 			paths.SetTop(baseDir)
 
-			mockWatcherHelper := NewMockWatcherHelper(t)
-			upgrader, err := NewUpgrader(log, &artifact.Config{}, nil, mockAgentInfo, mockWatcherHelper)
->>>>>>> ab23962a0 (Enhancement/5235 upgrade cleans up downloads and extracted agent (#9386))
+			upgrader, err := NewUpgrader(log, &artifact.Config{}, mockAgentInfo)
 			require.NoError(t, err)
 
 			tc.upgraderMocker(upgrader, filepath.Join(baseDir, "mockArchive"), "versionedHome")
