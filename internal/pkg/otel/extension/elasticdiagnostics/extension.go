@@ -81,7 +81,8 @@ func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) e
 	mux.Handle("/diagnostics", d)
 
 	d.server = &http.Server{
-		Handler: mux,
+		Handler:           mux,
+		ReadHeaderTimeout: 30 * time.Second,
 	}
 	go func() {
 		if err := d.server.Serve(d.listener); err != nil && err != http.ErrServerClosed {
