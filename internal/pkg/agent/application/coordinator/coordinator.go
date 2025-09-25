@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -361,6 +362,11 @@ type Coordinator struct {
 
 	// Abstraction for diagnostics AddSecretMarkers function for testability
 	secretMarkerFunc func(*logger.Logger, *config.Config) error
+
+	// migrationProgressWg is used to block processing of incoming policies after enroll is done
+	// incomming policies are blocked until we reboot so components receiving proxied MIGRATE action
+	// are not confused
+	migrationProgressWg sync.WaitGroup
 }
 
 // The channels Coordinator reads to receive updates from the various managers.
@@ -596,7 +602,12 @@ func (c *Coordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ..
 
 // Migrate migrates agent to a new cluster and ACKs success to the old one.
 // In case of failure no ack is performed and error is returned.
-func (c *Coordinator) Migrate(ctx context.Context, action *fleetapi.ActionMigrate, backoffFactory func(done <-chan struct{}) backoff.Backoff) error {
+func (c *Coordinator) Migrate(
+	ctx context.Context,
+	action *fleetapi.ActionMigrate,
+	backoffFactory func(done <-chan struct{}) backoff.Backoff,
+	notifyFn func(context.Context, *fleetapi.ActionMigrate) error,
+) error {
 	if !c.isManaged {
 		return ErrNotManaged
 	}
@@ -666,6 +677,24 @@ func (c *Coordinator) Migrate(ctx context.Context, action *fleetapi.ActionMigrat
 		return errors.Join(fmt.Errorf("failed to enroll: %w", err), restoreErr)
 	}
 
+	// lock processing of new config before notifying components
+	// hold lock until notification failure or reexec
+	c.migrationProgressWg.Add(1)
+	if notifyFn != nil {
+		// notify before completing migration
+		// components such endpoint are crucial to work even though it's on stale cluster
+		// error on component side is returned as part of Action response
+		if err := notifyFn(ctx, action); err != nil {
+			restoreErr := RestoreConfig()
+
+			// in case of failure no need to lock processing
+			// safe to forward policy from source cluster
+			c.migrationProgressWg.Done()
+
+			return errors.Join(fmt.Errorf("failed to notify components: %w", err), restoreErr)
+		}
+	}
+
 	// ACK success to source fleet server
 	if err := c.ackMigration(ctx, action, c.fleetAcker); err != nil {
 		c.logger.Warnf("failed to ACK success: %v", err)
@@ -677,23 +706,30 @@ func (c *Coordinator) Migrate(ctx context.Context, action *fleetapi.ActionMigrat
 		return fmt.Errorf("failed to clean backup config: %w", err)
 	}
 
+	c.bestEffortUnenroll(ctx, originalOptions)
+
+	return nil
+}
+
+func (c *Coordinator) bestEffortUnenroll(ctx context.Context, originalOptions enroll.EnrollOptions) {
 	originalRemoteConfig, err := originalOptions.RemoteConfig(false)
 	if err != nil {
-		return fmt.Errorf("failed to construct original remote config: %w", err)
+		c.logger.Warnf("failed to construct original remote config: %v", err)
+		return
 	}
 
 	originalClient, err := fleetapiClient.NewAuthWithConfig(
 		c.logger, originalOptions.EnrollAPIKey, originalRemoteConfig)
 	if err != nil {
-		return fmt.Errorf("failed to create original fleet client: %w", err)
+		c.logger.Warnf("failed to create original fleet client: %v", err)
+		return
 	}
 
 	// Best effort: call unenroll on source cluster once done
 	if err := c.unenroll(ctx, originalClient); err != nil {
 		c.logger.Warnf("failed to unenroll from original cluster: %v", err)
+		return
 	}
-
-	return nil
 }
 
 type upgradeOpts struct {
@@ -1532,6 +1568,8 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 
 // Always called on the main Coordinator goroutine.
 func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (err error) {
+	c.migrationProgressWg.Wait()
+
 	if c.otelMgr != nil {
 		c.otelCfg = cfg.OTel
 	}

@@ -75,6 +75,11 @@ receivers:
           static_configs:
             - targets: ['0.0.0.0:8888']
   elasticapmintake:
+  apache:
+  mysql:
+  postgresql:
+    username: test
+    password: test
   docker_stats:
 
 
@@ -166,6 +171,9 @@ service:
         - spanmetrics
         - prometheus
         - elasticapmintake
+        - apache
+        - mysql
+        - postgresql
 
     metrics/aggregated:
       receivers:
