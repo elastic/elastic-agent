@@ -49,15 +49,16 @@ func GetOtelDependencies(goModPath string) (*OtelDependencies, error) {
 			continue
 		}
 
-		if dependency.ComponentType == "connector" {
+		switch dependency.ComponentType {
+		case "connector":
 			connectors = append(connectors, dependency)
-		} else if dependency.ComponentType == "exporter" {
+		case "exporter":
 			exporters = append(exporters, dependency)
-		} else if dependency.ComponentType == "extension" {
+		case "extension":
 			extensions = append(extensions, dependency)
-		} else if dependency.ComponentType == "processor" {
+		case "processor":
 			processors = append(processors, dependency)
-		} else if dependency.ComponentType == "receiver" {
+		case "receiver":
 			receivers = append(receivers, dependency)
 		}
 	}
