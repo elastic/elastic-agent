@@ -244,13 +244,18 @@ func (d *diagnosticsExtension) ServeHTTP(w http.ResponseWriter, req *http.Reques
 		ComponentDiagnostics: componentResults,
 	})
 	if err != nil {
+		d.logger.Error("Failed marshaling response", zap.Error(err))
 		w.WriteHeader(503)
 		w.Header().Add("content-type", "application/json")
-		fmt.Fprintf(w, "{'error':'%v'}", err)
+		if _, err := fmt.Fprintf(w, "{'error':'%v'}", err); err != nil {
+			d.logger.Error("Failed writing response to client.", zap.Error(err))
+		}
 		return
 	}
 	w.Header().Add("content-type", "application/json")
-	w.Write(b)
+	if _, err := w.Write(b); err != nil {
+		d.logger.Error("Failed writing response to client.", zap.Error(err))
+	}
 }
 
 func extractMetricAddress(readers []otelconf.MetricReader) string {
