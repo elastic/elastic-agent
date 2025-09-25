@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"runtime/pprof"
@@ -19,7 +18,6 @@ import (
 	"time"
 
 	"go.opentelemetry.io/collector/component"
-	"go.opentelemetry.io/collector/config/configtelemetry"
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/service"
 	otelconf "go.opentelemetry.io/contrib/otelconf/v0.3.0"
@@ -119,49 +117,6 @@ func (d *diagnosticsExtension) registerGlobalDiagnostics() {
 			b, err := yaml.Marshal(d.collectorConfig.ToStringMap())
 			if err != nil {
 				return fmt.Appendf(nil, "error: failed to convert to yaml: %v", err)
-			}
-			return b
-		},
-	}
-
-	d.globalHooks["collector_telemetry"] = &diagHook{
-		description: "internal telemetry of the collector",
-		filename:    "edot/edot-telemetry.txt",
-		contentType: "text/plain",
-		hook: func() []byte {
-			if d.collectorConfig == nil {
-				return []byte("no active OTeL Configuration")
-			}
-			serviceCfg := serviceConfig{}
-			err := d.collectorConfig.Unmarshal(&serviceCfg)
-			if err != nil {
-				return fmt.Appendf(nil, "error: failed to get internal telemetry: %v", err)
-			}
-			if serviceCfg.Service.Telemetry.Metrics.Level == configtelemetry.LevelNone {
-				return []byte("internal telemetry is disabled")
-			}
-			addr := extractMetricAddress(serviceCfg.Service.Telemetry.Metrics.Readers)
-
-			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s/metrics", addr), nil)
-			if err != nil {
-				return fmt.Appendf(nil, "error: failed to create request: %v", err)
-			}
-
-			// Create an HTTP client with a timeout.
-			// 10 seconds should be enough for now, but we can make it configurable later if needed.
-			client := &http.Client{
-				Timeout: 10 * time.Second,
-			}
-
-			resp, err := client.Do(req.WithContext(context.Background()))
-			if err != nil {
-				return fmt.Appendf(nil, "error: failed to get internal telemetry: %v", err)
-			}
-			defer resp.Body.Close()
-
-			b, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return fmt.Appendf(nil, "error: failed to read response body: %v", err)
 			}
 			return b
 		},
