@@ -6,6 +6,7 @@ package monitoring
 
 import (
 	"crypto/sha256"
+	_ "embed"
 	"fmt"
 	"maps"
 	"math"
@@ -817,15 +818,15 @@ func (b *BeatsMonitor) getPrometheusStream(
 	failureThreshold *uint,
 	metricsCollectionIntervalString string,
 ) any {
+	monitoringNamespace := b.monitoringNamespace()
+	name := metricBeatName
+	dataset := fmt.Sprintf("elastic_agent.%s", name)
+	indexName := fmt.Sprintf("metrics-elastic_agent.%s-%s", name, monitoringNamespace)
+
 	prometheusHost := b.getCollectorTelemetryEndpoint()
 
-	// want metricset "collector"
-	monitoringNamespace := b.monitoringNamespace()
-	indexName := fmt.Sprintf("metrics-elastic_agent.collector-%s", monitoringNamespace)
-	dataset := "elastic_agent.collector"
-
 	otelStream := map[string]any{
-		idKey: fmt.Sprintf("%s-otel", monitoringMetricsUnitID),
+		idKey: fmt.Sprintf("%s-collector", monitoringMetricsUnitID),
 		"data_stream": map[string]interface{}{
 			"type":      "metrics",
 			"dataset":   dataset,
@@ -1069,6 +1070,19 @@ func processorsForCollectorPrometheusStream(namespace, dataset string, agentInfo
 		addElasticAgentFieldsProcessor(agentName, agentInfo),
 		addAgentFieldsProcessor(agentInfo.AgentID()),
 		addComponentFieldsProcessor(agentName, agentName),
+		addPrometheusMetricsRemapProcessor(),
+	}
+}
+
+//go:embed otel_remap.js
+var prometheusRemapJS string
+
+func addPrometheusMetricsRemapProcessor() map[string]any {
+	return map[string]any{
+		"script": map[string]any{
+			"lang":   "javascript",
+			"source": prometheusRemapJS,
+		},
 	}
 }
 
