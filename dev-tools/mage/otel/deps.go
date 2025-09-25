@@ -40,6 +40,15 @@ func GetOtelDependencies(goModPath string) (*OtelDependencies, error) {
 		}
 		pathToDep[req.Mod.Path] = dependency
 
+		// Special case: treat go.opentelemetry.io/ebpf-profiler as receiver
+		if req.Mod.Path == "go.opentelemetry.io/ebpf-profiler" {
+			dependency.ComponentType = "receiver"
+			dependency.Name = "profiling"
+			dependency.Link = fmt.Sprintf("https://github.com/open-telemetry/opentelemetry-ebpf-profiler/blob/%s/README.md", dependency.Version)
+			receivers = append(receivers, dependency)
+			continue
+		}
+
 		if dependency.ComponentType == "connector" {
 			connectors = append(connectors, dependency)
 		} else if dependency.ComponentType == "exporter" {
