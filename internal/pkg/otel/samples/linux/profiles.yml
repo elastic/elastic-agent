@@ -13,3 +13,4 @@ service:
     profiles:
       receivers: [ profiling ]
       exporters: [ elasticsearch ]
+
