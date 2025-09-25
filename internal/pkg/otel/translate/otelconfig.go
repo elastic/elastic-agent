@@ -11,9 +11,10 @@ import (
 	"slices"
 	"strings"
 
+	koanfmaps "github.com/knadh/koanf/maps"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
-	koanfmaps "github.com/knadh/koanf/maps"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
