@@ -72,6 +72,7 @@ type stateStore interface {
 	AckToken() string
 	SetAckToken(ackToken string)
 	Save() error
+	Action() fleetapi.Action
 }
 
 type FleetGateway struct {
@@ -360,15 +361,21 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	// Fix loglevel with the current log level used by coordinator
 	ecsMeta.Elastic.Agent.LogLevel = state.LogLevel.String()
 
+	action := f.stateStore.Action()
+	agentPolicyID := getPolicyID(action)
+	policyRevisionIDX := getPolicyRevisionIDX(action)
+
 	// checkin
 	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client)
 	req := &fleetapi.CheckinRequest{
-		AckToken:       ackToken,
-		Metadata:       ecsMeta,
-		Status:         agentStateToString(state.State),
-		Message:        state.Message,
-		Components:     components,
-		UpgradeDetails: state.UpgradeDetails,
+		AckToken:          ackToken,
+		Metadata:          ecsMeta,
+		Status:            agentStateToString(state.State),
+		Message:           state.Message,
+		Components:        components,
+		UpgradeDetails:    state.UpgradeDetails,
+		AgentPolicyID:     agentPolicyID,
+		PolicyRevisionIDX: policyRevisionIDX,
 	}
 
 	resp, took, err := cmd.Execute(stateCTX, req)
@@ -451,6 +458,46 @@ func RequestBackoff(done <-chan struct{}) backoff.Backoff {
 		defaultFleetBackoffSettings.Init,
 		defaultFleetBackoffSettings.Max,
 	)
+}
+
+// getPolicyID will check that the passed action is a POLICY_CHANGE action and return the policy_id attribute of the policy as a string.
+func getPolicyID(action fleetapi.Action) string {
+	policyChange, ok := action.(*fleetapi.ActionPolicyChange)
+	if !ok {
+		return ""
+	}
+	v, ok := policyChange.Data.Policy["policy_id"]
+	if !ok {
+		return ""
+	}
+	vv, ok := v.(string)
+	if !ok {
+		return ""
+	}
+	return vv
+}
+
+// getPolicyRevisionIDX will check that the passed action is a POLICY_CHANGE action and return the policy_revision_idx attribute of the policy as an int64.
+// The function will attempt to convert the attribute to int64 if int or float64 is used in order to prevent issues from serialization.
+func getPolicyRevisionIDX(action fleetapi.Action) int64 {
+	policyChange, ok := action.(*fleetapi.ActionPolicyChange)
+	if !ok {
+		return 0
+	}
+	v, ok := policyChange.Data.Policy["policy_revision_idx"]
+	if !ok {
+		return 0
+	}
+	switch vv := v.(type) {
+	case int64:
+		return vv
+	case int:
+		return int64(vv)
+	case float64:
+		return int64(vv)
+	default:
+		return 0
+	}
 }
 
 var errComponentStateChanged = errors.New("error component state changed")

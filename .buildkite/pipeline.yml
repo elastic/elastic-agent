@@ -374,10 +374,3 @@ steps:
     build:
       commit: "${BUILDKITE_COMMIT}"
       branch: "${BUILDKITE_BRANCH}"
-
-  # wait for packaging to be done
-  - wait: ~
-
-  - label: "Publish to serverless"
-    branches: main
-    trigger: "agentless-serverless-release"
