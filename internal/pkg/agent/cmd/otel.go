@@ -23,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/agentprovider"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -45,10 +46,14 @@ func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Comman
 			if err != nil {
 				return err
 			}
+			supervisedMonitoringURL, err := cmd.Flags().GetString(manager.OtelSupervisedMonitoringURLFlagName)
+			if err != nil {
+				return err
+			}
 			if err := prepareEnv(); err != nil {
 				return err
 			}
-			return RunCollector(cmd.Context(), cfgFiles, supervised, supervisedLoggingLevel)
+			return RunCollector(cmd.Context(), cfgFiles, supervised, supervisedLoggingLevel, supervisedMonitoringURL)
 		},
 		PreRun: func(c *cobra.Command, args []string) {
 			// hide inherited flags not to bloat help with flags not related to otel
@@ -76,7 +81,7 @@ func hideInheritedFlags(c *cobra.Command) {
 	})
 }
 
-func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool, supervisedLoggingLevel string) error {
+func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool, supervisedLoggingLevel string, supervisedMonitoringURL string) error {
 	settings, err := prepareCollectorSettings(configFiles, supervised, supervisedLoggingLevel)
 	if err != nil {
 		return fmt.Errorf("failed to prepare collector settings: %w", err)
@@ -88,6 +93,17 @@ func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool,
 		service.NotifyTermination()
 		service.WaitExecutionDone()
 	}()
+
+	if supervisedMonitoringURL != "" {
+		server, err := monitoring.NewServer(settings.log, supervisedMonitoringURL)
+		if err != nil {
+			return fmt.Errorf("error create monitoring server: %w", err)
+		}
+		server.Start()
+		defer func() {
+			_ = server.Stop()
+		}()
+	}
 
 	service.BeforeRun()
 	defer service.Cleanup()
@@ -102,18 +118,23 @@ func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool,
 	defer cancel()
 	go service.ProcessWindowsControlEvents(stopCollector)
 
-	return otel.Run(ctx, stop, settings)
+	return otel.Run(ctx, stop, settings.otelSettings)
 }
 
-func prepareCollectorSettings(configFiles []string, supervised bool, supervisedLoggingLevel string) (*otelcol.CollectorSettings, error) {
-	var settings *otelcol.CollectorSettings
+type edotSettings struct {
+	log          *logger.Logger
+	otelSettings *otelcol.CollectorSettings
+}
+
+func prepareCollectorSettings(configFiles []string, supervised bool, supervisedLoggingLevel string) (edotSettings, error) {
+	var settings edotSettings
 	if supervised {
 		// add stdin config provider
 		configProvider, err := agentprovider.NewBufferProvider(os.Stdin)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create config provider: %w", err)
+			return settings, fmt.Errorf("failed to create config provider: %w", err)
 		}
-		settings = otel.NewSettings(release.Version(), []string{configProvider.URI()},
+		settings.otelSettings = otel.NewSettings(release.Version(), []string{configProvider.URI()},
 			otel.WithConfigProviderFactory(configProvider.NewFactory()),
 		)
 
@@ -138,20 +159,21 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 
 		l, err := logger.NewFromConfig("edot", defaultCfg, defaultEventLogCfg, false)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create logger: %w", err)
+			return settings, fmt.Errorf("failed to create logger: %w", err)
 		}
+		settings.log = l
 
 		if logLevelSettingErr != nil {
 			l.Warnf("Fallback to default logging level due to: %v", logLevelSettingErr)
 		}
 
-		settings.LoggingOptions = []zap.Option{zap.WrapCore(func(zapcore.Core) zapcore.Core {
+		settings.otelSettings.LoggingOptions = []zap.Option{zap.WrapCore(func(zapcore.Core) zapcore.Core {
 			return l.Core()
 		})}
 
-		settings.DisableGracefulShutdown = false
+		settings.otelSettings.DisableGracefulShutdown = false
 	} else {
-		settings = otel.NewSettings(release.Version(), configFiles)
+		settings.otelSettings = otel.NewSettings(release.Version(), configFiles)
 	}
 	return settings, nil
 }
