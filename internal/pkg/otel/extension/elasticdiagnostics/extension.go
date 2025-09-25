@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -46,6 +47,7 @@ type diagnosticsExtension struct {
 	listener net.Listener
 	server   *http.Server
 	logger   *zap.Logger
+	logp     *logp.Logger
 
 	diagnosticsConfig *Config
 	collectorConfig   *confmap.Conf
@@ -64,7 +66,7 @@ type serviceConfig struct {
 func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) error {
 	var err error
 
-	l, err := logp.NewZapLogger(d.logger)
+	d.logp, err = logp.NewZapLogger(d.logger)
 	if err != nil {
 		// NewZapLogger always returns nil error, so this shouldn't happen.
 		return fmt.Errorf("failed to create logp.Logger from zap logger: %w", err)
@@ -72,7 +74,7 @@ func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) e
 
 	d.registerGlobalDiagnostics()
 
-	d.listener, err = ipc.CreateListener(l, d.diagnosticsConfig.Endpoint)
+	d.listener, err = ipc.CreateListener(d.logp, d.diagnosticsConfig.Endpoint)
 	if err != nil {
 		return fmt.Errorf("error creating listener: %w", err)
 	}
@@ -85,11 +87,22 @@ func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) e
 		ReadHeaderTimeout: 30 * time.Second,
 	}
 	go func() {
-		if err := d.server.Serve(d.listener); err != nil && err != http.ErrServerClosed {
+		if err := d.server.Serve(d.listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			d.logger.Error("HTTP server error", zap.Error(err))
 		}
 	}()
 	d.logger.Info("Diagnostics extension started", zap.String("address", d.listener.Addr().String()))
+	return nil
+}
+
+func (d *diagnosticsExtension) Shutdown(ctx context.Context) error {
+	if d.server == nil {
+		return nil
+	}
+	if err := d.server.Shutdown(ctx); err != nil {
+		return err
+	}
+	ipc.CleanupListener(d.logp, d.diagnosticsConfig.Endpoint)
 	return nil
 }
 
@@ -115,6 +128,9 @@ func (d *diagnosticsExtension) registerGlobalDiagnostics() {
 		filename:    "edot/edot-telemetry.txt",
 		contentType: "text/plain",
 		hook: func() []byte {
+			if d.collectorConfig == nil {
+				return []byte("no active OTeL Configuration")
+			}
 			serviceCfg := serviceConfig{}
 			err := d.collectorConfig.Unmarshal(&serviceCfg)
 			if err != nil {
@@ -166,16 +182,6 @@ func (d *diagnosticsExtension) registerGlobalDiagnostics() {
 			},
 		}
 	}
-}
-
-func (d *diagnosticsExtension) Shutdown(ctx context.Context) error {
-	if d.server == nil {
-		return nil
-	}
-	if err := d.server.Shutdown(ctx); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (d *diagnosticsExtension) NotifyConfig(ctx context.Context, conf *confmap.Conf) error {
