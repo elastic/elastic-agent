@@ -77,11 +77,18 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 		return err
 	}
 
+	// signed data contains secret reference to the enrollment token so we extract the cleartext value
+	// out of action.Data and replace it after unmarshalling the signed data into action.Data
+	// see: https://github.com/elastic/fleet-server/blob/22f1f7a0474080d3f56c7148a6505cff0957f549/internal/pkg/secret/secret.go#L75
+	enrollmentToken := action.Data.EnrollmentToken
+
 	if signedData != nil {
 		if err := json.Unmarshal(signedData, &action.Data); err != nil {
 			return fmt.Errorf("failed to convert signed data to action data: %w", err)
 		}
 	}
+
+	action.Data.EnrollmentToken = enrollmentToken
 
 	if err := h.coord.Migrate(ctx, action, fleetgateway.RequestBackoff); err != nil {
 		// this should not happen, unmanaged agent should not receive the action
