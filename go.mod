@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent
 
-go 1.24.11
+go 1.25.1
 
 require (
 	github.com/Jeffail/gabs/v2 v2.6.0
@@ -375,7 +375,7 @@ require (
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/gomodule/redigo v1.9.2 // indirect
 	github.com/google/btree v1.1.3 // indirect
-	github.com/google/cel-go v0.26.0 // indirect
+	github.com/google/cel-go v0.26.1 // indirect
 	github.com/google/flatbuffers v25.2.10+incompatible // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
