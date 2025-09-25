@@ -185,6 +185,8 @@ func (d *diagnosticsExtension) NotifyConfig(ctx context.Context, conf *confmap.C
 	return nil
 }
 
+// RegisterDiagnosticHook API exposes the ability for beat receivers to register their hooks.
+// NOTE: Changing the function signature will require changes to libbeat and beatreceivers. Proceed with caution.
 func (d *diagnosticsExtension) RegisterDiagnosticHook(componentName string, description string, filename string, contentType string, hook func() []byte) {
 	d.hooksMtx.Lock()
 	defer d.hooksMtx.Unlock()
