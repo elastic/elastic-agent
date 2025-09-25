@@ -86,6 +86,8 @@ This section provides a summary of components included in the Elastic Distributi
 | [tailsamplingprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/tailsamplingprocessor/v0.135.0/processor/tailsamplingprocessor/README.md) | v0.135.0 |
 | [transformprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/transformprocessor/v0.135.0/processor/transformprocessor/README.md) | v0.135.0 |
 
+> **_NOTE:_** The `elastictrace` processor was deprecated in favor of the `elasticapm` processor.
+
 ### Extensions
 
 | Component | Version |
