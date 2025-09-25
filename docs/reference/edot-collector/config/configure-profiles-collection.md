@@ -28,7 +28,9 @@ Follow these steps to turn on profiles collection through the EDOT Collector.
 
 :::::{stepper}
 ::::{step} Set up Universal Profiling
-Follow the steps to [`set up Universal Profiling`] before applying the following configuration.
+Universal Profiling must be set up once before profiles information can be ingested and visualized.
+
+To set up Universal Profiling, navigate to Observability in Kibana and then to Infrastructure > Universal Profiling. If it's not yet configured, click the "Set up Universal Profiling" button and follow the on-screen instructions. The setup dialog will not appear if Universal Profiling is already configured.
 ::::
 
 ::::{step} Full profiles collection
@@ -88,5 +90,3 @@ service:
 ## Kubernetes deployments
 
 In Kubernetes, deploy the EDOT Collector with a profiling receiver as a DaemonSet. This ensures comprehensive, node-level profiling across the entire complete cluster, providing consistent data collection, resilience, scalability, and simplified management. This approach is recommended for optimal performance and full observability.
-
-[`set up Universal Profiling`]: docs-content://solutions/observability/infra-and-hosts/get-started-with-universal-profiling.md#profiling-configure-data-ingestion 
