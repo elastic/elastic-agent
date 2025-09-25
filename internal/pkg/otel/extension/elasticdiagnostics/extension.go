@@ -172,7 +172,6 @@ func (d *diagnosticsExtension) NotifyConfig(ctx context.Context, conf *confmap.C
 func (d *diagnosticsExtension) RegisterDiagnosticHook(componentName string, description string, filename string, contentType string, hook func() []byte) {
 	d.hooksMtx.Lock()
 	defer d.hooksMtx.Unlock()
-	fmt.Println(d.componentHooks, componentName, filename)
 	if _, ok := d.componentHooks[componentName]; ok {
 		d.componentHooks[componentName] = append(d.componentHooks[componentName], &diagHook{
 			description: description,
