@@ -741,7 +741,6 @@ func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versio
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("rolling back install: removing new agent install at %q failed: %w", newAgentInstallPath, err)
 	}
-
 	return nil
 }
 
