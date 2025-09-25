@@ -1,6 +1,6 @@
 ---
 navigation_title: Profiles collection
-description: Configure the EDOT Collector for profiles collection.
+description: Learn how to configure and customize profiles collection through the Elastic Distribution of OpenTelemetry Collector.
 applies_to:
   stack: preview 9.2
   serverless:
@@ -12,26 +12,27 @@ products:
   - id: edot-collector
 ---
 
-# Profiles support in EDOT
+# Configure profiles collection
 
-Profiles represent the fourth pillar of observability, complementing logs, traces, and metrics.
+The {{edot}} (EDOT) Collector includes a profiling receiver, which offers an eBPF-based, system-wide profiler.
 
-The Elastic Distributions of OpenTelemetry (EDOT) Collector includes a profiling receiver, which offers an eBPF-based, system-wide profiler.
+To activate and configure profiling and send profiles to {{ecloud}} or {{es}}, follow these instructions.
 
-Deploying the EDOT Collector with a profiling receiver in Kubernetes should be done as a DaemonSet. This ensures comprehensive, node-level profiling across the entire complete cluster, providing consistent data collection, resilience, scalability, and simplified management. This approach is recommended for optimal performance and complete observability.
+:::{important}
+OpenTelemetry profiling is still under active development. Refer to [The State of Profiling](https://opentelemetry.io/blog/2024/state-profiling/) blog post for more information.
+:::
 
-::{note}
-OpenTelemetry profiles is not yet a stable feature. To use it, Elastic Distributions
-of OpenTelemetry (EDOT) Collector need to be started with the additional argument `--feature-gates=service.profilesSupport`.
-::
+## Turn on profiling
 
-## Full profiles collection
+Follow these steps to turn on profiles collection through the EDOT Collector.
 
-For full profiles collection and reporting use the following configuration.
+:::::{stepper}
+::::{step} Set up Universal Profiling
+Follow the steps to [`set up Universal Profiling`] before applying the following configuration.
+::::
 
-::{note}
-Please follow the steps in Kibana to [`set up Universal Profiling`] before applying the following configuration.
-::
+::::{step} Full profiles collection
+For full profiles collection and reporting, use this Collector configuration:
 
 ```yaml
 receivers:
@@ -44,10 +45,24 @@ service:
       receivers: [ profiling ]
       exporters: [ elasticsearch ]
 ```
+::::
+
+::::{step} Activate profiling in the Collector
+To activate profiling in the EDOT Collector, start it using the additional argument `--feature-gates=service.profilesSupport`.
+
+For example:
+
+```sh
+sudo ./otelcol --config otel.yml --feature-gates=service.profilesSupport
+```
+::::
+:::::
 
 ## Generate metrics from profiles
 
-The system can be configured to generate and report metrics exclusively from profile information. This method contributes to a reduction in ingest traffic and storage costs.
+You can configure the components to generate and report metrics exclusively from profile information. This method contributes to a reduction in ingest traffic and storage costs.
+
+The following example generates profiling metrics by frame, frame type, and classification:
 
 ```yaml
 connectors:
@@ -70,4 +85,8 @@ service:
       exporters: [ elasticsearch ]
 ```
 
-[`set up Universal Profiling`]: https://www.elastic.co/docs/solutions/observability/infra-and-hosts/get-started-with-universal-profiling#profiling-configure-data-ingestion 
+## Kubernetes deployments
+
+In Kubernetes, deploy the EDOT Collector with a profiling receiver as a DaemonSet. This ensures comprehensive, node-level profiling across the entire complete cluster, providing consistent data collection, resilience, scalability, and simplified management. This approach is recommended for optimal performance and full observability.
+
+[`set up Universal Profiling`]: docs-content://solutions/observability/infra-and-hosts/get-started-with-universal-profiling.md#profiling-configure-data-ingestion 
