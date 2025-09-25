@@ -184,61 +184,6 @@ func TestMarkUpgrade(t *testing.T) {
 			},
 		},
 		{
-			name: "rollback window specified but new version is too low - no rollbacks",
-			args: args{
-				updatedOn: updatedOnNow,
-				currentAgent: agentInstall{
-					parsedVersion: parsed456SNAPSHOT,
-					version:       "4.5.6-SNAPSHOT",
-					hash:          "curagt",
-					versionedHome: filepath.Join("data", "elastic-agent-4.5.6-SNAPSHOT-curagt"),
-				},
-				previousAgent: agentInstall{
-					parsedVersion: parsed123SNAPSHOT,
-					version:       "1.2.3-SNAPSHOT",
-					hash:          "prvagt",
-					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
-				},
-				action:  nil,
-				details: details.NewDetails("4.5.6-SNAPSHOT", details.StateReplacing, ""),
-				availableRollbacks: []v1.AgentInstallDesc{
-					{
-						OptionalTTLItem: v1.OptionalTTLItem{
-							TTL: &twentyFourHoursFromNow,
-						},
-						Version:       "1.2.3-SNAPSHOT",
-						Hash:          "prvagt",
-						VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
-						Flavor:        "basic",
-						Active:        false,
-					},
-				},
-			},
-			wantErr: assert.NoError,
-			assertAfterMark: func(t *testing.T, dataDir string) {
-				actualMarker, err := LoadMarker(dataDir)
-				require.NoError(t, err, "error reading actualMarker content after writing")
-
-				expectedMarker := &UpdateMarker{
-					Version:           "4.5.6-SNAPSHOT",
-					Hash:              "curagt",
-					VersionedHome:     filepath.Join("data", "elastic-agent-4.5.6-SNAPSHOT-curagt"),
-					UpdatedOn:         updatedOnNow,
-					PrevVersion:       "1.2.3-SNAPSHOT",
-					PrevHash:          "prvagt",
-					PrevVersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
-					Acked:             false,
-					Action:            nil,
-					Details: &details.Details{
-						TargetVersion: "4.5.6-SNAPSHOT",
-						State:         "UPG_REPLACING",
-						ActionID:      "",
-					},
-				}
-				assert.Equal(t, expectedMarker, actualMarker)
-			},
-		},
-		{
 			name: "rollback window specified and new version is at least 9.2.0-SNAPSHOT - available rollbacks must be present",
 			args: args{
 				updatedOn: updatedOnNow,

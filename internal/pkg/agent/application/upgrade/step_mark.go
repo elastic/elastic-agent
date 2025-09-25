@@ -161,22 +161,17 @@ func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile wr
 			Details:           upgradeDetails,
 		}
 
-		if agent.parsedVersion != nil && !agent.parsedVersion.Less(*Version_9_2_0_SNAPSHOT) {
-			// if we have a not empty rollback window, write the prev version in the rollbacks_available field
-			// we also need to check the destination version because the manual rollback and delayed cleanup will be
-			// handled by that version of agent, so it needs to be recent enough
-			for _, rollback := range availableRollbacks {
-				rollbackAvailable := RollbackAvailable{
-					Version: rollback.Version,
-					Home:    rollback.VersionedHome,
-				}
-
-				if rollback.TTL != nil {
-					rollbackAvailable.ValidUntil = *rollback.TTL
-				}
-
-				marker.RollbacksAvailable = append(marker.RollbacksAvailable, rollbackAvailable)
+		for _, rollback := range availableRollbacks {
+			rollbackAvailable := RollbackAvailable{
+				Version: rollback.Version,
+				Home:    rollback.VersionedHome,
 			}
+
+			if rollback.TTL != nil {
+				rollbackAvailable.ValidUntil = *rollback.TTL
+			}
+
+			marker.RollbacksAvailable = append(marker.RollbacksAvailable, rollbackAvailable)
 		}
 
 		markerBytes, err := yaml.Marshal(newMarkerSerializer(marker))
