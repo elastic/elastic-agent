@@ -352,9 +352,6 @@ func (b *BeatsMonitor) Prepare(unit string) error {
 	return nil
 }
 
-<<<<<<< HEAD
-// Cleanup removes
-=======
 // Returns true if any component in the list uses the otel runtime.
 func usingOtelRuntime(componentInfos []componentInfo) bool {
 	for _, ci := range componentInfos {
@@ -366,7 +363,6 @@ func usingOtelRuntime(componentInfos []componentInfo) bool {
 }
 
 // Cleanup removes files that were created for monitoring.
->>>>>>> 9f15088ce (feat: emit system resource metrics for EDOT subprocess (#10003))
 func (b *BeatsMonitor) Cleanup(unit string) error {
 	if !b.Enabled() {
 		return nil
