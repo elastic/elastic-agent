@@ -19,6 +19,7 @@ type FleetAgentConfig struct {
 	Client              remote.Config      `config:",inline" yaml:",inline"`
 	Info                *AgentInfo         `config:"agent" yaml:"agent"`
 	Server              *FleetServerConfig `config:"server" yaml:"server,omitempty"`
+	FastCheckin         bool               `config:"fast_checkin" yaml:"fast_checkin,omitempty"`
 }
 
 // Valid validates the required fields for accessing the API.

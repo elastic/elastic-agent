@@ -168,9 +168,8 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		}
 	}
 
-	fastCheckin := fleetgateway.FastCheckinEnabled(m.log)
 	var stateFetcher fleetgateway.StateFetcher
-	if fastCheckin {
+	if m.cfg.Fleet.FastCheckin {
 		gatewayStateSub := m.coord.StateSubscribe(ctx, 32)
 		stateFetcher = fleetgateway.NewFastCheckinStateFetcher(m.log, m.coord.State, gatewayStateSub)
 	} else {
@@ -220,7 +219,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	// Run the gateway.
 	gatewayRunner := runner.Start(gatewayCtx, func(ctx context.Context) error {
 		defer gatewayErrorsRunner.Stop()
-		if fastCheckin {
+		if m.cfg.Fleet.FastCheckin {
 			stateWatch := runner.Start(context.Background(), stateFetcher.StartStateWatch)
 			defer stateWatch.Stop()
 		}
