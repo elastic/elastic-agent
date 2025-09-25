@@ -67,4 +67,4 @@ service:
 
 ## Kubernetes deployments
 
-In Kubernetes, deploy the EDOT Collector with a profiling receiver as a DaemonSet. This ensures comprehensive, node-level profiling across the entire complete cluster, providing consistent data collection, resilience, scalability, and simplified management. This approach is recommended for optimal performance and full observability.
+In Kubernetes, we suggest deploying the EDOT Collector with a profiling receiver as a DaemonSet. This ensures comprehensive, node-level profiling across the entire cluster, providing consistent data collection, resilience, scalability, and simplified management. This approach is recommended for optimal performance and full observability.
