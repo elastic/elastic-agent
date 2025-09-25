@@ -10,4 +10,4 @@ status:
 
 tests:
   config:
-    endpoint: "localhost:6060"
+    endpoint: /tmp/test.sock
