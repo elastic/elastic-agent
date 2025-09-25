@@ -314,6 +314,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		goTest.Stderr = output
 	}
 
+	fmt.Println(">> go test command environment: ", params.LogName, goTest.Env)
 	err := goTest.Run()
 
 	var goTestErr *exec.ExitError
