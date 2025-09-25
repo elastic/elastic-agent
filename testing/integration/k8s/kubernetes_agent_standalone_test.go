@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 
@@ -1047,33 +1046,8 @@ func k8sStepDeployKustomize(containerName string, overrides k8sKustomizeOverride
 			}
 		})
 
-		defer func() {
-			if t.Failed() {
-				dumpK8sObjectsToTempDir(t, objects)
-			}
-		}()
-
 		err = k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true, namespace: namespace}, objects...)
 		require.NoError(t, err, "failed to create objects")
-	}
-}
-
-func dumpK8sObjectsToTempDir(t *testing.T, objects []k8s.Object) {
-	f, err := os.CreateTemp("", t.Name()+"-*")
-	if err != nil {
-		t.Logf("cannot create temp dir to dump K8s manifest: %s", err)
-	}
-
-	defer f.Close()
-	defer t.Logf("K8s manifest saved to: ", f.Name())
-
-	for _, obj := range objects {
-		yamlData, err := yaml.Marshal(obj)
-		if err != nil {
-			fmt.Printf("Error marshaling object to YAML: %v\n", err)
-			continue
-		}
-		fmt.Fprintf(f, "---\n%s\n", string(yamlData))
 	}
 }
 
