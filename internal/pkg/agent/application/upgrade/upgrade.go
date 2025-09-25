@@ -513,7 +513,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		versionedHome: currentVersionedHome,
 	}
 
-	availableRollbacks := getAvailableRollbacks(rollbackWindow, rotationTimestamp, unpackRes.VersionedHome, modifiedInstallDescriptor)
+	availableRollbacks := getAvailableRollbacks(rollbackWindow, parsedVersion, rotationTimestamp, unpackRes.VersionedHome, modifiedInstallDescriptor)
 
 	if err := u.markUpgrade(u.log,
 		paths.Data(), // data dir to place the marker in
@@ -554,9 +554,16 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	return cb, nil
 }
 
-func getAvailableRollbacks(rollbackWindow time.Duration, now time.Time, newVersionedHome string, descriptor *v1.InstallDescriptor) []v1.AgentInstallDesc {
+func getAvailableRollbacks(rollbackWindow time.Duration, version *agtversion.ParsedSemVer, now time.Time, newVersionedHome string, descriptor *v1.InstallDescriptor) []v1.AgentInstallDesc {
 	if rollbackWindow == 0 {
 		// if there's no rollback window it means that no rollback should survive the watcher cleanup at the end of the grace period.
+		return nil
+	}
+
+	if version == nil || version.Less(*Version_9_2_0_SNAPSHOT) {
+		// if we have a not empty rollback window, write the prev version in the rollbacks_available field
+		// we also need to check the destination version because the manual rollback and delayed cleanup will be
+		// handled by that version of agent, so it needs to be recent enough
 		return nil
 	}
 
