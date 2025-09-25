@@ -133,6 +133,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			resourcedetectionprocessor.NewFactory(),
 			memorylimiterprocessor.NewFactory(),
 			elasticapmprocessor.NewFactory(),
+			elasticapmprocessor.NewFactory(), // deprecated, will be removed in future
 			tailsamplingprocessor.NewFactory(),
 		)
 		if err != nil {
