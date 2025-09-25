@@ -2,8 +2,9 @@
 source .buildkite/scripts/common.sh
 set +euo pipefail
 
+target=${1:-"unitTest"}
 echo "--- Unit tests"
-RACE_DETECTOR=true TEST_COVERAGE=true mage unitTest
+RACE_DETECTOR=true TEST_COVERAGE=true mage $target
 TESTS_EXIT_STATUS=$?
 echo "--- Prepare artifacts"
 # Copy coverage file to build directory so it can be downloaded as an artifact
