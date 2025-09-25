@@ -2328,21 +2328,6 @@ func (i Integration) TestKubernetes(ctx context.Context) error {
 
 // TestKubernetesSingle runs a single integration test defined in testing/integration/k8s
 func (i Integration) TestKubernetesSingle(ctx context.Context, testName string) error {
-	envVars := map[string]string{
-		"DEV":                  "true",
-		"SNAPSHOT":             "true",
-		"EXTERNAL":             "true",
-		"PACKAGES":             "docker",
-		"PLATFORMS":            "linux/amd64",
-		"INSTANCE_PROVISIONER": "kind",
-	}
-
-	for k, v := range envVars {
-		fmt.Printf(">>> Setting env var: %s=%s", k, v)
-		os.Setenv(k, v)
-	}
-
-	mg.Deps(Dev.Build)
 	return i.testKubernetes(ctx, false, testName)
 }
 
