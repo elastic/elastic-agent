@@ -19,7 +19,7 @@ type FleetAgentConfig struct {
 	Client              remote.Config      `config:",inline" yaml:",inline"`
 	Info                *AgentInfo         `config:"agent" yaml:"agent"`
 	Server              *FleetServerConfig `config:"server" yaml:"server,omitempty"`
-	FastCheckin         bool               `config:"fast_checkin" yaml:"fast_checkin,omitempty"`
+	Checkin             FleetCheckin       `config:"checkin" yaml:"checkin,omitempty"`
 }
 
 // Valid validates the required fields for accessing the API.
@@ -37,6 +37,10 @@ func (e *FleetAgentConfig) Valid() error {
 		if len(e.Client.Host) == 0 {
 			return errors.New("missing fleet host configuration", errors.TypeConfig)
 		}
+
+		if err := e.Checkin.Validate(); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -48,5 +52,32 @@ func DefaultFleetAgentConfig() *FleetAgentConfig {
 		Enabled: false,
 		Client:  remote.DefaultClientConfig(),
 		Info:    &AgentInfo{},
+		Checkin: DefaultFleetCheckin(),
 	}
 }
+
+func DefaultFleetCheckin() FleetCheckin {
+	return FleetCheckin{
+		Mode: fleetCheckinModeStandard,
+	}
+}
+
+type FleetCheckin struct {
+	Mode string `config:"mode" yaml:"mode,omitempty"`
+}
+
+func (f *FleetCheckin) IsModeOnStateChanged() bool {
+	return f.Mode == fleetCheckinModeOnStateChanged
+}
+
+func (f *FleetCheckin) Validate() error {
+	if f.Mode != "" && f.Mode != fleetCheckinModeStandard && f.Mode != fleetCheckinModeOnStateChanged {
+		return errors.New("checkin.mode must be either 'standard' or 'on_state_change'")
+	}
+	return nil
+}
+
+const (
+	fleetCheckinModeStandard       = "standard"
+	fleetCheckinModeOnStateChanged = "on_state_change"
+)

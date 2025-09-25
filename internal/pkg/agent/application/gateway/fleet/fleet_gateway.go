@@ -573,7 +573,11 @@ func (s *FastCheckinStateFetcher) StartStateWatch(ctx context.Context) error {
 		case <-ctx.Done():
 			s.log.Info("FleetGateway state watching stopped")
 			return ctx.Err()
-		case st := <-s.stateChan:
+		case st, isOpen := <-s.stateChan:
+			if !isOpen {
+				s.log.Info("FleetGateway state watching channel closed, stopping loop.")
+				return nil
+			}
 			s.log.Infof("FleetGateway state change notification %#v", st)
 			// TODO: consider check for specific changes e.g. degraded?
 			s.invalidateState()
