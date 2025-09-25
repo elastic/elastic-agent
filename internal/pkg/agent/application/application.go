@@ -158,9 +158,10 @@ func New(
 				return nil
 			})
 			if updateInstallDescErr != nil {
-				log.Warnf("Error activating current version installed in %s", currentVersionedHome)
+				log.Warnf("Error setting current version as active in installDescriptor: %s", updateInstallDescErr)
 			}
 		}
+
 	}
 	upgrader, err := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, cfg.Settings.Upgrade, agentInfo, new(upgrade.AgentWatcherHelper), installDescriptorSource)
 	if err != nil {

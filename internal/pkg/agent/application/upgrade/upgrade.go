@@ -91,7 +91,7 @@ type unpackHandler interface {
 type copyActionStoreFunc func(log *logger.Logger, newHome string) error
 type copyRunDirectoryFunc func(log *logger.Logger, oldRunPath, newRunPath string) error
 type fileDirCopyFunc func(from, to string, opts ...filecopy.Options) error
-type markUpgradeFunc func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, rollbackWindow time.Duration) error
+type markUpgradeFunc func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks []v1.AgentInstallDesc) error
 type changeSymlinkFunc func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error
 type rollbackInstallFunc func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, ids installDescriptorSource) error
 
@@ -414,7 +414,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
 	}
 
-	//FIXME make it nicer
 	_, err = u.installDescriptorSource.AddInstallDesc(
 		v1.AgentInstallDesc{Version: version, VersionedHome: unpackRes.VersionedHome, Hash: unpackRes.Hash, Flavor: detectedFlavor, Active: false},
 	)
@@ -465,13 +464,9 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		rollbackWindow = u.upgradeSettings.Rollback.Window
 	}
 
-	var currentInstallTTL *time.Time = nil
-	if rollbackWindow > 0 {
-		currentInstallTTLVar := time.Now().Add(rollbackWindow)
-		currentInstallTTL = &currentInstallTTLVar
-	}
-
-	_, err = u.installDescriptorSource.ModifyInstallDesc(
+	// timestamp marking the moment the links have been rotated. It will be used for TTL calculations of pre-existing elastic-agent installs
+	rotationTimestamp := time.Now()
+	modifiedInstallDescriptor, err := u.installDescriptorSource.ModifyInstallDesc(
 		func(desc *v1.AgentInstallDesc) error {
 			if desc.VersionedHome == unpackRes.VersionedHome {
 				desc.Active = true
@@ -480,8 +475,9 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 				desc.Active = false
 			}
 
+			// set the TTL only for the current install
 			if desc.VersionedHome == currentVersionedHome {
-				desc.TTL = currentInstallTTL
+				desc.TTL = getCurrentInstallTTL(rollbackWindow, rotationTimestamp)
 			}
 
 			return nil
@@ -489,7 +485,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	)
 
 	if err != nil {
-		err = fmt.Errorf("error encountered when adding install description: %w", err)
+		err = fmt.Errorf("error encountered when setting new install description as active: %w", err)
 
 		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), unpackRes.VersionedHome, currentVersionedHome, u.installDescriptorSource)
 		if rollbackErr != nil {
@@ -517,12 +513,14 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		versionedHome: currentVersionedHome,
 	}
 
+	availableRollbacks := getAvailableRollbacks(rollbackWindow, rotationTimestamp, unpackRes.VersionedHome, modifiedInstallDescriptor)
+
 	if err := u.markUpgrade(u.log,
 		paths.Data(), // data dir to place the marker in
 		time.Now(),
 		current,  // new agent version data
 		previous, // old agent version data
-		action, det, rollbackWindow); err != nil {
+		action, det, availableRollbacks); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
 		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.installDescriptorSource)
 		return nil, goerrors.Join(err, rollbackErr)
@@ -554,6 +552,32 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	}
 
 	return cb, nil
+}
+
+func getAvailableRollbacks(rollbackWindow time.Duration, now time.Time, newVersionedHome string, descriptor *v1.InstallDescriptor) []v1.AgentInstallDesc {
+	if rollbackWindow == 0 {
+		// if there's no rollback window it means that no rollback should survive the watcher cleanup at the end of the grace period.
+		return nil
+	}
+
+	res := make([]v1.AgentInstallDesc, 0, len(descriptor.AgentInstalls))
+	for _, installDesc := range descriptor.AgentInstalls {
+		if installDesc.VersionedHome != newVersionedHome && (installDesc.TTL == nil || now.Before(*installDesc.TTL)) {
+			// this is a valid possible rollback target, so we have to keep it available beyond the end of the grace period
+			res = append(res, installDesc)
+		}
+	}
+	return res
+}
+
+func getCurrentInstallTTL(rollbackWindow time.Duration, now time.Time) *time.Time {
+	if rollbackWindow == 0 {
+		// no rollback window, no TTL
+		return nil
+	}
+
+	currentInstallTTLVar := now.Add(rollbackWindow)
+	return &currentInstallTTLVar
 }
 
 func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string, now time.Time, version string, action *fleetapi.ActionUpgrade) (reexec.ShutdownCallbackFn, error) {

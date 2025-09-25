@@ -1609,7 +1609,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, ids installDescriptorSource) error {
 					return nil
 				}
-				upgrader.markUpgrade = func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, rollbackWindow time.Duration) error {
+				upgrader.markUpgrade = func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks []v1.AgentInstallDesc) error {
 					return testError
 				}
 			},
