@@ -45,8 +45,6 @@ func GetOtelDependencies(goModPath string) (*OtelDependencies, error) {
 			dependency.ComponentType = "receiver"
 			dependency.Name = "profiling"
 			dependency.Link = fmt.Sprintf("https://github.com/open-telemetry/opentelemetry-ebpf-profiler/blob/%s/README.md", dependency.Version)
-			receivers = append(receivers, dependency)
-			continue
 		}
 
 		switch dependency.ComponentType {
