@@ -819,9 +819,9 @@ func (b *BeatsMonitor) getPrometheusStream(
 	metricsCollectionIntervalString string,
 ) any {
 	monitoringNamespace := b.monitoringNamespace()
-	name := metricBeatName
-	dataset := fmt.Sprintf("elastic_agent.%s", name)
-	indexName := fmt.Sprintf("metrics-elastic_agent.%s-%s", name, monitoringNamespace)
+	dataset := fmt.Sprintf("elastic_agent.%s", collectorName)
+	//indexName := fmt.Sprintf("metrics-elastic_agent.collector-%s", monitoringNamespace)
+	indexName := fmt.Sprintf("metrics-elastic_agent.%s-%s", metricBeatName, monitoringNamespace)
 
 	prometheusHost := b.getCollectorTelemetryEndpoint()
 
@@ -1069,8 +1069,20 @@ func processorsForCollectorPrometheusStream(namespace, dataset string, agentInfo
 		addEventFieldsProcessor(dataset),
 		addElasticAgentFieldsProcessor(agentName, agentInfo),
 		addAgentFieldsProcessor(agentInfo.AgentID()),
-		addComponentFieldsProcessor(agentName, agentName),
+		addComponentFieldsProcessor(agentName, collectorName),
+		addPrometheusTestField(),
 		addPrometheusMetricsRemapProcessor(),
+	}
+}
+
+func addPrometheusTestField() map[string]any {
+	return map[string]any{
+		"add_fields": map[string]any{
+			"target": "",
+			"fields": map[string]any{
+				"prometheus_marker": "prometheus",
+			},
+		},
 	}
 }
 

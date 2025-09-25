@@ -109,6 +109,7 @@ function process(event) {
   }
 
   if (!keep_event) {
-    event.Cancel();
+    event.Put("event.cancelled_flag", 1);
+    //event.Cancel();
   }
 }
