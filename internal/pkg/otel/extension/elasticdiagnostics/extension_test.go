@@ -52,7 +52,7 @@ func TestExtension(t *testing.T) {
 	client := &http.Client{Transport: tr}
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		req, err := http.NewRequest(http.MethodGet, "http://localhost/diagnostics", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://localhost/diagnostics?cpu=true&cpuduration=5s", nil)
 		require.NoError(collect, err)
 		resp, err := client.Do(req.WithContext(context.Background()))
 		require.NoError(collect, err)
@@ -64,7 +64,15 @@ func TestExtension(t *testing.T) {
 
 		// test that the response can be unmarshalled
 		require.NoErrorf(collect, json.Unmarshal(b, &res), "failed to unmarshal response: %s", string(b))
-
+		require.NotEmpty(collect, res.GlobalDiagnostics)
+		foundCPU := false
+		for _, global := range res.GlobalDiagnostics {
+			if global.Name == "cpu" {
+				foundCPU = true
+				break
+			}
+		}
+		require.True(collect, foundCPU, "cpu.pprof not found in global diagnostics")
 		require.NoError(collect, resp.Body.Close())
-	}, 5*time.Second, 100*time.Millisecond, "extension did not start in time")
+	}, 10*time.Second, 1*time.Millisecond, "extension did not start in time")
 }

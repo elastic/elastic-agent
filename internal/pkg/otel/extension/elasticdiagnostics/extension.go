@@ -29,6 +29,7 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/pkg/ipc"
 )
 
@@ -241,6 +242,33 @@ func (d *diagnosticsExtension) ServeHTTP(w http.ResponseWriter, req *http.Reques
 			Description: hook.description,
 			Content:     hook.hook(),
 			Generated:   timestamppb.Now(),
+		})
+	}
+
+	// only add a CPU profile if requested via query parameter.
+	if req.URL.Query().Get("cpu") == "true" {
+		diagCPUDuration := diagnostics.DiagCPUDuration
+
+		// check if cpuduration parameter is set, if so override the default duration
+		// if parsing fails, log the error and use the default duration
+		if req.URL.Query().Get("cpuduration") != "" {
+			var err error
+			diagCPUDuration, err = time.ParseDuration(req.URL.Query().Get("cpuduration"))
+			if err != nil {
+				d.logger.Error("Failed parsing cpuduration parameter, using default", zap.String("cpuduration", req.URL.Query().Get("cpuduration")), zap.Error(err))
+				diagCPUDuration = diagnostics.DiagCPUDuration
+			}
+		}
+		cpuProfile, err := diagnostics.CreateCPUProfile(req.Context(), diagCPUDuration)
+		if err != nil {
+			d.logger.Error("Failed creating CPU profile", zap.Error(err))
+		}
+		globalResults = append(globalResults, &proto.ActionDiagnosticUnitResult{
+			Name:        "cpu",
+			Filename:    "edot/cpu.profile.gz",
+			ContentType: "application/octet-stream",
+			Description: "CPU profile of the collector",
+			Content:     cpuProfile,
 		})
 	}
 
