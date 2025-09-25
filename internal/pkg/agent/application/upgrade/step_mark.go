@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/version"
 )
@@ -142,7 +143,7 @@ type updateActiveCommitFunc func(log *logger.Logger, topDirPath, hash string, wr
 
 // markUpgrade marks update happened so we can handle grace period
 func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile writeFileFunc) markUpgradeFunc {
-	return func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, rollbackWindow time.Duration) error {
+	return func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks []v1.AgentInstallDesc) error {
 
 		if len(previousAgent.hash) > hashLen {
 			previousAgent.hash = previousAgent.hash[:hashLen]
@@ -160,16 +161,21 @@ func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile wr
 			Details:           upgradeDetails,
 		}
 
-		if rollbackWindow > disableRollbackWindow && agent.parsedVersion != nil && !agent.parsedVersion.Less(*Version_9_2_0_SNAPSHOT) {
+		if agent.parsedVersion != nil && !agent.parsedVersion.Less(*Version_9_2_0_SNAPSHOT) {
 			// if we have a not empty rollback window, write the prev version in the rollbacks_available field
 			// we also need to check the destination version because the manual rollback and delayed cleanup will be
 			// handled by that version of agent, so it needs to be recent enough
-			marker.RollbacksAvailable = []RollbackAvailable{
-				{
-					Version:    previousAgent.version,
-					Home:       previousAgent.versionedHome,
-					ValidUntil: updatedOn.Add(rollbackWindow),
-				},
+			for _, rollback := range availableRollbacks {
+				rollbackAvailable := RollbackAvailable{
+					Version: rollback.Version,
+					Home:    rollback.VersionedHome,
+				}
+
+				if rollback.TTL != nil {
+					rollbackAvailable.ValidUntil = *rollback.TTL
+				}
+
+				marker.RollbacksAvailable = append(marker.RollbacksAvailable, rollbackAvailable)
 			}
 		}
 
