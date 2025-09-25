@@ -219,7 +219,11 @@ func TestCleanup(t *testing.T) {
 			require.NoError(t, err, "error loading update marker")
 			require.NotNil(t, marker, "loaded marker must not be nil")
 			t.Logf("Loaded update marker %+v", marker)
-			tt.wantErr(t, cleanup(testLogger, testTop, marker.VersionedHome, marker.Hash, tt.args.removeMarker, tt.args.keepLogs, 0), fmt.Sprintf("Cleanup(%v, %v, %v, %v)", marker.VersionedHome, marker.Hash, tt.args.removeMarker, tt.args.keepLogs))
+			versionedHome := marker.VersionedHome
+			if versionedHome == "" {
+				versionedHome = filepath.Join("data", fmt.Sprintf("elastic-agent-%s", marker.Hash[:6]))
+			}
+			tt.wantErr(t, cleanup(testLogger, testTop, tt.args.removeMarker, tt.args.keepLogs, 0, versionedHome), fmt.Sprintf("Cleanup(%v, %v, %v, %v)", marker.Hash, tt.args.removeMarker, tt.args.keepLogs, versionedHome))
 			tt.checkAfterCleanup(t, testTop)
 		})
 	}

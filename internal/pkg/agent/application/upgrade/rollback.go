@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -126,17 +127,21 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 		return nil
 	}
 
+	if prevVersionedHome == "" {
+		prevVersionedHome = filepath.Join("data", fmt.Sprintf("%s-%s", agentName, prevHash))
+	}
+
 	// cleanup everything except version we're rolling back into
-	return Cleanup(log, topDirPath, prevVersionedHome, prevHash, settings.RemoveMarker, true)
+	return Cleanup(log, topDirPath, settings.RemoveMarker, true, prevVersionedHome)
 }
 
 // Cleanup removes all artifacts and files related to a specified version.
-func Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool) error {
-	return cleanup(log, topDirPath, currentVersionedHome, currentHash, removeMarker, keepLogs, afterRestartDelay)
+func Cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool, versionedHomesToKeep ...string) error {
+	return cleanup(log, topDirPath, removeMarker, keepLogs, afterRestartDelay, versionedHomesToKeep...)
 }
 
-func cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool, delay time.Duration) error {
-	log.Infow("Cleaning up upgrade", "hash", currentHash, "remove_marker", removeMarker)
+func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool, delay time.Duration, versionedHomesToKeep ...string) error {
+	log.Infow("Cleaning up upgrade", "remove_marker", removeMarker)
 	<-time.After(delay)
 
 	// data directory path
@@ -172,19 +177,19 @@ func cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash s
 	_ = os.Remove(prevSymlink)
 
 	dirPrefix := fmt.Sprintf("%s-", agentName)
-	var currentDir string
-	if currentVersionedHome != "" {
-		currentDir, err = filepath.Rel("data", currentVersionedHome)
+
+	relativeHomePaths := make([]string, len(versionedHomesToKeep))
+	for i, h := range versionedHomesToKeep {
+		relHomePath, err := filepath.Rel("data", h)
 		if err != nil {
-			return fmt.Errorf("extracting elastic-agent path relative to data directory from %s: %w", currentVersionedHome, err)
+			return fmt.Errorf("extracting elastic-agent path relative to data directory from %s: %w", h, err)
 		}
-	} else {
-		currentDir = fmt.Sprintf("%s-%s", agentName, currentHash)
+		relativeHomePaths[i] = relHomePath
 	}
 
 	var errs []error
 	for _, dir := range subdirs {
-		if dir == currentDir {
+		if slices.Contains(relativeHomePaths, dir) {
 			continue
 		}
 
