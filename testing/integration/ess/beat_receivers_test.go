@@ -696,8 +696,6 @@ func TestBeatsReceiverLogs(t *testing.T) {
 		Stack: nil,
 	})
 
-	t.Skip("Skip this test as it's flaky. See https://github.com/elastic/elastic-agent/issues/9890")
-
 	type configOptions struct {
 		RuntimeExperimental string
 	}
@@ -737,53 +735,45 @@ agent.monitoring.enabled: false
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer cancel()
 
-	// use a subcontext for the agent
-	agentProcessCtx, agentProcessCancel := context.WithCancel(ctx)
-	fixture, cmd, output := prepareAgentCmd(t, agentProcessCtx, processConfig)
+	// set up a standalone agent
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
 
-	require.NoError(t, cmd.Start())
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	err = fixture.Configure(ctx, processConfig)
+	require.NoError(t, err)
+
+	output, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true})
+	require.NoError(t, err, "failed to install agent: %s", output)
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error
-		status, statusErr := fixture.ExecStatus(agentProcessCtx)
+		status, statusErr := fixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
 		assertBeatsHealthy(collect, &status, component.ProcessRuntimeManager, 1)
 		return
 	}, 1*time.Minute, 1*time.Second)
 
-	agentProcessCancel()
-	require.Error(t, cmd.Wait())
-	processLogsString := output.String()
-	output.Reset()
-
-	// use a subcontext for the agent
-	agentReceiverCtx, agentReceiverCancel := context.WithCancel(ctx)
-	fixture, cmd, output = prepareAgentCmd(t, agentReceiverCtx, receiverConfig)
-
-	require.NoError(t, cmd.Start())
-
-	t.Cleanup(func() {
-		if t.Failed() {
-			t.Log("Elastic-Agent output:")
-			t.Log(output.String())
-		}
-	})
+	// change configuration and wait until the beats receiver is healthy
+	err = fixture.Configure(ctx, receiverConfig)
+	require.NoError(t, err)
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error
-		status, statusErr := fixture.ExecStatus(agentReceiverCtx)
+		status, statusErr := fixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
 		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 1)
 		return
 	}, 1*time.Minute, 1*time.Second)
-	agentReceiverCancel()
-	require.Error(t, cmd.Wait())
-	receiverLogsString := output.String()
 
-	processLog := getBeatStartLogRecord(processLogsString)
-	assert.NotEmpty(t, processLog)
-	receiverLog := getBeatStartLogRecord(receiverLogsString)
-	assert.NotEmpty(t, receiverLog)
+	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
+	require.NoError(t, err, "failed to read logs: %v", err)
+
+	beatStartLogs := getBeatStartLogRecords(string(logsBytes))
+
+	require.Len(t, beatStartLogs, 2, "expected to find one log line for each configuration")
+	processLog, receiverLog := beatStartLogs[0], beatStartLogs[1]
 
 	// Check that the process log is a subset of the receiver log
 	for key, value := range processLog {
@@ -920,9 +910,10 @@ func assertBeatsHealthy(t *assert.CollectT, status *atesting.AgentStatusOutput, 
 	}
 }
 
-// getBeatStartLogRecord returns the log record for the a particular log line emitted when the beat starts
+// getBeatStartLogRecords returns the log records for a particular log line emitted when the beat starts
 // This log line is identical between beats processes and receivers, so it's a good point of comparison
-func getBeatStartLogRecord(logs string) map[string]any {
+func getBeatStartLogRecords(logs string) []map[string]any {
+	var logRecords []map[string]any
 	for _, line := range strings.Split(logs, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -933,13 +924,11 @@ func getBeatStartLogRecord(logs string) map[string]any {
 			continue
 		}
 
-		if message, ok := logRecord["message"].(string); !ok || !strings.HasPrefix(message, "Beat name:") {
-			continue
+		if message, ok := logRecord["message"].(string); ok && strings.HasPrefix(message, "Beat name:") {
+			logRecords = append(logRecords, logRecord)
 		}
-
-		return logRecord
 	}
-	return nil
+	return logRecords
 }
 
 func prepareAgentCmd(t *testing.T, ctx context.Context, config []byte) (*atesting.Fixture, *exec.Cmd, *strings.Builder) {
