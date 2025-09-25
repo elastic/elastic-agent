@@ -20,3 +20,4 @@ inputs:
       - id: journald-input-id
         paths:
           - "/opt/journald/"
+        merge: true

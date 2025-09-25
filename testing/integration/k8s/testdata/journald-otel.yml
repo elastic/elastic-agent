@@ -6,6 +6,8 @@ receivers:
           id: journald-input
           paths:
             - /opt/journal/
+          merge: true
+
     output:
       otelconsumer:
     logging:
