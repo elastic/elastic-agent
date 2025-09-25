@@ -7,6 +7,7 @@ package otel
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -24,9 +25,12 @@ func PerformDiagnosticsExt(ctx context.Context) (*elasticdiagnostics.Response, e
 	}
 	client := &http.Client{Transport: tr}
 	req, err := http.NewRequest(http.MethodGet, "http://localhost/diagnostics", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
 	resp, err := client.Do(req.WithContext(ctx))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to perform request: %w", err)
 	}
 	defer resp.Body.Close()
 	respBytes, err := io.ReadAll(resp.Body)

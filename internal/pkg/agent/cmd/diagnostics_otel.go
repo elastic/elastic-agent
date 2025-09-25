@@ -40,7 +40,7 @@ func newOtelDiagnosticsCommand(streams *cli.IOStreams) *cobra.Command {
 func otelDiagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	resp, err := otel.PerformDiagnosticsExt(cmd.Context())
 	if err != nil {
-		return fmt.Errorf("failed to get edot diagnostics: %v", err)
+		return fmt.Errorf("failed to get edot diagnostics: %w", err)
 	}
 
 	agentDiag := make([]client.DiagnosticFileResult, 0)
