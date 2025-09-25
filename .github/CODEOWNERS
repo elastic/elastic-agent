@@ -15,10 +15,7 @@
 /dev-tools/kubernetes @elastic/elastic-agent-control-plane
 /docs/release-notes @elastic/ingest-docs
 /docs/docset.yml @elastic/ingest-docs
-<<<<<<< HEAD
 /internal/pkg/agent/application/configuration_embed_changed_test.go @elastic/cloudbeat
-/internal/pkg/composable/providers/kubernetes @elastic/elastic-agent-control-plane
-=======
 /.github/workflows/update-docs.yml @elastic/ingest-docs
 /docs/reference/edot-collector @elastic/ingest-docs
 /docs/scripts/update-docs @elastic/ingest-docs
@@ -28,4 +25,3 @@
 /internal/pkg/otel/samples/darwin/autoops_es.yml @elastic/opex
 /internal/pkg/otel/samples/linux/autoops_es.yml @elastic/opex
 /internal/pkg/otel/samples/windows/autoops_es.yml @elastic/opex
->>>>>>> 1831928a5 (Add entries to CODEOWNERS file (#10049))
