@@ -16,7 +16,7 @@ import (
 func TestGetOtelDependencies(t *testing.T) {
 	goModContent := `module github.com/elastic/elastic-agent
 
-go 1.24.1
+go 1.25.7
 
 require (
 	github.com/elastic/opentelemetry-collector-components/connector/signaltometricsconnector v0.3.0
