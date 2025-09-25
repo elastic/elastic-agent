@@ -27,32 +27,6 @@ OpenTelemetry profiling is still under active development. Refer to [The State o
 Follow these steps to turn on profiles collection through the EDOT Collector.
 
 :::::{stepper}
-::::{step} Set up Universal Profiling
-Universal Profiling must be set up before profiles can be ingested and visualized.
-
-To set up Universal Profiling, go to **Observability** in Kibana and then to **Infrastructure** > **Universal Profiling**. If it's not yet configured, select **Set up Universal Profiling** and follow the instructions.
-
-:::{note}
-The setup dialog doesn't appear if Universal Profiling is already configured.
-:::
-::::
-
-::::{step} Full profiles collection
-For full profiles collection and reporting, use this Collector configuration:
-
-```yaml
-receivers:
-  profiling:
-    SamplesPerSecond: 19
-
-service:
-  pipelines:
-    profiles:
-      receivers: [ profiling ]
-      exporters: [ elasticsearch ]
-```
-::::
-
 ::::{step} Activate profiling in the Collector
 To activate profiling in the EDOT Collector, start it using the additional argument `--feature-gates=service.profilesSupport`.
 
