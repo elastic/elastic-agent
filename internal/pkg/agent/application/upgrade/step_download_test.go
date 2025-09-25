@@ -8,6 +8,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
@@ -301,6 +304,86 @@ func TestDownloadWithRetries(t *testing.T) {
 
 		require.Empty(t, *upgradeDetailsRetryErrorMsg)
 	})
+}
+
+type mockVerifier struct {
+	called      bool
+	returnError error
+}
+
+func (mv *mockVerifier) Name() string {
+	return ""
+}
+
+func (mv *mockVerifier) Verify(ctx context.Context, a artifact.Artifact, version agtversion.ParsedSemVer, skipDefaultPgp bool, pgpBytes ...string) error {
+	mv.called = true
+	return mv.returnError
+}
+
+func TestDownloadArtifact(t *testing.T) {
+	testLogger, _ := loggertest.New("TestDownloadArtifact")
+	tempConfig := &artifact.Config{} // used only to get os and arch, runtime.GOARCH returns amd64 which is not a valid arch when used in GetArtifactName
+
+	parsedVersion, err := agtversion.ParseVersion("8.9.0")
+	require.NoError(t, err)
+
+	upgradeDeatils := details.NewDetails(parsedVersion.String(), details.StateRequested, "")
+
+	mockContent := []byte("mock content")
+
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write(mockContent)
+		require.NoError(t, err)
+	}))
+	defer testServer.Close()
+
+	testError := errors.New("test error")
+
+	type testCase struct {
+		mockNewVerifierFactory verifierFactory
+		expectedError          error
+	}
+
+	testCases := map[string]testCase{
+		"should return path if verifier constructor fails": {
+			mockNewVerifierFactory: func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
+				return nil, testError
+			},
+			expectedError: testError,
+		},
+		"should return path if verifier fails": {
+			mockNewVerifierFactory: func(version *agtversion.ParsedSemVer, log *logger.Logger, settings *artifact.Config) (download.Verifier, error) {
+				return &mockVerifier{returnError: testError}, nil
+			},
+			expectedError: testError,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			paths.SetTop(t.TempDir())
+
+			artifactPath, err := artifact.GetArtifactPath(agentArtifact, *parsedVersion, tempConfig.OS(), tempConfig.Arch(), paths.Downloads())
+			require.NoError(t, err)
+
+			settings := artifact.Config{
+				RetrySleepInitDuration: 20 * time.Millisecond,
+				HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+					Timeout: 2 * time.Second,
+				},
+				SourceURI:       testServer.URL,
+				TargetDirectory: paths.Downloads(),
+			}
+
+			a := newArtifactDownloader(&settings, testLogger)
+			a.newVerifier = tc.mockNewVerifierFactory
+
+			path, err := a.downloadArtifact(t.Context(), parsedVersion, testServer.URL, upgradeDeatils, false, true)
+			require.ErrorIs(t, err, tc.expectedError)
+			require.Equal(t, artifactPath, path)
+		})
+	}
 }
 
 // mockUpgradeDetails returns a *details.Details value that has an observer registered on it for inspecting

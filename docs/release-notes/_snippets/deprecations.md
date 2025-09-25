@@ -1,3 +1,6 @@
+:::{include} /release-notes/_snippets/9.1.4/deprecations.md
+:::
+
 :::{include} /release-notes/_snippets/9.1.3/deprecations.md
 :::
 
@@ -8,6 +11,9 @@
 :::
 
 :::{include} /release-notes/_snippets/9.1.0/deprecations.md
+:::
+
+:::{include} /release-notes/_snippets/9.0.7/deprecations.md
 :::
 
 :::{include} /release-notes/_snippets/9.0.6/deprecations.md
