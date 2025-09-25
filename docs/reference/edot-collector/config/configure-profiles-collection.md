@@ -28,9 +28,13 @@ Follow these steps to turn on profiles collection through the EDOT Collector.
 
 :::::{stepper}
 ::::{step} Set up Universal Profiling
-Universal Profiling must be set up once before profiles information can be ingested and visualized.
+Universal Profiling must be set up before profiles can be ingested and visualized.
 
-To set up Universal Profiling, navigate to Observability in Kibana and then to Infrastructure > Universal Profiling. If it's not yet configured, click the "Set up Universal Profiling" button and follow the on-screen instructions. The setup dialog will not appear if Universal Profiling is already configured.
+To set up Universal Profiling, go to **Observability** in Kibana and then to **Infrastructure** > **Universal Profiling**. If it's not yet configured, select **Set up Universal Profiling** and follow the instructions.
+
+:::{note}
+The setup dialog doesn't appear if Universal Profiling is already configured.
+:::
 ::::
 
 ::::{step} Full profiles collection
