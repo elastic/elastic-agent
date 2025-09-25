@@ -844,7 +844,13 @@ func checkFIPS(t *testing.T, agentPackageRootDir string) {
 				case "-tags":
 					foundTags = true
 					require.Contains(t, setting.Value, "requirefips")
-					require.Contains(t, setting.Value, "ms_tls13kdf")
+					// the check on ms_tls13kdf is no longer needed for go >= 1.25
+					// It should probably be conditioned to the output of `go version <binary>`
+					// for example:
+					// go version elastic-agent-9.2.0-SNAPSHOT-linux-x86_64/data/elastic-agent-7b3817/components/apm-server
+					// elastic-agent-9.2.0-SNAPSHOT-linux-x86_64/data/elastic-agent-7b3817/components/apm-server: go1.25.1
+					//
+					// require.Contains(t, setting.Value, "ms_tls13kdf")
 					continue
 				case "GOEXPERIMENT":
 					foundExperiment = true
