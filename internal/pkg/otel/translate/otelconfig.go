@@ -13,7 +13,6 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
-
 	koanfmaps "github.com/knadh/koanf/maps"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
@@ -59,7 +58,7 @@ func GetOtelConfig(
 	beatMonitoringConfigGetter BeatMonitoringConfigGetter,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
-	components := getSupportedComponents(model, logger)
+	components := getSupportedComponents(logger, model)
 	if len(components) == 0 {
 		return nil, nil
 	}
@@ -116,7 +115,7 @@ func VerifyComponentIsOtelSupported(comp *component.Component) error {
 }
 
 // getSupportedComponents returns components from the given model that can be run in an Otel Collector.
-func getSupportedComponents(model *component.Model, logger *logp.Logger) []*component.Component {
+func getSupportedComponents(logger *logp.Logger, model *component.Model) []*component.Component {
 	var supportedComponents []*component.Component
 
 	for _, comp := range model.Components {
