@@ -79,7 +79,6 @@ receivers:
     username: test
     password: test
   docker_stats:
-  sqlserver:
 
 
 connectors:
