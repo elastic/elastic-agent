@@ -14,7 +14,6 @@ import (
 
 	// Receivers:
 	apachereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver"
-	awss3receiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver"
 	dockerstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver"
 	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
 	hostmetricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver"
@@ -121,7 +120,6 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			iisreceiver.NewFactory(),
 			mysqlreceiver.NewFactory(),
 			postgresqlreceiver.NewFactory(),
-			awss3receiver.NewFactory(),
 			sqlserverreceiver.NewFactory(),
 		}
 

@@ -79,12 +79,6 @@ receivers:
     username: test
     password: test
   docker_stats:
-  awss3:
-    starttime: "2024-01-01 01:00"
-    endtime: "2024-01-02"
-    s3downloader:
-      s3_bucket: 'test'
-      s3_prefix: 'test'
   sqlserver:
 
 
