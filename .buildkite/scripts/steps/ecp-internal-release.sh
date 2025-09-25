@@ -20,6 +20,7 @@ set -eu
 _SELF=$(dirname $0)
 source "${_SELF}/../common.sh"
 
+
 # annotate create temp markdown file if not exists
 # this file will be later used to annotate the build
 # it appends to the file the message passed as argument
@@ -32,9 +33,19 @@ write_annotation() {
     cat $BUILDKITE_ANNOTATE_FILE | buildkite-agent annotate --style info
 }
 
-BUILD_VERSION="$(jq -r '.version' .package-version)"
-DOCKER_TAG="git-${VERSION}"
 PRIVATE_REPO="docker.elastic.co/observability-ci/ecp-elastic-agent-service"
+SNAPSHOT_DRA_URL=https://snapshots.elastic.co/latest/master.json
+
+DRA_RESULT=$(curl -s -X GET "$SNAPSHOT_DRA_URL")
+echo "$DRA_RESULT"
+BUILD_ID=$(echo "$DRA_RESULT" | jq '.build_id' | tr -d '"')
+BUILD_VERSION=$(echo "$DRA_RESULT" | jq '.version' | tr -d '"')
+
+MANIFEST_URL="https://snapshots.elastic.co/$BUILD_ID/agent-package/agent-artifacts-$BUILD_VERSION.json"
+GIT_COMMIT=$(curl -s -X GET "$MANIFEST_URL" | jq '.projects["elastic-agent-core"]["commit_hash"]' | tr -d '"')
+GIT_SHORT_COMMIT=$(echo "$GIT_COMMIT" | cut -c1-12)
+
+DOCKER_TAG="git-${GIT_SHORT_COMMIT}"
 PRIVATE_IMAGE="${PRIVATE_REPO}:${DOCKER_TAG}"
 
 # TODO: let's avoid accessing vault directly but use the vault plugin itself
@@ -46,19 +57,13 @@ DOCKER_REGISTRY="docker.elastic.co"
 DOCKER_USERNAME_SECRET=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
 DOCKER_PASSWORD_SECRET=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
 skopeo login --username "${DOCKER_USERNAME_SECRET}" --password "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}"
-
-# download the amd64 and arm64 builds of the image from the previous steps
-buildkite-agent artifact download "build/distributions/**" . --step "packaging-service-container-amd64"
-buildkite-agent artifact download "build/distributions/**" . --step "packaging-service-container-arm64"
-
-# copy the images into the private image location
-skopeo copy --all "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-amd64.docker.tar.gz" "docker://$PRIVATE_IMAGE"
-skopeo copy --all "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-arm64.docker.tar.gz" "docker://$PRIVATE_IMAGE"
+skopeo copy --all "docker://docker.elastic.co/cloud-release/elastic-agent-service:$BUILD_ID-SNAPSHOT" "docker://$PRIVATE_IMAGE"
 
 annotate "* Image: $PRIVATE_IMAGE"
-annotate "* Short commit: $VERSION"
-annotate "* Commit: https://github.com/elastic/elastic-agent/commit/$VERSION"
+annotate "* Short commit: $GIT_SHORT_COMMIT"
+annotate "* Commit: https://github.com/elastic/elastic-agent/commit/$GIT_COMMIT"
+annotate "* Manifest: $MANIFEST_URL"
 
-buildkite-agent meta-data set "git-short-commit" "$VERSION"
+buildkite-agent meta-data set "git-short-commit" "$GIT_SHORT_COMMIT"
 
 write_annotation
