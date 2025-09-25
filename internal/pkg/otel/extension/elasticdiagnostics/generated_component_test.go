@@ -6,6 +6,8 @@ package elasticdiagnostics
 
 import (
 	"context"
+	"fmt"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -30,10 +32,14 @@ func TestComponentLifecycle(t *testing.T) {
 
 	cm, err := confmaptest.LoadConf("metadata.yaml")
 	require.NoError(t, err)
-	cfg := factory.CreateDefaultConfig()
+	cfg := factory.CreateDefaultConfig().(*Config)
 	sub, err := cm.Sub("tests::config")
 	require.NoError(t, err)
 	require.NoError(t, sub.Unmarshal(&cfg))
+	if runtime.GOOS == "windows" {
+		// Use a different endpoint on Windows as /tmp/test.sock is not valid
+		cfg.Endpoint = fmt.Sprintf("npipe://%s", cfg.Endpoint)
+	}
 	t.Run("shutdown", func(t *testing.T) {
 		e, err := factory.Create(context.Background(), extensiontest.NewNopSettings(typ), cfg)
 		require.NoError(t, err)
