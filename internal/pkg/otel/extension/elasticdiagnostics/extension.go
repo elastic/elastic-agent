@@ -13,14 +13,11 @@ import (
 	"net"
 	"net/http"
 	"runtime/pprof"
-	"strconv"
 	"sync"
 	"time"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
-	"go.opentelemetry.io/collector/service"
-	otelconf "go.opentelemetry.io/contrib/otelconf/v0.3.0"
 	"go.uber.org/zap"
 	"go.yaml.in/yaml/v3"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -55,11 +52,6 @@ type diagnosticsExtension struct {
 
 	hooksMtx sync.Mutex
 	confgMtx sync.Mutex
-}
-
-type serviceConfig struct {
-	Service    service.Config `mapstructure:"service"`
-	Beatconfig map[string]any `mapstructure:",remain"`
 }
 
 func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) error {
@@ -244,16 +236,4 @@ func (d *diagnosticsExtension) ServeHTTP(w http.ResponseWriter, req *http.Reques
 	if _, err := w.Write(b); err != nil {
 		d.logger.Error("Failed writing response to client.", zap.Error(err))
 	}
-}
-
-func extractMetricAddress(readers []otelconf.MetricReader) string {
-	for _, reader := range readers {
-		if reader.Pull != nil &&
-			reader.Pull.Exporter.Prometheus != nil &&
-			reader.Pull.Exporter.Prometheus.Host != nil &&
-			reader.Pull.Exporter.Prometheus.Port != nil {
-			return net.JoinHostPort(*reader.Pull.Exporter.Prometheus.Host, strconv.Itoa(*reader.Pull.Exporter.Prometheus.Port))
-		}
-	}
-	return ""
 }
