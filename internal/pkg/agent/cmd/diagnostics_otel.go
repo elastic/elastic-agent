@@ -34,11 +34,13 @@ func newOtelDiagnosticsCommand(streams *cli.IOStreams) *cobra.Command {
 		SilenceErrors: true,
 	}
 	cmd.Flags().StringP("file", "f", "", "name of the output diagnostics zip archive")
+	cmd.Flags().BoolP("cpu-profile", "p", false, "wait to collect a CPU profile")
 	return cmd
 }
 
 func otelDiagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
-	resp, err := otel.PerformDiagnosticsExt(cmd.Context())
+	cpuProfile, _ := cmd.Flags().GetBool("cpu-profile")
+	resp, err := otel.PerformDiagnosticsExt(cmd.Context(), cpuProfile)
 	if err != nil {
 		return fmt.Errorf("failed to get edot diagnostics: %w", err)
 	}
@@ -81,5 +83,10 @@ func otelDiagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 	defer f.Close()
 
-	return diagnostics.ZipArchive(streams.Err, f, paths.Top(), agentDiag, nil, componentDiag, false)
+	if err := diagnostics.ZipArchive(streams.Err, f, paths.Top(), agentDiag, nil, componentDiag, false); err != nil {
+		return fmt.Errorf("unable to create archive %q: %w", filepath, err)
+	}
+	fmt.Fprintf(streams.Out, "Created diagnostics archive %q\n", filepath)
+	fmt.Fprintln(streams.Out, "** WARNING **\nCreated archive may contain plain text credentials.\nEnsure that files in archive are redacted before sharing.\n*******")
+	return nil
 }

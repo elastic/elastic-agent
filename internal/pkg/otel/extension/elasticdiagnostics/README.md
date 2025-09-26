@@ -1,6 +1,8 @@
 # elasticdiagnosticsextension
 
 `elasticdiagnosticsextension` is an internal package for peforming diagnostics and is used in conjunction with EDOT.
+The extension is designed to return diagnostics in a format compatible with the [ActionDiagnosticUnitResult](https://github.com/elastic/elastic-agent-client/blob/888026ef85e1c9190fe76eb158cf21d9c9c02920/elastic-agent-client.proto#L424-L437) type defined in the control protocol.
+
 
 ## Configuration
 
@@ -25,7 +27,14 @@ The extension accepts the `endpoint` as a sole parameter. The endpoint should be
 
 ### Request/Response format:
 - This extension runs an HTTP server and listens to new requests on `/diagnostics` path.
-- It doesn't expect any requets params or body.
+- The following query parameters are optional:
+    - `cpu`
+        - If `true`, the extension will also collect cpu profile of EDOT. 
+        - By default, the extension doesn't collect the CPU profile unless explicitly specified.
+    - `cpuduration`:
+        - Specifies the time duration over which the CPU profile should be collected.
+        - Valid time units are `ns`, `us`, `ms`, `s`, `m`, `h`
+        - Default: `30s`.
 - The response format is defined in [response.go](./response.go). 
     - `GlobalDiagnostics`: Data related to the overall process:
         1. Profiles.

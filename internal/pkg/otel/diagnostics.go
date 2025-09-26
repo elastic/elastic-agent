@@ -17,7 +17,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 )
 
-func PerformDiagnosticsExt(ctx context.Context) (*elasticdiagnostics.Response, error) {
+func PerformDiagnosticsExt(ctx context.Context, cpu bool) (*elasticdiagnostics.Response, error) {
 	tr := &http.Transport{
 		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 			return client.Dialer(ctx, paths.DiagnosticsExtensionSocket())
