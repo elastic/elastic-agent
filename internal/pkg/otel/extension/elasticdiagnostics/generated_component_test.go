@@ -6,7 +6,6 @@ package elasticdiagnostics
 
 import (
 	"context"
-	"fmt"
 	"runtime"
 	"testing"
 
