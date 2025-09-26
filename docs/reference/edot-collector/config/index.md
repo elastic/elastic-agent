@@ -17,12 +17,12 @@ products:
 
 The following pages provide insights into the default configurations of the EDOT Collector in different environments and scenarios, as well as examples of EDOT Collector configuration for different custom use cases.
 
-* [Default Configuration - Standalone EDOT Collector](/reference/edot-collector/config/default-config-standalone.md)
-* [Default Configuration - EDOT Collectors on Kubernetes](/reference/edot-collector/config/default-config-k8s.md)
-* [Configure Metrics Collection](/reference/edot-collector/config/configure-metrics-collection.md)
-* [Configure Logs Collection](/reference/edot-collector/config/configure-logs-collection.md)
-* [Configure Profiles Collection](/reference/edot-collector/config/configure-profiles-collection.md)
-* [Authentication Methods](/reference/edot-collector/config/authentication-methods.md)
-* [Tail-based Sampling](/reference/edot-collector/config/tail-based-sampling.md)
+* [Default configuration - Standalone EDOT Collector](/reference/edot-collector/config/default-config-standalone.md)
+* [Default configuration - EDOT Collectors on Kubernetes](/reference/edot-collector/config/default-config-k8s.md)
+* [Configure metrics collection](/reference/edot-collector/config/configure-metrics-collection.md)
+* [Configure logs collection](/reference/edot-collector/config/configure-logs-collection.md)
+* [Configure profiles collection](/reference/edot-collector/config/configure-profiles-collection.md)
+* [Authentication methods](/reference/edot-collector/config/authentication-methods.md)
+* [Tail-based sampling](/reference/edot-collector/config/tail-based-sampling.md)
 
 
