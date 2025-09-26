@@ -459,6 +459,7 @@ github.com/eclipse/paho.mqtt.golang v1.3.5 h1:sWtmgNxYM9P2sP+xEItMozsR3w0cqZFlqn
 github.com/eclipse/paho.mqtt.golang v1.3.5/go.mod h1:eTzb4gxwwyWpqBUHGQZ4ABAV7+Jgm1PklsYT/eo8Hcc=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
 github.com/elastic/bayeux v1.0.5/go.mod h1:CSI4iP7qeo5MMlkznGvYKftp8M7qqP/3nzmVZoXHY68=
+<<<<<<< HEAD
 github.com/elastic/beats/v7 v7.0.0-alpha2.0.20241212201805-58af1537830b h1:BMd6gkQF5Zk4rQ7ZbySgUpF5dPZFy4zAzV3Ujds6fw4=
 github.com/elastic/beats/v7 v7.0.0-alpha2.0.20241212201805-58af1537830b/go.mod h1:JZIuztvKeiuHUM8zvfQ24wz6nJPPOM1DVqu9FHu9a0Q=
 github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250404163238-b16c2c085d99 h1:P01/ETvzzdyz/rKBacNc9Nq0c9LYR/PwcRIlnA6COYE=
@@ -471,6 +472,20 @@ github.com/elastic/elastic-agent-libs v0.20.0 h1:MPjenwuEr+QfMeQRV4BK817ZbiNS38S
 github.com/elastic/elastic-agent-libs v0.20.0/go.mod h1:1HNxREH8C27kGrJCtKZh/ot8pV8joH8VREP21+FrH5s=
 github.com/elastic/elastic-agent-system-metrics v0.11.15 h1:RWX0n6LakadsqB6YB2I7AIXyMlEO4qBUGWn4A+aGeKA=
 github.com/elastic/elastic-agent-system-metrics v0.11.15/go.mod h1:qiZC5p1hd8te4XVnhh7FkXdcYhxFnl5i9GJpROtf6zo=
+=======
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250924190604-3dc72030429f h1:A8N/bfbc/kvKOo9gu7JruzAauqMPXDnQ50jwBKAdcyo=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250924190604-3dc72030429f/go.mod h1:mxbP+JnIgGEDzOfEK7gNq8v3d6dPC2jzAt4q/QHsnt0=
+github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae h1:OiShmbWAyGU0MS0ADJWr1/QgeLIZliMk9xsrFicR3/s=
+github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae/go.mod h1:D2IckZVXARugvikE4fv1glvaJMohKSZRzrPsxCjo9O0=
+github.com/elastic/elastic-agent-autodiscover v0.10.0 h1:WJ4zl9uSfk1kHmn2B/0byQBLIL607Zt4LNfOgV7+XN0=
+github.com/elastic/elastic-agent-autodiscover v0.10.0/go.mod h1:Nf3zh9FcJ9nTTswTwDTUAqXmvQllOrNliM6xmORSxwE=
+github.com/elastic/elastic-agent-client/v7 v7.17.2 h1:Cl2TeABqWZgW40t5fchGWT/sRk4MDDLWA0d8iHHOxLA=
+github.com/elastic/elastic-agent-client/v7 v7.17.2/go.mod h1:5irRFqp6HLqtu1S+OeY0jg8x7K6PLL+DW+PwVk1vJnk=
+github.com/elastic/elastic-agent-libs v0.24.0 h1:8skd0le8Y/zAGVaj4m44ljiJMAp0xuJz07ngDTL/1kM=
+github.com/elastic/elastic-agent-libs v0.24.0/go.mod h1:xSeIP3NtOIT4N2pPS4EyURmS1Q8mK0lWZ8Wd1Du6q3w=
+github.com/elastic/elastic-agent-system-metrics v0.13.2 h1:R4ogKHESuWhWTtopnw/aHnBxxSZbxd7KHV4GefdwT2M=
+github.com/elastic/elastic-agent-system-metrics v0.13.2/go.mod h1:ezM1kzDUT+vWXFh5oK8QXB/AEB0UoLWqWA8rkRicFFo=
+>>>>>>> 5f0f2fd3b (Update journald tests now that Filebeat supports watching folders (#10131))
 github.com/elastic/elastic-transport-go/v8 v8.7.0 h1:OgTneVuXP2uip4BA658Xi6Hfw+PeIOod2rY3GVMGoVE=
 github.com/elastic/elastic-transport-go/v8 v8.7.0/go.mod h1:YLHer5cj0csTzNFXoNQ8qhtGY1GTvSqPnKWKaqQE3Hk=
 github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3 h1:UyNbxdkQiSfyipwsOCWAlO+ju3xXC61Z4prx/HBTtFk=
@@ -2061,6 +2076,7 @@ golang.org/x/text v0.13.0/go.mod h1:TvPlkZtksWOMsz7fbANvkp4WM8x/WCo/om8BMLbz+aE=
 golang.org/x/text v0.14.0/go.mod h1:18ZOQIKpY8NJVqYksKHtTdi31H5itFRjB5/qKTNYzSU=
 golang.org/x/text v0.15.0/go.mod h1:18ZOQIKpY8NJVqYksKHtTdi31H5itFRjB5/qKTNYzSU=
 golang.org/x/text v0.21.0/go.mod h1:4IBbMaMmOPCJ8SecivzSH54+73PCFmPWxNTLm+vZkEQ=
+<<<<<<< HEAD
 golang.org/x/text v0.23.0 h1:D71I7dUrlY+VX0gQShAThNGHFxZ13dGLBHQLVl1mJlY=
 golang.org/x/text v0.23.0/go.mod h1:/BLNzu4aZCJ1+kcD0DNRotWKage4q2rGVAg4o22unh4=
 golang.org/x/time v0.0.0-20181108054448-85acf8d2951c/go.mod h1:tRJNPiyCQ0inRvYxbN9jk5I+vvW/OXSQhTDSoE431IQ=
@@ -2070,6 +2086,12 @@ golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba/go.mod h1:tRJNPiyCQ0inRvYxb
 golang.org/x/time v0.5.0/go.mod h1:3BpzKBy/shNhVucY/MWOyx10tF3SFh9QdLuxbVysPQM=
 golang.org/x/time v0.8.0 h1:9i3RxcPv3PZnitoVGMPDKZSq1xW1gK1Xy3ArNOGZfEg=
 golang.org/x/time v0.8.0/go.mod h1:3BpzKBy/shNhVucY/MWOyx10tF3SFh9QdLuxbVysPQM=
+=======
+golang.org/x/text v0.29.0 h1:1neNs90w9YzJ9BocxfsQNHKuAT4pkghyXc4nhZ6sJvk=
+golang.org/x/text v0.29.0/go.mod h1:7MhJOA9CD2qZyOKYazxdYMF85OwPdEr9jTtBpO7ydH4=
+golang.org/x/time v0.12.0 h1:ScB/8o8olJvc+CQPWrK3fPZNfh7qgwCrY0zJmoEQLSE=
+golang.org/x/time v0.12.0/go.mod h1:CDIdPxbZBQxdj6cxyCIdrNogrJKMJ7pr37NYpMcMDSg=
+>>>>>>> 5f0f2fd3b (Update journald tests now that Filebeat supports watching folders (#10131))
 golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
 golang.org/x/tools v0.0.0-20190114222345-bf090417da8b/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
 golang.org/x/tools v0.0.0-20190226205152-f727befe758c/go.mod h1:9Yl7xja0Znq3iFh3HoIrodX9oNMXvdceNzlUR8zjMvY=
