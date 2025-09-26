@@ -1,6 +1,8 @@
 # elasticdiagnosticsextension
 
 `elasticdiagnosticsextension` is an internal package for peforming diagnostics and is used in conjunction with EDOT.
+The extension is designed to return diagnostics in a format compatible with the [ActionDiagnosticUnitResult](https://github.com/elastic/elastic-agent-client/blob/888026ef85e1c9190fe76eb158cf21d9c9c02920/elastic-agent-client.proto#L424-L437) type defined in the control protocol.
+
 
 ## Configuration
 
@@ -39,7 +41,6 @@ The extension accepts the `endpoint` as a sole parameter. The endpoint should be
         2. Internal telemetry.
         3. latest collector configuration.
     - `ComponentDiagnostics`: Data from individual receivers, collected via registered diagnostic hooks.
-    - The extension is designed to return diagnostics in a format compatible with the [ActionDiagnosticUnitResult](https://github.com/elastic/elastic-agent-client/blob/888026ef85e1c9190fe76eb158cf21d9c9c02920/elastic-agent-client.proto#L424-L437) type defined in the control protocol.
 
 ### Interaction with Elastic-Agent service in hybrid mode.
 
