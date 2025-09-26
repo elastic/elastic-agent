@@ -181,7 +181,7 @@ func NotifyTermination() {
 func trySendState(s svc.State, changes chan<- svc.Status) {
 	select {
 	case changes <- svc.Status{State: s}:
-	case <-time.After(500 * time.Millisecond): // should never happen, but don't make this blocking
+	case <-time.After(5000 * time.Millisecond): // should never happen, but don't make this blocking
 	}
 }
 
@@ -195,6 +195,6 @@ func WaitExecutionDone() {
 
 	select {
 	case <-serviceInstance.executeFinished:
-	case <-time.After(500 * time.Millisecond):
+	case <-time.After(3000 * time.Millisecond):
 	}
 }
