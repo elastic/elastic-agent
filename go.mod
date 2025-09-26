@@ -27,7 +27,7 @@ require (
 	github.com/elastic/go-ucfg v0.8.9-0.20250307075119-2a22403faaea
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.7.0
-	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.0.0-20250922093401-a76a7ba0448a
+	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.0.0-20250925233506-51d5c40132c7
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.5.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.7.0
 	github.com/elastic/opentelemetry-collector-components/extension/beatsauthextension v0.3.0
