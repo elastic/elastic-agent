@@ -40,6 +40,7 @@ type diagHook struct {
 }
 
 type diagnosticsExtension struct {
+	mx       sync.Mutex
 	listener net.Listener
 	server   *http.Server
 	logger   *zap.Logger
@@ -55,6 +56,8 @@ type diagnosticsExtension struct {
 }
 
 func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) error {
+	d.mx.Lock()
+	defer d.mx.Unlock()
 	var err error
 
 	d.logp, err = logp.NewZapLogger(d.logger)
@@ -87,6 +90,8 @@ func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) e
 }
 
 func (d *diagnosticsExtension) Shutdown(ctx context.Context) error {
+	d.mx.Lock()
+	defer d.mx.Unlock()
 	if d.server == nil {
 		return nil
 	}
