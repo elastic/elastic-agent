@@ -15,6 +15,16 @@ The File log receiver ingests logs from local files and forwards them for proces
 The receiver supports multiline parsing, filtering, persistent tracking of file offsets, and routing based on file metadata or log content.
 
 
+## Default usage in EDOT
+
+The `filelog` receiver is included by default in the EDOT Collector's Kubernetes Helm chart. It is preconfigured to collect logs from pod log files such as `/var/log/pods/*/*/*.log`, and uses the [`file_storage`](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/storage) extension to track read positions and avoid duplicate ingestion after restarts.
+
+To view or customize the default configuration, refer to:
+
+- [`logs collection config`](https://github.com/elastic/elastic-agent/blob/v9.1.4/deploy/helm/edot-collector/kube-stack/values.yaml#L179-L181)
+- [`filelogreceiver options`](https://github.com/elastic/elastic-agent/blob/v9.1.4/deploy/helm/edot-collector/kube-stack/values.yaml#L322-L335)
+
+
 ## Example configuration
 
 This example shows how to ingest Kubernetes container logs with routing logic based on log format:
@@ -58,38 +68,56 @@ receivers:
 
 ## **Key configuration options**
 
+The following are some of the most commonly used settings when working with the `filelog` receiver. These options help control what files are read, how logs are parsed, and how file positions are tracked between restarts:
+
 | Option | Description |
 |---------|-------------|
 | `include` | List of glob patterns for files to include |
-| `exclude` | Optional glob patterns for files to exclude |
-| `start_at` | `beginning` or `end`. Controls where to start reading |
+| `exclude` | Optional glob patterns for files to exclude (for example rotated or compressed files) |
+| `start_at` | `beginning` or `end`. Controls where to start reading files when no checkpoint exists |
 | `operators` | Parsing and routing logic for logs |
-| `storage` | Enables persistent state to avoid duplications on restarts |
+| `storage` | Enables persistent tracking of file positions using a storage extension |
 | `max_log_size` | Maximum size of individual log entries (in bytes) |
+| `fingerprint_size`| Size (in bytes) used to identify and deduplicate files |
 
 For the full list of options, refer to the[ upstream `filelogreceiver` docs](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/filelogreceiver/README.md).
 
 
-## **Best practices**
+## Best practices
 
-* Use [persistent storage](https://github.com/open-telemetry/opentelemetry-collector/blob/main/docs/design.md#storage-extension) to avoid duplicate log entries after restarts.
+These tips can help you get the most out of the file log receiver:
 
-* Leverage `operators` to normalize log formats (for example parse JSON, regex fields).
-* Use the `router` operator when handling multiple formats (for example containerd and CRI-O). 
-* Avoid using the `start_at: end` setting in ephemeral containers (risk of missing logs).
-* Use `exclude` for rotated or compressed logs you don’t want ingested.
+- **Use [persistent storage](https://github.com/open-telemetry/opentelemetry-collector/blob/main/docs/design.md#storage-extension) to avoid duplicates**  
+  Without persistent storage, the receiver will not retain file read positions across restarts. This can result in either duplicate ingestion (if `start_at` is set to `beginning`) or lost logs (if set to `end`). Use the `storage:` setting and configure a persistent volume when running in Kubernetes.
+
+- **Exclude rotated or compressed log files unless needed**  
+  The default configuration excludes rotated files, which helps prevent duplicate ingestion. If you need to include rotated logs, update the `include:` and `exclude:` patterns accordingly.
+
+- **Enable multiline log parsing for stack traces and similar patterns**  
+  Multiline log support is not enabled by default. To handle multi-line messages such as stack traces, define a `regex_parser`, `combine_logs`, or `multiline` operator in your Helm chart configuration.
+
+- **Route different log formats using conditional parsing**  
+  If your environment produces logs in multiple formats (e.g. containerd and CRI-O), use the `router` operator to apply appropriate parsers based on the log structure.
+
+- **Avoid using `start_at: beginning` without storage**  
+  Using `start_at: beginning` without a storage extension will re-read all files from the start after each restart, which might lead to duplicate log entries.
 
 
 ## Limitations
 
-* The `filelogreceiver` does not support dynamic file discovery inside containers.
+Like any component, `filelogreceiver` has some trade-offs and behaviors to be aware of, especially in Kubernetes environments:
 
-* High-volume directories (for example `/var/log/containers`) may require tuning `max_concurrent_files`.
+* Persistent log tracking requires explicit `storage:` configuration and persistent volume support in Kubernetes.
 
-* File renaming or rotation may cause skipped or duplicated lines without fingerprinting.
+* Multiline logs are not parsed by default — you must customize the configuration to parse them.
+
+* Incorrect include/exclude globs can result in missing rotated logs or unintended ingestion.
+
+* High-volume directories may require tuning of `max_concurrent_files`.
 
 
 ## Resources
 
 * [Upstream component: filelogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/filelogreceiver/README.md)
-* [Configure logs collection in EDOT](https://www.elastic.co/docs/reference/edot-collector/config/configure-logs-collection)
+* [Configure logs collection in EDOT](opentelemetry://reference/edot-collector/config/configure-logs-collection.md)
+* [Helm chart default values](https://github.com/elastic/elastic-agent/blob/v9.1.4/deploy/helm/edot-collector/kube-stack/values.yaml)
