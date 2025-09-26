@@ -251,7 +251,7 @@ func TestManualRollback(t *testing.T) {
 				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstall456).Return(newerWatcherExecutable)
 				watcherHelper.EXPECT().
 					InvokeWatcher(mock.Anything, newerWatcherExecutable, watcherSubcommand, "--rollback", "data/elastic-agent-1.2.3-oldver").
-					Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for rollbacksies"}}, nil)
+					Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for rollbacksies"}, Process: &os.Process{Pid: 123}}, nil)
 			},
 			artifactSettings: artifact.DefaultConfig(),
 			upgradeSettings:  configuration.DefaultUpgradeConfig(),
