@@ -537,6 +537,7 @@ func (Test) FIPSOnlyUnit(ctx context.Context) error {
 	params := devtools.DefaultGoTestUnitArgs()
 	params.Env["FIPS"] = "true"
 	params.Env["GODEBUG"] = "fips140=only"
+	params.Tags = append(params.Tags, "requirefips")
 	return devtools.GoTest(ctx, params)
 }
 
