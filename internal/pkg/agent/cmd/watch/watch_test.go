@@ -370,7 +370,7 @@ func Test_takedownWatcher(t *testing.T) {
 
 	const applockerFileName = "mocklocker.lock"
 
-	testExecutablePath := filepath.Join("..", "application", "filelock", "testlocker", "testlocker")
+	testExecutablePath := filepath.Join("..", "..", "application", "filelock", "testlocker", "testlocker")
 	if runtime.GOOS == "windows" {
 		testExecutablePath += ".exe"
 	}
