@@ -1,17 +1,10 @@
 {
-<<<<<<< HEAD
+
   "version": "8.18.7-SNAPSHOT",
   "build_id": "8.18.7-24d5b696",
   "manifest_url": "https://snapshots.elastic.co/8.18.7-24d5b696/manifest-8.18.7-SNAPSHOT.json",
   "summary_url": "https://snapshots.elastic.co/8.18.7-24d5b696/summary-8.18.7-SNAPSHOT.html",
   "core_version": "8.18.7",
   "stack_build_id": "8.18.7-24d5b696-SNAPSHOT"
-=======
-  "version": "9.2.0-SNAPSHOT",
-  "build_id": "9.2.0-b72ad686",
-  "manifest_url": "https://snapshots.elastic.co/9.2.0-b72ad686/manifest-9.2.0-SNAPSHOT.json",
-  "summary_url": "https://snapshots.elastic.co/9.2.0-b72ad686/summary-9.2.0-SNAPSHOT.html",
-  "core_version": "9.2.0",
-  "stack_build_id": "9.2.0-b72ad686-SNAPSHOT"
->>>>>>> 5f0f2fd3b (Update journald tests now that Filebeat supports watching folders (#10131))
+
 }
