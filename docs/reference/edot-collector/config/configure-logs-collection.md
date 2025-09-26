@@ -1,5 +1,5 @@
 ---
-navigation_title: Configure Logs Collection
+navigation_title: Logs collection
 description: Learn how to configure and customize logs collection through the Elastic Distribution of OpenTelemetry Collector. 
 applies_to:
   stack:
