@@ -19,4 +19,5 @@ inputs:
     streams:
       - id: journald-input-id
         paths:
-          - "/opt/journald/*/*"
+          - "/opt/journald/"
+        merge: true
