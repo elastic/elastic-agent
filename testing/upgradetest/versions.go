@@ -42,6 +42,15 @@ var (
 	// Version_8_14_0_SNAPSHOT is the minimum version for proper unprivileged execution on all platforms
 	Version_9_0_0_SNAPSHOT = version.NewParsedSemVer(9, 0, 0, "SNAPSHOT", "")
 
+	// Version 8_19_0_SNAPSHOT is a FIPS-capable artifact.
+	Version_8_19_0_SNAPSHOT = version.NewParsedSemVer(8, 19, 0, "SNAPSHOT", "")
+
+	// Version_9_1_0_SNAPSHOT is a FIPS-capable artifact.
+	Version_9_1_0_SNAPSHOT = version.NewParsedSemVer(9, 1, 0, "SNAPSHOT", "")
+
+	// Version_9_2_0_SNAPSHOT is the minimum version for manual rollback and rollback reason
+	Version_9_2_0_SNAPSHOT = version.NewParsedSemVer(9, 2, 0, "SNAPSHOT", "")
+
 	// ErrNoSnapshot is returned when a requested snapshot is not on the version list.
 	ErrNoSnapshot = errors.New("failed to find a snapshot on the version list")
 	// ErrNoPreviousMinor is returned when a requested previous minor is not on the version list.
@@ -78,9 +87,7 @@ type AgentVersions struct {
 	TestVersions []string `yaml:"testVersions"`
 }
 
-var (
-	agentVersions *AgentVersions
-)
+var agentVersions *AgentVersions
 
 func init() {
 	AgentVersionsFilename = filepath.Join("testing", "integration", "testdata", ".upgrade-test-agent-versions.yml")
@@ -199,6 +206,10 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 		case !version.Less(*parsedUpgradeToVersion):
 			continue
 
+		// never test upgrades if only the patch version changed
+		case version.Major() == parsedUpgradeToVersion.Major() && version.Minor() == parsedUpgradeToVersion.Minor():
+			continue
+
 		case recentSnapshotsToFind > 0 && version.IsSnapshot():
 			upgradableVersions = append(upgradableVersions, version.String())
 			recentSnapshotsToFind--
@@ -237,26 +248,32 @@ func findRequiredVersions(sortedParsedVersions []*version.ParsedSemVer, reqs Ver
 	return upgradableVersions, nil
 }
 
-// PreviousMinor returns the previous minor version available for upgrade.
 func PreviousMinor() (*version.ParsedSemVer, error) {
-	versions, err := GetUpgradableVersions()
+	currentVersion := define.Version()
+	upgradeableVersions, err := GetUpgradableVersions()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get upgradable versions: %w", err)
-	}
-	current, err := version.ParseVersion(define.Version())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse the current version %s: %w", define.Version(), err)
+		return nil, err
 	}
 
-	// Special case: if we are in the first release of a new major (so vX.0.0), we should
+	return previousMinor(currentVersion, upgradeableVersions)
+}
+
+// previousMinor returns the previous minor version available for upgrade from the given list of upgradeable versions.
+func previousMinor(currentVersion string, upgradeableVersions []*version.ParsedSemVer) (*version.ParsedSemVer, error) {
+	current, err := version.ParseVersion(currentVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse the current version %s: %w", currentVersion, err)
+	}
+
+	// Special case: if we are in the first release (or a patch release of the first release) of a new major (so vX.0.x), we should
 	// return the latest release from the previous major.
-	if current.Minor() == 0 && current.Patch() == 0 {
+	if current.Minor() == 0 {
 		// Since the current version is the first release of a new major (vX.0.0), there
 		// will be no minor versions in the versions list from the same major (vX). The list
 		// will only contain minors from the previous major (vX-1). Further, since the
 		// version list is sorted in descending order (newer versions first), we can return the
 		// first item from the list as it will be the newest minor of the previous major.
-		for _, v := range versions {
+		for _, v := range upgradeableVersions {
 			if v.Less(*current) {
 				return v, nil
 			}
@@ -265,7 +282,7 @@ func PreviousMinor() (*version.ParsedSemVer, error) {
 		return nil, ErrNoPreviousMinor
 	}
 
-	for _, v := range versions {
+	for _, v := range upgradeableVersions {
 		if v.Prerelease() != "" || v.BuildMetadata() != "" {
 			continue
 		}
@@ -273,6 +290,7 @@ func PreviousMinor() (*version.ParsedSemVer, error) {
 			return v, nil
 		}
 	}
+
 	return nil, ErrNoPreviousMinor
 }
 

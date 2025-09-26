@@ -1,26 +1,18 @@
 function ess_up {
   param (
       [string]$StackVersion,
+      [string]$StackBuildId = "",
       [string]$EssRegion = "gcp-us-west2"
   )
 
   Write-Output "~~~ Starting ESS Stack"
-  
+
   $Workspace = & git rev-parse --show-toplevel
   $TfDir = Join-Path -Path $Workspace -ChildPath "test_infra/ess/"
 
   if (-not $StackVersion) {
       Write-Error "Error: Specify stack version: ess_up [stack_version]"
       return 1
-  }
-
-  $Env:EC_API_KEY = Retry-Command -ScriptBlock {  
-    vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod
-  }
-
-  if (-not $Env:EC_API_KEY) {
-      Write-Error "Error: Failed to get EC API key from vault"
-      exit 1
   }
 
   $BuildkiteBuildCreator = if ($Env:BUILDKITE_BUILD_CREATOR) { $Env:BUILDKITE_BUILD_CREATOR } else { get_git_user_email }
@@ -31,6 +23,7 @@ function ess_up {
   & terraform init
   & terraform apply -auto-approve `
       -var="stack_version=$StackVersion" `
+      -var="stack_build_id=$StackBuildId" `
       -var="ess_region=$EssRegion" `
       -var="creator=$BuildkiteBuildCreator" `
       -var="buildkite_id=$BuildkiteBuildNumber" `
@@ -42,10 +35,14 @@ function ess_up {
   $Env:KIBANA_HOST = & terraform output -raw kibana_endpoint
   $Env:KIBANA_USERNAME = $Env:ELASTICSEARCH_USERNAME
   $Env:KIBANA_PASSWORD = $Env:ELASTICSEARCH_PASSWORD
+  $Env:INTEGRATIONS_SERVER_HOST = & terraform output -raw integrations_server_endpoint
   Pop-Location
 }
 
-function ess_down {  
+function ess_down {
+  param (
+      [string]$EssRegion = "gcp-us-west2"
+  )
   $Workspace = & git rev-parse --show-toplevel
   $TfDir = Join-Path -Path $Workspace -ChildPath "test_infra/ess/"
   $stateFilePath = Join-Path -Path $TfDir -ChildPath "terraform.tfstate"
@@ -55,13 +52,11 @@ function ess_down {
     return 0
   }
   Write-Output "~~~ Tearing down the ESS Stack(created for this step)"
-  try {  
-    $Env:EC_API_KEY = Retry-Command -ScriptBlock {  
-      vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod
-    }
+  try {
     Push-Location -Path $TfDir
     & terraform init
-    & terraform destroy -auto-approve
+    & terraform destroy -auto-approve `
+      -var="ess_region=$EssRegion"
     Pop-Location
   } catch {
     Write-Output "Error: Failed to destroy ESS stack(it will be auto-deleted later): $_"
@@ -92,11 +87,11 @@ function Retry-Command {
   $lastError = $null
 
   for ($attempt = 1; $attempt -le $MaxRetries; $attempt++) {
-      try {          
-        $result = & $ScriptBlock        
+      try {
+        $result = & $ScriptBlock
         return $result
       }
-      catch {          
+      catch {
           $lastError = $_
           Write-Warning "Attempt $attempt failed: $($_.Exception.Message)"
           Write-Warning "Retrying in $DelaySeconds seconds..."
@@ -110,14 +105,17 @@ function Retry-Command {
 
 function Get-Ess-Stack {
   param (
-      [string]$StackVersion
+      [string]$StackVersion,
+      [string]$StackBuildId = ""
   )
-  
+
   if ($Env:BUILDKITE_RETRY_COUNT -gt 0) {
-      Write-Output "The step is retried, starting the ESS stack again"        
-      ess_up $StackVersion
+      Write-Output "The step is retried, starting the ESS stack again"
+      ess_up $StackVersion $StackBuildId
       Write-Output "ESS stack is up. ES_HOST: $Env:ELASTICSEARCH_HOST"
   } else {
+      # TODO: Use a metadata prefix for "fips." if we ever need to test Windows artifacts for FIPS.
+
       # For the first run, we retrieve ESS stack metadata
       Write-Output "~~~ Receiving ESS stack metadata"
       $Env:ELASTICSEARCH_HOST = & buildkite-agent meta-data get "es.host"

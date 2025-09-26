@@ -1,0 +1,52 @@
+name: bump-otel-version
+
+on:
+  workflow_dispatch:
+  schedule:
+  - cron: '24 5 * * 1-5'
+
+permissions:
+  contents: read
+
+env:
+  JOB_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+jobs:
+  update-otel:
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        branch: ["main", "8.19"]
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version-file: 'go.mod'
+
+    - name: Install mage
+      uses: magefile/mage-action@6f50bbb8ea47d56e62dee92392788acbc8192d0b # v3.1.0
+      with:
+        version: v1.14.0
+        install-only: true
+
+    - name: Run Updatecli in Apply mode
+      uses: elastic/oblt-actions/updatecli/run@v1
+      with:
+        command: apply --config .ci/updatecli/update-otel.yml --values .ci/updatecli/values.d/scm.yml
+        version-file: .updatecli-version
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        BRANCH_NAME: ${{ matrix.branch }}
+
+    - if: ${{ failure()  }}
+      uses: elastic/oblt-actions/slack/send@v1
+      with:
+        bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
+        channel-id: "#ingest-notifications"
+        message: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@agent-team` please look what's going on <${{ env.JOB_URL }}|here>"

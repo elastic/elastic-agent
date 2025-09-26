@@ -8,7 +8,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"encoding/hex"
 	"syscall"
 )
 
@@ -46,15 +45,6 @@ func NewKey(kt AESKeyType) ([]byte, error) {
 	return key, nil
 }
 
-// NewKeyHexString generates new AES key as hex encoded string
-func NewKeyHexString(kt AESKeyType) (string, error) {
-	key, err := NewKey(kt)
-	if err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(key), nil
-}
-
 // Encrypt encrypts the data with AES-GCM
 func Encrypt(key, data []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
@@ -78,19 +68,6 @@ func Encrypt(key, data []byte) ([]byte, error) {
 	return ciphertext, nil
 }
 
-// EncryptHex encrypts with hex string key, producing hex encoded result
-func EncryptHex(key string, data []byte) (string, error) {
-	bkey, err := hex.DecodeString(key)
-	if err != nil {
-		return "", err
-	}
-	enc, err := Encrypt(bkey, data)
-	if err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(enc), nil
-}
-
 // Decrypt decrypts the data with AES-GCM
 func Decrypt(key, data []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
@@ -110,18 +87,4 @@ func Decrypt(key, data []byte) ([]byte, error) {
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
 
 	return aesGCM.Open(nil, nonce, ciphertext, nil)
-}
-
-// DecryptHex decrypts with hex string key and data
-func DecryptHex(key string, data string) ([]byte, error) {
-	bkey, err := hex.DecodeString(key)
-	if err != nil {
-		return nil, err
-	}
-
-	bdata, err := hex.DecodeString(data)
-	if err != nil {
-		return nil, err
-	}
-	return Decrypt(bkey, bdata)
 }

@@ -1,0 +1,71 @@
+version: 8.17.5
+entries:
+    - kind: bug-fix
+      summary: Change how Windows process handles are obtained when assigning sub-processes to Job objects.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/owner/repo/6825
+      issue: []
+      timestamp: 1739375044
+      file:
+        name: 1739375044-windows-change-how-process-handles-are-obtained-when-assigning-sub-processes-to-Job-objects..yaml
+        checksum: 0df081de5d273cb93b5a55a6ded1d28b3cea6ff5
+    - kind: bug-fix
+      summary: Rework Windows user password generation to meet security policy constraints
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7507
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/7506
+      timestamp: 1742562383
+      file:
+        name: 1742562383-Rework-Windows-user-password.yaml
+        checksum: 7525b7370fd7ea4cb043c9ccf26e77871bc56247
+    - kind: other
+      summary: Upgrade NodeJS to LTS 18.20.7
+      description: ""
+      component: heartbeat
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7583
+      issue: []
+      timestamp: 1743004444
+      file:
+        name: 1743004444-synthetics-upgrade-node-18.20.7.yaml
+        checksum: b4577aaf8c4ce12d8d5ad9b0a572775b9f62bce4
+    - kind: bug-fix
+      summary: Wait for Windows service to be fully removed before re-installing during agent switch
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7589
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6970
+      timestamp: 1743062612
+      file:
+        name: 1743062612-Wait-for-windows-server.yaml
+        checksum: 9c76b171019e884a3c975447def0f16e2e65f34a
+    - kind: bug-fix
+      summary: Fix panic during shutdown in fleetgateway
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7629
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/7309
+      timestamp: 1743421027
+      file:
+        name: 1743421027-Fix-panic-during-shutdown-in-fleetgateway.yaml
+        checksum: ab23c443146e41a81ebb165278dfcee5fabfbc36
+    - kind: enhancement
+      summary: Ensure consistent input order in self-monitoring configuration
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/7724
+      issue: []
+      timestamp: 1744022861
+      file:
+        name: 1744022861-consistent-monitoring-config.yaml
+        checksum: bb8a6597b84a50b3b60bf99844f904e94cc50969

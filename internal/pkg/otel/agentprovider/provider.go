@@ -13,7 +13,8 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 )
 
-const schemeName = "elasticagent"
+// build time guard that BufferProvider implements confmap.Provider
+var _ confmap.Provider = (*Provider)(nil)
 
 // Provider is a fixed provider that has a factory but only returns the same provider.
 type Provider struct {
@@ -29,7 +30,7 @@ type Provider struct {
 
 // NewProvider creates a `agentprovider.Provider`.
 func NewProvider(cfg *confmap.Conf) *Provider {
-	uri := fmt.Sprintf("%s:%s", schemeName, uuid.Must(uuid.NewV4()).String())
+	uri := fmt.Sprintf("%s:%s", AgentConfigProviderSchemeName, uuid.Must(uuid.NewV4()).String())
 	return &Provider{
 		uri:     uri,
 		cfg:     cfg,
@@ -61,7 +62,7 @@ func (p *Provider) Update(cfg *confmap.Conf) {
 // Retrieve returns the latest configuration.
 func (p *Provider) Retrieve(ctx context.Context, uri string, watcher confmap.WatcherFunc) (*confmap.Retrieved, error) {
 	if uri != p.uri {
-		return nil, fmt.Errorf("%q uri doesn't equal defined %q provider", uri, schemeName)
+		return nil, fmt.Errorf("%q uri doesn't equal defined %q provider", uri, AgentConfigProviderSchemeName)
 	}
 
 	// get latest cfg at time of call
@@ -87,7 +88,7 @@ func (p *Provider) Retrieve(ctx context.Context, uri string, watcher confmap.Wat
 
 // Scheme is the scheme for this provider.
 func (p *Provider) Scheme() string {
-	return schemeName
+	return AgentConfigProviderSchemeName
 }
 
 // Shutdown called by collect when stopping.

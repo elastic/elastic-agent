@@ -23,6 +23,7 @@ processors:
         key: key1
         value: value1
   batch:
+  cumulativetodelta:
   elasticinframetrics:
   filter:
   resource:
@@ -37,6 +38,7 @@ processors:
     limit_mib: 4000
     spike_limit_mib: 800
   elastictrace:
+  tail_sampling:
 
 receivers:
   filelog:
@@ -55,6 +57,7 @@ receivers:
     protocols:
       grpc:
   zipkin:
+  docker_stats:
 
 connectors:
   spanmetrics:
@@ -113,6 +116,7 @@ service:
       processors:
         - attributes
         - batch
+        - cumulativetodelta
         - elasticinframetrics
         - filter
         - resource

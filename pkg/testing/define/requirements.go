@@ -121,6 +121,10 @@ type Requirements struct {
 	// Sudo defines that this test must run under superuser permissions. On Mac and Linux the
 	// test gets executed under sudo and on Windows it gets run under Administrator.
 	Sudo bool `json:"sudo"`
+
+	// FIPS defines that this test must be run in an environment that is configured for FIPS,
+	// e.g. a Linux VM with OpenSSL configured with the FIPS provider.
+	FIPS bool `json:"fips"`
 }
 
 // Validate returns an error if not valid.

@@ -17,6 +17,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cenkalti/backoff/v5"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	semver "github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -26,6 +29,7 @@ type httpDoer interface {
 
 type artifactFetcher struct {
 	snapshotOnly bool
+	fipsOnly     bool
 
 	doer httpDoer
 }
@@ -36,6 +40,13 @@ type artifactFetcherOpt func(f *artifactFetcher)
 func WithArtifactSnapshotOnly() artifactFetcherOpt {
 	return func(f *artifactFetcher) {
 		f.snapshotOnly = true
+	}
+}
+
+// WithArtifactFIPSOnly sets the ArtifactFetcher to only pull a FIPS-compliant build.
+func WithArtifactFIPSOnly() artifactFetcherOpt {
+	return func(f *artifactFetcher) {
+		f.fipsOnly = true
 	}
 }
 
@@ -60,6 +71,7 @@ func (f *artifactFetcher) Name() string {
 
 // Fetch fetches the Elastic Agent and places the resulting binary at the path.
 func (f *artifactFetcher) Fetch(ctx context.Context, operatingSystem string, architecture string, version string, packageFormat string) (FetcherResult, error) {
+	prefix := GetPackagePrefix(f.fipsOnly)
 	suffix, err := GetPackageSuffix(operatingSystem, architecture, packageFormat)
 	if err != nil {
 		return nil, err
@@ -84,7 +96,7 @@ func (f *artifactFetcher) Fetch(ctx context.Context, operatingSystem string, arc
 	}
 
 	// this remote path cannot have the build metadata in it
-	srcPath := fmt.Sprintf("elastic-agent-%s-%s", ver.VersionWithPrerelease(), suffix)
+	srcPath := fmt.Sprintf("elastic-agent-%s%s-%s", prefix, ver.VersionWithPrerelease(), suffix)
 	downloadSrc := fmt.Sprintf("%s%s", uri, srcPath)
 
 	return &artifactResult{
@@ -116,21 +128,43 @@ func (r *artifactResult) Fetch(ctx context.Context, l Logger, dir string) error 
 		return fmt.Errorf("failed to create path %q: %w", dst, err)
 	}
 
-	err = DownloadPackage(ctx, l, r.doer, r.src, dst)
+	_, err = backoff.Retry(ctx, func() (any, error) {
+		if err = r.fetch(ctx, l, dst); err != nil {
+			return nil, err
+		}
+
+		// check package hash
+		if err = download.VerifySHA512Hash(dst); err != nil {
+			l.Logf("inconsistent package hash detected: %s", err)
+			return nil, fmt.Errorf("inconsistent package hash: %w", err)
+		}
+
+		return nil, nil
+	},
+		backoff.WithMaxTries(3),
+		backoff.WithBackOff(backoff.NewConstantBackOff(3*time.Second)),
+	)
+
 	if err != nil {
+		return fmt.Errorf("failed to fetch %s: %w", r.src, err)
+	}
+
+	return nil
+}
+
+func (r *artifactResult) fetch(ctx context.Context, l Logger, dst string) error {
+	if err := DownloadPackage(ctx, l, r.doer, r.src, dst); err != nil {
 		return fmt.Errorf("failed to download %s: %w", r.src, err)
 	}
 
 	// fetch package hash
-	err = DownloadPackage(ctx, l, r.doer, r.src+extHash, dst+extHash)
-	if err != nil {
-		return fmt.Errorf("failed to download %s: %w", r.src, err)
+	if err := DownloadPackage(ctx, l, r.doer, r.src+extHash, dst+extHash); err != nil {
+		return fmt.Errorf("failed to download %s: %w", r.src+extHash, err)
 	}
 
 	// fetch package asc
-	err = DownloadPackage(ctx, l, r.doer, r.src+extAsc, dst+extAsc)
-	if err != nil {
-		return fmt.Errorf("failed to download %s: %w", r.src, err)
+	if err := DownloadPackage(ctx, l, r.doer, r.src+extAsc, dst+extAsc); err != nil {
+		return fmt.Errorf("failed to download %s: %w", r.src+extAsc, err)
 	}
 
 	return nil
@@ -144,7 +178,12 @@ func findURI(ctx context.Context, doer httpDoer, version *semver.ParsedSemVer) (
 			return fmt.Sprintf("https://snapshots.elastic.co/%s-%s/downloads/beats/elastic-agent/", version.CoreVersion(), version.BuildMetadata()), nil
 		}
 
-		buildID, err := findLatestSnapshot(ctx, doer, version.CoreVersion())
+		buildID, err := backoff.Retry(ctx, func() (any, error) {
+			return findLatestSnapshot(ctx, doer, version.CoreVersion())
+		},
+			backoff.WithMaxTries(3),
+			backoff.WithBackOff(backoff.NewConstantBackOff(3*time.Second)),
+		)
 		if err != nil {
 			return "", fmt.Errorf("failed to find snapshot information for version %q: %w", version, err)
 		}

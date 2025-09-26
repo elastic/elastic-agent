@@ -5,6 +5,7 @@
 package monitoring
 
 import (
+	"fmt"
 	"net/http"
 	_ "net/http/pprof" //nolint:gosec // this is only conditionally exposed
 	"net/url"
@@ -17,6 +18,8 @@ import (
 	"go.elastic.co/apm/module/apmgorilla/v2"
 	"go.elastic.co/apm/v2"
 
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
+
 	"github.com/elastic/elastic-agent-libs/api"
 	"github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/reload"
@@ -25,30 +28,12 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-// New creates a new server exposing metrics and process information.
+// NewServer creates a new server exposing metrics and process information.
 func NewServer(
 	log *logger.Logger,
-	endpointConfig api.Config,
 	ns func(string) *monitoring.Namespace,
 	tracer *apm.Tracer,
 	coord CoordinatorState,
-	operatingSystem string,
-	mcfg *monitoringCfg.MonitoringConfig,
-) (*reload.ServerReloader, error) {
-	if err := createAgentMonitoringDrop(endpointConfig.Host); err != nil {
-		// log but ignore
-		log.Warnf("failed to create monitoring drop: %v", err)
-	}
-
-	return exposeMetricsEndpoint(log, ns, tracer, coord, operatingSystem, mcfg)
-}
-
-func exposeMetricsEndpoint(
-	log *logger.Logger,
-	ns func(string) *monitoring.Namespace,
-	tracer *apm.Tracer,
-	coord CoordinatorState,
-	operatingSystem string,
 	mcfg *monitoringCfg.MonitoringConfig,
 ) (*reload.ServerReloader, error) {
 
@@ -66,15 +51,15 @@ func exposeMetricsEndpoint(
 
 		statsHandler := statsHandler(statNs)
 		r.Handle("/stats", createHandler(statsHandler))
+		r.Handle("/readiness", createHandler(readinessHandler(coord)))
+		r.Handle("/liveness", createHandler(livenessHandler(coord)))
 
 		if isProcessStatsEnabled(cfg) {
 			log.Infof("process monitoring is enabled, creating monitoring endpoints")
 			r.Handle("/processes", createHandler(processesHandler(coord)))
-			r.Handle("/processes/{componentID}", createHandler(processHandler(coord, statsHandler, operatingSystem)))
-			r.Handle("/processes/{componentID}/", createHandler(processHandler(coord, statsHandler, operatingSystem)))
-			r.Handle("/processes/{componentID}/{metricsPath}", createHandler(processHandler(coord, statsHandler, operatingSystem)))
-
-			r.Handle("/liveness", createHandler(livenessHandler(coord)))
+			r.Handle("/processes/{componentID}", createHandler(processHandler(coord, statsHandler)))
+			r.Handle("/processes/{componentID}/", createHandler(processHandler(coord, statsHandler)))
+			r.Handle("/processes/{componentID}/{metricsPath}", createHandler(processHandler(coord, statsHandler)))
 		}
 
 		if isPprofEnabled(cfg) {
@@ -91,9 +76,13 @@ func exposeMetricsEndpoint(
 
 		srvCfg := api.DefaultConfig()
 		srvCfg.Enabled = cfg.Enabled
-		srvCfg.Host = AgentMonitoringEndpoint(operatingSystem, cfg)
+		srvCfg.Host = componentmonitoring.AgentMonitoringEndpoint(cfg)
 		srvCfg.Port = cfg.HTTP.Port
 		log.Infof("creating monitoring API with cfg %#v", srvCfg)
+		if err := createAgentMonitoringDrop(srvCfg.Host); err != nil {
+			// if it cannot create the path for the socket, then we cannot start the server
+			return nil, fmt.Errorf("failed to create monitoring socket directory: %w", err)
+		}
 		apiServer, err := api.NewFromConfig(log, mux, srvCfg)
 		if err != nil {
 			return nil, errors.New(err, "failed to create api server")

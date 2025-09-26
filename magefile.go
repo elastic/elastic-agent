@@ -8,6 +8,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/sha512"
 	"encoding/json"
@@ -26,6 +27,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -49,7 +51,6 @@ import (
 	tcommon "github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
-	"github.com/elastic/elastic-agent/pkg/testing/helm"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/kind"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
@@ -59,6 +60,7 @@ import (
 	pv "github.com/elastic/elastic-agent/pkg/testing/tools/product_versions"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/snapshots"
 	"github.com/elastic/elastic-agent/pkg/version"
+	"github.com/elastic/elastic-agent/testing/integration/k8s"
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 	bversion "github.com/elastic/elastic-agent/version"
 
@@ -66,6 +68,8 @@ import (
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
 	// mage:import
 	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/integtest/notests"
+	// mage:import update
+	_ "github.com/elastic/elastic-agent/dev-tools/mage/target/update"
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
 
@@ -78,6 +82,10 @@ import (
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/cli"
+	"helm.sh/helm/v3/pkg/downloader"
+	"helm.sh/helm/v3/pkg/getter"
+	"helm.sh/helm/v3/pkg/registry"
+	"helm.sh/helm/v3/pkg/repo"
 )
 
 const (
@@ -126,7 +134,7 @@ var (
 )
 
 func init() {
-	common.RegisterCheckDeps(Update, Check.All)
+	common.RegisterCheckDeps(Update, Check.All, Otel.Readme)
 	test.RegisterDeps(UnitTest)
 	devtools.BeatLicense = "Elastic License 2.0"
 	devtools.BeatDescription = "Elastic Agent - single, unified way to add monitoring for logs, metrics, and other types of data to a host."
@@ -254,31 +262,7 @@ func (Dev) RegenerateMocks() error {
 		return fmt.Errorf("generating mocks: %w", err)
 	}
 
-	// change CWD
-	workingDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("retrieving CWD: %w", err)
-	}
-	// restore the working directory when exiting the function
-	defer func() {
-		err := os.Chdir(workingDir)
-		if err != nil {
-			panic(fmt.Errorf("failed to restore working dir %q: %w", workingDir, err))
-		}
-	}()
-
-	mPath, err := mocksPath()
-	if err != nil {
-		return fmt.Errorf("retrieving mocks path: %w", err)
-	}
-
-	err = os.Chdir(mPath)
-	if err != nil {
-		return fmt.Errorf("changing current directory to %q: %w", mPath, err)
-	}
-
-	mg.Deps(devtools.AddLicenseHeaders)
-	mg.Deps(devtools.GoImports)
+	mg.Deps(devtools.Format)
 	return nil
 }
 
@@ -339,7 +323,8 @@ func (Build) WindowsArchiveRootBinary() error {
 	if devtools.FIPSBuild {
 		// there is no actual FIPS relevance for this particular binary
 		// but better safe than sorry
-		args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips")
+		args.ExtraFlags = append(args.ExtraFlags, "-tags=requirefips,ms_tls13kdf")
+		args.Env["MS_GOTOOLCHAIN_TELEMETRY_ENABLED"] = "0"
 		args.CGO = true
 	}
 
@@ -369,11 +354,6 @@ func GolangCrossBuild() error {
 	// return GolangCrossBuildOSS()
 
 	return nil
-}
-
-// BuildGoDaemon builds the go-daemon binary (use crossBuildGoDaemon).
-func BuildGoDaemon() error {
-	return devtools.BuildGoDaemon()
 }
 
 // BinaryOSS build the fleet artifact.
@@ -433,6 +413,8 @@ func getTestBinariesPath() ([]string, error) {
 		filepath.Join(wd, "pkg", "component", "fake", "component"),
 		filepath.Join(wd, "internal", "pkg", "agent", "install", "testblocking"),
 		filepath.Join(wd, "pkg", "core", "process", "testsignal"),
+		filepath.Join(wd, "internal", "pkg", "otel", "manager", "testing"),
+		filepath.Join(wd, "internal", "pkg", "agent", "application", "filelock", "testlocker"),
 	}
 	return testBinaryPkgs, nil
 }
@@ -573,6 +555,9 @@ func Package(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed downloading manifest: %w", err)
 		}
+		// we need that dependency to essentially download
+		// the components from the given manifest
+		mg.Deps(DownloadManifest)
 	}
 
 	var dependenciesVersion string
@@ -637,7 +622,6 @@ func ExtractComponentsFromSelectedPkgSpecs(pkgSpecs []devtools.OSPackageArgs) ([
 			}
 
 			for _, component := range pkg.Spec.Components {
-
 				if existingComp, ok := mappedDependencies[component.PackageName]; ok {
 					// sanity check: verify that for the same packageName we have the same component spec
 					if !existingComp.Equal(component) {
@@ -664,7 +648,6 @@ func ExtractComponentsFromSelectedPkgSpecs(pkgSpecs []devtools.OSPackageArgs) ([
 }
 
 func isSelected(pkg devtools.OSPackageArgs) bool {
-
 	// Checks if this package is compatible with the FIPS settings
 	if pkg.Spec.FIPS != devtools.FIPSBuild {
 		log.Printf("Skipping %s/%s package type because FIPS flag doesn't match [pkg=%v, build=%v]", pkg.Spec.Name, pkg.OS, pkg.Spec.FIPS, devtools.FIPSBuild)
@@ -804,7 +787,7 @@ func commitID() string {
 
 // Update is an alias for executing control protocol, configs, and specs.
 func Update() {
-	mg.Deps(Config, BuildPGP, BuildFleetCfg, Otel.Readme)
+	mg.Deps(Config, BuildPGP, BuildFleetCfg)
 }
 
 func EnsureCrossBuildOutputDir() error {
@@ -821,19 +804,13 @@ func CrossBuild() error {
 	return devtools.CrossBuild()
 }
 
-// CrossBuildGoDaemon cross-builds the go-daemon binary using Docker.
-func CrossBuildGoDaemon() error {
-	mg.Deps(EnsureCrossBuildOutputDir)
-	return devtools.CrossBuildGoDaemon()
-}
-
 // PackageAgentCore cross-builds and packages distribution artifacts containing
 // only elastic-agent binaries with no extra files or dependencies.
 func PackageAgentCore() {
 	start := time.Now()
 	defer func() { fmt.Println("packageAgentCore ran for", time.Since(start)) }()
 
-	mg.Deps(CrossBuild, CrossBuildGoDaemon)
+	mg.Deps(CrossBuild)
 
 	devtools.UseElasticAgentCorePackaging()
 
@@ -982,51 +959,90 @@ func (Cloud) Image(ctx context.Context) {
 	Package(ctx)
 }
 
+// Load loads an artifact as a docker image.
+// Looks in build/distributions for an elastic-agent-cloud*.docker.tar.gz artifact and imports it as docker.elastic.co/beats-ci/elastic-agent-cloud:$VERSION
+// DOCKER_IMPORT_SOURCE - override source for import
+func (Cloud) Load() error {
+	agentVersion, err := mage.AgentPackageVersion()
+	if err != nil {
+		return fmt.Errorf("failed to get agent package version: %w", err)
+	}
+
+	// Need to get the FIPS env var flag to see if we are using the normal source cloud image name, or the FIPS variant
+	fips := os.Getenv(fipsEnv)
+	fipsVal, err := strconv.ParseBool(fips)
+	if err != nil {
+		fipsVal = false
+	}
+
+	devtools.FIPSBuild = fipsVal
+
+	source := "build/distributions/elastic-agent-cloud-" + agentVersion + "-SNAPSHOT-linux-" + runtime.GOARCH + ".docker.tar.gz"
+	if fipsVal {
+		source = "build/distributions/elastic-agent-cloud-fips-" + agentVersion + "-SNAPSHOT-linux-" + runtime.GOARCH + ".docker.tar.gz"
+	}
+	if envSource, ok := os.LookupEnv("DOCKER_IMPORT_SOURCE"); ok && envSource != "" {
+		source = envSource
+	}
+
+	return sh.RunV("docker", "image", "load", "-i", source)
+}
+
 // Push builds a cloud image tags it correctly and pushes to remote image repo.
 // Previous login to elastic registry is required!
 func (Cloud) Push() error {
-	snapshot := os.Getenv(snapshotEnv)
-	defer os.Setenv(snapshotEnv, snapshot)
-
-	os.Setenv(snapshotEnv, "true")
-
-	version := getVersion()
-	var tag string
-	if envTag, isPresent := os.LookupEnv("CUSTOM_IMAGE_TAG"); isPresent && len(envTag) > 0 {
-		tag = envTag
-	} else {
-		commit := dockerCommitHash()
-		time := time.Now().Unix()
-
-		tag = fmt.Sprintf("%s-%s-%d", version, commit, time)
+	agentVersion, err := mage.AgentPackageVersion()
+	if err != nil {
+		return fmt.Errorf("failed to get agent package version: %w", err)
 	}
 
-	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s", version)
+	// Need to get the FIPS env var flag to see if we are using the normal source cloud image name, or the FIPS variant
+	fips := os.Getenv(fipsEnv)
+	defer os.Setenv(fipsEnv, fips)
+	fipsVal, err := strconv.ParseBool(fips)
+	if err != nil {
+		fipsVal = false
+	}
+	if err := os.Setenv(fipsEnv, strconv.FormatBool(fipsVal)); err != nil {
+		return fmt.Errorf("failed to set fips env var: %w", err)
+	}
+	devtools.FIPSBuild = fipsVal
+
+	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s-SNAPSHOT", agentVersion)
+	if fipsVal {
+		sourceCloudImageName = fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud-fips:%s-SNAPSHOT", agentVersion)
+	}
+	var targetTag string
+	if envTag, isPresent := os.LookupEnv("CUSTOM_IMAGE_TAG"); isPresent && len(envTag) > 0 {
+		targetTag = envTag
+	} else {
+		targetTag = fmt.Sprintf("%s-%s-%d", agentVersion, dockerCommitHash(), time.Now().Unix())
+	}
 	var targetCloudImageName string
 	if customImage, isPresent := os.LookupEnv("CI_ELASTIC_AGENT_DOCKER_IMAGE"); isPresent && len(customImage) > 0 {
-		targetCloudImageName = fmt.Sprintf("%s:%s", customImage, tag)
+		targetCloudImageName = fmt.Sprintf("%s:%s", customImage, targetTag)
 	} else {
-		targetCloudImageName = fmt.Sprintf(cloudImageTmpl, tag)
+		targetCloudImageName = fmt.Sprintf(cloudImageTmpl, targetTag)
 	}
 
 	fmt.Printf(">> Setting a docker image tag to %s\n", targetCloudImageName)
-	err := sh.RunV("docker", "tag", sourceCloudImageName, targetCloudImageName)
+	err = sh.RunV("docker", "tag", sourceCloudImageName, targetCloudImageName)
 	if err != nil {
-		return fmt.Errorf("Failed setting a docker image tag: %w", err)
+		return fmt.Errorf("failed setting a docker image tag: %w", err)
 	}
 	fmt.Println(">> Docker image tag updated successfully")
 
 	fmt.Println(">> Pushing a docker image to remote registry")
 	err = sh.RunV("docker", "image", "push", targetCloudImageName)
 	if err != nil {
-		return fmt.Errorf("Failed pushing docker image: %w", err)
+		return fmt.Errorf("failed pushing docker image: %w", err)
 	}
 	fmt.Printf(">> Docker image pushed to remote registry successfully: %s\n", targetCloudImageName)
 
 	return nil
 }
 
-// Creates a new devmachine that will be auto-deleted in 6 hours.
+// Create a new devmachine that will be auto-deleted in 6 hours.
 // Example: MACHINE_IMAGE="family/platform-ingest-elastic-agent-ubuntu-2204" ZONE="us-central1-a" mage devmachine:create "pavel-dev-machine"
 // ZONE defaults to 'us-central1-a', MACHINE_IMAGE defaults to 'family/platform-ingest-elastic-agent-ubuntu-2204'
 func (Devmachine) Create(instanceName string) error {
@@ -1160,12 +1176,16 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 		log.Printf("dependencies extracted from package specs: %v", dependencies)
 	}
 
+	keepArchive := os.Getenv("KEEP_ARCHIVE") != ""
+
 	// download/copy all the necessary dependencies for packaging elastic-agent
 	archivePath, dropPath, dependencies := collectPackageDependencies(platforms, dependenciesVersion, packageTypes, dependencies)
 
 	// cleanup after build
-	defer os.RemoveAll(archivePath)
-	defer os.RemoveAll(dropPath)
+	if !keepArchive {
+		defer os.RemoveAll(archivePath)
+		defer os.RemoveAll(dropPath)
+	}
 	defer os.Unsetenv(agentDropPath)
 
 	// create flat dir
@@ -1182,7 +1202,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	// package agent
 	log.Println("--- Running post packaging ")
 	mg.Deps(Update)
-	mg.Deps(agentBinaryTarget, CrossBuildGoDaemon)
+	mg.Deps(agentBinaryTarget)
 
 	// compile the elastic-agent.exe proxy binary for the windows archive
 	if slices.Contains(platforms, "windows/amd64") {
@@ -1377,7 +1397,6 @@ func removePythonWheels(matches []string, version string, dependencies []packagi
 // flattenDependencies will extract all the required packages collected in archivePath and dropPath in flatPath and
 // regenerate checksums
 func flattenDependencies(platforms []string, dependenciesVersion, archivePath, dropPath, flatPath string, manifestResponse *manifest.Build, dependencies []packaging.BinarySpec) {
-
 	for _, pltf := range platforms {
 
 		rp := manifest.PlatformPackages[pltf]
@@ -1459,7 +1478,6 @@ type branchInfo struct {
 // FetchLatestAgentCoreStagingDRA is a mage target that will retrieve the elastic-agent-core DRA artifacts and
 // place them under build/dra/buildID. It accepts one argument that has to be a release branch present in staging DRA
 func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
-
 	components, err := packaging.Components()
 	if err != nil {
 		return fmt.Errorf("retrieving defined components: %w", err)
@@ -1478,7 +1496,6 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 	elasticAgentCoreComponent := elasticAgentCoreComponents[0]
 
 	branchInformation, err := findLatestBuildForBranch(ctx, baseURLForSnapshotDRA, branch)
-
 	if err != nil {
 		return fmt.Errorf("getting latest build for branch %q: %v", err)
 	}
@@ -1626,7 +1643,6 @@ func mapManifestPlatformToAgentPlatform(manifestPltf string) (string, bool) {
 }
 
 func downloadDRAArtifacts(ctx context.Context, build *manifest.Build, version string, draDownloadDir string, components ...packaging.BinarySpec) (map[string]manifest.Package, error) {
-
 	err := os.MkdirAll(draDownloadDir, 0o770)
 	if err != nil {
 		return nil, fmt.Errorf("creating %q directory: %w", draDownloadDir, err)
@@ -2210,7 +2226,13 @@ func (Integration) Clean() error {
 // Check checks that integration tests are using define.Require
 func (Integration) Check() error {
 	fmt.Println(">> check: Checking for define.Require in integration tests") // nolint:forbidigo // it's ok to use fmt.println in mage
-	return define.ValidateDir("testing/integration")
+	return errors.Join(
+		define.ValidateDir("testing/integration/ess"),
+		define.ValidateDir("testing/integration/serverless"),
+		define.ValidateDir("testing/integration/beats/serverless"),
+		define.ValidateDir("testing/integration/leak"),
+		define.ValidateDir("testing/integration/k8s"),
+	)
 }
 
 // Local runs only the integration tests that support local mode
@@ -2267,56 +2289,134 @@ func (Integration) Auth(ctx context.Context) error {
 
 // Test runs integration tests on remote hosts
 func (Integration) Test(ctx context.Context) error {
-	return integRunner(ctx, false, "")
+	return integRunner(ctx, "testing/integration/ess", false, "")
 }
 
 // Matrix runs integration tests on a matrix of all supported remote hosts
 func (Integration) Matrix(ctx context.Context) error {
-	return integRunner(ctx, true, "")
+	return integRunner(ctx, "testing/integration/ess", true, "")
 }
 
 // Single runs single integration test on remote host
 func (Integration) Single(ctx context.Context, testName string) error {
-	return integRunner(ctx, false, testName)
+	return integRunner(ctx, "testing/integration/ess", false, testName)
 }
 
-// Kubernetes runs kubernetes integration tests
-func (Integration) Kubernetes(ctx context.Context) error {
+// TestServerless runs the integration tests defined in testing/integration/serverless
+func (i Integration) TestServerless(ctx context.Context) error {
+	return i.testServerless(ctx, false, "")
+}
+
+// TestServerlessSingle runs a single integration test defined in testing/integration/serverless
+func (i Integration) TestServerlessSingle(ctx context.Context, testName string) error {
+	return i.testServerless(ctx, false, testName)
+}
+
+func (i Integration) testServerless(ctx context.Context, matrix bool, testName string) error {
+	err := os.Setenv("STACK_PROVISIONER", "serverless")
+	if err != nil {
+		return fmt.Errorf("error setting serverless stack env var: %w", err)
+	}
+
+	return integRunner(ctx, "testing/integration/serverless", matrix, testName)
+}
+
+// TestKubernetes runs the integration tests defined in testing/integration/k8s
+func (i Integration) TestKubernetes(ctx context.Context) error {
+	return i.testKubernetes(ctx, false, "")
+}
+
+// TestKubernetesSingle runs a single integration test defined in testing/integration/k8s
+func (i Integration) TestKubernetesSingle(ctx context.Context, testName string) error {
+	return i.testKubernetes(ctx, false, testName)
+}
+
+// TestKubernetesMatrix runs a matrix of integration tests defined in testing/integration/k8s
+func (i Integration) TestKubernetesMatrix(ctx context.Context) error {
+	return i.testKubernetes(ctx, true, "")
+}
+
+func (i Integration) testKubernetes(ctx context.Context, matrix bool, testName string) error {
+	mg.Deps(Integration.BuildKubernetesTestData)
 	// invoke integration tests
 	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
 		return err
 	}
 
-	return integRunner(ctx, false, "")
+	return integRunner(ctx, "testing/integration/k8s", matrix, testName)
 }
 
-// KubernetesMatrix runs a matrix of kubernetes integration tests
-func (Integration) KubernetesMatrix(ctx context.Context) error {
-	// invoke integration tests
-	if err := os.Setenv("TEST_GROUPS", "kubernetes"); err != nil {
-		return err
+// BuildKubernetesTestData builds the test data required to run k8s integration tests
+func (Integration) BuildKubernetesTestData(ctx context.Context) error {
+	// build the dependencies for the elastic-agent helm chart
+	mg.Deps(Helm.BuildDependencies)
+
+	// download opentelemetry-kube-stack helm chart
+	kubeStackHelmChartTargetPath := filepath.Join("testing", "integration", "k8s", k8s.KubeStackChartPath)
+	if err := os.RemoveAll(kubeStackHelmChartTargetPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove %q: %w", kubeStackHelmChartTargetPath, err)
 	}
 
-	return integRunner(ctx, true, "")
+	kubeStackHelmChartTargetDir := filepath.Dir(kubeStackHelmChartTargetPath)
+	downloadedKubeStackHelmChartPath, err := devtools.DownloadFile(k8s.KubeStackChartURL, kubeStackHelmChartTargetDir)
+	if err != nil {
+		return fmt.Errorf("failed to download opentelemetry-kube-stack helm chart %q: %w", k8s.KubeStackChartURL, err)
+	}
+	if err := devtools.Extract(downloadedKubeStackHelmChartPath, kubeStackHelmChartTargetDir); err != nil {
+		return fmt.Errorf("failed to extract opentelemetry-kube-stack helm chart %q: %w", downloadedKubeStackHelmChartPath, err)
+	}
+	if err := os.Remove(downloadedKubeStackHelmChartPath); err != nil {
+		return fmt.Errorf("failed to remove downloaded opentelemetry-kube-stack helm chart %q: %w", downloadedKubeStackHelmChartPath, err)
+	}
+
+	// render elastic-agent-standalone kustomize
+	kustomizeYaml, err := kubernetes.RenderKustomize(ctx, filepath.Join("deploy", "kubernetes", "elastic-agent-kustomize", "default", "elastic-agent-standalone"))
+	if err != nil {
+		return fmt.Errorf("failed to render kustomize: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join("testing", "integration", "k8s", k8s.AgentKustomizePath), kustomizeYaml, 0o644); err != nil {
+		return fmt.Errorf("failed to write kustomize.yaml: %w", err)
+	}
+
+	return nil
 }
 
 // UpdateVersions runs an update on the `.agent-versions.yml` fetching
 // the latest version list from the artifact API.
 func (Integration) UpdateVersions(ctx context.Context) error {
-	maxSnapshots := 3
+	agentVersion, err := version.ParseVersion(bversion.Agent)
+	if err != nil {
+		return fmt.Errorf("failed to parse agent version %s: %w", bversion.Agent, err)
+	}
+
+	// maxSnapshots is the maximum number of snapshots from
+	// releases branches we want to include in the snapshot list
+	maxSnapshots := 2
 
 	branches, err := git.GetReleaseBranches(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list release branches: %w", err)
 	}
 
-	// -1 because we manually add 7.17 below
-	if len(branches) > maxSnapshots-1 {
-		branches = branches[:maxSnapshots-1]
+	// limit the number of snapshot branches to the maxSnapshots
+	targetSnapshotBranches := branches[:maxSnapshots]
+
+	// we also want to always include the latest snapshot from lts release branches
+	ltsBranches := []string{
+		// 7.17 is an LTS branch so we need to include it always
+		"7.17",
 	}
 
-	// it's not a part of this repository, cannot be retrieved with `GetReleaseBranches`
-	branches = append(branches, "7.17")
+	// if we have a newer version of the agent, we want to include the latest snapshot from 8.19 LTS branch
+	if agentVersion.Major() > 8 || agentVersion.Major() == 8 && agentVersion.Minor() > 19 {
+		// order is important
+		ltsBranches = append([]string{"8.19"}, ltsBranches...)
+	}
+
+	// need to include the LTS branches, sort them and remove duplicates
+	targetSnapshotBranches = append(targetSnapshotBranches, ltsBranches...)
+	sort.Slice(targetSnapshotBranches, git.Less(targetSnapshotBranches))
+	targetSnapshotBranches = slices.Compact(targetSnapshotBranches)
 
 	// uncomment if want to have the current version snapshot on the list as well
 	// branches = append([]string{"master"}, branches...)
@@ -2326,7 +2426,7 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 		CurrentMajors:    1,
 		PreviousMinors:   2,
 		PreviousMajors:   1,
-		SnapshotBranches: branches,
+		SnapshotBranches: targetSnapshotBranches,
 	}
 	b, _ := json.MarshalIndent(reqs, "", "  ")
 	fmt.Println(string(b))
@@ -2365,33 +2465,28 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 
 // UpdatePackageVersion update the file that contains the latest available snapshot version
 func (Integration) UpdatePackageVersion(ctx context.Context) error {
-	const packageVersionFilename = ".package-version"
-
 	currentReleaseBranch, err := git.GetCurrentReleaseBranch(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to identify the current release branch: %w", err)
 	}
 
-	sc := snapshots.NewSnapshotsClient()
-	versions, err := sc.FindLatestSnapshots(ctx, []string{currentReleaseBranch})
+	branchInformation, err := findLatestBuildForBranch(ctx, baseURLForSnapshotDRA, currentReleaseBranch)
 	if err != nil {
-		return fmt.Errorf("failed to fetch a manifest for the latest snapshot: %w", err)
-	}
-	if len(versions) != 1 {
-		return fmt.Errorf("expected a single version, got %v", versions)
-	}
-	packageVersion := versions[0].CoreVersion()
-	file, err := os.OpenFile(packageVersionFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
-	if err != nil {
-		return fmt.Errorf("failed to open %s for write: %w", packageVersionFilename, err)
-	}
-	defer file.Close()
-	_, err = file.WriteString(packageVersion)
-	if err != nil {
-		return fmt.Errorf("failed to write the package version file %s: %w", packageVersionFilename, err)
+		return fmt.Errorf("failed to get latest build for branch %q: %w", currentReleaseBranch, err)
 	}
 
-	fmt.Println(packageVersion)
+	err = devtools.UpdatePackageVersion(
+		branchInformation.Version, branchInformation.BuildID,
+		branchInformation.ManifestURL, branchInformation.SummaryURL)
+	if err != nil {
+		return fmt.Errorf("failed to write package version: %w", err)
+	}
+
+	packageVersionBytes, err := os.ReadFile(devtools.PackageVersionFilename)
+	if err != nil {
+		return fmt.Errorf("failed to read file: %w", err)
+	}
+	fmt.Println(string(packageVersionBytes))
 
 	return nil
 }
@@ -2486,6 +2581,7 @@ func listStacks() (string, error) {
 		t.AppendRows([]table.Row{
 			{"Elasticsearch URL", stack.Elasticsearch},
 			{"Kibana", stack.Kibana},
+			{"Integrations Server", stack.IntegrationsServer},
 			{"Username", stack.Username},
 			{"Password", stack.Password},
 		})
@@ -2578,6 +2674,8 @@ func generateEnvFile(stack tcommon.Stack) error {
 	fmt.Fprintf(f, "export KIBANA_HOST=\"%s\"\n", stack.Kibana)
 	fmt.Fprintf(f, "export KIBANA_USERNAME=\"%s\"\n", stack.Username)
 	fmt.Fprintf(f, "export KIBANA_PASSWORD=\"%s\"\n", stack.Password)
+
+	fmt.Fprintf(f, "export INTEGRATIONS_SERVER_HOST=\"%s\"\n", stack.IntegrationsServer)
 
 	return nil
 }
@@ -2750,7 +2848,7 @@ func (Integration) PrepareOnRemote() {
 	mg.Deps(mage.InstallGoTestTools)
 }
 
-// Run beat serverless tests
+// TestBeatServerless runs beats-oriented serverless tests
 func (Integration) TestBeatServerless(ctx context.Context, beatname string) error {
 	beatBuildPath := filepath.Join("..", "beats", "x-pack", beatname, "build", "distributions")
 	if os.Getenv("AGENT_BUILD_DIR") == "" {
@@ -2774,15 +2872,21 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 	if err != nil {
 		return fmt.Errorf("error setting binary name: %w", err)
 	}
-	return integRunner(ctx, false, "TestBeatsServerless")
+	return integRunner(ctx, "testing/integration/beats/serverless", false, "TestBeatsServerless")
 }
 
-func (Integration) TestForResourceLeaks(ctx context.Context) error {
-	err := os.Setenv("TEST_LONG_RUNNING", "true")
-	if err != nil {
-		return fmt.Errorf("error setting TEST_LONG_RUNNING: %w", err)
-	}
-	return integRunner(ctx, false, "TestLongRunningAgentForLeaks")
+// TestForResourceLeaks runs the integration tests defined in testing/integration/leak
+func (i Integration) TestForResourceLeaks(ctx context.Context) error {
+	return i.testForResourceLeaks(ctx, false, "")
+}
+
+// TestForResourceLeaksSingle runs a single integration test defined in testing/integration/leak
+func (i Integration) TestForResourceLeaksSingle(ctx context.Context, testName string) error {
+	return i.testForResourceLeaks(ctx, false, testName)
+}
+
+func (i Integration) testForResourceLeaks(ctx context.Context, matrix bool, testName string) error {
+	return integRunner(ctx, "testing/integration/leak", matrix, testName)
 }
 
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
@@ -2860,7 +2964,7 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 
 func (Integration) Buildkite() error {
 	goTestFlags := os.Getenv("GOTEST_FLAGS")
-	batches, err := define.DetermineBatches("testing/integration", goTestFlags, "integration")
+	batches, err := define.DetermineBatches("testing/integration/ess", goTestFlags, "integration")
 	if err != nil {
 		return fmt.Errorf("failed to determine batches: %w", err)
 	}
@@ -2909,7 +3013,7 @@ func (Integration) Buildkite() error {
 	return nil
 }
 
-func integRunner(ctx context.Context, matrix bool, singleTest string) error {
+func integRunner(ctx context.Context, testDir string, matrix bool, singleTest string) error {
 	if _, ok := ctx.Deadline(); !ok {
 		// If the context doesn't have a timeout (usually via the mage -t option), give it one.
 		var cancel context.CancelFunc
@@ -2918,7 +3022,7 @@ func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	}
 
 	for {
-		failedCount, err := integRunnerOnce(ctx, matrix, singleTest)
+		failedCount, err := integRunnerOnce(ctx, matrix, testDir, singleTest)
 		if err != nil {
 			return err
 		}
@@ -2937,10 +3041,10 @@ func integRunner(ctx context.Context, matrix bool, singleTest string) error {
 	}
 }
 
-func integRunnerOnce(ctx context.Context, matrix bool, singleTest string) (int, error) {
+func integRunnerOnce(ctx context.Context, matrix bool, testDir string, singleTest string) (int, error) {
 	goTestFlags := os.Getenv("GOTEST_FLAGS")
 
-	batches, err := define.DetermineBatches("testing/integration", goTestFlags, "integration")
+	batches, err := define.DetermineBatches(testDir, goTestFlags, "integration")
 	if err != nil {
 		return 0, fmt.Errorf("failed to determine batches: %w", err)
 	}
@@ -3678,6 +3782,9 @@ func (Helm) UpdateAgentVersion() error {
 		filepath.Join(helmMOtelChartPath, "values.yaml"): {
 			{"defaultCRConfig.image.tag", agentVersion},
 		},
+		filepath.Join(helmMOtelChartPath, "logs-values.yaml"): {
+			{"defaultCRConfig.image.tag", agentVersion},
+		},
 	} {
 		if err := updateYamlFile(yamlFile, keyVals...); err != nil {
 			return fmt.Errorf("failed to update agent version: %w", err)
@@ -3757,9 +3864,172 @@ func updateYamlFile(path string, keyVal ...struct {
 	return nil
 }
 
+func (Helm) ensureRepository(repoName, repoURL string, settings *cli.EnvSettings) error {
+	repoFile := settings.RepositoryConfig
+	// Load existing repositories
+	file, err := repo.LoadFile(repoFile)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			file = repo.NewFile()
+		} else {
+			return fmt.Errorf("could not load Helm repository config: %w", err)
+		}
+	}
+
+	// Check if the repository is already added
+	for _, entry := range file.Repositories {
+		if entry.URL == repoURL {
+			// repository already exists
+			return nil
+		}
+	}
+
+	// Add the repository
+	entry := &repo.Entry{
+		Name: repoName,
+		URL:  repoURL,
+	}
+
+	chartRepo, err := repo.NewChartRepository(entry, getter.All(settings))
+	if err != nil {
+		return fmt.Errorf("could not create repo %s: %w", repoURL, err)
+	}
+
+	_, err = chartRepo.DownloadIndexFile()
+	if err != nil {
+		return fmt.Errorf("could not download index file for repo %s: %w", repoURL, err)
+	}
+
+	file.Update(entry)
+	if err := file.WriteFile(repoFile, 0o644); err != nil {
+		return fmt.Errorf("could not write Helm repository config: %w", err)
+	}
+
+	return nil
+}
+
+func (h Helm) handleDependencies(update bool) error {
+	settings := cli.New()
+	settings.SetNamespace("")
+	actionConfig := &action.Configuration{}
+
+	chartFilePath := filepath.Join(helmChartPath, "Chart.yaml")
+	chartFile, err := os.ReadFile(chartFilePath)
+	if err != nil {
+		return fmt.Errorf("could not read %q: %w", chartFilePath, err)
+	}
+
+	dependencies := struct {
+		Entry []struct {
+			Name       string `yaml:"name"`
+			Repository string `yaml:"repository"`
+		} `yaml:"dependencies"`
+	}{}
+
+	if err := os.RemoveAll(filepath.Join(helmChartPath, "charts")); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("could not remove %s/charts: %w", helmChartPath, err)
+	}
+
+	err = yaml.Unmarshal(chartFile, &dependencies)
+	if err != nil {
+		return fmt.Errorf("could not unmarshal %s/Chart.yaml: %w", helmChartPath, err)
+	}
+
+	for _, dep := range dependencies.Entry {
+		err := h.ensureRepository(dep.Name, dep.Repository, settings)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "",
+		func(format string, v ...interface{}) {})
+	if err != nil {
+		return fmt.Errorf("failed to init helm action config: %w", err)
+	}
+
+	client := action.NewDependency()
+
+	registryClient, err := registry.NewClient(
+		registry.ClientOptDebug(settings.Debug),
+		registry.ClientOptEnableCache(true),
+		registry.ClientOptWriter(os.Stderr),
+		registry.ClientOptCredentialsFile(settings.RegistryConfig),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create helm registry client: %w", err)
+	}
+
+	buffer := bytes.Buffer{}
+
+	man := &downloader.Manager{
+		Out:              bufio.NewWriter(&buffer),
+		ChartPath:        helmChartPath,
+		Keyring:          client.Keyring,
+		SkipUpdate:       true,
+		Getters:          getter.All(settings),
+		RegistryClient:   registryClient,
+		RepositoryConfig: settings.RepositoryConfig,
+		RepositoryCache:  settings.RepositoryCache,
+		Debug:            settings.Debug,
+	}
+	if client.Verify {
+		man.Verify = downloader.VerifyIfPossible
+	}
+
+	if update {
+		if err = man.Update(); err != nil {
+			return fmt.Errorf("failed to build helm dependencies: %w", err)
+		}
+	} else {
+		if err = man.Build(); err != nil {
+			return fmt.Errorf("failed to update helm dependencies: %w", err)
+		}
+	}
+
+	subChartDir := filepath.Join(helmChartPath, "charts")
+
+	subChartArchives, err := filepath.Glob(filepath.Join(subChartDir, "*.tgz"))
+	if err != nil {
+		return fmt.Errorf("failed to get subchart archives: %w", err)
+	}
+
+	if len(subChartArchives) != len(dependencies.Entry) {
+		return fmt.Errorf("expected %d subchart archives, got %d", len(dependencies.Entry), len(subChartArchives))
+	}
+
+	for _, subChartArchive := range subChartArchives {
+		err := mage.Extract(subChartArchive, subChartDir)
+		if err != nil {
+			return fmt.Errorf("failed to extract %q: %w", subChartArchive, err)
+		}
+
+		err = os.Remove(subChartArchive)
+		if err != nil {
+			return fmt.Errorf("failed to remove %q: %w", subChartArchive, err)
+		}
+	}
+
+	return nil
+}
+
 // BuildDependencies builds the dependencies for the Elastic-Agent Helm chart.
-func (Helm) BuildDependencies() error {
-	return helm.BuildChartDependencies(helmChartPath)
+//
+// This is a custom implementation that extends the functionality of `helm dependency update`.
+// The standard Helm command assumes that all dependency repositories have been added beforehand
+// via `helm repo add`, otherwise it fails. This method improves usability by ensuring all
+// required repositories are added automatically before resolving dependencies.
+//
+// Furthermore, `helm dependency update` downloads dependencies as `.tgz` archives into the `charts/`
+// directory but does not untar them. For our integration tests, we require the subcharts to be
+// extracted. This method downloads and extracts each `.tgz` archive and removes the archive afterward,
+// so that only the extracted subcharts remain in the `charts/` directory.
+func (h Helm) BuildDependencies() error {
+	return h.handleDependencies(false)
+}
+
+func (h Helm) UpdateDependencies() error {
+	return h.handleDependencies(true)
 }
 
 // Package packages the Elastic-Agent Helm chart. Note that you need to set SNAPSHOT="false" to build a production-ready package.

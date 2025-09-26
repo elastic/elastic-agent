@@ -229,7 +229,7 @@ func CrossBuildImage(platform string) (string, error) {
 	case platform == "darwin/arm64" || platform == "darwin/universal":
 		tagSuffix = "darwin-arm64-debian11"
 	case platform == "linux/arm64":
-		tagSuffix = "base-arm-debian9"
+		tagSuffix = "base-arm-debian11"
 	case platform == "linux/armv5" || platform == "linux/armv6":
 		tagSuffix = "armel"
 	case platform == "linux/armv7":
@@ -274,6 +274,9 @@ func (b GolangCrossBuilder) Build() error {
 		return fmt.Errorf("failed to determine repo root and package sub dir: %w", err)
 	}
 
+	uid := os.Getuid()
+	gid := os.Getgid()
+
 	mountPoint := filepath.ToSlash(filepath.Join("/go", "src", repoInfo.CanonicalRootImportPath))
 	// use custom dir for build if given, subdir if not:
 	cwd := repoInfo.SubDir
@@ -315,8 +318,8 @@ func (b GolangCrossBuilder) Build() error {
 
 	if runtime.GOOS != "windows" {
 		args = append(args,
-			"--env", "EXEC_UID="+strconv.Itoa(os.Getuid()),
-			"--env", "EXEC_GID="+strconv.Itoa(os.Getgid()),
+			"--env", fmt.Sprintf("EXEC_UID=%d", uid),
+			"--env", fmt.Sprintf("EXEC_GID=%d", gid),
 		)
 	}
 	if versionQualified {
@@ -328,9 +331,31 @@ func (b GolangCrossBuilder) Build() error {
 		args = append(args, "-v", hostDir+":/go/pkg/mod:ro")
 	}
 
+	buildCacheLocation := "/tmp/.cache/go-build"
+	if CrossBuildMountBuildCache {
+		// Mount the go build cache volume into the container.
+		args = append(args,
+			"-v", fmt.Sprintf("%s:%s", CrossBuildBuildCacheVolumeName, buildCacheLocation),
+		)
+	}
+
+	// Mount /opt/git-mirrors (if present) to resolve git alternates in CI
+	if _, err := os.Stat("/opt/git-mirrors"); err == nil {
+		args = append(args, "-v", "/opt/git-mirrors:/opt/git-mirrors:ro")
+	}
+
+	if !ExternalBuild {
+		beatsPath, err := filepath.Abs(filepath.Join("../beats"))
+		if err != nil {
+			return fmt.Errorf("error while reading local beats: %w", err)
+		}
+		args = append(args, "-v", fmt.Sprintf("%s:%s", beatsPath, beatsPath))
+	}
+
 	args = append(args,
 		"--rm",
 		"--env", "GOFLAGS=-mod=readonly",
+		"--env", fmt.Sprintf("GOCACHE=%s", buildCacheLocation), // ensure this is writable by the user
 		"--env", "MAGEFILE_VERBOSE="+verbose,
 		"--env", "MAGEFILE_TIMEOUT="+EnvOr("MAGEFILE_TIMEOUT", ""),
 		"--env", fmt.Sprintf("SNAPSHOT=%v", Snapshot),

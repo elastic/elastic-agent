@@ -12,6 +12,7 @@ import (
 // The values may contain variables and will be expanded at the time of use.
 var DefaultCleanPaths = []string{
 	"build",
+	".agent-testing",
 	"docker-compose.yml.lock",
 	"{{.BeatName}}",
 	"{{.BeatName}}.exe",
@@ -24,7 +25,7 @@ var DefaultCleanPaths = []string{
 	"_meta/kibana/7/index-pattern/{{.BeatName}}.json",
 }
 
-// Clean clean generated build artifacts.
+// Clean clean generated build artifacts and caches.
 func Clean(pathLists ...[]string) error {
 	if len(pathLists) == 0 {
 		pathLists = [][]string{DefaultCleanPaths}
@@ -36,6 +37,9 @@ func Clean(pathLists ...[]string) error {
 				return err
 			}
 		}
+	}
+	if CrossBuildMountBuildCache {
+		return sh.Run("docker", "volume", "rm", "-f", CrossBuildBuildCacheVolumeName)
 	}
 	return nil
 }

@@ -14,10 +14,12 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -27,6 +29,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
+
+var UserOwnerMismatchError = errors.New("the command is executed as root but the program files are not owned by the root user. execute the command as the user that owns the program files")
 
 const (
 	fromInstallArg      = "from-install"
@@ -40,7 +44,7 @@ func newEnrollCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command
 		Short: "Enroll the Elastic Agent into Fleet",
 		Long:  "This command will enroll the Elastic Agent into Fleet.",
 		Run: func(c *cobra.Command, args []string) {
-			if err := enroll(streams, c); err != nil {
+			if err := doEnroll(streams, c); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 				logExternal(fmt.Sprintf("%s enroll failed: %s", paths.BinaryName, err))
 				os.Exit(1)
@@ -81,7 +85,7 @@ func addEnrollFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("fleet-server-cert-key", "", "", "Private key for the certificate used by Fleet Server for exposed HTTPS endpoint")
 	cmd.Flags().StringP("fleet-server-cert-key-passphrase", "", "", "Path for private key passphrase file used to decrypt Fleet Server certificate key")
 	cmd.Flags().StringP("fleet-server-client-auth", "", "none", "Fleet Server mTLS client authentication for connecting Elastic Agents. Must be one of [none, optional, required]")
-	cmd.Flags().StringSliceP("header", "", []string{}, "Headers used by Fleet Server when communicating with Elasticsearch")
+	cmd.Flags().StringSliceP("header", "", []string{}, "Headers used by Agent to communicate with Fleet Server, and when a bootstrapped Fleet Server communicates with Elasticsearch")
 	cmd.Flags().BoolP("fleet-server-insecure-http", "", false, "Expose Fleet Server over HTTP (not recommended; insecure)")
 	cmd.Flags().StringP("certificate-authorities", "a", "", "Comma-separated list of root certificates for server verification used by Elastic Agent and Fleet Server")
 	cmd.Flags().StringP("ca-sha256", "p", "", "Comma-separated list of certificate authority hash pins for server verification used by Elastic Agent and Fleet Server")
@@ -95,6 +99,7 @@ func addEnrollFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSliceP("proxy-header", "", []string{}, "Proxy headers used with CONNECT request: when bootstrapping Fleet Server, it's the proxy used by Fleet Server to connect to Elasticsearch; when enrolling the Elastic Agent to Fleet Server, it's the proxy used by the Elastic Agent to connect to Fleet Server")
 	cmd.Flags().BoolP("delay-enroll", "", false, "Delays enrollment to occur on first start of the Elastic Agent service")
 	cmd.Flags().DurationP("daemon-timeout", "", 0, "Timeout waiting for Elastic Agent daemon")
+	cmd.Flags().DurationP("enroll-timeout", "", 10*time.Minute, "Timeout waiting for Elastic Agent enroll command. A negative value disables the timeout.")
 	cmd.Flags().DurationP("fleet-server-timeout", "", 0, "When bootstrapping Fleet Server, timeout waiting for Fleet Server to be ready to start enrollment")
 	cmd.Flags().Bool("skip-daemon-reload", false, "Skip daemon reload after enrolling")
 	cmd.Flags().StringSliceP("tag", "", []string{}, "User-set tags")
@@ -205,6 +210,7 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	fProxyHeaders, _ := cmd.Flags().GetStringSlice("proxy-header")
 	delayEnroll, _ := cmd.Flags().GetBool("delay-enroll")
 	daemonTimeout, _ := cmd.Flags().GetDuration("daemon-timeout")
+	enrollTimeout, _ := cmd.Flags().GetDuration("enroll-timeout")
 	fTimeout, _ := cmd.Flags().GetDuration("fleet-server-timeout")
 	skipDaemonReload, _ := cmd.Flags().GetBool("skip-daemon-reload")
 	fTags, _ := cmd.Flags().GetStringSlice("tag")
@@ -285,6 +291,10 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 		args = append(args, "--daemon-timeout")
 		args = append(args, daemonTimeout.String())
 	}
+	if enrollTimeout != 0 {
+		args = append(args, "--enroll-timeout")
+		args = append(args, enrollTimeout.String())
+	}
 	if fTimeout != 0 {
 		args = append(args, "--fleet-server-timeout")
 		args = append(args, fTimeout.String())
@@ -356,31 +366,47 @@ func buildEnrollmentFlags(cmd *cobra.Command, url string, token string) []string
 	return args
 }
 
-func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
+// getFileOwnFromCmdFunc, getOwnerFromPathFunc and computeFixPermissions are for
+// testability. Instead of directly executing the code block in doEnroll, we
+// are calling computeFixPermissions. computeFixPermissions is tested on its own.
+type getFileOwnerFromCmdFunc func(*cobra.Command) (utils.FileOwner, error)
+type getOwnerFromPathFunc func(string) (utils.FileOwner, error)
+
+func computeFixPermissions(fromInstall bool, hasRoot bool, os string, getFileOwnerFromCmd getFileOwnerFromCmdFunc, getOwnerFromPath getOwnerFromPathFunc, cmd *cobra.Command) (*utils.FileOwner, error) {
+	// On MacOS Ventura and above, fixing the permissions on enrollment during installation fails with the error:
+	// Error: failed to fix permissions: chown /Library/Elastic/Agent/data/elastic-agent-c13f91/elastic-agent.app: operation not permitted
+	// This is because we are fixing permissions twice, once during installation and again during the enrollment step.
+	// When we are enrolling as part of installation on MacOS, skip the second attempt to fix permissions.
+	if fromInstall {
+		if os == "darwin" {
+			return nil, nil
+		}
+		perms, err := getFileOwnerFromCmd(cmd)
+		if err != nil {
+			// no context is added because the error is clear and user facing
+			return nil, err
+		}
+		return &perms, nil
+	}
+
+	if hasRoot {
+		perms, err := getOwnerFromPath(paths.Top())
+		if err != nil {
+			return nil, fmt.Errorf("failed to get owner from path %s: %w", paths.Top(), err)
+		}
+		return &perms, nil
+	}
+
+	return nil, nil
+}
+
+func doEnroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	err := validateEnrollFlags(cmd)
 	if err != nil {
 		return err
 	}
 
 	fromInstall, _ := cmd.Flags().GetBool(fromInstallArg)
-
-	hasRoot, err := utils.HasRoot()
-	if err != nil {
-		return fmt.Errorf("checking if running with root/Administrator privileges: %w", err)
-	}
-	if hasRoot && !fromInstall {
-		binPath, err := os.Executable()
-		if err != nil {
-			return fmt.Errorf("error while getting executable path: %w", err)
-		}
-		isOwner, err := isOwnerExec(binPath)
-		if err != nil {
-			return fmt.Errorf("ran into an error while figuring out if user is allowed to execute the enroll command: %w", err)
-		}
-		if !isOwner {
-			return UserOwnerMismatchError
-		}
-	}
 
 	pathConfigFile := paths.ConfigFile()
 	rawConfig, err := config.LoadFile(pathConfigFile)
@@ -461,6 +487,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	proxyHeaders, _ := cmd.Flags().GetStringSlice("proxy-header")
 	delayEnroll, _ := cmd.Flags().GetBool("delay-enroll")
 	daemonTimeout, _ := cmd.Flags().GetDuration("daemon-timeout")
+	enrollTimeout, _ := cmd.Flags().GetDuration("enroll-timeout")
 	fTimeout, _ := cmd.Flags().GetDuration("fleet-server-timeout")
 	skipDaemonReload, _ := cmd.Flags().GetBool("skip-daemon-reload")
 	tags, _ := cmd.Flags().GetStringSlice("tag")
@@ -475,24 +502,23 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	ctx := handleSignal(context.Background())
 
-	// On MacOS Ventura and above, fixing the permissions on enrollment during installation fails with the error:
-	//  Error: failed to fix permissions: chown /Library/Elastic/Agent/data/elastic-agent-c13f91/elastic-agent.app: operation not permitted
-	// This is because we are fixing permissions twice, once during installation and again during the enrollment step.
-	// When we are enrolling as part of installation on MacOS, skip the second attempt to fix permissions.
-	var fixPermissions *utils.FileOwner
-	if fromInstall {
-		perms, err := getFileOwnerFromCmd(cmd)
-		if err != nil {
-			// no context is added because the error is clear and user facing
-			return err
-		}
-		fixPermissions = &perms
-	}
-	if runtime.GOOS == "darwin" {
-		fixPermissions = nil
+	if enrollTimeout > 0 {
+		eCtx, cancel := context.WithTimeout(ctx, enrollTimeout)
+		defer cancel()
+		ctx = eCtx
 	}
 
-	options := enrollCmdOption{
+	hasRoot, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("checking if running with root/Administrator privileges: %w", err)
+	}
+
+	fixPermissions, err := computeFixPermissions(fromInstall, hasRoot, runtime.GOOS, getFileOwnerFromCmd, getOwnerFromPath, cmd)
+	if err != nil {
+		return err
+	}
+
+	options := enroll.EnrollOptions{
 		EnrollAPIKey:         enrollmentToken,
 		ID:                   id,
 		ReplaceToken:         replaceToken,
@@ -506,6 +532,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		UserProvidedMetadata: make(map[string]interface{}),
 		Staging:              staging,
 		FixPermissions:       fixPermissions,
+		Headers:              mapFromEnvList(fHeaders),
 		ProxyURL:             proxyURL,
 		ProxyDisabled:        proxyDisabled,
 		ProxyHeaders:         mapFromEnvList(proxyHeaders),
@@ -513,7 +540,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 		DaemonTimeout:        daemonTimeout,
 		SkipDaemonRestart:    skipDaemonReload,
 		Tags:                 tags,
-		FleetServer: enrollCmdFleetServerOption{
+		FleetServer: enroll.EnrollCmdFleetServerOption{
 			ConnStr:               fServer,
 			ElasticsearchCA:       fElasticSearchCA,
 			ElasticsearchCASHA256: fElasticSearchCASHA256,
@@ -549,7 +576,7 @@ func enroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 	store := storage.NewReplaceOnSuccessStore(
 		pathConfigFile,
-		application.DefaultAgentFleetConfig,
+		info.DefaultAgentFleetConfig,
 		encStore,
 		storeOpts...,
 	)

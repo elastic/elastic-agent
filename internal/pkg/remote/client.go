@@ -127,6 +127,10 @@ func NewWithConfig(log *logger.Logger, cfg Config, wrapper wrapperFunc) (*Client
 			return nil, err
 		}
 
+		if cfg.Headers != nil {
+			transport = &headersRoundTripper{rt: transport, headers: cfg.Headers}
+		}
+
 		if wrapper != nil {
 			transport, err = wrapper(transport)
 			if err != nil {
@@ -217,7 +221,7 @@ func (c *Client) Send(
 			errs = append(errs, fmt.Errorf("%s: %w", msg, err))
 
 			// Using debug level as the error is only relevant if all clients fail.
-			c.log.With("error", err).Debugf(msg)
+			c.log.With("error", err).Debug(msg)
 			continue
 		}
 		c.checkApiVersionHeaders(req, resp)
@@ -263,6 +267,10 @@ func newClient(
 	cfg Config,
 	clients ...*requestClient,
 ) (*Client, error) {
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid configuration: %w", err)
+	}
+
 	// Shuffle so all the agents don't access the hosts in the same order
 	rand.Shuffle(len(clients), func(i, j int) {
 		clients[i], clients[j] = clients[j], clients[i]
@@ -340,4 +348,16 @@ func (r requestClient) newRequest(method string, path string, params url.Values,
 	newPath := strings.Join([]string{r.host, path, "?", params.Encode()}, "")
 
 	return http.NewRequestWithContext(context.TODO(), method, newPath, body)
+}
+
+type headersRoundTripper struct {
+	rt      http.RoundTripper
+	headers map[string]string
+}
+
+func (r *headersRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	for key, value := range r.headers {
+		req.Header.Set(key, value)
+	}
+	return r.rt.RoundTrip(req)
 }

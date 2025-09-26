@@ -16,7 +16,10 @@ const (
 	defaultNamespace = "default"
 
 	// DefaultHost is used when host is not defined or empty
-	DefaultHost = "localhost"
+	DefaultHost           = "localhost"
+	ProcessRuntimeManager = "process"
+	OtelRuntimeManager    = "otel"
+	DefaultRuntimeManager = ProcessRuntimeManager
 )
 
 // MonitoringConfig describes a configuration of a monitoring
@@ -33,6 +36,7 @@ type MonitoringConfig struct {
 	MonitorTraces    bool                  `yaml:"traces" config:"traces"`
 	APM              APMConfig             `yaml:"apm,omitempty" config:"apm,omitempty" json:"apm,omitempty"`
 	Diagnostics      Diagnostics           `yaml:"diagnostics,omitempty" json:"diagnostics,omitempty"`
+	RuntimeManager   string                `yaml:"_runtime_experimental,omitempty" config:"_runtime_experimental,omitempty"`
 }
 
 // MonitoringHTTPConfig is a config defining HTTP endpoint published by agent
@@ -118,9 +122,10 @@ func DefaultConfig() *MonitoringConfig {
 			Host:    DefaultHost,
 			Port:    defaultPort,
 		},
-		Namespace:   defaultNamespace,
-		APM:         defaultAPMConfig(),
-		Diagnostics: defaultDiagnostics(),
+		Namespace:      defaultNamespace,
+		APM:            defaultAPMConfig(),
+		Diagnostics:    defaultDiagnostics(),
+		RuntimeManager: DefaultRuntimeManager,
 	}
 }
 

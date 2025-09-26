@@ -1,0 +1,226 @@
+{{ range $_, $collector := $.Values.collectors -}}
+{{- if $collector.enabled -}}
+{{- $collector := (mergeOverwrite (deepCopy $.Values.defaultCRConfig) $collector) }}
+{{- $merged := (dict "Template" $.Template "Files" $.Files "Chart" $.Chart "clusterRole" $.Values.clusterRole "collector" $collector "Release" $.Release "fullnameOverride" $.Values.fullnameOverride "presets" $.Values.presets "namespace" (include "opentelemetry-kube-stack.namespace" $)  "kubelet" $.Values.kubelet) }}
+{{- $fullname := (include "opentelemetry-kube-stack.collectorFullname" $merged) }}
+---
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: {{ $fullname }}
+  namespace: {{ include "opentelemetry-kube-stack.namespace" $ }}
+  labels:
+    {{- include "opentelemetry-kube-stack.labels" $ | nindent 4 }}
+    {{- include "opentelemetry-kube-stack.renderkv" $collector.labels | indent 4 }}
+    {{- include "opentelemetry-kube-stack.collectorOpAMPLabels" $.Values | indent 4 }}
+  {{- with $collector.annotations }}
+  annotations:
+    {{- include "opentelemetry-kube-stack.renderkv" . | nindent 4 }}
+  {{- end }}
+spec:
+  managementState: {{ $collector.managementState }}
+  mode: {{ $collector.mode }}
+  config:
+    {{- include "opentelemetry-kube-stack.config" $merged }}
+  {{- if and (not (eq $collector.mode "daemonset" )) (not $collector.autoscaler) }}
+  replicas: {{ $collector.replicas }}
+  {{- end }}
+  {{- if $collector.serviceAccount }}
+  serviceAccount: {{ $collector.serviceAccount }}
+  {{- end }}
+  {{- if $collector.image.digest }}
+  image: "{{ $collector.image.repository }}@{{ $collector.image.digest }}"
+  {{- else if $collector.image.tag }}
+  image: "{{ $collector.image.repository }}:{{ $collector.image.tag }}"
+  {{- end }}
+  imagePullPolicy: {{ $collector.image.pullPolicy }}
+  upgradeStrategy: {{ $collector.upgradeStrategy }}
+  {{- if $collector.hostNetwork }}
+  hostNetwork: {{ $collector.hostNetwork }}
+  {{- end }}
+  {{- if $collector.shareProcessNamespace }}
+  shareProcessNamespace: {{ $collector.shareProcessNamespace }}
+  {{- end }}
+  {{- if $collector.priorityClassName }}
+  priorityClassName: {{ $collector.priorityClassName }}
+  {{- end }}
+  terminationGracePeriodSeconds: {{ $collector.terminationGracePeriodSeconds }}
+  {{- with $collector.resources }}
+  resources:
+  {{- toYaml . | nindent 4}}
+  {{- end }}
+  {{- with $collector.nodeSelector }}
+  nodeSelector:
+  {{- toYaml . | nindent 4}}
+  {{- end }}
+  {{- with $collector.args }}
+  args:
+  {{- toYaml . | nindent 4}}
+  {{- end }}
+  {{- with $collector.autoscaler }}
+  autoscaler:
+  {{- toYaml . | nindent 4}}
+  {{- end }}
+  {{- with $collector.podDisruptionBudget }}
+  podDisruptionBudget:
+  {{- toYaml . | nindent 4}}
+  {{- end }}
+  securityContext:
+  {{- if and (not ($collector.securityContext)) ($collector.presets.logsCollection.storeCheckpoints) }}
+    runAsUser: 0
+    runAsGroup: 0
+  {{- else -}}
+  {{- toYaml $collector.securityContext | nindent 4 }}
+  {{- end }}
+  {{- with $collector.podSecurityContext }}
+  podSecurityContext:
+  {{- toYaml . | nindent 4}}
+  {{- end }}
+  {{- with $collector.podAnnotations }}
+  podAnnotations:
+  {{- toYaml . | nindent 4}}
+  {{- end }}
+  {{- with $collector.targetAllocator }}
+  targetAllocator:
+  {{- toYaml . | nindent 4}}
+  {{- end }}
+  {{- with $collector.ingress }}
+  ingress:
+  {{- toYaml . | nindent 4}}
+  {{- end }}
+  {{- with $collector.affinity }}
+  affinity:
+  {{- toYaml . | nindent 4}}
+  {{- end }}
+  {{- with $collector.lifecycle }}
+  lifecycle:
+  {{- toYaml . | nindent 4}}
+  {{- end }}
+  {{- with $collector.livenessProbe }}
+  livenessProbe:
+  {{- toYaml . | nindent 4}}
+  {{- end }}
+  {{- with $collector.observability }}
+  observability:
+  {{- toYaml . | nindent 4}}
+  {{- end }}
+  {{- with $collector.updateStrategy }}
+  updateStrategy:
+  {{- toYaml . | nindent 4}}
+  {{- end }}
+  {{- with $collector.deploymentUpdateStrategy }}
+  deploymentUpdateStrategy:
+  {{- toYaml . | nindent 4}}
+  {{- end }}
+  {{- if or ($collector.presets.logsCollection.enabled) ($collector.presets.logsCollection.storeCheckpoints) ($collector.presets.hostMetrics.enabled) ($collector.volumeMounts) }}
+  volumeMounts:
+  {{- if $collector.presets.logsCollection.enabled }}
+  - name: varlogpods
+    mountPath: /var/log/pods
+    readOnly: true
+  - name: varlibdockercontainers
+    mountPath: /var/lib/docker/containers
+    readOnly: true
+  {{- end }}
+  {{- if $collector.presets.logsCollection.storeCheckpoints}}
+  - name: varlibotelcol
+    mountPath: /var/lib/otelcol
+  {{- end }}
+  {{- if $collector.presets.hostMetrics.enabled }}
+  - name: hostfs
+    mountPath: /hostfs
+    readOnly: true
+    mountPropagation: HostToContainer
+  {{- end }}
+  {{- with $collector.volumeMounts }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
+  {{- end }}
+  {{- with $collector.ports }}
+  ports:
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+  env:
+  - name: OTEL_K8S_NODE_NAME
+    valueFrom:
+      fieldRef:
+        fieldPath: spec.nodeName
+  - name: OTEL_K8S_NODE_IP
+    valueFrom:
+      fieldRef:
+        fieldPath: status.hostIP
+  - name: OTEL_K8S_NAMESPACE
+    valueFrom:
+      fieldRef:
+        apiVersion: v1
+        fieldPath: metadata.namespace
+  - name: OTEL_K8S_POD_NAME
+    valueFrom:
+      fieldRef:
+        apiVersion: v1
+        fieldPath: metadata.name
+  - name: OTEL_K8S_POD_IP
+    valueFrom:
+      fieldRef:
+        apiVersion: v1
+        fieldPath: status.podIP
+  {{- if $.Values.clusterName }}
+  - name: OTEL_RESOURCE_ATTRIBUTES
+    value: "k8s.cluster.name={{ $.Values.clusterName }}"
+  {{- end }}
+  {{- include "opentelemetry-kube-stack.renderenvs" (dict "extraEnvs" $.Values.extraEnvs "env" $collector.env) | nindent 2 }}
+  {{- with $collector.envFrom }}
+  envFrom:
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $collector.volumeClaimTemplates }}
+  volumeClaimTemplates:
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $collector.tolerations }}
+  tolerations:
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- if or ($collector.presets.logsCollection.enabled) ($collector.presets.logsCollection.storeCheckpoints) ($collector.presets.hostMetrics.enabled) ($collector.volumes) }}
+  volumes:
+  {{- if $collector.presets.logsCollection.enabled }}
+  - name: varlogpods
+    hostPath:
+      path: /var/log/pods
+  {{- if $collector.presets.logsCollection.storeCheckpoints }}
+  - name: varlibotelcol
+    hostPath:
+      path: /var/lib/otelcol
+      type: DirectoryOrCreate
+  {{- end }}
+  - name: varlibdockercontainers
+    hostPath:
+      path: /var/lib/docker/containers
+  {{- end }}
+  {{- if $collector.presets.hostMetrics.enabled }}
+  - name: hostfs
+    hostPath:
+      path: /
+  {{- end }}
+  {{- with $collector.volumes }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
+  {{- end }}
+  {{- with $collector.initContainers }}
+  initContainers:
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $collector.additionalContainers }}
+  additionalContainers:
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $collector.topologySpreadConstraints }}
+  topologySpreadConstraints:
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $collector.configmaps }}
+  configmaps:
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
+{{- end }}

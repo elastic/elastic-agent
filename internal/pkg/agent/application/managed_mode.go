@@ -72,13 +72,9 @@ func newManagedConfigManager(
 	actionAcker acker.Acker,
 	retrier *retrier.Retrier,
 	stateStore *store.StateStore,
+	actionQueue *queue.ActionQueue,
 	clientSetters ...actions.ClientSetter,
 ) (*managedConfigManager, error) {
-	actionQueue, err := queue.NewActionQueue(stateStore.Queue(), stateStore)
-	if err != nil {
-		return nil, fmt.Errorf("unable to initialize action queue: %w", err)
-	}
-
 	actionDispatcher, err := dispatcher.New(log, topPath, handlers.NewDefault(log), actionQueue)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize action dispatcher: %w", err)
@@ -386,6 +382,11 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 	m.dispatcher.MustRegister(
 		&fleetapi.ActionApp{},
 		handlers.NewAppAction(m.log, m.coord, m.agentInfo.AgentID()),
+	)
+
+	m.dispatcher.MustRegister(
+		&fleetapi.ActionMigrate{},
+		handlers.NewMigrate(m.log, m.agentInfo, m.coord),
 	)
 
 	m.dispatcher.MustRegister(

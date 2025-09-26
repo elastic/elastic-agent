@@ -31,7 +31,7 @@ jobs:
       matrix: ${{ fromJson(needs.filter.outputs.matrix) }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: "${{ matrix.branch }}"
 
@@ -40,7 +40,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
 
@@ -50,9 +50,9 @@ jobs:
           git config --global user.name "github-actions[bot]"
 
       - name: Install mage
-        uses: magefile/mage-action@v3
+        uses: magefile/mage-action@6f50bbb8ea47d56e62dee92392788acbc8192d0b # v3.1.0
         with:
-          version: v1.13.0
+          version: v1.14.0
           install-only: true
 
       - name: Update versions
@@ -62,7 +62,7 @@ jobs:
         run: ./.github/workflows/bump-agent-versions.sh
 
       - if: ${{ failure()  }}
-        uses: slackapi/slack-github-action@485a9d42d3a73031f12ec201c457e2162c45d02d # v2.0.0
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
         with:
           method: chat.postMessage
           token: ${{ secrets.SLACK_BOT_TOKEN }}
@@ -85,7 +85,7 @@ jobs:
 
         # if a PR was created as a result of this job, we notify on the Slack channel
       - if: ${{ startsWith(steps.update.outputs.pr, 'https') }}
-        uses: slackapi/slack-github-action@485a9d42d3a73031f12ec201c457e2162c45d02d # v2.0.0
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
         with:
           method: chat.postMessage
           token: ${{ secrets.SLACK_BOT_TOKEN }}

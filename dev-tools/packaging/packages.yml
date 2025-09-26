@@ -40,8 +40,10 @@ settings:
       cgo: true
       env:
         GOEXPERIMENT: systemcrypto
+        MS_GOTOOLCHAIN_TELEMETRY_ENABLED: "0"
       tags:
         - requirefips
+        - ms_tls13kdf
       platforms:
         - *linux-amd64
         - *linux-arm64
@@ -54,7 +56,7 @@ components:
   #    packageName: <template representing the name of the archive to download/extract>
   #    binaryName: <binary name>
   #    rootDir: <template representing directory from the archive root where the binary is located>
-  #    fips: <boolean indicating if this component is FIPS compliant>
+  #    fips: <boolean indicating if this component is FIPS-capable>
   #    platforms:
   #      - <platform, use anchors for platforms above>
   #    pythonWheel: true # true if it's a package that is not platform specific
@@ -189,7 +191,7 @@ components:
       - *linux-amd64
       - *linux-arm64
     packageTypes: *all-package-types
-  # Elastic Agent core component (FIPS-compliant version), defined here because it's a dependency when packaging using elastic-agent DRA
+  # Elastic Agent core component (FIPS-capable version), defined here because it's a dependency when packaging using elastic-agent DRA
   - &comp-elastic-agent-core-fips
     projectName: elastic-agent-core
     packageName: elastic-agent-core-fips-{{.Version}}-{{.Platform}}.{{.Ext}}
@@ -241,7 +243,7 @@ shared:
       - *comp-pf-elastic-symbolizer
       - *comp-pf-host-agent
 
-  # components included in FIPS-compliant elastic-agent package specs
+  # components included in FIPS-capable elastic-agent package specs
   - &elastic_agent_fips_components
     components:
       - *comp-agentbeat-fips
@@ -283,18 +285,12 @@ shared:
         content: >
           {{ commit }}
         mode: 0644
-      /usr/share/{{.BeatName}}/bin/{{.BeatName}}-god:
-        source: build/golang-crossbuild/god-{{.GOOS}}-{{.Platform.Arch}}
-        mode: 0755
       /usr/bin/{{.BeatName}}:
         template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/elastic-agent.sh.tmpl'
         mode: 0755
       /lib/systemd/system/{{.BeatServiceName}}.service:
         template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/elastic-agent.unit.tmpl'
         mode: 0644
-      /etc/init.d/{{.BeatServiceName}}:
-        template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/{{.PackageType}}/elastic-agent.init.sh.tmpl'
-        mode: 0755
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}:
         source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
         mode: 0755
@@ -429,6 +425,10 @@ shared:
     files:
       <<: *agent_binary_files
       <<: *agent_unpacked_components_files
+      NOTICE.txt:
+        source: '{{ repo.RootDir }}/NOTICE-fips.txt'
+        mode: 0644
+
 
   - &agent_darwin_binary_spec
     <<: *common
@@ -454,10 +454,9 @@ shared:
       'data/{{.BeatName}}-{{ commit_short }}/otelcol.ps1':
         source: '{{ repo.RootDir }}/dev-tools/packaging/files/windows/otelcol.ps1'
         mode: 0755
-      # windows not supported yet
-      # 'otel_samples':
-      #   source: '{{ repo.RootDir }}/internal/pkg/otel/samples/windows/'
-      #   mode: 0755
+      'otel_samples':
+        source: '{{ repo.RootDir }}/internal/pkg/otel/samples/windows/'
+        mode: 0755
 
   # This image is used only for preparing the file tree before actually building the image
   - &docker_builder_spec
@@ -471,11 +470,11 @@ shared:
   - &docker_ubi_spec
     docker_variant: 'basic'
     extra_vars:
-      from: '--platform=linux/amd64 docker.elastic.co/ubi9/ubi-minimal'
+      from: '--platform=linux/amd64 redhat/ubi9-minimal'
   - &docker_ubi_arm_spec
     docker_variant: 'basic'
     extra_vars:
-      from: '--platform=linux/arm64 docker.elastic.co/ubi9/ubi-minimal'
+      from: '--platform=linux/arm64 redhat/ubi9-minimal'
 
   - &docker_wolfi_spec
     docker_variant: 'wolfi'
@@ -498,6 +497,7 @@ shared:
 
   - &agent_docker_spec
     <<: *agent_binary_spec
+    # Default docker image name is <spec name>-<docker variant>
     extra_vars:
       dockerfile: 'Dockerfile.elastic-agent.tmpl'
       docker_entrypoint: 'docker-entrypoint.elastic-agent.tmpl'
@@ -700,18 +700,12 @@ shared:
       /usr/share/{{.BeatName}}/kibana:
         source: _meta/kibana.generated
         mode: 0644
-      /usr/share/{{.BeatName}}/bin/{{.BeatName}}-god:
-        source: build/golang-crossbuild/god-{{.GOOS}}-{{.Platform.Arch}}
-        mode: 0755
       /usr/bin/{{.BeatName}}:
         template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/beatname.sh.tmpl'
         mode: 0755
       /lib/systemd/system/{{.BeatServiceName}}.service:
         template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/systemd.unit.tmpl'
         mode: 0644
-      /etc/init.d/{{.BeatServiceName}}:
-        template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/{{.PackageType}}/init.sh.tmpl'
-        mode: 0755
 
   # MacOS pkg spec for community beats.
   - &macos_beat_pkg_spec
@@ -1546,7 +1540,6 @@ specs:
             source: data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}
             symlink: true
             mode: 0755
-
     - os: linux
       arch: amd64
       types: [ docker ]
@@ -1583,9 +1576,12 @@ specs:
         <<: *docker_builder_spec
         <<: *agent_docker_cloud_fips_spec
         <<: *elastic_license_for_binaries
+        name: "elastic-agent-cloud-fips"
+        docker_image_name_template: "{{.BeatName}}-cloud-fips"
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     - os: linux
       arch: arm64
       types: [ docker ]
@@ -1596,6 +1592,8 @@ specs:
         <<: *docker_builder_arm_spec
         <<: *agent_docker_cloud_fips_spec
         <<: *elastic_license_for_binaries
+        name: "elastic-agent-cloud-fips"
+        docker_image_name_template: "{{.BeatName}}-cloud-fips"
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}

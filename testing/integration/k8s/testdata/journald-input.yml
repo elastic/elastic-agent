@@ -1,0 +1,23 @@
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - ${ES_HOST}
+    username: ${ELASTICSEARCH_USERNAME}
+    password: ${ELASTICSEARCH_PASSWORD}
+
+agent:
+  monitoring:
+    enabled: false
+
+inputs:
+  - id: journald
+    log_level: debug
+    type: journald
+    data_stream:
+      namespace: "${EA_POLICY_NAMESPACE}"
+    streams:
+      - id: journald-input-id
+        paths:
+          - "/opt/journald/"
+        merge: true

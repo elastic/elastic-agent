@@ -20,7 +20,7 @@ const (
 // snapshot is a flag marking build as a snapshot.
 var snapshot = ""
 
-// fips is a flag for marking a FIPS compliant build.
+// fips is a flag for marking a FIPS-capable build.
 var fips = "false"
 
 // complete is an environment variable marking the image as complete.
@@ -116,7 +116,7 @@ func (v VersionInfo) String() string {
 	sb.WriteString(" (build: ")
 	sb.WriteString(v.Commit)
 	if v.FIPSDistribution {
-		sb.WriteString(" fips: true")
+		sb.WriteString(" fips-distribution: true")
 	}
 	sb.WriteString(" at ")
 	sb.WriteString(v.BuildTime.Format("2006-01-02 15:04:05 -0700 MST"))

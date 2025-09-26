@@ -18,6 +18,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/gofrs/uuid/v5"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -37,6 +39,7 @@ var osInfo *types.OSInfo
 var osInfoErr error
 var osInfoOnce sync.Once
 var noSpecialCharsRegexp = regexp.MustCompile("[^a-zA-Z0-9]+")
+var kubernetesSupported = false
 
 // Require defines what this test requires for it to be run by the test runner.
 //
@@ -44,6 +47,12 @@ var noSpecialCharsRegexp = regexp.MustCompile("[^a-zA-Z0-9]+")
 // and the test runner will not be able to determine the requirements for a test.
 func Require(t *testing.T, req Requirements) *Info {
 	return defineAction(t, req)
+}
+
+// SetKubernetesSupported sets the kubernetesSupported flag to true
+// to allow kubernetes tests to be run.
+func SetKubernetesSupported() {
+	kubernetesSupported = true
 }
 
 type Info struct {
@@ -83,33 +92,31 @@ func Version() string {
 // NewFixtureFromLocalBuild returns a new Elastic Agent testing fixture with a LocalFetcher and
 // the agent logging to the test logger.
 func NewFixtureFromLocalBuild(t *testing.T, version string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
-	buildsDir := os.Getenv("AGENT_BUILD_DIR")
-	if buildsDir == "" {
-		projectDir, err := findProjectRoot()
-		if err != nil {
-			return nil, err
-		}
-		buildsDir = filepath.Join(projectDir, "build", "distributions")
-	}
+	return NewFixtureWithBinary(t, version, "elastic-agent", buildsDir(t), false, opts...)
+}
 
-	return NewFixtureWithBinary(t, version, "elastic-agent", buildsDir, opts...)
-
+// NewFixtureFromLocalFIPSBuild returns a new FIPS-capable Elastic Agent testing fixture with a LocalFetcher
+// and the agent logging to the test logger.
+func NewFixtureFromLocalFIPSBuild(t *testing.T, version string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
+	return NewFixtureWithBinary(t, version, "elastic-agent", buildsDir(t), true, opts...)
 }
 
 // NewFixtureWithBinary returns a new Elastic Agent testing fixture with a LocalFetcher and
 // the agent logging to the test logger.
-func NewFixtureWithBinary(t *testing.T, version string, binary string, buildsDir string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
+func NewFixtureWithBinary(t *testing.T, version string, binary string, buildsDir string, fips bool, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
 	ver, err := semver.ParseVersion(version)
 	if err != nil {
 		return nil, fmt.Errorf("%q is an invalid agent version: %w", version, err)
 	}
 
-	var binFetcher atesting.Fetcher
+	localFetcherOpts := []atesting.LocalFetcherOpt{atesting.WithCustomBinaryName(binary)}
 	if ver.IsSnapshot() {
-		binFetcher = atesting.LocalFetcher(buildsDir, atesting.WithLocalSnapshotOnly(), atesting.WithCustomBinaryName(binary))
-	} else {
-		binFetcher = atesting.LocalFetcher(buildsDir, atesting.WithCustomBinaryName(binary))
+		localFetcherOpts = append(localFetcherOpts, atesting.WithLocalSnapshotOnly())
 	}
+	if fips {
+		localFetcherOpts = append(localFetcherOpts, atesting.WithLocalFIPSOnly())
+	}
+	binFetcher := atesting.LocalFetcher(buildsDir, localFetcherOpts...)
 
 	opts = append(opts, atesting.WithFetcher(binFetcher), atesting.WithLogOutput())
 	if binary != "elastic-agent" {
@@ -139,7 +146,7 @@ func findProjectRoot() (string, error) {
 	}
 }
 
-func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Info {
+func runOrSkip(t *testing.T, req Requirements, local bool) *Info {
 	// always validate requirement is valid
 	if err := req.Validate(); err != nil {
 		panic(fmt.Sprintf("test %s has invalid requirements: %s", t.Name(), err))
@@ -155,6 +162,10 @@ func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Inf
 		t.Skipf("sudo requirement %t not matching sudo filter %t. Skipping", req.Sudo, *SudoFilter.value)
 	}
 
+	if FipsFilter.value != nil && req.FIPS != *FipsFilter.value {
+		t.Skipf("FIPS requirement %t not matching FIPS filter %t. Skipping.", req.FIPS, *FipsFilter.value)
+	}
+
 	// record autodiscover after filtering by group and sudo and before validating against the actual environment
 	if AutoDiscover {
 		discoverTest(t, req)
@@ -165,7 +176,7 @@ func runOrSkip(t *testing.T, req Requirements, local bool, kubernetes bool) *Inf
 		return nil
 	}
 	for _, o := range req.OS {
-		if o.Type == Kubernetes && !kubernetes {
+		if o.Type == Kubernetes && !kubernetesSupported {
 			t.Skip("test requires kubernetes")
 			return nil
 		}
@@ -296,4 +307,17 @@ func getKibanaClient() (*kibana.Client, error) {
 		return nil, fmt.Errorf("failed to create kibana client: %w", err)
 	}
 	return c, nil
+}
+
+func buildsDir(t *testing.T) string {
+	t.Helper()
+
+	buildsDir := os.Getenv("AGENT_BUILD_DIR")
+	if buildsDir == "" {
+		projectDir, err := findProjectRoot()
+		require.NoError(t, err)
+		buildsDir = filepath.Join(projectDir, "build", "distributions")
+	}
+
+	return buildsDir
 }

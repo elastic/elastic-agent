@@ -13,16 +13,23 @@ nodes:
   kubeadmConfigPatches:
   - |
     kind: ClusterConfiguration
-    scheduler:
-      extraArgs:
-        bind-address: "0.0.0.0"
-        port: "10251"
-        secure-port: "10259"
+    apiVersion: kind.x-k8s.io/v1alpha4
     controllerManager:
       extraArgs:
-        bind-address: "0.0.0.0"
-        port: "10252"
-        secure-port: "10257"
+      - name: bind-address
+        value: 0.0.0.0
+      - name: port
+        value: "10252"
+      - name: secure-port
+        value: "10257"
+    scheduler:
+      extraArgs:
+      - name: bind-address
+        value: 0.0.0.0
+      - name: port
+        value: "10251"
+      - name: secure-port
+        value: "10259"
 EOF
 kubectl cluster-info
 

@@ -174,7 +174,12 @@ func (s *Server) Restart(_ context.Context, _ *cproto.Empty) (*cproto.RestartRes
 
 // Upgrade performs the upgrade operation.
 func (s *Server) Upgrade(ctx context.Context, request *cproto.UpgradeRequest) (*cproto.UpgradeResponse, error) {
-	err := s.coord.Upgrade(ctx, request.Version, request.SourceURI, nil, request.SkipVerify, request.SkipDefaultPgp, request.PgpBytes...)
+	err := s.coord.Upgrade(ctx, request.Version, request.SourceURI, nil,
+		coordinator.WithSkipVerifyOverride(request.SkipVerify),
+		coordinator.WithSkipDefaultPgp(request.SkipDefaultPgp),
+		coordinator.WithPgpBytes(request.PgpBytes),
+		coordinator.WithRollback(request.Rollback),
+	)
 	if err != nil {
 		//nolint:nilerr // ignore the error, return a failure upgrade response
 		return &cproto.UpgradeResponse{
@@ -378,6 +383,7 @@ func stateToProto(state *coordinator.State, agentInfo info.Agent) (*cproto.State
 				FailedState:     string(state.UpgradeDetails.Metadata.FailedState),
 				ErrorMsg:        state.UpgradeDetails.Metadata.ErrorMsg,
 				RetryErrorMsg:   state.UpgradeDetails.Metadata.RetryErrorMsg,
+				Reason:          state.UpgradeDetails.Metadata.Reason,
 			},
 		}
 

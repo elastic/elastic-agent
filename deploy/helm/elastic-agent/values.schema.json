@@ -91,6 +91,10 @@
                     "type": "boolean",
                     "description": "Enable Kubernetes integration."
                 },
+                "onboardingID": {
+                    "type": "string",
+                    "description": "Onboarding ID for quick-start flow."
+                },
                 "output": {
                     "type": "string",
                     "description": "Name of the output used in Kubernetes integration. Must be defined in outputs."
@@ -1238,6 +1242,34 @@
                             "annotationKey": "annotationValue"
                         }
                     ]
+                },
+                "command": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Command for the container.",
+                    "examples": [
+                        [
+                            "/usr/local/bin/elastic-agent"
+                        ]
+                    ]
+                },
+                "args": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Arguments for the container command.",
+                    "examples": [
+                        [
+                            "run"
+                        ]
+                    ]
+                },
+                "otelConfig": {
+                    "type": "object",
+                    "description": "OpenTelemetry configuration."
                 },
                 "service": {
                     "type": "object",

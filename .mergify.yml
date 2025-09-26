@@ -19,6 +19,39 @@ defaults:
       labels:
         - "backport"
 pull_request_rules:
+  - name: automatic approval for updatecli pull requests with changes in .buildkite
+    conditions:
+      - author=github-actions[bot]
+      - check-success=buildkite/elastic-agent
+      - or:
+        - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
+      - head~=^updatecli_.*
+    actions:
+      review:
+        type: APPROVE
+        message: Automatically approving mergify
+  - name: automatic squash and merge with success checks and the files matching the regex .buildkite is modified.
+    conditions:
+      - author=github-actions[bot]
+      - check-success=buildkite/elastic-agent
+      - or:
+        - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
+      - head~=^updatecli_.*
+      - "#approved-reviews-by>=1"
+    actions:
+      queue:
+        name: default
+  - name: rebase pull requests for the VM autobump and ESS version pinning
+    conditions:
+      - author=github-actions[bot]
+      - or:
+        - files~=^.buildkite/(pipeline.yml|bk.integration.pipeline.yml)$
+      - head~=^updatecli_.*
+      - "#check-failure>0"
+      - schedule=Mon-Fri 04:00-06:00[Europe/Paris]
+    actions:
+      rebase:
+
   - name: self-assign PRs
     conditions:
       - -merged
@@ -46,7 +79,6 @@ pull_request_rules:
       - -merged
       - -closed
       - conflict
-      - -author=apmmachine
     actions:
         comment:
           message: |
@@ -354,19 +386,6 @@ pull_request_rules:
         labels:
           - "backport"
         title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
-  - name: backport patches to 8.x branch
-    conditions:
-      - merged
-      - label~=^(backport-v8.x|backport-8.x)$
-    actions:
-      backport:
-        assignees:
-          - "{{ author }}"
-        branches:
-          - "8.x"
-        labels:
-          - "backport"
-        title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
   - name: backport patches to 8.17 branch
     conditions:
       - merged
@@ -393,6 +412,14 @@ pull_request_rules:
         labels:
           - "backport"
         title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
+  - name: backport patches to 8.19 branch
+    conditions:
+      - merged
+      - label=backport-8.19
+    actions:
+      backport:
+        branches:
+          - "8.19"
   - name: backport patches to 9.0 branch
     conditions:
       - merged
@@ -406,3 +433,11 @@ pull_request_rules:
         labels:
           - "backport"
         title: "[{{ destination_branch }}](backport #{{ number }}) {{ title }}"
+  - name: backport patches to 9.1 branch
+    conditions:
+      - merged
+      - label=backport-9.1
+    actions:
+      backport:
+        branches:
+          - "9.1"

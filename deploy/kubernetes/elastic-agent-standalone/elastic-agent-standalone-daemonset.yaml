@@ -23,7 +23,14 @@ spec:
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
       serviceAccountName: elastic-agent-standalone
+      # The following setting is needed for Universal Profiling to observe all processes on the host
+      # and produce userspace frames.
+      # If you are using the Universal Profiling integration, please uncomment the following line before applying.
+      # hostPID: true
       hostNetwork: true
+      # The following setting is needed for Universal Profiling to allow to set procMount to "Unmasked".
+      # If you are using the Universal Profiling integration, please uncomment the following line before applying.
+      # hostUsers: false
       dnsPolicy: ClusterFirstWithHostNet
       # Uncomment if using hints feature
       #initContainers:
@@ -80,7 +87,7 @@ spec:
             #    - SYS_ADMIN
           resources:
             limits:
-              memory: 1Gi
+              memory: 1200Mi
             requests:
               cpu: 100m
               memory: 500Mi

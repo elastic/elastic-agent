@@ -6,18 +6,12 @@ function ess_up() {
   local WORKSPACE=$(git rev-parse --show-toplevel)
   local TF_DIR="${WORKSPACE}/test_infra/ess/"
   local STACK_VERSION=$1
-  local ESS_REGION=${2:-"gcp-us-west2"}
+  local STACK_BUILD_ID=${2:-""}
+  local ESS_REGION=${3:-"gcp-us-west2"}
     
   if [ -z "$STACK_VERSION" ]; then
     echo "Error: Specify stack version: ess_up [stack_version]" >&2
     return 1
-  fi
-
-  export EC_API_KEY=$(retry -t 5 -- vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)
-  
-  if [[ -z "${EC_API_KEY}" ]]; then
-    echo "Error: Failed to get EC API key from vault" >&2
-    exit 1
   fi
 
   BUILDKITE_BUILD_CREATOR="${BUILDKITE_BUILD_CREATOR:-"$(get_git_user_email)"}"
@@ -29,6 +23,7 @@ function ess_up() {
   terraform apply \
     -auto-approve \
     -var="stack_version=${STACK_VERSION}" \
+    -var="stack_build_id=${STACK_BUILD_ID}" \
     -var="ess_region=${ESS_REGION}" \
     -var="creator=${BUILDKITE_BUILD_CREATOR}" \
     -var="buildkite_id=${BUILDKITE_BUILD_NUMBER}" \
@@ -40,20 +35,20 @@ function ess_up() {
   export KIBANA_HOST=$(terraform output -raw kibana_endpoint)
   export KIBANA_USERNAME=$ELASTICSEARCH_USERNAME
   export KIBANA_PASSWORD=$ELASTICSEARCH_PASSWORD
+  export INTEGRATIONS_SERVER_HOST=$(terraform output -raw integrations_server_endpoint)
   popd
 }
 
 function ess_down() {
-  echo "~~~ Tearing down the ESS Stack"  
+  echo "~~~ Tearing down the ESS Stack"
+  local ESS_REGION=${1:-"gcp-us-west2"}
   local WORKSPACE=$(git rev-parse --show-toplevel)
   local TF_DIR="${WORKSPACE}/test_infra/ess/"
-  if [ -z "${EC_API_KEY:-}" ]; then
-    export EC_API_KEY=$(retry -t 5 -- vault kv get -field=apiKey kv/ci-shared/platform-ingest/platform-ingest-ec-prod)    
-  fi
   
   pushd "${TF_DIR}"
   terraform init
-  terraform destroy -auto-approve
+  terraform destroy -auto-approve \
+    -var="ess_region=${ESS_REGION}"
   popd
 }
 

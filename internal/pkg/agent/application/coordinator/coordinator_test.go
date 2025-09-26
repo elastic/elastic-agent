@@ -22,8 +22,6 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
 
-	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
-
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -52,6 +50,7 @@ import (
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	mockAcker "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/fleetapi/acker"
 )
 
 const (
@@ -537,9 +536,54 @@ func TestUpgradeSameErrorAcked(t *testing.T) {
 
 	acker.On("Ack", mock.Anything, actionUpgrade).Return(nil)
 
-	require.NoError(t, coord.Upgrade(t.Context(), "9.0", "http://localhost", actionUpgrade, true, true))
+	require.NoError(t, coord.Upgrade(t.Context(), "9.0", "http://localhost", actionUpgrade, WithSkipVerifyOverride(true), WithSkipDefaultPgp(true)))
 
 	acker.AssertCalled(t, "Ack", mock.Anything, actionUpgrade)
+}
+
+func TestPreUpgradeCallback(t *testing.T) {
+	coordCh := make(chan error)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	upgradeManager := &fakeUpgradeManager{
+		upgradeable: true,
+		upgradeErr:  upgrade.ErrUpgradeSameVersion,
+	}
+
+	acker := mockAcker.NewAcker(t)
+	coord, _, _ := createCoordinator(t, ctx,
+		ManagedCoordinator(true),
+		WithUpgradeManager(upgradeManager),
+		WithActionAcker(acker))
+
+	go func() {
+		err := coord.Run(ctx)
+		if errors.Is(err, context.Canceled) {
+			// allowed error
+			err = nil
+		}
+		coordCh <- err
+	}()
+
+	action := fleetapi.NewAction(fleetapi.ActionTypeUpgrade)
+	actionUpgrade, ok := action.(*fleetapi.ActionUpgrade)
+	require.True(t, ok)
+
+	preUpgradeCallbackErr := errors.New("pre upgrade callback error")
+
+	upgradeErr := coord.Upgrade(t.Context(), "9.0", "http://localhost", actionUpgrade,
+		WithSkipVerifyOverride(true), WithSkipDefaultPgp(true),
+		WithPreUpgradeCallback(func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error {
+			return preUpgradeCallbackErr
+		}))
+
+	assert.ErrorIs(t, preUpgradeCallbackErr, upgradeErr)
+	assert.Nil(t, coord.overrideState)
+	assert.Equal(t, preUpgradeCallbackErr, upgradeErr, "expected pre upgrade callback error")
+	assert.Eventually(t, func() bool {
+		return coord.State().UpgradeDetails.State == details.StateFailed
+	}, 10*time.Second, 100*time.Millisecond, "upgrade details are not set to failed")
 }
 
 func TestCoordinator_State_ConfigError_Managed(t *testing.T) {
@@ -919,7 +963,7 @@ func TestCoordinator_Upgrade(t *testing.T) {
 	require.NoError(t, err)
 	cfgMgr.Config(ctx, cfg)
 
-	err = coord.Upgrade(ctx, "9.0.0", "", nil, true, false)
+	err = coord.Upgrade(ctx, "9.0.0", "", nil, WithSkipVerifyOverride(true), WithSkipDefaultPgp(false))
 	require.ErrorIs(t, err, ErrNotUpgradable)
 	cancel()
 
@@ -956,7 +1000,7 @@ func TestCoordinator_UpgradeDetails(t *testing.T) {
 	require.NoError(t, err)
 	cfgMgr.Config(ctx, cfg)
 
-	err = coord.Upgrade(ctx, "9.0.0", "", nil, true, false)
+	err = coord.Upgrade(ctx, "9.0.0", "", nil, WithSkipVerifyOverride(true), WithSkipDefaultPgp(false))
 	require.ErrorIs(t, expectedErr, err)
 	cancel()
 
@@ -1078,8 +1122,7 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 	cfg.Port = 0
 	rm, err := runtime.NewManager(l, l, ai, apmtest.DiscardTracer, monitoringMgr, cfg)
 	require.NoError(t, err)
-	otelMgr := otelmanager.NewOTelManager(l)
-
+	otelMgr := &fakeOTelManager{}
 	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), l)
 	require.NoError(t, err)
 
@@ -1096,7 +1139,7 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 		acker = &fakeActionAcker{}
 	}
 
-	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelMgr, acker)
+	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelMgr, acker, nil)
 	return coord, cfgMgr, varsMgr
 }
 
@@ -1162,7 +1205,7 @@ func (f *fakeUpgradeManager) Reload(cfg *config.Config) error {
 	return nil
 }
 
-func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	f.upgradeCalled = true
 	if f.upgradeErr != nil {
 		return nil, f.upgradeErr
@@ -1199,6 +1242,9 @@ func (*testMonitoringManager) Enabled() bool                                  { 
 func (*testMonitoringManager) Reload(rawConfig *config.Config) error          { return nil }
 func (*testMonitoringManager) MonitoringConfig(map[string]interface{}, []component.Component, map[string]uint64) (map[string]interface{}, error) {
 	return nil, nil
+}
+func (*testMonitoringManager) ComponentMonitoringConfig(_, _ string) map[string]interface{} {
+	return nil
 }
 
 type fakeConfigManager struct {
@@ -1335,10 +1381,16 @@ func (f *fakeVarsManager) DefaultProvider() string {
 	return ""
 }
 
+var _ OTelManager = (*fakeOTelManager)(nil)
+
 type fakeOTelManager struct {
-	updateCallback func(*confmap.Conf) error
-	result         error
-	errChan        chan error
+	updateCollectorCallback             func(*confmap.Conf) error
+	updateComponentCallback             func([]component.Component) error
+	performDiagnosticsCallback          func(context.Context, ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic
+	performComponentDiagnosticsCallback func(context.Context, []cproto.AdditionalDiagnosticRequest, ...component.Component) ([]runtime.ComponentDiagnostic, error)
+	errChan                             chan error
+	collectorStatusChan                 chan *status.AggregateStatus
+	componentStateChan                  chan []runtime.ComponentComponentState
 }
 
 func (f *fakeOTelManager) Run(ctx context.Context) error {
@@ -1347,30 +1399,59 @@ func (f *fakeOTelManager) Run(ctx context.Context) error {
 }
 
 func (f *fakeOTelManager) Errors() <-chan error {
+	return f.errChan
+}
+
+func (f *fakeOTelManager) Update(cfg *confmap.Conf, components []component.Component) {
+	var collectorResult, componentResult error
+	if f.updateCollectorCallback != nil {
+		collectorResult = f.updateCollectorCallback(cfg)
+	}
+	if f.errChan != nil && collectorResult != nil {
+		// If a reporting channel is set, send the collectorResult to it
+		f.errChan <- collectorResult
+	}
+	if f.updateComponentCallback != nil {
+		componentResult = f.updateComponentCallback(components)
+	}
+	if f.errChan != nil && componentResult != nil {
+		// If a reporting channel is set, send the componentResult to it
+		f.errChan <- componentResult
+	}
+}
+
+func (f *fakeOTelManager) WatchCollector() <-chan *status.AggregateStatus {
+	return f.collectorStatusChan
+}
+
+func (f *fakeOTelManager) WatchComponents() <-chan []runtime.ComponentComponentState {
+	return f.componentStateChan
+}
+
+func (f *fakeOTelManager) MergedOtelConfig() *confmap.Conf { return nil }
+
+func (f *fakeOTelManager) PerformDiagnostics(ctx context.Context, reqs ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic {
+	if f.performDiagnosticsCallback != nil {
+		return f.performDiagnosticsCallback(ctx, reqs...)
+	}
 	return nil
 }
 
-func (f *fakeOTelManager) Update(cfg *confmap.Conf) {
-	f.result = nil
-	if f.updateCallback != nil {
-		f.result = f.updateCallback(cfg)
+func (f *fakeOTelManager) PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error) {
+	if f.performComponentDiagnosticsCallback != nil {
+		return f.performComponentDiagnosticsCallback(ctx, additionalMetrics, req...)
 	}
-	if f.errChan != nil {
-		// If a reporting channel is set, send the result to it
-		f.errChan <- f.result
-	}
-}
-
-func (f *fakeOTelManager) Watch() <-chan *status.AggregateStatus {
-	return nil
+	return nil, nil
 }
 
 // An implementation of the RuntimeManager interface for use in testing.
 type fakeRuntimeManager struct {
-	state          []runtime.ComponentComponentState
-	updateCallback func([]component.Component) error
-	result         error
-	errChan        chan error
+	state                               []runtime.ComponentComponentState
+	updateCallback                      func([]component.Component) error
+	performDiagnosticsCallback          func(context.Context, ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic
+	performComponentDiagnosticsCallback func(context.Context, []cproto.AdditionalDiagnosticRequest, ...component.Component) ([]runtime.ComponentDiagnostic, error)
+	result                              error
+	errChan                             chan error
 }
 
 func (r *fakeRuntimeManager) Run(ctx context.Context) error {
@@ -1408,12 +1489,18 @@ func (r *fakeRuntimeManager) SubscribeAll(context.Context) *runtime.Subscription
 
 // PerformDiagnostics executes the diagnostic action for the provided units. If no units are provided then
 // it performs diagnostics for all current units.
-func (r *fakeRuntimeManager) PerformDiagnostics(context.Context, ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic {
+func (r *fakeRuntimeManager) PerformDiagnostics(ctx context.Context, req ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic {
+	if r.performDiagnosticsCallback != nil {
+		return r.performDiagnosticsCallback(ctx, req...)
+	}
 	return nil
 }
 
 // PerformComponentDiagnostics  executes the diagnostic action for the provided components.
-func (r *fakeRuntimeManager) PerformComponentDiagnostics(_ context.Context, _ []cproto.AdditionalDiagnosticRequest, _ ...component.Component) ([]runtime.ComponentDiagnostic, error) {
+func (r *fakeRuntimeManager) PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error) {
+	if r.performComponentDiagnosticsCallback != nil {
+		return r.performComponentDiagnosticsCallback(ctx, additionalMetrics, req...)
+	}
 	return nil, nil
 }
 

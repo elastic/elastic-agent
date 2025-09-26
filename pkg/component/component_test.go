@@ -5,7 +5,7 @@
 package component
 
 import (
-	"errors"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,15 +16,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/go-ucfg"
-
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
+	"github.com/elastic/go-ucfg"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -700,7 +699,7 @@ func TestToComponents(t *testing.T) {
 							ID:       "filestream-default-filestream-1",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
-							Err:      fmt.Errorf("decoding error: %w", fmt.Errorf("decoding failed due to the following error(s):\n\n%w", errors.Join(errors.New("'meta' expected a map, got 'slice'")))),
+							Err:      fmt.Errorf("decoding error: %w", makeMapStructureErr(t)),
 						},
 					},
 					RuntimeManager: DefaultRuntimeManager,
@@ -790,7 +789,7 @@ func TestToComponents(t *testing.T) {
 							ID:       "cloudbeat-default-cloudbeat-1-unit",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
-							Err:      fmt.Errorf("decoding error: %w", fmt.Errorf("decoding failed due to the following error(s):\n\n%w", errors.Join(errors.New("'meta' expected a map, got 'slice'")))),
+							Err:      fmt.Errorf("decoding error: %w", makeMapStructureErr(t)),
 						},
 					},
 					RuntimeManager: DefaultRuntimeManager,
@@ -2167,7 +2166,8 @@ func TestToComponents(t *testing.T) {
 						"type":    "elasticsearch",
 						"enabled": true,
 						"headers": map[string]interface{}{
-							"header-two": "val-2",
+							"header-two":   "val-2",
+							"header-three": "val-3",
 						},
 					},
 				},
@@ -2196,8 +2196,9 @@ func TestToComponents(t *testing.T) {
 							Config: MustExpectedConfig(map[string]interface{}{
 								"type": "elasticsearch",
 								"headers": map[string]interface{}{
-									"header-two": "val-2",
-									"header-one": "val-1",
+									"header-two":   "val-2",
+									"header-one":   "val-1",
+									"header-three": "val-3",
 								},
 							}),
 						},
@@ -2215,7 +2216,8 @@ func TestToComponents(t *testing.T) {
 				},
 			},
 			headers: &testHeadersProvider{headers: map[string]string{
-				"header-one": "val-1",
+				"header-one":   "val-1",
+				"header-three": "val-3-diff",
 			}},
 		},
 		{
@@ -2228,6 +2230,7 @@ func TestToComponents(t *testing.T) {
 						"enabled": true,
 						"headers": map[string]interface{}{
 							"cloud1": "beat1",
+							"cloud3": "beat3",
 						},
 					},
 				},
@@ -2258,6 +2261,7 @@ func TestToComponents(t *testing.T) {
 								"headers": map[string]interface{}{
 									"cloud1": "beat1",
 									"cloud2": "beat2",
+									"cloud3": "beat3",
 								},
 							}),
 						},
@@ -2276,6 +2280,7 @@ func TestToComponents(t *testing.T) {
 			},
 			headers: &testHeadersProvider{headers: map[string]string{
 				"cloud2": "beat2",
+				"cloud3": "beat3-diff",
 			}},
 		},
 		{
@@ -3117,4 +3122,19 @@ func TestFlattenedDataStreamIsolatedUnits(t *testing.T) {
 			t.Errorf("expecting DataStream.Namespace: %q, got: %q", expectedNamespace[currentId], dataStream.Namespace)
 		}
 	}
+}
+
+func makeMapStructureErr(t *testing.T) error {
+	t.Helper()
+
+	jsonStr := `{ "meta": [] }`
+
+	var data map[string]interface{}
+	err := json.Unmarshal([]byte(jsonStr), &data)
+	require.NoError(t, err)
+
+	var output struct {
+		Meta struct{} `mapstructure:"meta"`
+	}
+	return mapstructure.Decode(data, &output)
 }

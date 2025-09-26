@@ -9,9 +9,18 @@ DOCKER_VARIANTS="${DOCKER_VARIANTS:-basic,wolfi,complete,complete-wolfi,service,
 CLUSTER_NAME="${K8S_VERSION}-kubernetes"
 
 if [[ -z "${AGENT_VERSION:-}" ]]; then
-  # If not specified, use the version in version/version.go
-  AGENT_VERSION="$(grep "const defaultBeatVersion =" version/version.go | cut -d\" -f2)"
-  AGENT_VERSION="${AGENT_VERSION}-SNAPSHOT"
+  if [[ -f "${WORKSPACE}/.package-version" ]]; then
+    AGENT_VERSION="$(jq -r '.version' .package-version)"
+    echo "~~~ Agent version: ${AGENT_VERSION} (from .package-version)"
+  else
+    AGENT_VERSION="$(grep "const defaultBeatVersion =" version/version.go | cut -d\" -f2)"
+    AGENT_VERSION="${AGENT_VERSION}-SNAPSHOT"
+    echo "~~~ Agent version: ${AGENT_VERSION} (from version/version.go)"
+  fi
+
+  export AGENT_VERSION
+else
+  echo "~~~ Agent version: ${AGENT_VERSION} (specified by env var)"
 fi
 
 echo "~~~ Create kind cluster '${CLUSTER_NAME}'"
@@ -41,8 +50,7 @@ chmod +x ./testsBinary
 
 export TEST_DEFINE_PREFIX="${CLUSTER_NAME}"
 
-go install gotest.tools/gotestsum
-gotestsum --version
+make install-gotestsum
 
 TESTS_EXIT_STATUS=0
 for variant in "${docker_variants[@]}"; do
@@ -100,9 +108,13 @@ EOF
   pod_logs_base="${PWD}/build/${fully_qualified_group_name}.pod_logs_dump"
 
   set +e
-  K8S_TESTS_POD_LOGS_BASE="${pod_logs_base}" AGENT_IMAGE="${image}" DOCKER_VARIANT="${variant}" gotestsum --hide-summary=skipped --format testname --no-color -f standard-quiet --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags kubernetes,integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration -v -args -integration.groups="${group_name}" -integration.sudo="false"
+  K8S_TESTS_POD_LOGS_BASE="${pod_logs_base}" AGENT_IMAGE="${image}" DOCKER_VARIANT="${variant}" gotestsum --hide-summary=skipped --format testname --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags kubernetes,integration -test.shuffle on -test.timeout 2h0m0s github.com/elastic/elastic-agent/testing/integration/k8s -v -args -integration.groups="${group_name}" -integration.sudo="false"
   exit_status=$?
   set -e
+
+  if [[ $exit_status -ne 0 ]]; then
+     echo "^^^ +++"
+  fi
 
   if [[ $TESTS_EXIT_STATUS -eq 0 && $exit_status -ne 0 ]]; then
     TESTS_EXIT_STATUS=$exit_status

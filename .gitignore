@@ -27,6 +27,8 @@ fleet.yml
 fleet.enc
 fleet.enc.lock
 env.sh
+.artifacts
+/docs/.artifacts
 
 # Editor swap files
 *.swp
@@ -60,3 +62,4 @@ fleet.yml.lock
 fleet.yml.old
 pkg/component/fake/component/component
 internal/pkg/agent/install/testblocking/testblocking
+internal/pkg/otel/manager/testing/testing

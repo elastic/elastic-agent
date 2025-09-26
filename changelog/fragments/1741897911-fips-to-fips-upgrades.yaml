@@ -11,7 +11,7 @@
 kind: enhancement
 
 # Change summary; a 80ish characters long description of the change.
-summary: With this change fips compliant agents will only be able to upgrade to other fips compliant agents. This change also restricts non-fips to fips upgrades as well.
+summary: With this change FIPS-capable agents will only be able to upgrade to other FIPS-capable agents. This change also restricts non-fips to fips upgrades as well.
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.

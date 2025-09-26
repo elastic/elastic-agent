@@ -7,6 +7,13 @@ env:
   DRA_PROJECT_ID: "elastic-agent-core"
   DRA_PROJECT_ARTIFACT_ID: "agent-core"
 
+# This section is used to define the plugins that will be used in the pipeline.
+# See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
+common:
+  - docker_login_plugin: &docker_login_plugin
+      elastic/vault-docker-login#v0.5.2:
+        secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+
 steps:
   - group: ":beats: DRA Elastic-Agent Core Snapshot :beats:"
     key: "dra-core-snapshot"
@@ -84,6 +91,8 @@ steps:
         machineType: "c2-standard-16"
       env:
         DRA_WORKFLOW: "snapshot"
+      plugins:
+        - *docker_login_plugin
 
     - label: ":hammer: Publish helm chart snapshot"
       trigger: elastic-agent-helm-charts
@@ -177,17 +186,8 @@ steps:
         machineType: "c2-standard-16"
       env:
         DRA_WORKFLOW: "staging"
-
-    - label: ":hammer: Publish helm chart staging"
-      trigger: elastic-agent-helm-charts
-      if: build.env("BUILDKITE_BRANCH") != "8.16" && build.env("BUILDKITE_BRANCH") != "8.17"
-      build:
-        branch: "${BUILDKITE_BRANCH}"
-        commit: "${BUILDKITE_COMMIT}"
-        message: "publish helm-chart for elastic-agent in dev (staging)"
-        env:
-          SNAPSHOT: "false"
-          HELM_REPO_ENV: "dev"
+      plugins:
+        - *docker_login_plugin
 
 notify:
   - slack: "#ingest-notifications"

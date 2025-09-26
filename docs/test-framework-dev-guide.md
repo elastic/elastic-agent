@@ -16,17 +16,43 @@ provides a high level overview of the testing framework.
 Go version should be at least the same than the one in [.go-version](https://github.com/elastic/elastic-agent/blob/main/.go-version) file at the root of this repository.
 
 
-### GCloud CLI
+#### GCloud CLI
 The integration testing framework spins up resources in GCP.  To achieve this, it needs the
 [GCloud CLI](https://cloud.google.com/sdk/gcloud) to be installed on the system where the tests are initiated from.
 
-### Beats
+#### Beats
 The Elastic Agent package that is used for integration tests packages Beats built from the Unified Release (as opposed to DRA).  There is no explicit action needed for this prerequisite but just keep in mind that if any Agent integration tests rely on certain Beats features or bugfixes, they may not be available in the integration tests yet because a unified release containing those features or bugfixes may not have happened yet.
+
+#### Helm & Helm charts
+To run the Kubernets integration tests you need to install
+[helm](https://helm.sh/). Then add and update some helm charts
+repositories:
+
+```
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+```
+
+Make sure to run `helm repo update` before running K8s integration
+tests otherwise the tests will fail stating a chart/version cannot be
+found.
 
 ### Configuration
 
 ESS (production) API Key to create on <https://cloud.elastic.co/account/keys>
 Warning: if you never created a deployment on it, you won't have permission to get this key, so you will need to create one first.
+
+
+#### Setup Serverless deployment
+
+This process is now automated and runs daily, utilizing the existing `oblt-cli` framework. Serverless deployments are created each day and automatically destroyed every three days.
+
+The automation is configured in the `serverless-project.yml` file located in the `.github/workflows` directory.
+
+If necessary, you can create a new serverless deployment manually; the previous deployments will be destroyed automatically, but not immediately. To do so, you need to run the GitHub action called [serverless-project.yml](https://github.com/elastic/elastic-agent/actions/workflows/serverless-project.yml).
+
+Credentials for these deployments are securely stored in Google and can only be accessed by Buildkite pipelines. The access control is set using [OpenID Connect in Google Cloud Platform](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/configuring-openid-connect-in-google-cloud-platform). And that's managed by the Robots team.
+
 
 ## Running tests
 
@@ -49,27 +75,138 @@ Go to https://docker-auth.elastic.co/ and authenticate with Okta to receive your
 
 [elastic_docker_registry]: docker.elastic.co
 
+### Packaging
+Before you can run any test, you first need to package the Elastic
+Agent version you want to test. For that you'll need to run
+
+```
+DEV=true SNAPSHOT=true EXTERNAL=true PACKAGES="tar.gz,deb,rpm" PLATFORMS=linux/amd64 mage -v package
+```
+
+The packaging process has many leavers that need to be correctly set:
+
+ - `DEV=true|false`: Build with debug symbols
+ - `EXTERNAL=true|false`: If `false` it will look for the `beats`
+   folder at the same level as `elastic-agent` and build
+   `x-pack/agentbeat` from there. Be aware that if you change Beats
+   code and there is already an Agentbeat artifact built, it will not
+   be re-build. You need to manually clean the Agentbeat build
+   folder. If `true` it will download the latest snapshot.
+ - `SNAPSHOT=true|false`: When downloading dependencies (like Beats)
+   use snapshot versions. That is required to package from the `main`
+   branch with `EXTERNAL=true`.
+ - `PLATFORMS`: Comma separated list of platforms you want to build. If
+  not set, it defaults to **ALL** platforms. [Selecting specific
+  platform](#selecting-specific-platform) contains a list of common
+  values. For a full list look at [`elastic-agent/dev-tools/mage/platforms.go`](https://github.com/elastic/elastic-agent/blob/main/dev-tools/mage/platforms.go#L15).
+ - `PACKAGES`: Comma separated list of packages you want to build. If
+  not set, it defaults to **ALL** packages, which takes a long time,
+  so make sure to *always* set it correctly. The packages are defined
+  on
+  [`elastic-agent/dev-tools/mage/pkgtypes.go`](https://github.com/elastic/elastic-agent/blob/main/dev-tools/mage/pkgtypes.go#L72).
+  To run Linux tests you need to package `tar.gz` ,`deb` and `rpm`.
+The possible options are:
+    - `tar.gz`
+    - `zip` (Windows only)
+    - `deb`
+    - `rpm`
+    - `docker`
+ - `DOCKER_VARIANTS`: When building Docker images, which variants to
+ build. The variants are defined on
+ [`elastic-agent/dev-tools/mage/dockervariants.go`](https://github.com/elastic/elastic-agent/blob/9f6c6a79f9e19ec2090d8f7da184280412cb8663/dev-tools/mage/dockervariants.go#L30),
+ possible values are:
+    - `basic`
+    - `ubi`
+    - `wolfi`
+    - `complete`
+    - `complete-wolfi`
+    - `cloud`
+    - `service`
+    - `elastic-otel-collector`
+    - `slim`
+    - `elastic-otel-collector-wolfi`
+    - `slim-wolfi`
+
 ### Running the tests
 
-The test are run with mage using the `integration` namespace:
+The test are run with mage using the `integration` namespace, they
+share similar leavers as the packaging process.
 
-- `mage integration:test` to execute all tests under the `testing/integration`
+ - `AGENT_VERSION`: The version to test, in the format
+   `9.2.0-SNAPSHOT`. It is **REQUIRED** to be set if you built the
+   packages with `SNAPTHOST=true`. Currently there is no way to tell
+   the integration tests framework to use snapshot versions if testing
+   on VMs.
+
+ - `SNAPSHOT=true|false`: Use snapshot build when running Kubernetes
+   tests.
+
+ - `INSTANCE_PROVISIONER`: Sets the provisioner used to create
+   instances, possible values are:
+     - `ogc`: Uses OGC to create VMs on GCP, if not set, that's the default.
+     - `multipass`: Uses [Multipass](https://canonical.com/multipass) to
+       create local VMs.
+     - `kind`: Uses [Kind](https://kind.sigs.k8s.io/) to run Kubernetes
+       in Docker. This needs to be set if running Kubernetes integration
+       tests.
+
+
+### TL;DR: Packaging and running tests
+**Package the Elastic Agent**
+```
+# If testing on VMs.
+DEV=true SNAPSHOT=true EXTERNAL=true PACKAGES="tar.gz,deb,rpm" PLATFORMS=linux/amd64 mage -v package
+
+# If running Kubernetes tests. Adjust the variants according to your tests
+DEV=true SNAPSHOT=true EXTERNAL=true PACKAGES="tar.gz,deb,rpm" DOCKER_VARIANTS="basic,complete,elastic-otel-collector" PLATFORMS=linux/amd64 mage -v package
+```
+
+**Run the tests**
+```
+# If testing on VMs. Adjust the AGENT_VERSION according to your build.
+AGENT_VERSION="9.2.0-SNAPSHOT" mage -v integration:single TestLogIngestionFleetManaged
+
+# If testing on Kubernetes
+SNAPSHOT=true INSTANCE_PROVISIONER=kind mage -v integration:testKubernetesSingle TestKubernetesJournaldInput
+```
+
+#### ESS oriented tests
+
+- `mage integration:test` to execute all tests under the `testing/integration/ess`
   folder. All tests are executed on remote VMs, including those that set `Local: true`.
 
 - `mage integration:local [testName|all]` to execute only those tests under the
-  `testing/integration` folder that set `Local: true`. It'll run all the tests if
+  `testing/integration/ess` folder that set `Local: true`. It'll run all the tests if
   `all` is passed as argument, or it'll pass `[testName]` to `go test` as
   `--run=[testName]`. These tests are executed on your local machine.
 
-- `mage integration:single [testName]` to execute a single test under the `testing/integration` folder. Only the selected test will be executed on remote VMs.
+- `mage integration:single [testName]` to execute a single test under the `testing/integration/ess` folder. Only the selected test will be executed on remote VMs.
 
-- `mage integration:matrix` to run all tests on the complete matrix of supported operating systems and architectures of the Elastic Agent.
+- `mage integration:matrix` to run all tests under the `testing/integration/ess` folder on the complete matrix of supported operating systems and architectures of the Elastic Agent.
 
-- `mage integration:kubernetes` to run kubernetes tests for the default image on the default version of kubernetes (all previous commands will not run any kubernetes tests).
+#### Kubernetes oriented tests
 
-- `mage integration:kubernetesMatrix` to run a matrix of kubernetes tests for all image types and supported versions of kubernetes.
+- `INSTANCE_PROVISIONER=kind mage integration:testKubernetes` to run kubernetes tests under the `testing/integration/k8s` folder for the default image on the default version of kubernetes (all previous commands will not run any kubernetes tests).
 
-#### Selecting specific platform
+- `INSTANCE_PROVISIONER=kind mage integration:testKubernetesMatrix` to run a matrix of kubernetes tests under the `testing/integration/k8s` folder for all image types and supported versions of kubernetes.
+
+- `INSTANCE_PROVISIONER=kind mage integration:testKubernetesSingle [testName|all]` to execute a single test under the `testing/integration/k8s` folder. Only the selected test will be executed.
+
+#### Serverless oriented tests
+
+- `mage integration:testServerless` to execute all tests under the `testing/integration/serverless` folder. All tests are executed on remote VMs, including those that set `Local: true`.
+
+- `mage integration:testServerlessSingle [testName|all]` to execute a single test under the `testing/integration/serverless` folder. Only the selected test will be executed on remote VMs.
+
+#### Resource leaks tests
+
+- `mage integration:testForResourceLeaks` to execute all tests under the `testing/integration/leak` folder. All tests are executed on remote VMs.
+
+- `mage integration:testForResourceLeaksSingle [testName|all]` to execute a single test under the `testing/integration/leak` folder. Only the selected test will be executed on remote VMs.
+
+You can list all available mage targets by running `mage -l`
+
+#### Selecting specific platform<a name="selecting-specific-platform"></a>
 
 By default, the runner will deploy to every combination of operating system and architecture that the tests define
 as supporting. When working on tests and debugging an issue it's better to limit the operating system and architecture
@@ -83,9 +220,10 @@ between, and it can be very specific or not very specific.
 - `TEST_PLATFORMS="linux/amd64/ubuntu/20.04 mage integration:test` to execute tests only on Ubuntu 20.04 ARM64.
 - `TEST_PLATFORMS="windows/amd64/2022 mage integration:test` to execute tests only on Windows Server 2022.
 - `TEST_PLATFORMS="linux/amd64 windows/amd64/2022 mage integration:test` to execute tests on Linux AMD64 and Windows Server 2022.
-- `TEST_PLATFORMS="kubernetes/arm64/1.32.0/wolfi" mage integration:kubernetes` to execute kubernetes tests on Kubernetes version 1.32.0 with wolfi docker variant.
+- `INSTANCE_PROVISIONER="kind" TEST_PLATFORMS="kubernetes/arm64/1.33.0/wolfi" mage integration:testKubernetes` to execute kubernetes tests on Kubernetes version 1.33.0 with wolfi docker variant under kind cluster.
 
-> **_NOTE:_**  This only filters down the tests based on the platform. It will not execute a tests on a platform unless
+> [!NOTE]
+> This only filters down the tests based on the platform. It will not execute a tests on a platform unless
 > the test defines as supporting it.
 
 #### Selecting specific group
@@ -130,10 +268,13 @@ We pass a `-test.count` flag along with the name match
 We pass a `-test.run` flag along with the names of the tests we want to run in OR
 `GOTEST_FLAGS="-test.run ^(TestStandaloneUpgrade|TestFleetManagedUpgrade)$" mage integration:test`
 
+##### Run Serverless tests
+The test framework includes a smoke test suite to check elastic-agent in a serverless environment. The suite can be run via the `integration:TestServerless` mage target.
+
 ##### Run Extended Runtime Leak Test
 The test framework includes a "long running" test to check for resource leaks and stability.
 The runtime of the test can be set via the `LONG_TEST_RUNTIME` environment variable.
-The test itself can be run via the `integration:TestLongRunningAgentForLeaks` mage target.
+The test itself can be run via the `integration:TestForResourceLeaks` mage target.
 
 ##### Limitations
 Due to the way the parameters are passed to `devtools.GoTest` the value of the environment variable
@@ -148,7 +289,8 @@ following `mage integration:*` commands to re-use the already provisioned resour
 
 Tests with external dependencies might need more environment variables to be set
 when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAME`,
-`ELASTICSEARCH_PASSWORD`, `KIBANA_HOST`, `KIBANA_USERNAME`, and `KIBANA_PASSWORD`.
+`ELASTICSEARCH_PASSWORD`, `KIBANA_HOST`, `KIBANA_USERNAME`, `KIBANA_PASSWORD`, and
+`INTEGRATIONS_SERVER_HOST`.
 
 ### Debugging tests
 
@@ -292,6 +434,25 @@ until it reports a failure.
 
 - `TEST_RUN_UNTIL_FAILURE=true mage integration:single [testName]`
 
+### Running integration tests with local changes in beats (for otel receivers)
+
+If you've made local changes to Beats-OTel and want to run the Agent's integration tests against those changes, follow these steps:
+1. Update go.mod and add a replace directive as follows (change the path to match your local machine):
+```
+replace github.com/elastic/beats/v7 => /Users/vihasmakwana/Desktop/Vihas/elastic/beats
+```
+2. Package the Agent with `EXTERNAL=true`:
+```sh
+EXTERNAL=true PLATFORMS=darwin/arm64 mage package
+```
+3. Run integration tests as per [the instructions](#running-the-tests)
+
+> [!NOTE]
+> Make sure you add an absolute path in replace directive
+
+> [!NOTE]
+> Old agent might be cached at `.agent-testing` directory. Run `mage integration:clean` to clean it.
+
 ## Writing tests
 
 Write integration and E2E tests by adding them to the `testing/integration`
@@ -318,11 +479,11 @@ groups is better than a ton of groups each executing a small set of tests, as th
 out weight the benefits of creating another group.
 
 #### Creating a new test group and Buildkite integration tests
-  
-  When creating a new test group, it is important to add the new group to the job in the `.buildkite/bk.integration.pipeline.yml` file. This will ensure that the new group is executed in the CI pipeline. 
 
-  Add the new group to the `matrix` in the corresponding steps. The matrix is a list of all test groups that are executed in the step. 
-  Example: 
+  When creating a new test group, it is important to add the new group to the job in the `.buildkite/bk.integration.pipeline.yml` file. This will ensure that the new group is executed in the CI pipeline.
+
+  Add the new group to the `matrix` in the corresponding steps. The matrix is a list of all test groups that are executed in the step.
+  Example:
 
   ```yaml
   - label: "x86_64:sudo: {{matrix}}"
@@ -335,7 +496,11 @@ out weight the benefits of creating another group.
           machineType: "n1-standard-8"
           image: "family/platform-ingest-elastic-agent-ubuntu-2404"
         plugins:
-          - test-collector#v1.10.1:
+          - elastic/vault-secrets#v0.1.0:
+              path: "kv/ci-shared/platform-ingest/buildkite_analytics_token"
+              field: "token"
+              env_var: "BUILDKITE_ANALYTICS_TOKEN"
+          - test-collector#v1.11.0:
               files: "build/TEST-*.xml"
               format: "junit"
               branches: "main"
@@ -383,7 +548,7 @@ not cause already provisioned resources to be replaced with an instance created 
 ### Kind Instance Provisioner
 Use only when running Kubernetes tests. Uses local installed kind to create Kubernetes clusters on the fly.
 
-- `INSTANCE_PROVISIONER="kind" mage integration:kubernetes`
+- `INSTANCE_PROVISIONER="kind" mage integration:testKubernetes`
 
 ## Troubleshooting Tips
 
@@ -420,6 +585,10 @@ If you encounter any errors mentioning `ogc`, try running `mage integration:clea
 re-running whatever `mage integration:*` target you were trying to run originally when you
 encountered the error.
 
+### Tests seemingly using a stale Elastic Agent package
+
+If your integration tests seem to be using a stale or outdated version of Elastic Agent, it might be due to a cached copy in the .agent-testing directory. To fix this, run `mage clean` to remove cached artifacts, then rebuild the agent with `mage package`, and finally run the integration tests again.
+
 ### Using a different agent version from the stack version
 
 The agent version is used as a fallback for the stack version to use in integration tests
@@ -430,3 +599,15 @@ using a separate env variable `AGENT_STACK_VERSION` like in this example (we use
 custom package version for the agent):
 
 ```AGENT_VERSION="8.10.0-testpkgversion.1-SNAPSHOT" AGENT_STACK_VERSION="8.10.0-SNAPSHOT" mage integration:test```
+
+### K8s: pod not read (`timeout waiting for k8s object elastic-agent-standalone-xxxxx to be ready`/`client rate limiter Wait returned an error: context deadline exceeded`)
+Your Kind cluster might be in a broken state. Run:
+
+```
+% kubectl get nodes
+NAME                               STATUS     ROLES           AGE   VERSION
+v1.33.0-kubernetes-control-plane   NotReady   control-plane   58m   v1.33.0
+```
+
+And check the status of your node. If it is different than `Ready`,
+delete the cluster and create a new one.

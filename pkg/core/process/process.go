@@ -18,6 +18,7 @@ type Info struct {
 	Process *os.Process
 	Stdin   io.WriteCloser
 	Stderr  io.ReadCloser
+	Cmd     *exec.Cmd
 }
 
 // CmdOption is an option func to change the underlying command
@@ -67,20 +68,6 @@ func WithArgs(args []string) StartOption {
 func WithEnv(env []string) StartOption {
 	return func(cfg *StartConfig) {
 		cfg.env = env
-	}
-}
-
-// WithUID sets UID
-func WithUID(uid int) StartOption {
-	return func(cfg *StartConfig) {
-		cfg.uid = uid
-	}
-}
-
-// WithGID sets GID
-func WithGID(gid int) StartOption {
-	return func(cfg *StartConfig) {
-		cfg.gid = gid
 	}
 }
 
@@ -148,9 +135,13 @@ func startContext(ctx context.Context, path string, uid, gid int, args []string,
 			return nil, fmt.Errorf("failed to set option command for %q: %w", path, err)
 		}
 	}
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create stdin for %q: %w", path, err)
+
+	var stdin io.WriteCloser
+	if cmd.Stdin == nil {
+		stdin, err = cmd.StdinPipe()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create stdin for %q: %w", path, err)
+		}
 	}
 
 	var stderr io.ReadCloser
@@ -180,5 +171,11 @@ func startContext(ctx context.Context, path string, uid, gid int, args []string,
 		Process: cmd.Process,
 		Stdin:   stdin,
 		Stderr:  stderr,
+		Cmd:     cmd,
 	}, err
+}
+
+// Terminate is a utility function to gracefully shutdown a process
+func Terminate(proc *os.Process) error {
+	return terminateCmd(proc)
 }

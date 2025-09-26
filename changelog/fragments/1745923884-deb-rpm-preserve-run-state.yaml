@@ -1,0 +1,5 @@
+kind: bug-fix
+summary: Preserve agent run state on DEB and RPM upgrades
+component: "elastic-agent"
+pr: https://github.com/elastic/elastic-agent/pull/7999
+issue: https://github.com/elastic/elastic-agent/issues/3832

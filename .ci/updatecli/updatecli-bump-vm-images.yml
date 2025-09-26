@@ -1,0 +1,89 @@
+# update-cli configuration for automated VM image version bumping
+---
+name: Bump vm-images to latest version
+pipelineid: 'updatecli-update-vm-images-{{ requiredEnv "BRANCH_NAME" }}'
+
+scms:
+  githubConfig:
+    kind: github
+    spec:
+      user: '{{ requiredEnv "GITHUB_ACTOR" }}'
+      username: '{{ requiredEnv "GITHUB_ACTOR" }}'
+      owner: '{{ .scm.owner }}'
+      repository: '{{ .scm.repository }}'
+      token: '{{ requiredEnv "GITHUB_TOKEN" }}'
+      commitusingapi: true
+      branch: '{{ requiredEnv "BRANCH_NAME" }}'
+      force: false
+
+actions:
+  elastic-agent:
+    kind: github/pullrequest
+    scmid: githubConfig
+    sourceid: latestGoVersion
+    spec:
+      automerge: false
+      labels:
+        - dependencies
+        - backport-skip
+        - skip-changelog
+      title: '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Bump VM Image version to {{ source "latestVersion" }}'
+
+sources:
+  latestVersion:
+    name: Get latest available build
+    kind: json
+    spec:
+      file: https://storage.googleapis.com/artifacts-api/vm-images/elastic-agent/latest.json
+      key: .date
+
+conditions:
+  latestVersion-check:
+    name: Check if defined latest version differs
+    kind: shell
+    sourceid: latestVersion
+    spec:
+      command: 'grep -q -v {{ source "latestVersion" }} .buildkite/pipeline.yml #'
+
+# NOTE: if you add a new target file, please update the .mergify.yml file
+#       to include the new file for the approval and automatic merge
+targets:
+  update-buildkite-pipeline:
+    name: "Update .buildkite/pipeline.yml"
+    sourceid: latestVersion
+    scmid: githubConfig
+    kind: file
+    spec:
+      file: .buildkite/pipeline.yml
+      matchpattern: '(IMAGE_.+): "platform-ingest-elastic-agent-(.+)-(.+)"'
+      replacepattern: '$1: "platform-ingest-elastic-agent-$2-{{ source "latestVersion" }}"'
+
+  update-buildkite-bk.integration.pipeline:
+    name: "Update .buildkite/bk.integration.pipeline.yml"
+    sourceid: latestVersion
+    scmid: githubConfig
+    kind: file
+    spec:
+      file: .buildkite/bk.integration.pipeline.yml
+      matchpattern: '(IMAGE_.+): "platform-ingest-elastic-agent-(.+)-(.+)"'
+      replacepattern: '$1: "platform-ingest-elastic-agent-$2-{{ source "latestVersion" }}"'
+
+  update-integration.pipeline:
+    name: "Update .buildkite/integration.pipeline.yml"
+    sourceid: latestVersion
+    scmid: githubConfig
+    kind: file
+    spec:
+      file: .buildkite/integration.pipeline.yml
+      matchpattern: '(IMAGE_.+): "platform-ingest-elastic-agent-(.+)-(.+)"'
+      replacepattern: '$1: "platform-ingest-elastic-agent-$2-{{ source "latestVersion" }}"'
+
+  update-buildkite-bk.integration-fips.pipeline:
+    name: "Update .buildkite/bk.integration-fips.pipeline.yml"
+    sourceid: latestVersion
+    scmid: githubConfig
+    kind: file
+    spec:
+      file: .buildkite/bk.integration-fips.pipeline.yml
+      matchpattern: '(IMAGE_.+): "platform-ingest-elastic-agent-(.+)-(.+)"'
+      replacepattern: '$1: "platform-ingest-elastic-agent-$2-{{ source "latestVersion" }}"'

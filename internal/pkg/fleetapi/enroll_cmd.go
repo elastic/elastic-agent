@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"syscall"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -209,6 +210,10 @@ func (e *EnrollCmd) Execute(ctx context.Context, r *EnrollRequest) (*EnrollRespo
 
 	resp, err := e.client.Send(ctx, "POST", p, nil, headers, bytes.NewBuffer(b))
 	if err != nil {
+		if errors.Is(err, syscall.ECONNREFUSED) {
+			return nil, ErrConnRefused
+		}
+
 		var et *url.Error
 		if errors.As(err, &et) {
 			return nil, et.Err
@@ -219,7 +224,9 @@ func (e *EnrollCmd) Execute(ctx context.Context, r *EnrollRequest) (*EnrollRespo
 			return nil, ErrConnRefused
 		}
 
-		return nil, err
+		return nil, errors.New(err,
+			"fail to execute request to fleet-server",
+			errors.TypeNetwork)
 	}
 	defer resp.Body.Close()
 

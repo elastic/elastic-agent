@@ -50,6 +50,7 @@ type Fixture struct {
 	binaryName      string
 	runLength       time.Duration
 	additionalArgs  []string
+	fipsArtifact    bool
 
 	srcPackage string
 	workDir    string
@@ -145,6 +146,12 @@ func WithAdditionalArgs(args []string) FixtureOpt {
 	}
 }
 
+func WithFIPSArtifact() FixtureOpt {
+	return func(f *Fixture) {
+		f.fipsArtifact = true
+	}
+}
+
 // NewFixture creates a new fixture to setup and manage Elastic Agent.
 func NewFixture(t *testing.T, version string, opts ...FixtureOpt) (*Fixture, error) {
 	// we store the caller so the fixture can find the cache directory for the artifacts that
@@ -214,10 +221,19 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	}
 	f.srcPackage = src
 	filename := filepath.Base(src)
+
+	// Determine name of extracted Agent artifact directory from
+	// the artifact filename.
 	name, _, err := splitFileType(filename)
 	if err != nil {
 		return err
 	}
+
+	// If the name has "-fips" in it, remove that part because
+	// the extracted directory does not have that in it, even though
+	// the artifact filename does.
+	name = strings.Replace(name, "-fips", "", 1)
+
 	extractDir := createTempDir(f.t)
 	finalDir := filepath.Join(extractDir, name)
 	err = ExtractArtifact(f.t, src, extractDir)
@@ -346,7 +362,6 @@ func (f *Fixture) RunBeat(ctx context.Context) error {
 		process.WithContext(ctx),
 		process.WithArgs(args),
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
-
 	if err != nil {
 		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
 	}
@@ -401,7 +416,8 @@ func RunProcess(t *testing.T,
 	lp Logger,
 	ctx context.Context, runLength time.Duration,
 	logOutput, allowErrs bool,
-	processPath string, args ...string) error {
+	processPath string, args ...string,
+) error {
 	if _, deadlineSet := ctx.Deadline(); !deadlineSet {
 		t.Fatal("Context passed to RunProcess() has no deadline set.")
 	}
@@ -419,7 +435,6 @@ func RunProcess(t *testing.T,
 		process.WithContext(ctx),
 		process.WithArgs(args),
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
-
 	if err != nil {
 		return fmt.Errorf("failed to spawn %q: %w", processPath, err)
 	}
@@ -549,7 +564,6 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 		process.WithContext(ctx),
 		process.WithArgs(args),
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
-
 	if err != nil {
 		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
 	}
@@ -1245,8 +1259,8 @@ func getCacheDir(caller string, name string) (string, error) {
 	return cacheDir, nil
 }
 
-// FindComponentsDir identifies the directory that holds the components.
-func FindComponentsDir(dir, version string) (string, error) {
+// findAgentDataVersionDir identifies the directory that holds the agent data of the given version.
+func findAgentDataVersionDir(dir, version string) (string, error) {
 	dataDir := filepath.Join(dir, "data")
 	agentVersions, err := os.ReadDir(dataDir)
 	if err != nil {
@@ -1256,6 +1270,7 @@ func FindComponentsDir(dir, version string) (string, error) {
 	for _, fi := range agentVersions {
 		filename := fi.Name()
 		if strings.HasPrefix(filename, "elastic-agent-") && fi.IsDir() {
+			// Below we exclude the hash suffix (7 characters) of the directory to check the version
 			if version != "" && filename[:len(filename)-7] != "elastic-agent-"+version {
 				// version specified but version mismatch. in case of upgrade we have multiple
 				// directories, we don't want first found
@@ -1268,12 +1283,42 @@ func FindComponentsDir(dir, version string) (string, error) {
 	if versionDir == "" {
 		return "", fmt.Errorf("failed to find versioned directory for version %q", version)
 	}
-	componentsDir := filepath.Join(dataDir, versionDir, "components")
+	return filepath.Join(dataDir, versionDir), nil
+}
+
+// FindComponentsDir identifies the directory that holds the components.
+func FindComponentsDir(dir, version string) (string, error) {
+	versionDir, err := findAgentDataVersionDir(dir, version)
+	if err != nil {
+		return "", err
+	}
+	componentsDir := filepath.Join(versionDir, "components")
 	fi, err := os.Stat(componentsDir)
 	if (err != nil && !os.IsExist(err)) || !fi.IsDir() {
 		return "", fmt.Errorf("failed to find components directory at %s: %w", componentsDir, err)
 	}
 	return componentsDir, nil
+}
+
+// FindRunDir identifies the directory that holds the run folder.
+func FindRunDir(fixture *Fixture) (string, error) {
+	agentWorkDir := fixture.WorkDir()
+	if pf := fixture.PackageFormat(); pf == "deb" || pf == "rpm" {
+		// these are hardcoded paths in packages.yml
+		agentWorkDir = "/var/lib/elastic-agent"
+	}
+
+	version := fixture.Version()
+	versionDir, err := findAgentDataVersionDir(agentWorkDir, version)
+	if err != nil {
+		return "", err
+	}
+	runDir := filepath.Join(versionDir, "run")
+	fi, err := os.Stat(runDir)
+	if (err != nil && !os.IsExist(err)) || !fi.IsDir() {
+		return "", fmt.Errorf("failed to find run directory at %s: %w", runDir, err)
+	}
+	return runDir, nil
 }
 
 // writeSpecFile writes the specification to a specification file at the defined destination.
@@ -1420,19 +1465,21 @@ type AgentStatusOutput struct {
 				OsqueryVersion string `json:"osquery_version"`
 			} `json:"payload"`
 		} `json:"units"`
-		VersionInfo struct {
-			Name    string `json:"name"`
-			Version string `json:"version"`
-			Meta    struct {
-				BuildTime string `json:"build_time"`
-				Commit    string `json:"commit"`
-			} `json:"meta"`
-		} `json:"version_info,omitempty"`
+		VersionInfo AgentStatusOutputVersionInfo `json:"version_info,omitempty"`
 	} `json:"components"`
 	Collector      *AgentStatusCollectorOutput `json:"collector"`
 	FleetState     int                         `json:"FleetState"`
 	FleetMessage   string                      `json:"FleetMessage"`
 	UpgradeDetails *details.Details            `json:"upgrade_details"`
+}
+
+type AgentStatusOutputVersionInfo struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	Meta    struct {
+		BuildTime string `json:"build_time"`
+		Commit    string `json:"commit"`
+	} `json:"meta"`
 }
 
 func (aso *AgentStatusOutput) IsZero() bool {

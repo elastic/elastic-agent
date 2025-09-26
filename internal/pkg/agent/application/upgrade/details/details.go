@@ -55,6 +55,10 @@ type Metadata struct {
 	// the Fail() method of UpgradeDetails to correctly record details when
 	// an upgrade fails.
 	ErrorMsg string `json:"error_msg,omitempty" yaml:"error_msg,omitempty"`
+
+	// Reason is a string that may give out more information about transitioning to the current state. It has been
+	// introduced initially to distinguish between manual and automatic rollbacks
+	Reason string `json:"reason,omitempty" yaml:"reason,omitempty"`
 }
 
 func NewDetails(targetVersion string, initialState State, actionID string) *Details {
@@ -75,6 +79,27 @@ func (d *Details) SetState(s State) {
 	defer d.mu.Unlock()
 
 	d.State = s
+
+	// If State is something other than StateFailed, make sure to clear
+	// Metadata.FailedState and Metadata.ErrorMsg as those two fields
+	// should be set when State is set to StateFailed. See the Fail method.
+	if s != StateFailed {
+		d.Metadata.ErrorMsg = ""
+		d.Metadata.FailedState = ""
+	}
+
+	d.notifyObservers()
+}
+
+// SetStateWithReason is a convenience method to set the state of the upgrade, the metadata.reason and
+// notify all observers.
+// Do NOT call SetStateWithReason with StateFailed; call the Fail method instead.
+func (d *Details) SetStateWithReason(s State, reason string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	d.State = s
+	d.Metadata.Reason = reason
 
 	// If State is something other than StateFailed, make sure to clear
 	// Metadata.FailedState and Metadata.ErrorMsg as those two fields
@@ -206,7 +231,8 @@ func (m Metadata) Equals(otherM Metadata) bool {
 		m.DownloadPercent == otherM.DownloadPercent &&
 		m.DownloadRate == otherM.DownloadRate &&
 		equalTimePointers(m.RetryUntil, otherM.RetryUntil) &&
-		m.RetryErrorMsg == otherM.RetryErrorMsg
+		m.RetryErrorMsg == otherM.RetryErrorMsg &&
+		m.Reason == otherM.Reason
 }
 
 func equalTimePointers(t, otherT *time.Time) bool {

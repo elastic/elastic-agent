@@ -75,7 +75,7 @@ func TestUpgradeCmd(t *testing.T) {
 		require.Eventually(t, func() bool {
 			counter := atomic.LoadInt32(&mock.upgrades)
 			return counter > 0
-		}, 5*time.Second, 100*time.Millisecond)
+		}, 30*time.Second, 100*time.Millisecond)
 
 		// then we close the tcp server which is supposed to interrupt the connection
 		s.Stop()
@@ -143,7 +143,7 @@ func TestUpgradeCmd(t *testing.T) {
 	t.Run("proceed with upgrade if fleet managed, privileged, --force is set", func(t *testing.T) {
 		mockClient := clientmocks.NewClient(t)
 		mockClient.EXPECT().State(mock.Anything).Return(&client.AgentState{State: cproto.State_HEALTHY}, nil)
-		mockClient.EXPECT().Upgrade(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("mockVersion", nil)
+		mockClient.EXPECT().Upgrade(mock.Anything, mock.Anything, false, mock.Anything, mock.Anything, mock.Anything).Return("mockVersion", nil)
 
 		args := []string{"8.13.0"} // Version argument
 		streams := cli.NewIOStreams()
@@ -231,7 +231,7 @@ func TestUpgradeCmd(t *testing.T) {
 	t.Run("proceed with upgrade if agent is standalone, user is privileged and skip-verify flag is set", func(t *testing.T) {
 		mockClient := clientmocks.NewClient(t)
 		mockClient.EXPECT().State(mock.Anything).Return(&client.AgentState{State: cproto.State_HEALTHY}, nil)
-		mockClient.EXPECT().Upgrade(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("mockVersion", nil)
+		mockClient.EXPECT().Upgrade(mock.Anything, mock.Anything, false, mock.Anything, mock.Anything, mock.Anything).Return("mockVersion", nil)
 
 		args := []string{"8.13.0"} // Version argument
 		streams := cli.NewIOStreams()

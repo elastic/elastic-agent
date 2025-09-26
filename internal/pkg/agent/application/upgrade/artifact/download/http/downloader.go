@@ -6,6 +6,7 @@ package http
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -49,11 +51,17 @@ type Downloader struct {
 	config         *artifact.Config
 	client         http.Client
 	upgradeDetails *details.Details
+	// The following are abstractions for stdlib functions so that we can mock them in tests.
+	copy     func(dst io.Writer, src io.Reader) (int64, error)
+	mkdirAll func(name string, perm os.FileMode) error
+	openFile func(name string, flag int, perm os.FileMode) (*os.File, error)
+	// Abstraction for the disk space error check function so that we can mock it in tests.
+	isDiskSpaceErrorFunc func(err error) bool
 }
 
 // NewDownloader creates and configures Elastic Downloader
 func NewDownloader(log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details) (*Downloader, error) {
-	client, err := config.HTTPTransportSettings.Client(
+	client, err := config.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 		httpcommon.WithKeepaliveSettings{Disable: false, IdleConnTimeout: 30 * time.Second},
 	)
@@ -68,16 +76,20 @@ func NewDownloader(log *logger.Logger, config *artifact.Config, upgradeDetails *
 // NewDownloaderWithClient creates Elastic Downloader with specific client used
 func NewDownloaderWithClient(log *logger.Logger, config *artifact.Config, client http.Client, upgradeDetails *details.Details) *Downloader {
 	return &Downloader{
-		log:            log,
-		config:         config,
-		client:         client,
-		upgradeDetails: upgradeDetails,
+		log:                  log,
+		config:               config,
+		client:               client,
+		upgradeDetails:       upgradeDetails,
+		copy:                 io.Copy,
+		mkdirAll:             os.MkdirAll,
+		openFile:             os.OpenFile,
+		isDiskSpaceErrorFunc: downloadErrors.IsDiskSpaceError,
 	}
 }
 
 func (e *Downloader) Reload(c *artifact.Config) error {
 	// reload client
-	client, err := c.HTTPTransportSettings.Client(
+	client, err := c.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 	)
 	if err != nil {
@@ -179,14 +191,14 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	}
 
 	if destinationDir := filepath.Dir(fullPath); destinationDir != "" && destinationDir != "." {
-		if err := os.MkdirAll(destinationDir, 0o755); err != nil {
+		if err := e.mkdirAll(destinationDir, 0o755); err != nil {
 			return "", err
 		}
 	}
 
-	destinationFile, err := os.OpenFile(fullPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
+	destinationFile, err := e.openFile(fullPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
 	if err != nil {
-		return "", errors.New(err, "creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath))
+		return "", goerrors.Join(errors.New("creating package file failed", errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath)), err)
 	}
 	defer destinationFile.Close()
 
@@ -209,15 +221,22 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 		}
 	}
 
-	loggingObserver := newLoggingProgressObserver(e.log, e.config.HTTPTransportSettings.Timeout)
+	loggingObserver := newLoggingProgressObserver(e.log, e.config.Timeout)
 	detailsObserver := newDetailsProgressObserver(e.upgradeDetails)
-	dp := newDownloadProgressReporter(sourceURI, e.config.HTTPTransportSettings.Timeout, fileSize, loggingObserver, detailsObserver)
+	dp := newDownloadProgressReporter(sourceURI, e.config.Timeout, fileSize, loggingObserver, detailsObserver)
 	dp.Report(ctx)
-	_, err = io.Copy(destinationFile, io.TeeReader(resp.Body, dp))
+
+	_, err = e.copy(destinationFile, io.TeeReader(resp.Body, dp))
 	if err != nil {
-		dp.ReportFailed(err)
+		// checking for disk space error here before passing it into the reporter
+		// so the details observer sets the state with clean error message
+		reportedErr := err
+		if e.isDiskSpaceErrorFunc(err) {
+			reportedErr = downloadErrors.ErrInsufficientDiskSpace
+		}
+		dp.ReportFailed(reportedErr)
 		// return path, file already exists and needs to be cleaned up
-		return fullPath, errors.New(err, "copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
+		return fullPath, goerrors.Join(errors.New("copying fetched package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI)), err)
 	}
 	dp.ReportComplete()
 

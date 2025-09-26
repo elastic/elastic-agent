@@ -10,12 +10,20 @@ exporters:
   otlphttp:
     endpoint: https://localhost.com:4318
   nop:
+  logstash:
+    hosts: ["localhost:5044"]
 
 extensions:
   health_check:
   memory_limiter:
     check_interval: 5s
     limit_mib: 100
+  headers_setter:
+    headers:
+      - action: insert
+        key: X-Scope-OrgID
+        from_context: tenant_id
+        default_value: Org-ID
 
 processors:
   attributes:
@@ -24,6 +32,7 @@ processors:
         key: key1
         value: value1
   batch:
+  cumulativetodelta:
   elasticinframetrics:
   filter:
   resource:
@@ -38,6 +47,7 @@ processors:
     limit_mib: 4000
     spike_limit_mib: 800
   elastictrace:
+  tail_sampling:
 
 receivers:
   nop:
@@ -64,6 +74,14 @@ receivers:
           scrape_interval: 5s
           static_configs:
             - targets: ['0.0.0.0:8888']
+  elasticapmintake:
+  apache:
+  mysql:
+  postgresql:
+    username: test
+    password: test
+  docker_stats:
+
 
 connectors:
   spanmetrics:
@@ -91,11 +109,13 @@ connectors:
       - telemetry.sdk.language
       - telemetry.sdk.name
   elasticapm:
+  forward:
 
 service:
   extensions:
     - memory_limiter
     - health_check
+    - headers_setter
   pipelines:
     logs:
       exporters:
@@ -116,6 +136,19 @@ service:
         - filelog
         - otlp
         - nop
+        - elasticapmintake
+
+    logs/forward_receive:
+      receivers:
+        - nop
+      exporters:
+        - forward
+
+    logs/forward_export:
+      receivers:
+        - forward
+      exporters:
+        - nop
 
     metrics:
       exporters:
@@ -125,6 +158,7 @@ service:
       processors:
         - attributes
         - batch
+        - cumulativetodelta
         - elasticinframetrics
         - filter
         - resource
@@ -136,6 +170,10 @@ service:
         - httpcheck
         - spanmetrics
         - prometheus
+        - elasticapmintake
+        - apache
+        - mysql
+        - postgresql
 
     metrics/aggregated:
       receivers:
@@ -167,3 +205,4 @@ service:
         - otlp
         - jaeger
         - zipkin
+        - elasticapmintake

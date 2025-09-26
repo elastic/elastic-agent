@@ -43,6 +43,7 @@ func newConnInfoServer(log *logger.Logger, comm Communicator, address string) (*
 	if err != nil {
 		return nil, fmt.Errorf("failed to start connection credentials listener: %w", err)
 	}
+	log.Debugf("started connection info server listener on %s", address)
 
 	s := &connInfoServer{log: log, listener: listener, stopTimeout: defaultStopTimeout}
 

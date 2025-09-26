@@ -158,14 +158,15 @@ func (p *fakeStackProvisioner) Create(_ context.Context, request common.StackReq
 	defer p.mx.Unlock()
 	p.requests = append(p.requests, request)
 	return common.Stack{
-		ID:            request.ID,
-		Version:       request.Version,
-		Elasticsearch: "http://localhost:9200",
-		Kibana:        "http://localhost:5601",
-		Username:      "elastic",
-		Password:      "changeme",
-		Internal:      nil,
-		Ready:         false,
+		ID:                 request.ID,
+		Version:            request.Version,
+		Elasticsearch:      "http://localhost:9200",
+		Kibana:             "http://localhost:5601",
+		IntegrationsServer: "http://localhost:8220",
+		Username:           "elastic",
+		Password:           "changeme",
+		Internal:           nil,
+		Ready:              false,
 	}, nil
 }
 
@@ -178,5 +179,10 @@ func (p *fakeStackProvisioner) Delete(_ context.Context, stack common.Stack) err
 	p.mx.Lock()
 	defer p.mx.Unlock()
 	p.deletedStacks = append(p.deletedStacks, stack)
+	return nil
+}
+
+func (p *fakeStackProvisioner) Upgrade(_ context.Context, _ common.Stack, _ string) error {
+	// fake upgrade does nothing
 	return nil
 }

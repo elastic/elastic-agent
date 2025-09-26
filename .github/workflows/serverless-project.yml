@@ -1,0 +1,108 @@
+---
+name: serverless-project
+
+on:
+  workflow_dispatch:
+  schedule:
+    # To run more often if needed, for now daily at 4:00 UTC
+    - cron: "0 4 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  create-serverless:
+    permissions:
+      id-token: write
+    runs-on: ubuntu-latest
+    env:
+      PREFIX: "ea-serverless-it"
+    steps:
+      ####################################
+      # 1. Create the serverless project
+      ####################################
+      - name: Get token
+        id: get_token
+        uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a # v2.1.0
+        with:
+          app_id: ${{ secrets.OBS_AUTOMATION_APP_ID }}
+          private_key: ${{ secrets.OBS_AUTOMATION_APP_PEM }}
+          permissions: >-
+            {
+              "checks": "read",
+              "contents": "write",
+              "pull_requests": "write"
+            }
+          repositories: >-
+            ["observability-test-environments"]
+
+      - uses: elastic/oblt-actions/git/setup@v1
+        with:
+          github-token: ${{ steps.get_token.outputs.token }}
+
+      - name: Get day of the week
+        id: get_day
+        run: echo "day=$(date +'%a' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - uses: elastic/oblt-actions/oblt-cli/cluster-create-custom@v1
+        id: create_serverless
+        with:
+          # NOTE: use a different username to avoid conflicts with the weekly tear-down
+          #       some usernames have a hard requirement to be destroyed always on Saturdays
+          #       regardless of the expiration date. The same for the ephemeral clusters
+          username: 'ea-automation'
+          template: 'serverless-ea-it'
+          parameters: '{"Target":"production","ProjectType":"observability","EphemeralCluster":"false"}'
+          cluster-name-prefix: "${{ env.PREFIX }}-${{ steps.get_day.outputs.day }}"
+          github-token: ${{ steps.get_token.outputs.token }}
+          gitops: true
+          wait: '15'
+
+      # Authenticate to the elastic-observability to get the cluster credentials
+      - uses: elastic/oblt-actions/google/auth@v1
+
+      - uses: elastic/oblt-actions/oblt-cli/cluster-credentials@v1
+        with:
+          cluster-name: ${{ steps.create_serverless.outputs.cluster-name }}
+          github-token: ${{ steps.get_token.outputs.token }}
+
+      - name: Smoke test
+        run: curl -X GET ${ELASTICSEARCH_HOST}/_cat/indices?v -u ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}
+
+      ####################################
+      # 2. Copy the serverless secrets
+      ####################################
+      # Authenticate to the elastic-observability-ci to rotate the cluster credentials
+      - uses: elastic/oblt-actions/google/auth@v1
+        with:
+          project-number: "911195782929"
+          project-id: "elastic-observability-ci"
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db  # v3.0.1
+
+      # TODO: as soon as the oblt-framework supports elastic-observability-ci we can avoid this step.
+      # NOTE:
+      #   * While runnning this workflow, it might cause some hiccups if a PR runs when rotating the secrets
+      #   * Secrets need to be created firstly. gcloud secrets create otherwise gcloud secrets versions add will fail.
+      #     That's not an issue now, as we use the same secret name.
+      - name: Rotate GCSM secrets
+        env:
+          GCP_PROJECT: "elastic-observability-ci"
+        run: |
+          echo -n "${ELASTICSEARCH_HOST}" | gcloud secrets versions add "${PREFIX}-elasticsearch-hostname" --data-file=- --quiet --project "${GCP_PROJECT}"
+          echo -n "${ELASTICSEARCH_PASSWORD}" | gcloud secrets versions add "${PREFIX}-elasticsearch-password" --data-file=- --quiet --project "${GCP_PROJECT}"
+          echo -n "${ELASTICSEARCH_USERNAME}" | gcloud secrets versions add "${PREFIX}-elasticsearch-username" --data-file=- --quiet --project "${GCP_PROJECT}"
+          echo -n "${KIBANA_HOST}" | gcloud secrets versions add "${PREFIX}-kibana-hostname" --data-file=- --quiet --project "${GCP_PROJECT}"
+          echo -n "${KIBANA_USERNAME}" | gcloud secrets versions add "${PREFIX}-kibana-username" --data-file=- --quiet --project "${GCP_PROJECT}"
+          echo -n "${KIBANA_PASSWORD}" | gcloud secrets versions add "${PREFIX}-kibana-password" --data-file=- --quiet --project "${GCP_PROJECT}"
+
+      # TODO: if rotation fails then rollback to the previous cluster.
+      - if: ${{ failure()  }}
+        uses: elastic/oblt-actions/slack/send@v1
+        env:
+          JOB_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        with:
+          bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
+          channel-id: "#ingest-notifications"
+          message: ":traffic_cone: serverless project creation failed for `${{ github.repository }}@${{ github.ref_name }}`, `@robots-ci` please look what's going on <${{ env.JOB_URL }}|here>"

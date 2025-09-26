@@ -5,13 +5,13 @@ kind: ServiceAccount
 automountServiceAccountToken: true
 metadata:
   labels:    
-    helm.sh/chart: kube-state-metrics-5.30.1
+    helm.sh/chart: kube-state-metrics-6.1.0
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: "2.15.0"
+    app.kubernetes.io/version: "2.16.0"
   name: kube-state-metrics
   namespace: default
 ---
@@ -22,10 +22,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.1.0-beta
+    helm.sh/chart: elastic-agent-9.2.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.1.0
+    app.kubernetes.io/version: 9.2.0
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -34,10 +34,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.1.0-beta
+    helm.sh/chart: elastic-agent-9.2.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.1.0
+    app.kubernetes.io/version: 9.2.0
 stringData:
 
   agent.yml: |-
@@ -78,13 +78,13 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:    
-    helm.sh/chart: kube-state-metrics-5.30.1
+    helm.sh/chart: kube-state-metrics-6.1.0
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: "2.15.0"
+    app.kubernetes.io/version: "2.16.0"
   name: kube-state-metrics
 rules:
 
@@ -103,12 +103,12 @@ rules:
   - cronjobs
   verbs: ["list", "watch"]
 
-- apiGroups: ["extensions", "apps"]
+- apiGroups: ["apps"]
   resources:
   - daemonsets
   verbs: ["list", "watch"]
 
-- apiGroups: ["extensions", "apps"]
+- apiGroups: ["apps"]
   resources:
   - deployments
   verbs: ["list", "watch"]
@@ -123,7 +123,7 @@ rules:
   - horizontalpodautoscalers
   verbs: ["list", "watch"]
 
-- apiGroups: ["extensions", "networking.k8s.io"]
+- apiGroups: ["networking.k8s.io"]
   resources:
   - ingresses
   verbs: ["list", "watch"]
@@ -183,7 +183,7 @@ rules:
   - pods
   verbs: ["list", "watch"]
 
-- apiGroups: ["extensions", "apps"]
+- apiGroups: ["apps"]
   resources:
   - replicasets
   verbs: ["list", "watch"]
@@ -234,10 +234,10 @@ kind: ClusterRole
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.1.0-beta
+    helm.sh/chart: elastic-agent-9.2.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.1.0
+    app.kubernetes.io/version: 9.2.0
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
     resources:
@@ -313,13 +313,13 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   labels:    
-    helm.sh/chart: kube-state-metrics-5.30.1
+    helm.sh/chart: kube-state-metrics-6.1.0
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: "2.15.0"
+    app.kubernetes.io/version: "2.16.0"
   name: kube-state-metrics
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -336,10 +336,10 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.1.0-beta
+    helm.sh/chart: elastic-agent-9.2.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.1.0
+    app.kubernetes.io/version: 9.2.0
 subjects:
   - kind: ServiceAccount
     name: agent-pernode-example
@@ -356,13 +356,13 @@ metadata:
   name: kube-state-metrics
   namespace: default
   labels:    
-    helm.sh/chart: kube-state-metrics-5.30.1
+    helm.sh/chart: kube-state-metrics-6.1.0
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: "2.15.0"
+    app.kubernetes.io/version: "2.16.0"
   annotations:
     prometheus.io/scrape: 'true'
 spec:
@@ -384,10 +384,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.1.0-beta
+    helm.sh/chart: elastic-agent-9.2.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.1.0
+    app.kubernetes.io/version: 9.2.0
 spec:
   selector:
     matchLabels:
@@ -432,7 +432,7 @@ spec:
           value: fleetToken
         - name: FLEET_ENROLL
           value: "true"
-        image: docker.elastic.co/elastic-agent/elastic-agent:9.1.0-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:9.2.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
@@ -528,13 +528,13 @@ metadata:
   name: kube-state-metrics
   namespace: default
   labels:    
-    helm.sh/chart: kube-state-metrics-5.30.1
+    helm.sh/chart: kube-state-metrics-6.1.0
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: "2.15.0"
+    app.kubernetes.io/version: "2.16.0"
 spec:
   selector:
     matchLabels:      
@@ -547,13 +547,13 @@ spec:
   template:
     metadata:
       labels:        
-        helm.sh/chart: kube-state-metrics-5.30.1
+        helm.sh/chart: kube-state-metrics-6.1.0
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/component: metrics
         app.kubernetes.io/part-of: kube-state-metrics
         app.kubernetes.io/name: kube-state-metrics
         app.kubernetes.io/instance: example
-        app.kubernetes.io/version: "2.15.0"
+        app.kubernetes.io/version: "2.16.0"
     spec:
       automountServiceAccountToken: true
       hostNetwork: false
@@ -565,13 +565,14 @@ spec:
         runAsUser: 65534
         seccompProfile:
           type: RuntimeDefault
+      dnsPolicy: ClusterFirst
       containers:
       - name: kube-state-metrics
         args:
         - --port=8080
         - --resources=certificatesigningrequests,configmaps,cronjobs,daemonsets,deployments,endpoints,horizontalpodautoscalers,ingresses,jobs,leases,limitranges,mutatingwebhookconfigurations,namespaces,networkpolicies,nodes,persistentvolumeclaims,persistentvolumes,poddisruptionbudgets,pods,replicasets,replicationcontrollers,resourcequotas,secrets,services,statefulsets,storageclasses,validatingwebhookconfigurations,volumeattachments
         imagePullPolicy: IfNotPresent
-        image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.15.0
+        image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.16.0
         ports:
         - containerPort: 8080
           name: "http"
