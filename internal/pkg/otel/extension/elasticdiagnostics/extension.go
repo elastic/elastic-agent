@@ -100,7 +100,7 @@ func (d *diagnosticsExtension) Shutdown(ctx context.Context) error {
 func (d *diagnosticsExtension) registerGlobalDiagnostics() {
 	d.globalHooks["collector_config"] = &diagHook{
 		description: "full collector configuration",
-		filename:    "edot/otel-merged.yaml",
+		filename:    "edot/otel-merged-actual.yaml",
 		contentType: "application/yaml",
 		hook: func() []byte {
 			if d.collectorConfig == nil {
