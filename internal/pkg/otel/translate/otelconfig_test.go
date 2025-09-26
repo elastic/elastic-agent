@@ -664,4 +664,339 @@ func TestGetOtelConfig(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
 // TODO: Add unit tests for other config generation functions
+=======
+func TestGetReceiversConfigForComponent(t *testing.T) {
+	testAgentInfo := &info.AgentInfo{}
+	mockBeatMonitoringConfigGetter := func(componentID, beatName string) map[string]any {
+		return nil // Behavior when self-monitoring is disabled
+	}
+
+	customBeatMonitoringConfigGetter := func(componentID, beatName string) map[string]any {
+		return map[string]any{
+			"http": map[string]any{
+				"enabled": true,
+				"host":    "custom-host:5067",
+				"port":    5067,
+			},
+		}
+	}
+
+	// Create proper component configurations that match existing test patterns
+	filebeatComponent := &component.Component{
+		ID:        "filebeat-test-id",
+		InputType: "filestream",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "agentbeat",
+			Spec: component.InputSpec{
+				Name: "filestream",
+				Command: &component.CommandSpec{
+					Args: []string{"filebeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "filebeat-test-id-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":         "test",
+					"use_output": "default",
+					"streams": []any{
+						map[string]any{
+							"id": "test-1",
+							"data_stream": map[string]any{
+								"dataset": "generic-1",
+							},
+							"paths": []any{
+								"/var/log/*.log",
+							},
+						},
+					},
+				}),
+			},
+		},
+	}
+
+	metricbeatComponent := &component.Component{
+		ID:        "metricbeat-test-id",
+		InputType: "system/metrics",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "agentbeat",
+			Spec: component.InputSpec{
+				Name: "system/metrics",
+				Command: &component.CommandSpec{
+					Args: []string{"metricbeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "metricbeat-test-id-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":         "test",
+					"use_output": "default",
+					"type":       "system/metrics",
+					"streams": []any{
+						map[string]any{
+							"id": "test-1",
+							"data_stream": map[string]any{
+								"dataset": "generic-1",
+							},
+							"metricsets": map[string]any{
+								"cpu": map[string]any{
+									"data_stream.dataset": "system.cpu",
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
+	}
+
+	tests := []struct {
+		name                       string
+		component                  *component.Component
+		outputQueueConfig          map[string]any
+		beatMonitoringConfigGetter BeatMonitoringConfigGetter
+		expectedError              string
+		expectedReceiverType       string
+		expectedBeatName           string
+	}{
+		{
+			name:                       "filebeat component with default monitoring",
+			component:                  filebeatComponent,
+			outputQueueConfig:          nil,
+			beatMonitoringConfigGetter: mockBeatMonitoringConfigGetter,
+			expectedReceiverType:       "filebeatreceiver",
+			expectedBeatName:           "filebeat",
+		},
+		{
+			name:      "metricbeat component with custom monitoring and queue config",
+			component: metricbeatComponent,
+			outputQueueConfig: map[string]any{
+				"type": "memory",
+				"size": 1000,
+			},
+			beatMonitoringConfigGetter: customBeatMonitoringConfigGetter,
+			expectedReceiverType:       "metricbeatreceiver",
+			expectedBeatName:           "metricbeat",
+		},
+		{
+			name: "component with no input units",
+			component: &component.Component{
+				ID:        "no-inputs-test-id",
+				InputType: "filestream",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "agentbeat",
+					Spec: component.InputSpec{
+						Name: "filestream",
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:   "output-unit",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type": "elasticsearch",
+						}),
+					},
+				},
+			},
+			outputQueueConfig:          nil,
+			beatMonitoringConfigGetter: mockBeatMonitoringConfigGetter,
+			expectedReceiverType:       "filebeatreceiver",
+			expectedBeatName:           "filebeat",
+		},
+		{
+			name: "unsupported component type",
+			component: &component.Component{
+				ID:        "unsupported-test-id",
+				InputType: "unsupported",
+			},
+			outputQueueConfig:          nil,
+			beatMonitoringConfigGetter: mockBeatMonitoringConfigGetter,
+			expectedError:              "unknown otel receiver type for input type: unsupported",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := getReceiversConfigForComponent(
+				tt.component,
+				testAgentInfo,
+				tt.outputQueueConfig,
+				tt.beatMonitoringConfigGetter,
+			)
+
+			if tt.expectedError != "" {
+				assert.Error(t, err)
+				assert.ErrorContains(t, err, tt.expectedError)
+				assert.Nil(t, result)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.NotNil(t, result)
+
+			// Verify the receiver ID is present
+			receiverID := fmt.Sprintf("%s/_agent-component/%s", tt.expectedReceiverType, tt.component.ID)
+			assert.Contains(t, result, receiverID)
+
+			receiverConfig, ok := result[receiverID].(map[string]any)
+			assert.True(t, ok, "receiver config should be a map")
+
+			// Verify configuration section presence
+			assert.Contains(t, receiverConfig, "output", "output config should be present")
+			assert.Contains(t, receiverConfig, "path", "path config should be present")
+			assert.Contains(t, receiverConfig, "logging", "logging config should be present")
+			assert.Contains(t, receiverConfig, tt.expectedBeatName, fmt.Sprintf("%s config should be present", tt.expectedBeatName))
+
+			// Verify queue configuration presence
+			if tt.outputQueueConfig != nil {
+				assert.Contains(t, receiverConfig, "queue", "queue config should be present")
+			} else {
+				assert.NotContains(t, receiverConfig, "queue", "queue config should not be present")
+			}
+
+			// Verify monitoring configuration is present (http section should exist)
+			assert.Contains(t, receiverConfig, "http", "http monitoring config should be present")
+			expectedMonitoringConfig := tt.beatMonitoringConfigGetter(tt.component.ID, tt.component.InputSpec.BinaryName)
+			// If the monitoring getter is not nil, verify the http section is the same
+			if expectedMonitoringConfig != nil {
+				assert.Equal(t, expectedMonitoringConfig["http"], receiverConfig["http"])
+			}
+		})
+	}
+}
+
+func TestVerifyComponentIsOtelSupported(t *testing.T) {
+	tests := []struct {
+		name          string
+		component     *component.Component
+		expectedError string
+	}{
+		{
+			name: "supported component",
+			component: &component.Component{
+				ID:         "supported-comp",
+				InputType:  "filestream",
+				OutputType: "elasticsearch",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "agentbeat",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:   "filestream-unit",
+						Type: client.UnitTypeInput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"streams": []any{
+								map[string]any{
+									"paths": []any{"/var/log/*.log"},
+								},
+							},
+						}),
+					},
+					{
+						ID:   "filestream-default",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type":  "elasticsearch",
+							"hosts": []any{"localhost:9200"},
+						}),
+					},
+				},
+			},
+		},
+		{
+			name: "unsupported output type - kafka",
+			component: &component.Component{
+				ID:         "unsupported-output",
+				InputType:  "filestream",
+				OutputType: "kafka", // unsupported
+			},
+			expectedError: "unsupported output type: kafka",
+		},
+		{
+			name: "unsupported output type - logstash",
+			component: &component.Component{
+				ID:         "unsupported-output",
+				InputType:  "filestream",
+				OutputType: "logstash", // unsupported
+			},
+			expectedError: "unsupported output type: logstash",
+		},
+		{
+			name: "unsupported input type",
+			component: &component.Component{
+				ID:         "unsupported-input",
+				InputType:  "log", // unsupported
+				OutputType: "elasticsearch",
+			},
+			expectedError: "unsupported input type: log",
+		},
+		{
+			name: "unsupported configuration",
+			component: &component.Component{
+				ID:         "unsupported-config",
+				InputType:  "filestream",
+				OutputType: "elasticsearch",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "agentbeat",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:   "filestream-unit",
+						Type: client.UnitTypeInput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"streams": []any{
+								map[string]any{
+									"paths": []any{"/var/log/*.log"},
+								},
+							},
+						}),
+					},
+					{
+						ID:   "filestream-default",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type":    "elasticsearch",
+							"hosts":   []any{"localhost:9200"},
+							"indices": []any{},
+						}),
+					},
+				},
+			},
+			expectedError: "unsupported configuration for unsupported-config: error translating config for output: default, unit: filestream-default, error: indices is currently not supported: unsupported operation",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := VerifyComponentIsOtelSupported(tt.component)
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Equal(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+>>>>>>> 2f0ba69f2 (Fall back to process runtime if otel runtime is unsupported (#10087))

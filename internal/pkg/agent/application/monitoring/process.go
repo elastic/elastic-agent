@@ -16,6 +16,8 @@ import (
 
 	"github.com/gorilla/mux"
 
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -120,8 +122,13 @@ func isProcessRedirectable(componentID string) bool {
 }
 
 func redirectToPath(w http.ResponseWriter, r *http.Request, id, path string) error {
+<<<<<<< HEAD
 	endpoint := prefixedEndpoint(utils.SocketURLWithFallback(id, paths.TempDir()))
 	metricsBytes, statusCode, metricsErr := processMetrics(r.Context(), endpoint, path)
+=======
+	endpoint := componentmonitoring.PrefixedEndpoint(utils.SocketURLWithFallback(id, paths.TempDir()))
+	metricsBytes, statusCode, metricsErr := GetProcessMetrics(r.Context(), endpoint, path)
+>>>>>>> 2f0ba69f2 (Fall back to process runtime if otel runtime is unsupported (#10087))
 	if metricsErr != nil {
 		return metricsErr
 	}

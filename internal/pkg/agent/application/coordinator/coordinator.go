@@ -13,6 +13,10 @@ import (
 	"sync/atomic"
 	"time"
 
+<<<<<<< HEAD
+=======
+	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
+>>>>>>> 2f0ba69f2 (Fall back to process runtime if otel runtime is unsupported (#10087))
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 
 	"go.opentelemetry.io/collector/component/componentstatus"
@@ -1678,6 +1682,7 @@ func (c *Coordinator) updateOtelManagerConfig(model *component.Model) error {
 func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtimeModel *component.Model, otelModel *component.Model) {
 	var otelComponents, runtimeComponents []component.Component
 	for _, comp := range model.Components {
+		c.maybeOverrideRuntimeForComponent(&comp)
 		switch comp.RuntimeManager {
 		case component.OtelRuntimeManager:
 			otelComponents = append(otelComponents, comp)
@@ -1699,6 +1704,59 @@ func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtime
 	return
 }
 
+<<<<<<< HEAD
+=======
+// maybeOverrideRuntimeForComponent sets the correct runtime for the given component.
+// Normally, we use the runtime set in the component itself via the configuration, but
+// we may also fall back to the process runtime if the otel runtime is unsupported for
+// some reason. One example is the output using unsupported config options.
+func (c *Coordinator) maybeOverrideRuntimeForComponent(comp *component.Component) {
+	if comp.RuntimeManager == component.ProcessRuntimeManager {
+		// do nothing, the process runtime can handle any component
+		return
+	}
+	if comp.RuntimeManager == component.OtelRuntimeManager {
+		// check if the component is actually supported
+		err := translate.VerifyComponentIsOtelSupported(comp)
+		if err != nil {
+			c.logger.Warnf("otel runtime is not supported for component %s, switching to process runtime, reason: %v", comp.ID, err)
+			comp.RuntimeManager = component.ProcessRuntimeManager
+		}
+	}
+}
+
+func (c *Coordinator) isFleetServer() bool {
+	for _, s := range c.state.Components {
+		if s.Component.InputType == fleetServer {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Coordinator) HasEndpoint() bool {
+	for _, component := range c.state.Components {
+		if component.Component.InputType == endpoint {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (c *Coordinator) ackMigration(ctx context.Context, action *fleetapi.ActionMigrate, acker acker.Acker) error {
+	if err := acker.Ack(ctx, action); err != nil {
+		return fmt.Errorf("failed to ack migrate action: %w", err)
+	}
+
+	if err := acker.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit migrate action: %w", err)
+	}
+
+	return nil
+}
+
+>>>>>>> 2f0ba69f2 (Fall back to process runtime if otel runtime is unsupported (#10087))
 // generateComponentModel regenerates the configuration tree and
 // components from the current AST and vars and returns the result.
 // Called from both the main Coordinator goroutine and from external
