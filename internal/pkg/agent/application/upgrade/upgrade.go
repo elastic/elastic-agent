@@ -23,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -241,13 +242,22 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
 func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
-
+	cleanupPaths := []string{}
 	defer func() {
 		if err != nil {
 			// Add the disk space error to the error chain if it is a disk space error
 			// so that we can use errors.Is to check for it
 			if u.isDiskSpaceErrorFunc(err) {
 				err = goerrors.Join(err, upgradeErrors.ErrInsufficientDiskSpace)
+			}
+			// If there is an error, we need to clean up downloads and any
+			// extracted agent files.
+			for _, path := range cleanupPaths {
+				rmErr := os.RemoveAll(path)
+				if rmErr != nil {
+					u.log.Errorw("error removing path during upgrade cleanup", "error.message", rmErr, "path", path)
+					err = goerrors.Join(err, rmErr)
+				}
 			}
 		}
 	}()
@@ -293,6 +303,15 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	}
 
 	archivePath, err := u.artifactDownloader.downloadArtifact(ctx, parsedVersion, sourceURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+
+	// If the artifactPath is not empty, then the artifact was downloaded.
+	// There may still be an error in the download process, so we need to add
+	// the archive and hash path to the cleanup slice.
+	if archivePath != "" {
+		archiveHashPath := download.AddHashExtension(archivePath)
+		cleanupPaths = append(cleanupPaths, archivePath, archiveHashPath)
+	}
+
 	if err != nil {
 		// Run the same pre-upgrade cleanup task to get rid of any newly downloaded files
 		// This may have an issue if users are upgrading to the same version number.
@@ -317,7 +336,22 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 
 	u.log.Infow("Unpacking agent package", "version", newVersion)
 
+	// Nice to have: add check that no archive files end up in the current versioned home
 	unpackRes, err := u.unpacker.unpack(version, archivePath, paths.Data())
+
+	// If VersionedHome is empty then unpack has not started unpacking the
+	// archive yet. There's nothing to clean up. Return the error.
+	if unpackRes.VersionedHome == "" {
+		return nil, goerrors.Join(err, fmt.Errorf("versionedhome is empty: %v", unpackRes))
+	}
+
+	// If VersionedHome is not empty, it means that the unpack function has
+	// started extracting the archive. It may have failed while extracting.
+	// Setup newHome to be cleanedup.
+	newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome)
+
+	cleanupPaths = append(cleanupPaths, newHome)
+
 	if err != nil {
 		return nil, err
 	}
@@ -326,12 +360,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, sourceURI string
 	if newHash == "" {
 		return nil, errors.New("unknown hash")
 	}
-
-	if unpackRes.VersionedHome == "" {
-		return nil, fmt.Errorf("versionedhome is empty: %v", unpackRes)
-	}
-
-	newHome := filepath.Join(paths.Top(), unpackRes.VersionedHome)
 
 	if err := u.copyActionStore(u.log, newHome); err != nil {
 		return nil, fmt.Errorf("failed to copy action store: %w", err)

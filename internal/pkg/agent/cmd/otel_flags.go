@@ -39,6 +39,11 @@ func setupOtelFlags(flags *pflag.FlagSet) {
 	// but look above, so we explicitly ignore it
 	_ = flags.MarkHidden(manager.OtelSupervisedLoggingLevelFlagName)
 
+	flags.String(manager.OtelSupervisedMonitoringURLFlagName, "", "Set the monitoring path")
+	// the only error we can get here is that the flag does not exist
+	// but look above, so we explicitly ignore it
+	_ = flags.MarkHidden(manager.OtelSupervisedMonitoringURLFlagName)
+
 	goFlags := new(flag.FlagSet)
 	featuregate.GlobalRegistry().RegisterFlags(goFlags)
 
