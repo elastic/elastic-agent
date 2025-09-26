@@ -11,13 +11,8 @@ import (
 
 	"go.elastic.co/apm/v2"
 
-<<<<<<< HEAD
-=======
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
-	"github.com/elastic/go-ucfg"
-
->>>>>>> 2f0ba69f2 (Fall back to process runtime if otel runtime is unsupported (#10087))
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"

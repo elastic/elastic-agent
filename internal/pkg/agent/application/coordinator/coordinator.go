@@ -13,12 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 
-<<<<<<< HEAD
-=======
-	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 
->>>>>>> 2f0ba69f2 (Fall back to process runtime if otel runtime is unsupported (#10087))
 	"go.opentelemetry.io/collector/component/componentstatus"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -1663,8 +1659,6 @@ func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtime
 	return
 }
 
-<<<<<<< HEAD
-=======
 // maybeOverrideRuntimeForComponent sets the correct runtime for the given component.
 // Normally, we use the runtime set in the component itself via the configuration, but
 // we may also fall back to the process runtime if the otel runtime is unsupported for
@@ -1684,38 +1678,6 @@ func (c *Coordinator) maybeOverrideRuntimeForComponent(comp *component.Component
 	}
 }
 
-func (c *Coordinator) isFleetServer() bool {
-	for _, s := range c.state.Components {
-		if s.Component.InputType == fleetServer {
-			return true
-		}
-	}
-	return false
-}
-
-func (c *Coordinator) HasEndpoint() bool {
-	for _, component := range c.state.Components {
-		if component.Component.InputType == endpoint {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (c *Coordinator) ackMigration(ctx context.Context, action *fleetapi.ActionMigrate, acker acker.Acker) error {
-	if err := acker.Ack(ctx, action); err != nil {
-		return fmt.Errorf("failed to ack migrate action: %w", err)
-	}
-
-	if err := acker.Commit(ctx); err != nil {
-		return fmt.Errorf("failed to commit migrate action: %w", err)
-	}
-
-	return nil
-}
-
->>>>>>> 2f0ba69f2 (Fall back to process runtime if otel runtime is unsupported (#10087))
 // generateComponentModel regenerates the configuration tree and
 // components from the current AST and vars and returns the result.
 // Called from both the main Coordinator goroutine and from external

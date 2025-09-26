@@ -11,16 +11,11 @@ import (
 	"slices"
 	"strings"
 
-<<<<<<< HEAD
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 
-=======
->>>>>>> 2f0ba69f2 (Fall back to process runtime if otel runtime is unsupported (#10087))
 	koanfmaps "github.com/knadh/koanf/maps"
 
-	"github.com/elastic/elastic-agent-libs/logp"
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
 	otelcomponent "go.opentelemetry.io/collector/component"

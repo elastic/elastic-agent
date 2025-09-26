@@ -877,9 +877,6 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
-// TODO: Add unit tests for other config generation functions
-=======
 func TestVerifyComponentIsOtelSupported(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -1003,4 +1000,3 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 		})
 	}
 }
->>>>>>> 2f0ba69f2 (Fall back to process runtime if otel runtime is unsupported (#10087))
