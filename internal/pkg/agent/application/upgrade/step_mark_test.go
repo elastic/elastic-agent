@@ -16,6 +16,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
@@ -86,14 +87,15 @@ func TestMarkUpgrade(t *testing.T) {
 	var parsed920SNAPSHOT = agtversion.NewParsedSemVer(9, 2, 0, "SNAPSHOT", "")
 	// fix a timestamp (truncated to the second because of loss of precision during marshalling/unmarshalling)
 	updatedOnNow := time.Now().UTC().Truncate(time.Second)
+	twentyFourHoursFromNow := updatedOnNow.Add(24 * time.Hour)
 
 	type args struct {
-		updatedOn      time.Time
-		currentAgent   agentInstall
-		previousAgent  agentInstall
-		action         *fleetapi.ActionUpgrade
-		details        *details.Details
-		rollbackWindow time.Duration
+		updatedOn          time.Time
+		currentAgent       agentInstall
+		previousAgent      agentInstall
+		action             *fleetapi.ActionUpgrade
+		details            *details.Details
+		availableRollbacks []v1.AgentInstallDesc
 	}
 	type workingDirHook func(t *testing.T, dataDir string)
 
@@ -130,9 +132,9 @@ func TestMarkUpgrade(t *testing.T) {
 					hash:          "prvagt",
 					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
 				},
-				action:         nil,
-				details:        details.NewDetails("4.5.6-SNAPSHOT", details.StateReplacing, ""),
-				rollbackWindow: 0,
+				action:             nil,
+				details:            details.NewDetails("4.5.6-SNAPSHOT", details.StateReplacing, ""),
+				availableRollbacks: nil,
 			},
 			wantErr: assert.Error,
 		},
@@ -152,9 +154,9 @@ func TestMarkUpgrade(t *testing.T) {
 					hash:          "prvagt",
 					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
 				},
-				action:         nil,
-				details:        details.NewDetails("4.5.6-SNAPSHOT", details.StateReplacing, ""),
-				rollbackWindow: 0,
+				action:             nil,
+				details:            details.NewDetails("4.5.6-SNAPSHOT", details.StateReplacing, ""),
+				availableRollbacks: nil,
 			},
 			wantErr: assert.NoError,
 			assertAfterMark: func(t *testing.T, dataDir string) {
@@ -182,50 +184,6 @@ func TestMarkUpgrade(t *testing.T) {
 			},
 		},
 		{
-			name: "rollback window specified but new version is too low - no rollbacks",
-			args: args{
-				updatedOn: updatedOnNow,
-				currentAgent: agentInstall{
-					parsedVersion: parsed456SNAPSHOT,
-					version:       "4.5.6-SNAPSHOT",
-					hash:          "curagt",
-					versionedHome: filepath.Join("data", "elastic-agent-4.5.6-SNAPSHOT-curagt"),
-				},
-				previousAgent: agentInstall{
-					parsedVersion: parsed123SNAPSHOT,
-					version:       "1.2.3-SNAPSHOT",
-					hash:          "prvagt",
-					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
-				},
-				action:         nil,
-				details:        details.NewDetails("4.5.6-SNAPSHOT", details.StateReplacing, ""),
-				rollbackWindow: 7 * 24 * time.Hour,
-			},
-			wantErr: assert.NoError,
-			assertAfterMark: func(t *testing.T, dataDir string) {
-				actualMarker, err := LoadMarker(dataDir)
-				require.NoError(t, err, "error reading actualMarker content after writing")
-
-				expectedMarker := &UpdateMarker{
-					Version:           "4.5.6-SNAPSHOT",
-					Hash:              "curagt",
-					VersionedHome:     filepath.Join("data", "elastic-agent-4.5.6-SNAPSHOT-curagt"),
-					UpdatedOn:         updatedOnNow,
-					PrevVersion:       "1.2.3-SNAPSHOT",
-					PrevHash:          "prvagt",
-					PrevVersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
-					Acked:             false,
-					Action:            nil,
-					Details: &details.Details{
-						TargetVersion: "4.5.6-SNAPSHOT",
-						State:         "UPG_REPLACING",
-						ActionID:      "",
-					},
-				}
-				assert.Equal(t, expectedMarker, actualMarker)
-			},
-		},
-		{
 			name: "rollback window specified and new version is at least 9.2.0-SNAPSHOT - available rollbacks must be present",
 			args: args{
 				updatedOn: updatedOnNow,
@@ -241,9 +199,20 @@ func TestMarkUpgrade(t *testing.T) {
 					hash:          "prvagt",
 					versionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
 				},
-				action:         nil,
-				details:        details.NewDetails("9.2.0-SNAPSHOT", details.StateReplacing, ""),
-				rollbackWindow: 7 * 24 * time.Hour,
+				action:  nil,
+				details: details.NewDetails("9.2.0-SNAPSHOT", details.StateReplacing, ""),
+				availableRollbacks: []v1.AgentInstallDesc{
+					{
+						OptionalTTLItem: v1.OptionalTTLItem{
+							TTL: &twentyFourHoursFromNow,
+						},
+						Version:       "1.2.3-SNAPSHOT",
+						Hash:          "prvagt",
+						VersionedHome: filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
+						Flavor:        "basic",
+						Active:        false,
+					},
+				},
 			},
 			wantErr: assert.NoError,
 			assertAfterMark: func(t *testing.T, dataDir string) {
@@ -270,7 +239,7 @@ func TestMarkUpgrade(t *testing.T) {
 						{
 							Version:    "1.2.3-SNAPSHOT",
 							Home:       filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"),
-							ValidUntil: updatedOnNow.Add(7 * 24 * time.Hour),
+							ValidUntil: twentyFourHoursFromNow,
 						},
 					},
 				}
@@ -295,7 +264,7 @@ func TestMarkUpgrade(t *testing.T) {
 				tc.setupBeforeMark(t, dataDir)
 			}
 
-			err := markUpgrade(log, dataDir, tc.args.updatedOn, tc.args.currentAgent, tc.args.previousAgent, tc.args.action, tc.args.details, tc.args.rollbackWindow)
+			err := markUpgrade(log, dataDir, tc.args.updatedOn, tc.args.currentAgent, tc.args.previousAgent, tc.args.action, tc.args.details, tc.args.availableRollbacks)
 			tc.wantErr(t, err)
 			if tc.assertAfterMark != nil {
 				tc.assertAfterMark(t, dataDir)

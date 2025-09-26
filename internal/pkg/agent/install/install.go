@@ -25,6 +25,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/utils"
+	"github.com/elastic/elastic-agent/pkg/utils/install"
+	manifestutils "github.com/elastic/elastic-agent/pkg/utils/manifest"
 )
 
 const (
@@ -61,17 +63,20 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 		}
 	}
 
-	err = setupInstallPath(topPath, ownership)
-	if err != nil {
-		return utils.FileOwner{}, fmt.Errorf("error setting up install path: %w", err)
-	}
-
 	manifest, err := readPackageManifest(dir)
 	if err != nil {
 		return utils.FileOwner{}, fmt.Errorf("reading package manifest: %w", err)
 	}
 
 	pathMappings := manifest.Package.PathMappings
+	pathMapper := manifestutils.NewPathMapper(pathMappings)
+
+	targetVersionedHome := filepath.FromSlash(pathMapper.Map(manifest.Package.VersionedHome))
+
+	err = setupInstallPath(topPath, ownership, targetVersionedHome, manifestutils.GetFullVersion(manifest), flavor)
+	if err != nil {
+		return utils.FileOwner{}, fmt.Errorf("error setting up install path: %w", err)
+	}
 
 	pt.Describe("Copying install files")
 	copyConcurrency := calculateCopyConcurrency(streams)
@@ -184,7 +189,7 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 }
 
 // setup the basic topPath, and the .installed file
-func setupInstallPath(topPath string, ownership utils.FileOwner) error {
+func setupInstallPath(topPath string, ownership utils.FileOwner, versionedHome string, version string, flavor string) error {
 	// ensure parent directory exists
 	err := os.MkdirAll(filepath.Dir(topPath), 0755)
 	if err != nil {
@@ -198,7 +203,7 @@ func setupInstallPath(topPath string, ownership utils.FileOwner) error {
 	}
 
 	// create the install marker
-	if err := CreateInstallMarker(topPath, ownership); err != nil {
+	if err := CreateInstallMarker(topPath, ownership, versionedHome, version, flavor); err != nil {
 		return fmt.Errorf("failed to create install marker: %w", err)
 	}
 	return nil
@@ -516,13 +521,15 @@ func hasAllSSDs(block ghw.BlockInfo) bool {
 
 // CreateInstallMarker creates a `.installed` file at the given install path,
 // and then calls fixInstallMarkerPermissions to set the ownership provided by `ownership`
-func CreateInstallMarker(topPath string, ownership utils.FileOwner) error {
+func CreateInstallMarker(topPath string, ownership utils.FileOwner, home string, version string, flavor string) error {
 	markerFilePath := filepath.Join(topPath, paths.MarkerFileName)
-	handle, err := os.Create(markerFilePath)
+	installDescProvider := install.NewFileDescriptorSource(markerFilePath)
+	installDesc := v1.AgentInstallDesc{Version: version, VersionedHome: home, Flavor: flavor, Active: true}
+	_, err := installDescProvider.AddInstallDesc(installDesc)
+
 	if err != nil {
-		return err
+		return fmt.Errorf("creating install marker: %w", err)
 	}
-	_ = handle.Close()
 	return fixInstallMarkerPermissions(markerFilePath, ownership)
 }
 
