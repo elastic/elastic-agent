@@ -808,3 +808,5 @@ replace (
 
 // Needed to prevent https://github.com/open-telemetry/opentelemetry-go/issues/7039
 replace go.opentelemetry.io/otel/exporters/prometheus => go.opentelemetry.io/otel/exporters/prometheus v0.58.0
+
+replace github.com/elastic/elastic-agent-libs => github.com/ycombinator/elastic-agent-libs v0.0.0-20250926122109-345a0542c79e
