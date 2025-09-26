@@ -25,7 +25,9 @@ import (
 const ()
 
 type migrateCoordinator interface {
-	Migrate(_ context.Context, _ *fleetapi.ActionMigrate, _ func(done <-chan struct{}) backoff.Backoff) error
+	actionCoordinator
+
+	Migrate(_ context.Context, _ *fleetapi.ActionMigrate, _ func(done <-chan struct{}) backoff.Backoff, _ func(context.Context, *fleetapi.ActionMigrate) error) error
 	ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string)
 	Protection() protection.Config
 }
@@ -77,13 +79,20 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 		return err
 	}
 
+	// signed data contains secret reference to the enrollment token so we extract the cleartext value
+	// out of action.Data and replace it after unmarshalling the signed data into action.Data
+	// see: https://github.com/elastic/fleet-server/blob/22f1f7a0474080d3f56c7148a6505cff0957f549/internal/pkg/secret/secret.go#L75
+	enrollmentToken := action.Data.EnrollmentToken
+
 	if signedData != nil {
 		if err := json.Unmarshal(signedData, &action.Data); err != nil {
 			return fmt.Errorf("failed to convert signed data to action data: %w", err)
 		}
 	}
 
-	if err := h.coord.Migrate(ctx, action, fleetgateway.RequestBackoff); err != nil {
+	action.Data.EnrollmentToken = enrollmentToken
+
+	if err := h.coord.Migrate(ctx, action, fleetgateway.RequestBackoff, h.notifyComponents); err != nil {
 		// this should not happen, unmanaged agent should not receive the action
 		// defensive coding to avoid misbehavior
 		if errors.Is(err, coordinator.ErrNotManaged) {
@@ -102,6 +111,22 @@ func (h *Migrate) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 
 	// reexec and load new config
 	h.coord.ReExec(nil)
+	return nil
+}
+
+func (h *Migrate) notifyComponents(ctx context.Context, migrateAction *fleetapi.ActionMigrate) error {
+	state := h.coord.State()
+	ucs := findMatchingUnitsByActionType(state, fleetapi.ActionTypeMigrate)
+	if len(ucs) > 0 {
+		err := notifyUnitsOfProxiedAction(ctx, h.log, migrateAction, ucs, h.coord.PerformAction)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Log and continue
+		h.log.Debugf("No components running for %v action type", fleetapi.ActionTypeMigrate)
+	}
+
 	return nil
 }
 

@@ -1,0 +1,57 @@
+This OCB configuration is for EDOT Collector version {{version.edot_collector}}.
+
+```yaml
+dist:
+  otelcol_edot:
+    description: "Elastic Distribution of OpenTelemetry Collector"
+    output_path: ./dist/otelcol_edot
+    builds:
+      - name: otelcol_edot
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+        output_path: ./dist/otelcol_edot_{{ "{{ .OS }}" }}_{{ "{{ .Arch }}" }}
+        env:
+          - CGO_ENABLED=0
+          - GOOS={{ "{{ .OS }}" }}
+          - GOARCH={{ "{{ .Arch }}" }}
+        ldflags:
+          - -s -w
+          - -X go.opentelemetry.io/collector/otelcol.buildTimestamp={{ "{{ .BuildTimestamp }}" }}
+          - -X go.opentelemetry.io/collector/otelcol.version={{ "{{ .Version }}" }}
+
+receivers:
+{%- for comp in grouped_components.get('Receivers', []) %}
+  {{ comp.name }}:
+    gomod: {{ comp.dep }}
+{%- endfor %}
+
+processors:
+{%- for comp in grouped_components.get('Processors', []) %}
+  {{ comp.name }}:
+    gomod: {{ comp.dep }}
+{%- endfor %}
+
+exporters:
+{%- for comp in grouped_components.get('Exporters', []) %}
+  {{ comp.name }}:
+    gomod: {{ comp.dep }}
+{%- endfor %}
+
+connectors:
+{%- for comp in grouped_components.get('Connectors', []) %}
+  {{ comp.name }}:
+    gomod: {{ comp.dep }}
+{%- endfor %}
+
+extensions:
+{%- for comp in grouped_components.get('Extensions', []) %}
+  {{ comp.name }}:
+    gomod: {{ comp.dep }}
+{%- endfor %}
+
+providers:
+{%- for comp in grouped_components.get('Providers', []) %}
+  {{ comp.name }}:
+    gomod: {{ comp.dep }}
+{%- endfor %}
+```

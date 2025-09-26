@@ -23,17 +23,34 @@ packages:
       logLevelSetter:
         config:
           mockname: "LogLevelSetter"
+      upgradeCoordinator:
+        config:
+          mockname: "UpgradeCoordinator"
   github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker:
     interfaces:
       Acker:
   github.com/elastic/elastic-agent/internal/pkg/agent/application/info:
     interfaces:
       Agent:
-  github.com/elastic/elastic-agent/internal/pkg/agent/cmd:
+  github.com/elastic/elastic-agent/internal/pkg/agent/cmd/watch:
+    config:
+      inpackage: True
+      with-expecter: True
+      dir: "{{.InterfaceDirRelative}}"
+      mockname: "{{.Mock}}{{.InterfaceName | firstUpper}}"
+      outpkg: "{{.PackageName}}"
+      filename: "{{.Mock | lower}}_{{.InterfaceName | lower}}_test.go"
     interfaces:
       agentWatcher:
-        config:
-          mockname: "AgentWatcher"
       installationModifier:
-        config:
-          mockname: "InstallationModifier"
+  github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade:
+    config:
+      inpackage: True
+      with-expecter: True
+      dir: "{{.InterfaceDirRelative}}"
+      mockname: "{{.Mock}}{{.InterfaceName | firstUpper}}"
+      outpkg: "{{.PackageName}}"
+      filename: "{{.Mock | lower}}_{{.InterfaceName | lower}}_test.go"
+    interfaces:
+      WatcherHelper:
+      watcherGrappler:

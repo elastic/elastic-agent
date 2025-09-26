@@ -15,16 +15,19 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -41,9 +44,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/reload"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -462,11 +467,7 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 		}
 	}()
 
-	upgradeMgr, err := upgrade.NewUpgrader(
-		log,
-		&artifact.Config{},
-		&info.AgentInfo{},
-	)
+	upgradeMgr, err := upgrade.NewUpgrader(log, &artifact.Config{}, nil, &info.AgentInfo{}, new(upgrade.AgentWatcherHelper))
 	require.NoError(t, err, "errored when creating a new upgrader")
 
 	// Channels have buffer length 1, so we don't have to run on multiple
@@ -1526,7 +1527,7 @@ func TestCoordinatorInitiatesUpgrade(t *testing.T) {
 	}
 
 	// Call upgrade and make sure the upgrade manager receives an Upgrade call
-	err := coord.Upgrade(ctx, "1.2.3", "", nil, false, false)
+	err := coord.Upgrade(ctx, "1.2.3", "", nil, WithSkipVerifyOverride(false), WithSkipDefaultPgp(false))
 	assert.True(t, upgradeMgr.upgradeCalled, "Coordinator Upgrade should call upgrade manager Upgrade")
 	assert.Equal(t, upgradeMgr.upgradeErr, err, "Upgrade should report upgrade manager error")
 
@@ -1581,7 +1582,7 @@ func TestCoordinator_UnmanagedAgent_SkipsMigrate(t *testing.T) {
 		return backoff.NewExpBackoff(done, 30*time.Millisecond, 2*time.Second)
 	}
 
-	err := coord.Migrate(ctx, action, backoffFactory)
+	err := coord.Migrate(ctx, action, backoffFactory, nil)
 	require.ErrorIs(t, err, ErrNotManaged)
 }
 
@@ -1627,7 +1628,7 @@ func TestCoordinator_FleetServer_SkipsMigration(t *testing.T) {
 		return backoff.NewExpBackoff(done, 30*time.Millisecond, 2*time.Second)
 	}
 
-	err := coord.Migrate(ctx, action, backoffFactory)
+	err := coord.Migrate(ctx, action, backoffFactory, nil)
 	require.ErrorIs(t, err, ErrFleetServer)
 }
 
@@ -1784,12 +1785,177 @@ func TestCoordinator_InitiatesMigration(t *testing.T) {
 		return backoff.NewExpBackoff(done, 30*time.Millisecond, 2*time.Second)
 	}
 
-	err = coord.Migrate(ctx, action, backoffFactory)
+	err = coord.Migrate(ctx, action, backoffFactory, nil)
 	require.NoError(t, err)
 
 	acker.AssertCalled(t, "Ack", mock.Anything, action)
 	acker.AssertCalled(t, "Commit", mock.Anything)
 	require.True(t, unenrollCalled)
+}
+
+func TestCoordinator_InvalidComponentRevertsMigration(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "vault does not use NewGCMWithRandomNonce.")
+	cfgPath := paths.Config()
+	defer paths.SetConfig(cfgPath)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	tmpConfig := t.TempDir()
+	paths.SetConfig(tmpConfig)
+	agentConfigFile := paths.ConfigFile()
+
+	var unenrollCalled bool
+	oldFleetServer := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			if strings.Contains(r.URL.Path, "unenroll") {
+				unenrollCalled = true
+			}
+
+			_, err := w.Write(nil)
+			require.NoError(t, err)
+
+		}))
+	defer oldFleetServer.Close()
+
+	fleetConfig := configuration.DefaultFleetAgentConfig()
+	fleetConfig.Enabled = true
+	fleetConfig.AccessAPIKey = "access-api-key"
+	fleetConfig.Info.ID = "agent.id"
+	fleetConfig.Client.Host = oldFleetServer.URL
+	fleetConfig.Client.Hosts = []string{oldFleetServer.URL}
+
+	agentConfig := &configuration.Configuration{
+		Fleet: fleetConfig,
+		Settings: &configuration.SettingsConfig{
+			ID: "agent.id",
+		},
+	}
+
+	rawAgentConfig := &configuration.Configuration{
+		Fleet: &configuration.FleetAgentConfig{
+			Enabled: true,
+		},
+		Settings: &configuration.SettingsConfig{
+			ID: "agent.id",
+		},
+	}
+
+	rawAgentConfigData, err := yaml.Marshal(rawAgentConfig)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(agentConfigFile, rawAgentConfigData, 0644))
+
+	// setup secret normally previously created by enroll
+	err = secret.CreateAgentSecret(ctx,
+		vault.WithUnprivileged(true),
+		vault.WithVaultPath(paths.AgentVaultPath()),
+	)
+	require.NoError(t, err)
+
+	store, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile(),
+		storage.WithUnprivileged(true),
+		storage.WithVaultPath(paths.AgentVaultPath()),
+	)
+	require.NoError(t, err)
+
+	fleetAgentConfigData, err := yaml.Marshal(agentConfig)
+	require.NoError(t, err)
+	require.NoError(t, store.Save(bytes.NewReader(fleetAgentConfigData)))
+
+	// overrideStateChan has buffer 2 so we can run on a single goroutine,
+	// since a successful upgrade sets the override state twice.
+	overrideStateChan := make(chan *coordinatorOverrideState, 2)
+
+	// similarly, upgradeDetailsChan is a buffered channel as well.
+	upgradeDetailsChan := make(chan *details.Details, 2)
+
+	// Create a manager that will allow upgrade attempts but return a failure
+	// from Upgrade itself (success requires testing ReExec and we aren't
+	// quite ready to do that yet).
+	upgradeMgr := &fakeUpgradeManager{
+		upgradeable: true,
+		upgradeErr:  errors.New("failed upgrade"),
+	}
+
+	acker := &fakeActionAcker{}
+
+	acker.On("Ack", mock.Anything, mock.Anything).Return(nil)
+	acker.On("Commit", mock.Anything).Return(nil)
+
+	agentInfo, err := info.NewAgentInfo(ctx, false)
+	require.NoError(t, err)
+	coord := &Coordinator{
+		stateBroadcaster:   broadcaster.New(State{}, 0, 0),
+		overrideStateChan:  overrideStateChan,
+		upgradeDetailsChan: upgradeDetailsChan,
+		upgradeMgr:         upgradeMgr,
+		logger:             logp.NewLogger("testing"),
+		// is managed so we proceed with migration
+		isManaged:  true,
+		fleetAcker: acker,
+		agentInfo:  agentInfo,
+	}
+
+	coord.state.Components = append(coord.state.Components, runtime.ComponentComponentState{
+		Component: component.Component{
+			InputType: "not-a-fleet-server",
+		},
+	})
+
+	newFleetServer := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			if strings.Contains(r.URL.Path, "status") {
+				_, err := w.Write(nil)
+				require.NoError(t, err)
+				return
+			}
+
+			body := []byte(`{
+	  "action": "created",
+	  "item": {
+	    "id": "a4937110-e53e-11e9-934f-47a8e38a522c",
+	    "active": true,
+	    "policy_id": "default",
+	    "type": "PERMANENT",
+	    "enrolled_at": "2019-10-02T18:01:22.337Z",
+	    "user_provided_metadata": {},
+	    "local_metadata": {},
+	    "actions": [],
+	    "access_api_key": "API_KEY"
+	  }
+	}`)
+			_, err := w.Write(body)
+			require.NoError(t, err)
+
+		}))
+	defer newFleetServer.Close()
+
+	action := &fleetapi.ActionMigrate{
+		Data: fleetapi.ActionMigrateData{
+			TargetURI:       newFleetServer.URL,
+			EnrollmentToken: "token",
+			Settings:        json.RawMessage(`{"insecure":true}`),
+		},
+		ActionID:   "migrate-id",
+		ActionType: "MIGRATE",
+	}
+
+	backoffFactory := func(done <-chan struct{}) backoff.Backoff {
+		return backoff.NewExpBackoff(done, 30*time.Millisecond, 2*time.Second)
+	}
+
+	failingComponentNotify := func(_ context.Context, _ *fleetapi.ActionMigrate) error {
+		return fmt.Errorf("failed to notify")
+	}
+
+	err = coord.Migrate(ctx, action, backoffFactory, failingComponentNotify)
+	require.Error(t, err)
+
+	acker.AssertNumberOfCalls(t, "Ack", 0)
+	acker.AssertNotCalled(t, "Commit", 0)
+	require.False(t, unenrollCalled)
 }
 
 // Returns an empty but non-nil set of transpiler variables for testing
@@ -1980,4 +2146,101 @@ func TestHasEndpoint(t *testing.T) {
 			assert.Equal(t, tc.expected, result, "HasEndpoint result mismatch")
 		})
 	}
+}
+
+type mockUpgradeManager struct {
+	upgradeErr error
+}
+
+func (m *mockUpgradeManager) Upgradeable() bool {
+	return true
+}
+
+func (m *mockUpgradeManager) Reload(cfg *config.Config) error {
+	return nil
+}
+
+func (m *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+	return nil, m.upgradeErr
+}
+
+func (m *mockUpgradeManager) Ack(ctx context.Context, acker acker.Acker) error {
+	return nil
+}
+
+func (m *mockUpgradeManager) AckAction(ctx context.Context, acker acker.Acker, action fleetapi.Action) error {
+	return nil
+}
+
+func (m *mockUpgradeManager) MarkerWatcher() upgrade.MarkerWatcher {
+	return nil
+}
+
+func TestCoordinator_Upgrade_InsufficientDiskSpaceError(t *testing.T) {
+	log, _ := loggertest.New("coordinator-insufficient-disk-space-test")
+
+	mockUpgradeManager := &mockUpgradeManager{
+		upgradeErr: fmt.Errorf("wrapped: %w", upgradeErrors.ErrInsufficientDiskSpace),
+	}
+
+	initialState := State{
+		CoordinatorState:   agentclient.Healthy,
+		CoordinatorMessage: "Running",
+	}
+
+	coord := &Coordinator{
+		state:              initialState,
+		logger:             log,
+		upgradeMgr:         mockUpgradeManager,
+		stateBroadcaster:   broadcaster.New(initialState, 64, 32),
+		overrideStateChan:  make(chan *coordinatorOverrideState),
+		upgradeDetailsChan: make(chan *details.Details),
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+
+	overrideStates := []agentclient.State{}
+	go func() {
+		state1 := <-coord.overrideStateChan
+		overrideStates = append(overrideStates, state1.state)
+
+		state2 := <-coord.overrideStateChan
+		if state2 != nil {
+			overrideStates = append(overrideStates, state2.state)
+		}
+
+		wg.Done()
+	}()
+
+	upgradeDetails := []*details.Details{}
+	go func() {
+		upgradeDetails = append(upgradeDetails, <-coord.upgradeDetailsChan)
+		upgradeDetails = append(upgradeDetails, <-coord.upgradeDetailsChan)
+		wg.Done()
+	}()
+
+	err := coord.Upgrade(t.Context(), "", "", nil)
+	require.Error(t, err)
+	require.Equal(t, err, upgradeErrors.ErrInsufficientDiskSpace)
+
+	wg.Wait()
+
+	require.Equal(t, []agentclient.State{agentclient.Upgrading}, overrideStates)
+
+	require.Equal(t, []*details.Details{
+		{
+			TargetVersion: "",
+			State:         details.StateRequested,
+			ActionID:      "",
+		},
+		{
+			TargetVersion: "",
+			State:         details.StateFailed,
+			Metadata: details.Metadata{
+				FailedState: details.StateRequested,
+				ErrorMsg:    upgradeErrors.ErrInsufficientDiskSpace.Error(),
+			},
+		},
+	}, upgradeDetails)
 }

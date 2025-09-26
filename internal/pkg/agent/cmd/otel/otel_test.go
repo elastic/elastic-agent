@@ -30,23 +30,23 @@ func TestPrepareCollectorSettings(t *testing.T) {
 		settings, err := prepareCollectorSettings(nil, true, "info")
 		require.NoError(t, err, "failed to prepare collector settings")
 		require.NotNil(t, settings, "settings should not be nil")
-		require.NotNil(t, settings.ConfigProviderSettings.ResolverSettings.URIs, "URIs should not be nil")
+		require.NotNil(t, settings.otelSettings.ConfigProviderSettings.ResolverSettings.URIs, "URIs should not be nil")
 		agentProviderURIFound := false
-		for _, uri := range settings.ConfigProviderSettings.ResolverSettings.URIs {
+		for _, uri := range settings.otelSettings.ConfigProviderSettings.ResolverSettings.URIs {
 			agentProviderURIFound = strings.Contains(uri, agentprovider.AgentConfigProviderSchemeName)
 			if agentProviderURIFound {
 				break
 			}
 		}
 		require.True(t, agentProviderURIFound, "agentprovider Scheme not found in the URIS of ConfigProviderSettings")
-		require.NotNil(t, settings.LoggingOptions, "loggingOptions should not be nil for supervised mode")
+		require.NotNil(t, settings.otelSettings.LoggingOptions, "loggingOptions should not be nil for supervised mode")
 	})
 
 	t.Run("returns valid settings in standalone mode", func(t *testing.T) {
 		settings, err := prepareCollectorSettings([]string{"fake-config.yaml"}, false, "info")
 		require.NoError(t, err, "failed to prepare collector settings")
 		require.NotNil(t, settings, "settings should not be nil")
-		require.Contains(t, settings.ConfigProviderSettings.ResolverSettings.URIs, "fake-config.yaml", "fake-config.yaml not found in the URIS of ConfigProviderSettings")
+		require.Contains(t, settings.otelSettings.ConfigProviderSettings.ResolverSettings.URIs, "fake-config.yaml", "fake-config.yaml not found in the URIS of ConfigProviderSettings")
 	})
 
 	t.Run("fails when supervised mode has invalid config from stdin", func(t *testing.T) {
@@ -61,7 +61,7 @@ func TestPrepareCollectorSettings(t *testing.T) {
 
 		settings, err := prepareCollectorSettings(nil, true, "info")
 		require.Error(t, err)
-		require.Nil(t, settings)
+		require.Nil(t, settings.otelSettings)
 	})
 
 	t.Run("doesn't fail when unsupervised mode has invalid config from stdin", func(t *testing.T) {
