@@ -27,28 +27,61 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 	// check that the upgrade marker exists and is accessible
 	updateMarkerPath := markerFilePath(paths.DataFrom(topDir))
 	_, err := os.Stat(updateMarkerPath)
-	if err != nil {
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf("stat() on upgrade marker %q failed: %w", updateMarkerPath, err)
 	}
 
+	var watcherExecutable string
+	var versionedHomeToRollbackTo string
+
+	if errors.Is(err, os.ErrNotExist) {
+		// there is no upgrade marker, we need to extract available rollbacks from agent installs
+		watcherExecutable, versionedHomeToRollbackTo, err = rollbackUsingAgentInstalls()
+	} else {
+		watcherExecutable, versionedHomeToRollbackTo, err = rollbackUsingUpgradeMarker(ctx, u.log, u.watcherHelper, topDir, now, version)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	// rollback
+	watcherCmd, err := u.watcherHelper.InvokeWatcher(u.log, watcherExecutable, "watch", "--rollback", versionedHomeToRollbackTo)
+	if err != nil {
+		return nil, fmt.Errorf("starting rollback command: %w", err)
+	}
+
+	u.log.Infof("rollback command started successfully, PID: %d", watcherCmd.Process.Pid)
+	return nil, nil
+}
+
+func rollbackUsingAgentInstalls() (string, string, error) {
+	//FIXME implement
+	//panic("Not implemented")
+	return "", "", errors.Join(errors.New("not implemented"), os.ErrNotExist)
+}
+
+func rollbackUsingUpgradeMarker(ctx context.Context, log *logger.Logger, watcherHelper WatcherHelper, topDir string, now time.Time, version string) (string, string, error) {
 	// read the upgrade marker
 	updateMarker, err := LoadMarker(paths.DataFrom(topDir))
 	if err != nil {
-		return nil, fmt.Errorf("loading marker: %w", err)
+		return "", "", fmt.Errorf("loading marker: %w", err)
 	}
 
 	if updateMarker == nil {
-		return nil, ErrNilUpdateMarker
+		return "", "", ErrNilUpdateMarker
 	}
 
 	// extract the agent installs involved in the upgrade and select the most appropriate watcher executable
 	previous, current, err := extractAgentInstallsFromMarker(updateMarker)
 	if err != nil {
-		return nil, fmt.Errorf("extracting current and previous install details: %w", err)
+		return "", "", fmt.Errorf("extracting current and previous install details: %w", err)
 	}
-	watcherExecutable := u.watcherHelper.SelectWatcherExecutable(topDir, previous, current)
+	watcherExecutable := watcherHelper.SelectWatcherExecutable(topDir, previous, current)
 
-	err = withTakeOverWatcher(ctx, u.log, topDir, u.watcherHelper, func() error {
+	var selectedRollbackVersionedHome string
+
+	err = withTakeOverWatcher(ctx, log, topDir, watcherHelper, func() error {
 		// read the upgrade marker
 		updateMarker, err = LoadMarker(paths.DataFrom(topDir))
 		if err != nil {
@@ -62,37 +95,29 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 		if len(updateMarker.RollbacksAvailable) == 0 {
 			return ErrNoRollbacksAvailable
 		}
-		var selectedRollback *TTLMarker
-		for _, rollback := range updateMarker.RollbacksAvailable {
+
+		for versionedHome, rollback := range updateMarker.RollbacksAvailable {
 			if rollback.Version == version && now.Before(rollback.ValidUntil) {
-				selectedRollback = &rollback
+				selectedRollbackVersionedHome = versionedHome
 				break
 			}
 		}
-		if selectedRollback == nil {
+		if selectedRollbackVersionedHome == "" {
 			return fmt.Errorf("version %q not listed among the available rollbacks: %w", version, ErrNoRollbacksAvailable)
 		}
-
-		// rollback
-		_, err = u.watcherHelper.InvokeWatcher(u.log, watcherExecutable, "watch", "--rollback", updateMarker.PrevVersionedHome)
-		if err != nil {
-			return fmt.Errorf("starting rollback command: %w", err)
-		}
-		u.log.Debug("rollback command started successfully, PID")
 		return nil
 	})
 
 	if err != nil {
 		// Invoke watcher again (now that we released the watcher applocks)
-		_, invokeWatcherErr := u.watcherHelper.InvokeWatcher(u.log, watcherExecutable)
+		_, invokeWatcherErr := watcherHelper.InvokeWatcher(log, watcherExecutable)
 		if invokeWatcherErr != nil {
-			return nil, errors.Join(err, fmt.Errorf("invoking watcher: %w", invokeWatcherErr))
+			return "", "", errors.Join(err, fmt.Errorf("invoking watcher: %w", invokeWatcherErr))
 		}
-		return nil, err
+		return "", "", err
 	}
 
-	return nil, nil
-
+	return watcherExecutable, selectedRollbackVersionedHome, nil
 }
 
 func withTakeOverWatcher(ctx context.Context, log *logger.Logger, topDir string, watcherHelper WatcherHelper, f func() error) error {
