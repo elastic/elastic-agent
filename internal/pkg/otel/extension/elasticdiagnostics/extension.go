@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	_ component.Component = &diagnosticsExtension{}
+	_ component.Component = (*diagnosticsExtension)(nil)
 )
 
 type diagHook struct {
