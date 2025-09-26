@@ -545,13 +545,15 @@ func (Test) Unit(ctx context.Context) error {
 
 // FIPSOnlyUnit runs all the unit tests with GODEBUG=fips140=only.
 func (Test) FIPSOnlyUnit(ctx context.Context) error {
+	mg.Deps(Prepare.Env, Build.TestBinaries)
+
 	// We pre-cache go module dependencies before running the unit tests with
 	// GODEBUG=fips140=only.  Otherwise, the command that runs the unit tests
 	// will try to download the dependencies and could fail because the TLS
 	// negotiation with the Go module proxy could use a non-FIPS compliant
 	// key exchange protocol, e.g. X25519.
 	RunGo("mod", "download")
-	mg.Deps(Prepare.Env, Build.TestBinaries)
+
 	params := devtools.DefaultGoTestUnitArgs()
 	params.Env["FIPS"] = "true"
 	params.Env["GODEBUG"] = "fips140=only"
