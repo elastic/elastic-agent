@@ -57,6 +57,19 @@ func TestComponentLifecycle(t *testing.T) {
 		require.NoError(t, secondExt.Start(context.Background(), newMdatagenNopHost()))
 		require.NoError(t, secondExt.Shutdown(context.Background()))
 	})
+	t.Run("shutdown twice", func(t *testing.T) {
+		firstExt, err := factory.Create(context.Background(), extensiontest.NewNopSettings(typ), cfg)
+		require.NoError(t, err)
+		require.NoError(t, firstExt.Start(context.Background(), newMdatagenNopHost()))
+		require.NoError(t, firstExt.Shutdown(context.Background()))
+		require.NoError(t, firstExt.Shutdown(context.Background()))
+	})
+	t.Run("shutdown twice - without start", func(t *testing.T) {
+		firstExt, err := factory.Create(context.Background(), extensiontest.NewNopSettings(typ), cfg)
+		require.NoError(t, err)
+		require.NoError(t, firstExt.Shutdown(context.Background()))
+		require.NoError(t, firstExt.Shutdown(context.Background()))
+	})
 }
 
 var _ component.Host = (*mdatagenNopHost)(nil)

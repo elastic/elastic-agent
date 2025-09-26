@@ -228,16 +228,15 @@ func (d *diagnosticsExtension) ServeHTTP(w http.ResponseWriter, req *http.Reques
 		GlobalDiagnostics:    globalResults,
 		ComponentDiagnostics: componentResults,
 	})
+	w.Header().Add("content-type", "application/json")
 	if err != nil {
 		d.logger.Error("Failed marshaling response", zap.Error(err))
-		w.WriteHeader(503)
-		w.Header().Add("content-type", "application/json")
+		w.WriteHeader(500)
 		if _, err := fmt.Fprintf(w, "{'error':'%v'}", err); err != nil {
 			d.logger.Error("Failed writing response to client.", zap.Error(err))
 		}
 		return
 	}
-	w.Header().Add("content-type", "application/json")
 	if _, err := w.Write(b); err != nil {
 		d.logger.Error("Failed writing response to client.", zap.Error(err))
 	}
