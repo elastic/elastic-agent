@@ -38,7 +38,7 @@ func TestComponentLifecycle(t *testing.T) {
 	require.NoError(t, sub.Unmarshal(&cfg))
 	if runtime.GOOS == "windows" {
 		// Use a different endpoint on Windows as /tmp/test.sock is not valid
-		cfg.Endpoint = fmt.Sprintf("npipe://%s", cfg.Endpoint)
+		cfg.Endpoint = "npipe:///elastic-agent-test"
 	}
 	t.Run("shutdown", func(t *testing.T) {
 		e, err := factory.Create(context.Background(), extensiontest.NewNopSettings(typ), cfg)
