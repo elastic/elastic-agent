@@ -105,7 +105,35 @@ func TestPolicyAcked(t *testing.T) {
 	agentInfo := &info.AgentInfo{}
 	nullStore := &storage.NullStore{}
 
-	t.Run("Config change should ACK", func(t *testing.T) {
+	t.Run("Default: Config changes are ACKed", func(t *testing.T) {
+		ch := make(chan coordinator.ConfigChange, 1)
+		tacker := &testAcker{}
+
+		config := map[string]interface{}{"hello": "world"}
+		actionID := "abc123"
+		action := &fleetapi.ActionPolicyChange{
+			ActionID:   actionID,
+			ActionType: "POLICY_CHANGE",
+			Data: fleetapi.ActionPolicyChangeData{
+				Policy: config,
+			},
+		}
+
+		// Test default FF value
+		cfg := configuration.DefaultConfiguration()
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
+
+		err := handler.Handle(context.Background(), action, tacker)
+		require.NoError(t, err)
+
+		change := <-ch
+		require.NoError(t, change.Ack())
+
+		actions := tacker.Items()
+		assert.Len(t, actions, 1)
+		assert.Equal(t, actionID, actions[0])
+	})
+	t.Run("Config change acks when forced", func(t *testing.T) {
 		ch := make(chan coordinator.ConfigChange, 1)
 		tacker := &testAcker{}
 
@@ -121,6 +149,7 @@ func TestPolicyAcked(t *testing.T) {
 
 		cfg := configuration.DefaultConfiguration()
 		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
+		handler.disableAckFn = func() bool { return false }
 
 		err := handler.Handle(context.Background(), action, tacker)
 		require.NoError(t, err)
@@ -129,8 +158,35 @@ func TestPolicyAcked(t *testing.T) {
 		require.NoError(t, change.Ack())
 
 		actions := tacker.Items()
-		assert.EqualValues(t, 1, len(actions))
+		assert.Len(t, actions, 1)
 		assert.Equal(t, actionID, actions[0])
+	})
+	t.Run("Config change do not ack when disabled", func(t *testing.T) {
+		ch := make(chan coordinator.ConfigChange, 1)
+		tacker := &testAcker{}
+
+		config := map[string]interface{}{"hello": "world"}
+		actionID := "abc123"
+		action := &fleetapi.ActionPolicyChange{
+			ActionID:   actionID,
+			ActionType: "POLICY_CHANGE",
+			Data: fleetapi.ActionPolicyChangeData{
+				Policy: config,
+			},
+		}
+
+		cfg := configuration.DefaultConfiguration()
+		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, ch, nilLogLevelSet(t), &coordinator.Coordinator{})
+		handler.disableAckFn = func() bool { return true }
+
+		err := handler.Handle(context.Background(), action, tacker)
+		require.NoError(t, err)
+
+		change := <-ch
+		require.NoError(t, change.Ack())
+
+		actions := tacker.Items()
+		assert.Empty(t, actions)
 	})
 }
 
