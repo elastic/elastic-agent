@@ -250,9 +250,16 @@ func TestGetOtelConfig(t *testing.T) {
 			"logs_dynamic_id": map[string]any{
 				"enabled": true,
 			},
+<<<<<<< HEAD
 			"timeout":           90 * time.Second,
 			"idle_conn_timeout": 3 * time.Second,
 		},
+=======
+			"auth": map[string]any{
+				"authenticator": "beatsauth/_agent-component/" + outputName,
+			},
+		}
+>>>>>>> 5f0f2fd3b (Update journald tests now that Filebeat supports watching folders (#10131))
 	}
 
 	defaultProcessors := func(streamId, dataset string, namespace string) []any {
@@ -312,6 +319,75 @@ func TestGetOtelConfig(t *testing.T) {
 		}
 	}
 
+<<<<<<< HEAD
+=======
+	// expects input id
+	expectedFilestreamConfig := func(id string) map[string]any {
+		return map[string]any{
+			"filebeat": map[string]any{
+				"inputs": []map[string]any{
+					{
+						"id":   "test-1",
+						"type": "filestream",
+						"data_stream": map[string]any{
+							"dataset": "generic-1",
+						},
+						"paths": []any{
+							"/var/log/*.log",
+						},
+						"index":      "logs-generic-1-default",
+						"processors": defaultProcessors("test-1", "generic-1", "logs"),
+					},
+					{
+						"id":   "test-2",
+						"type": "filestream",
+						"data_stream": map[string]any{
+							"dataset": "generic-2",
+						},
+						"paths": []any{
+							"/var/log/*.log",
+						},
+						"index":      "logs-generic-2-default",
+						"processors": defaultProcessors("test-2", "generic-2", "logs"),
+					},
+				},
+			},
+			"output": map[string]any{
+				"otelconsumer": map[string]any{},
+			},
+			"path": map[string]any{
+				"data": filepath.Join(paths.Run(), id),
+			},
+			"queue": map[string]any{
+				"mem": map[string]any{
+					"events": uint64(3200),
+					"flush": map[string]any{
+						"min_events": uint64(1600),
+						"timeout":    "10s",
+					},
+				},
+			},
+			"logging": map[string]any{
+				"with_fields": map[string]any{
+					"component": map[string]any{
+						"binary":  "filebeat",
+						"dataset": "elastic_agent.filebeat",
+						"type":    "filestream",
+						"id":      id,
+					},
+					"log": map[string]any{
+						"source": id,
+					},
+				},
+			},
+			"http": map[string]any{
+				"enabled": true,
+				"host":    "localhost",
+			},
+		}
+	}
+
+>>>>>>> 5f0f2fd3b (Update journald tests now that Filebeat supports watching folders (#10131))
 	getBeatMonitoringConfig := func(_, _ string) map[string]any {
 		return map[string]any{
 			"http": map[string]any{
