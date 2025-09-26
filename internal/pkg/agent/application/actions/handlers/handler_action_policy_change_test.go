@@ -36,6 +36,7 @@ import (
 	noopacker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	mockhandlers "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/actions/handlers"
@@ -595,6 +596,19 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 		fleetNomTLSServer.StartTLS()
 		defer fleetNomTLSServer.Close()
 
+		var tlsPreferredCurves []tlscommon.TLSCurveType
+		if fipsutils.GoDebugFIPS140() == fipsutils.GoDebugFIPS140Only {
+			// Exclude X25519 curves when in FIPS mode, otherwise we get the error:
+			// crypto/ecdh: use of X25519 is not allowed in FIPS 140-only mode
+			// Note that we only use FIPS 140-only mode, set via GODEBUG=fips140=only,
+			// while testing.
+			tlsPreferredCurves = []tlscommon.TLSCurveType{
+				tlscommon.TLSCurveType(tls.CurveP256),
+				tlscommon.TLSCurveType(tls.CurveP384),
+				tlscommon.TLSCurveType(tls.CurveP521),
+			}
+		}
+
 		trueVar := true
 		tcs := []struct {
 			name                     string
@@ -612,6 +626,11 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 					Fleet: &configuration.FleetAgentConfig{
 						Client: remote.Config{
 							Host: fleetNomTLSServer.URL,
+							Transport: httpcommon.HTTPTransportSettings{
+								TLS: &tlscommon.Config{
+									CurveTypes: tlsPreferredCurves,
+								},
+							},
 						},
 						AccessAPIKey: "ignore",
 					},
@@ -638,7 +657,10 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 							// but there is no way for it to work without a certificate, switched it to TLS fleet server ¯\_(ツ)_/¯
 							Host: fleetNomTLSServer.URL,
 							Transport: httpcommon.HTTPTransportSettings{
-								TLS: &tlscommon.Config{CAs: []string{string(fleetRootPair.Cert)}},
+								TLS: &tlscommon.Config{
+									CAs:        []string{string(fleetRootPair.Cert)},
+									CurveTypes: tlsPreferredCurves,
+								},
 							},
 						},
 						AccessAPIKey: "ignore",
@@ -666,7 +688,10 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 						Client: remote.Config{
 							Host: fleetNomTLSServer.URL,
 							Transport: httpcommon.HTTPTransportSettings{
-								TLS: &tlscommon.Config{CAs: []string{string(fleetRootPair.Cert)}},
+								TLS: &tlscommon.Config{
+									CAs:        []string{string(fleetRootPair.Cert)},
+									CurveTypes: tlsPreferredCurves,
+								},
 							},
 						},
 						AccessAPIKey: "ignore",
@@ -691,8 +716,10 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 							Host: fleetNomTLSServer.URL,
 							Transport: httpcommon.HTTPTransportSettings{
 								TLS: &tlscommon.Config{
-									Enabled: &trueVar,
-									CAs:     []string{string(fleetRootPair.Cert)}},
+									Enabled:    &trueVar,
+									CAs:        []string{string(fleetRootPair.Cert)},
+									CurveTypes: tlsPreferredCurves,
+								},
 							},
 						},
 						AccessAPIKey: "ignore",
@@ -722,7 +749,8 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 							Host: fleetmTLSServer.URL,
 							Transport: httpcommon.HTTPTransportSettings{
 								TLS: &tlscommon.Config{
-									CAs: []string{string(fleetRootPair.Cert)},
+									CAs:        []string{string(fleetRootPair.Cert)},
+									CurveTypes: tlsPreferredCurves,
 								},
 							},
 						},
@@ -761,6 +789,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 										Passphrase:     "",
 										PassphrasePath: "/path/to/passphrase",
 									},
+									CurveTypes: tlsPreferredCurves,
 								},
 							},
 						},
@@ -799,6 +828,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 										Certificate: string(agentChildPair.Cert),
 										Key:         string(agentChildPair.Key),
 									},
+									CurveTypes: tlsPreferredCurves,
 								},
 							},
 						},
@@ -835,6 +865,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 										Certificate: string(agentChildPair.Cert),
 										Key:         string(agentChildPair.Key),
 									},
+									CurveTypes: tlsPreferredCurves,
 								},
 							},
 						},
@@ -867,6 +898,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 										Certificate: string(agentChildPair.Cert),
 										Key:         string(agentChildPair.Key),
 									},
+									CurveTypes: tlsPreferredCurves,
 								},
 							},
 						},
