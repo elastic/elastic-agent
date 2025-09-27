@@ -691,8 +691,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 							Transport: httpcommon.HTTPTransportSettings{
 								TLS: &tlscommon.Config{
 									Enabled: &trueVar,
-									CAs:     []string{string(fleetRootPair.Cert)},
-								},
+									CAs:     []string{string(fleetRootPair.Cert)}},
 							},
 						},
 						AccessAPIKey: "ignore",
