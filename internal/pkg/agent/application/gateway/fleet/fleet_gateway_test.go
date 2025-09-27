@@ -461,7 +461,10 @@ func TestFleetGateway(t *testing.T) {
 
 		gateway, err := newFleetGatewayWithScheduler(
 			log,
-			settings,
+			&fleetGatewaySettings{
+				Duration: 5 * time.Second,
+				Backoff:  &backoffSettings{Init: 10 * time.Millisecond, Max: 30 * time.Second},
+			},
 			agentInfo,
 			client,
 			scheduler,
@@ -477,29 +480,45 @@ func TestFleetGateway(t *testing.T) {
 		ch2 := client.Answer(func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
 			requestSent <- struct{}{}
 			<-ctx.Done()
-			err := context.Cause(ctx)
-			assert.ErrorIs(t, err, errComponentStateChanged)
-			return nil, err
+			return nil, ctx.Err()
 		})
 
-		errCh := runFleetGateway(ctx, gateway)
-		// start state watcher
+		wg := sync.WaitGroup{}
+
+		// custom runFleetGateway
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
+			err := gateway.Run(ctx)
+			if err != nil && !errors.Is(err, context.Canceled) {
+				assert.NoError(t, err)
+			}
+		}()
+
+		// start state watcher
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 			err := stateFetcher.StartStateWatch(ctx)
 			assert.ErrorIs(t, err, context.Canceled)
 		}()
+
+		// trigger cmd loop
 		scheduler.Next()
-
+		// ensure that checkin request was sent (and it is waiting) and then interrupt with state change.
 		<-requestSent
-
 		// State change arrives while waiting on fleet sever long poll
 		stateChannel <- coordinator.State{}
 
+		// wait for fleet ctx canceled error
 		<-ch2
 
+		// ensure that this specific error returned from f.execute
+		executeErr := <-gateway.errCh
+		assert.ErrorIs(t, executeErr, errComponentStateChanged)
+
 		cancel()
-		err = <-errCh
-		require.NoError(t, err)
+		wg.Wait()
 	})
 }
 

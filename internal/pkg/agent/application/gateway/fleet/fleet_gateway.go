@@ -6,6 +6,7 @@ package fleet
 
 import (
 	"context"
+	stderrors "errors"
 	"sync"
 	"time"
 
@@ -194,7 +195,7 @@ func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 		f.log.Debugf("Checking started")
 		resp, took, err := f.execute(ctx)
 		if err != nil {
-			becauseOfStateChanged := errors.Is(context.Cause(ctx), errComponentStateChanged)
+			becauseOfStateChanged := errors.Is(err, errComponentStateChanged)
 
 			// don't count that as failed attempt
 			if !becauseOfStateChanged {
@@ -401,6 +402,9 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 
 	f.unauthCounter = 0
 	if err != nil {
+		if errors.Is(err, context.Canceled) && errors.Is(context.Cause(stateCTX), errComponentStateChanged) {
+			return nil, took, stderrors.Join(err, errComponentStateChanged)
+		}
 		return nil, took, err
 	}
 
