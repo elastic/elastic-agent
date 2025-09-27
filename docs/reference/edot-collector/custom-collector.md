@@ -43,6 +43,11 @@ Create a builder configuration file,`builder-config.yml`, to define the custom C
 
 The following example, `builder-config.yml`, contains the components needed to send your telemetry data to Elastic Observability. For more information on these components, refer to the [components](/reference/edot-collector/components.md) documentation. Keep or remove components from the example configuration file to fit your needs.
 
+% The following OCB configuration is automatically generated from the EDOT Collector source code.
+% Automation is handled by /docs/scripts/update-docs/update-components-docs.py, which
+% reads the go.mod file and then generates the OCB configuration.
+% Note that while this runs on `main`, the OCB configuration is updated based on the latest released version.
+
 % start:edot-collector-components-ocb
 This OCB configuration is for EDOT Collector version 9.1.4.
 
