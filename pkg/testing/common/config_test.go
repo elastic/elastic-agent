@@ -41,10 +41,6 @@ func TestConfig_GetPlatforms(t *testing.T) {
 			Err:       errors.New(`failed to parse platform string "linux/arm64/centos/12/toomany": more than 3 separators`),
 		},
 		{
-			Platforms: []string{"windows/arm64"},
-			Err:       errors.New(`failed to parse platform string "windows/arm64": windows on arm64 not supported`),
-		},
-		{
 			Platforms: []string{"linux/arm64/centos", "windows/arm64/toomany/2022"},
 			Err:       errors.New(`failed to parse platform string "windows/arm64/toomany/2022": more than 2 separators`),
 		},
@@ -62,6 +58,7 @@ func TestConfig_GetPlatforms(t *testing.T) {
 				"windows",
 				"windows/amd64",
 				"windows/amd64/2022",
+				"windows/arm64",
 			},
 			Results: []define.OS{
 				{
@@ -113,6 +110,10 @@ func TestConfig_GetPlatforms(t *testing.T) {
 					Type:    define.Windows,
 					Arch:    define.AMD64,
 					Version: "2022",
+				},
+				{
+					Type: define.Windows,
+					Arch: define.ARM64,
 				},
 			},
 		},
