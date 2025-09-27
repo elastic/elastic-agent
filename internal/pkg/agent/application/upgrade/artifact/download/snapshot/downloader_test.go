@@ -7,7 +7,6 @@ package snapshot
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -22,7 +21,6 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
-	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 )
@@ -139,14 +137,6 @@ func TestDownloadVersion(t *testing.T) {
 			transport.DialContext = func(_ context.Context, network, s string) (net.Conn, error) {
 				_ = s
 				return net.Dial(network, server.Listener.Addr().String())
-			}
-
-			if fipsutils.GoDebugFIPS140() == fipsutils.GoDebugFIPS140Only {
-				// Exclude X25519 curves when in FIPS mode, otherwise we get the error:
-				// crypto/ecdh: use of X25519 is not allowed in FIPS 140-only mode
-				// Note that we only use FIPS 140-only mode, set via GODEBUG=fips140=only,
-				// while testing.
-				transport.TLSClientConfig.CurvePreferences = []tls.CurveID{tls.CurveP256, tls.CurveP384, tls.CurveP521}
 			}
 
 			downloader, err := NewDownloaderWithClient(log, config, tt.args.version, client, upgradeDetails)
