@@ -10,7 +10,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 )
 
-const defaultExecMode = manager.EmbeddedExecutionMode
+const defaultExecMode = manager.SubprocessExecutionMode
 
 type execModeConfig struct {
 	Agent struct {
