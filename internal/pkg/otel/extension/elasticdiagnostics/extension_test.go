@@ -10,9 +10,11 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/pprof/profile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component"
@@ -44,6 +46,26 @@ func TestExtension(t *testing.T) {
 		require.NoError(t, ext.Shutdown(context.Background()))
 	}()
 
+	// mock a few calls to RegisterDiagnosticHook
+	diagExt := ext.(*diagnosticsExtension)
+	diagExt.RegisterDiagnosticHook("test_component",
+		"Test Hook",
+		"test.json",
+		"application/json",
+		func() []byte {
+			return []byte("diagnostic data")
+		},
+	)
+
+	diagExt.RegisterDiagnosticHook("test_component2",
+		"Test Hook2",
+		"test2.json",
+		"application/json",
+		func() []byte {
+			return []byte("diagnostic data 2")
+		},
+	)
+
 	tr := &http.Transport{
 		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 			return client.Dialer(ctx, config.Endpoint)
@@ -65,14 +87,39 @@ func TestExtension(t *testing.T) {
 		// test that the response can be unmarshalled
 		require.NoErrorf(collect, json.Unmarshal(b, &res), "failed to unmarshal response: %s", string(b))
 		require.NotEmpty(collect, res.GlobalDiagnostics)
+		require.NotEmpty(collect, res.ComponentDiagnostics)
 		foundCPU := false
 		for _, global := range res.GlobalDiagnostics {
 			if global.Name == "cpu" {
 				foundCPU = true
 				break
 			}
+			if strings.HasSuffix(global.Filename, "profile.gz") {
+				verifyPprof(t, global.Content)
+			}
 		}
 		require.True(collect, foundCPU, "cpu.pprof not found in global diagnostics")
+
+		for _, comp := range res.ComponentDiagnostics {
+			switch comp.Name {
+			case "test_component":
+				require.Equal(collect, "test.json", comp.Filename)
+				require.Equal(collect, "application/json", comp.ContentType)
+				require.Equal(collect, "Test Hook", comp.Description)
+				require.Equal(collect, []byte("diagnostic data"), comp.Content)
+			case "test_component2":
+				require.Equal(collect, "test2.json", comp.Filename)
+				require.Equal(collect, "application/json", comp.ContentType)
+				require.Equal(collect, "Test Hook2", comp.Description)
+				require.Equal(collect, []byte("diagnostic data 2"), comp.Content)
+			}
+		}
 		require.NoError(collect, resp.Body.Close())
 	}, 10*time.Second, 1*time.Millisecond, "extension did not start in time")
+}
+
+func verifyPprof(t *testing.T, content []byte) {
+	prof, err := profile.ParseData(content)
+	require.NoError(t, err)
+	require.NotNil(t, prof)
 }
