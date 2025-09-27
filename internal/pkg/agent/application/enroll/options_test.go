@@ -347,6 +347,28 @@ func TestMergeOptionsWithMigrateAction(t *testing.T) {
 			},
 			false,
 		},
+		{
+			"original id is used when replace token provided",
+			&fleetapi.ActionMigrate{
+				Data: fleetapi.ActionMigrateData{
+					EnrollmentToken: "token",
+					TargetURI:       "uri",
+					Settings:        json.RawMessage(`{"insecure": true, "replace_token": "replace-token", "tags":["a","b"]}`),
+				},
+			},
+			EnrollOptions{
+				ID: "test-id",
+			},
+			EnrollOptions{
+				EnrollAPIKey: "token",
+				ID:           "test-id",
+				Insecure:     true,
+				ReplaceToken: "replace-token",
+				Tags:         []string{"a", "b"},
+				URL:          "uri",
+			},
+			false,
+		},
 	}
 
 	for _, tc := range cases {
