@@ -6,6 +6,7 @@ package cmd
 
 import (
 	// include the composable providers
+	_ "github.com/elastic/elastic-agent/internal/pkg/agent/agentservice"
 	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/agent"
 	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/docker"
 	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/env"

@@ -32,7 +32,7 @@ packages:
   github.com/elastic/elastic-agent/internal/pkg/agent/application/info:
     interfaces:
       Agent:
-  github.com/elastic/elastic-agent/internal/pkg/agent/cmd:
+  github.com/elastic/elastic-agent/internal/pkg/agent/cmd/watch:
     config:
       inpackage: True
       with-expecter: True
