@@ -446,7 +446,7 @@ func TestFleetGateway(t *testing.T) {
 		}
 	})
 
-	t.Run("Test cancel checkin on sate update", func(t *testing.T) {
+	t.Run("Test cancel checkin on state update", func(t *testing.T) {
 		scheduler := scheduler.NewStepper()
 		client := newTestingClient()
 

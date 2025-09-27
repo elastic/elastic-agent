@@ -175,6 +175,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	} else {
 		stateFetcher = fleetgateway.NewCheckinStateFetcher(m.coord.State)
 	}
+	m.log.Infof("running managed config manager with checkin mode: %s", m.cfg.Fleet.Checkin.Mode)
 
 	gateway, err := fleetgateway.New(
 		m.log,
