@@ -80,7 +80,7 @@ processors:
           enabled: true
         os.type:
           enabled: true
-  elastictrace:
+  elasticapm:
 
 exporters:
   elasticsearch/otel:
@@ -94,7 +94,7 @@ service:
   pipelines:
     traces/fromsdk:
       receivers: [otlp/fromsdk]
-      processors: [elastictrace]
+      processors: [elasticapm]
       exporters: [elasticapm, elasticsearch/otel]
 
     metrics/fromsdk:
