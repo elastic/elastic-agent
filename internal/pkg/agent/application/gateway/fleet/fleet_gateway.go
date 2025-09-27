@@ -194,14 +194,20 @@ func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 		f.log.Debugf("Checking started")
 		resp, took, err := f.execute(ctx)
 		if err != nil {
+			becauseOfStateChanged := errors.Is(context.Cause(ctx), errComponentStateChanged)
+
 			// don't count that as failed attempt
-			if !errors.Is(err, context.Canceled) || !errors.Is(context.Cause(ctx), errComponentStateChanged) {
+			if !becauseOfStateChanged {
 				f.checkinFailCounter++
 			}
 
+			warnMsg := "Possible transient error during checkin with fleet-server, retrying"
+			if becauseOfStateChanged {
+				warnMsg = "Check in cancelled because of state change, retrying"
+			}
 			// Report the first two failures at warn level as they may be recoverable with retries.
 			if f.checkinFailCounter <= 2 {
-				f.log.Warnw("Possible transient error during checkin with fleet-server, retrying",
+				f.log.Warnw(warnMsg,
 					"error.message", err, "request_duration_ns", took, "failed_checkins", f.checkinFailCounter,
 					"retry_after_ns", bo.NextWait())
 			} else {
@@ -578,7 +584,6 @@ func (s *FastCheckinStateFetcher) StartStateWatch(ctx context.Context) error {
 				s.log.Info("FleetGateway state watching channel closed, stopping loop.")
 				return nil
 			}
-			s.log.Info("FleetGateway state change notification received")
 			// TODO: consider check for specific changes e.g. degraded?
 			s.invalidateState()
 		}
