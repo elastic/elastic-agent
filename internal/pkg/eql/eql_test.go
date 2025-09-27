@@ -267,6 +267,22 @@ func TestEql(t *testing.T) {
 		{expression: "arrayContains(${data.array}, 'array5', 'array2')", result: true},
 		{expression: "arrayContains('not array', 'str2')", err: true},
 
+		// methods exists
+		{expression: "exists(${env.MISSING})", err: false, allowMissingVars: true, result: false},
+		{expression: "exists(${env.MISSING})", err: true, allowMissingVars: false},
+		{expression: "exists(${env.HOSTNAME})", err: false, allowMissingVars: true, result: true},
+		{expression: "exists(${env.HOSTNAME})", err: false, allowMissingVars: false, result: true},
+		{expression: "exists(${missing})", err: false, allowMissingVars: true, result: false},
+		{expression: "exists(${missing})", err: true, allowMissingVars: false},
+		{expression: "exists()", err: true},
+		{expression: "exists('')", result: true},
+		{expression: "exists('str')", result: true},
+		{expression: "exists(true)", result: true},
+		{expression: "exists(false)", result: true},
+		{expression: "exists(1)", result: true},
+		{expression: "exists(['a', 'b'])", result: true},
+		{expression: "exists({key1: 'val1', key2: 'val2'})", result: true},
+
 		// methods dict
 		{expression: "hasKey({key1: 'val1', key2: 'val2'}, 'key2')", result: true},
 		{expression: "hasKey({key1: 'val1', key2: 'val2'}, 'other', 'key1')", result: true},
