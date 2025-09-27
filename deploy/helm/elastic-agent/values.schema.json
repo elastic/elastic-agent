@@ -418,7 +418,7 @@
                             "description": "Fleet server URL."
                         },
                         "token": {
-                            "type": "string",
+                            "$ref": "#/definitions/FleetToken",
                             "description": "Fleet enrollment token."
                         },
                         "insecure": {
@@ -469,8 +469,7 @@
                                         "format": "uri"
                                     },
                                     "token": {
-                                        "type": "string",
-                                        "minLength": 1
+                                        "$ref": "#/definitions/FleetToken"
                                     }
                                 }
                             },
@@ -1042,8 +1041,7 @@
                                 "format": "uri"
                             },
                             "token": {
-                                "type": "string",
-                                "minLength": 1
+                                "$ref": "#/definitions/ValueFrom"
                             }
                         }
                     },
@@ -1991,6 +1989,20 @@
                     "description": "If this option is specified, events that are older than the specified amount of time are ignored. Valid time units are \"ns\", \"us\" (or \"µs\"), \"ms\", \"s\", \"m\", \"h\"."
                 }
             }
+        },
+        "FleetToken": {
+            "description": "Fleet enrollment token - can be a direct string value or reference to a secret.",
+            "oneOf": [
+                {
+                    "type": "string",
+                    "description": "Direct token value.",
+                    "minLength": 1
+                },
+                {
+                    "$ref": "#/definitions/ValueFrom",
+                    "description": "Token from secret or direct value."
+                }
+            ]
         }
     }
 }
