@@ -6,6 +6,7 @@ package elasticdiagnostics
 
 import (
 	"context"
+	"fmt"
 	"runtime"
 	"testing"
 
@@ -37,7 +38,7 @@ func TestComponentLifecycle(t *testing.T) {
 	require.NoError(t, sub.Unmarshal(&cfg))
 	if runtime.GOOS == "windows" {
 		// Use a different endpoint on Windows as /tmp/test.sock is not valid
-		cfg.Endpoint = "npipe:///elastic-agent-test"
+		cfg.Endpoint = fmt.Sprintf("npipe://%s", cfg.Endpoint)
 	}
 	t.Run("shutdown", func(t *testing.T) {
 		e, err := factory.Create(context.Background(), extensiontest.NewNopSettings(typ), cfg)

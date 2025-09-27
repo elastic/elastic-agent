@@ -40,7 +40,6 @@ type diagHook struct {
 }
 
 type diagnosticsExtension struct {
-	mx       sync.Mutex
 	listener net.Listener
 	server   *http.Server
 	logger   *zap.Logger
@@ -51,8 +50,9 @@ type diagnosticsExtension struct {
 	componentHooks    map[string][]*diagHook
 	globalHooks       map[string]*diagHook
 
-	hooksMtx sync.Mutex
-	confgMtx sync.Mutex
+	mx        sync.Mutex
+	hooksMtx  sync.Mutex
+	configMtx sync.Mutex
 }
 
 func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) error {
@@ -108,8 +108,10 @@ func (d *diagnosticsExtension) registerGlobalDiagnostics() {
 		filename:    "edot/otel-merged-actual.yaml",
 		contentType: "application/yaml",
 		hook: func() []byte {
+			d.configMtx.Lock()
+			defer d.configMtx.Unlock()
 			if d.collectorConfig == nil {
-				return []byte("no active OTeL Configuration")
+				return []byte("no active OTel Configuration")
 			}
 			b, err := yaml.Marshal(d.collectorConfig.ToStringMap())
 			if err != nil {
@@ -138,8 +140,8 @@ func (d *diagnosticsExtension) registerGlobalDiagnostics() {
 }
 
 func (d *diagnosticsExtension) NotifyConfig(ctx context.Context, conf *confmap.Conf) error {
-	d.confgMtx.Lock()
-	defer d.confgMtx.Unlock()
+	d.configMtx.Lock()
+	defer d.configMtx.Unlock()
 	d.collectorConfig = conf
 	return nil
 }
