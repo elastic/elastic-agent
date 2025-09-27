@@ -54,6 +54,7 @@ var BuildPlatforms = BuildPlatformList{
 	{"solaris/amd64", CGOSupported},
 	{"windows/386", CGOSupported | CrossBuildSupported | Default},
 	{"windows/amd64", CGOSupported | CrossBuildSupported | Default},
+	{"windows/arm64", CGOSupported | CrossBuildSupported | Default},
 }
 
 // PlatformFeature specifies features that are supported for a platform.
