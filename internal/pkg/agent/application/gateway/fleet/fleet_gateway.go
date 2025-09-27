@@ -6,6 +6,8 @@ package fleet
 
 import (
 	"context"
+	stderrors "errors"
+	"sync"
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -83,8 +85,8 @@ type FleetGateway struct {
 	acker              acker.Acker
 	unauthCounter      int
 	checkinFailCounter int
-	stateFetcher       func() coordinator.State
 	stateStore         stateStore
+	stateFetcher       StateFetcher
 	errCh              chan error
 	actionCh           chan []fleetapi.Action
 }
@@ -95,8 +97,8 @@ func New(
 	agentInfo agentInfo,
 	client client.Sender,
 	acker acker.Acker,
-	stateFetcher func() coordinator.State,
 	stateStore stateStore,
+	stateFetcher StateFetcher,
 ) (*FleetGateway, error) {
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	return newFleetGatewayWithScheduler(
@@ -106,8 +108,8 @@ func New(
 		client,
 		scheduler,
 		acker,
-		stateFetcher,
 		stateStore,
+		stateFetcher,
 	)
 }
 
@@ -118,8 +120,8 @@ func newFleetGatewayWithScheduler(
 	client client.Sender,
 	scheduler scheduler.Scheduler,
 	acker acker.Acker,
-	stateFetcher func() coordinator.State,
 	stateStore stateStore,
+	stateFetcher StateFetcher,
 ) (*FleetGateway, error) {
 	return &FleetGateway{
 		log:          log,
@@ -193,11 +195,20 @@ func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 		f.log.Debugf("Checking started")
 		resp, took, err := f.execute(ctx)
 		if err != nil {
-			f.checkinFailCounter++
+			becauseOfStateChanged := errors.Is(err, errComponentStateChanged)
 
+			// don't count that as failed attempt
+			if !becauseOfStateChanged {
+				f.checkinFailCounter++
+			}
+
+			warnMsg := "Possible transient error during checkin with fleet-server, retrying"
+			if becauseOfStateChanged {
+				warnMsg = "Check in cancelled because of state change, retrying"
+			}
 			// Report the first two failures at warn level as they may be recoverable with retries.
 			if f.checkinFailCounter <= 2 {
-				f.log.Warnw("Possible transient error during checkin with fleet-server, retrying",
+				f.log.Warnw(warnMsg,
 					"error.message", err, "request_duration_ns", took, "failed_checkins", f.checkinFailCounter,
 					"retry_after_ns", bo.NextWait())
 			} else {
@@ -348,7 +359,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// get current state
-	state := f.stateFetcher()
+	state, stateCTX := f.stateFetcher.FetchState(ctx)
 
 	// convert components into checkin components structure
 	components := f.convertToCheckinComponents(state.Components, state.Collector)
@@ -374,7 +385,8 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 		PolicyRevisionIDX: policyRevisionIDX,
 	}
 
-	resp, took, err := cmd.Execute(ctx, req)
+	resp, took, err := cmd.Execute(stateCTX, req)
+	f.stateFetcher.Done()
 	if isUnauth(err) {
 		f.unauthCounter++
 		if f.shouldUseLongSched() {
@@ -390,6 +402,9 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 
 	f.unauthCounter = 0
 	if err != nil {
+		if errors.Is(err, context.Canceled) && errors.Is(context.Cause(stateCTX), errComponentStateChanged) {
+			return nil, took, stderrors.Join(err, errComponentStateChanged)
+		}
 		return nil, took, err
 	}
 
@@ -494,3 +509,105 @@ func getPolicyRevisionIDX(action fleetapi.Action) int64 {
 		return 0
 	}
 }
+
+var errComponentStateChanged = errors.New("error component state changed")
+
+type StateFetcher interface {
+	// FetchState returns the current state and a context that is valid as long as the returned state is valid to use.
+	FetchState(ctx context.Context) (coordinator.State, context.Context)
+	// Done should be called once the checkin call is complete.
+	Done()
+	StartStateWatch(ctx context.Context) error
+}
+
+type FastCheckinStateFetcher struct {
+	log       *logger.Logger
+	fetcher   func() coordinator.State
+	stateChan chan coordinator.State
+
+	cancel context.CancelCauseFunc
+	mutex  sync.Mutex
+}
+
+func NewFastCheckinStateFetcher(log *logger.Logger, fetcher func() coordinator.State, stateChan chan coordinator.State) *FastCheckinStateFetcher {
+	return &FastCheckinStateFetcher{
+		log:       log,
+		fetcher:   fetcher,
+		stateChan: stateChan,
+		cancel:    nil,
+		mutex:     sync.Mutex{},
+	}
+}
+
+// Fetch wraps the state fetching to send in the check-in request under the checkin state mutex.
+// After the state is fetched the checkin cancellation function has be initialized and the new context
+// is returned.
+func (s *FastCheckinStateFetcher) FetchState(ctx context.Context) (coordinator.State, context.Context) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.cancel != nil {
+		s.cancel(nil) // ensure ctx cleanup
+	}
+
+	ctx2, ctxCancel := context.WithCancelCause(ctx)
+	state := s.fetcher()
+	s.cancel = ctxCancel
+	return state, ctx2
+}
+
+func (s *FastCheckinStateFetcher) Done() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.cancel != nil {
+		s.cancel(nil) // ensure ctx cleanup
+		s.cancel = nil
+	}
+}
+
+func (s *FastCheckinStateFetcher) invalidateState() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.cancel != nil {
+		s.cancel(errComponentStateChanged)
+		s.cancel = nil
+	}
+}
+
+func (s *FastCheckinStateFetcher) StartStateWatch(ctx context.Context) error {
+	s.log.Info("FleetGateway state watching started")
+	for {
+		select {
+		case <-ctx.Done():
+			s.log.Info("FleetGateway state watching stopped")
+			return ctx.Err()
+		case _, isOpen := <-s.stateChan:
+			if !isOpen {
+				s.log.Info("FleetGateway state watching channel closed, stopping loop.")
+				return nil
+			}
+			// TODO: consider check for specific changes e.g. degraded?
+			s.invalidateState()
+		}
+	}
+}
+
+// CheckinStateFetcher implements the simple state fetching without any invalidation or fast checkin logic.
+type CheckinStateFetcher struct {
+	fetcher func() coordinator.State
+}
+
+func NewCheckinStateFetcher(fetcher func() coordinator.State) *CheckinStateFetcher {
+	return &CheckinStateFetcher{fetcher: fetcher}
+}
+
+// FetchState returns the current state and the given ctx because the current state is always valid to use.
+func (s *CheckinStateFetcher) FetchState(ctx context.Context) (coordinator.State, context.Context) {
+	state := s.fetcher()
+	return state, ctx
+}
+
+func (s *CheckinStateFetcher) Done()                                     {}
+func (s *CheckinStateFetcher) StartStateWatch(ctx context.Context) error { return nil }
