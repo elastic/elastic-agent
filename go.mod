@@ -14,7 +14,7 @@ require (
 	github.com/docker/docker v28.3.3+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250918130837-16c4d9a1aa8c
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250925105119-32b6777002dc
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.10.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
@@ -110,7 +110,6 @@ require (
 	go.elastic.co/go-licence-detector v0.7.0
 	go.opentelemetry.io/collector/component/componentstatus v0.135.0
 	go.opentelemetry.io/collector/component/componenttest v0.135.0
-	go.opentelemetry.io/collector/config/configtelemetry v0.135.0
 	go.opentelemetry.io/collector/connector/forwardconnector v0.135.0
 	go.opentelemetry.io/collector/exporter/debugexporter v0.135.0
 	go.opentelemetry.io/collector/exporter/nopexporter v0.135.0
@@ -123,8 +122,6 @@ require (
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.135.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.135.0
 	go.opentelemetry.io/collector/receiver/otlpreceiver v0.135.0
-	go.opentelemetry.io/collector/service v0.135.0
-	go.opentelemetry.io/contrib/otelconf v0.17.0
 	go.opentelemetry.io/ebpf-profiler v0.0.202536
 	go.uber.org/zap v1.27.0
 	go.yaml.in/yaml/v3 v3.0.4
@@ -684,6 +681,7 @@ require (
 	go.opentelemetry.io/collector/config/configopaque v1.41.0 // indirect
 	go.opentelemetry.io/collector/config/configoptional v0.135.0 // indirect
 	go.opentelemetry.io/collector/config/configretry v1.41.0 // indirect
+	go.opentelemetry.io/collector/config/configtelemetry v0.135.0 // indirect
 	go.opentelemetry.io/collector/config/configtls v1.41.0 // indirect
 	go.opentelemetry.io/collector/confmap/xconfmap v0.135.0 // indirect
 	go.opentelemetry.io/collector/connector/connectortest v0.135.0 // indirect
@@ -721,12 +719,14 @@ require (
 	go.opentelemetry.io/collector/scraper v0.135.0 // indirect
 	go.opentelemetry.io/collector/scraper/scraperhelper v0.135.0 // indirect
 	go.opentelemetry.io/collector/semconv v0.128.1-0.20250610090210-188191247685 // indirect
+	go.opentelemetry.io/collector/service v0.135.0 // indirect
 	go.opentelemetry.io/collector/service/hostcapabilities v0.135.0 // indirect
 	go.opentelemetry.io/contrib/bridges/otelzap v0.12.0 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.36.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.62.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.61.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.62.0 // indirect
+	go.opentelemetry.io/contrib/otelconf v0.17.0 // indirect
 	go.opentelemetry.io/contrib/propagators/b3 v1.37.0 // indirect
 	go.opentelemetry.io/otel v1.38.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.13.0 // indirect
