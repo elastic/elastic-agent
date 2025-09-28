@@ -9,8 +9,10 @@ package ipc
 import (
 	"fmt"
 	"net"
+	"os"
 	"os/user"
 	"strings"
+	"time"
 
 	"golang.org/x/sys/windows"
 
@@ -43,7 +45,13 @@ func CreateListener(log *logger.Logger, address string) (net.Listener, error) {
 }
 
 func CleanupListener(log *logger.Logger, address string) {
-	// nothing to do on windows
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		_, err := os.Stat(npipe.TransformString(address))
+		if os.IsNotExist(err) {
+			break
+		}
+	}
 }
 
 func securityDescriptor(log *logger.Logger) (string, error) {
