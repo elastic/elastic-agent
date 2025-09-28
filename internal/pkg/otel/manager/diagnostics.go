@@ -21,6 +21,7 @@ import (
 	"syscall"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -230,7 +231,7 @@ func GetBeatInputMetricsDiagnostics(ctx context.Context, componentID string) (*p
 }
 
 func GetBeatMetricsPayload(ctx context.Context, componentID string, path string) ([]byte, error) {
-	endpoint := monitoring.PrefixedEndpoint(monitoring.BeatsMonitoringEndpoint(componentID))
+	endpoint := componentmonitoring.PrefixedEndpoint(componentmonitoring.BeatsMonitoringEndpoint(componentID))
 	metricBytes, statusCode, err := monitoring.GetProcessMetrics(ctx, endpoint, path)
 	if err != nil {
 		return nil, err

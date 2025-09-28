@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	_ component.Component = &diagnosticsExtension{}
+	_ component.Component = (*diagnosticsExtension)(nil)
 )
 
 type diagHook struct {
@@ -50,11 +50,14 @@ type diagnosticsExtension struct {
 	componentHooks    map[string][]*diagHook
 	globalHooks       map[string]*diagHook
 
-	hooksMtx sync.Mutex
-	confgMtx sync.Mutex
+	mx        sync.Mutex
+	hooksMtx  sync.Mutex
+	configMtx sync.Mutex
 }
 
 func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) error {
+	d.mx.Lock()
+	defer d.mx.Unlock()
 	var err error
 
 	d.logp, err = logp.NewZapLogger(d.logger)
@@ -87,6 +90,8 @@ func (d *diagnosticsExtension) Start(ctx context.Context, host component.Host) e
 }
 
 func (d *diagnosticsExtension) Shutdown(ctx context.Context) error {
+	d.mx.Lock()
+	defer d.mx.Unlock()
 	if d.server == nil {
 		return nil
 	}
@@ -103,8 +108,10 @@ func (d *diagnosticsExtension) registerGlobalDiagnostics() {
 		filename:    "edot/otel-merged-actual.yaml",
 		contentType: "application/yaml",
 		hook: func() []byte {
+			d.configMtx.Lock()
+			defer d.configMtx.Unlock()
 			if d.collectorConfig == nil {
-				return []byte("no active OTeL Configuration")
+				return []byte("no active OTel Configuration")
 			}
 			b, err := yaml.Marshal(d.collectorConfig.ToStringMap())
 			if err != nil {
@@ -133,8 +140,8 @@ func (d *diagnosticsExtension) registerGlobalDiagnostics() {
 }
 
 func (d *diagnosticsExtension) NotifyConfig(ctx context.Context, conf *confmap.Conf) error {
-	d.confgMtx.Lock()
-	defer d.confgMtx.Unlock()
+	d.configMtx.Lock()
+	defer d.configMtx.Unlock()
 	d.collectorConfig = conf
 	return nil
 }
@@ -223,16 +230,15 @@ func (d *diagnosticsExtension) ServeHTTP(w http.ResponseWriter, req *http.Reques
 		GlobalDiagnostics:    globalResults,
 		ComponentDiagnostics: componentResults,
 	})
+	w.Header().Add("content-type", "application/json")
 	if err != nil {
 		d.logger.Error("Failed marshaling response", zap.Error(err))
-		w.WriteHeader(503)
-		w.Header().Add("content-type", "application/json")
+		w.WriteHeader(500)
 		if _, err := fmt.Fprintf(w, "{'error':'%v'}", err); err != nil {
 			d.logger.Error("Failed writing response to client.", zap.Error(err))
 		}
 		return
 	}
-	w.Header().Add("content-type", "application/json")
 	if _, err := w.Write(b); err != nil {
 		d.logger.Error("Failed writing response to client.", zap.Error(err))
 	}
