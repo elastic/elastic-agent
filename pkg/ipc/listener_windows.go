@@ -9,7 +9,6 @@ package ipc
 import (
 	"fmt"
 	"net"
-	"os"
 	"os/user"
 	"strings"
 	"time"
@@ -37,21 +36,30 @@ func CreateListener(log *logger.Logger, address string) (net.Listener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create security descriptor: %w", err)
 	}
-	lis, err := npipe.NewListener(npipe.TransformString(address), sd)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create npipe listener: %w", err)
+
+	retryDuration := 5 * time.Second
+	backoffDelay := 200 * time.Millisecond
+
+	deadline := time.Now().Add(retryDuration)
+	var lastErr error
+
+	for time.Now().Before(deadline) {
+		lis, err := npipe.NewListener(npipe.TransformString(address), sd)
+		if err == nil {
+			return lis, nil
+		}
+
+		// Log and backoff before retrying
+		log.Warnf("failed to create npipe listener, retrying...: %v", err)
+		lastErr = err
+		time.Sleep(backoffDelay)
 	}
-	return lis, nil
+
+	return nil, fmt.Errorf("failed to create npipe listener after retries: %w", lastErr)
 }
 
 func CleanupListener(log *logger.Logger, address string) {
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		_, err := os.Stat(npipe.TransformString(address))
-		if os.IsNotExist(err) {
-			break
-		}
-	}
+	// nothing to do on windows
 }
 
 func securityDescriptor(log *logger.Logger) (string, error) {
