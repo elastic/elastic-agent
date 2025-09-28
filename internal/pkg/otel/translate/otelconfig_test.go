@@ -506,11 +506,11 @@ func TestGetOtelConfig(t *testing.T) {
 					"filebeatreceiver/_agent-component/filestream-default": expectedFilestreamConfig("filestream-default"),
 				},
 				"service": map[string]any{
-					"extensions": []interface{}{"beatsauth/_agent-component/default"},
+					"extensions": []any{"beatsauth/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/filestream-default": map[string][]string{
-							"exporters": []string{"elasticsearch/_agent-component/default"},
-							"receivers": []string{"filebeatreceiver/_agent-component/filestream-default"},
+							"exporters": {"elasticsearch/_agent-component/default"},
+							"receivers": {"filebeatreceiver/_agent-component/filestream-default"},
 						},
 					},
 				},
@@ -586,15 +586,97 @@ func TestGetOtelConfig(t *testing.T) {
 					"filebeatreceiver/_agent-component/filestream-secondaryOutput": expectedFilestreamConfig("filestream-secondaryOutput"),
 				},
 				"service": map[string]any{
-					"extensions": []interface{}{"beatsauth/_agent-component/primaryOutput", "beatsauth/_agent-component/secondaryOutput"},
+					"extensions": []any{"beatsauth/_agent-component/primaryOutput", "beatsauth/_agent-component/secondaryOutput"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/filestream-primaryOutput": map[string][]string{
-							"exporters": []string{"elasticsearch/_agent-component/primaryOutput"},
-							"receivers": []string{"filebeatreceiver/_agent-component/filestream-primaryOutput"},
+							"exporters": {"elasticsearch/_agent-component/primaryOutput"},
+							"receivers": {"filebeatreceiver/_agent-component/filestream-primaryOutput"},
 						},
 						"logs/_agent-component/filestream-secondaryOutput": map[string][]string{
-							"exporters": []string{"elasticsearch/_agent-component/secondaryOutput"},
-							"receivers": []string{"filebeatreceiver/_agent-component/filestream-secondaryOutput"},
+							"exporters": {"elasticsearch/_agent-component/secondaryOutput"},
+							"receivers": {"filebeatreceiver/_agent-component/filestream-secondaryOutput"},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name: "multiple filestream inputs and one output",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "filestream1-default",
+						InputType:  "filestream",
+						OutputType: "elasticsearch",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "agentbeat",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"filebeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "filestream-unit",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(fileStreamConfig),
+							},
+							{
+								ID:     "filestream-default",
+								Type:   client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(esOutputConfig()),
+							},
+						},
+					},
+					{
+						ID:         "filestream2-default",
+						InputType:  "filestream",
+						OutputType: "elasticsearch",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "agentbeat",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"filebeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "filestream-unit",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(fileStreamConfig),
+							},
+							{
+								ID:     "filestream-default",
+								Type:   client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(esOutputConfig()),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"elasticsearch/_agent-component/default": expectedESConfig("default"),
+				},
+				"extensions": map[string]any{
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
+				},
+				"receivers": map[string]any{
+					"filebeatreceiver/_agent-component/filestream1-default": expectedFilestreamConfig("filestream1-default"),
+					"filebeatreceiver/_agent-component/filestream2-default": expectedFilestreamConfig("filestream2-default"),
+				},
+				"service": map[string]any{
+					"extensions": []any{"beatsauth/_agent-component/default"},
+					"pipelines": map[string]any{
+						"logs/_agent-component/filestream1-default": map[string][]string{
+							"exporters": {"elasticsearch/_agent-component/default"},
+							"receivers": {"filebeatreceiver/_agent-component/filestream1-default"},
+						},
+						"logs/_agent-component/filestream2-default": map[string][]string{
+							"exporters": {"elasticsearch/_agent-component/default"},
+							"receivers": {"filebeatreceiver/_agent-component/filestream2-default"},
 						},
 					},
 				},
@@ -689,11 +771,11 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 				"service": map[string]any{
-					"extensions": []interface{}{"beatsauth/_agent-component/default"},
+					"extensions": []any{"beatsauth/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
-							"exporters": []string{"elasticsearch/_agent-component/default"},
-							"receivers": []string{"metricbeatreceiver/_agent-component/beat-metrics-monitoring"},
+							"exporters": {"elasticsearch/_agent-component/default"},
+							"receivers": {"metricbeatreceiver/_agent-component/beat-metrics-monitoring"},
 						},
 					},
 				},
@@ -799,11 +881,11 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 				"service": map[string]any{
-					"extensions": []interface{}{"beatsauth/_agent-component/default"},
+					"extensions": []any{"beatsauth/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/system-metrics": map[string][]string{
-							"exporters": []string{"elasticsearch/_agent-component/default"},
-							"receivers": []string{"metricbeatreceiver/_agent-component/system-metrics"},
+							"exporters": {"elasticsearch/_agent-component/default"},
+							"receivers": {"metricbeatreceiver/_agent-component/system-metrics"},
 						},
 					},
 				},
