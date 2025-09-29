@@ -790,15 +790,6 @@ func TestOTelManager_Logging(t *testing.T) {
 				assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
 			}()
 
-<<<<<<< HEAD
-	// the collector should log to the base logger
-	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
-		logs := obs.All()
-		require.NotEmpty(collect, logs, "Logs should not be empty")
-		firstMessage := logs[0].Message
-		assert.Equal(collect, firstMessage, "Setting up own telemetry...")
-	}, time.Second*10, time.Second)
-=======
 			// watch is synchronous, so we need to read from it to avoid blocking the manager
 			go func() {
 				for {
@@ -818,11 +809,10 @@ func TestOTelManager_Logging(t *testing.T) {
 				logs := obs.All()
 				require.NotEmpty(collect, logs, "Logs should not be empty")
 				firstMessage := logs[0].Message
-				assert.Equal(collect, "Internal metrics telemetry disabled", firstMessage)
+				assert.Equal(collect, firstMessage, "Setting up own telemetry...")
 			}, time.Second*10, time.Second)
 		})
 	}
->>>>>>> 2f4b47c12 (feat: make EDOT subprocess the default execution mode (#10151))
 }
 
 // statusToYaml converts the status.AggregateStatus to a YAML string representation.
