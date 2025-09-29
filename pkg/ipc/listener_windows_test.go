@@ -7,6 +7,7 @@
 package ipc
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -16,11 +17,15 @@ import (
 func TestCreateListener(t *testing.T) {
 	name := "npipe:///testpipe"
 
-	// try creating and closing listeners with same name multiple times
+	// try creating and closing servers with same name multiple times
 	for range 1000 {
 		lis, err := CreateListener(logp.NewNopLogger(), name)
 		require.NoError(t, err)
 		require.NotNil(t, lis)
-		require.NotNil(t, lis.Close())
+		s := &http.Server{}
+		go func() {
+			s.Serve(lis)
+		}()
+		require.NoError(t, s.Close())
 	}
 }
