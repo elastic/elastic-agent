@@ -5,16 +5,16 @@
 package translate
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"slices"
 	"strings"
 
-	"github.com/elastic/elastic-agent-libs/logp"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
-
 	koanfmaps "github.com/knadh/koanf/maps"
+
+	"github.com/elastic/elastic-agent-libs/logp"
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
@@ -59,12 +59,12 @@ func GetOtelConfig(
 	beatMonitoringConfigGetter BeatMonitoringConfigGetter,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
-	components := getSupportedComponents(model)
+	components := getSupportedComponents(logger, model)
 	if len(components) == 0 {
 		return nil, nil
 	}
-	otelConfig := confmap.New()      // base config, nothing here for now
-	extensionList := []interface{}{} // we have to maintain a list because otel does not merge lists, it overrides them. This is a known issue: see https://github.com/open-telemetry/opentelemetry-collector/issues/8754
+	otelConfig := confmap.New()     // base config, nothing here for now
+	extensions := map[string]bool{} // we have to manually handle extensions because otel does not merge lists, it overrides them. This is a known issue: see https://github.com/open-telemetry/opentelemetry-collector/issues/8754
 
 	for _, comp := range components {
 		componentConfig, compErr := getCollectorConfigForComponent(comp, info, beatMonitoringConfigGetter, logger)
@@ -72,13 +72,11 @@ func GetOtelConfig(
 			return nil, compErr
 		}
 
-		// logic to merge extension list
+		// save the extensions, we deduplicate and add this list at the end
 		if componentConfig.IsSet("service::extensions") {
-			extensionList = append(extensionList, componentConfig.Get("service::extensions").([]interface{})...)
-			extensions := confmap.NewFromStringMap(map[string]any{"service::extensions": extensionList})
-			err := componentConfig.Merge(extensions)
-			if err != nil {
-				return nil, fmt.Errorf("error merging otel extensions for component %s: %w", comp.ID, err)
+			for _, extension := range componentConfig.Get("service::extensions").([]any) {
+				extensionName := extension.(string)
+				extensions[extensionName] = true
 			}
 		}
 
@@ -89,22 +87,54 @@ func GetOtelConfig(
 			return nil, fmt.Errorf("error merging otel config for component %s: %w", comp.ID, mergeErr)
 		}
 	}
+	// create a deduplicated extensions lists in a deterministic order
+	extensionsSlice := maps.Keys(extensions)
+	slices.Sort(extensionsSlice)
+	// for consistency, we set this back as a slice of any
+	untypedExtensions := make([]any, len(extensionsSlice))
+	for i, ext := range extensionsSlice {
+		untypedExtensions[i] = ext
+	}
+	extensionsConf := confmap.NewFromStringMap(map[string]any{"service::extensions": untypedExtensions})
+	err := otelConfig.Merge(extensionsConf)
+	if err != nil {
+		return nil, fmt.Errorf("error merging otel extensions: %w", err)
+	}
 	return otelConfig, nil
 }
 
-// IsComponentOtelSupported checks if the given component can be run in an Otel Collector.
-func IsComponentOtelSupported(comp *component.Component) bool {
-	return slices.Contains(OtelSupportedOutputTypes, comp.OutputType) &&
-		slices.Contains(OtelSupportedInputTypes, comp.InputType)
+// VerifyComponentIsOtelSupported verifies that the given component can be run in an Otel Collector. It returns an error
+// indicating what the problem is, if it can't.
+func VerifyComponentIsOtelSupported(comp *component.Component) error {
+	if !slices.Contains(OtelSupportedOutputTypes, comp.OutputType) {
+		return fmt.Errorf("unsupported output type: %s", comp.OutputType)
+	}
+
+	if !slices.Contains(OtelSupportedInputTypes, comp.InputType) {
+		return fmt.Errorf("unsupported input type: %s", comp.InputType)
+	}
+
+	// check if the actual configuration is supported. We need to actually generate the config and look for
+	// the right kind of error
+	_, compErr := getCollectorConfigForComponent(comp, &info.AgentInfo{}, func(unitID, binary string) map[string]any {
+		return nil
+	}, logp.NewNopLogger())
+	if errors.Is(compErr, errors.ErrUnsupported) {
+		return fmt.Errorf("unsupported configuration for %s: %w", comp.ID, compErr)
+	}
+
+	return nil
 }
 
 // getSupportedComponents returns components from the given model that can be run in an Otel Collector.
-func getSupportedComponents(model *component.Model) []*component.Component {
+func getSupportedComponents(logger *logp.Logger, model *component.Model) []*component.Component {
 	var supportedComponents []*component.Component
 
 	for _, comp := range model.Components {
-		if IsComponentOtelSupported(&comp) {
+		if err := VerifyComponentIsOtelSupported(&comp); err == nil {
 			supportedComponents = append(supportedComponents, &comp)
+		} else {
+			logger.Errorf("unsupported component %s submitted to otel manager, skipping: %v", comp.ID, err)
 		}
 	}
 
@@ -271,7 +301,7 @@ func getReceiversConfigForComponent(
 	// agent self-monitoring is disabled
 	monitoringConfig := beatMonitoringConfigGetter(comp.ID, beatName)
 	if monitoringConfig == nil {
-		endpoint := monitoring.BeatsMonitoringEndpoint(comp.ID)
+		endpoint := componentmonitoring.BeatsMonitoringEndpoint(comp.ID)
 		monitoringConfig = map[string]any{
 			"http": map[string]any{
 				"enabled": true,

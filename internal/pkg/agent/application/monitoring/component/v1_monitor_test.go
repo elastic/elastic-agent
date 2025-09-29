@@ -2,11 +2,12 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package monitoring
+package component
 
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -932,67 +933,102 @@ func TestMonitoringConfigForBeatsReceivers(t *testing.T) {
 }
 
 func TestMonitoringWithOtelRuntime(t *testing.T) {
-	agentInfo, err := info.NewAgentInfo(context.Background(), false)
-	require.NoError(t, err, "Error creating agent info")
-
-	cfg := &monitoringConfig{
-		C: &monitoringcfg.MonitoringConfig{
-			Enabled:        true,
-			MonitorLogs:    true,
-			MonitorMetrics: true,
-			Namespace:      "test",
-			HTTP: &monitoringcfg.MonitoringHTTPConfig{
-				Enabled: false,
-			},
-			RuntimeManager: monitoringcfg.OtelRuntimeManager,
-		},
-	}
-
-	policy := map[string]any{
-		"agent": map[string]any{
-			"monitoring": map[string]any{
-				"metrics": true,
-				"logs":    false,
-			},
-		},
-		"outputs": map[string]any{
-			"default": map[string]any{},
-		},
-	}
-
-	b := &BeatsMonitor{
-		enabled:   true,
-		config:    cfg,
-		agentInfo: agentInfo,
-	}
-
-	components := []component.Component{
+	for _, tc := range []struct {
+		name           string
+		edotSubprocess bool
+	}{
 		{
-			ID: "filestream-receiver",
-			InputSpec: &component.InputRuntimeSpec{
-				Spec: component.InputSpec{
-					Command: &component.CommandSpec{
-						Name: "filebeat",
+			name:           "otel runtime inprocess",
+			edotSubprocess: false,
+		},
+		{
+			name:           "otel runtime subprocess",
+			edotSubprocess: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			agentInfo, err := info.NewAgentInfo(context.Background(), false)
+			require.NoError(t, err, "Error creating agent info")
+
+			cfg := &monitoringConfig{
+				C: &monitoringcfg.MonitoringConfig{
+					Enabled:        true,
+					MonitorLogs:    true,
+					MonitorMetrics: true,
+					Namespace:      "test",
+					HTTP: &monitoringcfg.MonitoringHTTPConfig{
+						Enabled: false,
+					},
+					RuntimeManager: monitoringcfg.OtelRuntimeManager,
+				},
+			}
+
+			policy := map[string]any{
+				"agent": map[string]any{
+					"monitoring": map[string]any{
+						"metrics": true,
+						"logs":    false,
 					},
 				},
-			},
-			RuntimeManager: component.OtelRuntimeManager,
-		},
-	}
-	monitoringCfgMap, err := b.MonitoringConfig(policy, components, map[string]uint64{})
-	require.NoError(t, err)
+				"outputs": map[string]any{
+					"default": map[string]any{},
+				},
+			}
 
-	// Verify that if we're using filebeat receiver, there's no filebeat input
-	var monitoringCfg struct {
-		Inputs []struct {
-			ID             string
-			RuntimeManager string `mapstructure:"_runtime_experimental"`
-		}
-	}
-	err = mapstructure.Decode(monitoringCfgMap, &monitoringCfg)
-	require.NoError(t, err)
-	for _, input := range monitoringCfg.Inputs {
-		assert.Equal(t, monitoringcfg.OtelRuntimeManager, input.RuntimeManager)
+			b := &BeatsMonitor{
+				enabled:                 true,
+				config:                  cfg,
+				agentInfo:               agentInfo,
+				isOtelRuntimeSubprocess: tc.edotSubprocess,
+			}
+
+			components := []component.Component{
+				{
+					ID: "filestream-receiver",
+					InputSpec: &component.InputRuntimeSpec{
+						Spec: component.InputSpec{
+							Command: &component.CommandSpec{
+								Name: "filebeat",
+							},
+						},
+					},
+					RuntimeManager: component.OtelRuntimeManager,
+				},
+			}
+			monitoringCfgMap, err := b.MonitoringConfig(policy, components, map[string]uint64{})
+			require.NoError(t, err)
+
+			// Verify that if we're using filebeat receiver, there's no filebeat input
+			var monitoringCfg struct {
+				Inputs []struct {
+					ID             string
+					RuntimeManager string `mapstructure:"_runtime_experimental"`
+					Streams        []struct {
+						ID string `mapstructure:"id"`
+					} `mapstructure:"streams"`
+				}
+			}
+			err = mapstructure.Decode(monitoringCfgMap, &monitoringCfg)
+			require.NoError(t, err)
+			edotSubprocessStreamID := fmt.Sprintf("%s-edot-collector", monitoringMetricsUnitID)
+			foundEdotSubprocessStream := false
+			for _, input := range monitoringCfg.Inputs {
+				assert.Equal(t, monitoringcfg.OtelRuntimeManager, input.RuntimeManager)
+				if !foundEdotSubprocessStream && input.ID == "metrics-monitoring-agent" {
+					for _, stream := range input.Streams {
+						if stream.ID == edotSubprocessStreamID {
+							foundEdotSubprocessStream = true
+							break
+						}
+					}
+				}
+			}
+			if tc.edotSubprocess {
+				require.True(t, foundEdotSubprocessStream, "edot subprocess stream not found")
+			} else {
+				require.False(t, foundEdotSubprocessStream, "edot subprocess stream found")
+			}
+		})
 	}
 }
 
@@ -1066,7 +1102,7 @@ func TestMonitorReload(t *testing.T) {
 	monitorcfg.MonitorLogs = false
 	monitorcfg.MonitorMetrics = false
 
-	beatsMonitor := New(true, "", monitorcfg, nil)
+	beatsMonitor := New(true, "", monitorcfg, nil, false)
 	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, false)
 	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, false)
 

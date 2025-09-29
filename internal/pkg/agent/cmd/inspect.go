@@ -176,7 +176,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 			return fmt.Errorf("failed to detect inputs and outputs: %w", err)
 		}
 
-		monitorFn, err := installSvc.GetMonitoringFn(ctx, cfg)
+		monitorFn, err := installSvc.GetMonitoringFn(ctx, l, cfg)
 		if err != nil {
 			return fmt.Errorf("failed to get monitoring: %w", err)
 		}

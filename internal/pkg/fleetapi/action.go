@@ -471,6 +471,13 @@ func (a *ActionMigrate) String() string {
 	return s.String()
 }
 
+// MarshalMap marshals ActionMigrate into a corresponding map
+func (a *ActionMigrate) MarshalMap() (map[string]interface{}, error) {
+	var res map[string]interface{}
+	err := mapstructure.Decode(a, &res)
+	return res, err
+}
+
 func (a *ActionMigrate) AckEvent() AckEvent {
 	event := newAckEvent(a.ActionID, a.ActionType)
 	if a.Err != nil {

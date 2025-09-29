@@ -45,8 +45,10 @@ func main() {
 		})
 	}
 
+	monitoringURL := os.Getenv("TEST_SUPERVISED_COLLECTOR_MONITORING_URL")
+
 	exitCode := 0
-	err = cmd.RunCollector(ctx, nil, true, "debug")
+	err = cmd.RunCollector(ctx, nil, true, "debug", monitoringURL)
 	if err != nil && !errors.Is(err, context.Canceled) {
 		exitCode = 1
 	}

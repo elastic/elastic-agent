@@ -84,7 +84,7 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 	h.log.Debugf("handlerPrivilegeLevelChange: proceeding with user %q and group %q", username, groupname)
 
 	// apply empty config to stop processing
-	unenrollPolicy := newPolicyChange(ctx, config.New(), a, acker, true)
+	unenrollPolicy := newPolicyChange(ctx, config.New(), a, acker, true, false)
 	h.ch <- unenrollPolicy
 
 	unenrollCtx, cancel := context.WithTimeout(ctx, unenrollTimeout)
