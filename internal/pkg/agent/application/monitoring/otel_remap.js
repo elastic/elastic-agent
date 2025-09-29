@@ -5,7 +5,7 @@
 function process(event) {
   // This hard-coded exporter name will not work for the general
   // (non-monitoring) use case.
-  var elastic_exporter = event.Get("prometheus.labels.exporter") == "elasticsearch/_agent-component/default";
+  var elastic_exporter = event.Get("prometheus.labels.exporter") == "elasticsearch/_agent-component/monitoring";
   var elastic_scope = event.Get("prometheus.labels.otel_scope_name") == "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter";
 
   // We accept general collector fields that are scoped to the elasticsearch
