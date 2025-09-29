@@ -3,10 +3,15 @@
 // that can be viewed in Agent dashboards.
 
 function process(event) {
-  var exporter = event.Get("prometheus.labels.exporter");
   // This hard-coded exporter name will not work for the general
   // (non-monitoring) use case.
-  if (exporter != "elasticsearch/_agent-component/default") {
+  var elastic_exporter = event.Get("prometheus.labels.exporter") == "elasticsearch/_agent-component/default";
+  var elastic_scope = event.Get("prometheus.labels.otel_scope_name") == "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter";
+
+  // We accept general collector fields that are scoped to the elasticsearch
+  // exporter (queue metrics, sent / error stats), or fields specifically
+  // scoped to the elasticsearch exporter (custom elastic metrics).
+  if (!elastic_exporter && !elastic_scope) {
     event.Cancel();
     return;
   }
