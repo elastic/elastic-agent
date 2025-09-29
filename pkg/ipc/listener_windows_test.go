@@ -20,10 +20,10 @@ func TestCreateListener(t *testing.T) {
 
 	// try creating and closing servers with same name multiple times
 	for range 1000 {
-		lis, err := CreateListener(logp.NewNopLogger(), name) //nolint:gosec // this is a test
+		lis, err := CreateListener(logp.NewNopLogger(), name)
 		require.NoError(t, err)
 		require.NotNil(t, lis)
-		s := &http.Server{}
+		s := &http.Server{} //nolint:gosec // this is a test
 		go func() {
 			_ = s.Serve(lis)
 		}()
