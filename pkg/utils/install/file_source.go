@@ -22,6 +22,10 @@ func NewFileDescriptorSource(descriptorFile string) *FileDescriptorSource {
 	return &FileDescriptorSource{descriptorFile: descriptorFile}
 }
 
+func (dp *FileDescriptorSource) GetInstallDesc() (*v1.InstallDescriptor, error) {
+	return readInstallMarkerFile(dp.descriptorFile)
+}
+
 func (dp *FileDescriptorSource) AddInstallDesc(desc v1.AgentInstallDesc) (*v1.InstallDescriptor, error) {
 	installDescriptor, err := readInstallMarkerFile(dp.descriptorFile)
 	// not existing or empty files are tolerated, since we would be writing a new descriptor, return any other error
