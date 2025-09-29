@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/stretchr/testify/require"
 
 	"go.opentelemetry.io/collector/confmap"
@@ -307,8 +308,8 @@ func TestGetOtelConfig(t *testing.T) {
 				"authenticator": "beatsauth/_agent-component/" + outputName,
 			},
 			"tls": map[string]any{
-				"min_version": "1.1",
-				"max_version": "1.3",
+				"min_version": tlscommon.TLSVersionDefaultMin.Details().Version,
+				"max_version": tlscommon.TLSVersionDefaultMax.Details().Version,
 			},
 		}
 	}
