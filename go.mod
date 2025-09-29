@@ -14,7 +14,7 @@ require (
 	github.com/docker/docker v28.3.3+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250926150458-27ed09eb6766
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250926175917-b6c79e4437dc
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.10.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
@@ -44,7 +44,7 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/jaypipes/ghw v0.12.0
 	github.com/jedib0t/go-pretty/v6 v6.4.6
-	github.com/josephspurrier/goversioninfo v1.4.1
+	github.com/josephspurrier/goversioninfo v1.5.0
 	github.com/kardianos/service v1.2.1-0.20210728001519-a323c3813bc7
 	github.com/knadh/koanf/maps v0.1.2
 	github.com/magefile/mage v1.15.0
