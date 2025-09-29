@@ -70,13 +70,13 @@ components:
     rootDir: agentbeat-{{.Version}}-{{.Platform}}
     binaryName: agentbeat
     fips: false
-#    platforms: *all-platforms
-    platforms:
-      - *linux-amd64
-      - *linux-arm64
-      - *windows-amd64
-      - *darwin-amd64
-      - *darwin-arm64
+    platforms: *all-platforms
+#    platforms:
+#      - *linux-amd64
+#      - *linux-arm64
+#      - *windows-amd64
+#      - *darwin-amd64
+#      - *darwin-arm64
 
     packageTypes: *all-package-types
   - &comp-apm_server

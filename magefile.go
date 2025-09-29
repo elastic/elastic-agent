@@ -312,8 +312,7 @@ func (Build) WindowsArchiveRootBinary() error {
 			"main.CommitSHA": hashShort,
 		},
 		Env: map[string]string{
-			"GOOS": "windows",
-			//"GOARCH": "amd64",
+			"GOOS":   "windows",
 			"GOARCH": devtools.GOARCH,
 		},
 		LDFlags: []string{
