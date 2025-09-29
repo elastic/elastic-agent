@@ -46,6 +46,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/migration"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -265,6 +266,14 @@ func runElasticAgent(
 	} else {
 		// Set the initial log level (either default or from config file)
 		logger.SetLevel(logLvl)
+	}
+
+	// Fix permissions on startup to address existing installations that may have inherited permissions
+	// This ensures OSQuery extensions can load properly on Windows systems
+	// Note: This is called on every startup to guard against external permission modifications
+	if err := perms.FixPermissions(paths.Top()); err != nil {
+		// Log the error but don't fail startup - this is a best-effort fix for existing installations
+		l.Warnf("Failed to fix permissions on agent directory: %v", err)
 	}
 
 	// initiate agent watcher

@@ -83,8 +83,8 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 			return filepath.WalkDir(topPath, func(walkPath string, _ fs.DirEntry, err error) error {
 				switch {
 				case err == nil:
-					// first level doesn't inherit
-					inherit := topPath != walkPath
+					// disable inheritance for all directories to prevent OSQuery extension loading failures
+					inherit := false
 					return applyPermissions(walkPath, true, inherit, userSID, groupSID, grants...)
 				case errors.Is(err, fs.ErrNotExist):
 					return nil
@@ -99,8 +99,8 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 	return filepath.WalkDir(topPath, func(walkPath string, _ fs.DirEntry, err error) error {
 		switch {
 		case err == nil:
-			// first level doesn't inherit
-			inherit := topPath != walkPath
+			// disable inheritance for all directories to prevent OSQuery extension loading failures
+			inherit := false
 			return applyPermissions(walkPath, true, inherit, nil, nil, grants...)
 		case errors.Is(err, fs.ErrNotExist):
 			return nil
