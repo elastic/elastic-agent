@@ -63,8 +63,8 @@ func GetOtelConfig(
 	if len(components) == 0 {
 		return nil, nil
 	}
-	otelConfig := confmap.New()      // base config, nothing here for now
-	extensionList := []interface{}{} // we have to maintain a list because otel does not merge lists, it overrides them. This is a known issue: see https://github.com/open-telemetry/opentelemetry-collector/issues/8754
+	otelConfig := confmap.New()     // base config, nothing here for now
+	extensions := map[string]bool{} // we have to manually handle extensions because otel does not merge lists, it overrides them. This is a known issue: see https://github.com/open-telemetry/opentelemetry-collector/issues/8754
 
 	for _, comp := range components {
 		componentConfig, compErr := getCollectorConfigForComponent(comp, info, beatMonitoringConfigGetter, logger)
@@ -72,13 +72,11 @@ func GetOtelConfig(
 			return nil, compErr
 		}
 
-		// logic to merge extension list
+		// save the extensions, we deduplicate and add this list at the end
 		if componentConfig.IsSet("service::extensions") {
-			extensionList = append(extensionList, componentConfig.Get("service::extensions").([]interface{})...)
-			extensions := confmap.NewFromStringMap(map[string]any{"service::extensions": extensionList})
-			err := componentConfig.Merge(extensions)
-			if err != nil {
-				return nil, fmt.Errorf("error merging otel extensions for component %s: %w", comp.ID, err)
+			for _, extension := range componentConfig.Get("service::extensions").([]any) {
+				extensionName := extension.(string)
+				extensions[extensionName] = true
 			}
 		}
 
@@ -88,6 +86,19 @@ func GetOtelConfig(
 		if mergeErr != nil {
 			return nil, fmt.Errorf("error merging otel config for component %s: %w", comp.ID, mergeErr)
 		}
+	}
+	// create a deduplicated extensions lists in a deterministic order
+	extensionsSlice := maps.Keys(extensions)
+	slices.Sort(extensionsSlice)
+	// for consistency, we set this back as a slice of any
+	untypedExtensions := make([]any, len(extensionsSlice))
+	for i, ext := range extensionsSlice {
+		untypedExtensions[i] = ext
+	}
+	extensionsConf := confmap.NewFromStringMap(map[string]any{"service::extensions": untypedExtensions})
+	err := otelConfig.Merge(extensionsConf)
+	if err != nil {
+		return nil, fmt.Errorf("error merging otel extensions: %w", err)
 	}
 	return otelConfig, nil
 }
