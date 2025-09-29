@@ -9,14 +9,18 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/version"
+	agtversion "github.com/elastic/elastic-agent/version"
 )
 
 func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string, now time.Time, version string, action *fleetapi.ActionUpgrade) (reexec.ShutdownCallbackFn, error) {
@@ -33,11 +37,13 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 
 	var watcherExecutable string
 	var versionedHomeToRollbackTo string
+	var updateMarkerExistsBeforeRollback bool
 
 	if errors.Is(err, os.ErrNotExist) {
 		// there is no upgrade marker, we need to extract available rollbacks from agent installs
-		watcherExecutable, versionedHomeToRollbackTo, err = rollbackUsingAgentInstalls()
+		watcherExecutable, versionedHomeToRollbackTo, err = rollbackUsingAgentInstalls(u.log, u.watcherHelper, u.availableRollbacksSource, topDir, now, version, u.markUpgrade)
 	} else {
+		updateMarkerExistsBeforeRollback = true
 		watcherExecutable, versionedHomeToRollbackTo, err = rollbackUsingUpgradeMarker(ctx, u.log, u.watcherHelper, topDir, now, version)
 	}
 
@@ -46,8 +52,22 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 	}
 
 	// rollback
-	watcherCmd, err := u.watcherHelper.InvokeWatcher(u.log, watcherExecutable, "watch", "--rollback", versionedHomeToRollbackTo)
+	watcherCmd, err := u.watcherHelper.InvokeWatcher(u.log, watcherExecutable, "--rollback", versionedHomeToRollbackTo)
 	if err != nil {
+		if !updateMarkerExistsBeforeRollback {
+			// best effort: cleanup the fake update marker
+			cleanupErr := os.Remove(updateMarkerPath)
+			if cleanupErr != nil {
+				u.log.Errorf("Error cleaning up fake upgrade marker: %v", cleanupErr)
+			}
+		} else {
+			// attempt to resume the  "normal" watcher to continue watching
+			_, restoreWatcherErr := u.watcherHelper.InvokeWatcher(u.log, watcherExecutable)
+			if restoreWatcherErr != nil {
+				u.log.Errorf("Error resuming watch after rollback error : %v", restoreWatcherErr)
+			}
+		}
+
 		return nil, fmt.Errorf("starting rollback command: %w", err)
 	}
 
@@ -55,10 +75,62 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 	return nil, nil
 }
 
-func rollbackUsingAgentInstalls() (string, string, error) {
-	//FIXME implement
-	//panic("Not implemented")
-	return "", "", errors.Join(errors.New("not implemented"), os.ErrNotExist)
+func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper, source availableRollbacksSource, topDir string, now time.Time, rollbackVersion string, markUpgrade markUpgradeFunc) (string, string, error) {
+	// read the available installs
+	availableRollbacks, err := source.Get()
+	if err != nil {
+		return "", "", fmt.Errorf("retrieving available rollbacks: %w", err)
+	}
+	// check for the version we want to rollback to
+	var targetInstall string
+	var targetTTLMarker TTLMarker
+	for versionedHome, ttlMarker := range availableRollbacks {
+		if ttlMarker.Version == rollbackVersion && now.Before(ttlMarker.ValidUntil) {
+			// found a valid target
+			targetInstall = versionedHome
+			targetTTLMarker = ttlMarker
+			break
+		}
+	}
+
+	if targetInstall == "" {
+		return "", "", fmt.Errorf("version %q not listed among the available rollbacks: %w", rollbackVersion, ErrNoRollbacksAvailable)
+	}
+
+	prevAgentParsedVersion, err := version.ParseVersion(targetTTLMarker.Version)
+	if err != nil {
+		return "", "", fmt.Errorf("parsing version of target install %+v: %w", targetInstall, err)
+	}
+
+	// write out a fake upgrade marker to make the upgrade details state happy
+	currentHome := paths.VersionedHome(topDir)
+	relCurVersionedHome, err := filepath.Rel(topDir, currentHome)
+	if err != nil {
+		return "", "", fmt.Errorf("getting current install home path %q relative to top %q: %w", currentHome, topDir, err)
+	}
+	curAgentInstall := agentInstall{
+		parsedVersion: agtversion.GetParsedAgentPackageVersion(),
+		version:       release.VersionWithSnapshot(),
+		hash:          release.Commit(),
+		versionedHome: relCurVersionedHome,
+	}
+
+	prevAgentInstall := agentInstall{
+		parsedVersion: prevAgentParsedVersion,
+		version:       targetTTLMarker.Version,
+		hash:          "",
+		versionedHome: targetInstall,
+	}
+
+	upgradeDetails := details.NewDetails(release.VersionWithSnapshot(), details.StateRequested, "" /*action.ID*/)
+	err = markUpgrade(log, paths.DataFrom(topDir), now, curAgentInstall, prevAgentInstall, nil /*action*/, upgradeDetails, nil)
+	if err != nil {
+		return "", "", fmt.Errorf("creating upgrade marker: %w", err)
+	}
+
+	// return watcher executable and versionedHome to rollback to
+	watcherExecutable := watcherHelper.SelectWatcherExecutable(topDir, prevAgentInstall, curAgentInstall)
+	return watcherExecutable, targetInstall, nil
 }
 
 func rollbackUsingUpgradeMarker(ctx context.Context, log *logger.Logger, watcherHelper WatcherHelper, topDir string, now time.Time, version string) (string, string, error) {
