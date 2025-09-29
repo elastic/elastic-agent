@@ -139,9 +139,11 @@ func MergeOptionsWithMigrateAction(action *fleetapi.ActionMigrate, options Enrol
 		return EnrollOptions{}, fmt.Errorf("failed to decode enroll options: %w", err)
 	}
 
-	// do not preserve ID by default
-	delete(configMap, "id")
-	options.ID = ""
+	if len(options.ReplaceToken) == 0 {
+		// do not preserve ID by default
+		delete(configMap, "id")
+		options.ID = ""
+	}
 
 	// overwriting what's needed
 	if len(action.Data.Settings) > 0 {

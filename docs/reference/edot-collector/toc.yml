@@ -8,7 +8,9 @@ toc:
       - file: config/default-config-k8s.md
       - file: config/configure-logs-collection.md
       - file: config/configure-metrics-collection.md
+      - file: config/tail-based-sampling.md
       - file: config/authentication-methods.md
+      - file: config/configure-profiles-collection.md
       - file: config/proxy.md
   - file: components.md
     children:
