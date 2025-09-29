@@ -17,6 +17,7 @@ import (
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
@@ -99,11 +100,14 @@ func New(
 	acker acker.Acker,
 	stateStore stateStore,
 	stateFetcher StateFetcher,
+	cfg configuration.FleetCheckin,
 ) (*FleetGateway, error) {
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
+	st := defaultGatewaySettings
+	st.Backoff = getBackoffSettings(cfg)
 	return newFleetGatewayWithScheduler(
 		log,
-		defaultGatewaySettings,
+		st,
 		agentInfo,
 		client,
 		scheduler,
@@ -611,3 +615,16 @@ func (s *CheckinStateFetcher) FetchState(ctx context.Context) (coordinator.State
 
 func (s *CheckinStateFetcher) Done()                                     {}
 func (s *CheckinStateFetcher) StartStateWatch(ctx context.Context) error { return nil }
+
+func getBackoffSettings(cfg configuration.FleetCheckin) *backoffSettings {
+	bo := defaultFleetBackoffSettings
+
+	if cfg.RequestBackoffInit > 0 {
+		bo.Init = cfg.RequestBackoffInit
+	}
+	if cfg.RequestBackoffMax > 0 {
+		bo.Max = cfg.RequestBackoffMax
+	}
+
+	return &bo
+}

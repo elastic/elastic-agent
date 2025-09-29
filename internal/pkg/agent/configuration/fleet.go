@@ -5,6 +5,8 @@
 package configuration
 
 import (
+	"time"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 )
@@ -58,12 +60,16 @@ func DefaultFleetAgentConfig() *FleetAgentConfig {
 
 func DefaultFleetCheckin() FleetCheckin {
 	return FleetCheckin{
-		Mode: fleetCheckinModeStandard,
+		Mode:               fleetCheckinModeStandard,
+		RequestBackoffInit: 60 * time.Second,
+		RequestBackoffMax:  10 * time.Minute,
 	}
 }
 
 type FleetCheckin struct {
-	Mode string `config:"mode" yaml:"mode,omitempty"`
+	Mode               string        `config:"mode" yaml:"mode,omitempty"` // `standard` or `on_state_change` (empty string is accepted as standard)
+	RequestBackoffInit time.Duration `config:"request_backoff_init" yaml:"request_backoff_init,omitempty"`
+	RequestBackoffMax  time.Duration `config:"request_backoff_max" yaml:"request_backoff_max,omitempty"`
 }
 
 func (f *FleetCheckin) IsModeOnStateChanged() bool {
@@ -73,6 +79,10 @@ func (f *FleetCheckin) IsModeOnStateChanged() bool {
 func (f *FleetCheckin) Validate() error {
 	if f.Mode != "" && f.Mode != fleetCheckinModeStandard && f.Mode != fleetCheckinModeOnStateChanged {
 		return errors.New("checkin.mode must be either 'standard' or 'on_state_change'")
+	}
+
+	if f.RequestBackoffMax < f.RequestBackoffInit {
+		return errors.New("checkin.request_backoff_max must be grater than or equal to checkin.request_backoff_init")
 	}
 	return nil
 }

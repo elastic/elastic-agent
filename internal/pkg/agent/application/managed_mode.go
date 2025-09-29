@@ -184,6 +184,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		m.actionAcker,
 		m.stateStore,
 		stateFetcher,
+		m.cfg.Fleet.Checkin,
 	)
 	if err != nil {
 		return err
