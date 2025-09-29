@@ -4,7 +4,8 @@ agent:
       enabled: false
     metrics: true
 inputs:
-- id: filestream-monitoring-agent
+- _runtime_experimental: otel
+  id: filestream-monitoring-agent
   name: filestream-monitoring-agent
   streams:
   - close:
@@ -104,7 +105,8 @@ inputs:
     type: filestream
   type: filestream
   use_output: monitoring
-- data_stream:
+- _runtime_experimental: otel
+  data_stream:
     namespace: default
   id: metrics-monitoring-beats
   name: metrics-monitoring-beats
@@ -148,6 +150,14 @@ inputs:
           binary: metricbeat
           id: beat/metrics-monitoring
         target: component
+    - drop_fields:
+        fields:
+        - beat.stats.cgroup
+        - beat.stats.cpu
+        - beat.stats.handles
+        - beat.stats.memstats
+        - beat.stats.runtime
+        ignore_missing: true
   - data_stream:
       dataset: elastic_agent.filebeat
       namespace: default
@@ -226,6 +236,14 @@ inputs:
           binary: filebeat
           id: filestream-monitoring
         target: component
+    - drop_fields:
+        fields:
+        - beat.stats.cgroup
+        - beat.stats.cpu
+        - beat.stats.handles
+        - beat.stats.memstats
+        - beat.stats.runtime
+        ignore_missing: true
   - data_stream:
       dataset: elastic_agent.filebeat
       namespace: default
@@ -312,6 +330,14 @@ inputs:
           binary: metricbeat
           id: http/metrics-monitoring
         target: component
+    - drop_fields:
+        fields:
+        - beat.stats.cgroup
+        - beat.stats.cpu
+        - beat.stats.handles
+        - beat.stats.memstats
+        - beat.stats.runtime
+        ignore_missing: true
   - data_stream:
       dataset: elastic_agent.metricbeat
       namespace: default
@@ -351,9 +377,18 @@ inputs:
           binary: metricbeat
           id: prometheus/metrics-monitoring
         target: component
+    - drop_fields:
+        fields:
+        - beat.stats.cgroup
+        - beat.stats.cpu
+        - beat.stats.handles
+        - beat.stats.memstats
+        - beat.stats.runtime
+        ignore_missing: true
   type: beat/metrics
   use_output: monitoring
-- data_stream:
+- _runtime_experimental: otel
+  data_stream:
     namespace: default
   id: metrics-monitoring-agent
   name: metrics-monitoring-agent
@@ -426,61 +461,6 @@ inputs:
     failure_threshold: 5
     hosts:
     - placeholder
-    id: metrics-monitoring-metricbeat-1
-    index: metrics-elastic_agent.elastic_agent-default
-    metricsets:
-    - json
-    namespace: agent
-    path: /stats
-    period: 1m0s
-    processors:
-    - add_fields:
-        fields:
-          dataset: elastic_agent.elastic_agent
-        target: event
-    - add_fields:
-        fields:
-          id: ""
-          process: metricbeat
-          snapshot: false
-          version: placeholder
-        target: elastic_agent
-    - add_fields:
-        fields:
-          id: ""
-        target: agent
-    - copy_fields:
-        fail_on_error: false
-        fields:
-        - from: http.agent.beat.cpu
-          to: system.process.cpu
-        - from: http.agent.beat.memstats.memory_sys
-          to: system.process.memory.size
-        - from: http.agent.beat.handles
-          to: system.process.fd
-        - from: http.agent.beat.cgroup
-          to: system.process.cgroup
-        - from: http.agent.apm-server
-          to: apm-server
-        - from: http.filebeat_input
-          to: filebeat_input
-        ignore_missing: true
-    - drop_fields:
-        fields:
-        - http
-        ignore_missing: true
-    - add_fields:
-        fields:
-          binary: metricbeat
-          id: beat/metrics-monitoring
-        target: component
-  - data_stream:
-      dataset: elastic_agent.elastic_agent
-      namespace: default
-      type: metrics
-    failure_threshold: 5
-    hosts:
-    - placeholder
     id: metrics-monitoring-filebeat-1
     index: metrics-elastic_agent.elastic_agent-default
     metricsets:
@@ -586,61 +566,6 @@ inputs:
           id: filebeat-default
         target: component
   - data_stream:
-      dataset: elastic_agent.elastic_agent
-      namespace: default
-      type: metrics
-    failure_threshold: 5
-    hosts:
-    - placeholder
-    id: metrics-monitoring-filebeat-1
-    index: metrics-elastic_agent.elastic_agent-default
-    metricsets:
-    - json
-    namespace: agent
-    path: /stats
-    period: 1m0s
-    processors:
-    - add_fields:
-        fields:
-          dataset: elastic_agent.elastic_agent
-        target: event
-    - add_fields:
-        fields:
-          id: ""
-          process: filebeat
-          snapshot: false
-          version: placeholder
-        target: elastic_agent
-    - add_fields:
-        fields:
-          id: ""
-        target: agent
-    - copy_fields:
-        fail_on_error: false
-        fields:
-        - from: http.agent.beat.cpu
-          to: system.process.cpu
-        - from: http.agent.beat.memstats.memory_sys
-          to: system.process.memory.size
-        - from: http.agent.beat.handles
-          to: system.process.fd
-        - from: http.agent.beat.cgroup
-          to: system.process.cgroup
-        - from: http.agent.apm-server
-          to: apm-server
-        - from: http.filebeat_input
-          to: filebeat_input
-        ignore_missing: true
-    - drop_fields:
-        fields:
-        - http
-        ignore_missing: true
-    - add_fields:
-        fields:
-          binary: filebeat
-          id: filestream-monitoring
-        target: component
-  - data_stream:
       dataset: elastic_agent.filebeat_input
       namespace: default
       type: metrics
@@ -690,6 +615,7 @@ inputs:
     - drop_fields:
         fields:
         - http
+        - system
         ignore_missing: true
     - add_fields:
         fields:
@@ -753,119 +679,10 @@ inputs:
           binary: filebeat
           id: filestream-otel
         target: component
-  - data_stream:
-      dataset: elastic_agent.elastic_agent
-      namespace: default
-      type: metrics
-    failure_threshold: 5
-    hosts:
-    - placeholder
-    id: metrics-monitoring-metricbeat-1
-    index: metrics-elastic_agent.elastic_agent-default
-    metricsets:
-    - json
-    namespace: agent
-    path: /stats
-    period: 1m0s
-    processors:
-    - add_fields:
-        fields:
-          dataset: elastic_agent.elastic_agent
-        target: event
-    - add_fields:
-        fields:
-          id: ""
-          process: metricbeat
-          snapshot: false
-          version: placeholder
-        target: elastic_agent
-    - add_fields:
-        fields:
-          id: ""
-        target: agent
-    - copy_fields:
-        fail_on_error: false
-        fields:
-        - from: http.agent.beat.cpu
-          to: system.process.cpu
-        - from: http.agent.beat.memstats.memory_sys
-          to: system.process.memory.size
-        - from: http.agent.beat.handles
-          to: system.process.fd
-        - from: http.agent.beat.cgroup
-          to: system.process.cgroup
-        - from: http.agent.apm-server
-          to: apm-server
-        - from: http.filebeat_input
-          to: filebeat_input
-        ignore_missing: true
-    - drop_fields:
-        fields:
-        - http
-        ignore_missing: true
-    - add_fields:
-        fields:
-          binary: metricbeat
-          id: http/metrics-monitoring
-        target: component
-  - data_stream:
-      dataset: elastic_agent.elastic_agent
-      namespace: default
-      type: metrics
-    failure_threshold: 5
-    hosts:
-    - placeholder
-    id: metrics-monitoring-metricbeat-1
-    index: metrics-elastic_agent.elastic_agent-default
-    metricsets:
-    - json
-    namespace: agent
-    path: /stats
-    period: 1m0s
-    processors:
-    - add_fields:
-        fields:
-          dataset: elastic_agent.elastic_agent
-        target: event
-    - add_fields:
-        fields:
-          id: ""
-          process: metricbeat
-          snapshot: false
-          version: placeholder
-        target: elastic_agent
-    - add_fields:
-        fields:
-          id: ""
-        target: agent
-    - copy_fields:
-        fail_on_error: false
-        fields:
-        - from: http.agent.beat.cpu
-          to: system.process.cpu
-        - from: http.agent.beat.memstats.memory_sys
-          to: system.process.memory.size
-        - from: http.agent.beat.handles
-          to: system.process.fd
-        - from: http.agent.beat.cgroup
-          to: system.process.cgroup
-        - from: http.agent.apm-server
-          to: apm-server
-        - from: http.filebeat_input
-          to: filebeat_input
-        ignore_missing: true
-    - drop_fields:
-        fields:
-        - http
-        ignore_missing: true
-    - add_fields:
-        fields:
-          binary: metricbeat
-          id: prometheus/metrics-monitoring
-        target: component
   type: http/metrics
   use_output: monitoring
-- data_stream:
+- _runtime_experimental: otel
+  data_stream:
     namespace: default
   id: metrics-monitoring-collector
   name: metrics-monitoring-collector
