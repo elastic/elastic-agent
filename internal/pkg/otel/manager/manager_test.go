@@ -31,6 +31,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/logp/logptest"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -921,8 +922,7 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 				collectorCfg: tt.collectorCfg,
 				components:   tt.components,
 			}
-			l := newTestLogger()
-			result, err := buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter, l)
+			result, err := buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter, logptest.NewTestingLogger(t, ""))
 
 			if tt.expectedErrorString != "" {
 				assert.Error(t, err)
