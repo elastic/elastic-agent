@@ -1078,7 +1078,6 @@ func processorsForCollectorPrometheusStream(namespace, dataset string, agentInfo
 		// Set the metricset name to "stats" since we're remapping the OTel
 		// telemetry to look like the Beats stats metricset.
 		addMetricsetOverrideProcessor("stats"),
-		addPrometheusTestField(),
 		addPrometheusMetricsRemapProcessor(),
 	}
 }
@@ -1089,18 +1088,6 @@ func addMetricsetOverrideProcessor(metricset string) map[string]any {
 			"target": "metricset",
 			"fields": map[string]any{
 				"name": metricset,
-			},
-		},
-	}
-}
-
-// For use in testing, remove before merge
-func addPrometheusTestField() map[string]any {
-	return map[string]any{
-		"add_fields": map[string]any{
-			"target": "",
-			"fields": map[string]any{
-				"prometheus_marker": "prometheus",
 			},
 		},
 	}
