@@ -16,9 +16,27 @@ function process(event) {
     return;
   }
 
+  // Hack: if the scope is elastic-custom fields, deterministically mangle the
+  // agent.id. Since the label set is different, these are passed through in
+  // different events, and if we don't do this one of the events will be
+  // rejected as a duplicate since they have the same component id, agent id,
+  // and metricset.
+  var id = event.Get("agent.id");
+  if (id != null && id.length > 0) {
+    // Increment / wrap the last hex character of the uuid
+    var prefix = id.substring(0, id.length - 1);
+    var last = id.substring(id.length - 1);
+    var rotated = "0";
+    if (last < "f") {
+      rotated = String.fromCharCode(last.charCodeAt(0) + 1);
+    }
+    id = prefix + rotated;
+    event.Put("agent.id", id);
+  }
+
   // The event will be discarded unless we find some valid metric to convert.
 	var keep_event = false;
-  
+
 	var queue_size = event.Get("prometheus.metrics.otelcol_exporter_queue_size");
 	var queue_capacity = event.Get("prometheus.metrics.otelcol_exporter_queue_capacity");
   if (queue_size != null) {
