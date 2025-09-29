@@ -745,41 +745,74 @@ func TestOTelManager_Run(t *testing.T) {
 }
 
 func TestOTelManager_Logging(t *testing.T) {
+	wd, erWd := os.Getwd()
+	require.NoError(t, erWd, "cannot get working directory")
+
+	testBinary := filepath.Join(wd, "testing", "testing")
+	require.FileExists(t, testBinary, "testing binary not found")
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	const waitTimeForStop = 30 * time.Second
 
 	base, obs := loggertest.New("otel")
 	l, _ := loggertest.New("otel-manager")
-	m, err := NewOTelManager(l, logp.DebugLevel, base, EmbeddedExecutionMode, nil, nil, waitTimeForStop)
-	require.NoError(t, err, "could not create otel manager")
 
-	go func() {
-		err := m.Run(ctx)
-		assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
-	}()
+	for _, tc := range []struct {
+		name       string
+		execModeFn func(collectorRunErr chan error) (collectorExecution, error)
+	}{
+		{
+			name: "in-process execution",
+			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
+				return newExecutionEmbedded(), nil
+			},
+		},
+		{
+			name: "subprocess execution",
+			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary)
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// the execution mode passed here is overridden below so it is irrelevant
+			m, err := NewOTelManager(l, logp.DebugLevel, base, EmbeddedExecutionMode, nil, nil, waitTimeForStop)
+			require.NoError(t, err, "could not create otel manager")
 
-	// watch is synchronous, so we need to read from it to avoid blocking the manager
-	go func() {
-		for {
-			select {
-			case <-m.WatchCollector():
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
+			executionMode, err := tc.execModeFn(m.collectorRunErr)
+			require.NoError(t, err, "failed to create execution mode")
+			testExecutionMode := &testExecution{exec: executionMode}
+			m.execution = testExecutionMode
 
-	cfg := confmap.NewFromStringMap(testConfig)
-	m.Update(cfg, nil)
+			go func() {
+				err := m.Run(ctx)
+				assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
+			}()
 
-	// the collector should log to the base logger
-	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
-		logs := obs.All()
-		require.NotEmpty(collect, logs, "Logs should not be empty")
-		firstMessage := logs[0].Message
-		assert.Equal(collect, firstMessage, "Setting up own telemetry...")
-	}, time.Second*10, time.Second)
+			// watch is synchronous, so we need to read from it to avoid blocking the manager
+			go func() {
+				for {
+					select {
+					case <-m.WatchCollector():
+					case <-ctx.Done():
+						return
+					}
+				}
+			}()
+
+			cfg := confmap.NewFromStringMap(testConfig)
+			m.Update(cfg, nil)
+
+			// the collector should log to the base logger
+			assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+				logs := obs.All()
+				require.NotEmpty(collect, logs, "Logs should not be empty")
+				firstMessage := logs[0].Message
+				assert.Equal(collect, firstMessage, "Setting up own telemetry...")
+			}, time.Second*10, time.Second)
+		})
+	}
 }
 
 // statusToYaml converts the status.AggregateStatus to a YAML string representation.
