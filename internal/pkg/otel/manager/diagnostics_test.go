@@ -22,9 +22,9 @@ import (
 	"testing"
 	"time"
 
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/utils"
 
@@ -150,7 +150,7 @@ func TestBeatMetrics(t *testing.T) {
 	expectedMetricData, err := json.MarshalIndent(map[string]any{"test": "test"}, "", "  ")
 	require.NoError(t, err)
 
-	fileName := strings.TrimPrefix(monitoring.BeatsMonitoringEndpoint(compID), fmt.Sprintf("%s://", utils.SocketScheme))
+	fileName := strings.TrimPrefix(componentmonitoring.BeatsMonitoringEndpoint(compID), fmt.Sprintf("%s://", utils.SocketScheme))
 	err = os.MkdirAll(filepath.Dir(fileName), 0o755)
 	require.NoError(t, err)
 
