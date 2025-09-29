@@ -490,8 +490,7 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentInfo
 		"streams":    streams,
 	}
 
-	// Make sure we don't set anything until the configuration is stable if the otel manager isn't enabled
-	if b.config.C.RuntimeManager != monitoringCfg.DefaultRuntimeManager {
+	if b.config.C.RuntimeManager == monitoringCfg.OtelRuntimeManager {
 		input["_runtime_experimental"] = b.config.C.RuntimeManager
 	}
 
@@ -582,7 +581,7 @@ func (b *BeatsMonitor) injectMetricsInput(
 	}
 
 	// Make sure we don't set anything until the configuration is stable if the otel manager isn't enabled
-	if b.config.C.RuntimeManager != monitoringCfg.DefaultRuntimeManager {
+	if b.config.C.RuntimeManager == monitoringCfg.OtelRuntimeManager {
 		for _, input := range inputs {
 			inputMap := input.(map[string]interface{})
 			inputMap["_runtime_experimental"] = b.config.C.RuntimeManager
