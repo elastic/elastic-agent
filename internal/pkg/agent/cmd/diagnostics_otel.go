@@ -71,6 +71,7 @@ func otelDiagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		res.ComponentID = r.Name
 		componentDiag = append(componentDiag, res)
 	}
+	componentDiag = aggregateComponentDiagnostics(componentDiag)
 
 	filepath, _ := cmd.Flags().GetString("file")
 	if filepath == "" {
@@ -83,10 +84,29 @@ func otelDiagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 	defer f.Close()
 
-	if err := diagnostics.ZipArchive(streams.Err, f, paths.Top(), agentDiag, nil, componentDiag, false); err != nil {
+	if err := diagnostics.ZipArchive(streams.Err, f, paths.Top(), agentDiag, nil, componentDiag, false); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("unable to create archive %q: %w", filepath, err)
 	}
 	fmt.Fprintf(streams.Out, "Created diagnostics archive %q\n", filepath)
 	fmt.Fprintln(streams.Out, "** WARNING **\nCreated archive may contain plain text credentials.\nEnsure that files in archive are redacted before sharing.\n*******")
 	return nil
+}
+
+// aggregateComponentDiagnostics takes a slice of DiagnosticComponentResult and merges
+// results for components with the same ComponentID.
+func aggregateComponentDiagnostics(diags []client.DiagnosticComponentResult) []client.DiagnosticComponentResult {
+	m := make(map[string]client.DiagnosticComponentResult)
+	for _, d := range diags {
+		if existing, ok := m[d.ComponentID]; ok {
+			existing.Results = append(existing.Results, d.Results...)
+			m[d.ComponentID] = existing
+		} else {
+			m[d.ComponentID] = d
+		}
+	}
+	result := make([]client.DiagnosticComponentResult, 0, len(m))
+	for _, v := range m {
+		result = append(result, v)
+	}
+	return result
 }

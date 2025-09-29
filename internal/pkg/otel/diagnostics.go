@@ -24,7 +24,11 @@ func PerformDiagnosticsExt(ctx context.Context, cpu bool) (*elasticdiagnostics.R
 		},
 	}
 	client := &http.Client{Transport: tr}
-	req, err := http.NewRequest(http.MethodGet, "http://localhost/diagnostics", nil)
+	url := "http://localhost/diagnostics"
+	if cpu {
+		url = "http://localhost/diagnostics?cpu=true"
+	}
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}

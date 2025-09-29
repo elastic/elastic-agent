@@ -124,6 +124,26 @@ func (m *OTelManager) PerformComponentDiagnostics(
 		}
 	}
 
+	extDiagnostics, err := otel.PerformDiagnosticsExt(ctx, false)
+	if errors.Is(err, syscall.ENOENT) || errors.Is(err, syscall.ECONNREFUSED) {
+		// We're not running the EDOT if:
+		//  1. Either the socket doesn't exist
+		//	2. It is refusing the connections.
+		m.logger.Debugf("Couldn't fetch diagnostics from EDOT: %v", err)
+		return diagnostics, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("error fetching otel diagnostics: %w", err)
+	}
+
+	for idx, diag := range diagnostics {
+		for _, extDiag := range extDiagnostics.ComponentDiagnostics {
+			if strings.Contains(extDiag.Name, diag.Component.ID) {
+				diagnostics[idx].Results = append(diag.Results, extDiag)
+			}
+		}
+	}
+
 	for idx, diag := range diagnostics {
 		var results []*proto.ActionDiagnosticUnitResult
 		var errs []error
@@ -159,28 +179,8 @@ func (m *OTelManager) PerformComponentDiagnostics(
 
 		}
 
-		diagnostics[idx].Results = results
+		diagnostics[idx].Results = append(diagnostics[idx].Results, results...)
 		diagnostics[idx].Err = errors.Join(errs...)
-	}
-
-	extDiagnostics, err := otel.PerformDiagnosticsExt(ctx, false)
-	if errors.Is(err, syscall.ENOENT) || errors.Is(err, syscall.ECONNREFUSED) {
-		// We're not running the EDOT if:
-		//  1. Either the socket doesn't exist
-		//	2. It is refusing the connections.
-		m.logger.Debugf("Couldn't fetch diagnostics from EDOT: %v", err)
-		return diagnostics, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("error fetching otel diagnostics: %w", err)
-	}
-
-	for idx, diag := range diagnostics {
-		for _, extDiag := range extDiagnostics.ComponentDiagnostics {
-			if strings.Contains(extDiag.Name, diag.Component.ID) {
-				diagnostics[idx].Results = append(diag.Results, extDiag)
-			}
-		}
 	}
 
 	return diagnostics, nil
