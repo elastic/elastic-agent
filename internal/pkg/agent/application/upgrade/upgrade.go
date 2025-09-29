@@ -121,6 +121,7 @@ type installDescriptorSource interface {
 	AddInstallDesc(desc v1.AgentInstallDesc) (*v1.InstallDescriptor, error)
 	ModifyInstallDesc(modifierFunc func(desc *v1.AgentInstallDesc) error) (*v1.InstallDescriptor, error)
 	RemoveAgentInstallDesc(versionedHome string) (*v1.InstallDescriptor, error)
+	GetInstallDesc() (*v1.InstallDescriptor, error)
 }
 
 // Upgrader performs an upgrade

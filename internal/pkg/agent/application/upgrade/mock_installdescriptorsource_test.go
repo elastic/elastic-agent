@@ -83,6 +83,63 @@ func (_c *mockInstallDescriptorSource_AddInstallDesc_Call) RunAndReturn(run func
 	return _c
 }
 
+// GetInstallDesc provides a mock function with no fields
+func (_m *mockInstallDescriptorSource) GetInstallDesc() (*v1.InstallDescriptor, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetInstallDesc")
+	}
+
+	var r0 *v1.InstallDescriptor
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (*v1.InstallDescriptor, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() *v1.InstallDescriptor); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1.InstallDescriptor)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// mockInstallDescriptorSource_GetInstallDesc_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetInstallDesc'
+type mockInstallDescriptorSource_GetInstallDesc_Call struct {
+	*mock.Call
+}
+
+// GetInstallDesc is a helper method to define mock.On call
+func (_e *mockInstallDescriptorSource_Expecter) GetInstallDesc() *mockInstallDescriptorSource_GetInstallDesc_Call {
+	return &mockInstallDescriptorSource_GetInstallDesc_Call{Call: _e.mock.On("GetInstallDesc")}
+}
+
+func (_c *mockInstallDescriptorSource_GetInstallDesc_Call) Run(run func()) *mockInstallDescriptorSource_GetInstallDesc_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *mockInstallDescriptorSource_GetInstallDesc_Call) Return(_a0 *v1.InstallDescriptor, _a1 error) *mockInstallDescriptorSource_GetInstallDesc_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *mockInstallDescriptorSource_GetInstallDesc_Call) RunAndReturn(run func() (*v1.InstallDescriptor, error)) *mockInstallDescriptorSource_GetInstallDesc_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ModifyInstallDesc provides a mock function with given fields: modifierFunc
 func (_m *mockInstallDescriptorSource) ModifyInstallDesc(modifierFunc func(*v1.AgentInstallDesc) error) (*v1.InstallDescriptor, error) {
 	ret := _m.Called(modifierFunc)
