@@ -1,6 +1,12 @@
 ---
-title: File log receiver
+navigation_title: File log receiver
 description: The File log receiver is an OpenTelemetry Collector component that ingests logs from files.
+applies_to:
+  stack:
+  serverless:
+    observability:
+  product:
+    edot_collector:
 products:
   - id: elastic-agent
   - id: observability
