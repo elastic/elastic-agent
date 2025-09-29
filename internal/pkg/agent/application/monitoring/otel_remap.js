@@ -3,6 +3,14 @@
 // that can be viewed in Agent dashboards.
 
 function process(event) {
+  var exporter = event.Get("prometheus.labels.exporter");
+  // This hard-coded exporter name will not work for the general
+  // (non-monitoring) use case.
+  if (exporter != "elasticsearch/_agent-component/default") {
+    event.Cancel();
+    return;
+  }
+
 	var keep_event = false;
 	var queue_size = event.Get("prometheus.metrics.otelcol_exporter_queue_size");
 	var queue_capacity = event.Get("prometheus.metrics.otelcol_exporter_queue_capacity");
@@ -24,17 +32,17 @@ function process(event) {
   var total_sent = 0;
   var total_sent_valid = false;
   // Add send statistics from all source types
-  var sent_logs = event.Get("prometheus.metrics.otelcol_exporter_sent_log_records");
+  var sent_logs = event.Get("prometheus.metrics.otelcol_exporter_sent_log_records_total");
   if (sent_logs != null) {
     total_sent += sent_logs;
     total_sent_valid = true;
   }
-  var sent_spans = event.Get("prometheus.metrics.otelcol_exporter_sent_spans");
+  var sent_spans = event.Get("prometheus.metrics.otelcol_exporter_sent_spans_total");
   if (sent_spans != null) {
     total_sent += sent_spans;
     total_sent_valid = true;
   }
-  var sent_metrics = event.Get("prometheus.metrics.otelcol_exporter_sent_metric_points");
+  var sent_metrics = event.Get("prometheus.metrics.otelcol_exporter_sent_metric_points_total");
   if (sent_metrics != null) {
     total_sent += sent_metrics;
     total_sent_valid = true;
@@ -47,17 +55,17 @@ function process(event) {
   var total_failed = 0;
   var total_failed_valid = false;
   // Add failed statistics from all source types
-  var failed_logs = event.Get("prometheus.metrics.otelcol_exporter_send_failed_log_records");
+  var failed_logs = event.Get("prometheus.metrics.otelcol_exporter_send_failed_log_records_total");
   if (failed_logs != null) {
     total_failed += failed_logs;
     total_failed_valid = true;
   }
-  var failed_spans = event.Get("prometheus.metrics.otelcol_exporter_send_failed_spans");
+  var failed_spans = event.Get("prometheus.metrics.otelcol_exporter_send_failed_spans_total");
   if (failed_spans != null) {
     total_failed += failed_spans;
     total_failed_valid = true;
   }
-  var failed_metrics = event.Get("prometheus.metrics.otelcol_exporter_send_failed_metric_points");
+  var failed_metrics = event.Get("prometheus.metrics.otelcol_exporter_send_failed_metric_points_total");
   if (failed_metrics != null) {
     total_failed += failed_metrics;
     total_failed_valid = true;
@@ -67,13 +75,13 @@ function process(event) {
   	keep_event = true;
   }
 
-  var flushed_bytes = event.Get("prometheus.metrics.otelcol.elasticsearch.flushed.bytes");
+  var flushed_bytes = event.Get("prometheus.metrics.otelcol_elasticsearch_flushed_bytes_total");
   if (flushed_bytes != null) {
     event.Put("beat.stats.libbeat.output.write.bytes", flushed_bytes);
   	keep_event = true;
   }
 
-  var retried_docs = event.Get("prometheus.metrics.otelcol.elasticsearch.docs.retried");
+  var retried_docs = event.Get("prometheus.metrics.otelcol_elasticsearch_docs_retried_ratio_total");
   if (retried_docs != null) {
     // "failed" in the beats metric means an event failed to ingest but was
     // not dropped, and will be retried.
@@ -81,7 +89,7 @@ function process(event) {
   	keep_event = true;
   }
 
-  var request_count = event.Get("prometheus.metrics.otelcol.elasticsearch.bulk_requests.count");
+  var request_count = event.Get("prometheus.metrics.otelcol_elasticsearch_bulk_requests_count_ratio_total");
   if (request_count != null) {
     // This is not an exact semantic match for how Beats measures batch count,
     // but it's close.
@@ -89,27 +97,18 @@ function process(event) {
   	keep_event = true;
   }
 
-  var processed_docs_count = event.Get("prometheus.metrics.otelcol.elasticsearch.docs.processed");
+  var processed_docs_count = event.Get("prometheus.metrics.otelcol_elasticsearch_docs_processed_ratio_total");
   if (processed_docs_count != null) {
     // Approximate semantic match: the otel metric counts all document
-    // ingestion attempts, including success, failure, and retries.
+    // ingestion attempts, including success, failure, and retries,
+    // which is a better match for the Beats definition of total events
+    // than otelcol_elasticsearch_docs_received_ratio_total which
+    // includes only unique events seen (regardless of retries etc).
     event.Put("beat.stats.libbeat.output.events.total", processed_docs_count);
   	keep_event = true;
   }
 
-  var received_docs_count = event.Get("prometheus.metrics.otelcol.elasticsearch.docs.received");
-  // This measures documents passed to the exporter regardless of outcome
-  // (unaffected by success / failure / retries). This should give an
-  // approximate equivalent to beat.stats.libbeat.output.events.active
-  // when combined with the overall success/failure totals for the exporter.
-  if (received_docs_count != null && total_sent_valid && total_failed_valid) {
-    var active_count = received_docs_count - total_sent - total_failed;
-    event.Put("beat.stats.libbeat.output.events.active", active_count);
-    keep_event = true;
-  }
-
   if (!keep_event) {
-    event.Put("event.cancelled_flag", 1);
-    //event.Cancel();
+    event.Cancel();
   }
 }
