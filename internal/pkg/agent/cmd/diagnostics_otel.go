@@ -84,6 +84,7 @@ func otelDiagnosticCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 	defer f.Close()
 
+	// In EDOT, the logs path does not exist, so we ignore that error.
 	if err := diagnostics.ZipArchive(streams.Err, f, paths.Top(), agentDiag, nil, componentDiag, false); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("unable to create archive %q: %w", filepath, err)
 	}
