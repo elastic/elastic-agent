@@ -58,6 +58,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.135.0/receiver/receivercreator/README.md) | v0.135.0 |
 | [redisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/redisreceiver/v0.135.0/receiver/redisreceiver/README.md) | v0.135.0 |
 | [sqlserverreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/sqlserverreceiver/v0.135.0/receiver/sqlserverreceiver/README.md) | v0.135.0 |
+| [windowseventlogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/windowseventlogreceiver/v0.135.0/receiver/windowseventlogreceiver/README.md) | v0.135.0 |
 | [zipkinreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zipkinreceiver/v0.135.0/receiver/zipkinreceiver/README.md) | v0.135.0 |
 
 ### Exporters

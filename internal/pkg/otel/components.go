@@ -31,6 +31,7 @@ import (
 	receivercreator "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator"
 	redisreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver"
 	sqlserverreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver"
 	zipkinreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver"
 	nopreceiver "go.opentelemetry.io/collector/receiver/nopreceiver"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
@@ -123,6 +124,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			mysqlreceiver.NewFactory(),
 			postgresqlreceiver.NewFactory(),
 			sqlserverreceiver.NewFactory(),
+			windowseventlogreceiver.NewFactory(),
 		}
 
 		// some receivers are only available on certain OS.
