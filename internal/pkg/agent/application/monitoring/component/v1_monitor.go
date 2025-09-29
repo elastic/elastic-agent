@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package monitoring
+package component
 
 import (
 	"crypto/sha256"
@@ -32,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	otelMonitoring "github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
 )
 
 const (
@@ -88,11 +89,12 @@ var (
 // BeatsMonitor provides config values for monitoring of agent clients (beats, endpoint, etc)
 // by injecting the monitoring config into an existing fleet config
 type BeatsMonitor struct {
-	enabled         bool // feature flag disabling whole v1 monitoring story
-	config          *monitoringConfig
-	otelConfig      *confmap.Conf
-	operatingSystem string
-	agentInfo       info.Agent
+	enabled                 bool // feature flag disabling whole v1 monitoring story
+	config                  *monitoringConfig
+	otelConfig              *confmap.Conf
+	operatingSystem         string
+	agentInfo               info.Agent
+	isOtelRuntimeSubprocess bool
 }
 
 // componentInfo is the information necessary to generate monitoring configuration for a component. We don't just use
@@ -111,15 +113,16 @@ type monitoringConfig struct {
 }
 
 // New creates a new BeatsMonitor instance.
-func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, otelCfg *confmap.Conf, agentInfo info.Agent) *BeatsMonitor {
+func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, otelCfg *confmap.Conf, agentInfo info.Agent, isOtelRuntimeSubprocess bool) *BeatsMonitor {
 	return &BeatsMonitor{
 		enabled: enabled,
 		config: &monitoringConfig{
 			C: cfg,
 		},
-		otelConfig:      otelCfg,
-		operatingSystem: operatingSystem,
-		agentInfo:       agentInfo,
+		otelConfig:              otelCfg,
+		operatingSystem:         operatingSystem,
+		agentInfo:               agentInfo,
+		isOtelRuntimeSubprocess: isOtelRuntimeSubprocess,
 	}
 }
 
@@ -743,12 +746,34 @@ func (b *BeatsMonitor) getHttpStreams(
 		"namespace":  "agent",
 		"period":     metricsCollectionIntervalString,
 		"index":      indexName,
-		"processors": processorsForAgentHttpStream(monitoringNamespace, dataset, b.agentInfo),
+		"processors": processorsForAgentHttpStream(agentName, agentName, agentName, monitoringNamespace, dataset, b.agentInfo),
 	}
 	if failureThreshold != nil {
 		agentStream[failureThresholdKey] = *failureThreshold
 	}
 	httpStreams = append(httpStreams, agentStream)
+
+	if usingOtelRuntime(componentInfos) && b.isOtelRuntimeSubprocess {
+		edotSubprocessStream := map[string]any{
+			idKey: fmt.Sprintf("%s-edot-collector", monitoringMetricsUnitID),
+			"data_stream": map[string]interface{}{
+				"type":      "metrics",
+				"dataset":   dataset,
+				"namespace": monitoringNamespace,
+			},
+			"metricsets": []interface{}{"json"},
+			"path":       "/stats",
+			"hosts":      []interface{}{PrefixedEndpoint(otelMonitoring.EDOTMonitoringEndpoint())},
+			"namespace":  "agent",
+			"period":     metricsCollectionIntervalString,
+			"index":      indexName,
+			"processors": processorsForAgentHttpStream(agentName, otelMonitoring.EDOTComponentID, otelMonitoring.EDOTComponentID, monitoringNamespace, dataset, b.agentInfo),
+		}
+		if failureThreshold != nil {
+			edotSubprocessStream[failureThresholdKey] = *failureThreshold
+		}
+		httpStreams = append(httpStreams, edotSubprocessStream)
+	}
 
 	for _, compInfo := range componentInfos {
 		binaryName := compInfo.BinaryName
@@ -1054,15 +1079,15 @@ func processorsForHttpStream(binaryName, unitID, dataset string, agentInfo info.
 }
 
 // processorsForAgentHttpStream returns the processors used for the agent metric stream in the beats input.
-func processorsForAgentHttpStream(namespace, dataset string, agentInfo info.Agent) []any {
+func processorsForAgentHttpStream(binaryName, processName, unitID, namespace, dataset string, agentInfo info.Agent) []any {
 	return []interface{}{
 		addDataStreamFieldsProcessor(dataset, namespace),
 		addEventFieldsProcessor(dataset),
-		addElasticAgentFieldsProcessor(agentName, agentInfo),
+		addElasticAgentFieldsProcessor(processName, agentInfo),
 		addAgentFieldsProcessor(agentInfo.AgentID()),
 		addCopyFieldsProcessor(httpCopyRules(), true, false),
 		dropFieldsProcessor([]any{"http"}, true),
-		addComponentFieldsProcessor(agentName, agentName),
+		addComponentFieldsProcessor(binaryName, unitID),
 	}
 }
 
@@ -1106,7 +1131,7 @@ func addPrometheusMetricsRemapProcessor() map[string]any {
 }
 
 // addElasticAgentFieldsProcessor returns a processor definition that adds agent information in an `elastic_agent` field.
-func addElasticAgentFieldsProcessor(binaryName string, agentInfo info.Agent) map[string]any {
+func addElasticAgentFieldsProcessor(processName string, agentInfo info.Agent) map[string]any {
 	return map[string]any{
 		"add_fields": map[string]any{
 			"target": "elastic_agent",
@@ -1114,7 +1139,7 @@ func addElasticAgentFieldsProcessor(binaryName string, agentInfo info.Agent) map
 				"id":       agentInfo.AgentID(),
 				"version":  agentInfo.Version(),
 				"snapshot": agentInfo.Snapshot(),
-				"process":  binaryName,
+				"process":  processName,
 			},
 		},
 	}

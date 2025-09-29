@@ -11,6 +11,7 @@ inputs:
       - windows/amd64
       - container/amd64
       - container/arm64
+      - windows/arm64
     outputs: &outputs
       - elasticsearch
       - kafka
