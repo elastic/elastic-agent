@@ -307,7 +307,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"authenticator": "beatsauth/_agent-component/" + outputName,
 			},
 			"tls": map[string]any{
-				"min_version": "1.2",
+				"min_version": "1.1",
 				"max_version": "1.3",
 			},
 		}
@@ -1034,6 +1034,130 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			// If the monitoring getter is not nil, verify the http section is the same
 			if expectedMonitoringConfig != nil {
 				assert.Equal(t, expectedMonitoringConfig["http"], receiverConfig["http"])
+			}
+		})
+	}
+}
+
+func TestVerifyComponentIsOtelSupported(t *testing.T) {
+	tests := []struct {
+		name          string
+		component     *component.Component
+		expectedError string
+	}{
+		{
+			name: "supported component",
+			component: &component.Component{
+				ID:         "supported-comp",
+				InputType:  "filestream",
+				OutputType: "elasticsearch",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "agentbeat",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:   "filestream-unit",
+						Type: client.UnitTypeInput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"streams": []any{
+								map[string]any{
+									"paths": []any{"/var/log/*.log"},
+								},
+							},
+						}),
+					},
+					{
+						ID:   "filestream-default",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type":  "elasticsearch",
+							"hosts": []any{"localhost:9200"},
+						}),
+					},
+				},
+			},
+		},
+		{
+			name: "unsupported output type - kafka",
+			component: &component.Component{
+				ID:         "unsupported-output",
+				InputType:  "filestream",
+				OutputType: "kafka", // unsupported
+			},
+			expectedError: "unsupported output type: kafka",
+		},
+		{
+			name: "unsupported output type - logstash",
+			component: &component.Component{
+				ID:         "unsupported-output",
+				InputType:  "filestream",
+				OutputType: "logstash", // unsupported
+			},
+			expectedError: "unsupported output type: logstash",
+		},
+		{
+			name: "unsupported input type",
+			component: &component.Component{
+				ID:         "unsupported-input",
+				InputType:  "log", // unsupported
+				OutputType: "elasticsearch",
+			},
+			expectedError: "unsupported input type: log",
+		},
+		{
+			name: "unsupported configuration",
+			component: &component.Component{
+				ID:         "unsupported-config",
+				InputType:  "filestream",
+				OutputType: "elasticsearch",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "agentbeat",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:   "filestream-unit",
+						Type: client.UnitTypeInput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"streams": []any{
+								map[string]any{
+									"paths": []any{"/var/log/*.log"},
+								},
+							},
+						}),
+					},
+					{
+						ID:   "filestream-default",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type":    "elasticsearch",
+							"hosts":   []any{"localhost:9200"},
+							"indices": []any{},
+						}),
+					},
+				},
+			},
+			expectedError: "unsupported configuration for unsupported-config: error translating config for output: default, unit: filestream-default, error: indices is currently not supported: unsupported operation",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := VerifyComponentIsOtelSupported(tt.component)
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Equal(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
 			}
 		})
 	}

@@ -5,15 +5,17 @@
 package translate
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 
 	koanfmaps "github.com/knadh/koanf/maps"
+
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
@@ -58,7 +60,7 @@ func GetOtelConfig(
 	beatMonitoringConfigGetter BeatMonitoringConfigGetter,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
-	components := getSupportedComponents(model)
+	components := getSupportedComponents(logger, model)
 	if len(components) == 0 {
 		return nil, nil
 	}
@@ -91,19 +93,38 @@ func GetOtelConfig(
 	return otelConfig, nil
 }
 
-// IsComponentOtelSupported checks if the given component can be run in an Otel Collector.
-func IsComponentOtelSupported(comp *component.Component) bool {
-	return slices.Contains(OtelSupportedOutputTypes, comp.OutputType) &&
-		slices.Contains(OtelSupportedInputTypes, comp.InputType)
+// VerifyComponentIsOtelSupported verifies that the given component can be run in an Otel Collector. It returns an error
+// indicating what the problem is, if it can't.
+func VerifyComponentIsOtelSupported(comp *component.Component) error {
+	if !slices.Contains(OtelSupportedOutputTypes, comp.OutputType) {
+		return fmt.Errorf("unsupported output type: %s", comp.OutputType)
+	}
+
+	if !slices.Contains(OtelSupportedInputTypes, comp.InputType) {
+		return fmt.Errorf("unsupported input type: %s", comp.InputType)
+	}
+
+	// check if the actual configuration is supported. We need to actually generate the config and look for
+	// the right kind of error
+	_, compErr := getCollectorConfigForComponent(comp, &info.AgentInfo{}, func(unitID, binary string) map[string]any {
+		return nil
+	}, logp.NewNopLogger())
+	if errors.Is(compErr, errors.ErrUnsupported) {
+		return fmt.Errorf("unsupported configuration for %s: %w", comp.ID, compErr)
+	}
+
+	return nil
 }
 
 // getSupportedComponents returns components from the given model that can be run in an Otel Collector.
-func getSupportedComponents(model *component.Model) []*component.Component {
+func getSupportedComponents(logger *logp.Logger, model *component.Model) []*component.Component {
 	var supportedComponents []*component.Component
 
 	for _, comp := range model.Components {
-		if IsComponentOtelSupported(&comp) {
+		if err := VerifyComponentIsOtelSupported(&comp); err == nil {
 			supportedComponents = append(supportedComponents, &comp)
+		} else {
+			logger.Errorf("unsupported component %s submitted to otel manager, skipping: %v", comp.ID, err)
 		}
 	}
 
@@ -270,7 +291,7 @@ func getReceiversConfigForComponent(
 	// agent self-monitoring is disabled
 	monitoringConfig := beatMonitoringConfigGetter(comp.ID, beatName)
 	if monitoringConfig == nil {
-		endpoint := monitoring.BeatsMonitoringEndpoint(comp.ID)
+		endpoint := componentmonitoring.BeatsMonitoringEndpoint(comp.ID)
 		monitoringConfig = map[string]any{
 			"http": map[string]any{
 				"enabled": true,
