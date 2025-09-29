@@ -187,12 +187,7 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 	// since the default execution mode of Otel runtime is sub-process we should see resource
 	// metrics for elastic-agent/collector component.
 	edotCollectorComponentID := otelMonitoring.EDOTComponentID
-	query = genESQuery(agentStatus.Info.ID,
-		[][]string{
-			{"match", "component.id", edotCollectorComponentID},
-			{"exists", "field", "system.process.cpu.total.value"},
-			{"exists", "field", "system.process.memory.size"},
-		})
+	query = genESQuery(agentStatus.Info.ID, edotCollectorComponentID)
 
 	require.Eventually(t, func() bool {
 		now = time.Now()
