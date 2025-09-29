@@ -16,7 +16,9 @@ function process(event) {
     return;
   }
 
+  // The event will be discarded unless we find some valid metric to convert.
 	var keep_event = false;
+  
 	var queue_size = event.Get("prometheus.metrics.otelcol_exporter_queue_size");
 	var queue_capacity = event.Get("prometheus.metrics.otelcol_exporter_queue_capacity");
   if (queue_size != null) {
