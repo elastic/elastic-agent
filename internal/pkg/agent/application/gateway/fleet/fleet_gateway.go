@@ -150,7 +150,6 @@ func (f *FleetGateway) Run(ctx context.Context) error {
 	if f.settings.Backoff == nil {
 		requestBackoff = RequestBackoff(ctx.Done())
 	} else {
-		// this is only used in tests
 		requestBackoff = backoff.NewEqualJitterBackoff(
 			ctx.Done(),
 			f.settings.Backoff.Init,
@@ -363,7 +362,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// get current state
-	state, stateCTX := f.stateFetcher.FetchState(ctx)
+	state, stateCtx := f.stateFetcher.FetchState(ctx)
 
 	// convert components into checkin components structure
 	components := f.convertToCheckinComponents(state.Components, state.Collector)
@@ -389,7 +388,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 		PolicyRevisionIDX: policyRevisionIDX,
 	}
 
-	resp, took, err := cmd.Execute(stateCTX, req)
+	resp, took, err := cmd.Execute(stateCtx, req)
 	f.stateFetcher.Done()
 	if isUnauth(err) {
 		f.unauthCounter++
@@ -406,7 +405,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 
 	f.unauthCounter = 0
 	if err != nil {
-		if errors.Is(err, context.Canceled) && errors.Is(context.Cause(stateCTX), errComponentStateChanged) {
+		if errors.Is(err, context.Canceled) && errors.Is(context.Cause(stateCtx), errComponentStateChanged) {
 			return nil, took, stderrors.Join(err, errComponentStateChanged)
 		}
 		return nil, took, err

@@ -60,9 +60,7 @@ func DefaultFleetAgentConfig() *FleetAgentConfig {
 
 func DefaultFleetCheckin() FleetCheckin {
 	return FleetCheckin{
-		Mode:               fleetCheckinModeStandard,
-		RequestBackoffInit: 60 * time.Second,
-		RequestBackoffMax:  10 * time.Minute,
+		Mode: fleetCheckinModeStandard,
 	}
 }
 
@@ -82,7 +80,7 @@ func (f *FleetCheckin) Validate() error {
 	}
 
 	if f.RequestBackoffMax < f.RequestBackoffInit {
-		return errors.New("checkin.request_backoff_max must be grater than or equal to checkin.request_backoff_init")
+		return errors.New("checkin.request_backoff_max must be greater than or equal to checkin.request_backoff_init")
 	}
 	return nil
 }
