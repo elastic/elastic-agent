@@ -1779,7 +1779,7 @@ func (c *Coordinator) updateManagersWithConfig(model *component.Model) {
 		for _, comp := range otelModel.Components {
 			componentIDs = append(componentIDs, comp.ID)
 		}
-		c.logger.With("component_ids", componentIDs).Warn("Using OpenTelemetry collector runtime.")
+		c.logger.With("component_ids", componentIDs).Info("Using OpenTelemetry collector runtime.")
 	}
 	c.otelMgr.Update(c.otelCfg, otelModel.Components)
 }
