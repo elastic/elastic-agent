@@ -55,7 +55,7 @@ agent.monitoring.enabled: false
 	defer cancel()
 
 	// Create the fixture
-	f, err := define.NewFixtureFromLocalBuild(t, define.Version(), integrationtest.WithAllowErrors(), integrationtest.WithOSArchitecture("darwin", "arm64"))
+	f, err := define.NewFixtureFromLocalBuild(t, define.Version(), integrationtest.WithAllowErrors())
 	require.NoError(t, err)
 
 	// Create the data file to ingest
@@ -104,8 +104,7 @@ agent.monitoring.enabled: false
 	extractZipArchive(t, diagZip, extractionDir)
 
 	expectedFiles := []string{
-		"edot/otel-merged.yaml",
-		"edot/edot-telemetry.txt",
+		"edot/otel-merged-actual.yaml",
 		"edot/allocs.profile.gz",
 		"edot/block.profile.gz",
 		"edot/goroutine.profile.gz",

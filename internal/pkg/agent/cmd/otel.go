@@ -89,7 +89,6 @@ func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool,
 	if err != nil {
 		return fmt.Errorf("failed to prepare collector settings: %w", err)
 	}
-
 	// Windows: Mark service as stopped.
 	// After this is run, the service is considered by the OS to be stopped.
 	// This must be the first deferred cleanup task (last to execute).
