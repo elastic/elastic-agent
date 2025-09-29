@@ -819,9 +819,12 @@ func (b *BeatsMonitor) getPrometheusStream(
 	metricsCollectionIntervalString string,
 ) any {
 	monitoringNamespace := b.monitoringNamespace()
+
+	// Send these metrics through the metricbeat monitoring datastream, since
+	// the processors will convert any usable metrics into ECS equivalents
+	// so they're visible in Agent dashboards.
 	dataset := fmt.Sprintf("elastic_agent.%s", collectorName)
-	//indexName := fmt.Sprintf("metrics-elastic_agent.collector-%s", monitoringNamespace)
-	indexName := fmt.Sprintf("metrics-elastic_agent.%s-%s", metricBeatName, monitoringNamespace)
+	indexName := fmt.Sprintf("metrics-%s-%s", dataset, monitoringNamespace)
 
 	prometheusHost := b.getCollectorTelemetryEndpoint()
 
@@ -832,6 +835,8 @@ func (b *BeatsMonitor) getPrometheusStream(
 			"dataset":   dataset,
 			"namespace": monitoringNamespace,
 		},
+		// "collector" here is the coincidental name of the Prometheus metricset
+		// in metricbeat, nothing to do with the OTel collector.
 		"metricsets":   []interface{}{"collector"},
 		"metrics_path": "/metrics",
 		"hosts":        []interface{}{prometheusHost},
@@ -1069,12 +1074,27 @@ func processorsForCollectorPrometheusStream(namespace, dataset string, agentInfo
 		addEventFieldsProcessor(dataset),
 		addElasticAgentFieldsProcessor(agentName, agentInfo),
 		addAgentFieldsProcessor(agentInfo.AgentID()),
-		addComponentFieldsProcessor(agentName, collectorName),
+		addComponentFieldsProcessor(agentName, agentName+"/"+collectorName),
+		// Set the metricset name to "stats" since we're remapping the OTel
+		// telemetry to look like the Beats stats metricset.
+		addMetricsetOverrideProcessor("stats"),
 		addPrometheusTestField(),
 		addPrometheusMetricsRemapProcessor(),
 	}
 }
 
+func addMetricsetOverrideProcessor(metricset string) map[string]any {
+	return map[string]any{
+		"add_fields": map[string]any{
+			"target": "metricset",
+			"fields": map[string]any{
+				"name": metricset,
+			},
+		},
+	}
+}
+
+// For use in testing, remove before merge
 func addPrometheusTestField() map[string]any {
 	return map[string]any{
 		"add_fields": map[string]any{
