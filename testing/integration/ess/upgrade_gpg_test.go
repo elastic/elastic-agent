@@ -29,6 +29,7 @@ func TestStandaloneUpgradeWithGPGFallback(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
+	t.Skip("Skipping test temporarily until the DRA with the code that supports windows/arm64 is produced")
 
 	minVersion := upgradetest.Version_8_10_0_SNAPSHOT
 	currentVersion, err := version.ParseVersion(define.Version())
