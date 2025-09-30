@@ -370,11 +370,6 @@ func (m *OTelManager) buildMergedConfig(cfgUpdate configUpdate) (*confmap.Conf, 
 }
 
 func (m *OTelManager) injectDiagnosticsExtension(config *confmap.Conf) error {
-	if _, err := os.Stat(paths.DiagnosticsExtensionSocket()); !os.IsNotExist(err) {
-		// socket already exists. User is most likely using "development" namespace.
-		// generate a unique socket name by fetching current timestamp
-		paths.SetDiagnosticsExtensionSocket(fmt.Sprintf("%d-edot-diagnostics-extension.sock", time.Now().UnixMilli()))
-	}
 	extensionCfg := map[string]any{
 		"extensions": map[string]any{
 			"elastic_diagnostics": map[string]any{

@@ -1249,7 +1249,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 			t.Fatal("timeout waiting for collector config update")
 		}
 		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
-		mgr.injectDiagnosticsExtension(expectedCfg)
+		assert.NoError(t, mgr.injectDiagnosticsExtension(expectedCfg))
 		assert.Equal(t, expectedCfg, execution.cfg)
 
 	})
