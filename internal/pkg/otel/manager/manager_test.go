@@ -272,3 +272,717 @@ func toSerializableStatus(s *status.AggregateStatus) *serializableStatus {
 	}
 	return outputStruct
 }
+<<<<<<< HEAD
+=======
+
+// Mock function for BeatMonitoringConfigGetter
+func mockBeatMonitoringConfigGetter(unitID, binary string) map[string]any {
+	return map[string]any{"test": "config"}
+}
+
+// Helper function to create test logger
+func newTestLogger() *logger.Logger {
+	l, _ := loggertest.New("test")
+	return l
+}
+
+func TestOTelManager_buildMergedConfig(t *testing.T) {
+	// Common parameters used across all test cases
+	commonAgentInfo := &info.AgentInfo{}
+	commonBeatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
+	testComp := testComponent("test-component")
+
+	tests := []struct {
+		name                string
+		collectorCfg        *confmap.Conf
+		components          []component.Component
+		expectedKeys        []string
+		expectedErrorString string
+	}{
+		{
+			name:         "nil config returns nil",
+			collectorCfg: nil,
+			components:   nil,
+		},
+		{
+			name:         "empty config returns empty config",
+			collectorCfg: nil,
+			components:   nil,
+			expectedKeys: []string{},
+		},
+		{
+			name:         "collector config only",
+			collectorCfg: confmap.NewFromStringMap(map[string]any{"receivers": map[string]any{"nop": map[string]any{}}}),
+			components:   nil,
+			expectedKeys: []string{"receivers"},
+		},
+		{
+			name:         "components only",
+			collectorCfg: nil,
+			components:   []component.Component{testComp},
+			expectedKeys: []string{"receivers", "exporters", "service"},
+		},
+		{
+			name:         "both collector config and components",
+			collectorCfg: confmap.NewFromStringMap(map[string]any{"processors": map[string]any{"batch": map[string]any{}}}),
+			components:   []component.Component{testComp},
+			expectedKeys: []string{"receivers", "exporters", "service", "processors"},
+		},
+		{
+			name:         "component config generation error",
+			collectorCfg: nil,
+			components: []component.Component{{
+				ID:         "test-component",
+				InputType:  "filestream",    // Supported input type
+				OutputType: "elasticsearch", // Supported output type
+				// Missing InputSpec which should cause an error during config generation
+			}},
+			expectedErrorString: "failed to generate otel config: unknown otel receiver type for input type: filestream",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfgUpdate := configUpdate{
+				collectorCfg: tt.collectorCfg,
+				components:   tt.components,
+			}
+			result, err := buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter, logptest.NewTestingLogger(t, ""))
+
+			if tt.expectedErrorString != "" {
+				assert.Error(t, err)
+				assert.Equal(t, tt.expectedErrorString, err.Error())
+				assert.Nil(t, result)
+				return
+			}
+
+			assert.NoError(t, err)
+
+			if len(tt.expectedKeys) == 0 {
+				assert.Nil(t, result)
+				return
+			}
+
+			require.NotNil(t, result)
+			for _, key := range tt.expectedKeys {
+				assert.True(t, result.IsSet(key), "Expected key %s to be set", key)
+			}
+		})
+	}
+}
+
+func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
+	// Common test component used across test cases
+	testComp := testComponent("test-component")
+
+	tests := []struct {
+		name                    string
+		components              []component.Component
+		inputStatus             *status.AggregateStatus
+		expectedErrorString     string
+		expectedCollectorStatus *status.AggregateStatus
+		expectedComponentStates []runtime.ComponentComponentState
+	}{
+		{
+			name:       "successful status update with component states",
+			components: []component.Component{testComp},
+			inputStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					// This represents a pipeline for our component (with OtelNamePrefix)
+					"pipeline:logs/_agent-component/test-component": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							"receiver:filebeat/_agent-component/test-component": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							"exporter:elasticsearch/_agent-component/test-component": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+						},
+					},
+					// This represents a regular collector pipeline (should remain after cleaning)
+					"pipeline:logs": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+				},
+			},
+			expectedCollectorStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					// This represents a regular collector pipeline (should remain after cleaning)
+					"pipeline:logs": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+				},
+			},
+			expectedComponentStates: []runtime.ComponentComponentState{
+				{
+					Component: testComp,
+					State: runtime.ComponentState{
+						State:   client.UnitStateHealthy,
+						Message: "HEALTHY",
+						Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+							runtime.ComponentUnitKey{
+								UnitID:   "filestream-unit",
+								UnitType: client.UnitTypeInput,
+							}: {
+								State:   client.UnitStateHealthy,
+								Message: "Healthy",
+								Payload: map[string]any{
+									"streams": map[string]map[string]string{
+										"test-1": {
+											"error":  "",
+											"status": client.UnitStateHealthy.String(),
+										},
+										"test-2": {
+											"error":  "",
+											"status": client.UnitStateHealthy.String(),
+										},
+									},
+								},
+							},
+							runtime.ComponentUnitKey{
+								UnitID:   "filestream-default",
+								UnitType: client.UnitTypeOutput,
+							}: {
+								State:   client.UnitStateHealthy,
+								Message: "Healthy",
+							},
+						},
+						VersionInfo: runtime.ComponentVersionInfo{
+							Name: translate.OtelComponentName,
+							Meta: map[string]string{
+								"build_time": version.BuildTime().String(),
+								"commit":     version.Commit(),
+							},
+							BuildHash: version.Commit(),
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                    "handles nil otel status",
+			components:              []component.Component{},
+			inputStatus:             nil,
+			expectedCollectorStatus: nil,
+			expectedComponentStates: nil,
+		},
+		{
+			name:       "handles empty components list",
+			components: []component.Component{},
+			inputStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+			},
+			expectedErrorString: "",
+			expectedCollectorStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+			},
+			expectedComponentStates: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mgr := &OTelManager{
+				logger:                 newTestLogger(),
+				components:             tt.components,
+				currentComponentStates: make(map[string]runtime.ComponentComponentState),
+			}
+
+			componentStates, err := mgr.handleOtelStatusUpdate(tt.inputStatus)
+
+			// Verify error expectation
+			if tt.expectedErrorString != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.expectedErrorString)
+				return
+			}
+
+			require.NoError(t, err)
+
+			// Compare component states
+			assert.Equal(t, tt.expectedComponentStates, componentStates)
+
+			// Compare collector status
+			assertOtelStatusesEqualIgnoringTimestamps(t, tt.expectedCollectorStatus, mgr.currentCollectorStatus)
+		})
+	}
+}
+
+func TestOTelManager_processComponentStates(t *testing.T) {
+	tests := []struct {
+		name                       string
+		currentComponentStates     map[string]runtime.ComponentComponentState
+		inputComponentStates       []runtime.ComponentComponentState
+		expectedOutputStates       []runtime.ComponentComponentState
+		expectedCurrentStatesAfter map[string]runtime.ComponentComponentState
+	}{
+		{
+			name:                       "empty input and current states",
+			currentComponentStates:     map[string]runtime.ComponentComponentState{},
+			inputComponentStates:       []runtime.ComponentComponentState{},
+			expectedOutputStates:       []runtime.ComponentComponentState{},
+			expectedCurrentStatesAfter: map[string]runtime.ComponentComponentState{},
+		},
+		{
+			name:                   "new component state added",
+			currentComponentStates: map[string]runtime.ComponentComponentState{},
+			inputComponentStates: []runtime.ComponentComponentState{
+				{
+					Component: component.Component{ID: "comp1"},
+					State:     runtime.ComponentState{State: client.UnitStateHealthy},
+				},
+			},
+			expectedOutputStates: []runtime.ComponentComponentState{
+				{
+					Component: component.Component{ID: "comp1"},
+					State:     runtime.ComponentState{State: client.UnitStateHealthy},
+				},
+			},
+			expectedCurrentStatesAfter: map[string]runtime.ComponentComponentState{
+				"comp1": {
+					Component: component.Component{ID: "comp1"},
+					State:     runtime.ComponentState{State: client.UnitStateHealthy},
+				},
+			},
+		},
+		{
+			name: "component removed from config generates STOPPED state",
+			currentComponentStates: map[string]runtime.ComponentComponentState{
+				"comp1": {
+					Component: component.Component{ID: "comp1"},
+					State:     runtime.ComponentState{State: client.UnitStateHealthy},
+				},
+			},
+			inputComponentStates: []runtime.ComponentComponentState{},
+			expectedOutputStates: []runtime.ComponentComponentState{
+				{
+					Component: component.Component{ID: "comp1"},
+					State:     runtime.ComponentState{State: client.UnitStateStopped},
+				},
+			},
+			expectedCurrentStatesAfter: map[string]runtime.ComponentComponentState{},
+		},
+		{
+			name: "component stopped removes from current states",
+			currentComponentStates: map[string]runtime.ComponentComponentState{
+				"comp1": {
+					Component: component.Component{ID: "comp1"},
+					State:     runtime.ComponentState{State: client.UnitStateHealthy},
+				},
+			},
+			inputComponentStates: []runtime.ComponentComponentState{
+				{
+					Component: component.Component{ID: "comp1"},
+					State:     runtime.ComponentState{State: client.UnitStateStopped},
+				},
+			},
+			expectedOutputStates: []runtime.ComponentComponentState{
+				{
+					Component: component.Component{ID: "comp1"},
+					State:     runtime.ComponentState{State: client.UnitStateStopped},
+				},
+			},
+			expectedCurrentStatesAfter: map[string]runtime.ComponentComponentState{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mgr := &OTelManager{
+				logger:                 newTestLogger(),
+				currentComponentStates: tt.currentComponentStates,
+			}
+
+			result := mgr.processComponentStates(tt.inputComponentStates)
+
+			assert.ElementsMatch(t, tt.expectedOutputStates, result)
+			assert.Equal(t, tt.expectedCurrentStatesAfter, mgr.currentComponentStates)
+		})
+	}
+}
+
+// TestOTelManagerEndToEnd tests the full lifecycle of the OTelManager
+// including configuration updates, status updates, and error handling.
+func TestOTelManagerEndToEnd(t *testing.T) {
+	// Setup test logger and dependencies
+	testLogger, _ := loggertest.New("test")
+	agentInfo := &info.AgentInfo{}
+	beatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
+	collectorStarted := make(chan struct{})
+
+	execution := &mockExecution{
+		collectorStarted: collectorStarted,
+	}
+
+	// Create manager with test dependencies
+	mgr := OTelManager{
+		logger:                     testLogger,
+		baseLogger:                 testLogger,
+		errCh:                      make(chan error, 1), // holds at most one error
+		updateCh:                   make(chan configUpdate, 1),
+		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
+		componentStateCh:           make(chan []runtime.ComponentComponentState, 1),
+		doneChan:                   make(chan struct{}),
+		recoveryTimer:              newRestarterNoop(),
+		execution:                  execution,
+		agentInfo:                  agentInfo,
+		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
+		collectorRunErr:            make(chan error),
+	}
+
+	// Start manager in a goroutine
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*1)
+	defer cancel()
+
+	go func() {
+		err := mgr.Run(ctx)
+		assert.ErrorIs(t, err, context.Canceled)
+	}()
+
+	collectorCfg := confmap.NewFromStringMap(map[string]interface{}{
+		"receivers": map[string]interface{}{
+			"nop": map[string]interface{}{},
+		},
+		"exporters": map[string]interface{}{"nop": map[string]interface{}{}},
+		"service": map[string]interface{}{
+			"pipelines": map[string]interface{}{
+				"metrics": map[string]interface{}{
+					"receivers": []string{"nop"},
+					"exporters": []string{"nop"},
+				},
+			},
+		},
+	})
+
+	testComp := testComponent("test")
+	components := []component.Component{testComp}
+
+	t.Run("collector config is passed down to the collector execution", func(t *testing.T) {
+		mgr.Update(collectorCfg, nil)
+		select {
+		case <-collectorStarted:
+		case <-ctx.Done():
+			t.Fatal("timeout waiting for collector config update")
+		}
+		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
+		assert.NoError(t, injectDiagnosticsExtension(expectedCfg))
+		assert.Equal(t, expectedCfg, execution.cfg)
+
+	})
+
+	t.Run("collector status is passed up to the component manager", func(t *testing.T) {
+		otelStatus := &status.AggregateStatus{
+			Event: componentstatus.NewEvent(componentstatus.StatusOK),
+		}
+
+		select {
+		case <-ctx.Done():
+			t.Fatal("timeout waiting for collector status update")
+		case execution.statusCh <- otelStatus:
+		}
+
+		collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
+		require.NoError(t, err)
+		assert.Equal(t, otelStatus, collectorStatus)
+	})
+
+	t.Run("component config is passed down to the otel manager", func(t *testing.T) {
+		mgr.Update(collectorCfg, components)
+		select {
+		case <-collectorStarted:
+		case <-ctx.Done():
+			t.Fatal("timeout waiting for collector config update")
+		}
+		cfg := execution.cfg
+		require.NotNil(t, cfg)
+		receivers, err := cfg.Sub("receivers")
+		require.NoError(t, err)
+		require.NotNil(t, receivers)
+		assert.True(t, receivers.IsSet("nop"))
+		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test"))
+
+		collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
+		assert.Nil(t, err)
+		assert.Nil(t, collectorStatus)
+	})
+
+	t.Run("empty collector config leaves the component config running", func(t *testing.T) {
+		mgr.Update(nil, components)
+		select {
+		case <-collectorStarted:
+		case <-ctx.Done():
+			t.Fatal("timeout waiting for collector config update")
+		}
+		cfg := execution.cfg
+		require.NotNil(t, cfg)
+		receivers, err := cfg.Sub("receivers")
+		require.NoError(t, err)
+		require.NotNil(t, receivers)
+		assert.False(t, receivers.IsSet("nop"))
+		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test"))
+
+		collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
+		assert.Nil(t, err)
+		assert.Nil(t, collectorStatus)
+	})
+
+	t.Run("collector status with components is passed up to the component manager", func(t *testing.T) {
+		otelStatus := &status.AggregateStatus{
+			Event: componentstatus.NewEvent(componentstatus.StatusOK),
+			ComponentStatusMap: map[string]*status.AggregateStatus{
+				// This represents a pipeline for our component (with OtelNamePrefix)
+				"pipeline:logs/_agent-component/test": {
+					Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					ComponentStatusMap: map[string]*status.AggregateStatus{
+						"receiver:filebeatreceiver/_agent-component/test": {
+							Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						},
+						"exporter:elasticsearch/_agent-component/test": {
+							Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						},
+					},
+				},
+			},
+		}
+
+		select {
+		case <-ctx.Done():
+			t.Fatal("timeout waiting for collector status update")
+		case execution.statusCh <- otelStatus:
+		}
+
+		collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
+		require.NoError(t, err)
+		require.NotNil(t, collectorStatus)
+		assert.Len(t, collectorStatus.ComponentStatusMap, 0)
+
+		componentState, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchComponents(), mgr.Errors())
+		require.NoError(t, err)
+		require.NotNil(t, componentState)
+		require.Len(t, componentState, 1)
+		assert.Equal(t, componentState[0].Component, testComp)
+	})
+
+	t.Run("collector error is passed up to the component manager", func(t *testing.T) {
+		collectorErr := errors.New("collector error")
+
+		select {
+		case <-ctx.Done():
+			t.Fatal("timeout waiting for collector status update")
+		case execution.errCh <- collectorErr:
+		}
+
+		// we should get a nil status and an error
+		select {
+		case <-ctx.Done():
+			t.Fatal("timeout waiting for collector status update")
+		case s := <-mgr.WatchCollector():
+			assert.Nil(t, s)
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatal("timeout waiting for collector status update")
+		case err := <-mgr.Errors():
+			assert.Equal(t, collectorErr, err)
+		}
+	})
+}
+
+func getFromChannelOrErrorWithContext[T any](t *testing.T, ctx context.Context, ch <-chan T, errCh <-chan error) (T, error) {
+	t.Helper()
+	var result T
+	var err error
+	for err == nil {
+		select {
+		case result = <-ch:
+			return result, nil
+		case err = <-errCh:
+		case <-ctx.Done():
+			err = ctx.Err()
+		}
+	}
+	return result, err
+}
+
+func assertOtelStatusesEqualIgnoringTimestamps(t require.TestingT, a, b *status.AggregateStatus) bool {
+	if a == nil || b == nil {
+		return assert.Equal(t, a, b)
+	}
+
+	if !assert.Equal(t, a.Status(), b.Status()) {
+		return false
+	}
+
+	if !assert.Equal(t, len(a.ComponentStatusMap), len(b.ComponentStatusMap)) {
+		return false
+	}
+
+	for k, v := range a.ComponentStatusMap {
+		if !assertOtelStatusesEqualIgnoringTimestamps(t, v, b.ComponentStatusMap[k]) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func TestCalculateConfmapHash(t *testing.T) {
+	t.Run("nil config returns zero", func(t *testing.T) {
+		hash, err := calculateConfmapHash(nil)
+		require.NoError(t, err)
+		assert.Equal(t, []byte(nil), hash)
+	})
+
+	t.Run("same value gives same result", func(t *testing.T) {
+		conf := confmap.NewFromStringMap(map[string]any{
+			"key1": "value1",
+			"key2": 123,
+		})
+		hash1, err := calculateConfmapHash(conf)
+		require.NoError(t, err)
+		hash2, err := calculateConfmapHash(conf)
+		require.NoError(t, err)
+		assert.Equal(t, hash1, hash2)
+	})
+
+	t.Run("different values give different results", func(t *testing.T) {
+		conf1 := confmap.NewFromStringMap(map[string]any{
+			"key1": "value1",
+		})
+		hash1, err := calculateConfmapHash(conf1)
+		require.NoError(t, err)
+
+		conf2 := confmap.NewFromStringMap(map[string]any{
+			"key1": "value2",
+		})
+		hash2, err := calculateConfmapHash(conf2)
+		require.NoError(t, err)
+
+		assert.NotEqual(t, hash1, hash2)
+	})
+
+	t.Run("list of maps is processed correctly", func(t *testing.T) {
+		conf1 := confmap.NewFromStringMap(map[string]any{
+			"items": []any{
+				map[string]any{"name": "A", "value": 1},
+				map[string]any{"name": "B", "value": 2},
+			},
+		})
+		hash1, err := calculateConfmapHash(conf1)
+		require.NoError(t, err)
+
+		t.Run("same list of maps gives same hash", func(t *testing.T) {
+			conf2 := confmap.NewFromStringMap(map[string]any{
+				"items": []any{
+					map[string]any{"name": "A", "value": 1},
+					map[string]any{"name": "B", "value": 2},
+				},
+			})
+			hash2, err := calculateConfmapHash(conf2)
+			require.NoError(t, err)
+			assert.Equal(t, hash1, hash2)
+		})
+
+		t.Run("different order in list gives different hash", func(t *testing.T) {
+			conf3 := confmap.NewFromStringMap(map[string]any{
+				"items": []any{
+					map[string]any{"name": "B", "value": 2},
+					map[string]any{"name": "A", "value": 1},
+				},
+			})
+			hash3, err := calculateConfmapHash(conf3)
+			require.NoError(t, err)
+			assert.NotEqual(t, hash1, hash3)
+		})
+	})
+}
+
+func TestOTelManager_maybeUpdateMergedConfig(t *testing.T) {
+	t.Run("initial config", func(t *testing.T) {
+		m := &OTelManager{}
+		conf := confmap.NewFromStringMap(testConfig)
+
+		updated, err := m.maybeUpdateMergedConfig(conf)
+
+		require.NoError(t, err)
+		assert.True(t, updated)
+		assert.Equal(t, conf, m.mergedCollectorCfg)
+		assert.NotEqual(t, uint64(0), m.mergedCollectorCfgHash)
+	})
+
+	t.Run("same config", func(t *testing.T) {
+		conf := confmap.NewFromStringMap(testConfig)
+		hash, err := calculateConfmapHash(conf)
+		require.NoError(t, err)
+
+		m := &OTelManager{
+			mergedCollectorCfg:     conf,
+			mergedCollectorCfgHash: hash,
+		}
+
+		updated, err := m.maybeUpdateMergedConfig(conf)
+
+		require.NoError(t, err)
+		assert.False(t, updated)
+		assert.Equal(t, conf, m.mergedCollectorCfg)
+		assert.Equal(t, hash, m.mergedCollectorCfgHash)
+	})
+
+	t.Run("different config", func(t *testing.T) {
+		conf1 := confmap.NewFromStringMap(map[string]any{"key": "value1"})
+		hash1, err := calculateConfmapHash(conf1)
+		require.NoError(t, err)
+
+		m := &OTelManager{
+			mergedCollectorCfg:     conf1,
+			mergedCollectorCfgHash: hash1,
+		}
+
+		conf2 := confmap.NewFromStringMap(map[string]any{"key": "value2"})
+		hash2, err := calculateConfmapHash(conf2)
+		require.NoError(t, err)
+
+		updated, err := m.maybeUpdateMergedConfig(conf2)
+
+		require.NoError(t, err)
+		assert.True(t, updated)
+		assert.Equal(t, conf2, m.mergedCollectorCfg)
+		assert.Equal(t, hash2, m.mergedCollectorCfgHash)
+		assert.NotEqual(t, hash1, m.mergedCollectorCfgHash)
+	})
+
+	t.Run("hashing error with previous config", func(t *testing.T) {
+		conf1 := confmap.NewFromStringMap(map[string]any{"key": "value1"})
+		hash1, err := calculateConfmapHash(conf1)
+		require.NoError(t, err)
+
+		m := &OTelManager{
+			mergedCollectorCfg:     conf1,
+			mergedCollectorCfgHash: hash1,
+		}
+
+		badConf := confmap.NewFromStringMap(map[string]any{"bad": make(chan int)})
+		updated, err := m.maybeUpdateMergedConfig(badConf)
+
+		require.Error(t, err)
+		assert.True(t, updated, "update should proceed on hashing error")
+		assert.Equal(t, badConf, m.mergedCollectorCfg)
+		assert.Equal(t, []byte(nil), m.mergedCollectorCfgHash)
+	})
+
+	t.Run("hashing error with no previous config", func(t *testing.T) {
+		m := &OTelManager{}
+
+		badConf := confmap.NewFromStringMap(map[string]any{"bad": make(chan int)})
+		updated, err := m.maybeUpdateMergedConfig(badConf)
+
+		require.Error(t, err)
+		assert.True(t, updated, "update should proceed on hashing error, even with no previous config")
+		assert.Equal(t, badConf, m.mergedCollectorCfg)
+		assert.Equal(t, []byte(nil), m.mergedCollectorCfgHash)
+	})
+}
+>>>>>>> 47112bda4 ([otel] Implement EDOT diagnostics extension (#10052))

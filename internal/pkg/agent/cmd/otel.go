@@ -12,8 +12,21 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/elastic/elastic-agent-libs/service"
+<<<<<<< HEAD
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
+=======
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/internal/pkg/otel"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/agentprovider"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+>>>>>>> 47112bda4 ([otel] Implement EDOT diagnostics extension (#10052))
 )
 
 func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
@@ -47,6 +60,7 @@ func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Comman
 	setupOtelFlags(cmd.Flags())
 	cmd.AddCommand(newValidateCommandWithArgs(args, streams))
 	cmd.AddCommand(newComponentsCommandWithArgs(args, streams))
+	cmd.AddCommand(newOtelDiagnosticsCommand(streams))
 
 	return cmd
 }
@@ -79,7 +93,72 @@ func runCollector(cmdCtx context.Context, configFiles []string) error {
 	defer cancel()
 	go service.ProcessWindowsControlEvents(stopCollector)
 
+<<<<<<< HEAD
 	return otel.Run(ctx, stop, configFiles)
+=======
+	return otel.Run(ctx, stop, settings.otelSettings)
+}
+
+type edotSettings struct {
+	log          *logger.Logger
+	otelSettings *otelcol.CollectorSettings
+}
+
+func prepareCollectorSettings(configFiles []string, supervised bool, supervisedLoggingLevel string) (edotSettings, error) {
+	var settings edotSettings
+	conf := map[string]any{
+		"endpoint": paths.DiagnosticsExtensionSocket(),
+	}
+	if supervised {
+		// add stdin config provider
+		configProvider, err := agentprovider.NewBufferProvider(os.Stdin)
+		if err != nil {
+			return settings, fmt.Errorf("failed to create config provider: %w", err)
+		}
+		settings.otelSettings = otel.NewSettings(release.Version(), []string{configProvider.URI()},
+			otel.WithConfigProviderFactory(configProvider.NewFactory()),
+			otel.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)),
+		)
+
+		// setup logger
+		defaultCfg := logger.DefaultLoggingConfig()
+		defaultEventLogCfg := logger.DefaultEventLoggingConfig()
+
+		defaultCfg.ToStderr = true
+		defaultCfg.ToFiles = false
+
+		defaultEventLogCfg.ToFiles = false
+		defaultEventLogCfg.ToStderr = true
+
+		var logLevelSettingErr error
+		if supervisedLoggingLevel != "" {
+			if logLevelSettingErr = defaultCfg.Level.Unpack(supervisedLoggingLevel); logLevelSettingErr != nil {
+				defaultCfg.Level = logp.InfoLevel
+			}
+		} else {
+			defaultCfg.Level = logp.InfoLevel
+		}
+
+		l, err := logger.NewFromConfig("edot", defaultCfg, defaultEventLogCfg, false)
+		if err != nil {
+			return settings, fmt.Errorf("failed to create logger: %w", err)
+		}
+		settings.log = l
+
+		if logLevelSettingErr != nil {
+			l.Warnf("Fallback to default logging level due to: %v", logLevelSettingErr)
+		}
+
+		settings.otelSettings.LoggingOptions = []zap.Option{zap.WrapCore(func(zapcore.Core) zapcore.Core {
+			return l.Core()
+		})}
+
+		settings.otelSettings.DisableGracefulShutdown = false
+	} else {
+		settings.otelSettings = otel.NewSettings(release.Version(), configFiles, otel.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)))
+	}
+	return settings, nil
+>>>>>>> 47112bda4 ([otel] Implement EDOT diagnostics extension (#10052))
 }
 
 func prepareEnv() error {
