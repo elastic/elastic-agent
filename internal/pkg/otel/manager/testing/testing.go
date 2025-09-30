@@ -10,7 +10,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd/otel"
 )
 
 // This is a test binary used by the OTEL manager unit tests.
@@ -48,7 +48,7 @@ func main() {
 	monitoringURL := os.Getenv("TEST_SUPERVISED_COLLECTOR_MONITORING_URL")
 
 	exitCode := 0
-	err = cmd.RunCollector(ctx, nil, true, "debug", monitoringURL)
+	err = otel.RunCollector(ctx, nil, true, "debug", monitoringURL)
 	if err != nil && !errors.Is(err, context.Canceled) {
 		exitCode = 1
 	}
