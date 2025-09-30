@@ -130,10 +130,12 @@ func (m *OTelManager) PerformComponentDiagnostics(
 	//  1. Either the socket doesn't exist
 	//	2. It is refusing the connections.
 	// Return error for any other scenario.
-	if err != nil && !errors.Is(err, syscall.ENOENT) && !errors.Is(err, syscall.ECONNREFUSED) {
-		return nil, fmt.Errorf("error fetching otel diagnostics: %w", err)
+	if err != nil {
+		m.logger.Debugf("Couldn't fetch diagnostics from EDOT: %v", err)
+		if !errors.Is(err, syscall.ENOENT) && !errors.Is(err, syscall.ECONNREFUSED) {
+			return nil, fmt.Errorf("error fetching otel diagnostics: %w", err)
+		}
 	}
-	m.logger.Debugf("Couldn't fetch diagnostics from EDOT: %v", err)
 
 	for idx, diag := range diagnostics {
 		for _, extDiag := range extDiagnostics.ComponentDiagnostics {
