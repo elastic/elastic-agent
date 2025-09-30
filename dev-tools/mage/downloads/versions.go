@@ -436,6 +436,7 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 	if err != nil {
 		return "", err
 	}
+	fmt.Printf("Downloading from %s\n", downloadURL)
 	downloadLocation, err := handleDownload(downloadURL)
 	if err != nil {
 		return "", err
