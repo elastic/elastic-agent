@@ -516,43 +516,44 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 	return defaultMonitoringNamespace
 }
 
+// loadField traverses a given sequence of field names through a nested
+// map[string]any and tries to interpret the final value as the target type.
+// If successful, it returns true and overwrites the given target
+// pointer with the resulting value.
+func loadField[T any](target *T, conf any, fieldNames ...string) bool {
+	var current = conf
+	for _, name := range fieldNames {
+		if confMap, ok := current.(map[string]any); ok {
+			if val, ok := confMap[name]; ok {
+				current = val
+				continue
+			}
+		}
+		return false
+	}
+	result, ok := current.(T)
+	if ok {
+		*target = result
+	}
+	return ok
+}
+
 func (b *BeatsMonitor) getCollectorTelemetryEndpoint() string {
-	type metricsReaderConfig struct {
-		Pull struct {
-			Exporter struct {
-				Prometheus struct {
-					Host string `mapstructure:"host"`
-					Port int    `mapstructure:"port"`
-				} `mapstructure:"prometheus"`
-			} `mapstructure:"exporter"`
-		} `mapstructure:"pull"`
-	}
-	var otel struct {
-		Service struct {
-			Telemetry struct {
-				Metrics struct {
-					Readers []metricsReaderConfig `mapstructure:"readers"`
-				} `mapstructure:"metrics"`
-			} `mapstructure:"telemetry"`
-		} `mapstructure:"service"`
-	}
-	if err := b.otelConfig.Unmarshal(&otel, confmap.WithIgnoreUnused()); err == nil {
-		for _, reader := range otel.Service.Telemetry.Metrics.Readers {
-			p := reader.Pull.Exporter.Prometheus
-			if p.Host != "" || p.Port != 0 {
-				host := "localhost"
-				port := 8888
-				if p.Host != "" {
-					host = p.Host
-				}
-				if p.Port != 0 {
-					port = p.Port
-				}
+	otelConf := b.otelConfig.ToStringMap()
+	var readers []any
+	if loadField(&readers, otelConf, "service", "telemetry", "metrics", "readers") {
+		for _, reader := range readers {
+			host := "localhost"
+			port := 8888
+
+			hostOK := loadField(&host, reader, "pull", "exporter", "prometheus", "host")
+			portOK := loadField(&port, reader, "pull", "exporter", "prometheus", "port")
+			if hostOK || portOK {
 				return host + ":" + strconv.Itoa(port)
 			}
-
 		}
 	}
+
 	// If there is no explicit configuration, the collector publishes its telemetry on port 8888.
 	return "localhost:8888"
 }
