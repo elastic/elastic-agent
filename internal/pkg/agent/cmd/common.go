@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -23,8 +24,19 @@ import (
 
 func troubleshootMessage() string {
 	v := strings.Split(release.Version(), ".")
-	version := strings.Join(v[:2], ".")
-	return fmt.Sprintf("For help, please see our troubleshooting guide at https://www.elastic.co/guide/en/fleet/%s/fleet-troubleshooting.html", version)
+	docsURL := "https://www.elastic.co/docs/troubleshoot/ingest/fleet/common-problems"
+
+	// Use versioned docs for releases before 9.x. Fall back to unversioned docs on parse errors
+	// or when the version string is not in the expected format.
+	if len(v) >= 2 {
+		major, err := strconv.Atoi(v[0])
+		if err == nil && major < 9 {
+			ver := strings.Join(v[:2], ".")
+			docsURL = fmt.Sprintf("https://www.elastic.co/guide/en/fleet/%s/fleet-troubleshooting.html", ver)
+		}
+	}
+
+	return fmt.Sprintf("For help, please see our troubleshooting guide at %s", docsURL)
 }
 
 // NewCommand returns the default command for the agent.
