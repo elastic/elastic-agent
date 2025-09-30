@@ -133,9 +133,7 @@ func New(
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
 	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled
 
-	var installDescriptorSource *install.FileDescriptorSource = nil
-
-	installDescriptorSource = install.NewFileDescriptorSource(filepath.Join(paths.Top(), paths.MarkerFileName))
+	installDescriptorSource := install.NewFileDescriptorSource(filepath.Join(paths.Top(), paths.MarkerFileName))
 	if platform.OS != component.Container {
 		if initialUpdateMarker != nil && initialUpdateMarker.Details != nil && initialUpdateMarker.Details.State == details.StateRollback {
 			// Take the versionedHome of the version we rolledback from and remove it from the installation lists

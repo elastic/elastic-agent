@@ -22,7 +22,6 @@ import (
 )
 
 const markerFilename = ".update-marker"
-const disableRollbackWindow = time.Duration(0)
 
 // RollbackAvailable identifies an elastic-agent install available for rollback
 type RollbackAvailable struct {
