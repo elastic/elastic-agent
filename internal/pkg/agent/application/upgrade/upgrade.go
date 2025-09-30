@@ -468,7 +468,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		versionedHome: currentVersionedHome,
 	}
 
-	availableRollbacks := getAvailableRollbacks(rollbackWindow, time.Now(), release.VersionWithSnapshot(), previousParsedVersion, currentVersionedHome)
+	availableRollbacks := getAvailableRollbacks(rollbackWindow, time.Now(), release.VersionWithSnapshot(), previousParsedVersion, currentVersionedHome, release.Commit())
 
 	if err = u.availableRollbacksSource.Set(availableRollbacks); err != nil {
 		u.log.Errorw("Rolling back: setting ttl markers failed", "error.message", err)
