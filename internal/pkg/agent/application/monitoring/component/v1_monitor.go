@@ -539,7 +539,10 @@ func loadField[T any](target *T, conf any, fieldNames ...string) bool {
 }
 
 func (b *BeatsMonitor) getCollectorTelemetryEndpoint() string {
-	otelConf := b.otelConfig.ToStringMap()
+	var otelConf map[string]any
+	if b.otelConfig != nil {
+		otelConf = b.otelConfig.ToStringMap()
+	}
 	var readers []any
 	if loadField(&readers, otelConf, "service", "telemetry", "metrics", "readers") {
 		for _, reader := range readers {
