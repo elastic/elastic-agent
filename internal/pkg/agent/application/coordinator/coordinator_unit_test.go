@@ -954,6 +954,7 @@ service:
 	configChan <- cfgChange
 	coord.runLoopIteration(ctx)
 	assert.True(t, cfgChange.acked, "empty policy should be acknowledged")
+	assert.NoError(t, cfgChange.err, "config processing shouldn't report an error")
 	assert.True(t, updated, "empty policy should cause runtime manager update")
 	assert.Empty(t, components, "empty policy should produce empty component model")
 	assert.True(t, otelUpdated, "empty policy should cause otel manager update")
@@ -1070,6 +1071,7 @@ service:
 		configChan <- cfgChange
 		coord.runLoopIteration(ctx)
 		assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+		assert.NoError(t, cfgChange.err, "config processing shouldn't report an error")
 
 		// Make sure the runtime manager received the expected component update.
 		// An assert.Equal on the full component model doesn't play nice with
@@ -1134,6 +1136,7 @@ service:
 		configChan <- cfgChange
 		coord.runLoopIteration(ctx)
 		assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+		assert.NoError(t, cfgChange.err, "config processing shouldn't report an error")
 
 		// Make sure the runtime manager received the expected component update.
 		// An assert.Equal on the full component model doesn't play nice with
