@@ -13,6 +13,10 @@ components:
     doc_path: "/reference/edot-collector/components/elasticapmintakereceiver.md"
     title: "Elastic APM intake receiver"
 
+  filelogreceiver:
+    doc_path: "/reference/edot-collector/components/filelogreceiver.md"
+    title: "Filelog receiver"
+
   apikeyauthextension:
     doc_path: "/reference/edot-collector/config/authentication-methods.md"
     title: "Authentication methods"
