@@ -1509,6 +1509,12 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		case <-ctx.Done():
 			t.Fatal("timeout waiting for collector config update")
 		}
+<<<<<<< HEAD
+=======
+		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
+		assert.NoError(t, injectDiagnosticsExtension(expectedCfg))
+		assert.Equal(t, expectedCfg, execution.cfg)
+>>>>>>> 47112bda4 ([otel] Implement EDOT diagnostics extension (#10052))
 
 		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
 		assert.NoError(t, addCollectorMetricsReader(expectedCfg))

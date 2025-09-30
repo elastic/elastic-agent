@@ -12,7 +12,11 @@ import (
 	"fmt"
 	"hash/fnv"
 	"os"
+<<<<<<< HEAD
 	"strings"
+=======
+	"slices"
+>>>>>>> 47112bda4 ([otel] Implement EDOT diagnostics extension (#10052))
 	"sync"
 	"sync/atomic"
 	"time"
@@ -23,6 +27,7 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -371,11 +376,37 @@ func buildMergedConfig(
 		}
 	}
 
+<<<<<<< HEAD
 	if err := addCollectorMetricsReader(mergedOtelCfg); err != nil {
 		return nil, fmt.Errorf("failed to add random collector metrics port: %w", err)
+=======
+	if err := injectDiagnosticsExtension(mergedOtelCfg); err != nil {
+		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
+>>>>>>> 47112bda4 ([otel] Implement EDOT diagnostics extension (#10052))
 	}
 
 	return mergedOtelCfg, nil
+}
+
+func injectDiagnosticsExtension(config *confmap.Conf) error {
+	extensionCfg := map[string]any{
+		"extensions": map[string]any{
+			"elastic_diagnostics": map[string]any{
+				"endpoint": paths.DiagnosticsExtensionSocket(),
+			},
+		},
+	}
+	if config.IsSet("service::extensions") {
+		extensionList := config.Get("service::extensions").([]interface{})
+		if slices.Contains(extensionList, "elastic_diagnostics") {
+			// already configured, nothing to do
+			return nil
+		}
+		extensionList = append(extensionList, "elastic_diagnostics")
+		extensionCfg["service::extensions"] = extensionList
+	}
+
+	return config.Merge(confmap.NewFromStringMap(extensionCfg))
 }
 
 func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh chan *status.AggregateStatus, collectorRunErr chan error) error {

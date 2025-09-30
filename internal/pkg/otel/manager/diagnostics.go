@@ -18,9 +18,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
+	"github.com/elastic/elastic-agent/internal/pkg/otel"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -122,6 +124,27 @@ func (m *OTelManager) PerformComponentDiagnostics(
 		}
 	}
 
+	extDiagnostics, err := otel.PerformDiagnosticsExt(ctx, false)
+
+	// We're not running the EDOT if:
+	//  1. Either the socket doesn't exist
+	//	2. It is refusing the connections.
+	// Return error for any other scenario.
+	if err != nil {
+		m.logger.Debugf("Couldn't fetch diagnostics from EDOT: %v", err)
+		if !errors.Is(err, syscall.ENOENT) && !errors.Is(err, syscall.ECONNREFUSED) {
+			return nil, fmt.Errorf("error fetching otel diagnostics: %w", err)
+		}
+	}
+
+	for idx, diag := range diagnostics {
+		for _, extDiag := range extDiagnostics.ComponentDiagnostics {
+			if strings.Contains(extDiag.Name, diag.Component.ID) {
+				diagnostics[idx].Results = append(diag.Results, extDiag)
+			}
+		}
+	}
+
 	for idx, diag := range diagnostics {
 		var results []*proto.ActionDiagnosticUnitResult
 		var errs []error
@@ -157,7 +180,7 @@ func (m *OTelManager) PerformComponentDiagnostics(
 
 		}
 
-		diagnostics[idx].Results = results
+		diagnostics[idx].Results = append(diagnostics[idx].Results, results...)
 		diagnostics[idx].Err = errors.Join(errs...)
 	}
 

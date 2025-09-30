@@ -67,6 +67,8 @@ import (
 	filestorage "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage"
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
 
+	elasticdiagnostics "github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
+
 	"github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension"
 	"github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension"
 
@@ -170,7 +172,11 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			apikeyauthextension.NewFactory(),
 			apmconfigextension.NewFactory(),
 			beatsauthextension.NewFactory(),
+<<<<<<< HEAD
 			headersetterextension.NewFactory(),
+=======
+			elasticdiagnostics.NewFactory(),
+>>>>>>> 47112bda4 ([otel] Implement EDOT diagnostics extension (#10052))
 		}
 		extensions = append(extensions, extensionFactories...)
 		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)
