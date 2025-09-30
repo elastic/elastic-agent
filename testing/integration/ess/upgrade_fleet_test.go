@@ -52,6 +52,7 @@ func TestFleetManagedUpgradeUnprivileged(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
+	t.Skip("Skipping test temporarily until the DRA with the code that supports windows/arm64 is produced")
 	testFleetManagedUpgrade(t, info, true, false)
 }
 
@@ -66,6 +67,7 @@ func TestFleetManagedUpgradePrivileged(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
+	t.Skip("Skipping test temporarily until the DRA with the code that supports windows/arm64 is produced")
 	testFleetManagedUpgrade(t, info, false, false)
 }
 
@@ -124,6 +126,7 @@ func TestFleetAirGappedUpgradeUnprivileged(t *testing.T) {
 		Local: false, // Needed as the test requires Agent installation
 		Sudo:  true,  // Needed as the test uses iptables and installs the Agent
 	})
+	t.Skip("Skipping test temporarily until the DRA with the code that supports windows/arm64 is produced")
 	testFleetAirGappedUpgrade(t, stack, true)
 }
 
@@ -136,6 +139,7 @@ func TestFleetAirGappedUpgradePrivileged(t *testing.T) {
 		Local: false, // Needed as the test requires Agent installation
 		Sudo:  true,  // Needed as the test uses iptables and installs the Agent
 	})
+	t.Skip("Skipping test temporarily until the DRA with the code that supports windows/arm64 is produced")
 	testFleetAirGappedUpgrade(t, stack, false)
 }
 

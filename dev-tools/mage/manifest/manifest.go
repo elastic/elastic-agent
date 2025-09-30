@@ -152,10 +152,10 @@ func DownloadComponents(ctx context.Context, expectedBinaries []packaging.Binary
 			if err != nil {
 				return fmt.Errorf("failed to create directory %s", targetPath)
 			}
-			log.Printf("+++ Prepare to download [%s] project [%s] for [%s]", spec.BinaryName, spec.ProjectName, platform)
+			fmt.Printf("Prepare to download [%s] project [%s] for [%s]\n", spec.BinaryName, spec.ProjectName, platform)
 
 			if !spec.SupportsPlatform(platform) {
-				log.Printf(">>>>>>>>> Binary [%s] does not support platform [%s] ", spec.BinaryName, platform)
+				fmt.Printf("Binary [%s] does not support platform [%s]\n", spec.BinaryName, platform)
 				continue
 			}
 
@@ -165,7 +165,7 @@ func DownloadComponents(ctx context.Context, expectedBinaries []packaging.Binary
 			}
 
 			for _, p := range resolvedPackage.URLs {
-				log.Printf(">>>>>>>>> Downloading [%s] [%s] ", spec.BinaryName, p)
+				fmt.Printf("Downloading [%s] [%s]\n", spec.BinaryName, p)
 				pkgFilename := path.Base(p)
 				downloadTarget := filepath.Join(targetPath, pkgFilename)
 				if _, err := os.Stat(downloadTarget); err != nil {
@@ -182,7 +182,7 @@ func DownloadComponents(ctx context.Context, expectedBinaries []packaging.Binary
 		return fmt.Errorf("error downloading files: %w", err)
 	}
 
-	log.Printf("Downloads for manifest %q complete.", manifest)
+	fmt.Printf("Downloads for manifest %q complete.\n", manifest)
 	return nil
 }
 

@@ -25,7 +25,7 @@ else
     git add testing/integration/testdata/.upgrade-test-agent-versions.yml .package-version
 
     nl=$'\n' # otherwise the new line character is not recognized properly
-    commit_desc="These files are used for picking the starting (pre-upgrade) or ending (post-upgrade) agent versions in upgrade integration tests.${nl}${nl}The content is based on responses from https://www.elastic.co/api/product_versions and https://snapshots.elastic.co${nl}${nl}The current update is generated based on the following requirements:${nl}${nl}Package version: ${package_version}${nl}${nl}\`\`\`json${nl}${version_requirements}${nl}\`\`\`"
+    commit_desc="These files are used for picking the starting (pre-upgrade) or ending (post-upgrade) agent versions in upgrade integration tests.${nl}${nl}The content is based on responses from https://www.elastic.co/api/product_versions and https://snapshots.elastic.co${nl}${nl}The current update is generated based on the following requirements:${nl}${nl}\`.package-version\`${nl}${nl}\`\`\`json${nl}${package_version}${nl}\`\`\`${nl}${nl}\`testing/integration/testdata/.upgrade-test-agent-versions.yml\`${nl}${nl}\`\`\`json${nl}${version_requirements}${nl}\`\`\`"
 
     git commit -m "[$current_ref][Automation] Update versions" -m "$commit_desc"
     git push --set-upstream origin "$pr_branch"

@@ -29,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 // PolicyChangeHandler is a handler for POLICY_CHANGE action.
@@ -41,6 +42,7 @@ type PolicyChangeHandler struct {
 	setters              []actions.ClientSetter
 	policyLogLevelSetter logLevelSetter
 	coordinator          *coordinator.Coordinator
+	disableAckFn         func() bool
 	// Disabled for 8.8.0 release in order to limit the surface
 	// https://github.com/elastic/security-team/issues/6501
 	// // Last known valid signature validation key
@@ -67,6 +69,7 @@ func NewPolicyChangeHandler(
 		setters:              setters,
 		coordinator:          coordinator,
 		policyLogLevelSetter: policyLogLevelSetter,
+		disableAckFn:         features.DisablePolicyChangeAcks,
 	}
 }
 
@@ -111,7 +114,7 @@ func (h *PolicyChangeHandler) Handle(ctx context.Context, a fleetapi.Action, ack
 		return err
 	}
 
-	h.ch <- newPolicyChange(ctx, c, a, acker, false)
+	h.ch <- newPolicyChange(ctx, c, a, acker, false, h.disableAckFn())
 	return nil
 }
 
@@ -291,7 +294,7 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	}
 
 	// persist configuration
-	err = saveConfig(h.agentInfo, h.config, h.store)
+	err = saveConfig(h.agentInfo, h.config, h.store, h.log)
 	if err != nil {
 		return fmt.Errorf("saving config: %w", err)
 	}
@@ -379,7 +382,7 @@ func (h *PolicyChangeHandler) applyLoggingConfig(ctx context.Context, loggingCon
 	return h.policyLogLevelSetter.SetLogLevel(ctx, policyLogLevel)
 }
 
-func saveConfig(agentInfo info.Agent, validatedConfig *configuration.Configuration, store storage.Store) error {
+func saveConfig(agentInfo info.Agent, validatedConfig *configuration.Configuration, store storage.Store, log *logger.Logger) error {
 	if validatedConfig == nil {
 		// nothing to do for fleet hosts
 		return nil
@@ -391,8 +394,7 @@ func saveConfig(agentInfo info.Agent, validatedConfig *configuration.Configurati
 			errors.TypeUnexpected, errors.M("hosts", validatedConfig.Fleet.Client.Hosts))
 	}
 
-	err = store.Save(reader)
-	if err != nil {
+	if err := saveConfigToStore(store, reader, log); err != nil {
 		return errors.New(
 			err, "fail to persist new Fleet Server API client hosts",
 			errors.TypeFilesystem, errors.M("hosts", validatedConfig.Fleet.Client.Hosts))
@@ -448,7 +450,7 @@ func clientEqual(k1 remote.Config, k2 remote.Config) bool {
 	return true
 }
 
-func fleetToReader(agentID string, headers map[string]string, cfg *configuration.Configuration) (io.Reader, error) {
+func fleetToReader(agentID string, headers map[string]string, cfg *configuration.Configuration) (io.ReadSeeker, error) {
 	configToStore := map[string]interface{}{
 		"fleet": cfg.Fleet,
 		"agent": map[string]interface{}{ // Add event logging configuration here!
@@ -474,8 +476,8 @@ type policyChange struct {
 	cfg        *config.Config
 	action     fleetapi.Action
 	acker      acker.Acker
-	commit     bool
 	ackWatcher chan struct{}
+	disableAck bool
 }
 
 func newPolicyChange(
@@ -483,9 +485,10 @@ func newPolicyChange(
 	config *config.Config,
 	action fleetapi.Action,
 	acker acker.Acker,
-	commit bool) *policyChange {
+	makeCh bool,
+	disableAck bool) *policyChange {
 	var ackWatcher chan struct{}
-	if commit {
+	if makeCh {
 		// we don't need it otherwise
 		ackWatcher = make(chan struct{})
 	}
@@ -494,8 +497,8 @@ func newPolicyChange(
 		cfg:        config,
 		action:     action,
 		acker:      acker,
-		commit:     true,
 		ackWatcher: ackWatcher,
+		disableAck: disableAck,
 	}
 }
 
@@ -503,22 +506,21 @@ func (l *policyChange) Config() *config.Config {
 	return l.cfg
 }
 
+// Ack sends an ack for the associated action if the results are expected.
+// An ack will be sent for UNENROLL actions, or by POLICY_CHANGE actions if it has not been explicitly disabled.
 func (l *policyChange) Ack() error {
-	if l.action == nil {
+	if l.disableAck || l.action == nil {
 		return nil
 	}
 	err := l.acker.Ack(l.ctx, l.action)
 	if err != nil {
 		return err
 	}
-	if l.commit {
-		err := l.acker.Commit(l.ctx)
-		if l.ackWatcher != nil && err == nil {
-			close(l.ackWatcher)
-		}
-		return err
+	err = l.acker.Commit(l.ctx)
+	if err == nil && l.ackWatcher != nil {
+		close(l.ackWatcher)
 	}
-	return nil
+	return err
 }
 
 // WaitAck waits for policy change to be acked.
@@ -526,7 +528,7 @@ func (l *policyChange) Ack() error {
 // Caller is responsible to use any reasonable deadline otherwise
 // function call can be endlessly blocking.
 func (l *policyChange) WaitAck(ctx context.Context) {
-	if !l.commit || l.ackWatcher == nil {
+	if l.ackWatcher == nil {
 		return
 	}
 

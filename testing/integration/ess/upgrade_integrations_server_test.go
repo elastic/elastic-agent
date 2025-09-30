@@ -58,6 +58,9 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 	statefulProv, ok := prov.(*ess.StatefulProvisioner)
 	require.True(t, ok)
 
+	startVersions = filterVersionsForECH(t, startVersions, statefulProv)
+	startVersions = filterVersionsForSameReleaseType(t, startVersions, endVersion)
+
 	t.Logf("Running test cases for upgrade from versions [%v] to version [%s]", startVersions, endVersion)
 	for _, startVersion := range startVersions {
 		t.Logf("Running test case for upgrade from version [%s] to version [%s]...", startVersion.String(), endVersion)
@@ -126,4 +129,44 @@ func getUpgradeableFIPSVersions(t *testing.T) version.SortableParsedVersions {
 	sortedVers := version.SortableParsedVersions(filteredVersions)
 	sort.Sort(sortedVers)
 	return sortedVers
+}
+
+func filterVersionsForECH(t *testing.T, versions []*version.ParsedSemVer, echProv *ess.StatefulProvisioner) []*version.ParsedSemVer {
+	echVersions, err := echProv.AvailableVersions()
+	require.NoError(t, err)
+
+	filteredVersions := make([]*version.ParsedSemVer, 0)
+	for _, ver := range versions {
+		if isVersionInList(ver, echVersions) {
+			filteredVersions = append(filteredVersions, ver)
+		}
+	}
+
+	return filteredVersions
+}
+
+func isVersionInList(candidateVersion *version.ParsedSemVer, allowedVersions []*version.ParsedSemVer) bool {
+	for _, allowedVersion := range allowedVersions {
+		if allowedVersion.Equal(*candidateVersion) {
+			return true
+		}
+	}
+	return false
+}
+
+func filterVersionsForSameReleaseType(t *testing.T, versions []*version.ParsedSemVer, endVersion string) []*version.ParsedSemVer {
+	endVersionParsed, err := version.ParseVersion(endVersion)
+	require.NoError(t, err)
+	isEndVersionSnapshot := endVersionParsed.IsSnapshot()
+
+	filteredVersions := make([]*version.ParsedSemVer, 0)
+	for _, ver := range versions {
+		if isEndVersionSnapshot && ver.IsSnapshot() {
+			filteredVersions = append(filteredVersions, ver)
+		} else if !isEndVersionSnapshot && !ver.IsSnapshot() {
+			filteredVersions = append(filteredVersions, ver)
+		}
+	}
+
+	return filteredVersions
 }

@@ -10,6 +10,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -277,24 +278,51 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 	t.Log("Check if config files have been redacted.")
 	extractionDir := t.TempDir()
 	extractZipArchive(t, diagZip, extractionDir)
-	path := filepath.Join(extractionDir, "computed-config.yaml")
-	stat, err = os.Stat(path)
-	require.NoErrorf(t, err, "stat file %q failed", path)
-	require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", path)
-	f, err := os.Open(path)
-	require.NoErrorf(t, err, "open file %q failed", path)
-	defer f.Close()
-	var yObj struct {
-		SecretPaths []string `yaml:"secret_paths"`
-		Inputs      []struct {
-			CustomAttr string `yaml:"custom_attr"`
-		} `yaml:"inputs"`
+	fileNames := []string{
+		"pre-config.yaml",
+		"computed-config.yaml",
+		"components-expected.yaml",
+		"components-actual.yaml",
 	}
-	err = yaml.NewDecoder(f).Decode(&yObj)
-	require.NoError(t, err)
-	assert.ElementsMatch(t, []string{"inputs.0.custom_attr"}, yObj.SecretPaths)
-	require.Len(t, yObj.Inputs, 1)
-	assert.Equal(t, "<REDACTED>", yObj.Inputs[0].CustomAttr)
+
+	var checkRedacted func(any) error
+	checkRedacted = func(root any) error {
+		switch root := root.(type) {
+		case map[string]any:
+			for rootKey, value := range root {
+				if rootKey == "custom_attr" {
+					if value != "<REDACTED>" {
+						return fmt.Errorf("found non-redacted value in %q", rootKey)
+					}
+				}
+				return checkRedacted(value)
+			}
+		case []any:
+			for _, value := range root {
+				return checkRedacted(value)
+			}
+		default:
+			// ignore other types
+		}
+		return nil
+	}
+
+	for _, fileName := range fileNames {
+		path := filepath.Join(extractionDir, fileName)
+		stat, err := os.Stat(path)
+		require.NoErrorf(t, err, "stat file %q failed", path)
+		require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", path)
+		f, err := os.Open(path)
+		require.NoErrorf(t, err, "open file %q failed", path)
+		defer f.Close()
+
+		var yObj map[string]any
+		err = yaml.NewDecoder(f).Decode(&yObj)
+		require.NoError(t, err)
+
+		err = checkRedacted(yObj)
+		require.NoError(t, err, "file %q has non-redacted values", path)
+	}
 }
 
 func TestBeatDiagnostics(t *testing.T) {
@@ -308,7 +336,7 @@ inputs:
   - id: filestream-filebeat
     type: filestream
     paths:
-      - /var/log/system.log
+      - {{ .InputFile }}
     prospector.scanner.fingerprint.enabled: false
     file_identity.native: ~
     use_output: default
@@ -324,62 +352,89 @@ agent.monitoring.enabled: false
 	var filebeatSetup = map[string]integrationtest.ComponentState{
 		"filestream-default": {
 			State: integrationtest.NewClientState(client.Healthy),
-			Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
-				integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "filestream-default"}: {
-					State: integrationtest.NewClientState(client.Healthy),
-				},
-				integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "filestream-filebeat"}: {
-					State: integrationtest.NewClientState(client.Healthy),
-				},
-			},
 		},
 	}
-	f, err := define.NewFixtureFromLocalBuild(t, define.Version(), integrationtest.WithAllowErrors())
-	require.NoError(t, err)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
-	err = f.Prepare(ctx)
-	require.NoError(t, err)
 
-	t.Run("filebeat process", func(t *testing.T) {
-		var configBuffer bytes.Buffer
-		require.NoError(t,
-			template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, map[string]any{
-				"Runtime": "process",
-			}))
-		expectedCompDiagnosticsFiles := append(compDiagnosticsFiles,
-			"registry.tar.gz",
-			"input_metrics.json",
-			"beat_metrics.json",
-			"beat-rendered-config.yml",
-			"global_processors.txt",
-			"filestream-filebeat/error.txt",
-			"filestream-default/error.txt",
-		)
-		err = f.Run(ctx, integrationtest.State{
-			Configure:  configBuffer.String(),
-			AgentState: integrationtest.NewClientState(client.Healthy),
-			After:      testDiagnosticsFactory(t, filebeatSetup, diagnosticsFiles, expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
-		})
-		assert.NoError(t, err)
-	})
+	testCases := []struct {
+		name                         string
+		runtime                      string
+		expectedCompDiagnosticsFiles []string
+		expectedAgentState           *client.State
+		expectedComponentState       map[string]integrationtest.ComponentState
+	}{
+		{
+			name:    "filebeat process",
+			runtime: "process",
+			expectedCompDiagnosticsFiles: append(compDiagnosticsFiles,
+				"registry.tar.gz",
+				"input_metrics.json",
+				"beat_metrics.json",
+				"beat-rendered-config.yml",
+				"global_processors.txt",
+			),
+			expectedAgentState: integrationtest.NewClientState(client.Healthy),
+			expectedComponentState: map[string]integrationtest.ComponentState{
+				"filestream-default": {
+					State: integrationtest.NewClientState(client.Healthy),
+					Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
+						integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "filestream-default"}: {
+							State: integrationtest.NewClientState(client.Healthy),
+						},
+						integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "filestream-default-filestream-filebeat"}: {
+							State: integrationtest.NewClientState(client.Healthy),
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    "filebeat receiver",
+			runtime: "otel",
+			expectedCompDiagnosticsFiles: []string{
+				"registry.tar.gz",
+				"beat_metrics.json",
+				"input_metrics.json",
+			},
+			expectedAgentState: integrationtest.NewClientState(client.Degraded),
+		},
+	}
 
-	t.Run("filebeat receiver", func(t *testing.T) {
-		var configBuffer bytes.Buffer
-		require.NoError(t,
-			template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, map[string]any{
-				"Runtime": "otel",
-			}))
-		// currently we don't expect any diagnostics files for beats receivers
-		var expectedCompDiagnosticsFiles []string
-		err = f.Run(ctx, integrationtest.State{
-			Configure:  configBuffer.String(),
-			AgentState: integrationtest.NewClientState(client.Healthy),
-			After:      testDiagnosticsFactory(t, filebeatSetup, diagnosticsFiles, expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create the fixture
+			f, err := define.NewFixtureFromLocalBuild(t, define.Version(), integrationtest.WithAllowErrors())
+			require.NoError(t, err)
+			err = f.Prepare(ctx)
+			require.NoError(t, err)
+
+			// Create the data file to ingest
+			inputFile, err := os.CreateTemp(t.TempDir(), "input.txt")
+			require.NoError(t, err, "failed to create temp file to hold data to ingest")
+			t.Cleanup(func() {
+				cErr := inputFile.Close()
+				assert.NoError(t, cErr)
+			})
+			_, err = inputFile.WriteString("hello world\n")
+			require.NoError(t, err, "failed to write data to temp file")
+
+			var configBuffer bytes.Buffer
+			require.NoError(t,
+				template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, map[string]any{
+					"Runtime":   tc.runtime,
+					"InputFile": inputFile.Name(),
+				}))
+			err = f.Run(ctx, integrationtest.State{
+				Configure:  configBuffer.String(),
+				AgentState: tc.expectedAgentState,
+				Components: tc.expectedComponentState,
+				After:      testDiagnosticsFactory(t, filebeatSetup, diagnosticsFiles, tc.expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
+			})
+			assert.NoError(t, err)
 		})
-		assert.NoError(t, err)
-	})
+	}
 }
 
 func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string) func(ctx context.Context) error {
@@ -391,6 +446,11 @@ func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.C
 		require.NoError(t, err)
 
 		verifyDiagnosticArchive(t, compSetup, diagZip, diagFiles, diagCompFiles, avi)
+
+		// preserve the diagnostic archive if the test failed
+		if t.Failed() {
+			fix.MoveToDiagnosticsDir(diagZip)
+		}
 
 		return nil
 	}

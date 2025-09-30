@@ -10,12 +10,20 @@ exporters:
   otlphttp:
     endpoint: https://localhost.com:4318
   nop:
+  logstash:
+    hosts: ["localhost:5044"]
 
 extensions:
   health_check:
   memory_limiter:
     check_interval: 5s
     limit_mib: 100
+  headers_setter:
+    headers:
+      - action: insert
+        key: X-Scope-OrgID
+        from_context: tenant_id
+        default_value: Org-ID
 
 processors:
   attributes:
@@ -39,6 +47,7 @@ processors:
     limit_mib: 4000
     spike_limit_mib: 800
   elastictrace:
+  tail_sampling:
 
 receivers:
   nop:
@@ -66,7 +75,13 @@ receivers:
           static_configs:
             - targets: ['0.0.0.0:8888']
   elasticapmintake:
-    
+  apache:
+  mysql:
+  postgresql:
+    username: test
+    password: test
+  docker_stats:
+
 
 connectors:
   spanmetrics:
@@ -100,6 +115,7 @@ service:
   extensions:
     - memory_limiter
     - health_check
+    - headers_setter
   pipelines:
     logs:
       exporters:
@@ -155,6 +171,9 @@ service:
         - spanmetrics
         - prometheus
         - elasticapmintake
+        - apache
+        - mysql
+        - postgresql
 
     metrics/aggregated:
       receivers:

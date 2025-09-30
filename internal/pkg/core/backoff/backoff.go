@@ -17,13 +17,3 @@ type Backoff interface {
 	// Reset resets the backoff duration to an initial value governed by the backoff strategy.
 	Reset()
 }
-
-// WaitOnError is a convenience method, if an error is received it will block, if not errors is
-// received, the backoff will be resetted.
-func WaitOnError(b Backoff, err error) bool {
-	if err == nil {
-		b.Reset()
-		return true
-	}
-	return b.Wait()
-}

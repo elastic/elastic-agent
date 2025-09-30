@@ -20,11 +20,16 @@ if [ -z "$TEST_SUDO" ]; then
   exit 1
 fi
 
-# Override the agent package version using a string with format <major>.<minor>.<patch>
-# There is a time when the snapshot is not built yet, so we cannot use the latest version automatically
+# Override the stack version from `.package-version` contents
+# There is a time when the current snapshot is not available on cloud yet, so we cannot use the latest version automatically
 # This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
-OVERRIDE_STACK_VERSION="$(cat .package-version)"
-OVERRIDE_STACK_VERSION=${OVERRIDE_STACK_VERSION}"-SNAPSHOT"
+STACK_VERSION="$(jq -r '.version' .package-version)"
+STACK_BUILD_ID="$(jq -r '.stack_build_id' .package-version)"
+if [[ "${FIPS:-false}" == "true" ]]; then
+  # FRH testing environment does not have same stack build IDs as CFT environment so
+  # we just go with the STACK_VERSION.
+  STACK_BUILD_ID=""
+fi
 
 echo "~~~ Building test binaries"
 mage build:testBinaries
@@ -35,17 +40,23 @@ mage build:testBinaries
 if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 || "${FORCE_ESS_CREATE:-false}" == "true" ]]; then
   echo "~~~ The steps is retried, starting the ESS stack again"
   trap 'ess_down' EXIT
-  ess_up $OVERRIDE_STACK_VERSION || (echo -e "^^^ +++\nFailed to start ESS stack")
+  ess_up "$STACK_VERSION" "$STACK_BUILD_ID" || (echo -e "^^^ +++\nFailed to start ESS stack")
 else
   # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data
   echo "~~~ Receiving ESS stack metadata"
-  export ELASTICSEARCH_HOST=$(buildkite-agent meta-data get "es.host")
-  export ELASTICSEARCH_USERNAME=$(buildkite-agent meta-data get "es.username")
-  export ELASTICSEARCH_PASSWORD=$(buildkite-agent meta-data get "es.pwd")
-  export KIBANA_HOST=$(buildkite-agent meta-data get "kibana.host")
-  export KIBANA_USERNAME=$(buildkite-agent meta-data get "kibana.username")
-  export KIBANA_PASSWORD=$(buildkite-agent meta-data get "kibana.pwd")
-  export INTEGRATIONS_SERVER_HOST=$(buildkite-agent meta-data get "integrations_server.host")
+  METADATA_PREFIX=""
+  if [[ "${FIPS:-false}" == "true" ]]; then
+    METADATA_PREFIX="fips."
+    echo "Using FIPS metadata prefix: ${METADATA_PREFIX}"
+  fi
+  export ELASTICSEARCH_HOST=$(buildkite-agent meta-data get "${METADATA_PREFIX}es.host")
+  export ELASTICSEARCH_USERNAME=$(buildkite-agent meta-data get "${METADATA_PREFIX}es.username")
+  export ELASTICSEARCH_PASSWORD=$(buildkite-agent meta-data get "${METADATA_PREFIX}es.pwd")
+  export KIBANA_HOST=$(buildkite-agent meta-data get "${METADATA_PREFIX}kibana.host")
+  export KIBANA_USERNAME=$(buildkite-agent meta-data get "${METADATA_PREFIX}kibana.username")
+  export KIBANA_PASSWORD=$(buildkite-agent meta-data get "${METADATA_PREFIX}kibana.pwd")
+  export INTEGRATIONS_SERVER_HOST=$(buildkite-agent meta-data get "${METADATA_PREFIX}integrations_server.host")
+  echo "Elasticsearch Host: ${ELASTICSEARCH_HOST}"
 fi
 
 # Run integration tests

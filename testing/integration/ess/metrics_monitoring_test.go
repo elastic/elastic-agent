@@ -7,9 +7,12 @@
 package ess
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httputil"
 	"testing"
 	"time"
 
@@ -19,6 +22,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
+	otelMonitoring "github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
@@ -29,8 +33,9 @@ type MetricsRunner struct {
 	suite.Suite
 	info         *define.Info
 	agentFixture *atesting.Fixture
-
-	ESHost string
+	policyID     string
+	policyName   string
+	ESHost       string
 }
 
 func TestMetricsMonitoringCorrectBinaries(t *testing.T) {
@@ -76,10 +81,54 @@ func (runner *MetricsRunner) SetupSuite() {
 	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(runner.T(), err)
 
+	runner.policyName = policyResp.Name
+	runner.policyID = policyResp.ID
+
 	_, err = tools.InstallPackageFromDefaultFile(ctx, runner.info.KibanaClient, "system",
 		integration.PreinstalledPackages["system"], "testdata/system_integration_setup.json", uuid.Must(uuid.NewV4()).String(), policyResp.ID)
 	require.NoError(runner.T(), err)
 
+}
+
+func (runner *MetricsRunner) addMonitoringToOtelRuntimeOverwrite() {
+	addMonitoringOverwriteBody := fmt.Sprintf(`
+{
+  "name": "%s",
+  "namespace": "default",
+  "overrides": {
+    "agent": {
+      "monitoring": {
+        "_runtime_experimental": "otel"
+      }
+    }
+  }
+}
+`, runner.policyName)
+	resp, err := runner.info.KibanaClient.Send(
+		http.MethodPut,
+		fmt.Sprintf("/api/fleet/agent_policies/%s", runner.policyID),
+		nil,
+		nil,
+		bytes.NewBufferString(addMonitoringOverwriteBody),
+	)
+	if err != nil {
+		runner.T().Fatalf("could not execute request to Kibana/Fleet: %s", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		// On error dump the whole request response so we can easily spot
+		// what went wrong.
+		runner.T().Errorf("received a non 200-OK when adding overwrite to policy. "+
+			"Status code: %d", resp.StatusCode)
+		respDump, err := httputil.DumpResponse(resp, true)
+		if err != nil {
+			runner.T().Fatalf("could not dump error response from Kibana: %s", err)
+		}
+		// Make debugging as easy as possible
+		runner.T().Log("================================================================================")
+		runner.T().Log("Kibana error response:")
+		runner.T().Log(string(respDump))
+		runner.T().FailNow()
+	}
 }
 
 func (runner *MetricsRunner) TestBeatsMetrics() {
@@ -133,6 +182,30 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 			if res.Hits.Total.Value < 1 {
 				return false
 			}
+		}
+		return true
+	}, time.Minute*10, time.Second*10, "could not fetch metrics for all known components in default install: %v", componentIds)
+
+	// Add a policy overwrite to change the agent monitoring to use Otel runtime
+	runner.addMonitoringToOtelRuntimeOverwrite()
+
+	// since the default execution mode of Otel runtime is sub-process we should see resource
+	// metrics for elastic-agent/collector component.
+	edotCollectorComponentID := otelMonitoring.EDOTComponentID
+	query = genESQuery(agentStatus.Info.ID,
+		[][]string{
+			{"match", "component.id", edotCollectorComponentID},
+			{"exists", "field", "system.process.cpu.total.value"},
+			{"exists", "field", "system.process.memory.size"},
+		})
+
+	require.Eventually(t, func() bool {
+		now = time.Now()
+		res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
+		require.NoError(t, err)
+		t.Logf("Fetched metrics for %s, got %d hits", edotCollectorComponentID, res.Hits.Total.Value)
+		if res.Hits.Total.Value < 1 {
+			return false
 		}
 		return true
 	}, time.Minute*10, time.Second*10, "could not fetch metrics for all known components in default install: %v", componentIds)

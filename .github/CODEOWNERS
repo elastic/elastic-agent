@@ -2,17 +2,26 @@
 * @elastic/elastic-agent-control-plane
 
 # Top-level files ownership
-/catalog-info.yaml @elastic/observablt-ci @elastic/observablt-ci-contractors
+/catalog-info.yaml @elastic/elastic-agent-control-plane @elastic/observablt-ci
 
 # Sub-directories/files ownership. Remember that order matters; the last matching pattern takes the most precedence.
-/.buildkite @elastic/observablt-ci @elastic/observablt-ci-contractors
-/.ci @elastic/observablt-ci @elastic/observablt-ci-contractors
-/.github @elastic/observablt-ci @elastic/observablt-ci-contractors
+/.buildkite @elastic/elastic-agent-control-plane @elastic/observablt-ci
+/.ci @elastic/elastic-agent-control-plane @elastic/observablt-ci
+/.ci/scripts/ecp-internal-release.sh @elastic/elastic-agent-control-plane
+/.ci/scripts/update-otel.sh @elastic/elastic-agent-control-plane
+/.github @elastic/elastic-agent-control-plane @elastic/observablt-ci
 /.github/CODEOWNERS @elastic/ingest-tech-lead
 /deploy/helm @elastic/elastic-agent-control-plane
 /deploy/helm/edot-collector @elastic/ingest-otel-data
 /deploy/kubernetes @elastic/elastic-agent-control-plane
 /dev-tools/kubernetes @elastic/elastic-agent-control-plane
+/docs/release-notes @elastic/ingest-docs
+/docs/docset.yml @elastic/ingest-docs
+/.github/workflows/update-docs.yml @elastic/ingest-docs
+/docs/reference/edot-collector @elastic/ingest-docs
+/docs/scripts/update-docs @elastic/ingest-docs
+/internal/pkg/otel/samples @elastic/ingest-otel-data @elastic/ingest-docs
+/internal/pkg/otel/core-components.yaml @elastic/ingest-otel-leads
 /internal/pkg/composable/providers/kubernetes @elastic/elastic-agent-control-plane
 /internal/pkg/otel/samples/darwin/autoops_es.yml @elastic/opex
 /internal/pkg/otel/samples/linux/autoops_es.yml @elastic/opex

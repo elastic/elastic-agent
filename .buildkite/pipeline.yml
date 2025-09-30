@@ -5,12 +5,12 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1752282044"
-  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1752282044"
-  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1752282044"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1752282044"
-  IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-1752282044"
-  IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1752282044"
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1757725254"
+  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1757725254"
+  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1757725254"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1757725254"
+  IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-1757725254"
+  IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1757725254"
 
 steps:
   - label: "check-ci"
@@ -220,12 +220,14 @@ steps:
             allowed: true
 
   - label: ":junit: Junit annotate"
+    agents:
+      # requires at least "bash", "curl" and "git"
+      image: "docker.elastic.co/ci-agent-images/buildkite-junit-annotate:1.0"
     plugins:
-      - junit-annotate#v2.5.0:
+      - junit-annotate#v2.7.0:
           artifacts: "**TEST-*.xml"
           always-annotate: true
-    agents:
-      provider: "gcp"
+          run-in-docker: false
     depends_on:
       - step: "unit-tests-2204"
         allow_failure: true
@@ -255,7 +257,7 @@ steps:
     artifact_paths:
       - "build/TEST-go-unit.cov"
     agents:
-      image: "golang:1.24.5"
+      image: "golang:1.24.7"
     depends_on:
       - unit-tests
       - extended-windows
@@ -352,6 +354,7 @@ steps:
 
                 - .buildkite/integration.pipeline.yml
                 - .buildkite/bk.integration.pipeline.yml
+                - .buildkite/bk.integration-fips.pipeline.yml
                 - .buildkite/pipeline.yml
                 - .buildkite/scripts/
                 - .buildkite/hooks/
@@ -371,3 +374,10 @@ steps:
     build:
       commit: "${BUILDKITE_COMMIT}"
       branch: "${BUILDKITE_BRANCH}"
+
+  # wait for CI to be done
+  - wait: ~
+
+  - label: "Publish to serverless"
+    branches: main
+    trigger: "agentless-serverless-release"
