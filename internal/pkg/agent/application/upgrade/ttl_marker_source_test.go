@@ -21,6 +21,7 @@ import (
 func TestTTLMarkerRegistry_AddOrReplace(t *testing.T) {
 	const TTLMarkerYAMLTemplate = `
         version: {{ .Version }}
+        hash: {{ .Hash }}
         valid_until: {{ .ValidUntil }}`
 
 	expectedMarkerContentTemplate, err := template.New("expected marker").Parse(TTLMarkerYAMLTemplate)
@@ -40,6 +41,7 @@ func TestTTLMarkerRegistry_AddOrReplace(t *testing.T) {
 
 	versions := []string{"1.2.3", "4.5.6"}
 	versionedHomes := []string{"elastic-agent-1.2.3-past", "elastic-agent-4.5.6-present"}
+	hashes := []string{"past", "present"}
 
 	type args struct {
 		m map[string]TTLMarker
@@ -61,7 +63,7 @@ func TestTTLMarkerRegistry_AddOrReplace(t *testing.T) {
 					if i < 1 {
 						// add only 1 ttl marker as part of setup
 						buf := bytes.Buffer{}
-						err = expectedMarkerContentTemplate.Execute(&buf, map[string]string{"Version": versions[i], "ValidUntil": yesterdayString})
+						err = expectedMarkerContentTemplate.Execute(&buf, map[string]string{"Version": versions[i], "ValidUntil": yesterdayString, "Hash": hashes[i]})
 						require.NoError(t, err, "error executing ttl marker template")
 						err = os.WriteFile(filepath.Join(tmpDir, "data", versionedHome, ttlMarkerName), buf.Bytes(), 0644)
 						require.NoError(t, err, "error setting up fake agent ttl marker")
@@ -72,10 +74,12 @@ func TestTTLMarkerRegistry_AddOrReplace(t *testing.T) {
 				map[string]TTLMarker{
 					filepath.Join("data", versionedHomes[0]): {
 						Version:    versions[0],
+						Hash:       hashes[0],
 						ValidUntil: tomorrow,
 					},
 					filepath.Join("data", versionedHomes[1]): {
 						Version:    versions[1],
+						Hash:       hashes[1],
 						ValidUntil: tomorrow,
 					},
 				},
@@ -86,7 +90,7 @@ func TestTTLMarkerRegistry_AddOrReplace(t *testing.T) {
 					expectedTTLMarkerFilePath := filepath.Join(tmpDir, "data", versionedHome, ttlMarkerName)
 					if assert.FileExists(t, expectedTTLMarkerFilePath, "TTL marker should have been created/replaced") {
 						b := new(strings.Builder)
-						err = expectedMarkerContentTemplate.Execute(b, map[string]string{"Version": versions[i], "ValidUntil": tomorrowString})
+						err = expectedMarkerContentTemplate.Execute(b, map[string]string{"Version": versions[i], "ValidUntil": tomorrowString, "Hash": hashes[i]})
 						require.NoError(t, err)
 						actualMarkerContent, err := os.ReadFile(expectedTTLMarkerFilePath)
 						require.NoError(t, err)
@@ -234,6 +238,7 @@ func TestTTLMarkerRegistry_Get(t *testing.T) {
 func TestTTLMarkerRegistry_Set(t *testing.T) {
 	const TTLMarkerYAMLTemplate = `
         version: {{ .Version }}
+        hash: {{ .Hash }}
         valid_until: {{ .ValidUntil }}`
 
 	expectedMarkerContentTemplate, err := template.New("expected marker").Parse(TTLMarkerYAMLTemplate)
@@ -250,6 +255,7 @@ func TestTTLMarkerRegistry_Set(t *testing.T) {
 
 	versions := []string{"1.2.3", "4.5.6"}
 	versionedHomes := []string{"elastic-agent-1.2.3-past", "elastic-agent-4.5.6-present"}
+	hashes := []string{"past", "present"}
 	ttls := []string{tomorrowString, ""}
 
 	type args struct {
@@ -274,6 +280,7 @@ func TestTTLMarkerRegistry_Set(t *testing.T) {
 				map[string]TTLMarker{
 					filepath.Join("data", versionedHomes[0]): {
 						Version:    versions[0],
+						Hash:       hashes[0],
 						ValidUntil: tomorrow,
 					},
 				},
@@ -286,7 +293,7 @@ func TestTTLMarkerRegistry_Set(t *testing.T) {
 				if assert.FileExists(t, expectedTTLMarkerFilePath, "new TTL marker should have been created") {
 
 					b := new(strings.Builder)
-					err = expectedMarkerContentTemplate.Execute(b, map[string]string{"Version": versions[0], "ValidUntil": ttls[0]})
+					err = expectedMarkerContentTemplate.Execute(b, map[string]string{"Version": versions[0], "ValidUntil": ttls[0], "Hash": hashes[0]})
 					require.NoError(t, err)
 					actualMarkerContent, err := os.ReadFile(expectedTTLMarkerFilePath)
 					require.NoError(t, err)
@@ -301,7 +308,7 @@ func TestTTLMarkerRegistry_Set(t *testing.T) {
 					err = os.MkdirAll(filepath.Join(tmpDir, "data", versionedHome), 0755)
 					require.NoError(t, err, "error setting up fake agent install directory")
 					b := new(strings.Builder)
-					err = expectedMarkerContentTemplate.Execute(b, map[string]string{"Version": versions[i], "ValidUntil": ttls[i]})
+					err = expectedMarkerContentTemplate.Execute(b, map[string]string{"Version": versions[i], "ValidUntil": ttls[i], "Hash": hashes[i]})
 					require.NoError(t, err, "error setting up ttl marker")
 					err = os.WriteFile(filepath.Join(tmpDir, "data", versionedHomes[i], ttlMarkerName), []byte(b.String()), 0644)
 				}

@@ -7,7 +7,6 @@ package upgrade
 import (
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -107,8 +106,8 @@ func TestManualRollback(t *testing.T) {
 
 	// save the current timestamp, useful for TTL-based testing
 	aMomentInTime := time.Now()
-	//aMomentTomorrow := aMomentInTime.Add(24 * time.Hour)
-	//aMomentAgo := aMomentInTime.Add(-1 * time.Second)
+	aMomentTomorrow := aMomentInTime.Add(24 * time.Hour)
+	aMomentAgo := aMomentInTime.Add(-1 * time.Second)
 
 	type setupF func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *mockAvailableRollbacksSource)
 	type postRollbackAssertionsF func(t *testing.T, topDir string)
@@ -141,12 +140,13 @@ func TestManualRollback(t *testing.T) {
 			name: "no update marker - rollback fails",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *mockAvailableRollbacksSource) {
 				//do not setup anything here, let the rollback fail
+				rollbacksSource.EXPECT().Get().Return(nil, nil)
 			},
 			artifactSettings: artifact.DefaultConfig(),
 			upgradeSettings:  configuration.DefaultUpgradeConfig(),
 			version:          "1.2.3",
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
-				return assert.ErrorIs(t, err, fs.ErrNotExist)
+				return assert.ErrorIs(t, err, ErrNoRollbacksAvailable)
 			},
 			additionalAsserts: nil,
 		},
@@ -321,32 +321,13 @@ func TestManualRollback(t *testing.T) {
 		{
 			name: "no update marker, available install for rollback with valid TTL - rollback",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *mockAvailableRollbacksSource) {
-				//FIXME translate the installSource calls to rollbacksSource
-				//installSource.EXPECT().GetInstallDesc().Return(
-				//	&v1.InstallDescriptor{
-				//		AgentInstalls: []v1.AgentInstallDesc{
-				//			{
-				//				Version: release.VersionWithSnapshot(),
-				//				Hash:    release.Commit(),
-				//				// Versioned home should contain the version but since the path does not really exist we fallback to the legacy format with just the hash
-				//				//VersionedHome: filepath.Join("data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit())),
-				//				VersionedHome: filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit())),
-				//				Flavor:        "basic",
-				//				Active:        true,
-				//			},
-				//			{
-				//				// old install is still valid for the next 24  hours
-				//				OptionalTTLItem: v1.OptionalTTLItem{TTL: &aMomentTomorrow},
-				//				Version:         "1.2.3",
-				//				Hash:            "oldver",
-				//				VersionedHome:   "data/elastic-agent-1.2.3-oldver",
-				//				Flavor:          "basic",
-				//				Active:          false,
-				//			},
-				//		},
-				//	},
-				//	nil,
-				//)
+				rollbacksSource.EXPECT().Get().Return(map[string]TTLMarker{
+					"data/elastic-agent-1.2.3-oldver": {
+						Version:    "1.2.3",
+						Hash:       "oldver",
+						ValidUntil: aMomentTomorrow,
+					},
+				}, nil)
 				newerWatcherExecutable := filepath.Join(topDir, "data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit()), "elastic-agent")
 				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstallCurrent).Return(newerWatcherExecutable)
 				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable, "--rollback", "data/elastic-agent-1.2.3-oldver").
@@ -390,32 +371,15 @@ func TestManualRollback(t *testing.T) {
 		{
 			name: "no update marker, available install for rollback with expired TTL - error",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *mockAvailableRollbacksSource) {
-				//FIXME translate the installSource calls to rollbacksSource
-				//installSource.EXPECT().GetInstallDesc().Return(
-				//	&v1.InstallDescriptor{
-				//		AgentInstalls: []v1.AgentInstallDesc{
-				//			{
-				//				Version: release.VersionWithSnapshot(),
-				//				Hash:    release.Commit(),
-				//				// Versioned home should contain the version but since the path does not really exist we fallback to the legacy format with just the hash
-				//				// VersionedHome: filepath.Join("data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit())),
-				//				VersionedHome: filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit())),
-				//				Flavor:        "basic",
-				//				Active:        true,
-				//			},
-				//			{
-				//				// old install expired a second ago
-				//				OptionalTTLItem: v1.OptionalTTLItem{TTL: &aMomentAgo},
-				//				Version:         "1.2.3",
-				//				Hash:            "oldver",
-				//				VersionedHome:   "data/elastic-agent-1.2.3-oldver",
-				//				Flavor:          "basic",
-				//				Active:          false,
-				//			},
-				//		},
-				//	},
-				//	nil,
-				//)
+				rollbacksSource.EXPECT().Get().Return(
+					map[string]TTLMarker{
+						"data/elastic-agent-1.2.3-oldver": {
+							Version:    "1.2.3",
+							Hash:       "oldver",
+							ValidUntil: aMomentAgo,
+						},
+					},
+					nil)
 			},
 			artifactSettings: artifact.DefaultConfig(),
 			upgradeSettings: &configuration.UpgradeConfig{
@@ -437,32 +401,15 @@ func TestManualRollback(t *testing.T) {
 		{
 			name: "no update marker, no available install for the version - error",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *mockAvailableRollbacksSource) {
-				//FIXME translate the installSource calls to rollbacksSource
-				//installSource.EXPECT().GetInstallDesc().Return(
-				//	&v1.InstallDescriptor{
-				//		AgentInstalls: []v1.AgentInstallDesc{
-				//			{
-				//				Version: release.VersionWithSnapshot(),
-				//				Hash:    release.Commit(),
-				//				// Versioned home should contain the version but since the path does not really exist we fallback to the legacy format with just the hash
-				//				// VersionedHome: filepath.Join("data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit())),
-				//				VersionedHome: filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit())),
-				//				Flavor:        "basic",
-				//				Active:        true,
-				//			},
-				//			{
-				//				// old install - still valid
-				//				OptionalTTLItem: v1.OptionalTTLItem{TTL: &aMomentTomorrow},
-				//				Version:         "1.2.3",
-				//				Hash:            "oldver",
-				//				VersionedHome:   "data/elastic-agent-1.2.3-oldver",
-				//				Flavor:          "basic",
-				//				Active:          false,
-				//			},
-				//		},
-				//	},
-				//	nil,
-				//)
+				rollbacksSource.EXPECT().Get().Return(
+					map[string]TTLMarker{
+						"data/elastic-agent-1.2.3-oldver": {
+							Version:    "1.2.3",
+							Hash:       "oldver",
+							ValidUntil: aMomentTomorrow,
+						},
+					},
+					nil)
 			},
 			artifactSettings: artifact.DefaultConfig(),
 			upgradeSettings: &configuration.UpgradeConfig{
@@ -482,59 +429,9 @@ func TestManualRollback(t *testing.T) {
 			},
 		},
 		{
-			name: "no update marker, available install for rollback without TTL - error",
-			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *mockAvailableRollbacksSource) {
-				//FIXME translate the installSource calls to rollbacksSource
-				//installSource.EXPECT().GetInstallDesc().Return(
-				//	&v1.InstallDescriptor{
-				//		AgentInstalls: []v1.AgentInstallDesc{
-				//			{
-				//				Version: release.VersionWithSnapshot(),
-				//				Hash:    release.Commit(),
-				//				// Versioned home should contain the version but since the path does not really exist we fallback to the legacy format with just the hash
-				//				// VersionedHome: filepath.Join("data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit())),
-				//				VersionedHome: filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit())),
-				//				Flavor:        "basic",
-				//				Active:        true,
-				//			},
-				//			{
-				//				// old install without TTL
-				//				Version:       "1.2.3",
-				//				Hash:          "oldver",
-				//				VersionedHome: "data/elastic-agent-1.2.3-oldver",
-				//				Flavor:        "basic",
-				//				Active:        false,
-				//			},
-				//		},
-				//	},
-				//	nil,
-				//)
-			},
-			artifactSettings: artifact.DefaultConfig(),
-			upgradeSettings: &configuration.UpgradeConfig{
-				Rollback: &configuration.UpgradeRollbackConfig{
-					Window: 24 * time.Hour,
-				},
-			},
-			now:     aMomentInTime,
-			version: "1.2.3",
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
-				return assert.ErrorIs(t, err, ErrNoRollbacksAvailable, i...)
-			},
-			additionalAsserts: func(t *testing.T, topDir string) {
-				actualMarkerFilePath := filepath.Join(topDir, "data", markerFilename)
-				require.NoFileExists(t, actualMarkerFilePath, "marker file must not be created")
-
-			},
-		},
-		{
 			name: "no update marker, error retrieving agent installs",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *mockAvailableRollbacksSource) {
-				//FIXME translate the installSource calls to rollbacksSource
-				//installSource.EXPECT().GetInstallDesc().Return(
-				//	nil,
-				//	errors.New("error retrieving agent installs"),
-				//)
+				rollbacksSource.EXPECT().Get().Return(nil, errors.New("error retrieving agent rollbacks"))
 			},
 			artifactSettings: artifact.DefaultConfig(),
 			upgradeSettings: &configuration.UpgradeConfig{
@@ -549,32 +446,16 @@ func TestManualRollback(t *testing.T) {
 		{
 			name: "no update marker, invoking watcher fails - error",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *mockAvailableRollbacksSource) {
-				//FIXME translate the installSource calls to rollbacksSource
-				//installSource.EXPECT().GetInstallDesc().Return(
-				//	&v1.InstallDescriptor{
-				//		AgentInstalls: []v1.AgentInstallDesc{
-				//			{
-				//				Version: release.VersionWithSnapshot(),
-				//				Hash:    release.Commit(),
-				//				// Versioned home should contain the version but since the path does not really exist we fallback to the legacy format with just the hash
-				//				// VersionedHome: filepath.Join("data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit())),
-				//				VersionedHome: filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit())),
-				//				Flavor:        "basic",
-				//				Active:        true,
-				//			},
-				//			{
-				//				// old install is still valid for the next 24  hours
-				//				OptionalTTLItem: v1.OptionalTTLItem{TTL: &aMomentTomorrow},
-				//				Version:         "1.2.3",
-				//				Hash:            "oldver",
-				//				VersionedHome:   "data/elastic-agent-1.2.3-oldver",
-				//				Flavor:          "basic",
-				//				Active:          false,
-				//			},
-				//		},
-				//	},
-				//	nil,
-				//)
+				rollbacksSource.EXPECT().Get().Return(
+					map[string]TTLMarker{
+						"data/elastic-agent-1.2.3-oldver": {
+							Version:    "1.2.3",
+							Hash:       "oldver",
+							ValidUntil: aMomentTomorrow,
+						},
+					},
+					nil,
+				)
 				newerWatcherExecutable := filepath.Join(topDir, "data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit()), "elastic-agent")
 				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstallCurrent).Return(newerWatcherExecutable)
 				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable, "--rollback", "data/elastic-agent-1.2.3-oldver").

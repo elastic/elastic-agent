@@ -468,7 +468,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		versionedHome: currentVersionedHome,
 	}
 
-	availableRollbacks := getAvailableRollbacks(rollbackWindow, time.Now(), release.VersionWithSnapshot(), previousParsedVersion, currentVersionedHome)
+	availableRollbacks := getAvailableRollbacks(rollbackWindow, time.Now(), release.VersionWithSnapshot(), previousParsedVersion, currentVersionedHome, release.Commit())
 
 	if err := u.markUpgrade(u.log,
 		paths.Data(), // data dir to place the marker in

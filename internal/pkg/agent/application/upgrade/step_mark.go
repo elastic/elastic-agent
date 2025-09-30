@@ -21,11 +21,11 @@ import (
 )
 
 const markerFilename = ".update-marker"
-const disableRollbackWindow = time.Duration(0)
 
 // TTLMarker marks an elastic-agent install available for rollback
 type TTLMarker struct {
 	Version    string    `json:"version" yaml:"version"`
+	Hash       string    `json:"hash" yaml:"hash"`
 	ValidUntil time.Time `json:"valid_until" yaml:"valid_until"`
 }
 

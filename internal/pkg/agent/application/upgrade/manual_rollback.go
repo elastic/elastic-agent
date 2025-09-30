@@ -23,6 +23,8 @@ import (
 	agtversion "github.com/elastic/elastic-agent/version"
 )
 
+const disableRollbackWindow = time.Duration(0)
+
 func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string, now time.Time, version string, action *fleetapi.ActionUpgrade) (reexec.ShutdownCallbackFn, error) {
 	if version == "" {
 		return nil, ErrEmptyRollbackVersion
@@ -118,7 +120,7 @@ func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper,
 	prevAgentInstall := agentInstall{
 		parsedVersion: prevAgentParsedVersion,
 		version:       targetTTLMarker.Version,
-		hash:          "",
+		hash:          targetTTLMarker.Hash,
 		versionedHome: targetInstall,
 	}
 
@@ -233,8 +235,8 @@ func extractAgentInstallsFromMarker(updateMarker *UpdateMarker) (previous agentI
 	return previous, current, nil
 }
 
-func getAvailableRollbacks(rollbackWindow time.Duration, now time.Time, currentVersion string, parsedCurrentVersion *version.ParsedSemVer, currentVersionedHome string) map[string]TTLMarker {
-	if rollbackWindow == 0 {
+func getAvailableRollbacks(rollbackWindow time.Duration, now time.Time, currentVersion string, parsedCurrentVersion *version.ParsedSemVer, currentVersionedHome string, currentHash string) map[string]TTLMarker {
+	if rollbackWindow == disableRollbackWindow {
 		// if there's no rollback window it means that no rollback should survive the watcher cleanup at the end of the grace period.
 		return nil
 	}
