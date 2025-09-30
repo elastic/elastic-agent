@@ -924,6 +924,7 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 			}
 			mgr := &OTelManager{
 				logger:                     logptest.NewTestingLogger(t, ""),
+				baseLogger:                 logptest.NewTestingLogger(t, "base"),
 				beatMonitoringConfigGetter: commonBeatMonitoringConfigGetter,
 				agentInfo:                  commonAgentInfo,
 			}
