@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"os"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -279,7 +280,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			// and reset the retry count
 			m.recoveryTimer.Stop()
 			m.recoveryRetries.Store(0)
-			mergedCfg, err := m.buildMergedConfig(cfgUpdate)
+			mergedCfg, err := buildMergedConfig(cfgUpdate, m.agentInfo, m.beatMonitoringConfigGetter, m.baseLogger)
 			if err != nil {
 				reportErr(ctx, m.errCh, err)
 				continue
@@ -327,7 +328,7 @@ func (m *OTelManager) Errors() <-chan error {
 }
 
 // buildMergedConfig combines collector configuration with component-derived configuration.
-func (m *OTelManager) buildMergedConfig(cfgUpdate configUpdate) (*confmap.Conf, error) {
+func buildMergedConfig(cfgUpdate configUpdate, agentInfo info.Agent, monitoringConfigGetter translate.BeatMonitoringConfigGetter, logger *logp.Logger) (*confmap.Conf, error) {
 	mergedOtelCfg := confmap.New()
 
 	// Generate component otel config if there are components
@@ -335,7 +336,7 @@ func (m *OTelManager) buildMergedConfig(cfgUpdate configUpdate) (*confmap.Conf, 
 	if len(cfgUpdate.components) > 0 {
 		model := &component.Model{Components: cfgUpdate.components}
 		var err error
-		componentOtelCfg, err = translate.GetOtelConfig(model, m.agentInfo, m.beatMonitoringConfigGetter, m.baseLogger)
+		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, monitoringConfigGetter, logger)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}
@@ -362,14 +363,14 @@ func (m *OTelManager) buildMergedConfig(cfgUpdate configUpdate) (*confmap.Conf, 
 		}
 	}
 
-	if err := m.injectDiagnosticsExtension(mergedOtelCfg); err != nil {
+	if err := injectDiagnosticsExtension(mergedOtelCfg); err != nil {
 		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
 	}
 
 	return mergedOtelCfg, nil
 }
 
-func (m *OTelManager) injectDiagnosticsExtension(config *confmap.Conf) error {
+func injectDiagnosticsExtension(config *confmap.Conf) error {
 	extensionCfg := map[string]any{
 		"extensions": map[string]any{
 			"elastic_diagnostics": map[string]any{
@@ -379,6 +380,10 @@ func (m *OTelManager) injectDiagnosticsExtension(config *confmap.Conf) error {
 	}
 	if config.IsSet("service::extensions") {
 		extensionList := config.Get("service::extensions").([]interface{})
+		if slices.Contains(extensionList, "elastic_diagnostics") {
+			// already configured, nothing to do
+			return nil
+		}
 		extensionList = append(extensionList, "elastic_diagnostics")
 		extensionCfg["service::extensions"] = extensionList
 	}

@@ -523,6 +523,9 @@ agent.monitoring.enabled: false
 		"edot/heap.profile.gz",
 		"edot/mutex.profile.gz",
 		"edot/threadcreate.profile.gz",
+		"components/filestream-default/registry.tar.gz",
+		"components/filestream-default/beat_metrics.json",
+		"components/filestream-default/input_metrics.json",
 	}
 
 	for _, f := range expectedFiles {

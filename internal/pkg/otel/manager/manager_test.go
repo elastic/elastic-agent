@@ -922,13 +922,7 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 				collectorCfg: tt.collectorCfg,
 				components:   tt.components,
 			}
-			mgr := &OTelManager{
-				logger:                     logptest.NewTestingLogger(t, ""),
-				baseLogger:                 logptest.NewTestingLogger(t, "base"),
-				beatMonitoringConfigGetter: commonBeatMonitoringConfigGetter,
-				agentInfo:                  commonAgentInfo,
-			}
-			result, err := mgr.buildMergedConfig(cfgUpdate)
+			result, err := buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter, logptest.NewTestingLogger(t, ""))
 
 			if tt.expectedErrorString != "" {
 				assert.Error(t, err)
@@ -1249,7 +1243,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 			t.Fatal("timeout waiting for collector config update")
 		}
 		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
-		assert.NoError(t, mgr.injectDiagnosticsExtension(expectedCfg))
+		assert.NoError(t, injectDiagnosticsExtension(expectedCfg))
 		assert.Equal(t, expectedCfg, execution.cfg)
 
 	})
