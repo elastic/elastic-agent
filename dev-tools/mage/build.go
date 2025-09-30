@@ -27,6 +27,7 @@ import (
 type BuildArgs struct {
 	Name        string // Name of binary. (On Windows '.exe' is appended.)
 	InputFiles  []string
+	BuildMode   string
 	OutputDir   string
 	CGO         bool
 	Static      bool
@@ -86,9 +87,9 @@ func DefaultBuildArgs() BuildArgs {
 		args.Vars[elasticAgentModulePath+"/version.qualifier"] = "{{ .Qualifier }}"
 	}
 
-	if positionIndependentCodeSupported() {
-		args.ExtraFlags = append(args.ExtraFlags, "-buildmode", "pie")
-	}
+	//if positionIndependentCodeSupported() {
+	//	args.ExtraFlags = append(args.ExtraFlags, "-buildmode", "pie")
+	//}
 
 	if FIPSBuild {
 
@@ -150,9 +151,11 @@ func DefaultGolangCrossBuildArgs() BuildArgs {
 		args.CGO = bp.Flags.SupportsCGO()
 	}
 
-	// Enable DEP (data execution protection) for Windows binaries.
 	if Platform.GOOS == "windows" {
-		args.LDFlags = append(args.LDFlags, "-extldflags=-Wl,--nxcompat")
+		// Enable DEP (data execution protection) for Windows binaries.
+		//args.LDFlags = append(args.LDFlags, "-extldflags=-Wl,--nxcompat")
+		args.BuildMode = "c-archive"
+		args.InputFiles = []string{"windows/main.go"}
 	}
 
 	return args
@@ -184,7 +187,10 @@ func GolangCrossBuild(params BuildArgs) error {
 func Build(params BuildArgs) error {
 	fmt.Println(">> build: Building", params.Name)
 
-	binaryName := params.Name + binaryExtension(GOOS)
+	outputName := params.Name + binaryExtension(GOOS)
+	if params.BuildMode == "c-archive" {
+		outputName = params.Name + ".a"
+	}
 
 	if params.OutputDir != "" {
 		if err := os.MkdirAll(params.OutputDir, 0755); err != nil {
@@ -208,9 +214,14 @@ func Build(params BuildArgs) error {
 	args := []string{
 		"build",
 		"-o",
-		filepath.Join(params.OutputDir, binaryName),
+		filepath.Join(params.OutputDir, outputName),
 	}
 	args = append(args, params.ParseBuildTags()...)
+
+	// buildmode
+	if params.BuildMode != "" {
+		args = append(args, "-buildmode="+params.BuildMode)
+	}
 
 	// ldflags
 	ldflags := params.LDFlags
@@ -239,7 +250,28 @@ func Build(params BuildArgs) error {
 	}
 
 	log.Println("Adding build environment vars:", env)
-	return sh.RunWith(env, "go", args...)
+	err := sh.RunWith(env, "go", args...)
+	if err != nil {
+		return err
+	}
+
+	if GOOS == "windows" && params.BuildMode == "c-archive" {
+		binaryName := params.Name + binaryExtension(GOOS)
+		log.Println("Compiling binary linked with c-archive")
+		err := sh.Run(
+			"x86_64-w64-mingw32-gcc",
+			"-o", filepath.Join(params.OutputDir, binaryName),
+			"-I", params.OutputDir,
+			"windows/main.c",
+			filepath.Join(params.OutputDir, "elastic-agent-windows-amd64.a"),
+			"-lpthread",
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // MakeWindowsSysoFile generates a .syso file containing metadata about the
