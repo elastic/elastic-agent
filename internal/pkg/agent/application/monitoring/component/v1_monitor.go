@@ -22,6 +22,7 @@ import (
 	"unicode"
 
 	"go.opentelemetry.io/collector/confmap"
+	"go.opentelemetry.io/collector/service"
 
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -517,43 +518,29 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 	return defaultMonitoringNamespace
 }
 
-// loadField traverses a given sequence of field names through a nested
-// map[string]any and tries to interpret the final value as the target type.
-// If successful, it returns true and overwrites the given target
-// pointer with the resulting value.
-func loadField[T any](target *T, conf any, fieldNames ...string) bool {
-	var current = conf
-	for _, name := range fieldNames {
-		if confMap, ok := current.(map[string]any); ok {
-			if val, ok := confMap[name]; ok {
-				current = val
-				continue
-			}
-		}
-		return false
-	}
-	result, ok := current.(T)
-	if ok {
-		*target = result
-	}
-	return ok
-}
-
 func (b *BeatsMonitor) getCollectorTelemetryEndpoint() string {
-	var otelConf map[string]any
 	if b.otelConfig != nil {
-		otelConf = b.otelConfig.ToStringMap()
-	}
-	var readers []any
-	if loadField(&readers, otelConf, "service", "telemetry", "metrics", "readers") {
-		for _, reader := range readers {
-			host := "localhost"
-			port := 8888
+		if serviceConfig, err := b.otelConfig.Sub("service"); err == nil {
+			var service service.Config
+			if serviceConfig.Unmarshal(&service, confmap.WithIgnoreUnused()) == nil {
+				for _, reader := range service.Telemetry.Metrics.Readers {
+					if reader.Pull == nil || reader.Pull.Exporter.Prometheus == nil {
+						continue
+					}
+					prometheus := *reader.Pull.Exporter.Prometheus
+					host := "localhost"
+					port := 8888
 
-			hostOK := loadField(&host, reader, "pull", "exporter", "prometheus", "host")
-			portOK := loadField(&port, reader, "pull", "exporter", "prometheus", "port")
-			if hostOK || portOK {
-				return host + ":" + strconv.Itoa(port)
+					if prometheus.Host != nil {
+						host = *prometheus.Host
+					}
+					if prometheus.Port != nil {
+						port = *prometheus.Port
+					}
+					if prometheus.Host != nil || prometheus.Port != nil {
+						return host + ":" + strconv.Itoa(port)
+					}
+				}
 			}
 		}
 	}
