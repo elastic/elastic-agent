@@ -27,7 +27,6 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
-	"github.com/elastic/elastic-agent-libs/service"
 	"github.com/elastic/elastic-agent-system-metrics/report"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 
@@ -86,7 +85,7 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 			}
 			fleetInitTimeout, _ := cmd.Flags().GetDuration("fleet-init-timeout")
 			testingMode, _ := cmd.Flags().GetBool("testing-mode")
-			if err := run(nil, testingMode, fleetInitTimeout); err != nil && !errors.Is(err, context.Canceled) {
+			if err := run(cmd.Context(), nil, testingMode, fleetInitTimeout); err != nil && !errors.Is(err, context.Canceled) {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 				logExternal(fmt.Sprintf("%s run failed: %s", paths.BinaryName, err))
 				return err
@@ -119,28 +118,7 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func run(override application.CfgOverrider, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
-	// Windows: Mark service as stopped.
-	// After this is run, the service is considered by the OS to be stopped.
-	// This must be the first deferred cleanup task (last to execute).
-	defer func() {
-		service.NotifyTermination()
-		service.WaitExecutionDone()
-	}()
-
-	service.BeforeRun()
-	defer service.Cleanup()
-
-	// register as a service
-	stop := make(chan bool)
-	ctx, cancel := context.WithCancel(context.Background())
-	stopBeat := func() {
-		close(stop)
-	}
-
-	defer cancel()
-	go service.ProcessWindowsControlEvents(stopBeat)
-
+func run(ctx context.Context, override application.CfgOverrider, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
 	upgradeDetailsFromMarker, err := handleUpgrade()
 	if err != nil {
 		return fmt.Errorf("error checking for and handling upgrade: %w", err)
@@ -154,7 +132,7 @@ func run(override application.CfgOverrider, testingMode bool, fleetInitTimeout t
 		_ = locker.Unlock()
 	}()
 
-	return runElasticAgent(ctx, cancel, override, stop, testingMode, fleetInitTimeout, upgradeDetailsFromMarker, modifiers...)
+	return runElasticAgent(ctx, override, testingMode, fleetInitTimeout, upgradeDetailsFromMarker, modifiers...)
 }
 
 func logReturn(l *logger.Logger, err error) error {
@@ -166,14 +144,15 @@ func logReturn(l *logger.Logger, err error) error {
 
 func runElasticAgent(
 	ctx context.Context,
-	cancel context.CancelFunc,
 	override application.CfgOverrider,
-	stop chan bool,
 	testingMode bool,
 	fleetInitTimeout time.Duration,
 	upgradeDetailsFromMarker *details.Details,
 	modifiers ...component.PlatformModifier,
 ) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	err := coordinator.RestoreConfig()
 	if err != nil {
 		return err
@@ -374,9 +353,6 @@ func runElasticAgent(
 LOOP:
 	for {
 		select {
-		case <-stop:
-			l.Info("service.ProcessWindowsControlEvents invoked stop function. Shutting down")
-			break LOOP
 		case <-appDone:
 			l.Info("application done, coordinator exited")
 			logShutdown = false

@@ -27,7 +27,6 @@ import (
 type BuildArgs struct {
 	Name        string // Name of binary. (On Windows '.exe' is appended.)
 	InputFiles  []string
-	BuildMode   string
 	OutputDir   string
 	CGO         bool
 	Static      bool
@@ -36,6 +35,7 @@ type BuildArgs struct {
 	Vars        map[string]string // Vars that are passed as -X key=value with the ldflags.
 	ExtraFlags  []string
 	WinMetadata bool // Add resource metadata to Windows binaries (like add the version number to the .exe properties).
+	WinService  bool // Compile with windows service main entrypoint (see windows/README.md)
 }
 
 // buildTagRE is a regexp to match strings like "-tags=abcd"
@@ -82,14 +82,11 @@ func DefaultBuildArgs() BuildArgs {
 			elasticAgentModulePath + "/version.commit":    "{{ commit }}",
 		},
 		WinMetadata: true,
+		WinService:  true,
 	}
 	if versionQualified {
 		args.Vars[elasticAgentModulePath+"/version.qualifier"] = "{{ .Qualifier }}"
 	}
-
-	//if positionIndependentCodeSupported() {
-	//	args.ExtraFlags = append(args.ExtraFlags, "-buildmode", "pie")
-	//}
 
 	if FIPSBuild {
 
@@ -153,9 +150,7 @@ func DefaultGolangCrossBuildArgs() BuildArgs {
 
 	if Platform.GOOS == "windows" {
 		// Enable DEP (data execution protection) for Windows binaries.
-		//args.LDFlags = append(args.LDFlags, "-extldflags=-Wl,--nxcompat")
-		args.BuildMode = "c-archive"
-		args.InputFiles = []string{"windows/main.go"}
+		args.LDFlags = append(args.LDFlags, "-extldflags=-Wl,--nxcompat")
 	}
 
 	return args
@@ -187,8 +182,26 @@ func GolangCrossBuild(params BuildArgs) error {
 func Build(params BuildArgs) error {
 	fmt.Println(">> build: Building", params.Name)
 
+	// winServiceCompile changes the compilation to use a c-archive for the golang part
+	// and then statically compile that with `windows/main.c`
+	winServiceCompile := Platform.GOOS == "windows" && params.WinService && params.CGO && len(params.InputFiles) == 0
+
+	// inputFiles is adjusted based on winServiceCompile
+	inputFiles := params.InputFiles
+	if winServiceCompile {
+		inputFiles = []string{"windows/main.go"}
+	}
+
+	// buildMode is depending on if pie is supported and winServiceCompile
+	buildMode := ""
+	if winServiceCompile {
+		buildMode = "c-archive"
+	} else if positionIndependentCodeSupported() {
+		buildMode = "pie"
+	}
+
 	outputName := params.Name + binaryExtension(GOOS)
-	if params.BuildMode == "c-archive" {
+	if winServiceCompile {
 		outputName = params.Name + ".a"
 	}
 
@@ -219,8 +232,8 @@ func Build(params BuildArgs) error {
 	args = append(args, params.ParseBuildTags()...)
 
 	// buildmode
-	if params.BuildMode != "" {
-		args = append(args, "-buildmode="+params.BuildMode)
+	if buildMode != "" {
+		args = append(args, "-buildmode="+buildMode)
 	}
 
 	// ldflags
@@ -236,8 +249,8 @@ func Build(params BuildArgs) error {
 		args = append(args, MustExpand(strings.Join(ldflags, " ")))
 	}
 
-	if len(params.InputFiles) > 0 {
-		args = append(args, params.InputFiles...)
+	if len(inputFiles) > 0 {
+		args = append(args, inputFiles...)
 	}
 
 	if GOOS == "windows" && params.WinMetadata {
@@ -255,17 +268,33 @@ func Build(params BuildArgs) error {
 		return err
 	}
 
-	if GOOS == "windows" && params.BuildMode == "c-archive" {
+	// for winServiceCompile the build is just the c-archive and not the actual executable
+	//
+	// this completes the compilation with this last step that uses the C entrypoint as
+	// the main entrypoint to the executable
+	if winServiceCompile {
 		binaryName := params.Name + binaryExtension(GOOS)
-		log.Println("Compiling binary linked with c-archive")
-		err := sh.Run(
-			"x86_64-w64-mingw32-gcc",
+		log.Println("Compiling Windows binary with service entrypoint (see windows/README.md)")
+		args := []string{
+			"-Wl,--nxcompat",
+		}
+		if DevBuild {
+			// Disable optimizations (-O0), inlining (-fno-inline), include debug symbols (-g) for debugging.
+			args = append(args, "-O0", "-fno-inline", "-g")
+		} else {
+			// Strip all symbols from binary (does not affect Go stack traces).
+			args = append(args, "-s")
+		}
+		args = append(
+			args,
 			"-o", filepath.Join(params.OutputDir, binaryName),
 			"-I", params.OutputDir,
-			"windows/main.c",
-			filepath.Join(params.OutputDir, "elastic-agent-windows-amd64.a"),
-			"-lpthread",
+			"windows/main.c", // entrypoint
+			filepath.Join(params.OutputDir, outputName), // static c-archive
+			"-lpthread", // required by golang for threads
 		)
+		// what is a better way of selecting the compiler?
+		err := sh.RunWith(env, "x86_64-w64-mingw32-gcc", args...)
 		if err != nil {
 			return err
 		}

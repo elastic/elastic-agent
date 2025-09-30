@@ -159,7 +159,7 @@ all the above actions will be skipped, because the Elastic Agent has already bee
 occurs on every start of the container set FLEET_FORCE to 1.
 `,
 		Run: func(c *cobra.Command, args []string) {
-			if err := logContainerCmd(streams); err != nil {
+			if err := logContainerCmd(c.Context(), streams); err != nil {
 				logError(streams, err)
 				os.Exit(1)
 			}
@@ -177,7 +177,7 @@ func logInfo(streams *cli.IOStreams, a ...interface{}) {
 	fmt.Fprintln(streams.Out, a...)
 }
 
-func logContainerCmd(streams *cli.IOStreams) error {
+func logContainerCmd(ctx context.Context, streams *cli.IOStreams) error {
 	logsPath := envWithDefault("", "LOGS_PATH")
 	if logsPath != "" {
 		// log this entire command to a file as well as to the passed streams
@@ -193,10 +193,10 @@ func logContainerCmd(streams *cli.IOStreams) error {
 		streams.Out = io.MultiWriter(streams.Out, w)
 		streams.Err = io.MultiWriter(streams.Out, w)
 	}
-	return containerCmd(streams)
+	return containerCmd(ctx, streams)
 }
 
-func containerCmd(streams *cli.IOStreams) error {
+func containerCmd(ctx context.Context, streams *cli.IOStreams) error {
 	// set paths early so all action below use the defined paths
 	if err := setPaths("", "", "", "", true); err != nil {
 		return err
@@ -275,14 +275,14 @@ func containerCmd(streams *cli.IOStreams) error {
 
 	if runAgent {
 		// run the main elastic-agent container command
-		err = runContainerCmd(streams, cfg)
+		err = runContainerCmd(ctx, streams, cfg)
 	}
 	// wait until APM Server shut down
 	wg.Wait()
 	return err
 }
 
-func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
+func runContainerCmd(ctx context.Context, streams *cli.IOStreams, cfg setupConfig) error {
 	var err error
 
 	initTimeout := envTimeout(fleetInitTimeoutName)
@@ -361,7 +361,7 @@ func runContainerCmd(streams *cli.IOStreams, cfg setupConfig) error {
 		monitoringServer = nil
 	}
 
-	return run(containerCfgOverrides, false, initTimeout, isContainer)
+	return run(ctx, containerCfgOverrides, false, initTimeout, isContainer)
 }
 
 // TokenResp is used to decode a response for generating a service token
