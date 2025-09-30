@@ -426,11 +426,24 @@ agent.monitoring.enabled: false
 					"Runtime":   tc.runtime,
 					"InputFile": inputFile.Name(),
 				}))
+			expDiagFiles := append([]string{}, diagnosticsFiles...)
+			if tc.runtime == "otel" {
+				// EDOT adds these extra files.
+				// TestBeatDiagnostics is quite strict about what it expects to see in the archive.
+				expDiagFiles = append(expDiagFiles,
+					"edot/goroutine.profile.gz",
+					"edot/heap.profile.gz",
+					"edot/allocs.profile.gz",
+					"edot/block.profile.gz",
+					"edot/mutex.profile.gz",
+					"edot/threadcreate.profile.gz",
+					"edot/otel-merged-actual.yaml")
+			}
 			err = f.Run(ctx, integrationtest.State{
 				Configure:  configBuffer.String(),
 				AgentState: tc.expectedAgentState,
 				Components: tc.expectedComponentState,
-				After:      testDiagnosticsFactory(t, filebeatSetup, diagnosticsFiles, tc.expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
+				After:      testDiagnosticsFactory(t, filebeatSetup, expDiagFiles, tc.expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
 			})
 			assert.NoError(t, err)
 		})

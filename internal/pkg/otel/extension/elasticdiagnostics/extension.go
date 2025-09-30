@@ -30,7 +30,10 @@ import (
 )
 
 var (
-	_ component.Component             = (*diagnosticsExtension)(nil)
+	_ component.Component = (*diagnosticsExtension)(nil)
+
+	// The elasticdiagnostics extension also implements the otelmanager.DiagnosticExtension interface.
+	// NOTE: Changing the signature will require changes to libbeat and beatreceivers. Don't remove this.
 	_ otelmanager.DiagnosticExtension = (*diagnosticsExtension)(nil)
 )
 
