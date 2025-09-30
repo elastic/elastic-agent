@@ -113,11 +113,16 @@ func DownloadManifest(ctx context.Context, manifest string) (Build, error) {
 		return Build{}, errorNotAllowedManifestURL
 	}
 	sanitizedUrl := fmt.Sprintf("https://%s%s", manifestUrl.Host, manifestUrl.Path)
+	fmt.Printf(">>>> XXX Attempting manifest download URL: %s\n", sanitizedUrl)
+
 	f := func() (Build, error) { return downloadManifestData(ctx, sanitizedUrl) }
 	manifestResponse, err := doWithRetries(f)
 	if err != nil {
 		return Build{}, fmt.Errorf("downloading manifest: %w", err)
 	}
+
+	fmt.Printf(">>>> XXX Downloaded manifest %s\n", manifest)
+
 	if mg.Verbose() {
 		log.Printf(">>>> Downloaded manifest %s", manifest)
 		log.Printf(">>>> Packaging version: %s, build_id: %s, manifest_version:%s", manifestResponse.Version, manifestResponse.BuildID, manifestResponse.ManifestVersion)
