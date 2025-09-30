@@ -6,12 +6,65 @@
 
 package cmd
 
-import "github.com/elastic/elastic-agent/pkg/utils"
+import (
+	"fmt"
+	"os"
+	"syscall"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
+	"github.com/elastic/elastic-agent/pkg/utils"
+	"gopkg.in/ini.v1"
+)
 
 // logExternal logs the error to an external log.  On non-windows systems this is a no-op.
 func logExternal(msg string) {
 }
 
-func getDesiredUser() (string, string, error) { return "", "", nil }
+func getDesiredUser() (string, string, error) {
+	serviceFilePath := fmt.Sprintf("/etc/systemd/system/%s.service", paths.ServiceName())
+	svcCfg, err := ini.Load(serviceFilePath)
+	if os.IsNotExist(err) {
+		// not running as a service
+		return "", "", nil
+	}
+	if err != nil {
+		return "", "", fmt.Errorf("failed to read service file %s: %w", serviceFilePath, err)
+	}
 
-func dropRootPrivileges(ownership utils.FileOwner) error { return nil }
+	var username, groupname string
+
+	serviceSection := svcCfg.Section("Service")
+	if serviceSection.HasKey(install.SystemdUserNameKey) {
+		username = serviceSection.Key(install.SystemdUserNameKey).Value()
+	}
+
+	if serviceSection.HasKey(install.SystemdGroupNameKey) {
+		groupname = serviceSection.Key(install.SystemdGroupNameKey).Value()
+	}
+
+	return username, groupname, nil
+}
+
+func dropRootPrivileges(ownership utils.FileOwner) error {
+	// change group first, setuid will drop permission to change group
+	if ownership.GID > 0 {
+		// not necessary, just in case.
+		if err := syscall.Setegid(ownership.GID); err != nil {
+			return fmt.Errorf("failed to set eGID: %w", err)
+		}
+
+		if err := syscall.Setgid(ownership.GID); err != nil {
+			return fmt.Errorf("failed to set GID: %w", err)
+		}
+	}
+
+	if ownership.UID > 0 {
+		if err := syscall.Setuid(ownership.UID); err != nil {
+			return fmt.Errorf("failed to set UID: %w", err)
+		}
+	}
+
+	return nil
+
+}

@@ -32,6 +32,10 @@ func getDesiredUser() (string, string, error) {
 	plistPath := fmt.Sprintf("/Library/LaunchDaemons/%s.plist", serviceName)
 
 	content, err := os.ReadFile(plistPath)
+	if os.IsNotExist(err) {
+		// not running as a service
+		return "", "", nil
+	}
 	if err != nil {
 		return "", "", fmt.Errorf("failed to read plist file %s: %w", plistPath, err)
 	}
