@@ -21,9 +21,10 @@ import (
 	"time"
 	"unicode"
 
+	"go.opentelemetry.io/collector/confmap"
+
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/utils"
-	"go.opentelemetry.io/collector/confmap"
 
 	koanfmaps "github.com/knadh/koanf/maps"
 
