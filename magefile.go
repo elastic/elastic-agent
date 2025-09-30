@@ -1183,8 +1183,8 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 
 	// cleanup after build
 	if !keepArchive {
-		//defer os.RemoveAll(archivePath)
-		//defer os.RemoveAll(dropPath)
+		defer os.RemoveAll(archivePath)
+		defer os.RemoveAll(dropPath)
 	}
 	defer os.Unsetenv(agentDropPath)
 
