@@ -17,7 +17,11 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 )
 
-func PerformDiagnosticsExt(ctx context.Context, cpu bool) (*elasticdiagnostics.Response, error) {
+func PerformDiagnosticsExt(ctx context.Context, includeCpuProfile bool) (*elasticdiagnostics.Response, error) {
+	// PerformDiagnosticsExt connects to the diagnostics extension over a Unix socket,
+	// makes an HTTP request to fetch diagnostic info, and returns the parsed response.
+	// If includeCpuProfile is true, it also requests CPU profiling data.
+
 	tr := &http.Transport{
 		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 			return client.Dialer(ctx, paths.DiagnosticsExtensionSocket())
@@ -25,7 +29,7 @@ func PerformDiagnosticsExt(ctx context.Context, cpu bool) (*elasticdiagnostics.R
 	}
 	client := &http.Client{Transport: tr}
 	url := "http://localhost/diagnostics"
-	if cpu {
+	if includeCpuProfile {
 		url = "http://localhost/diagnostics?cpu=true"
 	}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
