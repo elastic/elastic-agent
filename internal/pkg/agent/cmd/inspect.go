@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"go.opentelemetry.io/collector/confmap"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -157,7 +158,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		return nil
 	}
 
-	cfg, lvl, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait, !isAdmin)
+	cfg, otel, lvl, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait, !isAdmin)
 	if err != nil {
 		return fmt.Errorf("error fetching config with variables: %w", err)
 	}
@@ -179,7 +180,11 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 			return fmt.Errorf("failed to detect inputs and outputs: %w", err)
 		}
 
+<<<<<<< HEAD
 		monitorFn, err := getMonitoringFn(ctx, cfg)
+=======
+		monitorFn, err := getMonitoringFn(ctx, l, cfg, otel)
+>>>>>>> a441ebee7 (Ingest internal telemetry from the OTel Collector when it is running (#9928))
 		if err != nil {
 			return fmt.Errorf("failed to get monitoring: %w", err)
 		}
@@ -369,12 +374,16 @@ func getComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath stri
 		return nil, fmt.Errorf("error checking for root/Administrator privileges: %w", err)
 	}
 
-	m, lvl, err := getConfigWithVariables(ctx, l, cfgPath, variablesWait, !isAdmin)
+	m, otel, lvl, err := getConfigWithVariables(ctx, l, cfgPath, variablesWait, !isAdmin)
 	if err != nil {
 		return nil, err
 	}
 
+<<<<<<< HEAD
 	monitorFn, err := getMonitoringFn(ctx, m)
+=======
+	monitorFn, err := getMonitoringFn(ctx, l, m, otel)
+>>>>>>> a441ebee7 (Ingest internal telemetry from the OTel Collector when it is running (#9928))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get monitoring: %w", err)
 	}
@@ -393,7 +402,11 @@ func getComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath stri
 	return comps, nil
 }
 
+<<<<<<< HEAD
 func getMonitoringFn(ctx context.Context, cfg map[string]interface{}) (component.GenerateMonitoringCfgFn, error) {
+=======
+func getMonitoringFn(ctx context.Context, logger *logger.Logger, cfg map[string]interface{}, otelCfg *confmap.Conf) (component.GenerateMonitoringCfgFn, error) {
+>>>>>>> a441ebee7 (Ingest internal telemetry from the OTel Collector when it is running (#9928))
 	config, err := config.NewConfigFrom(cfg)
 	if err != nil {
 		return nil, err
@@ -408,34 +421,40 @@ func getMonitoringFn(ctx context.Context, cfg map[string]interface{}) (component
 	if err != nil {
 		return nil, fmt.Errorf("could not load agent info: %w", err)
 	}
+<<<<<<< HEAD
 
 	monitor := monitoring.New(agentCfg.Settings.V1MonitoringEnabled, agentCfg.Settings.DownloadConfig.OS(), agentCfg.Settings.MonitoringConfig, agentInfo)
+=======
+	otelExecMode := otelconfig.GetExecutionModeFromConfig(logger, config)
+	isOtelExecModeSubprocess := otelExecMode == manager.SubprocessExecutionMode
+	monitor := componentmonitoring.New(agentCfg.Settings.V1MonitoringEnabled, agentCfg.Settings.DownloadConfig.OS(), agentCfg.Settings.MonitoringConfig, otelCfg, agentInfo, isOtelExecModeSubprocess)
+>>>>>>> a441ebee7 (Ingest internal telemetry from the OTel Collector when it is running (#9928))
 	return monitor.MonitoringConfig, nil
 }
 
-func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath string, timeout time.Duration, unprivileged bool) (map[string]interface{}, logp.Level, error) {
+func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath string, timeout time.Duration, unprivileged bool) (map[string]interface{}, *confmap.Conf, logp.Level, error) {
 
 	cfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true, unprivileged)
 	if err != nil {
-		return nil, logp.InfoLevel, err
+		return nil, nil, logp.InfoLevel, err
 	}
 	lvl, err := getLogLevel(cfg, cfgPath)
 	if err != nil {
-		return nil, logp.InfoLevel, err
+		return nil, nil, logp.InfoLevel, err
 	}
 	m, err := cfg.ToMapStr()
 	if err != nil {
-		return nil, lvl, err
+		return nil, nil, lvl, err
 	}
 	ast, err := transpiler.NewAST(m)
 	if err != nil {
-		return nil, lvl, fmt.Errorf("could not create the AST from the configuration: %w", err)
+		return nil, nil, lvl, fmt.Errorf("could not create the AST from the configuration: %w", err)
 	}
 
 	// Wait for the variables based on the timeout.
 	vars, err := vars.WaitForVariables(ctx, l, cfg, timeout)
 	if err != nil {
-		return nil, lvl, fmt.Errorf("failed to gather variables: %w", err)
+		return nil, nil, lvl, fmt.Errorf("failed to gather variables: %w", err)
 	}
 
 	// Render the inputs using the discovered inputs.
@@ -443,18 +462,18 @@ func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath strin
 	if ok {
 		renderedInputs, err := transpiler.RenderInputs(inputs, vars)
 		if err != nil {
-			return nil, lvl, fmt.Errorf("rendering inputs failed: %w", err)
+			return nil, nil, lvl, fmt.Errorf("rendering inputs failed: %w", err)
 		}
 		err = transpiler.Insert(ast, renderedInputs, "inputs")
 		if err != nil {
-			return nil, lvl, fmt.Errorf("inserting rendered inputs failed: %w", err)
+			return nil, nil, lvl, fmt.Errorf("inserting rendered inputs failed: %w", err)
 		}
 	}
 	m, err = ast.Map()
 	if err != nil {
-		return nil, lvl, fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
+		return nil, nil, lvl, fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
 	}
-	return m, lvl, nil
+	return m, cfg.OTel, lvl, nil
 }
 
 func getLogLevel(rawCfg *config.Config, cfgPath string) (logp.Level, error) {
