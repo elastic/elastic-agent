@@ -54,10 +54,12 @@ This section provides a summary of components included in the Elastic Distributi
 | [nopreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/nopreceiver/v0.135.0/receiver/nopreceiver/README.md) | v0.135.0 |
 | [otlpreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/otlpreceiver/v0.135.0/receiver/otlpreceiver/README.md) | v0.135.0 |
 | [postgresqlreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/postgresqlreceiver/v0.135.0/receiver/postgresqlreceiver/README.md) | v0.135.0 |
+| [profiling](https://github.com/open-telemetry/opentelemetry-ebpf-profiler/blob/v0.0.202536/README.md) | v0.0.202536 |
 | [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusreceiver/v0.135.0/receiver/prometheusreceiver/README.md) | v0.135.0 |
 | [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.135.0/receiver/receivercreator/README.md) | v0.135.0 |
 | [redisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/redisreceiver/v0.135.0/receiver/redisreceiver/README.md) | v0.135.0 |
 | [sqlserverreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/sqlserverreceiver/v0.135.0/receiver/sqlserverreceiver/README.md) | v0.135.0 |
+| [windowseventlogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/windowseventlogreceiver/v0.135.0/receiver/windowseventlogreceiver/README.md) | v0.135.0 |
 | [zipkinreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zipkinreceiver/v0.135.0/receiver/zipkinreceiver/README.md) | v0.135.0 |
 
 ### Exporters
@@ -80,6 +82,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.135.0/processor/attributesprocessor/README.md) | v0.135.0 |
 | [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.135.0/processor/batchprocessor/README.md) | v0.135.0 |
 | [cumulativetodeltaprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/cumulativetodeltaprocessor/v0.135.0/processor/cumulativetodeltaprocessor/README.md) | v0.135.0 |
+| [elasticapmprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticapmprocessor/v0.2.0/processor/elasticapmprocessor/README.md) | v0.2.0 |
 | [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.17.0/processor/elasticinframetricsprocessor/README.md) | v0.17.0 |
 | [elastictraceprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elastictraceprocessor/v0.10.0/processor/elastictraceprocessor/README.md) | v0.10.0 |
 | [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.135.0/processor/filterprocessor/README.md) | v0.135.0 |
@@ -99,6 +102,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [apmconfigextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apmconfigextension/v0.7.0/extension/apmconfigextension/README.md) | v0.7.0 |
 | [bearertokenauthextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/bearertokenauthextension/v0.135.0/extension/bearertokenauthextension/README.md) | v0.135.0 |
 | [beatsauthextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/beatsauthextension/v0.3.0/extension/beatsauthextension/README.md) | v0.3.0 |
+| [extensiontest](https://github.com/open-telemetry/opentelemetry-collector/blob/extension/extensiontest/v0.135.0/extension/extensiontest/README.md) | v0.135.0 |
 | [filestorage](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/storage/filestorage/v0.135.0/extension/storage/filestorage/README.md) | v0.135.0 |
 | [headerssetterextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/headerssetterextension/v0.135.0/extension/headerssetterextension/README.md) | v0.135.0 |
 | [healthcheckextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckextension/v0.135.0/extension/healthcheckextension/README.md) | v0.135.0 |

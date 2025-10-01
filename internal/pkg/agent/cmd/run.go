@@ -6,6 +6,7 @@ package cmd
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -29,6 +30,7 @@ import (
 	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent-system-metrics/report"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
+	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -49,7 +51,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/server"
@@ -87,7 +88,6 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 			testingMode, _ := cmd.Flags().GetBool("testing-mode")
 			if err := run(cmd.Context(), nil, testingMode, fleetInitTimeout); err != nil && !errors.Is(err, context.Canceled) {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
-				logExternal(fmt.Sprintf("%s run failed: %s", paths.BinaryName, err))
 				return err
 			}
 			return nil
@@ -118,58 +118,77 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func run(ctx context.Context, override application.CfgOverrider, testingMode bool, fleetInitTimeout time.Duration, modifiers ...component.PlatformModifier) error {
+func logReturn(l *logger.Logger, err error) error {
+	if err != nil && !errors.Is(err, context.Canceled) {
+		l.Errorf("%s", err)
+		logExternal(fmt.Sprintf("%s run failed: %s", paths.BinaryName, err))
+	}
+	return err
+}
+
+// run provides a critical path to running runElasticAgent, it exhausts all efforts to log any
+// errors to ensure that any issues are captured in the logs.
+func run(
+	ctx context.Context,
+	override application.CfgOverrider,
+	testingMode bool,
+	fleetInitTimeout time.Duration,
+	modifiers ...component.PlatformModifier,
+) error {
+	var errs []error
+
+	// early handleUpgrade, but don't error yet
 	upgradeDetailsFromMarker, err := handleUpgrade()
 	if err != nil {
-		return fmt.Errorf("error checking for and handling upgrade: %w", err)
+		errs = append(errs, fmt.Errorf("failed to handle upgrade: %w", err))
 	}
 
+	// single run, but don't error yet
 	locker := filelock.NewAppLocker(paths.Data(), paths.AgentLockFileName)
-	if err := locker.TryLock(); err != nil {
-		return err
+	lockErr := locker.TryLock()
+	if lockErr != nil {
+		errs = append(errs, fmt.Errorf("failed to get app lock: %w", err))
 	}
 	defer func() {
 		_ = locker.Unlock()
 	}()
 
-	return runElasticAgent(ctx, override, testingMode, fleetInitTimeout, upgradeDetailsFromMarker, modifiers...)
-}
-
-func logReturn(l *logger.Logger, err error) error {
-	if err != nil && !errors.Is(err, context.Canceled) {
-		l.Errorf("%s", err)
-	}
-	return err
-}
-
-func runElasticAgent(
-	ctx context.Context,
-	override application.CfgOverrider,
-	testingMode bool,
-	fleetInitTimeout time.Duration,
-	upgradeDetailsFromMarker *details.Details,
-	modifiers ...component.PlatformModifier,
-) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	err := coordinator.RestoreConfig()
-	if err != nil {
-		return err
+	// try restore (if app locker didn't fail), but don't error yet
+	if lockErr == nil {
+		err = coordinator.RestoreConfig()
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to restore configuration: %w", err))
+		}
 	}
 
+	// try load config, but don't error yet
 	cfg, err := loadConfig(ctx, override)
 	if err != nil {
-		return err
+		// failed to load configuration, just load the default to create the logger
+		errs = append(errs, fmt.Errorf("failed to load configuration: %w", err))
+		cfg = configuration.DefaultConfiguration()
 	}
 
-	logLvl := logger.DefaultLogLevel
-	if cfg.Settings.LoggingConfig != nil {
-		logLvl = cfg.Settings.LoggingConfig.Level
-	}
 	baseLogger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, cfg.Settings.EventLoggingConfig, true)
 	if err != nil {
-		return err
+		errs = append(errs, fmt.Errorf("failed to create logger: %w", err))
+
+		// failed to create the baseLogger, this comes from the configuration being possibly invalid
+		// switch to a default config and try again
+		cfg = configuration.DefaultConfiguration()
+		baseLogger, err = logger.NewFromConfig("", cfg.Settings.LoggingConfig, cfg.Settings.EventLoggingConfig, true)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to create logger with default configuration: %w", err))
+
+			// this really should not happen, but this whole critical function is very defensive
+			baseLogger, err = logger.New("", true)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to create logger with no configuration: %w", err))
+
+				// again? no way, but you never know
+				baseLogger = logger.NewWithoutConfig("")
+			}
+		}
 	}
 
 	// Make sure to flush any buffered logs before we're done.
@@ -179,10 +198,40 @@ func runElasticAgent(
 		"source": agentName,
 	})
 
+	// at this point the logger is working, so any errors that we hit can now be logged and returned
+	if len(errs) > 0 {
+		return logReturn(l, goerrors.Join(errs...))
+	}
+
+	// actually run the agent now
+	err = runElasticAgent(ctx, baseLogger, l, cfg, override, testingMode, fleetInitTimeout, upgradeDetailsFromMarker, modifiers...)
+	return logReturn(l, err)
+}
+
+// runElasticAgent runs the actual Elastic Agent.
+func runElasticAgent(
+	ctx context.Context,
+	baseLogger *logger.Logger,
+	l *logger.Logger,
+	cfg *configuration.Configuration,
+	override application.CfgOverrider,
+	testingMode bool,
+	fleetInitTimeout time.Duration,
+	upgradeDetailsFromMarker *details.Details,
+	modifiers ...component.PlatformModifier,
+) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	logLvl := logger.DefaultLogLevel
+	if cfg.Settings.LoggingConfig != nil {
+		logLvl = cfg.Settings.LoggingConfig.Level
+	}
+
 	// try early to check if running as root
 	isRoot, err := utils.HasRoot()
 	if err != nil {
-		return logReturn(l, fmt.Errorf("failed to check for root/Administrator privileges: %w", err))
+		return fmt.Errorf("failed to check for root/Administrator privileges: %w", err)
 	}
 
 	l.Infow("Elastic Agent started",
@@ -192,7 +241,7 @@ func runElasticAgent(
 
 	cfg, err = tryDelayEnroll(ctx, l, cfg, override)
 	if err != nil {
-		return logReturn(l, errors.New(err, "failed to perform delayed enrollment"))
+		return errors.New(err, "failed to perform delayed enrollment")
 	}
 
 	// agent ID needs to stay empty in bootstrap mode
@@ -204,7 +253,7 @@ func runElasticAgent(
 	// that writes the agentID into fleet.enc (encrypted fleet.yml) before even loading the configuration.
 	err = secret.CreateAgentSecret(ctx, vault.WithUnprivileged(!isRoot))
 	if err != nil {
-		return logReturn(l, fmt.Errorf("failed to read/write secrets: %w", err))
+		return fmt.Errorf("failed to read/write secrets: %w", err)
 	}
 
 	// Migrate .yml files if the corresponding .enc does not exist
@@ -212,7 +261,7 @@ func runElasticAgent(
 	// the encrypted config does not exist but the unencrypted file does
 	err = migration.MigrateToEncryptedConfig(ctx, l, paths.AgentConfigYmlFile(), paths.AgentConfigFile())
 	if err != nil {
-		return logReturn(l, errors.New(err, "error migrating fleet config"))
+		return errors.New(err, "error migrating fleet config")
 	}
 
 	// the encrypted state does not exist but the unencrypted file does
@@ -220,15 +269,15 @@ func runElasticAgent(
 		paths.AgentStateStoreYmlFile(),
 		paths.AgentStateStoreFile())
 	if err != nil {
-		return logReturn(l, errors.New(err, "error migrating agent state"))
+		return errors.New(err, "error migrating agent state")
 	}
 
 	agentInfo, err := info.NewAgentInfoWithLog(ctx, defaultLogLevel(cfg, logLvl.String()), createAgentID)
 	if err != nil {
-		return logReturn(l, errors.New(err,
+		return errors.New(err,
 			"could not load agent info",
 			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, paths.AgentConfigFile())))
+			errors.M(errors.MetaKeyPath, paths.AgentConfigFile()))
 	}
 
 	// Ensure that the log level now matches what is configured in the agentInfo.
@@ -254,14 +303,14 @@ func runElasticAgent(
 
 	execPath, err := reexecPath()
 	if err != nil {
-		return logReturn(l, fmt.Errorf("failed to get reexec path: %w", err))
+		return fmt.Errorf("failed to get reexec path: %w", err)
 	}
 	rexLogger := l.Named("reexec")
 	rex := reexec.NewManager(rexLogger, execPath)
 
 	tracer, err := initTracer(agentName, release.Version(), cfg.Settings.MonitoringConfig)
 	if err != nil {
-		return logReturn(l, fmt.Errorf("could not initiate APM tracer: %w", err))
+		return fmt.Errorf("could not initiate APM tracer: %w", err)
 	}
 	if tracer != nil {
 		l.Info("APM instrumentation enabled")
@@ -277,12 +326,12 @@ func runElasticAgent(
 	coord, configMgr, _, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode,
 		fleetInitTimeout, isBootstrap, override, upgradeDetailsFromMarker, modifiers...)
 	if err != nil {
-		return logReturn(l, err)
+		return err
 	}
 
 	monitoringServer, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {
-		return logReturn(l, err)
+		return err
 	}
 	coord.RegisterMonitoringServer(monitoringServer)
 	defer func() {
@@ -306,7 +355,7 @@ func runElasticAgent(
 
 	// start the control listener
 	if err := control.Start(); err != nil {
-		return logReturn(l, err)
+		return err
 	}
 	defer control.Stop()
 
@@ -386,7 +435,7 @@ LOOP:
 	if isRex {
 		rex.ShutdownComplete()
 	}
-	return logReturn(l, err)
+	return err
 }
 
 func loadConfig(ctx context.Context, override application.CfgOverrider) (*configuration.Configuration, error) {
