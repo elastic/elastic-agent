@@ -696,7 +696,7 @@ func setupMetrics(
 	tracer *apm.Tracer,
 	coord *coordinator.Coordinator,
 ) (*reload.ServerReloader, error) {
-	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil { // nolint:staticcheck // will be fixed in subsequent PR
+	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil { //nolint:staticcheck // will be fixed in subsequent PR
 		return nil, err
 	}
 
