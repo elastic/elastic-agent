@@ -10,6 +10,8 @@ exporters:
   otlphttp:
     endpoint: https://localhost.com:4318
   nop:
+  logstash:
+    hosts: ["localhost:5044"]
 
 extensions:
   health_check:
@@ -44,7 +46,7 @@ processors:
     check_interval: 1s
     limit_mib: 4000
     spike_limit_mib: 800
-  elastictrace:
+  elasticapm:
   tail_sampling:
 
 receivers:
@@ -197,7 +199,7 @@ service:
         - resource
         - resourcedetection
         - transform
-        - elastictrace
+        - elasticapm
       receivers:
         - nop
         - otlp
