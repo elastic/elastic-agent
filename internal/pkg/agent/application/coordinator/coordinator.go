@@ -105,7 +105,7 @@ type MonitorManager interface {
 	// Enabled when configured to collect metrics/logs.
 	Enabled() bool
 
-	// Reload reloads the configuration for the upgrade manager.
+	// Reload reloads the configuration for the monitoring manager.
 	Reload(rawConfig *config.Config) error
 
 	// MonitoringConfig injects monitoring configuration into resolved ast tree.
