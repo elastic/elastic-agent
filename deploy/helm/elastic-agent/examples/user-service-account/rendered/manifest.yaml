@@ -4,7 +4,7 @@ apiVersion: v1
 kind: ServiceAccount
 automountServiceAccountToken: true
 metadata:
-  labels:    
+  labels:
     helm.sh/chart: kube-state-metrics-6.1.0
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
@@ -22,10 +22,10 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.2.0-beta
+    helm.sh/chart: elastic-agent-9.3.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.2.0
+    app.kubernetes.io/version: 9.3.0
 stringData:
 
   agent.yml: |-
@@ -265,10 +265,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.2.0-beta
+    helm.sh/chart: elastic-agent-9.3.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.2.0
+    app.kubernetes.io/version: 9.3.0
 stringData:
 
   agent.yml: |-
@@ -445,7 +445,7 @@ stringData:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  labels:    
+  labels:
     helm.sh/chart: kube-state-metrics-6.1.0
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
@@ -602,10 +602,10 @@ kind: ClusterRole
 metadata:
   name: agent-clusterWide-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.2.0-beta
+    helm.sh/chart: elastic-agent-9.3.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.2.0
+    app.kubernetes.io/version: 9.3.0
   annotations:
     elastic-agent.k8s.elastic.co/cr: nginx
 rules:
@@ -684,10 +684,10 @@ kind: ClusterRole
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.2.0-beta
+    helm.sh/chart: elastic-agent-9.3.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.2.0
+    app.kubernetes.io/version: 9.3.0
   annotations:
     elastic-agent.k8s.elastic.co/cr: nginx
 rules:
@@ -764,7 +764,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  labels:    
+  labels:
     helm.sh/chart: kube-state-metrics-6.1.0
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
@@ -788,10 +788,10 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-clusterWide-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.2.0-beta
+    helm.sh/chart: elastic-agent-9.3.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.2.0
+    app.kubernetes.io/version: 9.3.0
 subjects:
   - kind: ServiceAccount
     name: user-sa-clusterWide
@@ -807,10 +807,10 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.2.0-beta
+    helm.sh/chart: elastic-agent-9.3.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.2.0
+    app.kubernetes.io/version: 9.3.0
 subjects:
   - kind: ServiceAccount
     name: user-sa-perNode
@@ -826,7 +826,7 @@ kind: Service
 metadata:
   name: kube-state-metrics
   namespace: default
-  labels:    
+  labels:
     helm.sh/chart: kube-state-metrics-6.1.0
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
@@ -843,8 +843,8 @@ spec:
     protocol: TCP
     port: 8080
     targetPort: 8080
-  
-  selector:    
+
+  selector:
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
 ---
@@ -855,10 +855,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.2.0-beta
+    helm.sh/chart: elastic-agent-9.3.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.2.0
+    app.kubernetes.io/version: 9.3.0
 spec:
   selector:
     matchLabels:
@@ -889,7 +889,7 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
-        image: docker.elastic.co/elastic-agent/elastic-agent:9.2.0-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:9.3.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
@@ -950,7 +950,7 @@ kind: Deployment
 metadata:
   name: kube-state-metrics
   namespace: default
-  labels:    
+  labels:
     helm.sh/chart: kube-state-metrics-6.1.0
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
@@ -960,7 +960,7 @@ metadata:
     app.kubernetes.io/version: "2.16.0"
 spec:
   selector:
-    matchLabels:      
+    matchLabels:
       app.kubernetes.io/name: kube-state-metrics
       app.kubernetes.io/instance: example
   replicas: 1
@@ -969,7 +969,7 @@ spec:
   revisionHistoryLimit: 10
   template:
     metadata:
-      labels:        
+      labels:
         helm.sh/chart: kube-state-metrics-6.1.0
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/component: metrics
@@ -1037,10 +1037,10 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.2.0-beta
+    helm.sh/chart: elastic-agent-9.3.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.2.0
+    app.kubernetes.io/version: 9.3.0
 spec:
   selector:
     matchLabels:
@@ -1071,7 +1071,7 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
-        image: docker.elastic.co/elastic-agent/elastic-agent:9.2.0-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:9.3.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
