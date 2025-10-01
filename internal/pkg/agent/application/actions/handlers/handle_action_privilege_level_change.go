@@ -47,7 +47,6 @@ func (h *PrivilegeLevelChange) Handle(ctx context.Context, a fleetapi.Action, ac
 }
 
 func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) (rerr error) {
-	h.log.Debugf("handlerPrivilegeLevelChange: action '%+v' received", a)
 	action, ok := a.(*fleetapi.ActionPrivilegeLevelChange)
 	if !ok {
 		return fmt.Errorf("invalid type, expected ActionPrivilegeLevelChange and received %T", a)
@@ -55,7 +54,6 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 
 	defer func() {
 		if rerr != nil {
-			h.log.Debugf("handlerPrivilegeLevelChange: acking failure: %v", rerr)
 			h.ackFailure(ctx, rerr, action, acker)
 		}
 	}()
@@ -81,8 +79,6 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 	username, password = install.UnprivilegedUser(username, password)
 	groupname = install.UnprivilegedGroup(groupname)
 
-	h.log.Debugf("handlerPrivilegeLevelChange: proceeding with user %q and group %q", username, groupname)
-
 	// apply empty config to stop processing
 	unenrollPolicy := newPolicyChange(ctx, config.New(), a, acker, true, false)
 	h.ch <- unenrollPolicy
@@ -90,16 +86,13 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 	unenrollCtx, cancel := context.WithTimeout(ctx, unenrollTimeout)
 	defer cancel()
 
-	h.log.Debugf("handlerPrivilegeLevelChange: waiting for empty policy to take place")
 	unenrollPolicy.WaitAck(unenrollCtx)
 
 	// fix permissions
 	topPath := paths.Top()
-	h.log.Debugf("handlerPrivilegeLevelChange: fixing permissions from %v", topPath)
 	_, err = install.SwitchServiceUser(topPath, &debugDescriber{h.log}, username, groupname, password)
 	if err != nil {
 		// error already adds context
-		h.log.Debugf("handlerPrivilegeLevelChange: fixing failed with error: %v", err)
 		return err
 	}
 

@@ -11,10 +11,11 @@ import (
 	"os"
 	"syscall"
 
+	"gopkg.in/ini.v1"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/pkg/utils"
-	"gopkg.in/ini.v1"
 )
 
 // logExternal logs the error to an external log.  On non-windows systems this is a no-op.
