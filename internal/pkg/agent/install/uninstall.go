@@ -392,7 +392,7 @@ func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken str
 			continue
 		}
 		if err = uninstallServiceComponent(ctx, log, comp, uninstallToken, pt); err != nil {
-			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall component %q: %s\n", comp.ID, err))
+			fmt.Fprintf(os.Stderr, "failed to uninstall component %q: %s\n", comp.ID, err)
 			// The decision was made to change the behaviour and leave the Agent installed if Endpoint uninstall fails
 			// https://github.com/elastic/elastic-agent/pull/2708#issuecomment-1574251911
 			// Thus returning error here.

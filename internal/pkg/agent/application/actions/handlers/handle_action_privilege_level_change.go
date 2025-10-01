@@ -98,10 +98,12 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 
 	// ack
 	if err := acker.Ack(ctx, a); err != nil {
-		h.log.Errorf("failed to ACK an action: %w", err)
+		h.log.Errorw("failed to ACK an action",
+			"error.message", err)
 	}
 	if err := acker.Commit(ctx); err != nil {
-		h.log.Errorf("failed to commit ACK of an action: %w", err)
+		h.log.Errorw("failed to commit ACK of an action",
+			"error.message", err)
 	}
 
 	// restart
@@ -124,10 +126,6 @@ func (h *PrivilegeLevelChange) ackFailure(ctx context.Context, err error, action
 			"action", action)
 	}
 }
-
-type noopDescriber struct{}
-
-func (*noopDescriber) Describe(string) {}
 
 type debugDescriber struct {
 	l *logger.Logger

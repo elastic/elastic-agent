@@ -211,7 +211,6 @@ func runElasticAgent(
 	if isRoot {
 		userName, groupName, err := getDesiredUser()
 		if err != nil {
-			l.Errorf("failed to determine target user: %w", err)
 			return fmt.Errorf("failed to determine target user: %w", err)
 		}
 
@@ -219,7 +218,6 @@ func runElasticAgent(
 		if userName != "" || groupName != "" {
 			ownership, err = install.EnsureUserAndGroup(userName, groupName, &debugDescriber{l}, true)
 			if err != nil {
-				l.Errorf("failed to setup user: %w", err)
 				return fmt.Errorf("failed to setup user: %w", err)
 			}
 		}
@@ -227,16 +225,10 @@ func runElasticAgent(
 		topPath := paths.Top()
 		err = perms.FixPermissions(topPath, perms.WithOwnership(ownership))
 		if err != nil {
-			l.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
 			return fmt.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
 		}
 
 		if err := dropRootPrivileges(ownership); err != nil {
-			l.Errorf("failed to drop permissions to user %q(%v):%q(%v): %w",
-				userName, ownership.UID,
-				groupName, ownership.GID,
-				err,
-			)
 			return fmt.Errorf("failed to drop permissions to user %q(%v):%q(%v): %w",
 				userName, ownership.UID,
 				groupName, ownership.GID,
@@ -341,7 +333,7 @@ func runElasticAgent(
 		return logReturn(l, err)
 	}
 
-	monitoringServer, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
+	monitoringServer, err := setupMetrics(l, cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {
 		return logReturn(l, err)
 	}
@@ -700,12 +692,11 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 
 func setupMetrics(
 	logger *logger.Logger,
-	operatingSystem string,
 	cfg *monitoringCfg.MonitoringConfig,
 	tracer *apm.Tracer,
 	coord *coordinator.Coordinator,
 ) (*reload.ServerReloader, error) {
-	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil {
+	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil { // nolint:staticcheck // will be fixed in subsequent PR
 		return nil, err
 	}
 
