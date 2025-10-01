@@ -31,6 +31,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.5.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.7.0
 	github.com/elastic/opentelemetry-collector-components/extension/beatsauthextension v0.3.0
+	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.2.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.17.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.10.0
 	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.3.0
@@ -93,6 +94,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver v0.135.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver v0.135.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.135.0
 	github.com/otiai10/copy v1.14.0
 	github.com/rednafi/link-patrol v0.0.0-20240826150821-057643e74d4d
@@ -122,6 +124,7 @@ require (
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.135.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.135.0
 	go.opentelemetry.io/collector/receiver/otlpreceiver v0.135.0
+	go.opentelemetry.io/collector/service v0.135.0
 	go.opentelemetry.io/ebpf-profiler v0.0.202536
 	go.uber.org/zap v1.27.0
 	go.yaml.in/yaml/v3 v3.0.4
@@ -719,7 +722,6 @@ require (
 	go.opentelemetry.io/collector/scraper v0.135.0 // indirect
 	go.opentelemetry.io/collector/scraper/scraperhelper v0.135.0 // indirect
 	go.opentelemetry.io/collector/semconv v0.128.1-0.20250610090210-188191247685 // indirect
-	go.opentelemetry.io/collector/service v0.135.0 // indirect
 	go.opentelemetry.io/collector/service/hostcapabilities v0.135.0 // indirect
 	go.opentelemetry.io/contrib/bridges/otelzap v0.12.0 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.36.0 // indirect
