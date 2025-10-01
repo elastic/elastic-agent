@@ -1,23 +1,2 @@
-:::{include} /release-notes/_snippets/9.0.7/index.md
-:::
-
-:::{include} /release-notes/_snippets/9.0.6/index.md
-:::
-
-:::{include} /release-notes/_snippets/9.0.5/index.md
-:::
-
-:::{include} /release-notes/_snippets/9.0.4/index.md
-:::
-
-:::{include} /release-notes/_snippets/9.0.3/index.md
-:::
-
-:::{include} /release-notes/_snippets/9.0.2/index.md
-:::
-
-:::{include} /release-notes/_snippets/9.0.1/index.md
-:::
-
-:::{include} /release-notes/_snippets/9.0.0/index.md
+:::{include} /release-notes/_snippets/index/9.0.md
 :::
