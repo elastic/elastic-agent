@@ -92,19 +92,19 @@ For the full list of options, refer to the [upstream `filelogreceiver` documenta
 
 These tips can help you get the most out of the filelog receiver:
 
-- **Use [persistent storage](https://github.com/open-telemetry/opentelemetry-collector/blob/main/docs/design.md#storage-extension) to avoid duplicates**  
+### Use [persistent storage](https://github.com/open-telemetry/opentelemetry-collector/blob/main/docs/design.md#storage-extension) to avoid duplicates
   Without persistent storage, the receiver will not retain file read positions across restarts. This can result in either duplicate ingestion (if `start_at` is set to `beginning`) or lost logs (if set to `end`). Use the `storage:` setting and configure a persistent volume when running in Kubernetes.
 
-- **Exclude rotated or compressed log files unless needed**  
+### Exclude rotated or compressed log files unless needed
   The default configuration excludes rotated files, which helps prevent duplicate ingestion. If you need to include rotated logs, update the `include:` and `exclude:` patterns accordingly.
 
-- **Enable multiline log parsing for stack traces and similar patterns**  
+### Enable multiline log parsing for stack traces and similar patterns
   Multiline log support is not enabled by default. To handle multi-line messages such as stack traces, define a `regex_parser`, `combine_logs`, or `multiline` operator in your Helm chart configuration.
 
-- **Route different log formats using conditional parsing**  
+### Route different log formats using conditional parsing 
   If your environment produces logs in multiple formats (for example containerd and CRI-O), use the `router` operator to apply appropriate parsers based on the log structure.
 
-- **Avoid using `start_at: beginning` without storage**  
+### Avoid using `start_at: beginning` without storage
   Using `start_at: beginning` without a storage extension will re-read all files from the start after each restart, which might lead to duplicate log entries.
 
 
