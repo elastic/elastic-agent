@@ -78,16 +78,16 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 
 	settings := NewRollbackSettings(opts...)
 
-	symlinkPath := filepath.Join(topDirPath, agentName)
+	symlinkPath := filepath.Join(topDirPath, AgentName)
 
 	var symlinkTarget string
 	if prevVersionedHome != "" {
-		symlinkTarget = paths.BinaryPath(filepath.Join(topDirPath, prevVersionedHome), agentName)
+		symlinkTarget = paths.BinaryPath(filepath.Join(topDirPath, prevVersionedHome), AgentName)
 	} else {
 		// fallback for upgrades that didn't use the manifest and path remapping
-		hashedDir := fmt.Sprintf("%s-%s", agentName, prevHash)
+		hashedDir := fmt.Sprintf("%s-%s", AgentName, prevHash)
 		// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
-		symlinkTarget = paths.BinaryPath(filepath.Join(paths.DataFrom(topDirPath), hashedDir), agentName)
+		symlinkTarget = paths.BinaryPath(filepath.Join(paths.DataFrom(topDirPath), hashedDir), AgentName)
 	}
 	// change symlink
 	if err := changeSymlink(log, topDirPath, symlinkPath, symlinkTarget); err != nil {
@@ -128,7 +128,7 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 	}
 
 	if prevVersionedHome == "" {
-		prevVersionedHome = filepath.Join("data", fmt.Sprintf("%s-%s", agentName, prevHash))
+		prevVersionedHome = filepath.Join("data", fmt.Sprintf("%s-%s", AgentName, prevHash))
 	}
 
 	// cleanup everything except version we're rolling back into
@@ -176,7 +176,7 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 	log.Infow("Removing previous symlink path", "file.path", prevSymlinkPath(topDirPath))
 	_ = os.Remove(prevSymlink)
 
-	dirPrefix := fmt.Sprintf("%s-", agentName)
+	dirPrefix := fmt.Sprintf("%s-", AgentName)
 
 	relativeHomePaths := make([]string, len(versionedHomesToKeep))
 	for i, h := range versionedHomesToKeep {

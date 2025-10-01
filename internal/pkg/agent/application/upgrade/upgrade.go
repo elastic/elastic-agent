@@ -43,8 +43,8 @@ import (
 )
 
 const (
-	agentName          = "elastic-agent"
-	hashLen            = 6
+	AgentName          = "elastic-agent"
+	HashLen            = 6
 	agentCommitFile    = ".elastic-agent.active.commit"
 	runDirMod          = 0770
 	snapshotSuffix     = "-SNAPSHOT"
@@ -54,8 +54,8 @@ const (
 
 var agentArtifact = artifact.Artifact{
 	Name:     "Elastic Agent",
-	Cmd:      agentName,
-	Artifact: "beats/" + agentName,
+	Cmd:      AgentName,
+	Artifact: "beats/" + AgentName,
 }
 
 var (
@@ -428,10 +428,10 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	// create symlink to the <new versioned-home>/elastic-agent
 	hashedDir := unpackRes.VersionedHome
 
-	symlinkPath := filepath.Join(paths.Top(), agentName)
+	symlinkPath := filepath.Join(paths.Top(), AgentName)
 
 	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
-	newPath := paths.BinaryPath(filepath.Join(paths.Top(), hashedDir), agentName)
+	newPath := paths.BinaryPath(filepath.Join(paths.Top(), hashedDir), AgentName)
 
 	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
 	if err != nil {
@@ -593,8 +593,8 @@ func isSameVersion(log *logger.Logger, current agentVersion, newVersion agentVer
 }
 
 func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, rollbackSource availableRollbacksSource) error {
-	oldAgentPath := paths.BinaryPath(filepath.Join(topDirPath, oldVersionedHome), agentName)
-	err := changeSymlink(log, topDirPath, filepath.Join(topDirPath, agentName), oldAgentPath)
+	oldAgentPath := paths.BinaryPath(filepath.Join(topDirPath, oldVersionedHome), AgentName)
+	err := changeSymlink(log, topDirPath, filepath.Join(topDirPath, AgentName), oldAgentPath)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("rolling back install: restoring symlink to %q failed: %w", oldAgentPath, err)
 	}

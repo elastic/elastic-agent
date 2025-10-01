@@ -339,7 +339,7 @@ func TestRollback(t *testing.T) {
 func TestRollbackWithOpts(t *testing.T) {
 	type hookFuncWithLogs func(t *testing.T, logs *observer.ObservedLogs, topDir string)
 
-	agentExecutableName := agentName
+	agentExecutableName := AgentName
 	if runtime.GOOS == "windows" {
 		agentExecutableName += ".exe"
 	}
@@ -595,7 +595,7 @@ func checkFilesAfterCleanup(t *testing.T, topDir, newAgentHome string, oldAgentH
 
 	// check the new agent home
 	assert.DirExists(t, filepath.Join(topDir, newAgentHome), "new agent directory should exist after cleanup")
-	agentExecutable := agentName
+	agentExecutable := AgentName
 	if runtime.GOOS == "windows" {
 		agentExecutable += ".exe"
 	}
@@ -624,11 +624,11 @@ func checkFilesAfterRollback(t *testing.T, topDir, oldAgentHome, newAgentHome st
 	// some things should have been removed from the new agent directory
 	assert.NoDirExists(t, filepath.Join(topDir, newAgentHome, "components"), "new agent components directory should have been cleaned up in the rollback")
 	assert.NoDirExists(t, filepath.Join(topDir, newAgentHome, "run"), "new agent run directory should have been cleaned up in the rollback")
-	assert.NoFileExists(t, filepath.Join(topDir, newAgentHome, agentName), "new agent binary should have been cleaned up in the rollback")
+	assert.NoFileExists(t, filepath.Join(topDir, newAgentHome, AgentName), "new agent binary should have been cleaned up in the rollback")
 
 	// check the old agent home
 	assert.DirExists(t, filepath.Join(topDir, oldAgentHome), "old agent directory should exist after rollback")
-	agentExecutable := agentName
+	agentExecutable := AgentName
 	if runtime.GOOS == "windows" {
 		agentExecutable += ".exe"
 	}
@@ -693,10 +693,10 @@ func setupAgents(t *testing.T, log *logger.Logger, topDir string, installations 
 func createFakeAgentInstall(t *testing.T, topDir, version, hash string, useVersionInPath bool) string {
 
 	// create versioned home
-	versionedHome := fmt.Sprintf("elastic-agent-%s", hash[:hashLen])
+	versionedHome := fmt.Sprintf("elastic-agent-%s", hash[:HashLen])
 	if useVersionInPath {
 		// use the version passed as parameter
-		versionedHome = fmt.Sprintf("elastic-agent-%s-%s", version, hash[:hashLen])
+		versionedHome = fmt.Sprintf("elastic-agent-%s-%s", version, hash[:HashLen])
 	}
 	relVersionedHomePath := filepath.Join("data", versionedHome)
 	absVersionedHomePath := filepath.Join(topDir, relVersionedHomePath)
@@ -721,7 +721,7 @@ func createFakeAgentInstall(t *testing.T, topDir, version, hash string, useVersi
 	require.NoError(t, err, "error creating fake install run directory %q", absRunDirPath)
 
 	// put some placeholder for files
-	agentExecutableName := agentName
+	agentExecutableName := AgentName
 	if runtime.GOOS == "windows" {
 		agentExecutableName += ".exe"
 	}
@@ -736,8 +736,8 @@ func createFakeAgentInstall(t *testing.T, topDir, version, hash string, useVersi
 }
 
 func createLink(t *testing.T, topDir string, currentAgentVersionedHome string) {
-	linkTarget := paths.BinaryPath(currentAgentVersionedHome, agentName)
-	linkName := agentName
+	linkTarget := paths.BinaryPath(currentAgentVersionedHome, AgentName)
+	linkName := AgentName
 	if runtime.GOOS == "windows" {
 		linkTarget += ".exe"
 		linkName += ".exe"
