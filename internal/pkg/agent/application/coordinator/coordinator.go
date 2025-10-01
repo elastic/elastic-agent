@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 
 	"go.opentelemetry.io/collector/component/componentstatus"
 
@@ -104,7 +105,7 @@ type MonitorManager interface {
 	// Enabled when configured to collect metrics/logs.
 	Enabled() bool
 
-	// Reload reloads the configuration for the upgrade manager.
+	// Reload reloads the configuration for the monitoring manager.
 	Reload(rawConfig *config.Config) error
 
 	// MonitoringConfig injects monitoring configuration into resolved ast tree.
@@ -1778,7 +1779,7 @@ func (c *Coordinator) updateManagersWithConfig(model *component.Model) {
 		for _, comp := range otelModel.Components {
 			componentIDs = append(componentIDs, comp.ID)
 		}
-		c.logger.With("component_ids", componentIDs).Warn("The Otel runtime manager is HIGHLY EXPERIMENTAL and only intended for testing. Use at your own risk.")
+		c.logger.With("component_ids", componentIDs).Info("Using OpenTelemetry collector runtime.")
 	}
 	c.otelMgr.Update(c.otelCfg, otelModel.Components)
 }
@@ -1787,6 +1788,7 @@ func (c *Coordinator) updateManagersWithConfig(model *component.Model) {
 func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtimeModel *component.Model, otelModel *component.Model) {
 	var otelComponents, runtimeComponents []component.Component
 	for _, comp := range model.Components {
+		c.maybeOverrideRuntimeForComponent(&comp)
 		switch comp.RuntimeManager {
 		case component.OtelRuntimeManager:
 			otelComponents = append(otelComponents, comp)
@@ -1806,6 +1808,25 @@ func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtime
 		Signed:     model.Signed,
 	}
 	return
+}
+
+// maybeOverrideRuntimeForComponent sets the correct runtime for the given component.
+// Normally, we use the runtime set in the component itself via the configuration, but
+// we may also fall back to the process runtime if the otel runtime is unsupported for
+// some reason. One example is the output using unsupported config options.
+func (c *Coordinator) maybeOverrideRuntimeForComponent(comp *component.Component) {
+	if comp.RuntimeManager == component.ProcessRuntimeManager {
+		// do nothing, the process runtime can handle any component
+		return
+	}
+	if comp.RuntimeManager == component.OtelRuntimeManager {
+		// check if the component is actually supported
+		err := translate.VerifyComponentIsOtelSupported(comp)
+		if err != nil {
+			c.logger.Warnf("otel runtime is not supported for component %s, switching to process runtime, reason: %v", comp.ID, err)
+			comp.RuntimeManager = component.ProcessRuntimeManager
+		}
+	}
 }
 
 func (c *Coordinator) isFleetServer() bool {
