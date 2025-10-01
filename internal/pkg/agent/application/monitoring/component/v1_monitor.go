@@ -21,13 +21,10 @@ import (
 	"time"
 	"unicode"
 
-	"go.opentelemetry.io/collector/confmap"
-	"go.opentelemetry.io/collector/service"
+	koanfmaps "github.com/knadh/koanf/maps"
 
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/utils"
-
-	koanfmaps "github.com/knadh/koanf/maps"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -91,12 +88,12 @@ var (
 // BeatsMonitor provides config values for monitoring of agent clients (beats, endpoint, etc)
 // by injecting the monitoring config into an existing fleet config
 type BeatsMonitor struct {
-	enabled                 bool // feature flag disabling whole v1 monitoring story
-	config                  *monitoringConfig
-	otelConfig              *confmap.Conf
-	operatingSystem         string
-	agentInfo               info.Agent
-	isOtelRuntimeSubprocess bool
+	enabled                     bool // feature flag disabling whole v1 monitoring story
+	config                      *monitoringConfig
+	operatingSystem             string
+	agentInfo                   info.Agent
+	isOtelRuntimeSubprocess     bool
+	otelCollectorMonitoringPort int
 }
 
 // componentInfo is the information necessary to generate monitoring configuration for a component. We don't just use
@@ -115,16 +112,23 @@ type monitoringConfig struct {
 }
 
 // New creates a new BeatsMonitor instance.
-func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, otelCfg *confmap.Conf, agentInfo info.Agent, isOtelRuntimeSubprocess bool) *BeatsMonitor {
+func New(
+	enabled bool,
+	operatingSystem string,
+	cfg *monitoringCfg.MonitoringConfig,
+	agentInfo info.Agent,
+	isOtelRuntimeSubprocess bool,
+	otelCollectorMonitoringPort int,
+) *BeatsMonitor {
 	return &BeatsMonitor{
 		enabled: enabled,
 		config: &monitoringConfig{
 			C: cfg,
 		},
-		otelConfig:              otelCfg,
-		operatingSystem:         operatingSystem,
-		agentInfo:               agentInfo,
-		isOtelRuntimeSubprocess: isOtelRuntimeSubprocess,
+		operatingSystem:             operatingSystem,
+		agentInfo:                   agentInfo,
+		isOtelRuntimeSubprocess:     isOtelRuntimeSubprocess,
+		otelCollectorMonitoringPort: otelCollectorMonitoringPort,
 	}
 }
 
@@ -149,7 +153,6 @@ func (b *BeatsMonitor) Reload(rawConfig *config.Config) error {
 	}
 
 	b.config = &newConfig
-	b.otelConfig = rawConfig.OTel
 	return nil
 }
 
@@ -519,34 +522,7 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 }
 
 func (b *BeatsMonitor) getCollectorTelemetryEndpoint() string {
-	if b.otelConfig != nil {
-		if serviceConfig, err := b.otelConfig.Sub("service"); err == nil {
-			var service service.Config
-			if serviceConfig.Unmarshal(&service, confmap.WithIgnoreUnused()) == nil {
-				for _, reader := range service.Telemetry.Metrics.Readers {
-					if reader.Pull == nil || reader.Pull.Exporter.Prometheus == nil {
-						continue
-					}
-					prometheus := *reader.Pull.Exporter.Prometheus
-					host := "localhost"
-					port := 8888
-
-					if prometheus.Host != nil {
-						host = *prometheus.Host
-					}
-					if prometheus.Port != nil {
-						port = *prometheus.Port
-					}
-					if prometheus.Host != nil || prometheus.Port != nil {
-						return host + ":" + strconv.Itoa(port)
-					}
-				}
-			}
-		}
-	}
-
-	// If there is no explicit configuration, the collector publishes its telemetry on port 8888.
-	return "localhost:8888"
+	return fmt.Sprintf("localhost:%d", b.otelCollectorMonitoringPort)
 }
 
 // injectMetricsInput injects monitoring config for agent monitoring to the `cfg` object.

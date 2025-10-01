@@ -5,33 +5,12 @@
 package manager
 
 import (
-	"errors"
-	"net"
 	"path/filepath"
-	"testing"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/component"
-
-	"github.com/stretchr/testify/require"
 )
-
-func TestFindRandomPort(t *testing.T) {
-	port, err := findRandomTCPPort()
-	require.NoError(t, err)
-	require.NotEqual(t, 0, port)
-
-	defer func() {
-		netListen = net.Listen
-	}()
-
-	netListen = func(string, string) (net.Listener, error) {
-		return nil, errors.New("some error")
-	}
-	_, err = findRandomTCPPort()
-	require.Error(t, err, "failed to find random port")
-}
 
 func testComponent(componentId string) component.Component {
 	fileStreamConfig := map[string]any{

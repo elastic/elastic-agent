@@ -77,6 +77,7 @@ type OTelManager struct {
 	// the mergedCollectorCfg is nil then the collector is not running.
 	mergedCollectorCfg     *confmap.Conf
 	mergedCollectorCfgHash []byte
+	collectorMetricsPort   int
 
 	currentCollectorStatus *status.AggregateStatus
 	currentComponentStates map[string]runtime.ComponentComponentState
@@ -122,6 +123,7 @@ func NewOTelManager(
 	baseLogger *logger.Logger,
 	mode ExecutionMode,
 	agentInfo info.Agent,
+	collectorMetricsPort int,
 	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter,
 	stopTimeout time.Duration,
 ) (*OTelManager, error) {
@@ -157,6 +159,7 @@ func NewOTelManager(
 		errCh:                      make(chan error, 1), // holds at most one error
 		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
 		componentStateCh:           make(chan []runtime.ComponentComponentState, 1),
+		collectorMetricsPort:       collectorMetricsPort,
 		updateCh:                   make(chan configUpdate, 1),
 		doneChan:                   make(chan struct{}),
 		execution:                  exec,
@@ -280,7 +283,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			// and reset the retry count
 			m.recoveryTimer.Stop()
 			m.recoveryRetries.Store(0)
-			mergedCfg, err := buildMergedConfig(cfgUpdate, m.agentInfo, m.beatMonitoringConfigGetter, m.baseLogger)
+			mergedCfg, err := buildMergedConfig(cfgUpdate, m.agentInfo, m.beatMonitoringConfigGetter, m.collectorMetricsPort, m.baseLogger)
 			if err != nil {
 				reportErr(ctx, m.errCh, err)
 				continue
@@ -328,7 +331,13 @@ func (m *OTelManager) Errors() <-chan error {
 }
 
 // buildMergedConfig combines collector configuration with component-derived configuration.
-func buildMergedConfig(cfgUpdate configUpdate, agentInfo info.Agent, monitoringConfigGetter translate.BeatMonitoringConfigGetter, logger *logp.Logger) (*confmap.Conf, error) {
+func buildMergedConfig(
+	cfgUpdate configUpdate,
+	agentInfo info.Agent,
+	monitoringConfigGetter translate.BeatMonitoringConfigGetter,
+	collectorMetricsPort int,
+	logger *logp.Logger,
+) (*confmap.Conf, error) {
 	mergedOtelCfg := confmap.New()
 
 	// Generate component otel config if there are components
@@ -361,6 +370,10 @@ func buildMergedConfig(cfgUpdate configUpdate, agentInfo info.Agent, monitoringC
 		if err != nil {
 			return nil, fmt.Errorf("failed to merge collector otel config: %w", err)
 		}
+	}
+
+	if err := addCollectorMetricsPort(mergedOtelCfg, collectorMetricsPort); err != nil {
+		return nil, fmt.Errorf("failed to add random collector metrics port: %w", err)
 	}
 
 	if err := injectDiagnosticsExtension(mergedOtelCfg); err != nil {
@@ -616,4 +629,41 @@ func calculateConfmapHash(conf *confmap.Conf) ([]byte, error) {
 	}
 
 	return h.Sum(nil), nil
+}
+
+func addCollectorMetricsPort(conf *confmap.Conf, port int) error {
+	// We operate on untyped maps instead of otel config structs because the otel collector has an elaborate
+	// configuration resolution system, and we can't reproduce it fully here. It's possible some of the values won't
+	// be valid for unmarshalling, because they're supposed to be loaded from environment variables, and so on.
+	metricReadersUntyped := conf.Get("service::telemetry::metrics::readers")
+	if metricReadersUntyped == nil {
+		metricReadersUntyped = []any{}
+	}
+	metricsReadersList, ok := metricReadersUntyped.([]any)
+	if !ok {
+		return fmt.Errorf("couldn't convert value of service::telemetry::metrics::readers to a list: %v", metricReadersUntyped)
+	}
+
+	metricsReader := map[string]any{
+		"pull": map[string]any{
+			"exporter": map[string]any{
+				"prometheus": map[string]any{
+					"host": "localhost",
+					"port": port,
+					// this is the default configuration from the otel collector
+					"without_scope_info":  true,
+					"without_units":       true,
+					"without_type_suffix": true,
+				},
+			},
+		},
+	}
+	metricsReadersList = append(metricsReadersList, metricsReader)
+	confMap := map[string]any{
+		"service::telemetry::metrics::readers": metricsReadersList,
+	}
+	if mergeErr := conf.Merge(confmap.NewFromStringMap(confMap)); mergeErr != nil {
+		return fmt.Errorf("failed to merge config: %w", mergeErr)
+	}
+	return nil
 }

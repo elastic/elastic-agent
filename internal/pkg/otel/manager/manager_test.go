@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -778,7 +779,9 @@ func TestOTelManager_Logging(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// the execution mode passed here is overridden below so it is irrelevant
-			m, err := NewOTelManager(l, logp.DebugLevel, base, EmbeddedExecutionMode, nil, nil, waitTimeForStop)
+			metricsPort, err := utils.FindRandomTCPPort()
+			require.NoError(t, err)
+			m, err := NewOTelManager(l, logp.DebugLevel, base, EmbeddedExecutionMode, nil, metricsPort, nil, waitTimeForStop)
 			require.NoError(t, err, "could not create otel manager")
 
 			executionMode, err := tc.execModeFn(m.collectorRunErr)
@@ -866,6 +869,7 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 	commonAgentInfo := &info.AgentInfo{}
 	commonBeatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
 	testComp := testComponent("test-component")
+	metricsPort := 9999
 
 	tests := []struct {
 		name                string
@@ -887,9 +891,9 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 		},
 		{
 			name:         "collector config only",
-			collectorCfg: confmap.NewFromStringMap(map[string]any{"receivers": map[string]any{"nop": map[string]any{}}}),
+			collectorCfg: confmap.NewFromStringMap(testConfig),
 			components:   nil,
-			expectedKeys: []string{"receivers"},
+			expectedKeys: []string{"receivers", "exporters", "service", "processors"},
 		},
 		{
 			name:         "components only",
@@ -899,7 +903,7 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 		},
 		{
 			name:         "both collector config and components",
-			collectorCfg: confmap.NewFromStringMap(map[string]any{"processors": map[string]any{"batch": map[string]any{}}}),
+			collectorCfg: confmap.NewFromStringMap(testConfig),
 			components:   []component.Component{testComp},
 			expectedKeys: []string{"receivers", "exporters", "service", "processors"},
 		},
@@ -922,7 +926,7 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 				collectorCfg: tt.collectorCfg,
 				components:   tt.components,
 			}
-			result, err := buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter, logptest.NewTestingLogger(t, ""))
+			result, err := buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter, metricsPort, logptest.NewTestingLogger(t, ""))
 
 			if tt.expectedErrorString != "" {
 				assert.Error(t, err)
@@ -1244,6 +1248,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		}
 		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
 		assert.NoError(t, injectDiagnosticsExtension(expectedCfg))
+		assert.NoError(t, addCollectorMetricsPort(expectedCfg, mgr.collectorMetricsPort))
 		assert.Equal(t, expectedCfg, execution.cfg)
 
 	})
@@ -1558,5 +1563,87 @@ func TestOTelManager_maybeUpdateMergedConfig(t *testing.T) {
 		assert.True(t, updated, "update should proceed on hashing error, even with no previous config")
 		assert.Equal(t, badConf, m.mergedCollectorCfg)
 		assert.Equal(t, []byte(nil), m.mergedCollectorCfgHash)
+	})
+}
+
+func TestAddCollectorMetricsPort(t *testing.T) {
+	port := 12345
+	expectedReader := map[string]any{
+		"pull": map[string]any{
+			"exporter": map[string]any{
+				"prometheus": map[string]any{
+					"host":                "localhost",
+					"port":                port,
+					"without_scope_info":  true,
+					"without_units":       true,
+					"without_type_suffix": true,
+				},
+			},
+		},
+	}
+	otelConfigWithReaders := func(readers any) *confmap.Conf {
+		baseConf := confmap.NewFromStringMap(testConfig)
+		err := baseConf.Merge(confmap.NewFromStringMap(map[string]any{
+			"service": map[string]any{
+				"telemetry": map[string]any{
+					"metrics": map[string]any{
+						"readers": readers,
+					},
+				},
+			},
+		}))
+		require.NoError(t, err)
+		return baseConf
+	}
+
+	t.Run("readers does not exist", func(t *testing.T) {
+		conf := otelConfigWithReaders(nil)
+		err := addCollectorMetricsPort(conf, port)
+		require.NoError(t, err)
+
+		readers := conf.Get("service::telemetry::metrics::readers")
+		require.NotNil(t, readers)
+		readersList, ok := readers.([]any)
+		require.True(t, ok)
+		require.Len(t, readersList, 1)
+
+		assert.Equal(t, expectedReader, readersList[0])
+	})
+
+	t.Run("readers is an empty list", func(t *testing.T) {
+		conf := otelConfigWithReaders([]any{})
+		err := addCollectorMetricsPort(conf, port)
+		require.NoError(t, err)
+
+		readers := conf.Get("service::telemetry::metrics::readers")
+		require.NotNil(t, readers)
+		readersList, ok := readers.([]any)
+		require.True(t, ok)
+		require.Len(t, readersList, 1)
+
+		assert.Equal(t, expectedReader, readersList[0])
+	})
+
+	t.Run("readers has existing items", func(t *testing.T) {
+		existingReader := map[string]any{"foo": "bar"}
+		conf := otelConfigWithReaders([]any{existingReader})
+		err := addCollectorMetricsPort(conf, port)
+		require.NoError(t, err)
+
+		readers := conf.Get("service::telemetry::metrics::readers")
+		require.NotNil(t, readers)
+		readersList, ok := readers.([]any)
+		require.True(t, ok)
+		require.Len(t, readersList, 2)
+
+		assert.Equal(t, existingReader, readersList[0])
+		assert.Equal(t, expectedReader, readersList[1])
+	})
+
+	t.Run("readers is not a list", func(t *testing.T) {
+		conf := otelConfigWithReaders("not a list")
+		err := addCollectorMetricsPort(conf, port)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "couldn't convert value of service::telemetry::metrics::readers to a list")
 	})
 }

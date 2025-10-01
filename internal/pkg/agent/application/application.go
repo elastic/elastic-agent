@@ -11,6 +11,8 @@ import (
 
 	"go.elastic.co/apm/v2"
 
+	"github.com/elastic/elastic-agent/pkg/utils"
+
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
 	"github.com/elastic/go-ucfg"
@@ -126,6 +128,10 @@ func New(
 
 	otelExecMode := otelconfig.GetExecutionModeFromConfig(log, rawConfig)
 	isOtelExecModeSubprocess := otelExecMode == otelmanager.SubprocessExecutionMode
+	otelCollectorMetricsPort, err := utils.FindRandomTCPPort()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to find a random port for otel collector metrics: %w", err)
+	}
 
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
 	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled
@@ -133,7 +139,14 @@ func New(
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create upgrader: %w", err)
 	}
-	monitor := componentmonitoring.New(isMonitoringSupported, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, rawConfig.OTel, agentInfo, isOtelExecModeSubprocess)
+	monitor := componentmonitoring.New(
+		isMonitoringSupported,
+		cfg.Settings.DownloadConfig.OS(),
+		cfg.Settings.MonitoringConfig,
+		agentInfo,
+		isOtelExecModeSubprocess,
+		otelCollectorMetricsPort,
+	)
 
 	runtime, err := runtime.NewManager(
 		log,
@@ -245,7 +258,15 @@ func New(
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
-	otelManager, err := otelmanager.NewOTelManager(log.Named("otel_manager"), logLevel, baseLogger, otelExecMode, agentInfo, monitor.ComponentMonitoringConfig, cfg.Settings.ProcessConfig.StopTimeout)
+	otelManager, err := otelmanager.NewOTelManager(
+		log.Named("otel_manager"),
+		logLevel, baseLogger,
+		otelExecMode,
+		agentInfo,
+		otelCollectorMetricsPort,
+		monitor.ComponentMonitoringConfig,
+		cfg.Settings.ProcessConfig.StopTimeout,
+	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)
 	}

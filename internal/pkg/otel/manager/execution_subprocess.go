@@ -17,6 +17,8 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"gopkg.in/yaml.v3"
 
+	"github.com/elastic/elastic-agent/pkg/utils"
+
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
@@ -87,7 +89,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 		return nil, fmt.Errorf("cannot access collector path: %w", err)
 	}
 
-	httpHealthCheckPort, err := findRandomTCPPort()
+	httpHealthCheckPort, err := utils.FindRandomTCPPort()
 	if err != nil {
 		return nil, fmt.Errorf("could not find port for http health check: %w", err)
 	}
