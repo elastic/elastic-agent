@@ -168,14 +168,14 @@ func runElasticAgentCritical(
 	// early handleUpgrade, but don't error yet
 	upgradeDetailsFromMarker, err := handleUpgrade()
 	if err != nil {
-		errs = append(errs, err)
+		errs = append(errs, fmt.Errorf("failed to handle upgrade: %w", err))
 	}
 
 	// single run, but don't error yet
 	locker := filelock.NewAppLocker(paths.Data(), paths.AgentLockFileName)
 	lockErr := locker.TryLock()
 	if lockErr != nil {
-		errs = append(errs, lockErr)
+		errs = append(errs, fmt.Errorf("failed to get app lock: %w", err))
 	}
 	defer func() {
 		_ = locker.Unlock()
@@ -185,7 +185,7 @@ func runElasticAgentCritical(
 	if lockErr == nil {
 		err = coordinator.RestoreConfig()
 		if err != nil {
-			errs = append(errs, err)
+			errs = append(errs, fmt.Errorf("failed to restore configuration: %w", err))
 		}
 	}
 
@@ -193,24 +193,25 @@ func runElasticAgentCritical(
 	cfg, err := loadConfig(ctx, override)
 	if err != nil {
 		// failed to load configuration, just load the default to create the logger
+		errs = append(errs, fmt.Errorf("failed to load configuration: %w", err))
 		cfg = configuration.DefaultConfiguration()
 	}
 
 	baseLogger, err := logger.NewFromConfig("", cfg.Settings.LoggingConfig, cfg.Settings.EventLoggingConfig, true)
 	if err != nil {
-		errs = append(errs, err)
+		errs = append(errs, fmt.Errorf("failed to create logger: %w", err))
 
 		// failed to create the baseLogger, this comes from the configuration being possibly invalid
 		// switch to a default config and try again
 		cfg = configuration.DefaultConfiguration()
 		baseLogger, err = logger.NewFromConfig("", cfg.Settings.LoggingConfig, cfg.Settings.EventLoggingConfig, true)
 		if err != nil {
-			errs = append(errs, err)
+			errs = append(errs, fmt.Errorf("failed to create logger with default configuration: %w", err))
 
 			// this really should not happen, but this whole critical function is very defensive
 			baseLogger, err = logger.New("", true)
 			if err != nil {
-				errs = append(errs, err)
+				errs = append(errs, fmt.Errorf("failed to create logger with no configuration: %w", err))
 
 				// again? no way, but you never know
 				baseLogger = logger.NewWithoutConfig("")
@@ -232,10 +233,7 @@ func runElasticAgentCritical(
 
 	// actually run the agent now
 	err = runElasticAgent(ctx, cancel, baseLogger, l, cfg, override, stop, testingMode, fleetInitTimeout, upgradeDetailsFromMarker, modifiers...)
-	if err != nil {
-		return logReturn(l, err)
-	}
-	return nil
+	return logReturn(l, err)
 }
 
 // runElasticAgent runs the actual Elastic Agent.
