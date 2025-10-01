@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 :::{include} /release-notes/_snippets/9.0.7/breaking.md
 :::
 
@@ -20,4 +21,10 @@
 :::
 
 :::{include} /release-notes/_snippets/9.0.0/breaking.md
+=======
+:::{include} /release-notes/_snippets/breaking-changes/9.1.md
+:::
+
+:::{include} /release-notes/_snippets/breaking-changes/9.0.md
+>>>>>>> 9b565cd9d ([docs] Refine Markdown release notes structure (#10184))
 :::
