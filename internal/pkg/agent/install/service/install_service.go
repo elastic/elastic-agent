@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"time"
 
+	"go.opentelemetry.io/collector/confmap"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
@@ -24,7 +26,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils"
-	"go.opentelemetry.io/collector/confmap"
 )
 
 func EnsureNoServiceComponentIssues() error {
