@@ -29,13 +29,23 @@ packages:
   github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker:
     interfaces:
       Acker:
+  github.com/elastic/elastic-agent/internal/pkg/agent/application:
+    config:
+      inpackage: True
+      with-expecter: True
+      dir: "{{.InterfaceDirRelative}}"
+      mockname: "{{.Mock}}{{.InterfaceName | firstUpper}}"
+      outpkg: "{{.PackageName}}"
+      filename: "{{.Mock | lower}}_{{.InterfaceName | lower}}_test.go"
+    interfaces:
+      installDescriptorSource:
+
   github.com/elastic/elastic-agent/internal/pkg/agent/application/info:
     interfaces:
       Agent:
   github.com/elastic/elastic-agent/internal/pkg/agent/cmd:
     config:
       inpackage: True
-      with-expecter: True
       dir: "{{.InterfaceDirRelative}}"
       mockname: "{{.Mock}}{{.InterfaceName | firstUpper}}"
       outpkg: "{{.PackageName}}"

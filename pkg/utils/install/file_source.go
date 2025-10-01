@@ -78,7 +78,7 @@ func (dp *FileDescriptorSource) ModifyInstallDesc(modifierFunc func(desc *v1.Age
 	return installDescriptor, nil
 }
 
-func (dp *FileDescriptorSource) RemoveAgentInstallDesc(versionedHome string) (*v1.InstallDescriptor, error) {
+func (dp *FileDescriptorSource) RemoveAgentInstallDesc(versionedHomes ...string) (*v1.InstallDescriptor, error) {
 	installDescriptor, err := readInstallMarkerFile(dp.descriptorFile)
 	if err != nil {
 		return nil, err
@@ -89,7 +89,7 @@ func (dp *FileDescriptorSource) RemoveAgentInstallDesc(versionedHome string) (*v
 	}
 
 	installDescriptor.AgentInstalls = slices.DeleteFunc(installDescriptor.AgentInstalls, func(installDesc v1.AgentInstallDesc) bool {
-		return installDesc.VersionedHome == versionedHome
+		return slices.Contains(versionedHomes, installDesc.VersionedHome)
 	})
 
 	err = writeInstallMarkerFile(dp.descriptorFile, installDescriptor)
