@@ -59,6 +59,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.135.0/receiver/receivercreator/README.md) | v0.135.0 |
 | [redisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/redisreceiver/v0.135.0/receiver/redisreceiver/README.md) | v0.135.0 |
 | [sqlserverreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/sqlserverreceiver/v0.135.0/receiver/sqlserverreceiver/README.md) | v0.135.0 |
+| [windowseventlogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/windowseventlogreceiver/v0.135.0/receiver/windowseventlogreceiver/README.md) | v0.135.0 |
 | [zipkinreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/zipkinreceiver/v0.135.0/receiver/zipkinreceiver/README.md) | v0.135.0 |
 
 ### Exporters
@@ -81,6 +82,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.135.0/processor/attributesprocessor/README.md) | v0.135.0 |
 | [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.135.0/processor/batchprocessor/README.md) | v0.135.0 |
 | [cumulativetodeltaprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/cumulativetodeltaprocessor/v0.135.0/processor/cumulativetodeltaprocessor/README.md) | v0.135.0 |
+| [elasticapmprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticapmprocessor/v0.2.0/processor/elasticapmprocessor/README.md) | v0.2.0 |
 | [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.17.0/processor/elasticinframetricsprocessor/README.md) | v0.17.0 |
 | [elastictraceprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elastictraceprocessor/v0.10.0/processor/elastictraceprocessor/README.md) | v0.10.0 |
 | [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.135.0/processor/filterprocessor/README.md) | v0.135.0 |

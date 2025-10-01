@@ -154,7 +154,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		return nil
 	}
 
-	cfg, lvl, err := installSvc.GetConfigWithVariables(ctx, l, cfgPath, opts.variablesWait, !isAdmin)
+	cfg, otel, lvl, err := installSvc.GetConfigWithVariables(ctx, l, cfgPath, opts.variablesWait, !isAdmin)
 	if err != nil {
 		return fmt.Errorf("error fetching config with variables: %w", err)
 	}
@@ -176,7 +176,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 			return fmt.Errorf("failed to detect inputs and outputs: %w", err)
 		}
 
-		monitorFn, err := installSvc.GetMonitoringFn(ctx, l, cfg)
+		monitorFn, err := installSvc.GetMonitoringFn(ctx, l, cfg, otel)
 		if err != nil {
 			return fmt.Errorf("failed to get monitoring: %w", err)
 		}

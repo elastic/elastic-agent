@@ -22,6 +22,7 @@ import (
 	"go.yaml.in/yaml/v3"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/elastic/beats/v7/x-pack/libbeat/common/otelbeat/otelmanager"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
@@ -30,6 +31,10 @@ import (
 
 var (
 	_ component.Component = (*diagnosticsExtension)(nil)
+
+	// The elasticdiagnostics extension also implements the otelmanager.DiagnosticExtension interface.
+	// NOTE: Changing the signature will require changes to libbeat and beatreceivers. Don't remove this.
+	_ otelmanager.DiagnosticExtension = (*diagnosticsExtension)(nil)
 )
 
 type diagHook struct {
