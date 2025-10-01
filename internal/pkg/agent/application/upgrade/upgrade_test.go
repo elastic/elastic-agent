@@ -136,8 +136,8 @@ func TestShutdownCallback(t *testing.T) {
 	testcases := []testcase{
 		{
 			name:                  "legacy run directories",
-			agentHomeDirectory:    fmt.Sprintf("%s-%s", agentName, release.ShortCommit()),
-			newAgentHomeDirectory: fmt.Sprintf("%s-%s", agentName, "abc123"),
+			agentHomeDirectory:    fmt.Sprintf("%s-%s", AgentName, release.ShortCommit()),
+			newAgentHomeDirectory: fmt.Sprintf("%s-%s", AgentName, "abc123"),
 			agentVersion:          "7.14.0",
 			newAgentVersion:       "7.15.0",
 			oldRunFile:            filepath.Join("run", "default", "process-7.14.0", "file.test"),

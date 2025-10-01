@@ -143,8 +143,8 @@ type updateActiveCommitFunc func(log *logger.Logger, topDirPath, hash string, wr
 func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile writeFileFunc) markUpgradeFunc {
 	return func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]TTLMarker) error {
 
-		if len(previousAgent.hash) > hashLen {
-			previousAgent.hash = previousAgent.hash[:hashLen]
+		if len(previousAgent.hash) > HashLen {
+			previousAgent.hash = previousAgent.hash[:HashLen]
 		}
 
 		marker := &UpdateMarker{
