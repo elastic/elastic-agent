@@ -4,7 +4,7 @@ apiVersion: v1
 kind: ServiceAccount
 automountServiceAccountToken: true
 metadata:
-  labels:
+  labels:    
     helm.sh/chart: kube-state-metrics-6.1.0
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
@@ -77,7 +77,7 @@ stringData:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  labels:
+  labels:    
     helm.sh/chart: kube-state-metrics-6.1.0
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
@@ -312,7 +312,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  labels:
+  labels:    
     helm.sh/chart: kube-state-metrics-6.1.0
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
@@ -355,7 +355,7 @@ kind: Service
 metadata:
   name: kube-state-metrics
   namespace: default
-  labels:
+  labels:    
     helm.sh/chart: kube-state-metrics-6.1.0
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
@@ -372,8 +372,8 @@ spec:
     protocol: TCP
     port: 8080
     targetPort: 8080
-
-  selector:
+  
+  selector:    
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
 ---
@@ -527,7 +527,7 @@ kind: Deployment
 metadata:
   name: kube-state-metrics
   namespace: default
-  labels:
+  labels:    
     helm.sh/chart: kube-state-metrics-6.1.0
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
@@ -537,7 +537,7 @@ metadata:
     app.kubernetes.io/version: "2.16.0"
 spec:
   selector:
-    matchLabels:
+    matchLabels:      
       app.kubernetes.io/name: kube-state-metrics
       app.kubernetes.io/instance: example
   replicas: 1
@@ -546,7 +546,7 @@ spec:
   revisionHistoryLimit: 10
   template:
     metadata:
-      labels:
+      labels:        
         helm.sh/chart: kube-state-metrics-6.1.0
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/component: metrics
