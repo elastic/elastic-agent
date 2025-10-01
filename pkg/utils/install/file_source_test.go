@@ -34,7 +34,7 @@ func TestFileDescriptorSource_AddInstallDesc(t *testing.T) {
 			arg: v1.AgentInstallDesc{
 				Version:       "1.2.3",
 				Hash:          "abcdef",
-				VersionedHome: "date/elastic-agent-1.2.3-abcdef",
+				VersionedHome: "data/elastic-agent-1.2.3-abcdef",
 				Flavor:        "basic",
 				Active:        true,
 			},
@@ -42,7 +42,7 @@ func TestFileDescriptorSource_AddInstallDesc(t *testing.T) {
 				{
 					Version:       "1.2.3",
 					Hash:          "abcdef",
-					VersionedHome: "date/elastic-agent-1.2.3-abcdef",
+					VersionedHome: "data/elastic-agent-1.2.3-abcdef",
 					Flavor:        "basic",
 					Active:        true,
 				},
@@ -63,7 +63,7 @@ func TestFileDescriptorSource_AddInstallDesc(t *testing.T) {
 			arg: v1.AgentInstallDesc{
 				Version:       "1.2.3",
 				Hash:          "abcdef",
-				VersionedHome: "date/elastic-agent-1.2.3-abcdef",
+				VersionedHome: "data/elastic-agent-1.2.3-abcdef",
 				Flavor:        "basic",
 				Active:        true,
 			},
@@ -71,7 +71,7 @@ func TestFileDescriptorSource_AddInstallDesc(t *testing.T) {
 				{
 					Version:       "1.2.3",
 					Hash:          "abcdef",
-					VersionedHome: "date/elastic-agent-1.2.3-abcdef",
+					VersionedHome: "data/elastic-agent-1.2.3-abcdef",
 					Flavor:        "basic",
 					Active:        true,
 				},
@@ -91,7 +91,7 @@ func TestFileDescriptorSource_AddInstallDesc(t *testing.T) {
 						OptionalTTLItem: v1.OptionalTTLItem{},
 						Version:         "0.0.0",
 						Hash:            "oooooo",
-						VersionedHome:   "date/elastic-agent-0.0.0-oooooo",
+						VersionedHome:   "data/elastic-agent-0.0.0-oooooo",
 						Flavor:          "oooo",
 						Active:          false,
 					},
@@ -110,7 +110,7 @@ func TestFileDescriptorSource_AddInstallDesc(t *testing.T) {
 			arg: v1.AgentInstallDesc{
 				Version:       "1.2.3",
 				Hash:          "abcdef",
-				VersionedHome: "date/elastic-agent-1.2.3-abcdef",
+				VersionedHome: "data/elastic-agent-1.2.3-abcdef",
 				Flavor:        "basic",
 				Active:        true,
 			},
@@ -118,14 +118,14 @@ func TestFileDescriptorSource_AddInstallDesc(t *testing.T) {
 				{
 					Version:       "1.2.3",
 					Hash:          "abcdef",
-					VersionedHome: "date/elastic-agent-1.2.3-abcdef",
+					VersionedHome: "data/elastic-agent-1.2.3-abcdef",
 					Flavor:        "basic",
 					Active:        true,
 				},
 				{
 					Version:       "0.0.0",
 					Hash:          "oooooo",
-					VersionedHome: "date/elastic-agent-0.0.0-oooooo",
+					VersionedHome: "data/elastic-agent-0.0.0-oooooo",
 					Flavor:        "oooo",
 					Active:        false,
 				},
@@ -149,7 +149,7 @@ func TestFileDescriptorSource_AddInstallDesc(t *testing.T) {
 			arg: v1.AgentInstallDesc{
 				Version:       "1.2.3",
 				Hash:          "abcdef",
-				VersionedHome: "date/elastic-agent-1.2.3-abcdef",
+				VersionedHome: "data/elastic-agent-1.2.3-abcdef",
 				Flavor:        "basic",
 				Active:        true,
 			},
@@ -261,21 +261,21 @@ func TestFileDescriptorSource_ModifyInstallDesc(t *testing.T) {
 					{
 						Version:       "4.5.6",
 						Hash:          "ghijkl",
-						VersionedHome: "date/elastic-agent-4.5.6-ghijkl",
+						VersionedHome: "data/elastic-agent-4.5.6-ghijkl",
 						Flavor:        "basic",
 						Active:        false,
 					},
 					{
 						Version:       "1.2.3",
 						Hash:          "abcdef",
-						VersionedHome: "date/elastic-agent-1.2.3-abcdef",
+						VersionedHome: "data/elastic-agent-1.2.3-abcdef",
 						Flavor:        "basic",
 						Active:        true,
 					},
 					{
 						Version:       "0.0.0",
 						Hash:          "oooooo",
-						VersionedHome: "date/elastic-agent-0.0.0-oooooo",
+						VersionedHome: "data/elastic-agent-0.0.0-oooooo",
 						Flavor:        "oooo",
 						Active:        false,
 					},
@@ -305,14 +305,14 @@ func TestFileDescriptorSource_ModifyInstallDesc(t *testing.T) {
 				{
 					Version:       "4.5.6",
 					Hash:          "ghijkl",
-					VersionedHome: "date/elastic-agent-4.5.6-ghijkl",
+					VersionedHome: "data/elastic-agent-4.5.6-ghijkl",
 					Flavor:        "basic",
 					Active:        true,
 				},
 				{
 					Version:       "1.2.3",
 					Hash:          "abcdef",
-					VersionedHome: "date/elastic-agent-1.2.3-abcdef",
+					VersionedHome: "data/elastic-agent-1.2.3-abcdef",
 					Flavor:        "basic",
 					Active:        false,
 					OptionalTTLItem: v1.OptionalTTLItem{
@@ -322,7 +322,7 @@ func TestFileDescriptorSource_ModifyInstallDesc(t *testing.T) {
 				{
 					Version:       "0.0.0",
 					Hash:          "oooooo",
-					VersionedHome: "date/elastic-agent-0.0.0-oooooo",
+					VersionedHome: "data/elastic-agent-0.0.0-oooooo",
 					Flavor:        "oooo",
 					Active:        false,
 					OptionalTTLItem: v1.OptionalTTLItem{
@@ -343,14 +343,14 @@ func TestFileDescriptorSource_ModifyInstallDesc(t *testing.T) {
 					{
 						Version:       "1.2.3",
 						Hash:          "abcdef",
-						VersionedHome: "date/elastic-agent-1.2.3-abcdef",
+						VersionedHome: "data/elastic-agent-1.2.3-abcdef",
 						Flavor:        "basic",
 						Active:        true,
 					},
 					{
 						Version:       "0.0.0",
 						Hash:          "oooooo",
-						VersionedHome: "date/elastic-agent-0.0.0-oooooo",
+						VersionedHome: "data/elastic-agent-0.0.0-oooooo",
 						Flavor:        "oooo",
 						Active:        false,
 					},
@@ -378,14 +378,14 @@ func TestFileDescriptorSource_ModifyInstallDesc(t *testing.T) {
 					{
 						Version:       "1.2.3",
 						Hash:          "abcdef",
-						VersionedHome: "date/elastic-agent-1.2.3-abcdef",
+						VersionedHome: "data/elastic-agent-1.2.3-abcdef",
 						Flavor:        "basic",
 						Active:        true,
 					},
 					{
 						Version:       "0.0.0",
 						Hash:          "oooooo",
-						VersionedHome: "date/elastic-agent-0.0.0-oooooo",
+						VersionedHome: "data/elastic-agent-0.0.0-oooooo",
 						Flavor:        "oooo",
 						Active:        false,
 					},
@@ -420,14 +420,14 @@ func TestFileDescriptorSource_RemoveAgentInstallDesc(t *testing.T) {
 	testcases := []struct {
 		name             string
 		setupDir         func(t *testing.T, tmpDir string) string
-		arg              string
+		arg              []string
 		expected         *v1.InstallDescriptor
 		wantErr          assert.ErrorAssertionFunc
 		postOpAssertions func(t *testing.T, tmpDir string, installMarker string, actual *v1.InstallDescriptor)
 	}{
 		{
 			name:     "no existing file, removing an agent install descriptor returns error",
-			arg:      "data/elastic-agent-1.2.3-abcdef",
+			arg:      []string{"data/elastic-agent-1.2.3-abcdef"},
 			expected: nil,
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
 				return assert.ErrorIs(t, err, os.ErrNotExist)
@@ -444,7 +444,7 @@ func TestFileDescriptorSource_RemoveAgentInstallDesc(t *testing.T) {
 				require.NoError(t, err, "error creating output file %s", markerFileName)
 				return markerFileName
 			},
-			arg:      "data/elastic-agent-1.2.3-abcdef",
+			arg:      []string{"data/elastic-agent-1.2.3-abcdef"},
 			expected: nil,
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
 				return assert.ErrorIs(t, err, io.EOF)
@@ -469,7 +469,7 @@ func TestFileDescriptorSource_RemoveAgentInstallDesc(t *testing.T) {
 				require.NoError(t, err, "error creating output file %s", markerFileName)
 				return markerFileName
 			},
-			arg:      "data/elastic-agent-1.2.3-abcdef",
+			arg:      []string{"data/elastic-agent-1.2.3-abcdef"},
 			expected: createInstallDescriptor(nil),
 			wantErr:  assert.NoError,
 			postOpAssertions: func(t *testing.T, tmpDir string, installMarker string, actual *v1.InstallDescriptor) {
@@ -484,28 +484,28 @@ func TestFileDescriptorSource_RemoveAgentInstallDesc(t *testing.T) {
 					{
 						Version:       "4.5.6",
 						Hash:          "ghijkl",
-						VersionedHome: "date/elastic-agent-4.5.6-ghijkl",
+						VersionedHome: "data/elastic-agent-4.5.6-ghijkl",
 						Flavor:        "basic",
 						Active:        false,
 					},
 					{
 						Version:       "1.2.3",
 						Hash:          "abcdef",
-						VersionedHome: "date/elastic-agent-1.2.3-abcdef",
+						VersionedHome: "data/elastic-agent-1.2.3-abcdef",
 						Flavor:        "basic",
 						Active:        true,
 					},
 					{
 						Version:       "0.0.0",
 						Hash:          "oooooo",
-						VersionedHome: "date/elastic-agent-0.0.0-oooooo",
+						VersionedHome: "data/elastic-agent-0.0.0-oooooo",
 						Flavor:        "oooo",
 						Active:        false,
 					},
 					{
 						Version:       "1.2.3 x2",
 						Hash:          "abcdef",
-						VersionedHome: "date/elastic-agent-1.2.3-abcdef",
+						VersionedHome: "data/elastic-agent-1.2.3-abcdef",
 						Flavor:        "basic",
 						Active:        false,
 					},
@@ -520,19 +520,78 @@ func TestFileDescriptorSource_RemoveAgentInstallDesc(t *testing.T) {
 
 				return markerFileName
 			},
-			arg: "date/elastic-agent-1.2.3-abcdef",
+			arg: []string{"data/elastic-agent-1.2.3-abcdef"},
 			expected: createInstallDescriptor([]v1.AgentInstallDesc{
 				{
 					Version:       "4.5.6",
 					Hash:          "ghijkl",
-					VersionedHome: "date/elastic-agent-4.5.6-ghijkl",
+					VersionedHome: "data/elastic-agent-4.5.6-ghijkl",
 					Flavor:        "basic",
 					Active:        false,
 				},
 				{
 					Version:       "0.0.0",
 					Hash:          "oooooo",
-					VersionedHome: "date/elastic-agent-0.0.0-oooooo",
+					VersionedHome: "data/elastic-agent-0.0.0-oooooo",
+					Flavor:        "oooo",
+					Active:        false,
+				},
+			}),
+			wantErr: assert.NoError,
+			postOpAssertions: func(t *testing.T, tmpDir string, installMarker string, actual *v1.InstallDescriptor) {
+				checkInstallDescriptorMatches(t, filepath.Join(tmpDir, installMarker), actual)
+			},
+		},
+		{
+			name: " valid descriptor with multiple installs, removing all descriptors matching the versionedHomes passed as argument",
+			setupDir: func(t *testing.T, tmpDir string) string {
+				markerFileName := "descriptor.yaml"
+				installDescriptor := createInstallDescriptor([]v1.AgentInstallDesc{
+					{
+						Version:       "4.5.6",
+						Hash:          "ghijkl",
+						VersionedHome: "data/elastic-agent-4.5.6-ghijkl",
+						Flavor:        "basic",
+						Active:        false,
+					},
+					{
+						Version:       "1.2.3",
+						Hash:          "abcdef",
+						VersionedHome: "data/elastic-agent-1.2.3-abcdef",
+						Flavor:        "basic",
+						Active:        true,
+					},
+					{
+						Version:       "0.0.0",
+						Hash:          "oooooo",
+						VersionedHome: "data/elastic-agent-0.0.0-oooooo",
+						Flavor:        "oooo",
+						Active:        false,
+					},
+					{
+						Version:       "1.2.3 x2",
+						Hash:          "abcdef",
+						VersionedHome: "data/elastic-agent-1.2.3-x2-abcdef",
+						Flavor:        "basic",
+						Active:        false,
+					},
+				})
+
+				buf := new(bytes.Buffer)
+				err := v1.WriteInstallDescriptor(buf, installDescriptor)
+				require.NoError(t, err, "error writing install descriptor during setup")
+
+				err = os.WriteFile(filepath.Join(tmpDir, markerFileName), buf.Bytes(), 0o644)
+				require.NoError(t, err, "error creating output file %s", markerFileName)
+
+				return markerFileName
+			},
+			arg: []string{"data/elastic-agent-1.2.3-abcdef", "data/elastic-agent-1.2.3-x2-abcdef", "data/elastic-agent-4.5.6-ghijkl"},
+			expected: createInstallDescriptor([]v1.AgentInstallDesc{
+				{
+					Version:       "0.0.0",
+					Hash:          "oooooo",
+					VersionedHome: "data/elastic-agent-0.0.0-oooooo",
 					Flavor:        "oooo",
 					Active:        false,
 				},
@@ -554,7 +613,7 @@ func TestFileDescriptorSource_RemoveAgentInstallDesc(t *testing.T) {
 
 			src := NewFileDescriptorSource(filepath.Join(tmpDir, installMarkerFile))
 
-			installDescriptor, err := src.RemoveAgentInstallDesc(tc.arg)
+			installDescriptor, err := src.RemoveAgentInstallDesc(tc.arg...)
 			tc.wantErr(t, err)
 			assert.Equal(t, tc.expected, installDescriptor)
 
