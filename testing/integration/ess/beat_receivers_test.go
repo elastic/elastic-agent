@@ -219,11 +219,12 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	require.NoError(t, err, "error unmarshalling policy: %s", string(policyBytes))
 	d, prs := policy.Outputs["default"]
 	require.True(t, prs, "default must be in outputs")
-	d.ApiKey = string(apiKey)
+	d.ApiKey = apiKey
 	policy.Outputs["default"] = d
 
 	processNamespace := fmt.Sprintf("%s-%s", info.Namespace, "process")
 	policy.Agent.Monitoring["namespace"] = processNamespace
+	policy.Agent.Monitoring["_runtime_experimental"] = "process"
 
 	updatedPolicyBytes, err := yaml.Marshal(policy)
 	require.NoErrorf(t, err, "error marshalling policy, struct was %v", policy)
