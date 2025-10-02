@@ -105,7 +105,7 @@ type MonitorManager interface {
 	// Enabled when configured to collect metrics/logs.
 	Enabled() bool
 
-	// Reload reloads the configuration for the upgrade manager.
+	// Reload reloads the configuration for the monitoring manager.
 	Reload(rawConfig *config.Config) error
 
 	// MonitoringConfig injects monitoring configuration into resolved ast tree.
@@ -1779,7 +1779,7 @@ func (c *Coordinator) updateManagersWithConfig(model *component.Model) {
 		for _, comp := range otelModel.Components {
 			componentIDs = append(componentIDs, comp.ID)
 		}
-		c.logger.With("component_ids", componentIDs).Warn("The Otel runtime manager is HIGHLY EXPERIMENTAL and only intended for testing. Use at your own risk.")
+		c.logger.With("component_ids", componentIDs).Info("Using OpenTelemetry collector runtime.")
 	}
 	c.otelMgr.Update(c.otelCfg, otelModel.Components)
 }

@@ -13,14 +13,15 @@ import (
 
 // forceExtension is a Converter that forces that an extension is enabled in the OTel configuration.
 type forceExtension struct {
-	name string
+	name   string
+	config map[string]any
 }
 
 func (fe *forceExtension) Convert(ctx context.Context, conf *confmap.Conf) error {
 	err := func() error {
 		err := conf.Merge(confmap.NewFromStringMap(map[string]interface{}{
 			"extensions": map[string]interface{}{
-				fe.name: nil,
+				fe.name: fe.config,
 			},
 		}))
 		if err != nil {
@@ -74,8 +75,8 @@ func (fe *forceExtension) Convert(ctx context.Context, conf *confmap.Conf) error
 	return nil
 }
 
-func NewForceExtensionConverterFactory(name string) confmap.ConverterFactory {
+func NewForceExtensionConverterFactory(name string, config map[string]any) confmap.ConverterFactory {
 	return confmap.NewConverterFactory(func(_ confmap.ConverterSettings) confmap.Converter {
-		return &forceExtension{name}
+		return &forceExtension{name, config}
 	})
 }
