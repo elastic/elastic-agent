@@ -41,7 +41,7 @@ func NewPrivilegeLevelChange(
 	}
 }
 
-// Handle handles UNENROLL action.
+// Handle handles PRIVILEGE_LEVEL_CHANGE action.
 func (h *PrivilegeLevelChange) Handle(ctx context.Context, a fleetapi.Action, acker acker.Acker) error {
 	return h.handle(ctx, a, acker)
 }
