@@ -1242,7 +1242,9 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		case <-ctx.Done():
 			t.Fatal("timeout waiting for collector config update")
 		}
-		assert.Equal(t, collectorCfg, execution.cfg)
+		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
+		assert.NoError(t, injectDiagnosticsExtension(expectedCfg))
+		assert.Equal(t, expectedCfg, execution.cfg)
 
 	})
 

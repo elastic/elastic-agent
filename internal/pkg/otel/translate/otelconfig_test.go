@@ -429,6 +429,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"enabled": true,
 				"host":    "localhost",
 			},
+			"management.otel.enabled": true,
 		}
 	}
 
@@ -764,6 +765,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"enabled": true,
 							"host":    "localhost",
 						},
+						"management.otel.enabled": true,
 					},
 				},
 				"service": map[string]any{
@@ -874,6 +876,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"enabled": true,
 							"host":    "localhost",
 						},
+						"management.otel.enabled": true,
 					},
 				},
 				"service": map[string]any{
