@@ -8,7 +8,9 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"syscall"
 
