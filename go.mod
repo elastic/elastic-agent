@@ -14,21 +14,12 @@ require (
 	github.com/docker/docker v27.5.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-<<<<<<< HEAD
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20241212201805-58af1537830b
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250404163238-b16c2c085d99
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.1
-	github.com/elastic/elastic-agent-libs v0.20.0
-	github.com/elastic/elastic-agent-system-metrics v0.11.15
-=======
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20250930172353-32b5e5a5e767
-	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
-	github.com/elastic/elastic-agent-autodiscover v0.10.0
-	github.com/elastic/elastic-agent-client/v7 v7.17.2
 	github.com/elastic/elastic-agent-libs v0.24.1
-	github.com/elastic/elastic-agent-system-metrics v0.13.2
->>>>>>> 278440a1d (build(deps): bump github.com/elastic/elastic-agent-libs from 0.24.0 to 0.24.1 (#10207))
+	github.com/elastic/elastic-agent-system-metrics v0.11.15
 	github.com/elastic/elastic-transport-go/v8 v8.7.0
 	github.com/elastic/go-elasticsearch/v8 v8.17.1
 	github.com/elastic/go-licenser v0.4.2
