@@ -39,8 +39,8 @@ void WINAPI ServiceCtrlHandler(DWORD ctrlCode) {
 
 // ServiceMain is the main entry point when running as a Windows service
 void WINAPI ServiceMain(DWORD argc, LPTSTR *argv) {
-    // register the control handler
-    serviceStatusHandle = RegisterServiceCtrlHandler(TEXT("elastic-agent"), ServiceCtrlHandler);
+    // register the control handler (argv[0] contains the service name)
+    serviceStatusHandle = RegisterServiceCtrlHandler(argv[0], ServiceCtrlHandler);
     if (!serviceStatusHandle) {
         return;
     }
@@ -70,9 +70,9 @@ void WINAPI ServiceMain(DWORD argc, LPTSTR *argv) {
 }
 
 // main is the entry point of the elastic-agent.exe
-int main() {
+int main(int argc, char *argv[]) {
     SERVICE_TABLE_ENTRY serviceTable[] = {
-        {TEXT("elastic-agent"), ServiceMain},
+        {argv[0], ServiceMain},
         {NULL, NULL}
     };
 
