@@ -414,14 +414,7 @@ func getMonitoringFn(ctx context.Context, logger *logger.Logger, cfg map[string]
 	}
 	otelExecMode := otelconfig.GetExecutionModeFromConfig(logger, config)
 	isOtelExecModeSubprocess := otelExecMode == manager.SubprocessExecutionMode
-	otelMetricsPortPlaceholder := 0 // this value is randomly selected on startup, set 0 here
-	monitor := componentmonitoring.New(
-		agentCfg.Settings.V1MonitoringEnabled,
-		agentCfg.Settings.DownloadConfig.OS(),
-		agentCfg.Settings.MonitoringConfig,
-		agentInfo,
-		isOtelExecModeSubprocess,
-		otelMetricsPortPlaceholder)
+	monitor := componentmonitoring.New(agentCfg.Settings.V1MonitoringEnabled, agentCfg.Settings.DownloadConfig.OS(), agentCfg.Settings.MonitoringConfig, agentInfo, isOtelExecModeSubprocess)
 	return monitor.MonitoringConfig, nil
 }
 

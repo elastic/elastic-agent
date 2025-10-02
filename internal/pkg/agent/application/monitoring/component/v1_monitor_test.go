@@ -1102,7 +1102,7 @@ func TestMonitorReload(t *testing.T) {
 	monitorcfg.MonitorLogs = false
 	monitorcfg.MonitorMetrics = false
 
-	beatsMonitor := New(true, "", monitorcfg, nil, false, 0)
+	beatsMonitor := New(true, "", monitorcfg, nil, false)
 	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, false)
 	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, false)
 

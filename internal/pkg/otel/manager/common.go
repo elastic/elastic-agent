@@ -6,9 +6,14 @@ package manager
 
 import (
 	"context"
+	"fmt"
+	"net"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 )
+
+// for testing purposes
+var netListen = net.Listen
 
 // reportErr sends an error to the provided error channel. It first drains the channel
 // to ensure that only the most recent error is kept, as intermediate errors can be safely discarded.
@@ -45,4 +50,27 @@ func reportCollectorStatus(ctx context.Context, statusCh chan *status.AggregateS
 		return
 	case statusCh <- collectorStatus:
 	}
+}
+
+// findRandomTCPPort finds count random available TCP ports on the localhost interface.
+func findRandomTCPPorts(count int) ([]int, error) {
+	ports := make([]int, 0, count)
+	for range count {
+		l, err := netListen("tcp", "localhost:0")
+		if err != nil {
+			return nil, err
+		}
+
+		port := l.Addr().(*net.TCPAddr).Port
+		err = l.Close()
+		if err != nil {
+			return nil, err
+		}
+		if port == 0 {
+			return nil, fmt.Errorf("failed to find random port")
+		}
+		ports = append(ports, port)
+	}
+
+	return ports, nil
 }

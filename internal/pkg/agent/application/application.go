@@ -11,8 +11,6 @@ import (
 
 	"go.elastic.co/apm/v2"
 
-	"github.com/elastic/elastic-agent/pkg/utils"
-
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
 	"github.com/elastic/go-ucfg"
@@ -128,10 +126,6 @@ func New(
 
 	otelExecMode := otelconfig.GetExecutionModeFromConfig(log, rawConfig)
 	isOtelExecModeSubprocess := otelExecMode == otelmanager.SubprocessExecutionMode
-	otelCollectorMetricsPort, err := utils.FindRandomTCPPort()
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to find a random port for otel collector metrics: %w", err)
-	}
 
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
 	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled
@@ -145,7 +139,6 @@ func New(
 		cfg.Settings.MonitoringConfig,
 		agentInfo,
 		isOtelExecModeSubprocess,
-		otelCollectorMetricsPort,
 	)
 
 	runtime, err := runtime.NewManager(
@@ -263,7 +256,8 @@ func New(
 		logLevel, baseLogger,
 		otelExecMode,
 		agentInfo,
-		otelCollectorMetricsPort,
+		0, // TODO: make this configurable in a follow-up
+		0, // TODO: make this configurable in a follow-up
 		monitor.ComponentMonitoringConfig,
 		cfg.Settings.ProcessConfig.StopTimeout,
 	)

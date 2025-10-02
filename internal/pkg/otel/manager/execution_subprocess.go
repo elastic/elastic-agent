@@ -17,7 +17,7 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"gopkg.in/yaml.v3"
 
-	"github.com/elastic/elastic-agent/pkg/utils"
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
@@ -38,7 +38,7 @@ const (
 	OtelSupervisedMonitoringURLFlagName = "supervised.monitoring.url"
 )
 
-func newSubprocessExecution(logLevel logp.Level, collectorPath string) (*subprocessExecution, error) {
+func newSubprocessExecution(logLevel logp.Level, collectorPath string, metricsPort int, healthCheckPort int) (*subprocessExecution, error) {
 	nsUUID, err := uuid.NewV4()
 	if err != nil {
 		return nil, fmt.Errorf("cannot generate UUID: %w", err)
@@ -57,18 +57,22 @@ func newSubprocessExecution(logLevel logp.Level, collectorPath string) (*subproc
 			fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, logLevel.String()),
 			fmt.Sprintf("--%s=%s", OtelSupervisedMonitoringURLFlagName, monitoring.EDOTMonitoringEndpoint()),
 		},
-		logLevel:               logLevel,
-		healthCheckExtensionID: healthCheckExtensionID,
-		reportErrFn:            reportErr,
+		logLevel:                 logLevel,
+		healthCheckExtensionID:   healthCheckExtensionID,
+		collectorMetricsPort:     metricsPort,
+		collectorHealthCheckPort: healthCheckPort,
+		reportErrFn:              reportErr,
 	}, nil
 }
 
 type subprocessExecution struct {
-	collectorPath          string
-	collectorArgs          []string
-	logLevel               logp.Level
-	healthCheckExtensionID string
-	reportErrFn            func(ctx context.Context, errCh chan error, err error) // required for testing
+	collectorPath            string
+	collectorArgs            []string
+	logLevel                 logp.Level
+	healthCheckExtensionID   string
+	collectorMetricsPort     int
+	collectorHealthCheckPort int
+	reportErrFn              func(ctx context.Context, errCh chan error, err error) // required for testing
 }
 
 // startCollector starts a supervised collector and monitors its health. Process exit errors are sent to the
@@ -89,9 +93,9 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 		return nil, fmt.Errorf("cannot access collector path: %w", err)
 	}
 
-	httpHealthCheckPort, err := utils.FindRandomTCPPort()
+	httpHealthCheckPort, collectorMetricsPort, err := r.getCollectorPorts()
 	if err != nil {
-		return nil, fmt.Errorf("could not find port for http health check: %w", err)
+		return nil, fmt.Errorf("could not find port for collector: %w", err)
 	}
 
 	if err := injectHeathCheckV2Extension(cfg, r.healthCheckExtensionID, httpHealthCheckPort); err != nil {
@@ -109,9 +113,12 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 	stdErr := runtimeLogger.NewLogWriterWithDefaults(logger.Core(), zapcore.Level(r.logLevel))
 
 	procCtx, procCtxCancel := context.WithCancel(ctx)
+	env := os.Environ()
+	// set the environment variable for the collector metrics port
+	env = append(env, fmt.Sprintf("%s=%d", componentmonitoring.OtelCollectorMetricsPortEnvVarName, collectorMetricsPort))
 	processInfo, err := process.Start(r.collectorPath,
 		process.WithArgs(r.collectorArgs),
-		process.WithEnv(os.Environ()),
+		process.WithEnv(env),
 		process.WithCmdOptions(func(c *exec.Cmd) error {
 			c.Stdin = bytes.NewReader(confBytes)
 			c.Stdout = stdOut
@@ -212,6 +219,41 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 	}()
 
 	return ctl, nil
+}
+
+func (r *subprocessExecution) getCollectorPorts() (healthCheckPort int, metricsPort int, err error) {
+	randomPortCount := 0
+	// if the ports are defined (non-zero), use them
+	if r.collectorMetricsPort == 0 {
+		randomPortCount++
+	} else {
+		metricsPort = r.collectorMetricsPort
+	}
+	if r.collectorHealthCheckPort == 0 {
+		randomPortCount++
+	} else {
+		healthCheckPort = r.collectorHealthCheckPort
+	}
+
+	if randomPortCount == 0 {
+		return
+	}
+
+	// we need at least one random port, create it
+	ports, err := findRandomTCPPorts(randomPortCount)
+	if err != nil {
+		return
+	}
+	// use the random values for ports which aren't set
+	portIndex := 0
+	if healthCheckPort == 0 {
+		healthCheckPort = ports[portIndex]
+		portIndex++
+	}
+	if metricsPort == 0 {
+		metricsPort = ports[1]
+	}
+	return
 }
 
 type procHandle struct {

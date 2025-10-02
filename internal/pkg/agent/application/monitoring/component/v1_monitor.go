@@ -35,6 +35,7 @@ import (
 )
 
 const (
+	OtelCollectorMetricsPortEnvVarName = "EDOT_COLLECTOR_METRICS_PORT"
 	// args: data path, pipeline name, application name
 	logFileFormat = "%s/logs/%s"
 	// args: data path, install path, pipeline name, application name
@@ -88,12 +89,11 @@ var (
 // BeatsMonitor provides config values for monitoring of agent clients (beats, endpoint, etc)
 // by injecting the monitoring config into an existing fleet config
 type BeatsMonitor struct {
-	enabled                     bool // feature flag disabling whole v1 monitoring story
-	config                      *monitoringConfig
-	operatingSystem             string
-	agentInfo                   info.Agent
-	isOtelRuntimeSubprocess     bool
-	otelCollectorMonitoringPort int
+	enabled                 bool // feature flag disabling whole v1 monitoring story
+	config                  *monitoringConfig
+	operatingSystem         string
+	agentInfo               info.Agent
+	isOtelRuntimeSubprocess bool
 }
 
 // componentInfo is the information necessary to generate monitoring configuration for a component. We don't just use
@@ -112,23 +112,15 @@ type monitoringConfig struct {
 }
 
 // New creates a new BeatsMonitor instance.
-func New(
-	enabled bool,
-	operatingSystem string,
-	cfg *monitoringCfg.MonitoringConfig,
-	agentInfo info.Agent,
-	isOtelRuntimeSubprocess bool,
-	otelCollectorMonitoringPort int,
-) *BeatsMonitor {
+func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, agentInfo info.Agent, isOtelRuntimeSubprocess bool) *BeatsMonitor {
 	return &BeatsMonitor{
 		enabled: enabled,
 		config: &monitoringConfig{
 			C: cfg,
 		},
-		operatingSystem:             operatingSystem,
-		agentInfo:                   agentInfo,
-		isOtelRuntimeSubprocess:     isOtelRuntimeSubprocess,
-		otelCollectorMonitoringPort: otelCollectorMonitoringPort,
+		operatingSystem:         operatingSystem,
+		agentInfo:               agentInfo,
+		isOtelRuntimeSubprocess: isOtelRuntimeSubprocess,
 	}
 }
 
@@ -522,7 +514,7 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 }
 
 func (b *BeatsMonitor) getCollectorTelemetryEndpoint() string {
-	return fmt.Sprintf("localhost:%d", b.otelCollectorMonitoringPort)
+	return fmt.Sprintf("localhost:${env:%s}", OtelCollectorMetricsPortEnvVarName)
 }
 
 // injectMetricsInput injects monitoring config for agent monitoring to the `cfg` object.

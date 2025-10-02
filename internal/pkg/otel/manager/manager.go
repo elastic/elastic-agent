@@ -19,6 +19,8 @@ import (
 
 	"go.uber.org/zap"
 
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -77,7 +79,6 @@ type OTelManager struct {
 	// the mergedCollectorCfg is nil then the collector is not running.
 	mergedCollectorCfg     *confmap.Conf
 	mergedCollectorCfgHash []byte
-	collectorMetricsPort   int
 
 	currentCollectorStatus *status.AggregateStatus
 	currentComponentStates map[string]runtime.ComponentComponentState
@@ -123,7 +124,8 @@ func NewOTelManager(
 	baseLogger *logger.Logger,
 	mode ExecutionMode,
 	agentInfo info.Agent,
-	collectorMetricsPort int,
+	collectorMetricsPort int, // 0 means we pick a random port
+	collectorHealthCheckPort int, // 0 means we pick a random port
 	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter,
 	stopTimeout time.Duration,
 ) (*OTelManager, error) {
@@ -138,13 +140,13 @@ func NewOTelManager(
 			return nil, fmt.Errorf("failed to get the path to the collector executable: %w", err)
 		}
 		recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
-		exec, err = newSubprocessExecution(logLevel, executable)
+		exec, err = newSubprocessExecution(logLevel, executable, collectorMetricsPort, collectorHealthCheckPort)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create subprocess execution: %w", err)
 		}
 	case EmbeddedExecutionMode:
 		recoveryTimer = newRestarterNoop()
-		exec = newExecutionEmbedded()
+		exec = newExecutionEmbedded(collectorMetricsPort)
 	default:
 		return nil, fmt.Errorf("unknown otel collector execution mode: %q", mode)
 	}
@@ -159,7 +161,6 @@ func NewOTelManager(
 		errCh:                      make(chan error, 1), // holds at most one error
 		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
 		componentStateCh:           make(chan []runtime.ComponentComponentState, 1),
-		collectorMetricsPort:       collectorMetricsPort,
 		updateCh:                   make(chan configUpdate, 1),
 		doneChan:                   make(chan struct{}),
 		execution:                  exec,
@@ -283,7 +284,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			// and reset the retry count
 			m.recoveryTimer.Stop()
 			m.recoveryRetries.Store(0)
-			mergedCfg, err := buildMergedConfig(cfgUpdate, m.agentInfo, m.beatMonitoringConfigGetter, m.collectorMetricsPort, m.baseLogger)
+			mergedCfg, err := buildMergedConfig(cfgUpdate, m.agentInfo, m.beatMonitoringConfigGetter, m.baseLogger)
 			if err != nil {
 				reportErr(ctx, m.errCh, err)
 				continue
@@ -335,7 +336,6 @@ func buildMergedConfig(
 	cfgUpdate configUpdate,
 	agentInfo info.Agent,
 	monitoringConfigGetter translate.BeatMonitoringConfigGetter,
-	collectorMetricsPort int,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
 	mergedOtelCfg := confmap.New()
@@ -372,7 +372,7 @@ func buildMergedConfig(
 		}
 	}
 
-	if err := addCollectorMetricsPort(mergedOtelCfg, collectorMetricsPort); err != nil {
+	if err := addCollectorMetricsReader(mergedOtelCfg); err != nil {
 		return nil, fmt.Errorf("failed to add random collector metrics port: %w", err)
 	}
 
@@ -631,7 +631,7 @@ func calculateConfmapHash(conf *confmap.Conf) ([]byte, error) {
 	return h.Sum(nil), nil
 }
 
-func addCollectorMetricsPort(conf *confmap.Conf, port int) error {
+func addCollectorMetricsReader(conf *confmap.Conf) error {
 	// We operate on untyped maps instead of otel config structs because the otel collector has an elaborate
 	// configuration resolution system, and we can't reproduce it fully here. It's possible some of the values won't
 	// be valid for unmarshalling, because they're supposed to be loaded from environment variables, and so on.
@@ -649,7 +649,7 @@ func addCollectorMetricsPort(conf *confmap.Conf, port int) error {
 			"exporter": map[string]any{
 				"prometheus": map[string]any{
 					"host": "localhost",
-					"port": port,
+					"port": fmt.Sprintf("${env:%s}", componentmonitoring.OtelCollectorMetricsPortEnvVarName),
 					// this is the default configuration from the otel collector
 					"without_scope_info":  true,
 					"without_units":       true,
