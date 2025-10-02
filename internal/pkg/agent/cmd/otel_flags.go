@@ -26,7 +26,7 @@ func setupOtelFlags(flags *pflag.FlagSet) {
 		" single location can be set per flag entry e.g. `--config=file:/path/to/first --config=file:path/to/second`.")
 
 	flags.StringArray(otelSetFlagName, []string{}, "Set arbitrary component config property. The component has to be defined in the config file and the flag"+
-		" has a higher precedence. Array config properties are overridden and maps are joined. Example --set=processors.batch.timeout=2s")
+		" has a higher precedence. Array config properties are overridden and maps are joined. Example --set \"processors::batch::timeout=2s\"")
 
 	goFlags := new(flag.FlagSet)
 	featuregate.GlobalRegistry().RegisterFlags(goFlags)
