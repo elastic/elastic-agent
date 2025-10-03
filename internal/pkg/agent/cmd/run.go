@@ -19,6 +19,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 
 	"go.elastic.co/apm/v2"
 	apmtransport "go.elastic.co/apm/v2/transport"
@@ -261,6 +262,37 @@ func runElasticAgent(
 		return fmt.Errorf("failed to check for root/Administrator privileges: %w", err)
 	}
 
+	// fix permissions
+	if isRoot {
+		userName, groupName, err := getDesiredUser()
+		if err != nil {
+			return fmt.Errorf("failed to determine target user: %w", err)
+		}
+
+		var ownership utils.FileOwner
+		if userName != "" || groupName != "" {
+			ownership, err = install.EnsureUserAndGroup(userName, groupName, &debugDescriber{l}, true)
+			if err != nil {
+				return fmt.Errorf("failed to setup user: %w", err)
+			}
+		}
+
+		topPath := paths.Top()
+		err = perms.FixPermissions(topPath, perms.WithOwnership(ownership))
+		if err != nil {
+			return fmt.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
+		}
+
+		if err := dropRootPrivileges(ownership); err != nil {
+			return fmt.Errorf("failed to drop permissions to user %q(%v):%q(%v): %w",
+				userName, ownership.UID,
+				groupName, ownership.GID,
+				err,
+			)
+		}
+
+	}
+
 	l.Infow("Elastic Agent started",
 		"process.pid", os.Getpid(),
 		"agent.version", version.GetAgentPackageVersion(),
@@ -356,7 +388,7 @@ func runElasticAgent(
 		return err
 	}
 
-	monitoringServer, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
+	monitoringServer, err := setupMetrics(l, cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {
 		return err
 	}
@@ -715,12 +747,11 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 
 func setupMetrics(
 	logger *logger.Logger,
-	operatingSystem string,
 	cfg *monitoringCfg.MonitoringConfig,
 	tracer *apm.Tracer,
 	coord *coordinator.Coordinator,
 ) (*reload.ServerReloader, error) {
-	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil {
+	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil { //nolint:staticcheck // will be fixed in subsequent PR
 		return nil, err
 	}
 
@@ -793,4 +824,12 @@ func ensureInstallMarkerPresent() error {
 	paths.ResolveControlSocket(true)
 
 	return nil
+}
+
+type debugDescriber struct {
+	l *logger.Logger
+}
+
+func (d *debugDescriber) Describe(a string) {
+	d.l.Debug(a)
 }

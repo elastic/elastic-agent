@@ -10,6 +10,7 @@ import (
 	"golang.org/x/sys/windows/svc/eventlog"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 // logExternal logs the error to an external log.  On Windows this is
@@ -22,3 +23,7 @@ func logExternal(msg string) {
 	}
 	_ = eLog.Error(1, msg)
 }
+
+func getDesiredUser() (string, string, error) { return "", "", nil }
+
+func dropRootPrivileges(ownership utils.FileOwner) error { return nil }
