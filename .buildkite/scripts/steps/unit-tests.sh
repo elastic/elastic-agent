@@ -2,7 +2,7 @@
 source .buildkite/scripts/common.sh
 
 # Read GOPROXY from buildkite-agent env and export if present
-GOPROXY_VALUE="$(buildkite-agent env get GOPROXY)"
+GOPROXY_VALUE="$(buildkite-agent meta-data get athens-proxy)"
 if [[ -n "$GOPROXY_VALUE" ]]; then
 	echo "Loaded GOPROXY from buildkite-agent env: $GOPROXY_VALUE"
 	export GOPROXY="$GOPROXY_VALUE"
