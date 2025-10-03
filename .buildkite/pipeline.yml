@@ -13,6 +13,23 @@ env:
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1757725254"
 
 steps:
+  - label: "Start athens proxy"
+    command: |
+      docker run -d --rm \
+        -p 3000:3000 \ 
+        -e ATHENS_STORAGE_TYPE=memory \
+        -e ATHENS_GOGET_STORAGE_TYPE=memory \
+        gomods/athens:latest
+    agents:
+      provider: "gcp"
+      image: "${IMAGE_UBUNTU_2204_X86_64}"
+  - label: "Download Go modules"
+    command: |
+      export GOPROXY=http://localhost:3000
+      go mod download
+    agents:
+      provider: "gcp"
+      image: "${IMAGE_UBUNTU_2204_X86_64}"
   - label: "check-ci"
     key: "check-ci"
     command: ".buildkite/scripts/steps/check-ci.sh"
@@ -34,6 +51,8 @@ steps:
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
           - "coverage-*.out"
+        env:
+          GOPROXY: "http://athens-proxy:3000"
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
@@ -47,6 +66,7 @@ steps:
         key: "unit-tests-2204-fips-tag"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         env:
+          GOPROXY: "http://athens-proxy:3000"
           FIPS: "true"
         artifact_paths:
           - "build/TEST-*.html"
@@ -66,6 +86,7 @@ steps:
         key: "unit-tests-2204-fips140-only"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         env:
+          GOPROXY: "http://athens-proxy:3000"
           FIPS: "true"
           GODEBUG: "fips140=only"
         artifact_paths:
@@ -85,6 +106,8 @@ steps:
       - label: "Unit tests - Ubuntu 22.04 ARM64"
         key: "unit-tests-2204-arm64"
         command: ".buildkite/scripts/steps/unit-tests.sh"
+        env:
+          GOPROXY: "http://athens-proxy:3000"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -104,6 +127,8 @@ steps:
       - label: "Unit tests - Windows 2022"
         key: "unit-tests-win2022"
         command: .buildkite/scripts/steps/unit-tests.ps1
+        env:
+          GOPROXY: "http://athens-proxy:3000"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -124,6 +149,8 @@ steps:
       - label: "Unit tests - Windows 2016"
         key: "unit-tests-win2016"
         command: .buildkite/scripts/steps/unit-tests.ps1
+        env:
+          GOPROXY: "http://athens-proxy:3000"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -146,6 +173,8 @@ steps:
     steps:
       - label: "Unit tests - macOS 15 ARM"
         command: ".buildkite/scripts/steps/unit-tests.sh"
+        env:
+          GOPROXY: "http://athens-proxy:3000"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -163,6 +192,8 @@ steps:
       # Runs only on main and release branches
       - label: "Unit tests - macOS 13"
         command: ".buildkite/scripts/steps/unit-tests.sh"
+        env:
+          GOPROXY: "http://athens-proxy:3000"
         branches: "main 8.* 9.*"
         artifact_paths:
           - "build/TEST-*.html"
@@ -184,6 +215,8 @@ steps:
       - label: "Unit tests - Windows 10"
         key: "unit-tests-win10"
         command: .buildkite/scripts/steps/unit-tests.ps1
+        env:
+          GOPROXY: "http://athens-proxy:3000"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -203,6 +236,8 @@ steps:
       - label: "Unit tests - Windows 11"
         key: "unit-tests-win11"
         command: .buildkite/scripts/steps/unit-tests.ps1
+        env:
+          GOPROXY: "http://athens-proxy:3000"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
