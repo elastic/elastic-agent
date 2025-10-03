@@ -456,7 +456,8 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 			return nil, err
 		}
 
-		renderedInputs, err := transpiler.RenderInputs(inputs, varsArray)
+		// We don't care about unrendered inputs here, because they are not actually running.
+		renderedInputs, _, err := transpiler.RenderInputs(inputs, varsArray)
 		if err != nil {
 			return nil, err
 		}

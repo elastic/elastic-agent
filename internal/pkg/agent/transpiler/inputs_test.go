@@ -13,10 +13,11 @@ import (
 
 func TestRenderInputs(t *testing.T) {
 	testcases := map[string]struct {
-		input     Node
-		expected  Node
-		varsArray []*Vars
-		err       bool
+		input                    Node
+		expectedInputs           Node
+		expectedUnrenderedInputs Node
+		varsArray                []*Vars
+		err                      bool
 	}{
 		"inputs not list": {
 			input: NewKey("inputs", NewStrVal("not list")),
@@ -46,11 +47,12 @@ func TestRenderInputs(t *testing.T) {
 					NewKey("key", NewStrVal("${var1.name}")),
 				}),
 			})),
-			expected: NewList([]Node{
+			expectedInputs: NewList([]Node{
 				NewDict([]Node{
 					NewKey("key", NewStrVal("value1")),
 				}),
 			}),
+			expectedUnrenderedInputs: NewList([]Node{}),
 			varsArray: []*Vars{
 				mustMakeVars(map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -65,11 +67,12 @@ func TestRenderInputs(t *testing.T) {
 					NewKey("key", NewStrVal("${name}")),
 				}),
 			})),
-			expected: NewList([]Node{
+			expectedInputs: NewList([]Node{
 				NewDict([]Node{
 					NewKey("key", NewStrVal("value1")),
 				}),
 			}),
+			expectedUnrenderedInputs: NewList([]Node{}),
 			varsArray: []*Vars{
 				mustMakeVarsWithDefault(map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -87,11 +90,12 @@ func TestRenderInputs(t *testing.T) {
 					NewKey("key", NewStrVal("${var1.diff}")),
 				}),
 			})),
-			expected: NewList([]Node{
+			expectedInputs: NewList([]Node{
 				NewDict([]Node{
 					NewKey("key", NewStrVal("value1")),
 				}),
 			}),
+			expectedUnrenderedInputs: NewList([]Node{}),
 			varsArray: []*Vars{
 				mustMakeVars(map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -101,7 +105,7 @@ func TestRenderInputs(t *testing.T) {
 				}),
 			},
 		},
-		"missing var removes input": {
+		"missing var makes input unrendered": {
 			input: NewKey("inputs", NewList([]Node{
 				NewDict([]Node{
 					NewKey("key", NewStrVal("${var1.name}")),
@@ -113,9 +117,14 @@ func TestRenderInputs(t *testing.T) {
 					NewKey("key", NewStrVal("${var1.removed}")),
 				}),
 			})),
-			expected: NewList([]Node{
+			expectedInputs: NewList([]Node{
 				NewDict([]Node{
 					NewKey("key", NewStrVal("value1")),
+				}),
+			}),
+			expectedUnrenderedInputs: NewList([]Node{
+				NewDict([]Node{
+					NewKey("key", NewStrVal("${var1.removed}")),
 				}),
 			}),
 			varsArray: []*Vars{
@@ -138,7 +147,7 @@ func TestRenderInputs(t *testing.T) {
 					NewKey("unique", NewStrVal("1")),
 				}),
 			})),
-			expected: NewList([]Node{
+			expectedInputs: NewList([]Node{
 				NewDict([]Node{
 					NewKey("key", NewStrVal("value1")),
 					NewKey("unique", NewStrVal("0")),
@@ -148,6 +157,7 @@ func TestRenderInputs(t *testing.T) {
 					NewKey("unique", NewStrVal("1")),
 				}),
 			}),
+			expectedUnrenderedInputs: NewList([]Node{}),
 			varsArray: []*Vars{
 				mustMakeVars(map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -166,7 +176,7 @@ func TestRenderInputs(t *testing.T) {
 					NewKey("key", NewStrVal("${var1.diff}")),
 				}),
 			})),
-			expected: NewList([]Node{
+			expectedInputs: NewList([]Node{
 				NewDict([]Node{
 					NewKey("key", NewStrVal("value1")),
 				}),
@@ -180,6 +190,7 @@ func TestRenderInputs(t *testing.T) {
 					NewKey("key", NewStrVal("value4")),
 				}),
 			}),
+			expectedUnrenderedInputs: NewList([]Node{}),
 			varsArray: []*Vars{
 				mustMakeVars(map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -213,6 +224,47 @@ func TestRenderInputs(t *testing.T) {
 				}),
 			},
 		},
+		"duplicates across vars array will not duplicate unrendered inputs": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("key", NewStrVal("${var1.name}")),
+				}),
+				NewDict([]Node{
+					NewKey("key", NewStrVal("${var2.name}")),
+				}),
+			})),
+			expectedInputs: NewList([]Node{}),
+			expectedUnrenderedInputs: NewList([]Node{
+				NewDict([]Node{
+					NewKey("key", NewStrVal("${var1.name}")),
+				}),
+				NewDict([]Node{
+					NewKey("key", NewStrVal("${var2.name}")),
+				}),
+			}),
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{
+					"var3": map[string]interface{}{
+						"name": "value3",
+					},
+				}),
+				mustMakeVars(map[string]interface{}{
+					"var4": map[string]interface{}{
+						"name": "value4",
+					},
+				}),
+				mustMakeVars(map[string]interface{}{
+					"var5": map[string]interface{}{
+						"name": "value5",
+					},
+				}),
+				mustMakeVars(map[string]interface{}{
+					"var6": map[string]interface{}{
+						"name": "value6",
+					},
+				}),
+			},
+		},
 		"nested in streams": {
 			input: NewKey("inputs", NewList([]Node{
 				NewDict([]Node{
@@ -226,7 +278,7 @@ func TestRenderInputs(t *testing.T) {
 					})),
 				}),
 			})),
-			expected: NewList([]Node{
+			expectedInputs: NewList([]Node{
 				NewDict([]Node{
 					NewKey("type", NewStrVal("logfile")),
 					NewKey("streams", NewList([]Node{
@@ -263,6 +315,18 @@ func TestRenderInputs(t *testing.T) {
 						NewDict([]Node{
 							NewKey("paths", NewList([]Node{
 								NewStrVal("/var/log/value4.log"),
+							})),
+						}),
+					})),
+				}),
+			}),
+			expectedUnrenderedInputs: NewList([]Node{
+				NewDict([]Node{
+					NewKey("type", NewStrVal("logfile")),
+					NewKey("streams", NewList([]Node{
+						NewDict([]Node{
+							NewKey("paths", NewList([]Node{
+								NewStrVal("/var/log/${var1.name}.log"),
 							})),
 						}),
 					})),
@@ -324,7 +388,7 @@ func TestRenderInputs(t *testing.T) {
 					})),
 				}),
 			})),
-			expected: NewList([]Node{
+			expectedInputs: NewList([]Node{
 				NewDict([]Node{
 					NewKey("type", NewStrVal("logfile")),
 					NewKey("streams", NewList([]Node{
@@ -366,6 +430,7 @@ func TestRenderInputs(t *testing.T) {
 					})),
 				}),
 			}),
+			expectedUnrenderedInputs: NewList([]Node{}),
 			varsArray: []*Vars{
 				mustMakeVars(map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -403,7 +468,7 @@ func TestRenderInputs(t *testing.T) {
 					})),
 				}),
 			})),
-			expected: NewList([]Node{
+			expectedInputs: NewList([]Node{
 				NewDict([]Node{
 					NewKey("id", NewStrVal("initial-value1")),
 					NewKey("type", NewStrVal("logfile")),
@@ -465,6 +530,7 @@ func TestRenderInputs(t *testing.T) {
 					NewKey("original_id", NewStrVal("initial")),
 				}),
 			}),
+			expectedUnrenderedInputs: NewList([]Node{}),
 			varsArray: []*Vars{
 				mustMakeVarsP("value1", map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -513,7 +579,7 @@ func TestRenderInputs(t *testing.T) {
 					})),
 				}),
 			})),
-			expected: NewList([]Node{
+			expectedInputs: NewList([]Node{
 				NewDict([]Node{
 					NewKey("type", NewStrVal("logfile")),
 					NewKey("streams", NewList([]Node{
@@ -557,6 +623,7 @@ func TestRenderInputs(t *testing.T) {
 					})),
 				}),
 			}),
+			expectedUnrenderedInputs: NewList([]Node{}),
 			varsArray: []*Vars{
 				mustMakeVarsP("value1", map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -610,7 +677,7 @@ func TestRenderInputs(t *testing.T) {
 					})),
 				}),
 			})),
-			expected: NewList([]Node{
+			expectedInputs: NewList([]Node{
 				NewDict([]Node{
 					NewKey("type", NewStrVal("logfile")),
 					NewKey("streams", NewList([]Node{
@@ -644,6 +711,7 @@ func TestRenderInputs(t *testing.T) {
 					NewKey("id", NewStrVal("value2")),
 				}),
 			}),
+			expectedUnrenderedInputs: NewList([]Node{}),
 			varsArray: []*Vars{
 				mustMakeVarsP("value1", map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -692,7 +760,7 @@ func TestRenderInputs(t *testing.T) {
 					})),
 				}),
 			})),
-			expected: NewList([]Node{
+			expectedInputs: NewList([]Node{
 				NewDict([]Node{
 					NewKey("type", NewStrVal("logfile")),
 					NewKey("streams", NewList([]Node{
@@ -715,6 +783,7 @@ func TestRenderInputs(t *testing.T) {
 					})),
 				}),
 			}),
+			expectedUnrenderedInputs: NewList([]Node{}),
 			varsArray: []*Vars{
 				mustMakeVarsP("value1", map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -770,7 +839,8 @@ func TestRenderInputs(t *testing.T) {
 					})),
 				}),
 			})),
-			expected: NewList([]Node{}),
+			expectedInputs:           NewList([]Node{}),
+			expectedUnrenderedInputs: NewList([]Node{}),
 			varsArray: []*Vars{
 				mustMakeVarsP("value1", map[string]interface{}{
 					"var1": map[string]interface{}{
@@ -788,16 +858,70 @@ func TestRenderInputs(t *testing.T) {
 					nil),
 			},
 		},
+		"input removal with stream conditions using undefined variables": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("type", NewStrVal("logfile")),
+					NewKey("streams", NewList([]Node{
+						// Different order of keys to ensure key order does not matter
+						NewDict([]Node{
+							NewKey("condition", NewStrVal("exists(${var1.missing})")),
+							NewKey("paths", NewList([]Node{
+								NewStrVal("/var/log/${var1.missing}.log"),
+							})),
+						}),
+						NewDict([]Node{
+							NewKey("condition", NewStrVal("exists(${var1.name})")),
+							NewKey("paths", NewList([]Node{
+								NewStrVal("/var/log/${var1.name}.log"),
+							})),
+						}),
+						NewDict([]Node{
+							NewKey("paths", NewList([]Node{
+								NewStrVal("/var/log/${var2.missing}.log"),
+							})),
+							NewKey("condition", NewStrVal("exists(${var2.missing})")),
+						}),
+					})),
+				}),
+			})),
+			expectedInputs: NewList([]Node{
+				NewDict([]Node{
+					NewKey("type", NewStrVal("logfile")),
+					NewKey("streams", NewList([]Node{
+						NewDict([]Node{
+							NewKey("paths", NewList([]Node{
+								NewStrVal("/var/log/value1.log"),
+							})),
+						}),
+					})),
+				}),
+			}),
+			expectedUnrenderedInputs: NewList([]Node{}),
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "value1",
+					},
+				}),
+				mustMakeVars(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"desc": "value2",
+					},
+				}),
+			},
+		},
 	}
 
 	for name, test := range testcases {
 		t.Run(name, func(t *testing.T) {
-			v, err := RenderInputs(test.input, test.varsArray)
+			v, u, err := RenderInputs(test.input, test.varsArray)
 			if test.err {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, test.expected.String(), v.String())
+				assert.Equal(t, test.expectedInputs.String(), v.String())
+				assert.Equal(t, test.expectedUnrenderedInputs.String(), u.String())
 			}
 		})
 	}

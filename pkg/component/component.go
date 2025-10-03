@@ -42,6 +42,16 @@ const (
 	ProcessRuntimeManager                = RuntimeManager("process")
 	OtelRuntimeManager                   = RuntimeManager("otel")
 	DefaultRuntimeManager RuntimeManager = ProcessRuntimeManager
+
+	// input config keys
+	outputsKey          = "outputs"
+	enabledKey          = "enabled"
+	inputsKey           = "inputs"
+	unrenderedInputsKey = "unrendered_inputs"
+	typeKey             = "type"
+	idKey               = "id"
+	useOutputKey        = "use_output"
+	runtimeManagerKey   = "_runtime_experimental"
 )
 
 // ErrInputRuntimeCheckFail error is used when an input specification runtime prevention check occurs.
@@ -366,6 +376,10 @@ func (r *RuntimeSpecs) componentsForInputType(
 		unitsForRuntimeManager := make(map[RuntimeManager][]Unit)
 		for _, input := range output.inputs[inputType] {
 			if input.enabled {
+				if componentErr == nil {
+					// Use the input's error (e.g., unrendered input) if there is one.
+					componentErr = input.err
+				}
 				unitID := fmt.Sprintf("%s-%s", componentID, input.id)
 				unitsForRuntimeManager[input.runtimeManager] = append(
 					unitsForRuntimeManager[input.runtimeManager],
@@ -402,6 +416,11 @@ func (r *RuntimeSpecs) componentsForInputType(
 			if componentErr == nil && !containsStr(inputSpec.Spec.Outputs, output.outputType) {
 				// This output is unsupported.
 				componentErr = ErrOutputNotSupported
+			}
+
+			if componentErr == nil {
+				// Use the input's error (e.g., unrendered input) if there is one.
+				componentErr = input.err
 			}
 
 			var units []Unit
@@ -527,16 +546,6 @@ func injectInputPolicyID(fleetPolicy map[string]interface{}, inputConfig map[str
 // toIntermediate takes the policy and returns it into an intermediate representation that is easier to map into a set
 // of components.
 func toIntermediate(policy map[string]interface{}, aliasMapping map[string]string, ll logp.Level, headers HeadersProvider) (map[string]outputI, error) {
-	const (
-		outputsKey        = "outputs"
-		enabledKey        = "enabled"
-		inputsKey         = "inputs"
-		typeKey           = "type"
-		idKey             = "id"
-		useOutputKey      = "use_output"
-		runtimeManagerKey = "_runtime_experimental"
-	)
-
 	// intermediate structure for output to input mapping (this structure allows different input types per output)
 	outputsMap := make(map[string]outputI)
 
@@ -612,27 +621,45 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 	}
 
 	// map the inputs to the outputs
-	inputsRaw, ok := policy[inputsKey]
-	if !ok {
-		// no inputs; no components then
+	err := mapInputs(aliasMapping, outputsMap, policy, ll, inputsKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// map the unrendered_inputs to the outputs
+	err = mapInputs(aliasMapping, outputsMap, policy, ll, unrenderedInputsKey)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(outputsMap) == 0 {
 		return nil, nil
 	}
-	inputs, ok := inputsRaw.([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("invalid 'inputs', expected an array not a %T", inputsRaw)
+	return outputsMap, nil
+}
+
+// mapInputs maps an input to an output
+func mapInputs(aliasMapping map[string]string, outputsMap map[string]outputI, policy map[string]any, ll logp.Level, key string) error {
+	var inputs []any
+	inputsRaw, ok := policy[key]
+	if ok {
+		inputs, ok = inputsRaw.([]any)
+		if !ok {
+			return fmt.Errorf("invalid '%s', expected an array not a %T", key, inputsRaw)
+		}
 	}
 	for idx, inputRaw := range inputs {
-		input, ok := inputRaw.(map[string]interface{})
+		input, ok := inputRaw.(map[string]any)
 		if !ok {
-			return nil, fmt.Errorf("invalid 'inputs.%d', expected a map not a %T", idx, inputRaw)
+			return fmt.Errorf("invalid '%s.%d', expected a map not a %T", key, idx, inputRaw)
 		}
 		typeRaw, ok := input[typeKey]
 		if !ok {
-			return nil, fmt.Errorf("invalid 'inputs.%d', 'type' missing", idx)
+			return fmt.Errorf("invalid '%s.%d', 'type' missing", key, idx)
 		}
 		t, ok := typeRaw.(string)
 		if !ok {
-			return nil, fmt.Errorf("invalid 'inputs.%d.type', expected a string not a %T", idx, typeRaw)
+			return fmt.Errorf("invalid '%s.%d.type', expected a string not a %T", key, idx, typeRaw)
 		}
 		if realInputType, found := aliasMapping[t]; found {
 			t = realInputType
@@ -646,36 +673,36 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 		}
 		id, ok := idRaw.(string)
 		if !ok {
-			return nil, fmt.Errorf("invalid 'inputs.%d.id', expected a string not a %T", idx, idRaw)
+			return fmt.Errorf("invalid '%s.%d.id', expected a string not a %T", key, idx, idRaw)
 		}
 		if hasDuplicate(outputsMap, id) {
-			return nil, fmt.Errorf("invalid 'inputs.%d.id', has a duplicate id %q. Please add a unique value for the 'id' key to each input in the agent policy", idx, id)
+			return fmt.Errorf("invalid '%s.%d.id', has a duplicate id %q. Please add a unique value for the 'id' key to each input in the agent policy", key, idx, id)
 		}
 		outputName := "default"
 		if outputRaw, ok := input[useOutputKey]; ok {
 			outputNameVal, ok := outputRaw.(string)
 			if !ok {
-				return nil, fmt.Errorf("invalid 'inputs.%d.use_output', expected a string not a %T", idx, outputRaw)
+				return fmt.Errorf("invalid '%s.%d.use_output', expected a string not a %T", key, idx, outputRaw)
 			}
 			outputName = outputNameVal
 			delete(input, useOutputKey)
 		}
 		output, ok := outputsMap[outputName]
 		if !ok {
-			return nil, fmt.Errorf("invalid 'inputs.%d.use_output', references an unknown output '%s'", idx, outputName)
+			return fmt.Errorf("invalid '%s.%d.use_output', references an unknown output '%s'", key, idx, outputName)
 		}
 		enabled := true
 		if enabledRaw, ok := input[enabledKey]; ok {
 			enabledVal, ok := enabledRaw.(bool)
 			if !ok {
-				return nil, fmt.Errorf("invalid 'inputs.%d.enabled', expected a bool not a %T", idx, enabledRaw)
+				return fmt.Errorf("invalid '%s.%d.enabled', expected a bool not a %T", key, idx, enabledRaw)
 			}
 			enabled = enabledVal
 			delete(input, enabledKey)
 		}
 		logLevel, err := getLogLevel(input, ll)
 		if err != nil {
-			return nil, fmt.Errorf("invalid 'inputs.%d.log_level', %w", idx, err)
+			return fmt.Errorf("invalid '%s.%d.log_level', %w", key, idx, err)
 		}
 
 		runtimeManager := DefaultRuntimeManager
@@ -683,13 +710,13 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 		if runtimeManagerRaw, ok := input[runtimeManagerKey]; ok {
 			runtimeManagerStr, ok := runtimeManagerRaw.(string)
 			if !ok {
-				return nil, fmt.Errorf("invalid 'inputs.%d.runtime', expected a string, not a %T", idx, runtimeManagerRaw)
+				return fmt.Errorf("invalid '%s.%d.runtime', expected a string, not a %T", key, idx, runtimeManagerRaw)
 			}
 			runtimeManagerVal := RuntimeManager(runtimeManagerStr)
 			switch runtimeManagerVal {
 			case OtelRuntimeManager, ProcessRuntimeManager:
 			default:
-				return nil, fmt.Errorf("invalid 'inputs.%d.runtime', valid values are: %s, %s", idx, OtelRuntimeManager, ProcessRuntimeManager)
+				return fmt.Errorf("invalid '%s.%d.runtime', valid values are: %s, %s", key, idx, OtelRuntimeManager, ProcessRuntimeManager)
 			}
 			runtimeManager = runtimeManagerVal
 			delete(input, runtimeManagerKey)
@@ -699,6 +726,11 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 		// allows individual inputs (like endpoint) to detect policy changes more easily.
 		injectInputPolicyID(policy, input)
 
+		var inputErr error
+		if key == unrenderedInputsKey {
+			inputErr = ErrInputNotRendered
+		}
+
 		output.inputs[t] = append(output.inputs[t], inputI{
 			idx:            idx,
 			id:             id,
@@ -707,12 +739,10 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 			inputType:      t,
 			config:         input,
 			runtimeManager: runtimeManager,
+			err:            inputErr,
 		})
 	}
-	if len(outputsMap) == 0 {
-		return nil, nil
-	}
-	return outputsMap, nil
+	return nil
 }
 
 type inputI struct {
@@ -722,6 +752,7 @@ type inputI struct {
 	logLevel       client.UnitLogLevel
 	inputType      string // canonical (non-alias) type
 	runtimeManager RuntimeManager
+	err            error
 
 	// The raw configuration for this input, with small cleanups:
 	// - the "enabled", "use_output", and "log_level" keys are removed

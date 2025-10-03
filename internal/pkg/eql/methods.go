@@ -13,6 +13,9 @@ var methods = map[string]callFunc{
 	// array
 	"arrayContains": arrayContains,
 
+	// exists
+	"exists": exists,
+
 	// dict
 	"hasKey": hasKey,
 
