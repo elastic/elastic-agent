@@ -13,7 +13,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/testing/integration"
@@ -59,6 +58,7 @@ func TestRestrictUpgradeDeb(t *testing.T) {
 
 		out, err := fixture.Exec(ctx, []string{"upgrade", "1.0.0"})
 		require.Error(t, err)
-		require.Contains(t, string(out), coordinator.ErrNotUpgradable.Error())
+		require.Contains(t, string(out), "cannot be upgraded; must be installed with install sub-command and "+
+			"running under control of the systems supervisor")
 	})
 }
