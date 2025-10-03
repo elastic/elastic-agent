@@ -55,7 +55,6 @@ steps:
 
       - label: "Unit tests - Ubuntu 22.04 with requirefips build tag"
         key: "unit-tests-2204-fips-tag"
-    depends_on: "preload"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         env:
           FIPS: "true"
@@ -75,7 +74,6 @@ steps:
 
       - label: "Unit tests - fips140=only Ubuntu 22.04"
         key: "unit-tests-2204-fips140-only"
-    depends_on: "preload"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         env:
           FIPS: "true"
@@ -96,7 +94,6 @@ steps:
 
       - label: "Unit tests - Ubuntu 22.04 ARM64"
         key: "unit-tests-2204-arm64"
-    depends_on: "preload"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         artifact_paths:
           - "build/TEST-*.html"
@@ -116,7 +113,7 @@ steps:
 
       - label: "Unit tests - Windows 2022"
         key: "unit-tests-win2022"
-    depends_on: "preload"
+  
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
           - "build/TEST-*.html"
@@ -137,7 +134,7 @@ steps:
 
       - label: "Unit tests - Windows 2016"
         key: "unit-tests-win2016"
-    depends_on: "preload"
+  
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
           - "build/TEST-*.html"
@@ -198,7 +195,7 @@ steps:
     steps:
       - label: "Unit tests - Windows 10"
         key: "unit-tests-win10"
-    depends_on: "preload"
+  
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
           - "build/TEST-*.html"
@@ -218,7 +215,7 @@ steps:
 
       - label: "Unit tests - Windows 11"
         key: "unit-tests-win11"
-    depends_on: "preload"
+  
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
           - "build/TEST-*.html"
