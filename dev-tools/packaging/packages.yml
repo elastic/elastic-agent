@@ -13,6 +13,9 @@ platforms: &all-platforms
   - &windows-amd64
     os: windows
     arch: x86_64
+  - &windows-arm64
+    os: windows
+    arch: arm64
   - &darwin-amd64
     os: darwin
     arch: x86_64
@@ -68,6 +71,7 @@ components:
     binaryName: agentbeat
     fips: false
     platforms: *all-platforms
+
     packageTypes: *all-package-types
   - &comp-apm_server
     projectName: apm-server
@@ -120,7 +124,12 @@ components:
     rootDir: fleet-server-{{.Version}}-{{.Platform}}
     binaryName: fleet-server
     fips: false
-    platforms: *all-platforms
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+      - *windows-amd64
+      - *darwin-amd64
+      - *darwin-arm64
     packageTypes: *all-package-types
   - &comp-pf-elastic-collector
     projectName: prodfiler

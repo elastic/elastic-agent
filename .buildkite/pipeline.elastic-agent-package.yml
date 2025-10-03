@@ -93,8 +93,8 @@ steps:
           imagePrefix: "core-ubuntu-2204-aarch64"
           diskSizeGb: 400
         env:
-          PLATFORMS: "linux/arm64 darwin/arm64"
-          PACKAGES: "docker,tar.gz,deb,rpm"
+          PLATFORMS: "linux/arm64 darwin/arm64 windows/arm64"
+          PACKAGES: "docker,tar.gz,deb,rpm,zip"
           FIPS: "{{matrix.fips}}"
         command: |
           echo "Add support for multiarch"
