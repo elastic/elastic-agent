@@ -27,17 +27,11 @@ steps:
     key: "unit-tests"
     steps:
       - label: "Start athens proxy"
-        command: ".buildkite/scripts/steps/run-athens.sh
-        agents:
-          provider: "gcp"
-          image: "${IMAGE_UBUNTU_2204_X86_64}"
+        command: ".buildkite/scripts/steps/run-athens.sh"
       - label: "Download Go modules"
         command: |
           export GOPROXY=http://athens-proxy:3000
           go mod download
-        agents:
-          provider: "gcp"
-          image: "${IMAGE_UBUNTU_2204_X86_64}"
       - label: "Unit tests - Ubuntu 22.04"
         key: "unit-tests-2204"
         command: ".buildkite/scripts/steps/unit-tests.sh"
