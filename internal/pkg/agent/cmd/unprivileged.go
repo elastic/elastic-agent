@@ -15,7 +15,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/install/service"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install/componentvalidation"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client/wait"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -72,7 +72,7 @@ func unprivilegedCmd(streams *cli.IOStreams, cmd *cobra.Command) (err error) {
 	}
 
 	// cannot switch to unprivileged when service components have issues
-	err = service.EnsureNoServiceComponentIssues()
+	err = componentvalidation.EnsureNoServiceComponentIssues()
 	if err != nil {
 		// error already adds context
 		return err

@@ -20,7 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	installSvc "github.com/elastic/elastic-agent/internal/pkg/agent/install/service"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install/componentvalidation"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
@@ -154,7 +154,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		return nil
 	}
 
-	cfg, otel, lvl, err := installSvc.GetConfigWithVariables(ctx, l, cfgPath, opts.variablesWait, !isAdmin)
+	cfg, otel, lvl, err := componentvalidation.GetConfigWithVariables(ctx, l, cfgPath, opts.variablesWait, !isAdmin)
 	if err != nil {
 		return fmt.Errorf("error fetching config with variables: %w", err)
 	}
@@ -176,7 +176,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 			return fmt.Errorf("failed to detect inputs and outputs: %w", err)
 		}
 
-		monitorFn, err := installSvc.GetMonitoringFn(ctx, l, cfg, otel)
+		monitorFn, err := componentvalidation.GetMonitoringFn(ctx, l, cfg, otel)
 		if err != nil {
 			return fmt.Errorf("failed to get monitoring: %w", err)
 		}
@@ -284,7 +284,7 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 		return err
 	}
 
-	comps, err := installSvc.GetComponentsFromPolicy(ctx, l, cfgPath, opts.variablesWait)
+	comps, err := componentvalidation.GetComponentsFromPolicy(ctx, l, cfgPath, opts.variablesWait)
 	if err != nil {
 		// error already includes the context
 		return err

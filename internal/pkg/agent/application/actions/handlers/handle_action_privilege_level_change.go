@@ -12,7 +12,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/install/service"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install/componentvalidation"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
@@ -64,7 +64,7 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 	}
 
 	// ensure no component issues
-	err := service.EnsureNoServiceComponentIssues()
+	err := componentvalidation.EnsureNoServiceComponentIssues()
 	if err != nil {
 		h.log.Debugf("handlerPrivilegeLevelChange: found issues with components: %v", err)
 		return err

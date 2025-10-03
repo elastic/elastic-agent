@@ -50,7 +50,8 @@ func getDesiredUser() (string, string, error) {
 func dropRootPrivileges(ownership utils.FileOwner) error {
 	// change group first, setuid will drop permission to change group
 	if ownership.GID > 0 {
-		// not necessary, just in case.
+		// Omitting setegid and using only setgid sets both real and effective group IDs,
+		// but explicit control over the effective group ID, which is used for access checks, is lost.
 		if err := syscall.Setegid(ownership.GID); err != nil {
 			return fmt.Errorf("failed to set eGID: %w", err)
 		}
