@@ -1066,7 +1066,11 @@ func TestMonitorReload(t *testing.T) {
 	monitorcfg.MonitorLogs = false
 	monitorcfg.MonitorMetrics = false
 
+<<<<<<< HEAD:internal/pkg/agent/application/monitoring/v1_monitor_test.go
 	beatsMonitor := New(true, "", monitorcfg, nil)
+=======
+	beatsMonitor := New(true, "", monitorcfg, nil, nil, false)
+>>>>>>> a441ebee7 (Ingest internal telemetry from the OTel Collector when it is running (#9928)):internal/pkg/agent/application/monitoring/component/v1_monitor_test.go
 	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, false)
 	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, false)
 

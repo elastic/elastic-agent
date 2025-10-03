@@ -128,7 +128,11 @@ func New(
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create upgrader: %w", err)
 	}
+<<<<<<< HEAD
 	monitor := monitoring.New(isMonitoringSupported, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, agentInfo)
+=======
+	monitor := componentmonitoring.New(isMonitoringSupported, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, rawConfig.OTel, agentInfo, isOtelExecModeSubprocess)
+>>>>>>> a441ebee7 (Ingest internal telemetry from the OTel Collector when it is running (#9928))
 
 	runtime, err := runtime.NewManager(
 		log,
