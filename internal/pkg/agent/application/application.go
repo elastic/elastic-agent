@@ -7,12 +7,16 @@ package application
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"go.elastic.co/apm/v2"
 
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
+	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
+	"github.com/elastic/elastic-agent/pkg/utils/install"
 	"github.com/elastic/go-ucfg"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -25,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	installpkg "github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	stateStore "github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
@@ -51,6 +56,15 @@ import (
 // CfgOverrider allows for application driven overrides of configuration read from disk.
 type CfgOverrider func(cfg *configuration.Configuration)
 
+// installDescriptorSource abstracts away the implementation details of the actual agent install registry.
+// this interface is very similar to upgrade.installDescriptorSource but only the methods actually used in this package
+// are defined here (Interface Segregation Principle)
+type installDescriptorSource interface {
+	ModifyInstallDesc(modifierFunc func(desc *v1.AgentInstallDesc) error) (*v1.InstallDescriptor, error)
+	RemoveAgentInstallDesc(versionedHome ...string) (*v1.InstallDescriptor, error)
+	GetInstallDesc() (*v1.InstallDescriptor, error)
+}
+
 // New creates a new Agent and bootstrap the required subsystem.
 func New(
 	ctx context.Context,
@@ -64,7 +78,7 @@ func New(
 	fleetInitTimeout time.Duration,
 	disableMonitoring bool,
 	override CfgOverrider,
-	initialUpgradeDetails *details.Details,
+	initialUpdateMarker *upgrade.UpdateMarker,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
@@ -129,7 +143,13 @@ func New(
 
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
 	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled
-	upgrader, err := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, cfg.Settings.Upgrade, agentInfo, new(upgrade.AgentWatcherHelper))
+
+	installDescriptorSource := install.NewFileDescriptorSource(filepath.Join(paths.Top(), paths.MarkerFileName))
+	if platform.OS != component.Container {
+		// If we are not running in a container, check and normalize the install descriptor before we start the agent
+		normalizeInstallDescriptorAtStartup(log, paths.Top(), time.Now(), initialUpdateMarker, installDescriptorSource)
+	}
+	upgrader, err := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, cfg.Settings.Upgrade, agentInfo, new(upgrade.AgentWatcherHelper), installDescriptorSource)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create upgrader: %w", err)
 	}
@@ -145,6 +165,12 @@ func New(
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
+	}
+
+	// prepare initialUpgradeDetails for injecting it in coordinator later on
+	var initialUpgradeDetails *details.Details
+	if initialUpdateMarker != nil && initialUpdateMarker.Details != nil {
+		initialUpgradeDetails = initialUpdateMarker.Details
 	}
 
 	var configMgr coordinator.ConfigManager
@@ -272,6 +298,94 @@ func New(
 	}
 
 	return coord, configMgr, varsManager, nil
+}
+
+// normalizeInstallDescriptorAtStartup will check the install descriptor checking:
+// - if we just rolled back: the update marker is checked and in case of rollback we clean up the entry about the failed upgraded install
+// - check all the entries:
+//   - verify that the home directory for that install still exists (remove what does not exist anymore)
+//   - TODO check TTLs of installs to schedule delayed cleanup while the agent is running
+//
+// This function will NOT error out, it will log any errors it encounters as warnings but any error must be treated as non-fatal
+func normalizeInstallDescriptorAtStartup(log *logger.Logger, topDir string, now time.Time, initialUpdateMarker *upgrade.UpdateMarker, installDescriptorSource installDescriptorSource) {
+	// Check if we rolled back and update the install descriptor
+	if initialUpdateMarker != nil && initialUpdateMarker.Details != nil && initialUpdateMarker.Details.State == details.StateRollback {
+		// Take the versionedHome of the version we rolledback from and remove it from the installation lists
+		_, removeInstallDescErr := installDescriptorSource.RemoveAgentInstallDesc(initialUpdateMarker.VersionedHome /* there should be the versionedHome from the upgrade marker here*/)
+		if removeInstallDescErr != nil {
+			log.Warnf("Error removing rolled back version %s installed in %s: %v", initialUpdateMarker.VersionedHome, initialUpdateMarker.VersionedHome, removeInstallDescErr)
+		}
+
+		currentVersionedHome, _ := filepath.Rel(topDir, paths.HomeFrom(topDir))
+		// Set the current version as active and all the others as inactive
+		_, updateInstallDescErr := installDescriptorSource.ModifyInstallDesc(func(desc *v1.AgentInstallDesc) error {
+			if desc.VersionedHome == currentVersionedHome {
+				// set the current version as active and make sure it doesn't have a TTL
+				desc.Active = true
+				desc.TTL = nil
+			} else {
+				// any other install is not the active one
+				desc.Active = false
+			}
+			return nil
+		})
+		if updateInstallDescErr != nil {
+			log.Warnf("Error setting current version as active in installDescriptor: %s", updateInstallDescErr)
+		}
+	}
+
+	// check that all listed installs are valid
+	installDescriptor, err := installDescriptorSource.GetInstallDesc()
+	if err != nil {
+		log.Warnf("Error getting install descriptor from installDescriptorSource during startup check: %s", err)
+		return
+	}
+
+	if installDescriptor == nil {
+		log.Warnf("Got a nil install descriptor from installDescriptorSource during startup check, skipping")
+		return
+	}
+
+	versionedHomesToCleanup := []string{}
+	for _, installDesc := range installDescriptor.AgentInstalls {
+
+		if installDesc.Active || filepath.Join(topDir, installDesc.VersionedHome) == paths.HomeFrom(topDir) {
+			// skip the current install
+			continue
+		}
+
+		versionedHomeAbsPath := filepath.Join(topDir, installDesc.VersionedHome)
+		_, err = os.Stat(versionedHomeAbsPath)
+		if errors.Is(err, os.ErrNotExist) {
+			log.Infof("agent install descriptor %+v will be deleted as the versioned home is not found on disk", installDesc)
+			versionedHomesToCleanup = append(versionedHomesToCleanup, installDesc.VersionedHome)
+			continue
+		}
+
+		if err != nil {
+			log.Warnf("error checking versioned home for agent install %+v: %s", installDesc, err.Error())
+			continue
+		}
+
+		if installDesc.TTL != nil && now.After(*installDesc.TTL) {
+			// the install directory exists but it's expired. Remove the files and add the versioned home to the entries to remove on the install descriptor
+			log.Infof("agent install descriptor %+v is expired, removing directory %q", installDesc, versionedHomeAbsPath)
+			if cleanupErr := installpkg.RemoveBut(versionedHomeAbsPath, true); cleanupErr != nil {
+				log.Warnf("Error removing directory %q: %s", versionedHomeAbsPath, cleanupErr)
+			} else {
+				log.Infof("Directory %q was removed, selecting agent install %+v for removal from the install descriptor", versionedHomeAbsPath, installDesc)
+				versionedHomesToCleanup = append(versionedHomesToCleanup, installDesc.VersionedHome)
+			}
+		}
+	}
+
+	if len(versionedHomesToCleanup) > 0 {
+		log.Infof("removing install descriptor for %v", versionedHomesToCleanup)
+		_, err = installDescriptorSource.RemoveAgentInstallDesc(versionedHomesToCleanup...)
+		if err != nil {
+			log.Warnf("Error removing install descriptor for %v: %v", versionedHomesToCleanup, err)
+		}
+	}
 }
 
 func mergeFleetConfig(ctx context.Context, rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {
