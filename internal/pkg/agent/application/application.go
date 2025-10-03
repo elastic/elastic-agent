@@ -386,8 +386,6 @@ func normalizeInstallDescriptorAtStartup(log *logger.Logger, topDir string, now 
 			log.Warnf("Error removing install descriptor(s): %s", err)
 		}
 	}
-
-	return
 }
 
 func mergeFleetConfig(ctx context.Context, rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {
