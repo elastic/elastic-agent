@@ -27,13 +27,23 @@ steps:
     key: "unit-tests"
     steps:
       - label: "Start athens proxy"
+        key: "athens"
         command: ".buildkite/scripts/steps/run-athens.sh"
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
       - label: "Download Go modules"
+        key: preload
+        depends_on: athens
         command: |
           export GOPROXY=http://athens-proxy:3000
           go mod download
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
       - label: "Unit tests - Ubuntu 22.04"
         key: "unit-tests-2204"
+        depends_on: "preload"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         artifact_paths:
           - "build/TEST-*.html"
@@ -53,6 +63,7 @@ steps:
 
       - label: "Unit tests - Ubuntu 22.04 with requirefips build tag"
         key: "unit-tests-2204-fips-tag"
+        depends_on: "preload"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         env:
           GOPROXY: "http://athens-proxy:3000"
@@ -73,6 +84,7 @@ steps:
 
       - label: "Unit tests - fips140=only Ubuntu 22.04"
         key: "unit-tests-2204-fips140-only"
+        depends_on: "preload"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         env:
           GOPROXY: "http://athens-proxy:3000"
@@ -94,6 +106,7 @@ steps:
 
       - label: "Unit tests - Ubuntu 22.04 ARM64"
         key: "unit-tests-2204-arm64"
+        depends_on: "preload"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         env:
           GOPROXY: "http://athens-proxy:3000"
@@ -115,6 +128,7 @@ steps:
 
       - label: "Unit tests - Windows 2022"
         key: "unit-tests-win2022"
+        depends_on: "preload"
         command: .buildkite/scripts/steps/unit-tests.ps1
         env:
           GOPROXY: "http://athens-proxy:3000"
@@ -137,6 +151,7 @@ steps:
 
       - label: "Unit tests - Windows 2016"
         key: "unit-tests-win2016"
+        depends_on: "preload"
         command: .buildkite/scripts/steps/unit-tests.ps1
         env:
           GOPROXY: "http://athens-proxy:3000"
@@ -203,6 +218,7 @@ steps:
     steps:
       - label: "Unit tests - Windows 10"
         key: "unit-tests-win10"
+        depends_on: "preload"
         command: .buildkite/scripts/steps/unit-tests.ps1
         env:
           GOPROXY: "http://athens-proxy:3000"
@@ -224,6 +240,7 @@ steps:
 
       - label: "Unit tests - Windows 11"
         key: "unit-tests-win11"
+        depends_on: "preload"
         command: .buildkite/scripts/steps/unit-tests.ps1
         env:
           GOPROXY: "http://athens-proxy:3000"
