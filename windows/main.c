@@ -18,12 +18,19 @@ void WINAPI ServiceCtrlHandler(DWORD ctrlCode) {
     switch (ctrlCode) {
         case SERVICE_CONTROL_STOP:
         case SERVICE_CONTROL_SHUTDOWN:
+            // report stop pending and then call `GoStop`.
+            // `GoStop` is non-blocking it just signals the stop causing `GoRun` to return
+            // once everything has been cleaned up.
             serviceStatus.dwCurrentState = SERVICE_STOP_PENDING;
             serviceStatus.dwWin32ExitCode = 0;
             serviceStatus.dwCheckPoint = 0;
             serviceStatus.dwWaitHint = 0;
             SetServiceStatus(serviceStatusHandle, &serviceStatus);
             GoStop();
+            break;
+        case SERVICE_CONTROL_INTERROGATE:
+            // report the current service status
+            SetServiceStatus(serviceStatusHandle, &serviceStatus);
             break;
         default:
             break;
