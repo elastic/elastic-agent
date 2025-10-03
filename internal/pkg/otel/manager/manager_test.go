@@ -928,6 +928,9 @@ func TestOTelManager_Ports(t *testing.T) {
 					assert.NoError(collect, err)
 					resp, err := http.DefaultClient.Do(req)
 					require.NoError(collect, err)
+					defer func() {
+						_ = resp.Body.Close()
+					}()
 					assert.Equal(collect, http.StatusOK, resp.StatusCode)
 				}, time.Second*10, time.Second)
 			}

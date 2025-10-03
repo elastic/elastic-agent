@@ -236,13 +236,13 @@ func (r *subprocessExecution) getCollectorPorts() (healthCheckPort int, metricsP
 	}
 
 	if randomPortCount == 0 {
-		return
+		return healthCheckPort, metricsPort, nil
 	}
 
 	// we need at least one random port, create it
 	ports, err := findRandomTCPPorts(randomPortCount)
 	if err != nil {
-		return
+		return 0, 0, err
 	}
 	// use the random values for ports which aren't set
 	portIndex := 0
@@ -251,9 +251,9 @@ func (r *subprocessExecution) getCollectorPorts() (healthCheckPort int, metricsP
 		portIndex++
 	}
 	if metricsPort == 0 {
-		metricsPort = ports[1]
+		metricsPort = ports[portIndex]
 	}
-	return
+	return healthCheckPort, metricsPort, nil
 }
 
 type procHandle struct {
