@@ -22,12 +22,13 @@ func newApplyFlavorCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "apply-flavor",
 		Short: "Apply Flavor cleans up unnecessary components from agent installation directory",
-		Run: func(c *cobra.Command, _ []string) {
+		RunE: func(c *cobra.Command, _ []string) error {
 			if err := applyCmd(); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 				logExternal(fmt.Sprintf("%s apply flavor failed: %s", paths.BinaryName, err))
-				os.Exit(1)
+				return NewExitCodeError(1, err)
 			}
+			return nil
 		},
 		Hidden: true,
 	}

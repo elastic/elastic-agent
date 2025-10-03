@@ -11,14 +11,7 @@
 
 SERVICE_STATUS serviceStatus;
 SERVICE_STATUS_HANDLE serviceStatusHandle;
-
-// ServiceCleanup is an atexit handler that sets the service to stopped.
-void ServiceCleanup(void) {
-    if (serviceStatusHandle) {
-        serviceStatus.dwCurrentState = SERVICE_STOPPED;
-        SetServiceStatus(serviceStatusHandle, &serviceStatus);
-    }
-}
+int serviceExitCode = 0;
 
 // ServiceCtrlHandler is called when the service is being controlled by Windows
 void WINAPI ServiceCtrlHandler(DWORD ctrlCode) {
@@ -59,14 +52,14 @@ void WINAPI ServiceMain(DWORD argc, LPTSTR *argv) {
     serviceStatus.dwCurrentState = SERVICE_RUNNING;
     SetServiceStatus(serviceStatusHandle, &serviceStatus);
 
-    // register the cleanup function to inform that it is stopped now
-    //
-    // atexit is used so no matter what happens in the goruntime the service is
-    // marked as stopped
-    atexit(ServiceCleanup);
+    // run the golang runtime and capture exit code
+    // GoRun maintains the golang boundary this will always return the exit code
+    // and all cleanup has been performed
+    serviceExitCode = GoRun();
 
-    // run the golang runtime
-    GoRun();
+    // mark stopped
+    serviceStatus.dwCurrentState = SERVICE_STOPPED;
+    SetServiceStatus(serviceStatusHandle, &serviceStatus);
 }
 
 // main is the entry point of the elastic-agent.exe
@@ -78,12 +71,16 @@ int main(int argc, char *argv[]) {
 
     // try to start as a service (this is blocking and only returns when the service is stopped)
     if (!StartServiceCtrlDispatcher(serviceTable)) {
-        if (GetLastError() == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT) {
+        DWORD error = GetLastError();
+        if (error == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT) {
             // not running as a service, so it can just call GoRun (which is also blocking)
-            GoRun();
-            return 0;
+            return GoRun();
+        } else {
+            // StartServiceCtrlDispatcher failed for another reason
+            fprintf(stderr, "StartServiceCtrlDispatcher failed with error: %lu\n", error);
+            return 1;
         }
     }
 
-    return 0;
+    return serviceExitCode;
 }

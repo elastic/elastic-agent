@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime/debug"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -22,11 +23,16 @@ var (
 )
 
 //export GoRun
-func GoRun() {
-	var err error
+func GoRun() C.int {
+	var exitCode C.int = 0
+
+	// golang boundry; we cannot allow a panic to exit the goroutine into C
+	// that will cause C to just crash and not continue
 	defer func() {
-		if err != nil {
-			os.Exit(1) // defer os exit and allow other goroutines to cleanup
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "panic: %v\n", r)
+			fmt.Fprintf(os.Stderr, "stack trace:\n%s\n", debug.Stack())
+			exitCode = 2
 		}
 	}()
 
@@ -37,24 +43,45 @@ func GoRun() {
 	pj, err := process.CreateJobObject()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize process job object: %v\n", err)
-		return
+		return 1
 	}
 	defer pj.Close()
 
 	command := cmd.NewCommand()
 	err = command.ExecuteContext(ctx)
 	if errors.Is(err, context.Canceled) {
-		// set to nil so defer func() doesn't os.Exit(1)
+		// clean exit
 		err = nil
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		return
+		var exitCodeErr *cmd.ExitCodeError
+		if errors.As(err, &exitCodeErr) {
+			// ExitCodeError requirement is that the code has already done the writing to logs and console.
+			// Inside of main() it is only used to provide the correct exit code.
+			exitCode = C.int(exitCodeErr.ExitCode())
+		}
+		// not an exit code error but still has an error, this covers the case of an error inside the cobra
+		// package. we write this error to stderr so its visible
+		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
+		exitCode = 1
+	} else {
+		// clean exit
+		exitCode = 0
 	}
+	return exitCode
 }
 
 //export GoStop
 func GoStop() {
+	// golang boundry; we cannot allow a panic to exit the goroutine into C
+	// that will cause C to just crash and not continue
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "panic in GoStop: %v\n", r)
+			fmt.Fprintf(os.Stderr, "stack trace:\n%s\n", debug.Stack())
+		}
+	}()
+
 	if cancel != nil {
 		cancel()
 	}

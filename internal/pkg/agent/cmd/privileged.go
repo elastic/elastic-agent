@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -32,11 +31,12 @@ daemon will always be started (even if it was off to start). In the case that th
 privileged it will still perform all the same work, including stopping and starting the Elastic Agent.
 `,
 		Args: cobra.ExactArgs(0),
-		Run: func(c *cobra.Command, args []string) {
+		RunE: func(c *cobra.Command, args []string) error {
 			if err := privilegedCmd(streams, c); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
-				os.Exit(1)
+				return NewExitCodeError(1, err)
 			}
+			return nil
 		},
 	}
 

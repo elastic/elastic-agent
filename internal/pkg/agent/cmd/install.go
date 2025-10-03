@@ -47,12 +47,13 @@ func newInstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 Unless all the require command-line parameters are provided or -f is used this command will ask questions on how you
 would like the Agent to operate.
 `,
-		Run: func(c *cobra.Command, _ []string) {
+		RunE: func(c *cobra.Command, _ []string) error {
 			if err := installCmd(streams, c); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
 				logExternal(fmt.Sprintf("%s install failed: %s", paths.BinaryName, err))
-				os.Exit(1)
+				return NewExitCodeError(1, err)
 			}
+			return nil
 		},
 	}
 

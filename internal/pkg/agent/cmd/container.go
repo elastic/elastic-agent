@@ -158,11 +158,12 @@ By default when this command starts it will check for an existing fleet.yml. If 
 all the above actions will be skipped, because the Elastic Agent has already been enrolled. To ensure that enrollment
 occurs on every start of the container set FLEET_FORCE to 1.
 `,
-		Run: func(c *cobra.Command, args []string) {
+		RunE: func(c *cobra.Command, args []string) error {
 			if err := logContainerCmd(c.Context(), streams); err != nil {
 				logError(streams, err)
-				os.Exit(1)
+				return NewExitCodeError(1, err)
 			}
+			return nil
 		},
 	}
 

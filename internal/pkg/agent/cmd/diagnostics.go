@@ -26,11 +26,12 @@ func newDiagnosticsCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 		Use:   "diagnostics",
 		Short: "Gather diagnostics information from the Elastic Agent and write it to a zip archive",
 		Long:  "This command gathers diagnostics information from the Elastic Agent and writes it to a zip archive.",
-		Run: func(c *cobra.Command, args []string) {
+		RunE: func(c *cobra.Command, args []string) error {
 			if err := diagnosticCmd(streams, c); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
-				os.Exit(1)
+				return NewExitCodeError(1, err)
 			}
+			return nil
 		},
 	}
 

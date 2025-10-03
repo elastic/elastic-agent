@@ -49,12 +49,13 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 		Short: "Upgrade the currently installed Elastic Agent to the specified version",
 		Long:  "This command upgrades the currently installed Elastic Agent to the specified version.",
 		Args:  cobra.ExactArgs(1),
-		Run: func(c *cobra.Command, args []string) {
+		RunE: func(c *cobra.Command, args []string) error {
 			c.SetContext(context.Background())
 			if err := upgradeCmd(streams, c, args); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
-				os.Exit(1)
+				return NewExitCodeError(1, err)
 			}
+			return nil
 		},
 	}
 
@@ -66,11 +67,7 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 	cmd.Flags().String(flagPGPBytesPath, "", "Path to a file containing PGP to use for package verification")
 	cmd.Flags().BoolP(flagForce, "", false, "Advanced option to force an upgrade on a fleet managed agent")
 	cmd.Flags().BoolP(flagRollback, "", false, "Roll back an upgrade")
-	err := cmd.Flags().MarkHidden(flagForce)
-	if err != nil {
-		fmt.Fprintf(streams.Err, "error while setting upgrade force flag attributes: %s", err.Error())
-		os.Exit(1)
-	}
+	_ = cmd.Flags().MarkHidden(flagForce) // only error here is that flagForce doesn't exist (it clearly does)
 
 	return cmd
 }

@@ -5,6 +5,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -14,11 +16,9 @@ import (
 
 // Setups and Runs agent.
 func main() {
-	var err error
+	exitCode := 1
 	defer func() {
-		if err != nil {
-			os.Exit(1) // defer os exit and allow other goroutines to cleanup
-		}
+		os.Exit(exitCode) // defer os exit and allow other goroutines to clean up
 	}()
 
 	pj, err := process.CreateJobObject()
@@ -30,8 +30,23 @@ func main() {
 
 	command := cmd.NewCommand()
 	err = command.Execute()
+	if errors.Is(err, context.Canceled) {
+		// clean exit
+		err = nil
+	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		return
+		var exitCodeErr *cmd.ExitCodeError
+		if errors.As(err, &exitCodeErr) {
+			// ExitCodeError requirement is that the code has already done the writing to logs and console.
+			// Inside of main() it is only used to provide the correct exit code.
+			exitCode = exitCodeErr.ExitCode()
+		}
+		// not an exit code error but still has an error, this covers the case of an error inside the cobra
+		// package. we write this error to stderr so its visible
+		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
+		exitCode = 1
+	} else {
+		// clean exit
+		exitCode = 0
 	}
 }

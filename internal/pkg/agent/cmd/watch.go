@@ -59,12 +59,12 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 		Use:   "watch",
 		Short: "Watch the Elastic Agent for failures and initiate rollback",
 		Long:  `This command watches Elastic Agent for failures and initiates rollback if necessary.`,
-		Run: func(c *cobra.Command, _ []string) {
+		RunE: func(c *cobra.Command, _ []string) error {
 			cfg := getConfig(streams)
 			log, err := configuredLogger(cfg, watcherName)
 			if err != nil {
 				fmt.Fprintf(streams.Err, "Error configuring logger: %v\n%s\n", err, troubleshootMessage())
-				os.Exit(3)
+				return NewExitCodeError(3, err)
 			}
 
 			// Make sure to flush any buffered logs before we're done.
@@ -73,7 +73,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 			err = setupParentProcessSignals()
 			if err != nil {
 				fmt.Fprintf(streams.Err, "Error setting parent process signals: %v\n", err)
-				os.Exit(errorSettingParentSignalsExitCode)
+				return NewExitCodeError(errorSettingParentSignalsExitCode, err)
 			}
 
 			takedown, _ := c.Flags().GetBool(takedownFlagName)
@@ -81,9 +81,9 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 				err = takedownWatcher(context.Background(), log, utils.GetWatcherPIDs)
 				if err != nil {
 					log.Errorf("error taking down watcher: %v", err)
-					os.Exit(5)
+					return NewExitCodeError(5, err)
 				}
-				return
+				return nil
 			}
 
 			if c.Flags().Changed(rollbackFlagName) {
@@ -91,14 +91,14 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 				rollbackTo, _ := c.Flags().GetString(rollbackFlagName)
 				if rollbackTo == "" {
 					fmt.Fprintf(streams.Err, "%s flag value cannot be empty", rollbackFlagName)
-					os.Exit(errorRollbackToValue)
+					return NewExitCodeError(errorRollbackToValue, err)
 				}
 				if err = withAppLocker(log, func() error {
 					return rollback(log, paths.Top(), client.New(), new(upgradeInstallationModifier), rollbackTo)
 				}); err != nil {
 					log.Errorw("Rollback command failed", "error.message", err)
 					fmt.Fprintf(streams.Err, "Rollback command failed: %v\n", err)
-					os.Exit(errorRollbackFailed)
+					return NewExitCodeError(errorRollbackFailed, err)
 				}
 			}
 
@@ -107,8 +107,9 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 			}); err != nil {
 				log.Errorw("Watch command failed", "error.message", err)
 				fmt.Fprintf(streams.Err, "Watch command failed: %v\n%s\n", err, troubleshootMessage())
-				os.Exit(4)
+				return NewExitCodeError(4, err)
 			}
+			return nil
 		},
 	}
 	cmd.Flags().BoolP(takedownFlagName, takedownFlagShorthand, false, "Take down the running watcher")

@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"sort"
 	"time"
 
@@ -42,11 +41,19 @@ func newStatusCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 		Use:   "status",
 		Short: "Show the current status of the running Elastic Agent daemon",
 		Long:  `This command shows the current status of the running Elastic Agent daemon.`,
-		Run: func(c *cobra.Command, args []string) {
+		RunE: func(c *cobra.Command, args []string) error {
 			if err := statusCmd(streams, c, args); err != nil {
+				// possible that the error here has already been written and the error is just because
+				// the elastic-agent is not healthy. we don't want to write it again as it will dirty
+				// the output. os.Exit cannot be used os we need this to come all the way back up the
+				// call stack.
+				if errors.As(err, &ExitCodeError{}) {
+					return err
+				}
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
-				os.Exit(1)
+				return NewExitCodeError(1, err)
 			}
+			return nil
 		},
 	}
 
@@ -85,11 +92,9 @@ func statusCmd(streams *cli.IOStreams, cmd *cobra.Command, args []string) error 
 	}
 	// exit 0 only if the Elastic Agent daemon is healthy
 	if state.State == client.Healthy {
-		os.Exit(0)
-	} else {
-		os.Exit(1)
+		return nil
 	}
-	return nil
+	return NewExitCodeError(1, fmt.Errorf("not healthy; %s", state.State))
 }
 
 func formatStatus(state client.State, message string) string {
