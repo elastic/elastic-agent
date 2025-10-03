@@ -82,6 +82,20 @@ func (r *embeddedExecution) startCollector(ctx context.Context, logger *logger.L
 	return ctl, nil
 }
 
+func (r *embeddedExecution) getCollectorMetricsPort() (metricsPort int, err error) {
+	// if the port is defined (non-zero), use it
+	if r.collectorMetricsPort > 0 {
+		return r.collectorMetricsPort, nil
+	}
+
+	// get a random port
+	ports, err := findRandomTCPPorts(1)
+	if err != nil {
+		return 0, err
+	}
+	return ports[0], nil
+}
+
 type ctxHandle struct {
 	collectorDoneCh chan struct{}
 	cancel          context.CancelFunc
