@@ -735,6 +735,40 @@ agent.monitoring.enabled: false
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer cancel()
 
+	// since we set the output to a nonexistent ES endpoint, we expect it to be degraded, but the input to be healthy
+	assertBeatsReady := func(t *assert.CollectT, status *atesting.AgentStatusOutput, runtime component.RuntimeManager) {
+		var componentVersionInfoName string
+		switch runtime {
+		case "otel":
+			componentVersionInfoName = "beats-receiver"
+		default:
+			componentVersionInfoName = "beat-v2-client"
+		}
+
+		// agent should be degraded
+		assert.Equal(t, int(cproto.State_DEGRADED), status.State)
+		assert.Equal(t, 1, len(status.Components))
+
+		// all the components should be degraded, their output units should be degraded, the input units should be healthy,
+		// and should identify themselves appropriately via their version info
+		for _, comp := range status.Components {
+			assert.Equal(t, int(cproto.State_DEGRADED), comp.State)
+			assert.Equal(t, componentVersionInfoName, comp.VersionInfo.Name)
+			for _, unit := range comp.Units {
+				var expectedState cproto.State
+				switch unit.UnitType {
+				case int(cproto.UnitType_INPUT):
+					expectedState = cproto.State_HEALTHY
+				case int(cproto.UnitType_OUTPUT):
+					expectedState = cproto.State_DEGRADED
+				}
+				assert.Equal(t, int(expectedState), unit.State,
+					"expected state of unit %s to be %s, got %s",
+					unit.UnitID, expectedState.String(), cproto.State(unit.State).String())
+			}
+		}
+	}
+
 	// set up a standalone agent
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
@@ -751,7 +785,7 @@ agent.monitoring.enabled: false
 		var statusErr error
 		status, statusErr := fixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
-		assertBeatsHealthy(collect, &status, component.ProcessRuntimeManager, 1)
+		assertBeatsReady(collect, &status, component.ProcessRuntimeManager)
 		return
 	}, 1*time.Minute, 1*time.Second)
 
@@ -763,7 +797,7 @@ agent.monitoring.enabled: false
 		var statusErr error
 		status, statusErr := fixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
-		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 1)
+		assertBeatsReady(collect, &status, component.ProcessRuntimeManager)
 		return
 	}, 1*time.Minute, 1*time.Second)
 
