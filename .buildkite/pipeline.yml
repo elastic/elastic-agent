@@ -23,8 +23,8 @@ steps:
       manual:
         allowed: true
 
-  - group: "Unit tests"
-    key: "unit-tests"
+  - group: "Gomods proxy"
+    key: "athens-proxy"
     steps:
       - label: "Start athens proxy"
         key: "athens"
@@ -41,6 +41,11 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
+  
+  - group: "Unit tests"
+    depends_on: "athens-proxy"
+    key: "unit-tests"
+    steps:
       - label: "Unit tests - Ubuntu 22.04"
         key: "unit-tests-2204"
         depends_on: "preload"
@@ -50,8 +55,6 @@ steps:
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
           - "coverage-*.out"
-        env:
-          GOPROXY: "http://athens-proxy:3000"
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
@@ -66,7 +69,6 @@ steps:
         depends_on: "preload"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         env:
-          GOPROXY: "http://athens-proxy:3000"
           FIPS: "true"
         artifact_paths:
           - "build/TEST-*.html"
@@ -87,7 +89,6 @@ steps:
         depends_on: "preload"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         env:
-          GOPROXY: "http://athens-proxy:3000"
           FIPS: "true"
           GODEBUG: "fips140=only"
         artifact_paths:
@@ -108,8 +109,6 @@ steps:
         key: "unit-tests-2204-arm64"
         depends_on: "preload"
         command: ".buildkite/scripts/steps/unit-tests.sh"
-        env:
-          GOPROXY: "http://athens-proxy:3000"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -130,8 +129,6 @@ steps:
         key: "unit-tests-win2022"
         depends_on: "preload"
         command: .buildkite/scripts/steps/unit-tests.ps1
-        env:
-          GOPROXY: "http://athens-proxy:3000"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -153,8 +150,6 @@ steps:
         key: "unit-tests-win2016"
         depends_on: "preload"
         command: .buildkite/scripts/steps/unit-tests.ps1
-        env:
-          GOPROXY: "http://athens-proxy:3000"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -174,11 +169,10 @@ steps:
 
   - group: "macOS tests"
     key: "macos-unit-tests"
+    depends_on: "athens-proxy"
     steps:
       - label: "Unit tests - macOS 15 ARM"
         command: ".buildkite/scripts/steps/unit-tests.sh"
-        env:
-          GOPROXY: "http://athens-proxy:3000"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -196,8 +190,6 @@ steps:
       # Runs only on main and release branches
       - label: "Unit tests - macOS 13"
         command: ".buildkite/scripts/steps/unit-tests.sh"
-        env:
-          GOPROXY: "http://athens-proxy:3000"
         branches: "main 8.* 9.*"
         artifact_paths:
           - "build/TEST-*.html"
@@ -215,13 +207,12 @@ steps:
 
   - group: "Desktop Windows tests"
     key: "extended-windows"
+    depends_on: "athens-proxy"
     steps:
       - label: "Unit tests - Windows 10"
         key: "unit-tests-win10"
         depends_on: "preload"
         command: .buildkite/scripts/steps/unit-tests.ps1
-        env:
-          GOPROXY: "http://athens-proxy:3000"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
@@ -242,8 +233,6 @@ steps:
         key: "unit-tests-win11"
         depends_on: "preload"
         command: .buildkite/scripts/steps/unit-tests.ps1
-        env:
-          GOPROXY: "http://athens-proxy:3000"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
