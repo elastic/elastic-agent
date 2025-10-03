@@ -13,18 +13,6 @@ env:
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1757725254"
 
 steps:
-  - label: "Start athens proxy"
-    command: ".buildkite/scripts/steps/run-athens.sh
-    agents:
-      provider: "gcp"
-      image: "${IMAGE_UBUNTU_2204_X86_64}"
-  - label: "Download Go modules"
-    command: |
-      export GOPROXY=http://localhost:3000
-      go mod download
-    agents:
-      provider: "gcp"
-      image: "${IMAGE_UBUNTU_2204_X86_64}"
   - label: "check-ci"
     key: "check-ci"
     command: ".buildkite/scripts/steps/check-ci.sh"
@@ -38,6 +26,18 @@ steps:
   - group: "Unit tests"
     key: "unit-tests"
     steps:
+      - label: "Start athens proxy"
+        command: ".buildkite/scripts/steps/run-athens.sh
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
+      - label: "Download Go modules"
+        command: |
+          export GOPROXY=http://athens-proxy:3000
+          go mod download
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
       - label: "Unit tests - Ubuntu 22.04"
         key: "unit-tests-2204"
         command: ".buildkite/scripts/steps/unit-tests.sh"
