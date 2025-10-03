@@ -46,6 +46,10 @@ func (r *embeddedExecution) startCollector(ctx context.Context, logger *logger.L
 	extConf := map[string]any{
 		"endpoint": paths.DiagnosticsExtensionSocket(),
 	}
+	collectorMetricsPort, err := r.getCollectorMetricsPort()
+	if err != nil {
+		return nil, err
+	}
 	// NewForceExtensionConverterFactory is used to ensure that the agent_status extension is always enabled.
 	// It is required for the Elastic Agent to extract the status out of the OTel collector.
 	settings := otel.NewSettings(
@@ -64,7 +68,7 @@ func (r *embeddedExecution) startCollector(ctx context.Context, logger *logger.L
 		return nil, err
 	}
 	go func() {
-		setErr := os.Setenv(componentmonitoring.OtelCollectorMetricsPortEnvVarName, strconv.Itoa(r.collectorMetricsPort))
+		setErr := os.Setenv(componentmonitoring.OtelCollectorMetricsPortEnvVarName, strconv.Itoa(collectorMetricsPort))
 		defer func() {
 			unsetErr := os.Unsetenv(componentmonitoring.OtelCollectorMetricsPortEnvVarName)
 			if unsetErr != nil {
