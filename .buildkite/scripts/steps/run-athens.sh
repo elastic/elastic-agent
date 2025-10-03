@@ -7,7 +7,7 @@ source .buildkite/scripts/common.sh
 
 ATHENS_IP=$(ip route get 1 | awk '{print $7; exit}')
 
-buildkite-agent meta-data set "athens-proxy" "$ATHENS_IP:3000"
+buildkite-agent meta-data set "athens-proxy" "http://$ATHENS_IP:3000"
 
 docker run -d --rm \
   -p 3000:3000 \
