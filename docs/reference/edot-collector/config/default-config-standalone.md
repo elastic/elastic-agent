@@ -179,7 +179,7 @@ processors:
 ```
 
 :::{note}
-:applies_to: edot_collector: 9.2
+:applies_to: edot_collector: ga 9.2
 The `elasticapm` processor replaces the deprecated `elastictrace` processor.
 :::
 
