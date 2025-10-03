@@ -26,7 +26,7 @@ func newOtelDiagnosticsCommand(streams *cli.IOStreams) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := otelDiagnosticCmd(streams, cmd); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
-				os.Exit(1)
+				return NewExitCodeError(1, err)
 			}
 			return nil
 		},

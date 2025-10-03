@@ -7,7 +7,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -51,7 +50,7 @@ more time. The --variables-wait allows an amount of time to be provided for vari
 wait that amount of time before using the variables for the configuration.
 `,
 		Args: cobra.ExactArgs(0),
-		Run: func(c *cobra.Command, args []string) {
+		RunE: func(c *cobra.Command, args []string) error {
 			var opts inspectConfigOpts
 			opts.variables, _ = c.Flags().GetBool("variables")
 			opts.includeMonitoring, _ = c.Flags().GetBool("monitoring")
@@ -63,8 +62,9 @@ wait that amount of time before using the variables for the configuration.
 			service.HandleSignals(func() {}, cancel)
 			if err := inspectConfig(ctx, paths.ConfigFile(), opts, streams); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
-				os.Exit(1)
+				return NewExitCodeError(1, err)
 			}
+			return nil
 		},
 	}
 
@@ -102,7 +102,7 @@ amount of time to be provided for variable discovery, when set it will wait that
 variables for the configuration.
 `,
 		Args: cobra.MaximumNArgs(1),
-		Run: func(c *cobra.Command, args []string) {
+		RunE: func(c *cobra.Command, args []string) error {
 			var opts inspectComponentsOpts
 			if len(args) > 0 {
 				opts.id = args[0]
@@ -116,8 +116,9 @@ variables for the configuration.
 
 			if err := inspectComponents(ctx, paths.ConfigFile(), opts, streams); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
-				os.Exit(1)
+				return NewExitCodeError(1, err)
 			}
+			return nil
 		},
 	}
 

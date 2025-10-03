@@ -423,24 +423,46 @@ func getTestBinariesPath() ([]string, error) {
 func (Build) TestBinaries() error {
 	testBinaryPkgs, err := getTestBinariesPath()
 	if err != nil {
-		fmt.Errorf("cannot build test binaries: %w", err)
+		return fmt.Errorf("cannot build test binaries: %w", err)
 	}
 
 	for _, pkg := range testBinaryPkgs {
-		binary := filepath.Base(pkg)
-		if runtime.GOOS == "windows" {
-			binary += ".exe"
+		err := buildTestBinary(pkg)
+		if err != nil {
+			return fmt.Errorf("cannot build test binary: %w", err)
 		}
+	}
+	return nil
+}
 
-		outputName := filepath.Join(pkg, binary)
-		err := RunGo("build", "-o", outputName, filepath.Join(pkg))
-		if err != nil {
-			return err
-		}
-		err = os.Chmod(outputName, 0o755)
-		if err != nil {
-			return err
-		}
+// TestFakeComponent builds just the fake component.
+func (Build) TestFakeComponent() error {
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("could not get working directory: %w", err)
+	}
+	pkg := filepath.Join(wd, "pkg", "component", "fake", "component")
+	err = buildTestBinary(pkg)
+	if err != nil {
+		return fmt.Errorf("cannot build test fake component binary: %w", err)
+	}
+	return nil
+}
+
+func buildTestBinary(pkg string) error {
+	binary := filepath.Base(pkg)
+	if runtime.GOOS == "windows" {
+		binary += ".exe"
+	}
+
+	outputName := filepath.Join(pkg, binary)
+	err := RunGo("build", "-o", outputName, filepath.Join(pkg))
+	if err != nil {
+		return err
+	}
+	err = os.Chmod(outputName, 0o755)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -2891,7 +2913,9 @@ func (i Integration) testForResourceLeaks(ctx context.Context, matrix bool, test
 
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
 func (Integration) TestOnRemote(ctx context.Context) error {
-	mg.Deps(Build.TestBinaries)
+	// only need the fake component for integration tests
+	mg.Deps(Build.TestFakeComponent)
+
 	version := os.Getenv("AGENT_VERSION")
 	if version == "" {
 		return errors.New("AGENT_VERSION environment variable must be set")
