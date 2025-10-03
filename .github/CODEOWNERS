@@ -1,6 +1,11 @@
 # Team responsible for Fleet Server
 * @elastic/elastic-agent-control-plane
 
+# List the changlog fragments without an owner. This will prevent the control plane team from being added
+# as a reviewer every time a change to files they do not own also adds a changelog entry.
+# https://github.community/t/codeowners-file-with-a-not-file-type-condition/1423/9
+changelog/fragments/
+
 # Top-level files ownership
 /catalog-info.yaml @elastic/elastic-agent-control-plane @elastic/observablt-ci
 
