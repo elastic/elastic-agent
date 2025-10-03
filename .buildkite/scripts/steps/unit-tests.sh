@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 source .buildkite/scripts/common.sh
+
+# Read GOPROXY from buildkite-agent env and export if present
+GOPROXY_VALUE="$(buildkite-agent env get GOPROXY)"
+if [[ -n "$GOPROXY_VALUE" ]]; then
+	export GOPROXY="$GOPROXY_VALUE"
+fi
 set +euo pipefail
 
 echo "--- Unit tests"
