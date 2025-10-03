@@ -32,10 +32,6 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
-      - label: "Download Go modules"
-        key: preload
-        depends_on: athens
-        command: go mod download
   
   - group: "Unit tests"
     depends_on: "athens-proxy"

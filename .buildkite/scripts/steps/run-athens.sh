@@ -13,4 +13,6 @@ docker run -d --rm \
 
 ATHENS_IP=$(ip route get 1 | awk '{print $7; exit}')
 
-buildkite-agent meta-data env set GOPROXY "$ATHENS_IP:3000"
+buildkite-agent env set GOPROXY "$ATHENS_IP:3000"
+
+go mod download
