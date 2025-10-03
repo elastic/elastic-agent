@@ -24,6 +24,7 @@ import (
 	apmtransport "go.elastic.co/apm/v2/transport"
 	"gopkg.in/yaml.v2"
 
+	"github.com/gofrs/uuid/v5"
 	"github.com/spf13/cobra"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -356,7 +357,7 @@ func runElasticAgent(
 		return err
 	}
 
-	monitoringServer, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
+	monitoringServer, err := setupMetrics(l, cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {
 		return err
 	}
@@ -715,12 +716,23 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 
 func setupMetrics(
 	logger *logger.Logger,
-	operatingSystem string,
 	cfg *monitoringCfg.MonitoringConfig,
 	tracer *apm.Tracer,
 	coord *coordinator.Coordinator,
 ) (*reload.ServerReloader, error) {
-	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil {
+	ephemeralID, err := uuid.NewV4()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate ephemeral id: %w", err)
+	}
+
+	if err = report.SetupMetricsOptions(report.MetricOptions{
+		Name:           agentName,
+		Version:        version.GetDefaultVersion(),
+		EphemeralID:    ephemeralID.String(),
+		Logger:         logger,
+		SystemMetrics:  monitoringLib.Default.GetOrCreateRegistry("system"),
+		ProcessMetrics: monitoringLib.Default.GetOrCreateRegistry("beat"),
+	}); err != nil {
 		return nil, err
 	}
 
