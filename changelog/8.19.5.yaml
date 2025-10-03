@@ -47,14 +47,6 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/10263
-        - https://github.com/elastic/elastic-agent/pull/10158
-        - https://github.com/elastic/elastic-agent/pull/10286
-        - https://github.com/elastic/elastic-agent/pull/10296
-        - https://github.com/elastic/elastic-agent/pull/9928
-        - https://github.com/elastic/elastic-agent/pull/10260
-        - https://github.com/elastic/elastic-agent/pull/10261
-        - https://github.com/elastic/elastic-agent/pull/10124
         - https://github.com/elastic/elastic-agent/pull/9903
       issue:
         - https://github.com/elastic/elastic-agent/issues/9889
@@ -69,14 +61,6 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/10263
-        - https://github.com/elastic/elastic-agent/pull/10158
-        - https://github.com/elastic/elastic-agent/pull/10286
-        - https://github.com/elastic/elastic-agent/pull/10296
-        - https://github.com/elastic/elastic-agent/pull/9928
-        - https://github.com/elastic/elastic-agent/pull/10260
-        - https://github.com/elastic/elastic-agent/pull/10261
-        - https://github.com/elastic/elastic-agent/pull/10124
         - https://github.com/elastic/elastic-agent/pull/9964
       issue: []
       impact: ""
@@ -116,14 +100,6 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/10263
-        - https://github.com/elastic/elastic-agent/pull/10158
-        - https://github.com/elastic/elastic-agent/pull/10286
-        - https://github.com/elastic/elastic-agent/pull/10296
-        - https://github.com/elastic/elastic-agent/pull/9928
-        - https://github.com/elastic/elastic-agent/pull/10260
-        - https://github.com/elastic/elastic-agent/pull/10261
-        - https://github.com/elastic/elastic-agent/pull/10124
         - https://github.com/elastic/elastic-agent/pull/10060
       issue:
         - https://github.com/elastic/elastic-agent/issues/8047

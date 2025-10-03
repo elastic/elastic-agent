@@ -13,8 +13,8 @@ Review important information about the  8.19.5 release.
 
 * Agent cleans up downloads directory and the new versioned home if upgrade fails. https://github.com/elastic/elastic-agent/pull/9386[#9386] https://github.com/elastic/elastic-agent/issues/5235[#5235]
 * When there is a disk space error during an upgrade, agent responds with clean insufficient disk space error message. https://github.com/elastic/elastic-agent/pull/9392[#9392] https://github.com/elastic/elastic-agent/issues/5235[#5235]
-* Add Headers Setter extension to EDOT Collector. https://github.com/elastic/elastic-agent/pull/10263[#10263] https://github.com/elastic/elastic-agent/pull/10158[#10158] https://github.com/elastic/elastic-agent/pull/10286[#10286] https://github.com/elastic/elastic-agent/pull/10296[#10296] https://github.com/elastic/elastic-agent/pull/9928[#9928] https://github.com/elastic/elastic-agent/pull/10260[#10260] https://github.com/elastic/elastic-agent/pull/10261[#10261] https://github.com/elastic/elastic-agent/pull/10124[#10124] https://github.com/elastic/elastic-agent/pull/9903[#9903] https://github.com/elastic/elastic-agent/issues/9889[#9889]
-* Update OTel components to v0.132.0. https://github.com/elastic/elastic-agent/pull/10263[#10263] https://github.com/elastic/elastic-agent/pull/10158[#10158] https://github.com/elastic/elastic-agent/pull/10286[#10286] https://github.com/elastic/elastic-agent/pull/10296[#10296] https://github.com/elastic/elastic-agent/pull/9928[#9928] https://github.com/elastic/elastic-agent/pull/10260[#10260] https://github.com/elastic/elastic-agent/pull/10261[#10261] https://github.com/elastic/elastic-agent/pull/10124[#10124] https://github.com/elastic/elastic-agent/pull/9964[#9964]
+* Add Headers Setter extension to EDOT Collector. https://github.com/elastic/elastic-agent/pull/9903[#9903] https://github.com/elastic/elastic-agent/issues/9889[#9889]
+* Update OTel components to v0.132.0. https://github.com/elastic/elastic-agent/pull/9964[#9964]
 
 [discrete]
 [[bug-fixes-8.19.5]]
@@ -25,6 +25,6 @@ Review important information about the  8.19.5 release.
 * Include aggregated agent status in HTTP liveness checks. https://github.com/elastic/elastic-agent/pull/9673[#9673] https://github.com/elastic/elastic-agent/issues/9576[#9576]
 * Reduce-default-telemetry-frequency. https://github.com/elastic/elastic-agent/pull/9987[#9987]
 * Fix stuck upgrade state by clearing coordinator overridden state after failed upgrade. https://github.com/elastic/elastic-agent/pull/9992[#9992]
-* Include components units status in HTTP liveness checks. https://github.com/elastic/elastic-agent/pull/10263[#10263] https://github.com/elastic/elastic-agent/pull/10158[#10158] https://github.com/elastic/elastic-agent/pull/10286[#10286] https://github.com/elastic/elastic-agent/pull/10296[#10296] https://github.com/elastic/elastic-agent/pull/9928[#9928] https://github.com/elastic/elastic-agent/pull/10260[#10260] https://github.com/elastic/elastic-agent/pull/10261[#10261] https://github.com/elastic/elastic-agent/pull/10124[#10124] https://github.com/elastic/elastic-agent/pull/10060[#10060] https://github.com/elastic/elastic-agent/issues/8047[#8047]
+* Include components units status in HTTP liveness checks. https://github.com/elastic/elastic-agent/pull/10060[#10060] https://github.com/elastic/elastic-agent/issues/8047[#8047]
 
 // end 8.19.5 relnotes
