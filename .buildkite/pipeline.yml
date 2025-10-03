@@ -34,7 +34,6 @@ steps:
           image: "${IMAGE_UBUNTU_2204_X86_64}"
   
   - group: "Unit tests"
-    depends_on: "athens-proxy"
     key: "unit-tests"
     steps:
       - label: "Unit tests - Ubuntu 22.04"
@@ -160,7 +159,6 @@ steps:
 
   - group: "macOS tests"
     key: "macos-unit-tests"
-    depends_on: "athens-proxy"
     steps:
       - label: "Unit tests - macOS 15 ARM"
         command: ".buildkite/scripts/steps/unit-tests.sh"
@@ -198,7 +196,6 @@ steps:
 
   - group: "Desktop Windows tests"
     key: "extended-windows"
-    depends_on: "athens-proxy"
     steps:
       - label: "Unit tests - Windows 10"
         key: "unit-tests-win10"

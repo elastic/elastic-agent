@@ -16,3 +16,5 @@ ATHENS_IP=$(ip route get 1 | awk '{print $7; exit}')
 buildkite-agent env set GOPROXY="$ATHENS_IP:3000"
 
 go mod download
+
+sleep 1h
