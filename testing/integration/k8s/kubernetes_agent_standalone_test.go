@@ -34,7 +34,6 @@ import (
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	testK8s "github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
@@ -1278,7 +1277,8 @@ func k8sStepCheckRestrictUpgrade(agentPodLabelSelector string, expectedPodNumber
 			err := kCtx.client.Resources().ExecInPod(ctx, namespace, pod.Name, containerName, command, &stdout, &stderr)
 			cancel()
 			require.Error(t, err)
-			require.Contains(t, stderr.String(), coordinator.ErrNotUpgradable.Error())
+			require.Contains(t, stderr.String(), "cannot be upgraded; must be installed with install sub-command and "+
+				"running under control of the systems supervisor")
 		}
 	}
 }
