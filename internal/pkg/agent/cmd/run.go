@@ -720,7 +720,8 @@ func setupMetrics(
 	tracer *apm.Tracer,
 	coord *coordinator.Coordinator,
 ) (*reload.ServerReloader, error) {
-	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil {
+
+	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil { //nolint:staticcheck // S1023 this will be fixed in a follow-up PR
 		return nil, err
 	}
 
