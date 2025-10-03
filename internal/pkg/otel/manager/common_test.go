@@ -18,9 +18,13 @@ import (
 )
 
 func TestFindRandomPort(t *testing.T) {
-	port, err := findRandomTCPPort()
+	portCount := 2
+	ports, err := findRandomTCPPorts(portCount)
 	require.NoError(t, err)
-	require.NotEqual(t, 0, port)
+	require.Len(t, ports, portCount)
+	for _, port := range ports {
+		require.NotEqual(t, 0, port)
+	}
 
 	defer func() {
 		netListen = net.Listen
@@ -29,7 +33,7 @@ func TestFindRandomPort(t *testing.T) {
 	netListen = func(string, string) (net.Listener, error) {
 		return nil, errors.New("some error")
 	}
-	_, err = findRandomTCPPort()
+	_, err = findRandomTCPPorts(portCount)
 	require.Error(t, err, "failed to find random port")
 }
 

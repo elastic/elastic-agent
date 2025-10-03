@@ -6,6 +6,8 @@ package manager
 
 import (
 	"context"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -13,6 +15,8 @@ import (
 	"go.opentelemetry.io/collector/otelcol"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
@@ -22,11 +26,12 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-func newExecutionEmbedded() *embeddedExecution {
-	return &embeddedExecution{}
+func newExecutionEmbedded(metricsPort int) *embeddedExecution {
+	return &embeddedExecution{collectorMetricsPort: metricsPort}
 }
 
 type embeddedExecution struct {
+	collectorMetricsPort int
 }
 
 // startCollector starts the collector in a new goroutine.
@@ -40,6 +45,10 @@ func (r *embeddedExecution) startCollector(ctx context.Context, logger *logger.L
 	}
 	extConf := map[string]any{
 		"endpoint": paths.DiagnosticsExtensionSocket(),
+	}
+	collectorMetricsPort, err := r.getCollectorMetricsPort()
+	if err != nil {
+		return nil, err
 	}
 	// NewForceExtensionConverterFactory is used to ensure that the agent_status extension is always enabled.
 	// It is required for the Elastic Agent to extract the status out of the OTel collector.
@@ -59,11 +68,36 @@ func (r *embeddedExecution) startCollector(ctx context.Context, logger *logger.L
 		return nil, err
 	}
 	go func() {
+		setErr := os.Setenv(componentmonitoring.OtelCollectorMetricsPortEnvVarName, strconv.Itoa(collectorMetricsPort))
+		defer func() {
+			unsetErr := os.Unsetenv(componentmonitoring.OtelCollectorMetricsPortEnvVarName)
+			if unsetErr != nil {
+				logger.Errorf("couldn't unset environment variable %s: %v", componentmonitoring.OtelCollectorMetricsPortEnvVarName, unsetErr)
+			}
+		}()
+		if setErr != nil {
+			reportErr(ctx, errCh, setErr)
+			return
+		}
 		runErr := svc.Run(collectorCtx)
 		close(ctl.collectorDoneCh)
 		reportErr(ctx, errCh, runErr)
 	}()
 	return ctl, nil
+}
+
+func (r *embeddedExecution) getCollectorMetricsPort() (metricsPort int, err error) {
+	// if the port is defined (non-zero), use it
+	if r.collectorMetricsPort > 0 {
+		return r.collectorMetricsPort, nil
+	}
+
+	// get a random port
+	ports, err := findRandomTCPPorts(1)
+	if err != nil {
+		return 0, err
+	}
+	return ports[0], nil
 }
 
 type ctxHandle struct {
