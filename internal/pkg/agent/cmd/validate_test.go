@@ -24,6 +24,26 @@ func TestValidateCommand(t *testing.T) {
 			false,
 		},
 		{
+			"otel config with set",
+			[]string{filepath.Join("testdata", "otel", "otel.yml"), "yaml:processors::resource::attributes: [{ key: service.name, action: insert, value: elastic-otel-test1 }]"},
+			false,
+		},
+		{
+			"otel config with set missing action field",
+			[]string{filepath.Join("testdata", "otel", "otel.yml"), "yaml:processors::resource::attributes: [{ key: service.name, value: elastic-otel-test2 }]"},
+			true,
+		},
+		{
+			"otel config with set missing key field",
+			[]string{filepath.Join("testdata", "otel", "otel.yml"), "yaml:processors::resource::attributes: [{ action: insert, value: elastic-otel-test3 }]"},
+			true,
+		},
+		{
+			"otel config with set missing key and action fields",
+			[]string{filepath.Join("testdata", "otel", "otel.yml"), "yaml:processors::resource::attributes: [{ value: elastic-otel-test4 }]"},
+			true,
+		},
+		{
 			"agent config",
 			[]string{filepath.Join("testdata", "otel", "elastic-agent.yml")},
 			true,
@@ -33,7 +53,12 @@ func TestValidateCommand(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.Name, func(t *testing.T) {
 			err := validateOtelConfig(context.Background(), tc.ConfigPaths)
-			require.Equal(t, tc.ExpectingErr, err != nil)
+
+			if tc.ExpectingErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }
