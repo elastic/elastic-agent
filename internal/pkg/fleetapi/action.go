@@ -696,10 +696,10 @@ type UserInfo struct {
 	// Groupname Custom group used to access Elastic Agent files.
 	Groupname string `json,yaml:"groupname,omitempty"`
 
-	// Password Password for user specified by username.
+	// Password for user specified by username.
 	Password string `json,yaml:"password,omitempty"`
 
-	// Username Username of custom user used to run Elastic Agent.
+	// Username of custom user used to run Elastic Agent.
 	Username string `json,yaml:"username,omitempty"`
 }
 
