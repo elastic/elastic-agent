@@ -808,3 +808,6 @@ replace (
 
 // Needed to prevent https://github.com/open-telemetry/opentelemetry-go/issues/7039
 replace go.opentelemetry.io/otel/exporters/prometheus => go.opentelemetry.io/otel/exporters/prometheus v0.58.0
+
+// To be removed when https://github.com/elastic/opentelemetry-collector-components/pull/796 is merged
+replace github.com/elastic/opentelemetry-collector-components/extension/beatsauthextension => github.com/pkoutsovasilis/opentelemetry-collector-components/extension/beatsauthextension v0.0.0-20251001151347-ed7ba8b82c02
