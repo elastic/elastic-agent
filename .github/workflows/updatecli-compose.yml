@@ -19,11 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-<<<<<<< HEAD
-      - uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
-=======
       - uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
->>>>>>> 5c5d452f6 (build(deps): bump docker/login-action from 3.5.0 to 3.6.0 (#10333))
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
