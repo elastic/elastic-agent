@@ -699,7 +699,7 @@ type UserInfo struct {
 	// Password for user specified by username.
 	Password string `json,yaml:"password,omitempty"`
 
-	// Username Username of custom user used to run Elastic Agent.
+	// Username of custom user used to run Elastic Agent.
 	Username string `json,yaml:"username,omitempty"`
 }
 
