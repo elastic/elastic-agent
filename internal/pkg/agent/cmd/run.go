@@ -24,7 +24,6 @@ import (
 	apmtransport "go.elastic.co/apm/v2/transport"
 	"gopkg.in/yaml.v2"
 
-	"github.com/gofrs/uuid/v5"
 	"github.com/spf13/cobra"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -720,19 +719,7 @@ func setupMetrics(
 	tracer *apm.Tracer,
 	coord *coordinator.Coordinator,
 ) (*reload.ServerReloader, error) {
-	ephemeralID, err := uuid.NewV4()
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate ephemeral id: %w", err)
-	}
-
-	if err = report.SetupMetricsOptions(report.MetricOptions{
-		Name:           agentName,
-		Version:        version.GetDefaultVersion(),
-		EphemeralID:    ephemeralID.String(),
-		Logger:         logger,
-		SystemMetrics:  monitoringLib.Default.GetOrCreateRegistry("system"),
-		ProcessMetrics: monitoringLib.Default.GetOrCreateRegistry("beat"),
-	}); err != nil {
+	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil { //nolint:staticcheck // ignore deprecation
 		return nil, err
 	}
 
