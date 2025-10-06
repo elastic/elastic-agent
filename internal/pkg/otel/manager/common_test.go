@@ -8,7 +8,10 @@ import (
 	"errors"
 	"net"
 	"path/filepath"
+	"slices"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -23,8 +26,10 @@ func TestFindRandomPort(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, ports, portCount)
 	for _, port := range ports {
-		require.NotEqual(t, 0, port)
+		assert.NotEqual(t, 0, port)
 	}
+	slices.Sort(ports)
+	require.Len(t, slices.Compact(ports), portCount, "returned ports should be unique")
 
 	defer func() {
 		netListen = net.Listen
@@ -34,7 +39,7 @@ func TestFindRandomPort(t *testing.T) {
 		return nil, errors.New("some error")
 	}
 	_, err = findRandomTCPPorts(portCount)
-	require.Error(t, err, "failed to find random port")
+	assert.Error(t, err, "failed to find random port")
 }
 
 func testComponent(componentId string) component.Component {
