@@ -6,6 +6,7 @@ package manager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 
@@ -53,9 +54,16 @@ func reportCollectorStatus(ctx context.Context, statusCh chan *status.AggregateS
 }
 
 // findRandomTCPPort finds count random available TCP ports on the localhost interface.
-func findRandomTCPPorts(count int) ([]int, error) {
-	portNums := make([]int, 0, count)
+func findRandomTCPPorts(count int) (ports []int, err error) {
+	ports = make([]int, 0, count)
 	listeners := make([]net.Listener, 0, count)
+	defer func() {
+		for _, listener := range listeners {
+			if closeErr := listener.Close(); closeErr != nil {
+				err = errors.Join(err, fmt.Errorf("error closing listener: %w", closeErr))
+			}
+		}
+	}()
 	for range count {
 		l, err := netListen("tcp", "localhost:0")
 		if err != nil {
@@ -67,15 +75,8 @@ func findRandomTCPPorts(count int) ([]int, error) {
 		if port == 0 {
 			return nil, fmt.Errorf("failed to find random port")
 		}
-		portNums = append(portNums, port)
+		ports = append(ports, port)
 	}
 
-	for _, listener := range listeners {
-		err := listener.Close()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return portNums, nil
+	return ports, err
 }

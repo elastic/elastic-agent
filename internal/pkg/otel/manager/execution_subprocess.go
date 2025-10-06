@@ -222,36 +222,30 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 }
 
 func (r *subprocessExecution) getCollectorPorts() (healthCheckPort int, metricsPort int, err error) {
-	randomPortCount := 0
+	randomPorts := make([]*int, 0, 2)
 	// if the ports are defined (non-zero), use them
 	if r.collectorMetricsPort == 0 {
-		randomPortCount++
+		randomPorts = append(randomPorts, &metricsPort)
 	} else {
 		metricsPort = r.collectorMetricsPort
 	}
 	if r.collectorHealthCheckPort == 0 {
-		randomPortCount++
+		randomPorts = append(randomPorts, &healthCheckPort)
 	} else {
 		healthCheckPort = r.collectorHealthCheckPort
 	}
 
-	if randomPortCount == 0 {
+	if len(randomPorts) == 0 {
 		return healthCheckPort, metricsPort, nil
 	}
 
 	// we need at least one random port, create it
-	ports, err := findRandomTCPPorts(randomPortCount)
+	ports, err := findRandomTCPPorts(len(randomPorts))
 	if err != nil {
 		return 0, 0, err
 	}
-	// use the random values for ports which aren't set
-	portIndex := 0
-	if healthCheckPort == 0 {
-		healthCheckPort = ports[portIndex]
-		portIndex++
-	}
-	if metricsPort == 0 {
-		metricsPort = ports[portIndex]
+	for i, port := range ports {
+		*randomPorts[i] = port
 	}
 	return healthCheckPort, metricsPort, nil
 }
