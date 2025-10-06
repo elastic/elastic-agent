@@ -954,10 +954,13 @@ func TestOTelManager_PortConflict(t *testing.T) {
 			return nil, err
 		}
 		if timesCalled < 2 {
+			// only actually close the listener after test completion, freeing the port
 			t.Cleanup(func() {
 				assert.NoError(t, l.Close())
 			})
-			l = &testListener{inner: l}
+			// this listener won't free the port even after Close is called, leading to port binding conflicts later
+			// in the test
+			l = &fakeCloseListener{inner: l}
 		}
 		timesCalled++
 		return l, err
@@ -1858,18 +1861,20 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 	})
 }
 
-type testListener struct {
+// fakeCloseListener is a wrapper around a net.Listener that ignores the Close() method. This is used in a very particular
+// port conflict test to ensure ports are not unbound while the otel collector tries to use them.
+type fakeCloseListener struct {
 	inner net.Listener
 }
 
-func (t *testListener) Accept() (net.Conn, error) {
+func (t *fakeCloseListener) Accept() (net.Conn, error) {
 	return t.inner.Accept()
 }
 
-func (t *testListener) Close() error {
+func (t *fakeCloseListener) Close() error {
 	return nil
 }
 
-func (t *testListener) Addr() net.Addr {
+func (t *fakeCloseListener) Addr() net.Addr {
 	return t.inner.Addr()
 }
