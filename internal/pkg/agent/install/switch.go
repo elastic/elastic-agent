@@ -16,8 +16,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-// Describer is used to describe execution progress
-type Describer interface {
+// ProgressDescriber is used to describe execution progress
+type ProgressDescriber interface {
 	Describe(string)
 }
 
@@ -25,7 +25,7 @@ type Describer interface {
 //
 // When username and groupName are blank then it switched back to root/Administrator and when a username/groupName is
 // provided then it switched to running with that username and groupName.
-func SwitchExecutingMode(topPath string, pt Describer, username string, groupName string, password string) error {
+func SwitchExecutingMode(topPath string, pt ProgressDescriber, username string, groupName string, password string) error {
 	// ensure service is stopped
 	status, err := EnsureStoppedService(topPath, pt)
 	if err != nil {
@@ -94,7 +94,7 @@ func SwitchExecutingMode(topPath string, pt Describer, username string, groupNam
 }
 
 // SwitchServiceUser switches the service user to the provided username and groupName.
-func SwitchServiceUser(topPath string, pt Describer, username string, groupName string, password string) (utils.FileOwner, error) {
+func SwitchServiceUser(topPath string, pt ProgressDescriber, username string, groupName string, password string) (utils.FileOwner, error) {
 	var ownership utils.FileOwner
 	if username != "" && groupName != "" {
 		var err error

@@ -10,6 +10,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-func switchPlatformMode(_ Describer, _ utils.FileOwner) error {
+func switchPlatformMode(_ ProgressDescriber, _ utils.FileOwner) error {
 	return nil
 }

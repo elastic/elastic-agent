@@ -13,7 +13,7 @@ import (
 
 // EnsureUserAndGroup creates the given username and group returning the file ownership information for that
 // user and group.
-func EnsureUserAndGroup(username string, groupName string, pt Describer, forceCreate bool) (utils.FileOwner, error) {
+func EnsureUserAndGroup(username string, groupName string, pt ProgressDescriber, forceCreate bool) (utils.FileOwner, error) {
 	var err error
 	var ownership utils.FileOwner
 

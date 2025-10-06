@@ -17,7 +17,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-func switchPlatformMode(pt Describer, ownership utils.FileOwner) error {
+func switchPlatformMode(pt ProgressDescriber, ownership utils.FileOwner) error {
 	ctx := context.Background()
 
 	unprivilegedVault, err := checkForUnprivilegedVault(ctx)

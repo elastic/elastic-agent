@@ -39,7 +39,7 @@ const (
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
-func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt Describer, streams *cli.IOStreams, customUser, customGroup, userPassword string, flavor string) (utils.FileOwner, error) {
+func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt ProgressDescriber, streams *cli.IOStreams, customUser, customGroup, userPassword string, flavor string) (utils.FileOwner, error) {
 	dir, err := findDirectory()
 	if err != nil {
 		return utils.FileOwner{}, errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)
