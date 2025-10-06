@@ -162,8 +162,6 @@ func runElasticAgentCritical(
 	fleetInitTimeout time.Duration,
 	modifiers ...component.PlatformModifier,
 ) error {
-<<<<<<< HEAD
-=======
 	var errs []error
 
 	// early handleUpgrade, but don't error yet
@@ -182,16 +180,7 @@ func runElasticAgentCritical(
 		_ = locker.Unlock()
 	}()
 
-	// try restore (if app locker didn't fail), but don't error yet
-	if lockErr == nil {
-		err = coordinator.RestoreConfig()
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to restore configuration: %w", err))
-		}
-	}
-
 	// try load config, but don't error yet
->>>>>>> 18beeba11 (Improve logging to catch early errors on startup (#10158))
 	cfg, err := loadConfig(ctx, override)
 	if err != nil {
 		// failed to load configuration, just load the default to create the logger
@@ -310,11 +299,7 @@ func runElasticAgent(
 		return errors.New(err,
 			"could not load agent info",
 			errors.TypeFilesystem,
-<<<<<<< HEAD
-			errors.M(errors.MetaKeyPath, pathConfigFile)))
-=======
-			errors.M(errors.MetaKeyPath, paths.AgentConfigFile()))
->>>>>>> 18beeba11 (Improve logging to catch early errors on startup (#10158))
+			errors.M(errors.MetaKeyPath, pathConfigFile))
 	}
 
 	// Ensure that the log level now matches what is configured in the agentInfo.
