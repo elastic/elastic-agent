@@ -22,6 +22,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -782,7 +783,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// the execution mode passed here is overridden below so it is irrelevant
-			m, err := NewOTelManager(l, logp.DebugLevel, base, EmbeddedExecutionMode, nil, 0, 0, nil, waitTimeForStop)
+			m, err := NewOTelManager(l, logp.DebugLevel, base, EmbeddedExecutionMode, nil, nil, nil, waitTimeForStop)
 			require.NoError(t, err, "could not create otel manager")
 
 			executionMode, err := tc.execModeFn(m.collectorRunErr)
@@ -824,6 +825,14 @@ func TestOTelManager_Ports(t *testing.T) {
 	ports, err := findRandomTCPPorts(2)
 	require.NoError(t, err)
 	healthCheckPort, metricsPort := ports[0], ports[1]
+	agentCollectorConfig := configuration.CollectorConfig{
+		HealthCheckConfig: configuration.CollectorHealthCheckConfig{
+			Endpoint: fmt.Sprintf("http://localhost:%d", healthCheckPort),
+		},
+		TelemetryConfig: configuration.CollectorTelemetryConfig{
+			Endpoint: fmt.Sprintf("http://localhost:%d", metricsPort),
+		},
+	}
 
 	wd, erWd := os.Getwd()
 	require.NoError(t, erWd, "cannot get working directory")
@@ -872,8 +881,7 @@ func TestOTelManager_Ports(t *testing.T) {
 				logp.DebugLevel,
 				base, EmbeddedExecutionMode,
 				nil,
-				metricsPort,
-				healthCheckPort,
+				&agentCollectorConfig,
 				nil,
 				waitTimeForStop,
 			)
@@ -995,8 +1003,7 @@ func TestOTelManager_PortConflict(t *testing.T) {
 		logp.DebugLevel,
 		base, SubprocessExecutionMode,
 		nil,
-		0,
-		0,
+		nil,
 		nil,
 		waitTimeForStop,
 	)
