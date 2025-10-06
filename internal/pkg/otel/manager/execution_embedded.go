@@ -26,6 +26,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+// newExecutionEmbedded creates a new execution which runs the otel collector in a goroutine. A metricsPort of 0 will
+// result in a random port being used.
 func newExecutionEmbedded(metricsPort int) *embeddedExecution {
 	return &embeddedExecution{collectorMetricsPort: metricsPort}
 }
@@ -68,6 +70,7 @@ func (r *embeddedExecution) startCollector(ctx context.Context, logger *logger.L
 		return nil, err
 	}
 	go func() {
+		// Set the environment variable for the collector metrics port. See comment at the constant definition for more information.
 		setErr := os.Setenv(componentmonitoring.OtelCollectorMetricsPortEnvVarName, strconv.Itoa(collectorMetricsPort))
 		defer func() {
 			unsetErr := os.Unsetenv(componentmonitoring.OtelCollectorMetricsPortEnvVarName)
@@ -86,6 +89,8 @@ func (r *embeddedExecution) startCollector(ctx context.Context, logger *logger.L
 	return ctl, nil
 }
 
+// getCollectorPorts returns the metrics port used by the OTel collector. If the port set in the execution struct is 0,
+// a random port is returned instead.
 func (r *embeddedExecution) getCollectorMetricsPort() (metricsPort int, err error) {
 	// if the port is defined (non-zero), use it
 	if r.collectorMetricsPort > 0 {

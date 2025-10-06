@@ -35,6 +35,11 @@ import (
 )
 
 const (
+	// OtelCollectorMetricsPortEnvVarName is the name of the environment variable used to pass the collector metrics
+	// port to the managed EDOT collector. It exists because by default we use a random port for this, and we want to
+	// determine it as late as possible. However, the monitoring manager is instantiated early in the application
+	// startup process, so instead we rely on this variable. The OTel manager is required to set it whenever it starts
+	// a collector.
 	OtelCollectorMetricsPortEnvVarName = "EDOT_COLLECTOR_METRICS_PORT"
 	// args: data path, pipeline name, application name
 	logFileFormat = "%s/logs/%s"
@@ -514,6 +519,8 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 }
 
 func (b *BeatsMonitor) getCollectorTelemetryEndpoint() string {
+	// The OTel manager is required to set the environment variable. See comment at the constant definition for more
+	// information.
 	return fmt.Sprintf("localhost:${env:%s}", OtelCollectorMetricsPortEnvVarName)
 }
 

@@ -38,6 +38,8 @@ const (
 	OtelSupervisedMonitoringURLFlagName = "supervised.monitoring.url"
 )
 
+// newExecutionSubProcess creates a new execution which runs the otel collector in a subprocess. A metricsPort or
+// healthCheckPort of 0 will result in a random port being used.
 func newSubprocessExecution(logLevel logp.Level, collectorPath string, metricsPort int, healthCheckPort int) (*subprocessExecution, error) {
 	nsUUID, err := uuid.NewV4()
 	if err != nil {
@@ -114,7 +116,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 
 	procCtx, procCtxCancel := context.WithCancel(ctx)
 	env := os.Environ()
-	// set the environment variable for the collector metrics port
+	// Set the environment variable for the collector metrics port. See comment at the constant definition for more information.
 	env = append(env, fmt.Sprintf("%s=%d", componentmonitoring.OtelCollectorMetricsPortEnvVarName, collectorMetricsPort))
 	processInfo, err := process.Start(r.collectorPath,
 		process.WithArgs(r.collectorArgs),
@@ -221,6 +223,8 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 	return ctl, nil
 }
 
+// getCollectorPorts returns the ports used by the OTel collector. If the ports set in the execution struct are 0,
+// random ports are returned instead.
 func (r *subprocessExecution) getCollectorPorts() (healthCheckPort int, metricsPort int, err error) {
 	randomPorts := make([]*int, 0, 2)
 	// if the ports are defined (non-zero), use them

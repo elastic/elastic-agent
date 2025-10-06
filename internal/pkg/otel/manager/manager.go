@@ -649,6 +649,8 @@ func addCollectorMetricsReader(conf *confmap.Conf) error {
 			"exporter": map[string]any{
 				"prometheus": map[string]any{
 					"host": "localhost",
+					// The OTel manager is required to set this environment variable. See comment at the constant
+					// definition for more information.
 					"port": fmt.Sprintf("${env:%s}", componentmonitoring.OtelCollectorMetricsPortEnvVarName),
 					// this is the default configuration from the otel collector
 					"without_scope_info":  true,
