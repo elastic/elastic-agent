@@ -6,6 +6,7 @@ package handlers
 
 import (
 	"context"
+	"io"
 	"os"
 	"path"
 	"testing"
@@ -395,4 +396,38 @@ func TestDiagnosticHandlerWithCPUProfile(t *testing.T) {
 	// Check that CPU profile was collected and passed to PerformComponentDiagnostics
 	assert.True(t, cpuCalled, "CPU profile collector was not called.")
 	mockDiagProvider.AssertExpectations(t)
+}
+
+func TestDiagnosticsHandlerWithEDOT(t *testing.T) {
+	tempAgentRoot := t.TempDir()
+	paths.SetTop(tempAgentRoot)
+	err := os.MkdirAll(path.Join(tempAgentRoot, "data"), 0755)
+	require.NoError(t, err)
+	called := false
+	s := mockhandlers.NewMockServer(t, paths.DiagnosticsExtensionSocket(), &called)
+	defer func() {
+		require.NoError(t, s.Shutdown(context.Background()))
+	}()
+	mockDiagProvider := mockhandlers.NewDiagnosticsProvider(t)
+	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{hook1})
+	mockDiagProvider.EXPECT().PerformDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentUnitDiagnostic{mockUnitDiagnostic})
+	mockDiagProvider.EXPECT().PerformComponentDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentDiagnostic{}, nil)
+
+	mockAcker := mockackers.NewAcker(t)
+	mockAcker.EXPECT().Ack(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, a fleetapi.Action) error {
+		require.IsType(t, new(fleetapi.ActionDiagnostics), a)
+		assert.NoError(t, a.(*fleetapi.ActionDiagnostics).Err)
+		return nil
+	})
+	mockAcker.EXPECT().Commit(mock.Anything).Return(nil)
+
+	mockUploader := mockhandlers.NewUploader(t)
+	mockUploader.EXPECT().UploadDiagnostics(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, s1, s2 string, i int64, r io.Reader) (string, error) {
+		return "upload-id", nil
+	})
+
+	testLogger, _ := loggertest.New("diagnostic-handler-test")
+	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
+	handler.collectDiag(t.Context(), &fleetapi.ActionDiagnostics{}, mockAcker)
+	require.True(t, called, "expected the mock diagnostics server to be called")
 }
