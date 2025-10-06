@@ -5,7 +5,7 @@
 Elastic Agent relies on backporting PRs to incorporate changes into the appropriate release branches after merging
 into `main`. Creating backport PRs is handled automatically using the appropriate [backport labels](https://github.com/elastic/elastic-agent/labels?q=backport).
 
-To target specific release(s), add one or more labels `backport-<branchName>` (e.g. `backport-9.2`). PRs can be labeled
+To target specific release branch(es), add one or more labels `backport-<release branch name>` (e.g. `backport-9.2`). PRs can be labeled
 before or after the PR is merged. If added before merging, the backports will be created after merging to `main`. Adding
 a backport label to an already merged PR will create backports shortly after adding the label(s).
 
