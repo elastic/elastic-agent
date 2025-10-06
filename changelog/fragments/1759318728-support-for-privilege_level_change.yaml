@@ -13,7 +13,7 @@ kind: feature
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: support for privilege_level_change
+summary: Add support for downgrading a running Agent's privileges from Fleet
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
