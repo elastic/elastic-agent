@@ -151,24 +151,6 @@ var (
 		},
 		Runner: windows.WindowsRunner{},
 	}
-	// WindowsARM64_2022 - Windows (arm64) Server 2022
-	WindowsARM64_2022 = common.SupportedOS{
-		OS: define.OS{
-			Type:    define.Windows,
-			Arch:    define.ARM64,
-			Version: "2022",
-		},
-		Runner: windows.WindowsRunner{},
-	}
-	// WindowsARM64_2022_Core - Windows (arm64) Server 2022 Core
-	WindowsARM64_2022_Core = common.SupportedOS{
-		OS: define.OS{
-			Type:    define.Windows,
-			Arch:    define.ARM64,
-			Version: "2022-core",
-		},
-		Runner: windows.WindowsRunner{},
-	}
 )
 
 // supported defines the set of supported OS's.
@@ -194,8 +176,6 @@ var supported = []common.SupportedOS{
 	// https://github.com/elastic/ingest-dev/issues/3484
 	// WindowsAMD64_2016,
 	// WindowsAMD64_2016_Core,
-	WindowsARM64_2022,
-	WindowsARM64_2022_Core,
 }
 
 // init injects the kubernetes support list into the support list above

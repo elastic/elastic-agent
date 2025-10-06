@@ -186,28 +186,4 @@ var ogcSupported = []LayoutOS{
 		Username:     "windows",
 		RemotePath:   "C:\\Users\\windows\\agent",
 	},
-	{
-		OS: define.OS{
-			Type:    define.Windows,
-			Arch:    define.ARM64,
-			Version: "2022",
-		},
-		Provider:     Google,
-		InstanceSize: "c4a-highcpu-16", // 16 arm64 cpus, 32 GB RAM
-		RunsOn:       "windows-2022",
-		Username:     "windows",
-		RemotePath:   "C:\\Users\\windows\\agent",
-	},
-	{
-		OS: define.OS{
-			Type:    define.Windows,
-			Arch:    define.ARM64,
-			Version: "2022-core",
-		},
-		Provider:     Google,
-		InstanceSize: "c4a-highcpu-16", // 16 arm64 cpus, 32 GB RAM
-		RunsOn:       "windows-2022-core",
-		Username:     "windows",
-		RemotePath:   "C:\\Users\\windows\\agent",
-	},
 }
