@@ -53,7 +53,7 @@ func reportCollectorStatus(ctx context.Context, statusCh chan *status.AggregateS
 	}
 }
 
-// findRandomTCPPort finds count random available TCP ports on the localhost interface.
+// findRandomTCPPorts finds count random available TCP ports on the localhost interface.
 func findRandomTCPPorts(count int) (ports []int, err error) {
 	ports = make([]int, 0, count)
 	listeners := make([]net.Listener, 0, count)
