@@ -13,7 +13,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install/componentvalidation"
-	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -80,13 +79,7 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 	groupname = install.UnprivilegedGroup(groupname)
 
 	// apply empty config to stop processing
-	unenrollPolicy := newPolicyChange(ctx, config.New(), a, acker, true, false)
-	h.ch <- unenrollPolicy
-
-	unenrollCtx, cancel := context.WithTimeout(ctx, unenrollTimeout)
-	defer cancel()
-
-	unenrollPolicy.WaitAck(unenrollCtx)
+	stopComponents(ctx, h.ch, a, acker, nil)
 
 	// fix permissions
 	topPath := paths.Top()
