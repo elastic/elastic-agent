@@ -73,12 +73,6 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/10266
-        - https://github.com/elastic/elastic-agent/pull/10158
-        - https://github.com/elastic/elastic-agent/pull/10207
-        - https://github.com/elastic/elastic-agent/pull/10286
-        - https://github.com/elastic/elastic-agent/pull/10296
-        - https://github.com/elastic/elastic-agent/pull/10265
         - https://github.com/elastic/elastic-agent/pull/10060
       issue:
         - https://github.com/elastic/elastic-agent/issues/8047

@@ -23,6 +23,6 @@ Review important information about the  8.18.8 release.
 * Include aggregated agent status in HTTP liveness checks. https://github.com/elastic/elastic-agent/pull/9673[#9673] https://github.com/elastic/elastic-agent/issues/9576[#9576]
 * Reduce-default-telemetry-frequency. https://github.com/elastic/elastic-agent/pull/9987[#9987]
 * Fix stuck upgrade state by clearing coordinator overridden state after failed upgrade. https://github.com/elastic/elastic-agent/pull/9992[#9992]
-* Include components units status in HTTP liveness checks. https://github.com/elastic/elastic-agent/pull/10266[#10266] https://github.com/elastic/elastic-agent/pull/10158[#10158] https://github.com/elastic/elastic-agent/pull/10207[#10207] https://github.com/elastic/elastic-agent/pull/10286[#10286] https://github.com/elastic/elastic-agent/pull/10296[#10296] https://github.com/elastic/elastic-agent/pull/10265[#10265] https://github.com/elastic/elastic-agent/pull/10060[#10060] https://github.com/elastic/elastic-agent/issues/8047[#8047]
+* Include components units status in HTTP liveness checks. https://github.com/elastic/elastic-agent/pull/10060[#10060] https://github.com/elastic/elastic-agent/issues/8047[#8047]
 
 // end 8.18.8 relnotes
