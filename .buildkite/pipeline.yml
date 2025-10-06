@@ -5,12 +5,12 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1757725254"
-  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1757725254"
-  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1757725254"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1757725254"
-  IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-1757725254"
-  IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1757725254"
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1758934870"
+  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1758934870"
+  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1758934870"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1758934870"
+  IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-1758934870"
+  IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1758934870"
 
 steps:
   - label: "check-ci"
@@ -248,22 +248,6 @@ steps:
       - step: "unit-tests-win11"
         allow_failure: true
 
-  - label: "Merge coverage reports"
-    key: "merge-coverage"
-    env:
-      BUILDKITE_REPO: ""
-    command: |
-      .buildkite/scripts/steps/merge.sh
-    artifact_paths:
-      - "build/TEST-go-unit.cov"
-    agents:
-      image: "golang:1.24.7"
-    depends_on:
-      - unit-tests
-      - extended-windows
-    allow_dependency_failure: true
-    soft_fail: true # Until https://github.com/elastic/ingest-dev/issues/4042 is resolved
-
   - group: "K8s tests"
     key: "k8s-tests"
     steps:
@@ -287,21 +271,6 @@ steps:
         retry:
           manual:
             allowed: true
-
-  - label: ":sonarqube: Continuous Code Inspection"
-    env:
-      VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
-    agents:
-      image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
-    command:
-      - "buildkite-agent artifact download --step merge-coverage build/TEST-go-unit.cov ."
-      - "/scan-source-code.sh"
-    depends_on:
-      - "merge-coverage"
-    retry:
-      manual:
-        allowed: true
-    soft_fail: true # Until https://github.com/elastic/ingest-dev/issues/4042 is resolved
 
   # Triggers a dynamic step: Sync K8s
   # Runs only on main and if k8s files are changed
