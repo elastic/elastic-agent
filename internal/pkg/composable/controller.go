@@ -469,11 +469,11 @@ func (c *controller) startContextProvider(ctx context.Context, wg *sync.WaitGrou
 				return
 			}
 			// all other exits are bad, even a nil error
-			cause := "exited unexpectedly with nil error"
+			cause := ""
 			if err != nil {
-				cause = err.Error()
+				cause = fmt.Sprintf(": %v", err)
 			}
-			l.Errorf("provider %q failed to run (will retry in %s): %s", name, c.restartInterval.String(), cause)
+			l.Errorf("provider %q failed to run (will retry in %s)%s", name, c.restartInterval.String(), cause)
 			if fpok {
 				// turn off fetch provider
 				sendFetchProvider(ctx, fetchCh, name, nil)
@@ -531,11 +531,11 @@ func (c *controller) startDynamicProvider(ctx context.Context, wg *sync.WaitGrou
 				return
 			}
 			// all other exits are bad, even a nil error
-			cause := "exited unexpectedly with nil error"
+			cause := ""
 			if err != nil {
-				cause = err.Error()
+				cause = fmt.Sprintf(": %v", err)
 			}
-			l.Errorf("provider %q failed to run (will restart in %s): %s", name, c.restartInterval.String(), cause)
+			l.Errorf("provider %q failed to run (will restart in %s)%s", name, c.restartInterval.String(), cause)
 			select {
 			case <-ctx.Done():
 				return
