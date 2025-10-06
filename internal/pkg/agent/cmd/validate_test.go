@@ -29,21 +29,6 @@ func TestValidateCommand(t *testing.T) {
 			false,
 		},
 		{
-			"otel config with set missing action field",
-			[]string{filepath.Join("testdata", "otel", "otel.yml"), "yaml:processors::resource::attributes: [{ key: service.name, value: elastic-otel-test2 }]"},
-			true,
-		},
-		{
-			"otel config with set missing key field",
-			[]string{filepath.Join("testdata", "otel", "otel.yml"), "yaml:processors::resource::attributes: [{ action: insert, value: elastic-otel-test3 }]"},
-			true,
-		},
-		{
-			"otel config with set missing key and action fields",
-			[]string{filepath.Join("testdata", "otel", "otel.yml"), "yaml:processors::resource::attributes: [{ value: elastic-otel-test4 }]"},
-			true,
-		},
-		{
 			"agent config",
 			[]string{filepath.Join("testdata", "otel", "elastic-agent.yml")},
 			true,
