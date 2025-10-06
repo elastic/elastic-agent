@@ -104,7 +104,8 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 	}
 	if err := acker.Commit(ctx); err != nil {
 		h.log.Errorw("failed to commit ACK of an action",
-			"error.message", err)
+			"error.message", err,
+			"action", a)
 	}
 
 	// restart
