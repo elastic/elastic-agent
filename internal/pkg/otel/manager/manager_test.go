@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -907,11 +908,11 @@ func TestOTelManager_Ports(t *testing.T) {
 			require.EventuallyWithT(t, func(collect *assert.CollectT) {
 				select {
 				case collectorStatus := <-m.WatchCollector():
-					require.NotNil(t, collectorStatus, "collector status should not be nil")
+					require.NotNil(collect, collectorStatus, "collector status should not be nil")
 					assert.Equal(collect, componentstatus.StatusOK, collectorStatus.Status())
 					assert.NotEmpty(collect, collectorStatus.ComponentStatusMap)
 				case <-ctx.Done():
-					require.NoError(t, ctx.Err())
+					require.NoError(collect, ctx.Err())
 				}
 			}, time.Second*10, time.Second)
 
@@ -936,6 +937,98 @@ func TestOTelManager_Ports(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestOTelManager_PortConflict test verifies that the collector restarts and tries new ports if it encounters a port
+// conflict.
+func TestOTelManager_PortConflict(t *testing.T) {
+	// switch the net.Listen implementation with one that returns test listeners that ignore the Close call the first
+	// two times
+	var timesCalled int
+	var mx sync.Mutex
+	netListen = func(network string, address string) (net.Listener, error) {
+		mx.Lock()
+		defer mx.Unlock()
+		l, err := net.Listen(network, address)
+		if err != nil {
+			return nil, err
+		}
+		if timesCalled < 2 {
+			t.Cleanup(func() {
+				assert.NoError(t, l.Close())
+			})
+			l = &testListener{inner: l}
+		}
+		timesCalled++
+		return l, err
+	}
+	t.Cleanup(func() {
+		netListen = net.Listen
+	})
+
+	wd, erWd := os.Getwd()
+	require.NoError(t, erWd, "cannot get working directory")
+
+	testBinary := filepath.Join(wd, "testing", "testing")
+	require.FileExists(t, testBinary, "testing binary not found")
+
+	const waitTimeForStop = 30 * time.Second
+
+	base, obs := loggertest.New("base")
+	l := base.Named("otel-manager")
+	ctx := t.Context()
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			for _, log := range obs.All() {
+				t.Logf("%+v", log)
+			}
+		}
+	})
+
+	// the execution mode passed here is overridden below so it is irrelevant
+	m, err := NewOTelManager(
+		l,
+		logp.DebugLevel,
+		base, SubprocessExecutionMode,
+		nil,
+		0,
+		0,
+		nil,
+		waitTimeForStop,
+	)
+	require.NoError(t, err, "could not create otel manager")
+	executionMode, err := newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
+	require.NoError(t, err, "could not create subprocess execution mode")
+	m.execution = executionMode
+
+	go func() {
+		err := m.Run(ctx)
+		assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
+	}()
+
+	cfg := confmap.NewFromStringMap(testConfig)
+	cfg.Delete("service::telemetry::metrics::level") // change this to default
+
+	// no retries, collector is not running
+	assert.Equal(t, uint32(0), m.recoveryRetries.Load())
+
+	m.Update(cfg, nil)
+
+	// wait until status reflects the config update
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		select {
+		case collectorStatus := <-m.WatchCollector():
+			require.NotNil(collect, collectorStatus, "collector status should not be nil")
+			assert.Equal(collect, componentstatus.StatusOK, collectorStatus.Status())
+			assert.NotEmpty(collect, collectorStatus.ComponentStatusMap)
+		case <-ctx.Done():
+			require.NoError(collect, ctx.Err())
+		}
+	}, time.Second*10, time.Second)
+
+	// collector must have retried exactly once
+	assert.Equal(t, uint32(1), m.recoveryRetries.Load())
 }
 
 // statusToYaml converts the status.AggregateStatus to a YAML string representation.
@@ -1763,4 +1856,20 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "couldn't convert value of service::telemetry::metrics::readers to a list")
 	})
+}
+
+type testListener struct {
+	inner net.Listener
+}
+
+func (t *testListener) Accept() (net.Conn, error) {
+	return t.inner.Accept()
+}
+
+func (t *testListener) Close() error {
+	return nil
+}
+
+func (t *testListener) Addr() net.Addr {
+	return t.inner.Addr()
 }
