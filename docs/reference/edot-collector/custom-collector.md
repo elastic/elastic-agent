@@ -113,8 +113,8 @@ processors:
     gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.130.0
   cumulativetodeltaprocessor :
     gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/cumulativetodeltaprocessor v0.130.0
-  elasticapmprocessor :
-    gomod: github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.1.0
+  elastictraceprocessor :
+    gomod: github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.9.0
   elasticinframetricsprocessor :
     gomod: github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.16.0
   filterprocessor :
