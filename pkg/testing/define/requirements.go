@@ -72,9 +72,6 @@ func (o OS) Validate() error {
 		if o.Arch != AMD64 && o.Arch != ARM64 {
 			return errors.New("arch must be either amd64 or arm64")
 		}
-		if o.Type == Windows && o.Arch == ARM64 {
-			return errors.New("windows on arm64 not supported")
-		}
 	}
 	if o.Distro != "" && (o.Type != Linux && o.Type != Kubernetes) {
 		return errors.New("distro can only be set when type is linux or kubernetes")
