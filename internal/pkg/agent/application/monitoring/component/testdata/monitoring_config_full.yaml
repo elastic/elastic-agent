@@ -871,14 +871,14 @@ inputs:
   name: metrics-monitoring-collector
   streams:
   - data_stream:
-      dataset: elastic_agent.collector
+      dataset: elastic_agent.elastic_agent
       namespace: default
       type: metrics
     failure_threshold: 5
     hosts:
     - placeholder
     id: metrics-monitoring-collector
-    index: metrics-elastic_agent.collector-default
+    index: metrics-elastic_agent.elastic_agent-default
     metrics_path: /metrics
     metricsets:
     - collector
@@ -887,13 +887,13 @@ inputs:
     processors:
     - add_fields:
         fields:
-          dataset: elastic_agent.collector
+          dataset: elastic_agent.elastic_agent
           namespace: default
           type: metrics
         target: data_stream
     - add_fields:
         fields:
-          dataset: elastic_agent.collector
+          dataset: elastic_agent.elastic_agent
         target: event
     - add_fields:
         fields:
