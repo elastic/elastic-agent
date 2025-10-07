@@ -26,15 +26,15 @@ require (
 	github.com/elastic/go-sysinfo v1.15.4
 	github.com/elastic/go-ucfg v0.8.9-0.20250307075119-2a22403faaea
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
-	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.7.0
-	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.0.0-20250922093401-a76a7ba0448a
-	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.5.0
-	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.7.0
-	github.com/elastic/opentelemetry-collector-components/extension/beatsauthextension v0.3.0
-	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.2.0
-	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.17.0
+	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.8.0
+	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.1.0
+	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.8.0
+	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.8.0
+	github.com/elastic/opentelemetry-collector-components/extension/beatsauthextension v0.5.0
+	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.3.0
+	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.18.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.10.0
-	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.3.0
+	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.4.0
 	github.com/fatih/color v1.18.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-viper/mapstructure/v2 v2.4.0
@@ -139,7 +139,7 @@ require (
 	golang.org/x/time v0.12.0
 	golang.org/x/tools v0.36.0
 	google.golang.org/api v0.239.0
-	google.golang.org/grpc v1.75.1
+	google.golang.org/grpc v1.76.0
 	google.golang.org/protobuf v1.36.9
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -376,7 +376,7 @@ require (
 	github.com/elastic/mito v1.22.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.8.0 // indirect
-	github.com/elastic/opentelemetry-lib v0.21.0 // indirect
+	github.com/elastic/opentelemetry-lib v0.24.0 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
 	github.com/elastic/sarama v1.19.1-0.20250603175145-7672917f26b6 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
@@ -397,7 +397,7 @@ require (
 	github.com/go-asn1-ber/asn1-ber v1.5.5 // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
 	github.com/go-gorp/gorp/v3 v3.1.0 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.1 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.2 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/go-ldap/ldap/v3 v3.4.6 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
@@ -750,7 +750,7 @@ require (
 	go.opentelemetry.io/otel/sdk/log v0.14.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.38.0 // indirect
 	go.opentelemetry.io/otel/trace v1.38.0 // indirect
-	go.opentelemetry.io/proto/otlp v1.7.1 // indirect
+	go.opentelemetry.io/proto/otlp v1.8.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/mock v0.5.0 // indirect
