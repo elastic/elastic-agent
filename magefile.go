@@ -313,7 +313,7 @@ func (Build) WindowsArchiveRootBinary() error {
 		},
 		Env: map[string]string{
 			"GOOS":   "windows",
-			"GOARCH": "amd64",
+			"GOARCH": devtools.GOARCH,
 		},
 		LDFlags: []string{
 			"-s", // Strip all debug symbols from binary (does not affect Go stack traces).
@@ -467,7 +467,7 @@ func (Check) Changes() error {
 	if len(out) != 0 {
 		fmt.Fprintln(os.Stderr, "Changes:")
 		fmt.Fprintln(os.Stderr, out)
-		return fmt.Errorf("uncommited changes")
+		return fmt.Errorf("uncommitted changes")
 	}
 	return nil
 }
@@ -932,7 +932,7 @@ func (Cloud) Image(ctx context.Context) {
 	os.Setenv(dockerVariants, "cloud")
 
 	if s, err := strconv.ParseBool(snapshot); err == nil && !s {
-		// only disable SNAPSHOT build when explicitely defined
+		// only disable SNAPSHOT build when explicitly defined
 		os.Setenv(snapshotEnv, "false")
 		devtools.Snapshot = false
 	} else {
@@ -1205,7 +1205,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	mg.Deps(agentBinaryTarget)
 
 	// compile the elastic-agent.exe proxy binary for the windows archive
-	if slices.Contains(platforms, "windows/amd64") {
+	if slices.Contains(platforms, "windows/amd64") || slices.Contains(platforms, "windows/arm64") {
 		mg.Deps(Build.WindowsArchiveRootBinary)
 	}
 

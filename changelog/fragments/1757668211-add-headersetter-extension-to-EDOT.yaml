@@ -1,4 +1,0 @@
-kind: enhancement
-summary: Add Headers Setter extension to EDOT Collector
-component: elastic-agent
-issue: https://github.com/elastic/elastic-agent/issues/9889
