@@ -5,7 +5,10 @@
 package handlers
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -67,6 +70,20 @@ var (
 			{
 				Name:        "mock unit diagnostic result",
 				Filename:    "mock_unit_diag_file.yaml",
+				ContentType: "application/yaml",
+				Content:     []byte("hello: there"),
+			},
+		},
+	}
+	mockComponentDiagnostic = runtime.ComponentDiagnostic{
+		Component: component.Component{
+			ID:    "ComponentID",
+			Units: []component.Unit{mockInputUnit},
+		},
+		Results: []*proto.ActionDiagnosticUnitResult{
+			{
+				Name:        "mock component diagnostic result",
+				Filename:    "mock_component_diag_file.yaml",
 				ContentType: "application/yaml",
 				Content:     []byte("hello: there"),
 			},
@@ -410,8 +427,8 @@ func TestDiagnosticsHandlerWithEDOT(t *testing.T) {
 	}()
 	mockDiagProvider := mockhandlers.NewDiagnosticsProvider(t)
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{hook1})
-	mockDiagProvider.EXPECT().PerformDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentUnitDiagnostic{mockUnitDiagnostic})
-	mockDiagProvider.EXPECT().PerformComponentDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentDiagnostic{}, nil)
+	mockDiagProvider.EXPECT().PerformDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentUnitDiagnostic{})
+	mockDiagProvider.EXPECT().PerformComponentDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentDiagnostic{mockComponentDiagnostic}, nil)
 
 	mockAcker := mockackers.NewAcker(t)
 	mockAcker.EXPECT().Ack(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, a fleetapi.Action) error {
@@ -423,6 +440,11 @@ func TestDiagnosticsHandlerWithEDOT(t *testing.T) {
 
 	mockUploader := mockhandlers.NewUploader(t)
 	mockUploader.EXPECT().UploadDiagnostics(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, s1, s2 string, i int64, r io.Reader) (string, error) {
+		expectedContent := map[string][]byte{
+			"components/ComponentID/mock_component_diag_file.yaml": []byte("hello: there"),
+			"mock_global.txt": []byte("This is a mock global diagnostic content."),
+		}
+		verifyZip(t, r, expectedContent)
 		return "upload-id", nil
 	})
 
@@ -430,4 +452,28 @@ func TestDiagnosticsHandlerWithEDOT(t *testing.T) {
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 	handler.collectDiag(t.Context(), &fleetapi.ActionDiagnostics{}, mockAcker)
 	require.True(t, called, "expected the mock diagnostics server to be called")
+}
+
+func verifyZip(t *testing.T, reader io.Reader, expectedContent map[string][]byte) {
+	// Read all from io.Reader into a buffer
+	buf, err := io.ReadAll(reader)
+	require.NoErrorf(t, err, "failed to read the buffer: %v", err)
+
+	// Create a zip reader from the buffer
+	zr, err := zip.NewReader(bytes.NewReader(buf), int64(len(buf)))
+	require.NoErrorf(t, err, "got error while creating reader: %v", err)
+
+	foundFiles := map[string][]byte{}
+	for _, f := range zr.File {
+		fmt.Println(f.Name)
+		if _, ok := expectedContent[f.Name]; ok {
+			rc, err := f.Open()
+			require.NoErrorf(t, err, "failed to open the zip file at %v: %v", f.Name, err)
+			defer rc.Close()
+			content, err := io.ReadAll(rc)
+			require.NoErrorf(t, err, "failed to read the zip file at %v: %v", f.Name, err)
+			foundFiles[f.Name] = content
+		}
+	}
+	require.Equal(t, expectedContent, foundFiles)
 }

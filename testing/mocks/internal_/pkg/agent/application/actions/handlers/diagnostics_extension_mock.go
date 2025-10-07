@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/ipc"
@@ -15,7 +16,17 @@ func NewMockServer(t *testing.T, host string, called *bool) *http.Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/diagnostics", func(w http.ResponseWriter, r *http.Request) {
 		*called = true
-		err := json.NewEncoder(w).Encode(elasticdiagnostics.Response{})
+		resp := elasticdiagnostics.Response{
+			GlobalDiagnostics: []*proto.ActionDiagnosticUnitResult{
+				{
+					Description: "Mock Global Diagnostic",
+					Filename:    "mock_global.txt",
+					ContentType: "text/plain",
+					Content:     []byte("This is a mock global diagnostic content."),
+				},
+			},
+		}
+		err := json.NewEncoder(w).Encode(resp)
 		require.NoError(t, err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
