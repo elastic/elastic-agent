@@ -35,7 +35,7 @@ func NewMockServer(t *testing.T, host string, called *bool) *http.Server {
 
 	l, err := ipc.CreateListener(logger.NewWithoutConfig(""), host)
 	require.NoError(t, err)
-	server := &http.Server{Handler: mux}
+	server := &http.Server{Handler: mux} //nolint:gosec / This is a test
 	go func() {
 		err := server.Serve(l)
 		require.ErrorIs(t, err, http.ErrServerClosed)
