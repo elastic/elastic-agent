@@ -814,7 +814,7 @@ func (b *BeatsMonitor) getPrometheusStream(
 	// Send these metrics through the metricbeat monitoring datastream, since
 	// the processors will convert any usable metrics into ECS equivalents
 	// so they're visible in Agent dashboards.
-	dataset := fmt.Sprintf("elastic_agent.%s", collectorName)
+	dataset := "elastic_agent.elastic_agent"
 	indexName := fmt.Sprintf("metrics-%s-%s", dataset, monitoringNamespace)
 
 	prometheusHost := b.getCollectorTelemetryEndpoint()
