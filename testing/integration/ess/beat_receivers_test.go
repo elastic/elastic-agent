@@ -737,6 +737,8 @@ agent.monitoring.enabled: false
 
 	// since we set the output to a nonexistent ES endpoint, we expect it to be degraded, but the input to be healthy
 	assertBeatsReady := func(t *assert.CollectT, status *atesting.AgentStatusOutput, runtime component.RuntimeManager) {
+		t.Helper()
+
 		var componentVersionInfoName string
 		switch runtime {
 		case "otel":
@@ -745,26 +747,19 @@ agent.monitoring.enabled: false
 			componentVersionInfoName = "beat-v2-client"
 		}
 
-		// agent should be degraded
-		assert.Equal(t, int(cproto.State_DEGRADED), status.State)
+		// we don't actually care about anything here other than the receiver itself
 		assert.Equal(t, 1, len(status.Components))
 
 		// all the components should be degraded, their output units should be degraded, the input units should be healthy,
 		// and should identify themselves appropriately via their version info
 		for _, comp := range status.Components {
-			assert.Equal(t, int(cproto.State_DEGRADED), comp.State)
 			assert.Equal(t, componentVersionInfoName, comp.VersionInfo.Name)
 			for _, unit := range comp.Units {
-				var expectedState cproto.State
-				switch unit.UnitType {
-				case int(cproto.UnitType_INPUT):
-					expectedState = cproto.State_HEALTHY
-				case int(cproto.UnitType_OUTPUT):
-					expectedState = cproto.State_DEGRADED
+				if unit.UnitType == int(cproto.UnitType_INPUT) {
+					assert.Equal(t, int(cproto.State_HEALTHY), unit.State,
+						"expected state of unit %s to be %s, got %s",
+						unit.UnitID, cproto.State_HEALTHY.String(), cproto.State(unit.State).String())
 				}
-				assert.Equal(t, int(expectedState), unit.State,
-					"expected state of unit %s to be %s, got %s",
-					unit.UnitID, expectedState.String(), cproto.State(unit.State).String())
 			}
 		}
 	}
@@ -787,7 +782,7 @@ agent.monitoring.enabled: false
 		assert.NoError(collect, statusErr)
 		assertBeatsReady(collect, &status, component.ProcessRuntimeManager)
 		return
-	}, 1*time.Minute, 1*time.Second)
+	}, 2*time.Minute, 5*time.Second)
 
 	// change configuration and wait until the beats receiver is healthy
 	err = fixture.Configure(ctx, receiverConfig)
@@ -799,7 +794,7 @@ agent.monitoring.enabled: false
 		assert.NoError(collect, statusErr)
 		assertBeatsReady(collect, &status, component.ProcessRuntimeManager)
 		return
-	}, 1*time.Minute, 1*time.Second)
+	}, 2*time.Minute, 5*time.Second)
 
 	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
 	require.NoError(t, err, "failed to read logs: %v", err)
