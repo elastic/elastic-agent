@@ -11,10 +11,12 @@ import (
 )
 
 type ActionTmpl struct {
-	AgentID  string
-	ActionID string
-	Data     string
-	Type     string
+	AgentID    string
+	ActionID   string
+	Data       string
+	Type       string
+	StartTime  string
+	Expiration string
 }
 
 type CheckinData struct {

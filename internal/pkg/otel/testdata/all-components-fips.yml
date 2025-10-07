@@ -37,7 +37,8 @@ processors:
     check_interval: 1s
     limit_mib: 4000
     spike_limit_mib: 800
-  elastictrace:
+  elasticapm:
+  tail_sampling:
 
 receivers:
   filelog:
@@ -56,6 +57,7 @@ receivers:
     protocols:
       grpc:
   zipkin:
+  docker_stats:
 
 connectors:
   spanmetrics:
@@ -148,7 +150,7 @@ service:
         - resource
         - resourcedetection
         - transform
-        - elastictrace
+        - elasticapm
       receivers:
         - otlp
         - jaeger

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"syscall"
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -31,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
+	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -174,7 +176,12 @@ func (s *Server) Restart(_ context.Context, _ *cproto.Empty) (*cproto.RestartRes
 
 // Upgrade performs the upgrade operation.
 func (s *Server) Upgrade(ctx context.Context, request *cproto.UpgradeRequest) (*cproto.UpgradeResponse, error) {
-	err := s.coord.Upgrade(ctx, request.Version, request.SourceURI, nil, request.SkipVerify, request.SkipDefaultPgp, request.PgpBytes...)
+	err := s.coord.Upgrade(ctx, request.Version, request.SourceURI, nil,
+		coordinator.WithSkipVerifyOverride(request.SkipVerify),
+		coordinator.WithSkipDefaultPgp(request.SkipDefaultPgp),
+		coordinator.WithPgpBytes(request.PgpBytes),
+		coordinator.WithRollback(request.Rollback),
+	)
 	if err != nil {
 		//nolint:nilerr // ignore the error, return a failure upgrade response
 		return &cproto.UpgradeResponse{
@@ -205,10 +212,11 @@ func (s *Server) DiagnosticAgent(ctx context.Context, req *cproto.DiagnosticAgen
 			Generated:   timestamppb.New(time.Now().UTC()),
 		})
 	}
-
+	foundCPU := false
 	for _, metric := range req.AdditionalMetrics {
 		switch metric {
 		case cproto.AdditionalDiagnosticRequest_CPU:
+			foundCPU = true
 			duration := diagnostics.DiagCPUDuration
 			s.logger.Infof("Collecting CPU metrics, waiting for %s", duration)
 			cpuResults, err := diagnostics.CreateCPUProfile(ctx, duration)
@@ -224,6 +232,27 @@ func (s *Server) DiagnosticAgent(ctx context.Context, req *cproto.DiagnosticAgen
 				Generated:   timestamppb.New(time.Now().UTC()),
 			})
 		}
+	}
+
+	resp, err := otel.PerformDiagnosticsExt(ctx, foundCPU)
+	if errors.Is(err, syscall.ENOENT) || errors.Is(err, syscall.ECONNREFUSED) {
+		// We're not running the EDOT if:
+		//  1. Either the socket doesn't exist
+		//	2. It is refusing the connections.
+		s.logger.Debugf("Couldn't fetch diagnostics from EDOT: %v", err)
+		return &cproto.DiagnosticAgentResponse{Results: res}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range resp.GlobalDiagnostics {
+		res = append(res, &cproto.DiagnosticFileResult{
+			Name:        r.Name,
+			Filename:    r.Filename,
+			ContentType: r.ContentType,
+			Content:     r.Content,
+			Description: r.Description,
+		})
 	}
 
 	if ctx.Err() != nil {

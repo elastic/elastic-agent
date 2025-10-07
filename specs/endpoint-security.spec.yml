@@ -14,6 +14,7 @@ inputs:
     proxied_actions: &proxied_actions
       - UNENROLL
       - UPGRADE
+      - MIGRATE
     runtime:
       preventions:
         - condition: ${runtime.native_arch} != '' and ${runtime.arch} != ${runtime.native_arch}
@@ -36,6 +37,9 @@ inputs:
             - "--log"
             - "stderr"
           timeout: 60s
+          non_fatal_exit_codes:
+            - 28 # tamper protection enabled but could not (re)install - posix code
+            - 284 # tamper protection enabled but could not (re)install - windows code
         install:
           args:
             - "install"
@@ -45,6 +49,8 @@ inputs:
             - "--resources"
             - "endpoint-security-resources.zip"
           timeout: 600s
+          non_fatal_exit_codes:
+            - 28 # tamper protection enabled but could not (re)install
         uninstall:
           args:
             - "uninstall"

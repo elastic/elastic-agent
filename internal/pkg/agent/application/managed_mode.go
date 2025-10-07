@@ -72,13 +72,9 @@ func newManagedConfigManager(
 	actionAcker acker.Acker,
 	retrier *retrier.Retrier,
 	stateStore *store.StateStore,
+	actionQueue *queue.ActionQueue,
 	clientSetters ...actions.ClientSetter,
 ) (*managedConfigManager, error) {
-	actionQueue, err := queue.NewActionQueue(stateStore.Queue(), stateStore)
-	if err != nil {
-		return nil, fmt.Errorf("unable to initialize action queue: %w", err)
-	}
-
 	actionDispatcher, err := dispatcher.New(log, topPath, handlers.NewDefault(log), actionQueue)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize action dispatcher: %w", err)
@@ -172,13 +168,23 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		}
 	}
 
+	var stateFetcher fleetgateway.StateFetcher
+	if m.cfg.Fleet.Checkin.IsModeOnStateChanged() {
+		gatewayStateSub := m.coord.StateSubscribe(ctx, 32)
+		stateFetcher = fleetgateway.NewFastCheckinStateFetcher(m.log, m.coord.State, gatewayStateSub)
+	} else {
+		stateFetcher = fleetgateway.NewCheckinStateFetcher(m.coord.State)
+	}
+	m.log.Infof("running managed config manager with checkin mode: %s", m.cfg.Fleet.Checkin.Mode)
+
 	gateway, err := fleetgateway.New(
 		m.log,
 		m.agentInfo,
 		m.client,
 		m.actionAcker,
-		m.coord.State,
 		m.stateStore,
+		stateFetcher,
+		m.cfg.Fleet.Checkin,
 	)
 	if err != nil {
 		return err
@@ -215,6 +221,10 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	// Run the gateway.
 	gatewayRunner := runner.Start(gatewayCtx, func(ctx context.Context) error {
 		defer gatewayErrorsRunner.Stop()
+		if m.cfg.Fleet.Checkin.IsModeOnStateChanged() {
+			stateWatch := runner.Start(context.Background(), stateFetcher.StartStateWatch)
+			defer stateWatch.Stop()
+		}
 		return gateway.Run(ctx)
 	})
 
@@ -261,7 +271,6 @@ func (m *managedConfigManager) wasUnenrolled() bool {
 }
 
 func (m *managedConfigManager) initFleetServer(ctx context.Context, cfg *configuration.FleetServerConfig) error {
-
 	if m.fleetInitTimeout == 0 {
 		m.fleetInitTimeout = 30 * time.Second
 	}

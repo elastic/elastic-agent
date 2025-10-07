@@ -17,7 +17,7 @@ the config is written as YAML.
 {{- $_ := set $collector "config" $config }}
 {{- end }}
 {{- if .collector.presets.logsCollection.enabled }}
-{{- $_ := set $collector "exclude" (printf "/var/log/pods/%s_%s*_*/%s/*.log" .namespace (include "opentelemetry-kube-stack.collectorFullname" .) (.Chart.Name | lower)) }}
+{{- $_ := set $collector "exclude" (list (printf "/var/log/pods/%s_%s*_*/otc-container/*.log" .namespace (include "opentelemetry-kube-stack.collectorFullname" .))) }}
 {{- $config = (include "opentelemetry-kube-stack.collector.applyLogsCollectionConfig" (dict "collector" $collector) | fromYaml) -}}
 {{- $_ := set $collector "config" $config }}
 {{- end }}
@@ -34,14 +34,14 @@ the config is written as YAML.
 {{- $_ := set $collector "config" $config }}
 {{- end }}
 {{- if .collector.presets.kubernetesEvents.enabled }}
-{{- $config = (include "opentelemetry-kube-stack.collector.applyKubernetesEventsConfig" (dict "collector" $collector) | fromYaml) -}}
+{{- $config = (include "opentelemetry-kube-stack.collector.applyKubernetesEventsConfig" (dict "collector" $collector "namespace" .namespace) | fromYaml) -}}
 {{- $_ := set $collector "config" $config }}
 {{- end }}
 {{- if .collector.presets.clusterMetrics.enabled }}
-{{- $config = (include "opentelemetry-kube-stack.collector.applyClusterMetricsConfig" (dict "collector" $collector) | fromYaml) -}}
+{{- $config = (include "opentelemetry-kube-stack.collector.applyClusterMetricsConfig" (dict "collector" $collector "namespace" .namespace) | fromYaml) -}}
 {{- $_ := set $collector "config" $config }}
 {{- end }}
-{{- toYaml $collector.config | nindent 4 }}
+{{- tpl (toYaml $collector.config) . | nindent 4 }}
 {{- end }}
 
 {{/*
@@ -110,6 +110,7 @@ processors:
     - sources:
       - from: connection
     extract:
+      otel_annotations: true
       metadata:
         - k8s.namespace.name
         - k8s.pod.name
@@ -130,18 +131,13 @@ processors:
         - container.image.tag
         - container.image.name
         - k8s.cluster.uid
+        - service.namespace
+        - service.name
+        - service.version
+        - service.instance.id
       labels:
-      - tag_name: service.name
-        key: app.kubernetes.io/name
-        from: pod
-      - tag_name: service.name
-        key: k8s-app
-        from: pod
       - tag_name: k8s.app.instance
         key: app.kubernetes.io/instance
-        from: pod
-      - tag_name: service.version
-        key: app.kubernetes.io/version
         from: pod
       - tag_name: k8s.app.component
         key: app.kubernetes.io/component
@@ -227,16 +223,25 @@ receivers:
 {{- end }}
 
 {{- define "opentelemetry-kube-stack.collector.applyClusterMetricsConfig" -}}
-{{- $config := mustMergeOverwrite (include "opentelemetry-kube-stack.collector.clusterMetricsConfig" .collector | fromYaml) .collector.config }}
+{{- $electorName := "k8s_cluster" }}
+{{- $config := mustMergeOverwrite (include "opentelemetry-kube-stack.collector.clusterMetricsConfig" (dict "collector" .collector "namespace" .namespace "electorName" $electorName) | fromYaml) .collector.config }}
 {{- if and (dig "service" "pipelines" "metrics" false $config) (not (has "k8s_cluster" (dig "service" "pipelines" "metrics" "receivers" list $config))) }}
 {{- $_ := set $config.service.pipelines.metrics "receivers" (append ($config.service.pipelines.metrics.receivers | default list) "k8s_cluster" | uniq)  }}
+{{- $_ := set $config.service "extensions" (append ($config.service.extensions | default list) (printf "k8s_leader_elector/%s" $electorName) | uniq)  }}
 {{- end }}
 {{- $config | toYaml }}
 {{- end }}
 
 {{- define "opentelemetry-kube-stack.collector.clusterMetricsConfig" -}}
+{{- $disableLeaderElection := .collector.presets.kubernetesEvents.disableLeaderElection}}
+{{- if not $disableLeaderElection}}
+{{- include "opentelemetry-kube-stack.collector.leaderElectionConfig" (dict "name" .electorName "leaseName" "k8s.cluster.receiver.opentelemetry.io" "leaseNamespace" .namespace)}}
+{{- end}}
 receivers:
   k8s_cluster:
+    {{- if not $disableLeaderElection}}
+    k8s_leader_elector: k8s_leader_elector/{{ .electorName }}
+    {{- end}}
     collection_interval: 10s
     auth_type: serviceAccount
     node_conditions_to_report: [Ready, MemoryPressure, DiskPressure, NetworkUnavailable]
@@ -308,7 +313,8 @@ receivers:
     exclude: []
     {{- else }}
     # Exclude collector container's logs. The file format is /var/log/pods/<namespace_name>_<pod_name>_<pod_uid>/<container_name>/<run_id>.log
-    exclude: {{ .exclude }}
+    exclude:
+    {{- toYaml .exclude | nindent 4 }}
     {{- end }}
     start_at: end
     retry_on_failure:
@@ -326,20 +332,37 @@ receivers:
 {{- end }}
 
 {{- define "opentelemetry-kube-stack.collector.applyKubernetesEventsConfig" -}}
-{{- $config := mustMergeOverwrite (include "opentelemetry-kube-stack.collector.kubernetesEventsConfig" .collector | fromYaml) .collector.config }}
+{{- $electorName := "k8s_objects" }}
+{{- $config := mustMergeOverwrite (include "opentelemetry-kube-stack.collector.kubernetesEventsConfig" (dict "collector" .collector "namespace" .namespace "electorName" $electorName) | fromYaml) .collector.config }}
 {{- if and (dig "service" "pipelines" "logs" false $config) (not (has "k8sobjects" (dig "service" "pipelines" "logs" "receivers" list $config))) }}
 {{- $_ := set $config.service.pipelines.logs "receivers" (append ($config.service.pipelines.logs.receivers | default list) "k8sobjects" | uniq)  }}
+{{- $_ := set $config.service "extensions" (append ($config.service.extensions | default list) (printf "k8s_leader_elector/%s" $electorName) | uniq)  }}
 {{- end }}
 {{- $config | toYaml }}
 {{- end }}
 
 {{- define "opentelemetry-kube-stack.collector.kubernetesEventsConfig" -}}
+{{- $disableLeaderElection := .collector.presets.kubernetesEvents.disableLeaderElection}}
+{{- if not $disableLeaderElection}}
+{{- include "opentelemetry-kube-stack.collector.leaderElectionConfig" (dict "name" .electorName "leaseName" "k8s.objects.receiver.opentelemetry.io" "leaseNamespace" .namespace)}}
+{{- end}}
 receivers:
   k8sobjects:
+    {{- if not $disableLeaderElection}}
+    k8s_leader_elector: k8s_leader_elector/{{ .electorName }}
+    {{- end}}
     objects:
       - name: events
         mode: "watch"
         group: "events.k8s.io"
         exclude_watch_type:
           - "DELETED"
+{{- end }}
+
+{{- define "opentelemetry-kube-stack.collector.leaderElectionConfig" -}}
+extensions:
+  k8s_leader_elector/{{ .name }}:
+    auth_type: serviceAccount
+    lease_name: {{ .leaseName }}
+    lease_namespace: {{ .leaseNamespace }}
 {{- end }}

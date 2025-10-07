@@ -16,6 +16,8 @@ import (
 
 	"github.com/gorilla/mux"
 
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -43,7 +45,7 @@ var redirectableProcesses = []string{
 	profilingServicePrefix,
 }
 
-func processHandler(coord CoordinatorState, statsHandler func(http.ResponseWriter, *http.Request) error, operatingSystem string) func(http.ResponseWriter, *http.Request) error {
+func processHandler(coord CoordinatorState, statsHandler func(http.ResponseWriter, *http.Request) error) func(http.ResponseWriter, *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
@@ -76,7 +78,7 @@ func processHandler(coord CoordinatorState, statsHandler func(http.ResponseWrite
 				metricsPath = "stats"
 			}
 
-			return redirectToPath(w, r, componentID, metricsPath, operatingSystem)
+			return redirectToPath(w, r, componentID, metricsPath)
 		}
 
 		state := coord.State()
@@ -119,8 +121,8 @@ func isProcessRedirectable(componentID string) bool {
 	return false
 }
 
-func redirectToPath(w http.ResponseWriter, r *http.Request, id, path, operatingSystem string) error {
-	endpoint := PrefixedEndpoint(utils.SocketURLWithFallback(id, paths.TempDir()))
+func redirectToPath(w http.ResponseWriter, r *http.Request, id, path string) error {
+	endpoint := componentmonitoring.PrefixedEndpoint(utils.SocketURLWithFallback(id, paths.TempDir()))
 	metricsBytes, statusCode, metricsErr := GetProcessMetrics(r.Context(), endpoint, path)
 	if metricsErr != nil {
 		return metricsErr

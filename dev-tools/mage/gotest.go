@@ -261,6 +261,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 		testArgs = append(testArgs,
 			"-covermode=atomic",
 			"-coverprofile="+params.CoverageProfileFile,
+			"-coverpkg=./...", // needed to calculate the coverage across the elastic-agent packages
 		)
 	}
 

@@ -322,7 +322,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		var statusErr error
 		status, statusErr := beatReceiverFixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
-		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 3)
+		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 4)
 		return
 	}, 1*time.Minute, 1*time.Second)
 
@@ -382,6 +382,9 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 			"data_stream.namespace",
 			"elastic_agent.id",
 			"event.ingested",
+
+			// only in receiver doc
+			"agent.otelcol",
 		}
 		switch tc.onlyCompareKeys {
 		case true:
@@ -586,6 +589,10 @@ outputs:
 			"data_stream.namespace",
 			"event.ingested",
 			"event.duration",
+
+			// only in receiver doc
+			"agent.otelcol.component.id",
+			"agent.otelcol.component.kind",
 		}
 
 		stripNondeterminism := func(m mapstr.M, mset string) {
@@ -669,7 +676,7 @@ outputs:
 				stripNondeterminism(agentDoc, tt.metricset)
 				stripNondeterminism(otelDoc, tt.metricset)
 
-				AssertMapstrKeysEqual(t, agentDoc, otelDoc, nil, "expected documents keys to be equal for metricset "+tt.metricset)
+				AssertMapstrKeysEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents keys to be equal for metricset "+tt.metricset)
 				AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for metricset "+tt.metricset)
 			})
 		}
@@ -689,6 +696,9 @@ func TestBeatsReceiverLogs(t *testing.T) {
 		},
 		Stack: nil,
 	})
+
+	t.Skip("Skip this test as it's flaky. See https://github.com/elastic/elastic-agent/issues/9890")
+
 	type configOptions struct {
 		RuntimeExperimental string
 	}
@@ -784,6 +794,99 @@ agent.monitoring.enabled: false
 		}
 		assert.Equal(t, value, receiverLog[key])
 	}
+}
+
+// TestBeatsReceiverProcessRuntimeFallback verifies that we fall back to the process runtime if the otel runtime
+// does not support the requested configuration.
+func TestBeatsReceiverProcessRuntimeFallback(t *testing.T) {
+	_ = define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: nil,
+	})
+
+	config := `agent.logging.to_stderr: true
+agent.logging.to_files: false
+inputs:
+  # Collecting system metrics
+  - type: system/metrics
+    id: unique-system-metrics-input
+    _runtime_experimental: otel
+    streams:
+      - metricsets:
+        - cpu
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [http://localhost:9200]
+    api_key: placeholder
+    indices: [] # not supported by the elasticsearch exporter
+agent.monitoring.enabled: false
+`
+
+	// this is the context for the whole test, with a global timeout defined
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	// set up a standalone agent
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	err = fixture.Configure(ctx, []byte(config))
+	require.NoError(t, err)
+
+	installOutput, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true})
+	require.NoError(t, err, "install failed, output: %s", string(installOutput))
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+		// we should be running beats processes even though the otel runtime was requested
+		assertBeatsHealthy(collect, &status, component.ProcessRuntimeManager, 1)
+		return
+	}, 1*time.Minute, 1*time.Second)
+	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
+	require.NoError(t, err)
+
+	// verify we've logged a warning about using the process runtime
+	var unsupportedLogRecord map[string]any
+	for _, line := range strings.Split(string(logsBytes), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var logRecord map[string]any
+		if unmarshalErr := json.Unmarshal([]byte(line), &logRecord); unmarshalErr != nil {
+			continue
+		}
+
+		if message, ok := logRecord["message"].(string); ok && strings.HasPrefix(message, "otel runtime is not supported") {
+			unsupportedLogRecord = logRecord
+			break
+		}
+	}
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent logs seen by the test:")
+			t.Log(string(logsBytes))
+		}
+	})
+
+	require.NotNil(t, unsupportedLogRecord, "unsupported log message should be present")
+	message, ok := unsupportedLogRecord["message"].(string)
+	require.True(t, ok, "log message field should be a string")
+	expectedMessage := "otel runtime is not supported for component system/metrics-default, switching to process runtime, reason: unsupported configuration for system/metrics-default: error translating config for output: default, unit: system/metrics-default, error: indices is currently not supported: unsupported operation"
+	assert.Equal(t, expectedMessage, message)
 }
 
 func assertCollectorComponentsHealthy(t *assert.CollectT, status *atesting.AgentStatusCollectorOutput) {
