@@ -38,7 +38,7 @@ const (
 	OtelSupervisedMonitoringURLFlagName = "supervised.monitoring.url"
 )
 
-// newExecutionSubProcess creates a new execution which runs the otel collector in a subprocess. A metricsPort or
+// newSubprocessExecution creates a new execution which runs the otel collector in a subprocess. A metricsPort or
 // healthCheckPort of 0 will result in a random port being used.
 func newSubprocessExecution(logLevel logp.Level, collectorPath string, metricsPort int, healthCheckPort int) (*subprocessExecution, error) {
 	nsUUID, err := uuid.NewV4()
