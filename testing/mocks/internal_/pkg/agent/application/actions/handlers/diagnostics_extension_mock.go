@@ -23,7 +23,7 @@ func NewMockServer(t *testing.T, host string, called *bool) *http.Server {
 					Description: "Mock Global Diagnostic",
 					Filename:    "mock_global.txt",
 					ContentType: "text/plain",
-					Content:     []byte("This is a mock global diagnostic content."),
+					Content:     []byte("This is a mock global diagnostic content"),
 				},
 			},
 		}

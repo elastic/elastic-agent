@@ -8,7 +8,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"path"
@@ -85,7 +84,7 @@ var (
 				Name:        "mock component diagnostic result",
 				Filename:    "mock_component_diag_file.yaml",
 				ContentType: "application/yaml",
-				Content:     []byte("hello: there"),
+				Content:     []byte("hello: component"),
 			},
 		},
 	}
@@ -427,7 +426,7 @@ func TestDiagnosticsHandlerWithEDOT(t *testing.T) {
 	}()
 	mockDiagProvider := mockhandlers.NewDiagnosticsProvider(t)
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{hook1})
-	mockDiagProvider.EXPECT().PerformDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentUnitDiagnostic{})
+	mockDiagProvider.EXPECT().PerformDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentUnitDiagnostic{mockUnitDiagnostic})
 	mockDiagProvider.EXPECT().PerformComponentDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentDiagnostic{mockComponentDiagnostic}, nil)
 
 	mockAcker := mockackers.NewAcker(t)
@@ -441,8 +440,9 @@ func TestDiagnosticsHandlerWithEDOT(t *testing.T) {
 	mockUploader := mockhandlers.NewUploader(t)
 	mockUploader.EXPECT().UploadDiagnostics(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, s1, s2 string, i int64, r io.Reader) (string, error) {
 		expectedContent := map[string][]byte{
-			"components/ComponentID/mock_component_diag_file.yaml": []byte("hello: there"),
-			"mock_global.txt": []byte("This is a mock global diagnostic content."),
+			"components/ComponentID/mock_component_diag_file.yaml":   []byte("hello: component\n"),
+			"components/ComponentID/UnitID/mock_unit_diag_file.yaml": []byte("hello: there\n"),
+			"mock_global.txt": []byte("This is a mock global diagnostic content"),
 		}
 		verifyZip(t, r, expectedContent)
 		return "upload-id", nil
@@ -463,17 +463,16 @@ func verifyZip(t *testing.T, reader io.Reader, expectedContent map[string][]byte
 	zr, err := zip.NewReader(bytes.NewReader(buf), int64(len(buf)))
 	require.NoErrorf(t, err, "got error while creating reader: %v", err)
 
-	foundFiles := map[string][]byte{}
+	foundContent := map[string][]byte{}
 	for _, f := range zr.File {
-		fmt.Println(f.Name)
 		if _, ok := expectedContent[f.Name]; ok {
 			rc, err := f.Open()
 			require.NoErrorf(t, err, "failed to open the zip file at %v: %v", f.Name, err)
 			defer rc.Close()
 			content, err := io.ReadAll(rc)
 			require.NoErrorf(t, err, "failed to read the zip file at %v: %v", f.Name, err)
-			foundFiles[f.Name] = content
+			foundContent[f.Name] = content
 		}
 	}
-	require.Equal(t, expectedContent, foundFiles)
+	require.Equal(t, expectedContent, foundContent)
 }
