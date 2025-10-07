@@ -43,7 +43,6 @@ func TestOtelKubeStackHelm(t *testing.T) {
 		},
 		Group: define.Kubernetes,
 	})
-	t.Skip("https://github.com/elastic/elastic-agent/issues/10020: Constantly failing test")
 
 	kCtx := k8sGetContext(t, info)
 
