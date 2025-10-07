@@ -34,7 +34,6 @@ import (
 	"github.com/elastic/elastic-agent/testing/integration"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gofrs/uuid/v5"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
