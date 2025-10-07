@@ -14,7 +14,7 @@ import (
 )
 
 // changeUser changes user associated with a service without reinstalling the service itself
-func changeUser(topPath string, ownership utils.FileOwner, username string, groupName string, _ string) error {
+func changeUser(_ string, _ utils.FileOwner, username string, groupName string, _ string) error {
 	serviceName := paths.ServiceName()
 	plistPath := fmt.Sprintf("/Library/LaunchDaemons/%s.plist", serviceName)
 
