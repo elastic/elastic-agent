@@ -115,8 +115,6 @@ processors:
     gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/cumulativetodeltaprocessor v0.130.0
   elasticinframetricsprocessor :
     gomod: github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.16.0
-  elastictraceprocessor :
-    gomod: github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.9.0
   filterprocessor :
     gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.130.0
   geoipprocessor :
