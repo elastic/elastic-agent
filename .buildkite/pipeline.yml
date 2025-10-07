@@ -67,7 +67,7 @@ steps:
         command: ".buildkite/scripts/steps/unit-tests.sh"
         env:
           FIPS: "true"
-          GODEBUG: "fips140=only"
+          GODEBUG: "fips140=only,tlsmlkem=0"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
