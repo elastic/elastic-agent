@@ -21,13 +21,10 @@ import (
 	"time"
 	"unicode"
 
-	"go.opentelemetry.io/collector/confmap"
-	"go.opentelemetry.io/collector/service"
+	koanfmaps "github.com/knadh/koanf/maps"
 
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/utils"
-
-	koanfmaps "github.com/knadh/koanf/maps"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -38,6 +35,12 @@ import (
 )
 
 const (
+	// OtelCollectorMetricsPortEnvVarName is the name of the environment variable used to pass the collector metrics
+	// port to the managed EDOT collector. It exists because by default we use a random port for this, and we want to
+	// determine it as late as possible. However, the monitoring manager is instantiated early in the application
+	// startup process, so instead we rely on this variable. The OTel manager is required to set it whenever it starts
+	// a collector.
+	OtelCollectorMetricsPortEnvVarName = "EDOT_COLLECTOR_METRICS_PORT"
 	// args: data path, pipeline name, application name
 	logFileFormat = "%s/logs/%s"
 	// args: data path, install path, pipeline name, application name
@@ -93,7 +96,6 @@ var (
 type BeatsMonitor struct {
 	enabled                 bool // feature flag disabling whole v1 monitoring story
 	config                  *monitoringConfig
-	otelConfig              *confmap.Conf
 	operatingSystem         string
 	agentInfo               info.Agent
 	isOtelRuntimeSubprocess bool
@@ -115,13 +117,12 @@ type monitoringConfig struct {
 }
 
 // New creates a new BeatsMonitor instance.
-func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, otelCfg *confmap.Conf, agentInfo info.Agent, isOtelRuntimeSubprocess bool) *BeatsMonitor {
+func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, agentInfo info.Agent, isOtelRuntimeSubprocess bool) *BeatsMonitor {
 	return &BeatsMonitor{
 		enabled: enabled,
 		config: &monitoringConfig{
 			C: cfg,
 		},
-		otelConfig:              otelCfg,
 		operatingSystem:         operatingSystem,
 		agentInfo:               agentInfo,
 		isOtelRuntimeSubprocess: isOtelRuntimeSubprocess,
@@ -149,7 +150,6 @@ func (b *BeatsMonitor) Reload(rawConfig *config.Config) error {
 	}
 
 	b.config = &newConfig
-	b.otelConfig = rawConfig.OTel
 	return nil
 }
 
@@ -519,34 +519,9 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 }
 
 func (b *BeatsMonitor) getCollectorTelemetryEndpoint() string {
-	if b.otelConfig != nil {
-		if serviceConfig, err := b.otelConfig.Sub("service"); err == nil {
-			var service service.Config
-			if serviceConfig.Unmarshal(&service, confmap.WithIgnoreUnused()) == nil {
-				for _, reader := range service.Telemetry.Metrics.Readers {
-					if reader.Pull == nil || reader.Pull.Exporter.Prometheus == nil {
-						continue
-					}
-					prometheus := *reader.Pull.Exporter.Prometheus
-					host := "localhost"
-					port := 8888
-
-					if prometheus.Host != nil {
-						host = *prometheus.Host
-					}
-					if prometheus.Port != nil {
-						port = *prometheus.Port
-					}
-					if prometheus.Host != nil || prometheus.Port != nil {
-						return host + ":" + strconv.Itoa(port)
-					}
-				}
-			}
-		}
-	}
-
-	// If there is no explicit configuration, the collector publishes its telemetry on port 8888.
-	return "localhost:8888"
+	// The OTel manager is required to set the environment variable. See comment at the constant definition for more
+	// information.
+	return fmt.Sprintf("localhost:${env:%s}", OtelCollectorMetricsPortEnvVarName)
 }
 
 // injectMetricsInput injects monitoring config for agent monitoring to the `cfg` object.
