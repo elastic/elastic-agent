@@ -3,3 +3,4 @@ deploy/
 .ogc_cache/
 .agent_testing/
 data/
+.cache
