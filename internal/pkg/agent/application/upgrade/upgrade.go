@@ -414,18 +414,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
 	}
 
-	_, err = u.installDescriptorSource.AddInstallDesc(
-		v1.AgentInstallDesc{Version: version, VersionedHome: unpackRes.VersionedHome, Hash: unpackRes.Hash, Flavor: detectedFlavor, Active: false},
-	)
-	if err != nil {
-		err = fmt.Errorf("error encountered when adding install description: %w", err)
-
-		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), unpackRes.VersionedHome, currentVersionedHome, u.installDescriptorSource)
-		if rollbackErr != nil {
-			return nil, goerrors.Join(err, rollbackErr)
-		}
-		return nil, err
-	}
+	u.addNewInstallToRegistry(version, unpackRes, detectedFlavor)
 
 	newHash := unpackRes.Hash
 	if newHash == "" {
@@ -459,40 +448,14 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, goerrors.Join(err, rollbackErr)
 	}
 
-	rollbackWindow := time.Duration(0)
+	rollbackWindow := disableRollbackWindow
 	if u.upgradeSettings != nil && u.upgradeSettings.Rollback != nil {
 		rollbackWindow = u.upgradeSettings.Rollback.Window
 	}
 
 	// timestamp marking the moment the links have been rotated. It will be used for TTL calculations of pre-existing elastic-agent installs
 	rotationTimestamp := time.Now()
-	modifiedInstallDescriptor, err := u.installDescriptorSource.ModifyInstallDesc(
-		func(desc *v1.AgentInstallDesc) error {
-			if desc.VersionedHome == unpackRes.VersionedHome {
-				desc.Active = true
-				return nil
-			} else {
-				desc.Active = false
-			}
-
-			// set the TTL only for the current install
-			if desc.VersionedHome == currentVersionedHome {
-				desc.TTL = getCurrentInstallTTL(rollbackWindow, rotationTimestamp)
-			}
-
-			return nil
-		},
-	)
-
-	if err != nil {
-		err = fmt.Errorf("error encountered when setting new install description as active: %w", err)
-
-		rollbackErr := rollbackInstall(ctx, u.log, paths.Top(), unpackRes.VersionedHome, currentVersionedHome, u.installDescriptorSource)
-		if rollbackErr != nil {
-			return nil, goerrors.Join(err, rollbackErr)
-		}
-		return nil, err
-	}
+	modifiedInstallDescriptor := u.activateInstallInRegistry(unpackRes.VersionedHome, currentVersionedHome, rollbackWindow, rotationTimestamp)
 
 	// We rotated the symlink successfully: prepare the current and previous agent installation details for the update marker
 	// In update marker the `current` agent install is the one where the symlink is pointing (the new one we didn't start yet)
@@ -552,6 +515,39 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	}
 
 	return cb, nil
+}
+
+func (u *Upgrader) addNewInstallToRegistry(version string, unpackRes UnpackResult, detectedFlavor string) {
+	_, err := u.installDescriptorSource.AddInstallDesc(
+		v1.AgentInstallDesc{Version: version, VersionedHome: unpackRes.VersionedHome, Hash: unpackRes.Hash, Flavor: detectedFlavor, Active: false},
+	)
+	if err != nil {
+		u.log.Warnf("error encountered when adding install description of new agent version: %s", err.Error())
+	}
+}
+
+func (u *Upgrader) activateInstallInRegistry(newVersionedHome, currentVersionedHome string, rollbackWindow time.Duration, rotationTimestamp time.Time) *v1.InstallDescriptor {
+	modifiedInstallDescriptor, err := u.installDescriptorSource.ModifyInstallDesc(
+		func(desc *v1.AgentInstallDesc) error {
+			if desc.VersionedHome == newVersionedHome {
+				desc.Active = true
+				return nil
+			} else {
+				desc.Active = false
+			}
+
+			// set the TTL only for the current install
+			if desc.VersionedHome == currentVersionedHome {
+				desc.TTL = getCurrentInstallTTL(rollbackWindow, rotationTimestamp)
+			}
+
+			return nil
+		},
+	)
+	if err != nil {
+		u.log.Warnf("error encountered when setting new install description as active:  %s", err.Error())
+	}
+	return modifiedInstallDescriptor
 }
 
 func getAvailableRollbacks(rollbackWindow time.Duration, now time.Time, newVersionedHome string, descriptor *v1.InstallDescriptor) []v1.AgentInstallDesc {
