@@ -792,7 +792,7 @@ agent.monitoring.enabled: false
 		var statusErr error
 		status, statusErr := fixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
-		assertBeatsReady(collect, &status, component.ProcessRuntimeManager)
+		assertBeatsReady(collect, &status, component.OtelRuntimeManager)
 		return
 	}, 2*time.Minute, 5*time.Second)
 
