@@ -12,23 +12,17 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-<<<<<<< HEAD
-=======
 	"os"
 	"os/exec"
->>>>>>> eb098ec53 ([beatreceiver] Enable telemetry for indexing errors on ES exporter - and test to ensure sensitive logs are not shipped (#9341))
 	"runtime"
 	"strings"
 	"testing"
 	"text/template"
 	"time"
 
-<<<<<<< HEAD
-=======
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/go-elasticsearch/v8"
 
->>>>>>> eb098ec53 ([beatreceiver] Enable telemetry for indexing errors on ES exporter - and test to ensure sensitive logs are not shipped (#9341))
 	"github.com/gofrs/uuid/v5"
 	"gopkg.in/yaml.v2"
 
