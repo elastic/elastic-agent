@@ -300,8 +300,14 @@ func TestGetOtelConfig(t *testing.T) {
 			"logs_dynamic_id": map[string]any{
 				"enabled": true,
 			},
+<<<<<<< HEAD
 			"timeout":           90 * time.Second,
 			"idle_conn_timeout": 3 * time.Second,
+=======
+			"telemetry": map[string]any{
+				"log_failed_docs_input": true,
+			},
+>>>>>>> eb098ec53 ([beatreceiver] Enable telemetry for indexing errors on ES exporter - and test to ensure sensitive logs are not shipped (#9341))
 			"auth": map[string]any{
 				"authenticator": "beatsauth/_agent-component/" + outputName,
 			},
