@@ -42,6 +42,10 @@ var (
 			platform: "windows-x86_64",
 			ext:      "zip",
 		},
+		"windows/arm64": {
+			platform: "windows-arm64",
+			ext:      "zip",
+		},
 	}
 	settings *packagesConfig
 )
