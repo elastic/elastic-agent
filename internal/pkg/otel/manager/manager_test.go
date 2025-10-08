@@ -627,7 +627,7 @@ func TestOTelManager_Run(t *testing.T) {
 				ports, err := findRandomTCPPorts(3)
 				require.NoError(t, err, "failed to find random tcp ports")
 				subprocessExec.collectorHealthCheckPort = ports[0]
-				subprocessExec.collectorHealthCheckPort = ports[1]
+				subprocessExec.collectorMetricsPort = ports[1]
 				err = injectHeathCheckV2Extension(cfg, healthCheckExtensionID, ports[2])
 				require.NoError(t, err, "failed to inject user health extension")
 
