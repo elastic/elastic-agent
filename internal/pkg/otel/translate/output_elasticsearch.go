@@ -263,7 +263,7 @@ func cfgDecodeHookFunc() mapstructure.DecodeHookFunc {
 			if err := proxy_url.Unpack(data.(string)); err != nil {
 				return nil, fmt.Errorf("failed parsing proxy_url: %w", err)
 			}
-			return proxy_url.String(), nil
+			return proxy_url, nil
 		default:
 			return data, nil
 		}
