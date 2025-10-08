@@ -1,0 +1,50 @@
+dir: testing/mocks/{{ replaceAll .InterfaceDirRelative "internal" "internal_"  }}
+structname: '{{.InterfaceName}}'
+pkgname: '{{.PackageName}}'
+template: testify
+template-data:
+  unroll-variadic: true
+packages:
+  github.com/elastic/elastic-agent/internal/pkg/agent/application/actions/handlers:
+    interfaces:
+      Uploader: {}
+      diagnosticsProvider:
+        config:
+          structname: DiagnosticsProvider
+      logLevelSetter:
+        config:
+          structname: LogLevelSetter
+      upgradeCoordinator:
+        config:
+          structname: UpgradeCoordinator
+  github.com/elastic/elastic-agent/internal/pkg/agent/application/info:
+    interfaces:
+      Agent: {}
+  github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade:
+    config:
+      dir: '{{.InterfaceDirRelative}}'
+      structname: '{{.Mock}}{{.InterfaceName | firstUpper}}'
+      pkgname: '{{.PackageName}}'
+    interfaces:
+      WatcherHelper: {}
+      watcherGrappler: {}
+  github.com/elastic/elastic-agent/internal/pkg/agent/cmd:
+    config:
+      dir: '{{.InterfaceDirRelative}}'
+      structname: '{{.Mock}}{{.InterfaceName | firstUpper}}'
+      pkgname: '{{.PackageName}}'
+    interfaces:
+      agentWatcher: {}
+      installationModifier: {}
+  github.com/elastic/elastic-agent/internal/pkg/agent/storage:
+    interfaces:
+      Storage: {}
+  github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker:
+    interfaces:
+      Acker: {}
+  github.com/elastic/elastic-agent/internal/pkg/fleetapi/client:
+    interfaces:
+      Sender: {}
+  github.com/elastic/elastic-agent/pkg/control/v2/client:
+    interfaces:
+      Client: {}
