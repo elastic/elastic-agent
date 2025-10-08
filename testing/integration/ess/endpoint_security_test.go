@@ -510,7 +510,7 @@ func TestInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T) {
 	}
 }
 
-// installSecurityAgent is a helper function to install an elastic-agent in priviliged mode with the force+non-interactve flags.
+// installSecurityAgent is a helper function to install an elastic-agent in privileged mode with the force+non-interactve flags.
 // the policy the agent is enrolled with can have protection enabled if passed
 func installSecurityAgent(ctx context.Context, t *testing.T, info *define.Info, protected bool) (*atesting.Fixture, kibana.PolicyResponse, string) {
 	t.Helper()

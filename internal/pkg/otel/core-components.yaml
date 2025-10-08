@@ -23,7 +23,7 @@ components:
   - attributesprocessor
   - batchprocessor
   - elasticinframetricsprocessor
-  - elastictraceprocessor
+  - elasticapmprocessor
   - k8sattributesprocessor
   - resourcedetectionprocessor
   - resourceprocessor

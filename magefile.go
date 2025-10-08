@@ -39,7 +39,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/otiai10/copy"
 
-	devmachine "github.com/elastic/elastic-agent/dev-tools/devmachine"
+	"github.com/elastic/elastic-agent/dev-tools/devmachine"
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
@@ -235,58 +235,13 @@ func (Dev) Package(ctx context.Context) {
 	Package(ctx)
 }
 
-func mocksPath() (string, error) {
-	repositoryRoot, err := findRepositoryRoot()
-	if err != nil {
-		return "", fmt.Errorf("finding repository root: %w", err)
-	}
-	return filepath.Join(repositoryRoot, "testing", "mocks"), nil
-}
-
-func (Dev) CleanMocks() error {
-	mPath, err := mocksPath()
-	if err != nil {
-		return fmt.Errorf("retrieving mocks path: %w", err)
-	}
-	err = os.RemoveAll(mPath)
-	if err != nil {
-		return fmt.Errorf("removing mocks: %w", err)
-	}
-	return nil
-}
-
 func (Dev) RegenerateMocks() error {
-	mg.Deps(Dev.CleanMocks)
 	err := sh.Run("mockery")
 	if err != nil {
 		return fmt.Errorf("generating mocks: %w", err)
 	}
 
-	// change CWD
-	workingDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("retrieving CWD: %w", err)
-	}
-	// restore the working directory when exiting the function
-	defer func() {
-		err := os.Chdir(workingDir)
-		if err != nil {
-			panic(fmt.Errorf("failed to restore working dir %q: %w", workingDir, err))
-		}
-	}()
-
-	mPath, err := mocksPath()
-	if err != nil {
-		return fmt.Errorf("retrieving mocks path: %w", err)
-	}
-
-	err = os.Chdir(mPath)
-	if err != nil {
-		return fmt.Errorf("changing current directory to %q: %w", mPath, err)
-	}
-
-	mg.Deps(devtools.AddLicenseHeaders)
-	mg.Deps(devtools.GoImports)
+	mg.Deps(devtools.Format)
 	return nil
 }
 
@@ -337,7 +292,7 @@ func (Build) WindowsArchiveRootBinary() error {
 		},
 		Env: map[string]string{
 			"GOOS":   "windows",
-			"GOARCH": "amd64",
+			"GOARCH": devtools.GOARCH,
 		},
 		LDFlags: []string{
 			"-s", // Strip all debug symbols from binary (does not affect Go stack traces).
@@ -438,6 +393,7 @@ func getTestBinariesPath() ([]string, error) {
 		filepath.Join(wd, "internal", "pkg", "agent", "install", "testblocking"),
 		filepath.Join(wd, "pkg", "core", "process", "testsignal"),
 		filepath.Join(wd, "internal", "pkg", "otel", "manager", "testing"),
+		filepath.Join(wd, "internal", "pkg", "agent", "application", "filelock", "testlocker"),
 	}
 	return testBinaryPkgs, nil
 }
@@ -490,7 +446,7 @@ func (Check) Changes() error {
 	if len(out) != 0 {
 		fmt.Fprintln(os.Stderr, "Changes:")
 		fmt.Fprintln(os.Stderr, out)
-		return fmt.Errorf("uncommited changes")
+		return fmt.Errorf("uncommitted changes")
 	}
 	return nil
 }
@@ -955,7 +911,7 @@ func (Cloud) Image(ctx context.Context) {
 	os.Setenv(dockerVariants, "cloud")
 
 	if s, err := strconv.ParseBool(snapshot); err == nil && !s {
-		// only disable SNAPSHOT build when explicitely defined
+		// only disable SNAPSHOT build when explicitly defined
 		os.Setenv(snapshotEnv, "false")
 		devtools.Snapshot = false
 	} else {
@@ -1199,12 +1155,16 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 		log.Printf("dependencies extracted from package specs: %v", dependencies)
 	}
 
+	keepArchive := os.Getenv("KEEP_ARCHIVE") != ""
+
 	// download/copy all the necessary dependencies for packaging elastic-agent
 	archivePath, dropPath, dependencies := collectPackageDependencies(platforms, dependenciesVersion, packageTypes, dependencies)
 
 	// cleanup after build
-	defer os.RemoveAll(archivePath)
-	defer os.RemoveAll(dropPath)
+	if !keepArchive {
+		defer os.RemoveAll(archivePath)
+		defer os.RemoveAll(dropPath)
+	}
 	defer os.Unsetenv(agentDropPath)
 
 	// create flat dir
@@ -1224,7 +1184,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	mg.Deps(agentBinaryTarget)
 
 	// compile the elastic-agent.exe proxy binary for the windows archive
-	if slices.Contains(platforms, "windows/amd64") {
+	if slices.Contains(platforms, "windows/amd64") || slices.Contains(platforms, "windows/arm64") {
 		mg.Deps(Build.WindowsArchiveRootBinary)
 	}
 

@@ -20,6 +20,6 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 		Local: false,
 		Sudo:  true,
 	})
-
+	t.Skip("Skip serverless tests until we can enroll an agent with 9.3.0-SNAPSHOT.")
 	integration.LogIngestionFleetManaged(t, info)
 }

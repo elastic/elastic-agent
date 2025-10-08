@@ -12,7 +12,7 @@
 
 See https://www.elastic.co/guide/en/fleet/current/index.html.
 
-The source files for the offical Elastic Agent documentation are currently stored
+The source files for the official Elastic Agent documentation are currently stored
 in the [ingest-docs](https://github.com/elastic/ingest-docs/tree/main/docs/en/ingest-management) repository.
 
 ## Contributing
@@ -71,8 +71,8 @@ For details on writing and running tests see the [Test Framework Developer Guide
 The changelog for the Elastic Agent is generated and maintained using the [elastic-agent-changelog-tool](https://github.com/elastic/elastic-agent-changelog-tool). Read the [installation](https://github.com/elastic/elastic-agent-changelog-tool/blob/main/docs/install.md)
 and [usage](https://github.com/elastic/elastic-agent-changelog-tool/blob/main/docs/usage.md#im-a-developer) instructions to get started.
 
-The changelog tool produces fragement files that are consolidated to generate a changelog for each release. Each PR containing a change with user
-impact (new feature, bug fix, etc.) must contain a changelog fragement describing the change. There is a GitHub action in CI that will fail
+The changelog tool produces fragment files that are consolidated to generate a changelog for each release. Each PR containing a change with user
+impact (new feature, bug fix, etc.) must contain a changelog fragment describing the change. There is a GitHub action in CI that will fail
 if a PR does not contain a changelog fragment. For PRs that should not have a changelog entry, use the "skip-changelog" label to bypass
 this check.
 
@@ -107,6 +107,11 @@ To build a local version of the agent for development, run the command below. Th
 # PACKAGES=tar.gz produces a tar.gz package
 DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=tar.gz mage -v package
 ```
+
+If you build the same agent package often (when running integration tests, for example),
+you can also set KEEP_ARCHIVE=true in your environment. The packaging step will then
+avoid deleting the binary archive after the package is generated, removing the need to
+re-download binaries on every invocation.
 
 The resulting package will be produced in the build/distributions directory. The version is controlled by the value in [version.go](version/version.go).
 To install the agent extract the package and run the install command:

@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -209,22 +210,66 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 		},
 	}
-	esOutputConfig := map[string]any{
-		"type":             "elasticsearch",
-		"hosts":            []any{"localhost:9200"},
-		"username":         "elastic",
-		"password":         "password",
-		"preset":           "balanced",
-		"queue.mem.events": 3200,
+
+	type extraParams struct {
+		key   string
+		value any
+	}
+	// pass ssl params as extra args to this method
+	esOutputConfig := func(extra ...extraParams) map[string]any {
+		finalOutput := map[string]any{
+			"type":             "elasticsearch",
+			"hosts":            []any{"localhost:9200"},
+			"username":         "elastic",
+			"password":         "password",
+			"preset":           "balanced",
+			"queue.mem.events": 3200,
+			"ssl.enabled":      true,
+		}
+
+		for _, v := range extra {
+			finalOutput[v.key] = v.value
+		}
+		return finalOutput
 	}
 
-	expectedESConfig := map[string]any{
-		"elasticsearch/_agent-component/default": map[string]any{
-			"batcher": map[string]any{
-				"enabled":  true,
-				"max_size": 1600,
-				"min_size": 0,
+	expectedExtensionConfig := func(extra ...extraParams) map[string]any {
+		finalOutput := map[string]any{
+			"idle_connection_timeout": "3s",
+			"proxy_disable":           false,
+			"ssl": map[string]interface{}{
+				"ca_sha256":               []interface{}{},
+				"ca_trusted_fingerprint":  "",
+				"certificate":             "",
+				"certificate_authorities": []interface{}{},
+				"cipher_suites":           []interface{}{},
+				"curve_types":             []interface{}{},
+				"enabled":                 true,
+				"key":                     "",
+				"key_passphrase":          "",
+				"key_passphrase_path":     "",
+				"renegotiation":           int64(0),
+				"supported_protocols":     []interface{}{},
+				"verification_mode":       uint64(0),
 			},
+			"timeout": "1m30s",
+		}
+		for _, v := range extra {
+			// accepts one level deep parameters to replace
+			if _, ok := v.value.(map[string]any); ok {
+				for newkey, newvalue := range v.value.(map[string]any) {
+					// this is brittle - it is expected that developers will pass expected params correctly here
+					finalOutput[v.key].(map[string]any)[newkey] = newvalue
+				}
+				continue
+			}
+			finalOutput[v.key] = v.value
+		}
+		return finalOutput
+	}
+
+	expectedESConfig := func(outputName string) map[string]any {
+		return map[string]any{
 			"compression": "gzip",
 			"compression_params": map[string]any{
 				"level": 1,
@@ -232,21 +277,39 @@ func TestGetOtelConfig(t *testing.T) {
 			"mapping": map[string]any{
 				"mode": "bodymap",
 			},
-			"endpoints": []string{"http://localhost:9200"},
-			"password":  "password",
-			"user":      "elastic",
+			"endpoints":          []string{"http://localhost:9200"},
+			"password":           "password",
+			"user":               "elastic",
+			"max_conns_per_host": 1,
 			"retry": map[string]any{
 				"enabled":          true,
 				"initial_interval": 1 * time.Second,
 				"max_interval":     1 * time.Minute,
 				"max_retries":      3,
 			},
+			"sending_queue": map[string]any{
+				"enabled":           true,
+				"num_consumers":     1,
+				"queue_size":        3200,
+				"block_on_overflow": true,
+				"wait_for_result":   true,
+				"batch": map[string]any{
+					"flush_timeout": "10s",
+					"max_size":      1600,
+					"min_size":      0,
+					"sizer":         "items",
+				},
+			},
 			"logs_dynamic_id": map[string]any{
 				"enabled": true,
 			},
-			"timeout":           90 * time.Second,
-			"idle_conn_timeout": 3 * time.Second,
-		},
+			"telemetry": map[string]any{
+				"log_failed_docs_input": true,
+			},
+			"auth": map[string]any{
+				"authenticator": "beatsauth/_agent-component/" + outputName,
+			},
+		}
 	}
 
 	defaultProcessors := func(streamId, dataset string, namespace string) []any {
@@ -306,6 +369,73 @@ func TestGetOtelConfig(t *testing.T) {
 		}
 	}
 
+	// expects input id
+	expectedFilestreamConfig := func(id string) map[string]any {
+		return map[string]any{
+			"filebeat": map[string]any{
+				"inputs": []map[string]any{
+					{
+						"id":   "test-1",
+						"type": "filestream",
+						"data_stream": map[string]any{
+							"dataset": "generic-1",
+						},
+						"paths": []any{
+							"/var/log/*.log",
+						},
+						"index":      "logs-generic-1-default",
+						"processors": defaultProcessors("test-1", "generic-1", "logs"),
+					},
+					{
+						"id":   "test-2",
+						"type": "filestream",
+						"data_stream": map[string]any{
+							"dataset": "generic-2",
+						},
+						"paths": []any{
+							"/var/log/*.log",
+						},
+						"index":      "logs-generic-2-default",
+						"processors": defaultProcessors("test-2", "generic-2", "logs"),
+					},
+				},
+			},
+			"output": map[string]any{
+				"otelconsumer": map[string]any{},
+			},
+			"path": map[string]any{
+				"data": filepath.Join(paths.Run(), id),
+			},
+			"queue": map[string]any{
+				"mem": map[string]any{
+					"events": uint64(3200),
+					"flush": map[string]any{
+						"min_events": uint64(1600),
+						"timeout":    "10s",
+					},
+				},
+			},
+			"logging": map[string]any{
+				"with_fields": map[string]any{
+					"component": map[string]any{
+						"binary":  "filebeat",
+						"dataset": "elastic_agent.filebeat",
+						"type":    "filestream",
+						"id":      id,
+					},
+					"log": map[string]any{
+						"source": id,
+					},
+				},
+			},
+			"http": map[string]any{
+				"enabled": true,
+				"host":    "localhost",
+			},
+			"management.otel.enabled": true,
+		}
+	}
+
 	getBeatMonitoringConfig := func(_, _ string) map[string]any {
 		return map[string]any{
 			"http": map[string]any{
@@ -359,83 +489,194 @@ func TestGetOtelConfig(t *testing.T) {
 							{
 								ID:     "filestream-default",
 								Type:   client.UnitTypeOutput,
-								Config: component.MustExpectedConfig(esOutputConfig),
+								Config: component.MustExpectedConfig(esOutputConfig()),
 							},
 						},
 					},
 				},
 			},
 			expectedConfig: confmap.NewFromStringMap(map[string]any{
-				"exporters": expectedESConfig,
+				"exporters": map[string]any{
+					"elasticsearch/_agent-component/default": expectedESConfig("default"),
+				},
+				"extensions": map[string]any{
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
+				},
 				"receivers": map[string]any{
-					"filebeatreceiver/_agent-component/filestream-default": map[string]any{
-						"filebeat": map[string]any{
-							"inputs": []map[string]any{
-								{
-									"id":   "test-1",
-									"type": "filestream",
-									"data_stream": map[string]any{
-										"dataset": "generic-1",
-									},
-									"paths": []any{
-										"/var/log/*.log",
-									},
-									"index":      "logs-generic-1-default",
-									"processors": defaultProcessors("test-1", "generic-1", "logs"),
-								},
-								{
-									"id":   "test-2",
-									"type": "filestream",
-									"data_stream": map[string]any{
-										"dataset": "generic-2",
-									},
-									"paths": []any{
-										"/var/log/*.log",
-									},
-									"index":      "logs-generic-2-default",
-									"processors": defaultProcessors("test-2", "generic-2", "logs"),
-								},
-							},
-						},
-						"output": map[string]any{
-							"otelconsumer": map[string]any{},
-						},
-						"path": map[string]any{
-							"data": filepath.Join(paths.Run(), "filestream-default"),
-						},
-						"queue": map[string]any{
-							"mem": map[string]any{
-								"events": uint64(3200),
-								"flush": map[string]any{
-									"min_events": uint64(1600),
-									"timeout":    "10s",
-								},
-							},
-						},
-						"logging": map[string]any{
-							"with_fields": map[string]any{
-								"component": map[string]any{
-									"binary":  "filebeat",
-									"dataset": "elastic_agent.filebeat",
-									"type":    "filestream",
-									"id":      "filestream-default",
-								},
-								"log": map[string]any{
-									"source": "filestream-default",
-								},
-							},
-						},
-						"http": map[string]any{
-							"enabled": true,
-							"host":    "localhost",
+					"filebeatreceiver/_agent-component/filestream-default": expectedFilestreamConfig("filestream-default"),
+				},
+				"service": map[string]any{
+					"extensions": []any{"beatsauth/_agent-component/default"},
+					"pipelines": map[string]any{
+						"logs/_agent-component/filestream-default": map[string][]string{
+							"exporters": {"elasticsearch/_agent-component/default"},
+							"receivers": {"filebeatreceiver/_agent-component/filestream-default"},
 						},
 					},
 				},
+			}),
+		},
+		{
+			name: "multiple filestream inputs and output types",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "filestream-primaryOutput",
+						InputType:  "filestream",
+						OutputType: "elasticsearch",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "agentbeat",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"filebeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "filestream-unit",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(fileStreamConfig),
+							},
+							{
+								ID:     "filestream-primaryOutput",
+								Type:   client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(esOutputConfig(extraParams{"ssl.verification_mode", "certificate"})),
+							},
+						},
+					},
+					{
+						ID:         "filestream-secondaryOutput",
+						InputType:  "filestream",
+						OutputType: "elasticsearch",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "agentbeat",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"filebeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "filestream-unit-2",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(fileStreamConfig),
+							},
+							{
+								ID:     "filestream-secondaryOutput",
+								Type:   client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(esOutputConfig(extraParams{"ssl.ca_trusted_fingerprint", "b9a10bbe64ee9826abeda6546fc988c8bf798b41957c33d05db736716513dc9c"})),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"elasticsearch/_agent-component/primaryOutput":   expectedESConfig("primaryOutput"),
+					"elasticsearch/_agent-component/secondaryOutput": expectedESConfig("secondaryOutput"),
+				},
+				"extensions": map[string]any{
+					"beatsauth/_agent-component/primaryOutput":   expectedExtensionConfig(extraParams{"ssl", map[string]any{"verification_mode": uint64(2)}}),
+					"beatsauth/_agent-component/secondaryOutput": expectedExtensionConfig(extraParams{"ssl", map[string]any{"ca_trusted_fingerprint": "b9a10bbe64ee9826abeda6546fc988c8bf798b41957c33d05db736716513dc9c"}}),
+				},
+				"receivers": map[string]any{
+					"filebeatreceiver/_agent-component/filestream-primaryOutput":   expectedFilestreamConfig("filestream-primaryOutput"),
+					"filebeatreceiver/_agent-component/filestream-secondaryOutput": expectedFilestreamConfig("filestream-secondaryOutput"),
+				},
 				"service": map[string]any{
+					"extensions": []any{"beatsauth/_agent-component/primaryOutput", "beatsauth/_agent-component/secondaryOutput"},
 					"pipelines": map[string]any{
-						"logs/_agent-component/filestream-default": map[string][]string{
-							"exporters": []string{"elasticsearch/_agent-component/default"},
-							"receivers": []string{"filebeatreceiver/_agent-component/filestream-default"},
+						"logs/_agent-component/filestream-primaryOutput": map[string][]string{
+							"exporters": {"elasticsearch/_agent-component/primaryOutput"},
+							"receivers": {"filebeatreceiver/_agent-component/filestream-primaryOutput"},
+						},
+						"logs/_agent-component/filestream-secondaryOutput": map[string][]string{
+							"exporters": {"elasticsearch/_agent-component/secondaryOutput"},
+							"receivers": {"filebeatreceiver/_agent-component/filestream-secondaryOutput"},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name: "multiple filestream inputs and one output",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "filestream1-default",
+						InputType:  "filestream",
+						OutputType: "elasticsearch",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "agentbeat",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"filebeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "filestream-unit",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(fileStreamConfig),
+							},
+							{
+								ID:     "filestream-default",
+								Type:   client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(esOutputConfig()),
+							},
+						},
+					},
+					{
+						ID:         "filestream2-default",
+						InputType:  "filestream",
+						OutputType: "elasticsearch",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "agentbeat",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"filebeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "filestream-unit",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(fileStreamConfig),
+							},
+							{
+								ID:     "filestream-default",
+								Type:   client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(esOutputConfig()),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"elasticsearch/_agent-component/default": expectedESConfig("default"),
+				},
+				"extensions": map[string]any{
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
+				},
+				"receivers": map[string]any{
+					"filebeatreceiver/_agent-component/filestream1-default": expectedFilestreamConfig("filestream1-default"),
+					"filebeatreceiver/_agent-component/filestream2-default": expectedFilestreamConfig("filestream2-default"),
+				},
+				"service": map[string]any{
+					"extensions": []any{"beatsauth/_agent-component/default"},
+					"pipelines": map[string]any{
+						"logs/_agent-component/filestream1-default": map[string][]string{
+							"exporters": {"elasticsearch/_agent-component/default"},
+							"receivers": {"filebeatreceiver/_agent-component/filestream1-default"},
+						},
+						"logs/_agent-component/filestream2-default": map[string][]string{
+							"exporters": {"elasticsearch/_agent-component/default"},
+							"receivers": {"filebeatreceiver/_agent-component/filestream2-default"},
 						},
 					},
 				},
@@ -466,14 +707,19 @@ func TestGetOtelConfig(t *testing.T) {
 							{
 								ID:     "beat/metrics-default",
 								Type:   client.UnitTypeOutput,
-								Config: component.MustExpectedConfig(esOutputConfig),
+								Config: component.MustExpectedConfig(esOutputConfig()),
 							},
 						},
 					},
 				},
 			},
 			expectedConfig: confmap.NewFromStringMap(map[string]any{
-				"exporters": expectedESConfig,
+				"exporters": map[string]any{
+					"elasticsearch/_agent-component/default": expectedESConfig("default"),
+				},
+				"extensions": map[string]any{
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
+				},
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring": map[string]any{
 						"metricbeat": map[string]any{
@@ -522,13 +768,15 @@ func TestGetOtelConfig(t *testing.T) {
 							"enabled": true,
 							"host":    "localhost",
 						},
+						"management.otel.enabled": true,
 					},
 				},
 				"service": map[string]any{
+					"extensions": []any{"beatsauth/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
-							"exporters": []string{"elasticsearch/_agent-component/default"},
-							"receivers": []string{"metricbeatreceiver/_agent-component/beat-metrics-monitoring"},
+							"exporters": {"elasticsearch/_agent-component/default"},
+							"receivers": {"metricbeatreceiver/_agent-component/beat-metrics-monitoring"},
 						},
 					},
 				},
@@ -559,14 +807,19 @@ func TestGetOtelConfig(t *testing.T) {
 							{
 								ID:     "system/metrics-default",
 								Type:   client.UnitTypeOutput,
-								Config: component.MustExpectedConfig(esOutputConfig),
+								Config: component.MustExpectedConfig(esOutputConfig()),
 							},
 						},
 					},
 				},
 			},
 			expectedConfig: confmap.NewFromStringMap(map[string]any{
-				"exporters": expectedESConfig,
+				"exporters": map[string]any{
+					"elasticsearch/_agent-component/default": expectedESConfig("default"),
+				},
+				"extensions": map[string]any{
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
+				},
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/system-metrics": map[string]any{
 						"metricbeat": map[string]any{
@@ -626,13 +879,15 @@ func TestGetOtelConfig(t *testing.T) {
 							"enabled": true,
 							"host":    "localhost",
 						},
+						"management.otel.enabled": true,
 					},
 				},
 				"service": map[string]any{
+					"extensions": []any{"beatsauth/_agent-component/default"},
 					"pipelines": map[string]any{
 						"logs/_agent-component/system-metrics": map[string][]string{
-							"exporters": []string{"elasticsearch/_agent-component/default"},
-							"receivers": []string{"metricbeatreceiver/_agent-component/system-metrics"},
+							"exporters": {"elasticsearch/_agent-component/default"},
+							"receivers": {"metricbeatreceiver/_agent-component/system-metrics"},
 						},
 					},
 				},
@@ -641,7 +896,7 @@ func TestGetOtelConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, getBeatMonitoringConfig)
+			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, getBeatMonitoringConfig, logp.NewNopLogger())
 			if actualConf == nil || tt.expectedConfig == nil {
 				assert.Equal(t, tt.expectedConfig, actualConf)
 			} else { // this gives a nicer diff
@@ -867,4 +1122,126 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 	}
 }
 
-// TODO: Add unit tests for other config generation functions
+func TestVerifyComponentIsOtelSupported(t *testing.T) {
+	tests := []struct {
+		name          string
+		component     *component.Component
+		expectedError string
+	}{
+		{
+			name: "supported component",
+			component: &component.Component{
+				ID:         "supported-comp",
+				InputType:  "filestream",
+				OutputType: "elasticsearch",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "agentbeat",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:   "filestream-unit",
+						Type: client.UnitTypeInput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"streams": []any{
+								map[string]any{
+									"paths": []any{"/var/log/*.log"},
+								},
+							},
+						}),
+					},
+					{
+						ID:   "filestream-default",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type":  "elasticsearch",
+							"hosts": []any{"localhost:9200"},
+						}),
+					},
+				},
+			},
+		},
+		{
+			name: "unsupported output type - kafka",
+			component: &component.Component{
+				ID:         "unsupported-output",
+				InputType:  "filestream",
+				OutputType: "kafka", // unsupported
+			},
+			expectedError: "unsupported output type: kafka",
+		},
+		{
+			name: "unsupported output type - logstash",
+			component: &component.Component{
+				ID:         "unsupported-output",
+				InputType:  "filestream",
+				OutputType: "logstash", // unsupported
+			},
+			expectedError: "unsupported output type: logstash",
+		},
+		{
+			name: "unsupported input type",
+			component: &component.Component{
+				ID:         "unsupported-input",
+				InputType:  "log", // unsupported
+				OutputType: "elasticsearch",
+			},
+			expectedError: "unsupported input type: log",
+		},
+		{
+			name: "unsupported configuration",
+			component: &component.Component{
+				ID:         "unsupported-config",
+				InputType:  "filestream",
+				OutputType: "elasticsearch",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "agentbeat",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:   "filestream-unit",
+						Type: client.UnitTypeInput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"streams": []any{
+								map[string]any{
+									"paths": []any{"/var/log/*.log"},
+								},
+							},
+						}),
+					},
+					{
+						ID:   "filestream-default",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type":    "elasticsearch",
+							"hosts":   []any{"localhost:9200"},
+							"indices": []any{},
+						}),
+					},
+				},
+			},
+			expectedError: "unsupported configuration for unsupported-config: error translating config for output: default, unit: filestream-default, error: indices is currently not supported: unsupported operation",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := VerifyComponentIsOtelSupported(tt.component)
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Equal(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}

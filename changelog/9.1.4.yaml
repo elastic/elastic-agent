@@ -1,0 +1,151 @@
+version: 9.1.4
+entries:
+    - kind: feature
+      summary: Add the dockerstats OpenTelemetry receiver
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9364
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1755168462
+      file:
+        name: 1755168462-add_dockerstats_receiver.yaml
+        checksum: e74c2c46a819ec070e5b288c875fc41910009fe1
+    - kind: bug-fix
+      summary: Retry service start command upon failure with 30-second delay.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9313
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1755283748
+      file:
+        name: 1755283748-service-retry-install.yaml
+        checksum: 886d72511d47a5cae4f6cfbe361058fc784c1ed2
+    - kind: enhancement
+      summary: Bump kube-stack Helm Chart to 0.9.1 and enable the cluster collector
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9535
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1755873563
+      file:
+        name: 1755873563-bump_kube_stack.yaml
+        checksum: 426353e1b9973af91cbc457becf854ad8326f9a7
+    - kind: security
+      summary: redact secrets from pre-config, computed-config, components-expected, and components-actual files in diagnostics archive
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9560
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1756122869
+      file:
+        name: 1756122869-update-secret-redaction-in-diagnostics.yaml
+        checksum: 3fe28334e7831c7910a2161097c1643797fc6ef7
+    - kind: bug-fix
+      summary: fix reporting of scheduled upgrade details across restarts and cancels
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9562
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/8778
+      impact: ""
+      action: ""
+      timestamp: 1756218044
+      file:
+        name: 1756218044-fix-upgrade-details-state.yaml
+        checksum: 9677e35d59df7dfef2ff540d19d9f05d7017ede1
+    - kind: bug-fix
+      summary: enable root user to re-enroll unprivileged agent for mac and linux
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9603
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/8544
+      impact: ""
+      action: ""
+      timestamp: 1756313785
+      file:
+        name: 1756313785-enable-root-user-to-re-enroll-unprivileged-agent-for-mac-and-linux.yaml
+        checksum: 0f9fb2207e09b12416a5e661dde758f8d432b13f
+    - kind: bug-fix
+      summary: Fix missing liveness healthcheck during container enrollment
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9612
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/9611
+      impact: ""
+      action: ""
+      timestamp: 1756325090
+      file:
+        name: 1756325090-Fix-missing-liveness-healthcheck-during-container-enrollment.yaml
+        checksum: de9a5a42d9b6603cba3b3bf19596eb3213e892f6
+    - kind: bug-fix
+      summary: enable admin user to re-enroll unprivileged agent for windows
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9623
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/8544
+      impact: ""
+      action: ""
+      timestamp: 1756433743
+      file:
+        name: 1756433743-enable-root-user-to-re-enroll-unprivileged-agent-for-windows.yaml
+        checksum: 65a96ffe81178578e80d9e800ebc31cf74a26d82
+    - kind: enhancement
+      summary: Enhanced loggers for easier debugging of upgrade related issues.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9689
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/9536
+      impact: ""
+      action: ""
+      timestamp: 1756833043
+      file:
+        name: 1756833043-enhance-upgrade-action-loggers.yaml
+        checksum: 14a08bc69878adbea5e5b81bdd507edb34c9d096
+    - kind: bug-fix
+      summary: Treat exit code 284 from Endpoint binary as non-fatal
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9687
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1756921212
+      file:
+        name: 1756921212-endpoint-284-non-fatal.yaml
+        checksum: 958a1547c78ab758322016e0a672f726eecb0a80
+    - kind: bug-fix
+      summary: ensure failed upgrade actions are removed from queue and details are set
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9634
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/9629
+      impact: ""
+      action: ""
+      timestamp: 1757079091
+      file:
+        name: 1757079091-fix-stale-upgrade-actions.yaml
+        checksum: b79516aaa48bcf3e06e746295c4f23b32df1b1b2

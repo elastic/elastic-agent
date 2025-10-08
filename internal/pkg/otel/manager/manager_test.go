@@ -9,6 +9,9 @@ package manager
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,6 +21,7 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -31,6 +35,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/logp/logptest"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -52,6 +57,9 @@ var (
 				"metrics": map[string]interface{}{
 					"level":   "none",
 					"readers": []any{},
+				},
+				"logs": map[string]interface{}{
+					"level": "info",
 				},
 			},
 			"pipelines": map[string]interface{}{
@@ -138,10 +146,11 @@ type mockCollectorHandle struct {
 	cancel context.CancelFunc
 }
 
-func (h *mockCollectorHandle) Stop(ctx context.Context) {
+func (h *mockCollectorHandle) Stop(waitTime time.Duration) {
 	h.cancel()
 	select {
-	case <-ctx.Done():
+	case <-time.After(waitTime):
+		return
 	case <-h.stopCh:
 	}
 }
@@ -288,28 +297,32 @@ func TestOTelManager_Run(t *testing.T) {
 	testBinary := filepath.Join(wd, "testing", "testing")
 	require.FileExists(t, testBinary, "testing binary not found")
 
+	const waitTimeForStop = 30 * time.Second
+
 	for _, tc := range []struct {
 		name                string
-		exec                func() (collectorExecution, error)
+		execModeFn          func(collectorRunErr chan error) (collectorExecution, error)
 		restarter           collectorRecoveryTimer
 		skipListeningErrors bool
-		testFn              func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution)
+		testFn              func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error)
 	}{
 		{
 			name: "embedded collector config updates",
-			exec: func() (collectorExecution, error) {
-				return newExecutionEmbedded(), nil
+			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
+				return newExecutionEmbedded(0), nil
 			},
 			restarter: newRestarterNoop(),
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
 				m.Update(cfg, nil)
 				e.EnsureHealthy(t, updateTime)
 
-				// trigger update (no config compare is due externally to otel collector)
+				// trigger update
 				updateTime = time.Now()
+				ok := cfg.Delete("service::telemetry::logs::level") // modify the config
+				require.True(t, ok)
 				m.Update(cfg, nil)
 				e.EnsureHealthy(t, updateTime)
 
@@ -322,19 +335,21 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name: "subprocess collector config updates",
-			exec: func() (collectorExecution, error) {
-				return newSubprocessExecution(logp.DebugLevel, testBinary)
+			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
 				m.Update(cfg, nil)
 				e.EnsureHealthy(t, updateTime)
 
-				// trigger update (no config compare is due externally to otel collector)
+				// trigger update
 				updateTime = time.Now()
+				ok := cfg.Delete("service::telemetry::logs::level") // modify the config
+				require.True(t, ok)
 				m.Update(cfg, nil)
 				e.EnsureHealthy(t, updateTime)
 
@@ -348,11 +363,11 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name: "embedded collector stopped gracefully outside manager",
-			exec: func() (collectorExecution, error) {
-				return newExecutionEmbedded(), nil
+			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
+				return newExecutionEmbedded(0), nil
 			},
 			restarter: newRestarterNoop(),
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
@@ -361,8 +376,8 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// stop it, this should be restarted by the manager
 				updateTime = time.Now()
-				require.NotNil(t, exec.handle, "exec handle should not be nil")
-				exec.handle.Stop(t.Context())
+				require.NotNil(t, exec.handle, "execModeFn handle should not be nil")
+				exec.handle.Stop(waitTimeForStop)
 				e.EnsureHealthy(t, updateTime)
 
 				// no configuration should stop the runner
@@ -374,11 +389,11 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name: "subprocess collector stopped gracefully outside manager",
-			exec: func() (collectorExecution, error) {
-				return newSubprocessExecution(logp.DebugLevel, testBinary)
+			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
@@ -387,8 +402,8 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// stop it, this should be restarted by the manager
 				updateTime = time.Now()
-				require.NotNil(t, exec.handle, "exec handle should not be nil")
-				exec.handle.Stop(t.Context())
+				require.NotNil(t, exec.handle, "execModeFn handle should not be nil")
+				exec.handle.Stop(waitTimeForStop)
 				e.EnsureHealthy(t, updateTime)
 				assert.EqualValues(t, 1, countHealthCheckExtensionStatuses(e.getStatus()), "health check extension status count should be 1")
 
@@ -402,11 +417,11 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name: "subprocess collector killed outside manager",
-			exec: func() (collectorExecution, error) {
-				return newSubprocessExecution(logp.DebugLevel, testBinary)
+			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
@@ -419,9 +434,9 @@ func TestOTelManager_Run(t *testing.T) {
 				for i := 0; i < 3; i++ {
 					// kill it
 					handle := exec.getProcessHandle()
-					require.NotNil(t, handle, "exec handle should not be nil, iteration ", i)
+					require.NotNil(t, handle, "execModeFn handle should not be nil, iteration ", i)
 					pHandle, ok := handle.(*procHandle)
-					require.True(t, ok, "exec handle should be of type procHandle, iteration ", i)
+					require.True(t, ok, "execModeFn handle should be of type procHandle, iteration ", i)
 					if oldPHandle != nil {
 						require.NotEqual(t, pHandle.processInfo.PID, oldPHandle.processInfo.PID, "processes PIDs should be different, iteration ", i)
 					}
@@ -445,11 +460,11 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name: "subprocess collector panics",
-			exec: func() (collectorExecution, error) {
-				return newSubprocessExecution(logp.DebugLevel, testBinary)
+			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
 				err := os.Setenv("TEST_SUPERVISED_COLLECTOR_PANIC", (3 * time.Second).String())
 				require.NoError(t, err, "failed to set TEST_SUPERVISED_COLLECTOR_PANIC env var")
 				t.Cleanup(func() {
@@ -480,13 +495,119 @@ func TestOTelManager_Run(t *testing.T) {
 			},
 		},
 		{
+			name: "subprocess collector killed if delayed and manager is stopped",
+			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
+				subprocessExec, err := newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
+				if err != nil {
+					return nil, err
+				}
+				subprocessExec.reportErrFn = func(ctx context.Context, errCh chan error, err error) {
+					// override the reportErrFn to send the error to this test collectorRunErr channel
+					// so we can listen to subprocess run errors
+					if errCh != collectorRunErr {
+						// if the error channel is not the one we expect, forward the error to the original reportErrFn
+						reportErr(ctx, errCh, err)
+						return
+					}
+					collectorRunErr <- err
+				}
+				return &testExecution{exec: subprocessExec}, nil
+			},
+			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
+				delayDuration := 40 * time.Second // the otel manager stop timeout is waitTimeForStop (30 seconds)
+				t.Setenv("TEST_SUPERVISED_COLLECTOR_DELAY", delayDuration.String())
+
+				// ensure that it got healthy
+				cfg := confmap.NewFromStringMap(testConfig)
+				updateTime := time.Now()
+				m.Update(cfg, nil)
+				e.EnsureHealthy(t, updateTime)
+
+				// stop the manager to simulate that elastic-agent is shutting down
+				managerCtxCancel()
+
+				// wait for the manager to report done
+				select {
+				case <-m.doneChan:
+				case <-time.After(10 * time.Second):
+					require.Fail(t, "manager should have reported done")
+				case <-t.Context().Done():
+					return
+				}
+
+				// wait for the subprocess to exit by checking the collectorRunErr channel
+				select {
+				case err := <-collectorRunErr:
+					require.Error(t, err, "process should have exited with an error")
+				case <-t.Context().Done():
+					return
+				case <-time.After(2 * waitTimeForStop):
+					require.Fail(t, "timeout waiting for process to exit")
+				}
+			},
+		},
+		{
+			name: "subprocess collector gracefully exited if delayed a bit and manager is stopped",
+			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
+				subprocessExec, err := newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
+				if err != nil {
+					return nil, err
+				}
+				subprocessExec.reportErrFn = func(ctx context.Context, errCh chan error, err error) {
+					// override the reportErrFn to send the error to this test collectorRunErr channel
+					// so we can listen to subprocess run errors
+					if errCh != collectorRunErr {
+						// if the error channel is not the one we expect, forward the error to the original reportErrFn
+						reportErr(ctx, errCh, err)
+						return
+					}
+					collectorRunErr <- err
+				}
+				return &testExecution{exec: subprocessExec}, nil
+			},
+			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
+				delayDuration := 5 * time.Second // the otel manager stop timeout is waitTimeForStop (30 seconds)
+				t.Setenv("TEST_SUPERVISED_COLLECTOR_DELAY", delayDuration.String())
+
+				// ensure that it got healthy
+				cfg := confmap.NewFromStringMap(testConfig)
+				updateTime := time.Now()
+				m.Update(cfg, nil)
+				e.EnsureHealthy(t, updateTime)
+
+				// stop the manager to simulate that elastic-agent is shutting down
+				managerCtxCancel()
+
+				// wait for the manager to report done
+				select {
+				case <-m.doneChan:
+				case <-time.After(10 * time.Second):
+					require.Fail(t, "manager should have reported done")
+				case <-t.Context().Done():
+					return
+				}
+
+				// wait for the subprocess to exit by checking the collectorRunErr channel
+				select {
+				case err := <-collectorRunErr:
+					require.NoError(t, err, "process should have exited without an error")
+				case <-t.Context().Done():
+					return
+				case <-time.After(2 * waitTimeForStop):
+					require.Fail(t, "timeout waiting for process to exit")
+				}
+			},
+		},
+		{
 			name: "embedded collector invalid config",
-			exec: func() (collectorExecution, error) {
-				return newExecutionEmbedded(), nil
+			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
+				return newExecutionEmbedded(0), nil
 			},
 			restarter:           newRestarterNoop(),
 			skipListeningErrors: true,
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
 				// Errors channel is non-blocking, should be able to send an Update that causes an error multiple
 				// times without it blocking on sending over the errCh.
 				for range 3 {
@@ -522,12 +643,12 @@ func TestOTelManager_Run(t *testing.T) {
 		},
 		{
 			name: "subprocess collector invalid config",
-			exec: func() (collectorExecution, error) {
-				return newSubprocessExecution(logp.DebugLevel, testBinary)
+			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
 			},
 			restarter:           newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			skipListeningErrors: true,
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution) {
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
 				// Errors channel is non-blocking, should be able to send an Update that causes an error multiple
 				// times without it blocking on sending over the errCh.
 				for range 3 {
@@ -568,21 +689,23 @@ func TestOTelManager_Run(t *testing.T) {
 			l, _ := loggertest.New("otel")
 			base, obs := loggertest.New("otel")
 
-			executionMode, err := tc.exec()
-			require.NoError(t, err, "failed to create execution mode")
-			testExecutionMode := &testExecution{exec: executionMode}
-
 			m := &OTelManager{
 				logger:            l,
 				baseLogger:        base,
 				errCh:             make(chan error, 1), // holds at most one error
-				updateCh:          make(chan configUpdate),
+				updateCh:          make(chan configUpdate, 1),
 				collectorStatusCh: make(chan *status.AggregateStatus),
 				componentStateCh:  make(chan []runtime.ComponentComponentState, 1),
 				doneChan:          make(chan struct{}),
+				collectorRunErr:   make(chan error),
 				recoveryTimer:     tc.restarter,
-				execution:         testExecutionMode,
+				stopTimeout:       waitTimeForStop,
 			}
+
+			executionMode, err := tc.execModeFn(m.collectorRunErr)
+			require.NoError(t, err, "failed to create execution mode")
+			testExecutionMode := &testExecution{exec: executionMode}
+			m.execution = testExecutionMode
 
 			eListener := &EventListener{}
 			defer func() {
@@ -609,12 +732,13 @@ func TestOTelManager_Run(t *testing.T) {
 
 			var runErr error
 			runWg.Add(1)
+			managerCtx, managerCancel := context.WithCancel(ctx)
 			go func() {
 				defer runWg.Done()
-				runErr = m.Run(ctx)
+				runErr = m.Run(managerCtx)
 			}()
 
-			tc.testFn(t, m, eListener, testExecutionMode)
+			tc.testFn(t, m, eListener, testExecutionMode, managerCancel, m.collectorRunErr)
 
 			cancel()
 			runWg.Wait()
@@ -626,39 +750,288 @@ func TestOTelManager_Run(t *testing.T) {
 }
 
 func TestOTelManager_Logging(t *testing.T) {
+	wd, erWd := os.Getwd()
+	require.NoError(t, erWd, "cannot get working directory")
+
+	testBinary := filepath.Join(wd, "testing", "testing")
+	require.FileExists(t, testBinary, "testing binary not found")
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	const waitTimeForStop = 30 * time.Second
+
 	base, obs := loggertest.New("otel")
 	l, _ := loggertest.New("otel-manager")
-	m, err := NewOTelManager(l, logp.DebugLevel, base, EmbeddedExecutionMode, nil, nil)
+
+	for _, tc := range []struct {
+		name       string
+		execModeFn func(collectorRunErr chan error) (collectorExecution, error)
+	}{
+		{
+			name: "in-process execution",
+			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
+				return newExecutionEmbedded(0), nil
+			},
+		},
+		{
+			name: "subprocess execution",
+			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// the execution mode passed here is overridden below so it is irrelevant
+			m, err := NewOTelManager(l, logp.DebugLevel, base, EmbeddedExecutionMode, nil, 0, 0, nil, waitTimeForStop)
+			require.NoError(t, err, "could not create otel manager")
+
+			executionMode, err := tc.execModeFn(m.collectorRunErr)
+			require.NoError(t, err, "failed to create execution mode")
+			testExecutionMode := &testExecution{exec: executionMode}
+			m.execution = testExecutionMode
+
+			go func() {
+				err := m.Run(ctx)
+				assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
+			}()
+
+			// watch is synchronous, so we need to read from it to avoid blocking the manager
+			go func() {
+				for {
+					select {
+					case <-m.WatchCollector():
+					case <-ctx.Done():
+						return
+					}
+				}
+			}()
+
+			cfg := confmap.NewFromStringMap(testConfig)
+			m.Update(cfg, nil)
+
+			// the collector should log to the base logger
+			assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+				logs := obs.All()
+				require.NotEmpty(collect, logs, "Logs should not be empty")
+				firstMessage := logs[0].Message
+				assert.Equal(collect, "Internal metrics telemetry disabled", firstMessage)
+			}, time.Second*10, time.Second)
+		})
+	}
+}
+
+func TestOTelManager_Ports(t *testing.T) {
+	ports, err := findRandomTCPPorts(2)
+	require.NoError(t, err)
+	healthCheckPort, metricsPort := ports[0], ports[1]
+
+	wd, erWd := os.Getwd()
+	require.NoError(t, erWd, "cannot get working directory")
+
+	testBinary := filepath.Join(wd, "testing", "testing")
+	require.FileExists(t, testBinary, "testing binary not found")
+
+	const waitTimeForStop = 30 * time.Second
+
+	for _, tc := range []struct {
+		name               string
+		execModeFn         func(collectorRunErr chan error) (collectorExecution, error)
+		healthCheckEnabled bool
+	}{
+		{
+			name: "in-process execution",
+			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
+				return newExecutionEmbedded(metricsPort), nil
+			},
+			healthCheckEnabled: false,
+		},
+		{
+			name: "subprocess execution",
+			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary, metricsPort, healthCheckPort)
+			},
+			healthCheckEnabled: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			base, obs := loggertest.New("otel")
+			l, _ := loggertest.New("otel-manager")
+			ctx := t.Context()
+
+			t.Cleanup(func() {
+				if t.Failed() {
+					for _, log := range obs.All() {
+						t.Logf("%+v", log)
+					}
+				}
+			})
+
+			// the execution mode passed here is overridden below so it is irrelevant
+			m, err := NewOTelManager(
+				l,
+				logp.DebugLevel,
+				base, EmbeddedExecutionMode,
+				nil,
+				metricsPort,
+				healthCheckPort,
+				nil,
+				waitTimeForStop,
+			)
+			require.NoError(t, err, "could not create otel manager")
+
+			executionMode, err := tc.execModeFn(m.collectorRunErr)
+			require.NoError(t, err, "failed to create execution mode")
+			testExecutionMode := &testExecution{exec: executionMode}
+			m.execution = testExecutionMode
+
+			go func() {
+				err := m.Run(ctx)
+				assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
+			}()
+
+			go func() {
+				for {
+					select {
+					case colErr := <-m.Errors():
+						require.NoError(t, colErr, "otel manager should not return errors")
+					case <-ctx.Done():
+						return
+					}
+				}
+			}()
+
+			cfg := confmap.NewFromStringMap(testConfig)
+			cfg.Delete("service::telemetry::metrics::level") // change this to default
+			m.Update(cfg, nil)
+
+			// wait until status reflects the config update
+			require.EventuallyWithT(t, func(collect *assert.CollectT) {
+				select {
+				case collectorStatus := <-m.WatchCollector():
+					require.NotNil(collect, collectorStatus, "collector status should not be nil")
+					assert.Equal(collect, componentstatus.StatusOK, collectorStatus.Status())
+					assert.NotEmpty(collect, collectorStatus.ComponentStatusMap)
+				case <-ctx.Done():
+					require.NoError(collect, ctx.Err())
+				}
+			}, time.Second*10, time.Second)
+
+			// the collector should expose its status and metrics on the set ports
+			healthCheckUrl := fmt.Sprintf("http://localhost:%d%s", healthCheckPort, healthCheckHealthStatusPath)
+			metricsUrl := fmt.Sprintf("http://localhost:%d/metrics", metricsPort)
+			urlsToCheck := []string{metricsUrl}
+			if tc.healthCheckEnabled {
+				urlsToCheck = append(urlsToCheck, healthCheckUrl)
+			}
+			for _, url := range urlsToCheck {
+				assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+					req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+					assert.NoError(collect, err)
+					resp, err := http.DefaultClient.Do(req)
+					require.NoError(collect, err)
+					defer func() {
+						_ = resp.Body.Close()
+					}()
+					assert.Equal(collect, http.StatusOK, resp.StatusCode)
+				}, time.Second*10, time.Second)
+			}
+		})
+	}
+}
+
+// TestOTelManager_PortConflict test verifies that the collector restarts and tries new ports if it encounters a port
+// conflict.
+func TestOTelManager_PortConflict(t *testing.T) {
+	// switch the net.Listen implementation with one that returns test listeners that ignore the Close call the first
+	// two times
+	var timesCalled int
+	var mx sync.Mutex
+	netListen = func(network string, address string) (net.Listener, error) {
+		mx.Lock()
+		defer mx.Unlock()
+		l, err := net.Listen(network, address)
+		if err != nil {
+			return nil, err
+		}
+		if timesCalled < 2 {
+			// only actually close the listener after test completion, freeing the port
+			t.Cleanup(func() {
+				assert.NoError(t, l.Close())
+			})
+			// this listener won't free the port even after Close is called, leading to port binding conflicts later
+			// in the test
+			l = &fakeCloseListener{inner: l}
+		}
+		timesCalled++
+		return l, err
+	}
+	t.Cleanup(func() {
+		netListen = net.Listen
+	})
+
+	wd, erWd := os.Getwd()
+	require.NoError(t, erWd, "cannot get working directory")
+
+	testBinary := filepath.Join(wd, "testing", "testing")
+	require.FileExists(t, testBinary, "testing binary not found")
+
+	const waitTimeForStop = 30 * time.Second
+
+	base, obs := loggertest.New("base")
+	l := base.Named("otel-manager")
+	ctx := t.Context()
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			for _, log := range obs.All() {
+				t.Logf("%+v", log)
+			}
+		}
+	})
+
+	// the execution mode passed here is overridden below so it is irrelevant
+	m, err := NewOTelManager(
+		l,
+		logp.DebugLevel,
+		base, SubprocessExecutionMode,
+		nil,
+		0,
+		0,
+		nil,
+		waitTimeForStop,
+	)
 	require.NoError(t, err, "could not create otel manager")
+	executionMode, err := newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
+	require.NoError(t, err, "could not create subprocess execution mode")
+	m.execution = executionMode
 
 	go func() {
 		err := m.Run(ctx)
 		assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
 	}()
 
-	// watch is synchronous, so we need to read from it to avoid blocking the manager
-	go func() {
-		for {
-			select {
-			case <-m.WatchCollector():
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
 	cfg := confmap.NewFromStringMap(testConfig)
+	cfg.Delete("service::telemetry::metrics::level") // change this to default
+
+	// no retries, collector is not running
+	assert.Equal(t, uint32(0), m.recoveryRetries.Load())
+
 	m.Update(cfg, nil)
 
-	// the collector should log to the base logger
-	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
-		logs := obs.All()
-		require.NotEmpty(collect, logs, "Logs should not be empty")
-		firstMessage := logs[0].Message
-		assert.Equal(collect, firstMessage, "Setting up own telemetry...")
+	// wait until status reflects the config update
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		select {
+		case collectorStatus := <-m.WatchCollector():
+			require.NotNil(collect, collectorStatus, "collector status should not be nil")
+			assert.Equal(collect, componentstatus.StatusOK, collectorStatus.Status())
+			assert.NotEmpty(collect, collectorStatus.ComponentStatusMap)
+		case <-ctx.Done():
+			require.NoError(collect, ctx.Err())
+		}
 	}, time.Second*10, time.Second)
+
+	// collector must have retried exactly once
+	assert.Equal(t, uint32(1), m.recoveryRetries.Load())
 }
 
 // statusToYaml converts the status.AggregateStatus to a YAML string representation.
@@ -732,9 +1105,9 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 		},
 		{
 			name:         "collector config only",
-			collectorCfg: confmap.NewFromStringMap(map[string]any{"receivers": map[string]any{"nop": map[string]any{}}}),
+			collectorCfg: confmap.NewFromStringMap(testConfig),
 			components:   nil,
-			expectedKeys: []string{"receivers"},
+			expectedKeys: []string{"receivers", "exporters", "service", "processors"},
 		},
 		{
 			name:         "components only",
@@ -744,7 +1117,7 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 		},
 		{
 			name:         "both collector config and components",
-			collectorCfg: confmap.NewFromStringMap(map[string]any{"processors": map[string]any{"batch": map[string]any{}}}),
+			collectorCfg: confmap.NewFromStringMap(testConfig),
 			components:   []component.Component{testComp},
 			expectedKeys: []string{"receivers", "exporters", "service", "processors"},
 		},
@@ -767,7 +1140,7 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 				collectorCfg: tt.collectorCfg,
 				components:   tt.components,
 			}
-			result, err := buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter)
+			result, err := buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter, logptest.NewTestingLogger(t, ""))
 
 			if tt.expectedErrorString != "" {
 				assert.Error(t, err)
@@ -1042,7 +1415,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		logger:                     testLogger,
 		baseLogger:                 testLogger,
 		errCh:                      make(chan error, 1), // holds at most one error
-		updateCh:                   make(chan configUpdate),
+		updateCh:                   make(chan configUpdate, 1),
 		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
 		componentStateCh:           make(chan []runtime.ComponentComponentState, 1),
 		doneChan:                   make(chan struct{}),
@@ -1050,6 +1423,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		execution:                  execution,
 		agentInfo:                  agentInfo,
 		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
+		collectorRunErr:            make(chan error),
 	}
 
 	// Start manager in a goroutine
@@ -1086,7 +1460,10 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		case <-ctx.Done():
 			t.Fatal("timeout waiting for collector config update")
 		}
-		assert.Equal(t, collectorCfg, execution.cfg)
+		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
+		assert.NoError(t, injectDiagnosticsExtension(expectedCfg))
+		assert.NoError(t, addCollectorMetricsReader(expectedCfg))
+		assert.Equal(t, expectedCfg, execution.cfg)
 
 	})
 
@@ -1244,4 +1621,260 @@ func assertOtelStatusesEqualIgnoringTimestamps(t require.TestingT, a, b *status.
 	}
 
 	return true
+}
+
+func TestCalculateConfmapHash(t *testing.T) {
+	t.Run("nil config returns zero", func(t *testing.T) {
+		hash, err := calculateConfmapHash(nil)
+		require.NoError(t, err)
+		assert.Equal(t, []byte(nil), hash)
+	})
+
+	t.Run("same value gives same result", func(t *testing.T) {
+		conf := confmap.NewFromStringMap(map[string]any{
+			"key1": "value1",
+			"key2": 123,
+		})
+		hash1, err := calculateConfmapHash(conf)
+		require.NoError(t, err)
+		hash2, err := calculateConfmapHash(conf)
+		require.NoError(t, err)
+		assert.Equal(t, hash1, hash2)
+	})
+
+	t.Run("different values give different results", func(t *testing.T) {
+		conf1 := confmap.NewFromStringMap(map[string]any{
+			"key1": "value1",
+		})
+		hash1, err := calculateConfmapHash(conf1)
+		require.NoError(t, err)
+
+		conf2 := confmap.NewFromStringMap(map[string]any{
+			"key1": "value2",
+		})
+		hash2, err := calculateConfmapHash(conf2)
+		require.NoError(t, err)
+
+		assert.NotEqual(t, hash1, hash2)
+	})
+
+	t.Run("list of maps is processed correctly", func(t *testing.T) {
+		conf1 := confmap.NewFromStringMap(map[string]any{
+			"items": []any{
+				map[string]any{"name": "A", "value": 1},
+				map[string]any{"name": "B", "value": 2},
+			},
+		})
+		hash1, err := calculateConfmapHash(conf1)
+		require.NoError(t, err)
+
+		t.Run("same list of maps gives same hash", func(t *testing.T) {
+			conf2 := confmap.NewFromStringMap(map[string]any{
+				"items": []any{
+					map[string]any{"name": "A", "value": 1},
+					map[string]any{"name": "B", "value": 2},
+				},
+			})
+			hash2, err := calculateConfmapHash(conf2)
+			require.NoError(t, err)
+			assert.Equal(t, hash1, hash2)
+		})
+
+		t.Run("different order in list gives different hash", func(t *testing.T) {
+			conf3 := confmap.NewFromStringMap(map[string]any{
+				"items": []any{
+					map[string]any{"name": "B", "value": 2},
+					map[string]any{"name": "A", "value": 1},
+				},
+			})
+			hash3, err := calculateConfmapHash(conf3)
+			require.NoError(t, err)
+			assert.NotEqual(t, hash1, hash3)
+		})
+	})
+}
+
+func TestOTelManager_maybeUpdateMergedConfig(t *testing.T) {
+	t.Run("initial config", func(t *testing.T) {
+		m := &OTelManager{}
+		conf := confmap.NewFromStringMap(testConfig)
+
+		updated, err := m.maybeUpdateMergedConfig(conf)
+
+		require.NoError(t, err)
+		assert.True(t, updated)
+		assert.Equal(t, conf, m.mergedCollectorCfg)
+		assert.NotEqual(t, uint64(0), m.mergedCollectorCfgHash)
+	})
+
+	t.Run("same config", func(t *testing.T) {
+		conf := confmap.NewFromStringMap(testConfig)
+		hash, err := calculateConfmapHash(conf)
+		require.NoError(t, err)
+
+		m := &OTelManager{
+			mergedCollectorCfg:     conf,
+			mergedCollectorCfgHash: hash,
+		}
+
+		updated, err := m.maybeUpdateMergedConfig(conf)
+
+		require.NoError(t, err)
+		assert.False(t, updated)
+		assert.Equal(t, conf, m.mergedCollectorCfg)
+		assert.Equal(t, hash, m.mergedCollectorCfgHash)
+	})
+
+	t.Run("different config", func(t *testing.T) {
+		conf1 := confmap.NewFromStringMap(map[string]any{"key": "value1"})
+		hash1, err := calculateConfmapHash(conf1)
+		require.NoError(t, err)
+
+		m := &OTelManager{
+			mergedCollectorCfg:     conf1,
+			mergedCollectorCfgHash: hash1,
+		}
+
+		conf2 := confmap.NewFromStringMap(map[string]any{"key": "value2"})
+		hash2, err := calculateConfmapHash(conf2)
+		require.NoError(t, err)
+
+		updated, err := m.maybeUpdateMergedConfig(conf2)
+
+		require.NoError(t, err)
+		assert.True(t, updated)
+		assert.Equal(t, conf2, m.mergedCollectorCfg)
+		assert.Equal(t, hash2, m.mergedCollectorCfgHash)
+		assert.NotEqual(t, hash1, m.mergedCollectorCfgHash)
+	})
+
+	t.Run("hashing error with previous config", func(t *testing.T) {
+		conf1 := confmap.NewFromStringMap(map[string]any{"key": "value1"})
+		hash1, err := calculateConfmapHash(conf1)
+		require.NoError(t, err)
+
+		m := &OTelManager{
+			mergedCollectorCfg:     conf1,
+			mergedCollectorCfgHash: hash1,
+		}
+
+		badConf := confmap.NewFromStringMap(map[string]any{"bad": make(chan int)})
+		updated, err := m.maybeUpdateMergedConfig(badConf)
+
+		require.Error(t, err)
+		assert.True(t, updated, "update should proceed on hashing error")
+		assert.Equal(t, badConf, m.mergedCollectorCfg)
+		assert.Equal(t, []byte(nil), m.mergedCollectorCfgHash)
+	})
+
+	t.Run("hashing error with no previous config", func(t *testing.T) {
+		m := &OTelManager{}
+
+		badConf := confmap.NewFromStringMap(map[string]any{"bad": make(chan int)})
+		updated, err := m.maybeUpdateMergedConfig(badConf)
+
+		require.Error(t, err)
+		assert.True(t, updated, "update should proceed on hashing error, even with no previous config")
+		assert.Equal(t, badConf, m.mergedCollectorCfg)
+		assert.Equal(t, []byte(nil), m.mergedCollectorCfgHash)
+	})
+}
+
+func TestAddCollectorMetricsPort(t *testing.T) {
+	expectedReader := map[string]any{
+		"pull": map[string]any{
+			"exporter": map[string]any{
+				"prometheus": map[string]any{
+					"host":                "localhost",
+					"port":                fmt.Sprintf("${env:%s}", componentmonitoring.OtelCollectorMetricsPortEnvVarName),
+					"without_scope_info":  true,
+					"without_units":       true,
+					"without_type_suffix": true,
+				},
+			},
+		},
+	}
+	otelConfigWithReaders := func(readers any) *confmap.Conf {
+		baseConf := confmap.NewFromStringMap(testConfig)
+		err := baseConf.Merge(confmap.NewFromStringMap(map[string]any{
+			"service": map[string]any{
+				"telemetry": map[string]any{
+					"metrics": map[string]any{
+						"readers": readers,
+					},
+				},
+			},
+		}))
+		require.NoError(t, err)
+		return baseConf
+	}
+
+	t.Run("readers does not exist", func(t *testing.T) {
+		conf := otelConfigWithReaders(nil)
+		err := addCollectorMetricsReader(conf)
+		require.NoError(t, err)
+
+		readers := conf.Get("service::telemetry::metrics::readers")
+		require.NotNil(t, readers)
+		readersList, ok := readers.([]any)
+		require.True(t, ok)
+		require.Len(t, readersList, 1)
+
+		assert.Equal(t, expectedReader, readersList[0])
+	})
+
+	t.Run("readers is an empty list", func(t *testing.T) {
+		conf := otelConfigWithReaders([]any{})
+		err := addCollectorMetricsReader(conf)
+		require.NoError(t, err)
+
+		readers := conf.Get("service::telemetry::metrics::readers")
+		require.NotNil(t, readers)
+		readersList, ok := readers.([]any)
+		require.True(t, ok)
+		require.Len(t, readersList, 1)
+
+		assert.Equal(t, expectedReader, readersList[0])
+	})
+
+	t.Run("readers has existing items", func(t *testing.T) {
+		existingReader := map[string]any{"foo": "bar"}
+		conf := otelConfigWithReaders([]any{existingReader})
+		err := addCollectorMetricsReader(conf)
+		require.NoError(t, err)
+
+		readers := conf.Get("service::telemetry::metrics::readers")
+		require.NotNil(t, readers)
+		readersList, ok := readers.([]any)
+		require.True(t, ok)
+		require.Len(t, readersList, 2)
+
+		assert.Equal(t, existingReader, readersList[0])
+		assert.Equal(t, expectedReader, readersList[1])
+	})
+
+	t.Run("readers is not a list", func(t *testing.T) {
+		conf := otelConfigWithReaders("not a list")
+		err := addCollectorMetricsReader(conf)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "couldn't convert value of service::telemetry::metrics::readers to a list")
+	})
+}
+
+// fakeCloseListener is a wrapper around a net.Listener that ignores the Close() method. This is used in a very particular
+// port conflict test to ensure ports are not unbound while the otel collector tries to use them.
+type fakeCloseListener struct {
+	inner net.Listener
+}
+
+func (t *fakeCloseListener) Accept() (net.Conn, error) {
+	return t.inner.Accept()
+}
+
+func (t *fakeCloseListener) Close() error {
+	return nil
+}
+
+func (t *fakeCloseListener) Addr() net.Addr {
+	return t.inner.Addr()
 }
