@@ -300,6 +300,17 @@ kubernetes:
       # -- system metric stream vars
       # @section -- 2 - Kubernetes integration
       vars: {}
+autoOps:
+  enabled: false
+  autoops_token: "OEdumJLuS"
+  autoops_otel_url: "https://platform-metrics.es.us-central1.gcp.cloud.es.io"
+  autoops_temp_resource_id: "07f968d2-e75e-48c6-ssss-89f805aaab5cced"
+  es_api_key: ""
+  es_username: ""
+  es_password: ""
+  elastic_cloud_connected_mode_api_key: "essu_V0RoSlEwOUthME1kxbEplRFIxV0RWSk4zVkNkdz09AAAAAFh4v2g"
+  elastic_cloud_connected_mode_api_url: "API_CCM_URL"
+  autoops_es_url: "https://ccm-test-eu-west-1.es.us-east-2.aws.elastic-cloud.com"
 system:
   # -- enable System integration.
   # @section -- 4 - System integration
@@ -530,6 +541,14 @@ agent:
         kubernetes:
           node: ${NODE_NAME}
           scope: node
+    autoOps:
+      mode: deployment
+      serviceAccount:
+        create: true
+      clusterRole:
+        create: false
+      nodeSelector:
+        kubernetes.io/os: linux
 kube-state-metrics:
   enabled: true
   fullnameOverride: "kube-state-metrics"
