@@ -728,7 +728,7 @@ agent.monitoring.enabled: false
 	require.NoError(t,
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 			configOptions{
-				RuntimeExperimental: "otel",
+				RuntimeExperimental: component.OtelRuntimeManager.String(),
 			}))
 	receiverConfig := configBuffer.Bytes()
 	// this is the context for the whole test, with a global timeout defined
