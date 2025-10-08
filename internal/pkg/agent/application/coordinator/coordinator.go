@@ -62,6 +62,8 @@ const (
 
 var ErrNotManaged = errors.New("unmanaged agent")
 
+var ErrContainerNotSupported = errors.New("unsupported action: agent runs in a container")
+
 var ErrFleetServer = errors.New("unsupported action: agent runs Fleet server")
 
 // ErrNotUpgradable error is returned when upgrade cannot be performed.
@@ -609,6 +611,9 @@ func (c *Coordinator) Migrate(
 	backoffFactory func(done <-chan struct{}) backoff.Backoff,
 	notifyFn func(context.Context, *fleetapi.ActionMigrate) error,
 ) error {
+	if c.specs.Platform().OS == component.Container {
+		return ErrContainerNotSupported
+	}
 	if !c.isManaged {
 		return ErrNotManaged
 	}

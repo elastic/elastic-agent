@@ -558,9 +558,9 @@ collectors:
           # explicitly set send_batch_max_size to 0, as splitting metrics requests may cause version_conflict_engine_exception in TSDB
           send_batch_max_size: 0
           timeout: 1s
-        # [Elastic Trace Processor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elastictraceprocessor)
+        # [Elastic APM Processor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticapmprocessor)
         # The processor enriches traces with elastic specific requirements.
-        elastictrace: {}
+        elasticapm: {}
       exporters:
         debug: {}
         # [Elasticsearch exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/README.md)
@@ -585,7 +585,7 @@ collectors:
             exporters: [debug, elasticapm, elasticsearch/otel]
           traces:
             receivers: [otlp]
-            processors: [batch, elastictrace]
+            processors: [batch, elasticapm]
             exporters: [debug, elasticapm, elasticsearch/otel]
           metrics/aggregated-otel-metrics:
             receivers:
