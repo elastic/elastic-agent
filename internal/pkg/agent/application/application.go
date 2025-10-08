@@ -7,12 +7,15 @@ package application
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"go.elastic.co/apm/v2"
 
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
+	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
+	"github.com/elastic/elastic-agent/pkg/utils/install"
 	"github.com/elastic/go-ucfg"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -64,7 +67,7 @@ func New(
 	fleetInitTimeout time.Duration,
 	disableMonitoring bool,
 	override CfgOverrider,
-	initialUpgradeDetails *details.Details,
+	initialUpdateMarker *upgrade.UpdateMarker,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
@@ -129,7 +132,38 @@ func New(
 
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
 	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled
-	upgrader, err := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, cfg.Settings.Upgrade, agentInfo, new(upgrade.AgentWatcherHelper))
+
+	var installDescriptorSource *install.FileDescriptorSource = nil
+
+	installDescriptorSource = install.NewFileDescriptorSource(filepath.Join(paths.Top(), paths.MarkerFileName))
+	if platform.OS != component.Container {
+		if initialUpdateMarker != nil && initialUpdateMarker.Details != nil && initialUpdateMarker.Details.State == details.StateRollback {
+			// Take the versionedHome of the version we rolledback from and remove it from the installation lists
+			_, removeInstallDescErr := installDescriptorSource.RemoveAgentInstallDesc(initialUpdateMarker.VersionedHome /* there should be the versionedHome from the upgrade marker here*/)
+			if removeInstallDescErr != nil {
+				log.Warnf("Error removing rolled back version %s installed in %s: %v", initialUpdateMarker.VersionedHome, initialUpdateMarker.VersionedHome, removeInstallDescErr)
+			}
+
+			currentVersionedHome, _ := filepath.Rel(paths.Top(), paths.Home())
+			// Set the current version as active and all the others as inactive
+			_, updateInstallDescErr := installDescriptorSource.ModifyInstallDesc(func(desc *v1.AgentInstallDesc) error {
+				if desc.VersionedHome == currentVersionedHome {
+					// set the current version as active and make sure it doesn't have a TTL
+					desc.Active = true
+					desc.TTL = nil
+				} else {
+					// any other install is not the active one
+					desc.Active = false
+				}
+				return nil
+			})
+			if updateInstallDescErr != nil {
+				log.Warnf("Error setting current version as active in installDescriptor: %s", updateInstallDescErr)
+			}
+		}
+
+	}
+	upgrader, err := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, cfg.Settings.Upgrade, agentInfo, new(upgrade.AgentWatcherHelper), installDescriptorSource)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create upgrader: %w", err)
 	}
@@ -151,6 +185,12 @@ func New(
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
+	}
+
+	// prepare initialUpgradeDetails for injecting it in coordinator later on
+	var initialUpgradeDetails *details.Details
+	if initialUpdateMarker != nil && initialUpdateMarker.Details != nil {
+		initialUpgradeDetails = initialUpdateMarker.Details
 	}
 
 	var configMgr coordinator.ConfigManager
