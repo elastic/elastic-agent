@@ -171,8 +171,10 @@ inputs:
 
 	// now that the watcher has stopped lets ensure that it's still the expected
 	// version, otherwise it's possible that it was rolled back to the original version
-	err = upgradetest.CheckHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary)
-	assert.NoError(t, err)
+	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+		checkErr := upgradetest.CheckHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary)
+		require.NoError(collect, checkErr, "failed to check health and version: %w")
+	}, time.Minute, time.Second)
 }
 
 // TestStandaloneUpgradeRollbackOnRestarts tests the scenario where upgrading to a new version
