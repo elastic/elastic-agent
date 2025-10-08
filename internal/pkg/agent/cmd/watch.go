@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"time"
 
@@ -26,7 +27,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/version"
 )
@@ -141,7 +141,7 @@ func WithSkipRestart(skipRestart bool) upgrade.RollbackOption {
 }
 
 type installationModifier interface {
-	Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool) error
+	Cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool, versionedHomesToKeep ...string) error
 	Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string, opts ...upgrade.RollbackOption) error
 }
 
@@ -190,7 +190,12 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		// if we're not within grace and marker is still there it might mean
 		// that cleanup was not performed ok, cleanup everything except current version
 		// hash is the same as hash of agent which initiated watcher.
-		if err := installModifier.Cleanup(log, paths.Top(), paths.VersionedHome(topDir), release.ShortCommit(), true, false); err != nil {
+		versionedHomesToKeep := make([]string, 0, len(marker.RollbacksAvailable)+1)
+		// current version needs to be kept
+		versionedHomesToKeep = append(versionedHomesToKeep, paths.VersionedHome(topDir))
+		versionedHomesToKeep = appendAvailableRollbacks(log, marker, versionedHomesToKeep)
+		log.Infof("About to clean up upgrade. Keeping versioned homes: %v", versionedHomesToKeep)
+		if err := installModifier.Cleanup(log, paths.Top(), true, false, paths.VersionedHome(topDir)); err != nil {
 			log.Error("clean up of prior watcher run failed", err)
 		}
 		// exit nicely
@@ -233,11 +238,29 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	// Why is this being skipped on Windows? The comment above is not clear.
 	// issue: https://github.com/elastic/elastic-agent/issues/3027
 	removeMarker := !isWindows()
-	err = installModifier.Cleanup(log, topDir, marker.VersionedHome, marker.Hash, removeMarker, false)
+	newVersionedHome := marker.VersionedHome
+	if newVersionedHome == "" {
+		// the upgrade marker may have been created by an older version of agent where the versionedHome is always `data/elastic-agent-<shortHash>`
+		newVersionedHome = filepath.Join("data", fmt.Sprintf("elastic-agent-%s", marker.Hash[:6]))
+	}
+	versionedHomesToKeep := make([]string, 0, len(marker.RollbacksAvailable)+1)
+	versionedHomesToKeep = append(versionedHomesToKeep, newVersionedHome)
+	versionedHomesToKeep = appendAvailableRollbacks(log, marker, versionedHomesToKeep)
+
+	err = installModifier.Cleanup(log, topDir, removeMarker, false, versionedHomesToKeep...)
 	if err != nil {
 		log.Error("cleanup after successful watch failed", err)
 	}
 	return err
+}
+
+func appendAvailableRollbacks(log *logp.Logger, marker *upgrade.UpdateMarker, versionedHomesToKeep []string) []string {
+	// add any available rollbacks
+	for _, ra := range marker.RollbacksAvailable {
+		log.Debugf("Adding available rollback %+v to the directories to keep during cleanup", ra)
+		versionedHomesToKeep = append(versionedHomesToKeep, ra.Home)
+	}
+	return versionedHomesToKeep
 }
 
 func rollback(log *logp.Logger, topDir string, client client.Client, installModifier installationModifier, versionedHome string) error {
