@@ -377,8 +377,9 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// stop it, this should be restarted by the manager
 				updateTime = time.Now()
-				require.NotNil(t, exec.handle, "execModeFn handle should not be nil")
-				exec.handle.Stop(waitTimeForStop)
+				execHandle := exec.getProcessHandle()
+				require.NotNil(t, execHandle, "execModeFn handle should not be nil")
+				execHandle.Stop(waitTimeForStop)
 				e.EnsureHealthy(t, updateTime)
 
 				// no configuration should stop the runner
@@ -403,8 +404,9 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// stop it, this should be restarted by the manager
 				updateTime = time.Now()
-				require.NotNil(t, exec.handle, "execModeFn handle should not be nil")
-				exec.handle.Stop(waitTimeForStop)
+				execHandle := exec.getProcessHandle()
+				require.NotNil(t, execHandle, "execModeFn handle should not be nil")
+				execHandle.Stop(waitTimeForStop)
 				e.EnsureHealthy(t, updateTime)
 				assert.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getStatus()), "health check extension status count should be 0")
 
