@@ -741,7 +741,7 @@ agent.monitoring.enabled: false
 
 		var componentVersionInfoName string
 		switch runtime {
-		case "otel":
+		case component.OtelRuntimeManager:
 			componentVersionInfoName = "beats-receiver"
 		default:
 			componentVersionInfoName = "beat-v2-client"
