@@ -779,7 +779,7 @@ agent.monitoring.enabled: false
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error
 		status, statusErr := fixture.ExecStatus(ctx)
-		assert.NoError(collect, statusErr)
+		require.NoError(collect, statusErr)
 		assertBeatsReady(collect, &status, component.ProcessRuntimeManager)
 		return
 	}, 2*time.Minute, 5*time.Second)
@@ -791,7 +791,7 @@ agent.monitoring.enabled: false
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error
 		status, statusErr := fixture.ExecStatus(ctx)
-		assert.NoError(collect, statusErr)
+		require.NoError(collect, statusErr)
 		assertBeatsReady(collect, &status, component.OtelRuntimeManager)
 		return
 	}, 2*time.Minute, 5*time.Second)
