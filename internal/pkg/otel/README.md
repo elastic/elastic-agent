@@ -115,7 +115,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| [elasticapmconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/elasticapmconnector/v0.7.0/connector/elasticapmconnector/README.md) | v0.7.0 |
+| [elasticapmconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/elasticapmconnector/v0.8.0/connector/elasticapmconnector/README.md) | v0.8.0 |
 | [forwardconnector](https://github.com/open-telemetry/opentelemetry-collector/blob/connector/forwardconnector/v0.135.0/connector/forwardconnector/README.md) | v0.135.0 |
 | [profilingmetricsconnector](https://github.com/elastic/opentelemetry-collector-components/blob/a76a7ba0448a/connector/profilingmetricsconnector/README.md) | v0.0.0-20250922093401-a76a7ba0448a |
 | [routingconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/routingconnector/v0.135.0/connector/routingconnector/README.md) | v0.135.0 |
