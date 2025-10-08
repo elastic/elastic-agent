@@ -34,6 +34,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/integration"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -251,7 +252,6 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		status, statusErr := classicFixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
 		assertBeatsHealthy(collect, &status, component.ProcessRuntimeManager, 3)
-		return
 	}, 1*time.Minute, 1*time.Second)
 
 	// 2. Assert monitoring logs and metrics are available on ES
@@ -322,7 +322,6 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		status, statusErr := beatReceiverFixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
 		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 4)
-		return
 	}, 1*time.Minute, 1*time.Second)
 
 	// 5. Assert monitoring logs and metrics are available on ES (for otel mode)
@@ -785,7 +784,6 @@ agent.monitoring.enabled: false
 		status, statusErr := fixture.ExecStatus(ctx)
 		require.NoError(collect, statusErr)
 		assertBeatsReady(collect, &status, component.ProcessRuntimeManager)
-		return
 	}, 2*time.Minute, 5*time.Second)
 
 	// change configuration and wait until the beats receiver is healthy
@@ -797,7 +795,6 @@ agent.monitoring.enabled: false
 		status, statusErr := fixture.ExecStatus(ctx)
 		require.NoError(collect, statusErr)
 		assertBeatsReady(collect, &status, component.OtelRuntimeManager)
-		return
 	}, 2*time.Minute, 5*time.Second)
 
 	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
@@ -874,7 +871,6 @@ agent.monitoring.enabled: false
 		assert.NoError(collect, statusErr)
 		// we should be running beats processes even though the otel runtime was requested
 		assertBeatsHealthy(collect, &status, component.ProcessRuntimeManager, 1)
-		return
 	}, 1*time.Minute, 1*time.Second)
 	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
 	require.NoError(t, err)
@@ -1218,4 +1214,268 @@ func setStrictMapping(client *elasticsearch.Client, index string) error {
 		return fmt.Errorf("incorrect response code: %v", err)
 	}
 	return nil
+}
+
+// TestMonitoringNoDuplicates checks to see if switching to otel
+// runtime re-ingests logs.  Also checks to make sure restarting
+// elastic-agent when using otel runtime for monitoring doesn't
+// re-ingest logs.
+//
+// Flow
+// 1) Create policy in Kibana with just monitoring and download it
+// 2) Install with monitoring with "process" runtime
+// 3) restart agent, to roll log files
+// 4) Switch to monitoring "otel" runtime
+// 5) restart agent 3 times, making sure healthy between restarts
+// 6) query ES for monitoring logs with aggregation on fingerprint and line number, should be 0 duplicates
+// 7) uninstall
+func TestMonitoringNoDuplicates(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Linux},
+			{Type: define.Darwin},
+			{Type: define.Windows},
+		},
+		Stack: &define.Stack{},
+		Sudo:  true,
+	})
+
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Privileged:     true,
+		Force:          true,
+		Develop:        true,
+	}
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	t.Cleanup(cancel)
+
+	policyCtx, policyCancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	t.Cleanup(policyCancel)
+
+	createPolicyReq := kibana.AgentPolicy{
+		Name:        fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String()),
+		Namespace:   info.Namespace,
+		Description: fmt.Sprintf("%s policy", t.Name()),
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+	}
+	policyResponse, err := info.KibanaClient.CreatePolicy(policyCtx, createPolicyReq)
+	require.NoError(t, err, "error creating policy")
+
+	downloadURL := fmt.Sprintf("/api/fleet/agent_policies/%s/download", policyResponse.ID)
+	resp, err := info.KibanaClient.Connection.SendWithContext(policyCtx, http.MethodGet, downloadURL, nil, nil, nil)
+	require.NoError(t, err, "error downloading policy")
+	policyBytes, err := io.ReadAll(resp.Body)
+	require.NoError(t, err, "error reading policy response")
+	defer resp.Body.Close()
+
+	apiKeyResponse, err := createESApiKey(info.ESClient)
+	require.NoError(t, err, "failed to get api key")
+	require.True(t, len(apiKeyResponse.Encoded) > 1, "api key is invalid %q", apiKeyResponse)
+	apiKey, err := getDecodedApiKey(apiKeyResponse)
+	require.NoError(t, err, "error decoding api key")
+
+	type PolicyOutputs struct {
+		Type   string   `yaml:"type"`
+		Hosts  []string `yaml:"hosts"`
+		Preset string   `yaml:"preset"`
+		ApiKey string   `yaml:"api_key"`
+	}
+	type PolicyStruct struct {
+		ID                string                   `yaml:"id"`
+		Revision          int                      `yaml:"revision"`
+		Outputs           map[string]PolicyOutputs `yaml:"outputs"`
+		Fleet             map[string]any           `yaml:"fleet"`
+		OutputPermissions map[string]any           `yaml:"output_permissions"`
+		Agent             struct {
+			Monitoring map[string]any `yaml:"monitoring"`
+			Rest       map[string]any `yaml:",inline"`
+		} `yaml:"agent"`
+		Inputs           []map[string]any `yaml:"inputs"`
+		Signed           map[string]any   `yaml:"signed"`
+		SecretReferences []map[string]any `yaml:"secret_references"`
+		Namespaces       []string         `yaml:"namespaces"`
+	}
+
+	policy := PolicyStruct{}
+	err = yaml.Unmarshal(policyBytes, &policy)
+	require.NoError(t, err, "error unmarshalling policy: %s", string(policyBytes))
+	d, prs := policy.Outputs["default"]
+	require.True(t, prs, "default must be in outputs")
+	d.ApiKey = string(apiKey)
+	policy.Outputs["default"] = d
+	policy.Agent.Monitoring["_runtime_experimental"] = "process"
+
+	updatedPolicyBytes, err := yaml.Marshal(policy)
+	require.NoErrorf(t, err, "error marshalling policy, struct was %v", policy)
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Logf("policy was %s", string(updatedPolicyBytes))
+		}
+	})
+
+	fut, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+	err = fut.Prepare(ctx)
+	require.NoError(t, err)
+	err = fut.Configure(ctx, updatedPolicyBytes)
+	require.NoError(t, err)
+	combinedOutput, err := fut.InstallWithoutEnroll(ctx, &installOpts)
+	require.NoErrorf(t, err, "error install without enroll: %s\ncombinedoutput:\n%s", err, string(combinedOutput))
+
+	// store timestamp to filter otel docs with timestamp greater than this value
+	installTimestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+
+	healthcheck := func(ctx context.Context, message string, runtime component.RuntimeManager, componentCount int, timestamp string) {
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			var statusErr error
+			status, statusErr := fut.ExecStatus(ctx)
+			assert.NoError(collect, statusErr)
+			assertBeatsHealthy(collect, &status, runtime, componentCount)
+		}, 1*time.Minute, 1*time.Second)
+		require.Eventuallyf(t,
+			func() bool {
+				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+				defer findCancel()
+				mustClauses := []map[string]any{
+					{"match_phrase": map[string]any{"message": message}},
+					{"match": map[string]any{"data_stream.type": "logs"}},
+					{"match": map[string]any{"data_stream.dataset": "elastic_agent"}},
+					{"match": map[string]any{"data_stream.namespace": info.Namespace}},
+				}
+				rawQuery := map[string]any{
+					"query": map[string]any{
+						"bool": map[string]any{
+							"must":   mustClauses,
+							"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestamp}}},
+						},
+					},
+					"sort": []map[string]any{
+						{"@timestamp": map[string]any{"order": "asc"}},
+					},
+				}
+				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, "logs-*", info.ESClient)
+				require.NoError(t, err)
+				return docs.Hits.Total.Value > 0
+			},
+			4*time.Minute, 5*time.Second,
+			"health check failed: timestamp: %s", timestamp)
+	}
+
+	// make sure running and logs are making it to ES
+	healthcheck(ctx, "control checkin v2 protocol has chunking enabled", component.ProcessRuntimeManager, 3, installTimestamp)
+
+	// restart process monitoring, gives us multiple files to track in registry
+	restartTimestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	restartBytes, err := fut.Exec(ctx, []string{"restart"})
+	require.NoErrorf(t, err, "Restart error: %s, output was: %s", err, string(restartBytes))
+	healthcheck(ctx, "control checkin v2 protocol has chunking enabled", component.ProcessRuntimeManager, 3, restartTimestamp)
+
+	// turn off monitoring
+	policy.Agent.Monitoring["enabled"] = false
+	updatedPolicyBytes, err = yaml.Marshal(policy)
+	require.NoErrorf(t, err, "error marshalling policy, struct was %v", policy)
+	err = fut.Configure(ctx, updatedPolicyBytes)
+	require.NoError(t, err)
+
+	// restart to make sure beat processes have exited
+	restartBytes, err = fut.Exec(ctx, []string{"restart"})
+	require.NoErrorf(t, err, "Restart error: %s, output was: %s", err, string(restartBytes))
+
+	// make sure agent is running. with no processes.
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fut.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+		assertBeatsHealthy(collect, &status, component.ProcessRuntimeManager, 0)
+	}, 1*time.Minute, 1*time.Second)
+
+	// Switch to otel monitoring
+	policy.Agent.Monitoring["enabled"] = true
+	policy.Agent.Monitoring["_runtime_experimental"] = "otel"
+	updatedPolicyBytes, err = yaml.Marshal(policy)
+	require.NoErrorf(t, err, "error marshalling policy, struct was %v", policy)
+	err = fut.Configure(ctx, updatedPolicyBytes)
+	require.NoError(t, err)
+
+	// make sure running and logs are making it to ES
+	otelTimestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	healthcheck(ctx, "Everything is ready. Begin running and processing data.", component.OtelRuntimeManager, 4, otelTimestamp)
+
+	// restart 3 times, checks path definition is stable
+	for range 3 {
+		restartTimestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+		restartBytes, err := fut.Exec(ctx, []string{"restart"})
+		require.NoErrorf(t, err, "Restart error: %s, output was: %s", err, string(restartBytes))
+		healthcheck(ctx, "Everything is ready. Begin running and processing data.", component.OtelRuntimeManager, 4, restartTimestamp)
+	}
+
+	// duplicate check
+	dupCtx, dupCancel := context.WithTimeout(ctx, 10*time.Second)
+	defer dupCancel()
+	rawQuery := map[string]any{
+		"runtime_mappings": map[string]any{
+			"log.offset": map[string]any{
+				"type": "keyword",
+			},
+			"log.file.fingerprint": map[string]any{
+				"type": "keyword",
+			},
+		},
+		"query": map[string]any{
+			"bool": map[string]any{
+				"must": []map[string]any{
+					{"match": map[string]any{"data_stream.type": "logs"}},
+					{"match": map[string]any{"data_stream.dataset": "elastic_agent"}},
+					{"match": map[string]any{"data_stream.namespace": info.Namespace}},
+				},
+				"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": installTimestamp}}},
+			},
+		},
+		"aggs": map[string]any{
+			"duplicates": map[string]any{
+				"multi_terms": map[string]any{
+					"min_doc_count": 2,
+					"terms": []map[string]any{
+						{"field": "log.file.fingerprint"},
+						{"field": "log.offset"},
+					},
+				},
+			},
+		},
+	}
+	var buf bytes.Buffer
+	err = json.NewEncoder(&buf).Encode(rawQuery)
+	require.NoError(t, err)
+
+	es := esapi.New(info.ESClient)
+	res, err := es.Search(
+		es.Search.WithIndex("logs-*"),
+		es.Search.WithSize(0),
+		es.Search.WithBody(&buf),
+		es.Search.WithPretty(),
+		es.Search.WithContext(dupCtx),
+	)
+	require.NoError(t, err)
+	require.Falsef(t, (res.StatusCode >= http.StatusMultipleChoices || res.StatusCode < http.StatusOK), "status should be 2xx was: %d", res.StatusCode)
+	resultBuf, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+	aggResults := map[string]any{}
+	err = json.Unmarshal(resultBuf, &aggResults)
+	aggs, ok := aggResults["aggregations"].(map[string]any)
+	require.Truef(t, ok, "'aggregations' wasn't a map[string]any, result was %s", string(resultBuf))
+	dups, ok := aggs["duplicates"].(map[string]any)
+	require.Truef(t, ok, "'duplicates' wasn't a map[string]any, result was %s", string(resultBuf))
+	buckets, ok := dups["buckets"].([]any)
+	require.Truef(t, ok, "'buckets' wasn't a []any, result was %s", string(resultBuf))
+	require.Equalf(t, 0, len(buckets), "buckets contained duplicates, result was %s", string(resultBuf))
+
+	// Uninstall
+	combinedOutput, err = fut.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+	require.NoErrorf(t, err, "error uninstalling beat receiver agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
 }
