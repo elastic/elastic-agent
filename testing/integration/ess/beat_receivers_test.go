@@ -722,7 +722,7 @@ agent.monitoring.enabled: false
 	require.NoError(t,
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 			configOptions{
-				RuntimeExperimental: "process",
+				RuntimeExperimental: component.ProcessRuntimeManager.String(),
 			}))
 	processConfig := configBuffer.Bytes()
 	require.NoError(t,
