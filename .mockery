@@ -1,38 +1,24 @@
-dir: testing/mocks/{{ replaceAll .InterfaceDirRelative "internal" "internal_"  }}
-structname: '{{.InterfaceName}}'
-pkgname: '{{.PackageName}}'
+structname: '{{.Mock}}{{.InterfaceName | firstUpper}}'
+pkgname: '{{.SrcPackageName}}'
 template: testify
+filename: mocks.go
 template-data:
   unroll-variadic: true
 packages:
   github.com/elastic/elastic-agent/internal/pkg/agent/application/actions/handlers:
     interfaces:
       Uploader: {}
-      diagnosticsProvider:
-        config:
-          structname: DiagnosticsProvider
-      logLevelSetter:
-        config:
-          structname: LogLevelSetter
-      upgradeCoordinator:
-        config:
-          structname: UpgradeCoordinator
+      diagnosticsProvider: {}
+      logLevelSetter: {}
+      upgradeCoordinator: {}
   github.com/elastic/elastic-agent/internal/pkg/agent/application/info:
     interfaces:
       Agent: {}
   github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade:
-    config:
-      dir: '{{.InterfaceDirRelative}}'
-      structname: '{{.Mock}}{{.InterfaceName | firstUpper}}'
-      pkgname: '{{.PackageName}}'
     interfaces:
       WatcherHelper: {}
       watcherGrappler: {}
   github.com/elastic/elastic-agent/internal/pkg/agent/cmd:
-    config:
-      dir: '{{.InterfaceDirRelative}}'
-      structname: '{{.Mock}}{{.InterfaceName | firstUpper}}'
-      pkgname: '{{.PackageName}}'
     interfaces:
       agentWatcher: {}
       installationModifier: {}
