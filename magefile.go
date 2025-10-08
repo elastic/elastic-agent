@@ -39,7 +39,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/otiai10/copy"
 
-	devmachine "github.com/elastic/elastic-agent/dev-tools/devmachine"
+	"github.com/elastic/elastic-agent/dev-tools/devmachine"
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
@@ -235,28 +235,7 @@ func (Dev) Package(ctx context.Context) {
 	Package(ctx)
 }
 
-func mocksPath() (string, error) {
-	repositoryRoot, err := findRepositoryRoot()
-	if err != nil {
-		return "", fmt.Errorf("finding repository root: %w", err)
-	}
-	return filepath.Join(repositoryRoot, "testing", "mocks"), nil
-}
-
-func (Dev) CleanMocks() error {
-	mPath, err := mocksPath()
-	if err != nil {
-		return fmt.Errorf("retrieving mocks path: %w", err)
-	}
-	err = os.RemoveAll(mPath)
-	if err != nil {
-		return fmt.Errorf("removing mocks: %w", err)
-	}
-	return nil
-}
-
 func (Dev) RegenerateMocks() error {
-	mg.Deps(Dev.CleanMocks)
 	err := sh.Run("mockery")
 	if err != nil {
 		return fmt.Errorf("generating mocks: %w", err)

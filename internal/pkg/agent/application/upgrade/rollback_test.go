@@ -21,9 +21,9 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
-	mocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
 )
 
 type hookFunc func(t *testing.T, topDir string)
@@ -316,7 +316,7 @@ func TestRollback(t *testing.T) {
 			t.Logf("Loaded update marker %+v", marker)
 
 			// mock client
-			mockClient := mocks.NewClient(t)
+			mockClient := client.NewMockClient(t)
 			mockClient.EXPECT().Connect(
 				mock.AnythingOfType("*context.timerCtx"),
 				mock.AnythingOfType("*grpc.funcDialOption"),
@@ -348,7 +348,7 @@ func TestRollbackWithOpts(t *testing.T) {
 
 	tests := map[string]struct {
 		agentInstallsSetup setupAgentInstallations
-		setupMocks         func(*mocks.Client)
+		setupMocks         func(*client.MockClient)
 		args               args
 		wantErr            assert.ErrorAssertionFunc
 		checkAfterRollback hookFuncWithLogs
@@ -366,7 +366,7 @@ func TestRollbackWithOpts(t *testing.T) {
 					},
 				},
 			},
-			setupMocks: func(mockClient *mocks.Client) {
+			setupMocks: func(mockClient *client.MockClient) {
 				mockClient.EXPECT().Connect(
 					mock.AnythingOfType("*context.timerCtx"),
 					mock.AnythingOfType("*grpc.funcDialOption"),
@@ -404,7 +404,7 @@ func TestRollbackWithOpts(t *testing.T) {
 					},
 				},
 			},
-			setupMocks: func(mockClient *mocks.Client) {
+			setupMocks: func(mockClient *client.MockClient) {
 				// nothing to do here, no restart will be issued
 			},
 			args: args{
@@ -436,7 +436,7 @@ func TestRollbackWithOpts(t *testing.T) {
 					},
 				},
 			},
-			setupMocks: func(mockClient *mocks.Client) {
+			setupMocks: func(mockClient *client.MockClient) {
 				mockClient.EXPECT().Connect(
 					mock.AnythingOfType("*context.timerCtx"),
 					mock.AnythingOfType("*grpc.funcDialOption"),
@@ -482,7 +482,7 @@ func TestRollbackWithOpts(t *testing.T) {
 					},
 				},
 			},
-			setupMocks: func(mockClient *mocks.Client) {
+			setupMocks: func(mockClient *client.MockClient) {
 				// no restart request should be made
 			},
 			args: args{
@@ -513,7 +513,7 @@ func TestRollbackWithOpts(t *testing.T) {
 			setupAgents(t, testLogger, testTop, tt.agentInstallsSetup, false)
 
 			// mock client
-			mockClient := mocks.NewClient(t)
+			mockClient := client.NewMockClient(t)
 			tt.setupMocks(mockClient)
 
 			tt.wantErr(t, RollbackWithOpts(t.Context(), testLogger, mockClient, testTop, tt.args.prevVersionedHome, tt.args.prevHash, tt.args.rollbackOptions...))
