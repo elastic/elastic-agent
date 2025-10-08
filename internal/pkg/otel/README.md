@@ -79,22 +79,6 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-<<<<<<< HEAD
-| [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.135.0/processor/attributesprocessor/README.md) | v0.135.0 |
-| [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.135.0/processor/batchprocessor/README.md) | v0.135.0 |
-| [cumulativetodeltaprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/cumulativetodeltaprocessor/v0.135.0/processor/cumulativetodeltaprocessor/README.md) | v0.135.0 |
-| [elasticapmprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticapmprocessor/v0.2.0/processor/elasticapmprocessor/README.md) | v0.2.0 |
-| [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.17.0/processor/elasticinframetricsprocessor/README.md) | v0.17.0 |
-| [elastictraceprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elastictraceprocessor/v0.10.0/processor/elastictraceprocessor/README.md) | v0.10.0 |
-| [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.135.0/processor/filterprocessor/README.md) | v0.135.0 |
-| [geoipprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/geoipprocessor/v0.135.0/processor/geoipprocessor/README.md) | v0.135.0 |
-| [k8sattributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/k8sattributesprocessor/v0.135.0/processor/k8sattributesprocessor/README.md) | v0.135.0 |
-| [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.135.0/processor/memorylimiterprocessor/README.md) | v0.135.0 |
-| [resourcedetectionprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourcedetectionprocessor/v0.135.0/processor/resourcedetectionprocessor/README.md) | v0.135.0 |
-| [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.135.0/processor/resourceprocessor/README.md) | v0.135.0 |
-| [tailsamplingprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/tailsamplingprocessor/v0.135.0/processor/tailsamplingprocessor/README.md) | v0.135.0 |
-| [transformprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/transformprocessor/v0.135.0/processor/transformprocessor/README.md) | v0.135.0 |
-=======
 | [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.137.0/processor/attributesprocessor/README.md) | v0.137.0 |
 | [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.137.0/processor/batchprocessor/README.md) | v0.137.0 |
 | [cumulativetodeltaprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/cumulativetodeltaprocessor/v0.137.0/processor/cumulativetodeltaprocessor/README.md) | v0.137.0 |
@@ -108,7 +92,6 @@ This section provides a summary of components included in the Elastic Distributi
 | [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.137.0/processor/resourceprocessor/README.md) | v0.137.0 |
 | [tailsamplingprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/tailsamplingprocessor/v0.137.0/processor/tailsamplingprocessor/README.md) | v0.137.0 |
 | [transformprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/transformprocessor/v0.137.0/processor/transformprocessor/README.md) | v0.137.0 |
->>>>>>> 7ea323ea1 (feat: update OTel Collector components to v0.137.0 (#10391))
 
 ### Extensions
 
