@@ -1,6 +1,6 @@
 ---
-navigation_title: Filelog receiver
-description: The Filelog receiver is an OpenTelemetry Collector component that ingests logs from files.
+navigation_title: File log receiver
+description: The file log receiver is an OpenTelemetry Collector component that ingests logs from files.
 applies_to:
   stack:
   serverless:
@@ -13,9 +13,9 @@ products:
   - id: edot-collector
 ---
 
-# Filelog receiver
+# File log receiver
 
-The Filelog receiver ingests logs from local files and forwards them for processing and exporting. It is a versatile and widely-used component for collecting logs in file-based formats, such as container logs, system logs, or custom application logs.
+The file log receiver ingests logs from local files and forwards them for processing and exporting. It is a versatile and widely-used component for collecting logs in file-based formats, such as container logs, system logs, or custom application logs.
 
 The receiver supports multiline parsing, filtering, persistent tracking of file offsets, and routing based on file metadata or log content.
 
@@ -73,7 +73,7 @@ receivers:
 
 ## Key configuration options
 
-The following are some of the most commonly used settings when working with the filelog receiver. These options help control what files are read, how logs are parsed, and how file positions are tracked between restarts:
+The following are some of the most commonly used settings when working with the file log receiver. These options help control what files are read, how logs are parsed, and how file positions are tracked between restarts:
 
 | Option | Description |
 |---------|-------------|
@@ -90,7 +90,7 @@ For the full list of options, refer to the [upstream `filelogreceiver` documenta
 
 ## Best practices
 
-These tips can help you get the most out of the filelog receiver:
+These tips can help you get the most out of the file log receiver:
 
 ### Use [persistent storage](https://github.com/open-telemetry/opentelemetry-collector/blob/main/docs/design.md#storage-extension) to avoid duplicates
   Without persistent storage, the receiver will not retain file read positions across restarts. This can result in either duplicate ingestion (if `start_at` is set to `beginning`) or lost logs (if set to `end`). Use the `storage:` setting and configure a persistent volume when running in Kubernetes.
@@ -110,7 +110,7 @@ These tips can help you get the most out of the filelog receiver:
 
 ## Limitations
 
-Like any component, filelog receiver has some trade-offs and behaviors to be aware of, especially in Kubernetes environments:
+Like any component, file log receiver has some trade-offs and behaviors to be aware of, especially in Kubernetes environments:
 
 * Persistent log tracking requires explicit `storage:` configuration and persistent volume support in Kubernetes.
 
