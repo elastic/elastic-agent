@@ -29,7 +29,6 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
-	"github.com/elastic/elastic-agent/pkg/utils/install"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
@@ -469,7 +468,7 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 	}()
 
 	tmpDir := t.TempDir()
-	upgradeMgr, err := upgrade.NewUpgrader(log, &artifact.Config{}, nil, &info.AgentInfo{}, new(upgrade.AgentWatcherHelper), install.NewFileDescriptorSource(filepath.Join(tmpDir, paths.MarkerFileName)))
+	upgradeMgr, err := upgrade.NewUpgrader(log, &artifact.Config{}, nil, &info.AgentInfo{}, new(upgrade.AgentWatcherHelper), upgrade.NewTTLMarkerRegistry(tmpDir))
 	require.NoError(t, err, "errored when creating a new upgrader")
 
 	// Channels have buffer length 1, so we don't have to run on multiple

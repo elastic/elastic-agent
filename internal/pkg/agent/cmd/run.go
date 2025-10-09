@@ -777,7 +777,7 @@ func ensureInstallMarkerPresent() error {
 	if err != nil {
 		return fmt.Errorf("failed to get current file owner: %w", err)
 	}
-	if err := install.CreateInstallMarker(paths.Top(), ownership, paths.Home(), version.GetAgentPackageVersion(), ""); err != nil {
+	if err := install.CreateInstallMarker(paths.Top(), ownership); err != nil {
 		return fmt.Errorf("unable to create installation marker file during upgrade: %w", err)
 	}
 
