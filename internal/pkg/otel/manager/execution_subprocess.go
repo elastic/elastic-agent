@@ -223,6 +223,29 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 	return ctl, nil
 }
 
+// cloneCollectorStatus creates a deep copy of the provided AggregateStatus.
+func cloneCollectorStatus(aStatus *status.AggregateStatus) *status.AggregateStatus {
+	st := &status.AggregateStatus{
+		Event: aStatus.Event,
+	}
+
+	if len(aStatus.ComponentStatusMap) > 0 {
+		st.ComponentStatusMap = make(map[string]*status.AggregateStatus, len(aStatus.ComponentStatusMap))
+		for k, cs := range aStatus.ComponentStatusMap {
+			st.ComponentStatusMap[k] = cloneCollectorStatus(cs)
+		}
+	}
+
+	return st
+}
+
+func (r *subprocessExecution) reportSubprocessCollectorStatus(ctx context.Context, statusCh chan *status.AggregateStatus, collectorStatus *status.AggregateStatus) {
+	// we need to clone the status to prevent any mutation on the receiver side
+	// affecting the original ref
+	clonedStatus := cloneCollectorStatus(collectorStatus)
+	reportCollectorStatus(ctx, statusCh, clonedStatus)
+}
+
 // getCollectorPorts returns the ports used by the OTel collector. If the ports set in the execution struct are 0,
 // random ports are returned instead.
 func (r *subprocessExecution) getCollectorPorts() (healthCheckPort int, metricsPort int, err error) {

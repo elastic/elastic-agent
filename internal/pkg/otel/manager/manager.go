@@ -12,6 +12,11 @@ import (
 	"fmt"
 	"hash/fnv"
 	"os"
+<<<<<<< HEAD
+=======
+	"slices"
+	"strings"
+>>>>>>> d8f1daeae (fix: do not report agent managed otel extensions statuses (#10412))
 	"sync"
 	"sync/atomic"
 	"time"
@@ -478,6 +483,24 @@ func (m *OTelManager) MergedOtelConfig() *confmap.Conf {
 // and prepares component state updates for distribution to watchers.
 // Returns component state updates and any error encountered during processing.
 func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus) ([]runtime.ComponentComponentState, error) {
+	// Remove agent managed extensions from the status report
+	if otelStatus != nil {
+		if extensionsMap, exists := otelStatus.ComponentStatusMap["extensions"]; exists {
+			for extensionKey := range extensionsMap.ComponentStatusMap {
+				switch {
+				case strings.HasPrefix(extensionKey, "extension:beatsauth"):
+					delete(extensionsMap.ComponentStatusMap, extensionKey)
+				case strings.HasPrefix(extensionKey, "extension:elastic_diagnostics"):
+					delete(extensionsMap.ComponentStatusMap, extensionKey)
+				}
+			}
+
+			if len(extensionsMap.ComponentStatusMap) == 0 {
+				delete(otelStatus.ComponentStatusMap, "extensions")
+			}
+		}
+	}
+
 	// Extract component states from otel status
 	componentStates, err := translate.GetAllComponentStates(otelStatus, m.components)
 	if err != nil {
