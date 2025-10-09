@@ -950,7 +950,7 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 		if err != nil {
 			return err
 		}
-		defer file.Close()
+		defer closeOrLog(file, "zip input file")
 
 		if _, err = io.Copy(w, file); err != nil {
 			return err
@@ -1031,7 +1031,7 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 		if err != nil {
 			return err
 		}
-		defer file.Close()
+		defer closeOrLog(file, "tar input file")
 
 		if _, err = io.Copy(ar, file); err != nil {
 			return err
