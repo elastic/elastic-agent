@@ -17,10 +17,12 @@ import (
 	"github.com/elastic/elastic-agent/pkg/ipc"
 )
 
-func NewMockServer(t *testing.T, host string, called *bool) *http.Server {
+func NewMockServer(t *testing.T, host string, called *bool, response *elasticdiagnostics.Response) *http.Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/diagnostics", func(w http.ResponseWriter, r *http.Request) {
-		*called = true
+		if called != nil {
+			*called = true
+		}
 		resp := elasticdiagnostics.Response{
 			GlobalDiagnostics: []*proto.ActionDiagnosticUnitResult{
 				{
@@ -30,6 +32,10 @@ func NewMockServer(t *testing.T, host string, called *bool) *http.Server {
 					Content:     []byte("This is a mock global diagnostic content"),
 				},
 			},
+		}
+		if response != nil {
+			// overwrite default response
+			resp = *response
 		}
 		err := json.NewEncoder(w).Encode(resp)
 		require.NoError(t, err)

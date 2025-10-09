@@ -10,25 +10,17 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"io"
-	"net/http"
-	"testing"
 
 	mock "github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/ipc"
 )
 
 // NewMockUploader creates a new instance of MockUploader. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
@@ -701,40 +693,4 @@ func (_c *mockLogLevelSetter_SetLogLevel_Call) Return(err error) *mockLogLevelSe
 func (_c *mockLogLevelSetter_SetLogLevel_Call) RunAndReturn(run func(ctx context.Context, lvl *logp.Level) error) *mockLogLevelSetter_SetLogLevel_Call {
 	_c.Call.Return(run)
 	return _c
-}
-
-func NewMockServer(t *testing.T, host string, called *bool, response *elasticdiagnostics.Response) *http.Server {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/diagnostics", func(w http.ResponseWriter, r *http.Request) {
-		if called != nil {
-			*called = true
-		}
-		resp := elasticdiagnostics.Response{
-			GlobalDiagnostics: []*proto.ActionDiagnosticUnitResult{
-				{
-					Description: "Mock Global Diagnostic",
-					Filename:    "mock_global.txt",
-					ContentType: "text/plain",
-					Content:     []byte("This is a mock global diagnostic content"),
-				},
-			},
-		}
-		if response != nil {
-			// overwrite default response
-			resp = *response
-		}
-		err := json.NewEncoder(w).Encode(resp)
-		require.NoError(t, err)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-	})
-
-	l, err := ipc.CreateListener(logger.NewWithoutConfig(""), host)
-	require.NoError(t, err)
-	server := &http.Server{Handler: mux} //nolint:gosec // This is a test
-	go func() {
-		err := server.Serve(l)
-		require.ErrorIs(t, err, http.ErrServerClosed)
-	}()
-	return server
 }
