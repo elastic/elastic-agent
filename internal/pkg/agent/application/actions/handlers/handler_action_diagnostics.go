@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"syscall"
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -18,10 +19,12 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/pkg/component"
 
 	"golang.org/x/time/rate"
@@ -246,6 +249,26 @@ func (h *Diagnostics) runHooks(ctx context.Context, action *fleetapi.ActionDiagn
 			ContentType: diagnostics.DiagCPUContentType,
 			Content:     p,
 			Generated:   time.Now().UTC(),
+		})
+	}
+	resp, err := otel.PerformDiagnosticsExt(ctx, collectCPU)
+	if errors.Is(err, syscall.ENOENT) || errors.Is(err, syscall.ECONNREFUSED) {
+		// We're not running the EDOT if:
+		//  1. Either the socket doesn't exist
+		//	2. It is refusing the connections.
+		h.log.Debugf("Couldn't fetch diagnostics from EDOT: %v", err)
+		return diags, nil
+	}
+	if err != nil {
+		return diags, err
+	}
+	for _, r := range resp.GlobalDiagnostics {
+		diags = append(diags, client.DiagnosticFileResult{
+			Name:        r.Name,
+			Filename:    r.Filename,
+			ContentType: r.ContentType,
+			Content:     r.Content,
+			Description: r.Description,
 		})
 	}
 	return diags, nil
