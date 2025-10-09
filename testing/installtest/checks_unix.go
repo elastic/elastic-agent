@@ -80,7 +80,7 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opt
 		}
 		fs, ok := info.Sys().(*syscall.Stat_t)
 		if !ok {
-			return fmt.Errorf("failed to convert info.Sys() into *syscall.Stat_t")
+			return errors.New("failed to convert info.Sys() into *syscall.Stat_t")
 		}
 		if fs.Uid != uid32 {
 			return fmt.Errorf("%s not owned by %s user", socketPath, username)
@@ -149,7 +149,7 @@ func validateFileTree(dir string, uid uint32, gid uint32) error {
 		}
 		fs, ok := info.Sys().(*syscall.Stat_t)
 		if !ok {
-			return fmt.Errorf("failed to convert info.Sys() into *syscall.Stat_t")
+			return errors.New("failed to convert info.Sys() into *syscall.Stat_t")
 		}
 		if fs.Uid != uid {
 			return fmt.Errorf("%s doesn't have correct uid: has %d (expected %d)", file, fs.Uid, uid)
