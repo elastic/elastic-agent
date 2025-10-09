@@ -23,12 +23,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
-	mockhandlers "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/actions/handlers"
-	mockackers "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/fleetapi/acker"
 )
 
 var defaultRateLimit config.Limit = config.Limit{
@@ -78,8 +77,8 @@ func TestDiagnosticHandlerHappyPathWithLogs(t *testing.T) {
 	err := os.MkdirAll(path.Join(tempAgentRoot, "data"), 0755)
 	require.NoError(t, err)
 
-	mockDiagProvider := mockhandlers.NewDiagnosticsProvider(t)
-	mockUploader := mockhandlers.NewUploader(t)
+	mockDiagProvider := newMockDiagnosticsProvider(t)
+	mockUploader := NewMockUploader(t)
 	testLogger, observedLogs := loggertest.New("diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
@@ -87,7 +86,7 @@ func TestDiagnosticHandlerHappyPathWithLogs(t *testing.T) {
 	mockDiagProvider.EXPECT().PerformDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentUnitDiagnostic{mockUnitDiagnostic})
 	mockDiagProvider.EXPECT().PerformComponentDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentDiagnostic{}, nil)
 
-	mockAcker := mockackers.NewAcker(t)
+	mockAcker := acker.NewMockAcker(t)
 	mockAcker.EXPECT().Ack(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, a fleetapi.Action) error {
 		require.IsType(t, new(fleetapi.ActionDiagnostics), a)
 		assert.NoError(t, a.(*fleetapi.ActionDiagnostics).Err)
@@ -159,8 +158,8 @@ func TestDiagnosticHandlerUploaderErrorWithLogs(t *testing.T) {
 	err := os.MkdirAll(path.Join(tempAgentRoot, "data"), 0755)
 	require.NoError(t, err)
 
-	mockDiagProvider := mockhandlers.NewDiagnosticsProvider(t)
-	mockUploader := mockhandlers.NewUploader(t)
+	mockDiagProvider := newMockDiagnosticsProvider(t)
+	mockUploader := NewMockUploader(t)
 	testLogger, observedLogs := loggertest.New("diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
@@ -172,7 +171,7 @@ func TestDiagnosticHandlerUploaderErrorWithLogs(t *testing.T) {
 	uploaderError := errors.New("upload went wrong!")
 	mockUploader.EXPECT().UploadDiagnostics(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", uploaderError)
 
-	mockAcker := mockackers.NewAcker(t)
+	mockAcker := acker.NewMockAcker(t)
 	mockAcker.EXPECT().Ack(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, a fleetapi.Action) error {
 		require.IsType(t, new(fleetapi.ActionDiagnostics), a)
 		// verify that we are acking the action with the correct error set
@@ -200,8 +199,8 @@ func TestDiagnosticHandlerZipArchiveErrorWithLogs(t *testing.T) {
 	// we don't set a 'data' subdirectory in order to make the zip process return an error
 	// this is the only way/trick to do it with the current implementation, sadly :(
 
-	mockDiagProvider := mockhandlers.NewDiagnosticsProvider(t)
-	mockUploader := mockhandlers.NewUploader(t)
+	mockDiagProvider := newMockDiagnosticsProvider(t)
+	mockUploader := NewMockUploader(t)
 	testLogger, observedLogs := loggertest.New("diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
@@ -209,7 +208,7 @@ func TestDiagnosticHandlerZipArchiveErrorWithLogs(t *testing.T) {
 	mockDiagProvider.EXPECT().PerformDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentUnitDiagnostic{})
 	mockDiagProvider.EXPECT().PerformComponentDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentDiagnostic{}, nil)
 
-	mockAcker := mockackers.NewAcker(t)
+	mockAcker := acker.NewMockAcker(t)
 	mockAcker.EXPECT().Ack(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, a fleetapi.Action) error {
 		require.IsType(t, new(fleetapi.ActionDiagnostics), a)
 		assert.Error(t, a.(*fleetapi.ActionDiagnostics).Err)
@@ -236,8 +235,8 @@ func TestDiagnosticHandlerAckErrorWithLogs(t *testing.T) {
 	err := os.MkdirAll(path.Join(tempAgentRoot, "data"), 0755)
 	require.NoError(t, err)
 
-	mockDiagProvider := mockhandlers.NewDiagnosticsProvider(t)
-	mockUploader := mockhandlers.NewUploader(t)
+	mockDiagProvider := newMockDiagnosticsProvider(t)
+	mockUploader := NewMockUploader(t)
 	testLogger, observedLogs := loggertest.New("diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
@@ -245,7 +244,7 @@ func TestDiagnosticHandlerAckErrorWithLogs(t *testing.T) {
 	mockDiagProvider.EXPECT().PerformDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentUnitDiagnostic{})
 	mockDiagProvider.EXPECT().PerformComponentDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentDiagnostic{}, nil)
 
-	mockAcker := mockackers.NewAcker(t)
+	mockAcker := acker.NewMockAcker(t)
 	ackError := errors.New("acking went wrong")
 	mockAcker.EXPECT().Ack(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, a fleetapi.Action) error {
 		require.IsType(t, new(fleetapi.ActionDiagnostics), a)
@@ -275,8 +274,8 @@ func TestDiagnosticHandlerCommitErrorWithLogs(t *testing.T) {
 	err := os.MkdirAll(path.Join(tempAgentRoot, "data"), 0755)
 	require.NoError(t, err)
 
-	mockDiagProvider := mockhandlers.NewDiagnosticsProvider(t)
-	mockUploader := mockhandlers.NewUploader(t)
+	mockDiagProvider := newMockDiagnosticsProvider(t)
+	mockUploader := NewMockUploader(t)
 	testLogger, observedLogs := loggertest.New("diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
@@ -284,7 +283,7 @@ func TestDiagnosticHandlerCommitErrorWithLogs(t *testing.T) {
 	mockDiagProvider.EXPECT().PerformDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentUnitDiagnostic{})
 	mockDiagProvider.EXPECT().PerformComponentDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentDiagnostic{}, nil)
 
-	mockAcker := mockackers.NewAcker(t)
+	mockAcker := acker.NewMockAcker(t)
 	mockAcker.EXPECT().Ack(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, a fleetapi.Action) error {
 		require.IsType(t, new(fleetapi.ActionDiagnostics), a)
 		assert.NoError(t, a.(*fleetapi.ActionDiagnostics).Err)
@@ -315,14 +314,14 @@ func TestDiagnosticHandlerContexteExpiredErrorWithLogs(t *testing.T) {
 	err := os.MkdirAll(path.Join(tempAgentRoot, "data"), 0755)
 	require.NoError(t, err)
 
-	mockDiagProvider := mockhandlers.NewDiagnosticsProvider(t)
-	mockUploader := mockhandlers.NewUploader(t)
+	mockDiagProvider := newMockDiagnosticsProvider(t)
+	mockUploader := NewMockUploader(t)
 	testLogger, observedLogs := loggertest.New("diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{})
 
-	mockAcker := mockackers.NewAcker(t)
+	mockAcker := acker.NewMockAcker(t)
 	mockAcker.EXPECT().Ack(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, a fleetapi.Action) error {
 		require.IsType(t, new(fleetapi.ActionDiagnostics), a)
 		assert.ErrorIs(t, a.(*fleetapi.ActionDiagnostics).Err, context.Canceled)
@@ -359,8 +358,8 @@ func TestDiagnosticHandlerWithCPUProfile(t *testing.T) {
 		return []byte(`hello, world!`), nil
 	}
 
-	mockDiagProvider := mockhandlers.NewDiagnosticsProvider(t)
-	mockUploader := mockhandlers.NewUploader(t)
+	mockDiagProvider := newMockDiagnosticsProvider(t)
+	mockUploader := NewMockUploader(t)
 	testLogger, _ := loggertest.New("diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
@@ -377,7 +376,7 @@ func TestDiagnosticHandlerWithCPUProfile(t *testing.T) {
 		return false
 	})).Return([]runtime.ComponentDiagnostic{}, nil)
 
-	mockAcker := mockackers.NewAcker(t)
+	mockAcker := acker.NewMockAcker(t)
 	mockAcker.EXPECT().Ack(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, a fleetapi.Action) error {
 		require.IsType(t, new(fleetapi.ActionDiagnostics), a)
 		assert.NoError(t, a.(*fleetapi.ActionDiagnostics).Err)
