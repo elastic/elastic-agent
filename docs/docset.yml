@@ -7,8 +7,11 @@ exclude:
 cross_links:
   - docs-content
   - beats
+  - opentelemetry
+  - ecs
 toc:
   - toc: release-notes
+  - toc: reference/edot-collector
 subs:
   agent:          "Elastic Agent"
   agent-issue:    "https://github.com/elastic/elastic-agent/issues/"
@@ -17,3 +20,14 @@ subs:
   beats:          "Beats"
   es:             "Elasticsearch"
   fleet:          "Fleet"
+  motlp: Elastic Cloud Managed OTLP Endpoint
+  edot: Elastic Distribution of OpenTelemetry
+  ecloud:   "Elastic Cloud"
+  edot-cf:   "EDOT Cloud Forwarder"
+  ech:   "Elastic Cloud Hosted"
+  ess:   "Elasticsearch Service"
+  ece:   "Elastic Cloud Enterprise"
+  serverless-full:   "Elastic Cloud Serverless"
+  stack:   "Elastic Stack"
+  kib:   "Kibana"
+  ls:   "Logstash"
