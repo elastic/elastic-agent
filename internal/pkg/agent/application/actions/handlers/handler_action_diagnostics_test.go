@@ -429,6 +429,7 @@ func TestDiagnosticsHandlerWithEDOT(t *testing.T) {
 	mockDiagProvider.EXPECT().PerformComponentDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentDiagnostic{mockComponentDiagnostic}, nil)
 
 	mockAcker := acker.NewMockAcker(t)
+
 	mockAcker.EXPECT().Ack(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, a fleetapi.Action) error {
 		require.IsType(t, new(fleetapi.ActionDiagnostics), a)
 		assert.NoError(t, a.(*fleetapi.ActionDiagnostics).Err)

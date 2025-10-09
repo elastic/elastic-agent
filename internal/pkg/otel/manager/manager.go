@@ -19,6 +19,8 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -124,13 +126,31 @@ func NewOTelManager(
 	baseLogger *logger.Logger,
 	mode ExecutionMode,
 	agentInfo info.Agent,
-	collectorMetricsPort int, // 0 means we pick a random port
-	collectorHealthCheckPort int, // 0 means we pick a random port
+	agentCollectorConfig *configuration.CollectorConfig,
 	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter,
 	stopTimeout time.Duration,
 ) (*OTelManager, error) {
 	var exec collectorExecution
 	var recoveryTimer collectorRecoveryTimer
+	var err error
+
+	// determine the otel collector ports
+	collectorMetricsPort, collectorHealthCheckPort := 0, 0
+	if agentCollectorConfig != nil {
+		if agentCollectorConfig.HealthCheckConfig.Endpoint != "" {
+			collectorHealthCheckPort, err = agentCollectorConfig.HealthCheckConfig.Port()
+			if err != nil {
+				return nil, fmt.Errorf("invalid collector health check port: %w", err)
+			}
+		}
+		if agentCollectorConfig.TelemetryConfig.Endpoint != "" {
+			collectorMetricsPort, err = agentCollectorConfig.TelemetryConfig.Port()
+			if err != nil {
+				return nil, fmt.Errorf("invalid collector metrics port: %w", err)
+			}
+		}
+	}
+
 	switch mode {
 	case SubprocessExecutionMode:
 		// NOTE: if we stop embedding the collector binary in elastic-agent, we need to

@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/go-viper/mapstructure/v2"
 	koanfmaps "github.com/knadh/koanf/maps"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -21,7 +22,6 @@ import (
 	"go.opentelemetry.io/collector/pipeline"
 	"golang.org/x/exp/maps"
 
-	elasticsearchtranslate "github.com/elastic/beats/v7/libbeat/otelbeat/oteltranslate/outputs/elasticsearch"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
 	"github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
@@ -501,7 +501,7 @@ func getDefaultDatastreamTypeForComponent(comp *component.Component) (string, er
 
 // translateEsOutputToExporter translates an elasticsearch output configuration to an elasticsearch exporter configuration.
 func translateEsOutputToExporter(cfg *config.C, logger *logp.Logger) (map[string]any, error) {
-	esConfig, err := elasticsearchtranslate.ToOTelConfig(cfg, logger)
+	esConfig, err := ToOTelConfig(cfg, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -524,10 +524,25 @@ func BeatDataPath(componentId string) string {
 
 // getBeatsAuthExtensionConfig sets http transport settings on beatsauth
 // currently this is only supported for elasticsearch output
-func getBeatsAuthExtensionConfig(cfg *config.C) (map[string]any, error) {
+func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 	defaultTransportSettings := elasticsearch.ESDefaultTransportSettings()
-	err := cfg.Unpack(&defaultTransportSettings)
+
+	var resultMap map[string]any
+	if err := outputCfg.Unpack(&resultMap); err != nil {
+		return nil, err
+	}
+
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result:          &defaultTransportSettings,
+		TagName:         "config",
+		SquashTagOption: "inline",
+		DecodeHook:      cfgDecodeHookFunc(),
+	})
 	if err != nil {
+		return nil, err
+	}
+
+	if err = decoder.Decode(&resultMap); err != nil {
 		return nil, err
 	}
 
@@ -541,6 +556,10 @@ func getBeatsAuthExtensionConfig(cfg *config.C) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// required to make the extension not cause the collector to fail and exit
+	// on startup
+	newMap["continue_on_error"] = true
 
 	return newMap, nil
 }
