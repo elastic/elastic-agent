@@ -236,6 +236,7 @@ func TestGetOtelConfig(t *testing.T) {
 
 	expectedExtensionConfig := func(extra ...extraParams) map[string]any {
 		finalOutput := map[string]any{
+			"continue_on_error":       true,
 			"idle_connection_timeout": "3s",
 			"proxy_disable":           false,
 			"ssl": map[string]interface{}{
