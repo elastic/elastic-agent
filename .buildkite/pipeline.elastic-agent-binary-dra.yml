@@ -138,7 +138,7 @@ steps:
         PLATFORMS: "linux/amd64"
         FIPS: "true"
 
-    - label: ":package: linux/arm64 darwin/arm64 Elastic-Agent Core staging"
+    - label: ":package: linux/arm64 darwin/arm64 windows/arm64 Elastic-Agent Core staging"
       commands: |
         source .buildkite/scripts/version_qualifier.sh
         .buildkite/scripts/steps/build-agent-core.sh
@@ -151,7 +151,7 @@ steps:
         imagePrefix: "core-ubuntu-2204-aarch64"
       env:
         DRA_WORKFLOW: "dra-core-staging"
-        PLATFORMS: "linux/arm64 darwin/arm64"
+        PLATFORMS: "linux/arm64 darwin/arm64 windows/arm64"
 
     - label: ":package: linux/arm64 FIPS Elastic-Agent Core staging"
       commands: |
