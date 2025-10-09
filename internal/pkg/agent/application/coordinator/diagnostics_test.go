@@ -91,6 +91,7 @@ func TestDiagnosticLocalConfig(t *testing.T) {
 	// The YAML we expect to see from the preceding config
 	expectedCfg := `
 agent:
+  collector: null
   download: null
   grpc: null
   id: ""
