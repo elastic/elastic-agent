@@ -28,6 +28,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
@@ -43,8 +44,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
-	"github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/info"
-	mocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
 )
 
 func Test_CopyFile(t *testing.T) {
@@ -249,7 +248,7 @@ func TestIsInProgress(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// Expect client.State() call to be made only if no Upgrade Watcher PIDs
 			// are returned (i.e. no Upgrade Watcher is found to be running).
-			mc := mocks.NewClient(t)
+			mc := client.NewMockClient(t)
 			if test.watcherPIDsFetcher != nil {
 				pids, _ := test.watcherPIDsFetcher()
 				if len(pids) == 0 {
@@ -303,37 +302,31 @@ func TestUpgraderAckAction(t *testing.T) {
 		require.Nil(t, u.AckAction(t.Context(), nil, action))
 	})
 	t.Run("AckAction with acker", func(t *testing.T) {
-		acker := &fakeAcker{}
-		acker.On("Ack", mock.Anything, action).Return(nil)
-		acker.On("Commit", mock.Anything).Return(nil)
+		mockAcker := acker.NewMockAcker(t)
+		mockAcker.EXPECT().Ack(mock.Anything, action).Return(nil)
+		mockAcker.EXPECT().Commit(mock.Anything).Return(nil)
 
-		require.Nil(t, u.AckAction(t.Context(), acker, action))
-		acker.AssertCalled(t, "Ack", mock.Anything, action)
-		acker.AssertCalled(t, "Commit", mock.Anything)
+		require.Nil(t, u.AckAction(t.Context(), mockAcker, action))
 	})
 
 	t.Run("AckAction with acker - failing commit", func(t *testing.T) {
-		acker := &fakeAcker{}
+		mockAcker := acker.NewMockAcker(t)
 
 		errCommit := errors.New("failed commit")
-		acker.On("Ack", mock.Anything, action).Return(nil)
-		acker.On("Commit", mock.Anything).Return(errCommit)
+		mockAcker.EXPECT().Ack(mock.Anything, action).Return(nil)
+		mockAcker.EXPECT().Commit(mock.Anything).Return(errCommit)
 
-		require.ErrorIs(t, u.AckAction(t.Context(), acker, action), errCommit)
-		acker.AssertCalled(t, "Ack", mock.Anything, action)
-		acker.AssertCalled(t, "Commit", mock.Anything)
+		require.ErrorIs(t, u.AckAction(t.Context(), mockAcker, action), errCommit)
 	})
 
 	t.Run("AckAction with acker - failed ack", func(t *testing.T) {
-		acker := &fakeAcker{}
+		mockAcker := acker.NewMockAcker(t)
 
 		errAck := errors.New("ack error")
-		acker.On("Ack", mock.Anything, action).Return(errAck)
-		acker.On("Commit", mock.Anything).Return(nil)
+		mockAcker.EXPECT().Ack(mock.Anything, action).Return(errAck)
+		// no expectation on Commit() since it shouldn't be called after an error during Ack()
 
-		require.ErrorIs(t, u.AckAction(t.Context(), acker, action), errAck)
-		acker.AssertCalled(t, "Ack", mock.Anything, action)
-		acker.AssertNotCalled(t, "Commit", mock.Anything)
+		require.ErrorIs(t, u.AckAction(t.Context(), mockAcker, action), errAck)
 	})
 }
 
@@ -1122,22 +1115,6 @@ func TestIsSameReleaseVersion(t *testing.T) {
 	}
 }
 
-var _ acker.Acker = &fakeAcker{}
-
-type fakeAcker struct {
-	mock.Mock
-}
-
-func (f *fakeAcker) Ack(ctx context.Context, action fleetapi.Action) error {
-	args := f.Called(ctx, action)
-	return args.Error(0)
-}
-
-func (f *fakeAcker) Commit(ctx context.Context) error {
-	args := f.Called(ctx)
-	return args.Error(0)
-}
-
 type mockArtifactDownloader struct {
 	returnError       error
 	returnArchivePath string
@@ -1377,7 +1354,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		},
 	}
 
-	mockAgentInfo := info.NewAgent(t)
+	mockAgentInfo := info.NewMockAgent(t)
 	mockAgentInfo.On("Version").Return("9.0.0")
 
 	for name, tc := range testCases {
