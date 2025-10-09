@@ -6,6 +6,7 @@ package comp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -77,7 +78,7 @@ func (s *killAction) Execute(_ context.Context, _ map[string]interface{}) (map[s
 func newRunningUnit(logger zerolog.Logger, manager *StateManager, unit *client.Unit) (runningUnit, error) {
 	expected := unit.Expected()
 	if expected.Config.Type == "" {
-		return nil, fmt.Errorf("unit config type empty")
+		return nil, errors.New("unit config type empty")
 	}
 	if unit.Type() == client.UnitTypeOutput {
 		switch expected.Config.Type {

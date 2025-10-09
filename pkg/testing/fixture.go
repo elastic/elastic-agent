@@ -213,7 +213,7 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	}
 	if f.extractDir != "" {
 		// already prepared
-		return fmt.Errorf("already been prepared")
+		return errors.New("already been prepared")
 	}
 	src, err := f.fetch(ctx)
 	if err != nil {

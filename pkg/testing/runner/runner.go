@@ -705,7 +705,7 @@ func (r *Runner) getStackForBatchID(id string) (common.Stack, error) {
 	}
 	_, ok = r.batchToStackCh[id]
 	if ok {
-		return common.Stack{}, fmt.Errorf("getStackForBatchID called twice; this is not allowed")
+		return common.Stack{}, errors.New("getStackForBatchID called twice; this is not allowed")
 	}
 	ch := make(chan stackRes, 1)
 	r.batchToStackCh[id] = ch
@@ -717,7 +717,7 @@ func (r *Runner) getStackForBatchID(id string) (common.Stack, error) {
 	defer t.Stop()
 	select {
 	case <-t.C:
-		return common.Stack{}, fmt.Errorf("failed waiting for a response after 12 minutes")
+		return common.Stack{}, errors.New("failed waiting for a response after 12 minutes")
 	case res = <-ch:
 		return res.stack, res.err
 	}

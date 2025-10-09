@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -231,7 +232,7 @@ func getDockerClient() (*client.Client, error) {
 
 				endpoint, ok := dockerContext.Endpoints["docker"]
 				if !ok {
-					return nil, fmt.Errorf("docker endpoint not found in context")
+					return nil, errors.New("docker endpoint not found in context")
 				}
 
 				return client.NewClientWithOpts(

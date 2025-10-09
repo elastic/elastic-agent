@@ -7,6 +7,7 @@ package ogc
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -96,7 +97,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 		// Without this it's unclear where OGC went wrong, it
 		// doesn't do a great job of reporting a clean error
 		fmt.Fprintf(os.Stdout, "%s\n", upOutput)
-		return nil, fmt.Errorf("ogc didn't create any machines")
+		return nil, errors.New("ogc didn't create any machines")
 	}
 
 	// map the machines to instances

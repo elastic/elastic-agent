@@ -461,7 +461,7 @@ func (m *Manager) PerformComponentDiagnostics(ctx context.Context, additionalMet
 	for res := 0; res < diagnosticCount; res++ {
 		select {
 		case <-collectTimeout.Done():
-			return nil, fmt.Errorf("got context done waiting for diagnostics")
+			return nil, errors.New("got context done waiting for diagnostics")
 		case data := <-respChan:
 			resp = append(resp, data)
 		}

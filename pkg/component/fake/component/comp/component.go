@@ -219,7 +219,7 @@ func (f *fakeInput) Update(u *client.Unit, triggers client.Trigger) error {
 	}
 
 	if expected.Config.Type == "" {
-		return fmt.Errorf("unit missing config type")
+		return errors.New("unit missing config type")
 	}
 	if expected.Config.Type != Fake && expected.Config.Type != FakeIsolatedUnits {
 		return fmt.Errorf("unit type changed with the same unit ID: %s",

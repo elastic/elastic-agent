@@ -242,15 +242,15 @@ func (p *StatefulProvisioner) createDeployment(ctx context.Context, r common.Sta
 
 func (p *StatefulProvisioner) getDeploymentID(stack common.Stack) (string, error) {
 	if stack.Internal == nil {
-		return "", fmt.Errorf("missing internal information")
+		return "", errors.New("missing internal information")
 	}
 	deploymentIDRaw, ok := stack.Internal["deployment_id"]
 	if !ok {
-		return "", fmt.Errorf("missing internal deployment_id")
+		return "", errors.New("missing internal deployment_id")
 	}
 	deploymentID, ok := deploymentIDRaw.(string)
 	if !ok {
-		return "", fmt.Errorf("internal deployment_id not a string")
+		return "", errors.New("internal deployment_id not a string")
 	}
 	return deploymentID, nil
 }
