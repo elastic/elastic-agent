@@ -61,6 +61,15 @@ inputs:
 #     # Frequency used to check the queue of events to be sent out to fleet.
 #     #reporting_check_frequency_sec: 30
 
+## configuration for the otel collector managed by elastic-agent
+# agent.collector:
+#   telemetry:
+#     # Endpoint on which the otel collector will expose its Prometheus metrics. Default is localhost with a random port.
+#     endpoint:
+#   healthcheck:
+#     # Endpoint on which the otel collector will expose its status. Default is localhost with a random port.
+#     endpoint:
+
 # agent.download:
 #   # source of the artifacts, requires elastic like structure and naming of the binaries
 #   # e.g /windows-x86.zip
