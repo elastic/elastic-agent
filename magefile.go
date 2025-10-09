@@ -446,7 +446,7 @@ func (Check) Changes() error {
 	if len(out) != 0 {
 		fmt.Fprintln(os.Stderr, "Changes:")
 		fmt.Fprintln(os.Stderr, out)
-		return fmt.Errorf("uncommitted changes")
+		return errors.New("uncommitted changes")
 	}
 	return nil
 }
