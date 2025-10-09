@@ -1514,7 +1514,7 @@ func PackageUsingDRA(ctx context.Context) error {
 
 	platforms := devtools.Platforms.Names()
 	if len(platforms) == 0 {
-		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")
+		return errors.New("elastic-agent package is expected to build at least one platform package")
 	}
 
 	if !devtools.PackagingFromManifest {
@@ -3109,7 +3109,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		return nil, err
 	}
 	if !ok {
-		return nil, fmt.Errorf("ESS api key missing; run 'mage integration:auth'")
+		return nil, errors.New("ESS api key missing; run 'mage integration:auth'")
 	}
 
 	// Possible to change the region for deployment, default is gcp-us-west2 which is
@@ -3124,7 +3124,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 		return nil, err
 	}
 	if !ok {
-		return nil, fmt.Errorf("GCE service token missing; run 'mage integration:auth'")
+		return nil, errors.New("GCE service token missing; run 'mage integration:auth'")
 	}
 	datacenter := os.Getenv("TEST_INTEG_AUTH_GCP_DATACENTER")
 	if datacenter == "" {
@@ -3813,9 +3813,9 @@ func updateYamlFile(path string, keyVal ...struct {
 	}
 
 	if rootNode.Kind != yaml.DocumentNode {
-		return fmt.Errorf("root node is not a document node")
+		return errors.New("root node is not a document node")
 	} else if len(rootNode.Content) == 0 {
-		return fmt.Errorf("root node has no content")
+		return errors.New("root node has no content")
 	}
 
 	for _, kv := range keyVal {
@@ -4082,7 +4082,7 @@ func (h Helm) Package() error {
 
 func updateYamlNodes(rootNode *yaml.Node, value string, keys ...string) error {
 	if len(keys) == 0 {
-		return fmt.Errorf("no keys provided")
+		return errors.New("no keys provided")
 	}
 
 	for i := 0; i < len(rootNode.Content)-1; i += 2 {

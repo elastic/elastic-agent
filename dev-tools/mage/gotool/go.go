@@ -5,6 +5,7 @@
 package gotool
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -90,7 +91,7 @@ func ListDepsLocation(pkg string) (map[string]string, error) {
 	for _, l := range lines {
 		parts := strings.Split(l, ";")
 		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid number of parts")
+			return nil, errors.New("invalid number of parts")
 		}
 		deps[parts[0]] = parts[1]
 	}

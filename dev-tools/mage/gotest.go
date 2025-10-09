@@ -184,7 +184,7 @@ func InstallGoTestTools() error {
 
 func GoTestBuild(ctx context.Context, params GoTestArgs) error {
 	if params.OutputFile == "" {
-		return fmt.Errorf("missing output file")
+		return errors.New("missing output file")
 	}
 
 	fmt.Println(">> go test:", params.LogName, "Building Test Binary")

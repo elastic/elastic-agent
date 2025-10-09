@@ -5,6 +5,7 @@
 package mage
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -110,7 +111,7 @@ func (t *CopyTask) fileCopy(src, dest string, entry fs.DirEntry) error {
 	}
 
 	if !info.Mode().IsRegular() {
-		return fmt.Errorf("failed to copy source file because it is not a regular file")
+		return errors.New("failed to copy source file because it is not a regular file")
 	}
 
 	mode := t.Mode

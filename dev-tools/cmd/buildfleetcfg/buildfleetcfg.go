@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"go/format"
@@ -97,7 +98,7 @@ func gen(path string, l string) ([]byte, error) {
 	}
 
 	if len(files) > 1 {
-		return nil, fmt.Errorf("can only embed a single configuration file")
+		return nil, errors.New("can only embed a single configuration file")
 	}
 
 	var buf bytes.Buffer

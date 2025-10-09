@@ -1134,7 +1134,7 @@ func readDocker(dockerFile string, filterWorkingDir bool) (*packageFile, *docker
 	}
 
 	if len(info.Config.Entrypoint) == 0 {
-		return nil, nil, fmt.Errorf("no entrypoint")
+		return nil, nil, errors.New("no entrypoint")
 	}
 
 	workingDir := info.Config.WorkingDir
