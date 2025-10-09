@@ -152,7 +152,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 			close(healthCheckDone)
 		}()
 		currentStatus := aggregateStatus(componentstatus.StatusStarting, nil)
-		reportCollectorStatus(ctx, statusCh, currentStatus)
+		r.reportSubprocessCollectorStatus(ctx, statusCh, currentStatus)
 
 		// specify a max duration of not being able to get the status from the collector
 		const maxFailuresDuration = 130 * time.Second
@@ -168,21 +168,21 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 			if err != nil {
 				switch {
 				case errors.Is(err, context.Canceled):
-					reportCollectorStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStopped, nil))
+					r.reportSubprocessCollectorStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStopped, nil))
 					return
 				}
 			} else {
 				maxFailuresTimer.Reset(maxFailuresDuration)
-
+				removeManagedHealthCheckExtensionStatus(statuses, r.healthCheckExtensionID)
 				if !compareStatuses(currentStatus, statuses) {
 					currentStatus = statuses
-					reportCollectorStatus(procCtx, statusCh, statuses)
+					r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
 				}
 			}
 
 			select {
 			case <-procCtx.Done():
-				reportCollectorStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStopped, nil))
+				r.reportSubprocessCollectorStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStopped, nil))
 				return
 			case <-healthCheckPollTimer.C:
 				healthCheckPollTimer.Reset(healthCheckPollDuration)
@@ -193,7 +193,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 				)
 				if !compareStatuses(currentStatus, failedToConnectStatuses) {
 					currentStatus = statuses
-					reportCollectorStatus(procCtx, statusCh, statuses)
+					r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
 				}
 			}
 		}
@@ -221,6 +221,29 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 	}()
 
 	return ctl, nil
+}
+
+// cloneCollectorStatus creates a deep copy of the provided AggregateStatus.
+func cloneCollectorStatus(aStatus *status.AggregateStatus) *status.AggregateStatus {
+	st := &status.AggregateStatus{
+		Event: aStatus.Event,
+	}
+
+	if len(aStatus.ComponentStatusMap) > 0 {
+		st.ComponentStatusMap = make(map[string]*status.AggregateStatus, len(aStatus.ComponentStatusMap))
+		for k, cs := range aStatus.ComponentStatusMap {
+			st.ComponentStatusMap[k] = cloneCollectorStatus(cs)
+		}
+	}
+
+	return st
+}
+
+func (r *subprocessExecution) reportSubprocessCollectorStatus(ctx context.Context, statusCh chan *status.AggregateStatus, collectorStatus *status.AggregateStatus) {
+	// we need to clone the status to prevent any mutation on the receiver side
+	// affecting the original ref
+	clonedStatus := cloneCollectorStatus(collectorStatus)
+	reportCollectorStatus(ctx, statusCh, clonedStatus)
 }
 
 // getCollectorPorts returns the ports used by the OTel collector. If the ports set in the execution struct are 0,
@@ -252,6 +275,16 @@ func (r *subprocessExecution) getCollectorPorts() (healthCheckPort int, metricsP
 		*randomPorts[i] = port
 	}
 	return healthCheckPort, metricsPort, nil
+}
+
+func removeManagedHealthCheckExtensionStatus(status *status.AggregateStatus, healthCheckExtensionID string) {
+	extensions, exists := status.ComponentStatusMap["extensions"]
+	if !exists {
+		return
+	}
+
+	extensionID := "extension:" + healthCheckExtensionID
+	delete(extensions.ComponentStatusMap, extensionID)
 }
 
 type procHandle struct {
