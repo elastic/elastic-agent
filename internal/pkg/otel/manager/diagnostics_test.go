@@ -6,12 +6,12 @@ package manager
 
 import (
 	"encoding/json"
+	"fmt"
 	"runtime"
 	"testing"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions/handlers"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -53,13 +53,9 @@ func TestPerformComponentDiagnostics(t *testing.T) {
 	require.NoError(t, err)
 	for i, d := range diags {
 		assert.Equal(t, expectedDiags[i].Component.ID, d.Component.ID)
-		// we should have errors set about not being able to connect to monitoring endpoints
+		// we should have errors set about not being able to connect to diagnostics extension
 		require.NotNil(t, d.Err)
-		assert.ErrorContains(t, d.Err, "failed to get stats beat metrics")
-		assert.ErrorContains(t, d.Err, "failed to get input beat metrics")
-		if translate.GetBeatNameForComponent(&d.Component) == "filebeat" {
-			assert.ErrorContains(t, d.Err, "failed to get filebeat registry archive")
-		}
+		assert.ErrorContains(t, d.Err, fmt.Sprintf("failed to get diagnostics for %s", d.Component.ID))
 	}
 }
 

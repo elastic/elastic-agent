@@ -12,7 +12,6 @@ import (
 	"syscall"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -127,12 +126,7 @@ func (m *OTelManager) PerformComponentDiagnostics(
 			}
 		}
 		if !found {
-			var errs []error
-			errs = append(errs, errors.New("failed to get stats beat metrics"), errors.New("failed to get input beat metrics"))
-			if translate.GetBeatNameForComponent(&diag.Component) == "filebeat" {
-				errs = append(errs, errors.New("failed to get filebeat registry archive: %w"))
-			}
-			diagnostics[idx].Err = errors.Join(errs...)
+			diagnostics[idx].Err = fmt.Errorf("failed to get diagnostics for %s", diag.Component.ID)
 		}
 	}
 
