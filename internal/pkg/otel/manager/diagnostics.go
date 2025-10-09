@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -104,24 +105,34 @@ func (m *OTelManager) PerformComponentDiagnostics(
 		}
 	}
 
-	extDiagnostics, err := otel.PerformDiagnosticsExt(ctx, false)
+	extDiagnostics, extErr := otel.PerformDiagnosticsExt(ctx, false)
 
 	// We're not running the EDOT if:
 	//  1. Either the socket doesn't exist
 	//	2. It is refusing the connections.
 	// Return error for any other scenario.
-	if err != nil {
-		m.logger.Debugf("Couldn't fetch diagnostics from EDOT: %v", err)
-		if !errors.Is(err, syscall.ENOENT) && !errors.Is(err, syscall.ECONNREFUSED) {
-			return nil, fmt.Errorf("error fetching otel diagnostics: %w", err)
+	if extErr != nil {
+		m.logger.Debugf("Couldn't fetch diagnostics from EDOT: %v", extErr)
+		if !errors.Is(extErr, syscall.ENOENT) && !errors.Is(extErr, syscall.ECONNREFUSED) {
+			return nil, fmt.Errorf("error fetching otel diagnostics: %w", extErr)
 		}
 	}
 
 	for idx, diag := range diagnostics {
+		found := false
 		for _, extDiag := range extDiagnostics.ComponentDiagnostics {
 			if strings.Contains(extDiag.Name, diag.Component.ID) {
+				found = true
 				diagnostics[idx].Results = append(diagnostics[idx].Results, extDiag)
 			}
+		}
+		if !found {
+			var errs []error
+			errs = append(errs, errors.New("failed to get stats beat metrics"), errors.New("failed to get input beat metrics"))
+			if translate.GetBeatNameForComponent(&diag.Component) == "filebeat" {
+				errs = append(errs, errors.New("failed to get filebeat registry archive: %w"))
+			}
+			diagnostics[idx].Err = errors.Join(errs...)
 		}
 	}
 

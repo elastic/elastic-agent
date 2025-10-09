@@ -419,16 +419,16 @@ func TestDiagnosticsHandlerWithEDOT(t *testing.T) {
 	err := os.MkdirAll(path.Join(tempAgentRoot, "data"), 0755)
 	require.NoError(t, err)
 	called := false
-	s := mockhandlers.NewMockServer(t, paths.DiagnosticsExtensionSocket(), &called)
+	s := NewMockServer(t, paths.DiagnosticsExtensionSocket(), &called, nil)
 	defer func() {
 		require.NoError(t, s.Shutdown(context.Background()))
 	}()
-	mockDiagProvider := mockhandlers.NewDiagnosticsProvider(t)
+	mockDiagProvider := newMockDiagnosticsProvider(t)
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{hook1})
 	mockDiagProvider.EXPECT().PerformDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentUnitDiagnostic{mockUnitDiagnostic})
 	mockDiagProvider.EXPECT().PerformComponentDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentDiagnostic{mockComponentDiagnostic}, nil)
 
-	mockAcker := mockackers.NewAcker(t)
+	mockAcker := acker.NewMockAcker(t)
 	mockAcker.EXPECT().Ack(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, a fleetapi.Action) error {
 		require.IsType(t, new(fleetapi.ActionDiagnostics), a)
 		assert.NoError(t, a.(*fleetapi.ActionDiagnostics).Err)
@@ -436,7 +436,7 @@ func TestDiagnosticsHandlerWithEDOT(t *testing.T) {
 	})
 	mockAcker.EXPECT().Commit(mock.Anything).Return(nil)
 
-	mockUploader := mockhandlers.NewUploader(t)
+	mockUploader := NewMockUploader(t)
 	mockUploader.EXPECT().UploadDiagnostics(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, s1, s2 string, i int64, r io.Reader) (string, error) {
 		expectedContent := map[string][]byte{
 			"components/ComponentID/mock_component_diag_file.yaml":   []byte("hello: component\n"),
