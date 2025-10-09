@@ -62,6 +62,18 @@ func TestHttpFetcher_Fetch(t *testing.T) {
 			},
 			wantErr: assert.NoError,
 		},
+		{
+			name:   "invalid baseURL",
+			fields: fields{baseURL: "://bad-url"},
+			args: args{
+				operatingSystem: "linux",
+				architecture:    "arm64",
+				version:         "1.2.3",
+				pkgFormat:       "targz",
+			},
+			want:    nil,
+			wantErr: assert.Error,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
