@@ -17,9 +17,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
-	mocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
 )
 
 type hookFunc func(t *testing.T, topDir string)
@@ -312,7 +312,7 @@ func TestRollback(t *testing.T) {
 			t.Logf("Loaded update marker %+v", marker)
 
 			// mock client
-			mockClient := mocks.NewClient(t)
+			mockClient := client.NewMockClient(t)
 			mockClient.EXPECT().Connect(
 				mock.AnythingOfType("*context.timerCtx"),
 				mock.AnythingOfType("*grpc.funcDialOption"),
