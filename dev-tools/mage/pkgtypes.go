@@ -748,8 +748,8 @@ func PackageTarGz(spec PackageSpec) error {
 	return nil
 }
 
-func closeOrLog(file io.Closer, what string) {
-	err := file.Close()
+func closeOrLog(closer io.Closer, what string) {
+	err := closer.Close()
 	if err == nil || errors.Is(err, os.ErrClosed) {
 		return
 	}
