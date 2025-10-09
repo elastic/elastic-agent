@@ -292,7 +292,7 @@ func (Build) WindowsArchiveRootBinary() error {
 		},
 		Env: map[string]string{
 			"GOOS":   "windows",
-			"GOARCH": "amd64",
+			"GOARCH": devtools.GOARCH,
 		},
 		LDFlags: []string{
 			"-s", // Strip all debug symbols from binary (does not affect Go stack traces).
@@ -1184,7 +1184,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	mg.Deps(agentBinaryTarget)
 
 	// compile the elastic-agent.exe proxy binary for the windows archive
-	if slices.Contains(platforms, "windows/amd64") {
+	if slices.Contains(platforms, "windows/amd64") || slices.Contains(platforms, "windows/arm64") {
 		mg.Deps(Build.WindowsArchiveRootBinary)
 	}
 
