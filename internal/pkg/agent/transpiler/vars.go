@@ -111,7 +111,7 @@ func replaceVars(value string, replacer func(variable string) (Node, Processors,
 	var processors Processors
 	matchIdxs := varsRegex.FindAllSubmatchIndex([]byte(value), -1)
 	if !validBrackets(value, matchIdxs) {
-		return nil, fmt.Errorf("starting ${ is missing ending }")
+		return nil, errors.New("starting ${ is missing ending }")
 	}
 	result := ""
 	lastIndex := 0
@@ -251,7 +251,7 @@ func extractVars(i string, defaultProvider string) ([]varI, error) {
 					res = append(res, &constString{string(is)})
 				} else if len(is) > 0 {
 					if is[len(is)-1] == '.' {
-						return nil, fmt.Errorf("variable cannot end with '.'")
+						return nil, errors.New("variable cannot end with '.'")
 					}
 					res = append(res, &varString{maybeAddDefaultProvider(string(is), defaultProvider)})
 				}
@@ -293,7 +293,7 @@ func extractVars(i string, defaultProvider string) ([]varI, error) {
 		res = append(res, &constString{string(is)})
 	} else if len(is) > 0 {
 		if is[len(is)-1] == '.' {
-			return nil, fmt.Errorf("variable cannot end with '.'")
+			return nil, errors.New("variable cannot end with '.'")
 		}
 		res = append(res, &varString{maybeAddDefaultProvider(string(is), defaultProvider)})
 	}

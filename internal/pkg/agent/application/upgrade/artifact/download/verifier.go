@@ -155,7 +155,7 @@ func VerifyChecksum(hasher hash.Hash, filename, checksumFileName string) error {
 	defer f.Close()
 
 	if _, err := io.Copy(hasher, f); err != nil {
-		return fmt.Errorf("faled to read file to calculate hash")
+		return errors.New("faled to read file to calculate hash")
 	}
 
 	computedHash := hex.EncodeToString(hasher.Sum(nil))

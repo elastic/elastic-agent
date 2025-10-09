@@ -154,7 +154,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	locker := filelock.NewAppLocker(paths.Data(), paths.AgentLockFileName)
 	if err := locker.TryLock(); err != nil {
 		if errors.Is(err, filelock.ErrAppAlreadyRunning) {
-			return fmt.Errorf("cannot perform installation as Elastic Agent is already running from this directory")
+			return errors.New("cannot perform installation as Elastic Agent is already running from this directory")
 		}
 		return fmt.Errorf("error obtaining lock: %w", err)
 	}
@@ -165,20 +165,20 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			fmt.Fprintf(streams.Out, "Elastic Agent is installed but currently broken: %s\n", reason)
 			confirm, err := cli.Confirm(fmt.Sprintf("Continuing will re-install Elastic Agent over the current installation at %s. Do you want to continue?", topPath), true)
 			if err != nil {
-				return fmt.Errorf("problem reading prompt response")
+				return errors.New("problem reading prompt response")
 			}
 			if !confirm {
-				return fmt.Errorf("installation was cancelled by the user")
+				return errors.New("installation was cancelled by the user")
 			}
 		}
 	} else if status != install.PackageInstall {
 		if !force && !nonInteractive {
 			confirm, err := cli.Confirm(fmt.Sprintf("Elastic Agent will be installed at %s and will run as a service. Do you want to continue?", topPath), true)
 			if err != nil {
-				return fmt.Errorf("problem reading prompt response")
+				return errors.New("problem reading prompt response")
 			}
 			if !confirm {
-				return fmt.Errorf("installation was cancelled by the user")
+				return errors.New("installation was cancelled by the user")
 			}
 		}
 	}
@@ -198,7 +198,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	if askEnroll {
 		confirm, err := cli.Confirm("Do you want to enroll this Agent into Fleet?", true)
 		if err != nil {
-			return fmt.Errorf("problem reading prompt response")
+			return errors.New("problem reading prompt response")
 		}
 		if !confirm {
 			// not enrolling
@@ -213,11 +213,11 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	if enroll && fleetServer == "" {
 		if url == "" {
 			if nonInteractive {
-				return fmt.Errorf("missing required --url argument used to enroll the agent")
+				return errors.New("missing required --url argument used to enroll the agent")
 			}
 			url, err = cli.ReadInput("URL you want to enroll this Agent into:")
 			if err != nil {
-				return fmt.Errorf("problem reading prompt response")
+				return errors.New("problem reading prompt response")
 			}
 			if url == "" {
 				fmt.Fprintln(streams.Out, "Enrollment cancelled because no URL was provided.")
@@ -226,11 +226,11 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		}
 		if token == "" {
 			if nonInteractive {
-				return fmt.Errorf("missing required --enrollment-token argument used to enroll the agent")
+				return errors.New("missing required --enrollment-token argument used to enroll the agent")
 			}
 			token, err = cli.ReadInput("Fleet enrollment token:")
 			if err != nil {
-				return fmt.Errorf("problem reading prompt response")
+				return errors.New("problem reading prompt response")
 			}
 			if token == "" {
 				fmt.Fprintf(streams.Out, "Enrollment cancelled because no enrollment token was provided.\n")

@@ -27,7 +27,7 @@ const (
 
 type SkipFn func(relPath string) bool
 
-var ErrUnknownFlavor = fmt.Errorf("unknown flavor")
+var ErrUnknownFlavor = errors.New("unknown flavor")
 
 type FlavorDefinition struct {
 	Name       string
@@ -218,7 +218,7 @@ func allowedSubpathsForFlavor(versionedHome string, flavor FlavorDefinition) ([]
 
 func subpathsForComponent(componentName, sourceComponentsDir string) ([]string, error) {
 	if componentName == "" {
-		return nil, fmt.Errorf("empty component name")
+		return nil, errors.New("empty component name")
 	}
 	specFilename := fmt.Sprintf("%s.spec.yml", componentName)
 	content, err := os.ReadFile(filepath.Join(sourceComponentsDir, specFilename))

@@ -7,6 +7,7 @@ package remote
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -386,7 +387,7 @@ func TestSortClients(t *testing.T) {
 	t.Run("Picks second requester when first has error", func(t *testing.T) {
 		one := &requestClient{
 			lastUsed:   time.Now().UTC(),
-			lastErr:    fmt.Errorf("fake error"),
+			lastErr:    errors.New("fake error"),
 			lastErrOcc: time.Now().UTC(),
 		}
 		two := &requestClient{}
@@ -435,7 +436,7 @@ func TestSortClients(t *testing.T) {
 		}
 		two := &requestClient{
 			lastUsed:   time.Now().UTC().Add(-3 * time.Minute),
-			lastErr:    fmt.Errorf("fake error"),
+			lastErr:    errors.New("fake error"),
 			lastErrOcc: time.Now().Add(-time.Minute),
 		}
 		three := &requestClient{
@@ -451,17 +452,17 @@ func TestSortClients(t *testing.T) {
 	t.Run("Picks second requester when its oldest and all have old errors", func(t *testing.T) {
 		one := &requestClient{
 			lastUsed:   time.Now().UTC().Add(-time.Minute),
-			lastErr:    fmt.Errorf("fake error"),
+			lastErr:    errors.New("fake error"),
 			lastErrOcc: time.Now().Add(-time.Minute),
 		}
 		two := &requestClient{
 			lastUsed:   time.Now().UTC().Add(-3 * time.Minute),
-			lastErr:    fmt.Errorf("fake error"),
+			lastErr:    errors.New("fake error"),
 			lastErrOcc: time.Now().Add(-3 * time.Minute),
 		}
 		three := &requestClient{
 			lastUsed:   time.Now().UTC().Add(-2 * time.Minute),
-			lastErr:    fmt.Errorf("fake error"),
+			lastErr:    errors.New("fake error"),
 			lastErrOcc: time.Now().Add(-2 * time.Minute),
 		}
 		client, err := newClient(nil, Config{}, one, two, three)

@@ -403,7 +403,7 @@ func (b *BeatsMonitor) injectMonitoringOutput(source, dest map[string]interface{
 
 	outputs, ok := outputsNode.(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("outputs not a map")
+		return errors.New("outputs not a map")
 	}
 
 	outputNode, found := outputs[monitoringOutputName]
@@ -498,12 +498,12 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentInfo
 	inputs := []any{input}
 	inputsNode, found := cfg[inputsKey]
 	if !found {
-		return fmt.Errorf("no inputs in config")
+		return errors.New("no inputs in config")
 	}
 
 	inputsCfg, ok := inputsNode.([]interface{})
 	if !ok {
-		return fmt.Errorf("inputs is not an array")
+		return errors.New("inputs is not an array")
 	}
 
 	inputsCfg = append(inputsCfg, inputs...)
@@ -595,12 +595,12 @@ func (b *BeatsMonitor) injectMetricsInput(
 
 	inputsNode, found := cfg[inputsKey]
 	if !found {
-		return fmt.Errorf("no inputs in config")
+		return errors.New("no inputs in config")
 	}
 
 	inputsCfg, ok := inputsNode.([]interface{})
 	if !ok {
-		return fmt.Errorf("inputs is not an array")
+		return errors.New("inputs is not an array")
 	}
 
 	inputsCfg = append(inputsCfg, inputs...)

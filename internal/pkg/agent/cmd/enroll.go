@@ -428,7 +428,7 @@ func doEnroll(streams *cli.IOStreams, cmd *cobra.Command) error {
 	staging, _ := cmd.Flags().GetString("staging")
 	if staging != "" {
 		if len(staging) < 8 {
-			return errors.New(fmt.Errorf("invalid staging build hash; must be at least 8 characters"), "Error")
+			return errors.New(errors.New("invalid staging build hash; must be at least 8 characters"), "Error")
 		}
 	}
 

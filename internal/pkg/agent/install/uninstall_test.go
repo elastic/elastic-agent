@@ -6,6 +6,7 @@ package install
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -174,7 +175,7 @@ func TestNotifyFleetAuditUnenroll(t *testing.T) {
 				w.WriteHeader(http.StatusConflict)
 			}))
 		},
-		err: fmt.Errorf("unretryable return status: 409"),
+		err: errors.New("unretryable return status: 409"),
 	}}
 
 	log, _ := logp.NewInMemoryLocal("test", zap.NewDevelopmentEncoderConfig())

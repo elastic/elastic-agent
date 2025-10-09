@@ -6,6 +6,7 @@ package composable
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -52,10 +53,10 @@ func (r *ProviderRegistry) AddDynamicProvider(providerName string, builder Dynam
 	defer r.lock.Unlock()
 
 	if providerName == "" {
-		return fmt.Errorf("provider providerName is required")
+		return errors.New("provider providerName is required")
 	}
 	if strings.ToLower(providerName) != providerName {
-		return fmt.Errorf("provider providerName must be lowercase")
+		return errors.New("provider providerName must be lowercase")
 	}
 	_, contextExists := r.contextProviders[providerName]
 	_, dynamicExists := r.dynamicProviders[providerName]

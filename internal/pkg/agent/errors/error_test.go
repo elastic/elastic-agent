@@ -92,20 +92,20 @@ func TestErrors(t *testing.T) {
 	}
 
 	cases := []testCase{
-		testCase{"custom message", TypeUnexpected, "UNEXPECTED", "msg1: err1", nil, []interface{}{fmt.Errorf("err1"), "msg1"}},
-		testCase{"no message", TypeUnexpected, "UNEXPECTED", "err1", nil, []interface{}{fmt.Errorf("err1")}},
+		testCase{"custom message", TypeUnexpected, "UNEXPECTED", "msg1: err1", nil, []interface{}{errors.New("err1"), "msg1"}},
+		testCase{"no message", TypeUnexpected, "UNEXPECTED", "err1", nil, []interface{}{errors.New("err1")}},
 
-		testCase{"custom type (crash)", TypeApplicationCrash, "CRASH", "msg1: err1", nil, []interface{}{fmt.Errorf("err1"), "msg1", TypeApplicationCrash}},
-		testCase{"custom type (config)", TypeConfig, "CONFIG", "msg1: err1", nil, []interface{}{fmt.Errorf("err1"), "msg1", TypeConfig}},
-		testCase{"custom type (path)", TypePath, "PATH", "msg1: err1", nil, []interface{}{fmt.Errorf("err1"), "msg1", TypePath}},
+		testCase{"custom type (crash)", TypeApplicationCrash, "CRASH", "msg1: err1", nil, []interface{}{errors.New("err1"), "msg1", TypeApplicationCrash}},
+		testCase{"custom type (config)", TypeConfig, "CONFIG", "msg1: err1", nil, []interface{}{errors.New("err1"), "msg1", TypeConfig}},
+		testCase{"custom type (path)", TypePath, "PATH", "msg1: err1", nil, []interface{}{errors.New("err1"), "msg1", TypePath}},
 
-		testCase{"meta simple", TypeUnexpected, "UNEXPECTED", "msg1: err1", map[string]interface{}{"a": 1}, []interface{}{fmt.Errorf("err1"), "msg1", M("a", 1)}},
-		testCase{"meta two keys", TypeUnexpected, "UNEXPECTED", "msg1: err1", map[string]interface{}{"a": 1, "b": 21}, []interface{}{fmt.Errorf("err1"), "msg1", M("a", 1), M("b", 21)}},
-		testCase{"meta overriding key", TypeUnexpected, "UNEXPECTED", "msg1: err1", map[string]interface{}{"a": 21}, []interface{}{fmt.Errorf("err1"), "msg1", M("a", 1), M("a", 21)}},
+		testCase{"meta simple", TypeUnexpected, "UNEXPECTED", "msg1: err1", map[string]interface{}{"a": 1}, []interface{}{errors.New("err1"), "msg1", M("a", 1)}},
+		testCase{"meta two keys", TypeUnexpected, "UNEXPECTED", "msg1: err1", map[string]interface{}{"a": 1, "b": 21}, []interface{}{errors.New("err1"), "msg1", M("a", 1), M("b", 21)}},
+		testCase{"meta overriding key", TypeUnexpected, "UNEXPECTED", "msg1: err1", map[string]interface{}{"a": 21}, []interface{}{errors.New("err1"), "msg1", M("a", 1), M("a", 21)}},
 
-		testCase{"overriding custom message", TypeUnexpected, "UNEXPECTED", "msg2: err1", nil, []interface{}{fmt.Errorf("err1"), "msg1", "msg2"}},
-		testCase{"overriding custom type (crash)", TypeApplicationCrash, "CRASH", "msg1: err1", nil, []interface{}{fmt.Errorf("err1"), "msg1", TypeConfig, TypeApplicationCrash}},
-		testCase{"overriding error", TypeUnexpected, "UNEXPECTED", "err2", nil, []interface{}{fmt.Errorf("err1"), fmt.Errorf("err2")}},
+		testCase{"overriding custom message", TypeUnexpected, "UNEXPECTED", "msg2: err1", nil, []interface{}{errors.New("err1"), "msg1", "msg2"}},
+		testCase{"overriding custom type (crash)", TypeApplicationCrash, "CRASH", "msg1: err1", nil, []interface{}{errors.New("err1"), "msg1", TypeConfig, TypeApplicationCrash}},
+		testCase{"overriding error", TypeUnexpected, "UNEXPECTED", "err2", nil, []interface{}{errors.New("err1"), errors.New("err2")}},
 	}
 
 	for _, tc := range cases {
@@ -148,7 +148,7 @@ func TestErrors(t *testing.T) {
 }
 
 func TestMetaFold(t *testing.T) {
-	err1 := fmt.Errorf("level1")
+	err1 := errors.New("level1")
 	err2 := New("level2", err1, M("key1", "level2"), M("key2", "level2"))
 	err3 := New("level3", err2, M("key1", "level3"), M("key3", "level3"))
 	err4 := New("level4", err3)
@@ -184,7 +184,7 @@ func TestMetaFold(t *testing.T) {
 }
 
 func TestMetaCallDoesNotModifyCollection(t *testing.T) {
-	err1 := fmt.Errorf("level1")
+	err1 := errors.New("level1")
 	err2 := New("level2", err1, M("key1", "level2"), M("key2", "level2"))
 	err3 := New("level3", err2, M("key1", "level3"), M("key3", "level3"))
 	err4 := New("level4", err3)

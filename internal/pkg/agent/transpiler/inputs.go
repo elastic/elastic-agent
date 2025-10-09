@@ -22,7 +22,7 @@ const (
 func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 	l, ok := inputs.Value().(*List)
 	if !ok {
-		return nil, fmt.Errorf("inputs must be an array")
+		return nil, errors.New("inputs must be an array")
 	}
 	var nodes []varIDMap
 	nodesMap := map[uint64]*Dict{}

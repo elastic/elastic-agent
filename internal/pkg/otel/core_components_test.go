@@ -6,6 +6,7 @@ package otel
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -104,7 +105,7 @@ func loadCoreComponentsYAML() ([]string, error) {
 	// Get the directory of the current file
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
-		return nil, fmt.Errorf("failed to get current file path")
+		return nil, errors.New("failed to get current file path")
 	}
 	dir := filepath.Dir(filename)
 	yamlPath := filepath.Join(dir, "core-components.yaml")

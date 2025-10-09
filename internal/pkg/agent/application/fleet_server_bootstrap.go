@@ -106,7 +106,7 @@ func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig) co
 // addBootrapCfg will transform the passed configuration.Elasticsearch to a map and add it to dst under the bootstrap key.
 func addBootstrapCfg(dst map[string]interface{}, es *configuration.Elasticsearch) error {
 	if es == nil {
-		return fmt.Errorf("fleet-server bootstrap output config is undefined")
+		return errors.New("fleet-server bootstrap output config is undefined")
 	}
 	mp, err := toMapStr(es)
 	if err != nil {

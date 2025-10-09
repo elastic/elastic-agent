@@ -5,7 +5,6 @@
 package docker
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/elastic/elastic-agent-autodiscover/bus"
@@ -117,7 +116,7 @@ func DynamicProviderBuilder(logger *logger.Logger, c *config.Config, managed boo
 func generateData(event bus.Event) (*dockerContainerData, error) {
 	container, ok := event["container"].(*docker.Container)
 	if !ok {
-		return nil, fmt.Errorf("unable to get container from watcher event")
+		return nil, errors.New("unable to get container from watcher event")
 	}
 
 	labelMap := mapstr.M{}

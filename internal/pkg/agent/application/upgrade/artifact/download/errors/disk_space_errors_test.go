@@ -5,6 +5,7 @@
 package errors
 
 import (
+	"errors"
 	goerrors "errors"
 	"fmt"
 	"testing"
@@ -23,7 +24,7 @@ func TestIsDiskSpaceError(t *testing.T) {
 			"os_error":         {err: err, want: true},
 			"wrapped_os_error": {err: fmt.Errorf("wrapped: %w", err), want: true},
 			"joined_error":     {err: goerrors.Join(err, goerrors.New("test")), want: true},
-			"new_error":        {err: agentErrors.New(err, fmt.Errorf("test")), want: false},
+			"new_error":        {err: agentErrors.New(err, errors.New("test")), want: false},
 		}
 		for name, tc := range testCases {
 			t.Run(fmt.Sprintf("%s_%s", err.Error(), name), func(t *testing.T) {

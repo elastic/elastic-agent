@@ -5,6 +5,7 @@
 package monitoring
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -119,7 +120,7 @@ func getURL(
 
 	if !strings.HasSuffix(u.Scheme, "unix") && !strings.HasSuffix(u.Scheme, "npipe") {
 		if u.Host == "" {
-			return nil, t, fmt.Errorf("error parsing URL: empty host")
+			return nil, t, errors.New("error parsing URL: empty host")
 		}
 
 		// Validate the host. The port is optional.
@@ -132,7 +133,7 @@ func getURL(
 			}
 		}
 		if host == "" {
-			return nil, t, fmt.Errorf("error parsing URL: empty host")
+			return nil, t, errors.New("error parsing URL: empty host")
 		}
 	}
 

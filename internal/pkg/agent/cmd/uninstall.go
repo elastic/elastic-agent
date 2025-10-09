@@ -5,6 +5,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -54,7 +55,7 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	}
 	status, reason := install.Status(paths.Top())
 	if status == install.NotInstalled {
-		return fmt.Errorf("not installed")
+		return errors.New("not installed")
 	}
 	if status == install.Installed && !paths.RunningInstalled() {
 		return fmt.Errorf("can only be uninstalled by executing the installed Elastic Agent at: %s", install.ExecutablePath(paths.Top()))
@@ -68,20 +69,20 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			fmt.Fprintf(streams.Out, "%s is installed but currently broken: %s\n", paths.ServiceDisplayName(), reason)
 			confirm, err := cli.Confirm(fmt.Sprintf("Continuing will uninstall the broken %s at %s. Do you want to continue?", paths.ServiceDisplayName(), paths.Top()), true)
 			if err != nil {
-				return fmt.Errorf("problem reading prompt response")
+				return errors.New("problem reading prompt response")
 			}
 			if !confirm {
-				return fmt.Errorf("uninstall was cancelled by the user")
+				return errors.New("uninstall was cancelled by the user")
 			}
 		}
 	} else {
 		if !force {
 			confirm, err := cli.Confirm(fmt.Sprintf("%s will be uninstalled from your system at %s. Do you want to continue?", paths.ServiceDisplayName(), paths.Top()), true)
 			if err != nil {
-				return fmt.Errorf("problem reading prompt response")
+				return errors.New("problem reading prompt response")
 			}
 			if !confirm {
-				return fmt.Errorf("uninstall was cancelled by the user")
+				return errors.New("uninstall was cancelled by the user")
 			}
 		}
 	}

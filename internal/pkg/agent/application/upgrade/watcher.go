@@ -341,7 +341,7 @@ func takeOverWatcher(ctx context.Context, log *logger.Logger, watcherGrappler wa
 	for {
 		select {
 		case <-takeoverCtx.Done():
-			return nil, fmt.Errorf("timed out taking over watcher applocker")
+			return nil, errors.New("timed out taking over watcher applocker")
 		case <-takeOverTicker.C:
 			locker := filelock.NewAppLocker(topDir, watcherApplockerFileName)
 			err := locker.TryLock()
