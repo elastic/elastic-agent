@@ -9,6 +9,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -666,27 +667,15 @@ func PackageTarGz(spec PackageSpec) error {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err := outFile.Close(); err != nil {
-			log.Printf("failed to close output file: %v", err)
-		}
-	}()
+	defer closeOrLog(outFile, "output file")
 
 	// Create a gzip writer to our output file
 	gzWriter := gzip.NewWriter(outFile)
-	defer func() {
-		if err := gzWriter.Close(); err != nil {
-			log.Printf("failed to close gzip writer: %v", err)
-		}
-	}()
+	defer closeOrLog(gzWriter, "gzip writer")
 
 	// Create a new tar archive.
 	w := tar.NewWriter(gzWriter)
-	defer func() {
-		if err := w.Close(); err != nil {
-			log.Printf("failed to close tar writer: %v", err)
-		}
-	}()
+	defer closeOrLog(gzWriter, "tar writer")
 
 	// // Replace the darwin-universal by darwin-x86_64 and darwin-arm64. Also
 	// // keep the other files.
@@ -757,6 +746,14 @@ func PackageTarGz(spec PackageSpec) error {
 		return fmt.Errorf("failed to create .sha512 file: %w", err)
 	}
 	return nil
+}
+
+func closeOrLog(file io.Closer, what string) {
+	err := file.Close()
+	if err == nil || errors.Is(err, os.ErrClosed) {
+		return
+	}
+	log.Printf("failed to close %s: %v", what, err)
 }
 
 // PackageDeb packages a deb file. This requires Docker to execute FPM.
