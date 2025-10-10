@@ -14,7 +14,7 @@ require (
 	github.com/docker/docker v28.3.3+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251007223150-78caa87aae7e
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251009195622-1a0d5cddaa86
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.10.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
@@ -372,7 +372,7 @@ require (
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/lunes v0.1.0 // indirect
-	github.com/elastic/mito v1.22.0 // indirect
+	github.com/elastic/mito v1.23.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.8.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.21.0 // indirect
