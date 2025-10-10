@@ -19,8 +19,6 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
-	mockhandlers "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/actions/handlers"
-	mockAcker "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/fleetapi/acker"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -424,7 +422,7 @@ func TestEndpointPreUpgradeCallback(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			mockCoordinator := mockhandlers.NewUpgradeCoordinator(t)
+			mockCoordinator := newMockUpgradeCoordinator(t)
 
 			var coordState coordinator.State
 			if tc.shouldProxyToEndpoint {
@@ -469,7 +467,7 @@ func TestEndpointPreUpgradeCallback(t *testing.T) {
 				return nil
 			}
 
-			ack := mockAcker.NewAcker(t)
+			ack := acker.NewMockAcker(t)
 
 			if tc.coordUpgradeErr != nil {
 				// on a coordinator upgrade error we should ack and commit all the bkg actions

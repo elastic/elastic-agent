@@ -50,7 +50,6 @@ import (
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	mockAcker "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/fleetapi/acker"
 )
 
 const (
@@ -551,7 +550,7 @@ func TestPreUpgradeCallback(t *testing.T) {
 		upgradeErr:  upgrade.ErrUpgradeSameVersion,
 	}
 
-	acker := mockAcker.NewAcker(t)
+	acker := acker.NewMockAcker(t)
 	coord, _, _ := createCoordinator(t, ctx,
 		ManagedCoordinator(true),
 		WithUpgradeManager(upgradeManager),
