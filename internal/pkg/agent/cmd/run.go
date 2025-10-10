@@ -19,6 +19,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
+	"github.com/gofrs/uuid/v5"
 
 	"go.elastic.co/apm/v2"
 	apmtransport "go.elastic.co/apm/v2/transport"
@@ -720,8 +721,20 @@ func setupMetrics(
 	tracer *apm.Tracer,
 	coord *coordinator.Coordinator,
 ) (*reload.ServerReloader, error) {
-	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil {
-		return nil, err
+	ephemeralID, err := generateEphemeralID()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate ephemeral ID: %w", err)
+	}
+
+	if err := report.SetupMetricsOptions(report.MetricOptions{
+		Name:           agentName,
+		Version:        version.GetDefaultVersion(),
+		Logger:         logger,
+		EphemeralID:    ephemeralID,
+		SystemMetrics:  monitoringLib.Default.GetOrCreateRegistry("system"),
+		ProcessMetrics: monitoringLib.Default.GetOrCreateRegistry("beat"),
+	}); err != nil {
+		return nil, fmt.Errorf("failed to setup metrics: %w", err)
 	}
 
 	s, err := monitoring.NewServer(logger, monitoringLib.GetNamespace, tracer, coord, cfg)
@@ -793,4 +806,14 @@ func ensureInstallMarkerPresent() error {
 	paths.ResolveControlSocket(true)
 
 	return nil
+}
+
+// generateEphemeralID generates a random UUID
+func generateEphemeralID() (string, error) {
+	uid, err := uuid.NewV4()
+	if err != nil {
+		return "", fmt.Errorf("error while generating UUID for agent: %w", err)
+	}
+
+	return uid.String(), nil
 }
