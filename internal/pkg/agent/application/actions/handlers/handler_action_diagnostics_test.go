@@ -395,3 +395,70 @@ func TestDiagnosticHandlerWithCPUProfile(t *testing.T) {
 	assert.True(t, cpuCalled, "CPU profile collector was not called.")
 	mockDiagProvider.AssertExpectations(t)
 }
+<<<<<<< HEAD
+=======
+
+func TestDiagnosticsHandlerWithEDOT(t *testing.T) {
+	tempAgentRoot := t.TempDir()
+	paths.SetTop(tempAgentRoot)
+	err := os.MkdirAll(path.Join(tempAgentRoot, "data"), 0755)
+	require.NoError(t, err)
+	called := false
+	s := NewMockServer(t, paths.DiagnosticsExtensionSocket(), &called, nil)
+	defer func() {
+		require.NoError(t, s.Shutdown(context.Background()))
+	}()
+	mockDiagProvider := newMockDiagnosticsProvider(t)
+	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{hook1})
+	mockDiagProvider.EXPECT().PerformDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentUnitDiagnostic{mockUnitDiagnostic})
+	mockDiagProvider.EXPECT().PerformComponentDiagnostics(mock.Anything, mock.Anything).Return([]runtime.ComponentDiagnostic{mockComponentDiagnostic}, nil)
+
+	mockAcker := acker.NewMockAcker(t)
+
+	mockAcker.EXPECT().Ack(mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, a fleetapi.Action) error {
+		require.IsType(t, new(fleetapi.ActionDiagnostics), a)
+		assert.NoError(t, a.(*fleetapi.ActionDiagnostics).Err)
+		return nil
+	})
+	mockAcker.EXPECT().Commit(mock.Anything).Return(nil)
+
+	mockUploader := NewMockUploader(t)
+	mockUploader.EXPECT().UploadDiagnostics(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(ctx context.Context, s1, s2 string, i int64, r io.Reader) (string, error) {
+		expectedContent := map[string][]byte{
+			"components/ComponentID/mock_component_diag_file.yaml":   []byte("hello: component\n"),
+			"components/ComponentID/UnitID/mock_unit_diag_file.yaml": []byte("hello: there\n"),
+			"mock_global.txt": []byte("This is a mock global diagnostic content"),
+		}
+		verifyZip(t, r, expectedContent)
+		return "upload-id", nil
+	})
+
+	testLogger, _ := loggertest.New("diagnostic-handler-test")
+	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
+	handler.collectDiag(t.Context(), &fleetapi.ActionDiagnostics{}, mockAcker)
+	require.True(t, called, "expected the mock diagnostics server to be called")
+}
+
+func verifyZip(t *testing.T, reader io.Reader, expectedContent map[string][]byte) {
+	// Read all from io.Reader into a buffer
+	buf, err := io.ReadAll(reader)
+	require.NoErrorf(t, err, "failed to read the buffer: %v", err)
+
+	// Create a zip reader from the buffer
+	zr, err := zip.NewReader(bytes.NewReader(buf), int64(len(buf)))
+	require.NoErrorf(t, err, "got error while creating reader: %v", err)
+
+	foundContent := map[string][]byte{}
+	for _, f := range zr.File {
+		if _, ok := expectedContent[f.Name]; ok {
+			rc, err := f.Open()
+			require.NoErrorf(t, err, "failed to open the zip file at %v: %v", f.Name, err)
+			defer rc.Close()
+			content, err := io.ReadAll(rc)
+			require.NoErrorf(t, err, "failed to read the zip file at %v: %v", f.Name, err)
+			foundContent[f.Name] = content
+		}
+	}
+	require.Equal(t, expectedContent, foundContent)
+}
+>>>>>>> 7afb20069 ([edot][diagnostics] remove otel diagnostics from manager (#10415))
