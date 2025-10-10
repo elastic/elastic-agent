@@ -56,16 +56,18 @@ jobs:
 #        shell: bash
 
   unit-tests-pr:
-    name: Unit tests macos-15
+    name: Unit tests macos
     #    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
-        os: [ macos-15-large, macos-14 ]
+        os: [ macos-15, macos-14 ]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-go@v6
         with:
