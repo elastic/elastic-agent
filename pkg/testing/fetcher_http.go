@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -47,11 +46,6 @@ func (h HttpFetcher) Name() string {
 }
 
 func (h HttpFetcher) Fetch(ctx context.Context, operatingSystem string, architecture string, version string, packageFormat string) (FetcherResult, error) {
-	_, err := url.Parse(h.baseURL)
-	if err != nil {
-		return nil, err
-	}
-
 	suffix, err := GetPackageSuffix(operatingSystem, architecture, packageFormat)
 	if err != nil {
 		return nil, err
