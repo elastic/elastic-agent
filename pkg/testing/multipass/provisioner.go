@@ -170,7 +170,7 @@ func (p *provisioner) launch(ctx context.Context, cfg common.Config, batch commo
 	if err != nil {
 		return fmt.Errorf("failed to run multipass launch: %w", err)
 	}
-	_, err = proc.Stdin.Write([]byte(fmt.Sprintf("#cloud-config\n%s", cloudCfgData)))
+	_, err = fmt.Fprintf(proc.Stdin, "#cloud-config\n%s", cloudCfgData)
 	if err != nil {
 		_ = proc.Stdin.Close()
 		_ = proc.Kill()
