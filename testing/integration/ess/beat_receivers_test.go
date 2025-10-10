@@ -331,8 +331,8 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		assert.NoError(collect, statusErr)
 		// agent should be healthy
 		assert.Equal(collect, int(cproto.State_HEALTHY), otelStatus.State)
-		// we should have 3 components running: filestream-monitoring, http/metrics-monitoring and beats/metrics-monitoring
-		assert.Equal(collect, 3, len(otelStatus.Components))
+		// we should have 4 components running: filestream-monitoring, http/metrics-monitoring, beats/metrics-monitoring, and prometheus/metrics-monitoring
+		assert.Equal(collect, 4, len(otelStatus.Components))
 
 		// all the components should be healthy, their units should be healthy, and should identify themselves
 		// as beats receivers via their version info
