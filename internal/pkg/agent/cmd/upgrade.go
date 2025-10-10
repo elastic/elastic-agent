@@ -52,7 +52,7 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 		Run: func(c *cobra.Command, args []string) {
 			c.SetContext(context.Background())
 			if err := upgradeCmd(streams, c, args); err != nil {
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
 				os.Exit(1)
 			}
 		},
