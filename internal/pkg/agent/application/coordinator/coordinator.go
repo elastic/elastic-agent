@@ -230,7 +230,7 @@ type ComponentsModifier func(comps []component.Component, cfg map[string]interfa
 
 // managerShutdownTimeout is how long the coordinator will wait during shutdown
 // to receive termination states from its managers.
-const managerShutdownTimeout = time.Second * 5
+const managerShutdownTimeout = time.Second * 30
 
 type configReloader interface {
 	Reload(*config.Config) error
