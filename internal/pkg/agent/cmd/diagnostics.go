@@ -29,7 +29,7 @@ func newDiagnosticsCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 		Long:  "This command gathers diagnostics information from the Elastic Agent and writes it to a zip archive.",
 		Run: func(c *cobra.Command, args []string) {
 			if err := diagnosticCmd(streams, c); err != nil {
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
 				os.Exit(1)
 			}
 		},
