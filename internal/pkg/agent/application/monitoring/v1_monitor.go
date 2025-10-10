@@ -90,19 +90,11 @@ var (
 // BeatsMonitor provides config values for monitoring of agent clients (beats, endpoint, etc)
 // by injecting the monitoring config into an existing fleet config
 type BeatsMonitor struct {
-<<<<<<< HEAD:internal/pkg/agent/application/monitoring/v1_monitor.go
 	enabled         bool // feature flag disabling whole v1 monitoring story
 	config          *monitoringConfig
+	otelConfig      *confmap.Conf
 	operatingSystem string
 	agentInfo       info.Agent
-=======
-	enabled                 bool // feature flag disabling whole v1 monitoring story
-	config                  *monitoringConfig
-	otelConfig              *confmap.Conf
-	operatingSystem         string
-	agentInfo               info.Agent
-	isOtelRuntimeSubprocess bool
->>>>>>> a441ebee7 (Ingest internal telemetry from the OTel Collector when it is running (#9928)):internal/pkg/agent/application/monitoring/component/v1_monitor.go
 }
 
 // componentInfo is the information necessary to generate monitoring configuration for a component. We don't just use
@@ -121,25 +113,15 @@ type monitoringConfig struct {
 }
 
 // New creates a new BeatsMonitor instance.
-<<<<<<< HEAD:internal/pkg/agent/application/monitoring/v1_monitor.go
-func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, agentInfo info.Agent) *BeatsMonitor {
-=======
-func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, otelCfg *confmap.Conf, agentInfo info.Agent, isOtelRuntimeSubprocess bool) *BeatsMonitor {
->>>>>>> a441ebee7 (Ingest internal telemetry from the OTel Collector when it is running (#9928)):internal/pkg/agent/application/monitoring/component/v1_monitor.go
+func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, otelCfg *confmap.Conf, agentInfo info.Agent) *BeatsMonitor {
 	return &BeatsMonitor{
 		enabled: enabled,
 		config: &monitoringConfig{
 			C: cfg,
 		},
-<<<<<<< HEAD:internal/pkg/agent/application/monitoring/v1_monitor.go
+		otelConfig:      otelCfg,
 		operatingSystem: operatingSystem,
 		agentInfo:       agentInfo,
-=======
-		otelConfig:              otelCfg,
-		operatingSystem:         operatingSystem,
-		agentInfo:               agentInfo,
-		isOtelRuntimeSubprocess: isOtelRuntimeSubprocess,
->>>>>>> a441ebee7 (Ingest internal telemetry from the OTel Collector when it is running (#9928)):internal/pkg/agent/application/monitoring/component/v1_monitor.go
 	}
 }
 
@@ -374,6 +356,15 @@ func (b *BeatsMonitor) Prepare(unit string) error {
 	}
 
 	return nil
+}
+
+func usingOtelRuntime(componentInfos []componentInfo) bool {
+	for _, ci := range componentInfos {
+		if ci.RuntimeManager == component.OtelRuntimeManager {
+			return true
+		}
+	}
+	return false
 }
 
 // Cleanup removes files that were created for monitoring.

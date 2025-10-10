@@ -329,7 +329,6 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		var statusErr error
 		otelStatus, statusErr = beatReceiverFixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
-<<<<<<< HEAD
 		// agent should be healthy
 		assert.Equal(collect, int(cproto.State_HEALTHY), otelStatus.State)
 		// we should have 3 components running: filestream-monitoring, http/metrics-monitoring and beats/metrics-monitoring
@@ -345,9 +344,6 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 			}
 		}
 
-=======
-		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 4)
->>>>>>> a441ebee7 (Ingest internal telemetry from the OTel Collector when it is running (#9928))
 		return
 	}, 1*time.Minute, 1*time.Second)
 

@@ -180,11 +180,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 			return fmt.Errorf("failed to detect inputs and outputs: %w", err)
 		}
 
-<<<<<<< HEAD
-		monitorFn, err := getMonitoringFn(ctx, cfg)
-=======
-		monitorFn, err := getMonitoringFn(ctx, l, cfg, otel)
->>>>>>> a441ebee7 (Ingest internal telemetry from the OTel Collector when it is running (#9928))
+		monitorFn, err := getMonitoringFn(ctx, cfg, otel)
 		if err != nil {
 			return fmt.Errorf("failed to get monitoring: %w", err)
 		}
@@ -379,11 +375,7 @@ func getComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath stri
 		return nil, err
 	}
 
-<<<<<<< HEAD
-	monitorFn, err := getMonitoringFn(ctx, m)
-=======
-	monitorFn, err := getMonitoringFn(ctx, l, m, otel)
->>>>>>> a441ebee7 (Ingest internal telemetry from the OTel Collector when it is running (#9928))
+	monitorFn, err := getMonitoringFn(ctx, m, otel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get monitoring: %w", err)
 	}
@@ -402,11 +394,7 @@ func getComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath stri
 	return comps, nil
 }
 
-<<<<<<< HEAD
-func getMonitoringFn(ctx context.Context, cfg map[string]interface{}) (component.GenerateMonitoringCfgFn, error) {
-=======
-func getMonitoringFn(ctx context.Context, logger *logger.Logger, cfg map[string]interface{}, otelCfg *confmap.Conf) (component.GenerateMonitoringCfgFn, error) {
->>>>>>> a441ebee7 (Ingest internal telemetry from the OTel Collector when it is running (#9928))
+func getMonitoringFn(ctx context.Context, cfg map[string]interface{}, otelCfg *confmap.Conf) (component.GenerateMonitoringCfgFn, error) {
 	config, err := config.NewConfigFrom(cfg)
 	if err != nil {
 		return nil, err
@@ -421,14 +409,8 @@ func getMonitoringFn(ctx context.Context, logger *logger.Logger, cfg map[string]
 	if err != nil {
 		return nil, fmt.Errorf("could not load agent info: %w", err)
 	}
-<<<<<<< HEAD
 
-	monitor := monitoring.New(agentCfg.Settings.V1MonitoringEnabled, agentCfg.Settings.DownloadConfig.OS(), agentCfg.Settings.MonitoringConfig, agentInfo)
-=======
-	otelExecMode := otelconfig.GetExecutionModeFromConfig(logger, config)
-	isOtelExecModeSubprocess := otelExecMode == manager.SubprocessExecutionMode
-	monitor := componentmonitoring.New(agentCfg.Settings.V1MonitoringEnabled, agentCfg.Settings.DownloadConfig.OS(), agentCfg.Settings.MonitoringConfig, otelCfg, agentInfo, isOtelExecModeSubprocess)
->>>>>>> a441ebee7 (Ingest internal telemetry from the OTel Collector when it is running (#9928))
+	monitor := monitoring.New(agentCfg.Settings.V1MonitoringEnabled, agentCfg.Settings.DownloadConfig.OS(), agentCfg.Settings.MonitoringConfig, otelCfg, agentInfo)
 	return monitor.MonitoringConfig, nil
 }
 
