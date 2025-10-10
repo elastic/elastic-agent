@@ -42,13 +42,8 @@ func newEnrollCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command
 		Short: "Enroll the Elastic Agent into Fleet",
 		Long:  "This command will enroll the Elastic Agent into Fleet.",
 		Run: func(c *cobra.Command, args []string) {
-<<<<<<< HEAD
 			if err := enroll(streams, c); err != nil {
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
-=======
-			if err := doEnroll(streams, c); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
->>>>>>> b74942add (Fix troubleshooting message URL for versions after 9.x (#10218))
 				logExternal(fmt.Sprintf("%s enroll failed: %s", paths.BinaryName, err))
 				os.Exit(1)
 			}
