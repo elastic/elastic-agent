@@ -419,7 +419,7 @@ func TestDiagnosticsHandlerWithEDOT(t *testing.T) {
 	err := os.MkdirAll(path.Join(tempAgentRoot, "data"), 0755)
 	require.NoError(t, err)
 	called := false
-	s := NewMockServer(t, paths.DiagnosticsExtensionSocket(), &called)
+	s := NewMockServer(t, paths.DiagnosticsExtensionSocket(), &called, nil)
 	defer func() {
 		require.NoError(t, s.Shutdown(context.Background()))
 	}()
