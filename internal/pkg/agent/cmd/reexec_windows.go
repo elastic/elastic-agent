@@ -9,7 +9,6 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"time"
 
@@ -33,12 +32,12 @@ func newReExecWindowsCommand(_ []string, streams *cli.IOStreams) *cobra.Command 
 		Short:  "ReExec the windows service",
 		Long:   "This waits for the windows service to stop then restarts it to allow self-upgrading.",
 		Args:   cobra.ExactArgs(2),
-		Run: func(c *cobra.Command, args []string) {
+		RunE: func(c *cobra.Command, args []string) error {
 			cfg := getConfig(streams)
 			log, err := configuredLogger(cfg, reexecName)
 			if err != nil {
 				fmt.Fprintf(streams.Err, "Error configuring logger: %v\n%s\n", err, troubleshootMessage())
-				os.Exit(3)
+				return NewExitCodeError(1, err)
 			}
 
 			// Make sure to flush any buffered logs before we're done.
@@ -49,9 +48,10 @@ func newReExecWindowsCommand(_ []string, streams *cli.IOStreams) *cobra.Command 
 			if err != nil {
 				log.Errorw("reexec failed", "error.message", err)
 				fmt.Fprintf(streams.Err, "reexec failed: %v\n", err)
-				os.Exit(1)
+				return NewExitCodeError(1, err)
 			}
 			reExec(log, serviceName, servicePid, streams.Err)
+			return nil
 		},
 	}
 

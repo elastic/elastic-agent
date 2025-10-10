@@ -55,6 +55,16 @@ func (WindowsRunner) Prepare(ctx context.Context, sshClient ssh.SSHClient, logge
 		return fmt.Errorf("failed to install make: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
 
+	// install mingw (CGO is required)
+	// CGO is required on Windows for github.com\godror\godror otherwise it will not be able to run
+	logger.Logf("Installing mingw")
+	mingwCtx, mingwCancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer mingwCancel()
+	stdOut, errOut, err = sshClient.ExecWithRetry(mingwCtx, "choco", []string{"install", "-y", "mingw"}, 15*time.Second)
+	if err != nil {
+		return fmt.Errorf("failed to install mingw: %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
+	}
+
 	// install golang (doesn't use choco, because sometimes it doesn't have the required version)
 	logger.Logf("Installing golang %s (%s)", goVersion, arch)
 	downloadURL := fmt.Sprintf("https://go.dev/dl/go%s.windows-%s.msi", goVersion, arch)
@@ -261,6 +271,8 @@ func toPowershellScript(agentVersion string, prefix string, verbose bool, tests 
 		sb.WriteString(v)
 		sb.WriteString("\"\n")
 	}
+	// CGO is required on Windows for github.com\godror\godror otherwise it will not be able to run
+	sb.WriteString("$env:CGO_ENABLED=\"1\"\n")
 	sb.WriteString("$env:AGENT_VERSION=\"")
 	sb.WriteString(agentVersion)
 	sb.WriteString("\"\n")

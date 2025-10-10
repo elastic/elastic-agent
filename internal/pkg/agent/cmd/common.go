@@ -106,3 +106,32 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 
 	return cmd
 }
+
+// ExitCodeError is an error that includes an exit code.
+type ExitCodeError struct {
+	exitCode int
+	err      error
+}
+
+// Error returns the error message.
+func (e *ExitCodeError) Error() string {
+	return e.err.Error()
+}
+
+// ExitCode returns the exit code.
+func (e *ExitCodeError) ExitCode() int {
+	return e.exitCode
+}
+
+// Unwrap returns the wrapped error.
+func (e *ExitCodeError) Unwrap() error {
+	return e.err
+}
+
+// NewExitCodeError creates a new error with an exit code.
+func NewExitCodeError(exitCode int, err error) *ExitCodeError {
+	return &ExitCodeError{
+		exitCode: exitCode,
+		err:      err,
+	}
+}
