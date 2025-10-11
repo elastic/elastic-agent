@@ -723,6 +723,234 @@ outputs:
 	})
 }
 
+<<<<<<< HEAD
+=======
+// TestBeatsReceiverLogs is a test that compares logs emitted by beats processes to those emitted by beats receivers.
+func TestBeatsReceiverLogs(t *testing.T) {
+	_ = define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: nil,
+	})
+
+	type configOptions struct {
+		RuntimeExperimental string
+	}
+	configTemplate := `agent.logging.level: info
+agent.logging.to_stderr: true
+agent.logging.to_files: false
+inputs:
+  # Collecting system metrics
+  - type: system/metrics
+    id: unique-system-metrics-input
+    _runtime_experimental: {{.RuntimeExperimental}}
+    streams:
+      - metricsets:
+        - cpu
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [http://localhost:9200]
+    api_key: placeholder
+agent.monitoring.enabled: false
+`
+
+	var configBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			configOptions{
+				RuntimeExperimental: string(component.ProcessRuntimeManager),
+			}))
+	processConfig := configBuffer.Bytes()
+	require.NoError(t,
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			configOptions{
+				RuntimeExperimental: string(component.OtelRuntimeManager),
+			}))
+	receiverConfig := configBuffer.Bytes()
+	// this is the context for the whole test, with a global timeout defined
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	// since we set the output to a nonexistent ES endpoint, we expect it to be degraded, but the input to be healthy
+	assertBeatsReady := func(t *assert.CollectT, status *atesting.AgentStatusOutput, runtime component.RuntimeManager) {
+		t.Helper()
+
+		var componentVersionInfoName string
+		switch runtime {
+		case component.OtelRuntimeManager:
+			componentVersionInfoName = "beats-receiver"
+		default:
+			componentVersionInfoName = "beat-v2-client"
+		}
+
+		// we don't actually care about anything here other than the receiver itself
+		assert.Equal(t, 1, len(status.Components))
+
+		// all the components should be degraded, their output units should be degraded, the input units should be healthy,
+		// and should identify themselves appropriately via their version info
+		for _, comp := range status.Components {
+			assert.Equal(t, componentVersionInfoName, comp.VersionInfo.Name)
+			for _, unit := range comp.Units {
+				if unit.UnitType == int(cproto.UnitType_INPUT) {
+					assert.Equal(t, int(cproto.State_HEALTHY), unit.State,
+						"expected state of unit %s to be %s, got %s",
+						unit.UnitID, cproto.State_HEALTHY.String(), cproto.State(unit.State).String())
+				}
+			}
+		}
+	}
+
+	// set up a standalone agent
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	err = fixture.Configure(ctx, processConfig)
+	require.NoError(t, err)
+
+	output, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true})
+	require.NoError(t, err, "failed to install agent: %s", output)
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		require.NoError(collect, statusErr)
+		assertBeatsReady(collect, &status, component.ProcessRuntimeManager)
+		return
+	}, 2*time.Minute, 5*time.Second)
+
+	// change configuration and wait until the beats receiver is healthy
+	err = fixture.Configure(ctx, receiverConfig)
+	require.NoError(t, err)
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		require.NoError(collect, statusErr)
+		assertBeatsReady(collect, &status, component.OtelRuntimeManager)
+		return
+	}, 2*time.Minute, 5*time.Second)
+
+	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
+	require.NoError(t, err, "failed to read logs: %v", err)
+
+	beatStartLogs := getBeatStartLogRecords(string(logsBytes))
+
+	require.Len(t, beatStartLogs, 2, "expected to find one log line for each configuration")
+	processLog, receiverLog := beatStartLogs[0], beatStartLogs[1]
+
+	// Check that the process log is a subset of the receiver log
+	for key, value := range processLog {
+		assert.Contains(t, receiverLog, key)
+		if key == "@timestamp" { // the timestamp value will be different
+			continue
+		}
+		assert.Equal(t, value, receiverLog[key])
+	}
+}
+
+// TestBeatsReceiverProcessRuntimeFallback verifies that we fall back to the process runtime if the otel runtime
+// does not support the requested configuration.
+func TestBeatsReceiverProcessRuntimeFallback(t *testing.T) {
+	_ = define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: nil,
+	})
+
+	config := `agent.logging.to_stderr: true
+agent.logging.to_files: false
+inputs:
+  # Collecting system metrics
+  - type: system/metrics
+    id: unique-system-metrics-input
+    _runtime_experimental: otel
+    streams:
+      - metricsets:
+        - cpu
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [http://localhost:9200]
+    api_key: placeholder
+    indices: [] # not supported by the elasticsearch exporter
+agent.monitoring.enabled: false
+`
+
+	// this is the context for the whole test, with a global timeout defined
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	// set up a standalone agent
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	err = fixture.Configure(ctx, []byte(config))
+	require.NoError(t, err)
+
+	installOutput, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true})
+	require.NoError(t, err, "install failed, output: %s", string(installOutput))
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+		// we should be running beats processes even though the otel runtime was requested
+		assertBeatsHealthy(collect, &status, component.ProcessRuntimeManager, 1)
+		return
+	}, 1*time.Minute, 1*time.Second)
+	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
+	require.NoError(t, err)
+
+	// verify we've logged a warning about using the process runtime
+	var unsupportedLogRecord map[string]any
+	for _, line := range strings.Split(string(logsBytes), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var logRecord map[string]any
+		if unmarshalErr := json.Unmarshal([]byte(line), &logRecord); unmarshalErr != nil {
+			continue
+		}
+
+		if message, ok := logRecord["message"].(string); ok && strings.HasPrefix(message, "otel runtime is not supported") {
+			unsupportedLogRecord = logRecord
+			break
+		}
+	}
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent logs seen by the test:")
+			t.Log(string(logsBytes))
+		}
+	})
+
+	require.NotNil(t, unsupportedLogRecord, "unsupported log message should be present")
+	message, ok := unsupportedLogRecord["message"].(string)
+	require.True(t, ok, "log message field should be a string")
+	expectedMessage := "otel runtime is not supported for component system/metrics-default, switching to process runtime, reason: unsupported configuration for system/metrics-default: error translating config for output: default, unit: system/metrics-default, error: indices is currently not supported: unsupported operation"
+	assert.Equal(t, expectedMessage, message)
+}
+
+>>>>>>> 71ece0de9 (Rewrite the beats receiver log test using common tooling (#10153))
 func assertCollectorComponentsHealthy(t *assert.CollectT, status *atesting.AgentStatusCollectorOutput) {
 	assert.Equal(t, int(cproto.CollectorComponentStatus_StatusOK), status.Status, "component status should be ok")
 	assert.Equal(t, "", status.Error, "component status should not have an error")
@@ -731,6 +959,75 @@ func assertCollectorComponentsHealthy(t *assert.CollectT, status *atesting.Agent
 	}
 }
 
+<<<<<<< HEAD
+=======
+func assertBeatsHealthy(t *assert.CollectT, status *atesting.AgentStatusOutput, runtime component.RuntimeManager, componentCount int) {
+	var componentVersionInfoName string
+	switch runtime {
+	case "otel":
+		componentVersionInfoName = "beats-receiver"
+	default:
+		componentVersionInfoName = "beat-v2-client"
+	}
+
+	// agent should be healthy
+	assert.Equal(t, int(cproto.State_HEALTHY), status.State)
+	assert.Equal(t, componentCount, len(status.Components))
+
+	// all the components should be healthy, their units should be healthy, and should identify themselves
+	// as beats processes via their version info
+	for _, comp := range status.Components {
+		assert.Equal(t, int(cproto.State_HEALTHY), comp.State)
+		assert.Equal(t, componentVersionInfoName, comp.VersionInfo.Name)
+		for _, unit := range comp.Units {
+			assert.Equal(t, int(cproto.State_HEALTHY), unit.State)
+		}
+	}
+}
+
+// getBeatStartLogRecords returns the log records for a particular log line emitted when the beat starts
+// This log line is identical between beats processes and receivers, so it's a good point of comparison
+func getBeatStartLogRecords(logs string) []map[string]any {
+	var logRecords []map[string]any
+	for _, line := range strings.Split(logs, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		logRecord := make(map[string]any)
+		if unmarshalErr := json.Unmarshal([]byte(line), &logRecord); unmarshalErr != nil {
+			continue
+		}
+
+		if message, ok := logRecord["message"].(string); ok && strings.HasPrefix(message, "Beat name:") {
+			logRecords = append(logRecords, logRecord)
+		}
+	}
+	return logRecords
+}
+
+func prepareAgentCmd(t *testing.T, ctx context.Context, config []byte) (*atesting.Fixture, *exec.Cmd, *strings.Builder) {
+	// set up a standalone agent
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	err = fixture.Configure(ctx, config)
+	require.NoError(t, err)
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err)
+	cmd.WaitDelay = 1 * time.Second
+
+	var output strings.Builder
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	return fixture, cmd, &output
+}
+
+>>>>>>> 71ece0de9 (Rewrite the beats receiver log test using common tooling (#10153))
 func genIgnoredFields(goos string) []string {
 	switch goos {
 	case "windows":
