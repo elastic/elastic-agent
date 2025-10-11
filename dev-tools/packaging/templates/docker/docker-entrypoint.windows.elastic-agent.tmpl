@@ -1,0 +1,15 @@
+# PowerShell entrypoint for Elastic Agent Windows containers
+# Equivalent to docker-entrypoint.elastic-agent.tmpl for Linux
+
+# For information on the possible environment variables that can be passed into the container, run:
+# .\{{ .BeatName }}.exe container --help
+
+$ErrorActionPreference = "Stop"
+
+if ($env:ELASTIC_AGENT_OTEL -eq "true") {
+    & "{{ .BeatName }}.exe" otel $args
+} else {
+    & "{{ .BeatName }}.exe" container $args
+}
+
+exit $LASTEXITCODE

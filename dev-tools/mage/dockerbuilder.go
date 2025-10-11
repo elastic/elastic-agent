@@ -193,20 +193,34 @@ func (b *dockerBuilder) expandDockerfile(templatesDir string, data map[string]in
 		dockerfile = f
 	}
 
+	// Use Windows-specific Dockerfile for Windows builds
+	if b.OS == "windows" {
+		dockerfile = "Dockerfile.windows.elastic-agent.tmpl"
+	}
+
 	entrypoint := "docker-entrypoint.tmpl"
 	if e, found := b.ExtraVars["docker_entrypoint"]; found {
 		entrypoint = e
+	}
+
+	// Use Windows-specific entrypoint for Windows builds
+	if b.OS == "windows" {
+		entrypoint = "docker-entrypoint.windows.elastic-agent.tmpl"
 	}
 
 	type fileExpansion struct {
 		source string
 		target string
 	}
-	for _, file := range []fileExpansion{{dockerfile, "Dockerfile.tmpl"}, {entrypoint, "docker-entrypoint.tmpl"}} {
-		target := strings.TrimSuffix(
-			filepath.Join(b.buildDir, file.target),
-			".tmpl",
-		)
+
+	targetDockerfile := "Dockerfile"
+	targetEntrypoint := "docker-entrypoint"
+	if b.OS == "windows" {
+		targetEntrypoint = "docker-entrypoint.ps1"
+	}
+
+	for _, file := range []fileExpansion{{dockerfile, targetDockerfile}, {entrypoint, targetEntrypoint}} {
+		target := filepath.Join(b.buildDir, file.target)
 		path := filepath.Join(templatesDir, file.source)
 		err := b.ExpandFile(path, target, data)
 		if err != nil {

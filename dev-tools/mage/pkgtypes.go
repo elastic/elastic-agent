@@ -148,6 +148,9 @@ var OSArchNames = map[string]map[PackageType]map[string]string{
 			"amd64": "x86_64",
 			"arm64": "arm64",
 		},
+		Docker: {
+			"amd64": "amd64",
+		},
 	},
 	"darwin": {
 		TarGz: {

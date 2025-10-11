@@ -1,0 +1,63 @@
+{{- $beatHome := printf "C:/%s" .BeatName }}
+{{- $repoInfo := repo }}
+
+FROM {{ .from }}
+
+ENV BEAT_SETUID_AS={{ .user }}
+
+LABEL \
+  org.label-schema.build-date="{{ date }}" \
+  org.label-schema.schema-version="1.0" \
+  org.label-schema.vendor="{{ .BeatVendor }}" \
+  org.label-schema.license="{{ .License }}" \
+  org.label-schema.name="{{ .BeatName }}" \
+  org.label-schema.version="{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}" \
+  org.label-schema.url="{{ .BeatURL }}" \
+  org.label-schema.vcs-url="{{ $repoInfo.RootImportPath }}" \
+  org.label-schema.vcs-ref="{{ commit }}" \
+  io.k8s.description="{{ .BeatDescription }}" \
+  io.k8s.display-name="{{ .BeatName | title }} image" \
+  org.opencontainers.image.created="{{ date }}" \
+  org.opencontainers.image.licenses="{{ .License }}" \
+  org.opencontainers.image.title="{{ .BeatName | title }}" \
+  org.opencontainers.image.vendor="{{ .BeatVendor }}" \
+  org.opencontainers.image.authors="infra@elastic.co" \
+  maintainer="infra@elastic.co" \
+  name="{{ .BeatName }}" \
+  vendor="{{ .BeatVendor }}" \
+  version="{{ agent_package_version }}{{if .Snapshot}}-SNAPSHOT{{end}}" \
+  release="1" \
+  url="{{ .BeatURL }}" \
+  summary="{{ .BeatName }}" \
+  license="{{ .License }}" \
+  description="{{ .BeatDescription }}"
+
+ENV ELASTIC_CONTAINER="true"
+ENV PATH="{{ $beatHome }};C:/Windows/system32;C:/Windows"
+ENV GODEBUG="madvdontneed=1"
+
+# Copy the agent files
+COPY beat {{ $beatHome }}
+
+# Copy the entrypoint script
+COPY docker-entrypoint.ps1 C:/docker-entrypoint.ps1
+
+# Create necessary directories using cmd (nanoserver has limited PowerShell)
+RUN cmd /S /C "mkdir {{ $beatHome }}\data 2>nul & mkdir C:\licenses 2>nul & exit 0"
+
+# Copy license files
+RUN cmd /S /C "if exist {{ $beatHome }}\LICENSE.txt copy {{ $beatHome }}\LICENSE.txt C:\licenses\LICENSE.txt"
+RUN cmd /S /C "if exist {{ $beatHome }}\NOTICE.txt copy {{ $beatHome }}\NOTICE.txt C:\licenses\NOTICE.txt"
+
+{{- range $i, $port := .ExposePorts }}
+EXPOSE {{ $port }}
+{{- end }}
+
+# When running under Docker, we must ensure libbeat monitoring pulls cgroup
+# metrics from the proper location (not applicable to Windows but kept for consistency)
+ENV LIBBEAT_MONITORING_CGROUPS_HIERARCHY_OVERRIDE=/
+
+WORKDIR {{ $beatHome }}
+
+# Use PowerShell Core with full path from PowerShell nanoserver image
+ENTRYPOINT ["C:/Program Files/PowerShell/pwsh.exe", "-NoProfile", "-File", "C:/docker-entrypoint.ps1"]
