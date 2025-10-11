@@ -6,9 +6,7 @@ package cmd
 
 import (
 	"flag"
-	"fmt"
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -17,15 +15,12 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/basecmd"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/version"
 )
 
-func troubleshootMessage() string {
-	v := strings.Split(release.Version(), ".")
-	version := strings.Join(v[:2], ".")
-	return fmt.Sprintf("For help, please see our troubleshooting guide at https://www.elastic.co/guide/en/fleet/%s/fleet-troubleshooting.html", version)
-}
+const (
+	troubleshootMessage = "For help, please see our troubleshooting guide at https://www.elastic.co/docs/troubleshoot/ingest/fleet/common-problems"
+)
 
 // NewCommand returns the default command for the agent.
 func NewCommand() *cobra.Command {
