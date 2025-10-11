@@ -485,9 +485,25 @@ func CheckHealthyAndVersion(ctx context.Context, f *atesting.Fixture, versionInf
 			return fmt.Errorf("commits don't match: got %s, want %s",
 				status.Info.Commit, versionInfo.Commit)
 		}
+		// we only check the health of the input here
+		// beats receivers have output health reporting, so the agent might be degraded if there's no ES running
+		if status.State == int(v2proto.State_HEALTHY) {
+			return nil
+		}
+		for _, compStatus := range status.Components {
+			if compStatus.State == int(v2proto.State_HEALTHY) {
+				continue
+			}
+			for _, unitStatus := range compStatus.Units {
+				if unitStatus.UnitType == int(v2proto.UnitType_INPUT) && unitStatus.State != int(v2proto.State_HEALTHY) {
+					return fmt.Errorf("agent input %s state is not healthy: got %s", unitStatus.UnitID,
+						v2proto.State(status.State).String())
+				}
+
+			}
+		}
 		if status.State != int(v2proto.State_HEALTHY) {
-			return fmt.Errorf("agent state is not healthy: got %d",
-				status.State)
+
 		}
 		return nil
 	}

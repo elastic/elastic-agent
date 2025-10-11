@@ -128,6 +128,7 @@ func TestMonitoringFull(t *testing.T) {
 	outCfgString := string(outCfgBytes)
 	// replace the version with a placeholder
 	outCfgString = strings.ReplaceAll(outCfgString, agentInfo.Version(), "placeholder")
+	// os.WriteFile(expectedConfigFilePath, []byte(outCfgString), 0644)
 	assert.Equal(t, string(expectedConfigBytes), outCfgString)
 }
 
