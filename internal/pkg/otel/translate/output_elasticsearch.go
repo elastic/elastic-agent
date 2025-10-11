@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/url"
 	"reflect"
 	"strings"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"github.com/elastic/beats/v7/libbeat/publisher/queue/memqueue"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 )
 
@@ -256,6 +258,12 @@ func cfgDecodeHookFunc() mapstructure.DecodeHookFunc {
 				return nil, fmt.Errorf("failed parsing TLS verification mode: %w", err)
 			}
 			return verificationMode, nil
+		case t == reflect.TypeOf(httpcommon.ProxyURI(url.URL{})):
+			proxyURL := httpcommon.ProxyURI(url.URL{})
+			if err := proxyURL.Unpack(data.(string)); err != nil {
+				return nil, fmt.Errorf("failed parsing proxy_url: %w", err)
+			}
+			return proxyURL, nil
 		default:
 			return data, nil
 		}
