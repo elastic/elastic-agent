@@ -7,8 +7,10 @@
 package ess
 
 import (
+	"archive/tar"
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -547,6 +549,7 @@ agent.monitoring.enabled: false
 		require.NoErrorf(t, err, "stat file %q failed", path)
 		require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", path)
 	}
+	verifyFilebeatRegistry(t, filepath.Join(extractionDir, "components/filestream-default/registry.tar.gz"))
 }
 
 func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string) func(ctx context.Context) error {
@@ -730,4 +733,24 @@ func extractKeysFromMap[K comparable, V any](src map[K]V) []K {
 type filePattern struct {
 	pattern  string
 	optional bool
+}
+
+func verifyFilebeatRegistry(t *testing.T, path string) {
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	gzReader, err := gzip.NewReader(bytes.NewReader(data))
+	require.NoError(t, err)
+	tarReader := tar.NewReader(gzReader)
+	hdr, err := tarReader.Next()
+	require.NoError(t, err)
+	assert.Equal(t, "registry", hdr.Name)
+	hdr, err = tarReader.Next()
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join("registry", "filebeat"), hdr.Name)
+	hdr, err = tarReader.Next()
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join("registry", "filebeat", "log.json"), hdr.Name)
+	hdr, err = tarReader.Next()
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join("registry", "filebeat", "meta.json"), hdr.Name)
 }
