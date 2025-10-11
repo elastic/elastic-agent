@@ -1,0 +1,13 @@
+type: elastic_diagnostics
+github_project: elastic/elastic-agent
+
+status:
+  class: extension
+  stability:
+    development: [extension]
+  codeowners:
+    active: [VihasMakwana]
+
+tests:
+  config:
+    endpoint: /tmp/test.sock
