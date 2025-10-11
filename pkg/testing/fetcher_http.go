@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -69,7 +70,11 @@ func (h httpFetcherResult) Name() string {
 }
 
 func (h httpFetcherResult) Fetch(ctx context.Context, l Logger, dir string) error {
-	var err error
+	_, err := url.Parse(h.baseURL)
+	if err != nil {
+		return fmt.Errorf("invalid base url %q: %w", h.baseURL, err)
+	}
+
 	baseURL := h.baseURL
 	if !strings.HasSuffix(baseURL, "/") {
 		baseURL += "/"
