@@ -7,6 +7,7 @@ package packaging
 import (
 	"bytes"
 	_ "embed"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -228,7 +229,7 @@ func parsePackageSettings(r io.Reader) (*packagesConfig, error) {
 // Components returns a *copy* of all the binary specs loaded from packages.yml
 func Components() ([]BinarySpec, error) {
 	if settings == nil {
-		return nil, fmt.Errorf("package settings not loaded")
+		return nil, errors.New("package settings not loaded")
 	}
 	ret := make([]BinarySpec, len(settings.Components))
 	copy(ret, settings.Components)

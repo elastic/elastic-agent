@@ -5,7 +5,7 @@
 package testing
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/elastic/elastic-agent/pkg/component"
 )
@@ -39,14 +39,14 @@ type UsableComponent struct {
 // Validate ensures correctness of component specification.
 func (c *UsableComponent) Validate() error {
 	if c.Name == "" {
-		return fmt.Errorf("Name must be defined")
+		return errors.New("Name must be defined")
 	}
 	if c.BinaryPath != "" {
 		if c.Spec == nil && c.SpecPath == "" {
-			return fmt.Errorf("either Spec or SpecPath must be defined")
+			return errors.New("either Spec or SpecPath must be defined")
 		}
 		if c.Spec != nil && c.SpecPath != "" {
-			return fmt.Errorf("both Spec or SpecPath cannot be defined")
+			return errors.New("both Spec or SpecPath cannot be defined")
 		}
 	}
 	return nil

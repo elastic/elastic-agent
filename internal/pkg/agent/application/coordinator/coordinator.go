@@ -915,7 +915,7 @@ func (c *Coordinator) PerformComponentDiagnostics(ctx context.Context, additiona
 // Called from external goroutines.
 func (c *Coordinator) SetLogLevel(ctx context.Context, lvl *logp.Level) error {
 	if lvl == nil {
-		return fmt.Errorf("logp.Level passed to Coordinator.SetLogLevel() must be not nil")
+		return errors.New("logp.Level passed to Coordinator.SetLogLevel() must be not nil")
 	}
 	select {
 	case <-ctx.Done():

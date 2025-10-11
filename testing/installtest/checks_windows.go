@@ -143,7 +143,7 @@ func getAllowedSIDs(secInfo *windows.SECURITY_DESCRIPTOR) ([]*windows.SID, error
 		return nil, fmt.Errorf("secInfo.DACL() failed: %w", err)
 	}
 	if dacl == nil {
-		return nil, fmt.Errorf("no DACL set")
+		return nil, errors.New("no DACL set")
 	}
 
 	var sids []*windows.SID
@@ -160,7 +160,7 @@ func getAllowedSIDs(secInfo *windows.SECURITY_DESCRIPTOR) ([]*windows.SID, error
 		}
 		if ace.AceType == ACCESS_DENIED_ACE_TYPE {
 			// we never set denied ACE, something is wrong
-			return nil, fmt.Errorf("denied ACE found (should not be set)")
+			return nil, errors.New("denied ACE found (should not be set)")
 		}
 		if ace.AceType != ACCESS_ALLOWED_ACE_TYPE {
 			// unknown ace type

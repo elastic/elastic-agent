@@ -185,12 +185,12 @@ func TestControllerWithFetchProvider(t *testing.T) {
 						// replace occurred so the fetch provider is now present
 						strNode, ok := node.(*transpiler.StrVal)
 						if !ok {
-							setErr <- fmt.Errorf("expected *transpiler.StrVal")
+							setErr <- errors.New("expected *transpiler.StrVal")
 							return
 						}
 						strVal, ok := strNode.Value().(string)
 						if !ok {
-							setErr <- fmt.Errorf("expected string")
+							setErr <- errors.New("expected string")
 							return
 						}
 						if strVal != "vars.key1" {

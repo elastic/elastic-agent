@@ -2048,7 +2048,7 @@ func TestCoordinator_InvalidComponentRevertsMigration(t *testing.T) {
 	}
 
 	failingComponentNotify := func(_ context.Context, _ *fleetapi.ActionMigrate) error {
-		return fmt.Errorf("failed to notify")
+		return errors.New("failed to notify")
 	}
 
 	err = coord.Migrate(ctx, action, backoffFactory, failingComponentNotify)

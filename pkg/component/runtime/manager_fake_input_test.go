@@ -1632,7 +1632,7 @@ func (suite *FakeInputSuite) TestManager_Restarts() {
 								if !errors.Is(err, context.DeadlineExceeded) {
 									// should have got deadline exceeded for this call
 									if err == nil {
-										err = fmt.Errorf("should have got deadline exceeded")
+										err = errors.New("should have got deadline exceeded")
 									} else {
 										err = fmt.Errorf("should have got deadline exceeded, instead got: %w", err)
 									}
@@ -2161,9 +2161,9 @@ func (suite *FakeInputSuite) TestManager_InvalidAction() {
 							_, err := m.PerformAction(actionCtx, comp, comp.Units[0], "invalid_missing_action", nil)
 							actionCancel()
 							if err == nil {
-								subErrCh <- fmt.Errorf("should have returned an error")
+								subErrCh <- errors.New("should have returned an error")
 							} else if err.Error() != errActionUndefined {
-								subErrCh <- fmt.Errorf("should have returned error: action undefined")
+								subErrCh <- errors.New("should have returned error: action undefined")
 							} else {
 								subErrCh <- nil
 							}
@@ -2514,9 +2514,9 @@ func (suite *FakeInputSuite) TestManager_LogLevel() {
 							_, err := m.PerformAction(actionCtx, comp, comp.Units[0], "invalid_missing_action", nil)
 							actionCancel()
 							if err == nil {
-								subErrCh <- fmt.Errorf("should have returned an error")
+								subErrCh <- errors.New("should have returned an error")
 							} else if err.Error() != errActionUndefined {
-								subErrCh <- fmt.Errorf("should have returned error: action undefined")
+								subErrCh <- errors.New("should have returned error: action undefined")
 							} else {
 								subErrCh <- nil
 							}
