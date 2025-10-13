@@ -739,8 +739,6 @@ agent.monitoring.enabled: false
 
 	// since we set the output to a nonexistent ES endpoint, we expect it to be degraded, but the input to be healthy
 	assertBeatsReady := func(t *assert.CollectT, status *atesting.AgentStatusOutput, runtime component.RuntimeManager) {
-		t.Helper()
-
 		var componentVersionInfoName string
 		switch runtime {
 		case component.OtelRuntimeManager:
