@@ -46,14 +46,14 @@ func createBatchesFromBatch(batch define.Batch, platforms []define.OS, groups []
 	specifics, err := getSupported(batch.OS, platforms)
 	if errors.Is(err, ErrOSNotSupported) {
 		var s common.SupportedOS
-		s.OS.Type = batch.OS.Type
-		s.OS.Arch = batch.OS.Arch
-		s.OS.Distro = batch.OS.Distro
-		if s.OS.Distro == "" {
-			s.OS.Distro = "unknown"
+		s.Type = batch.OS.Type
+		s.Arch = batch.OS.Arch
+		s.Distro = batch.OS.Distro
+		if s.Distro == "" {
+			s.Distro = "unknown"
 		}
-		if s.OS.Version == "" {
-			s.OS.Version = "unknown"
+		if s.Version == "" {
+			s.Version = "unknown"
 		}
 		b := common.OSBatch{
 			OS:    s,
