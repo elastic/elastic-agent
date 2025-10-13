@@ -58,7 +58,7 @@ wait that amount of time before using the variables for the configuration.
 			ctx, cancel := context.WithCancel(context.Background())
 			service.HandleSignals(func() {}, cancel)
 			if err := inspectConfig(ctx, paths.ConfigFile(), opts, streams); err != nil {
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
 				os.Exit(1)
 			}
 		},
@@ -111,7 +111,7 @@ variables for the configuration.
 			service.HandleSignals(func() {}, cancel)
 
 			if err := inspectComponents(ctx, paths.ConfigFile(), opts, streams); err != nil {
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
 				os.Exit(1)
 			}
 		},
