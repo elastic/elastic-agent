@@ -1460,15 +1460,10 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		case <-ctx.Done():
 			t.Fatal("timeout waiting for collector config update")
 		}
-<<<<<<< HEAD
-		assert.Equal(t, collectorCfg, execution.cfg)
-=======
+
 		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
-		assert.NoError(t, injectDiagnosticsExtension(expectedCfg))
 		assert.NoError(t, addCollectorMetricsReader(expectedCfg))
 		assert.Equal(t, expectedCfg, execution.cfg)
->>>>>>> 5cb8c31da (Use a random port for otel collector monitoring endpoint (#10240))
-
 	})
 
 	t.Run("collector status is passed up to the component manager", func(t *testing.T) {

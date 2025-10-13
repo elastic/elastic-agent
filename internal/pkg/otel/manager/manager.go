@@ -370,17 +370,10 @@ func buildMergedConfig(
 		}
 	}
 
-<<<<<<< HEAD
-=======
 	if err := addCollectorMetricsReader(mergedOtelCfg); err != nil {
 		return nil, fmt.Errorf("failed to add random collector metrics port: %w", err)
 	}
 
-	if err := injectDiagnosticsExtension(mergedOtelCfg); err != nil {
-		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
-	}
-
->>>>>>> 5cb8c31da (Use a random port for otel collector monitoring endpoint (#10240))
 	return mergedOtelCfg, nil
 }
 

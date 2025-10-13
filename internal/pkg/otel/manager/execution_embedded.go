@@ -16,12 +16,8 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-<<<<<<< HEAD
-=======
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
->>>>>>> 5cb8c31da (Use a random port for otel collector monitoring endpoint (#10240))
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/agentprovider"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -47,17 +43,11 @@ func (r *embeddedExecution) startCollector(ctx context.Context, logger *logger.L
 		collectorDoneCh: make(chan struct{}),
 		cancel:          collectorCancel,
 	}
-<<<<<<< HEAD
 
-=======
-	extConf := map[string]any{
-		"endpoint": paths.DiagnosticsExtensionSocket(),
-	}
 	collectorMetricsPort, err := r.getCollectorMetricsPort()
 	if err != nil {
 		return nil, err
 	}
->>>>>>> 5cb8c31da (Use a random port for otel collector monitoring endpoint (#10240))
 	// NewForceExtensionConverterFactory is used to ensure that the agent_status extension is always enabled.
 	// It is required for the Elastic Agent to extract the status out of the OTel collector.
 	settings := otel.NewSettings(
