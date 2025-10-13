@@ -714,7 +714,7 @@ func setupMetrics(
 	tracer *apm.Tracer,
 	coord *coordinator.Coordinator,
 ) (*reload.ServerReloader, error) {
-	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil { //nolint:staticcheck // ignore deprecation
+	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil {
 		return nil, err
 	}
 
