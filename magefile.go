@@ -3158,7 +3158,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	}
 
 	provisionCfg := ess.ProvisionerConfig{
-		Identifier: fmt.Sprintf("at-%s", strings.ReplaceAll(strings.Split(email, "@")[0], ".", "-"),
+		Identifier: fmt.Sprintf("at-%s", strings.ReplaceAll(strings.Split(email, "@")[0], ".", "-")),
 		APIKey:     essToken,
 		Region:     essRegion,
 	}
