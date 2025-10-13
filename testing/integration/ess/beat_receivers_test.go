@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,6 +21,8 @@ import (
 
 	"github.com/gofrs/uuid/v5"
 	"gopkg.in/yaml.v2"
+
+	"github.com/elastic/elastic-agent/pkg/component"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/mapstr"
@@ -778,8 +781,6 @@ agent.monitoring.enabled: false
 
 	// since we set the output to a nonexistent ES endpoint, we expect it to be degraded, but the input to be healthy
 	assertBeatsReady := func(t *assert.CollectT, status *atesting.AgentStatusOutput, runtime component.RuntimeManager) {
-		t.Helper()
-
 		var componentVersionInfoName string
 		switch runtime {
 		case component.OtelRuntimeManager:
@@ -999,27 +1000,6 @@ func getBeatStartLogRecords(logs string) []map[string]any {
 		}
 	}
 	return logRecords
-}
-
-func prepareAgentCmd(t *testing.T, ctx context.Context, config []byte) (*atesting.Fixture, *exec.Cmd, *strings.Builder) {
-	// set up a standalone agent
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-	require.NoError(t, err)
-
-	err = fixture.Prepare(ctx)
-	require.NoError(t, err)
-	err = fixture.Configure(ctx, config)
-	require.NoError(t, err)
-
-	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
-	require.NoError(t, err)
-	cmd.WaitDelay = 1 * time.Second
-
-	var output strings.Builder
-	cmd.Stderr = &output
-	cmd.Stdout = &output
-
-	return fixture, cmd, &output
 }
 
 func genIgnoredFields(goos string) []string {
