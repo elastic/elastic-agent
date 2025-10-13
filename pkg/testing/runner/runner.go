@@ -627,7 +627,7 @@ func (r *Runner) startStacks(ctx context.Context) error {
 
 	var requests []stackReq
 	for _, version := range versions {
-		id := strings.Replace(version, ".", "", -1)
+		id := strings.ReplaceAll(version, ".", "")
 		requests = append(requests, stackReq{
 			request: common.StackRequest{ID: id, Version: version},
 			stack:   r.findStack(id),

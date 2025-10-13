@@ -163,12 +163,12 @@ func createBatchID(batch common.OSBatch) string {
 		id += "-" + batch.OS.Distro
 	}
 	if batch.OS.Version != "" {
-		id += "-" + strings.Replace(batch.OS.Version, ".", "", -1)
+		id += "-" + strings.ReplaceAll(batch.OS.Version, ".", "")
 	}
 	if batch.OS.Type == define.Kubernetes && batch.OS.DockerVariant != "" {
 		id += "-" + batch.OS.DockerVariant
 	}
-	id += "-" + strings.Replace(batch.Batch.Group, ".", "", -1)
+	id += "-" + strings.ReplaceAll(batch.Batch.Group, ".", "")
 
 	// The batchID needs to be at most 63 characters long otherwise
 	// OGC will fail to instantiate the VM.

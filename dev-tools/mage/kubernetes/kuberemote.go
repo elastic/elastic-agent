@@ -70,7 +70,7 @@ func NewKubeRemote(kubeconfig string, namespace string, name string, workDir str
 	if err != nil {
 		return nil, err
 	}
-	name = strings.Replace(name, "_", "-", -1)
+	name = strings.ReplaceAll(name, "_", "-")
 	svcAccName := fmt.Sprintf("%s-sa", name)
 	secretName := fmt.Sprintf("%s-ssh-key", name)
 	privateKey, publicKey, err := generateSSHKeyPair()
