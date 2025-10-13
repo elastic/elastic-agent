@@ -723,8 +723,6 @@ outputs:
 	})
 }
 
-<<<<<<< HEAD
-=======
 // TestBeatsReceiverLogs is a test that compares logs emitted by beats processes to those emitted by beats receivers.
 func TestBeatsReceiverLogs(t *testing.T) {
 	_ = define.Require(t, define.Requirements{
@@ -950,7 +948,6 @@ agent.monitoring.enabled: false
 	assert.Equal(t, expectedMessage, message)
 }
 
->>>>>>> 71ece0de9 (Rewrite the beats receiver log test using common tooling (#10153))
 func assertCollectorComponentsHealthy(t *assert.CollectT, status *atesting.AgentStatusCollectorOutput) {
 	assert.Equal(t, int(cproto.CollectorComponentStatus_StatusOK), status.Status, "component status should be ok")
 	assert.Equal(t, "", status.Error, "component status should not have an error")
@@ -959,8 +956,6 @@ func assertCollectorComponentsHealthy(t *assert.CollectT, status *atesting.Agent
 	}
 }
 
-<<<<<<< HEAD
-=======
 func assertBeatsHealthy(t *assert.CollectT, status *atesting.AgentStatusOutput, runtime component.RuntimeManager, componentCount int) {
 	var componentVersionInfoName string
 	switch runtime {
@@ -1027,7 +1022,6 @@ func prepareAgentCmd(t *testing.T, ctx context.Context, config []byte) (*atestin
 	return fixture, cmd, &output
 }
 
->>>>>>> 71ece0de9 (Rewrite the beats receiver log test using common tooling (#10153))
 func genIgnoredFields(goos string) []string {
 	switch goos {
 	case "windows":
