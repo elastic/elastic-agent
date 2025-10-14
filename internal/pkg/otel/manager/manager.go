@@ -12,11 +12,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"os"
-<<<<<<< HEAD
-=======
-	"slices"
 	"strings"
->>>>>>> d8f1daeae (fix: do not report agent managed otel extensions statuses (#10412))
 	"sync"
 	"sync/atomic"
 	"time"
