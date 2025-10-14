@@ -382,6 +382,9 @@ func (handleMon *handleMonitor) Init(ctx context.Context, t *testing.T, fixture 
 
 	for _, comp := range status.Components {
 		pidStr := pidInStatusMessageRegex.FindString(comp.Message)
+		if pidStr == "" { // could be an otel receiver, not a process
+			continue
+		}
 		pid, err := strconv.ParseInt(pidStr, 10, 64)
 		require.NoError(t, err)
 
