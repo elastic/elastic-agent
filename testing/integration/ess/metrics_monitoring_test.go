@@ -169,15 +169,11 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 	t.Logf("starting to ES for metrics at %s", now.Format(time.RFC3339Nano))
 	require.Eventually(t, func() bool {
 		for _, cid := range componentIds {
-<<<<<<< HEAD
-			query = genESQuery(agentStatus.Info.ID, cid)
-=======
 			query = genESQuery(agentStatus.Info.ID,
 				[][]string{
 					{"match", "component.id", cid},
 					{"match", "agent.type", "metricbeat"},
 				})
->>>>>>> 3ccf28da2 (Fix tests in preparation for making otel self monitoring default (#10537))
 			now = time.Now()
 			res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
 			require.NoError(t, err)
