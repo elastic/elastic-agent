@@ -197,13 +197,10 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	d.ApiKey = apiKey
 	policy.Outputs["default"] = d
 
-<<<<<<< HEAD
-=======
 	processNamespace := fmt.Sprintf("%s-%s", info.Namespace, "process")
 	policy.Agent.Monitoring["namespace"] = processNamespace
 	policy.Agent.Monitoring["_runtime_experimental"] = "process"
 
->>>>>>> 3ccf28da2 (Fix tests in preparation for making otel self monitoring default (#10537))
 	updatedPolicyBytes, err := yaml.Marshal(policy)
 	require.NoErrorf(t, err, "error marshalling policy, struct was %v", policy)
 	t.Cleanup(func() {
