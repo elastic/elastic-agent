@@ -586,8 +586,8 @@ github.com/elastic/opentelemetry-collector-components/processor/elasticinframetr
 github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.18.0/go.mod h1:qu5waDNj2cH5lQK9SmXRxZ5dg08FjM+tqE2/ib5WDxs=
 github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.8.0 h1:m2RieHXVTRykAd7VdpryuAV56Ia/eidgtlEutnG/m5w=
 github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.8.0/go.mod h1:uQHpGpKwGHhdO5fm2hx1mthiPMiScmFOp5XNwD0EqVw=
-github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.4.0 h1:uMnL1EaQtmdCrtgv31b3QKLxvb+FP6dOHneF/9aDkzI=
-github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.4.0/go.mod h1:gRgnOTENLyQ6HXJX8L014J05EdEwacD4GC0VIfKnXKA=
+github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.5.0 h1:d0MzBAFWFeK2R1idJ12r5yQQdqYMr1aCkOxx9vY2gEo=
+github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.5.0/go.mod h1:uatbH3vF+d7EOe+yfL3u/XryCQ/oysxFq+mde0hezTs=
 github.com/elastic/opentelemetry-lib v0.24.0 h1:yydHiL0P4+7cbmSOuRyNgsQdUZDJiUcGvqEn261nhBk=
 github.com/elastic/opentelemetry-lib v0.24.0/go.mod h1:yPivg02r9Ae6PSCT73OW/qK1VaRiOR8e3ufj9CvGZY4=
 github.com/elastic/pkcs8 v1.0.0 h1:HhitlUKxhN288kcNcYkjW6/ouvuwJWd9ioxpjnD9jVA=
@@ -2213,8 +2213,8 @@ google.golang.org/protobuf v1.22.0/go.mod h1:EGpADcykh3NcUnDUJcl1+ZksZNG86OlYog2
 google.golang.org/protobuf v1.23.0/go.mod h1:EGpADcykh3NcUnDUJcl1+ZksZNG86OlYog2l/sGQquU=
 google.golang.org/protobuf v1.23.1-0.20200526195155-81db48ad09cc/go.mod h1:EGpADcykh3NcUnDUJcl1+ZksZNG86OlYog2l/sGQquU=
 google.golang.org/protobuf v1.25.0/go.mod h1:9JNX74DMeImyA3h4bdi1ymwjUzf21/xIlbajtzgsN7c=
-google.golang.org/protobuf v1.36.9 h1:w2gp2mA27hUeUzj9Ex9FBjsBm40zfaDtEWow293U7Iw=
-google.golang.org/protobuf v1.36.9/go.mod h1:fuxRtAxBytpl4zzqUh6/eyUujkJdNiuEkXntxiD/uRU=
+google.golang.org/protobuf v1.36.10 h1:AYd7cD/uASjIL6Q9LiTjz8JLcrh/88q5UObnmY3aOOE=
+google.golang.org/protobuf v1.36.10/go.mod h1:HTf+CrKn2C3g5S8VImy6tdcUvCska2kB7j23XfzDpco=
 gopkg.in/alecthomas/kingpin.v2 v2.2.6/go.mod h1:FMv+mEhP44yOT+4EoQTLFTRgOQ1FBLkstjWtayDeSgw=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=

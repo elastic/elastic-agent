@@ -33,7 +33,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/extension/beatsauthextension v0.5.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.3.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.18.0
-	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.4.0
+	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.5.0
 	github.com/fatih/color v1.18.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-viper/mapstructure/v2 v2.4.0
@@ -139,7 +139,7 @@ require (
 	golang.org/x/tools v0.37.0
 	google.golang.org/api v0.239.0
 	google.golang.org/grpc v1.76.0
-	google.golang.org/protobuf v1.36.9
+	google.golang.org/protobuf v1.36.10
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
