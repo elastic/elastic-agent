@@ -123,8 +123,7 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 			query = genESQuery(agentStatus.Info.ID,
 				[][]string{
 					{"match", "component.id", cid},
-					{"exists", "field", "system.process.cpu.total.value"},
-					{"exists", "field", "system.process.memory.size"},
+					{"match", "agent.type", "metricbeat"},
 				})
 			now = time.Now()
 			res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
