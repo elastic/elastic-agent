@@ -173,7 +173,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 				}
 			} else {
 				maxFailuresTimer.Reset(maxFailuresDuration)
-
+				removeManagedHealthCheckExtensionStatus(statuses, r.healthCheckExtensionID)
 				if !compareStatuses(currentStatus, statuses) {
 					currentStatus = statuses
 					r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
@@ -275,6 +275,16 @@ func (r *subprocessExecution) getCollectorPorts() (healthCheckPort int, metricsP
 		*randomPorts[i] = port
 	}
 	return healthCheckPort, metricsPort, nil
+}
+
+func removeManagedHealthCheckExtensionStatus(status *status.AggregateStatus, healthCheckExtensionID string) {
+	extensions, exists := status.ComponentStatusMap["extensions"]
+	if !exists {
+		return
+	}
+
+	extensionID := "extension:" + healthCheckExtensionID
+	delete(extensions.ComponentStatusMap, extensionID)
 }
 
 type procHandle struct {
