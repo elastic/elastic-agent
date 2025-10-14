@@ -13,6 +13,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	semver "github.com/elastic/elastic-agent/pkg/version"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/configure"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -215,7 +217,17 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		log.Error("Error detected, proceeding to rollback: %v", err)
 
 		upgradeDetails.SetStateWithReason(details.StateRollback, details.ReasonWatchFailed)
-		err = installModifier.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash)
+		var opts []upgrade.RollbackOption
+		previousVersion, versionParseErr := semver.ParseVersion(marker.PrevVersion)
+		if versionParseErr != nil {
+			return fmt.Errorf("could not parse previous version %s: %w", marker.PrevVersion, versionParseErr)
+		}
+		if previousVersion.Less(*semver.NewParsedSemVer(9, 2, 0, "", "")) {
+			opts = append(opts, func(ros upgrade.RollbackOptionSetter) {
+				ros.SetRemoveMarker(true)
+			})
+		}
+		err = installModifier.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash, opts...)
 		if err != nil {
 			log.Error("rollback failed", err)
 			upgradeDetails.Fail(err)

@@ -44,6 +44,7 @@ type RollbackSettings struct {
 	skipCleanup    bool
 	skipRestart    bool
 	preRestartHook RollbackHook
+	removeMarker   bool
 }
 
 func newRollbackSettings(opts ...RollbackOpt) *RollbackSettings {
@@ -66,6 +67,10 @@ func (r *RollbackSettings) SetSkipRestart(skipRestart bool) {
 
 func (r *RollbackSettings) SetPreRestartHook(preRestartHook RollbackHook) {
 	r.preRestartHook = preRestartHook
+}
+
+func (r *RollbackSettings) SetRemoveMarker(removeMarker bool) {
+	r.removeMarker = removeMarker
 }
 
 func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, topDirPath string, prevVersionedHome string, prevHash string, opts ...RollbackOpt) error {
@@ -122,7 +127,7 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 	}
 
 	// cleanup everything except version we're rolling back into
-	return Cleanup(log, topDirPath, prevVersionedHome, prevHash, false, true)
+	return Cleanup(log, topDirPath, prevVersionedHome, prevHash, settings.removeMarker, true)
 }
 
 // Cleanup removes all artifacts and files related to a specified version.
