@@ -1262,7 +1262,7 @@ func setStrictMapping(client *elasticsearch.Client, index string) error {
 // 3) restart agent, to roll log files
 // 4) Switch to monitoring "otel" runtime
 // 5) restart agent 3 times, making sure healthy between restarts
-// 6) query ES for monitoring logs with aggregation on fingerprint and line number, should be 0 duplicates
+// 6) query ES for monitoring logs with aggregation on fingerprint and line number, ideally 0 duplicates but possible to have a small number
 // 7) uninstall
 func TestMonitoringNoDuplicates(t *testing.T) {
 	info := define.Require(t, define.Requirements{
@@ -1475,6 +1475,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 		"aggs": map[string]any{
 			"duplicates": map[string]any{
 				"multi_terms": map[string]any{
+					"size":          500,
 					"min_doc_count": 2,
 					"terms": []map[string]any{
 						{"field": "log.file.fingerprint"},
@@ -1508,7 +1509,19 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 	require.Truef(t, ok, "'duplicates' wasn't a map[string]any, result was %s", string(resultBuf))
 	buckets, ok := dups["buckets"].([]any)
 	require.Truef(t, ok, "'buckets' wasn't a []any, result was %s", string(resultBuf))
-	require.Equalf(t, 0, len(buckets), "buckets contained duplicates, result was %s", string(resultBuf))
+
+	// It is possible to have a batch in flight not get acked
+	// before elastic-agent shutsdown. That can lead to
+	// duplicates. So to account for that we have to tolerate a
+	// "few" duplicates. 10% of total docs seems reasonable.
+	hits, ok := aggResults["hits"].(map[string]any)
+	require.Truef(t, ok, "'hits' wasn't a map[string]any, result was %s", string(resultBuf))
+	total, ok := hits["total"].(map[string]any)
+	require.Truef(t, ok, "'total' wasn't a map[string]any, result was %s", string(resultBuf))
+	value, ok := total["value"].(float64)
+	require.Truef(t, ok, "'total' wasn't an int, result was %s", string(resultBuf))
+
+	require.True(t, float64(len(buckets)) < (value/10), "buckets contained duplicates, result was %s", string(resultBuf))
 
 	// Uninstall
 	combinedOutput, err = fut.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
