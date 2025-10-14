@@ -410,7 +410,7 @@ func (Build) TestBinaries() error {
 		}
 
 		outputName := filepath.Join(pkg, binary)
-		err := RunGo("build", "-o", outputName, filepath.Join(pkg))
+		err := RunGo("build", "-v", "-o", outputName, filepath.Join(pkg))
 		if err != nil {
 			return err
 		}
