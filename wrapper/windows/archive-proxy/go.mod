@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent/wrapper/windows/archive-proxy
 
-go 1.24.8
+go 1.24.9
 
 require github.com/elastic/elastic-agent v0.0.0
 
