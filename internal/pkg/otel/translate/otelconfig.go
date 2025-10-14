@@ -11,13 +11,10 @@ import (
 	"slices"
 	"strings"
 
-<<<<<<< HEAD
-	"github.com/elastic/elastic-agent-libs/logp"
-
-=======
 	"github.com/go-viper/mapstructure/v2"
->>>>>>> 0c0dada00 (feat: utilise continue_on_err in beatsauthextension (#10343))
 	koanfmaps "github.com/knadh/koanf/maps"
+
+	"github.com/elastic/elastic-agent-libs/logp"
 
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
