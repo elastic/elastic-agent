@@ -152,7 +152,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 			close(healthCheckDone)
 		}()
 		currentStatus := aggregateStatus(componentstatus.StatusStarting, nil)
-		reportCollectorStatus(ctx, statusCh, currentStatus)
+		r.reportSubprocessCollectorStatus(ctx, statusCh, currentStatus)
 
 		// specify a max duration of not being able to get the status from the collector
 		const maxFailuresDuration = 130 * time.Second
@@ -168,7 +168,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 			if err != nil {
 				switch {
 				case errors.Is(err, context.Canceled):
-					reportCollectorStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStopped, nil))
+					r.reportSubprocessCollectorStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStopped, nil))
 					return
 				}
 			} else {
@@ -176,13 +176,13 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 
 				if !compareStatuses(currentStatus, statuses) {
 					currentStatus = statuses
-					reportCollectorStatus(procCtx, statusCh, statuses)
+					r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
 				}
 			}
 
 			select {
 			case <-procCtx.Done():
-				reportCollectorStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStopped, nil))
+				r.reportSubprocessCollectorStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStopped, nil))
 				return
 			case <-healthCheckPollTimer.C:
 				healthCheckPollTimer.Reset(healthCheckPollDuration)
@@ -193,7 +193,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 				)
 				if !compareStatuses(currentStatus, failedToConnectStatuses) {
 					currentStatus = statuses
-					reportCollectorStatus(procCtx, statusCh, statuses)
+					r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
 				}
 			}
 		}
