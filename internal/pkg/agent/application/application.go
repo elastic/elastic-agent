@@ -131,7 +131,13 @@ func New(
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create upgrader: %w", err)
 	}
-	monitor := componentmonitoring.New(isMonitoringSupported, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, rawConfig.OTel, agentInfo, isOtelExecModeSubprocess)
+	monitor := componentmonitoring.New(
+		isMonitoringSupported,
+		cfg.Settings.DownloadConfig.OS(),
+		cfg.Settings.MonitoringConfig,
+		agentInfo,
+		isOtelExecModeSubprocess,
+	)
 
 	runtime, err := runtime.NewManager(
 		log,
@@ -243,7 +249,16 @@ func New(
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
-	otelManager, err := otelmanager.NewOTelManager(log.Named("otel_manager"), logLevel, baseLogger, otelExecMode, agentInfo, monitor.ComponentMonitoringConfig, cfg.Settings.ProcessConfig.StopTimeout)
+	otelManager, err := otelmanager.NewOTelManager(
+		log.Named("otel_manager"),
+		logLevel, baseLogger,
+		otelExecMode,
+		agentInfo,
+		0, // TODO: make this configurable in a follow-up
+		0, // TODO: make this configurable in a follow-up
+		monitor.ComponentMonitoringConfig,
+		cfg.Settings.ProcessConfig.StopTimeout,
+	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)
 	}
