@@ -85,6 +85,7 @@ require (
 	go.opentelemetry.io/collector/pipeline v1.38.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.132.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.132.0
+	go.opentelemetry.io/collector/service v0.132.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.41.0
 	golang.org/x/exp v0.0.0-20250215185904-eff6e970281f
@@ -342,7 +343,7 @@ require (
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/lunes v0.1.0 // indirect
-	github.com/elastic/mito v1.22.0 // indirect
+	github.com/elastic/mito v1.23.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.7.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.21.0 // indirect
@@ -685,7 +686,6 @@ require (
 	go.opentelemetry.io/collector/scraper v0.132.0 // indirect
 	go.opentelemetry.io/collector/scraper/scraperhelper v0.132.0 // indirect
 	go.opentelemetry.io/collector/semconv v0.128.1-0.20250610090210-188191247685 // indirect
-	go.opentelemetry.io/collector/service v0.132.0 // indirect
 	go.opentelemetry.io/collector/service/hostcapabilities v0.132.0 // indirect
 	go.opentelemetry.io/contrib/bridges/otelzap v0.12.0 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.36.0 // indirect
