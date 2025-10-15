@@ -140,7 +140,7 @@ By default, the exporter performs its own buffering and batching, as configured 
 ### Using sending queue
 
 ```{applies_to}
-stack: 9.0 9.1
+stack: ga 9.0, deprecated 9.2
 ```
 
 The sending queue can be enabled and configured with the `batcher` section, using [common `batcher` settings](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/exporterhelper/internal/queue_sender.go).
