@@ -266,12 +266,12 @@ func (r *Runner) runK8sInstances(ctx context.Context, instances []StateInstance)
 
 		// set the go test flags
 		env["GOTEST_FLAGS"] = r.cfg.TestFlags
-		env["KUBECONFIG"] = instance.Instance.Internal["config"].(string)
+		env["KUBECONFIG"] = instance.Internal["config"].(string)
 		env["TEST_BINARY_NAME"] = r.cfg.BinaryName
-		env["K8S_VERSION"] = instance.Instance.Internal["version"].(string)
-		env["AGENT_IMAGE"] = instance.Instance.Internal["agent_image"].(string)
+		env["K8S_VERSION"] = instance.Internal["version"].(string)
+		env["AGENT_IMAGE"] = instance.Internal["agent_image"].(string)
 
-		prefix := fmt.Sprintf("%s-%s", instance.Instance.Internal["version"].(string), batch.ID)
+		prefix := fmt.Sprintf("%s-%s", instance.Internal["version"].(string), batch.ID)
 
 		// run the actual tests on the host
 		result, runErr := batch.OS.Runner.Run(ctx, r.cfg.VerboseMode, nil, logger, r.cfg.AgentVersion, prefix, batch.Batch, env)
@@ -625,7 +625,7 @@ func (r *Runner) startStacks(ctx context.Context) error {
 
 	var requests []stackReq
 	for _, version := range versions {
-		id := strings.Replace(version, ".", "", -1)
+		id := strings.ReplaceAll(version, ".", "")
 		requests = append(requests, stackReq{
 			request: common.StackRequest{ID: id, Version: version},
 			stack:   r.findStack(id),
