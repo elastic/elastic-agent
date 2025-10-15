@@ -17,4 +17,5 @@ deprecated:
   # When a component is deprecated, it will be marked as "Deprecated" in the components table
   # instead of [Core] or [Extended]. The component name will still link to its documentation
   # or source repository, but the status column will clearly show it's deprecated.
+  - elastictraceprocessor  # Replaced by elasticapmprocessor in 9.2.0
 
