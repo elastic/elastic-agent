@@ -169,11 +169,7 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 	t.Logf("starting to ES for metrics at %s", now.Format(time.RFC3339Nano))
 	require.Eventually(t, func() bool {
 		for _, cid := range componentIds {
-			query = genESQuery(agentStatus.Info.ID,
-				[][]string{
-					{"match", "component.id", cid},
-					{"match", "agent.type", "metricbeat"},
-				})
+			query = genESQuery(agentStatus.Info.ID, cid)
 			now = time.Now()
 			res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
 			require.NoError(t, err)
