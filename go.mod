@@ -31,8 +31,9 @@ require (
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.8.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.8.0
 	github.com/elastic/opentelemetry-collector-components/extension/beatsauthextension v0.5.0
-	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.3.0
+	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.4.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.18.0
+	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.13.0
 	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.4.0
 	github.com/fatih/color v1.18.0
 	github.com/fsnotify/fsnotify v1.9.0
