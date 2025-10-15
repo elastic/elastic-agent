@@ -28,6 +28,7 @@ GATEWAY_8X_TAG = 'edot-gateway-8x-table'
 EDOT_COLLECTOR_DIR = '../../../docs/reference/edot-collector'
 TEMPLATE_COLLECTOR_COMPONENTS_TABLE = 'templates/components-table.jinja2'
 TEMPLATE_COLLECTOR_OCB_FILE = 'templates/ocb.jinja2'
+TEMPLATE_GATEWAY_TABLE = 'templates/gateway-table.jinja2'
 COMPONENT_DOCS_YAML = '../../../docs/reference/edot-collector/component-docs.yml'
 DEFAULT_CONFIG_FILE = '../../../docs/reference/edot-collector/config/default-config-standalone.md'
 DEPRECATED_COMPONENTS_YAML = '../../../internal/pkg/otel/deprecated-components.yaml'
@@ -193,14 +194,11 @@ def get_otel_components(version='main', component_docs_mapping=None):
         # Check if this component is deprecated (takes precedence)
         if comp_name in deprecated_components:
             comp['support_status'] = 'Deprecated'
-            comp['is_deprecated'] = True
         # Check if this component is in the core components list
         elif comp_name in core_components:
             comp['support_status'] = '[Core]'
-            comp['is_deprecated'] = False
         else:
             comp['support_status'] = '[Extended]'
-            comp['is_deprecated'] = False
             
         # Add documentation link if available
         if component_docs_mapping and comp_name in component_docs_mapping:
@@ -347,28 +345,20 @@ def get_latest_minor_versions(major_version):
     # Sort by minor version (descending)
     return sorted(versions.values(), key=lambda x: x['minor'], reverse=True)
 
-def parse_gateway_table(content, tag):
-    """Parse existing gateway table to extract current versions and their tags
+def get_minor_versions_above(major_version, min_minor):
+    """Get the latest patch for each minor version >= min_minor for a major version
+    
+    Args:
+        major_version: The major version number (e.g., 8 or 9)
+        min_minor: Minimum minor version to include (e.g., 0 for 9.0+, 17 for 8.17+)
     
     Returns:
-        List of dicts with 'version' (e.g., '9.1') and 'current_tag' (e.g., 'v9.1.4')
+        List of version info dicts sorted by minor version (descending)
     """
-    start_tag = f'% start:{tag}'
-    end_tag = f'% end:{tag}'
-    
-    pattern = start_tag + r'(.*?)' + end_tag
-    matches = re.findall(pattern, content, re.DOTALL)
-    
-    if not matches:
-        return []
-    
-    table_content = matches[0]
-    # Extract version and tag from each row
-    # Pattern matches: | 9.1     | [Gateway mode](https://...v9.1.4/...) |
-    row_pattern = r'\|\s*(\d+\.\d+)\s*\|[^|]*\(https://[^/]+/[^/]+/[^/]+/refs/tags/(v[\d.]+)/[^)]+\)'
-    rows = re.findall(row_pattern, table_content)
-    
-    return [{'version': version, 'current_tag': tag} for version, tag in rows]
+    all_versions = get_latest_minor_versions(major_version)
+    # Filter to only include versions >= min_minor
+    filtered = [v for v in all_versions if v['minor'] >= min_minor]
+    return filtered
 
 def check_file_exists_at_tag(file_path, tag):
     """Check if a file exists at a specific Git tag"""
@@ -382,115 +372,39 @@ def check_file_exists_at_tag(file_path, tag):
     except subprocess.CalledProcessError:
         return False
 
-def update_gateway_table(content, tag, major_version):
-    """Update gateway configuration table with new versions and updated patch releases
+def get_gateway_versions(major_version, min_minor):
+    """Get version data for gateway configuration table
     
     Args:
-        content: The file content to update
-        tag: The marker tag for the table section
         major_version: The major version number (8 or 9)
+        min_minor: Minimum minor version to include
     
     Returns:
-        Updated file content
+        List of dicts with 'version' and 'tag' for valid versions
     """
-    # Parse existing rows in the table (with their current tags)
-    existing_rows = parse_gateway_table(content, tag)
-    existing_versions = {row['version'] for row in existing_rows}
+    print(f"Generating {major_version}.x table (versions >= {major_version}.{min_minor})")
     
-    print(f"Existing versions for {major_version}.x: {[row['version'] for row in existing_rows]}")
+    # Get all minor versions >= min_minor with their latest patches
+    versions = get_minor_versions_above(major_version, min_minor)
     
-    # Get all available minor versions for this major version (with latest patches)
-    available_versions = get_latest_minor_versions(major_version)
-    available_map = {f"{major_version}.{v['minor']}": v for v in available_versions}
+    # Filter to only versions where gateway.yml exists
+    gateway_file = 'internal/pkg/otel/samples/linux/gateway.yml'
+    valid_versions = []
     
-    # Track updates and new versions
-    updated_rows = []
-    new_rows = []
-    
-    # Check existing rows for patch updates
-    for existing_row in existing_rows:
-        version = existing_row['version']
-        current_tag = existing_row['current_tag']
+    for version_info in versions:
+        version_str = f"{major_version}.{version_info['minor']}"
+        tag_name = version_info['tag']
         
-        if version in available_map:
-            latest_tag = available_map[version]['tag']
-            if latest_tag != current_tag:
-                updated_rows.append({
-                    'version': version,
-                    'old_tag': current_tag,
-                    'new_tag': latest_tag
-                })
-                print(f"  Updating {version}: {current_tag} → {latest_tag}")
-            else:
-                print(f"  {version} is up to date ({current_tag})")
+        if check_file_exists_at_tag(gateway_file, tag_name):
+            valid_versions.append({
+                'version': version_str,
+                'tag': tag_name
+            })
+            print(f"  {version_str} → {tag_name}")
+        else:
+            print(f"  Skipping {version_str}: gateway.yml not found at {tag_name}")
     
-    # Find new minor versions that need to be added
-    for version_str, version_info in available_map.items():
-        if version_str not in existing_versions:
-            # Check if the gateway.yml file exists at this tag
-            gateway_file = 'internal/pkg/otel/samples/linux/gateway.yml'
-            if check_file_exists_at_tag(gateway_file, version_info['tag']):
-                new_rows.append({
-                    'version': version_str,
-                    'tag': version_info['tag']
-                })
-                print(f"  New version found: {version_str} (tag: {version_info['tag']})")
-            else:
-                print(f"  Skipping {version_str}: gateway.yml not found at {version_info['tag']}")
-    
-    if not new_rows and not updated_rows:
-        print(f"  No updates needed for {major_version}.x")
-        return content
-    
-    # Update the table content
-    start_tag_str = f'% start:{tag}'
-    end_tag_str = f'% end:{tag}'
-    pattern = start_tag_str + r'(.*?)' + end_tag_str
-    
-    def replace_table(match):
-        old_table = match.group(1)
-        lines = old_table.split('\n')
-        
-        # Find where the table content starts (after the header)
-        header_end_idx = 0
-        for i, line in enumerate(lines):
-            if '|---------|' in line or '|---|' in line:
-                header_end_idx = i + 1
-                break
-        
-        # Generate new rows for additions
-        new_table_rows = []
-        for row in new_rows:
-            new_table_rows.append(
-                f"| {row['version']:<7} | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/{row['tag']}/internal/pkg/otel/samples/linux/gateway.yml) |"
-            )
-        
-        # Process existing rows (update tags where needed)
-        existing_table_rows = []
-        for i in range(header_end_idx, len(lines)):
-            line = lines[i]
-            if line.strip() and '|' in line:
-                # Check if this row needs updating
-                # Match both the version AND the old tag to avoid cross-contamination
-                for update_info in updated_rows:
-                    version = update_info['version']
-                    old_tag = update_info['old_tag']
-                    new_tag = update_info['new_tag']
-                    # Match pattern: | version | ... old_tag ...
-                    version_pattern = rf'\|\s*{re.escape(version)}\s*\|'
-                    if re.search(version_pattern, line) and old_tag in line:
-                        line = line.replace(old_tag, new_tag)
-                        break
-                existing_table_rows.append(line)
-        
-        # Reconstruct: header + new rows + updated existing rows
-        new_content_lines = lines[:header_end_idx] + new_table_rows + existing_table_rows
-        
-        return start_tag_str + '\n'.join(new_content_lines) + '\n' + end_tag_str
-    
-    updated_content = re.sub(pattern, replace_table, content, flags=re.DOTALL)
-    
-    return updated_content
+    return valid_versions
 
 def check_markdown():
     col_version = get_collector_version()
@@ -549,19 +463,29 @@ def generate_markdown():
     # Update gateway configuration tables
     print("\nUpdating gateway configuration tables...")
     
-    # Read the current file
-    with open(DEFAULT_CONFIG_FILE, 'r', encoding='utf-8') as file:
-        content = file.read()
+    # Generate 9.x table (9.0 and above)
+    gateway_9x_versions = get_gateway_versions(major_version=9, min_minor=0)
+    gateway_9x_data = {'versions': gateway_9x_versions}
     
-    print("Checking for new 9.x versions...")
-    content = update_gateway_table(content, GATEWAY_9X_TAG, 9)
+    print()
     
-    print("\nChecking for new 8.x versions...")
-    content = update_gateway_table(content, GATEWAY_8X_TAG, 8)
+    # Generate 8.x table (8.17 and above)
+    gateway_8x_versions = get_gateway_versions(major_version=8, min_minor=17)
+    gateway_8x_data = {'versions': gateway_8x_versions}
     
-    # Write the updated content back to the file
-    with open(DEFAULT_CONFIG_FILE, 'w', encoding='utf-8') as file:
-        file.write(content)
+    # Render tables using template
+    render_components_into_file(
+        os.path.dirname(DEFAULT_CONFIG_FILE), 
+        gateway_9x_data, 
+        TEMPLATE_GATEWAY_TABLE, 
+        GATEWAY_9X_TAG
+    )
+    render_components_into_file(
+        os.path.dirname(DEFAULT_CONFIG_FILE), 
+        gateway_8x_data, 
+        TEMPLATE_GATEWAY_TABLE, 
+        GATEWAY_8X_TAG
+    )
     
     print("\nGateway configuration tables updated successfully!")
 
