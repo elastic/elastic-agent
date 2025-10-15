@@ -97,7 +97,7 @@ func TestMonitoringFull(t *testing.T) {
 		},
 		{
 			Name:               "Process runtime manager",
-			RuntimeManager:     monitoringcfg.DefaultRuntimeManager,
+			RuntimeManager:     monitoringcfg.ProcessRuntimeManager,
 			ExpectedConfigPath: filepath.Join(".", "testdata", "monitoring_config_full_process.yaml"),
 		},
 		{
