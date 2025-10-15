@@ -15,7 +15,7 @@
 # this material is strictly forbidden unless prior written
 # permission is obtained from Elasticsearch B.V.
 
-set -eux
+set -eu
 
 _SELF=$(dirname $0)
 source "${_SELF}/../common.sh"
@@ -59,7 +59,6 @@ ARM64_DIGEST=$(docker image inspect --format "{{index .RepoDigests 0}}" "$PRIVAT
 docker buildx imagetools create -t "$PRIVATE_IMAGE" \
   "$AMD64_DIGEST" \
   "$ARM64_DIGEST"
-docker push "$PRIVATE_IMAGE"
 
 annotate "* Image: $PRIVATE_IMAGE"
 annotate "* Short commit: $VERSION"
