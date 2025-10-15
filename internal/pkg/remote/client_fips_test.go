@@ -186,9 +186,17 @@ func TestClientWithCertificate(t *testing.T) {
 				require.Contains(t, err.Error(), test.expectedHandshakeErr)
 			}
 
+<<<<<<< HEAD
 			require.EventuallyWithT(t, func(c *assert.CollectT) {
 				require.Contains(c, serverLog.String(), test.expectedServerLog)
 			},
+=======
+			require.EventuallyWithT(
+				t,
+				func(collect *assert.CollectT) {
+					assert.Contains(collect, serverLog.String(), test.expectedServerLog)
+				},
+>>>>>>> c67fea0d1 ([9.1][tests] - Fix flaky TestClientWithCertificate (#10564))
 				100*time.Millisecond, 10*time.Millisecond,
 			)
 		})
