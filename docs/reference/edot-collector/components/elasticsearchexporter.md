@@ -171,7 +171,7 @@ stack: 9.2
 
 The Elasticsearch exporter supports the `sending_queue` setting, which supports both queueing and batching. 
 However, the sending queue is currently deactivated by default. 
-You can turn on the sending queue by setting `sending_queue` to true. Batching support in sending queue is also deactivated by default and can be turned on by defining `sending_queue::batch`. For example:
+You can turn on the sending queue by setting `sending_queue::enabled` to true. Batching support in sending queue is also deactivated by default and can be turned on by defining `sending_queue::batch`. For example:
 
 ```yaml subs=true
 exporters:
