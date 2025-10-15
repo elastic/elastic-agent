@@ -226,6 +226,7 @@ func TestGetOtelConfig(t *testing.T) {
 			"preset":           "balanced",
 			"queue.mem.events": 3200,
 			"ssl.enabled":      true,
+			"proxy_url":        "https://example.com",
 		}
 
 		for _, v := range extra {
@@ -238,6 +239,7 @@ func TestGetOtelConfig(t *testing.T) {
 		finalOutput := map[string]any{
 			"idle_connection_timeout": "3s",
 			"proxy_disable":           false,
+			"proxy_url":               "https://example.com",
 			"ssl": map[string]interface{}{
 				"ca_sha256":               []interface{}{},
 				"ca_trusted_fingerprint":  "",
