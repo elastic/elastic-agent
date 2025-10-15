@@ -30,21 +30,6 @@ import (
 func TestMonitoringFull(t *testing.T) {
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)
 	require.NoError(t, err, "Error creating agent info")
-	testMon := BeatsMonitor{
-		enabled: true,
-		config: &monitoringConfig{
-			C: &monitoringcfg.MonitoringConfig{
-				Enabled:        true,
-				MonitorMetrics: true,
-				MonitorLogs:    true,
-				HTTP: &monitoringcfg.MonitoringHTTPConfig{
-					Enabled: true,
-				},
-				RuntimeManager: monitoringcfg.DefaultRuntimeManager,
-			},
-		},
-		agentInfo: agentInfo,
-	}
 
 	policy := map[string]any{
 		"agent": map[string]any{
@@ -99,35 +84,76 @@ func TestMonitoringFull(t *testing.T) {
 		"endpoint-default": 1234,
 	}
 
-	expectedConfigFilePath := filepath.Join(".", "testdata", "monitoring_config_full.yaml")
-	expectedConfigBytes, err := os.ReadFile(expectedConfigFilePath)
-	require.NoError(t, err)
-
-	outCfg, err := testMon.MonitoringConfig(policy, compList, existingPidStateMap)
-	require.NoError(t, err)
-
-	// Replace paths with placeholders. Log paths are different for each OS and it's annoying to fully account for the
-	// differences in this test. Same thing applies to endpoints.
-	for _, inputCfg := range outCfg["inputs"].([]any) {
-		inputCfgMap := inputCfg.(map[string]interface{})
-		streams := inputCfgMap["streams"].([]interface{})
-		for _, stream := range streams {
-			streamMap := stream.(map[string]interface{})
-			if _, ok := streamMap["paths"]; ok {
-				streamMap["paths"] = []string{"placeholder"}
-			}
-			if _, ok := streamMap["hosts"]; ok {
-				streamMap["hosts"] = []string{"placeholder"}
-			}
-		}
+	testCases := []struct {
+		Name               string
+		RuntimeManager     string
+		ExpectedConfigPath string
+	}{
+		{
+			Name:               "Default runtime manager",
+			RuntimeManager:     monitoringcfg.DefaultRuntimeManager,
+			ExpectedConfigPath: filepath.Join(".", "testdata", "monitoring_config_full_process.yaml"),
+		},
+		{
+			Name:               "Process runtime manager",
+			RuntimeManager:     monitoringcfg.ProcessRuntimeManager,
+			ExpectedConfigPath: filepath.Join(".", "testdata", "monitoring_config_full_process.yaml"),
+		},
+		{
+			Name:               "Otel runtime manager",
+			RuntimeManager:     monitoringcfg.OtelRuntimeManager,
+			ExpectedConfigPath: filepath.Join(".", "testdata", "monitoring_config_full_otel.yaml"),
+		},
 	}
 
-	outCfgBytes, err := yaml.Marshal(outCfg)
-	require.NoError(t, err)
-	outCfgString := string(outCfgBytes)
-	// replace the version with a placeholder
-	outCfgString = strings.ReplaceAll(outCfgString, agentInfo.Version(), "placeholder")
-	assert.Equal(t, string(expectedConfigBytes), outCfgString)
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			testMon := BeatsMonitor{
+				enabled: true,
+				config: &monitoringConfig{
+					C: &monitoringcfg.MonitoringConfig{
+						Enabled:        true,
+						MonitorMetrics: true,
+						MonitorLogs:    true,
+						HTTP: &monitoringcfg.MonitoringHTTPConfig{
+							Enabled: true,
+						},
+						RuntimeManager: tc.RuntimeManager,
+					},
+				},
+				agentInfo: agentInfo,
+			}
+
+			expectedConfigBytes, err := os.ReadFile(tc.ExpectedConfigPath)
+			require.NoError(t, err)
+
+			outCfg, err := testMon.MonitoringConfig(policy, compList, existingPidStateMap)
+			require.NoError(t, err)
+
+			// Replace paths with placeholders. Log paths are different for each OS and it's annoying to fully account for the
+			// differences in this test. Same thing applies to endpoints.
+			for _, inputCfg := range outCfg["inputs"].([]any) {
+				inputCfgMap := inputCfg.(map[string]interface{})
+				streams := inputCfgMap["streams"].([]interface{})
+				for _, stream := range streams {
+					streamMap := stream.(map[string]interface{})
+					if _, ok := streamMap["paths"]; ok {
+						streamMap["paths"] = []string{"placeholder"}
+					}
+					if _, ok := streamMap["hosts"]; ok {
+						streamMap["hosts"] = []string{"placeholder"}
+					}
+				}
+			}
+
+			outCfgBytes, err := yaml.Marshal(outCfg)
+			require.NoError(t, err)
+			outCfgString := string(outCfgBytes)
+			// replace the version with a placeholder
+			outCfgString = strings.ReplaceAll(outCfgString, agentInfo.Version(), "placeholder")
+			assert.Equal(t, string(expectedConfigBytes), outCfgString)
+		})
+	}
 }
 
 func TestMonitoringWithEndpoint(t *testing.T) {
