@@ -64,6 +64,11 @@ receivers:
       metrics: Undefined
       traces: Beta
 processors:
+  - name: elastictrace
+    stability:
+      logs: Undefined
+      metrics: Undefined
+      traces: Deprecated
   - name: attributes
     stability:
       logs: Beta
