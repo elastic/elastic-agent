@@ -306,7 +306,7 @@ func (gm *goroutinesMonitor) Init(ctx context.Context, t *testing.T, fixture *at
 				Transport: &http.Transport{
 					DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 						if runtime.GOOS != "windows" {
-							path := strings.Replace(socketPath, "unix://", "", -1)
+							path := strings.ReplaceAll(socketPath, "unix://", "")
 							return net.Dial("unix", path)
 						} else {
 							if strings.HasPrefix(socketPath, "npipe:///") {
