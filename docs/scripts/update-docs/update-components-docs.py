@@ -106,7 +106,9 @@ def get_deprecated_components(version='main'):
         
     try:
         data = yaml.safe_load(content)
-        return data.get('deprecated', [])
+        deprecated = data.get('deprecated', [])
+        # Handle case where 'deprecated:' exists but has no items (returns None)
+        return deprecated if deprecated is not None else []
     except yaml.YAMLError as e:
         print(f"Warning: Error parsing deprecated-components.yaml from tag {version_tag}: {e}")
         return []
