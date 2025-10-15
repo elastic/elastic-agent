@@ -189,7 +189,7 @@ func TestClientWithCertificate(t *testing.T) {
 			require.EventuallyWithT(
 				t,
 				func(collect *assert.CollectT) {
-					return assert.Contains(collect, serverLog.String(), test.expectedServerLog)
+					assert.Contains(collect, serverLog.String(), test.expectedServerLog)
 				},
 				100*time.Millisecond, 10*time.Millisecond,
 			)
