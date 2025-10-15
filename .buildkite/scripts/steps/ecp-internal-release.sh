@@ -15,7 +15,7 @@
 # this material is strictly forbidden unless prior written
 # permission is obtained from Elasticsearch B.V.
 
-set -eu
+set -eux
 
 _SELF=$(dirname $0)
 source "${_SELF}/../common.sh"
