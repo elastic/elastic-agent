@@ -74,6 +74,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.137.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.137.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver v0.137.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver v0.137.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver v0.137.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.137.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.137.0
@@ -553,6 +554,7 @@ require (
 	github.com/open-telemetry/opamp-go v0.22.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/signaltometricsconnector v0.137.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer v0.137.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampcustommessages v0.137.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/aws/ecsutil v0.137.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.137.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.137.0 // indirect
