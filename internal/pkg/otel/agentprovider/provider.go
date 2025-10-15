@@ -78,6 +78,8 @@ func (p *Provider) Retrieve(passedCtx context.Context, uri string, watcher confm
 		case <-ctx.Done():
 			return
 		case <-p.updated:
+			// if passedCtx is cancelled, the collector has shutdown.
+			// return instead of calling `watcher`
 			if passedCtx.Err() != nil {
 				return
 			}
