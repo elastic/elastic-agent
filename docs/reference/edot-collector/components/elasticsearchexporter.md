@@ -135,7 +135,7 @@ The exporter supports both internal batching and OpenTelemetry's standard `sendi
 
 ### Internal batching (default)
 
-By default, the exporter performs its own buffering and batching, as configured through the `flush` setting, unless the `sending_queue` and/or  `batcher` settings are defined.
+By default, the exporter performs its own buffering and batching, as configured through the `flush` setting, unless the `sending_queue::batch` and/or  `batcher` settings are defined.
 
 ### Using sending queue
 
