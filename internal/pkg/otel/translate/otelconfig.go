@@ -277,20 +277,7 @@ func getReceiversConfigForComponent(
 
 	// add monitoring config if necessary
 	monitoringConfig := beatMonitoringConfigGetter(comp.ID, beatName)
-<<<<<<< HEAD
-=======
-	if monitoringConfig == nil {
-		endpoint := componentmonitoring.BeatsMonitoringEndpoint(comp.ID)
-		monitoringConfig = map[string]any{
-			"http": map[string]any{
-				"enabled": true,
-				"host":    endpoint,
-			},
-		}
-	}
-	// indicate that beat receivers are managed by the elastic-agent
 	receiverConfig["management.otel.enabled"] = true
->>>>>>> 47112bda4 ([otel] Implement EDOT diagnostics extension (#10052))
 	koanfmaps.Merge(monitoringConfig, receiverConfig)
 
 	return map[string]any{

@@ -8,6 +8,7 @@ package ess
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -17,6 +18,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -323,8 +325,6 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
-=======
 func TestBeatDiagnostics(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: integration.Default,
@@ -549,7 +549,6 @@ agent.monitoring.enabled: false
 	}
 }
 
->>>>>>> 47112bda4 ([otel] Implement EDOT diagnostics extension (#10052))
 func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string) func(ctx context.Context) error {
 	return func(ctx context.Context) error {
 		diagZip, err := fix.ExecDiagnostics(ctx, cmd...)

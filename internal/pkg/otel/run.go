@@ -20,6 +20,9 @@ import (
 
 	"go.opentelemetry.io/collector/otelcol"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
 
@@ -27,7 +30,10 @@ const buildDescription = "Elastic opentelemetry-collector distribution"
 
 func Run(ctx context.Context, stop chan bool, configFiles []string) error {
 	fmt.Fprintln(os.Stdout, "Starting in otel mode")
-	settings := NewSettings(release.Version(), configFiles)
+	conf := map[string]any{
+		"endpoint": paths.DiagnosticsExtensionSocket(),
+	}
+	settings := NewSettings(release.Version(), configFiles, WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)))
 	svc, err := otelcol.NewCollector(*settings)
 	if err != nil {
 		return err

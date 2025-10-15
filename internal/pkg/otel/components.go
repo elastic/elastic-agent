@@ -172,11 +172,8 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			apikeyauthextension.NewFactory(),
 			apmconfigextension.NewFactory(),
 			beatsauthextension.NewFactory(),
-<<<<<<< HEAD
 			headersetterextension.NewFactory(),
-=======
 			elasticdiagnostics.NewFactory(),
->>>>>>> 47112bda4 ([otel] Implement EDOT diagnostics extension (#10052))
 		}
 		extensions = append(extensions, extensionFactories...)
 		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)
