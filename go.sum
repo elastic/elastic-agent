@@ -520,8 +520,8 @@ github.com/elastic/elastic-agent-client/v7 v7.17.2 h1:Cl2TeABqWZgW40t5fchGWT/sRk
 github.com/elastic/elastic-agent-client/v7 v7.17.2/go.mod h1:5irRFqp6HLqtu1S+OeY0jg8x7K6PLL+DW+PwVk1vJnk=
 github.com/elastic/elastic-agent-libs v0.24.1 h1:kFPpOG5mbdaGRRNXPb2KfEaR65Uoi8nsMbDOKA02/Go=
 github.com/elastic/elastic-agent-libs v0.24.1/go.mod h1:o/iXtbHYaojpG4BOY7Z3hFMQAgEoqq2owO17JPGpf3A=
-github.com/elastic/elastic-agent-system-metrics v0.13.2 h1:R4ogKHESuWhWTtopnw/aHnBxxSZbxd7KHV4GefdwT2M=
-github.com/elastic/elastic-agent-system-metrics v0.13.2/go.mod h1:ezM1kzDUT+vWXFh5oK8QXB/AEB0UoLWqWA8rkRicFFo=
+github.com/elastic/elastic-agent-system-metrics v0.13.3 h1:VlY3Ezuwi5bPZRsAM97WaJEW78XkXgqmPHcTl1WGMRw=
+github.com/elastic/elastic-agent-system-metrics v0.13.3/go.mod h1:lB8veYWYBlA9eF6TahmPN87G1IEgWlbep7QSqLSW90U=
 github.com/elastic/elastic-transport-go/v8 v8.7.0 h1:OgTneVuXP2uip4BA658Xi6Hfw+PeIOod2rY3GVMGoVE=
 github.com/elastic/elastic-transport-go/v8 v8.7.0/go.mod h1:YLHer5cj0csTzNFXoNQ8qhtGY1GTvSqPnKWKaqQE3Hk=
 github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3 h1:UyNbxdkQiSfyipwsOCWAlO+ju3xXC61Z4prx/HBTtFk=
@@ -1241,6 +1241,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer v0.
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer v0.137.0/go.mod h1:EsOdYfEhvqaTeHVye3tCiW80R3hLxRIjlMyDW5Kdb5A=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.137.0 h1:LfT3U0idFhtOke5T/Eanpdew7bqYRuvNyorJ4kmoYL0=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.137.0/go.mod h1:CZUjDlF2+pC4BAnpr3YdoxWJMw3TAUjBX5SfJpPTvR4=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampcustommessages v0.137.0 h1:PNkfP1wwjw1XV32pZ8Aa+jwL2vk1ytKIx2m4x5Vbndc=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampcustommessages v0.137.0/go.mod h1:gLJlqRfHOzS5fRLaclK9qAcKPBlrxGr+/eKBgQSM4jE=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.137.0 h1:P0bLjuQ/iklHRqd5yhzqFeCJS5J6xtzKPEsw/pRQC8M=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.137.0/go.mod h1:SAzkB2DOPQfVI0sXxP0d0tzc/0PWD14BVENzwwLx/ZA=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage v0.137.0 h1:ummp0OH+kULQM9uBLOnWebkx+zyQLQqrV4FdD4pIuMg=
@@ -1339,6 +1341,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformpro
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.137.0/go.mod h1:/9FuutTkrG+QHUAwDvVyJFko5SHtsySNouDiOfx3b9o=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver v0.137.0 h1:8XhVcCazuTjvG+t0aIN3YKwKJc5hIBbkp97102tlY2w=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver v0.137.0/go.mod h1:bBj7bbrOS+BaVBO5Pggup5LHenxxPblr+wis3jhPHGQ=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver v0.137.0 h1:TYs3B/Rd6fYYkBjA0C3rLy3kOefGxEA/wbJYFU9sguk=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver v0.137.0/go.mod h1:eLOXUYIX+tFsGSnAlIkqqOs69sHXddDFI7b5LP241f8=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver v0.137.0 h1:7f3QI/1ly0o2uObNkAqjaVg81aha5eRrsq/h5cpnsSg=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver v0.137.0/go.mod h1:j0kaPBaQhfYySi2XW4qCYlfmfENqpa0WLzStAriJEIY=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.137.0 h1:ljhC9Y219q3S9L2R9uY8KinuTzGjMH5pI+1+s/orjNw=

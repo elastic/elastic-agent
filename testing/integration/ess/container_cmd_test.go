@@ -412,7 +412,7 @@ func createMockESOutput(t *testing.T, info *define.Info, percentDuplicate, perce
 `
 	// The API will return an error if the output ID/name contains an
 	// UUID substring, so we replace the '-' by '_' to keep the API happy.
-	outputUUID := strings.Replace(uuid.Must(uuid.NewV4()).String(), "-", "_", -1)
+	outputUUID := strings.ReplaceAll(uuid.Must(uuid.NewV4()).String(), "-", "_")
 	bodyStr := fmt.Sprintf(createOutputBody, outputUUID, mockesURL)
 	bodyReader := strings.NewReader(bodyStr)
 	// THE URL IS MISSING
