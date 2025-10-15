@@ -26,7 +26,12 @@ changelog/fragments/
 /docs/reference/edot-collector @elastic/ingest-docs
 /docs/scripts/update-docs @elastic/ingest-docs
 /internal/pkg/otel/samples @elastic/ingest-otel-data @elastic/ingest-docs
+<<<<<<< HEAD
 /internal/pkg/otel/core-components.yaml @elastic/ingest-otel-data @elastic/ingest-docs
+=======
+/internal/pkg/otel/core-components.yaml @elastic/ingest-otel-leads
+/internal/pkg/otel/deprecated-components.yaml @elastic/ingest-otel-leads
+>>>>>>> fdc6b8b33 (Improve docs automation for Gateway configs and deprecated components (#10539))
 /internal/pkg/composable/providers/kubernetes @elastic/elastic-agent-control-plane
 /internal/pkg/otel/samples/darwin/autoops_es.yml @elastic/opex
 /internal/pkg/otel/samples/linux/autoops_es.yml @elastic/opex
