@@ -135,11 +135,43 @@ The exporter supports both internal batching and OpenTelemetry's standard `sendi
 
 ### Internal batching (default)
 
-By default, the exporter performs its own buffering and batching, as configured through the `flush` setting, unless the `sending_queue` and  `batcher` settings are defined.
+By default, the exporter performs its own buffering and batching, as configured through the `flush` setting, unless the `sending_queue` and/or  `batcher` settings are defined.
 
 ### Using sending queue
 
-The Elasticsearch exporter supports the `sending_queue` setting, which supports both queueing and batching. However, the sending queue is currently deactivated by default. You can turn on the sending queue by setting `sending_queue` to true. Batching support in sending queue is also deactivated by default and can be turned on by defining `sending_queue::batch`. For example:
+```{applies_to}
+stack: 9.0 9.1
+```
+
+The sending queue can be enabled and configured with the `batcher` section, using [common `batcher` settings](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/exporterhelper/internal/queue_sender.go).
+
+- `batcher`:
+  - `enabled` (default=unset): Enable batching of requests into 1 or more bulk requests. On a batcher flush, it is possible for a batched request to be translated to more than 1 bulk request due to `flush::bytes`.
+  - `sizer` (default=items): Unit of `min_size` and `max_size`. Currently supports only "items", in the future will also support "bytes".
+  - `min_size` (default=5000): Minimum batch size to be exported to Elasticsearch, measured in units according to `batcher::sizer`.
+  - `max_size` (default=0): Maximum batch size to be exported to Elasticsearch, measured in units according to `batcher::sizer`. To limit bulk request size, configure `flush::bytes` instead. :warning: It is recommended to keep `max_size` as 0 as a non-zero value may lead to broken metrics grouping and indexing rejections.
+  - `flush_timeout` (default=10s): Maximum time of the oldest item spent inside the batcher buffer, aka "max age of batcher buffer". A batcher flush will happen regardless of the size of content in batcher buffer.
+
+For example:
+
+```yaml subs=true
+exporters:
+  elasticsearch:
+    endpoint: https://elasticsearch:9200
+    batcher:
+      enabled: true
+      min_size: 1000
+      max_size: 10000
+      flush_timeout: 5s
+```
+
+```{applies to}
+stack: 9.2
+```
+
+The Elasticsearch exporter supports the `sending_queue` setting, which supports both queueing and batching. 
+However, the sending queue is currently deactivated by default. 
+You can turn on the sending queue by setting `sending_queue` to true. Batching support in sending queue is also deactivated by default and can be turned on by defining `sending_queue::batch`. For example:
 
 ```yaml subs=true
 exporters:
