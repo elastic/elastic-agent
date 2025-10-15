@@ -59,7 +59,7 @@ func (p *Provider) Update(cfg *confmap.Conf) {
 }
 
 // Retrieve returns the latest configuration.
-func (p *Provider) Retrieve(ctx context.Context, uri string, watcher confmap.WatcherFunc) (*confmap.Retrieved, error) {
+func (p *Provider) Retrieve(passedCtx context.Context, uri string, watcher confmap.WatcherFunc) (*confmap.Retrieved, error) {
 	if uri != p.uri {
 		return nil, fmt.Errorf("%q uri doesn't equal defined %q provider", uri, schemeName)
 	}
@@ -78,6 +78,11 @@ func (p *Provider) Retrieve(ctx context.Context, uri string, watcher confmap.Wat
 		case <-ctx.Done():
 			return
 		case <-p.updated:
+			// if passedCtx is cancelled, the collector has shutdown.
+			// return instead of calling `watcher`
+			if passedCtx.Err() != nil {
+				return
+			}
 			watcher(&confmap.ChangeEvent{})
 		}
 	}()
