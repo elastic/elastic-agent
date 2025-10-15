@@ -39,7 +39,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/otiai10/copy"
 
-	devmachine "github.com/elastic/elastic-agent/dev-tools/devmachine"
+	"github.com/elastic/elastic-agent/dev-tools/devmachine"
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
@@ -235,58 +235,13 @@ func (Dev) Package(ctx context.Context) {
 	Package(ctx)
 }
 
-func mocksPath() (string, error) {
-	repositoryRoot, err := findRepositoryRoot()
-	if err != nil {
-		return "", fmt.Errorf("finding repository root: %w", err)
-	}
-	return filepath.Join(repositoryRoot, "testing", "mocks"), nil
-}
-
-func (Dev) CleanMocks() error {
-	mPath, err := mocksPath()
-	if err != nil {
-		return fmt.Errorf("retrieving mocks path: %w", err)
-	}
-	err = os.RemoveAll(mPath)
-	if err != nil {
-		return fmt.Errorf("removing mocks: %w", err)
-	}
-	return nil
-}
-
 func (Dev) RegenerateMocks() error {
-	mg.Deps(Dev.CleanMocks)
 	err := sh.Run("mockery")
 	if err != nil {
 		return fmt.Errorf("generating mocks: %w", err)
 	}
 
-	// change CWD
-	workingDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("retrieving CWD: %w", err)
-	}
-	// restore the working directory when exiting the function
-	defer func() {
-		err := os.Chdir(workingDir)
-		if err != nil {
-			panic(fmt.Errorf("failed to restore working dir %q: %w", workingDir, err))
-		}
-	}()
-
-	mPath, err := mocksPath()
-	if err != nil {
-		return fmt.Errorf("retrieving mocks path: %w", err)
-	}
-
-	err = os.Chdir(mPath)
-	if err != nil {
-		return fmt.Errorf("changing current directory to %q: %w", mPath, err)
-	}
-
-	mg.Deps(devtools.AddLicenseHeaders)
-	mg.Deps(devtools.GoImports)
+	mg.Deps(devtools.Format)
 	return nil
 }
 
@@ -455,7 +410,7 @@ func (Build) TestBinaries() error {
 		}
 
 		outputName := filepath.Join(pkg, binary)
-		err := RunGo("build", "-o", outputName, filepath.Join(pkg))
+		err := RunGo("build", "-v", "-o", outputName, filepath.Join(pkg))
 		if err != nil {
 			return err
 		}
@@ -3201,7 +3156,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	}
 
 	provisionCfg := ess.ProvisionerConfig{
-		Identifier: fmt.Sprintf("at-%s", strings.Replace(strings.Split(email, "@")[0], ".", "-", -1)),
+		Identifier: fmt.Sprintf("at-%s", strings.ReplaceAll(strings.Split(email, "@")[0], ".", "-")),
 		APIKey:     essToken,
 		Region:     essRegion,
 	}
@@ -3449,7 +3404,7 @@ func authGCP(ctx context.Context) error {
 	var svcList []struct {
 		Email string `json:"email"`
 	}
-	serviceAcctName := fmt.Sprintf("%s-agent-testing", strings.Replace(parts[0], ".", "-", -1))
+	serviceAcctName := fmt.Sprintf("%s-agent-testing", strings.ReplaceAll(parts[0], ".", "-"))
 	iamAcctName := fmt.Sprintf("%s@%s.iam.gserviceaccount.com", serviceAcctName, project)
 	cmd = exec.CommandContext(ctx, cliName, "iam", "service-accounts", "list", "--format=json")
 	output, err = cmd.Output()
