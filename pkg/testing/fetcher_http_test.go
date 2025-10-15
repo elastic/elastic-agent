@@ -119,6 +119,7 @@ func TestHttpFetcher_Name(t *testing.T) {
 
 func Test_httpFetcherResult_Fetch(t *testing.T) {
 	type fields struct {
+		baseURL     string
 		packageName string
 	}
 	type args struct {
@@ -165,24 +166,41 @@ func Test_httpFetcherResult_Fetch(t *testing.T) {
 			args:    args{availableFiles: map[string]string{}},
 			wantErr: assert.Error,
 		},
+		{
+			name: "invalid base URL - malformed string",
+			fields: fields{
+				baseURL:     "invalid-url",
+				packageName: "elastic-agent-1.2.3-linux-arm64.tar.gz",
+			},
+			args:    args{},
+			wantErr: assert.Error,
+		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			hf := http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-				path := request.URL.Path
-				content, ok := tt.args.availableFiles[path]
-				if !ok {
-					writer.WriteHeader(http.StatusNotFound)
-					return
-				}
+			baseURL := tt.fields.baseURL
 
-				_, err := writer.Write([]byte(content))
-				require.NoError(t, err, "error writing file content")
-			})
-			server := httptest.NewServer(hf)
-			defer server.Close()
+			// If no baseURL provided, use an httptest.Server
+			if baseURL == "" {
+				hf := http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+					path := request.URL.Path
+					content, ok := tt.args.availableFiles[path]
+					if !ok {
+						writer.WriteHeader(http.StatusNotFound)
+						return
+					}
+
+					_, err := writer.Write([]byte(content))
+					require.NoError(t, err, "error writing file content")
+				})
+				server := httptest.NewServer(hf)
+				defer server.Close()
+				baseURL = server.URL
+			}
+
 			h := httpFetcherResult{
-				baseURL:     server.URL,
+				baseURL:     baseURL,
 				packageName: tt.fields.packageName,
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
