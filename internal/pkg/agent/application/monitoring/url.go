@@ -110,7 +110,7 @@ func getURL(
 			u.Path = "/" + segs[1]
 		}
 
-		p = `\\.\pipe\` + strings.Replace(p, "/", "\\", -1)
+		p = `\\.\pipe\` + strings.ReplaceAll(p, "/", "\\")
 		t = dialer.NewNpipeDialerBuilder(p)
 	default:
 		t = dialer.NewDefaultDialerBuilder()

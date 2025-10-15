@@ -3158,7 +3158,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	}
 
 	provisionCfg := ess.ProvisionerConfig{
-		Identifier: fmt.Sprintf("at-%s", strings.Replace(strings.Split(email, "@")[0], ".", "-", -1)),
+		Identifier: fmt.Sprintf("at-%s", strings.ReplaceAll(strings.Split(email, "@")[0], ".", "-")),
 		APIKey:     essToken,
 		Region:     essRegion,
 	}
@@ -3406,7 +3406,7 @@ func authGCP(ctx context.Context) error {
 	var svcList []struct {
 		Email string `json:"email"`
 	}
-	serviceAcctName := fmt.Sprintf("%s-agent-testing", strings.Replace(parts[0], ".", "-", -1))
+	serviceAcctName := fmt.Sprintf("%s-agent-testing", strings.ReplaceAll(parts[0], ".", "-"))
 	iamAcctName := fmt.Sprintf("%s@%s.iam.gserviceaccount.com", serviceAcctName, project)
 	cmd = exec.CommandContext(ctx, cliName, "iam", "service-accounts", "list", "--format=json")
 	output, err = cmd.Output()
