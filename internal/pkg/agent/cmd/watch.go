@@ -142,6 +142,12 @@ func WithSkipRestart(skipRestart bool) upgrade.RollbackOption {
 	}
 }
 
+func WithRemoveMarker(removeMarker bool) upgrade.RollbackOption {
+	return func(ros upgrade.RollbackOptionSetter) {
+		ros.SetRemoveMarker(removeMarker)
+	}
+}
+
 type installationModifier interface {
 	Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool) error
 	Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string, opts ...upgrade.RollbackOption) error
@@ -217,17 +223,19 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		log.Error("Error detected, proceeding to rollback: %v", err)
 
 		upgradeDetails.SetStateWithReason(details.StateRollback, details.ReasonWatchFailed)
-		var opts []upgrade.RollbackOption
+
+		// by default remove marker (backward compatible behaviour)
+		removeMarker := true
+
 		previousVersion, versionParseErr := semver.ParseVersion(marker.PrevVersion)
 		if versionParseErr != nil {
-			return fmt.Errorf("could not parse previous version %s: %w", marker.PrevVersion, versionParseErr)
+			log.Errorf("could not parse previous version %s: %s", marker.PrevVersion, versionParseErr)
+		} else if !previousVersion.Less(*semver.NewParsedSemVer(9, 2, 0, "SNAPSHOT", "")) {
+			// leave the marker in place when rolling back to agent >= 9.2.0-SNAPSHOT as it will be used to determine
+			// that agent was rolled back and the reason
+			removeMarker = false
 		}
-		if previousVersion.Less(*semver.NewParsedSemVer(9, 2, 0, "", "")) {
-			opts = append(opts, func(ros upgrade.RollbackOptionSetter) {
-				ros.SetRemoveMarker(true)
-			})
-		}
-		err = installModifier.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash, opts...)
+		err = installModifier.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash, WithRemoveMarker(removeMarker))
 		if err != nil {
 			log.Error("rollback failed", err)
 			upgradeDetails.Fail(err)
