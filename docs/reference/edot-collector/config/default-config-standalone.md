@@ -102,6 +102,33 @@ Data from OTel SDKs is piped through the [`OTLP`] receiver directly to the OTLP 
 
 With the {{motlp}}, there is no need to configure any Elastic-specific components, such as the [`elasticinframetrics`] and [`elasticapm`] processors, the [`elasticapm`] connector, or the [`elasticsearch`] exporter. Edge setup and configuration can be fully vendor agnostic.
 
+### Batching configuration for contrib OpenTelemetry Collector
+
+Contrib OpenTelemetry collectors should use the following batching configuration when sending data to the {{motlp}}. This configuration is already included in EDOT and optimizes data transfer to the managed endpoint:
+
+```yaml
+otlp/ingest:
+  endpoint: <motlp.ingest endpoint>
+  headers:
+    Authorization: ApiKey <value>
+  sending_queue:
+    enabled: true
+    sizer: bytes
+    queue_size: 50000000 # 50MB uncompressed
+    block_on_overflow: true
+  batch:
+    flush_interval: 1s
+    min_size: 1_000_000 # 1MB uncompressed
+    max_size: 4_000_000 # 4MB uncompressed
+```
+
+The batching configuration ensures efficient data transfer by:
+
+- Using a 50MB queue to buffer data before sending.
+- Flushing batches at least every second.
+- Sending batches between 1MB and 4MB in size.
+- Blocking when the queue is full to prevent data loss.
+
 ## Gateway mode
 
 In Gateway mode, the Collector ingests data from other Collectors running in Agent mode and forwards it to Elastic.
