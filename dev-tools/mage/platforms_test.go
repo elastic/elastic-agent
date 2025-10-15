@@ -97,8 +97,9 @@ func TestBuildPlatformsListFilter(t *testing.T) {
 	assert.Len(t, BuildPlatforms.Filter("solaris"), 1)
 	assert.Len(t, BuildPlatforms.Defaults().Filter("solaris"), 0)
 
-	assert.Len(t, BuildPlatforms.Filter("windows"), 2)
+	assert.Len(t, BuildPlatforms.Filter("windows"), 3)
 	assert.Len(t, BuildPlatforms.Filter("windows/386"), 1)
+	assert.Len(t, BuildPlatforms.Filter("windows/arm64"), 1)
 	assert.Len(t, BuildPlatforms.Filter("!defaults"), len(BuildPlatforms)-len(BuildPlatforms.Defaults()))
 
 	defaults := BuildPlatforms.Defaults()

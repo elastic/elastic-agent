@@ -28,6 +28,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
@@ -36,6 +37,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -43,9 +45,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
-	infomocks "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/info"
-	ackermocks "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/fleetapi/acker"
-	clientmocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
 )
 
 func Test_CopyFile(t *testing.T) {
@@ -247,7 +246,7 @@ func TestIsInProgress(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// Expect client.State() call to be made only if no Upgrade Watcher PIDs
 			// are returned (i.e. no Upgrade Watcher is found to be running).
-			mc := clientmocks.NewClient(t)
+			mc := client.NewMockClient(t)
 			if test.watcherPIDsFetcher != nil {
 				pids, _ := test.watcherPIDsFetcher()
 				if len(pids) == 0 {
@@ -301,7 +300,7 @@ func TestUpgraderAckAction(t *testing.T) {
 		require.Nil(t, u.AckAction(t.Context(), nil, action))
 	})
 	t.Run("AckAction with acker", func(t *testing.T) {
-		mockAcker := ackermocks.NewAcker(t)
+		mockAcker := acker.NewMockAcker(t)
 		mockAcker.EXPECT().Ack(mock.Anything, action).Return(nil)
 		mockAcker.EXPECT().Commit(mock.Anything).Return(nil)
 
@@ -309,7 +308,7 @@ func TestUpgraderAckAction(t *testing.T) {
 	})
 
 	t.Run("AckAction with acker - failing commit", func(t *testing.T) {
-		mockAcker := ackermocks.NewAcker(t)
+		mockAcker := acker.NewMockAcker(t)
 
 		errCommit := errors.New("failed commit")
 		mockAcker.EXPECT().Ack(mock.Anything, action).Return(nil)
@@ -319,7 +318,7 @@ func TestUpgraderAckAction(t *testing.T) {
 	})
 
 	t.Run("AckAction with acker - failed ack", func(t *testing.T) {
-		mockAcker := ackermocks.NewAcker(t)
+		mockAcker := acker.NewMockAcker(t)
 
 		errAck := errors.New("ack error")
 		mockAcker.EXPECT().Ack(mock.Anything, action).Return(errAck)
@@ -1109,7 +1108,7 @@ func TestManualRollback(t *testing.T) {
 	// the update marker yaml assume 7d TLL for rollbacks, let's make an extra day pass
 	nowAfterTTL := nowBeforeTTL.Add(8 * 24 * time.Hour)
 
-	type setupF func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper)
+	type setupF func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper)
 	type postRollbackAssertionsF func(t *testing.T, topDir string)
 	type testcase struct {
 		name              string
@@ -1125,7 +1124,7 @@ func TestManualRollback(t *testing.T) {
 	testcases := []testcase{
 		{
 			name: "no rollback version - rollback fails",
-			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
+			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper) {
 				//do not setup anything here, let the rollback fail
 			},
 			artifactSettings: artifact.DefaultConfig(),
@@ -1138,7 +1137,7 @@ func TestManualRollback(t *testing.T) {
 		},
 		{
 			name: "no update marker - rollback fails",
-			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
+			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper) {
 				//do not setup anything here, let the rollback fail
 			},
 			artifactSettings: artifact.DefaultConfig(),
@@ -1151,7 +1150,7 @@ func TestManualRollback(t *testing.T) {
 		},
 		{
 			name: "update marker is malformed - rollback fails",
-			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
+			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper) {
 				err := os.WriteFile(markerFilePath(paths.DataFrom(topDir)), []byte("this is not a proper YAML file"), 0600)
 				require.NoError(t, err, "error setting up update marker")
 				locker := filelock.NewAppLocker(topDir, "watcher.lock")
@@ -1171,7 +1170,7 @@ func TestManualRollback(t *testing.T) {
 		},
 		{
 			name: "update marker ok but rollback available is empty - error",
-			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
+			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper) {
 				err := os.WriteFile(markerFilePath(paths.DataFrom(topDir)), []byte(updatemarkerwatching456NoRollbackAvailable), 0600)
 				require.NoError(t, err, "error setting up update marker")
 				locker := filelock.NewAppLocker(topDir, "watcher.lock")
@@ -1200,7 +1199,7 @@ func TestManualRollback(t *testing.T) {
 		},
 		{
 			name: "update marker ok but version is not available for rollback - error",
-			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
+			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper) {
 				err := os.WriteFile(markerFilePath(paths.DataFrom(topDir)), []byte(updatemarkerwatching456), 0600)
 				require.NoError(t, err, "error setting up update marker")
 				locker := filelock.NewAppLocker(topDir, "watcher.lock")
@@ -1229,7 +1228,7 @@ func TestManualRollback(t *testing.T) {
 		},
 		{
 			name: "update marker ok but rollback is expired - error",
-			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
+			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper) {
 				err := os.WriteFile(markerFilePath(paths.DataFrom(topDir)), []byte(updatemarkerwatching456), 0600)
 				require.NoError(t, err, "error setting up update marker")
 				locker := filelock.NewAppLocker(topDir, "watcher.lock")
@@ -1259,7 +1258,7 @@ func TestManualRollback(t *testing.T) {
 		},
 		{
 			name: "update marker ok - takeover watcher, persist rollback and restart most recent watcher",
-			setup: func(t *testing.T, topDir string, agent *infomocks.Agent, watcherHelper *MockWatcherHelper) {
+			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper) {
 				err := os.WriteFile(markerFilePath(paths.DataFrom(topDir)), []byte(updatemarkerwatching456), 0600)
 				require.NoError(t, err, "error setting up update marker")
 				locker := filelock.NewAppLocker(topDir, "watcher.lock")
@@ -1291,7 +1290,7 @@ func TestManualRollback(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			log, _ := loggertest.New(t.Name())
-			mockAgentInfo := infomocks.NewAgent(t)
+			mockAgentInfo := info.NewMockAgent(t)
 			mockWatcherHelper := NewMockWatcherHelper(t)
 			topDir := t.TempDir()
 			err := os.MkdirAll(paths.DataFrom(topDir), 0777)
@@ -1593,7 +1592,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		},
 	}
 
-	mockAgentInfo := infomocks.NewAgent(t)
+	mockAgentInfo := info.NewMockAgent(t)
 	mockAgentInfo.On("Version").Return("9.0.0")
 
 	for name, tc := range testCases {

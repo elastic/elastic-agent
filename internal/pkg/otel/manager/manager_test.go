@@ -19,23 +19,25 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
-	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/component/runtime"
-	"github.com/elastic/elastic-agent/version"
-
+	"github.com/gofrs/uuid/v5"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	otelComponent "go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/logptest"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
+	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	"github.com/elastic/elastic-agent/version"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -376,8 +378,9 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// stop it, this should be restarted by the manager
 				updateTime = time.Now()
-				require.NotNil(t, exec.handle, "execModeFn handle should not be nil")
-				exec.handle.Stop(waitTimeForStop)
+				execHandle := exec.getProcessHandle()
+				require.NotNil(t, execHandle, "execModeFn handle should not be nil")
+				execHandle.Stop(waitTimeForStop)
 				e.EnsureHealthy(t, updateTime)
 
 				// no configuration should stop the runner
@@ -402,10 +405,11 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// stop it, this should be restarted by the manager
 				updateTime = time.Now()
-				require.NotNil(t, exec.handle, "execModeFn handle should not be nil")
-				exec.handle.Stop(waitTimeForStop)
+				execHandle := exec.getProcessHandle()
+				require.NotNil(t, execHandle, "execModeFn handle should not be nil")
+				execHandle.Stop(waitTimeForStop)
 				e.EnsureHealthy(t, updateTime)
-				assert.EqualValues(t, 1, countHealthCheckExtensionStatuses(e.getStatus()), "health check extension status count should be 1")
+				assert.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getStatus()), "health check extension status count should be 0")
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
@@ -427,7 +431,7 @@ func TestOTelManager_Run(t *testing.T) {
 				updateTime := time.Now()
 				m.Update(cfg, nil)
 				e.EnsureHealthy(t, updateTime)
-				assert.EqualValues(t, 1, countHealthCheckExtensionStatuses(e.getStatus()), "health check extension status count should be 1")
+				assert.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getStatus()), "health check extension status count should be 0")
 
 				var oldPHandle *procHandle
 				// repeatedly kill the collector
@@ -445,7 +449,7 @@ func TestOTelManager_Run(t *testing.T) {
 					// the collector should restart and report healthy
 					updateTime = time.Now()
 					e.EnsureHealthy(t, updateTime)
-					assert.EqualValues(t, 1, countHealthCheckExtensionStatuses(e.getStatus()), "health check extension status count should be 1")
+					assert.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getStatus()), "health check extension status count should be 0")
 				}
 
 				seenRecoveredTimes := m.recoveryRetries.Load()
@@ -598,6 +602,41 @@ func TestOTelManager_Run(t *testing.T) {
 				case <-time.After(2 * waitTimeForStop):
 					require.Fail(t, "timeout waiting for process to exit")
 				}
+			},
+		},
+		{
+			name: "subprocess user has healthcheck extension",
+			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
+			},
+			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
+
+				subprocessExec, ok := exec.exec.(*subprocessExecution)
+				require.True(t, ok, "execution mode isn't subprocess")
+
+				cfg := confmap.NewFromStringMap(testConfig)
+
+				nsUUID, err := uuid.NewV4()
+				require.NoError(t, err, "failed to create a uuid")
+
+				componentType, err := otelComponent.NewType(healthCheckExtensionName)
+				require.NoError(t, err, "failed to create component type")
+
+				healthCheckExtensionID := otelComponent.NewIDWithName(componentType, nsUUID.String()).String()
+
+				ports, err := findRandomTCPPorts(3)
+				require.NoError(t, err, "failed to find random tcp ports")
+				subprocessExec.collectorHealthCheckPort = ports[0]
+				subprocessExec.collectorMetricsPort = ports[1]
+				err = injectHeathCheckV2Extension(cfg, healthCheckExtensionID, ports[2])
+				require.NoError(t, err, "failed to inject user health extension")
+
+				updateTime := time.Now()
+				m.Update(cfg, nil)
+				e.EnsureHealthy(t, updateTime)
+
+				assert.EqualValues(t, 1, countHealthCheckExtensionStatuses(e.getStatus()), "health check extension status count should be 1")
 			},
 		},
 		{
@@ -782,7 +821,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// the execution mode passed here is overridden below so it is irrelevant
-			m, err := NewOTelManager(l, logp.DebugLevel, base, EmbeddedExecutionMode, nil, 0, 0, nil, waitTimeForStop)
+			m, err := NewOTelManager(l, logp.DebugLevel, base, EmbeddedExecutionMode, nil, nil, nil, waitTimeForStop)
 			require.NoError(t, err, "could not create otel manager")
 
 			executionMode, err := tc.execModeFn(m.collectorRunErr)
@@ -824,6 +863,14 @@ func TestOTelManager_Ports(t *testing.T) {
 	ports, err := findRandomTCPPorts(2)
 	require.NoError(t, err)
 	healthCheckPort, metricsPort := ports[0], ports[1]
+	agentCollectorConfig := configuration.CollectorConfig{
+		HealthCheckConfig: configuration.CollectorHealthCheckConfig{
+			Endpoint: fmt.Sprintf("http://localhost:%d", healthCheckPort),
+		},
+		TelemetryConfig: configuration.CollectorTelemetryConfig{
+			Endpoint: fmt.Sprintf("http://localhost:%d", metricsPort),
+		},
+	}
 
 	wd, erWd := os.Getwd()
 	require.NoError(t, erWd, "cannot get working directory")
@@ -872,8 +919,7 @@ func TestOTelManager_Ports(t *testing.T) {
 				logp.DebugLevel,
 				base, EmbeddedExecutionMode,
 				nil,
-				metricsPort,
-				healthCheckPort,
+				&agentCollectorConfig,
 				nil,
 				waitTimeForStop,
 			)
@@ -995,8 +1041,7 @@ func TestOTelManager_PortConflict(t *testing.T) {
 		logp.DebugLevel,
 		base, SubprocessExecutionMode,
 		nil,
-		0,
-		0,
+		nil,
 		nil,
 		waitTimeForStop,
 	)
@@ -1197,6 +1242,17 @@ func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
 					// This represents a regular collector pipeline (should remain after cleaning)
 					"pipeline:logs": {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+					"extensions": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							"extension:beatsauth/test": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							"extension:elastic_diagnostics/test": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+						},
 					},
 				},
 			},

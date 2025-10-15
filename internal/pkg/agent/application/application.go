@@ -256,8 +256,7 @@ func New(
 		logLevel, baseLogger,
 		otelExecMode,
 		agentInfo,
-		0, // TODO: make this configurable in a follow-up
-		0, // TODO: make this configurable in a follow-up
+		cfg.Settings.Collector,
 		monitor.ComponentMonitoringConfig,
 		cfg.Settings.ProcessConfig.StopTimeout,
 	)

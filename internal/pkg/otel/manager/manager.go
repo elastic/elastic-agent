@@ -13,11 +13,14 @@ import (
 	"hash/fnv"
 	"os"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
@@ -124,13 +127,31 @@ func NewOTelManager(
 	baseLogger *logger.Logger,
 	mode ExecutionMode,
 	agentInfo info.Agent,
-	collectorMetricsPort int, // 0 means we pick a random port
-	collectorHealthCheckPort int, // 0 means we pick a random port
+	agentCollectorConfig *configuration.CollectorConfig,
 	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter,
 	stopTimeout time.Duration,
 ) (*OTelManager, error) {
 	var exec collectorExecution
 	var recoveryTimer collectorRecoveryTimer
+	var err error
+
+	// determine the otel collector ports
+	collectorMetricsPort, collectorHealthCheckPort := 0, 0
+	if agentCollectorConfig != nil {
+		if agentCollectorConfig.HealthCheckConfig.Endpoint != "" {
+			collectorHealthCheckPort, err = agentCollectorConfig.HealthCheckConfig.Port()
+			if err != nil {
+				return nil, fmt.Errorf("invalid collector health check port: %w", err)
+			}
+		}
+		if agentCollectorConfig.TelemetryConfig.Endpoint != "" {
+			collectorMetricsPort, err = agentCollectorConfig.TelemetryConfig.Port()
+			if err != nil {
+				return nil, fmt.Errorf("invalid collector metrics port: %w", err)
+			}
+		}
+	}
+
 	switch mode {
 	case SubprocessExecutionMode:
 		// NOTE: if we stop embedding the collector binary in elastic-agent, we need to
@@ -505,6 +526,24 @@ func (m *OTelManager) MergedOtelConfig() *confmap.Conf {
 // and prepares component state updates for distribution to watchers.
 // Returns component state updates and any error encountered during processing.
 func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus) ([]runtime.ComponentComponentState, error) {
+	// Remove agent managed extensions from the status report
+	if otelStatus != nil {
+		if extensionsMap, exists := otelStatus.ComponentStatusMap["extensions"]; exists {
+			for extensionKey := range extensionsMap.ComponentStatusMap {
+				switch {
+				case strings.HasPrefix(extensionKey, "extension:beatsauth"):
+					delete(extensionsMap.ComponentStatusMap, extensionKey)
+				case strings.HasPrefix(extensionKey, "extension:elastic_diagnostics"):
+					delete(extensionsMap.ComponentStatusMap, extensionKey)
+				}
+			}
+
+			if len(extensionsMap.ComponentStatusMap) == 0 {
+				delete(otelStatus.ComponentStatusMap, "extensions")
+			}
+		}
+	}
+
 	// Extract component states from otel status
 	componentStates, err := translate.GetAllComponentStates(otelStatus, m.components)
 	if err != nil {
