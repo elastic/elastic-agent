@@ -131,19 +131,32 @@ The `elasticsearch.index` attribute is removed from the final document if it exi
 
 ## Performance and batching
 
-The exporter supports both internal batching and OpenTelemetry's standard `sending_queue` configuration:
+### Using sending queue
+
+The Elasticsearch exporter supports the `sending_queue` setting, which supports both queueing and batching. 
+However, the sending queue is currently deactivated by default. 
+You can turn on the sending queue by setting `sending_queue::enabled` to true.
+
+```yaml subs=true
+exporters:
+  elasticsearch:
+    endpoint: https://elasticsearch:9200
+    sending_queue:
+      enabled: true
+```
 
 ### Internal batching (default)
 
 By default, the exporter performs its own buffering and batching, as configured through the `flush` setting, unless the `sending_queue::batch` and/or  `batcher` settings are defined.
+In that case, batching is controlled by either of the two settings, depending on the version.
 
-### Using sending queue
+### Custom batching
 
 ```{applies_to}
 stack: ga 9.0, deprecated 9.2
 ```
 
-The sending queue can be enabled and configured with the `batcher` section, using [common `batcher` settings](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/exporterhelper/internal/queue_sender.go).
+Batching can be enabled and configured with the `batcher` section, using [common `batcher` settings](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/exporterhelper/internal/queue_sender.go).
 
 - `batcher`:
   - `enabled` (default=unset): Enable batching of requests into 1 or more bulk requests. On a batcher flush, it is possible for a batched request to be translated to more than 1 bulk request due to `flush::bytes`.
@@ -165,13 +178,11 @@ exporters:
       flush_timeout: 5s
 ```
 
-```{applies to}
-stack: 9.2
+```{applies_to}
+stack: ga 9.2
 ```
 
-The Elasticsearch exporter supports the `sending_queue` setting, which supports both queueing and batching. 
-However, the sending queue is currently deactivated by default. 
-You can turn on the sending queue by setting `sending_queue::enabled` to true. Batching support in sending queue is also deactivated by default and can be turned on by defining `sending_queue::batch`. For example:
+Batching support in sending queue is also deactivated by default and can be turned on by defining `sending_queue::batch`. For example:
 
 ```yaml subs=true
 exporters:
