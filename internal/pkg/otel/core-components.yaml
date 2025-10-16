@@ -28,6 +28,7 @@ components:
   - resourcedetectionprocessor
   - resourceprocessor
   - transformprocessor
+  - elastictraceprocessor # deprecated, will be removed in future
 
 # Connectors
   - elasticapmconnector
