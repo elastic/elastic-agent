@@ -27,8 +27,10 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 	var nodes []varIDMap
 	nodesMap := map[uint64]*Dict{}
 	hasher := xxhash.New()
+	inputApplied := make(map[int]bool)
+	inputNoMatchErr := make(map[int]error)
 	for _, vars := range varsArray {
-		for _, node := range l.Value().([]Node) {
+		for inputIdx, node := range l.Value().([]Node) {
 			dict, ok := node.(*Dict)
 			if !ok {
 				continue
@@ -39,8 +41,17 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 			}
 			// Apply creates a new Node with a deep copy of all the values
 			n, err := dict.Apply(vars)
+			if errors.Is(err, ErrNoMatchAllowed) {
+				// has an optional variable that didn't match, so we ignore it
+				continue
+			}
 			if errors.Is(err, ErrNoMatch) {
-				// has a variable that didn't exist, so we ignore it
+				// has a required variable that didn't exist
+				if _, exists := inputNoMatchErr[inputIdx]; !exists {
+					// store it; only if it never gets a match will it be an error
+					inputNoMatchErr[inputIdx] = err
+				}
+				// try other vars
 				continue
 			}
 			if err != nil {
@@ -67,8 +78,23 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 				nodesMap[hash] = dict
 				nodes = append(nodes, varIDMap{vars.ID(), dict})
 			}
+			// input successfully applied
+			inputApplied[inputIdx] = true
 		}
 	}
+
+	// check if any inputs had ErrNoMatch but were never successfully applied
+	var err error
+	for inputIdx, inputErr := range inputNoMatchErr {
+		if !inputApplied[inputIdx] {
+			// not applied (add to err, so all non-matches are included in the error)
+			err = errors.Join(err, inputErr)
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+
 	var nInputs []Node
 	for _, node := range nodes {
 		if node.id != "" {
