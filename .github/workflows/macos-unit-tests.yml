@@ -2,7 +2,6 @@ name: macos-unit-tests
 
 on:
   workflow_dispatch:
-  pull_request:
   push:
     branches:
       - main
@@ -48,11 +47,6 @@ jobs:
 
       - name: Install mage
         run: make mage
-
-      - name: Beat version
-        run: |
-          BEAT_VERSION=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\-[a-zA-Z]+[0-9]+)?' "./version/version.go")
-          echo "BEAT_VERSION=$beatVersion" >> $GITHUB_ENV
 
       - run: |
           ${{ matrix.flags }} mage unitTest
