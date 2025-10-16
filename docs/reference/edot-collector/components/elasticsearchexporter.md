@@ -133,9 +133,9 @@ The `elasticsearch.index` attribute is removed from the final document if it exi
 
 ### Using sending queue
 
-The Elasticsearch exporter supports the `sending_queue` setting, which supports both queueing and batching. 
-However, the sending queue is currently deactivated by default. 
-You can turn on the sending queue by setting `sending_queue::enabled` to true.
+The {{es}} exporter includes the `sending_queue` setting, which supports both queueing and batching.  The sending queue is deactivated by default.
+
+You can turn on the sending queue by setting `sending_queue::enabled` to `true`:
 
 ```yaml subs=true
 exporters:
@@ -147,14 +147,32 @@ exporters:
 
 ### Internal batching (default)
 
-By default, the exporter performs its own buffering and batching, as configured through the `flush` setting, unless the `sending_queue::batch` and/or  `batcher` settings are defined.
-In that case, batching is controlled by either of the two settings, depending on the version.
+By default, the exporter performs its own buffering and batching, as configured through the `flush` setting, unless the `sending_queue::batch` or the `batcher` settings, or both, are defined. In that case, batching is controlled by either of the two settings, depending on the version.
 
 ### Custom batching
 
-```{applies_to}
-stack: ga 9.0, deprecated 9.2
+::::{applies-switch}
+
+:::{applies-item} stack: ga 9.2
+Batching support in sending queue is deactivated by default. To turn it on, define `sending_queue::batch`. 
+
+For example:
+
+```yaml subs=true
+exporters:
+  elasticsearch:
+    endpoint: https://elasticsearch:9200
+    sending_queue:
+      enabled: true
+      batch:
+        enabled: true
+        min_size: 1000
+        max_size: 10000
+        timeout: 5s
 ```
+:::
+
+:::{applies-item} stack: ga 9.0, deprecated 9.2
 
 Batching can be enabled and configured with the `batcher` section, using [common `batcher` settings](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/exporterhelper/internal/queue_sender.go).
 
@@ -177,25 +195,8 @@ exporters:
       max_size: 10000
       flush_timeout: 5s
 ```
-
-```{applies_to}
-stack: ga 9.2
-```
-
-Batching support in sending queue is also deactivated by default and can be turned on by defining `sending_queue::batch`. For example:
-
-```yaml subs=true
-exporters:
-  elasticsearch:
-    endpoint: https://elasticsearch:9200
-    sending_queue:
-      enabled: true
-      batch:
-        enabled: true
-        min_size: 1000
-        max_size: 10000
-        timeout: 5s
-```
+:::
+::::
 
 ## Bulk indexing
 
