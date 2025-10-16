@@ -435,24 +435,6 @@ func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh c
 			// our caller ctx is Done
 			return ctx.Err()
 		}
-		// drain the internal status update channel
-		// this status handling is normally done in the main loop, but in this case we want to ensure that we emit a
-		// nil status after the collector has stopped
-		select {
-		case statusCh := <-collectorStatusCh:
-			updateErr := m.reportOtelStatusUpdate(ctx, statusCh)
-			if updateErr != nil {
-				m.logger.Error("failed to update otel status", zap.Error(updateErr))
-			}
-		case <-ctx.Done():
-			// our caller ctx is Done
-			return ctx.Err()
-		default:
-		}
-		err := m.reportOtelStatusUpdate(ctx, nil)
-		if err != nil {
-			return err
-		}
 	}
 
 	if m.mergedCollectorCfg == nil {

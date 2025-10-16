@@ -132,6 +132,7 @@ func (e *mockExecution) startCollector(
 		<-collectorCtx.Done()
 		close(stopCh)
 		reportErr(ctx, errCh, nil)
+		reportCollectorStatus(ctx, statusCh, nil)
 	}()
 	handle := &mockCollectorHandle{
 		stopCh: stopCh,
@@ -152,7 +153,6 @@ func (h *mockCollectorHandle) Stop(waitTime time.Duration) {
 	h.cancel()
 	select {
 	case <-time.After(waitTime):
-		return
 	case <-h.stopCh:
 	}
 }
