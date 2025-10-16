@@ -165,7 +165,6 @@ exporters:
     sending_queue:
       enabled: true
       batch:
-        enabled: true
         min_size: 1000
         max_size: 10000
         timeout: 5s
