@@ -39,7 +39,7 @@ In this example we install the built-in `kubernetes` integration with the defaul
      jLwbOPbWqOGRkxTMLOV6Q1dtr09zf2SuOQuxm7F2
      -----END CERTIFICATE-----
      ```
-5. A logstash instance running withe the server tls certificates that match the client set used by elastic agent. Running a pipeline similar to the below:
+5. A logstash instance running with the server tls certificates that match the client set used by elastic agent. Running a pipeline similar to the below:
 
 ```
     input {
