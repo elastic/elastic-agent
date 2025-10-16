@@ -34,14 +34,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.org/x/sync/errgroup"
+	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
+
+	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/otiai10/copy"
 
 	"github.com/elastic/elastic-agent/dev-tools/devmachine"
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
-	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
 	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
 	"github.com/elastic/elastic-agent/dev-tools/packaging"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
@@ -71,10 +73,9 @@ import (
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
 
-	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	filecopy "github.com/otiai10/copy"
+	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
 
 	"helm.sh/helm/v3/pkg/action"
@@ -320,16 +321,25 @@ func GolangCrossBuildOSS() error {
 // GolangCrossBuild build the Beat binary inside of the golang-builder.
 // Do not use directly, use crossBuild instead.
 func GolangCrossBuild() error {
+	// build elastic-agent
 	params := devtools.DefaultGolangCrossBuildArgs()
 	params.OutputDir = "build/golang-crossbuild"
+	params.Package = "github.com/elastic/elastic-agent"
 	injectBuildVars(params.Vars)
-
 	if err := devtools.GolangCrossBuild(params); err != nil {
-		return err
+		return fmt.Errorf("error building elastic-agent: %w", err)
 	}
 
-	// TODO: no OSS bits just yet
-	// return GolangCrossBuildOSS()
+	// build EDOT
+	edotParams := devtools.DefaultGolangCrossBuildArgs()
+	edotParams.Name = "edot-" + devtools.Platform.GOOS + "-" + devtools.Platform.Arch
+	edotParams.Package = "github.com/elastic/elastic-agent/internal/edot"
+	edotParams.OutputDir = "build/golang-crossbuild"
+	edotParams.WorkDir = "./internal/edot"
+	injectBuildVars(edotParams.Vars)
+	if err := devtools.GolangCrossBuild(edotParams); err != nil {
+		return fmt.Errorf("error building edot: %w", err)
+	}
 
 	return nil
 }
@@ -391,7 +401,7 @@ func getTestBinariesPath() ([]string, error) {
 		filepath.Join(wd, "pkg", "component", "fake", "component"),
 		filepath.Join(wd, "internal", "pkg", "agent", "install", "testblocking"),
 		filepath.Join(wd, "pkg", "core", "process", "testsignal"),
-		filepath.Join(wd, "internal", "pkg", "otel", "manager", "testing"),
+		filepath.Join(wd, "internal", "edot", "cmd", "testing"),
 		filepath.Join(wd, "internal", "pkg", "agent", "application", "filelock", "testlocker"),
 	}
 	return testBinaryPkgs, nil
@@ -404,20 +414,6 @@ func (Build) TestBinaries() error {
 		fmt.Errorf("cannot build test binaries: %w", err)
 	}
 
-	args := []string{"build", "-v"}
-	if runtime.GOOS == "darwin" {
-		osMajorVer, err := getMacOSMajorVersion()
-		if err != nil {
-			return fmt.Errorf("cannot determine darwin OS major version: %w", err)
-		}
-
-		if osMajorVer > 13 {
-			// Workaround for https://github.com/golang/go/issues/67854 until it
-			// is resolved.
-			args = append(args, "-ldflags", "-extldflags='-ld_classic'")
-		}
-	}
-
 	for _, pkg := range testBinaryPkgs {
 		binary := filepath.Base(pkg)
 		if runtime.GOOS == "windows" {
@@ -425,12 +421,7 @@ func (Build) TestBinaries() error {
 		}
 
 		outputName := filepath.Join(pkg, binary)
-
-		finalArgs := make([]string, len(args))
-		copy(finalArgs, args)
-		finalArgs = append(finalArgs, "-o", outputName, filepath.Join(pkg))
-
-		err := RunGo(finalArgs...)
+		err := devtools.Run(nil, nil, os.Stderr, "go", pkg, "build", "-v", "-o", outputName, pkg)
 		if err != nil {
 			return err
 		}
@@ -1806,8 +1797,8 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestURL string, versio
 
 		log.Printf("copying %q to %q", srcBinaryPath, dstBinaryPath)
 
-		err = filecopy.Copy(srcBinaryPath, dstBinaryPath, filecopy.Options{
-			PermissionControl: filecopy.PerservePermission,
+		err = copy.Copy(srcBinaryPath, dstBinaryPath, copy.Options{
+			PermissionControl: copy.PerservePermission,
 		})
 		if err != nil {
 			return fmt.Errorf("copying %q to %q: %w", srcBinaryPath, dstBinaryPath, err)
@@ -3615,10 +3606,10 @@ func hasCleanOnExit() bool {
 }
 
 func (Otel) Readme() error {
-	fmt.Println(">> Building internal/pkg/otel/README.md")
+	fmt.Println(">> Building internal/edot/README.md")
 
-	readmeTmpl := filepath.Join("internal", "pkg", "otel", "templates", "README.md.tmpl")
-	readmeOut := filepath.Join("internal", "pkg", "otel", "README.md")
+	readmeTmpl := filepath.Join("internal", "edot", "templates", "README.md.tmpl")
+	readmeOut := filepath.Join("internal", "edot", "README.md")
 
 	// read README template
 	tmpl, err := template.ParseFiles(readmeTmpl)
@@ -3626,7 +3617,7 @@ func (Otel) Readme() error {
 		return fmt.Errorf("failed to parse README template: %w", err)
 	}
 
-	data, err := otel.GetOtelDependencies("go.mod")
+	data, err := otel.GetOtelDependencies(filepath.Join("internal", "edot", "go.mod"))
 	if err != nil {
 		return fmt.Errorf("Failed to get OTel dependencies: %w", err)
 	}
@@ -4132,19 +4123,4 @@ func loadYamlFile(path string) (map[string]any, error) {
 		return nil, err
 	}
 	return data, nil
-}
-
-func getMacOSMajorVersion() (int, error) {
-	ver, err := sh.Output("sw_vers", "-productVersion")
-	if err != nil {
-		return 0, err
-	}
-
-	majorVerStr := strings.Split(ver, ".")[0]
-	majorVer, err := strconv.Atoi(majorVerStr)
-	if err != nil {
-		return 0, fmt.Errorf("unable to parse major version from %q: %w", ver, err)
-	}
-
-	return majorVer, nil
 }

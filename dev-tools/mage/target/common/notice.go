@@ -44,6 +44,8 @@ func Notice() (err error) {
 // generateNotice generates a generateNotice file with the name outputFilename.
 // see getDependentModules for use of additionalTags.
 func generateNotice(outputFilename string, additionalTags ...string) error {
+	// TODO(splitting-edot): need to figure out how to make this work with EDOT separated
+
 	// NOTE: this is not invoked through mg.Deps because
 	// we want to always invoke it and guarantee that it runs
 	// as mg.Deps does memoization

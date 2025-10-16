@@ -11,7 +11,8 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
-	"os"
+	"path/filepath"
+	goruntime "runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -160,18 +161,21 @@ func NewOTelManager(
 	case SubprocessExecutionMode:
 		// NOTE: if we stop embedding the collector binary in elastic-agent, we need to
 		// change this
-		executable, err := os.Executable()
+		elasticAgentExecutableDir, err := paths.RetrieveExecutableDir()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get the path to the collector executable: %w", err)
 		}
+
+		edotExecutable := filepath.Join(elasticAgentExecutableDir, "edot")
+		if goruntime.GOOS == "windows" {
+			edotExecutable += ".exe"
+		}
+
 		recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
-		exec, err = newSubprocessExecution(logLevel, executable, collectorMetricsPort, collectorHealthCheckPort)
+		exec, err = newSubprocessExecution(logLevel, edotExecutable, collectorMetricsPort, collectorHealthCheckPort)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create subprocess execution: %w", err)
 		}
-	case EmbeddedExecutionMode:
-		recoveryTimer = newRestarterNoop()
-		exec = newExecutionEmbedded(collectorMetricsPort)
 	default:
 		return nil, fmt.Errorf("unknown otel collector execution mode: %q", mode)
 	}
@@ -228,7 +232,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 			newRetries := m.recoveryRetries.Add(1)
 			m.logger.Infof("collector recovery restarting, total retries: %d", newRetries)
-			m.proc, err = m.execution.startCollector(ctx, m.baseLogger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh)
+			m.proc, err = m.execution.startCollector(ctx, m.baseLogger, m.logger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh)
 			if err != nil {
 				reportErr(ctx, m.errCh, err)
 				// reset the restart timer to the next backoff
@@ -260,7 +264,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 				// in this rare case the collector stopped running but a configuration was
 				// provided and the collector stopped with a clean exit
-				m.proc, err = m.execution.startCollector(ctx, m.baseLogger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh)
+				m.proc, err = m.execution.startCollector(ctx, m.baseLogger, m.logger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh)
 				if err != nil {
 					// failed to create the collector (this is different then
 					// it's failing to run). we do not retry creation on failure
@@ -447,7 +451,7 @@ func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh c
 	} else {
 		// either a new configuration or the first configuration
 		// that results in the collector being started
-		proc, err := m.execution.startCollector(ctx, m.baseLogger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh)
+		proc, err := m.execution.startCollector(ctx, m.baseLogger, m.logger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh)
 		if err != nil {
 			// failed to create the collector (this is different then
 			// it's failing to run). we do not retry creation on failure

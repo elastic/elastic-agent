@@ -31,7 +31,7 @@ TEMPLATE_COLLECTOR_OCB_FILE = 'templates/ocb.jinja2'
 TEMPLATE_GATEWAY_TABLE = 'templates/gateway-table.jinja2'
 COMPONENT_DOCS_YAML = '../../../docs/reference/edot-collector/component-docs.yml'
 DEFAULT_CONFIG_FILE = '../../../docs/reference/edot-collector/config/default-config-standalone.md'
-DEPRECATED_COMPONENTS_YAML = '../../../internal/pkg/otel/deprecated-components.yaml'
+DEPRECATED_COMPONENTS_YAML = '../../../internal/edot/deprecated-components.yaml'
 
 
 def read_file_from_git_tag(file_path, tag):
@@ -79,7 +79,7 @@ def get_core_components(version='main'):
     version_tag = f"v{latest_version}"
     
     # Always read from Git tag
-    core_components_path = 'internal/pkg/otel/core-components.yaml'
+    core_components_path = 'internal/edot/core-components.yaml'
     print(f"Reading core components from tag {version_tag}: {core_components_path}")
     content = read_file_from_git_tag(core_components_path, version_tag)
     if content is None:
@@ -97,7 +97,7 @@ def get_deprecated_components(version='main'):
     version_tag = f"v{latest_version}"
     
     # Always read from Git tag
-    deprecated_components_path = 'internal/pkg/otel/deprecated-components.yaml'
+    deprecated_components_path = 'internal/edot/deprecated-components.yaml'
     print(f"Reading deprecated components from tag {version_tag}: {deprecated_components_path}")
     content = read_file_from_git_tag(deprecated_components_path, version_tag)
     if content is None:
@@ -390,7 +390,7 @@ def get_gateway_versions(major_version, min_minor):
     versions = get_minor_versions_above(major_version, min_minor)
     
     # Filter to only versions where gateway.yml exists
-    gateway_file = 'internal/pkg/otel/samples/linux/gateway.yml'
+    gateway_file = 'internal/edot/samples/linux/gateway.yml'
     valid_versions = []
     
     for version_info in versions:

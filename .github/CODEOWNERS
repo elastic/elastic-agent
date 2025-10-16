@@ -26,10 +26,10 @@ changelog/fragments/
 /.github/workflows/update-docs.yml @elastic/ingest-docs
 /docs/reference/edot-collector @elastic/ingest-docs
 /docs/scripts/update-docs @elastic/ingest-docs
-/internal/pkg/otel/samples @elastic/ingest-otel-data @elastic/ingest-docs
-/internal/pkg/otel/core-components.yaml @elastic/ingest-otel-leads
-/internal/pkg/otel/deprecated-components.yaml @elastic/ingest-otel-leads
+/internal/edot/samples @elastic/ingest-otel-data @elastic/ingest-docs
+/internal/edot/core-components.yaml @elastic/ingest-otel-leads
+/internal/edot/deprecated-components.yaml @elastic/ingest-otel-leads
 /internal/pkg/composable/providers/kubernetes @elastic/elastic-agent-control-plane
-/internal/pkg/otel/samples/darwin/autoops_es*.yml @elastic/opex
-/internal/pkg/otel/samples/linux/autoops_es*.yml @elastic/opex
-/internal/pkg/otel/samples/windows/autoops_es*.yml @elastic/opex
+/internal/edot/samples/darwin/autoops_es*.yml @elastic/opex
+/internal/edot/samples/linux/autoops_es*.yml @elastic/opex
+/internal/edot/samples/windows/autoops_es*.yml @elastic/opex

@@ -2,11 +2,10 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package otel
+package pkg
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"go.opentelemetry.io/collector/component"
@@ -24,7 +23,6 @@ import (
 const buildDescription = "Elastic opentelemetry-collector distribution"
 
 func Run(ctx context.Context, stop chan bool, settings *otelcol.CollectorSettings) error {
-	fmt.Fprintln(os.Stdout, "Starting in otel mode")
 	svc, err := otelcol.NewCollector(*settings)
 	if err != nil {
 		return err
