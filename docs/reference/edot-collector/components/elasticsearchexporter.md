@@ -133,7 +133,7 @@ The `elasticsearch.index` attribute is removed from the final document if it exi
 
 ### Using sending queue
 
-The {{es}} exporter includes the `sending_queue` setting, which supports both queueing and batching.  The sending queue is deactivated by default.
+The {{es}} exporter supports the `sending_queue` setting, which supports both queueing and batching.  The sending queue is deactivated by default.
 
 You can turn on the sending queue by setting `sending_queue::enabled` to `true`:
 
@@ -147,14 +147,14 @@ exporters:
 
 ### Internal batching (default)
 
-By default, the exporter performs its own buffering and batching, as configured through the `flush` setting, unless the `sending_queue::batch` or the `batcher` settings, or both, are defined. In that case, batching is controlled by either of the two settings, depending on the version.
+By default, the exporter performs its own buffering and batching, as configured through the `flush` setting, unless the `sending_queue::batch` or the `batcher` settings are defined. In that case, batching is controlled by either of the two settings, depending on the version.
 
 ### Custom batching
 
 ::::{applies-switch}
 
 :::{applies-item} stack: ga 9.2
-Batching support in sending queue is deactivated by default. To turn it on, define `sending_queue::batch`. 
+Batching support in sending queue is deactivated by default. To turn it on, enable sending queue and define `sending_queue::batch`. 
 
 For example:
 
