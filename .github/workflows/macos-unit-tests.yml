@@ -6,7 +6,7 @@ on:
   push:
     branches:
       - main
-      - 8.*
+      - '8.19'
       - 9.*
 
 permissions:
@@ -19,13 +19,17 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  unit-tests-push:
+  unit-tests:
     name: Unit tests ${{ matrix.os }}
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
-        os: [ macos-14 ]
+        include:
+          - os: macos-14
+            flags: ''
+          - os: macos-15
+            flags: 'RACE_DETECTOR=true TEST_COVERAGE=true '
+        event: [ 'pull_request', 'push', 'workflow_dispatch' ]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -41,59 +45,14 @@ jobs:
         run: |
           brew install make
           export PATH="/usr/local/opt/make/libexec/gnubin:$PATH"
-        shell: bash
 
       - name: Install mage
         run: make mage
-        shell: bash
 
       - name: Beat version
         run: |
-          beatVersion=$(make get-version)
+          BEAT_VERSION=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\-[a-zA-Z]+[0-9]+)?' "${WORKSPACE}/version/version.go")
           echo "BEAT_VERSION=$beatVersion" >> $GITHUB_ENV
-        shell: bash
-
-      # On macOS 14 running unit tests with `RACE_DETECTOR=true TEST_COVERAGE=true` causes failure:
-      # `clang: error: linker command failed with exit code 1`
-      # Related issue: https://github.com/elastic/elastic-agent/issues/10572
-      - run: |
-          mage unitTest
-        shell: bash
-
-  unit-tests-pr:
-    name: Unit tests ${{ matrix.os }}
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ macos-15 ]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: .go-version
-
-      - name: Install make
-        run: |
-          brew install make
-          export PATH="/usr/local/opt/make/libexec/gnubin:$PATH"
-        shell: bash
-
-      - name: Install mage
-        run: make mage
-        shell: bash
-
-      - name: Beat version
-        run: |
-          beatVersion=$(make get-version)
-          echo "BEAT_VERSION=$beatVersion" >> $GITHUB_ENV
-        shell: bash
 
       - run: |
           RACE_DETECTOR=true TEST_COVERAGE=true mage unitTest
-        shell: bash
