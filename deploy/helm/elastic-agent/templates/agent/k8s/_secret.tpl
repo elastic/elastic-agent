@@ -67,17 +67,13 @@
   {{- end }}
   {{- end }}
   {{- end }}
-  {{- with .ssl.certificate  }}
-  {{- if .value }}
+  {{- if ne ( . | dig "ssl" "certificate" "value" "not_found") "not_found"  }}
   {{ printf "%s%s" $idx ".ssl.certificate" }} : |-
-    {{- .value | nindent 4 }}
+    {{- .ssl.certificate.value | nindent 4 }}
   {{- end }}
-  {{- end }}
-  {{- with .ssl.key  }}
-  {{- if .value }}
+  {{- if ne ( . | dig "ssl" "key" "value" "not_found") "not_found"  }}
   {{ printf "%s%s" $idx ".ssl.key" }} : |-
-    {{- .value | nindent 4 }}
-  {{- end }}
+    {{- .ssl.key.value | nindent 4 }}
   {{- end }}
   {{- end }}
   {{- end }}
