@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"syscall"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
@@ -119,8 +120,10 @@ func (m *OTelManager) PerformComponentDiagnostics(
 	for idx, diag := range diagnostics {
 		found := false
 		for _, extDiag := range extDiagnostics.ComponentDiagnostics {
-			found = true
-			diagnostics[idx].Results = append(diagnostics[idx].Results, extDiag)
+			if strings.Contains(extDiag.Name, diag.Component.ID) {
+				found = true
+				diagnostics[idx].Results = append(diagnostics[idx].Results, extDiag)
+			}
 		}
 		if !found {
 			diagnostics[idx].Err = fmt.Errorf("failed to get diagnostics for %s", diag.Component.ID)
