@@ -10,7 +10,7 @@ metadata:
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
-    app.kubernetes.io/instance: test
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: "2.16.0"
   name: kube-state-metrics
   namespace: default
@@ -19,41 +19,41 @@ metadata:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: agent-clusterwide-test
+  name: agent-clusterwide-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-9.3.0-beta
     app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: test
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.3.0
 ---
 # Source: elastic-agent/templates/agent/service-account.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: agent-pernode-test
+  name: agent-pernode-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-9.3.0-beta
     app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: test
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.3.0
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
 kind: Secret
 metadata:
-  name: agent-clusterwide-test
+  name: agent-clusterwide-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-9.3.0-beta
     app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: test
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.3.0
 stringData:
 
   agent.yml: |-
-    id: agent-clusterwide-test
+    id: agent-clusterwide-example
     outputs:
       test:
         hosts:
@@ -74,11 +74,11 @@ stringData:
         backoff.max: "30s"
         backoff.init: "1s"
         allow_older_versions: false
-        certificate: /mnt/secrets/elastic-agent/cert-secret.cert
-        key: /mnt/secrets/elastic-agent/cert-secret.key
+        ssl.certificate: /mnt/secrets/elastic-agent/cert-secret.cert
         ssl.certificate_authorities:
         - /mnt/secrets/elastic-agent/test.ssl.certificate_authorities.0
-        ssl.verification_mode: strict
+        ssl.key: /mnt/secrets/elastic-agent/cert-secret.key
+        ssl.verification_mode: certificate
     secret_references: []
     agent:
       monitoring:
@@ -298,7 +298,7 @@ stringData:
         scope: cluster
       kubernetes_leaderelection:
         enabled: true
-        leader_lease: test-clusterwide
+        leader_lease: example-clusterwide
   test.ssl.certificate_authorities.0 : |-
     -----BEGIN CERTIFICATE-----
     MIIDSjCCAjKgAwIBAgIRALx9cV4kYFWe1ZtMXLzfX4cwDQYJKoZIhvcNAQELBQAw
@@ -325,17 +325,17 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: agent-pernode-test
+  name: agent-pernode-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-9.3.0-beta
     app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: test
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.3.0
 stringData:
 
   agent.yml: |-
-    id: agent-pernode-test
+    id: agent-pernode-example
     outputs:
       test:
         hosts:
@@ -356,11 +356,11 @@ stringData:
         backoff.max: "30s"
         backoff.init: "1s"
         allow_older_versions: false
-        certificate: /mnt/secrets/elastic-agent/cert-secret.cert
-        key: /mnt/secrets/elastic-agent/cert-secret.key
+        ssl.certificate: /mnt/secrets/elastic-agent/cert-secret.cert
         ssl.certificate_authorities:
         - /mnt/secrets/elastic-agent/test.ssl.certificate_authorities.0
-        ssl.verification_mode: strict
+        ssl.key: /mnt/secrets/elastic-agent/cert-secret.key
+        ssl.verification_mode: certificate
     secret_references: []
     agent:
       monitoring:
@@ -556,7 +556,7 @@ stringData:
         scope: node
       kubernetes_leaderelection:
         enabled: false
-        leader_lease: test-pernode
+        leader_lease: example-pernode
   test.ssl.certificate_authorities.0 : |-
     -----BEGIN CERTIFICATE-----
     MIIDSjCCAjKgAwIBAgIRALx9cV4kYFWe1ZtMXLzfX4cwDQYJKoZIhvcNAQELBQAw
@@ -589,7 +589,7 @@ metadata:
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
-    app.kubernetes.io/instance: test
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: "2.16.0"
   name: kube-state-metrics
 rules:
@@ -738,11 +738,11 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: agent-clusterWide-test-default
+  name: agent-clusterWide-example-default
   labels:
     helm.sh/chart: elastic-agent-9.3.0-beta
     app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: test
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.3.0
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
@@ -818,11 +818,11 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: agent-perNode-test-default
+  name: agent-perNode-example-default
   labels:
     helm.sh/chart: elastic-agent-9.3.0-beta
     app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: test
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.3.0
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
@@ -904,7 +904,7 @@ metadata:
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
-    app.kubernetes.io/instance: test
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: "2.16.0"
   name: kube-state-metrics
 roleRef:
@@ -920,38 +920,38 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: agent-clusterWide-test-default
+  name: agent-clusterWide-example-default
   labels:
     helm.sh/chart: elastic-agent-9.3.0-beta
     app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: test
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.3.0
 subjects:
   - kind: ServiceAccount
-    name: agent-clusterwide-test
+    name: agent-clusterwide-example
     namespace: "default"
 roleRef:
   kind: ClusterRole
-  name: agent-clusterWide-test-default
+  name: agent-clusterWide-example-default
   apiGroup: rbac.authorization.k8s.io
 ---
 # Source: elastic-agent/templates/agent/cluster-role-binding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: agent-perNode-test-default
+  name: agent-perNode-example-default
   labels:
     helm.sh/chart: elastic-agent-9.3.0-beta
     app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: test
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.3.0
 subjects:
   - kind: ServiceAccount
-    name: agent-pernode-test
+    name: agent-pernode-example
     namespace: "default"
 roleRef:
   kind: ClusterRole
-  name: agent-perNode-test-default
+  name: agent-perNode-example-default
   apiGroup: rbac.authorization.k8s.io
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/service.yaml
@@ -966,7 +966,7 @@ metadata:
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
-    app.kubernetes.io/instance: test
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: "2.16.0"
   annotations:
     prometheus.io/scrape: 'true'
@@ -980,29 +980,29 @@ spec:
   
   selector:    
     app.kubernetes.io/name: kube-state-metrics
-    app.kubernetes.io/instance: test
+    app.kubernetes.io/instance: example
 ---
 # Source: elastic-agent/templates/agent/k8s/daemonset.yaml
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: agent-pernode-test
+  name: agent-pernode-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-9.3.0-beta
     app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: test
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.3.0
 spec:
   selector:
     matchLabels:
-      name: agent-pernode-test
+      name: agent-pernode-example
   template:
     metadata:
       labels:
-        name: agent-pernode-test
+        name: agent-pernode-example
       annotations:
-        checksum/config: e9aced73591b5444eeabb4fca128d417ebf294216b388f2087fc585fc38f3432
+        checksum/config: 04a734259ed7703bf634cca18a83a7992080c0209e0e4fa0f64c79c98bf79af8
     spec:
       automountServiceAccountToken: true
       containers:
@@ -1073,7 +1073,7 @@ spec:
       hostNetwork: true
       nodeSelector:
         kubernetes.io/os: linux
-      serviceAccountName: agent-pernode-test
+      serviceAccountName: agent-pernode-example
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/control-plane
@@ -1091,13 +1091,13 @@ spec:
           defaultMode: 292
           secretName: cert-secret
       - hostPath:
-          path: /etc/elastic-agent/default/agent-pernode-test/state
+          path: /etc/elastic-agent/default/agent-pernode-example/state
           type: DirectoryOrCreate
         name: agent-data
       - name: config
         secret:
           defaultMode: 292
-          secretName: agent-pernode-test
+          secretName: agent-pernode-example
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/deployment.yaml
 apiVersion: apps/v1
@@ -1111,13 +1111,13 @@ metadata:
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
-    app.kubernetes.io/instance: test
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: "2.16.0"
 spec:
   selector:
     matchLabels:      
       app.kubernetes.io/name: kube-state-metrics
-      app.kubernetes.io/instance: test
+      app.kubernetes.io/instance: example
   replicas: 1
   strategy:
     type: RollingUpdate
@@ -1130,7 +1130,7 @@ spec:
         app.kubernetes.io/component: metrics
         app.kubernetes.io/part-of: kube-state-metrics
         app.kubernetes.io/name: kube-state-metrics
-        app.kubernetes.io/instance: test
+        app.kubernetes.io/instance: example
         app.kubernetes.io/version: "2.16.0"
     spec:
       automountServiceAccountToken: true
@@ -1189,23 +1189,23 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: agent-clusterwide-test
+  name: agent-clusterwide-example
   namespace: "default"
   labels:
     helm.sh/chart: elastic-agent-9.3.0-beta
     app.kubernetes.io/name: elastic-agent
-    app.kubernetes.io/instance: test
+    app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.3.0
 spec:
   selector:
     matchLabels:
-      name: agent-clusterwide-test
+      name: agent-clusterwide-example
   template:
     metadata:
       labels:
-        name: agent-clusterwide-test
+        name: agent-clusterwide-example
       annotations:
-        checksum/config: 4953343d3866e53a3754a3436e3dd6e3be0cc89f94e46b2aab4c7d21e157e6c2
+        checksum/config: c7f13fc8f5ea6200ee7c56540f5297b25d10d86abd768b4462f00aadb49cc734
     spec:
       automountServiceAccountToken: true
       containers:
@@ -1269,7 +1269,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       nodeSelector:
         kubernetes.io/os: linux
-      serviceAccountName: agent-clusterwide-test
+      serviceAccountName: agent-clusterwide-example
       volumes:
       - name: cert-secret
         secret:
@@ -1280,4 +1280,4 @@ spec:
       - name: config
         secret:
           defaultMode: 292
-          secretName: agent-clusterwide-test
+          secretName: agent-clusterwide-example
