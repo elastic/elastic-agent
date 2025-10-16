@@ -127,6 +127,73 @@ namespace: {{.}}
 {{/* no preset env vars for ESECKRef output */}}
 {{- end -}}
 
+{{- define "elasticagent.output.Logstash.preset.config" -}}
+{{- $ := index . 0 -}}
+{{- $outputName := index . 1 -}}
+{{- $outputVal := deepCopy (index . 2) -}}
+{{$outputName}}:
+  hosts:
+  {{- range $idx, $host := $outputVal.hosts }}
+    - {{$host | quote}}
+  {{- end }}
+  type: logstash
+  {{- if hasKey $outputVal "loadbalance" }}
+  loadbalance: {{$outputVal.loadbalance}}
+  {{- end }}
+  {{- with $outputVal.ttl }}
+  ttl: {{. | quote}}
+  {{- end }}
+  {{- if hasKey $outputVal "slow_start" }}
+  slow_start: {{ $outputVal.slow_start}}
+  {{- end }}
+  {{- with $outputVal.pipelining }}
+  pipelining: {{.}}
+  {{- end }}
+  {{- with $outputVal.workers }}
+  workers: {{.}}
+  {{- end }}
+  {{- with $outputVal.timeout }}
+  timeout: {{. | quote }}
+  {{- end }}
+
+  {{- with index $outputVal "queue.mem.flush.timeout" }}
+  queue.mem.flush.timeout: {{. | quote}}
+  {{- end }}
+  {{- with index $outputVal "queue.mem.flush.min_events" }}
+  queue.mem.flush.min_events: {{.}}
+  {{- end }}
+  {{- with index $outputVal "queue.mem.events" }}
+  queue.mem.events: {{.}}
+  {{- end }}
+  {{- with $outputVal.max_retries}}
+  max_retries: {{.}}
+  {{- end }}
+  {{- with $outputVal.compression_level}}
+  compression_level: {{.}}
+  {{- end }}
+  {{- with $outputVal.bulk_max_size}}
+  bulk_max_size: {{.}}
+  {{- end }}
+  {{- with index $outputVal "backoff.max" }}
+  backoff.max: {{. | quote }}
+  {{- end }}
+  {{- with index $outputVal "backoff.init" }}
+  backoff.init: {{. | quote }}
+  {{- end }}
+  {{- if hasKey $outputVal "allow_older_versions"}}
+  allow_older_versions: {{$outputVal.allow_older_versions}}
+  {{- end }}
+  {{- $outputSSLConfig := dig "ssl" dict $outputVal -}}
+  {{- with (include "elasticagent.output.render.sslconfig" (list $outputSSLConfig $outputName) | fromYaml) }}
+  {{- . | toYaml | nindent 2}}
+  {{- end }}
+{{- end -}}
+
+{{- define "elasticagent.output.Logstash.preset.envvars" -}}
+{{/* this is plain text so nothing to be added in the pod env vars */}}
+{{- end -}}
+
+
 {{- define "elasticagent.output.render.sslconfig" -}}
 {{- $outputSSLConfig := index . 0 -}}
 {{- $outputName := index . 1 -}}
@@ -136,6 +203,12 @@ ssl.certificate_authorities:
 {{- range $idx, $certificateAuthority := . }}
   -  {{$certificateAuthority._mountPath  | quote}}
 {{- end }}
+{{- end }}
+{{- with $outputSSLConfig.certificate }}
+ssl.certificate: {{ ._mountPath  | quote}}
+{{- end }}
+{{- with $outputSSLConfig.key }}
+ssl.key: {{ ._mountPath  | quote}}
 {{- end }}
 {{- with $outputSSLConfig.verificationMode }}
 ssl.verification_mode: {{.}}
@@ -156,6 +229,12 @@ ssl.ca_trusted_fingerprint: {{.}}
 {{- $volumeMounts = append $volumeMounts $certificateAuthority._volumeMount -}}
 {{- end -}}
 {{- end -}}
+{{- with $outputSSLConfig.certificate -}}
+{{- $volumeMounts = append $volumeMounts ._volumeMount -}}
+{{- end -}}
+{{- with $outputSSLConfig.key -}}
+{{- $volumeMounts = append $volumeMounts ._volumeMount -}}
+{{- end -}}
 {{- with $volumeMounts -}}
 {{. | toYaml}}
 {{- end -}}
@@ -174,6 +253,12 @@ ssl.ca_trusted_fingerprint: {{.}}
 {{- $volumes = append $volumes $certificateAuthority._volume -}}
 {{- end -}}
 {{- end -}}
+{{- end -}}
+{{- with $outputSSLConfig.certificate -}}
+{{- $volumes = append $volumes ._volume -}}
+{{- end -}}
+{{- with $outputSSLConfig.key -}}
+{{- $volumes = append $volumes ._volume -}}
 {{- end -}}
 {{- with $volumes -}}
 {{. | toYaml}}

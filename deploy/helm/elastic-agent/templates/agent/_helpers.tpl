@@ -76,6 +76,12 @@ Validate fleet configuration
 {{- range $idx, $certificateAuthorityConfig := $sslCertificateAuthoritiesConfig -}}
 {{- include "elasticagent.init.valueFrom" (list $ $certificateAuthorityConfig (printf "%s.ssl.certificate_authorities.%d" $outputName $idx)) -}}
 {{- end -}}
+{{- if and ( $outputVal.ssl) ($outputVal.ssl.certificate) -}}
+{{- include "elasticagent.init.valueFrom" (list $ $outputVal.ssl.certificate (printf "%s.ssl.certificate" $outputName)) -}}
+{{- end -}}
+{{- if and ( $outputVal.ssl) ($outputVal.ssl.key) -}}
+{{- include "elasticagent.init.valueFrom" (list $ $outputVal.ssl.key (printf "%s.ssl.key" $outputName)) -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}

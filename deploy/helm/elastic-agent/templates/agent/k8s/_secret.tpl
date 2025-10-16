@@ -67,6 +67,18 @@
   {{- end }}
   {{- end }}
   {{- end }}
+  {{- with .ssl.certificate  }}
+  {{- if .value }}
+  {{ printf "%s%s" $idx ".ssl.certificate" }} : |-
+    {{- .value | nindent 4 }}
+  {{- end }}
+  {{- end }}
+  {{- with .ssl.key  }}
+  {{- if .value }}
+  {{ printf "%s%s" $idx ".ssl.key" }} : |-
+    {{- .value | nindent 4 }}
+  {{- end }}
+  {{- end }}
   {{- end }}
   {{- end }}
   {{- end }}
