@@ -232,6 +232,11 @@ func NewRuntimeSpecs(platform PlatformDetail, inputSpecs []InputRuntimeSpec) (Ru
 	}, nil
 }
 
+// Platform return PlatformDetail being used.
+func (r *RuntimeSpecs) Platform() PlatformDetail {
+	return r.platform
+}
+
 // Inputs returns the list of supported inputs for this platform.
 func (r *RuntimeSpecs) Inputs() []string {
 	inputs := make([]string, 0, len(r.inputSpecs))

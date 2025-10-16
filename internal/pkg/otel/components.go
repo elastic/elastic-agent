@@ -14,6 +14,7 @@ import (
 
 	// Receivers:
 	apachereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver"
+	awss3receiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver"
 	dockerstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver"
 	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
 	hostmetricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver"
@@ -55,7 +56,7 @@ import (
 	"go.opentelemetry.io/collector/processor/memorylimiterprocessor"
 
 	elasticapmprocessor "github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor"
-	"github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor"
+	elastictraceprocessor "github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor"
 
 	"github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor"
 
@@ -128,6 +129,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			postgresqlreceiver.NewFactory(),
 			sqlserverreceiver.NewFactory(),
 			windowseventlogreceiver.NewFactory(),
+			awss3receiver.NewFactory(),
 		}
 
 		// some receivers are only available on certain OS.

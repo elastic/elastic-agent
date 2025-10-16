@@ -87,7 +87,7 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 			fleetInitTimeout, _ := cmd.Flags().GetDuration("fleet-init-timeout")
 			testingMode, _ := cmd.Flags().GetBool("testing-mode")
 			if err := run(cmd.Context(), nil, testingMode, fleetInitTimeout); err != nil && !errors.Is(err, context.Canceled) {
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
 				return err
 			}
 			return nil
@@ -329,7 +329,7 @@ func runElasticAgent(
 		return err
 	}
 
-	monitoringServer, err := setupMetrics(l, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, tracer, coord)
+	monitoringServer, err := setupMetrics(l, cfg.Settings.MonitoringConfig, tracer, coord)
 	if err != nil {
 		return err
 	}
@@ -685,12 +685,11 @@ func initTracer(agentName, version string, mcfg *monitoringCfg.MonitoringConfig)
 
 func setupMetrics(
 	logger *logger.Logger,
-	operatingSystem string,
 	cfg *monitoringCfg.MonitoringConfig,
 	tracer *apm.Tracer,
 	coord *coordinator.Coordinator,
 ) (*reload.ServerReloader, error) {
-	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil {
+	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil { //nolint:staticcheck // ignore deprecation
 		return nil, err
 	}
 

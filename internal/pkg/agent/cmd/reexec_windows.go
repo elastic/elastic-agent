@@ -36,8 +36,8 @@ func newReExecWindowsCommand(_ []string, streams *cli.IOStreams) *cobra.Command 
 			cfg := getConfig(streams)
 			log, err := configuredLogger(cfg, reexecName)
 			if err != nil {
-				fmt.Fprintf(streams.Err, "Error configuring logger: %v\n%s\n", err, troubleshootMessage())
-				return NewExitCodeError(1, err)
+				fmt.Fprintf(streams.Err, "Error configuring logger: %v\n%s\n", err, troubleshootMessage)
+				return NewExitCodeError(3, err)
 			}
 
 			// Make sure to flush any buffered logs before we're done.

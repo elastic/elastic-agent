@@ -170,7 +170,7 @@ func newLogsCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 		Long:  "This command allows to output, watch and filter Elastic Agent logs.",
 		RunE: func(c *cobra.Command, _ []string) error {
 			if err := logsCmd(streams, c, logsDir, eventLogsDir); err != nil {
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
 				return NewExitCodeError(1, err)
 			}
 			return nil

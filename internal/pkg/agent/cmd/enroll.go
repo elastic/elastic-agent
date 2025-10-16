@@ -45,7 +45,7 @@ func newEnrollCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command
 		Long:  "This command will enroll the Elastic Agent into Fleet.",
 		RunE: func(c *cobra.Command, args []string) error {
 			if err := doEnroll(streams, c); err != nil {
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
 				logExternal(fmt.Sprintf("%s enroll failed: %s", paths.BinaryName, err))
 				return NewExitCodeError(1, err)
 			}

@@ -13,6 +13,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	semver "github.com/elastic/elastic-agent/pkg/version"
+
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/configure"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -63,7 +65,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 			cfg := getConfig(streams)
 			log, err := configuredLogger(cfg, watcherName)
 			if err != nil {
-				fmt.Fprintf(streams.Err, "Error configuring logger: %v\n%s\n", err, troubleshootMessage())
+				fmt.Fprintf(streams.Err, "Error configuring logger: %v\n%s\n", err, troubleshootMessage)
 				return NewExitCodeError(3, err)
 			}
 
@@ -106,7 +108,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 				return watchCmd(log, paths.Top(), cfg.Settings.Upgrade.Watcher, new(upgradeAgentWatcher), new(upgradeInstallationModifier))
 			}); err != nil {
 				log.Errorw("Watch command failed", "error.message", err)
-				fmt.Fprintf(streams.Err, "Watch command failed: %v\n%s\n", err, troubleshootMessage())
+				fmt.Fprintf(streams.Err, "Watch command failed: %v\n%s\n", err, troubleshootMessage)
 				return NewExitCodeError(4, err)
 			}
 			return nil
@@ -138,6 +140,12 @@ func WithSkipCleanup(skipCleanup bool) upgrade.RollbackOption {
 func WithSkipRestart(skipRestart bool) upgrade.RollbackOption {
 	return func(ros upgrade.RollbackOptionSetter) {
 		ros.SetSkipRestart(skipRestart)
+	}
+}
+
+func WithRemoveMarker(removeMarker bool) upgrade.RollbackOption {
+	return func(ros upgrade.RollbackOptionSetter) {
+		ros.SetRemoveMarker(removeMarker)
 	}
 }
 
@@ -216,7 +224,19 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		log.Error("Error detected, proceeding to rollback: %v", err)
 
 		upgradeDetails.SetStateWithReason(details.StateRollback, details.ReasonWatchFailed)
-		err = installModifier.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash)
+
+		// by default remove marker (backward compatible behaviour)
+		removeMarker := true
+
+		previousVersion, versionParseErr := semver.ParseVersion(marker.PrevVersion)
+		if versionParseErr != nil {
+			log.Errorf("could not parse previous version %s: %s", marker.PrevVersion, versionParseErr)
+		} else if !previousVersion.Less(*semver.NewParsedSemVer(9, 2, 0, "SNAPSHOT", "")) {
+			// leave the marker in place when rolling back to agent >= 9.2.0-SNAPSHOT as it will be used to determine
+			// that agent was rolled back and the reason
+			removeMarker = false
+		}
+		err = installModifier.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash, WithRemoveMarker(removeMarker))
 		if err != nil {
 			log.Error("rollback failed", err)
 			upgradeDetails.Fail(err)

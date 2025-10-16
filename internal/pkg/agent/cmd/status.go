@@ -50,7 +50,7 @@ func newStatusCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 				if errors.As(err, &ExitCodeError{}) {
 					return err
 				}
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
 				return NewExitCodeError(1, err)
 			}
 			return nil

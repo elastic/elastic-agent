@@ -61,7 +61,7 @@ wait that amount of time before using the variables for the configuration.
 			ctx, cancel := context.WithCancel(context.Background())
 			service.HandleSignals(func() {}, cancel)
 			if err := inspectConfig(ctx, paths.ConfigFile(), opts, streams); err != nil {
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
 				return NewExitCodeError(1, err)
 			}
 			return nil
@@ -115,7 +115,7 @@ variables for the configuration.
 			service.HandleSignals(func() {}, cancel)
 
 			if err := inspectComponents(ctx, paths.ConfigFile(), opts, streams); err != nil {
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
 				return NewExitCodeError(1, err)
 			}
 			return nil
@@ -319,24 +319,30 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 
 	// ID provided.
 	if opts.id != "" {
-		splitID := strings.SplitN(opts.id, "/", 2)
-		compID := splitID[0]
-		unitID := ""
-		if len(splitID) > 1 {
-			unitID = splitID[1]
-		}
+		// Interpret the ID as either a component or component/unit.
+		// First try to find a component with the full ID.
+		compID := opts.id
 		comp, ok := findComponent(comps, compID)
 		if ok {
-			if unitID != "" {
-				unit, ok := findUnit(comp, unitID)
-				if ok {
-					return printUnit(unit, streams)
-				}
-				return fmt.Errorf("unable to find unit with ID: %s/%s", compID, unitID)
-			}
 			return printComponent(comp, streams)
 		}
-		return fmt.Errorf("unable to find component with ID: %s", compID)
+
+		// Next try to split the ID and find a unit inside a component.
+		splitID := strings.SplitN(opts.id, "/", 2)
+		if len(splitID) > 1 {
+			compID = splitID[0]
+			comp, ok = findComponent(comps, compID)
+		}
+		if !ok {
+			return fmt.Errorf("unable to find component with ID: %s", compID)
+		}
+
+		unitID := splitID[1]
+		unit, ok := findUnit(comp, unitID)
+		if !ok {
+			return fmt.Errorf("unable to find unit with ID: %s/%s", compID, unitID)
+		}
+		return printUnit(unit, streams)
 	}
 
 	// Separate any components that are blocked by capabilities config
@@ -415,7 +421,7 @@ func getMonitoringFn(ctx context.Context, logger *logger.Logger, cfg map[string]
 	}
 	otelExecMode := otelconfig.GetExecutionModeFromConfig(logger, config)
 	isOtelExecModeSubprocess := otelExecMode == manager.SubprocessExecutionMode
-	monitor := componentmonitoring.New(agentCfg.Settings.V1MonitoringEnabled, agentCfg.Settings.DownloadConfig.OS(), agentCfg.Settings.MonitoringConfig, otelCfg, agentInfo, isOtelExecModeSubprocess)
+	monitor := componentmonitoring.New(agentCfg.Settings.V1MonitoringEnabled, agentCfg.Settings.DownloadConfig.OS(), agentCfg.Settings.MonitoringConfig, agentInfo, isOtelExecModeSubprocess)
 	return monitor.MonitoringConfig, nil
 }
 

@@ -54,7 +54,7 @@ The goal of EDOT is to preserve OTel data formats and semantics as much as possi
 For logs collection, the default configuration uses the [`filelog`] receiver to read log entries from files. In addition, the [`resourcedetection`] processor enriches the log entries with metadata about the corresponding host and operating system.
 
 :::{note}
-The `from_context: client_metadata` option in the `resource` processor only applies to transport-level metadata. It cannot extract custom application attributes.  
+The `from_context: client_metadata` option in the `resource` processor only applies to transport-level metadata. It cannot extract custom application attributes.
 
 To propagate such values into your telemetry, set them explicitly in your application code using EDOT SDK instrumentation. For more information, refer to [EDOT Collector doesn’t propagate client metadata](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/metadata.md).
 :::
@@ -65,12 +65,12 @@ Data is exported directly to {{es}} using the [`elasticsearch`] exporter in `OTe
 
 The application pipeline in the EDOT Collector receives data from OTel SDKs through the [`OTLP`] receiver. While logs and metrics are exported verbatim into {{es}}, traces require two additional components.
 
-The [`elastictrace`] processor enriches trace data with additional attributes that improve the user experience in the Elastic Observability UIs. In addition, the [`elasticapm`] connector generates pre-aggregated APM metrics from tracing data.
+{applies_to}`edot_collector: ga 9.2` The [`elasticapm`] processor enriches trace data with additional attributes that improve the user experience in the Elastic Observability UIs. In addition, the [`elasticapm`] connector generates pre-aggregated APM metrics from tracing data.
 
 Application-related OTel data is ingested into {{es}} in OTel-native format using the [`elasticsearch`] exporter.
 
 :::{note}
-Both components, `elastictrace` and `elasticapm` are required for Elastic APM UIs to work properly. As they aren't included in the OpenTelemetry [Collector Contrib repository](https://github.com/open-telemetry/opentelemetry-collector-contrib), you can:
+Both the `elasticapm` processor and the `elasticapm` connector are required for Elastic APM UIs to work properly. As they aren't included in the OpenTelemetry [Collector Contrib repository](https://github.com/open-telemetry/opentelemetry-collector-contrib), you can:
 
 * Use the EDOT Collector with the available configuration to ingest data into {{es}}.
 * [Build a custom, EDOT-like Collector](/reference/edot-collector/custom-collector.md) for ingesting data into {{es}}.
@@ -92,7 +92,7 @@ The [`resourcedetection`] processor enriches the metrics with meta information a
 
 ### Using the Managed OTLP Endpoint
 
-When ingesting OTel data through the [{{motlp}}](opentelemetry://reference/motlp.md), all the enrichment that is required for an optimal experience in the Elastic solutions happens at the endpoint level and is transparent to users. 
+When ingesting OTel data through the [{{motlp}}](opentelemetry://reference/motlp.md), all the enrichment that is required for an optimal experience in the Elastic solutions happens at the endpoint level and is transparent to users.
 
 The Collector configuration for all use cases that involve the {{motlp}} is only concerned with local data collection and context enrichment.
 
@@ -100,23 +100,37 @@ Platform logs are scraped with the [`filelog`] receiver, host metrics are collec
 
 Data from OTel SDKs is piped through the [`OTLP`] receiver directly to the OTLP exporter that sends data for all signals to the {{motlp}}.
 
-With the {{motlp}}, there is no need to configure any Elastic-specific components, such as [`elasticinframetrics`], [`elastictrace`] processors, the [`elasticapm`] connector, or the [`elasticsearch`] exporter. Edge setup and configuration can be 100% vendor agnostic.
+With the {{motlp}}, there is no need to configure any Elastic-specific components, such as the [`elasticinframetrics`] and [`elasticapm`] processors, the [`elasticapm`] connector, or the [`elasticsearch`] exporter. Edge setup and configuration can be fully vendor agnostic.
 
 ## Gateway mode
 
 In Gateway mode, the Collector ingests data from other Collectors running in Agent mode and forwards it to Elastic.
 
-## Example configuration
+### Example configuration
 
 The following example configuration files are available for the Gateway mode:
 
+:::::{tab-set}
+
+::::{tab-item} 9.x
+% start:edot-gateway-9x-table
 | Version | Configuration  |
 |---------|----------------|
-| 8.17    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.0.4/internal/pkg/otel/samples/linux/gateway.yml) |
-| 8.18    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.0.4/internal/pkg/otel/samples/linux/gateway.yml) |
-| 9.0     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.0.4/internal/pkg/otel/samples/linux/gateway.yml) |
-| 8.19    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.19.0/internal/pkg/otel/samples/linux/gateway.yml) |
-| 9.1     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.1.0/internal/pkg/otel/samples/linux/gateway.yml) |
+| 9.1     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.1.5/internal/pkg/otel/samples/linux/gateway.yml) |
+| 9.0     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.0.8/internal/pkg/otel/samples/linux/gateway.yml) |
+% end:edot-gateway-9x-table
+::::
+
+::::{tab-item} 8.x
+% start:edot-gateway-8x-table
+| Version | Configuration  |
+|---------|----------------|
+| 8.19    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.19.5/internal/pkg/otel/samples/linux/gateway.yml) |
+| 8.18    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.18.8/internal/pkg/otel/samples/linux/gateway.yml) |
+| 8.17    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.17.10/internal/pkg/otel/samples/linux/gateway.yml) |
+% end:edot-gateway-8x-table
+::::
+:::::
 
 Use the previous example configuration as a reference when configuring your Gateway Collector or customizing your EDOT Collector configuration.
 
@@ -175,8 +189,13 @@ processors:
   batch/metrics:
     send_batch_max_size: 0 # Prevents splitting metrics requests
     timeout: 1s
-  elastictrace: {}
+  elasticapm: {}
 ```
+
+:::{note}
+:applies_to: edot_collector: ga 9.2
+The `elasticapm` processor replaces the deprecated `elastictrace` processor.
+:::
 
 ### Data export
 
@@ -211,7 +230,6 @@ The service section defines separate pipelines for different telemetry types:
 - Aggregated OTel metrics pipeline
 
 Each pipeline connects specific receivers, processors, and exporters to handle different data types appropriately.
-
 
 ## Central configuration
 
@@ -312,7 +330,7 @@ The server expects incoming HTTP requests to include an API key with sufficient 
 [`hostmetrics`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/hostmetricsreceiver
 [`elasticsearch`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/elasticsearchexporter
 [`elasticinframetrics`]: https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticinframetricsprocessor
-[`elastictrace`]: https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elastictraceprocessor
+[`elasticapm`]: https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticapmprocessor
 [`elasticapm`]: https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector
 [`resource`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourceprocessor
 [`resourcedetection`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor

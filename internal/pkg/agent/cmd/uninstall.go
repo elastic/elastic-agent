@@ -28,7 +28,7 @@ Unless -f is used this command will ask confirmation before performing removal.
 `,
 		RunE: func(c *cobra.Command, _ []string) error {
 			if err := uninstallCmd(streams, c); err != nil {
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
 				logExternal(fmt.Sprintf("%s uninstall failed: %s", paths.BinaryName, err))
 				return NewExitCodeError(1, err)
 			}
