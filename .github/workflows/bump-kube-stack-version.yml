@@ -1,5 +1,5 @@
 ---
-name: bump-edot-images
+name: bump-kube-stack-version
 
 on:
   workflow_dispatch:
