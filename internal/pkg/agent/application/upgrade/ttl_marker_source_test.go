@@ -33,7 +33,6 @@ func TestTTLMarkerRegistry_AddOrReplace(t *testing.T) {
 
 	yesterday := now.Add(-24 * time.Hour)
 	yesterdayString := yesterday.Format(time.RFC3339)
-	yesterday, _ = time.Parse(time.RFC3339, yesterdayString)
 
 	tomorrow := now.Add(24 * time.Hour)
 	tomorrowString := tomorrow.Format(time.RFC3339)
@@ -224,10 +223,10 @@ func TestTTLMarkerRegistry_Get(t *testing.T) {
 			tt.setup(t, tmpDir)
 			T := NewTTLMarkerRegistry(tmpDir)
 			got, err := T.Get()
-			if !tt.wantErr(t, err, fmt.Sprintf("Get()")) {
+			if !tt.wantErr(t, err, "Get()") {
 				return
 			}
-			assert.Equalf(t, tt.want, got, "Get()")
+			assert.Equal(t, tt.want, got, "Get()")
 		})
 	}
 }

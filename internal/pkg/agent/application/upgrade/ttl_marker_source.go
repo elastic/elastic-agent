@@ -40,7 +40,7 @@ func (T TTLMarkerRegistry) Set(m map[string]TTLMarker) error {
 		return fmt.Errorf("accessing existing markers: %w", err)
 	}
 
-	for versionedHome, _ := range existingMarkers {
+	for versionedHome := range existingMarkers {
 		_, ok := m[versionedHome]
 		if !ok {
 			// the existing marker should not be in the final state
