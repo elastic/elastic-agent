@@ -56,7 +56,7 @@ jobs:
       - name: check for modified otel README.md
         id: otel-readme-check
         run: |
-          if git diff --quiet HEAD -- internal/pkg/otel/README.md; then
+          if git diff --quiet HEAD -- internal/edot/README.md; then
             echo "modified=false" >> $GITHUB_OUTPUT
           else
             echo "modified=true" >> $GITHUB_OUTPUT
@@ -67,7 +67,7 @@ jobs:
         run: |
           git config --global user.name 'dependabot[bot]'
           git config --global user.email 'dependabot[bot]@users.noreply.github.com'
-          git add internal/pkg/otel/README.md
+          git add internal/edot/README.md
           git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
           git commit -m "Update otel README.md"
           git push

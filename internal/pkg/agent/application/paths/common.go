@@ -272,20 +272,24 @@ func SetControlSocket(path string) {
 // The agent executable for MacOS is wrapped in the app bundle, so the path to the binary is
 // top-level/data/elastic-agent-${hash}/elastic-agent.app/Contents/MacOS
 func initialTop() string {
-	return ExecDir(retrieveExecutableDir())
-}
-
-// retrieveExecutablePath returns the executing binary, even if the started binary was a symlink
-func retrieveExecutableDir() string {
-	execPath, err := os.Executable()
+	executableDir, err := RetrieveExecutableDir()
 	if err != nil {
 		panic(err)
+	}
+	return ExecDir(executableDir)
+}
+
+// RetrieveExecutableDir returns the executing binary, even if the started binary was a symlink
+func RetrieveExecutableDir() (string, error) {
+	execPath, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("failed to get executable path: %w", err)
 	}
 	evalPath, err := filepath.EvalSymlinks(execPath)
 	if err != nil {
-		panic(err)
+		return "", fmt.Errorf("failed to get evaluated executable path: %w", err)
 	}
-	return filepath.Dir(evalPath)
+	return filepath.Dir(evalPath), nil
 }
 
 // isInsideData returns true when the exePath is inside of the current Agents data path.

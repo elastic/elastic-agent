@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build !requirefips
+//go:build requirefips
 
 package cmd
 
@@ -17,7 +17,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/internal/pkg/otel"
+	edotPkg "github.com/elastic/elastic-agent/internal/edot/pkg"
 )
 
 type componentsOutput struct {
@@ -42,7 +42,7 @@ func TestComponentsCommand(t *testing.T) {
 	cmd := &cobra.Command{}
 	cmd.SetArgs([]string{"components"})
 
-	expectedOutput, err := os.ReadFile(filepath.Join("testdata", "otel/components-output.yml"))
+	expectedOutput, err := os.ReadFile(filepath.Join("testdata", "otel/components-output-fips.yml"))
 	require.NoError(t, err)
 	expectedComponents := &componentsOutput{}
 	err = yaml.Unmarshal(expectedOutput, expectedComponents)
@@ -50,7 +50,7 @@ func TestComponentsCommand(t *testing.T) {
 
 	b := bytes.NewBufferString("")
 	cmd.SetOut(b)
-	err = otel.Components(cmd)
+	err = edotPkg.Components(cmd)
 	require.NoError(t, err)
 	outputComponents := &componentsOutput{}
 	err = yaml.Unmarshal(b.Bytes(), outputComponents)

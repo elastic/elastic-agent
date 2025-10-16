@@ -9,6 +9,7 @@ import (
 	"go/build"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -18,8 +19,8 @@ import (
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 
+	devtools "github.com/elastic/elastic-agent-libs/dev-tools/mage"
 	"github.com/elastic/elastic-agent-libs/file"
-	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 )
 
 const defaultCrossBuildTarget = "golangCrossBuild"
@@ -172,7 +173,30 @@ func CrossBuild(options ...CrossBuildOption) error {
 	if CrossBuildMountModcache {
 		// Make sure the module dependencies are downloaded on the host,
 		// as they will be mounted into the container read-only.
-		mg.Deps(func() error { return gotool.Mod.Download() })
+		mg.Deps(func() error {
+			goModFiles, err := devtools.FindFilesRecursive(func(path string, _ os.FileInfo) bool {
+				return filepath.Base(path) == "go.mod"
+			})
+			if err != nil {
+				return err
+			}
+			for _, file := range goModFiles {
+				dir, err := filepath.Abs(filepath.Dir(file))
+				if err != nil {
+					return fmt.Errorf("error getting absolute dir of %q: %w", file, err)
+				}
+				fmt.Printf(">> Running go download tidy inside %q\n", dir)
+				cmd := exec.Command(mg.GoCmd(), "mod", "download") // #nosec G204 -- Need to pass in name of package
+				cmd.Dir = dir
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				err = cmd.Run()
+				if err != nil {
+					return fmt.Errorf("error running go mod download inside %q: %w", dir, err)
+				}
+			}
+			return nil
+		})
 	}
 
 	// Build the magefile for Linux, so we can run it inside the container.

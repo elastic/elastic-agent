@@ -303,6 +303,9 @@ shared:
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}:
         source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
         mode: 0755
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/edot{{.BinaryExt}}:
+        source: build/golang-crossbuild/edot-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+        mode: 0755
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/package.version:
         content: >
           {{ agent_package_version }}
@@ -325,7 +328,7 @@ shared:
       source: '{{ repo.RootDir }}/dev-tools/packaging/files/linux/otelcol.sh'
       mode: 0755
     'otel_samples':
-      source: '{{ repo.RootDir }}/internal/pkg/otel/samples/linux/'
+      source: '{{ repo.RootDir }}/internal/edot/samples/linux/'
       mode: 0755
 
   - &agent_binary_common_files
@@ -369,6 +372,9 @@ shared:
     'data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}':
       source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
+    'data/{{.BeatName}}-{{ commit_short }}/edot{{.BinaryExt}}':
+      source: build/golang-crossbuild/edot-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+      mode: 0755
     'data/{{.BeatName}}-{{ commit_short }}/package.version':
       content: >
         {{ agent_package_version }}
@@ -390,6 +396,9 @@ shared:
     'data/{{.BeatName}}-{{ commit_short }}/elastic-agent.app/Contents/MacOS/{{.BeatName}}{{.BinaryExt}}':
       source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
+    'data/{{.BeatName}}-{{ commit_short }}/elastic-agent.app/Contents/MacOS/edot{{.BinaryExt}}':
+      source: build/golang-crossbuild/edot-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+      mode: 0755
     'data/{{.BeatName}}-{{ commit_short }}/package.version':
       content: >
         {{ agent_package_version }}
@@ -401,7 +410,7 @@ shared:
       source: '{{ repo.RootDir }}/dev-tools/packaging/files/darwin/otelcol.sh'
       mode: 0755
     'otel_samples':
-      source: '{{ repo.RootDir }}/internal/pkg/otel/samples/darwin/'
+      source: '{{ repo.RootDir }}/internal/edot/samples/darwin/'
       mode: 0755
     <<: *agent_darwin_app_bundle_files
     <<: *agent_binary_common_files
@@ -464,7 +473,7 @@ shared:
         source: '{{ repo.RootDir }}/dev-tools/packaging/files/windows/otelcol.ps1'
         mode: 0755
       'otel_samples':
-        source: '{{ repo.RootDir }}/internal/pkg/otel/samples/windows/'
+        source: '{{ repo.RootDir }}/internal/edot/samples/windows/'
         mode: 0755
 
   # This image is used only for preparing the file tree before actually building the image

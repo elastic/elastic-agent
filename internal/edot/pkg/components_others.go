@@ -5,7 +5,7 @@
 //go:build !linux
 // +build !linux
 
-package otel
+package pkg
 
 import "go.opentelemetry.io/collector/receiver"
 

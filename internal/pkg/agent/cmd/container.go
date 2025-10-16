@@ -59,7 +59,7 @@ const (
 	defaultRequestRetrySleep = "1s"                          // sleep 1 sec between retries for HTTP requests
 	defaultMaxRequestRetries = "30"                          // maximum number of retries for HTTP requests
 	agentBaseDirectory       = "/usr/share/elastic-agent"    // directory that holds all elastic-agent related files
-	defaultStateDirectory    = agentBaseDirectory + "/state" // directory that will hold the state data
+	DefaultStateDirectory    = agentBaseDirectory + "/state" // directory that will hold the state data
 
 	logsPathPerms = 0775
 )
@@ -828,7 +828,7 @@ func containerCfgOverrides(cfg *configuration.Configuration) {
 func setPaths(statePath, configPath, logsPath, socketPath string, writePaths bool) error {
 	statePath = envWithDefault(statePath, "STATE_PATH")
 	if statePath == "" {
-		statePath = defaultStateDirectory
+		statePath = DefaultStateDirectory
 	}
 
 	topPath := filepath.Join(statePath, "data")
@@ -922,7 +922,7 @@ func writeContainerPaths(statePath, configPath, logsPath, socketPath string) err
 func tryContainerLoadPaths() error {
 	statePath := envWithDefault("", "STATE_PATH")
 	if statePath == "" {
-		statePath = defaultStateDirectory
+		statePath = DefaultStateDirectory
 	}
 	pathFile := filepath.Join(statePath, "container-paths.yml")
 	_, err := os.Stat(pathFile)

@@ -9,8 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	edotPkg "github.com/elastic/elastic-agent/internal/edot/pkg"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/internal/pkg/otel"
 )
 
 func newValidateCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
@@ -39,5 +39,5 @@ func newValidateCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 }
 
 func validateOtelConfig(ctx context.Context, cfgFiles []string) error {
-	return otel.Validate(ctx, cfgFiles)
+	return edotPkg.Validate(ctx, cfgFiles)
 }

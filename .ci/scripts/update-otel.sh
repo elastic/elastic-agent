@@ -18,10 +18,10 @@ next_stable_core=${2:-}
 
 next_contrib=${3:-$next_beta_core}
 
-# Get current versions from go.mod
-current_beta_core=$(grep 'go\.opentelemetry\.io/collector/receiver/otlpreceiver ' go.mod | cut -d' ' -f 2 || true)
-current_stable_core=$(grep 'go\.opentelemetry\.io/collector/confmap/provider/fileprovider ' go.mod | cut -d' ' -f 2 || true)
-current_contrib=$(grep 'github\.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver ' go.mod | cut -d' ' -f 2 || true)
+# Get current versions from internal/edot/go.mod
+current_beta_core=$(grep 'go\.opentelemetry\.io/collector/receiver/otlpreceiver ' internal/edot/go.mod | cut -d' ' -f 2 || true)
+current_stable_core=$(grep 'go\.opentelemetry\.io/collector/confmap/provider/fileprovider ' internal/edot/go.mod | cut -d' ' -f 2 || true)
+current_contrib=$(grep 'github\.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver ' internal/edot/go.mod | cut -d' ' -f 2 || true)
 
 [[ -n "$current_beta_core" ]] || (echo "Error: couldn't find current beta core version." && exit 2)
 [[ -n "$current_stable_core" ]] || (echo "Error: couldn't find current stable core version" && exit 3)
@@ -30,10 +30,10 @@ current_contrib=$(grep 'github\.com/open-telemetry/opentelemetry-collector-contr
 echo "=> Updating core from $current_beta_core/$current_stable_core to $next_beta_core/$next_stable_core"
 echo "=> Updating contrib from $current_contrib to $next_contrib"
 
-sed -i.bak "s/\(go\.opentelemetry\.io\/collector.*\) $current_beta_core/\1 $next_beta_core/" go.mod
-sed -i.bak "s/\(go\.opentelemetry\.io\/collector.*\) $current_stable_core/\1 $next_stable_core/" go.mod
-sed -i.bak "s/\(github\.com\/open-telemetry\/opentelemetry\-collector\-contrib\/.*\) $current_contrib/\1 $next_contrib/" go.mod
-rm go.mod.bak
+sed -i.bak "s/\(go\.opentelemetry\.io\/collector.*\) $current_beta_core/\1 $next_beta_core/" internal/edot/go.mod
+sed -i.bak "s/\(go\.opentelemetry\.io\/collector.*\) $current_stable_core/\1 $next_stable_core/" internal/edot/go.mod
+sed -i.bak "s/\(github\.com\/open-telemetry\/opentelemetry\-collector\-contrib\/.*\) $current_contrib/\1 $next_contrib/" internal/edot/go.mod
+rm internal/edot/go.mod.bak
 
 echo "=> Running go mod tidy"
 go mod tidy

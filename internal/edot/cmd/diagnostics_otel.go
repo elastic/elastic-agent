@@ -7,6 +7,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -110,4 +111,20 @@ func aggregateComponentDiagnostics(diags []client.DiagnosticComponentResult) []c
 		result = append(result, v)
 	}
 	return result
+}
+
+func createFile(filepath string) (*os.File, error) {
+	// Ensure all the folders on filepath exist as os.Create does not do so.
+	// 0777 is the same permission, before unmask, os.Create uses.
+	dir := path.Dir(filepath)
+	if err := os.MkdirAll(dir, 0777); err != nil {
+		return nil, fmt.Errorf("could not create folders to save diagnostics on %q: %w",
+			dir, err)
+	}
+
+	f, err := os.Create(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("error creating .zip file: %w", err)
+	}
+	return f, nil
 }
