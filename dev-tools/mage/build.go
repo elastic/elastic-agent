@@ -299,7 +299,11 @@ func Build(params BuildArgs) error {
 			"-lpthread",                                 // required by golang for threads
 		)
 		// what is a better way of selecting the compiler?
-		err := sh.RunWith(env, "x86_64-w64-mingw32-gcc", args...)
+		cc := os.Getenv("CC")
+		if cc == "" {
+			return errors.New("CC environment variable not set")
+		}
+		err := sh.RunWith(env, cc, args...)
 		if err != nil {
 			return err
 		}
