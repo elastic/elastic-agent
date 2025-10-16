@@ -1512,6 +1512,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 
 		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
 		assert.NoError(t, addCollectorMetricsReader(expectedCfg))
+		assert.NoError(t, injectDiagnosticsExtension(expectedCfg))
 		assert.Equal(t, expectedCfg, execution.cfg)
 	})
 
