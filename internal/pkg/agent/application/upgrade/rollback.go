@@ -41,12 +41,13 @@ func Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPa
 var FatalRollbackError = errors.New("fatal rollback error")
 
 type RollbackSettings struct {
-	skipCleanup    bool
-	skipRestart    bool
-	preRestartHook RollbackHook
+	SkipCleanup    bool
+	SkipRestart    bool
+	PreRestartHook RollbackHook
+	RemoveMarker   bool
 }
 
-func newRollbackSettings(opts ...RollbackOpt) *RollbackSettings {
+func NewRollbackSettings(opts ...RollbackOpt) *RollbackSettings {
 	rs := new(RollbackSettings)
 	for _, opt := range opts {
 		opt(rs)
@@ -57,20 +58,24 @@ func newRollbackSettings(opts ...RollbackOpt) *RollbackSettings {
 type RollbackOpt func(*RollbackSettings)
 
 func (r *RollbackSettings) SetSkipCleanup(skipCleanup bool) {
-	r.skipCleanup = skipCleanup
+	r.SkipCleanup = skipCleanup
 }
 
 func (r *RollbackSettings) SetSkipRestart(skipRestart bool) {
-	r.skipRestart = skipRestart
+	r.SkipRestart = skipRestart
 }
 
 func (r *RollbackSettings) SetPreRestartHook(preRestartHook RollbackHook) {
-	r.preRestartHook = preRestartHook
+	r.PreRestartHook = preRestartHook
+}
+
+func (r *RollbackSettings) SetRemoveMarker(removeMarker bool) {
+	r.RemoveMarker = removeMarker
 }
 
 func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, topDirPath string, prevVersionedHome string, prevHash string, opts ...RollbackOpt) error {
 
-	settings := newRollbackSettings(opts...)
+	settings := NewRollbackSettings(opts...)
 
 	symlinkPath := filepath.Join(topDirPath, agentName)
 
@@ -94,8 +99,8 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 	}
 
 	// Hook
-	if settings.preRestartHook != nil {
-		hookErr := settings.preRestartHook(ctx, log, topDirPath)
+	if settings.PreRestartHook != nil {
+		hookErr := settings.PreRestartHook(ctx, log, topDirPath)
 		if hookErr != nil {
 			if errors.Is(hookErr, FatalRollbackError) {
 				return fmt.Errorf("pre-restart hook failed: %w", hookErr)
@@ -105,7 +110,7 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 		}
 	}
 
-	if settings.skipRestart {
+	if settings.SkipRestart {
 		log.Info("Skipping restart")
 		return nil
 	}
@@ -116,13 +121,13 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 		return err
 	}
 
-	if settings.skipCleanup {
+	if settings.SkipCleanup {
 		log.Info("Skipping cleanup")
 		return nil
 	}
 
 	// cleanup everything except version we're rolling back into
-	return Cleanup(log, topDirPath, prevVersionedHome, prevHash, false, true)
+	return Cleanup(log, topDirPath, prevVersionedHome, prevHash, settings.RemoveMarker, true)
 }
 
 // Cleanup removes all artifacts and files related to a specified version.

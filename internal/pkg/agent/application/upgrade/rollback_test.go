@@ -389,6 +389,7 @@ func TestRollbackWithOpts(t *testing.T) {
 				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
 				assert.NoError(t, err, "reading topPath elastic-agent link")
 				assert.Equal(t, paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName), linkTarget)
+				assert.FileExists(t, filepath.Join(topDir, "data", markerFilename))
 			},
 		},
 		"SkipRestart: no cleanup, no restart": {
@@ -421,6 +422,7 @@ func TestRollbackWithOpts(t *testing.T) {
 				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
 				assert.NoError(t, err, "reading topPath elastic-agent link")
 				assert.Equal(t, paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName), linkTarget)
+				assert.FileExists(t, filepath.Join(topDir, "data", markerFilename))
 			},
 		},
 		"Prerestart hook not fatal error: rollback, cleanup and restart as normal": {
@@ -467,6 +469,7 @@ func TestRollbackWithOpts(t *testing.T) {
 				if assert.Len(t, snippetLogs, 1) {
 					assert.Equal(t, zapcore.WarnLevel, snippetLogs[0].Level)
 				}
+				assert.FileExists(t, filepath.Join(topDir, "data", markerFilename))
 			},
 		},
 		"Prerestart hook fatal error: rollback then return the error (no restart, no cleanup)": {
@@ -503,6 +506,47 @@ func TestRollbackWithOpts(t *testing.T) {
 				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
 				assert.NoError(t, err, "reading topPath elastic-agent link")
 				assert.Equal(t, paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName), linkTarget)
+				assert.FileExists(t, filepath.Join(topDir, "data", markerFilename))
+			},
+		},
+		"RemoveMarker true: delete the upgrade marker": {
+			agentInstallsSetup: setupAgentInstallations{
+				installedAgents: []testAgentInstall{
+					{
+						version:          version123Snapshot,
+						useVersionInPath: true,
+					},
+					{
+						version:          version456Snapshot,
+						useVersionInPath: true,
+					},
+				},
+			},
+			setupMocks: func(mockClient *client.MockClient) {
+				mockClient.EXPECT().Connect(
+					mock.AnythingOfType("*context.timerCtx"),
+					mock.AnythingOfType("*grpc.funcDialOption"),
+					mock.AnythingOfType("*grpc.funcDialOption"),
+				).Return(nil)
+				mockClient.EXPECT().Disconnect().Return()
+				mockClient.EXPECT().Restart(mock.Anything).Return(nil).Once()
+			},
+			args: args{
+				prevVersionedHome: "data/elastic-agent-1.2.3-SNAPSHOT-abcdef",
+				prevHash:          "abcdef",
+				rollbackOptions: []RollbackOpt{
+					func(rs *RollbackSettings) {
+						rs.SetRemoveMarker(true)
+					},
+				}},
+			wantErr: assert.NoError,
+			checkAfterRollback: func(t *testing.T, logs *observer.ObservedLogs, topDir string) {
+				assertAgentInstallExists(t, filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName)
+				assertAgentInstallCleaned(t, filepath.Join(topDir, "data", "elastic-agent-4.5.6-SNAPSHOT-ghijkl"), agentExecutableName)
+				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
+				assert.NoError(t, err, "reading topPath elastic-agent link")
+				assert.Equal(t, paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName), linkTarget)
+				assert.NoFileExists(t, filepath.Join(topDir, "data", markerFilename))
 			},
 		},
 	}
@@ -510,7 +554,7 @@ func TestRollbackWithOpts(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			testLogger, obsLogs := loggertest.New(t.Name())
 			testTop := t.TempDir()
-			setupAgents(t, testLogger, testTop, tt.agentInstallsSetup, false)
+			setupAgents(t, testLogger, testTop, tt.agentInstallsSetup, true)
 
 			// mock client
 			mockClient := client.NewMockClient(t)
