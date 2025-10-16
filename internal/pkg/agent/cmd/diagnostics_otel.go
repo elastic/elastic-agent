@@ -25,7 +25,7 @@ func newOtelDiagnosticsCommand(streams *cli.IOStreams) *cobra.Command {
 		Long:  "This command gathers diagnostics information from the EDOT and writes it to a zip archive",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := otelDiagnosticCmd(streams, cmd); err != nil {
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
 				os.Exit(1)
 			}
 			return nil

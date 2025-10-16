@@ -14,12 +14,12 @@ require (
 	github.com/docker/docker v28.4.0+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251009130213-2298b4338dab
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251015190252-9610b5b94265
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.10.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
 	github.com/elastic/elastic-agent-libs v0.24.1
-	github.com/elastic/elastic-agent-system-metrics v0.13.2
+	github.com/elastic/elastic-agent-system-metrics v0.13.3
 	github.com/elastic/elastic-transport-go/v8 v8.7.0
 	github.com/elastic/go-elasticsearch/v8 v8.19.0
 	github.com/elastic/go-licenser v0.4.2
@@ -31,8 +31,9 @@ require (
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.8.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.8.0
 	github.com/elastic/opentelemetry-collector-components/extension/beatsauthextension v0.5.0
-	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.3.0
+	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.4.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.18.0
+	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.13.0
 	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.4.0
 	github.com/fatih/color v1.18.0
 	github.com/fsnotify/fsnotify v1.9.0
