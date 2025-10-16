@@ -29,7 +29,7 @@ jobs:
             flags: ''
           - os: macos-15
             flags: 'RACE_DETECTOR=true TEST_COVERAGE=true '
-        event: [ 'pull_request', 'push', 'workflow_dispatch' ]
+#        event: [ 'pull_request', 'push', 'workflow_dispatch' ]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -51,8 +51,8 @@ jobs:
 
       - name: Beat version
         run: |
-          BEAT_VERSION=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\-[a-zA-Z]+[0-9]+)?' "${WORKSPACE}/version/version.go")
+          BEAT_VERSION=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\-[a-zA-Z]+[0-9]+)?' "./version/version.go")
           echo "BEAT_VERSION=$beatVersion" >> $GITHUB_ENV
 
       - run: |
-          RACE_DETECTOR=true TEST_COVERAGE=true mage unitTest
+          ${{ matrix.flags }} mage unitTest
