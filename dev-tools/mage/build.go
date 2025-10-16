@@ -46,13 +46,14 @@ var buildTagRE = regexp.MustCompile(`-tags=([\S]+)?`)
 //
 // For example if given -someflag=val1 -tags=buildtag1 -tags=buildtag2
 // It will return -someflag=val1 -tags=buildtag1,buildtag2
-func (b BuildArgs) ParseBuildTags() []string {
+func (b BuildArgs) ParseBuildTags(extraTags ...string) []string {
 	flags := make([]string, 0)
-	if len(b.ExtraFlags) == 0 {
+	if len(b.ExtraFlags) == 0 || len(extraTags) == 0 {
 		return flags
 	}
 
-	buildTags := make([]string, 0)
+	buildTags := make([]string, 0, len(extraTags))
+	buildTags = append(buildTags, extraTags...)
 	for _, flag := range b.ExtraFlags {
 		if buildTagRE.MatchString(flag) {
 			arr := buildTagRE.FindStringSubmatch(flag)
@@ -229,7 +230,11 @@ func Build(params BuildArgs) error {
 		"-o",
 		filepath.Join(params.OutputDir, outputName),
 	}
-	args = append(args, params.ParseBuildTags()...)
+	var extraTags []string
+	if winServiceCompile {
+		extraTags = []string{"centry"}
+	}
+	args = append(args, params.ParseBuildTags(extraTags...)...)
 
 	// buildmode
 	if buildMode != "" {
@@ -289,9 +294,9 @@ func Build(params BuildArgs) error {
 			args,
 			"-o", filepath.Join(params.OutputDir, binaryName),
 			"-I", params.OutputDir,
-			"windows/main.c", // entrypoint
+			"windows/main.c",                            // entrypoint
 			filepath.Join(params.OutputDir, outputName), // static c-archive
-			"-lpthread", // required by golang for threads
+			"-lpthread",                                 // required by golang for threads
 		)
 		// what is a better way of selecting the compiler?
 		err := sh.RunWith(env, "x86_64-w64-mingw32-gcc", args...)
