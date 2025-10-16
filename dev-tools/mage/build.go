@@ -294,9 +294,9 @@ func Build(params BuildArgs) error {
 			args,
 			"-o", filepath.Join(params.OutputDir, binaryName),
 			"-I", params.OutputDir,
-			"windows/main.c",                            // entrypoint
+			"windows/main.c", // entrypoint
 			filepath.Join(params.OutputDir, outputName), // static c-archive
-			"-lpthread",                                 // required by golang for threads
+			"-lpthread", // required by golang for threads
 		)
 		// what is a better way of selecting the compiler?
 		cc := os.Getenv("CC")
