@@ -9,13 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"syscall"
 
-<<<<<<< HEAD
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
-	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
-=======
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
->>>>>>> 7afb20069 ([edot][diagnostics] remove otel diagnostics from manager (#10415))
 
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -108,45 +104,6 @@ func (m *OTelManager) PerformComponentDiagnostics(
 		}
 	}
 
-<<<<<<< HEAD
-	for idx, diag := range diagnostics {
-		var results []*proto.ActionDiagnosticUnitResult
-		var errs []error
-		jsonMetricDiagnostic, err := GetBeatJsonMetricsDiagnostics(ctx, diag.Component.ID)
-		errs = append(errs, err)
-		if jsonMetricDiagnostic != nil {
-			results = append(results, jsonMetricDiagnostic)
-		}
-
-		inputMetricsDiagnostic, err := GetBeatInputMetricsDiagnostics(ctx, diag.Component.ID)
-		errs = append(errs, err)
-		if inputMetricsDiagnostic != nil {
-			results = append(results, inputMetricsDiagnostic)
-		}
-
-		if translate.GetBeatNameForComponent(&diag.Component) == "filebeat" {
-			// include filebeat registry, reimplementation of a filebeat diagnostic hook
-			registryTarGzBytes, err := FileBeatRegistryTarGz(m.logger, diag.Component.ID)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to get filebeat registry archive: %w", err))
-			}
-			if registryTarGzBytes != nil {
-				m.logger.Debugf("created registry tar.gz, size %d", len(registryTarGzBytes))
-				results = append(results, &proto.ActionDiagnosticUnitResult{
-					Name:        "registry",
-					Description: "Filebeat's registry",
-					Filename:    "registry.tar.gz",
-					ContentType: "application/octet-stream",
-					Content:     registryTarGzBytes,
-					Generated:   timestamppb.Now(),
-				})
-			}
-
-		}
-
-		diagnostics[idx].Results = results
-		diagnostics[idx].Err = errors.Join(errs...)
-=======
 	extDiagnostics, err := otel.PerformDiagnosticsExt(ctx, false)
 
 	// We're not running the EDOT if:
@@ -171,7 +128,6 @@ func (m *OTelManager) PerformComponentDiagnostics(
 		if !found {
 			diagnostics[idx].Err = fmt.Errorf("failed to get diagnostics for %s", diag.Component.ID)
 		}
->>>>>>> 7afb20069 ([edot][diagnostics] remove otel diagnostics from manager (#10415))
 	}
 
 	return diagnostics, nil

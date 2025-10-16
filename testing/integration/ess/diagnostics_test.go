@@ -439,8 +439,6 @@ agent.monitoring.enabled: false
 	}
 }
 
-<<<<<<< HEAD
-=======
 func TestEDOTDiagnostics(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: integration.Default,
@@ -541,7 +539,6 @@ agent.monitoring.enabled: false
 	verifyFilebeatRegistry(t, filepath.Join(extractionDir, "components/filestream-default/registry.tar.gz"))
 }
 
->>>>>>> 7afb20069 ([edot][diagnostics] remove otel diagnostics from manager (#10415))
 func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string) func(ctx context.Context) error {
 	return func(ctx context.Context) error {
 		diagZip, err := fix.ExecDiagnostics(ctx, cmd...)

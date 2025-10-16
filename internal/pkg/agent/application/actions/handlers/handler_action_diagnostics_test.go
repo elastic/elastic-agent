@@ -5,7 +5,10 @@
 package handlers
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
+	"io"
 	"os"
 	"path"
 	"testing"
@@ -395,8 +398,6 @@ func TestDiagnosticHandlerWithCPUProfile(t *testing.T) {
 	assert.True(t, cpuCalled, "CPU profile collector was not called.")
 	mockDiagProvider.AssertExpectations(t)
 }
-<<<<<<< HEAD
-=======
 
 func TestDiagnosticsHandlerWithEDOT(t *testing.T) {
 	tempAgentRoot := t.TempDir()
@@ -461,4 +462,3 @@ func verifyZip(t *testing.T, reader io.Reader, expectedContent map[string][]byte
 	}
 	require.Equal(t, expectedContent, foundContent)
 }
->>>>>>> 7afb20069 ([edot][diagnostics] remove otel diagnostics from manager (#10415))
