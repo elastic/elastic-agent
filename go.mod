@@ -100,11 +100,13 @@ require (
 	go.elastic.co/ecszap v1.0.3
 	go.elastic.co/go-licence-detector v0.7.0
 	go.opentelemetry.io/collector/component/componentstatus v0.137.0
+	go.opentelemetry.io/collector/component/componenttest v0.137.0
 	go.opentelemetry.io/collector/connector/forwardconnector v0.137.0
 	go.opentelemetry.io/collector/exporter/debugexporter v0.137.0
 	go.opentelemetry.io/collector/exporter/nopexporter v0.137.0
 	go.opentelemetry.io/collector/exporter/otlpexporter v0.137.0
 	go.opentelemetry.io/collector/exporter/otlphttpexporter v0.137.0
+	go.opentelemetry.io/collector/extension/extensiontest v0.137.0
 	go.opentelemetry.io/collector/extension/memorylimiterextension v0.137.0
 	go.opentelemetry.io/collector/pipeline v1.43.0
 	go.opentelemetry.io/collector/processor/batchprocessor v0.137.0
@@ -112,6 +114,7 @@ require (
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.137.0
 	go.opentelemetry.io/collector/receiver/otlpreceiver v0.137.0
 	go.uber.org/zap v1.27.0
+	go.yaml.in/yaml/v3 v3.0.4
 	golang.org/x/crypto v0.42.0
 	golang.org/x/exp v0.0.0-20250911091902-df9299821621
 	golang.org/x/mod v0.28.0
@@ -646,7 +649,6 @@ require (
 	go.opentelemetry.io/auto/sdk v1.2.0 // indirect
 	go.opentelemetry.io/collector v0.137.0 // indirect
 	go.opentelemetry.io/collector/client v1.43.0 // indirect
-	go.opentelemetry.io/collector/component/componenttest v0.137.0 // indirect
 	go.opentelemetry.io/collector/config/configauth v1.43.0 // indirect
 	go.opentelemetry.io/collector/config/configcompression v1.43.0 // indirect
 	go.opentelemetry.io/collector/config/configgrpc v0.137.0 // indirect
@@ -673,7 +675,6 @@ require (
 	go.opentelemetry.io/collector/extension/extensionauth v1.43.0 // indirect
 	go.opentelemetry.io/collector/extension/extensioncapabilities v0.137.0 // indirect
 	go.opentelemetry.io/collector/extension/extensionmiddleware v0.137.0 // indirect
-	go.opentelemetry.io/collector/extension/extensiontest v0.137.0 // indirect
 	go.opentelemetry.io/collector/extension/xextension v0.137.0 // indirect
 	go.opentelemetry.io/collector/filter v0.137.0 // indirect
 	go.opentelemetry.io/collector/internal/fanoutconsumer v0.137.0 // indirect
@@ -731,7 +732,6 @@ require (
 	go.uber.org/ratelimit v0.3.1 // indirect
 	go.uber.org/zap/exp v0.3.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
-	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/telemetry v0.0.0-20250908211612-aef8a434d053 // indirect
 	golang.org/x/tools/godoc v0.1.0-deprecated // indirect
