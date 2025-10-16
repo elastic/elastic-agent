@@ -173,7 +173,7 @@ func TestBeatMetrics(t *testing.T) {
 
 	diags, err := m.PerformComponentDiagnostics(t.Context(), nil)
 	require.NoError(t, err)
-	assert.Len(t, obs.All(), 0)
+	assert.Len(t, obs.All(), 1)
 	require.Len(t, diags, 1)
 
 	diag := diags[0]
