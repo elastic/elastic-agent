@@ -46,8 +46,8 @@ targets:
     sourceid: opentelemetry-kube-stack-helm
     spec:
       file: "testing/integration/k8s/k8s.go"
-      matchpattern: "KubeStackChartVersion .*"
-      replacepattern: 'KubeStackChartVersion         = "{{ source "opentelemetry-kube-stack-helm" }}"'
+      matchpattern: '(KubeStackChartVersion\s*=\s)".*"'
+      replacepattern: '$1"{{ source "opentelemetry-kube-stack-helm" }}"'
 
   update-testdata:
     name: 'Update local OpenTelemetry Kube Stack Helm Chart files'
@@ -56,4 +56,7 @@ targets:
     scmid: elastic-agent
     kind: shell
     spec:
-      command: .ci/scripts/update-integration-testdata.sh
+      command: /home/neck/Documents/github/rogercoll/elastic-agent/.ci/scripts/update-integration-testdata.sh
+      environments:
+      - name: PATH
+      - name: HOME

@@ -5,5 +5,5 @@
 #
 set -euo pipefail
 
-echo "~~~ Updating integration tests testdata"
+echo "~~~ Running mage integration:buildKubernetesTestData"
 mage integration:buildKubernetesTestData
