@@ -483,8 +483,8 @@ github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumpti
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic/go.mod h1:0vCBR1wgGwZeGmloJ+eCWIZF2S47grTXRzj2mftg2Nk=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
 github.com/elastic/bayeux v1.0.5/go.mod h1:CSI4iP7qeo5MMlkznGvYKftp8M7qqP/3nzmVZoXHY68=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251014184859-68ff042e9f80 h1:CARFOlWz/X64LhFRHxfEpQN8VwraWonaAUt3HVwZRUE=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251014184859-68ff042e9f80/go.mod h1:Jny+z7bsErkDJRctt1LEcqT+up4DA3ze+VsWdbnndTM=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251015174124-92504ea3e2b1 h1:Dj+3orH+sTr70+DiMKsjR7CykNShk6IVwbWWmli3mKc=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251015174124-92504ea3e2b1/go.mod h1:3KzR/ua/u9W4IJKVK7l58OwDjI1QT4LiFVh1mf/S5cw=
 github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae h1:OiShmbWAyGU0MS0ADJWr1/QgeLIZliMk9xsrFicR3/s=
 github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae/go.mod h1:D2IckZVXARugvikE4fv1glvaJMohKSZRzrPsxCjo9O0=
 github.com/elastic/elastic-agent-autodiscover v0.10.0 h1:WJ4zl9uSfk1kHmn2B/0byQBLIL607Zt4LNfOgV7+XN0=
@@ -493,8 +493,8 @@ github.com/elastic/elastic-agent-client/v7 v7.17.2 h1:Cl2TeABqWZgW40t5fchGWT/sRk
 github.com/elastic/elastic-agent-client/v7 v7.17.2/go.mod h1:5irRFqp6HLqtu1S+OeY0jg8x7K6PLL+DW+PwVk1vJnk=
 github.com/elastic/elastic-agent-libs v0.24.1 h1:kFPpOG5mbdaGRRNXPb2KfEaR65Uoi8nsMbDOKA02/Go=
 github.com/elastic/elastic-agent-libs v0.24.1/go.mod h1:o/iXtbHYaojpG4BOY7Z3hFMQAgEoqq2owO17JPGpf3A=
-github.com/elastic/elastic-agent-system-metrics v0.13.2 h1:R4ogKHESuWhWTtopnw/aHnBxxSZbxd7KHV4GefdwT2M=
-github.com/elastic/elastic-agent-system-metrics v0.13.2/go.mod h1:ezM1kzDUT+vWXFh5oK8QXB/AEB0UoLWqWA8rkRicFFo=
+github.com/elastic/elastic-agent-system-metrics v0.13.3 h1:VlY3Ezuwi5bPZRsAM97WaJEW78XkXgqmPHcTl1WGMRw=
+github.com/elastic/elastic-agent-system-metrics v0.13.3/go.mod h1:lB8veYWYBlA9eF6TahmPN87G1IEgWlbep7QSqLSW90U=
 github.com/elastic/elastic-transport-go/v8 v8.7.0 h1:OgTneVuXP2uip4BA658Xi6Hfw+PeIOod2rY3GVMGoVE=
 github.com/elastic/elastic-transport-go/v8 v8.7.0/go.mod h1:YLHer5cj0csTzNFXoNQ8qhtGY1GTvSqPnKWKaqQE3Hk=
 github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3 h1:UyNbxdkQiSfyipwsOCWAlO+ju3xXC61Z4prx/HBTtFk=
