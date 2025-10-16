@@ -12,11 +12,8 @@ import (
 	"fmt"
 	"hash/fnv"
 	"os"
-<<<<<<< HEAD
-	"strings"
-=======
 	"slices"
->>>>>>> 47112bda4 ([otel] Implement EDOT diagnostics extension (#10052))
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -376,13 +373,12 @@ func buildMergedConfig(
 		}
 	}
 
-<<<<<<< HEAD
 	if err := addCollectorMetricsReader(mergedOtelCfg); err != nil {
 		return nil, fmt.Errorf("failed to add random collector metrics port: %w", err)
-=======
+	}
+
 	if err := injectDiagnosticsExtension(mergedOtelCfg); err != nil {
 		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
->>>>>>> 47112bda4 ([otel] Implement EDOT diagnostics extension (#10052))
 	}
 
 	return mergedOtelCfg, nil
