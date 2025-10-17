@@ -234,10 +234,7 @@ collectors:
             http:
               endpoint: ${env:MY_POD_IP}:4318
       processors:
-        batch:
-          send_batch_size: 1000
-          timeout: 1s
-          send_batch_max_size: 1500
+
       exporters:
         debug:
         otlp/ingest:
@@ -258,7 +255,7 @@ collectors:
         pipelines:
           logs:
             receivers: [otlp]
-            processors: [batch]
+            processors: []
             exporters: [debug, otlp/ingest]
 # For more details on OpenTelemetry's zero-code instrumentation, see:
 # https://opentelemetry.io/docs/concepts/instrumentation/zero-code/
