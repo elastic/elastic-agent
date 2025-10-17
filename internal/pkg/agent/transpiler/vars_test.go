@@ -325,7 +325,7 @@ func TestVars_Replace(t *testing.T) {
 			} else if test.NoMatch {
 				assert.ErrorIs(t, err, ErrNoMatch)
 			} else if test.NoMatchAllowed {
-				assert.ErrorIs(t, err, ErrNoMatchAllowed)
+				assert.ErrorIs(t, err, errNoMatchAllowed)
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, test.Result, res)

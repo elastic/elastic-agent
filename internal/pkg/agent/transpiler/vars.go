@@ -22,8 +22,10 @@ var varsRegex = regexp.MustCompile(`\$\$?{([\p{L}\d\s\\\-_|.'":\/\?]*)}`)
 // ErrNoMatch is return when the replace didn't fail, just that no vars match to perform the replace.
 var ErrNoMatch = errors.New("no matching vars")
 
-// ErrNoMatchAllowed is returned when the replace didn't fail, no vars match to perform the replace, but the variable was marked as optional with |?.
-var ErrNoMatchAllowed = errors.New("no matching vars allowed")
+// errNoMatchAllowed is returned when the replace didn't fail, no vars match to perform the replace, but the variable was marked as optional with |?.
+// This is kept private because it should not be used outside of this module. Only ErrNoMatch will ever be returned
+// outside of the module.
+var errNoMatchAllowed = errors.New("no matching vars allowed")
 
 // Vars is a context of variables that also contain a list of processors that go with the mapping.
 type Vars struct {
@@ -159,7 +161,7 @@ func replaceVars(value string, replacer func(variable string) (Node, Processors,
 			}
 			if !set && reqMatch {
 				if optional {
-					return NewStrVal(""), fmt.Errorf("%w: %s", ErrNoMatchAllowed, toRepresentation(vars, optional))
+					return NewStrVal(""), fmt.Errorf("%w: %s", errNoMatchAllowed, toRepresentation(vars, optional))
 				}
 				return NewStrVal(""), fmt.Errorf("%w: %s", ErrNoMatch, toRepresentation(vars, optional))
 			}

@@ -42,7 +42,7 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 			}
 			// Apply creates a new Node with a deep copy of all the values
 			n, err := dict.Apply(vars)
-			if errors.Is(err, ErrNoMatchAllowed) {
+			if errors.Is(err, errNoMatchAllowed) {
 				// has an optional variable that didn't match, so we ignore it
 				continue
 			}
