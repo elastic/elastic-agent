@@ -75,6 +75,10 @@
   {{ printf "%s%s" $idx ".ssl.key" }} : |-
     {{- .ssl.key.value | nindent 4 }}
   {{- end }}
+  {{- if ne ( . | dig "ssl" "key_passphrase" "value" "not_found") "not_found"  }}
+  {{ printf "%s%s" $idx ".ssl.key_passphrase" }} : |-
+    {{- .ssl.key_passphrase.value | nindent 4 }}
+  {{- end }}
   {{- end }}
   {{- end }}
   {{- end }}

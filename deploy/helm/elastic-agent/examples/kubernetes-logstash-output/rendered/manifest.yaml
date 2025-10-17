@@ -73,12 +73,12 @@ stringData:
         bulk_max_size: 1600
         backoff.max: "30s"
         backoff.init: "1s"
-        allow_older_versions: false
-        ssl.certificate: /mnt/secrets/elastic-agent/cert-secret.cert
+        allow_older_versions: false  
         ssl.certificate_authorities:
-        - /mnt/secrets/elastic-agent/test.ssl.certificate_authorities.0
-        ssl.key: /mnt/secrets/elastic-agent/cert-secret.key
-        ssl.verification_mode: certificate
+          -  "/mnt/secrets/elastic-agent/test.ssl.certificate_authorities.0"
+        ssl.certificate: "/mnt/secrets/elastic-agent/cert-secret.cert"
+        ssl.key: "/mnt/secrets/elastic-agent/cert-secret.key"
+        ssl.verification_mode: "certificate"
     secret_references: []
     agent:
       monitoring:
@@ -355,12 +355,12 @@ stringData:
         bulk_max_size: 1600
         backoff.max: "30s"
         backoff.init: "1s"
-        allow_older_versions: false
-        ssl.certificate: /mnt/secrets/elastic-agent/cert-secret.cert
+        allow_older_versions: false  
         ssl.certificate_authorities:
-        - /mnt/secrets/elastic-agent/test.ssl.certificate_authorities.0
-        ssl.key: /mnt/secrets/elastic-agent/cert-secret.key
-        ssl.verification_mode: certificate
+          -  "/mnt/secrets/elastic-agent/test.ssl.certificate_authorities.0"
+        ssl.certificate: "/mnt/secrets/elastic-agent/cert-secret.cert"
+        ssl.key: "/mnt/secrets/elastic-agent/cert-secret.key"
+        ssl.verification_mode: "certificate"
     secret_references: []
     agent:
       monitoring:
@@ -1002,7 +1002,7 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: 04a734259ed7703bf634cca18a83a7992080c0209e0e4fa0f64c79c98bf79af8
+        checksum/config: 58b5f6536359da3117624c879848e4f04a8246dc8b693eb644f26fe04f8614ae
     spec:
       automountServiceAccountToken: true
       containers:
@@ -1205,7 +1205,7 @@ spec:
       labels:
         name: agent-clusterwide-example
       annotations:
-        checksum/config: c7f13fc8f5ea6200ee7c56540f5297b25d10d86abd768b4462f00aadb49cc734
+        checksum/config: cd4b7ec10e39d622959c2eedafe1b354cd081121e0d132c0fe874f0d086e6804
     spec:
       automountServiceAccountToken: true
       containers:

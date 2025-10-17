@@ -1021,6 +1021,11 @@
         "SSLConfigClient": {
             "type": "object",
             "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Enables or disables the SSL configuration.",
+                    "examples": [true, false]
+                },
                 "certificateAuthorities": {
                     "type": "array",
                     "items": {
@@ -1038,6 +1043,20 @@
                     "$ref": "#/definitions/ValueFrom",
                     "description": "The key for mtls verifications(Logstash Only)."
                 },
+                "key_passphrase": {
+                    "type": "object",
+                    "$ref": "#/definitions/ValueFrom",
+                    "description": "The key passphrase for mtls verifications(Logstash Only)."
+                },
+                "renegotiation": {
+                    "type": "string",
+                    "description": "Configures the type of TLS renegotiation to support.",
+                    "enum": [
+                      "never",
+                      "once",
+                      "freely"
+                  ]
+                },
                 "verificationMode": {
                     "type": "string",
                     "description": "Controls the verification of server certificates.",
@@ -1048,6 +1067,34 @@
                       "certificate",
                       "none"
                   ]
+                },
+                "client_authentication": {
+                    "type": "string",
+                    "description": "Configures client authentication.",
+                    "enum": [
+                      "none",
+                      "optional",
+                      "required"
+                  ]
+                },
+                "cipher_suites": {
+                    "type": "array",
+                    "description": "The list of cipher suites to use. The first entry has the highest priority. If this option is omitted, the Go crypto library’s default suites are used (recommended). Note that TLS 1.3 cipher suites are not individually configurable in Go, so they are not included in this list.",
+                    "examples": [["ECDHE-ECDSA-AES-128-CBC-SHA", "ECDHE-ECDSA-AES-256-CBC-SHA"]]
+                },
+                "curve_types": {
+                    "type": "array",
+                    "description": "The list of curve types for ECDHE (Elliptic Curve Diffie-Hellman ephemeral key exchange).",
+                    "examples": [["P-256", "P-384"]]
+                },
+                "supported_protocols": {
+                    "type": "array",
+                    "description": "List of allowed SSL/TLS versions. If the SSL/TLS server supports none of the specified versions, the connection will be dropped during or after the handshake. The list of allowed protocol versions include: TLSv1.1, TLSv1.2, and TLSv1.3.",
+                    "examples": [["TLSv1.2", "TLSv1.3"]]
+                },
+                "ca_sha256": {
+                    "type": "string",
+                    "description": "This configures a certificate pin that you can use to ensure that a specific certificate is part of the verified chain."
                 },
                 "caTrustedFingerprint": {
                     "type": "string",
