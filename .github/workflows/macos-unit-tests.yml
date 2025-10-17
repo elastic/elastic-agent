@@ -26,7 +26,7 @@ jobs:
       matrix:
         include:
           - os: macos-14
-            flags: ''
+            flags: 'RACE_DETECTOR=true TEST_COVERAGE=true '
           - os: macos-15
             flags: 'RACE_DETECTOR=true TEST_COVERAGE=true '
     runs-on: ${{ matrix.os }}
