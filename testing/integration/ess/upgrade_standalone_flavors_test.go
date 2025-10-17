@@ -30,6 +30,10 @@ func TestStandaloneUpgrade_Flavor_Basic(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
 	minVersion := upgradetest.Version_9_0_0_SNAPSHOT
 	currentVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
@@ -88,6 +92,10 @@ func TestStandaloneUpgrade_Flavor_Servers(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
 	minVersion := upgradetest.Version_9_0_0_SNAPSHOT
 	currentVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
@@ -144,6 +152,10 @@ func TestStandaloneUpgrade_Flavor_UpgradeFromUnflavored(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
+
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
 
 	minVersion := upgradetest.Version_9_0_0_SNAPSHOT
 	currentVersion, err := version.ParseVersion(define.Version())
