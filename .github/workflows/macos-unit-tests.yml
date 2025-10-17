@@ -2,7 +2,8 @@ name: macos-unit-tests
 
 on:
   workflow_dispatch:
-  pull_request:
+  # Temporary disabled for PRs
+  # pull_request:
   push:
     branches:
       - main
