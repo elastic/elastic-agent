@@ -7,6 +7,7 @@ package transpiler
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/cespare/xxhash/v2"
 )
@@ -84,11 +85,17 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 	}
 
 	// check if any inputs had ErrNoMatch but were never successfully applied
+	var errStrs []string
 	var err error
 	for inputIdx, inputErr := range inputNoMatchErr {
 		if !inputApplied[inputIdx] {
-			// not applied (add to err, so all non-matches are included in the error)
-			err = errors.Join(err, inputErr)
+			// not applied
+			// only add unique errors that way the same variable is not repeated
+			// multiple times cause the error message to be un-readable.
+			if !slices.Contains(errStrs, inputErr.Error()) {
+				errStrs = append(errStrs, inputErr.Error())
+				err = errors.Join(err, inputErr)
+			}
 		}
 	}
 	if err != nil {
