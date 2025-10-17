@@ -411,3 +411,61 @@ func translateEsOutputToExporter(cfg *config.C) (map[string]any, error) {
 	esConfig["mapping"] = map[string]any{"mode": "bodymap"}
 	return esConfig, nil
 }
+<<<<<<< HEAD:internal/pkg/otel/configtranslate/otelconfig.go
+=======
+
+func BeatDataPath(componentId string) string {
+	return filepath.Join(paths.Run(), componentId)
+}
+
+// getBeatsAuthExtensionConfig sets http transport settings on beatsauth
+// currently this is only supported for elasticsearch output
+func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
+	defaultTransportSettings := elasticsearch.ESDefaultTransportSettings()
+
+	var resultMap map[string]any
+	if err := outputCfg.Unpack(&resultMap); err != nil {
+		return nil, err
+	}
+
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result:          &defaultTransportSettings,
+		TagName:         "config",
+		SquashTagOption: "inline",
+		DecodeHook:      cfgDecodeHookFunc(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if err = decoder.Decode(&resultMap); err != nil {
+		return nil, err
+	}
+
+	newConfig, err := config.NewConfigFrom(defaultTransportSettings)
+	if err != nil {
+		return nil, err
+	}
+
+	// proxy_url on newConfig is of type url.URL. Beatsauth extension expects it to be of string type instead
+	// this logic here converts url.URL to string type similar to what a user would set on filebeat config
+	if defaultTransportSettings.Proxy.URL != nil {
+		err = newConfig.SetString("proxy_url", -1, defaultTransportSettings.Proxy.URL.String())
+		if err != nil {
+			return nil, fmt.Errorf("error settingg proxy url:%w ", err)
+		}
+	}
+
+	var newMap map[string]any
+	err = newConfig.Unpack(&newMap)
+	if err != nil {
+		return nil, err
+	}
+
+	// required to make the extension not cause the collector to fail and exit
+	// on startup
+	newMap["continue_on_error"] = true
+
+	return newMap, nil
+}
+>>>>>>> 0e533344c (Support proxy_url on otel translation logic (#10454)):internal/pkg/otel/translate/otelconfig.go
