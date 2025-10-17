@@ -26,7 +26,10 @@ jobs:
       matrix:
         include:
           - os: macos-14
-            flags: 'RACE_DETECTOR=true TEST_COVERAGE=true '
+            # On macOS 14 running unit tests with `RACE_DETECTOR=true TEST_COVERAGE=true` causes failure:
+            # `clang: error: linker command failed with exit code 1`
+            # Related issue: https://github.com/elastic/elastic-agent/issues/10572
+            flags: ''
           - os: macos-15
             flags: 'RACE_DETECTOR=true TEST_COVERAGE=true '
     runs-on: ${{ matrix.os }}
@@ -34,6 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
+          # pkg/testing/tools/git TestGetReleaseBranches test require full git history
           fetch-depth: 0
 
       - uses: actions/setup-go@v6
