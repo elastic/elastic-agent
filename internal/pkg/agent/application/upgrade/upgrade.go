@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/otiai10/copy"
+	filecopy "github.com/otiai10/copy"
 	"go.elastic.co/apm/v2"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
@@ -43,8 +43,8 @@ import (
 )
 
 const (
-	agentName          = "elastic-agent"
-	hashLen            = 6
+	AgentName          = "elastic-agent"
+	HashLen            = 6
 	agentCommitFile    = ".elastic-agent.active.commit"
 	runDirMod          = 0770
 	snapshotSuffix     = "-SNAPSHOT"
@@ -54,8 +54,8 @@ const (
 
 var agentArtifact = artifact.Artifact{
 	Name:     "Elastic Agent",
-	Cmd:      agentName,
-	Artifact: "beats/" + agentName,
+	Cmd:      AgentName,
+	Artifact: "beats/" + AgentName,
 }
 
 var (
@@ -66,9 +66,9 @@ var (
 	ErrNilUpdateMarker      = errors.New("loaded a nil update marker")
 	ErrEmptyRollbackVersion = errors.New("rollback version is empty")
 	ErrNoRollbacksAvailable = errors.New("no rollbacks available")
-
-	// Version_9_2_0_SNAPSHOT is the minimum version for manual rollback and rollback reason
-	Version_9_2_0_SNAPSHOT = agtversion.NewParsedSemVer(9, 2, 0, "SNAPSHOT", "")
+	ErrAgentInstallNotFound = errors.New("agent install descriptor not found")
+	// Version_9_3_0_SNAPSHOT is the minimum version for manual rollback and rollback reason
+	Version_9_3_0_SNAPSHOT = agtversion.NewParsedSemVer(9, 3, 0, "SNAPSHOT", "")
 )
 
 func init() {
@@ -89,8 +89,8 @@ type unpackHandler interface {
 // Types used to abstract copyActionStore, copyRunDirectory and github.com/otiai10/copy.Copy
 type copyActionStoreFunc func(log *logger.Logger, newHome string) error
 type copyRunDirectoryFunc func(log *logger.Logger, oldRunPath, newRunPath string) error
-type fileDirCopyFunc func(from, to string, opts ...copy.Options) error
-type markUpgradeFunc func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, rollbackWindow time.Duration) error
+type fileDirCopyFunc func(from, to string, opts ...filecopy.Options) error
+type markUpgradeFunc func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]TTLMarker) error
 type changeSymlinkFunc func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error
 type rollbackInstallFunc func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error
 
@@ -116,16 +116,22 @@ type WatcherHelper interface {
 	TakeOverWatcher(ctx context.Context, log *logger.Logger, topDir string) (*filelock.AppLocker, error)
 }
 
+type availableRollbacksSource interface {
+	Set(map[string]TTLMarker) error
+	Get() (map[string]TTLMarker, error)
+}
+
 // Upgrader performs an upgrade
 type Upgrader struct {
-	log             *logger.Logger
-	settings        *artifact.Config
-	upgradeSettings *configuration.UpgradeConfig
-	agentInfo       info.Agent
-	upgradeable     bool
-	fleetServerURI  string
-	markerWatcher   MarkerWatcher
-	watcherHelper   WatcherHelper
+	log                      *logger.Logger
+	settings                 *artifact.Config
+	upgradeSettings          *configuration.UpgradeConfig
+	agentInfo                info.Agent
+	upgradeable              bool
+	fleetServerURI           string
+	markerWatcher            MarkerWatcher
+	watcherHelper            WatcherHelper
+	availableRollbacksSource availableRollbacksSource
 
 	// The following are abstractions for testability
 	artifactDownloader   artifactDownloadHandler
@@ -147,24 +153,25 @@ func IsUpgradeable() bool {
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
-func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *configuration.UpgradeConfig, agentInfo info.Agent, watcherHelper WatcherHelper) (*Upgrader, error) {
+func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *configuration.UpgradeConfig, agentInfo info.Agent, watcherHelper WatcherHelper, ars availableRollbacksSource) (*Upgrader, error) {
 	return &Upgrader{
-		log:                  log,
-		settings:             settings,
-		upgradeSettings:      upgradeConfig,
-		agentInfo:            agentInfo,
-		upgradeable:          IsUpgradeable(),
-		markerWatcher:        newMarkerFileWatcher(markerFilePath(paths.Data()), log),
-		watcherHelper:        watcherHelper,
-		artifactDownloader:   newArtifactDownloader(settings, log),
-		unpacker:             newUnpacker(log),
-		isDiskSpaceErrorFunc: upgradeErrors.IsDiskSpaceError,
-		extractAgentVersion:  extractAgentVersion,
-		copyActionStore:      copyActionStoreProvider(os.ReadFile, os.WriteFile),
-		copyRunDirectory:     copyRunDirectoryProvider(os.MkdirAll, copy.Copy),
-		markUpgrade:          markUpgradeProvider(UpdateActiveCommit, os.WriteFile),
-		changeSymlink:        changeSymlink,
-		rollbackInstall:      rollbackInstall,
+		log:                      log,
+		settings:                 settings,
+		upgradeSettings:          upgradeConfig,
+		agentInfo:                agentInfo,
+		upgradeable:              IsUpgradeable(),
+		markerWatcher:            newMarkerFileWatcher(markerFilePath(paths.Data()), log),
+		watcherHelper:            watcherHelper,
+		availableRollbacksSource: ars,
+		artifactDownloader:       newArtifactDownloader(settings, log),
+		unpacker:                 newUnpacker(log),
+		isDiskSpaceErrorFunc:     upgradeErrors.IsDiskSpaceError,
+		extractAgentVersion:      extractAgentVersion,
+		copyActionStore:          copyActionStoreProvider(os.ReadFile, os.WriteFile),
+		copyRunDirectory:         copyRunDirectoryProvider(os.MkdirAll, filecopy.Copy),
+		markUpgrade:              markUpgradeProvider(UpdateActiveCommit, os.WriteFile),
+		changeSymlink:            changeSymlink,
+		rollbackInstall:          rollbackInstall,
 	}, nil
 }
 
@@ -400,6 +407,11 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, err
 	}
 
+	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
+	if err != nil {
+		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
+	}
+
 	newHash := unpackRes.Hash
 	if newHash == "" {
 		return nil, errors.New("unknown hash")
@@ -421,20 +433,20 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	// create symlink to the <new versioned-home>/elastic-agent
 	hashedDir := unpackRes.VersionedHome
 
-	symlinkPath := filepath.Join(paths.Top(), agentName)
+	symlinkPath := filepath.Join(paths.Top(), AgentName)
 
 	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
-	newPath := paths.BinaryPath(filepath.Join(paths.Top(), hashedDir), agentName)
-
-	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
-	if err != nil {
-		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
-	}
+	newPath := paths.BinaryPath(filepath.Join(paths.Top(), hashedDir), AgentName)
 
 	if err := u.changeSymlink(u.log, paths.Top(), symlinkPath, newPath); err != nil {
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
 		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
 		return nil, goerrors.Join(err, rollbackErr)
+	}
+
+	rollbackWindow := disableRollbackWindow
+	if u.upgradeSettings != nil && u.upgradeSettings.Rollback != nil {
+		rollbackWindow = u.upgradeSettings.Rollback.Window
 	}
 
 	// We rotated the symlink successfully: prepare the current and previous agent installation details for the update marker
@@ -455,19 +467,22 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		hash:          release.Commit(),
 		versionedHome: currentVersionedHome,
 	}
-	rollbackWindow := time.Duration(0)
-	if u.upgradeSettings != nil && u.upgradeSettings.Rollback != nil {
-		rollbackWindow = u.upgradeSettings.Rollback.Window
-	}
+
+	availableRollbacks := getAvailableRollbacks(rollbackWindow, time.Now(), release.VersionWithSnapshot(), previousParsedVersion, currentVersionedHome, release.Commit())
+
 	if err := u.markUpgrade(u.log,
 		paths.Data(), // data dir to place the marker in
 		time.Now(),
 		current,  // new agent version data
 		previous, // old agent version data
-		action, det, rollbackWindow); err != nil {
+		action, det, availableRollbacks); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
 		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
 		return nil, goerrors.Join(err, rollbackErr)
+	}
+
+	if err = u.availableRollbacksSource.Set(availableRollbacks); err != nil {
+		u.log.Warnw("Setting rollback targets failed. Manual rollback may not be available beyond grace period", "error.message", err)
 	}
 
 	watcherExecutable := u.watcherHelper.SelectWatcherExecutable(paths.Top(), previous, current)
@@ -496,123 +511,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	}
 
 	return cb, nil
-}
-
-func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string, now time.Time, version string, action *fleetapi.ActionUpgrade) (reexec.ShutdownCallbackFn, error) {
-	if version == "" {
-		return nil, ErrEmptyRollbackVersion
-	}
-
-	// check that the upgrade marker exists and is accessible
-	updateMarkerPath := markerFilePath(paths.DataFrom(topDir))
-	_, err := os.Stat(updateMarkerPath)
-	if err != nil {
-		return nil, fmt.Errorf("stat() on upgrade marker %q failed: %w", updateMarkerPath, err)
-	}
-
-	// read the upgrade marker
-	updateMarker, err := LoadMarker(paths.DataFrom(topDir))
-	if err != nil {
-		return nil, fmt.Errorf("loading marker: %w", err)
-	}
-
-	if updateMarker == nil {
-		return nil, ErrNilUpdateMarker
-	}
-
-	// extract the agent installs involved in the upgrade and select the most appropriate watcher executable
-	previous, current, err := extractAgentInstallsFromMarker(updateMarker)
-	if err != nil {
-		return nil, fmt.Errorf("extracting current and previous install details: %w", err)
-	}
-	watcherExecutable := u.watcherHelper.SelectWatcherExecutable(topDir, previous, current)
-
-	err = withTakeOverWatcher(ctx, u.log, topDir, u.watcherHelper, func() error {
-		// read the upgrade marker
-		updateMarker, err = LoadMarker(paths.DataFrom(topDir))
-		if err != nil {
-			return fmt.Errorf("loading marker: %w", err)
-		}
-
-		if updateMarker == nil {
-			return ErrNilUpdateMarker
-		}
-
-		if len(updateMarker.RollbacksAvailable) == 0 {
-			return ErrNoRollbacksAvailable
-		}
-		var selectedRollback *RollbackAvailable
-		for _, rollback := range updateMarker.RollbacksAvailable {
-			if rollback.Version == version && now.Before(rollback.ValidUntil) {
-				selectedRollback = &rollback
-				break
-			}
-		}
-		if selectedRollback == nil {
-			return fmt.Errorf("version %q not listed among the available rollbacks: %w", version, ErrNoRollbacksAvailable)
-		}
-
-		// rollback
-		_, err = u.watcherHelper.InvokeWatcher(u.log, watcherExecutable, "watch", "--rollback", updateMarker.PrevVersionedHome)
-		if err != nil {
-			return fmt.Errorf("starting rollback command: %w", err)
-		}
-		u.log.Debug("rollback command started successfully, PID")
-		return nil
-	})
-
-	if err != nil {
-		// Invoke watcher again (now that we released the watcher applocks)
-		_, invokeWatcherErr := u.watcherHelper.InvokeWatcher(u.log, watcherExecutable)
-		if invokeWatcherErr != nil {
-			return nil, goerrors.Join(err, fmt.Errorf("invoking watcher: %w", invokeWatcherErr))
-		}
-		return nil, err
-	}
-
-	return nil, nil
-
-}
-
-func withTakeOverWatcher(ctx context.Context, log *logger.Logger, topDir string, watcherHelper WatcherHelper, f func() error) error {
-	watcherApplock, err := watcherHelper.TakeOverWatcher(ctx, log, topDir)
-	if err != nil {
-		return fmt.Errorf("taking over watcher processes: %w", err)
-	}
-	defer func(watcherApplock *filelock.AppLocker) {
-		releaseWatcherAppLockerErr := watcherApplock.Unlock()
-		if releaseWatcherAppLockerErr != nil {
-			log.Warnw("error releasing watcher applock", "error", releaseWatcherAppLockerErr)
-		}
-	}(watcherApplock)
-
-	return f()
-}
-
-func extractAgentInstallsFromMarker(updateMarker *UpdateMarker) (previous agentInstall, current agentInstall, err error) {
-	previousParsedVersion, err := agtversion.ParseVersion(updateMarker.PrevVersion)
-	if err != nil {
-		return previous, current, fmt.Errorf("parsing previous version %q: %w", updateMarker.PrevVersion, err)
-	}
-	previous = agentInstall{
-		parsedVersion: previousParsedVersion,
-		version:       updateMarker.PrevVersion,
-		hash:          updateMarker.PrevHash,
-		versionedHome: updateMarker.PrevVersionedHome,
-	}
-
-	currentParsedVersion, err := agtversion.ParseVersion(updateMarker.Version)
-	if err != nil {
-		return previous, current, fmt.Errorf("parsing current version %q: %w", updateMarker.Version, err)
-	}
-	current = agentInstall{
-		parsedVersion: currentParsedVersion,
-		version:       updateMarker.Version,
-		hash:          updateMarker.Hash,
-		versionedHome: updateMarker.VersionedHome,
-	}
-
-	return previous, current, nil
 }
 
 // Ack acks last upgrade action
@@ -693,8 +591,8 @@ func isSameVersion(log *logger.Logger, current agentVersion, newVersion agentVer
 }
 
 func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {
-	oldAgentPath := paths.BinaryPath(filepath.Join(topDirPath, oldVersionedHome), agentName)
-	err := changeSymlink(log, topDirPath, filepath.Join(topDirPath, agentName), oldAgentPath)
+	oldAgentPath := paths.BinaryPath(filepath.Join(topDirPath, oldVersionedHome), AgentName)
+	err := changeSymlink(log, topDirPath, filepath.Join(topDirPath, AgentName), oldAgentPath)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("rolling back install: restoring symlink to %q failed: %w", oldAgentPath, err)
 	}
@@ -783,7 +681,7 @@ func shutdownCallback(l *logger.Logger, homePath, prevVersion, newVersion, newHo
 			newRelPath = strings.ReplaceAll(newRelPath, oldHome, newHome)
 			newDir := filepath.Join(newHome, newRelPath)
 			l.Debugf("copying %q -> %q", processDir, newDir)
-			if err := copyDir(l, processDir, newDir, true, copy.Copy); err != nil {
+			if err := copyDir(l, processDir, newDir, true, filecopy.Copy); err != nil {
 				return err
 			}
 		}
@@ -855,9 +753,9 @@ func copyDir(l *logger.Logger, from, to string, ignoreErrs bool, fileDirCopy fil
 		copyConcurrency = runtime.NumCPU() * 4
 	}
 
-	return fileDirCopy(from, to, copy.Options{
-		OnSymlink: func(_ string) copy.SymlinkAction {
-			return copy.Shallow
+	return fileDirCopy(from, to, filecopy.Options{
+		OnSymlink: func(_ string) filecopy.SymlinkAction {
+			return filecopy.Shallow
 		},
 		Sync:         true,
 		OnError:      onErr,
