@@ -1258,13 +1258,14 @@ func setStrictMapping(client *elasticsearch.Client, index string) error {
 // re-ingest logs.
 //
 // Flow
-// 1) Create policy in Kibana with just monitoring and "process" runtime
-// 2) Install and Enroll
-// 3) restart agent, to roll log files
-// 4) Switch to monitoring "otel" runtime
-// 5) restart agent 3 times, making sure healthy between restarts
-// 6) query ES for monitoring logs with aggregation on fingerprint and line number, ideally 0 duplicates but possible to have a small number
-// 7) uninstall
+//  1. Create policy in Kibana with just monitoring and "process" runtime
+//  2. Install and Enroll
+//  3. Switch to monitoring "otel" runtime
+//  4. restart agent 3 times, making sure healthy between restarts
+//  5. switch back to "process" runtime
+//  6. query ES for monitoring logs with aggregation on fingerprint and line number,
+//     ideally 0 duplicates but possible to have a small number
+//  7. uninstall
 func TestMonitoringNoDuplicates(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: integration.Default,
@@ -1278,7 +1279,9 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 		Sudo:  true,
 	})
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t,
+		context.Background(),
+		time.Now().Add(5*time.Minute))
 	t.Cleanup(cancel)
 
 	policyName := fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String())
@@ -1301,9 +1304,10 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 	policyResponse, err := info.KibanaClient.CreatePolicy(ctx, createPolicyReq)
 	require.NoError(t, err, "error creating policy")
 
-	enrollmentToken, err := info.KibanaClient.CreateEnrollmentAPIKey(ctx, kibana.CreateEnrollmentAPIKeyRequest{
-		PolicyID: policyResponse.ID,
-	})
+	enrollmentToken, err := info.KibanaClient.CreateEnrollmentAPIKey(ctx,
+		kibana.CreateEnrollmentAPIKeyRequest{
+			PolicyID: policyResponse.ID,
+		})
 
 	fut, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
@@ -1329,7 +1333,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 	// store timestamp to filter duplicate docs with timestamp greater than this value
 	installTimestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
-	healthcheck := func(ctx context.Context, message string, runtime component.RuntimeManager, componentCount int, timestamp string) {
+	healthCheck := func(ctx context.Context, message string, runtime component.RuntimeManager, componentCount int, timestamp string) {
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
 			var statusErr error
 			status, statusErr := fut.ExecStatus(ctx)
@@ -1366,7 +1370,11 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 	}
 
 	// make sure running and logs are making it to ES
-	healthcheck(ctx, "control checkin v2 protocol has chunking enabled", component.ProcessRuntimeManager, 3, installTimestamp)
+	healthCheck(ctx,
+		"control checkin v2 protocol has chunking enabled",
+		component.ProcessRuntimeManager,
+		3,
+		installTimestamp)
 
 	// Switch to otel monitoring
 	otelMonUpdateReq := kibana.AgentPolicyUpdateRequest{
@@ -1388,22 +1396,66 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 	otelTimestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
 	// wait until policy is applied
-	require.Eventually(t, func() bool {
-		inspectOutput, err := fut.ExecInspect(ctx)
-		require.NoError(t, err)
-		return otelMonResp.Revision == inspectOutput.Revision
-	}, 3*time.Minute, 1*time.Second)
+	policyCheck := func(expectedRevision int) {
+		require.Eventually(t, func() bool {
+			inspectOutput, err := fut.ExecInspect(ctx)
+			require.NoError(t, err)
+			return expectedRevision == inspectOutput.Revision
+		}, 3*time.Minute, 1*time.Second)
+	}
+	policyCheck(otelMonResp.Revision)
 
 	// make sure running and logs are making it to ES
-	healthcheck(ctx, "Everything is ready. Begin running and processing data.", component.OtelRuntimeManager, 4, otelTimestamp)
+	healthCheck(ctx,
+		"Everything is ready. Begin running and processing data.",
+		component.OtelRuntimeManager,
+		4,
+		otelTimestamp)
 
 	// restart 3 times, checks path definition is stable
 	for range 3 {
 		restartTimestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 		restartBytes, err := fut.Exec(ctx, []string{"restart"})
-		require.NoErrorf(t, err, "Restart error: %s, output was: %s", err, string(restartBytes))
-		healthcheck(ctx, "Everything is ready. Begin running and processing data.", component.OtelRuntimeManager, 4, restartTimestamp)
+		require.NoErrorf(t,
+			err,
+			"Restart error: %s, output was: %s",
+			err,
+			string(restartBytes))
+		healthCheck(ctx,
+			"Everything is ready. Begin running and processing data.",
+			component.OtelRuntimeManager,
+			4,
+			restartTimestamp)
 	}
+
+	// Switch back to process monitoring
+	processMonUpdateReq := kibana.AgentPolicyUpdateRequest{
+		Name:      policyName,
+		Namespace: info.Namespace,
+		Overrides: map[string]any{
+			"agent": map[string]any{
+				"monitoring": map[string]any{
+					"_runtime_experimental": "process",
+				},
+			},
+		},
+	}
+
+	processMonResp, err := info.KibanaClient.UpdatePolicy(ctx,
+		policyResponse.ID, processMonUpdateReq)
+	require.NoError(t, err)
+
+	processTimestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+
+	// wait until policy is applied
+	policyCheck(processMonResp.Revision)
+
+	// make sure running and logs are making it to ES
+	healthCheck(ctx,
+		"control checkin v2 protocol has chunking enabled",
+		component.ProcessRuntimeManager,
+		3,
+		processTimestamp)
 
 	// duplicate check
 	rawQuery := map[string]any{
@@ -1474,6 +1526,8 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 	require.Truef(t, ok, "'total' wasn't a map[string]any, result was %s", string(resultBuf))
 	value, ok := total["value"].(float64)
 	require.Truef(t, ok, "'total' wasn't an int, result was %s", string(resultBuf))
+
+	require.Equalf(t, 0, len(buckets), "len(buckets): %d, hits.total.value: %d, result was %s", len(buckets), value, string(resultBuf))
 	require.True(t, float64(len(buckets)) < (value/10), "len(buckets): %d, hits.total.value: %d, result was %s", len(buckets), value, string(resultBuf))
 
 	// Uninstall
