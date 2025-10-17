@@ -23,10 +23,9 @@ import (
 const markerFilename = ".update-marker"
 const disableRollbackWindow = time.Duration(0)
 
-// RollbackAvailable identifies an elastic-agent install available for rollback
-type RollbackAvailable struct {
+// TTLMarker marks an elastic-agent install available for rollback
+type TTLMarker struct {
 	Version    string    `json:"version" yaml:"version"`
-	Home       string    `json:"home" yaml:"home"`
 	ValidUntil time.Time `json:"valid_until" yaml:"valid_until"`
 }
 
@@ -55,7 +54,7 @@ type UpdateMarker struct {
 
 	Details *details.Details `json:"details,omitempty" yaml:"details,omitempty"`
 
-	RollbacksAvailable []RollbackAvailable `json:"rollbacks_available,omitempty" yaml:"rollbacks_available,omitempty"`
+	RollbacksAvailable map[string]TTLMarker `json:"rollbacks_available,omitempty" yaml:"rollbacks_available,omitempty"`
 }
 
 // GetActionID returns the Fleet Action ID associated with the
@@ -112,7 +111,7 @@ type updateMarkerSerializer struct {
 	Acked              bool                 `yaml:"acked"`
 	Action             *MarkerActionUpgrade `yaml:"action"`
 	Details            *details.Details     `yaml:"details"`
-	RollbacksAvailable []RollbackAvailable  `yaml:"rollbacks_available,omitempty"`
+	RollbacksAvailable map[string]TTLMarker `yaml:"rollbacks_available,omitempty"`
 }
 
 func newMarkerSerializer(m *UpdateMarker) *updateMarkerSerializer {
@@ -142,35 +141,23 @@ type updateActiveCommitFunc func(log *logger.Logger, topDirPath, hash string, wr
 
 // markUpgrade marks update happened so we can handle grace period
 func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile writeFileFunc) markUpgradeFunc {
-	return func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, rollbackWindow time.Duration) error {
+	return func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]TTLMarker) error {
 
 		if len(previousAgent.hash) > hashLen {
 			previousAgent.hash = previousAgent.hash[:hashLen]
 		}
 
 		marker := &UpdateMarker{
-			Version:           agent.version,
-			Hash:              agent.hash,
-			VersionedHome:     agent.versionedHome,
-			UpdatedOn:         updatedOn,
-			PrevVersion:       previousAgent.version,
-			PrevHash:          previousAgent.hash,
-			PrevVersionedHome: previousAgent.versionedHome,
-			Action:            action,
-			Details:           upgradeDetails,
-		}
-
-		if rollbackWindow > disableRollbackWindow && agent.parsedVersion != nil && !agent.parsedVersion.Less(*Version_9_2_0_SNAPSHOT) {
-			// if we have a not empty rollback window, write the prev version in the rollbacks_available field
-			// we also need to check the destination version because the manual rollback and delayed cleanup will be
-			// handled by that version of agent, so it needs to be recent enough
-			marker.RollbacksAvailable = []RollbackAvailable{
-				{
-					Version:    previousAgent.version,
-					Home:       previousAgent.versionedHome,
-					ValidUntil: updatedOn.Add(rollbackWindow),
-				},
-			}
+			Version:            agent.version,
+			Hash:               agent.hash,
+			VersionedHome:      agent.versionedHome,
+			UpdatedOn:          updatedOn,
+			PrevVersion:        previousAgent.version,
+			PrevHash:           previousAgent.hash,
+			PrevVersionedHome:  previousAgent.versionedHome,
+			Action:             action,
+			Details:            upgradeDetails,
+			RollbacksAvailable: availableRollbacks,
 		}
 
 		markerBytes, err := yaml.Marshal(newMarkerSerializer(marker))
