@@ -5,6 +5,7 @@
 package kubernetes
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -66,7 +67,7 @@ func (d *IntegrationTester) Test(dir string, mageTarget string, env map[string]s
 	manifestPath := filepath.Join(dir, "kubernetes.yml")
 	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
 		// defensive, as `Use` should cause this runner not to be used if no file.
-		return fmt.Errorf("no kubernetes.yml")
+		return errors.New("no kubernetes.yml")
 	}
 
 	kubeConfig := env["KUBECONFIG"]

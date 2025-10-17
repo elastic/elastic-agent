@@ -5,6 +5,7 @@
 package cmd
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"strings"
@@ -58,7 +59,7 @@ func getConfigFiles(cmd *cobra.Command, useDefault bool) ([]string, error) {
 
 	if len(configFiles) == 0 {
 		if !useDefault {
-			return nil, fmt.Errorf("at least one config flag must be provided")
+			return nil, errors.New("at least one config flag must be provided")
 		}
 		configFiles = append(configFiles, paths.OtelConfigFile())
 	}

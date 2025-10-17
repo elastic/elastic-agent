@@ -6,6 +6,7 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -42,11 +43,11 @@ func GetUninstallToken(ctx context.Context, kibClient *kibana.Client, policyId s
 		return "", fmt.Errorf("failed to fetch uninstall tokens: %w", err)
 	}
 	if len(resp.Items) == 0 {
-		return "", fmt.Errorf("expected non-zero number of tokens")
+		return "", errors.New("expected non-zero number of tokens")
 	}
 
 	if len(resp.Items[0].Token) == 0 {
-		return "", fmt.Errorf("expected non-empty token")
+		return "", errors.New("expected non-empty token")
 	}
 
 	return resp.Items[0].Token, nil

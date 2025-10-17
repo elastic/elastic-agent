@@ -6,7 +6,7 @@ package cmd
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"os"
 	"syscall"
 	"testing"
@@ -46,7 +46,7 @@ func Test_watchLoop(t *testing.T) {
 		signals := make(chan os.Signal, 1)
 		errChan := make(chan error, 1)
 		graceTimer := make(chan time.Time, 1)
-		agentWatcherError := fmt.Errorf("some error")
+		agentWatcherError := errors.New("some error")
 		errChan <- agentWatcherError
 		err := watchLoop(t.Context(), log, signals, errChan, graceTimer)
 		require.ErrorIs(t, err, agentWatcherError)

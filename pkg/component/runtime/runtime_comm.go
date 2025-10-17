@@ -110,7 +110,7 @@ func (c *runtimeComm) WriteStartUpInfo(w io.Writer, services ...client.Service) 
 	srvs := make([]proto.ConnInfoServices, 0, len(services))
 	for _, srv := range services {
 		if srv == client.ServiceCheckin {
-			return fmt.Errorf("cannot provide access to v1 checkin service")
+			return errors.New("cannot provide access to v1 checkin service")
 		}
 		if srv == client.ServiceCheckinV2 {
 			hasV2 = true

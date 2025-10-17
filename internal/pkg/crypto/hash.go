@@ -51,7 +51,7 @@ func GeneratePBKDF2FromPassword(password []byte) ([]byte, error) {
 // ComparePBKDF2HashAndPassword verifies if the hashed password matches the provided plain password.
 func ComparePBKDF2HashAndPassword(hash []byte, password []byte) error {
 	if len(hash) != hashTotalLength {
-		return fmt.Errorf("hashedPassword is invalid")
+		return errors.New("hashedPassword is invalid")
 	}
 
 	// Read from hash

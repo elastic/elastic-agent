@@ -5,7 +5,7 @@
 package filelock
 
 import (
-	"fmt"
+	"errors"
 	"os"
 	"path/filepath"
 
@@ -13,7 +13,7 @@ import (
 )
 
 // ErrAppAlreadyRunning error returned when another elastic-agent is already holding the lock.
-var ErrAppAlreadyRunning = fmt.Errorf("another elastic-agent is already running")
+var ErrAppAlreadyRunning = errors.New("another elastic-agent is already running")
 
 // AppLocker locks the agent.lock file inside the provided directory.
 type AppLocker struct {

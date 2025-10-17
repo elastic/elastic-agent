@@ -446,7 +446,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						}
 
 						if !resp.EnrolledAt.Equal(enrolledAt) {
-							return fmt.Errorf("agent enrollment time is updated")
+							return errors.New("agent enrollment time is updated")
 						}
 						return nil
 					})(t, ctx, kCtx, namespace)
@@ -556,7 +556,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						}
 
 						if !resp.EnrolledAt.Equal(enrolledAt) {
-							return fmt.Errorf("agent enrollment time is updated")
+							return errors.New("agent enrollment time is updated")
 						}
 						return nil
 					})(t, ctx, kCtx, namespace)
@@ -624,7 +624,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 							return fmt.Errorf("agent with id %s not found in enrolledIDs", id)
 						}
 						if !resp.EnrolledAt.Equal(enrolledAt) {
-							return fmt.Errorf("agent enrollment time is updated")
+							return errors.New("agent enrollment time is updated")
 						}
 						return nil
 					})(t, ctx, kCtx, namespace)

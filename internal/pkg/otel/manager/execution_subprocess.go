@@ -137,7 +137,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 	if processInfo.Process == nil {
 		// this should not happen but just in case
 		procCtxCancel()
-		return nil, fmt.Errorf("failed to start supervised collector: process is nil")
+		return nil, errors.New("failed to start supervised collector: process is nil")
 	}
 
 	ctl := &procHandle{
