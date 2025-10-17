@@ -134,7 +134,7 @@ steps:
           - build/distributions/**
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "c2-standard-16"
           diskSizeGb: 200
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         plugins:
