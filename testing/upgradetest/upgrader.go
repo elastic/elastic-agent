@@ -485,9 +485,33 @@ func CheckHealthyAndVersion(ctx context.Context, f *atesting.Fixture, versionInf
 			return fmt.Errorf("commits don't match: got %s, want %s",
 				status.Info.Commit, versionInfo.Commit)
 		}
+		// we only check the health of the input here
+		// beats receivers have output health reporting, so the agent might be degraded if there's no ES running
+		if status.State == int(v2proto.State_HEALTHY) {
+			return nil
+		}
+		for _, compStatus := range status.Components {
+			if compStatus.State == int(v2proto.State_HEALTHY) {
+				continue
+			}
+			if compStatus.VersionInfo.Name == "beats-client-v2" { // beat process, output should always be healthy
+				return fmt.Errorf("component state %s is not healthy: got %s, want %s",
+					compStatus.ID, v2proto.State(compStatus.State).String(), v2proto.State_HEALTHY.String()) //nolint:gosec // G115 Conversion from int to uint32 is safe here.
+			}
+			// beat receiver, outputs are allowed to be unhealthy, but inputs should be healthy
+			for _, unitStatus := range compStatus.Units {
+				if unitStatus.State != int(v2proto.State_HEALTHY) {
+					if unitStatus.UnitType == int(v2proto.UnitType_INPUT) {
+						return fmt.Errorf("agent input %s state is not healthy: got %s", unitStatus.UnitID,
+							v2proto.State(status.State).String()) //nolint:gosec // G115 Conversion from int to uint32 is safe here.
+					}
+				}
+
+			}
+		}
 		if status.State != int(v2proto.State_HEALTHY) {
-			return fmt.Errorf("agent state is not healthy: got %d",
-				status.State)
+			return fmt.Errorf("agent state is not healthy: got %s, want %s",
+				v2proto.State(status.State).String(), v2proto.State_HEALTHY.String()) //nolint:gosec // G115 Conversion from int to uint32 is safe here.
 		}
 		return nil
 	}
