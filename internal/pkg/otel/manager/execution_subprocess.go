@@ -168,7 +168,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 			if err != nil {
 				switch {
 				case errors.Is(err, context.Canceled):
-					r.reportSubprocessCollectorStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStopped, nil))
+					r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
 					return
 				}
 			} else {
@@ -182,7 +182,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 
 			select {
 			case <-procCtx.Done():
-				r.reportSubprocessCollectorStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStopped, nil))
+				r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
 				return
 			case <-healthCheckPollTimer.C:
 				healthCheckPollTimer.Reset(healthCheckPollDuration)
@@ -225,6 +225,10 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 
 // cloneCollectorStatus creates a deep copy of the provided AggregateStatus.
 func cloneCollectorStatus(aStatus *status.AggregateStatus) *status.AggregateStatus {
+	if aStatus == nil {
+		return nil
+	}
+
 	st := &status.AggregateStatus{
 		Event: aStatus.Event,
 	}
