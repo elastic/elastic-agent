@@ -229,8 +229,13 @@ type VarsManager interface {
 type ComponentsModifier func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error)
 
 // managerShutdownTimeout is how long the coordinator will wait during shutdown
-// to receive termination states from its managers.
-const managerShutdownTimeout = time.Second * 5
+// to receive termination states from its managers. As the default stop timeout
+// for components spawned as subprocesses is 30 seconds (process.DefaultConfig()),
+// we need to wait a bit longer to ensure that all managers have had time to terminate.
+// Note: if this timeout doesn't accommodate for the subprocess stop timeout,
+// the Wait of subprocess might never be called, and we may end up with Zombie processes
+// during restart in Unix systemss.
+const managerShutdownTimeout = time.Second * 35
 
 type configReloader interface {
 	Reload(*config.Config) error

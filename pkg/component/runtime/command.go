@@ -433,9 +433,12 @@ func (c *commandRuntime) stop(ctx context.Context) error {
 			return
 		case <-t.C:
 			// kill no matter what (might already be stopped)
+			c.log.Debugf("timeout waiting for pid %d, killing it", c.proc.PID)
 			_ = info.Kill()
 		}
 	}(c.proc, cmdSpec.Timeouts.Stop)
+
+	c.log.Debugf("gracefully stopping pid %d", c.proc.PID)
 	return c.proc.Stop()
 }
 
@@ -452,6 +455,7 @@ func (c *commandRuntime) startWatcher(info *process.Info, comm Communicator) {
 
 		ch := info.Wait()
 		s := <-ch
+		c.log.Debugf("wait for pid %d returned", info.PID)
 		c.procCh <- procState{
 			proc:  info,
 			state: s,
