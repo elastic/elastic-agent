@@ -67,8 +67,9 @@ var (
 func TestOTelManager_Run(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	l, _ := loggertest.New("otel")
-	m := NewOTelManager(l)
+	base, _ := loggertest.New("otel")
+	l, _ := loggertest.New("otel-manager")
+	m := NewOTelManager(l, base)
 
 	var errMx sync.Mutex
 	var err error
@@ -188,8 +189,9 @@ func TestOTelManager_Run(t *testing.T) {
 func TestOTelManager_ConfigError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	l, _ := loggertest.New("otel")
-	m := NewOTelManager(l)
+	base, _ := loggertest.New("otel")
+	l, _ := loggertest.New("otel-manager")
+	m := NewOTelManager(l, base)
 
 	go func() {
 		err := m.Run(ctx)
@@ -238,6 +240,41 @@ outer:
 		}
 	}
 	assert.Error(t, err, "otel manager should have returned an error")
+}
+
+func TestOTelManager_Logging(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	base, obs := loggertest.New("otel")
+	l, _ := loggertest.New("otel-manager")
+	m := NewOTelManager(l, base)
+
+	go func() {
+		err := m.Run(ctx)
+		assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
+	}()
+
+	// watch is synchronous, so we need to read from it to avoid blocking the manager
+	go func() {
+		for {
+			select {
+			case <-m.Watch():
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	cfg := confmap.NewFromStringMap(testConfig)
+	m.Update(cfg)
+
+	// the collector should log to the base logger
+	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+		logs := obs.All()
+		require.NotEmpty(collect, logs, "Logs should not be empty")
+		firstMessage := logs[0].Message
+		assert.Equal(collect, firstMessage, "Setting up own telemetry...")
+	}, time.Second*10, time.Second)
 }
 
 func statusToYaml(s *status.AggregateStatus) string {
