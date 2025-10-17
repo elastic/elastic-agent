@@ -12,9 +12,10 @@ import (
 
 func Test_BuildArgs_ParseBuildTags(t *testing.T) {
 	tests := []struct {
-		name   string
-		input  []string
-		expect []string
+		name      string
+		input     []string
+		expect    []string
+		extraTags []string
 	}{{
 		name:   "no flags",
 		input:  nil,
@@ -47,12 +48,17 @@ func Test_BuildArgs_ParseBuildTags(t *testing.T) {
 		name:   "incorrectly formatted tag with valid tag",
 		input:  []string{"-tags= example", "-tags=test"},
 		expect: []string{"-tags=test"},
+	}, {
+		name:      "multiple build tags with other flags w/ extra tags prepended",
+		input:     []string{"-tags=example", "-tags=test", "-key=value", "-a"},
+		expect:    []string{"-key=value", "-a", "-tags=extra,example,test"},
+		extraTags: []string{"extra"},
 	}}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			args := BuildArgs{ExtraFlags: tc.input}
-			flags := args.ParseBuildTags()
+			flags := args.ParseBuildTags(tc.extraTags...)
 			assert.EqualValues(t, tc.expect, flags)
 		})
 	}

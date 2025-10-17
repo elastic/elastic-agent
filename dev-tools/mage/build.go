@@ -48,7 +48,7 @@ var buildTagRE = regexp.MustCompile(`-tags=([\S]+)?`)
 // It will return -someflag=val1 -tags=buildtag1,buildtag2
 func (b BuildArgs) ParseBuildTags(extraTags ...string) []string {
 	flags := make([]string, 0)
-	if len(b.ExtraFlags) == 0 || len(extraTags) == 0 {
+	if len(b.ExtraFlags) == 0 && len(extraTags) == 0 {
 		return flags
 	}
 
