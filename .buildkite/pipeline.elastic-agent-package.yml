@@ -120,6 +120,25 @@ steps:
               - false
               - true
 
+      - label: ":package: :windows: Package Windows Docker Container"
+        key: package_elastic-agent-windows-docker
+        depends_on: package_elastic-agent
+        agents:
+          provider: "gcp"
+          image: "family/elastic-workers-windows-2022"
+          machineType: "n2-standard-8"
+          diskSizeGb: 200
+        env:
+          PLATFORMS: "windows/amd64"
+          PACKAGES: "docker"
+        command: |
+          powershell -ExecutionPolicy Bypass -File .buildkite/scripts/steps/package-windows-docker.ps1
+        artifact_paths:
+          - "build/distributions/**/*"
+        plugins:
+          - elastic/vault-docker-login#v0.5.2:
+              secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+
   - label: ":elastic-stack: Publishing to DRA"
     if: build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == null || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") != "independent-agent-release-staging"
     key: dra-publish
