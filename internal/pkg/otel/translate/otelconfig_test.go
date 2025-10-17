@@ -12,13 +12,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
-
 	"go.opentelemetry.io/collector/confmap"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 
@@ -295,9 +294,10 @@ func TestGetOtelConfig(t *testing.T) {
 				"block_on_overflow": true,
 				"wait_for_result":   true,
 				"batch": map[string]any{
-					"max_size": 1600,
-					"min_size": 0,
-					"sizer":    "items",
+					"flush_timeout": "10s",
+					"max_size":      1600,
+					"min_size":      0,
+					"sizer":         "items",
 				},
 			},
 			"logs_dynamic_id": map[string]any{
@@ -308,10 +308,6 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 			"auth": map[string]any{
 				"authenticator": "beatsauth/_agent-component/" + outputName,
-			},
-			"tls": map[string]any{
-				"min_version": tlscommon.TLSVersionDefaultMin.Details().Version,
-				"max_version": tlscommon.TLSVersionDefaultMax.Details().Version,
 			},
 		}
 	}
@@ -436,8 +432,8 @@ func TestGetOtelConfig(t *testing.T) {
 				"enabled": true,
 				"host":    "localhost",
 			},
+			"management.otel.enabled": true,
 		}
-
 	}
 
 	getBeatMonitoringConfig := func(_, _ string) map[string]any {
@@ -772,6 +768,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"enabled": true,
 							"host":    "localhost",
 						},
+						"management.otel.enabled": true,
 					},
 				},
 				"service": map[string]any{
@@ -882,6 +879,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"enabled": true,
 							"host":    "localhost",
 						},
+						"management.otel.enabled": true,
 					},
 				},
 				"service": map[string]any{

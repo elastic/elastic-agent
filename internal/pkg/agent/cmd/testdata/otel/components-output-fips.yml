@@ -79,6 +79,11 @@ processors:
       logs: Undefined
       metrics: Undefined
       traces: Alpha
+  - name: elastictrace
+    stability:
+      logs: Undefined
+      metrics: Undefined
+      traces: Deprecated
   - name: filter
     stability:
       logs: Alpha

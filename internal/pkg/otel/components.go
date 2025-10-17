@@ -43,7 +43,8 @@ import (
 	"go.opentelemetry.io/collector/processor/batchprocessor"                                                    // for batching events
 	"go.opentelemetry.io/collector/processor/memorylimiterprocessor"
 
-	"github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor"
+	elasticapmprocessor "github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor"
+	elastictraceprocessor "github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor"
 
 	"github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor"
 
@@ -66,6 +67,8 @@ import (
 	pprofextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension"
 	filestorage "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage"
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
+
+	elasticdiagnostics "github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 
 	"github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension"
 	"github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension"
@@ -124,7 +127,8 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			elasticinframetricsprocessor.NewFactory(),
 			resourcedetectionprocessor.NewFactory(),
 			memorylimiterprocessor.NewFactory(),
-			elastictraceprocessor.NewFactory(),
+			elasticapmprocessor.NewFactory(),
+			elastictraceprocessor.NewFactory(), // deprecated, will be removed in future
 		)
 		if err != nil {
 			return otelcol.Factories{}, err
@@ -171,6 +175,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			apmconfigextension.NewFactory(),
 			beatsauthextension.NewFactory(),
 			headersetterextension.NewFactory(),
+			elasticdiagnostics.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)
 		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)
