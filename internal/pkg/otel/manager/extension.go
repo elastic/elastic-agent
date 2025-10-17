@@ -75,7 +75,7 @@ func NewAgentStatusFactory(statusCh chan *status.AggregateStatus) extension.Fact
 
 // Start implements the component.Component interface.
 func (as *AgentStatusExtension) Start(ctx context.Context, host component.Host) error {
-	as.telemetry.Logger.Debug("Starting agent status extension")
+	as.telemetry.Logger.Debug("Starting agent collectorStatus extension")
 	as.host = host
 	return nil
 }
@@ -104,7 +104,7 @@ func (as *AgentStatusExtension) ComponentStatusChanged(
 	source *componentstatus.InstanceID,
 	event *componentstatus.Event,
 ) {
-	// this extension is always force loaded and not by the user, so status
+	// this extension is always force loaded and not by the user, so collectorStatus
 	// information should be hidden as they didn't directly enable it
 	if source.ComponentID().String() == AgentStatusExtensionType.String() {
 		return

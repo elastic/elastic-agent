@@ -168,7 +168,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 			if err != nil {
 				switch {
 				case errors.Is(err, context.Canceled):
-					r.reportSubprocessCollectorStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStopped, nil))
+					r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
 					return
 				}
 			} else {

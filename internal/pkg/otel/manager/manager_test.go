@@ -138,7 +138,9 @@ func (e *mockExecution) startCollector(
 		stopCh: stopCh,
 		cancel: collectorCancel,
 	}
-	e.collectorStarted <- struct{}{}
+	if e.collectorStarted != nil {
+		e.collectorStarted <- struct{}{}
+	}
 	return handle, nil
 }
 
@@ -159,25 +161,35 @@ func (h *mockCollectorHandle) Stop(waitTime time.Duration) {
 
 // EventListener listens to the events from the OTelManager and stores the latest error and status.
 type EventListener struct {
-	mtx    sync.Mutex
-	err    *EventTime[error]
-	status *EventTime[*status.AggregateStatus]
+	mtx             sync.Mutex
+	err             *EventTime[error]
+	collectorStatus *EventTime[*status.AggregateStatus]
+	componentStates *EventTime[[]runtime.ComponentComponentState]
 }
 
 // Listen starts listening to the error and status channels. It updates the latest error and status in the
 // EventListener.
-func (e *EventListener) Listen(ctx context.Context, errorCh <-chan error, statusCh <-chan *status.AggregateStatus) {
+func (e *EventListener) Listen(
+	ctx context.Context,
+	errorCh <-chan error,
+	collectorStatusCh <-chan *status.AggregateStatus,
+	componentStateCh <-chan []runtime.ComponentComponentState,
+) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case c := <-statusCh:
+		case c := <-collectorStatusCh:
 			e.mtx.Lock()
-			e.status = &EventTime[*status.AggregateStatus]{val: c, time: time.Now()}
+			e.collectorStatus = &EventTime[*status.AggregateStatus]{val: c, time: time.Now()}
 			e.mtx.Unlock()
 		case c := <-errorCh:
 			e.mtx.Lock()
 			e.err = &EventTime[error]{val: c, time: time.Now()}
+			e.mtx.Unlock()
+		case componentStates := <-componentStateCh:
+			e.mtx.Lock()
+			e.componentStates = &EventTime[[]runtime.ComponentComponentState]{val: componentStates, time: time.Now()}
 			e.mtx.Unlock()
 		}
 	}
@@ -190,11 +202,11 @@ func (e *EventListener) getError() error {
 	return e.err.Value()
 }
 
-// getStatus retrieves the latest status from the EventListener.
-func (e *EventListener) getStatus() *status.AggregateStatus {
+// getCollectorStatus retrieves the latest collector status from the EventListener.
+func (e *EventListener) getCollectorStatus() *status.AggregateStatus {
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
-	return e.status.Value()
+	return e.collectorStatus.Value()
 }
 
 // EnsureHealthy ensures that the OTelManager is healthy by checking the latest error and status.
@@ -202,7 +214,7 @@ func (e *EventListener) EnsureHealthy(t *testing.T, u time.Time) {
 	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 		e.mtx.Lock()
 		latestErr := e.err
-		latestStatus := e.status
+		latestStatus := e.collectorStatus
 		e.mtx.Unlock()
 
 		// we expect to have a reported error which is nil and a reported status which is StatusOK
@@ -221,7 +233,7 @@ func (e *EventListener) EnsureOffWithoutError(t *testing.T, u time.Time) {
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		e.mtx.Lock()
 		latestErr := e.err
-		latestStatus := e.status
+		latestStatus := e.collectorStatus
 		e.mtx.Unlock()
 
 		// we expect to have a reported error which is nil and a reported status which is nil
@@ -239,7 +251,7 @@ func (e *EventListener) EnsureOffWithError(t *testing.T, u time.Time) {
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		e.mtx.Lock()
 		latestErr := e.err
-		latestStatus := e.status
+		latestStatus := e.collectorStatus
 		e.mtx.Unlock()
 
 		// we expect to have a reported error which is not nil and a reported status which is nil
@@ -409,7 +421,7 @@ func TestOTelManager_Run(t *testing.T) {
 				require.NotNil(t, execHandle, "execModeFn handle should not be nil")
 				execHandle.Stop(waitTimeForStop)
 				e.EnsureHealthy(t, updateTime)
-				assert.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getStatus()), "health check extension status count should be 0")
+				assert.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 0")
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
@@ -431,7 +443,7 @@ func TestOTelManager_Run(t *testing.T) {
 				updateTime := time.Now()
 				m.Update(cfg, nil)
 				e.EnsureHealthy(t, updateTime)
-				assert.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getStatus()), "health check extension status count should be 0")
+				assert.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 0")
 
 				var oldPHandle *procHandle
 				// repeatedly kill the collector
@@ -449,7 +461,7 @@ func TestOTelManager_Run(t *testing.T) {
 					// the collector should restart and report healthy
 					updateTime = time.Now()
 					e.EnsureHealthy(t, updateTime)
-					assert.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getStatus()), "health check extension status count should be 0")
+					assert.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 0")
 				}
 
 				seenRecoveredTimes := m.recoveryRetries.Load()
@@ -636,7 +648,7 @@ func TestOTelManager_Run(t *testing.T) {
 				m.Update(cfg, nil)
 				e.EnsureHealthy(t, updateTime)
 
-				assert.EqualValues(t, 1, countHealthCheckExtensionStatuses(e.getStatus()), "health check extension status count should be 1")
+				assert.EqualValues(t, 1, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 1")
 			},
 		},
 		{
@@ -752,7 +764,7 @@ func TestOTelManager_Run(t *testing.T) {
 					return
 				}
 				t.Logf("latest received err: %s", eListener.getError())
-				t.Logf("latest received status: %s", statusToYaml(eListener.getStatus()))
+				t.Logf("latest received status: %s", statusToYaml(eListener.getCollectorStatus()))
 				for _, entry := range obs.All() {
 					t.Logf("%+v", entry)
 				}
@@ -763,9 +775,9 @@ func TestOTelManager_Run(t *testing.T) {
 			go func() {
 				defer runWg.Done()
 				if !tc.skipListeningErrors {
-					eListener.Listen(ctx, m.Errors(), m.WatchCollector())
+					eListener.Listen(ctx, m.Errors(), m.WatchCollector(), m.WatchComponents())
 				} else {
-					eListener.Listen(ctx, nil, m.WatchCollector())
+					eListener.Listen(ctx, nil, m.WatchCollector(), m.WatchComponents())
 				}
 			}()
 
@@ -940,6 +952,7 @@ func TestOTelManager_Ports(t *testing.T) {
 					select {
 					case colErr := <-m.Errors():
 						require.NoError(t, colErr, "otel manager should not return errors")
+					case <-m.WatchComponents(): // ensure we receive component updates
 					case <-ctx.Done():
 						return
 					}
@@ -1053,6 +1066,17 @@ func TestOTelManager_PortConflict(t *testing.T) {
 	go func() {
 		err := m.Run(ctx)
 		assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
+	}()
+
+	go func() {
+		for {
+			select {
+			case <-m.Errors():
+			case <-m.WatchComponents(): // ensure we receive component updates
+			case <-ctx.Done():
+				return
+			}
+		}
 	}()
 
 	cfg := confmap.NewFromStringMap(testConfig)
@@ -1462,9 +1486,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	beatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
 	collectorStarted := make(chan struct{})
 
-	execution := &mockExecution{
-		collectorStarted: collectorStarted,
-	}
+	execution := &mockExecution{}
 
 	// Create manager with test dependencies
 	mgr := OTelManager{
@@ -1491,6 +1513,9 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		assert.ErrorIs(t, err, context.Canceled)
 	}()
 
+	eListener := &EventListener{}
+	eListener.Listen(ctx, mgr.Errors(), mgr.WatchCollector(), mgr.WatchComponents())
+
 	collectorCfg := confmap.NewFromStringMap(map[string]interface{}{
 		"receivers": map[string]interface{}{
 			"nop": map[string]interface{}{},
@@ -1510,17 +1535,13 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	components := []component.Component{testComp}
 
 	t.Run("collector config is passed down to the collector execution", func(t *testing.T) {
+		updateTime := time.Now()
 		mgr.Update(collectorCfg, nil)
-		select {
-		case <-collectorStarted:
-		case <-ctx.Done():
-			t.Fatal("timeout waiting for collector config update")
-		}
+		eListener.EnsureHealthy(t, updateTime)
 		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
 		assert.NoError(t, injectDiagnosticsExtension(expectedCfg))
 		assert.NoError(t, addCollectorMetricsReader(expectedCfg))
 		assert.Equal(t, expectedCfg, execution.cfg)
-
 	})
 
 	t.Run("collector status is passed up to the component manager", func(t *testing.T) {
@@ -1534,18 +1555,15 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		case execution.statusCh <- otelStatus:
 		}
 
-		collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
-		require.NoError(t, err)
-		assert.Equal(t, otelStatus, collectorStatus)
+		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+			assert.Equal(t, otelStatus, eListener.getCollectorStatus())
+		}, 10*time.Second, 1*time.Second)
 	})
 
 	t.Run("component config is passed down to the otel manager", func(t *testing.T) {
+		updateTime := time.Now()
 		mgr.Update(collectorCfg, components)
-		select {
-		case <-collectorStarted:
-		case <-ctx.Done():
-			t.Fatal("timeout waiting for collector config update")
-		}
+		eListener.EnsureHealthy(t, updateTime)
 		cfg := execution.cfg
 		require.NotNil(t, cfg)
 		receivers, err := cfg.Sub("receivers")
@@ -1553,10 +1571,6 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		require.NotNil(t, receivers)
 		assert.True(t, receivers.IsSet("nop"))
 		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test"))
-
-		collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
-		assert.Nil(t, err)
-		assert.Nil(t, collectorStatus)
 	})
 
 	t.Run("empty collector config leaves the component config running", func(t *testing.T) {
