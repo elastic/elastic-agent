@@ -134,7 +134,7 @@ steps:
           - build/distributions/**
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "c2-standard-16"
           diskSizeGb: 200
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         plugins:
@@ -191,11 +191,11 @@ steps:
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
   - label: "Triggering Integration tests"
-    depends_on:
-      - int-packaging
+#    depends_on:
+#      - int-packaging
     command: "buildkite-agent pipeline upload .buildkite/bk.integration.pipeline.yml"
 
   - label: "Triggering custom FIPS integration tests"
-    depends_on:
-      - int-packaging
+#    depends_on:
+#      - int-packaging
     command: "buildkite-agent pipeline upload .buildkite/bk.integration-fips.pipeline.yml"
