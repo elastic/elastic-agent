@@ -7,7 +7,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <windows.h>
+#if defined(__x86_64__)
 #include "elastic-agent-windows-amd64.h"
+#elif defined(__aarch64__)
+#include "elastic-agent-windows-arm64.h"
+#else
+#error "Unsupported architecture"
+#endif
 
 SERVICE_STATUS serviceStatus;
 SERVICE_STATUS_HANDLE serviceStatusHandle;
