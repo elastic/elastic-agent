@@ -13,6 +13,7 @@ changelog/fragments/
 /.buildkite @elastic/elastic-agent-control-plane @elastic/observablt-ci
 /.ci @elastic/elastic-agent-control-plane @elastic/observablt-ci
 /.ci/scripts/ecp-internal-release.sh @elastic/elastic-agent-control-plane
+/.ci/scripts/update-integration-testdata.sh @elastic/elastic-agent-control-plane
 /.ci/scripts/update-otel.sh @elastic/elastic-agent-control-plane
 /.github @elastic/elastic-agent-control-plane @elastic/observablt-ci
 /.github/CODEOWNERS @elastic/ingest-tech-lead
