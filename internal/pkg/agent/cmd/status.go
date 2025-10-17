@@ -47,7 +47,8 @@ func newStatusCommand(_ []string, streams *cli.IOStreams) *cobra.Command {
 				// the elastic-agent is not healthy. we don't want to write it again as it will dirty
 				// the output. os.Exit cannot be used os we need this to come all the way back up the
 				// call stack.
-				if errors.As(err, &ExitCodeError{}) {
+				var exitCodeErr *ExitCodeError
+				if errors.As(err, &exitCodeErr) {
 					return err
 				}
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
