@@ -15,7 +15,7 @@ components:
 
   filelogreceiver:
     doc_path: "/reference/edot-collector/components/filelogreceiver.md"
-    title: "Filelog receiver"
+    title: "File log receiver"
 
   apikeyauthextension:
     doc_path: "/reference/edot-collector/config/authentication-methods.md"
