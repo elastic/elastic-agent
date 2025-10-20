@@ -38,3 +38,7 @@ sudo ./otelcol --config otel.yml
 ```
 
 For specific configuration, refer to the [Quickstart guides](docs-content://solutions/observability/get-started/opentelemetry/quickstart/index.md) or refer to [Configuration](/reference/edot-collector/config/index.md).
+
+:::{tip}
+To download a specific version of the EDOT Collector, replace {{version.edot_collector}} with the version you want to download.
+:::

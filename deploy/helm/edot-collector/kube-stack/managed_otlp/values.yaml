@@ -17,7 +17,7 @@ crds:
 defaultCRConfig:
   image:
     repository: "docker.elastic.co/elastic-agent/elastic-agent"
-    tag: "9.2.0"
+    tag: "9.3.0"
   targetAllocator:
     enabled: false # Enable/disable the Operator's Target allocator.
     # Refer to: https://github.com/open-telemetry/opentelemetry-operator/tree/main/cmd/otel-allocator
@@ -26,6 +26,10 @@ clusterRole:
     - apiGroups: [""]
       resources: ["configmaps"]
       verbs: ["get"]
+    # Required by the k8s_events receiver
+    - apiGroups: [""]
+      resources: ["events"]
+      verbs: ["get", "list", "watch"]
 # `clusterName` specifies the name of the Kubernetes cluster. It sets the 'k8s.cluster.name' field.
 # Cluster Name is automatically detected for EKS/GKE/AKS. Add the below value in environments where cluster name cannot be detected.
 # clusterName: myClusterName
@@ -73,22 +77,6 @@ collectors:
             resource_attributes:
               k8s.cluster.name:
                 enabled: true
-        # [Resource Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourceprocessor)
-        resource/k8s: # Resource attributes tailored for services within Kubernetes.
-          attributes:
-            - key: service.name # Set the service.name resource attribute based on the well-known app.kubernetes.io/name label
-              from_attribute: app.label.name
-              action: insert
-            - key: service.name # Set the service.name resource attribute based on the k8s.container.name attribute
-              from_attribute: k8s.container.name
-              action: insert
-            - key: app.label.name # Delete app.label.name attribute previously used for service.name
-              action: delete
-            - key: service.version # Set the service.version resource attribute based on the well-known app.kubernetes.io/version label
-              from_attribute: app.label.version
-              action: insert
-            - key: app.label.version # Delete app.label.version attribute previously used for service.version
-              action: delete
         resource/hostname:
           attributes:
             - key: host.name
@@ -121,15 +109,14 @@ collectors:
               - "k8s.pod.ip"
               - "k8s.pod.uid"
               - "k8s.pod.start_time"
-            labels:
-              - tag_name: app.label.name
-                key: app.kubernetes.io/name
-                from: pod
-              - tag_name: app.label.version
-                key: app.kubernetes.io/version
-                from: pod
+              # Service attributes added based on https://opentelemetry.io/docs/specs/semconv/non-normative/k8s-attributes/#service-attributes
+              - "service.name"
+              - "service.version"
       receivers:
+        # [K8s Events Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8seventsreceiver)
+        k8s_events:
         # [K8s Objects Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sobjectsreceiver)
+        # NOTE: The k8sobjects receiver for K8s Events collection is being replaced by the k8s_events receiver, it might be removed in future versions of this configuration
         k8sobjects:
           objects:
             - name: events
@@ -139,6 +126,7 @@ collectors:
                 - "DELETED"
         # [K8s Cluster Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sclusterreceiver)
         k8s_cluster:
+          collection_interval: 60s
           auth_type: serviceAccount # Determines how to authenticate to the K8s API server. This can be one of none (for no auth), serviceAccount (to use the standard service account token provided to the agent pod), or kubeConfig to use credentials from ~/.kube/config.
           node_conditions_to_report:
             - Ready
@@ -170,13 +158,13 @@ collectors:
               - resourcedetection/eks
               - resourcedetection/gcp
               - resourcedetection/aks
-              - resource/k8s
               - resource/hostname
             receivers:
               - k8s_cluster
           logs:
             receivers:
               - k8sobjects
+              - k8s_events
             processors:
               - resourcedetection/eks
               - resourcedetection/gcp
@@ -191,9 +179,6 @@ collectors:
   daemon:
     fullnameOverride: "opentelemetry-kube-stack-daemon"
     env:
-      # Work around for open /mounts error: https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/35990
-      - name: HOST_PROC_MOUNTINFO
-        value: ""
       - name: ELASTIC_AGENT_OTEL
         value: '"true"'
     presets:
@@ -292,22 +277,6 @@ collectors:
                 enabled: false
               host.id:
                 enabled: true
-        # [Resource Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourceprocessor)
-        resource/k8s: # Resource attributes tailored for services within Kubernetes.
-          attributes:
-            - key: service.name # Set the service.name resource attribute based on the well-known app.kubernetes.io/name label
-              from_attribute: app.label.name
-              action: insert
-            - key: service.name # Set the service.name resource attribute based on the k8s.container.name attribute
-              from_attribute: k8s.container.name
-              action: insert
-            - key: app.label.name # Delete app.label.name attribute previously used for service.name
-              action: delete
-            - key: service.version # Set the service.version resource attribute based on the well-known app.kubernetes.io/version label
-              from_attribute: app.label.version
-              action: insert
-            - key: app.label.version # Delete app.label.version attribute previously used for service.version
-              action: delete
         resource/cloud:
           attributes:
             - key: cloud.instance.id
@@ -343,13 +312,9 @@ collectors:
               - "k8s.pod.ip"
               - "k8s.pod.uid"
               - "k8s.pod.start_time"
-            labels:
-              - tag_name: app.label.name
-                key: app.kubernetes.io/name
-                from: pod
-              - tag_name: app.label.version
-                key: app.kubernetes.io/version
-                from: pod
+              # Service attributes added based on https://opentelemetry.io/docs/specs/semconv/non-normative/k8s-attributes/#service-attributes
+              - "service.name"
+              - "service.version"
       receivers:
         # [OTLP Receiver](https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver)
         otlp:
@@ -375,7 +340,7 @@ collectors:
               type: container
         # [Hostmetrics Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/hostmetricsreceiver)
         hostmetrics:
-          collection_interval: 10s
+          collection_interval: 60s
           root_path: /hostfs # Mounted node's root file system
           scrapers:
             cpu:
@@ -446,7 +411,7 @@ collectors:
         # [Kubelet Stats Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/kubeletstatsreceiver)
         kubeletstats:
           auth_type: serviceAccount # Authentication mechanism with the Kubelet endpoint, refer to: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/kubeletstatsreceiver#configuration
-          collection_interval: 20s
+          collection_interval: 60s
           endpoint: ${env:OTEL_K8S_NODE_NAME}:10250
           node: "${env:OTEL_K8S_NODE_NAME}"
           # Required to work for all CSPs without an issue
@@ -495,7 +460,6 @@ collectors:
               - resourcedetection/eks
               - resourcedetection/gcp
               - resourcedetection/aks
-              - resource/k8s
               - resource/hostname
               - resource/cloud
             exporters:
@@ -511,7 +475,6 @@ collectors:
               - resourcedetection/eks
               - resourcedetection/gcp
               - resourcedetection/aks
-              - resource/k8s
               - resource/hostname
               - resource/cloud
             exporters:
@@ -626,12 +589,12 @@ instrumentation:
     type: parentbased_traceidratio # Sampler type
     argument: "1.0" # Sampling rate set to 100% (all traces are sampled).
   java:
-    image: docker.elastic.co/observability/elastic-otel-javaagent:1.5.0
+    image: docker.elastic.co/observability/elastic-otel-javaagent:1.6.0
   nodejs:
-    image: docker.elastic.co/observability/elastic-otel-node:1.3.0
+    image: docker.elastic.co/observability/elastic-otel-node:1.5.0
   dotnet:
     image: docker.elastic.co/observability/elastic-otel-dotnet:1.1.0
   python:
-    image: docker.elastic.co/observability/elastic-otel-python:1.7.0
+    image: docker.elastic.co/observability/elastic-otel-python:1.9.0
   go:
-    image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.22.1
+    image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.23.0

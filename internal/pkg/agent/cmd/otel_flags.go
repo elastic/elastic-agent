@@ -27,7 +27,7 @@ func setupOtelFlags(flags *pflag.FlagSet) {
 		" single location can be set per flag entry e.g. `--config=file:/path/to/first --config=file:path/to/second`.")
 
 	flags.StringArray(otelSetFlagName, []string{}, "Set arbitrary component config property. The component has to be defined in the config file and the flag"+
-		" has a higher precedence. Array config properties are overridden and maps are joined. Example --set=processors.batch.timeout=2s")
+		" has a higher precedence. Array config properties are overridden and maps are joined. Example --set \"processors::batch::timeout=2s\"")
 
 	flags.Bool(manager.OtelSetSupervisedFlagName, false, "Set that this collector is supervised.")
 	// the only error we can get here is that the flag does not exist
@@ -38,6 +38,11 @@ func setupOtelFlags(flags *pflag.FlagSet) {
 	// the only error we can get here is that the flag does not exist
 	// but look above, so we explicitly ignore it
 	_ = flags.MarkHidden(manager.OtelSupervisedLoggingLevelFlagName)
+
+	flags.String(manager.OtelSupervisedMonitoringURLFlagName, "", "Set the monitoring path")
+	// the only error we can get here is that the flag does not exist
+	// but look above, so we explicitly ignore it
+	_ = flags.MarkHidden(manager.OtelSupervisedMonitoringURLFlagName)
 
 	goFlags := new(flag.FlagSet)
 	featuregate.GlobalRegistry().RegisterFlags(goFlags)

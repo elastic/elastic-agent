@@ -18,19 +18,20 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
-	mockinfo "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/info"
 )
 
 func TestActionMigratelHandler(t *testing.T) {
 	log, _ := loggertest.New("")
 	t.Run("wrong action type", func(t *testing.T) {
 
-		mockAgentInfo := mockinfo.NewAgent(t)
+		mockAgentInfo := info.NewMockAgent(t)
 
 		action := &fleetapi.ActionSettings{}
 		ack := &fakeAcker{}
@@ -38,7 +39,7 @@ func TestActionMigratelHandler(t *testing.T) {
 		ack.On("Commit", t.Context()).Return(nil)
 
 		coord := &fakeMigrateCoordinator{}
-		coord.On("Migrate", mock.Anything, mock.Anything).Return(nil)
+		coord.On("Migrate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		coord.On("ReExec", mock.Anything, mock.Anything)
 		coord.On("Protection").Return(protection.Config{SignatureValidationKey: nil})
 
@@ -63,7 +64,7 @@ func TestActionMigratelHandler(t *testing.T) {
 
 		for _, tc := range tamperCases {
 			t.Run("tamper protected agent - "+tc.name, func(t *testing.T) {
-				mockAgentInfo := mockinfo.NewAgent(t)
+				mockAgentInfo := info.NewMockAgent(t)
 				if tc.expectedRun {
 					mockAgentInfo.On("AgentID").Return("agent-id")
 				}
@@ -77,7 +78,8 @@ func TestActionMigratelHandler(t *testing.T) {
 				ack.On("Commit", t.Context()).Return(nil)
 
 				coord := &fakeMigrateCoordinator{}
-				coord.On("Migrate", mock.Anything, mock.Anything).Return(nil)
+				coord.On("State").Return(coordinator.State{})
+				coord.On("Migrate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 				coord.On("ReExec", mock.Anything, mock.Anything)
 				coord.On("Protection").Return(protection.Config{SignatureValidationKey: nil, Enabled: tc.protectionEnabled})
 
@@ -105,7 +107,7 @@ func TestActionMigratelHandler(t *testing.T) {
 	})
 
 	t.Run("action propagated to coordinator", func(t *testing.T) {
-		mockAgentInfo := mockinfo.NewAgent(t)
+		mockAgentInfo := info.NewMockAgent(t)
 		mockAgentInfo.On("AgentID").Return("agent-id")
 		action := &fleetapi.ActionMigrate{}
 
@@ -114,7 +116,8 @@ func TestActionMigratelHandler(t *testing.T) {
 		ack.On("Commit", t.Context()).Return(nil)
 
 		coord := &fakeMigrateCoordinator{}
-		coord.On("Migrate", mock.Anything, mock.Anything).Return(nil)
+		coord.On("State").Return(coordinator.State{})
+		coord.On("Migrate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		coord.On("ReExec", mock.Anything, mock.Anything)
 		coord.On("Protection").Return(protection.Config{SignatureValidationKey: nil})
 
@@ -131,7 +134,7 @@ func TestActionMigratelHandler(t *testing.T) {
 	})
 
 	t.Run("signature present", func(t *testing.T) {
-		mockAgentInfo := mockinfo.NewAgent(t)
+		mockAgentInfo := info.NewMockAgent(t)
 		mockAgentInfo.On("AgentID").Return("agent-id")
 
 		private, signatureValidationKey, err := genKeys()
@@ -163,7 +166,8 @@ func TestActionMigratelHandler(t *testing.T) {
 		ack.On("Commit", t.Context()).Return(nil)
 
 		coord := &fakeMigrateCoordinator{}
-		coord.On("Migrate", mock.Anything, mock.Anything).Return(nil)
+		coord.On("State").Return(coordinator.State{})
+		coord.On("Migrate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		coord.On("ReExec", mock.Anything, mock.Anything)
 		coord.On("Protection").Return(protection.Config{SignatureValidationKey: signatureValidationKey})
 
@@ -180,7 +184,7 @@ func TestActionMigratelHandler(t *testing.T) {
 	})
 
 	t.Run("signature present, action not signed", func(t *testing.T) {
-		mockAgentInfo := mockinfo.NewAgent(t)
+		mockAgentInfo := info.NewMockAgent(t)
 		mockAgentInfo.On("AgentID").Return("agent-id")
 
 		_, signatureValidationKey, err := genKeys()
@@ -199,7 +203,7 @@ func TestActionMigratelHandler(t *testing.T) {
 		ack.On("Commit", t.Context()).Return(nil)
 
 		coord := &fakeMigrateCoordinator{}
-		coord.On("Migrate", mock.Anything, mock.Anything).Return(nil)
+		coord.On("Migrate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		coord.On("ReExec", mock.Anything, mock.Anything)
 		coord.On("Protection").Return(protection.Config{SignatureValidationKey: signatureValidationKey})
 
@@ -216,7 +220,7 @@ func TestActionMigratelHandler(t *testing.T) {
 	})
 
 	t.Run("signature not present", func(t *testing.T) {
-		mockAgentInfo := mockinfo.NewAgent(t)
+		mockAgentInfo := info.NewMockAgent(t)
 		mockAgentInfo.On("AgentID").Return("agent-id")
 
 		private, _, err := genKeys()
@@ -248,7 +252,8 @@ func TestActionMigratelHandler(t *testing.T) {
 		ack.On("Commit", t.Context()).Return(nil)
 
 		coord := &fakeMigrateCoordinator{}
-		coord.On("Migrate", mock.Anything, mock.Anything).Return(nil)
+		coord.On("State").Return(coordinator.State{})
+		coord.On("Migrate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		coord.On("ReExec", mock.Anything, mock.Anything)
 		coord.On("Protection").Return(protection.Config{SignatureValidationKey: nil})
 
@@ -265,7 +270,7 @@ func TestActionMigratelHandler(t *testing.T) {
 	})
 
 	t.Run("malformed signature", func(t *testing.T) {
-		mockAgentInfo := mockinfo.NewAgent(t)
+		mockAgentInfo := info.NewMockAgent(t)
 		mockAgentInfo.On("AgentID").Return("agent-id")
 
 		_, signatureValidationKey, err := genKeys()
@@ -300,7 +305,7 @@ func TestActionMigratelHandler(t *testing.T) {
 		ack.On("Commit", t.Context()).Return(nil)
 
 		coord := &fakeMigrateCoordinator{}
-		coord.On("Migrate", mock.Anything, mock.Anything).Return(nil)
+		coord.On("Migrate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		coord.On("ReExec", mock.Anything, mock.Anything)
 		coord.On("Protection").Return(protection.Config{SignatureValidationKey: signatureValidationKey})
 
@@ -313,7 +318,7 @@ func TestActionMigratelHandler(t *testing.T) {
 	})
 
 	t.Run("fleet server", func(t *testing.T) {
-		mockAgentInfo := mockinfo.NewAgent(t)
+		mockAgentInfo := info.NewMockAgent(t)
 		mockAgentInfo.On("AgentID").Return("agent-id")
 		action := &fleetapi.ActionMigrate{}
 
@@ -322,7 +327,8 @@ func TestActionMigratelHandler(t *testing.T) {
 		ack.On("Commit", t.Context()).Return(nil)
 
 		coord := &fakeMigrateCoordinator{}
-		coord.On("Migrate", mock.Anything, mock.Anything).Return(coordinator.ErrFleetServer)
+		coord.On("State").Return(coordinator.State{})
+		coord.On("Migrate", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(coordinator.ErrFleetServer)
 		coord.On("ReExec", mock.Anything, mock.Anything)
 		coord.On("Protection").Return(protection.Config{SignatureValidationKey: nil})
 
@@ -343,9 +349,19 @@ type fakeMigrateCoordinator struct {
 	mock.Mock
 }
 
-func (f *fakeMigrateCoordinator) Migrate(ctx context.Context, a *fleetapi.ActionMigrate, _ func(done <-chan struct{}) backoff.Backoff) error {
-	args := f.Called(ctx, a)
+func (f *fakeMigrateCoordinator) Migrate(ctx context.Context, a *fleetapi.ActionMigrate, b func(done <-chan struct{}) backoff.Backoff, n func(context.Context, *fleetapi.ActionMigrate) error) error {
+	args := f.Called(ctx, a, b, n)
 	return args.Error(0)
+}
+
+func (f *fakeMigrateCoordinator) State() coordinator.State {
+	args := f.Called()
+	return args.Get(0).(coordinator.State)
+}
+
+func (f *fakeMigrateCoordinator) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
+	args := f.Called(ctx, comp, unit, name, params)
+	return args.Get(0).(map[string]interface{}), args.Error(1)
 }
 
 func (f *fakeMigrateCoordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string) {

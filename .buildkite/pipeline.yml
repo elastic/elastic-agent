@@ -5,12 +5,12 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1757725254"
-  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1757725254"
-  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1757725254"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1757725254"
-  IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-1757725254"
-  IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1757725254"
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1760144464"
+  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1760144464"
+  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1760144464"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1760144464"
+  IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-1760144464"
+  IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1760144464"
 
 steps:
   - label: "check-ci"
@@ -220,12 +220,14 @@ steps:
             allowed: true
 
   - label: ":junit: Junit annotate"
+    agents:
+      # requires at least "bash", "curl" and "git"
+      image: "docker.elastic.co/ci-agent-images/buildkite-junit-annotate:1.0"
     plugins:
-      - junit-annotate#v2.5.0:
+      - junit-annotate#v2.7.0:
           artifacts: "**TEST-*.xml"
           always-annotate: true
-    agents:
-      provider: "gcp"
+          run-in-docker: false
     depends_on:
       - step: "unit-tests-2204"
         allow_failure: true
@@ -245,22 +247,6 @@ steps:
         allow_failure: true
       - step: "unit-tests-win11"
         allow_failure: true
-
-  - label: "Merge coverage reports"
-    key: "merge-coverage"
-    env:
-      BUILDKITE_REPO: ""
-    command: |
-      .buildkite/scripts/steps/merge.sh
-    artifact_paths:
-      - "build/TEST-go-unit.cov"
-    agents:
-      image: "golang:1.24.7"
-    depends_on:
-      - unit-tests
-      - extended-windows
-    allow_dependency_failure: true
-    soft_fail: true # Until https://github.com/elastic/ingest-dev/issues/4042 is resolved
 
   - group: "K8s tests"
     key: "k8s-tests"
@@ -285,21 +271,6 @@ steps:
         retry:
           manual:
             allowed: true
-
-  - label: ":sonarqube: Continuous Code Inspection"
-    env:
-      VAULT_SONAR_TOKEN_PATH: "kv/ci-shared/platform-ingest/elastic/elastic-agent/sonar-analyze-token"
-    agents:
-      image: "docker.elastic.co/cloud-ci/sonarqube/buildkite-scanner:latest"
-    command:
-      - "buildkite-agent artifact download --step merge-coverage build/TEST-go-unit.cov ."
-      - "/scan-source-code.sh"
-    depends_on:
-      - "merge-coverage"
-    retry:
-      manual:
-        allowed: true
-    soft_fail: true # Until https://github.com/elastic/ingest-dev/issues/4042 is resolved
 
   # Triggers a dynamic step: Sync K8s
   # Runs only on main and if k8s files are changed
@@ -373,7 +344,7 @@ steps:
       commit: "${BUILDKITE_COMMIT}"
       branch: "${BUILDKITE_BRANCH}"
 
-  # wait for packaging to be done
+  # wait for CI to be done
   - wait: ~
 
   - label: "Publish to serverless"

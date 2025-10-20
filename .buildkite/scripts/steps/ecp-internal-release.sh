@@ -32,29 +32,50 @@ write_annotation() {
     cat $BUILDKITE_ANNOTATE_FILE | buildkite-agent annotate --style info
 }
 
+echo "--- :package: Preparing build information"
 BUILD_VERSION="$(jq -r '.version' .package-version)"
 DOCKER_TAG="git-${VERSION}"
 PRIVATE_REPO="docker.elastic.co/observability-ci/ecp-elastic-agent-service"
 PRIVATE_IMAGE="${PRIVATE_REPO}:${DOCKER_TAG}"
 
-# TODO: let's avoid accessing vault directly but use the vault plugin itself
-#       https://github.com/elastic/vault-docker-login-buildkite-plugin does not support
-#       the `skopeo` command by default but looks for the current installed tools in the runner
-#       Let's contribute in a follow-up PR to support `skopeo` as well.
-DOCKER_REGISTRY_SECRET_PATH="kv/ci-shared/platform-ingest/docker_registry_prod"
-DOCKER_REGISTRY="docker.elastic.co"
-DOCKER_USERNAME_SECRET=$(retry 5 vault kv get -field user "${DOCKER_REGISTRY_SECRET_PATH}")
-DOCKER_PASSWORD_SECRET=$(retry 5 vault kv get -field password "${DOCKER_REGISTRY_SECRET_PATH}")
-skopeo login --username "${DOCKER_USERNAME_SECRET}" --password "${DOCKER_PASSWORD_SECRET}" "${DOCKER_REGISTRY}"
+echo "Build version: ${BUILD_VERSION}"
+echo "Docker tag: ${DOCKER_TAG}"
+echo "Target image: ${PRIVATE_IMAGE}"
 
-# download the amd64 and arm64 builds of the image from the previous steps
+echo "--- :arrow_down: Downloading build artifacts"
+echo "Downloading AMD64 build artifacts..."
 buildkite-agent artifact download "build/distributions/**" . --step "packaging-service-container-amd64"
+echo "Downloading ARM64 build artifacts..."
 buildkite-agent artifact download "build/distributions/**" . --step "packaging-service-container-arm64"
 
-# copy the images into the private image location
-skopeo copy --all "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-amd64.docker.tar.gz" "docker://$PRIVATE_IMAGE"
-skopeo copy --all "docker-archive:./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-arm64.docker.tar.gz" "docker://$PRIVATE_IMAGE"
+echo "--- :docker: Processing AMD64 image"
+echo "Loading AMD64 image..."
+docker load -i ./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-amd64.docker.tar.gz
+echo "Tagging AMD64 image as ${PRIVATE_IMAGE}..."
+docker image tag "elastic-agent-service:$DOCKER_TAG" "$PRIVATE_IMAGE"
+echo "Pushing AMD64 image..."
+docker push "$PRIVATE_IMAGE"
+AMD64_DIGEST=$(docker image inspect --format "{{index .RepoDigests 0}}" "$PRIVATE_IMAGE")
+echo "AMD64 digest: ${AMD64_DIGEST}"
 
+echo "--- :docker: Processing ARM64 image"
+echo "Loading ARM64 image..."
+docker load -i ./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-arm64.docker.tar.gz
+echo "Tagging ARM64 image as ${PRIVATE_IMAGE}..."
+docker image tag "elastic-agent-service:$DOCKER_TAG" "$PRIVATE_IMAGE"
+echo "Pushing ARM64 image..."
+docker push "$PRIVATE_IMAGE"
+ARM64_DIGEST=$(docker image inspect --format "{{index .RepoDigests 0}}" "$PRIVATE_IMAGE")
+echo "ARM64 digest: ${ARM64_DIGEST}"
+
+echo "--- :rocket: Creating multi-architecture manifest"
+echo "Creating multi-arch image from digests..."
+docker buildx imagetools create -t "$PRIVATE_IMAGE" \
+  "$AMD64_DIGEST" \
+  "$ARM64_DIGEST"
+echo "Multi-architecture image created and pushed successfully"
+
+echo "--- :memo: Creating build annotation and metadata"
 annotate "* Image: $PRIVATE_IMAGE"
 annotate "* Short commit: $VERSION"
 annotate "* Commit: https://github.com/elastic/elastic-agent/commit/$VERSION"

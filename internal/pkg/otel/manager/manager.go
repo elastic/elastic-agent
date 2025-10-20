@@ -5,18 +5,28 @@
 package manager
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"os"
+	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -70,7 +80,8 @@ type OTelManager struct {
 
 	// The current configuration that the OTel collector is using. In the case that
 	// the mergedCollectorCfg is nil then the collector is not running.
-	mergedCollectorCfg *confmap.Conf
+	mergedCollectorCfg     *confmap.Conf
+	mergedCollectorCfgHash []byte
 
 	currentCollectorStatus *status.AggregateStatus
 	currentComponentStates map[string]runtime.ComponentComponentState
@@ -116,11 +127,31 @@ func NewOTelManager(
 	baseLogger *logger.Logger,
 	mode ExecutionMode,
 	agentInfo info.Agent,
+	agentCollectorConfig *configuration.CollectorConfig,
 	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter,
 	stopTimeout time.Duration,
 ) (*OTelManager, error) {
 	var exec collectorExecution
 	var recoveryTimer collectorRecoveryTimer
+	var err error
+
+	// determine the otel collector ports
+	collectorMetricsPort, collectorHealthCheckPort := 0, 0
+	if agentCollectorConfig != nil {
+		if agentCollectorConfig.HealthCheckConfig.Endpoint != "" {
+			collectorHealthCheckPort, err = agentCollectorConfig.HealthCheckConfig.Port()
+			if err != nil {
+				return nil, fmt.Errorf("invalid collector health check port: %w", err)
+			}
+		}
+		if agentCollectorConfig.TelemetryConfig.Endpoint != "" {
+			collectorMetricsPort, err = agentCollectorConfig.TelemetryConfig.Port()
+			if err != nil {
+				return nil, fmt.Errorf("invalid collector metrics port: %w", err)
+			}
+		}
+	}
+
 	switch mode {
 	case SubprocessExecutionMode:
 		// NOTE: if we stop embedding the collector binary in elastic-agent, we need to
@@ -130,13 +161,13 @@ func NewOTelManager(
 			return nil, fmt.Errorf("failed to get the path to the collector executable: %w", err)
 		}
 		recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
-		exec, err = newSubprocessExecution(logLevel, executable)
+		exec, err = newSubprocessExecution(logLevel, executable, collectorMetricsPort, collectorHealthCheckPort)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create subprocess execution: %w", err)
 		}
 	case EmbeddedExecutionMode:
 		recoveryTimer = newRestarterNoop()
-		exec = newExecutionEmbedded()
+		exec = newExecutionEmbedded(collectorMetricsPort)
 	default:
 		return nil, fmt.Errorf("unknown otel collector execution mode: %q", mode)
 	}
@@ -282,14 +313,30 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 			// this is the only place where we mutate the internal config attributes, take a write lock for the duration
 			m.mx.Lock()
-			m.mergedCollectorCfg = mergedCfg
+			previousConfigHash := m.mergedCollectorCfgHash
+			configChanged, configUpdateErr := m.maybeUpdateMergedConfig(mergedCfg)
 			m.collectorCfg = cfgUpdate.collectorCfg
 			m.components = cfgUpdate.components
 			m.mx.Unlock()
 
-			err = m.applyMergedConfig(ctx, collectorStatusCh, m.collectorRunErr)
-			// report the error unconditionally to indicate that the config was applied
-			reportErr(ctx, m.errCh, err)
+			if configUpdateErr != nil {
+				m.logger.Warn("failed to calculate hash of merged config, proceeding with update", zap.Error(configUpdateErr))
+			}
+
+			if configChanged {
+				m.logger.Debugf(
+					"new config hash (%d) is different than the old config hash (%d), applying update",
+					m.mergedCollectorCfgHash, previousConfigHash)
+				applyErr := m.applyMergedConfig(ctx, collectorStatusCh, m.collectorRunErr)
+				// only report the error if we actually apply the update
+				// otherwise, we could override an actual error with a nil in the channel when the collector
+				// state doesn't actually change
+				reportErr(ctx, m.errCh, applyErr)
+			} else {
+				m.logger.Debugf(
+					"new config hash (%d) is identical to the old config hash (%d), skipping update",
+					m.mergedCollectorCfgHash, previousConfigHash)
+			}
 
 		case otelStatus := <-collectorStatusCh:
 			err = m.reportOtelStatusUpdate(ctx, otelStatus)
@@ -306,7 +353,12 @@ func (m *OTelManager) Errors() <-chan error {
 }
 
 // buildMergedConfig combines collector configuration with component-derived configuration.
-func buildMergedConfig(cfgUpdate configUpdate, agentInfo info.Agent, monitoringConfigGetter translate.BeatMonitoringConfigGetter, logger *logp.Logger) (*confmap.Conf, error) {
+func buildMergedConfig(
+	cfgUpdate configUpdate,
+	agentInfo info.Agent,
+	monitoringConfigGetter translate.BeatMonitoringConfigGetter,
+	logger *logp.Logger,
+) (*confmap.Conf, error) {
 	mergedOtelCfg := confmap.New()
 
 	// Generate component otel config if there are components
@@ -341,7 +393,36 @@ func buildMergedConfig(cfgUpdate configUpdate, agentInfo info.Agent, monitoringC
 		}
 	}
 
+	if err := addCollectorMetricsReader(mergedOtelCfg); err != nil {
+		return nil, fmt.Errorf("failed to add random collector metrics port: %w", err)
+	}
+
+	if err := injectDiagnosticsExtension(mergedOtelCfg); err != nil {
+		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
+	}
+
 	return mergedOtelCfg, nil
+}
+
+func injectDiagnosticsExtension(config *confmap.Conf) error {
+	extensionCfg := map[string]any{
+		"extensions": map[string]any{
+			"elastic_diagnostics": map[string]any{
+				"endpoint": paths.DiagnosticsExtensionSocket(),
+			},
+		},
+	}
+	if config.IsSet("service::extensions") {
+		extensionList := config.Get("service::extensions").([]interface{})
+		if slices.Contains(extensionList, "elastic_diagnostics") {
+			// already configured, nothing to do
+			return nil
+		}
+		extensionList = append(extensionList, "elastic_diagnostics")
+		extensionCfg["service::extensions"] = extensionList
+	}
+
+	return config.Merge(confmap.NewFromStringMap(extensionCfg))
 }
 
 func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh chan *status.AggregateStatus, collectorRunErr chan error) error {
@@ -445,6 +526,24 @@ func (m *OTelManager) MergedOtelConfig() *confmap.Conf {
 // and prepares component state updates for distribution to watchers.
 // Returns component state updates and any error encountered during processing.
 func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus) ([]runtime.ComponentComponentState, error) {
+	// Remove agent managed extensions from the status report
+	if otelStatus != nil {
+		if extensionsMap, exists := otelStatus.ComponentStatusMap["extensions"]; exists {
+			for extensionKey := range extensionsMap.ComponentStatusMap {
+				switch {
+				case strings.HasPrefix(extensionKey, "extension:beatsauth"):
+					delete(extensionsMap.ComponentStatusMap, extensionKey)
+				case strings.HasPrefix(extensionKey, "extension:elastic_diagnostics"):
+					delete(extensionsMap.ComponentStatusMap, extensionKey)
+				}
+			}
+
+			if len(extensionsMap.ComponentStatusMap) == 0 {
+				delete(otelStatus.ComponentStatusMap, "extensions")
+			}
+		}
+	}
+
 	// Extract component states from otel status
 	componentStates, err := translate.GetAllComponentStates(otelStatus, m.components)
 	if err != nil {
@@ -513,6 +612,19 @@ func (m *OTelManager) processComponentStates(componentStates []runtime.Component
 	return componentStates
 }
 
+// maybeUpdateMergedConfig updates the merged config if it's different from the current value. It checks this by
+// calculating a hash and comparing. It returns a value indicating if the configuration was updated.
+// If an error is encountered when calculating the hash, this will always be true.
+func (m *OTelManager) maybeUpdateMergedConfig(mergedCfg *confmap.Conf) (updated bool, err error) {
+	// if we get an error here, we just proceed with the update, worst that can happen is that we reload unnecessarily
+	mergedCfgHash, err := calculateConfmapHash(mergedCfg)
+	previousConfigHash := m.mergedCollectorCfgHash
+
+	m.mergedCollectorCfg = mergedCfg
+	m.mergedCollectorCfgHash = mergedCfgHash
+	return !bytes.Equal(mergedCfgHash, previousConfigHash) || err != nil, err
+}
+
 // reportComponentStateUpdates sends component state updates to the component watch channel. It first drains
 // the channel to ensure that only the most recent status is kept, as intermediate statuses can be safely discarded.
 // This ensures the receiver always observes the latest reported status.
@@ -531,4 +643,68 @@ func (m *OTelManager) reportComponentStateUpdates(ctx context.Context, component
 		// Manager is shutting down, ignore the update
 		return
 	}
+}
+
+// calculateConfmapHash calculates a hash of a given configuration. It's optimized for speed, which is why it
+// json encodes the values directly into a xxhash instance, instead of converting to a map[string]any first.
+func calculateConfmapHash(conf *confmap.Conf) ([]byte, error) {
+	if conf == nil {
+		return nil, nil
+	}
+
+	h := fnv.New128()
+	// We encode the configuration to json instead of yaml, because it's simpler and more performant.
+	// In general otel configuration can be marshalled to any format supported by koanf, but the confmap
+	// API doesn't expose this. This is why the small workaround below to avoid converting to a Go map is necessary.
+	encoder := json.NewEncoder(h)
+
+	for _, key := range conf.AllKeys() { // this is a sorted list, so the output is consistent
+		if err := encoder.Encode(key); err != nil {
+			return nil, err
+		}
+		if err := encoder.Encode(conf.Get(key)); err != nil {
+			return nil, err
+		}
+	}
+
+	return h.Sum(nil), nil
+}
+
+func addCollectorMetricsReader(conf *confmap.Conf) error {
+	// We operate on untyped maps instead of otel config structs because the otel collector has an elaborate
+	// configuration resolution system, and we can't reproduce it fully here. It's possible some of the values won't
+	// be valid for unmarshalling, because they're supposed to be loaded from environment variables, and so on.
+	metricReadersUntyped := conf.Get("service::telemetry::metrics::readers")
+	if metricReadersUntyped == nil {
+		metricReadersUntyped = []any{}
+	}
+	metricsReadersList, ok := metricReadersUntyped.([]any)
+	if !ok {
+		return fmt.Errorf("couldn't convert value of service::telemetry::metrics::readers to a list: %v", metricReadersUntyped)
+	}
+
+	metricsReader := map[string]any{
+		"pull": map[string]any{
+			"exporter": map[string]any{
+				"prometheus": map[string]any{
+					"host": "localhost",
+					// The OTel manager is required to set this environment variable. See comment at the constant
+					// definition for more information.
+					"port": fmt.Sprintf("${env:%s}", componentmonitoring.OtelCollectorMetricsPortEnvVarName),
+					// this is the default configuration from the otel collector
+					"without_scope_info":  true,
+					"without_units":       true,
+					"without_type_suffix": true,
+				},
+			},
+		},
+	}
+	metricsReadersList = append(metricsReadersList, metricsReader)
+	confMap := map[string]any{
+		"service::telemetry::metrics::readers": metricsReadersList,
+	}
+	if mergeErr := conf.Merge(confmap.NewFromStringMap(confMap)); mergeErr != nil {
+		return fmt.Errorf("failed to merge config: %w", mergeErr)
+	}
+	return nil
 }
