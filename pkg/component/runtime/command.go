@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -368,8 +367,9 @@ func (c *commandRuntime) start(comm Communicator) error {
 	}
 	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentID, c.current.ID))
 	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentType, c.getSpecType()))
-	uid, gid := os.Geteuid(), os.Getegid()
-	workDir, err := c.workDir(uid, gid)
+	uid := os.Geteuid()
+	workDir := c.current.WorkDirPath(paths.Run())
+	err := c.current.Setup(paths.Run())
 	if err != nil {
 		return err
 	}
@@ -388,9 +388,7 @@ func (c *commandRuntime) start(comm Communicator) error {
 	args := c.monitor.EnrichArgs(c.current.ID, c.getSpecBinaryName(), cmdSpec.Args)
 
 	// differentiate data paths
-	dataPath := filepath.Join(paths.Run(), c.current.ID)
-	_ = os.MkdirAll(dataPath, 0755)
-	args = append(args, "-E", "path.data="+dataPath)
+	args = append(args, "-E", "path.data="+workDir)
 
 	// reset checkin state before starting the process.
 	c.lastCheckin = time.Time{}
@@ -480,36 +478,13 @@ func (c *commandRuntime) handleProc(state *os.ProcessState) bool {
 		// stopping (should have exited)
 		if c.actionState == actionTeardown {
 			// teardown so the entire component has been removed (cleanup work directory)
-			_ = os.RemoveAll(c.workDirPath())
+			teardownErr := c.current.Teardown(paths.Run())
+			c.log.Warnf("error while tearing down component %s: %v", c.current.ID, teardownErr)
 		}
 		stopMsg := fmt.Sprintf("Stopped: pid '%d' exited with code '%d'", state.Pid(), state.ExitCode())
 		c.forceCompState(client.UnitStateStopped, stopMsg)
 	}
 	return false
-}
-
-func (c *commandRuntime) workDirPath() string {
-	return filepath.Join(paths.Run(), c.current.ID)
-}
-
-func (c *commandRuntime) workDir(uid int, gid int) (string, error) {
-	path := c.workDirPath()
-	err := os.MkdirAll(path, runDirMod)
-	if err != nil {
-		return "", fmt.Errorf("failed to create path %q: %w", path, err)
-	}
-	if runtime.GOOS == component.Windows {
-		return path, nil
-	}
-	err = os.Chown(path, uid, gid)
-	if err != nil {
-		return "", fmt.Errorf("failed to chown %q: %w", path, err)
-	}
-	err = os.Chmod(path, runDirMod)
-	if err != nil {
-		return "", fmt.Errorf("failed to chmod %q: %w", path, err)
-	}
-	return path, nil
 }
 
 func (c *commandRuntime) getSpecType() string {
