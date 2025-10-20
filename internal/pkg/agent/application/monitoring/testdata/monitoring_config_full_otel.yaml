@@ -33,10 +33,6 @@ inputs:
         when:
           regexp:
             message: ^Non-zero metrics in the last
-    - drop_event:
-        when:
-          equals:
-            log.type: event
     - copy_fields:
         fields:
         - from: data_stream.dataset
@@ -688,14 +684,14 @@ inputs:
   name: metrics-monitoring-collector
   streams:
   - data_stream:
-      dataset: elastic_agent.elastic_agent
+      dataset: elastic_agent.collector
       namespace: default
       type: metrics
     failure_threshold: 5
     hosts:
     - placeholder
     id: metrics-monitoring-collector
-    index: metrics-elastic_agent.elastic_agent-default
+    index: metrics-elastic_agent.collector-default
     metrics_path: /metrics
     metricsets:
     - collector
@@ -704,13 +700,13 @@ inputs:
     processors:
     - add_fields:
         fields:
-          dataset: elastic_agent.elastic_agent
+          dataset: elastic_agent.collector
           namespace: default
           type: metrics
         target: data_stream
     - add_fields:
         fields:
-          dataset: elastic_agent.elastic_agent
+          dataset: elastic_agent.collector
         target: event
     - add_fields:
         fields:
