@@ -46,7 +46,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 			cfg := getConfig(streams)
 			log, err := configuredLogger(cfg, watcherName)
 			if err != nil {
-				fmt.Fprintf(streams.Err, "Error configuring logger: %v\n%s\n", err, troubleshootMessage())
+				fmt.Fprintf(streams.Err, "Error configuring logger: %v\n%s\n", err, troubleshootMessage)
 				os.Exit(3)
 			}
 
@@ -55,7 +55,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 
 			if err := watchCmd(log, cfg); err != nil {
 				log.Errorw("Watch command failed", "error.message", err)
-				fmt.Fprintf(streams.Err, "Watch command failed: %v\n%s\n", err, troubleshootMessage())
+				fmt.Fprintf(streams.Err, "Watch command failed: %v\n%s\n", err, troubleshootMessage)
 				os.Exit(4)
 			}
 		},
