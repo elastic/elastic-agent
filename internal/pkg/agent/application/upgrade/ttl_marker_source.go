@@ -21,7 +21,7 @@ type TTLMarkerRegistry struct {
 	markerFileGlobPattern string
 }
 
-func (T TTLMarkerRegistry) AddOrReplace(m map[string]TTLMarker) error {
+func (T TTLMarkerRegistry) addOrReplace(m map[string]TTLMarker) error {
 	for versionedHome, marker := range m {
 		dstFilePath := filepath.Join(T.baseDir, versionedHome, ttlMarkerName)
 		err := writeTTLMarker(dstFilePath, marker)
@@ -52,7 +52,7 @@ func (T TTLMarkerRegistry) Set(m map[string]TTLMarker) error {
 	}
 
 	// create all the remaining markers
-	return T.AddOrReplace(m)
+	return T.addOrReplace(m)
 }
 
 func (T TTLMarkerRegistry) Get() (map[string]TTLMarker, error) {

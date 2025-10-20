@@ -104,8 +104,8 @@ func TestTTLMarkerRegistry_AddOrReplace(t *testing.T) {
 				tt.setup(t, tmpDir)
 			}
 			T := NewTTLMarkerRegistry(tmpDir)
-			err := T.AddOrReplace(tt.args.m)
-			if !tt.wantErr(t, err, fmt.Sprintf("AddOrReplace(%v)", tt.args.m)) {
+			err := T.addOrReplace(tt.args.m)
+			if !tt.wantErr(t, err, fmt.Sprintf("addOrReplace(%v)", tt.args.m)) {
 				return
 			}
 			if tt.postAssertions != nil {
