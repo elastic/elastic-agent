@@ -585,35 +585,50 @@ collectors:
             http:
               endpoint: ${env:MY_POD_IP}:4318
       processors:
-        batch:
-          send_batch_size: 1000
-          timeout: 1s
-          send_batch_max_size: 1500
-        batch/metrics:
-          # explicitly set send_batch_max_size to 0, as splitting metrics requests may cause version_conflict_engine_exception in TSDB
-          send_batch_max_size: 0
-          timeout: 1s
       exporters:
         debug:
-        otlp/ingest:
+        otlp/ingest_logs:
           endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
           headers:
             Authorization: ApiKey ${env:ELASTIC_API_KEY}
+          sending_queue:
+            enabled: true
+            sizer: bytes
+            queue_size: 50000000 # 50MB uncompressed
+            block_on_overflow: true
+            batch:
+              flush_timeout: 1s
+              min_size: 1_000_000 # 1MB uncompressed
+              max_size: 4_000_000 # 4MB uncompressed
+          timeout: 15s
+        otlp/ingest_metrics_traces:
+          endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
+          headers:
+            Authorization: ApiKey ${env:ELASTIC_API_KEY}
+          sending_queue:
+            enabled: true
+            sizer: bytes
+            queue_size: 50000000 # 50MB uncompressed
+            block_on_overflow: true
+            batch:
+              flush_timeout: 1s
+              min_size: 1_000_000 # 1MB uncompressed
+              max_size: 4_000_000 # 4MB uncompressed
           timeout: 15s
       service:
         pipelines:
           metrics:
             receivers: [otlp]
-            processors: [batch/metrics]
-            exporters: [debug, otlp/ingest]
+            processors: []
+            exporters: [debug, otlp/ingest_metrics_traces]
           logs:
             receivers: [otlp]
-            processors: [batch]
-            exporters: [debug, otlp/ingest]
+            processors: []
+            exporters: [debug, otlp/ingest_logs]
           traces:
             receivers: [otlp]
-            processors: [batch]
-            exporters: [debug, otlp/ingest]
+            processors: []
+            exporters: [debug, otlp/ingest_metrics_traces]
 # For more details on OpenTelemetry's zero-code instrumentation, see:
 # https://opentelemetry.io/docs/concepts/instrumentation/zero-code/
 instrumentation:
