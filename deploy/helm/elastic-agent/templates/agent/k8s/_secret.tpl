@@ -68,15 +68,15 @@
   {{- end }}
   {{- end }}
   {{- if ne ( . | dig "ssl" "certificate" "value" "not_found") "not_found"  }}
-  {{ printf "%s%s" $idx ".ssl.certificate" }} : |-
+  {{ .ssl.certificate._key }} : |-
     {{- .ssl.certificate.value | nindent 4 }}
   {{- end }}
   {{- if ne ( . | dig "ssl" "key" "value" "not_found") "not_found"  }}
-  {{ printf "%s%s" $idx ".ssl.key" }} : |-
+  {{ .ssl.key._key }} : |-
     {{- .ssl.key.value | nindent 4 }}
   {{- end }}
   {{- if ne ( . | dig "ssl" "key_passphrase" "value" "not_found") "not_found"  }}
-  {{ printf "%s%s" $idx ".ssl.key_passphrase" }} : |-
+  {{ .ssl.key_passphrase._key }} : |-
     {{- .ssl.key_passphrase.value | nindent 4 }}
   {{- end }}
   {{- end }}
