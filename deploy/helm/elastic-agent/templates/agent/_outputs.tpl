@@ -155,15 +155,14 @@ namespace: {{.}}
   {{- with $outputVal.timeout }}
   timeout: {{. | quote }}
   {{- end }}
-
-  {{- with index $outputVal "queue.mem.flush.timeout" }}
-  queue.mem.flush.timeout: {{. | quote}}
+  {{- if ne (dig "queue" "mem" "flush" "timeout" "not_found" $outputVal ) "not_found" }}
+  queue.mem.flush.timeout: {{$outputVal.queue.mem.flush.timeout | quote}}
   {{- end }}
-  {{- with index $outputVal "queue.mem.flush.min_events" }}
-  queue.mem.flush.min_events: {{.}}
+  {{- if ne (int (dig "queue" "mem" "flush" "min_events"  -1 $outputVal )) -1 }}
+  queue.mem.flush.min_events: {{$outputVal.queue.mem.flush.min_events}}
   {{- end }}
-  {{- with index $outputVal "queue.mem.events" }}
-  queue.mem.events: {{.}}
+  {{- if ne (int (dig "queue" "mem" "events" -1 $outputVal )) -1 }}
+  queue.mem.events: {{$outputVal.queue.mem.events}}
   {{- end }}
   {{- with $outputVal.max_retries}}
   max_retries: {{.}}
@@ -174,11 +173,11 @@ namespace: {{.}}
   {{- with $outputVal.bulk_max_size}}
   bulk_max_size: {{.}}
   {{- end }}
-  {{- with index $outputVal "backoff.max" }}
-  backoff.max: {{. | quote }}
+  {{- if ne (dig "backoff" "max" "not_found" $outputVal ) "not_found" }}
+  backoff.max: {{$outputVal.backoff.max | quote }}
   {{- end }}
-  {{- with index $outputVal "backoff.init" }}
-  backoff.init: {{. | quote }}
+  {{- if ne (dig "backoff" "init" "not_found" $outputVal ) "not_found" }}
+  backoff.init: {{$outputVal.backoff.init | quote }}
   {{- end }}
   {{- if hasKey $outputVal "allow_older_versions" }}
   allow_older_versions: {{$outputVal.allow_older_versions}}

@@ -762,20 +762,35 @@
                     "description": "The HTTP request timeout in seconds for the output request. If using Elasticsearch the Custom preset must be set to use this",
                     "examples": [ "90s", "30s" ]
                 },
-                "queue.mem.flush.timeout": {
-                    "type": "string",
-                    "description": "The maximum wait time for queue.mem.flush.min_events to be fulfilled. If set to 0s, events are available to the output immediately. If using Elasticsearch the Custom preset must be set to use this",
-                    "examples": [ "10s", "30s" ]
-                },
-                "queue.mem.flush.min_events": {
-                    "type": "integer",
-                    "description": "flush.min_events is a legacy parameter, and new configurations should prefer to control batch size with bulk_max_size. As of 8.13, there is never a performance advantage to limiting batch size with flush.min_events instead of bulk_max_size. If using Elasticsearch the Custom preset must be set to use this",
-                    "examples": [ 3200, 1600 ]
-                },
-                "queue.mem.events": {
-                    "type": "integer",
-                    "description": "The number of events the queue can store. This value should be evenly divisible by the smaller of queue.mem.flush.min_events or bulk_max_size to avoid sending partial batches to the output. If using Elasticsearch the Custom preset must be set to use this",
-                    "examples": [ 3200, 1600 ]
+                "queue": {
+                    "type": "object",
+                    "properties": {
+                        "mem": {
+                            "type": "object",
+                            "properties": {
+                                "flush": {
+                                    "type": "object",
+                                    "properties": {
+                                        "timeout": {
+                                            "type": "string",
+                                            "description": "The maximum wait time for queue.mem.flush.min_events to be fulfilled. If set to 0s, events are available to the output immediately. If using Elasticsearch the Custom preset must be set to use this",
+                                            "examples": [ "10s", "30s" ]
+                                        },
+                                        "min_events": {
+                                            "type": "integer",
+                                            "description": "flush.min_events is a legacy parameter, and new configurations should prefer to control batch size with bulk_max_size. As of 8.13, there is never a performance advantage to limiting batch size with flush.min_events instead of bulk_max_size. If using Elasticsearch the Custom preset must be set to use this",
+                                            "examples": [ 3200, 1600 ]   
+                                        }
+                                    }
+                                },
+                                "events": {
+                                    "type": "integer",
+                                    "description": "The number of events the queue can store. This value should be evenly divisible by the smaller of queue.mem.flush.min_events or bulk_max_size to avoid sending partial batches to the output. If using Elasticsearch the Custom preset must be set to use this",
+                                    "examples": [ 3200, 1600 ]  
+                                }
+                            }
+                        }
+                    }
                 },
                 "max_retries": {
                     "type": "integer",
@@ -792,15 +807,20 @@
                     "description": "The maximum number of events to bulk in a single Elasticsearch bulk API index request. Events can be collected into batches. Elastic Agent will split batches larger than bulk_max_size into multiple batches. Specifying a larger batch size can improve performance by lowering the overhead of sending events. However big batch sizes can also increase processing times, which might result in API errors, killed connections, timed-out publishing requests, and, ultimately, lower throughput. Setting bulk_max_size to values less than or equal to 0 turns off the splitting of batches. When splitting is disabled, the queue decides on the number of events to be contained in a batch. If using Elasticsearch the Custom preset must be set to use this",
                     "examples": [ 3200, 1600 ]
                 },
-                "backoff.max": {
-                    "type": "string",
-                    "description": "The maximum number of seconds to wait before attempting to connect to Elasticsearch after a network error. If using Elasticsearch the Custom preset must be set to use this",
-                    "examples": [ "60s", "30s" ]
-                },
-                "backoff.init": {
-                    "type": "string",
-                    "description": "The number of seconds to wait before trying to reconnect to Elasticsearch after a network error. After waiting backoff.init seconds, Elastic Agent tries to reconnect. If the attempt fails, the backoff timer is increased exponentially up to backoff.max. After a successful connection, the backoff timer is reset. If using Elasticsearch the Custom preset must be set to use this",
-                    "examples": [ "1s", "5s" ]
+                "backoff": {
+                    "type": "object",
+                    "properties": {
+                        "max": {
+                            "type": "string",
+                            "description": "The maximum number of seconds to wait before attempting to connect to Elasticsearch after a network error. If using Elasticsearch the Custom preset must be set to use this",
+                            "examples": [ "30s", "60s" ]
+                        },
+                        "init": {
+                            "type": "string",
+                            "description": "The number of seconds to wait before trying to reconnect to Elasticsearch after a network error. After waiting backoff.init seconds, Elastic Agent tries to reconnect. If the attempt fails, the backoff timer is increased exponentially up to backoff.max. After a successful connection, the backoff timer is reset. If using Elasticsearch the Custom preset must be set to use this",
+                            "examples": [ "1s", "5s" ]                           
+                        }
+                    }
                 },
                 "allow_older_versions": {
                     "type": "boolean",
@@ -980,14 +1000,29 @@
                             "timeout": {
                                 "type": "string"
                             },
-                            "queue.mem.flush.timeout": {
-                                "type": "string"
-                            },
-                            "queue.mem.flush.min_events": {
-                                "type": "integer"
-                            },
-                            "queue.mem.events": {
-                                "type": "integer"
+                            "queue": {
+                                "type": "object",
+                                "properties": {
+                                    "mem": {
+                                        "type": "object",
+                                        "properties": {
+                                            "flush": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "timeout": {
+                                                        "type": "string"
+                                                    },
+                                                    "min_events": {
+                                                        "type": "integer"
+                                                    }
+                                                }
+                                            },
+                                            "events": {
+                                                "type": "integer"
+                                            }
+                                        }
+                                    }
+                                }
                             },
                             "max_retries": {
                                 "type": "integer"
@@ -998,11 +1033,16 @@
                             "bulk_max_size": {
                                 "type": "integer"
                             },
-                            "backoff.max": {
-                                "type": "string"
-                            },
-                            "backoff.init": {
-                                "type": "string"
+                            "backoff": {
+                                "type": "object",
+                                "properties": {
+                                    "max": {
+                                        "type": "string"
+                                    },
+                                    "init": {
+                                        "type": "string"                      
+                                    }
+                                }
                             },
                             "allow_older_versions": {
                                 "type": "boolean"

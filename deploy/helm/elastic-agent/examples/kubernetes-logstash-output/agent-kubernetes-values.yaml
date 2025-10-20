@@ -20,13 +20,17 @@ outputs:
     workers: 5
     pipelining: 1
     bulk_max_size: 1600
-    queue.mem.flush.timeout: "30s"
-    queue.mem.flush.min_events: 1600
-    queue.mem.events:  3200
+    queue:
+      mem: 
+        flush:
+         timeout: "30s"
+         min_events: 1600
+        events:  3200
     max_retries: 3
     compression_level: 5
-    backoff.max: "30s"
-    backoff.init: "1s"
+    backoff:
+      max: "30s"
+      init: "1s"
     allow_older_versions: false
     ssl:
       certificate: 
