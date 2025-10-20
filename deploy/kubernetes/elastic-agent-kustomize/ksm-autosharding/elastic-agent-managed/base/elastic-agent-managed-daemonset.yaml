@@ -23,11 +23,15 @@ spec:
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
       serviceAccountName: elastic-agent
+      # The following setting is needed for Universal Profiling to observe all processes on the host
+      # and produce userspace frames.
+      # If you are using the Universal Profiling integration, please uncomment the following line before applying.
+      # hostPID: true
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: elastic-agent
-          image: docker.elastic.co/elastic-agent/elastic-agent:9.1.5
+          image: docker.elastic.co/elastic-agent/elastic-agent:9.1.6
           env:
             # Set to 1 for enrollment into Fleet server. If not set, Elastic Agent is run in standalone mode
             - name: FLEET_ENROLL

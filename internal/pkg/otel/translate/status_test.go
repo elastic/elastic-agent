@@ -78,7 +78,7 @@ func TestGetAllComponentState(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: fmt.Errorf("pipeline status id %s is not a pipeline", fmt.Sprintf("logs/%sfilestream-default", OtelNamePrefix)),
+			expectedErr: fmt.Errorf("couldn't parse otel status id: %s", fmt.Sprintf("logs/%sfilestream-default", OtelNamePrefix)),
 		},
 		{
 			name:       "one otel component, one process component",
@@ -213,7 +213,20 @@ func TestDropComponentStateFromOtelStatus(t *testing.T) {
 		s, err := DropComponentStateFromOtelStatus(otelStatus)
 		require.Error(t, err)
 		require.Nil(t, s)
-		assert.Equal(t, "pipeline status id logs is not a pipeline", err.Error())
+		assert.Equal(t, "couldn't parse otel status id: logs", err.Error())
+	})
+
+	t.Run("ignore extensions", func(t *testing.T) {
+		otelStatus := &status.AggregateStatus{
+			ComponentStatusMap: map[string]*status.AggregateStatus{
+				"extensions": {
+					Event: componentstatus.NewEvent(componentstatus.StatusOK),
+				},
+			},
+		}
+		s, err := DropComponentStateFromOtelStatus(otelStatus)
+		require.NoError(t, err)
+		assert.Equal(t, otelStatus, s)
 	})
 }
 
@@ -262,7 +275,19 @@ func TestGetOtelRuntimePipelineStatuses(t *testing.T) {
 				},
 			},
 			expected: nil,
-			err:      "pipeline status id invalid-format is not a pipeline",
+			err:      "couldn't parse otel status id: invalid-format",
+		},
+		{
+			name: "extensions are ignored",
+			status: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					"extensions": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+				},
+			},
+			expected: map[string]*status.AggregateStatus{},
 		},
 	}
 
@@ -487,16 +512,20 @@ func TestParseEntityStatusId(t *testing.T) {
 		id               string
 		expectedKind     string
 		expectedEntityID string
+		expectedErr      error
 	}{
-		{"pipeline:logs", "pipeline", "logs"},
-		{"pipeline:logs/filestream-monitoring", "pipeline", "logs/filestream-monitoring"},
-		{"receiver:filebeat/filestream-monitoring", "receiver", "filebeat/filestream-monitoring"},
-		{"exporter:elasticsearch/default", "exporter", "elasticsearch/default"},
-		{"invalid", "", ""},
+		{"pipeline:logs", "pipeline", "logs", nil},
+		{"pipeline:logs/filestream-monitoring", "pipeline", "logs/filestream-monitoring", nil},
+		{"receiver:filebeat/filestream-monitoring", "receiver", "filebeat/filestream-monitoring", nil},
+		{"exporter:elasticsearch/default", "exporter", "elasticsearch/default", nil},
+		{"invalid", "", "", fmt.Errorf("couldn't parse otel status id: %s", "invalid")},
+		{"", "", "", fmt.Errorf("couldn't parse otel status id: %s", "")},
+		{"extensions", "extensions", "", nil},
 	}
 
 	for _, test := range tests {
-		componentKind, pipelineId := parseEntityStatusId(test.id)
+		componentKind, pipelineId, err := parseEntityStatusId(test.id)
+		assert.Equal(t, test.expectedErr, err)
 		assert.Equal(t, test.expectedKind, componentKind, "component kind")
 		assert.Equal(t, test.expectedEntityID, pipelineId, "pipeline id")
 	}

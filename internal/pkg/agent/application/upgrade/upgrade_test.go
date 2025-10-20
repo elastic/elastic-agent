@@ -28,6 +28,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
@@ -43,8 +44,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
-	"github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/info"
-	mocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
 )
 
 func Test_CopyFile(t *testing.T) {
@@ -246,7 +245,7 @@ func TestIsInProgress(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// Expect client.State() call to be made only if no Upgrade Watcher PIDs
 			// are returned (i.e. no Upgrade Watcher is found to be running).
-			mc := mocks.NewClient(t)
+			mc := client.NewMockClient(t)
 			if test.watcherPIDsFetcher != nil {
 				pids, _ := test.watcherPIDsFetcher()
 				if len(pids) == 0 {
@@ -300,37 +299,31 @@ func TestUpgraderAckAction(t *testing.T) {
 		require.Nil(t, u.AckAction(t.Context(), nil, action))
 	})
 	t.Run("AckAction with acker", func(t *testing.T) {
-		acker := &fakeAcker{}
-		acker.On("Ack", mock.Anything, action).Return(nil)
-		acker.On("Commit", mock.Anything).Return(nil)
+		mockAcker := acker.NewMockAcker(t)
+		mockAcker.EXPECT().Ack(mock.Anything, action).Return(nil)
+		mockAcker.EXPECT().Commit(mock.Anything).Return(nil)
 
-		require.Nil(t, u.AckAction(t.Context(), acker, action))
-		acker.AssertCalled(t, "Ack", mock.Anything, action)
-		acker.AssertCalled(t, "Commit", mock.Anything)
+		require.Nil(t, u.AckAction(t.Context(), mockAcker, action))
 	})
 
 	t.Run("AckAction with acker - failing commit", func(t *testing.T) {
-		acker := &fakeAcker{}
+		mockAcker := acker.NewMockAcker(t)
 
 		errCommit := errors.New("failed commit")
-		acker.On("Ack", mock.Anything, action).Return(nil)
-		acker.On("Commit", mock.Anything).Return(errCommit)
+		mockAcker.EXPECT().Ack(mock.Anything, action).Return(nil)
+		mockAcker.EXPECT().Commit(mock.Anything).Return(errCommit)
 
-		require.ErrorIs(t, u.AckAction(t.Context(), acker, action), errCommit)
-		acker.AssertCalled(t, "Ack", mock.Anything, action)
-		acker.AssertCalled(t, "Commit", mock.Anything)
+		require.ErrorIs(t, u.AckAction(t.Context(), mockAcker, action), errCommit)
 	})
 
 	t.Run("AckAction with acker - failed ack", func(t *testing.T) {
-		acker := &fakeAcker{}
+		mockAcker := acker.NewMockAcker(t)
 
 		errAck := errors.New("ack error")
-		acker.On("Ack", mock.Anything, action).Return(errAck)
-		acker.On("Commit", mock.Anything).Return(nil)
+		mockAcker.EXPECT().Ack(mock.Anything, action).Return(errAck)
+		// no expectation on Commit() since it shouldn't be called after an error during Ack()
 
-		require.ErrorIs(t, u.AckAction(t.Context(), acker, action), errAck)
-		acker.AssertCalled(t, "Ack", mock.Anything, action)
-		acker.AssertNotCalled(t, "Commit", mock.Anything)
+		require.ErrorIs(t, u.AckAction(t.Context(), mockAcker, action), errAck)
 	})
 }
 
@@ -1284,29 +1277,14 @@ func TestIsSameReleaseVersion(t *testing.T) {
 	}
 }
 
-var _ acker.Acker = &fakeAcker{}
-
-type fakeAcker struct {
-	mock.Mock
-}
-
-func (f *fakeAcker) Ack(ctx context.Context, action fleetapi.Action) error {
-	args := f.Called(ctx, action)
-	return args.Error(0)
-}
-
-func (f *fakeAcker) Commit(ctx context.Context) error {
-	args := f.Called(ctx)
-	return args.Error(0)
-}
-
 type mockArtifactDownloader struct {
-	returnError    error
-	fleetServerURI string
+	returnError       error
+	returnArchivePath string
+	fleetServerURI    string
 }
 
 func (m *mockArtifactDownloader) downloadArtifact(ctx context.Context, parsedVersion *agtversion.ParsedSemVer, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
-	return "", m.returnError
+	return m.returnArchivePath, m.returnError
 }
 
 func (m *mockArtifactDownloader) withFleetServerURI(fleetServerURI string) {
@@ -1331,39 +1309,49 @@ func (m *mockUnpacker) unpack(version, archivePath, dataDir string, flavor strin
 func TestUpgradeErrorHandling(t *testing.T) {
 	log, _ := loggertest.New("test")
 	testError := errors.New("test error")
-	type upgraderMocker func(upgrader *Upgrader)
+
+	type upgraderMocker func(upgrader *Upgrader, archivePath string, versionedHome string)
 
 	type testCase struct {
-		isDiskSpaceErrorResult bool
-		expectedError          error
-		upgraderMocker         upgraderMocker
+		isDiskSpaceErrorResult    bool
+		expectedError             error
+		upgraderMocker            upgraderMocker
+		checkArchiveCleanup       bool
+		checkVersionedHomeCleanup bool
 	}
 
 	testCases := map[string]testCase{
-		"should return error if downloadArtifact fails": {
+		"should return error and cleanup downloaded archive if downloadArtifact fails after download is complete": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-			upgraderMocker: func(upgrader *Upgrader) {
+			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
-					returnError: testError,
+					returnError:       testError,
+					returnArchivePath: archivePath,
 				}
 			},
+			checkArchiveCleanup: true,
 		},
 		"should return error if getPackageMetadata fails": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-			upgraderMocker: func(upgrader *Upgrader) {
-				upgrader.artifactDownloader = &mockArtifactDownloader{}
+			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{
+					returnArchivePath: archivePath,
+				}
 				upgrader.unpacker = &mockUnpacker{
 					returnPackageMetadataError: testError,
 				}
 			},
+			checkArchiveCleanup: true,
 		},
-		"should return error if unpack fails": {
+		"should return error and cleanup downloaded archive if unpack fails before extracting": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-			upgraderMocker: func(upgrader *Upgrader) {
-				upgrader.artifactDownloader = &mockArtifactDownloader{}
+			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{
+					returnArchivePath: archivePath,
+				}
 				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
 					return agentVersion{
 						version:  upgradeVersion,
@@ -1379,12 +1367,44 @@ func TestUpgradeErrorHandling(t *testing.T) {
 					returnUnpackError: testError,
 				}
 			},
+			checkArchiveCleanup: true,
 		},
-		"should return error if copyActionStore fails": {
+		"should return error and cleanup downloaded archive if unpack fails after extracting": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-			upgraderMocker: func(upgrader *Upgrader) {
-				upgrader.artifactDownloader = &mockArtifactDownloader{}
+			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{
+					returnArchivePath: archivePath,
+				}
+				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
+					return agentVersion{
+						version:  upgradeVersion,
+						snapshot: false,
+						hash:     metadata.hash,
+					}
+				}
+				upgrader.unpacker = &mockUnpacker{
+					returnPackageMetadata: packageMetadata{
+						manifest: &v1.PackageManifest{},
+						hash:     "hash",
+					},
+					returnUnpackError: testError,
+					returnUnpackResult: UnpackResult{
+						Hash:          "hash",
+						VersionedHome: versionedHome,
+					},
+				}
+			},
+			checkArchiveCleanup:       true,
+			checkVersionedHomeCleanup: true,
+		},
+		"should return error and cleanup downloaded artifact and extracted archive if copyActionStore fails": {
+			isDiskSpaceErrorResult: false,
+			expectedError:          testError,
+			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{
+					returnArchivePath: archivePath,
+				}
 				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
 					return agentVersion{
 						version:  upgradeVersion,
@@ -1399,20 +1419,24 @@ func TestUpgradeErrorHandling(t *testing.T) {
 					},
 					returnUnpackResult: UnpackResult{
 						Hash:          "hash",
-						VersionedHome: "versionedHome",
+						VersionedHome: versionedHome,
 					},
 				}
 				upgrader.copyActionStore = func(log *logger.Logger, newHome string) error {
 					return testError
 				}
 			},
+			checkArchiveCleanup:       true,
+			checkVersionedHomeCleanup: true,
 		},
-		"should return error if copyRunDirectory fails": {
+		"should return error and cleanup downloaded artifact and extracted archive if copyRunDirectory fails": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-			upgraderMocker: func(upgrader *Upgrader) {
+			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{}
-				upgrader.artifactDownloader = &mockArtifactDownloader{}
+				upgrader.artifactDownloader = &mockArtifactDownloader{
+					returnArchivePath: archivePath,
+				}
 				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
 					return agentVersion{
 						version:  upgradeVersion,
@@ -1427,7 +1451,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 					},
 					returnUnpackResult: UnpackResult{
 						Hash:          "hash",
-						VersionedHome: "versionedHome",
+						VersionedHome: versionedHome,
 					},
 				}
 				upgrader.copyActionStore = func(log *logger.Logger, newHome string) error {
@@ -1437,12 +1461,16 @@ func TestUpgradeErrorHandling(t *testing.T) {
 					return testError
 				}
 			},
+			checkArchiveCleanup:       true,
+			checkVersionedHomeCleanup: true,
 		},
-		"should return error if changeSymlink fails": {
+		"should return error and cleanup downloaded artifact and extracted archive if changeSymlink fails": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-			upgraderMocker: func(upgrader *Upgrader) {
-				upgrader.artifactDownloader = &mockArtifactDownloader{}
+			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{
+					returnArchivePath: archivePath,
+				}
 				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
 					return agentVersion{
 						version:  upgradeVersion,
@@ -1457,7 +1485,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 					},
 					returnUnpackResult: UnpackResult{
 						Hash:          "hash",
-						VersionedHome: "versionedHome",
+						VersionedHome: versionedHome,
 					},
 				}
 				upgrader.copyActionStore = func(log *logger.Logger, newHome string) error {
@@ -1473,12 +1501,16 @@ func TestUpgradeErrorHandling(t *testing.T) {
 					return testError
 				}
 			},
+			checkArchiveCleanup:       true,
+			checkVersionedHomeCleanup: true,
 		},
-		"should return error if markUpgrade fails": {
+		"should return error and cleanup downloaded artifact and extracted archive if markUpgrade fails": {
 			isDiskSpaceErrorResult: false,
 			expectedError:          testError,
-			upgraderMocker: func(upgrader *Upgrader) {
-				upgrader.artifactDownloader = &mockArtifactDownloader{}
+			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
+				upgrader.artifactDownloader = &mockArtifactDownloader{
+					returnArchivePath: archivePath,
+				}
 				upgrader.extractAgentVersion = func(metadata packageMetadata, upgradeVersion string) agentVersion {
 					return agentVersion{
 						version:  upgradeVersion,
@@ -1493,7 +1525,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 					},
 					returnUnpackResult: UnpackResult{
 						Hash:          "hash",
-						VersionedHome: "versionedHome",
+						VersionedHome: versionedHome,
 					},
 				}
 				upgrader.copyActionStore = func(log *logger.Logger, newHome string) error {
@@ -1512,27 +1544,39 @@ func TestUpgradeErrorHandling(t *testing.T) {
 					return testError
 				}
 			},
+			checkArchiveCleanup:       true,
+			checkVersionedHomeCleanup: true,
 		},
 		"should add disk space error to the error chain if downloadArtifact fails with disk space error": {
 			isDiskSpaceErrorResult: true,
 			expectedError:          upgradeErrors.ErrInsufficientDiskSpace,
-			upgraderMocker: func(upgrader *Upgrader) {
+			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
-					returnError: upgradeErrors.ErrInsufficientDiskSpace,
+					returnError: testError,
 				}
 			},
 		},
 	}
 
-	mockAgentInfo := info.NewAgent(t)
+	mockAgentInfo := info.NewMockAgent(t)
 	mockAgentInfo.On("Version").Return("9.0.0")
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			baseDir := t.TempDir()
+			paths.SetTop(baseDir)
+
 			upgrader, err := NewUpgrader(log, &artifact.Config{}, mockAgentInfo)
 			require.NoError(t, err)
 
-			tc.upgraderMocker(upgrader)
+			tc.upgraderMocker(upgrader, filepath.Join(baseDir, "mockArchive"), "versionedHome")
+
+			// Create the test files for all the cases
+			err = os.WriteFile(filepath.Join(baseDir, "mockArchive"), []byte("test"), 0o600)
+			require.NoError(t, err)
+
+			err = os.WriteFile(filepath.Join(baseDir, "versionedHome"), []byte("test"), 0o600)
+			require.NoError(t, err)
 
 			upgrader.isDiskSpaceErrorFunc = func(err error) bool {
 				return tc.isDiskSpaceErrorResult
@@ -1540,28 +1584,22 @@ func TestUpgradeErrorHandling(t *testing.T) {
 
 			_, err = upgrader.Upgrade(context.Background(), "9.0.0", "", nil, details.NewDetails("9.0.0", details.StateRequested, "test"), true, true)
 			require.ErrorIs(t, err, tc.expectedError)
+
+			// If the downloaded archive needs to be cleaned up assert that it is indeed cleaned up, if not assert that it still exists. The downloaded archive is a mock file that is created for all tests cases.
+			if tc.checkArchiveCleanup {
+				require.NoFileExists(t, filepath.Join(baseDir, "mockArchive"))
+			} else {
+				require.FileExists(t, filepath.Join(baseDir, "mockArchive"))
+			}
+
+			// If the extracted agent needs to be cleaned up assert that it is indeed cleaned up, if not assert that it still exists. Versioned home is a mock file that is created for all test cases.
+			if tc.checkVersionedHomeCleanup {
+				require.NoFileExists(t, filepath.Join(baseDir, "versionedHome"))
+			} else {
+				require.FileExists(t, filepath.Join(baseDir, "versionedHome"))
+			}
 		})
 	}
-}
-
-type mockSender struct{}
-
-func (m *mockSender) Send(ctx context.Context, method, path string, params url.Values, headers http.Header, body io.Reader) (*http.Response, error) {
-	return nil, nil
-}
-
-func (m *mockSender) URI() string {
-	return "mockURI"
-}
-func TestSetClient(t *testing.T) {
-	log, _ := loggertest.New("test")
-	upgrader := &Upgrader{
-		log:                log,
-		artifactDownloader: &mockArtifactDownloader{},
-	}
-
-	upgrader.SetClient(&mockSender{})
-	require.Equal(t, "mockURI", upgrader.artifactDownloader.(*mockArtifactDownloader).fleetServerURI)
 }
 
 func TestCopyActionStore(t *testing.T) {
@@ -1747,4 +1785,24 @@ func TestCopyRunDirectory(t *testing.T) {
 			require.Equal(t, []byte("content for old run file"), content, "content of %s is not as expected", filepath.Join(newRunPath, "file.txt"))
 		})
 	}
+}
+
+type mockSender struct{}
+
+func (m *mockSender) Send(ctx context.Context, method, path string, params url.Values, headers http.Header, body io.Reader) (*http.Response, error) {
+	return nil, nil
+}
+
+func (m *mockSender) URI() string {
+	return "mockURI"
+}
+func TestSetClient(t *testing.T) {
+	log, _ := loggertest.New("test")
+	upgrader := &Upgrader{
+		log:                log,
+		artifactDownloader: &mockArtifactDownloader{},
+	}
+
+	upgrader.SetClient(&mockSender{})
+	require.Equal(t, "mockURI", upgrader.artifactDownloader.(*mockArtifactDownloader).fleetServerURI)
 }

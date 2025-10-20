@@ -29,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
+	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
@@ -671,6 +672,15 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 			det.SetState(details.StateCompleted)
 			return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
 		}
+
+		c.logger.Errorw("upgrade failed", "error", logp.Error(err))
+		// If ErrInsufficientDiskSpace is in the error chain, we want to set the
+		// the error to ErrInsufficientDiskSpace so that the error message is
+		// more concise and clear.
+		if errors.Is(err, upgradeErrors.ErrInsufficientDiskSpace) {
+			err = upgradeErrors.ErrInsufficientDiskSpace
+		}
+
 		det.Fail(err)
 		return err
 	}
@@ -1630,7 +1640,7 @@ func (c *Coordinator) updateOtelManagerConfig(model *component.Model) error {
 	if len(model.Components) > 0 {
 		var err error
 		c.logger.With("components", model.Components).Debug("Updating otel manager model")
-		componentOtelCfg, err = translate.GetOtelConfig(model, c.agentInfo, c.monitorMgr.ComponentMonitoringConfig)
+		componentOtelCfg, err = translate.GetOtelConfig(model, c.agentInfo, c.monitorMgr.ComponentMonitoringConfig, logp.NewLogger(""))
 		if err != nil {
 			c.logger.Errorf("failed to generate otel config: %v", err)
 		}

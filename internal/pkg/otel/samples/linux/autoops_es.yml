@@ -36,6 +36,15 @@ exporters:
     headers:
       Authorization: "AutoOpsToken ${env:AUTOOPS_TOKEN}"
     endpoint: ${env:AUTOOPS_OTEL_URL}
+    sending_queue:
+      batch:
+        flush_timeout: 1s
+        min_size: 1048576 # 1 MiB uncompressed
+        max_size: 4194304 # 4 MiB uncompressed
+      block_on_overflow: true
+      enabled: true
+      queue_size: 52428800 # 50 MiB uncompressed
+      sizer: bytes
 
 service:
   pipelines:
