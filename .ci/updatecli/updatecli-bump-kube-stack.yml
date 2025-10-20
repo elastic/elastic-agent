@@ -56,7 +56,7 @@ targets:
     scmid: elastic-agent
     kind: shell
     spec:
-      command: /home/neck/Documents/github/rogercoll/elastic-agent/.ci/scripts/update-integration-testdata.sh
+      command: .ci/scripts/update-integration-testdata.sh
       environments:
       - name: PATH
       - name: HOME
