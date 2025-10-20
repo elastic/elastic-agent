@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 
 	"gopkg.in/yaml.v2"
+
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const ttlMarkerName = ".ttl"
@@ -19,18 +21,15 @@ var defaultMarkerGlobPattern = filepath.Join("data", "elastic-agent-*", ttlMarke
 type TTLMarkerRegistry struct {
 	baseDir               string
 	markerFileGlobPattern string
+	log                   *logger.Logger
 }
 
-func (T TTLMarkerRegistry) addOrReplace(m map[string]TTLMarker) error {
-	for versionedHome, marker := range m {
-		dstFilePath := filepath.Join(T.baseDir, versionedHome, ttlMarkerName)
-		err := writeTTLMarker(dstFilePath, marker)
-		if err != nil {
-			return fmt.Errorf("writing marker %q: %w", dstFilePath, err)
-		}
+func NewTTLMarkerRegistry(log *logger.Logger, baseDir string) *TTLMarkerRegistry {
+	return &TTLMarkerRegistry{
+		baseDir:               baseDir,
+		markerFileGlobPattern: defaultMarkerGlobPattern,
+		log:                   log,
 	}
-
-	return nil
 }
 
 func (T TTLMarkerRegistry) Set(m map[string]TTLMarker) error {
@@ -44,6 +43,7 @@ func (T TTLMarkerRegistry) Set(m map[string]TTLMarker) error {
 		_, ok := m[versionedHome]
 		if !ok {
 			// the existing marker should not be in the final state
+			T.log.Debugf("Removing marker for versionedHome: %s", versionedHome)
 			err = os.Remove(filepath.Join(T.baseDir, versionedHome, ttlMarkerName))
 			if err != nil {
 				return fmt.Errorf("removing ttl marker for %q: %w", versionedHome, err)
@@ -60,8 +60,10 @@ func (T TTLMarkerRegistry) Get() (map[string]TTLMarker, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to glob files using %q: %w", T.markerFileGlobPattern, err)
 	}
+	T.log.Debugf("Found matching versionedHomes: %v", matches)
 	ttlMarkers := make(map[string]TTLMarker, len(matches))
 	for _, match := range matches {
+		T.log.Debugf("Reading marker from versionedHome: %s", match)
 		relPath, err := filepath.Rel(T.baseDir, filepath.Dir(match))
 		if err != nil {
 			return nil, fmt.Errorf("failed to determine path for %q relative to %q : %w", match, T.baseDir, err)
@@ -76,11 +78,16 @@ func (T TTLMarkerRegistry) Get() (map[string]TTLMarker, error) {
 	return ttlMarkers, nil
 }
 
-func NewTTLMarkerRegistry(baseDir string) *TTLMarkerRegistry {
-	return &TTLMarkerRegistry{
-		baseDir:               baseDir,
-		markerFileGlobPattern: defaultMarkerGlobPattern,
+func (T TTLMarkerRegistry) addOrReplace(m map[string]TTLMarker) error {
+	for versionedHome, marker := range m {
+		dstFilePath := filepath.Join(T.baseDir, versionedHome, ttlMarkerName)
+		err := writeTTLMarker(dstFilePath, marker)
+		if err != nil {
+			return fmt.Errorf("writing marker %q: %w", dstFilePath, err)
+		}
 	}
+
+	return nil
 }
 
 func readTTLMarker(filePath string) (TTLMarker, error) {

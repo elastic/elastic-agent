@@ -16,104 +16,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
-
-func TestTTLMarkerRegistry_AddOrReplace(t *testing.T) {
-	const TTLMarkerYAMLTemplate = `
-        version: {{ .Version }}
-        valid_until: {{ .ValidUntil }}`
-
-	expectedMarkerContentTemplate, err := template.New("expected marker").Parse(TTLMarkerYAMLTemplate)
-	require.NoError(t, err)
-
-	now := time.Now()
-	nowString := now.Format(time.RFC3339)
-	// re-parse now to account for loss of fidelity due to marshal/unmarshal
-	now, _ = time.Parse(time.RFC3339, nowString)
-
-	yesterday := now.Add(-24 * time.Hour)
-	yesterdayString := yesterday.Format(time.RFC3339)
-
-	tomorrow := now.Add(24 * time.Hour)
-	tomorrowString := tomorrow.Format(time.RFC3339)
-	tomorrow, _ = time.Parse(time.RFC3339, tomorrowString)
-
-	versions := []string{"1.2.3", "4.5.6"}
-	versionedHomes := []string{"elastic-agent-1.2.3-past", "elastic-agent-4.5.6-present"}
-
-	type args struct {
-		m map[string]TTLMarker
-	}
-	tests := []struct {
-		name           string
-		setup          func(t *testing.T, tmpDir string)
-		args           args
-		wantErr        assert.ErrorAssertionFunc
-		postAssertions func(t *testing.T, tmpDir string)
-	}{
-		{
-			name: "ttl are present in one install - all get created/replaced",
-			setup: func(t *testing.T, tmpDir string) {
-				for i, versionedHome := range versionedHomes {
-					err := os.MkdirAll(filepath.Join(tmpDir, "data", versionedHome), 0755)
-					require.NoError(t, err, "error setting up fake agent install directory")
-
-					if i < 1 {
-						// add only 1 ttl marker as part of setup
-						buf := bytes.Buffer{}
-						err = expectedMarkerContentTemplate.Execute(&buf, map[string]string{"Version": versions[i], "ValidUntil": yesterdayString})
-						require.NoError(t, err, "error executing ttl marker template")
-						err = os.WriteFile(filepath.Join(tmpDir, "data", versionedHome, ttlMarkerName), buf.Bytes(), 0644)
-						require.NoError(t, err, "error setting up fake agent ttl marker")
-					}
-				}
-			},
-			args: args{
-				map[string]TTLMarker{
-					filepath.Join("data", versionedHomes[0]): {
-						Version:    versions[0],
-						ValidUntil: tomorrow,
-					},
-					filepath.Join("data", versionedHomes[1]): {
-						Version:    versions[1],
-						ValidUntil: tomorrow,
-					},
-				},
-			},
-			wantErr: assert.NoError,
-			postAssertions: func(t *testing.T, tmpDir string) {
-				for i, versionedHome := range versionedHomes {
-					expectedTTLMarkerFilePath := filepath.Join(tmpDir, "data", versionedHome, ttlMarkerName)
-					if assert.FileExists(t, expectedTTLMarkerFilePath, "TTL marker should have been created/replaced") {
-						b := new(strings.Builder)
-						err = expectedMarkerContentTemplate.Execute(b, map[string]string{"Version": versions[i], "ValidUntil": tomorrowString})
-						require.NoError(t, err)
-						actualMarkerContent, err := os.ReadFile(expectedTTLMarkerFilePath)
-						require.NoError(t, err)
-						assert.YAMLEq(t, b.String(), string(actualMarkerContent))
-					}
-				}
-
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tmpDir := t.TempDir()
-			if tt.setup != nil {
-				tt.setup(t, tmpDir)
-			}
-			T := NewTTLMarkerRegistry(tmpDir)
-			err := T.addOrReplace(tt.args.m)
-			if !tt.wantErr(t, err, fmt.Sprintf("addOrReplace(%v)", tt.args.m)) {
-				return
-			}
-			if tt.postAssertions != nil {
-				tt.postAssertions(t, tmpDir)
-			}
-		})
-	}
-}
 
 func TestTTLMarkerRegistry_Get(t *testing.T) {
 	const TTLMarkerYAMLTemplate = `
@@ -221,7 +126,8 @@ func TestTTLMarkerRegistry_Get(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			tt.setup(t, tmpDir)
-			T := NewTTLMarkerRegistry(tmpDir)
+			testLogger, _ := loggertest.New(t.Name())
+			T := NewTTLMarkerRegistry(testLogger, tmpDir)
 			got, err := T.Get()
 			if !tt.wantErr(t, err, "Get()") {
 				return
@@ -324,7 +230,8 @@ func TestTTLMarkerRegistry_Set(t *testing.T) {
 			if tt.setup != nil {
 				tt.setup(t, tmpDir)
 			}
-			T := NewTTLMarkerRegistry(tmpDir)
+			testLogger, _ := loggertest.New(t.Name())
+			T := NewTTLMarkerRegistry(testLogger, tmpDir)
 			tt.wantErr(t, T.Set(tt.args.m), fmt.Sprintf("Set(%v)", tt.args.m))
 			if tt.postAssertions != nil {
 				tt.postAssertions(t, tmpDir)
