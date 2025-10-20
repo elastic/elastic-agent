@@ -320,7 +320,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		var statusErr error
 		status, statusErr := beatReceiverFixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
-		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 3)
+		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 4)
 		return
 	}, 1*time.Minute, 1*time.Second)
 
