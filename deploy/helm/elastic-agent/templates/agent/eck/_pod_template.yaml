@@ -137,6 +137,10 @@ template:
           {{- with ($presetVal).outputs }}
           {{- range $outputName, $outputVal := . -}}
           {{- (include (printf "elasticagent.output.%s.preset.envvars" ($outputVal).type) (list $ $outputName $outputVal)) | nindent 10 }}
+          {{- $outputSSLConfig := dig "ssl" dict $outputVal -}}
+          {{- if $outputSSLConfig }}
+          {{- (include "elasticagent.output.render.sslconfig.envvars" (list $outputSSLConfig $outputName $agentName) | nindent 10) }}
+          {{- end }}
           {{- end }}
           {{- end }}
           {{- end }}
