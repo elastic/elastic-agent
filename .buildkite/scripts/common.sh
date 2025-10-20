@@ -7,7 +7,7 @@ if [[ -z "${WORKSPACE-""}" ]]; then
     export WORKSPACE
 fi
 if [[ -z "${SETUP_GVM_VERSION-""}" ]]; then
-    SETUP_GVM_VERSION="v0.5.2" # https://github.com/andrewkroh/gvm/issues/44#issuecomment-1013231151
+    SETUP_GVM_VERSION="v0.6.0" # https://github.com/andrewkroh/gvm/issues/44#issuecomment-1013231151
 fi
 
 if [[ -z "${BEAT_VERSION-""}" ]]; then
@@ -74,7 +74,7 @@ go(){
         mkdir -p "${_bin}"
         retry 5 curl -sL -o "${_bin}/gvm" "https://github.com/andrewkroh/gvm/releases/download/${SETUP_GVM_VERSION}/gvm-${AGENT_OS_NAME}-${AGENT_OS_ARCH}"
         chmod +x "${_bin}/gvm"
-        eval "$(command "${_bin}/gvm" --url=https://go.dev/dl "${GO_VERSION}" )"
+        eval "$(command "${_bin}/gvm" "${GO_VERSION}" )"
         export GOPATH=$(command go env GOPATH)
         export PATH="${PATH}:${GOPATH}/bin"
     fi
