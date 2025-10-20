@@ -229,6 +229,7 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 					atesting.WithFetcher(atesting.ArtifactFetcher()),
 				)
 				require.NoError(t, err)
+
 				return fromFixture, toFixture
 			},
 		},
