@@ -77,13 +77,13 @@ The following are some of the most commonly used settings when working with the 
 
 | Option | Description |
 |---------|-------------|
-| `include` | List of glob patterns for files to include |
-| `exclude` | Optional glob patterns for files to exclude (for example rotated or compressed files) |
-| `start_at` | `beginning` or `end`. Controls where to start reading files when no checkpoint exists |
-| `operators` | Parsing and routing logic for logs |
-| `storage` | Enables persistent tracking of file positions using a storage extension |
-| `max_log_size` | Maximum size of individual log entries (in bytes) |
-| `fingerprint_size`| Size (in bytes) used to identify and deduplicate files |
+| `include` | List of glob patterns for files to include. |
+| `exclude` | Optional glob patterns for files to exclude (for example rotated or compressed files). |
+| `start_at` | `beginning` or `end`. Controls where to start reading files when no checkpoint exists. |
+| `operators` | Parsing and routing logic for logs. |
+| `storage` | Enables persistent tracking of file positions using a storage extension. |
+| `max_log_size` | Maximum size of individual log entries (in bytes). |
+| `fingerprint_size`| Size (in bytes) used to identify and deduplicate files. |
 
 For the full list of options, refer to the [upstream `filelogreceiver` documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/filelogreceiver/README.md).
 
