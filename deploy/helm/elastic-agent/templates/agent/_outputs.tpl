@@ -198,7 +198,7 @@ namespace: {{.}}
 {{- $outputName := index . 1 -}}
 {{- $agentName := index . 2 -}}
 {{- with $outputSSLConfig }}
-{{- if not ( .| dig "key_passphrase" dict | empty) }}
+{{- if (dig "key_passphrase" dict .) }}
 - name: OUTPUT_{{upper $outputName}}_KEY_PASSPHRASE
   valueFrom:
     secretKeyRef:

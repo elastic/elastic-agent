@@ -76,10 +76,10 @@ Validate fleet configuration
 {{- range $idx, $certificateAuthorityConfig := $sslCertificateAuthoritiesConfig -}}
 {{- include "elasticagent.init.valueFrom" (list $ $certificateAuthorityConfig (printf "%s.ssl.certificate_authorities.%d" $outputName $idx)) -}}
 {{- end -}}
-{{- if not (  $outputVal | dig "ssl" "certificate" dict | empty )  }}
+{{- if (dig "ssl" "certificate" dict $outputVal)  }}
 {{- include "elasticagent.init.valueFrom" (list $ $outputVal.ssl.certificate (printf "%s.ssl.certificate" $outputName)) -}}
 {{- end -}}
-{{- if not (  $outputVal | dig "ssl" "certificate" dict | empty )  }}
+{{- if (dig "ssl" "key" dict $outputVal)   }}
 {{- include "elasticagent.init.valueFrom" (list $ $outputVal.ssl.key (printf "%s.ssl.key" $outputName)) -}}
 {{- end -}}
 {{- end -}}
