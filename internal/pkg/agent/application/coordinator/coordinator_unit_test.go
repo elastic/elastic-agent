@@ -1152,6 +1152,167 @@ service:
 
 }
 
+func TestCoordinatorManagesComponentWorkDirs(t *testing.T) {
+	// Send a test policy to the Coordinator as a Config Manager update,
+	// verify it creates a working directory for the component, keeps that working directory as the component
+	// moves to a different runtime, then deletes it after the component is stopped.
+	top := paths.Top()
+	paths.SetTop(t.TempDir())
+	t.Cleanup(func() {
+		paths.SetTop(top)
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	logger := logp.NewLogger("testing")
+
+	configChan := make(chan ConfigChange, 1)
+	updateChan := make(chan runtime.ComponentComponentState, 1)
+
+	// Create a mocked runtime manager that will report the update call
+	runtimeManager := &fakeRuntimeManager{}
+	otelManager := &fakeOTelManager{}
+
+	// we need the filestream spec to be able to convert to Otel config
+	componentSpec := component.InputRuntimeSpec{
+		InputType:  "filestream",
+		BinaryName: "agentbeat",
+		Spec: component.InputSpec{
+			Name: "filestream",
+			Command: &component.CommandSpec{
+				Args: []string{"filebeat"},
+			},
+			Platforms: []string{
+				"linux/amd64",
+				"linux/arm64",
+				"darwin/amd64",
+				"darwin/arm64",
+				"windows/amd64",
+				"container/amd64",
+				"container/arm64",
+			},
+		},
+	}
+
+	platform, err := component.LoadPlatformDetail()
+	require.NoError(t, err)
+	specs, err := component.NewRuntimeSpecs(platform, []component.InputRuntimeSpec{componentSpec})
+	require.NoError(t, err)
+
+	monitoringMgr := newTestMonitoringMgr()
+	coord := &Coordinator{
+		logger:           logger,
+		agentInfo:        &info.AgentInfo{},
+		stateBroadcaster: broadcaster.New(State{}, 0, 0),
+		managerChans: managerChans{
+			configManagerUpdate:  configChan,
+			runtimeManagerUpdate: updateChan,
+		},
+		monitorMgr:         monitoringMgr,
+		runtimeMgr:         runtimeManager,
+		otelMgr:            otelManager,
+		specs:              specs,
+		vars:               emptyVars(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
+	}
+
+	var workDirPath string
+
+	t.Run("run in process manager", func(t *testing.T) {
+		// Create a policy with one input and one output (no otel configuration)
+		cfg := config.MustNewConfigFrom(`
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - localhost:9200
+inputs:
+  - id: test-input
+    type: filestream
+    use_output: default
+    _runtime_experimental: process
+`)
+
+		// Send the policy change and make sure it was acknowledged.
+		cfgChange := &configChange{cfg: cfg}
+		configChan <- cfgChange
+		coord.runLoopIteration(ctx)
+		assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+		assert.NoError(t, cfgChange.err, "config processing shouldn't report an error")
+		require.Len(t, coord.componentModel, 1, "there should be one component")
+		workDirPath = coord.componentModel[0].WorkDirPath(paths.Run())
+		assert.DirExists(t, workDirPath, "component working directory should exist")
+	})
+
+	t.Run("run in otel manager", func(t *testing.T) {
+		// Create a policy with one input and one output (no otel configuration)
+		cfg := config.MustNewConfigFrom(`
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - localhost:9200
+inputs:
+  - id: test-input
+    type: filestream
+    use_output: default
+    _runtime_experimental: otel
+`)
+
+		// Send the policy change and make sure it was acknowledged.
+		cfgChange := &configChange{cfg: cfg}
+		configChan <- cfgChange
+		coord.runLoopIteration(ctx)
+		assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+		assert.NoError(t, cfgChange.err, "config processing shouldn't report an error")
+		require.Len(t, coord.componentModel, 1, "there should be one component")
+		compState := runtime.ComponentComponentState{
+			Component: component.Component{
+				ID: "filestream-default",
+			},
+			State: runtime.ComponentState{
+				State: client.UnitStateStopped,
+			},
+		}
+		updateChan <- compState
+		coord.runLoopIteration(ctx)
+		assert.DirExists(t, workDirPath, "component working directory should still exist")
+	})
+	t.Run("remove component", func(t *testing.T) {
+		// Create a policy with one input and one output (no otel configuration)
+		cfg := config.MustNewConfigFrom(`
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - localhost:9200
+inputs: []
+`)
+
+		// Send the policy change and make sure it was acknowledged.
+		cfgChange := &configChange{cfg: cfg}
+		configChan <- cfgChange
+		coord.runLoopIteration(ctx)
+		assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+		assert.NoError(t, cfgChange.err, "config processing shouldn't report an error")
+		require.Len(t, coord.componentModel, 0, "there should be one component")
+
+		compState := runtime.ComponentComponentState{
+			Component: component.Component{
+				ID: "filestream-default",
+			},
+			State: runtime.ComponentState{
+				State: client.UnitStateStopped,
+			},
+		}
+		updateChan <- compState
+		coord.runLoopIteration(ctx)
+		assert.NoDirExists(t, workDirPath, "component working directory should still exist")
+	})
+
+}
+
 func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 	// Set a one-second timeout -- nothing here should block, but if it
 	// does let's report a failure instead of timing out the test runner.

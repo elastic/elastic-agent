@@ -33,8 +33,6 @@ const (
 	actionStop     = actionMode(0)
 	actionStart    = actionMode(1)
 
-	runDirMod = 0770
-
 	envAgentComponentID   = "AGENT_COMPONENT_ID"
 	envAgentComponentType = "AGENT_COMPONENT_TYPE"
 
@@ -43,8 +41,6 @@ const (
 
 func (m actionMode) String() string {
 	switch m {
-	case actionTeardown:
-		return "teardown"
 	case actionStop:
 		return "stop"
 	case actionStart:
@@ -369,7 +365,7 @@ func (c *commandRuntime) start(comm Communicator) error {
 	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentType, c.getSpecType()))
 	uid := os.Geteuid()
 	workDir := c.current.WorkDirPath(paths.Run())
-	err := c.current.Setup(paths.Run())
+	err := c.current.PrepareWorkDir(paths.Run())
 	if err != nil {
 		return err
 	}
@@ -476,11 +472,7 @@ func (c *commandRuntime) handleProc(state *os.ProcessState) bool {
 		return true
 	case actionStop, actionTeardown:
 		// stopping (should have exited)
-		if c.actionState == actionTeardown {
-			// teardown so the entire component has been removed (cleanup work directory)
-			teardownErr := c.current.Teardown(paths.Run())
-			c.log.Warnf("error while tearing down component %s: %v", c.current.ID, teardownErr)
-		}
+		// Component workdir creation and deletion happens in the coordinator, nothing to do here.
 		stopMsg := fmt.Sprintf("Stopped: pid '%d' exited with code '%d'", state.Pid(), state.ExitCode())
 		c.forceCompState(client.UnitStateStopped, stopMsg)
 	}

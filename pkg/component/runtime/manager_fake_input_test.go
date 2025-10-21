@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -2902,9 +2901,7 @@ LOOP:
 	err = <-errCh
 	require.NoError(t, err)
 
-	workDir := filepath.Join(paths.Run(), comp.ID)
-	_, err = os.Stat(workDir)
-	require.ErrorIs(t, err, os.ErrNotExist)
+	require.DirExists(t, comp.WorkDirPath(paths.Run()))
 }
 
 func signalState(subErrCh chan error, state *ComponentState, acceptableStates []client.UnitState) {

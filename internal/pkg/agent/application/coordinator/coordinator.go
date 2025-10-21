@@ -946,10 +946,15 @@ func (c *Coordinator) watchRuntimeComponents(
 	state := make(map[string]runtime.ComponentState)
 
 	for {
+		var componentStates []runtime.ComponentComponentState
 		select {
 		case <-ctx.Done():
 			return
 		case componentState := <-runtimeComponentStates:
+			componentStates = append(componentStates, componentState)
+		case componentStates = <-otelComponentStates:
+		}
+		for _, componentState := range componentStates {
 			logComponentStateChange(c.logger, state, &componentState)
 			// Forward the final changes back to Coordinator, unless our context
 			// has ended.
@@ -958,19 +963,21 @@ func (c *Coordinator) watchRuntimeComponents(
 			case <-ctx.Done():
 				return
 			}
-		case componentStates := <-otelComponentStates:
-			for _, componentState := range componentStates {
-				logComponentStateChange(c.logger, state, &componentState)
-				// Forward the final changes back to Coordinator, unless our context
-				// has ended.
-				select {
-				case c.managerChans.runtimeManagerUpdate <- componentState:
-				case <-ctx.Done():
-					return
-				}
-			}
 		}
 	}
+}
+
+// ensureComponentWorkDirs ensures the component working directories exist for current components. This method is
+// idempotent.
+func (c *Coordinator) ensureComponentWorkDirs() error {
+	for _, comp := range c.componentModel {
+		c.logger.Debugf("Ensuring a working directory exists for component: %s", comp.ID)
+		err := comp.PrepareWorkDir(paths.Run())
+		if err != nil {
+			return fmt.Errorf("preparing a working directory for component %s failed: %w", comp.ID, err)
+		}
+	}
+	return nil
 }
 
 // logComponentStateChange emits a log message based on the new component state.
@@ -1753,6 +1760,12 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 	err = c.generateComponentModel()
 	if err != nil {
 		return fmt.Errorf("generating component model: %w", err)
+	}
+
+	// ensure all components have working directories
+	err = c.ensureComponentWorkDirs()
+	if err != nil {
+		return fmt.Errorf("ensuring component work dirs exists: %w", err)
 	}
 
 	signed, err := component.SignedFromPolicy(c.derivedConfig)
