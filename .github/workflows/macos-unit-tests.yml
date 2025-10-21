@@ -26,11 +26,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
-            # On macOS 14 running unit tests with `RACE_DETECTOR=true TEST_COVERAGE=true` causes failure:
-            # `clang: error: linker command failed with exit code 1`
-            # Related issue: https://github.com/elastic/elastic-agent/issues/10572
-            flags: ''
           - os: macos-15
             flags: 'RACE_DETECTOR=true TEST_COVERAGE=true '
     runs-on: ${{ matrix.os }}
