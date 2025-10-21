@@ -132,11 +132,23 @@ namespace: {{.}}
 {{- $outputName := index . 1 -}}
 {{- $outputVal := deepCopy (index . 2) -}}
 {{$outputName}}:
+  type: logstash
+  {{- if hasKey $outputVal "enabled" }}
+  enabled: {{$outputVal.enabled}}
+  {{- end }}
   hosts:
   {{- range $idx, $host := $outputVal.hosts }}
     - {{$host | quote}}
   {{- end }}
-  type: logstash
+  {{- if hasKey $outputVal "escape_html" }}
+  escape_html: {{$outputVal.escape_html}}
+  {{- end }}
+  {{- with $outputVal.proxy_url }}
+  proxy_url: {{. | quote}}
+  {{- end }}
+  {{- if hasKey $outputVal "proxy_use_local_resolver" }}
+  proxy_use_local_resolver: {{$outputVal.proxy_use_local_resolver}}
+  {{- end }}
   {{- if hasKey $outputVal "loadbalance" }}
   loadbalance: {{$outputVal.loadbalance}}
   {{- end }}

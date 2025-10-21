@@ -960,8 +960,28 @@
                     },
                     "then": {
                         "properties": {
+                            "enabled": {
+                                "type": "boolean",
+                                "description": "Enabled or disables the output. If set to false the output is disabled"
+                            },
                             "hosts": {
                                 "type": "array"
+                            },
+                            "escape_html": {
+                                "type": "boolean",
+                                "description": "Configures escaping of HTML in strings. Set to true to enable escaping."
+                            },
+                            "proxy_url": {
+                                "type": "string",
+                                "description": "The URL of the SOCKS5 proxy to use when connecting to the Logstash servers. The value must be a URL with a scheme of socks5://",
+                                "examples": [
+                                    "socks5://user:password@socks5-proxy:2233",
+                                    "socks5://socks5-proxy:2233"
+                                ]
+                            },
+                            "proxy_use_local_resolver": {
+                                "type": "boolean",
+                                "description": "Determines whether Logstash hostnames are resolved locally when using a proxy. If false and a proxy is used, name resolution occurs on the proxy server."
                             },
                             "loadbalance": {
                                 "type": "boolean",
