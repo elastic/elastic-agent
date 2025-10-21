@@ -1668,20 +1668,19 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 	}
 
 	// Create manager with test dependencies
-	mgr := OTelManager{
-		logger:                     testLogger,
-		baseLogger:                 testLogger,
-		errCh:                      make(chan error, 1), // holds at most one error
-		updateCh:                   make(chan configUpdate, 1),
-		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
-		componentStateCh:           make(chan []runtime.ComponentComponentState),
-		doneChan:                   make(chan struct{}),
-		recoveryTimer:              newRestarterNoop(),
-		execution:                  execution,
-		agentInfo:                  agentInfo,
-		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
-		collectorRunErr:            make(chan error),
-	}
+	mgr, err := NewOTelManager(
+		testLogger,
+		logp.DebugLevel,
+		testLogger,
+		SubprocessExecutionMode, // irrelevant, we'll override it
+		agentInfo,
+		nil,
+		beatMonitoringConfigGetter,
+		time.Second,
+	)
+	require.NoError(t, err)
+	mgr.recoveryTimer = newRestarterNoop()
+	mgr.execution = execution
 
 	// Start manager in a goroutine
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
