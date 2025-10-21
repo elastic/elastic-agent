@@ -217,7 +217,8 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 		return
 	}
 
-	// restart the agent to try and cause
+	// restart the agent to validate that this does not result in any agent-spawned subprocess
+	// becoming defunct
 	err = runner.agentFixture.ExecRestart(ctx)
 	require.NoError(t, err, "could not restart agent")
 
@@ -232,7 +233,7 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 
 	procStats := process.Stats{
 		// filtering with '.*elastic-agent' or '^.*elastic-agent$' doesn't
-		// seem to work as expected, filtering is done in the for loop below
+		// seem to work as expected
 		Procs: []string{".*"},
 	}
 	err = procStats.Init()
