@@ -92,7 +92,7 @@ type copyRunDirectoryFunc func(log *logger.Logger, oldRunPath, newRunPath string
 type fileDirCopyFunc func(from, to string, opts ...filecopy.Options) error
 type markUpgradeFunc func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]TTLMarker) error
 type changeSymlinkFunc func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error
-type rollbackInstallFunc func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error
+type rollbackInstallFunc func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, rollbackSource availableRollbacksSource) error
 
 // Types used to abstract stdlib functions
 type mkdirAllFunc func(name string, perm fs.FileMode) error
@@ -440,7 +440,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 
 	if err := u.changeSymlink(u.log, paths.Top(), symlinkPath, newPath); err != nil {
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
-		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
+		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.availableRollbacksSource)
 		return nil, goerrors.Join(err, rollbackErr)
 	}
 
@@ -470,19 +470,21 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 
 	availableRollbacks := getAvailableRollbacks(rollbackWindow, time.Now(), release.VersionWithSnapshot(), previousParsedVersion, currentVersionedHome)
 
-	if err := u.markUpgrade(u.log,
+	if err = u.availableRollbacksSource.Set(availableRollbacks); err != nil {
+		u.log.Errorw("Rolling back: setting ttl markers failed", "error.message", err)
+		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.availableRollbacksSource)
+		return nil, goerrors.Join(err, rollbackErr)
+	}
+
+	if err = u.markUpgrade(u.log,
 		paths.Data(), // data dir to place the marker in
 		time.Now(),
 		current,  // new agent version data
 		previous, // old agent version data
 		action, det, availableRollbacks); err != nil {
 		u.log.Errorw("Rolling back: marking upgrade failed", "error.message", err)
-		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
+		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.availableRollbacksSource)
 		return nil, goerrors.Join(err, rollbackErr)
-	}
-
-	if err = u.availableRollbacksSource.Set(availableRollbacks); err != nil {
-		u.log.Warnw("Setting rollback targets failed. Manual rollback may not be available beyond grace period", "error.message", err)
 	}
 
 	watcherExecutable := u.watcherHelper.SelectWatcherExecutable(paths.Top(), previous, current)
@@ -490,14 +492,14 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	var watcherCmd *exec.Cmd
 	if watcherCmd, err = u.watcherHelper.InvokeWatcher(u.log, watcherExecutable); err != nil {
 		u.log.Errorw("Rolling back: starting watcher failed", "error.message", err)
-		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
+		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.availableRollbacksSource)
 		return nil, goerrors.Join(err, rollbackErr)
 	}
 
 	watcherWaitErr := u.watcherHelper.WaitForWatcher(ctx, u.log, markerFilePath(paths.Data()), watcherMaxWaitTime)
 	if watcherWaitErr != nil {
 		killWatcherErr := watcherCmd.Process.Kill()
-		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome)
+		rollbackErr := u.rollbackInstall(ctx, u.log, paths.Top(), hashedDir, currentVersionedHome, u.availableRollbacksSource)
 		return nil, goerrors.Join(watcherWaitErr, killWatcherErr, rollbackErr)
 	}
 
@@ -729,7 +731,7 @@ func isSameVersion(log *logger.Logger, current agentVersion, newVersion agentVer
 	return current == newVersion
 }
 
-func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {
+func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, rollbackSource availableRollbacksSource) error {
 	oldAgentPath := paths.BinaryPath(filepath.Join(topDirPath, oldVersionedHome), agentName)
 	err := changeSymlink(log, topDirPath, filepath.Join(topDirPath, agentName), oldAgentPath)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -740,6 +742,11 @@ func rollbackInstall(ctx context.Context, log *logger.Logger, topDirPath, versio
 	err = os.RemoveAll(newAgentInstallPath)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("rolling back install: removing new agent install at %q failed: %w", newAgentInstallPath, err)
+	}
+
+	err = rollbackSource.Set(nil)
+	if err != nil {
+		return fmt.Errorf("rolling back install: error clearing ttl markers: %w", err)
 	}
 
 	return nil

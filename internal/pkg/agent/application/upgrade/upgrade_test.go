@@ -1547,7 +1547,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				upgrader.copyRunDirectory = func(log *logger.Logger, oldRunPath, newRunPath string) error {
 					return nil
 				}
-				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {
+				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, source availableRollbacksSource) error {
 					return nil
 				}
 				upgrader.changeSymlink = func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
@@ -1593,7 +1593,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				upgrader.changeSymlink = func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
 					return nil
 				}
-				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {
+				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, source availableRollbacksSource) error {
 					return nil
 				}
 				upgrader.markUpgrade = func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]TTLMarker) error {
