@@ -23,11 +23,12 @@ components:
   - attributesprocessor
   - batchprocessor
   - elasticinframetricsprocessor
-  - elastictraceprocessor
+  - elasticapmprocessor
   - k8sattributesprocessor
   - resourcedetectionprocessor
   - resourceprocessor
   - transformprocessor
+  - elastictraceprocessor # deprecated, will be removed in future
 
 # Connectors
   - elasticapmconnector

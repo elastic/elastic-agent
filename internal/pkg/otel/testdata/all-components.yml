@@ -10,6 +10,8 @@ exporters:
   otlphttp:
     endpoint: https://localhost.com:4318
   nop:
+  logstash:
+    hosts: ["localhost:5044"]
 
 extensions:
   health_check:
@@ -44,7 +46,7 @@ processors:
     check_interval: 1s
     limit_mib: 4000
     spike_limit_mib: 800
-  elastictrace:
+  elasticapm:
   tail_sampling:
 
 receivers:
@@ -73,7 +75,18 @@ receivers:
           static_configs:
             - targets: ['0.0.0.0:8888']
   elasticapmintake:
+  apache:
+  mysql:
+  postgresql:
+    username: test
+    password: test
   docker_stats:
+  awss3:
+    starttime: "2024-01-01 01:00"
+    endtime: "2024-01-02"
+    s3downloader:
+      s3_bucket: 'test'
+      s3_prefix: 'test'
 
 
 connectors:
@@ -164,6 +177,9 @@ service:
         - spanmetrics
         - prometheus
         - elasticapmintake
+        - apache
+        - mysql
+        - postgresql
 
     metrics/aggregated:
       receivers:
@@ -189,7 +205,7 @@ service:
         - resource
         - resourcedetection
         - transform
-        - elastictrace
+        - elasticapm
       receivers:
         - nop
         - otlp

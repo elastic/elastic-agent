@@ -10,12 +10,14 @@ toc:
       - file: config/configure-metrics-collection.md
       - file: config/tail-based-sampling.md
       - file: config/authentication-methods.md
+      - file: config/configure-profiles-collection.md
       - file: config/proxy.md
   - file: components.md
     children:
       - file: components/elasticsearchexporter.md
       - file: components/elasticapmintakereceiver.md
       - file: components/k8sclusterreceiver.md
+      - file: components/filelogreceiver.md
   - file: customization.md
     children:
       - file: custom-collector.md

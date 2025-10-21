@@ -1,3 +1,13 @@
 exporters:
   file:
     path: ${env:TMP}\file-exporter-output.json
+receivers:
+  windowseventlog:
+    channel: "Application"
+service:
+  pipelines:
+    logs/windows:
+      receivers:
+        - windowseventlog
+      exporters:
+        - nop

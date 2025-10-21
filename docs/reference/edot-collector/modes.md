@@ -58,7 +58,7 @@ This is the only case where using the {{es}} exporter is recommended. In all oth
 
 The following components are required for APM functionality in self-managed Elastic:
 
-- The `elastictrace` processor enriches trace data with additional attributes that improve the user experience in Elastic Observability UIs.
+- {applies_to}`edot_collector: ga 9.2` The `elasticapm` processor enriches trace data with additional attributes that improve the user experience in Elastic Observability UIs.
 - The `elasticapm` connector generates pre-aggregated APM metrics from trace data.
 
 In this case, EDOT Collector as a Gateway also handles routing of the different types of telemetry data to the relevant indices.
