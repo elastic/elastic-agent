@@ -168,6 +168,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 			if err != nil {
 				switch {
 				case errors.Is(err, context.Canceled):
+					// after the collector exits, we need to report a nil status
 					r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
 					return
 				}
@@ -182,6 +183,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 
 			select {
 			case <-procCtx.Done():
+				// after the collector exits, we need to report a nil status
 				r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
 				return
 			case <-healthCheckPollTimer.C:

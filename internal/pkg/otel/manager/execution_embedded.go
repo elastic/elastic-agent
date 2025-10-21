@@ -84,6 +84,7 @@ func (r *embeddedExecution) startCollector(ctx context.Context, logger *logger.L
 		}
 		runErr := svc.Run(collectorCtx)
 		close(ctl.collectorDoneCh)
+		// after the collector exits, we need to report the error and a nil status
 		reportErr(ctx, errCh, runErr)
 		reportCollectorStatus(ctx, statusCh, nil)
 	}()
