@@ -47,12 +47,6 @@ service:
 
 The receiver authenticates to the Kubernetes API (using a service account, kubeconfig, or no authentication) and continuously watches cluster objects such as Pods, Nodes, Deployments, and StatefulSets.
 
-It produces three kinds of data:
-
-- **Metrics** — cluster-wide and namespace-scoped performance data  
-- **Logs** — entity change events, when attached to a logs pipeline  
-- **Metadata updates** — sent to exporters that implement metadata sync interfaces
-
 The receiver can coordinate multiple instances using the `k8s_leader_elector` extension, ensuring only one active collector scrapes data at any given time.
 
 
