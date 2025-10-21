@@ -1604,6 +1604,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			checkVersionedHomeCleanup: true,
 			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
 				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+				mockRollbackSrc.EXPECT().Set(map[string]TTLMarker(nil)).Return(nil)
 			},
 		},
 		"should add disk space error to the error chain if downloadArtifact fails with disk space error": {
