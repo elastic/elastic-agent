@@ -407,11 +407,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, err
 	}
 
-	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
-	if err != nil {
-		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
-	}
-
 	newHash := unpackRes.Hash
 	if newHash == "" {
 		return nil, errors.New("unknown hash")
@@ -437,6 +432,11 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 
 	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
 	newPath := paths.BinaryPath(filepath.Join(paths.Top(), hashedDir), agentName)
+
+	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
+	if err != nil {
+		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
+	}
 
 	if err := u.changeSymlink(u.log, paths.Top(), symlinkPath, newPath); err != nil {
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
