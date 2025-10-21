@@ -132,7 +132,6 @@ namespace: {{.}}
 {{- $outputName := index . 1 -}}
 {{- $outputVal := deepCopy (index . 2) -}}
 {{$outputName}}:
-  type: logstash
   {{- if hasKey $outputVal "enabled" }}
   enabled: {{$outputVal.enabled}}
   {{- end }}
@@ -140,6 +139,7 @@ namespace: {{.}}
   {{- range $idx, $host := $outputVal.hosts }}
     - {{$host | quote}}
   {{- end }}
+  type: logstash
   {{- if hasKey $outputVal "escape_html" }}
   escape_html: {{$outputVal.escape_html}}
   {{- end }}
