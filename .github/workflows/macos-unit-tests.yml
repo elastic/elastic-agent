@@ -21,14 +21,7 @@ concurrency:
 
 jobs:
   unit-tests:
-    name: Unit tests ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-15
-            flags: 'RACE_DETECTOR=true TEST_COVERAGE=true '
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-15
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
@@ -48,5 +41,5 @@ jobs:
       - name: Install mage
         run: make mage
 
-      - run: |
-          ${{ matrix.flags }} mage unitTest
+      - name: mage unitTest
+        run: RACE_DETECTOR=true TEST_COVERAGE=true mage unitTest
