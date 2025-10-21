@@ -419,6 +419,13 @@ func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh c
 	if m.proc != nil {
 		m.proc.Stop(m.stopTimeout)
 		m.proc = nil
+		// We wait here for the collector to exit before possibly starting a new one. The execution indicates this
+		// by sending an error over the appropriate channel. It will also send a nil status that we'll either process
+		// after exiting from this function and going back to the main loop, or it will be overridden by the status
+		// from the newly started collector.
+		// This is the only blocking wait inside the main loop involving channels, so we need to be extra careful not to
+		// deadlock.
+		// TODO: Verify if we need to wait for the error at all. Stop() is already blocking.
 		select {
 		case <-collectorRunErr:
 		case <-ctx.Done():
