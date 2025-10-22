@@ -411,6 +411,8 @@ func (Build) TestBinaries() error {
 			return fmt.Errorf("cannot determine darwin OS version: %w", err)
 		}
 
+		fmt.Println("darwin OS version:", ver)
+
 		releaseParsed, err := version.ParseVersion(ver)
 		if err != nil {
 			return fmt.Errorf("cannot parse darwin release version %q: %w", ver, err)
