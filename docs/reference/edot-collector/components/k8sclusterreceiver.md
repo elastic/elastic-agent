@@ -1,6 +1,6 @@
 ---
-navigation_title: Kubernetes Cluster receiver
-description: Collects Kubernetes cluster-level metrics and entity events for Elastic Observability through the EDOT Collector.
+navigation_title: Kubernetes cluster receiver
+description: The Kubernetes cluster receiver is an OpenTelemetry Collector component that collects Kubernetes cluster-level metrics and entity events for Elastic Observability through the EDOT Collector.
 applies_to:
   stack:
   serverless:
@@ -13,18 +13,18 @@ products:
   - id: edot-collector
 ---
 
-# Kubernetes Cluster receiver
+# Kubernetes cluster receiver
 
-The Kubernetes Cluster receiver (`k8s_cluster`) is a core component of the {{edot}} (EDOT) Collector. It collects cluster-level metrics and entity events from the Kubernetes API server, enabling observability into node health, resource allocation, and workload states in Elastic Observability.
+The Kubernetes cluster receiver (`k8s_cluster`) is a core component of the {{edot}} (EDOT) Collector. It collects cluster-level metrics and entity events from the Kubernetes API server, enabling observability into node health, resource allocation, and workload states in Elastic Observability.
 
-This receiver should be deployed as a single instance per cluster. It uses the Kubernetes API to watch for updates and emit metrics and events to your configured exporters.
-
-For full contrib details, see the [OpenTelemetry k8s_cluster receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sclusterreceiver).
+For full contrib details, refer to the [OpenTelemetry k8s_cluster receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sclusterreceiver).
 
 
 ## Get started
 
-To use the Kubernetes Cluster receiver, include it in the `receivers` section of your EDOT Collector configuration. The receiver is already bundled in the default EDOT Collector distribution.
+To use the Kubernetes cluster receiver, include it in the receivers section of your Collector configuration.
+
+The receiver is already included in the default {{edot}} Collector distribution.
 
 ```yaml
 receivers:
@@ -42,10 +42,14 @@ service:
       exporters: [elasticsearch]
 ```
 
+:::{note}
+When deploying with the {{edot}} Helm chart, the `k8s_cluster` receiver runs as a single instance per cluster by default. If you’re configuring the Collector manually, ensure only one active instance of this receiver runs per cluster to avoid duplicate data.
+:::
+
 
 ## How it works
 
-The receiver authenticates to the Kubernetes API (using a service account, kubeconfig, or no authentication) and continuously watches cluster objects such as Pods, Nodes, Deployments, and StatefulSets.
+The receiver authenticates to the Kubernetes API using a service account, kubeconfig, or no authentication, and continuously watches cluster objects such as Pods, Nodes, Deployments, and StatefulSets.
 
 The receiver can coordinate multiple instances using the `k8s_leader_elector` extension, ensuring only one active collector scrapes data at any given time.
 
@@ -93,9 +97,9 @@ The following configuration options control how the receiver connects to the Kub
 | `node_conditions_to_report` | List of node conditions to report (for example `Ready`, `MemoryPressure`). | `[Ready]` |
 | `allocatable_types_to_report` | Resource types to report (`cpu`, `memory`, `ephemeral-storage`, `pods`). When empty, no allocatable metrics are emitted. | `[]` (unless explicitly configured) |
 | `distribution` | Kubernetes distribution used. (`kubernetes` or `openshift`). | `kubernetes` |
-| `namespaces` | Limit observation to specific namespaces. Cluster-level objects (like Nodes) won’t be collected. | none |
+| `namespaces` | Limit observation to specific namespaces. Cluster-level objects (like Nodes) won’t be collected. | None |
 
-For the full configuration schema, refer to [contrib config.go](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/k8sclusterreceiver/config.go).
+For the full configuration schema, refer to [contrib `config.go`](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/k8sclusterreceiver/config.go).
 
 
 
@@ -180,7 +184,7 @@ See [contrib RBAC examples](https://github.com/open-telemetry/opentelemetry-coll
 
 ## Caveats and limitations
 
-Be aware of the following considerations and limitations when deploying the `k8s_cluster` receiver:
+The following considerations apply when using the `k8s_cluster` receiver in the {{edot}} Collector. These behaviors originate from the contrib OpenTelemetry implementation and also apply to other distributions:
 
 - Only one active `k8s_cluster` instance should run per cluster. Use `k8s_leader_elector` extension for high availability (HA).
 - Restricting namespaces turns off some cluster-level metrics.  
@@ -189,10 +193,7 @@ Be aware of the following considerations and limitations when deploying the `k8s
 
 
 
-## See also
+## Resources
 
 - [Contrib `k8s_cluster` receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sclusterreceiver)  
-- [Kubernetes environments](opentelemetry://reference/architecture/k8s.md)  
-<!--- [Kubernetes Objects receiver]()  
-
- - [Filelog receiver]() --->
+- [Kubernetes environments](opentelemetry://reference/architecture/k8s.md)
