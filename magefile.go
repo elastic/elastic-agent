@@ -35,7 +35,6 @@ import (
 	"time"
 
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/sys/unix"
 
 	"github.com/elastic/elastic-agent/dev-tools/devmachine"
 	"github.com/elastic/elastic-agent/dev-tools/mage"
@@ -407,15 +406,14 @@ func (Build) TestBinaries() error {
 
 	args := []string{"build", "-v"}
 	if runtime.GOOS == "darwin" {
-		var uts unix.Utsname
-		if err := unix.Uname(&uts); err != nil {
-			return err
+		ver, err := osVersion()
+		if err != nil {
+			return fmt.Errorf("cannot determine darwin OS version: %w", err)
 		}
 
-		release := unix.ByteSliceToString(uts.Release[:])
-		releaseParsed, err := version.ParseVersion(release)
+		releaseParsed, err := version.ParseVersion(ver)
 		if err != nil {
-			return fmt.Errorf("cannot parse darwin release version %q: %w", release, err)
+			return fmt.Errorf("cannot parse darwin release version %q: %w", ver, err)
 		}
 
 		if releaseParsed.Major() >= 21 { // 21 == macOS 15 Monterey
