@@ -1,0 +1,52 @@
+// begin 8.19.6 relnotes
+
+[[release-notes-8.19.6]]
+==  8.19.6
+
+Review important information about the  8.19.6 release.
+
+
+
+
+
+
+
+
+
+[discrete]
+[[new-features-8.19.6]]
+=== New features
+
+The 8.19.6 release adds the following new and notable features.
+
+
+**elastic-agent**
+
+* Add logs_metrics_traces.yml sample in EDOT for Windows. https://github.com/elastic/elastic-agent/pull/10514[#10514] 
+
+
+[discrete]
+[[enhancements-8.19.6]]
+=== Enhancements
+
+
+**elastic-agent**
+
+* Include OTel Collector internal telemetry in Agent monitoring. https://github.com/elastic/elastic-agent/pull/9928[#9928] 
+* Update OTel Collector components to v0.137.0. https://github.com/elastic/elastic-agent/pull/10391[#10391] 
+
+
+
+
+[discrete]
+[[bug-fixes-8.19.6]]
+=== Bug fixes
+
+
+**elastic-agent**
+
+* Improve logging to catch early errors on startup. https://github.com/elastic/elastic-agent/pull/10158[#10158] https://github.com/elastic/elastic-agent/issues/9099[#9099]
+* Fix an incorrectly formatted log message when a provider fails. https://github.com/elastic/elastic-agent/pull/10217[#10217] 
+* Inspect: Handle components with slashes in their name. https://github.com/elastic/elastic-agent/pull/10442[#10442] 
+
+// end 8.19.6 relnotes
