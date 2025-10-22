@@ -54,7 +54,6 @@ The receiver authenticates to the Kubernetes API using a service account, kubeco
 The receiver can coordinate multiple instances using the `k8s_leader_elector` extension, ensuring only one active collector scrapes data at any given time.
 
 
-
 ## Configuration
 
 Example minimal configuration:
