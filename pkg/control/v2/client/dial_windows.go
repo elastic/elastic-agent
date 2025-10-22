@@ -20,13 +20,13 @@ import (
 func dialContext(ctx context.Context, address string, maxMsgSize int, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	opts = append(opts,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithContextDialer(dialer),
+		grpc.WithContextDialer(Dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),
 	)
 	return grpc.DialContext(ctx, address, opts...) //nolint:staticcheck // Only the deprecated version allows this call to be blocking
 }
 
-func dialer(ctx context.Context, addr string) (net.Conn, error) {
+func Dialer(ctx context.Context, addr string) (net.Conn, error) {
 	if strings.HasPrefix(addr, "http://") {
 		var d net.Dialer
 		return d.DialContext(ctx, "tcp", strings.TrimPrefix(addr, "http://"))
