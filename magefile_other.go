@@ -6,7 +6,7 @@
 
 package main
 
-func osVersion() (string, error) {
+func osMajorVersion() (int, error) {
 	// Not needed for OSes other than macOS
-	return "", nil
+	return 0, nil
 }

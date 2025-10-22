@@ -406,22 +406,12 @@ func (Build) TestBinaries() error {
 
 	args := []string{"build", "-v"}
 	if runtime.GOOS == "darwin" {
-		ver, err := osVersion()
+		osMajorVer, err := osMajorVersion()
 		if err != nil {
-			return fmt.Errorf("cannot determine darwin OS version: %w", err)
+			return fmt.Errorf("cannot determine darwin OS major version: %w", err)
 		}
 
-		// run shell command to print the version for logging purposes
-		sh.RunV("sw_vers", "-productVersion")
-
-		fmt.Println("darwin OS version:", ver)
-
-		releaseParsed, err := version.ParseVersion(ver)
-		if err != nil {
-			return fmt.Errorf("cannot parse darwin release version %q: %w", ver, err)
-		}
-
-		if releaseParsed.Major() >= 21 { // 21 == macOS 15 Monterey
+		if osMajorVer > 13 {
 			// Workaround for https://github.com/golang/go/issues/67854 until it
 			// is resolved.
 			args = append(args, "-ldflags", "-extldflags='-ld_classic'")

@@ -6,13 +6,25 @@
 
 package main
 
-import "golang.org/x/sys/unix"
+import (
+	"fmt"
+	"strconv"
+	"strings"
 
-func osVersion() (string, error) {
-	var uts unix.Utsname
-	if err := unix.Uname(&uts); err != nil {
-		return "", err
+	"github.com/magefile/mage/sh"
+)
+
+func osMajorVersion() (int, error) {
+	ver, err := sh.Output("sw_vers", "-productVersion")
+	if err != nil {
+		return 0, err
 	}
 
-	return unix.ByteSliceToString(uts.Release[:]), nil
+	majorVerStr := strings.Split(ver, ".")[0]
+	majorVer, err := strconv.Atoi(majorVerStr)
+	if err != nil {
+		return 0, fmt.Errorf("unable to parse major version from %q: %w", ver, err)
+	}
+
+	return majorVer, nil
 }
