@@ -12,13 +12,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
-
 	"go.opentelemetry.io/collector/confmap"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 
@@ -237,6 +236,7 @@ func TestGetOtelConfig(t *testing.T) {
 
 	expectedExtensionConfig := func(extra ...extraParams) map[string]any {
 		finalOutput := map[string]any{
+			"continue_on_error":       true,
 			"idle_connection_timeout": "3s",
 			"proxy_disable":           false,
 			"proxy_url":               "https://example.com",
@@ -297,22 +297,20 @@ func TestGetOtelConfig(t *testing.T) {
 				"block_on_overflow": true,
 				"wait_for_result":   true,
 				"batch": map[string]any{
-					"max_size": 1600,
-					"min_size": 0,
-					"sizer":    "items",
+					"flush_timeout": "10s",
+					"max_size":      1600,
+					"min_size":      0,
+					"sizer":         "items",
 				},
 			},
 			"logs_dynamic_id": map[string]any{
 				"enabled": true,
 			},
-			"timeout":           90 * time.Second,
-			"idle_conn_timeout": 3 * time.Second,
+			"telemetry": map[string]any{
+				"log_failed_docs_input": true,
+			},
 			"auth": map[string]any{
 				"authenticator": "beatsauth/_agent-component/" + outputName,
-			},
-			"tls": map[string]any{
-				"min_version": tlscommon.TLSVersionDefaultMin.Details().Version,
-				"max_version": tlscommon.TLSVersionDefaultMax.Details().Version,
 			},
 		}
 	}
@@ -437,8 +435,8 @@ func TestGetOtelConfig(t *testing.T) {
 				"enabled": true,
 				"host":    "localhost",
 			},
+			"management.otel.enabled": true,
 		}
-
 	}
 
 	getBeatMonitoringConfig := func(_, _ string) map[string]any {
@@ -773,6 +771,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"enabled": true,
 							"host":    "localhost",
 						},
+						"management.otel.enabled": true,
 					},
 				},
 				"service": map[string]any{
@@ -883,6 +882,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"enabled": true,
 							"host":    "localhost",
 						},
+						"management.otel.enabled": true,
 					},
 				},
 				"service": map[string]any{

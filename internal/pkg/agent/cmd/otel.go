@@ -19,9 +19,11 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/service"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/agentprovider"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -71,6 +73,7 @@ func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Comman
 	setupOtelFlags(cmd.Flags())
 	cmd.AddCommand(newValidateCommandWithArgs(args, streams))
 	cmd.AddCommand(newComponentsCommandWithArgs(args, streams))
+	cmd.AddCommand(newOtelDiagnosticsCommand(streams))
 
 	return cmd
 }
@@ -128,6 +131,9 @@ type edotSettings struct {
 
 func prepareCollectorSettings(configFiles []string, supervised bool, supervisedLoggingLevel string) (edotSettings, error) {
 	var settings edotSettings
+	conf := map[string]any{
+		"endpoint": paths.DiagnosticsExtensionSocket(),
+	}
 	if supervised {
 		// add stdin config provider
 		configProvider, err := agentprovider.NewBufferProvider(os.Stdin)
@@ -136,6 +142,7 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 		}
 		settings.otelSettings = otel.NewSettings(release.Version(), []string{configProvider.URI()},
 			otel.WithConfigProviderFactory(configProvider.NewFactory()),
+			otel.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)),
 		)
 
 		// setup logger
@@ -173,7 +180,7 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 
 		settings.otelSettings.DisableGracefulShutdown = false
 	} else {
-		settings.otelSettings = otel.NewSettings(release.Version(), configFiles)
+		settings.otelSettings = otel.NewSettings(release.Version(), configFiles, otel.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)))
 	}
 	return settings, nil
 }
