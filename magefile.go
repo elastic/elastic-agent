@@ -411,6 +411,9 @@ func (Build) TestBinaries() error {
 			return fmt.Errorf("cannot determine darwin OS version: %w", err)
 		}
 
+		// run shell command to print the version for logging purposes
+		sh.RunV("sw_vers", "-productVersion")
+
 		fmt.Println("darwin OS version:", ver)
 
 		releaseParsed, err := version.ParseVersion(ver)
