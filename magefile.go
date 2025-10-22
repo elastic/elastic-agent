@@ -34,15 +34,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
-
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/otiai10/copy"
+	filecopy "github.com/otiai10/copy"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
+	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
 	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
 	"github.com/elastic/elastic-agent/dev-tools/packaging"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
@@ -421,7 +420,12 @@ func (Build) TestBinaries() error {
 		}
 
 		outputName := filepath.Join(pkg, binary)
-		err := devtools.Run(nil, nil, os.Stderr, "go", pkg, "build", "-v", "-o", outputName, pkg)
+
+		finalArgs := make([]string, len(args))
+		copy(finalArgs, args)
+		finalArgs = append(finalArgs, "-o", outputName, filepath.Join(pkg))
+
+		err := RunGo(finalArgs...)
 		if err != nil {
 			return err
 		}
@@ -1790,8 +1794,8 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestURL string, versio
 
 		log.Printf("copying %q to %q", srcBinaryPath, dstBinaryPath)
 
-		err = copy.Copy(srcBinaryPath, dstBinaryPath, copy.Options{
-			PermissionControl: copy.PerservePermission,
+		err = filecopy.Copy(srcBinaryPath, dstBinaryPath, filecopy.Options{
+			PermissionControl: filecopy.PerservePermission,
 		})
 		if err != nil {
 			return fmt.Errorf("copying %q to %q: %w", srcBinaryPath, dstBinaryPath, err)
