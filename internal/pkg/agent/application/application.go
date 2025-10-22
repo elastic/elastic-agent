@@ -266,7 +266,7 @@ func New(
 		agentInfo,
 		cfg.Settings.Collector,
 		monitor.ComponentMonitoringConfig,
-		cfg.Settings.ProcessConfig.StopTimeout,
+		3*time.Second, // this needs to be shorter than 5 * time.Seconds (coordinator.managerShutdownTimeout) otherwise we might end up with defunct processes
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)

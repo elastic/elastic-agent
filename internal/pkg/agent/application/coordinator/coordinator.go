@@ -235,7 +235,7 @@ type ComponentsModifier func(comps []component.Component, cfg map[string]interfa
 // Note: if this timeout doesn't accommodate for the subprocess stop timeout,
 // the Wait of subprocess might never be called, and we may end up with Zombie processes
 // during restart in Unix systemss.
-const managerShutdownTimeout = time.Second * 35
+const managerShutdownTimeout = time.Second * 5
 
 type configReloader interface {
 	Reload(*config.Config) error
