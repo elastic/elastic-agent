@@ -406,7 +406,7 @@ func (Build) TestBinaries() error {
 
 	args := []string{"build", "-v"}
 	if runtime.GOOS == "darwin" {
-		osMajorVer, err := osMajorVersion()
+		osMajorVer, err := getMacOSMajorVersion()
 		if err != nil {
 			return fmt.Errorf("cannot determine darwin OS major version: %w", err)
 		}
@@ -4132,4 +4132,19 @@ func loadYamlFile(path string) (map[string]any, error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+func getMacOSMajorVersion() (int, error) {
+	ver, err := sh.Output("sw_vers", "-productVersion")
+	if err != nil {
+		return 0, err
+	}
+
+	majorVerStr := strings.Split(ver, ".")[0]
+	majorVer, err := strconv.Atoi(majorVerStr)
+	if err != nil {
+		return 0, fmt.Errorf("unable to parse major version from %q: %w", ver, err)
+	}
+
+	return majorVer, nil
 }
