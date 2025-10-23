@@ -25,6 +25,11 @@ components:
     doc_path: "/reference/edot-collector/config/authentication-methods.md"
     title: "Authentication methods"
 
+  # Processors
+  elasticapmprocessor:
+    doc_path: "/reference/edot-collector/components/elasticapmprocessor.md"
+    title: "Elastic APM processor"
+
   # Add more components as documentation is created
   # elasticapmconnector:
   #   doc_path: "/reference/edot-collector/components/elasticapmconnector"
