@@ -435,8 +435,12 @@ func TestAgentMetricsInput(t *testing.T) {
 		RuntimeExperimental string
 		Metricsets          []string
 	}
-	configTemplate := `agent.logging.level: info
-agent.logging.to_stderr: true
+	configTemplate := `agent:
+  logging:
+    level: debug
+    to_stderr: true
+  monitoring:
+    _runtime_experimental: {{.RuntimeExperimental}}
 inputs:
   # Collecting system metrics
   - type: system/metrics
@@ -472,7 +476,7 @@ outputs:
 		name                string
 		runtimeExperimental string
 	}{
-		{name: "agent"},
+		{name: "agent", runtimeExperimental: "process"},
 		{name: "otel", runtimeExperimental: "otel"},
 	}
 
