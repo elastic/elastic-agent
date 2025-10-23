@@ -118,7 +118,7 @@ These are the most important settings when configuring the host metrics receiver
 | `scrapers` | Map of scraper names to their configurations. Each scraper can be customized individually. |
 | `scrapers.<name>.metrics` | Control which specific metrics are enabled for a given scraper. |
 
-For the complete list of configuration options and scraper-specific settings, refer to the [upstream `hostmetricsreceiver` documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/hostmetricsreceiver/README.md).
+For the complete list of configuration options and scraper-specific settings, refer to the [contrib `hostmetricsreceiver` documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/hostmetricsreceiver/README.md).
 
 ## Best practices
 
@@ -141,7 +141,7 @@ Follow these recommendations to get the most value from the host metrics receive
 
 Be aware of these constraints and behaviors when using the host metrics receiver:
 
-* **Process metrics are turned off by default**: The `process` scraper generates significant metric volume and is commented out in EDOT default configuration. Turning it on can substantially increase storage requirements and costs. Refer to the upstream [issue #39423](https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/39423) for ongoing discussion about optimizing process metrics collection.
+* **Process metrics are turned off by default**: The `process` scraper generates significant metric volume and is commented out in EDOT default configuration. Turning it on can substantially increase storage requirements and costs. Refer to the contrib [issue #39423](https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/39423) for ongoing discussion about optimizing process metrics collection.
 
 * **Container deployment requires privileged access**: To collect host metrics from inside a container (Kubernetes DaemonSet), the collector must run with elevated privileges (`runAsUser: 0`) and have the host's `/proc` and `/sys` filesystems mounted. Refer to the [collecting host metrics from inside a container](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/hostmetricsreceiver#collecting-host-metrics-from-inside-a-container-linux-only) guide for details.
 
@@ -153,7 +153,7 @@ Be aware of these constraints and behaviors when using the host metrics receiver
 
 ## Resources
 
-* [Upstream component: hostmetricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/hostmetricsreceiver/README.md)
+* [Contrib component: hostmetricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/hostmetricsreceiver/README.md)
 * [Configure metrics collection in EDOT](../config/configure-metrics-collection.md)
 * [{{product.observability}} host metrics reference](https://www.elastic.co/docs/reference/observability/observability-host-metrics)
 
