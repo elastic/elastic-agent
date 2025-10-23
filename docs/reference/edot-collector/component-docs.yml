@@ -13,8 +13,6 @@ components:
     doc_path: "/reference/edot-collector/components/elasticapmintakereceiver.md"
     title: "Elastic APM intake receiver"
 
-<<<<<<< HEAD
-=======
   elasticapmprocessor:
     doc_path: "/reference/edot-collector/components/elasticapmprocessor.md"
     title: "Elastic APM processor"
@@ -23,7 +21,6 @@ components:
     doc_path: "/reference/edot-collector/components/filelogreceiver.md"
     title: "File log receiver"
 
->>>>>>> 4389ac1c0 (Add elasticapm processor docs (#10718))
   apikeyauthextension:
     doc_path: "/reference/edot-collector/config/authentication-methods.md"
     title: "Authentication methods"
