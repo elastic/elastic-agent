@@ -368,4 +368,4 @@ The server expects incoming HTTP requests to include an API key with sufficient 
 [Logs &#124; Metrics - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/managed_otlp/platformlogs_hostmetrics.yml
 [Logs &#124; Metrics &#124; App - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/logs_metrics_traces.yml
 [Logs &#124; Metrics &#124; App - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/managed_otlp/logs_metrics_traces.yml
-[Gateway mode]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/gateway.yml
+[Gateway mode]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/heads/main/internal/pkg/otel/samples/linux/gateway.yml
