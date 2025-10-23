@@ -277,6 +277,18 @@ func (f *Fixture) Configure(ctx context.Context, yamlConfig []byte) error {
 	return os.WriteFile(cfgFilePath, yamlConfig, 0600)
 }
 
+// ConfigureOtel replaces the default Agent otel mode configuration file with the provided
+// configuration. This must be called after `Prepare` is called.
+func (f *Fixture) ConfigureOtel(ctx context.Context, yamlConfig []byte) error {
+	err := f.EnsurePrepared(ctx)
+	if err != nil {
+		return err
+	}
+
+	cfgFilePath := filepath.Join(f.workDir, "otel.yml")
+	return os.WriteFile(cfgFilePath, yamlConfig, 0600)
+}
+
 // SetUninstallToken sets uninstall token
 func (f *Fixture) SetUninstallToken(uninstallToken string) {
 	f.uninstallToken = uninstallToken
