@@ -14,15 +14,13 @@ if [[ "$BUILDKITE_STEP_KEY" == *"integration-tests"* ]]; then
   SNAPSHOT=true mage integration:clean
 fi
 
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "buildkite-elastic-agent-integration-matrix" ]]; then
-  if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
-    if test -f "$GOOGLE_APPLICATION_CREDENTIALS"; then
-      rm $GOOGLE_APPLICATION_CREDENTIALS
-    fi
+if [ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]; then
+  if test -f "$GOOGLE_APPLICATION_CREDENTIALS"; then
+    rm $GOOGLE_APPLICATION_CREDENTIALS
   fi
 fi
 
-if [ -n "$TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE" ]; then
+if [ -n "${TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE:-}" ]; then
   if test -f "$TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE"; then
     rm $TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE
   fi
