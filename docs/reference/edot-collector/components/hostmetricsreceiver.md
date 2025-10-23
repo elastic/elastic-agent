@@ -27,7 +27,7 @@ The `hostmetricsreceiver` is included by default in the EDOT Collector for both 
 
 In standalone deployments, the host metrics receiver is part of the default [host metrics collection pipeline](../config/default-config-standalone.md#host-metrics-collection-pipeline). It collects system metrics at 60-second intervals and can be configured to export either:
 
-- Directly to {{es}} using the `elasticsearch` exporter (with ECS translation through the `elasticinframetrics` processor).
+- Directly to {{es}} using the `elasticsearch` exporter (with optional ECS translation through the `elasticinframetrics` processor).
 - To the [{{motlp}}](opentelemetry://reference/motlp.md) using the `otlp` exporter.
 
 ### Kubernetes deployment
