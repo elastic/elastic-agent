@@ -36,7 +36,6 @@ import (
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
 
-	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/otiai10/copy"
 	"golang.org/x/sync/errgroup"
 
@@ -76,7 +75,6 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	filecopy "github.com/otiai10/copy"
 	"gopkg.in/yaml.v3"
 
 	"helm.sh/helm/v3/pkg/action"
@@ -402,6 +400,8 @@ func (Build) TestBinaries() error {
 	}
 
 	args := []string{"build", "-v"}
+	if runtime.GOOS == "darwin" {
+		osMajorVer, err := getMacOSMajorVersion()
 		if err != nil {
 			return fmt.Errorf("cannot determine darwin OS major version: %w", err)
 		}
@@ -415,6 +415,7 @@ func (Build) TestBinaries() error {
 
 	for _, pkg := range testBinaryPkgs {
 		binary := filepath.Base(pkg)
+		if runtime.GOOS == "windows" {
 			binary += ".exe"
 		}
 
