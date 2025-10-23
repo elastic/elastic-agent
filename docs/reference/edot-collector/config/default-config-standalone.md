@@ -357,7 +357,7 @@ The server expects incoming HTTP requests to include an API key with sufficient 
 [`hostmetrics`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/hostmetricsreceiver
 [`elasticsearch`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/elasticsearchexporter
 [`elasticinframetrics`]: https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticinframetricsprocessor
-[`elasticapm`]: https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticapmprocessor
+[`elasticapm` processor]: https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticapmprocessor
 [`elasticapm` connector]: https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector
 [`resource`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourceprocessor
 [`resourcedetection`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor
