@@ -51,7 +51,7 @@ processors:
   elasticapm: {}
 ```
 
-When combined with the elasticapm connector in a complete pipeline:
+When combined with the `elasticapm` connector in a complete pipeline:
 
 ```yaml
 receivers:
@@ -106,7 +106,7 @@ The Elastic APM processor enhances trace data with the following capabilities:
 | Error handling | Transforms error information to align with Elastic's error model. |
 | Data stream routing | Adds necessary attributes for proper data stream routing in {{es}}. |
 
-For detailed information about specific attributes and transformations, refer to the [upstream `elasticapmprocessor` documentation](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticapmprocessor).
+For detailed information about specific attributes and transformations, refer to the [contrib `elasticapmprocessor` documentation](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticapmprocessor).
 
 ## Best practices
 
@@ -128,7 +128,7 @@ Be aware of these constraints and behaviors when using the Elastic APM processor
 
 * **Required for Elastic {{product.apm}} UIs**: Without the Elastic APM processor, OpenTelemetry traces will be stored in {{es}} but may not render correctly in Elastic {{product.apm}} UIs. Service maps, transaction groups, and other {{product.apm}}-specific visualizations depend on the enrichments this processor provides.
 
-* **Not available in upstream OTel Collector**: The Elastic APM processor is an Elastic-specific component not included in the standard OpenTelemetry Collector or Collector Contrib distributions. To use it, you must either use EDOT Collector or [build a custom collector](../custom-collector.md) that includes Elastic's components.
+* **Not available in contrib OTel Collector**: The Elastic APM processor is an Elastic-specific component not included in the standard OpenTelemetry Collector or Collector Contrib distributions. To use it, you must either use EDOT Collector or [build a custom collector](../custom-collector.md) that includes Elastic's components.
 
 
 * **Minimal configuration options**: Unlike some processors, the Elastic APM processor operates with fixed behavior and offers few configuration parameters. While this simplifies setup, it also means you can't customize the enrichment logic.
@@ -137,7 +137,7 @@ Be aware of these constraints and behaviors when using the Elastic APM processor
 
 ## Resources
 
-* [Upstream component: elasticapmprocessor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticapmprocessor)
+* [Contrib component: elasticapmprocessor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticapmprocessor)
 * [Elastic {{product.apm}} connector](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector)
 * [Default configuration (Standalone)](../config/default-config-standalone.md#application-and-traces-collection-pipeline)
 * [Default configuration (Kubernetes)](../config/default-config-k8s.md)
