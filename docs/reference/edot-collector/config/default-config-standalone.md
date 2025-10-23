@@ -65,7 +65,7 @@ Data is exported directly to {{es}} using the [`elasticsearch`] exporter in `OTe
 
 The application pipeline in the EDOT Collector receives data from OTel SDKs through the [`OTLP`] receiver. While logs and metrics are exported verbatim into {{es}}, traces require two additional components.
 
-{applies_to}`edot_collector: ga 9.2` The [`elasticapm`](../components/elasticapmprocessor.md) processor enriches trace data with additional attributes that improve the user experience in the {{product.observability}} UIs. In addition, the [`elasticapm`](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector) connector generates pre-aggregated APM metrics from tracing data.
+{applies_to}`edot_collector: ga 9.2` The [`elasticapm` processor](../components/elasticapmprocessor.md) enriches trace data with additional attributes that improve the user experience in the {{product.observability}} UIs. In addition, the [`elasticapm` connector](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector) generates pre-aggregated APM metrics from tracing data.
 
 Application-related OTel data is ingested into {{es}} in OTel-native format using the [`elasticsearch`] exporter.
 
@@ -358,7 +358,7 @@ The server expects incoming HTTP requests to include an API key with sufficient 
 [`elasticsearch`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/elasticsearchexporter
 [`elasticinframetrics`]: https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticinframetricsprocessor
 [`elasticapm`]: https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticapmprocessor
-[`elasticapm`]: https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector
+[`elasticapm` connector]: https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector
 [`resource`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourceprocessor
 [`resourcedetection`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor
 [`OTLP`]: https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver
@@ -368,4 +368,4 @@ The server expects incoming HTTP requests to include an API key with sufficient 
 [Logs &#124; Metrics - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/managed_otlp/platformlogs_hostmetrics.yml
 [Logs &#124; Metrics &#124; App - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/logs_metrics_traces.yml
 [Logs &#124; Metrics &#124; App - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/managed_otlp/logs_metrics_traces.yml
-[Gateway mode]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/heads/main/internal/pkg/otel/samples/linux/gateway.yml
+[Gateway mode]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/gateway.yml
