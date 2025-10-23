@@ -40,9 +40,9 @@ function run_release_manager() {
     # shellcheck disable=SC2086
     docker run --rm \
         --name release-manager \
-        -e VAULT_ADDR="${VAULT_ADDR_SECRET}" \
-        -e VAULT_ROLE_ID="${VAULT_ROLE_ID_SECRET}" \
-        -e VAULT_SECRET_ID="${VAULT_SECRET}" \
+        -e VAULT_ADDR \
+        -e VAULT_ROLE_ID \
+        -e VAULT_SECRET_ID \
         --mount type=bind,readonly=false,src="${PWD}",target=/artifacts \
         docker.elastic.co/infra/release-manager:latest \
         cli "${_command}" \
