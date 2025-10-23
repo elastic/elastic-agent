@@ -65,7 +65,7 @@ Data is exported directly to {{es}} using the [`elasticsearch`] exporter in `OTe
 
 The application pipeline in the EDOT Collector receives data from OTel SDKs through the [`OTLP`] receiver. While logs and metrics are exported verbatim into {{es}}, traces require two additional components.
 
-{applies_to}`edot_collector: ga 9.2` The [`elasticapm`] processor enriches trace data with additional attributes that improve the user experience in the {{product.observability}} UIs. In addition, the [`elasticapm`] connector generates pre-aggregated APM metrics from tracing data.
+{applies_to}`edot_collector: ga 9.2` The [`elasticapm`](../components/elasticapmprocessor.md) processor enriches trace data with additional attributes that improve the user experience in the {{product.observability}} UIs. In addition, the [`elasticapm`](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector) connector generates pre-aggregated APM metrics from tracing data.
 
 Application-related OTel data is ingested into {{es}} in OTel-native format using the [`elasticsearch`] exporter.
 
