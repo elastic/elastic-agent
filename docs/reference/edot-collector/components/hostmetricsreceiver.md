@@ -124,7 +124,7 @@ For the complete list of configuration options and scraper-specific settings, re
 
 Follow these recommendations to get the most value from the host metrics receiver:
 
-* **Use the `root_path` setting when running in containers**: When the collector runs inside a container, it needs access to the host's filesystem to collect accurate metrics. Mount the host's root directory (typically at `/hostfs`) and set `root_path: /hostfs` in your configuration. This ensures the receiver reads from the host's `/proc`, `/sys`, and other system directories rather than the container's isolated filesystem.
+* **Use the `root_path` setting when running in containers**: When the collector runs inside a container, it needs access to the host's filesystem to collect accurate metrics. Mount the host's root directory (typically at `/`) and set `root_path: /hostfs` in your configuration. This ensures the receiver reads from the host's `/proc`, `/sys`, and other system directories rather than the container's isolated filesystem.
 
 * **Filter out non-data filesystems and mount points**: To avoid collecting metrics from temporary, virtual, or container-specific filesystems, use the `exclude_mount_points` and `exclude_fs_types` options in the filesystem scraper. The default EDOT configuration already excludes common noise sources like `/dev/*`, `/proc/*`, `/sys/*`, overlay filesystems, and various pseudo-filesystems.
 
