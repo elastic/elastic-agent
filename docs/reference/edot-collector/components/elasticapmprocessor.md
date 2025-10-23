@@ -1,6 +1,6 @@
 ---
 navigation_title: Elastic APM processor
-description: The Elastic APM processor is an OpenTelemetry Collector component that enriches trace data for optimal use with Elastic APM.
+description: The Elastic APM processor is an OpenTelemetry Collector component that enriches OTel data for optimal use with Elastic APM.
 applies_to:
   stack:
   serverless:
