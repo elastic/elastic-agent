@@ -16,6 +16,12 @@ toc:
     children:
       - file: components/elasticsearchexporter.md
       - file: components/elasticapmintakereceiver.md
+<<<<<<< HEAD
+=======
+      - file: components/k8sclusterreceiver.md
+      - file: components/elasticapmprocessor.md
+      - file: components/filelogreceiver.md
+>>>>>>> fd48f5a74 ([DOCS] Kubernetes Cluster receiver (k8s_cluster) (#10651))
   - file: customization.md
     children:
       - file: custom-collector.md
