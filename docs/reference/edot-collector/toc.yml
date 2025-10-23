@@ -16,6 +16,11 @@ toc:
     children:
       - file: components/elasticsearchexporter.md
       - file: components/elasticapmintakereceiver.md
+<<<<<<< HEAD
+=======
+      - file: components/elasticapmprocessor.md
+      - file: components/filelogreceiver.md
+>>>>>>> 4389ac1c0 (Add elasticapm processor docs (#10718))
   - file: customization.md
     children:
       - file: custom-collector.md
