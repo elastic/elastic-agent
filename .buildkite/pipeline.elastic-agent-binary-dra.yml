@@ -13,6 +13,21 @@ common:
   - docker_login_plugin: &docker_login_plugin
       elastic/vault-docker-login#v0.5.2:
         secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+  - vault_addr: &vault_addr
+      elastic/vault-secrets#v0.1.0:
+          path: "kv/ci-shared/release/dra-role"
+          field: "vault_addr"
+          env_var: "VAULT_ADDR"
+  - vault_role_id: &vault_role_id
+      elastic/vault-secrets#v0.1.0:
+          path: "kv/ci-shared/release/dra-role"
+          field: "role_id"
+          env_var: "VAULT_ROLE_ID"
+  - vault_secret_id: &vault_secret_id
+      elastic/vault-secrets#v0.1.0:
+          path: "kv/ci-shared/release/dra-role"
+          field: "secret_id"
+          env_var: "VAULT_SECRET_ID"
 
 steps:
   - group: ":beats: DRA Elastic-Agent Core Snapshot :beats:"
@@ -93,6 +108,9 @@ steps:
         DRA_WORKFLOW: "snapshot"
       plugins:
         - *docker_login_plugin
+        - *vault_addr
+        - *vault_role_id
+        - *vault_secret_id
 
     - label: ":hammer: Publish helm chart snapshot"
       trigger: elastic-agent-helm-charts
@@ -188,6 +206,9 @@ steps:
         DRA_WORKFLOW: "staging"
       plugins:
         - *docker_login_plugin
+        - *vault_addr
+        - *vault_role_id
+        - *vault_secret_id
 
 notify:
   - slack: "#ingest-notifications"
