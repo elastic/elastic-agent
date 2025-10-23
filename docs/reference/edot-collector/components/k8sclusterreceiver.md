@@ -20,6 +20,7 @@ The Kubernetes cluster receiver (`k8s_cluster`) is a core component of the {{edo
 For full contrib details, refer to the [OpenTelemetry k8s_cluster receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sclusterreceiver).
 
 
+
 ## Get started
 
 To use the Kubernetes cluster receiver, include it in the receivers section of your Collector configuration.
