@@ -25,6 +25,18 @@ components:
     doc_path: "/reference/edot-collector/config/authentication-methods.md"
     title: "Authentication methods"
 
+<<<<<<< HEAD
+=======
+  hostmetricsreceiver:
+    doc_path: "/reference/edot-collector/components/hostmetricsreceiver.md"
+    title: "Host metrics receiver"
+
+  # Processors
+  elasticapmprocessor:
+    doc_path: "/reference/edot-collector/components/elasticapmprocessor.md"
+    title: "Elastic APM processor"
+
+>>>>>>> 7421d08c0 (Document hostmetrics receiver (#10716))
   # Add more components as documentation is created
   # elasticapmconnector:
   #   doc_path: "/reference/edot-collector/components/elasticapmconnector"
