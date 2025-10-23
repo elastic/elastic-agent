@@ -87,3 +87,23 @@ targets:
       file: .buildkite/bk.integration-fips.pipeline.yml
       matchpattern: '(IMAGE_.+): "platform-ingest-elastic-agent-(.+)-(.+)"'
       replacepattern: '$1: "platform-ingest-elastic-agent-$2-{{ source "latestVersion" }}"'
+
+  update-buildkite-pipeline.elastic-agent-binary-dra:
+    name: "Update .buildkite/pipeline.elastic-agent-binary-dra.yml"
+    sourceid: latestVersion
+    scmid: githubConfig
+    kind: file
+    spec:
+      file: .buildkite/pipeline.elastic-agent-binary-dra.yml
+      matchpattern: '(IMAGE_.+): "platform-ingest-elastic-agent-(.+)-(.+)"'
+      replacepattern: '$1: "platform-ingest-elastic-agent-$2-{{ source "latestVersion" }}"'
+
+  update-buildkite-pipeline.elastic-agent-package:
+    name: "Update .buildkite/pipeline.elastic-agent-package.yml"
+    sourceid: latestVersion
+    scmid: githubConfig
+    kind: file
+    spec:
+      file: .buildkite/pipeline.elastic-agent-package.yml
+      matchpattern: '(IMAGE_.+): "platform-ingest-elastic-agent-(.+)-(.+)"'
+      replacepattern: '$1: "platform-ingest-elastic-agent-$2-{{ source "latestVersion" }}"'
