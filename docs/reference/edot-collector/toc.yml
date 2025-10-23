@@ -20,6 +20,7 @@ toc:
       - file: components/elasticapmprocessor.md
       - file: components/filelogreceiver.md
       - file: components/k8sobjectsreceiver.md
+      - file: components/hostmetricsreceiver.md
   - file: customization.md
     children:
       - file: custom-collector.md
