@@ -20,7 +20,7 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "buildkite-elastic-agent-integration-matrix"
       rm $GOOGLE_APPLICATION_CREDENTIALS
     fi
   fi
-then
+fi
 
 if [ -n "$TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE" ]; then
   if test -f "$TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE"; then
