@@ -13,10 +13,6 @@ components:
     doc_path: "/reference/edot-collector/components/elasticapmintakereceiver.md"
     title: "Elastic APM intake receiver"
 
-  elasticapmprocessor:
-    doc_path: "/reference/edot-collector/components/elasticapmprocessor.md"
-    title: "Elastic APM processor"
-
   filelogreceiver:
     doc_path: "/reference/edot-collector/components/filelogreceiver.md"
     title: "File log receiver"
