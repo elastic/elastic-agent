@@ -36,10 +36,6 @@ receivers:
       processes:
       load:
 
-extensions:
-  file_storage:
-    directory: ${env:STORAGE_DIR}
-
 processors:
   resourcedetection:
     detectors: ["system"]
@@ -82,7 +78,6 @@ exporters:
       mode: otel
 
 service:
-  extensions: [file_storage]
   pipelines:
     metrics/hostmetrics:
       receivers: [hostmetrics/system]

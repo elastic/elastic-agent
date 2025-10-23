@@ -2,10 +2,6 @@ receivers:
   windowseventlog:
     channel: application
 
-extensions:
-  file_storage:
-    directory: ${env:STORAGE_DIR}
-
 processors:
   resourcedetection:
     detectors: ["system"]
@@ -62,7 +58,6 @@ exporters:
         max_size: 4_000_000 # 4MB uncompressed
 
 service:
-  extensions: [file_storage]
   pipelines:
     logs/platformlogs:
       receivers: [windowseventlog]
