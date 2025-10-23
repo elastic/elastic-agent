@@ -34,10 +34,14 @@ import (
 	"sync/atomic"
 	"time"
 
+<<<<<<< HEAD
 	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/otiai10/copy"
+=======
+	"golang.org/x/sync/errgroup"
+>>>>>>> c46d45692 ([MacOS unit testing] Add version check (#10723))
 
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
@@ -72,9 +76,10 @@ import (
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
 
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"golang.org/x/sync/errgroup"
+	filecopy "github.com/otiai10/copy"
 	"gopkg.in/yaml.v3"
 
 	"helm.sh/helm/v3/pkg/action"
@@ -399,6 +404,23 @@ func (Build) TestBinaries() error {
 		fmt.Errorf("cannot build test binaries: %w", err)
 	}
 
+<<<<<<< HEAD
+=======
+	args := []string{"build", "-v"}
+	if runtime.GOOS == "darwin" {
+		osMajorVer, err := getMacOSMajorVersion()
+		if err != nil {
+			return fmt.Errorf("cannot determine darwin OS major version: %w", err)
+		}
+
+		if osMajorVer > 13 {
+			// Workaround for https://github.com/golang/go/issues/67854 until it
+			// is resolved.
+			args = append(args, "-ldflags", "-extldflags='-ld_classic'")
+		}
+	}
+
+>>>>>>> c46d45692 ([MacOS unit testing] Add version check (#10723))
 	for _, pkg := range testBinaryPkgs {
 		binary := filepath.Base(pkg)
 		if runtime.GOOS == "windows" {
@@ -4095,4 +4117,19 @@ func loadYamlFile(path string) (map[string]any, error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+func getMacOSMajorVersion() (int, error) {
+	ver, err := sh.Output("sw_vers", "-productVersion")
+	if err != nil {
+		return 0, err
+	}
+
+	majorVerStr := strings.Split(ver, ".")[0]
+	majorVer, err := strconv.Atoi(majorVerStr)
+	if err != nil {
+		return 0, fmt.Errorf("unable to parse major version from %q: %w", ver, err)
+	}
+
+	return majorVer, nil
 }
