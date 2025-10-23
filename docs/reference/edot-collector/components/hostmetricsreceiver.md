@@ -32,7 +32,7 @@ In standalone deployments, the host metrics receiver is part of the default [hos
 
 ### Kubernetes deployment
 
-In Kubernetes, the host metrics receiver runs as part of the [DaemonSet collectors pipeline](../config/default-config-k8s.md#daemonset-collectors-pipeline) on every node to collect node-level host metrics at 60-second intervals. The receiver uses `root_path: /hostfs` to access the host's filesystem from within the container.
+In Kubernetes, the host metrics receiver runs as part of the [DaemonSet collectors pipeline](../config/default-config-k8s.md#daemonset-collectors-pipeline) on every node to collect node-level host metrics at 60-second intervals. The receiver uses `root_path: /hostfs` (a mounted Kubernetes volume) to access the host's filesystem from within the container.
 
 For more details about the Kubernetes configuration, refer to [Default configuration (Kubernetes)](../config/default-config-k8s.md).
 
