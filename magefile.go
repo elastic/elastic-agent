@@ -34,14 +34,11 @@ import (
 	"sync/atomic"
 	"time"
 
-<<<<<<< HEAD
 	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/otiai10/copy"
-=======
 	"golang.org/x/sync/errgroup"
->>>>>>> c46d45692 ([MacOS unit testing] Add version check (#10723))
 
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
@@ -404,11 +401,7 @@ func (Build) TestBinaries() error {
 		fmt.Errorf("cannot build test binaries: %w", err)
 	}
 
-<<<<<<< HEAD
-=======
 	args := []string{"build", "-v"}
-	if runtime.GOOS == "darwin" {
-		osMajorVer, err := getMacOSMajorVersion()
 		if err != nil {
 			return fmt.Errorf("cannot determine darwin OS major version: %w", err)
 		}
@@ -420,10 +413,8 @@ func (Build) TestBinaries() error {
 		}
 	}
 
->>>>>>> c46d45692 ([MacOS unit testing] Add version check (#10723))
 	for _, pkg := range testBinaryPkgs {
 		binary := filepath.Base(pkg)
-		if runtime.GOOS == "windows" {
 			binary += ".exe"
 		}
 
