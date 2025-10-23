@@ -130,7 +130,6 @@ Be aware of these constraints and behaviors when using the Elastic APM processor
 
 * **Not available in upstream OTel Collector**: The Elastic APM processor is an Elastic-specific component not included in the standard OpenTelemetry Collector or Collector Contrib distributions. To use it, you must either use EDOT Collector or [build a custom collector](../custom-collector.md) that includes Elastic's components.
 
-* **Works only with OTel-native mode**: The processor is designed for use with the `elasticsearch` exporter in `otel` mode. It doesn't apply transformations for ECS-mode exports, as those follow a different data model.
 
 * **Minimal configuration options**: Unlike some processors, the Elastic APM processor operates with fixed behavior and offers few configuration parameters. While this simplifies setup, it also means you can't customize the enrichment logic.
 
