@@ -17,7 +17,7 @@ products:
 
 The Elastic {{product.apm}} processor enriches OpenTelemetry trace data with Elastic-specific attributes and metadata, ensuring optimal compatibility with Elastic {{product.apm}} UIs and functionality. It bridges the gap between OpenTelemetry's trace format and Elastic's expectations, enabling features like service maps, transaction groups, and enhanced trace visualization.
 
-The processor works in tandem with the [Elastic {{product.apm}} connector](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector), which generates pre-aggregated {{product.apm}} metrics from trace data. Together, these components provide the complete Elastic {{product.apm}} experience when ingesting OpenTelemetry traces.
+The processor works in tandem with the [Elastic {{product.apm}} connector](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector), which generates pre-aggregated {{product.apm}} metrics from trace data.
 
 ## Default usage in EDOT
 
