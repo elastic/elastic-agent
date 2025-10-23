@@ -225,6 +225,7 @@ func TestGetOtelConfig(t *testing.T) {
 			"preset":           "balanced",
 			"queue.mem.events": 3200,
 			"ssl.enabled":      true,
+			"proxy_url":        "https://example.com",
 		}
 
 		for _, v := range extra {
@@ -235,8 +236,10 @@ func TestGetOtelConfig(t *testing.T) {
 
 	expectedExtensionConfig := func(extra ...extraParams) map[string]any {
 		finalOutput := map[string]any{
+			"continue_on_error":       true,
 			"idle_connection_timeout": "3s",
 			"proxy_disable":           false,
+			"proxy_url":               "https://example.com",
 			"ssl": map[string]interface{}{
 				"ca_sha256":               []interface{}{},
 				"ca_trusted_fingerprint":  "",
@@ -302,6 +305,9 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 			"logs_dynamic_id": map[string]any{
 				"enabled": true,
+			},
+			"telemetry": map[string]any{
+				"log_failed_docs_input": true,
 			},
 			"auth": map[string]any{
 				"authenticator": "beatsauth/_agent-component/" + outputName,

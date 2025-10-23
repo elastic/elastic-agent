@@ -6,6 +6,8 @@ package manager
 
 import (
 	"context"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -13,6 +15,8 @@ import (
 	"go.opentelemetry.io/collector/otelcol"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
@@ -22,11 +26,14 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-func newExecutionEmbedded() *embeddedExecution {
-	return &embeddedExecution{}
+// newExecutionEmbedded creates a new execution which runs the otel collector in a goroutine. A metricsPort of 0 will
+// result in a random port being used.
+func newExecutionEmbedded(metricsPort int) *embeddedExecution {
+	return &embeddedExecution{collectorMetricsPort: metricsPort}
 }
 
 type embeddedExecution struct {
+	collectorMetricsPort int
 }
 
 // startCollector starts the collector in a new goroutine.
@@ -40,6 +47,10 @@ func (r *embeddedExecution) startCollector(ctx context.Context, logger *logger.L
 	}
 	extConf := map[string]any{
 		"endpoint": paths.DiagnosticsExtensionSocket(),
+	}
+	collectorMetricsPort, err := r.getCollectorMetricsPort()
+	if err != nil {
+		return nil, err
 	}
 	// NewForceExtensionConverterFactory is used to ensure that the agent_status extension is always enabled.
 	// It is required for the Elastic Agent to extract the status out of the OTel collector.
@@ -59,11 +70,41 @@ func (r *embeddedExecution) startCollector(ctx context.Context, logger *logger.L
 		return nil, err
 	}
 	go func() {
+		// Set the environment variable for the collector metrics port. See comment at the constant definition for more information.
+		setErr := os.Setenv(componentmonitoring.OtelCollectorMetricsPortEnvVarName, strconv.Itoa(collectorMetricsPort))
+		defer func() {
+			unsetErr := os.Unsetenv(componentmonitoring.OtelCollectorMetricsPortEnvVarName)
+			if unsetErr != nil {
+				logger.Errorf("couldn't unset environment variable %s: %v", componentmonitoring.OtelCollectorMetricsPortEnvVarName, unsetErr)
+			}
+		}()
+		if setErr != nil {
+			reportErr(ctx, errCh, setErr)
+			return
+		}
 		runErr := svc.Run(collectorCtx)
 		close(ctl.collectorDoneCh)
+		// after the collector exits, we need to report the error and a nil status
 		reportErr(ctx, errCh, runErr)
+		reportCollectorStatus(ctx, statusCh, nil)
 	}()
 	return ctl, nil
+}
+
+// getCollectorPorts returns the metrics port used by the OTel collector. If the port set in the execution struct is 0,
+// a random port is returned instead.
+func (r *embeddedExecution) getCollectorMetricsPort() (metricsPort int, err error) {
+	// if the port is defined (non-zero), use it
+	if r.collectorMetricsPort > 0 {
+		return r.collectorMetricsPort, nil
+	}
+
+	// get a random port
+	ports, err := findRandomTCPPorts(1)
+	if err != nil {
+		return 0, err
+	}
+	return ports[0], nil
 }
 
 type ctxHandle struct {

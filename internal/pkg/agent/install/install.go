@@ -135,7 +135,7 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *p
 			// We use strings.Replace instead of fmt.Sprintf here because, with the
 			// latter, govet throws a false positive error here: "fmt.Sprintf call has
 			// arguments but no formatting directives".
-			shellWrapper := strings.Replace(paths.ShellWrapperFmt, "%s", topPath, -1)
+			shellWrapper := strings.ReplaceAll(paths.ShellWrapperFmt, "%s", topPath)
 			err = os.WriteFile(paths.ShellWrapperPath(), []byte(shellWrapper), 0755)
 			if err != nil {
 				return utils.FileOwner{}, errors.New(

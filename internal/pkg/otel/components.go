@@ -55,7 +55,7 @@ import (
 	"go.opentelemetry.io/collector/processor/memorylimiterprocessor"
 
 	elasticapmprocessor "github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor"
-	"github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor"
+	elastictraceprocessor "github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor"
 
 	"github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor"
 

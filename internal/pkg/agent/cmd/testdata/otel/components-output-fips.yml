@@ -83,7 +83,7 @@ processors:
     stability:
       logs: Undefined
       metrics: Undefined
-      traces: Alpha
+      traces: Deprecated
   - name: filter
     stability:
       logs: Alpha
