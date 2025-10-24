@@ -1,0 +1,133 @@
+version: 9.1.6
+entries:
+    - kind: bug-fix
+      summary: Improve logging to catch early errors on startup
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10158
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/9099
+      impact: ""
+      action: ""
+      timestamp: 1758827841
+      file:
+        name: 1758827841-Improve-logging-to-catch-early-errors-on-startup.yaml
+        checksum: fe8e78cac10031403c4f9c10193cc86c2b4eec7c
+    - kind: enhancement
+      summary: Include OTel Collector internal telemetry in Agent monitoring
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9928
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1759257958
+      file:
+        name: 1759257958-collector-telemetry-monitoring.yaml
+        checksum: ae32205aa4e143a02262e8c3f6c4dad37949d276
+    - kind: bug-fix
+      summary: Fix an incorrectly formatted log message when a provider fails
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10217
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1759334752
+      file:
+        name: 1759334752-fix-error-logging-for-provider-failures.yaml
+        checksum: fe5977b4c25d48f63323274a7164e6815aca3952
+    - kind: bug-fix
+      summary: Fix troubleshooting docs URL for 9.x+ to prevent invalid version links
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10218
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1759335344
+      file:
+        name: 1759335344-fix-troubleshooting-message-url-for-versions-after-9.yaml
+        checksum: ab36f1d7bbdb9879a903642bfa3c3182995a614f
+    - kind: bug-fix
+      summary: 'inspect: Handle components with slashes in their name'
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10442
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1759994876
+      file:
+        name: 1759994876-fix-10417-inspect-slash.yaml
+        checksum: e4e48c62243d23ce27d7a3c08d7e89e746b0c74c
+    - kind: bug-fix
+      summary: Improve OTel batching and queueing for AutoOps data shipping
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10492
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1760133531
+      file:
+        name: 1760133531-autoops-improve-batching.yaml
+        checksum: 44fb73e37e24c9594a90770ab507565f6fa8ff5c
+    - kind: feature
+      summary: add logs_metrics_traces.yml sample in EDOT for Windows
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10514
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1760341169
+      file:
+        name: 1760341169-add-logs_metrics_traces.yml-sample-in-EDOT-for-Windows.yaml
+        checksum: 9831c6e424ea5a829f424e185729229a6939d94e
+    - kind: other
+      summary: upgrade node to LTS v22.20.0
+      description: ""
+      component: heartbeat
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10541
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1760454869
+      file:
+        name: 1760454869-dependency-upgrade-node-to-LTS-v22.20.0.yaml
+        checksum: 251c74ed27df04b51294248d237d2ede1117009d
+    - kind: other
+      summary: Updating EDOT gateway collector batch configuration when ingesting to mOTLP endpoint.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10569
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1760515775
+      file:
+        name: 1760515775-batchingconfig.yaml
+        checksum: 811c606c6e5c7a411d5d9369241e6f885e533e4d
+    - kind: other
+      summary: Bump golang to 1.24.9
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10422
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1760594937
+      file:
+        name: 1760594937-bump-golang-to-1.24.9.yaml
+        checksum: 7fd1d4b3c093c1d7912b9dbadadafca6b42fc411

@@ -167,6 +167,9 @@ receivers:
       http:
         auth:
           authenticator: apikeyauth
+
+service:
+  extensions: [apikeyauth]
 ```
 
 ### Securing collector-to-collector communication
@@ -185,6 +188,9 @@ receivers:
       grpc:
         auth:
           authenticator: bearertokenauth
+
+service:
+  extensions: [bearertokenauth]
 ```
 
 ### Multi-tenant authentication
@@ -201,6 +207,9 @@ extensions:
         resources: ["*"]
     cache:
       key_headers: ["X-Tenant-Id", "X-Organization-Id"]
+
+service:
+  extensions: [apikeyauth]
 ```
 
 ## Security considerations
