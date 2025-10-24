@@ -251,6 +251,7 @@ func getAvailableRollbacks(rollbackWindow time.Duration, now time.Time, currentV
 	res := make(map[string]TTLMarker, 1)
 	res[currentVersionedHome] = TTLMarker{
 		Version:    currentVersion,
+		Hash:       currentHash,
 		ValidUntil: now.Add(rollbackWindow),
 	}
 
