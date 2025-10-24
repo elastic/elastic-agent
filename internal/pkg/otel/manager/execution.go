@@ -24,5 +24,8 @@ type collectorExecution interface {
 }
 
 type collectorHandle interface {
+	// Stop stops and waits for collector to exit gracefully within the given duration. Note that if the collector
+	// doesn't exit within that time, it will be killed and then it will wait an extra second for it to ensure it's
+	// really stopped.
 	Stop(waitTime time.Duration)
 }

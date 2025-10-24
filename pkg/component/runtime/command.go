@@ -330,9 +330,10 @@ func (c *commandRuntime) forceCompState(state client.UnitState, msg string) {
 // compState updates just the component state not all the units.
 func (c *commandRuntime) compState(state client.UnitState) {
 	msg := stateUnknownMessage
-	if state == client.UnitStateHealthy {
+	switch state {
+	case client.UnitStateHealthy:
 		msg = fmt.Sprintf("Healthy: communicating with pid '%d'", c.proc.PID)
-	} else if state == client.UnitStateDegraded {
+	case client.UnitStateDegraded:
 		if c.missedCheckins == 1 {
 			msg = fmt.Sprintf("Degraded: pid '%d' missed 1 check-in", c.proc.PID)
 		} else {
@@ -426,9 +427,12 @@ func (c *commandRuntime) stop(ctx context.Context) error {
 			return
 		case <-t.C:
 			// kill no matter what (might already be stopped)
+			c.log.Debugf("timeout waiting for pid %d, killing it", c.proc.PID)
 			_ = info.Kill()
 		}
 	}(c.proc, cmdSpec.Timeouts.Stop)
+
+	c.log.Debugf("gracefully stopping pid %d", c.proc.PID)
 	return c.proc.Stop()
 }
 
@@ -436,7 +440,7 @@ func (c *commandRuntime) startWatcher(info *process.Info, comm Communicator) {
 	go func() {
 		err := comm.WriteStartUpInfo(info.Stdin)
 		if err != nil {
-			_, _ = c.logErr.Write([]byte(fmt.Sprintf("Failed: failed to provide connection information to spawned pid '%d': %s", info.PID, err)))
+			_, _ = fmt.Fprintf(c.logErr, "Failed: failed to provide connection information to spawned pid '%d': %s", info.PID, err)
 			// kill instantly
 			_ = info.Kill()
 		} else {
@@ -445,6 +449,7 @@ func (c *commandRuntime) startWatcher(info *process.Info, comm Communicator) {
 
 		ch := info.Wait()
 		s := <-ch
+		c.log.Debugf("wait for pid %d returned", info.PID)
 		c.procCh <- procState{
 			proc:  info,
 			state: s,
