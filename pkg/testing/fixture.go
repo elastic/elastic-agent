@@ -849,6 +849,12 @@ func (f *Fixture) ExecInspect(ctx context.Context, opts ...process.CmdOption) (A
 	return inspect, err
 }
 
+// ExecRestart executes the restart subcommand on the prepared Elastic Agent binary.
+func (f *Fixture) ExecRestart(ctx context.Context, opts ...process.CmdOption) error {
+	_, err := f.Exec(ctx, []string{"restart"}, opts...)
+	return err
+}
+
 // ExecVersion executes the version subcommand on the prepared Elastic Agent binary
 // with '--binary-only'. It returns the parsed YAML output.
 func (f *Fixture) ExecVersion(ctx context.Context, opts ...process.CmdOption) (AgentVersionOutput, error) {
