@@ -256,7 +256,7 @@ func New(
 		agentInfo,
 		cfg.Settings.Collector,
 		monitor.ComponentMonitoringConfig,
-		cfg.Settings.ProcessConfig.StopTimeout,
+		otelmanager.CollectorStopTimeout,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)
