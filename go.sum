@@ -585,8 +585,8 @@ github.com/elastic/opentelemetry-collector-components/processor/elasticinframetr
 github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.18.0/go.mod h1:qu5waDNj2cH5lQK9SmXRxZ5dg08FjM+tqE2/ib5WDxs=
 github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.13.0 h1:N3TGpxaDtPgjOiqDtbHyNKb2zJouiEHgy20F0mx1ygI=
 github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.13.0/go.mod h1:W5d/R5og+IInD86ZCZQTSQhfQAJwuKSAzRO9EfnqDFM=
-github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.8.0 h1:m2RieHXVTRykAd7VdpryuAV56Ia/eidgtlEutnG/m5w=
-github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.8.0/go.mod h1:uQHpGpKwGHhdO5fm2hx1mthiPMiScmFOp5XNwD0EqVw=
+github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.20.0 h1:kCALap00d0jlzibLvL08r/hyFpb4BiZ8Y188p0GL7Eo=
+github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.20.0/go.mod h1:zouaz4WwA/VqBgh5+8sYeOaetQjPSkWEOMqUr2n//NU=
 github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.4.0 h1:uMnL1EaQtmdCrtgv31b3QKLxvb+FP6dOHneF/9aDkzI=
 github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.4.0/go.mod h1:gRgnOTENLyQ6HXJX8L014J05EdEwacD4GC0VIfKnXKA=
 github.com/elastic/opentelemetry-lib v0.24.0 h1:yydHiL0P4+7cbmSOuRyNgsQdUZDJiUcGvqEn261nhBk=
@@ -1848,10 +1848,10 @@ go.opentelemetry.io/collector/processor/processorhelper v0.137.0 h1:7SrbH1v1AvaG
 go.opentelemetry.io/collector/processor/processorhelper v0.137.0/go.mod h1:cW+NzuRN33ZOCIPML+9eJKbM7AFCWsNsAgIDT/EEYoY=
 go.opentelemetry.io/collector/processor/processorhelper/xprocessorhelper v0.137.0 h1:CRVoHPm7cjTQzFuOK276/n/ZEoIaNwOU1Af6otBqsZ0=
 go.opentelemetry.io/collector/processor/processorhelper/xprocessorhelper v0.137.0/go.mod h1:+g1m38aDyJEbZeR3iht4ngTsskLYPsR+Q5VjDc8zHZ8=
-go.opentelemetry.io/collector/processor/processortest v0.137.0 h1:ArZ6fFzE7Fyyfy4A7/skOGJMnG6bZDkYzOb0XPWEj9o=
-go.opentelemetry.io/collector/processor/processortest v0.137.0/go.mod h1:eBXM8LmHFsnMKfS441uYGGKMk0Lid189DVS9pLBwYSQ=
-go.opentelemetry.io/collector/processor/xprocessor v0.137.0 h1:mN8ucEyZr9lUaTDx5h2nRTW5Tw43T9pv9SmZOweukLQ=
-go.opentelemetry.io/collector/processor/xprocessor v0.137.0/go.mod h1:8G9DTxSA1v7anuTx2sq2VsJJnyntCeaEHCKYiDKyTy8=
+go.opentelemetry.io/collector/processor/processortest v0.138.0 h1:WSHPESV1NqPHlt9ShzTlc9y7ZLf83223fyfC4wzJoZg=
+go.opentelemetry.io/collector/processor/processortest v0.138.0/go.mod h1:h+rFcy+svVipVVpAkellP5egcPYsHeOfL3o7lkFNsGs=
+go.opentelemetry.io/collector/processor/xprocessor v0.138.0 h1:V+zKVy2kstPhIDsGvEBIRUxq8HzAdG1zdJP/hAuwENQ=
+go.opentelemetry.io/collector/processor/xprocessor v0.138.0/go.mod h1:0Ybup3sw+eJkB0Jn1HID/LPNvTo33ur61ArHYq7Nozo=
 go.opentelemetry.io/collector/receiver v1.44.0 h1:oPgHg7u+aqplnVTLyC3FapTsAE7BiGdTtDceE1BuTJg=
 go.opentelemetry.io/collector/receiver v1.44.0/go.mod h1:NzkrGOIoWigOG54eF92ZGfJ8oSWhqGHTT0ZCGaH5NMc=
 go.opentelemetry.io/collector/receiver/nopreceiver v0.137.0 h1:TcdoajoKEZyB5Aysf8sUmPc2hBtfSW4gU/oW1Fk0ru0=

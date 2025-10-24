@@ -375,7 +375,7 @@ require (
 	github.com/elastic/lunes v0.1.0 // indirect
 	github.com/elastic/mito v1.23.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
-	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.8.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.20.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.24.0 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
 	github.com/elastic/sarama v1.19.1-0.20250603175145-7672917f26b6 // indirect
@@ -717,8 +717,8 @@ require (
 	go.opentelemetry.io/collector/pipeline/xpipeline v0.138.0 // indirect
 	go.opentelemetry.io/collector/processor/processorhelper v0.137.0 // indirect
 	go.opentelemetry.io/collector/processor/processorhelper/xprocessorhelper v0.137.0 // indirect
-	go.opentelemetry.io/collector/processor/processortest v0.137.0 // indirect
-	go.opentelemetry.io/collector/processor/xprocessor v0.137.0 // indirect
+	go.opentelemetry.io/collector/processor/processortest v0.138.0 // indirect
+	go.opentelemetry.io/collector/processor/xprocessor v0.138.0 // indirect
 	go.opentelemetry.io/collector/receiver/receiverhelper v0.137.0 // indirect
 	go.opentelemetry.io/collector/receiver/receivertest v0.138.0 // indirect
 	go.opentelemetry.io/collector/receiver/xreceiver v0.138.0 // indirect
