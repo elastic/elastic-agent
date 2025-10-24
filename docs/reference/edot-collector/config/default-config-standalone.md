@@ -117,7 +117,7 @@ otlp/ingest:
     queue_size: 50000000 # 50MB uncompressed
     block_on_overflow: true
     batch:
-      flush_interval: 1s
+      flush_timeout: 1s
       min_size: 1_000_000 # 1MB uncompressed
       max_size: 4_000_000 # 4MB uncompressed
 ```
