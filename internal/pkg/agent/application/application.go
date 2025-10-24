@@ -128,7 +128,7 @@ func New(
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create upgrader: %w", err)
 	}
-	monitor := monitoring.New(isMonitoringSupported, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, agentInfo)
+	monitor := monitoring.New(isMonitoringSupported, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, rawConfig.OTel, agentInfo)
 
 	runtime, err := runtime.NewManager(
 		log,
@@ -240,7 +240,7 @@ func New(
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
-	otelManager := otelmanager.NewOTelManager(log.Named("otel_manager"))
+	otelManager := otelmanager.NewOTelManager(log.Named("otel_manager"), baseLogger)
 	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelManager, actionAcker, initialUpgradeDetails, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
