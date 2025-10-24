@@ -17,7 +17,9 @@ func WithDeadline(
 	parent context.Context,
 	deadline time.Time) (context.Context, context.CancelFunc) {
 	if d, ok := t.Deadline(); ok {
-		deadline = d
+		if d.Before(deadline) {
+			deadline = d
+		}
 	}
 	ctx, cancel := context.WithDeadline(parent, deadline)
 	return ctx, cancel

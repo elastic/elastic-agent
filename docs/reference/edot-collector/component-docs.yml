@@ -13,6 +13,10 @@ components:
     doc_path: "/reference/edot-collector/components/elasticapmintakereceiver.md"
     title: "Elastic APM intake receiver"
 
+  filelogreceiver:
+    doc_path: "/reference/edot-collector/components/filelogreceiver.md"
+    title: "File log receiver"
+
   apikeyauthextension:
     doc_path: "/reference/edot-collector/config/authentication-methods.md"
     title: "Authentication methods"
@@ -20,6 +24,15 @@ components:
   bearertokenauthextension:
     doc_path: "/reference/edot-collector/config/authentication-methods.md"
     title: "Authentication methods"
+
+  hostmetricsreceiver:
+    doc_path: "/reference/edot-collector/components/hostmetricsreceiver.md"
+    title: "Host metrics receiver"
+
+  # Processors
+  elasticapmprocessor:
+    doc_path: "/reference/edot-collector/components/elasticapmprocessor.md"
+    title: "Elastic APM processor"
 
   # Add more components as documentation is created
   # elasticapmconnector:

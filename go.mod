@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent
 
-go 1.24.7
+go 1.24.9
 
 require (
 	github.com/Jeffail/gabs/v2 v2.6.0
@@ -86,6 +86,7 @@ require (
 	go.opentelemetry.io/collector/pipeline v1.38.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.132.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.132.0
+	go.opentelemetry.io/collector/service v0.132.0
 	go.uber.org/zap v1.27.0
 	go.yaml.in/yaml/v3 v3.0.4
 	golang.org/x/crypto v0.41.0
@@ -687,7 +688,6 @@ require (
 	go.opentelemetry.io/collector/scraper v0.132.0 // indirect
 	go.opentelemetry.io/collector/scraper/scraperhelper v0.132.0 // indirect
 	go.opentelemetry.io/collector/semconv v0.128.1-0.20250610090210-188191247685 // indirect
-	go.opentelemetry.io/collector/service v0.132.0 // indirect
 	go.opentelemetry.io/collector/service/hostcapabilities v0.132.0 // indirect
 	go.opentelemetry.io/contrib/bridges/otelzap v0.12.0 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.36.0 // indirect

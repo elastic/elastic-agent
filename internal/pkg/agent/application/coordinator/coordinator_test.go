@@ -1123,7 +1123,7 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 	cfg.Port = 0
 	rm, err := runtime.NewManager(l, l, ai, apmtest.DiscardTracer, monitoringMgr, cfg)
 	require.NoError(t, err)
-	otelMgr := otelmanager.NewOTelManager(l)
+	otelMgr := otelmanager.NewOTelManager(l, l)
 
 	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), l)
 	require.NoError(t, err)

@@ -34,16 +34,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
-
-	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/otiai10/copy"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/elastic/elastic-agent/dev-tools/devmachine"
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
+	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
 	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
 	"github.com/elastic/elastic-agent/dev-tools/packaging"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
@@ -73,9 +71,10 @@ import (
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
 
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"golang.org/x/sync/errgroup"
+	filecopy "github.com/otiai10/copy"
 	"gopkg.in/yaml.v3"
 
 	"helm.sh/helm/v3/pkg/action"
@@ -403,6 +402,20 @@ func (Build) TestBinaries() error {
 		fmt.Errorf("cannot build test binaries: %w", err)
 	}
 
+	args := []string{"build", "-v"}
+	if runtime.GOOS == "darwin" {
+		osMajorVer, err := getMacOSMajorVersion()
+		if err != nil {
+			return fmt.Errorf("cannot determine darwin OS major version: %w", err)
+		}
+
+		if osMajorVer > 13 {
+			// Workaround for https://github.com/golang/go/issues/67854 until it
+			// is resolved.
+			args = append(args, "-ldflags", "-extldflags='-ld_classic'")
+		}
+	}
+
 	for _, pkg := range testBinaryPkgs {
 		binary := filepath.Base(pkg)
 		if runtime.GOOS == "windows" {
@@ -410,7 +423,12 @@ func (Build) TestBinaries() error {
 		}
 
 		outputName := filepath.Join(pkg, binary)
-		err := RunGo("build", "-v", "-o", outputName, filepath.Join(pkg))
+
+		finalArgs := make([]string, len(args))
+		copy(finalArgs, args)
+		finalArgs = append(finalArgs, "-o", outputName, filepath.Join(pkg))
+
+		err := RunGo(finalArgs...)
 		if err != nil {
 			return err
 		}
@@ -1786,8 +1804,8 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestURL string, versio
 
 		log.Printf("copying %q to %q", srcBinaryPath, dstBinaryPath)
 
-		err = copy.Copy(srcBinaryPath, dstBinaryPath, copy.Options{
-			PermissionControl: copy.PerservePermission,
+		err = filecopy.Copy(srcBinaryPath, dstBinaryPath, filecopy.Options{
+			PermissionControl: filecopy.PerservePermission,
 		})
 		if err != nil {
 			return fmt.Errorf("copying %q to %q: %w", srcBinaryPath, dstBinaryPath, err)
@@ -4112,4 +4130,19 @@ func loadYamlFile(path string) (map[string]any, error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+func getMacOSMajorVersion() (int, error) {
+	ver, err := sh.Output("sw_vers", "-productVersion")
+	if err != nil {
+		return 0, err
+	}
+
+	majorVerStr := strings.Split(ver, ".")[0]
+	majorVer, err := strconv.Atoi(majorVerStr)
+	if err != nil {
+		return 0, fmt.Errorf("unable to parse major version from %q: %w", ver, err)
+	}
+
+	return majorVer, nil
 }
