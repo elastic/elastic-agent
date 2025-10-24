@@ -834,11 +834,3 @@ func ensureInstallMarkerPresent() error {
 
 	return nil
 }
-
-type debugDescriber struct {
-	l *logger.Logger
-}
-
-func (d *debugDescriber) Describe(a string) {
-	d.l.Debug(a)
-}
