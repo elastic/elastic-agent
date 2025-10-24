@@ -40,6 +40,12 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+const (
+	// CollectorStopTimeout is the duration to wait for the collector to stop. Note: this needs to be shorter
+	// than 5 * time.Second (coordinator.managerShutdownTimeout) otherwise we might end up with a defunct process.
+	CollectorStopTimeout = 3 * time.Second
+)
+
 type collectorRecoveryTimer interface {
 	// IsStopped returns true if the timer is stopped
 	IsStopped() bool
