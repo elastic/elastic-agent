@@ -467,7 +467,8 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 		}
 	}()
 
-	upgradeMgr, err := upgrade.NewUpgrader(log, &artifact.Config{}, nil, &info.AgentInfo{}, new(upgrade.AgentWatcherHelper))
+	tmpDir := t.TempDir()
+	upgradeMgr, err := upgrade.NewUpgrader(log, &artifact.Config{}, nil, &info.AgentInfo{}, new(upgrade.AgentWatcherHelper), upgrade.NewTTLMarkerRegistry(nil, tmpDir))
 	require.NoError(t, err, "errored when creating a new upgrader")
 
 	// Channels have buffer length 1, so we don't have to run on multiple
@@ -1637,6 +1638,54 @@ func TestCoordinator_UnmanagedAgent_SkipsMigrate(t *testing.T) {
 
 	err := coord.Migrate(ctx, action, backoffFactory, nil)
 	require.ErrorIs(t, err, ErrNotManaged)
+}
+
+func TestCoordinator_ContainerAgent_SkipsMigrate(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	// overrideStateChan has buffer 2 so we can run on a single goroutine,
+	// since a successful upgrade sets the override state twice.
+	overrideStateChan := make(chan *coordinatorOverrideState, 2)
+
+	// similarly, upgradeDetailsChan is a buffered channel as well.
+	upgradeDetailsChan := make(chan *details.Details, 2)
+
+	// Create a manager that will allow upgrade attempts but return a failure
+	// from Upgrade itself (success requires testing ReExec and we aren't
+	// quite ready to do that yet).
+	upgradeMgr := &fakeUpgradeManager{
+		upgradeable: true,
+		upgradeErr:  errors.New("failed upgrade"),
+	}
+
+	platformSpecs, _ := component.NewRuntimeSpecs(component.PlatformDetail{
+		Platform:                     component.Platform{OS: component.Container},
+		NativeArch:                   "",
+		Family:                       "",
+		Major:                        0,
+		Minor:                        0,
+		IsInstalledViaExternalPkgMgr: false,
+		User:                         component.UserDetail{},
+	}, nil)
+	coord := &Coordinator{
+		stateBroadcaster:   broadcaster.New(State{}, 0, 0),
+		overrideStateChan:  overrideStateChan,
+		upgradeDetailsChan: upgradeDetailsChan,
+		upgradeMgr:         upgradeMgr,
+		logger:             logp.NewLogger("testing"),
+		isManaged:          false,
+		specs:              platformSpecs,
+	}
+
+	action := &fleetapi.ActionMigrate{}
+
+	backoffFactory := func(done <-chan struct{}) backoff.Backoff {
+		return backoff.NewExpBackoff(done, 30*time.Millisecond, 2*time.Second)
+	}
+
+	err := coord.Migrate(ctx, action, backoffFactory, nil)
+	require.ErrorIs(t, err, ErrContainerNotSupported)
 }
 
 func TestCoordinator_FleetServer_SkipsMigration(t *testing.T) {

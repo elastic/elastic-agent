@@ -64,7 +64,7 @@ func New(
 	fleetInitTimeout time.Duration,
 	disableMonitoring bool,
 	override CfgOverrider,
-	initialUpgradeDetails *details.Details,
+	initialUpdateMarker *upgrade.UpdateMarker,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
@@ -129,11 +129,19 @@ func New(
 
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
 	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled
-	upgrader, err := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, cfg.Settings.Upgrade, agentInfo, new(upgrade.AgentWatcherHelper))
+
+	availableRollbacksSource := upgrade.NewTTLMarkerRegistry(log, paths.Top())
+	upgrader, err := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, cfg.Settings.Upgrade, agentInfo, new(upgrade.AgentWatcherHelper), availableRollbacksSource)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create upgrader: %w", err)
 	}
-	monitor := componentmonitoring.New(isMonitoringSupported, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, rawConfig.OTel, agentInfo, isOtelExecModeSubprocess)
+	monitor := componentmonitoring.New(
+		isMonitoringSupported,
+		cfg.Settings.DownloadConfig.OS(),
+		cfg.Settings.MonitoringConfig,
+		agentInfo,
+		isOtelExecModeSubprocess,
+	)
 
 	runtime, err := runtime.NewManager(
 		log,
@@ -145,6 +153,12 @@ func New(
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
+	}
+
+	// prepare initialUpgradeDetails for injecting it in coordinator later on
+	var initialUpgradeDetails *details.Details
+	if initialUpdateMarker != nil && initialUpdateMarker.Details != nil {
+		initialUpgradeDetails = initialUpdateMarker.Details
 	}
 
 	var configMgr coordinator.ConfigManager
@@ -245,7 +259,15 @@ func New(
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
-	otelManager, err := otelmanager.NewOTelManager(log.Named("otel_manager"), logLevel, baseLogger, otelExecMode, agentInfo, monitor.ComponentMonitoringConfig, cfg.Settings.ProcessConfig.StopTimeout)
+	otelManager, err := otelmanager.NewOTelManager(
+		log.Named("otel_manager"),
+		logLevel, baseLogger,
+		otelExecMode,
+		agentInfo,
+		cfg.Settings.Collector,
+		monitor.ComponentMonitoringConfig,
+		cfg.Settings.ProcessConfig.StopTimeout,
+	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)
 	}

@@ -16,6 +16,10 @@ toc:
     children:
       - file: components/elasticsearchexporter.md
       - file: components/elasticapmintakereceiver.md
+      - file: components/k8sclusterreceiver.md
+      - file: components/elasticapmprocessor.md
+      - file: components/filelogreceiver.md
+      - file: components/hostmetricsreceiver.md
   - file: customization.md
     children:
       - file: custom-collector.md

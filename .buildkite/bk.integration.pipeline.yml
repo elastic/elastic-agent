@@ -6,12 +6,12 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1758934870"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1758934870"
-  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1758934870"
-  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1758934870"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1758934870"
-  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1758934870"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1760144464"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1760144464"
+  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1760144464"
+  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1760144464"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1760144464"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1760144464"
   ASDF_TERRAFORM_VERSION: 1.9.2
 
 # This section is used to define the plugins that will be used in the pipeline.
@@ -98,11 +98,11 @@ steps:
     steps:
       - label: "Windows:2022:amd64:sudo"
         depends_on:
-          - packaging-windows
+          - packaging-windows-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/leak"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 fleet true
         artifact_paths:
           - build/**
@@ -119,11 +119,11 @@ steps:
 
       - label: "Windows:2025:amd64:sudo"
         depends_on:
-          - packaging-windows
+          - packaging-windows-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/leak"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 fleet true
         artifact_paths:
           - build/**
@@ -168,11 +168,11 @@ steps:
     steps:
       - label: "Win2022:sudo:{{matrix}}"
         depends_on:
-          - packaging-windows
+          - packaging-windows-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
         artifact_paths:
           - build/**
@@ -198,11 +198,11 @@ steps:
 
       - label: "Win2022:non-sudo:{{matrix}}"
         depends_on:
-          - packaging-windows
+          - packaging-windows-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
         artifact_paths:
           - build/**
@@ -221,11 +221,11 @@ steps:
 
       - label: "Win2025:sudo:{{matrix}}"
         depends_on:
-          - packaging-windows
+          - packaging-windows-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
         artifact_paths:
           - build/**
@@ -251,11 +251,11 @@ steps:
 
       - label: "Win2025:non-sudo:{{matrix}}"
         depends_on:
-          - packaging-windows
+          - packaging-windows-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
         artifact_paths:
           - build/**
@@ -555,11 +555,11 @@ steps:
     steps:
       - label: "Windows:2022:amd64:sudo"
         depends_on:
-          - packaging-windows
+          - packaging-windows-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/serverless"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows-amd64'
           .buildkite/scripts/buildkite-integration-tests.ps1 fleet true
         artifact_paths:
           - build/**
@@ -577,11 +577,11 @@ steps:
 
       - label: "Windows:2025:amd64:sudo"
         depends_on:
-          - packaging-windows
+          - packaging-windows-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/serverless"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows-amd64'
           .buildkite/scripts/buildkite-integration-tests.ps1 fleet true
         artifact_paths:
           - build/**

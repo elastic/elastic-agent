@@ -1,0 +1,45 @@
+name: macos-unit-tests
+
+on:
+  workflow_dispatch:
+  # Temporary disabled for PRs
+  # pull_request:
+  push:
+    branches:
+      - main
+      - '8.19'
+      - 9.*
+
+permissions:
+  contents: read
+
+## Concurrency only allowed in the main branch.
+## So old builds running for old commits within the same Pull Request are cancelled
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  unit-tests:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # pkg/testing/tools/git TestGetReleaseBranches test require full git history
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: .go-version
+
+      - name: Install make
+        run: |
+          brew install make
+          export PATH="/usr/local/opt/make/libexec/gnubin:$PATH"
+
+      - name: Install mage
+        run: make mage
+
+      - name: mage unitTest
+        run: RACE_DETECTOR=true TEST_COVERAGE=true mage unitTest

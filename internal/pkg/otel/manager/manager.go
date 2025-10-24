@@ -13,11 +13,16 @@ import (
 	"hash/fnv"
 	"os"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -122,11 +127,31 @@ func NewOTelManager(
 	baseLogger *logger.Logger,
 	mode ExecutionMode,
 	agentInfo info.Agent,
+	agentCollectorConfig *configuration.CollectorConfig,
 	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter,
 	stopTimeout time.Duration,
 ) (*OTelManager, error) {
 	var exec collectorExecution
 	var recoveryTimer collectorRecoveryTimer
+	var err error
+
+	// determine the otel collector ports
+	collectorMetricsPort, collectorHealthCheckPort := 0, 0
+	if agentCollectorConfig != nil {
+		if agentCollectorConfig.HealthCheckConfig.Endpoint != "" {
+			collectorHealthCheckPort, err = agentCollectorConfig.HealthCheckConfig.Port()
+			if err != nil {
+				return nil, fmt.Errorf("invalid collector health check port: %w", err)
+			}
+		}
+		if agentCollectorConfig.TelemetryConfig.Endpoint != "" {
+			collectorMetricsPort, err = agentCollectorConfig.TelemetryConfig.Port()
+			if err != nil {
+				return nil, fmt.Errorf("invalid collector metrics port: %w", err)
+			}
+		}
+	}
+
 	switch mode {
 	case SubprocessExecutionMode:
 		// NOTE: if we stop embedding the collector binary in elastic-agent, we need to
@@ -136,13 +161,13 @@ func NewOTelManager(
 			return nil, fmt.Errorf("failed to get the path to the collector executable: %w", err)
 		}
 		recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
-		exec, err = newSubprocessExecution(logLevel, executable)
+		exec, err = newSubprocessExecution(logLevel, executable, collectorMetricsPort, collectorHealthCheckPort)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create subprocess execution: %w", err)
 		}
 	case EmbeddedExecutionMode:
 		recoveryTimer = newRestarterNoop()
-		exec = newExecutionEmbedded()
+		exec = newExecutionEmbedded(collectorMetricsPort)
 	default:
 		return nil, fmt.Errorf("unknown otel collector execution mode: %q", mode)
 	}
@@ -156,7 +181,7 @@ func NewOTelManager(
 		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
 		errCh:                      make(chan error, 1), // holds at most one error
 		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
-		componentStateCh:           make(chan []runtime.ComponentComponentState, 1),
+		componentStateCh:           make(chan []runtime.ComponentComponentState),
 		updateCh:                   make(chan configUpdate, 1),
 		doneChan:                   make(chan struct{}),
 		execution:                  exec,
@@ -216,10 +241,6 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				if m.proc != nil {
 					m.proc.Stop(m.stopTimeout)
 					m.proc = nil
-					updateErr := m.reportOtelStatusUpdate(ctx, nil)
-					if updateErr != nil {
-						reportErr(ctx, m.errCh, updateErr)
-					}
 				}
 
 				if m.mergedCollectorCfg == nil {
@@ -259,12 +280,6 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				if m.proc != nil {
 					m.proc.Stop(m.stopTimeout)
 					m.proc = nil
-					// don't wait here for <-collectorRunErr, already occurred
-					// clear status, no longer running
-					updateErr := m.reportOtelStatusUpdate(ctx, nil)
-					if updateErr != nil {
-						err = errors.Join(err, updateErr)
-					}
 				}
 				// pass the error to the errCh so the coordinator, unless it's a cancel error
 				if !errors.Is(err, context.Canceled) {
@@ -328,7 +343,12 @@ func (m *OTelManager) Errors() <-chan error {
 }
 
 // buildMergedConfig combines collector configuration with component-derived configuration.
-func buildMergedConfig(cfgUpdate configUpdate, agentInfo info.Agent, monitoringConfigGetter translate.BeatMonitoringConfigGetter, logger *logp.Logger) (*confmap.Conf, error) {
+func buildMergedConfig(
+	cfgUpdate configUpdate,
+	agentInfo info.Agent,
+	monitoringConfigGetter translate.BeatMonitoringConfigGetter,
+	logger *logp.Logger,
+) (*confmap.Conf, error) {
 	mergedOtelCfg := confmap.New()
 
 	// Generate component otel config if there are components
@@ -363,6 +383,10 @@ func buildMergedConfig(cfgUpdate configUpdate, agentInfo info.Agent, monitoringC
 		}
 	}
 
+	if err := addCollectorMetricsReader(mergedOtelCfg); err != nil {
+		return nil, fmt.Errorf("failed to add random collector metrics port: %w", err)
+	}
+
 	if err := injectDiagnosticsExtension(mergedOtelCfg); err != nil {
 		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
 	}
@@ -395,29 +419,18 @@ func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh c
 	if m.proc != nil {
 		m.proc.Stop(m.stopTimeout)
 		m.proc = nil
+		// We wait here for the collector to exit before possibly starting a new one. The execution indicates this
+		// by sending an error over the appropriate channel. It will also send a nil status that we'll either process
+		// after exiting from this function and going back to the main loop, or it will be overridden by the status
+		// from the newly started collector.
+		// This is the only blocking wait inside the main loop involving channels, so we need to be extra careful not to
+		// deadlock.
+		// TODO: Verify if we need to wait for the error at all. Stop() is already blocking.
 		select {
 		case <-collectorRunErr:
 		case <-ctx.Done():
 			// our caller ctx is Done
 			return ctx.Err()
-		}
-		// drain the internal status update channel
-		// this status handling is normally done in the main loop, but in this case we want to ensure that we emit a
-		// nil status after the collector has stopped
-		select {
-		case statusCh := <-collectorStatusCh:
-			updateErr := m.reportOtelStatusUpdate(ctx, statusCh)
-			if updateErr != nil {
-				m.logger.Error("failed to update otel status", zap.Error(updateErr))
-			}
-		case <-ctx.Done():
-			// our caller ctx is Done
-			return ctx.Err()
-		default:
-		}
-		err := m.reportOtelStatusUpdate(ctx, nil)
-		if err != nil {
-			return err
 		}
 	}
 
@@ -492,6 +505,24 @@ func (m *OTelManager) MergedOtelConfig() *confmap.Conf {
 // and prepares component state updates for distribution to watchers.
 // Returns component state updates and any error encountered during processing.
 func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus) ([]runtime.ComponentComponentState, error) {
+	// Remove agent managed extensions from the status report
+	if otelStatus != nil {
+		if extensionsMap, exists := otelStatus.ComponentStatusMap["extensions"]; exists {
+			for extensionKey := range extensionsMap.ComponentStatusMap {
+				switch {
+				case strings.HasPrefix(extensionKey, "extension:beatsauth"):
+					delete(extensionsMap.ComponentStatusMap, extensionKey)
+				case strings.HasPrefix(extensionKey, "extension:elastic_diagnostics"):
+					delete(extensionsMap.ComponentStatusMap, extensionKey)
+				}
+			}
+
+			if len(extensionsMap.ComponentStatusMap) == 0 {
+				delete(otelStatus.ComponentStatusMap, "extensions")
+			}
+		}
+	}
+
 	// Extract component states from otel status
 	componentStates, err := translate.GetAllComponentStates(otelStatus, m.components)
 	if err != nil {
@@ -573,18 +604,10 @@ func (m *OTelManager) maybeUpdateMergedConfig(mergedCfg *confmap.Conf) (updated 
 	return !bytes.Equal(mergedCfgHash, previousConfigHash) || err != nil, err
 }
 
-// reportComponentStateUpdates sends component state updates to the component watch channel. It first drains
-// the channel to ensure that only the most recent status is kept, as intermediate statuses can be safely discarded.
-// This ensures the receiver always observes the latest reported status.
+// reportComponentStateUpdates sends component state updates to the component watch channel. It is synchronous and
+// blocking - the update must be received before this function returns. We are not allowed to drop older updates
+// in favor of newer ones here, as the coordinator expected incremental updates.
 func (m *OTelManager) reportComponentStateUpdates(ctx context.Context, componentUpdates []runtime.ComponentComponentState) {
-	select {
-	case <-ctx.Done():
-		// context is already done
-		return
-	case <-m.componentStateCh:
-	// drain the channel first
-	default:
-	}
 	select {
 	case m.componentStateCh <- componentUpdates:
 	case <-ctx.Done():
@@ -616,4 +639,43 @@ func calculateConfmapHash(conf *confmap.Conf) ([]byte, error) {
 	}
 
 	return h.Sum(nil), nil
+}
+
+func addCollectorMetricsReader(conf *confmap.Conf) error {
+	// We operate on untyped maps instead of otel config structs because the otel collector has an elaborate
+	// configuration resolution system, and we can't reproduce it fully here. It's possible some of the values won't
+	// be valid for unmarshalling, because they're supposed to be loaded from environment variables, and so on.
+	metricReadersUntyped := conf.Get("service::telemetry::metrics::readers")
+	if metricReadersUntyped == nil {
+		metricReadersUntyped = []any{}
+	}
+	metricsReadersList, ok := metricReadersUntyped.([]any)
+	if !ok {
+		return fmt.Errorf("couldn't convert value of service::telemetry::metrics::readers to a list: %v", metricReadersUntyped)
+	}
+
+	metricsReader := map[string]any{
+		"pull": map[string]any{
+			"exporter": map[string]any{
+				"prometheus": map[string]any{
+					"host": "localhost",
+					// The OTel manager is required to set this environment variable. See comment at the constant
+					// definition for more information.
+					"port": fmt.Sprintf("${env:%s}", componentmonitoring.OtelCollectorMetricsPortEnvVarName),
+					// this is the default configuration from the otel collector
+					"without_scope_info":  true,
+					"without_units":       true,
+					"without_type_suffix": true,
+				},
+			},
+		},
+	}
+	metricsReadersList = append(metricsReadersList, metricsReader)
+	confMap := map[string]any{
+		"service::telemetry::metrics::readers": metricsReadersList,
+	}
+	if mergeErr := conf.Merge(confmap.NewFromStringMap(confMap)); mergeErr != nil {
+		return fmt.Errorf("failed to merge config: %w", mergeErr)
+	}
+	return nil
 }
