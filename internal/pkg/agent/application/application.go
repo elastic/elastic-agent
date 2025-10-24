@@ -240,7 +240,22 @@ func New(
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
+<<<<<<< HEAD
 	otelManager := otelmanager.NewOTelManager(log.Named("otel_manager"), baseLogger)
+=======
+	otelManager, err := otelmanager.NewOTelManager(
+		log.Named("otel_manager"),
+		logLevel, baseLogger,
+		otelExecMode,
+		agentInfo,
+		cfg.Settings.Collector,
+		monitor.ComponentMonitoringConfig,
+		otelmanager.CollectorStopTimeout,
+	)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)
+	}
+>>>>>>> 9c001b07d (fix: zombie processes during restart (#10650))
 	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelManager, actionAcker, initialUpgradeDetails, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the

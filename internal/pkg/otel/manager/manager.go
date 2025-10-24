@@ -20,6 +20,38 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+<<<<<<< HEAD
+=======
+type ExecutionMode string
+
+const (
+	SubprocessExecutionMode ExecutionMode = "subprocess"
+	EmbeddedExecutionMode   ExecutionMode = "embedded"
+
+	// CollectorStopTimeout is the duration to wait for the collector to stop. Note: this needs to be shorter
+	// than 5 * time.Second (coordinator.managerShutdownTimeout) otherwise we might end up with a defunct process.
+	CollectorStopTimeout = 3 * time.Second
+)
+
+type collectorRecoveryTimer interface {
+	// IsStopped returns true if the timer is stopped
+	IsStopped() bool
+	// Stop stops the timer
+	Stop()
+	// ResetInitial resets the timer to the initial interval
+	ResetInitial() time.Duration
+	// ResetNext resets the timer to the next interval
+	ResetNext() time.Duration
+	// C returns the timer channel
+	C() <-chan time.Time
+}
+
+type configUpdate struct {
+	collectorCfg *confmap.Conf
+	components   []component.Component
+}
+
+>>>>>>> 9c001b07d (fix: zombie processes during restart (#10650))
 // OTelManager is a manager that manages the lifecycle of the OTel collector inside of the Elastic Agent.
 type OTelManager struct {
 	// baseLogger is the base logger for the otel collector, and doesn't include any agent-specific fields.
