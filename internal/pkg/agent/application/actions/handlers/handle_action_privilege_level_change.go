@@ -101,6 +101,19 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 			"action", a)
 	}
 
+	// check everything is properly set up
+	userName, groupName, err := install.GetDesiredUser()
+	if err != nil {
+		return fmt.Errorf("failed to determine target user: %w", err)
+	}
+
+	if userName != "" || groupName != "" {
+		_, err = install.EnsureUserAndGroup(userName, groupName, &debugDescriber{h.log}, true)
+		if err != nil {
+			return fmt.Errorf("failed to setup user: %w", err)
+		}
+	}
+
 	// restart
 	h.coord.ReExec(nil)
 	return nil

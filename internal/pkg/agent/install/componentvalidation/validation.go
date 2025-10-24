@@ -128,7 +128,7 @@ func GetMonitoringFn(ctx context.Context, logger *logger.Logger, cfg map[string]
 	}
 	otelExecMode := otelconfig.GetExecutionModeFromConfig(logger, config)
 	isOtelExecModeSubprocess := otelExecMode == manager.SubprocessExecutionMode
-	monitor := componentmonitoring.New(agentCfg.Settings.V1MonitoringEnabled, agentCfg.Settings.DownloadConfig.OS(), agentCfg.Settings.MonitoringConfig, otelCfg, agentInfo, isOtelExecModeSubprocess)
+	monitor := componentmonitoring.New(agentCfg.Settings.V1MonitoringEnabled, agentCfg.Settings.DownloadConfig.OS(), agentCfg.Settings.MonitoringConfig, agentInfo, isOtelExecModeSubprocess)
 	return monitor.MonitoringConfig, nil
 }
 

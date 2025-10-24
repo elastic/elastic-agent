@@ -264,17 +264,26 @@ func runElasticAgent(
 
 	// fix permissions
 	if isRoot {
-		userName, groupName, err := getDesiredUser()
+		userName, groupName, err := install.GetDesiredUser()
 		if err != nil {
-			return fmt.Errorf("failed to determine target user: %w", err)
+			return fmt.Errorf("failed to determine target user: %w", err) // in general this should not happen
 		}
 
 		var ownership utils.FileOwner
-		if userName != "" || groupName != "" {
-			ownership, err = install.EnsureUserAndGroup(userName, groupName, &debugDescriber{l}, true)
+		if userName != "" {
+			uid, err := install.FindUID(userName)
 			if err != nil {
-				return fmt.Errorf("failed to setup user: %w", err)
+				return fmt.Errorf("failed to find user: %w", err)
 			}
+			ownership.UID = uid
+		}
+
+		if groupName != "" {
+			gid, err := install.FindGID(groupName)
+			if err != nil {
+				return fmt.Errorf("failed to find group: %w", err)
+			}
+			ownership.GID = gid
 		}
 
 		topPath := paths.Top()
@@ -283,7 +292,7 @@ func runElasticAgent(
 			return fmt.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
 		}
 
-		if err := dropRootPrivileges(ownership); err != nil {
+		if err := dropRootPrivileges(l, ownership); err != nil {
 			return fmt.Errorf("failed to drop permissions to user %q(%v):%q(%v): %w",
 				userName, ownership.UID,
 				groupName, ownership.GID,

@@ -8,13 +8,9 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"syscall"
 
-	"gopkg.in/ini.v1"
-
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -22,38 +18,13 @@ import (
 func logExternal(msg string) {
 }
 
-func getDesiredUser() (string, string, error) {
-	serviceFilePath := fmt.Sprintf("/etc/systemd/system/%s.service", paths.ServiceName())
-	svcCfg, err := ini.Load(serviceFilePath)
-	if os.IsNotExist(err) {
-		// not running as a service
-		return "", "", nil
-	}
-	if err != nil {
-		return "", "", fmt.Errorf("failed to read service file %s: %w", serviceFilePath, err)
-	}
-
-	var username, groupname string
-
-	serviceSection := svcCfg.Section("Service")
-	if serviceSection.HasKey(install.SystemdUserNameKey) {
-		username = serviceSection.Key(install.SystemdUserNameKey).Value()
-	}
-
-	if serviceSection.HasKey(install.SystemdGroupNameKey) {
-		groupname = serviceSection.Key(install.SystemdGroupNameKey).Value()
-	}
-
-	return username, groupname, nil
-}
-
-func dropRootPrivileges(ownership utils.FileOwner) error {
+func dropRootPrivileges(l *logger.Logger, ownership utils.FileOwner) error {
 	// change group first, setuid will drop permission to change group
 	if ownership.GID > 0 {
 		// Omitting setegid and using only setgid sets both real and effective group IDs,
 		// but explicit control over the effective group ID, which is used for access checks, is lost.
 		if err := syscall.Setegid(ownership.GID); err != nil {
-			return fmt.Errorf("failed to set eGID: %w", err)
+			l.Warnf("SETEGID failed with error: %v", err)
 		}
 
 		if err := syscall.Setgid(ownership.GID); err != nil {
