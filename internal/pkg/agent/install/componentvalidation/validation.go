@@ -22,7 +22,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
 	otelconfig "github.com/elastic/elastic-agent/internal/pkg/otel/config"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -127,7 +126,7 @@ func GetMonitoringFn(ctx context.Context, logger *logger.Logger, cfg map[string]
 		return nil, fmt.Errorf("could not load agent info: %w", err)
 	}
 	otelExecMode := otelconfig.GetExecutionModeFromConfig(logger, config)
-	isOtelExecModeSubprocess := otelExecMode == manager.SubprocessExecutionMode
+	isOtelExecModeSubprocess := otelExecMode == otelconfig.SubprocessExecutionMode
 	monitor := componentmonitoring.New(agentCfg.Settings.V1MonitoringEnabled, agentCfg.Settings.DownloadConfig.OS(), agentCfg.Settings.MonitoringConfig, agentInfo, isOtelExecModeSubprocess)
 	return monitor.MonitoringConfig, nil
 }

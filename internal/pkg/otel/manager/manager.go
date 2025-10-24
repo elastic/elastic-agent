@@ -27,6 +27,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -37,13 +38,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-)
-
-type ExecutionMode string
-
-const (
-	SubprocessExecutionMode ExecutionMode = "subprocess"
-	EmbeddedExecutionMode   ExecutionMode = "embedded"
 )
 
 type collectorRecoveryTimer interface {
@@ -125,7 +119,7 @@ func NewOTelManager(
 	logger *logger.Logger,
 	logLevel logp.Level,
 	baseLogger *logger.Logger,
-	mode ExecutionMode,
+	mode config.ExecutionMode,
 	agentInfo info.Agent,
 	agentCollectorConfig *configuration.CollectorConfig,
 	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter,
@@ -153,7 +147,7 @@ func NewOTelManager(
 	}
 
 	switch mode {
-	case SubprocessExecutionMode:
+	case config.SubprocessExecutionMode:
 		// NOTE: if we stop embedding the collector binary in elastic-agent, we need to
 		// change this
 		executable, err := os.Executable()
@@ -165,7 +159,7 @@ func NewOTelManager(
 		if err != nil {
 			return nil, fmt.Errorf("failed to create subprocess execution: %w", err)
 		}
-	case EmbeddedExecutionMode:
+	case config.EmbeddedExecutionMode:
 		recoveryTimer = newRestarterNoop()
 		exec = newExecutionEmbedded(collectorMetricsPort)
 	default:

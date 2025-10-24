@@ -11,9 +11,10 @@ import (
 	"os"
 	"os/exec"
 
+	"gopkg.in/ini.v1"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/utils"
-	"gopkg.in/ini.v1"
 )
 
 // GetDesiredUser retrieves user and group names as configured in a service file
