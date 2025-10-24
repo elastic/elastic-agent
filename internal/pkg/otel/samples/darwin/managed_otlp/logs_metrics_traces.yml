@@ -83,6 +83,31 @@ exporters:
     endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
     headers:
       Authorization: ApiKey ${env:ELASTIC_API_KEY}
+<<<<<<< HEAD
+=======
+    sending_queue:
+      enabled: true
+      sizer: bytes
+      queue_size: 50000000 # 50MB uncompressed
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 1_000_000 # 1MB uncompressed
+        max_size: 4_000_000 # 4MB uncompressed
+  otlp/ingest_metrics_traces:
+    endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
+    headers:
+      Authorization: ApiKey ${env:ELASTIC_API_KEY}
+    sending_queue:
+      enabled: true
+      sizer: bytes
+      queue_size: 50000000 # 50MB uncompressed
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 1_000_000 # 1MB uncompressed
+        max_size: 4_000_000 # 4MB uncompressed
+>>>>>>> 23ce46ec0 (fix: update EDOT -> mOTLP config with correct field (#10822))
 
 service:
   extensions: [file_storage]
