@@ -125,7 +125,7 @@ func New(
 	}
 
 	otelExecMode := otelconfig.GetExecutionModeFromConfig(log, rawConfig)
-	isOtelExecModeSubprocess := otelExecMode == otelmanager.SubprocessExecutionMode
+	isOtelExecModeSubprocess := otelExecMode == otelconfig.SubprocessExecutionMode
 
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
 	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled

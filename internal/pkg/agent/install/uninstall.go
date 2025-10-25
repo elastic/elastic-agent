@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/kardianos/service"
-	"github.com/schollz/progressbar/v3"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -55,7 +54,7 @@ func (a *agentInfo) AgentID() string {
 }
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
-func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar, skipFleetAudit bool) error {
+func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log *logp.Logger, pt ProgressDescriber, skipFleetAudit bool) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("unable to get current working directory")
@@ -171,18 +170,18 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 }
 
 // Injecting notifyFleetAuditUninstall for easier unit testing
-func notifyFleetIfNeeded(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, agentID agentInfo, notifyFleet, localFleet, skipFleetAudit bool, notifyFleetAuditUninstall NotifyFleetAuditUninstall) {
+func notifyFleetIfNeeded(ctx context.Context, log *logp.Logger, pt ProgressDescriber, cfg *configuration.Configuration, agentID agentInfo, notifyFleet, localFleet, skipFleetAudit bool, notifyFleetAuditUninstall NotifyFleetAuditUninstall) {
 	if notifyFleet && !localFleet && !skipFleetAudit {
 		notifyFleetAuditUninstall(ctx, log, pt, cfg, &agentID) //nolint:errcheck // ignore the error as we can't act on it)
 	}
 }
 
-type NotifyFleetAuditUninstall func(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai fleetapi.AgentInfo) error
+type NotifyFleetAuditUninstall func(ctx context.Context, log *logp.Logger, pt ProgressDescriber, cfg *configuration.Configuration, ai fleetapi.AgentInfo) error
 
 // notifyFleetAuditUninstall will attempt to notify fleet-server of the agent's uninstall.
 //
 // There are retries for the attempt after a 10s wait, but it is a best-effort approach.
-func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai fleetapi.AgentInfo) error {
+func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt ProgressDescriber, cfg *configuration.Configuration, ai fleetapi.AgentInfo) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	pt.Describe("Attempting to notify Fleet of uninstall")
@@ -236,7 +235,7 @@ func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progre
 }
 
 // EnsureStoppedService ensures that the installed service is stopped.
-func EnsureStoppedService(topPath string, pt *progressbar.ProgressBar) (service.Status, error) {
+func EnsureStoppedService(topPath string, pt ProgressDescriber) (service.Status, error) {
 	status, _ := StatusService(topPath)
 	if status == service.StatusRunning {
 		pt.Describe("Stopping service")
@@ -343,7 +342,7 @@ func containsString(str string, a []string, caseSensitive bool) bool {
 	return false
 }
 
-func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string, log *logp.Logger, pt *progressbar.ProgressBar, unprivileged bool) error {
+func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken string, log *logp.Logger, pt ProgressDescriber, unprivileged bool) error {
 	platform, err := component.LoadPlatformDetail()
 	if err != nil {
 		return fmt.Errorf("failed to gather system information: %w", err)
@@ -393,7 +392,7 @@ func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken str
 			continue
 		}
 		if err = uninstallServiceComponent(ctx, log, comp, uninstallToken, pt); err != nil {
-			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall component %q: %s\n", comp.ID, err))
+			fmt.Fprintf(os.Stderr, "failed to uninstall component %q: %s\n", comp.ID, err)
 			// The decision was made to change the behaviour and leave the Agent installed if Endpoint uninstall fails
 			// https://github.com/elastic/elastic-agent/pull/2708#issuecomment-1574251911
 			// Thus returning error here.
@@ -404,7 +403,7 @@ func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken str
 	return nil
 }
 
-func uninstallServiceComponent(ctx context.Context, log *logp.Logger, comp component.Component, uninstallToken string, pt *progressbar.ProgressBar) error {
+func uninstallServiceComponent(ctx context.Context, log *logp.Logger, comp component.Component, uninstallToken string, pt ProgressDescriber) error {
 	// Do not use infinite retries when uninstalling from the command line. If the uninstall needs to be
 	// retried the entire uninstall command can be retried. Retries may complete asynchronously with the
 	// execution of the uninstall command, leading to bugs like https://github.com/elastic/elastic-agent/issues/3060.
@@ -475,7 +474,7 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 }
 
 // killWatcher finds and kills any running Elastic Agent watcher.
-func killWatcher(pt *progressbar.ProgressBar) error {
+func killWatcher(pt ProgressDescriber) error {
 	for {
 		// finding and killing watchers is performed in a loop until no
 		// more watchers are existing, this ensures that during uninstall

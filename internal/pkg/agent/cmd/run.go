@@ -19,6 +19,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 
 	"go.elastic.co/apm/v2"
 	apmtransport "go.elastic.co/apm/v2/transport"
@@ -259,6 +260,46 @@ func runElasticAgent(
 	isRoot, err := utils.HasRoot()
 	if err != nil {
 		return fmt.Errorf("failed to check for root/Administrator privileges: %w", err)
+	}
+
+	// fix permissions
+	if isRoot {
+		userName, groupName, err := install.GetDesiredUser()
+		if err != nil {
+			return fmt.Errorf("failed to determine target user: %w", err) // in general this should not happen
+		}
+
+		var ownership utils.FileOwner
+		if userName != "" {
+			uid, err := install.FindUID(userName)
+			if err != nil {
+				return fmt.Errorf("failed to find user: %w", err)
+			}
+			ownership.UID = uid
+		}
+
+		if groupName != "" {
+			gid, err := install.FindGID(groupName)
+			if err != nil {
+				return fmt.Errorf("failed to find group: %w", err)
+			}
+			ownership.GID = gid
+		}
+
+		topPath := paths.Top()
+		err = perms.FixPermissions(topPath, perms.WithOwnership(ownership))
+		if err != nil {
+			return fmt.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
+		}
+
+		if err := dropRootPrivileges(l, ownership); err != nil {
+			return fmt.Errorf("failed to drop permissions to user %q(%v):%q(%v): %w",
+				userName, ownership.UID,
+				groupName, ownership.GID,
+				err,
+			)
+		}
+
 	}
 
 	l.Infow("Elastic Agent started",

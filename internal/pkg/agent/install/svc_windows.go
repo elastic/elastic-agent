@@ -15,6 +15,10 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
+// GetDesiredUser retrieves user and group names as configured in a service file
+// on windows it is a no-op
+func GetDesiredUser() (string, string, error) { return "", "", nil }
+
 func withPassword(password string) serviceOpt {
 	return func(opts *serviceOpts) {
 		opts.Password = password
