@@ -70,6 +70,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+<<<<<<< HEAD
 | [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.132.0/processor/attributesprocessor/README.md) | v0.132.0 |
 | [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.132.0/processor/batchprocessor/README.md) | v0.132.0 |
 | [cumulativetodeltaprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/cumulativetodeltaprocessor/v0.132.0/processor/cumulativetodeltaprocessor/README.md) | v0.132.0 |
@@ -82,6 +83,22 @@ This section provides a summary of components included in the Elastic Distributi
 | [resourcedetectionprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourcedetectionprocessor/v0.132.0/processor/resourcedetectionprocessor/README.md) | v0.132.0 |
 | [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.132.0/processor/resourceprocessor/README.md) | v0.132.0 |
 | [transformprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/transformprocessor/v0.132.0/processor/transformprocessor/README.md) | v0.132.0 |
+=======
+| [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.137.0/processor/attributesprocessor/README.md) | v0.137.0 |
+| [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.137.0/processor/batchprocessor/README.md) | v0.137.0 |
+| [cumulativetodeltaprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/cumulativetodeltaprocessor/v0.137.0/processor/cumulativetodeltaprocessor/README.md) | v0.137.0 |
+| [elasticapmprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticapmprocessor/v0.4.0/processor/elasticapmprocessor/README.md) | v0.4.0 |
+| [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.20.0/processor/elasticinframetricsprocessor/README.md) | v0.20.0 |
+| [elastictraceprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elastictraceprocessor/v0.13.0/processor/elastictraceprocessor/README.md) | v0.13.0 |
+| [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.137.0/processor/filterprocessor/README.md) | v0.137.0 |
+| [geoipprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/geoipprocessor/v0.137.0/processor/geoipprocessor/README.md) | v0.137.0 |
+| [k8sattributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/k8sattributesprocessor/v0.137.0/processor/k8sattributesprocessor/README.md) | v0.137.0 |
+| [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.137.0/processor/memorylimiterprocessor/README.md) | v0.137.0 |
+| [resourcedetectionprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourcedetectionprocessor/v0.137.0/processor/resourcedetectionprocessor/README.md) | v0.137.0 |
+| [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.137.0/processor/resourceprocessor/README.md) | v0.137.0 |
+| [tailsamplingprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/tailsamplingprocessor/v0.137.0/processor/tailsamplingprocessor/README.md) | v0.137.0 |
+| [transformprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/transformprocessor/v0.137.0/processor/transformprocessor/README.md) | v0.137.0 |
+>>>>>>> d527583ed (build(deps): bump github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor from 0.18.0 to 0.20.0 (#10829))
 
 ### Extensions
 
