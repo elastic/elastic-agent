@@ -140,6 +140,7 @@ func TestTTLMarkerRegistry_Get(t *testing.T) {
 func TestTTLMarkerRegistry_Set(t *testing.T) {
 	const TTLMarkerYAMLTemplate = `
         version: {{ .Version }}
+        hash: {{ .Hash }}
         valid_until: {{ .ValidUntil }}`
 
 	expectedMarkerContentTemplate, err := template.New("expected marker").Parse(TTLMarkerYAMLTemplate)
@@ -156,6 +157,7 @@ func TestTTLMarkerRegistry_Set(t *testing.T) {
 
 	versions := []string{"1.2.3", "4.5.6"}
 	versionedHomes := []string{"elastic-agent-1.2.3-past", "elastic-agent-4.5.6-present"}
+	hashes := []string{"past", "present"}
 	ttls := []string{tomorrowString, ""}
 
 	type args struct {
@@ -180,6 +182,7 @@ func TestTTLMarkerRegistry_Set(t *testing.T) {
 				map[string]TTLMarker{
 					filepath.Join("data", versionedHomes[0]): {
 						Version:    versions[0],
+						Hash:       hashes[0],
 						ValidUntil: tomorrow,
 					},
 				},
@@ -192,7 +195,7 @@ func TestTTLMarkerRegistry_Set(t *testing.T) {
 				if assert.FileExists(t, expectedTTLMarkerFilePath, "new TTL marker should have been created") {
 
 					b := new(strings.Builder)
-					err = expectedMarkerContentTemplate.Execute(b, map[string]string{"Version": versions[0], "ValidUntil": ttls[0]})
+					err = expectedMarkerContentTemplate.Execute(b, map[string]string{"Version": versions[0], "ValidUntil": ttls[0], "Hash": hashes[0]})
 					require.NoError(t, err)
 					actualMarkerContent, err := os.ReadFile(expectedTTLMarkerFilePath)
 					require.NoError(t, err)
@@ -207,7 +210,7 @@ func TestTTLMarkerRegistry_Set(t *testing.T) {
 					err = os.MkdirAll(filepath.Join(tmpDir, "data", versionedHome), 0755)
 					require.NoError(t, err, "error setting up fake agent install directory")
 					b := new(strings.Builder)
-					err = expectedMarkerContentTemplate.Execute(b, map[string]string{"Version": versions[i], "ValidUntil": ttls[i]})
+					err = expectedMarkerContentTemplate.Execute(b, map[string]string{"Version": versions[i], "ValidUntil": ttls[i], "Hash": hashes[i]})
 					require.NoError(t, err, "error setting up ttl marker")
 					err = os.WriteFile(filepath.Join(tmpDir, "data", versionedHomes[i], ttlMarkerName), []byte(b.String()), 0644)
 				}

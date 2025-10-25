@@ -21,11 +21,11 @@ import (
 )
 
 const markerFilename = ".update-marker"
-const disableRollbackWindow = time.Duration(0)
 
 // TTLMarker marks an elastic-agent install available for rollback
 type TTLMarker struct {
 	Version    string    `json:"version" yaml:"version"`
+	Hash       string    `json:"hash" yaml:"hash"`
 	ValidUntil time.Time `json:"valid_until" yaml:"valid_until"`
 }
 
@@ -143,8 +143,8 @@ type updateActiveCommitFunc func(log *logger.Logger, topDirPath, hash string, wr
 func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile writeFileFunc) markUpgradeFunc {
 	return func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]TTLMarker) error {
 
-		if len(previousAgent.hash) > hashLen {
-			previousAgent.hash = previousAgent.hash[:hashLen]
+		if len(previousAgent.hash) > HashLen {
+			previousAgent.hash = previousAgent.hash[:HashLen]
 		}
 
 		marker := &UpdateMarker{

@@ -5,6 +5,9 @@ filename: mocks.go
 template-data:
   unroll-variadic: true
 packages:
+  github.com/elastic/elastic-agent/internal/pkg/agent/application:
+    interfaces:
+      rollbacksSource: {}
   github.com/elastic/elastic-agent/internal/pkg/agent/application/actions/handlers:
     interfaces:
       Uploader: {}
