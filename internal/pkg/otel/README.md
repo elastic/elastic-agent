@@ -57,8 +57,8 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| [debugexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/debugexporter/v0.132.0/exporter/debugexporter/README.md) | v0.132.0 |
-| [elasticsearchexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/elasticsearchexporter/v0.132.0/exporter/elasticsearchexporter/README.md) | v0.132.0 |
+| [debugexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/debugexporter/v0.135.0/exporter/debugexporter/README.md) | v0.135.0 |
+| [elasticsearchexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/elasticsearchexporter/v0.135.0/exporter/elasticsearchexporter/README.md) | v0.135.0 |
 | [fileexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/fileexporter/v0.132.0/exporter/fileexporter/README.md) | v0.132.0 |
 | [kafkaexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/kafkaexporter/v0.132.0/exporter/kafkaexporter/README.md) | v0.132.0 |
 | [loadbalancingexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/loadbalancingexporter/v0.132.0/exporter/loadbalancingexporter/README.md) | v0.132.0 |
@@ -91,7 +91,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [apmconfigextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apmconfigextension/v0.6.0/extension/apmconfigextension/README.md) | v0.6.0 |
 | [bearertokenauthextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/bearertokenauthextension/v0.132.0/extension/bearertokenauthextension/README.md) | v0.132.0 |
 | [beatsauthextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/beatsauthextension/v0.2.0/extension/beatsauthextension/README.md) | v0.2.0 |
-| [extensiontest](https://github.com/open-telemetry/opentelemetry-collector/blob/extension/extensiontest/v0.132.0/extension/extensiontest/README.md) | v0.132.0 |
+| [extensiontest](https://github.com/open-telemetry/opentelemetry-collector/blob/extension/extensiontest/v0.135.0/extension/extensiontest/README.md) | v0.135.0 |
 | [filestorage](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/storage/filestorage/v0.132.0/extension/storage/filestorage/README.md) | v0.132.0 |
 | [headerssetterextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/headerssetterextension/v0.132.0/extension/headerssetterextension/README.md) | v0.132.0 |
 | [healthcheckextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/healthcheckextension/v0.132.0/extension/healthcheckextension/README.md) | v0.132.0 |
