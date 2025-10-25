@@ -5,6 +5,7 @@
 package transpiler
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -50,10 +51,12 @@ func RenderOutputs(outputs Node, varsArray []*Vars) (Node, error) {
 		}
 		// Apply creates a new Node with a deep copy of all the values
 		value, err := dict.Apply(vars)
-		// inputs allows a variable not to match and it will be removed
-		// outputs are not that way, if an ErrNoMatch is returned we
-		// return it back to the caller
 		if err != nil {
+			if errors.Is(err, errNoMatchAllowed) {
+				// optional `|?` syntax; remove the output as no match was provided
+				continue
+			}
+			// no match and not optional
 			return nil, fmt.Errorf("rendering output %q failed: %w", key.name, err)
 		}
 		keys[i] = &Key{
