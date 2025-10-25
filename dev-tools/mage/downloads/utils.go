@@ -110,7 +110,7 @@ func verifyChecksum(checksumFile string) error {
 	}
 
 	if expectedChecksum != actualChecksum {
-		return fmt.Errorf("checksum of file %s does not match expected checksum of %s", fileName, actualChecksum)
+		return fmt.Errorf("%s checksum mismatch: expected=%s actual=%s", fileName, expectedChecksum, actualChecksum)
 	}
 
 	return nil
