@@ -31,7 +31,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.8.0
 	github.com/elastic/opentelemetry-collector-components/extension/beatsauthextension v0.5.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.4.0
-	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.18.0
+	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.20.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.13.0
 	github.com/fatih/color v1.18.0
 	github.com/fsnotify/fsnotify v1.9.0
@@ -153,8 +153,13 @@ require (
 	go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.43.0
 	go.opentelemetry.io/collector/connector v0.137.0
 	go.opentelemetry.io/collector/exporter v1.43.0
+<<<<<<< HEAD
 	go.opentelemetry.io/collector/extension v1.43.0
 	go.opentelemetry.io/collector/featuregate v1.43.0
+=======
+	go.opentelemetry.io/collector/extension v1.44.0
+	go.opentelemetry.io/collector/featuregate v1.44.0
+>>>>>>> d527583ed (build(deps): bump github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor from 0.18.0 to 0.20.0 (#10829))
 	go.opentelemetry.io/collector/otelcol v0.137.0
 	go.opentelemetry.io/collector/processor v1.43.0
 	go.opentelemetry.io/collector/receiver v1.43.0
@@ -353,7 +358,7 @@ require (
 	github.com/elastic/mito v1.23.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.8.0 // indirect
-	github.com/elastic/opentelemetry-lib v0.24.0 // indirect
+	github.com/elastic/opentelemetry-lib v0.25.0 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
 	github.com/elastic/sarama v1.19.1-0.20250603175145-7672917f26b6 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
@@ -649,13 +654,20 @@ require (
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.0 // indirect
 	go.opentelemetry.io/collector v0.137.0 // indirect
+<<<<<<< HEAD
 	go.opentelemetry.io/collector/client v1.43.0 // indirect
 	go.opentelemetry.io/collector/config/configauth v1.43.0 // indirect
 	go.opentelemetry.io/collector/config/configcompression v1.43.0 // indirect
+=======
+	go.opentelemetry.io/collector/client v1.44.0 // indirect
+	go.opentelemetry.io/collector/config/configauth v1.44.0 // indirect
+	go.opentelemetry.io/collector/config/configcompression v1.44.0 // indirect
+>>>>>>> d527583ed (build(deps): bump github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor from 0.18.0 to 0.20.0 (#10829))
 	go.opentelemetry.io/collector/config/configgrpc v0.137.0 // indirect
-	go.opentelemetry.io/collector/config/confighttp v0.137.0 // indirect
-	go.opentelemetry.io/collector/config/configmiddleware v1.43.0 // indirect
+	go.opentelemetry.io/collector/config/confighttp v0.138.0 // indirect
+	go.opentelemetry.io/collector/config/configmiddleware v1.44.0 // indirect
 	go.opentelemetry.io/collector/config/confignet v1.43.0 // indirect
+<<<<<<< HEAD
 	go.opentelemetry.io/collector/config/configopaque v1.43.0 // indirect
 	go.opentelemetry.io/collector/config/configoptional v1.43.0 // indirect
 	go.opentelemetry.io/collector/config/configretry v1.43.0 // indirect
@@ -666,6 +678,18 @@ require (
 	go.opentelemetry.io/collector/connector/xconnector v0.137.0 // indirect
 	go.opentelemetry.io/collector/consumer v1.43.0 // indirect
 	go.opentelemetry.io/collector/consumer/consumererror v0.137.0 // indirect
+=======
+	go.opentelemetry.io/collector/config/configopaque v1.44.0 // indirect
+	go.opentelemetry.io/collector/config/configoptional v1.44.0 // indirect
+	go.opentelemetry.io/collector/config/configretry v1.43.0 // indirect
+	go.opentelemetry.io/collector/config/configtelemetry v0.137.0 // indirect
+	go.opentelemetry.io/collector/config/configtls v1.44.0 // indirect
+	go.opentelemetry.io/collector/confmap/xconfmap v0.138.0 // indirect
+	go.opentelemetry.io/collector/connector/connectortest v0.138.0 // indirect
+	go.opentelemetry.io/collector/connector/xconnector v0.138.0 // indirect
+	go.opentelemetry.io/collector/consumer v1.44.0 // indirect
+	go.opentelemetry.io/collector/consumer/consumererror v0.138.0 // indirect
+>>>>>>> d527583ed (build(deps): bump github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor from 0.18.0 to 0.20.0 (#10829))
 	go.opentelemetry.io/collector/consumer/consumererror/xconsumererror v0.137.0 // indirect
 	go.opentelemetry.io/collector/consumer/consumertest v0.137.0 // indirect
 	go.opentelemetry.io/collector/consumer/xconsumer v0.137.0 // indirect
@@ -673,9 +697,9 @@ require (
 	go.opentelemetry.io/collector/exporter/exporterhelper/xexporterhelper v0.137.0 // indirect
 	go.opentelemetry.io/collector/exporter/exportertest v0.137.0 // indirect
 	go.opentelemetry.io/collector/exporter/xexporter v0.137.0 // indirect
-	go.opentelemetry.io/collector/extension/extensionauth v1.43.0 // indirect
+	go.opentelemetry.io/collector/extension/extensionauth v1.44.0 // indirect
 	go.opentelemetry.io/collector/extension/extensioncapabilities v0.137.0 // indirect
-	go.opentelemetry.io/collector/extension/extensionmiddleware v0.137.0 // indirect
+	go.opentelemetry.io/collector/extension/extensionmiddleware v0.138.0 // indirect
 	go.opentelemetry.io/collector/extension/xextension v0.137.0 // indirect
 	go.opentelemetry.io/collector/filter v0.137.0 // indirect
 	go.opentelemetry.io/collector/internal/fanoutconsumer v0.137.0 // indirect
@@ -686,11 +710,16 @@ require (
 	go.opentelemetry.io/collector/pdata/pprofile v0.137.0 // indirect
 	go.opentelemetry.io/collector/pdata/testdata v0.137.0 // indirect
 	go.opentelemetry.io/collector/pdata/xpdata v0.137.0 // indirect
+<<<<<<< HEAD
 	go.opentelemetry.io/collector/pipeline/xpipeline v0.137.0 // indirect
 	go.opentelemetry.io/collector/processor/processorhelper v0.137.0 // indirect
+=======
+	go.opentelemetry.io/collector/pipeline/xpipeline v0.138.0 // indirect
+	go.opentelemetry.io/collector/processor/processorhelper v0.138.0 // indirect
+>>>>>>> d527583ed (build(deps): bump github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor from 0.18.0 to 0.20.0 (#10829))
 	go.opentelemetry.io/collector/processor/processorhelper/xprocessorhelper v0.137.0 // indirect
-	go.opentelemetry.io/collector/processor/processortest v0.137.0 // indirect
-	go.opentelemetry.io/collector/processor/xprocessor v0.137.0 // indirect
+	go.opentelemetry.io/collector/processor/processortest v0.138.0 // indirect
+	go.opentelemetry.io/collector/processor/xprocessor v0.138.0 // indirect
 	go.opentelemetry.io/collector/receiver/receiverhelper v0.137.0 // indirect
 	go.opentelemetry.io/collector/receiver/receivertest v0.137.0 // indirect
 	go.opentelemetry.io/collector/receiver/xreceiver v0.137.0 // indirect
