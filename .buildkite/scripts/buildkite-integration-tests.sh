@@ -66,7 +66,12 @@ echo "~~~ Integration tests: ${GROUP_NAME}"
 # This 2-hour timeout provides enough room for future, potentially longer tests,
 # while still enforcing a reasonable upper limit on total execution time.
 # See: https://pkg.go.dev/cmd/go#hdr-Testing_flags
-GOTEST_ARGS=(-tags integration -test.shuffle on -test.timeout 2h0m0s "${TEST_PACKAGE}" -v -args "-integration.groups=${GROUP_NAME}" "-integration.sudo=${TEST_SUDO}" "-integration.fips=${FIPS:-false}")
+
+GOTEST_OPTS="-test.shuffle on -test.timeout 2h0m0s"
+if [[ "${BUILDKITE_PULL_REQUEST:="false"}" != "false" ]]; then
+  GOTEST_OPTS="${GOTEST_OPTS} -test.short"
+fi
+GOTEST_ARGS=(-tags integration ${GOTEST_OPTS} "${TEST_PACKAGE}" -v -args "-integration.groups=${GROUP_NAME}" "-integration.sudo=${TEST_SUDO}" "-integration.fips=${FIPS:-false}")
 set +e
 TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true \
   gotestsum --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- "${GOTEST_ARGS[@]}"

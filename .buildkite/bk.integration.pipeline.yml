@@ -524,7 +524,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n2-standard-4"
+          machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
           diskSizeGb: 80
         plugins:
