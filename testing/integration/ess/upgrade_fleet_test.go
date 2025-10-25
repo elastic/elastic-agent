@@ -475,7 +475,7 @@ func PerformManagedUpgrade(
 		checkSuccessful := check.FleetAgentStatus(
 			ctx, t, kibClient, agentID, "online")()
 		if !checkSuccessful {
-			return checkSuccessful, fmt.Errorf("agent status is not online")
+			return checkSuccessful, errors.New("agent status is not online")
 		}
 		return checkSuccessful, nil
 	}, backoff.WithMaxElapsedTime(2*time.Minute), backoff.WithBackOff(backoff.NewConstantBackOff(10*time.Second)))
@@ -498,7 +498,7 @@ func PerformManagedUpgrade(
 			return agent, getAgentErr
 		}
 		if agent.UpgradeDetails == nil {
-			return agent, fmt.Errorf("agent upgrade details is empty")
+			return agent, errors.New("agent upgrade details is empty")
 		}
 		return agent, nil
 	}, backoff.WithMaxElapsedTime(5*time.Minute), backoff.WithBackOff(backoff.NewConstantBackOff(time.Second)))
@@ -530,7 +530,7 @@ func PerformManagedUpgrade(
 	_, err = backoff.Retry(ctx, func() (any, error) {
 		checkSuccessful := check.FleetAgentStatus(ctx, t, kibClient, agentID, "online")()
 		if !checkSuccessful {
-			return checkSuccessful, fmt.Errorf("agent status is not online")
+			return checkSuccessful, errors.New("agent status is not online")
 		}
 		return checkSuccessful, nil
 	}, backoff.WithMaxElapsedTime(10*time.Minute), backoff.WithBackOff(backoff.NewConstantBackOff(15*time.Second)))

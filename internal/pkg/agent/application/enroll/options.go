@@ -6,6 +6,7 @@ package enroll
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -77,7 +78,7 @@ func (e *EnrollOptions) RemoteConfig(failOnInsecureMismatch bool) (remote.Config
 		return remote.Config{}, err
 	}
 	if failOnInsecureMismatch && cfg.Protocol == remote.ProtocolHTTP && !e.Insecure {
-		return remote.Config{}, fmt.Errorf("connection to fleet-server is insecure, strongly recommended to use a secure connection (override with --insecure)")
+		return remote.Config{}, errors.New("connection to fleet-server is insecure, strongly recommended to use a secure connection (override with --insecure)")
 	}
 
 	cfg.Headers = e.Headers
@@ -125,7 +126,7 @@ func MergeOptionsWithMigrateAction(action *fleetapi.ActionMigrate, options Enrol
 	// i'm keeping it this way (michal)
 	if action.Data.EnrollmentToken == "" ||
 		action.Data.TargetURI == "" {
-		return EnrollOptions{}, fmt.Errorf("required fields missing")
+		return EnrollOptions{}, errors.New("required fields missing")
 	}
 
 	configMap := make(map[string]interface{})
