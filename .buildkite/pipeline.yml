@@ -12,6 +12,11 @@ env:
   IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-1760749288"
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1760749288"
 
+common:
+  - aws_oidc: &aws_oidc
+      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-aws-buildkite-oidc.tf
+      elastic/oblt-aws-auth#v0.2.0:
+
 steps:
   - label: "check-ci"
     key: "check-ci"
@@ -37,6 +42,8 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
+        plugins:
+          - *aws_oidc
         retry:
           automatic:
             limit: 1
