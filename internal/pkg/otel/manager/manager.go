@@ -44,6 +44,10 @@ type ExecutionMode string
 const (
 	SubprocessExecutionMode ExecutionMode = "subprocess"
 	EmbeddedExecutionMode   ExecutionMode = "embedded"
+
+	// CollectorStopTimeout is the duration to wait for the collector to stop. Note: this needs to be shorter
+	// than 5 * time.Second (coordinator.managerShutdownTimeout) otherwise we might end up with a defunct process.
+	CollectorStopTimeout = 3 * time.Second
 )
 
 type collectorRecoveryTimer interface {
