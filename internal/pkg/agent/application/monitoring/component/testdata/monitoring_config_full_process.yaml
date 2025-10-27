@@ -865,7 +865,8 @@ inputs:
         target: component
   type: http/metrics
   use_output: monitoring
-- data_stream:
+- _runtime_experimental: otel
+  data_stream:
     namespace: default
   id: metrics-monitoring-collector
   name: metrics-monitoring-collector
