@@ -292,10 +292,9 @@ func TestGetOtelConfig(t *testing.T) {
 				"block_on_overflow": true,
 				"wait_for_result":   true,
 				"batch": map[string]any{
-					"flush_timeout": "10s",
-					"max_size":      1600,
-					"min_size":      0,
-					"sizer":         "items",
+					"max_size": 1600,
+					"min_size": 0,
+					"sizer":    "items",
 				},
 			},
 			"logs_dynamic_id": map[string]any{
