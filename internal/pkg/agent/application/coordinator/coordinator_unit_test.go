@@ -1218,6 +1218,7 @@ func TestCoordinatorManagesComponentWorkDirs(t *testing.T) {
 	}
 
 	var workDirPath string
+	var workDirCreated time.Time
 
 	t.Run("run in process manager", func(t *testing.T) {
 		// Create a policy with one input and one output (no otel configuration)
@@ -1242,7 +1243,10 @@ inputs:
 		assert.NoError(t, cfgChange.err, "config processing shouldn't report an error")
 		require.Len(t, coord.componentModel, 1, "there should be one component")
 		workDirPath = coord.componentModel[0].WorkDirPath(paths.Run())
-		assert.DirExists(t, workDirPath, "component working directory should exist")
+		stat, err := os.Stat(workDirPath)
+		require.NoError(t, err, "component working directory should exist")
+		assert.True(t, stat.IsDir(), "component working directory should exist")
+		workDirCreated = stat.ModTime()
 	})
 
 	t.Run("run in otel manager", func(t *testing.T) {
@@ -1277,7 +1281,10 @@ inputs:
 		}
 		updateChan <- compState
 		coord.runLoopIteration(ctx)
-		assert.DirExists(t, workDirPath, "component working directory should still exist")
+		stat, err := os.Stat(workDirPath)
+		require.NoError(t, err, "component working directory should exist")
+		assert.True(t, stat.IsDir(), "component working directory should exist")
+		assert.Equal(t, workDirCreated, stat.ModTime(), "component working directory shouldn't have been modified")
 	})
 	t.Run("remove component", func(t *testing.T) {
 		// Create a policy with one input and one output (no otel configuration)
@@ -1308,7 +1315,7 @@ inputs: []
 		}
 		updateChan <- compState
 		coord.runLoopIteration(ctx)
-		assert.NoDirExists(t, workDirPath, "component working directory should still exist")
+		assert.NoDirExists(t, workDirPath, "component working directory shouldn't exist anymore")
 	})
 
 }

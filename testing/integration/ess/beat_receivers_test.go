@@ -975,6 +975,7 @@ agent.monitoring.enabled: false
 	require.NoError(t, err, "failed to install agent: %s", output)
 
 	var componentID, componentWorkDir string
+	var workDirCreated time.Time
 
 	// wait for component to appear in status
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -990,7 +991,10 @@ agent.monitoring.enabled: false
 	require.NoError(t, err)
 
 	componentWorkDir = filepath.Join(runDir, componentID)
-	require.DirExists(t, componentWorkDir)
+	stat, err := os.Stat(componentWorkDir)
+	require.NoError(t, err, "component working directory should exist")
+	assert.True(t, stat.IsDir(), "component working directory should exist")
+	workDirCreated = stat.ModTime()
 
 	// change configuration and wait until the beats receiver is present in status
 	err = fixture.Configure(ctx, receiverConfig)
@@ -1006,7 +1010,10 @@ agent.monitoring.enabled: false
 	}, 2*time.Minute, 5*time.Second)
 
 	// the component working directory should still exist
-	require.DirExists(t, componentWorkDir)
+	stat, err = os.Stat(componentWorkDir)
+	require.NoError(t, err, "component working directory should exist")
+	assert.True(t, stat.IsDir(), "component working directory should exist")
+	assert.Equal(t, workDirCreated, stat.ModTime(), "component working directory shouldn't have been modified")
 
 	configNoComponents := `agent.logging.level: info
 agent.logging.to_stderr: true
