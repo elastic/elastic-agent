@@ -14,6 +14,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -905,6 +906,131 @@ agent.monitoring.enabled: false
 	require.True(t, ok, "log message field should be a string")
 	expectedMessage := "otel runtime is not supported for component system/metrics-default, switching to process runtime, reason: unsupported configuration for system/metrics-default: error translating config for output: default, unit: system/metrics-default, error: indices is currently not supported: unsupported operation"
 	assert.Equal(t, expectedMessage, message)
+}
+
+// TestComponentWorkDir verifies that the component working directory is not deleted when moving the component from
+// the process runtime to the otel runtime.
+func TestComponentWorkDir(t *testing.T) {
+	_ = define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: nil,
+	})
+
+	type configOptions struct {
+		RuntimeExperimental string
+	}
+	configTemplate := `agent.logging.level: info
+agent.logging.to_stderr: true
+agent.logging.to_files: false
+inputs:
+  # Collecting system metrics
+  - type: system/metrics
+    id: unique-system-metrics-input
+    _runtime_experimental: {{.RuntimeExperimental}}
+    streams:
+      - metricsets:
+        - cpu
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [http://localhost:9200]
+    api_key: placeholder
+agent.monitoring.enabled: false
+`
+
+	var configBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			configOptions{
+				RuntimeExperimental: string(component.ProcessRuntimeManager),
+			}))
+	processConfig := configBuffer.Bytes()
+	require.NoError(t,
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			configOptions{
+				RuntimeExperimental: string(component.OtelRuntimeManager),
+			}))
+	receiverConfig := configBuffer.Bytes()
+	// this is the context for the whole test, with a global timeout defined
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	// set up a standalone agent
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	err = fixture.Configure(ctx, processConfig)
+	require.NoError(t, err)
+
+	output, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true})
+	require.NoError(t, err, "failed to install agent: %s", output)
+
+	var componentID, componentWorkDir string
+
+	// wait for component to appear in status
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		require.NoError(collect, statusErr)
+		require.Equal(collect, 1, len(status.Components))
+		componentStatus := status.Components[0]
+		componentID = componentStatus.ID
+	}, 2*time.Minute, 5*time.Second)
+
+	runDir, err := atesting.FindRunDir(fixture)
+	require.NoError(t, err)
+
+	componentWorkDir = filepath.Join(runDir, componentID)
+	require.DirExists(t, componentWorkDir)
+
+	// change configuration and wait until the beats receiver is present in status
+	err = fixture.Configure(ctx, receiverConfig)
+	require.NoError(t, err)
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		require.NoError(collect, statusErr)
+		require.Equal(collect, 1, len(status.Components))
+		componentStatus := status.Components[0]
+		assert.Equal(collect, "beats-receiver", componentStatus.VersionInfo.Name)
+	}, 2*time.Minute, 5*time.Second)
+
+	// the component working directory should still exist
+	require.DirExists(t, componentWorkDir)
+
+	configNoComponents := `agent.logging.level: info
+agent.logging.to_stderr: true
+agent.logging.to_files: false
+inputs: []
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [http://localhost:9200]
+    api_key: placeholder
+agent.monitoring.enabled: false
+`
+	err = fixture.Configure(ctx, []byte(configNoComponents))
+	require.NoError(t, err)
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		require.NoError(collect, statusErr)
+		require.Equal(collect, 0, len(status.Components))
+	}, 2*time.Minute, 5*time.Second)
+
+	// the component working directory shouldn't exist anymore
+	require.NoDirExists(t, componentWorkDir)
 }
 
 func assertCollectorComponentsHealthy(t *assert.CollectT, status *atesting.AgentStatusCollectorOutput) {
