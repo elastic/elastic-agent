@@ -301,14 +301,8 @@ func TestGetOtelConfig(t *testing.T) {
 			"logs_dynamic_id": map[string]any{
 				"enabled": true,
 			},
-			"timeout":           90 * time.Second,
-			"idle_conn_timeout": 3 * time.Second,
 			"auth": map[string]any{
 				"authenticator": "beatsauth/_agent-component/" + outputName,
-			},
-			"tls": map[string]any{
-				"min_version": "1.2",
-				"max_version": "1.3",
 			},
 		}
 	}
