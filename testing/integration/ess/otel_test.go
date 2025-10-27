@@ -1623,6 +1623,8 @@ service:
 		"@timestamp",
 		"agent.ephemeral_id",
 		"agent.id",
+
+		// for short periods of time, the beats binary version can be out of sync with the beat receiver version
 		"agent.version",
 
 		// Missing from fbreceiver doc
@@ -1983,7 +1985,7 @@ receivers:
             - cpu
     output:
       otelconsumer:
-    queue.mem.flush.timeout: 0s	  
+    queue.mem.flush.timeout: 0s
 exporters:
   elasticsearch/log:
     endpoints:
@@ -2070,3 +2072,141 @@ service:
 
 	cancel()
 }
+<<<<<<< HEAD
+=======
+
+func TestOtelBeatsAuthExtensionInvalidCertificates(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			// {Type: define.Windows}, we don't support otel on Windows yet
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	// Create the otel configuration file
+	type otelConfigOptions struct {
+		ESEndpoint string
+		ESApiKey   string
+		Index      string
+	}
+	esEndpoint, err := integration.GetESHost()
+	require.NoError(t, err, "error getting elasticsearch endpoint")
+	esApiKey, err := createESApiKey(info.ESClient)
+	require.NoError(t, err, "error creating API key")
+	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	index := "logs-integration-" + info.Namespace
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	otelConfigTemplate := `
+extensions:
+  beatsauth:
+    continue_on_error: true
+    ssl:
+      enabled: true
+      verification_mode: none
+      certificate: /nonexistent.pem
+      key: /nonexistent.key
+      key_passphrase: null
+      key_passphrase_path: null
+      verification_mode: none
+receivers:
+  metricbeatreceiver:
+    metricbeat:
+      modules:
+        - module: system
+          enabled: true
+          period: 1s
+          processes:
+            - '.*'
+          metricsets:
+            - cpu
+    output:
+      otelconsumer:
+    queue.mem.flush.timeout: 0s
+exporters:
+  elasticsearch/log:
+    endpoints:
+      - {{.ESEndpoint}}
+    api_key: {{.ESApiKey}}
+    logs_index: {{.Index}}
+    batcher:
+      enabled: true
+      flush_timeout: 1s
+      min_size: 1
+    auth:
+      authenticator: beatsauth
+    mapping:
+      mode: bodymap
+service:
+  extensions: [beatsauth]
+  pipelines:
+    logs:
+      receivers:
+        - metricbeatreceiver
+      exporters:
+        - elasticsearch/log
+`
+	var otelConfigBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("otelConfig").Parse(otelConfigTemplate)).Execute(&otelConfigBuffer,
+			otelConfigOptions{
+				ESEndpoint: esEndpoint,
+				ESApiKey:   esApiKey.Encoded,
+				Index:      index,
+			}))
+
+	// configure elastic-agent.yml
+	err = fixture.Configure(ctx, otelConfigBuffer.Bytes())
+
+	// prepare agent command
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err, "cannot prepare Elastic-Agent command: %w", err)
+
+	output := strings.Builder{}
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	// start elastic-agent
+	err = cmd.Start()
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+		require.NotNil(collect, status.Collector)
+		require.NotNil(collect, status.Collector.ComponentStatusMap)
+
+		pipelines, exists := status.Collector.ComponentStatusMap["pipeline:logs"]
+		require.True(collect, exists)
+
+		receiver, exists := pipelines.ComponentStatusMap["receiver:metricbeatreceiver"]
+		require.True(collect, exists)
+		require.EqualValues(collect, receiver.Status, cproto.State_HEALTHY)
+
+		exporter, exists := pipelines.ComponentStatusMap["exporter:elasticsearch/log"]
+		require.True(collect, exists)
+		require.EqualValues(collect, exporter.Status, cproto.State_DEGRADED)
+	}, 2*time.Minute, 5*time.Second)
+
+	cancel()
+}
+>>>>>>> 89c9b279d (Allow different beats versions in integration tests (#10851))
