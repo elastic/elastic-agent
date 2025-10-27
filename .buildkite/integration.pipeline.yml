@@ -22,12 +22,12 @@ steps:
           context: "buildkite/elastic-agent - Packaging"
     steps:
       # Build matrix is not used for packaging in favor to unique step keys
-      # Packaging linux/amd64
-      - label: "Packaging: linux/amd64 rpm"
-        key: packaging-ubuntu-x86-64
+      # Packaging amd64 non-containers
+      - label: "Packaging: amd64 zip,tar.gz,rpm,deb "
+        key: packaging-amd64
         env:
-          PLATFORMS: "linux/amd64"
-          PACKAGES: "tar.gz,rpm,deb"
+          PLATFORMS: "windows/amd64,linux/amd64"
+          PACKAGES: "zip,tar.gz,rpm,deb"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
@@ -39,8 +39,8 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
 
-      - label: "Packaging: Ubuntu x86_64 FIPS"
-        key: "packaging-ubuntu-x86-64-fips"
+      - label: "Packaging: Ubuntu x86_64 FIPS tar.gz"
+        key: "packaging-amd64-fips"
         env:
           PACKAGES: "tar.gz"
           PLATFORMS: "linux/amd64"
@@ -57,11 +57,11 @@ steps:
           image: "${IMAGE_UBUNTU_2204_X86_64}"
 
       # Packaging linux/arm64
-      - label: "Packaging: linux/arm64 tar.gz"
-        key: packaging-ubuntu-arm64
+      - label: "Packaging: arm64 zip,tar.gz"
+        key: packaging-arm64
         env:
-          PLATFORMS: "linux/arm64"
-          PACKAGES: "tar.gz"
+          PLATFORMS: "windows/arm64,linux/arm64"
+          PACKAGES: "tar.gz,zip"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
@@ -73,44 +73,12 @@ steps:
           instanceType: "c6g.2xlarge"
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
-      - label: "Packaging: Ubuntu arm64 FIPS"
-        key: "packaging-ubuntu-arm64-fips"
+      - label: "Packaging: Ubuntu arm64 FIPS tar.gz"
+        key: "packaging-arm64-fips"
         env:
           PACKAGES: "tar.gz"
           PLATFORMS: "linux/arm64"
           FIPS: "true"
-        command: ".buildkite/scripts/steps/integration-package.sh"
-        artifact_paths:
-          - build/distributions/**
-        retry:
-          automatic:
-            limit: 1
-        agents:
-          provider: "aws"
-          instanceType: "c6g.2xlarge"
-          image: "${IMAGE_UBUNTU_2204_ARM_64}"
-
-      - label: "Packaging: windows/amd64 zip"
-        key: packaging-windows-amd64
-        env:
-          PACKAGES: "zip"
-          PLATFORMS: "windows/amd64"
-        command: ".buildkite/scripts/steps/integration-package.sh"
-        artifact_paths:
-          - build/distributions/**
-        retry:
-          automatic:
-            limit: 1
-        agents:
-          provider: "gcp"
-          machineType: "n2-standard-8"
-          image: "${IMAGE_UBUNTU_2204_X86_64}"
-
-      - label: "Packaging: windows/arm64 zip"
-        key: packaging-windows-arm64
-        env:
-          PACKAGES: "zip"
-          PLATFORMS: "windows/arm64"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
