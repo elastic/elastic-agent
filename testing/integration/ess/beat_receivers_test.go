@@ -376,7 +376,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 			"agent.ephemeral_id",
 			// agent.id is different because it's the id of the underlying beat
 			"agent.id",
-			// agent.version is different because we force version 9.0.0 in CI
+			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
 			"agent.version",
 			"data_stream.namespace",
 			"elastic_agent.id",
@@ -589,6 +589,9 @@ outputs:
 			"data_stream.namespace",
 			"event.ingested",
 			"event.duration",
+
+			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
+			"agent.version",
 
 			// only in receiver doc
 			"agent.otelcol.component.id",
