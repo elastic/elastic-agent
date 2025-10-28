@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os/exec"
 	"runtime"
 	"strings"
 	"testing"
@@ -515,17 +514,17 @@ outputs:
 			ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 			defer cancel()
 
-			fixture, cmd, output := prepareAgentCmd(t, ctx, configContents)
-
-			err = cmd.Start()
+			// set up a standalone agent
+			fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 			require.NoError(t, err)
 
-			t.Cleanup(func() {
-				if t.Failed() {
-					t.Log("Elastic-Agent output:")
-					t.Log(output.String())
-				}
-			})
+			err = fixture.Prepare(ctx)
+			require.NoError(t, err)
+			err = fixture.Configure(ctx, configContents)
+			require.NoError(t, err)
+
+			output, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true})
+			require.NoError(t, err, "failed to install agent: %s", output)
 
 			require.Eventually(t, func() bool {
 				err = fixture.IsHealthy(ctx)
@@ -570,9 +569,6 @@ outputs:
 					30*time.Second, 1*time.Second,
 					"Expected to find at least one document for metricset %s in index %s and runtime %q, got 0", mset, index, tt.runtimeExperimental)
 			}
-
-			cancel()
-			cmd.Wait()
 		})
 	}
 
@@ -874,27 +870,6 @@ func getBeatStartLogRecords(logs string) []map[string]any {
 		}
 	}
 	return logRecords
-}
-
-func prepareAgentCmd(t *testing.T, ctx context.Context, config []byte) (*atesting.Fixture, *exec.Cmd, *strings.Builder) {
-	// set up a standalone agent
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-	require.NoError(t, err)
-
-	err = fixture.Prepare(ctx)
-	require.NoError(t, err)
-	err = fixture.Configure(ctx, config)
-	require.NoError(t, err)
-
-	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
-	require.NoError(t, err)
-	cmd.WaitDelay = 1 * time.Second
-
-	var output strings.Builder
-	cmd.Stderr = &output
-	cmd.Stdout = &output
-
-	return fixture, cmd, &output
 }
 
 func genIgnoredFields(goos string) []string {
