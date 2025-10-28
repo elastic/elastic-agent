@@ -141,7 +141,7 @@ func New(
 	availableRollbacksSource := upgrade.NewTTLMarkerRegistry(log, paths.Top())
 	if upgrade.IsUpgradeable() {
 		// If we are not running in a container, check and normalize the install descriptor before we start the agent
-		normalizeInstallDescriptorAtStartup(log, paths.Top(), time.Now(), initialUpdateMarker, availableRollbacksSource)
+		normalizeAgentInstalls(log, paths.Top(), time.Now(), initialUpdateMarker, availableRollbacksSource)
 	}
 	upgrader, err := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, cfg.Settings.Upgrade, agentInfo, new(upgrade.AgentWatcherHelper), availableRollbacksSource)
 	if err != nil {
@@ -308,15 +308,15 @@ func New(
 	return coord, configMgr, varsManager, nil
 }
 
-// normalizeInstallDescriptorAtStartup will check the install descriptor checking:
-// - if we just rolled back: the update marker is checked and in case of rollback we clean up the entry about the failed upgraded install
+// normalizeAgentInstalls will attempt to normalize the agent installs and related TTL markers:
+// - if we just rolled back: the update marker is checked and in case of rollback we clean up the TTL marker of the rolled back version
 // - check all the entries:
-//   - verify that the home directory for that install still exists (remove what does not exist anymore)
-//   - TODO check TTLs of installs to schedule delayed cleanup while the agent is running
+//   - verify that the home directory for that install still exists (remove TTL markers for what does not exist anymore)
+//   - check if the agent install: if it is no longer valid collect the versioned home and the TTL marker for deletion
 //
 // This function will NOT error out, it will log any errors it encounters as warnings but any error must be treated as non-fatal
-func normalizeInstallDescriptorAtStartup(log *logger.Logger, topDir string, now time.Time, initialUpdateMarker *upgrade.UpdateMarker, rollbackSource rollbacksSource) {
-	// Check if we rolled back and update the install descriptor
+func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, initialUpdateMarker *upgrade.UpdateMarker, rollbackSource rollbacksSource) {
+	// Check if we rolled back and update the TTL markers
 	if initialUpdateMarker != nil && initialUpdateMarker.Details != nil && initialUpdateMarker.Details.State == details.StateRollback {
 		// Reset the TTL for the current version if we are coming off a rollback
 		rollbacks, err := rollbackSource.Get()
@@ -329,7 +329,7 @@ func normalizeInstallDescriptorAtStartup(log *logger.Logger, topDir string, now 
 		delete(rollbacks, initialUpdateMarker.PrevVersionedHome)
 		err = rollbackSource.Set(rollbacks)
 		if err != nil {
-			log.Warnf("Error removing install descriptor from installDescriptorSource during startup check: %s", err)
+			log.Warnf("Error setting available rollbacks during normalization: %s", err)
 			return
 		}
 	}
@@ -354,7 +354,7 @@ func normalizeInstallDescriptorAtStartup(log *logger.Logger, topDir string, now 
 
 		_, err = os.Stat(versionedHomeAbsPath)
 		if errors.Is(err, os.ErrNotExist) {
-			log.Warnf("Versioned home %s corresponding to agent install descriptor %+v  is not found on disk", versionedHomeAbsPath, ttlMarker)
+			log.Warnf("Versioned home %s corresponding to agent TTL marker %+v  is not found on disk", versionedHomeAbsPath, ttlMarker)
 			versionedHomesToCleanup = append(versionedHomesToCleanup, versionedHome)
 			continue
 		}
@@ -366,7 +366,7 @@ func normalizeInstallDescriptorAtStartup(log *logger.Logger, topDir string, now 
 
 		if now.After(ttlMarker.ValidUntil) {
 			// the install directory exists but it's expired. Remove the files.
-			log.Infof("agent install descriptor %+v is expired, removing directory %q", ttlMarker, versionedHomeAbsPath)
+			log.Infof("agent TTL marker %+v marks %q as expired, removing directory", ttlMarker, versionedHomeAbsPath)
 			if cleanupErr := install.RemoveBut(versionedHomeAbsPath, true); cleanupErr != nil {
 				log.Warnf("Error removing directory %q: %s", versionedHomeAbsPath, cleanupErr)
 			} else {
