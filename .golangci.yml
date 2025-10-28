@@ -59,6 +59,7 @@ linters:
         - github.com/google/gopacket
         - github.com/insomniacslk/dhcp
         - github.com/meraki/dashboard-api-go/v3
+        - go.opentelemetry.io/otel/exporters/prometheus
       replace-local: false
     gomodguard:
       blocked:
