@@ -6,7 +6,6 @@ package otel
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -42,7 +41,6 @@ func TestSamples(t *testing.T) {
 		os.Unsetenv("AUTOOPS_OTEL_URL")
 	}()
 	err := filepath.WalkDir(filepath.Join(".", "samples", runtime.GOOS), func(path string, d os.DirEntry, err error) error {
-		fmt.Println(path)
 		if err != nil {
 			return err
 		}
