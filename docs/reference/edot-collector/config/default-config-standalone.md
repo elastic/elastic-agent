@@ -369,3 +369,46 @@ The server expects incoming HTTP requests to include an API key with sufficient 
 [Logs &#124; Metrics &#124; App - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/logs_metrics_traces.yml
 [Logs &#124; Metrics &#124; App - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/managed_otlp/logs_metrics_traces.yml
 [Gateway mode]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/heads/main/internal/pkg/otel/samples/linux/gateway.yml
+
+
+### Secure the connection between the EDOT Collector and Elastic
+
+In addition to securing communication between the {{edot}} SDKs and the `apmconfigextension`, you should secure the connection between the EDOT Collector and Elastic APM or {{es}} endpoints.
+
+The EDOT Collector uses the `otlphttp/elastic` or `elasticsearch` exporter to send telemetry data to Elastic. Elastic recommends using HTTPS to encrypt the connection and verify the server's certificate.
+
+Example configuration:
+
+```yaml
+exporters:
+  otlphttp/elastic:
+    endpoint: "https://example.elastic.co:443"
+    headers:
+      Authorization: "ApiKey <api-key>"
+    tls:
+      insecure: false
+      ca_file: "/path/to/elastic-ca.crt"
+```
+
+This setup encrypts data in transit and verifies the Elastic endpoint certificate.
+
+#### Mutual TLS (mTLS)
+
+For self-managed Elastic deployments, you can optionally enable mTLS to authenticate both the Collector and the Elastic endpoint. For example:
+
+```yaml
+exporters:
+  otlphttp/elastic:
+    endpoint: "https://example.elastic.co:443"
+    headers:
+      Authorization: "ApiKey <api-key>"
+    tls:
+      ca_file: "/path/to/elastic-ca.crt"
+      cert_file: "/path/to/client.crt"
+      key_file: "/path/to/client.key"
+      insecure: false
+```
+
+mTLS ensures that only authorized collectors can send telemetry data.
+
+For Elastic Cloud and Serverless deployments, mTLS is not required. TLS and API key authentication are enforced automatically.
