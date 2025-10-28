@@ -23,7 +23,7 @@ steps:
     steps:
       # Build matrix is not used for packaging in favor to unique step keys
       # Packaging amd64 non-containers
-      - label: "Packaging: amd64 zip,tar.gz,rpm,deb "
+      - label: ":package: amd64: zip,tar.gz,rpm,deb "
         key: packaging-amd64
         env:
           PLATFORMS: "windows/amd64,linux/amd64"
@@ -39,7 +39,7 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
 
-      - label: "Packaging: Ubuntu x86_64 FIPS tar.gz"
+      - label: ":package: amd64: FIPS tar.gz"
         key: "packaging-amd64-fips"
         env:
           PACKAGES: "tar.gz"
@@ -56,8 +56,8 @@ steps:
           machineType: "n2-standard-4"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
 
-      # Packaging linux/arm64
-      - label: "Packaging: arm64 zip,tar.gz"
+      # Packaging linux and windows for arm64
+      - label: ":package: arm64: zip,tar.gz"
         key: packaging-arm64
         env:
           PLATFORMS: "windows/arm64,linux/arm64"
@@ -73,7 +73,7 @@ steps:
           instanceType: "c6g.2xlarge"
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
-      - label: "Packaging: Ubuntu arm64 FIPS tar.gz"
+      - label: ":package: arm64: FIPS tar.gz"
         key: "packaging-arm64-fips"
         env:
           PACKAGES: "tar.gz"
@@ -90,7 +90,7 @@ steps:
           instanceType: "c6g.2xlarge"
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
-      - label: "Packaging: Containers linux/amd64"
+      - label: ":package: amd64: Containers"
         key: packaging-containers-x86-64
         env:
           PACKAGES: "docker"
@@ -108,7 +108,7 @@ steps:
         plugins:
           - *vault_docker_login
 
-      - label: "Packaging: Containers linux/arm64"
+      - label: ":package: arm64: Containers"
         key: packaging-containers-arm64
         env:
           PACKAGES: "docker"
@@ -123,7 +123,7 @@ steps:
           diskSizeGb: 200
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
-      - label: "Packaging: Containers linux/amd64 FIPS"
+      - label: ":package: amd64: FIPS Containers"
         key: packaging-containers-x86-64-fips
         env:
           PACKAGES: "docker"
@@ -142,7 +142,7 @@ steps:
         plugins:
           - *vault_docker_login
 
-      - label: "Packaging: Containers linux/arm64 FIPS"
+      - label: ":package: arm64: FIPS Containers"
         key: packaging-containers-arm64-fips
         env:
           PACKAGES: "docker"
@@ -159,11 +159,7 @@ steps:
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
   - label: "Triggering Integration tests"
-#    depends_on:
-#      - int-packaging
     command: "buildkite-agent pipeline upload .buildkite/bk.integration.pipeline.yml"
 
   - label: "Triggering custom FIPS integration tests"
-#    depends_on:
-#      - int-packaging
     command: "buildkite-agent pipeline upload .buildkite/bk.integration-fips.pipeline.yml"
