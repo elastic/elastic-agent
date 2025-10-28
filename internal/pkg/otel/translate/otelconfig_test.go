@@ -1194,10 +1194,10 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			name: "unsupported input type",
 			component: &component.Component{
 				ID:         "unsupported-input",
-				InputType:  "log", // unsupported
+				InputType:  "stdin", // unsupported
 				OutputType: "elasticsearch",
 			},
-			expectedError: "unsupported input type: log",
+			expectedError: "unsupported input type: stdin",
 		},
 		{
 			name: "unsupported configuration",
