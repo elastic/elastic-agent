@@ -139,7 +139,7 @@ func New(
 	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled
 
 	availableRollbacksSource := upgrade.NewTTLMarkerRegistry(log, paths.Top())
-	if platform.OS != component.Container {
+	if upgrade.IsUpgradeable() {
 		// If we are not running in a container, check and normalize the install descriptor before we start the agent
 		normalizeInstallDescriptorAtStartup(log, paths.Top(), time.Now(), initialUpdateMarker, availableRollbacksSource)
 	}
