@@ -34,14 +34,16 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-package" ]]; then
   fi
 fi
 
-if [[ "$BUILDKITE_STEP_KEY" == *"integration-tests"* ]]; then
+if [[ "$BUILDKITE_PIPELINE_SLUG" == "buildkite-elastic-agent-integration-matrix" ]]; then
   echo "Setting credentials"
   # Set GCP credentials
   export GOOGLE_APPLICATION_GCP_SECRET=$(retry 5 vault kv get -format=json -field=data ${CI_GCP_OBS_PATH})
   echo "${GOOGLE_APPLICATION_GCP_SECRET}" > ./gcp.json
   export GOOGLE_APPLICATION_CREDENTIALS=$(realpath ./gcp.json)
   export TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE=$(realpath ./gcp.json)
+fi
 
+if [[ "$BUILDKITE_STEP_KEY" == *"integration-tests"* ]]; then
   # ESS credentials
   export API_KEY_TOKEN=$(vault kv get -field apiKey ${CI_ESS_PATH})
   echo ${API_KEY_TOKEN} > ./apiKey
