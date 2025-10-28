@@ -203,7 +203,7 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		versionedHomesToKeep = append(versionedHomesToKeep, paths.VersionedHome(topDir))
 		versionedHomesToKeep = appendAvailableRollbacks(log, marker, versionedHomesToKeep)
 		log.Infof("About to clean up upgrade. Keeping versioned homes: %v", versionedHomesToKeep)
-		if err := installModifier.Cleanup(log, paths.Top(), true, false, paths.VersionedHome(topDir)); err != nil {
+		if err := installModifier.Cleanup(log, paths.Top(), true, false, versionedHomesToKeep...); err != nil {
 			log.Error("clean up of prior watcher run failed", err)
 		}
 		// exit nicely
