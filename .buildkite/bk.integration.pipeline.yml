@@ -43,6 +43,16 @@ common:
         path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
         field: "apiKey"
         env_var: "EC_API_KEY"
+  # key to hold the list of k8s version to test against
+  - k8s_test_versions: &k8s_test_versions
+    - &k8s_min_test_version v1.27.16
+    - v1.28.15
+    - v1.29.14
+    - v1.30.0
+    - v1.31.0
+    - v1.32.0
+    - v1.33.0
+    - &k8s_max_test_version v1.34.0
 
 steps:
   - label: "Custom ECH Testing"
@@ -497,7 +507,7 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_RHEL_8}"
 
-  - group: "Kubernetes"
+  - group: ":kubernetes: Kubernetes"
     key: integration-tests-kubernetes
     notify:
       - github_commit_status:
@@ -506,7 +516,9 @@ steps:
       - integration-ess
       - packaging-containers-x86-64
     steps:
-      - label: "{{matrix.version}}:amd64:{{matrix.variants}}"
+      - label: ":git: :kubernetes: {{matrix.version}}:amd64:{{matrix.variants}}"
+        # Run this step only if we are **not** building a PR (we use all supported k8s versions)
+        if: build.env("BUILDKITE_PULL_REQUEST") == null
         env:
           K8S_VERSION: "{{matrix.version}}"
           ASDF_KIND_VERSION: "0.27.0"
@@ -532,27 +544,56 @@ steps:
         matrix:
           setup:
             variants:
-            - basic
-            - slim
-            - complete
-            - service
-            - elastic-otel-collector
-            - wolfi
-            - slim-wolfi
-            - complete-wolfi
-            - elastic-otel-collector-wolfi
+            - "basic,slim,complete,service,elastic-otel-collector"
+            - "wolfi,slim-wolfi,complete-wolfi,elastic-otel-collector-wolfi"
             # See the Kubernetes Compatible Versions for Elastic Agent in the Elastic
             # Support Matrix (https://www.elastic.co/support/matrix#matrix_kubernetes) for
             # the rationale on why these specific versions are chosen.
             version:
-#              - v1.27.16
-#              - v1.28.15
-#              - v1.29.14
-#              - v1.30.0
-#              - v1.31.0
-              - v1.32.0
-              - v1.33.0
-              - v1.34.0
+              *k8s_test_versions
+      - label: ":open-pull-request: :kubernetes: {{matrix.version}}:amd64:{{matrix.variants}}"
+        # Run this step only if we are building a PR (we use only min/max k8s versions)
+        if: build.env("BUILDKITE_PULL_REQUEST") != null
+        env:
+          K8S_VERSION: "{{matrix.version}}"
+          ASDF_KIND_VERSION: "0.27.0"
+          DOCKER_VARIANTS: "{{matrix.variants}}"
+          TARGET_ARCH: "amd64"
+        command: |
+          buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64'
+          .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
+        artifact_paths:
+          - build/**
+          - build/diagnostics/**
+          - build/*.pod_logs_dump/*
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
+          diskSizeGb: 80
+        plugins:
+          - *vault_ec_key_prod
+        matrix:
+          setup:
+            variants:
+              - basic
+              - slim
+              - complete
+              - service
+              - elastic-otel-collector
+              - wolfi
+              - slim-wolfi
+              - complete-wolfi
+              - elastic-otel-collector-wolfi
+            # See the Kubernetes Compatible Versions for Elastic Agent in the Elastic
+            # Support Matrix (https://www.elastic.co/support/matrix#matrix_kubernetes) for
+            # the rationale on why these specific versions are chosen.
+            version:
+              - *k8s_min_test_version
+              - *k8s_max_test_version
 
   - group: "Serverless integration test"
     key: integration-tests-serverless
