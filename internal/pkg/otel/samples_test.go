@@ -12,11 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/otelcol"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 func TestSamples(t *testing.T) {
