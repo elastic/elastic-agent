@@ -358,7 +358,7 @@ steps:
                 - .buildkite/scripts/steps/beats_tests.sh
                 - .buildkite/hooks/pre-command
               config:
-                trigger: "elastic-agent-extended-testing"
+                trigger: "beats-agent-serverless-tests"
                 build:
                   commit: "${BUILDKITE_COMMIT}"
                   branch: "${BUILDKITE_BRANCH}"
