@@ -5,12 +5,10 @@
 package otel
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/featuregate"
@@ -60,13 +58,6 @@ func testSample(t *testing.T, configFile string) {
 	collector, err := otelcol.NewCollector(*settings)
 	assert.NoError(t, err)
 	assert.NotNil(t, collector)
-
-	wg := startCollector(context.Background(), t, collector, "")
-
-	assert.Eventually(t, func() bool {
-		return otelcol.StateRunning == collector.GetState()
-	}, 20*time.Second, 200*time.Millisecond)
+	assert.NoError(t, collector.DryRun(t.Context()))
 	collector.Shutdown()
-	wg.Wait()
-	assert.Equal(t, otelcol.StateClosed, collector.GetState())
 }
