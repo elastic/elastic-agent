@@ -1673,6 +1673,10 @@ func downloadDRAArtifacts(ctx context.Context, build *manifest.Build, version st
 
 			packageName := comp.GetPackageName(version, platform)
 
+			log.Printf("XXX Given Version: %s -- Platform: %s", version, platform)
+			log.Printf("XXX Manifest Version: %s", build.Version)
+			log.Printf("XXX Downloading DRA artifact for %s/%s: %s", comp.ProjectName, comp.BinaryName, packageName)
+
 			if packageSpec, ok := project.Packages[packageName]; ok {
 				downloadFunc := func(pkgName string, pkgDesc manifest.Package) func() error {
 					return func() error {
@@ -1719,6 +1723,48 @@ func downloadDRAArtifacts(ctx context.Context, build *manifest.Build, version st
 	return downloadedArtifacts, errGrp.Wait()
 }
 
+func getComponentVersionFromManifest(ctx context.Context, initialVersion string, manifestResponse manifest.Build, component packaging.BinarySpec) (string, error) {
+
+	versionResult := initialVersion
+	if strings.Contains(manifestResponse.Version, "+build") {
+		// This is an Independent Agent Release, so we need to check if the
+		// component has an overridden version in the manifest
+		for _, platform := range devtools.Platforms.Names() {
+			project, ok := manifestResponse.Projects[component.ProjectName]
+			if !ok {
+				return "", fmt.Errorf("project %q not found in manifest", component.ProjectName)
+			}
+
+			packageName := component.GetPackageName(initialVersion, platform)
+
+			// If we find the package w/ the initial version, we are done
+			if _, ok := project.Packages[packageName]; ok {
+				log.Printf("Component %s/%s uses the IAR given core version %s", component.ProjectName, component.BinaryName, initialVersion)
+			} else {
+				parsedVersion, err := version.ParseVersion(manifestResponse.Version)
+				if err != nil {
+					return "", fmt.Errorf("parsing manifest version %q: %w", manifestResponse.Version, err)
+				}
+
+				// If the component is opted in, it will be one patch version ahead of the manifest version
+				bumpedPatch := parsedVersion.Patch() + 1
+				bumpedVersion := version.NewParsedSemVer(parsedVersion.Major(), parsedVersion.Minor(), bumpedPatch, "", "")
+				bumpedCoreVersion := bumpedVersion.CoreVersion()
+				packageName = component.GetPackageName(bumpedCoreVersion, platform)
+				// If the component isn't here w/ the bumped version, then something else is wrong
+				if _, ok := project.Packages[packageName]; ok {
+					log.Printf("Component %s/%s uses the IAR bumped core version %s", component.ProjectName, component.BinaryName, bumpedCoreVersion)
+					versionResult = bumpedCoreVersion
+				} else {
+					return "", fmt.Errorf("component %s/%s not found in manifest with either core version %s or bumped core version %s", component.ProjectName, component.BinaryName, initialVersion, bumpedCoreVersion)
+				}
+			}
+		}
+	}
+
+	return versionResult, nil
+}
+
 func useDRAAgentBinaryForPackage(ctx context.Context, manifestURL string, version string) error {
 	components, err := packaging.Components()
 	if err != nil {
@@ -1756,7 +1802,17 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestURL string, versio
 
 	// Create a dir with the buildID at <downloadDir>/<buildID>
 	draDownloadDir := filepath.Join(downloadDir, manifestResponse.BuildID)
-	artifacts, err := downloadDRAArtifacts(ctx, &manifestResponse, version, draDownloadDir, elasticAgentCoreComponent)
+
+	// Get the version of elastic-agent-core to download from the manifest
+	// If it's part of Independent Agent Release, it will be different than the manifest core version
+	agentCoreVersion, err := getComponentVersionFromManifest(ctx, version, manifestResponse, elasticAgentCoreComponent)
+	if err != nil {
+		return fmt.Errorf("getting elastic-agent-core version from manifest: %w", err)
+	}
+
+	log.Printf("Using elastic-agent-core version %q for manifest version %q", agentCoreVersion, manifestResponse.Version)
+
+	artifacts, err := downloadDRAArtifacts(ctx, &manifestResponse, agentCoreVersion, draDownloadDir, elasticAgentCoreComponent)
 	if err != nil {
 		return fmt.Errorf("downloading elastic-agent-core artifacts: %w", err)
 	}
@@ -1769,7 +1825,7 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestURL string, versio
 			continue
 		}
 
-		expectedPackageName := elasticAgentCoreComponent.GetPackageName(version, platform)
+		expectedPackageName := elasticAgentCoreComponent.GetPackageName(agentCoreVersion, platform)
 
 		artifactMetadata, ok := artifacts[expectedPackageName]
 
@@ -1787,7 +1843,7 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestURL string, versio
 		}
 
 		// this is the directory name where we can find the agent executable
-		targetArtifactName := elasticAgentCoreComponent.GetRootDir(version, platform)
+		targetArtifactName := elasticAgentCoreComponent.GetRootDir(agentCoreVersion, platform)
 		binaryExt := ""
 		if slices.Contains(artifactMetadata.Os, "windows") {
 			binaryExt += ".exe"
