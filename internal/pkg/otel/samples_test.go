@@ -31,6 +31,7 @@ func TestSamples(t *testing.T) {
 	t.Setenv("AUTOOPS_TEMP_RESOURCE_ID", "temp")
 	t.Setenv("AUTOOPS_OTEL_URL", "http://localhost:4318")
 
+	// Enable service.profilesSupport featuregate to test the profiling samples.
 	assert.NoError(t, featuregate.GlobalRegistry().Set("service.profilesSupport", true))
 	defer func() {
 		assert.NoError(t, featuregate.GlobalRegistry().Set("service.profilesSupport", false))
