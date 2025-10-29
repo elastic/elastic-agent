@@ -986,6 +986,7 @@ func genIgnoredFields(goos string) []string {
 
 // TestSensitiveLogsESExporter tests sensitive logs from ex-exporter are not sent to fleet
 func TestSensitiveLogsESExporter(t *testing.T) {
+	t.Skip("Enable this test after https://github.com/elastic/elastic-agent/issues/10423 is implemented with appropriate config")
 	// The ES exporter logs the original document on indexing failure only if
 	// the "telemetry::log_failed_docs_input" setting is enabled and the log level is set to debug.
 	info := define.Require(t, define.Requirements{
@@ -1163,6 +1164,156 @@ agent.logging.stderr: true
 
 	assert.NoError(t, err)
 	assert.Zero(t, docs.Hits.Total.Value)
+}
+
+func TestSensitiveIncludeSourceOnError(t *testing.T) {
+	// The ES exporter logs the original document on indexing failures
+	info := define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+	tmpDir := t.TempDir()
+	numEvents := 50
+	// Create the data file to ingest
+	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
+	require.NoError(t, err, "failed to create temp file to hold data to ingest")
+	inputFilePath := inputFile.Name()
+
+	// these messages will fail to index as message is expected to be of integer type
+	for i := 0; i < numEvents; i++ {
+		_, err = inputFile.Write([]byte(fmt.Sprintf("Line %d\n", i)))
+		require.NoErrorf(t, err, "failed to write line %d to temp file", i)
+	}
+	err = inputFile.Close()
+	require.NoError(t, err, "failed to close data temp file")
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	// Create the otel configuration file
+	type otelConfigOptions struct {
+		InputPath  string
+		ESEndpoint string
+		ESApiKey   string
+		Namespace  string
+	}
+	esEndpoint, err := integration.GetESHost()
+	require.NoError(t, err, "error getting elasticsearch endpoint")
+	esApiKey, err := createESApiKey(info.ESClient)
+	require.NoError(t, err, "error creating API key")
+	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	decodedApiKey, err := getDecodedApiKey(esApiKey)
+	require.NoError(t, err)
+
+	configTemplate := `
+agent.grpc:
+  port: 6799
+inputs:
+  - type: filestream
+    id: filestream-e2e
+    use_output: default
+    _runtime_experimental: otel
+    streams:
+      - id: e2e
+        data_stream:
+          dataset: source.error
+          namespace: {{ .Namespace }}
+        paths:
+          - {{.InputPath}}
+        prospector.scanner.fingerprint.enabled: false
+        file_identity.native: ~
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [{{.ESEndpoint}}]
+    api_key: "{{.ESApiKey}}"
+agent:
+  monitoring:
+    enabled: true
+    metrics: false
+    logs: true
+    _runtime_experimental: otel
+agent.logging.level: debug
+agent.logging.stderr: true
+`
+	index := "logs-source.error-" + info.Namespace
+	var configBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			otelConfigOptions{
+				InputPath:  inputFilePath,
+				ESEndpoint: esEndpoint,
+				ESApiKey:   decodedApiKey,
+				Namespace:  info.Namespace,
+			}))
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
+	defer cancel()
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+	require.NoError(t, err)
+
+	err = setStrictMapping(info.ESClient, index)
+	require.NoError(t, err, "could not set strict mapping due to %v", err)
+
+	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+
+	output, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true, Develop: true})
+	require.NoError(t, err, "Elastic Agent installation failed with error: %w, output: %s", err, string(output))
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 2)
+	}, 1*time.Minute, 1*time.Second)
+
+	// Check 1:
+	// Ensure sensitive logs from ES exporter are not shipped to ES
+	rawQuery := map[string]any{
+		"query": map[string]any{
+			"bool": map[string]any{
+				"must": map[string]any{
+					"match_phrase": map[string]any{
+						// this message comes from ES exporter
+						"message": "failed to index document",
+					},
+				},
+				"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestamp}}},
+			},
+		},
+		"sort": []map[string]any{
+			{"@timestamp": map[string]any{"order": "asc"}},
+		},
+	}
+
+	var monitoringDoc estools.Documents
+	assert.EventuallyWithT(t,
+		func(ct *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer findCancel()
+
+			monitoringDoc, err = estools.PerformQueryForRawQuery(findCtx, rawQuery, "logs-elastic_agent-default*", info.ESClient)
+			require.NoError(ct, err)
+
+			assert.GreaterOrEqual(ct, monitoringDoc.Hits.Total.Value, 1)
+		},
+		2*time.Minute, 5*time.Second,
+		"Expected at least %d log, got %d", 1, monitoringDoc.Hits.Total.Value)
+
+	// assert that error.reason is not part of monitoring logs
+	inputField := monitoringDoc.Hits.Hits[0].Source["error.reason"]
+	assert.Nil(t, inputField)
+
 }
 
 // setStrictMapping takes es client and index name
