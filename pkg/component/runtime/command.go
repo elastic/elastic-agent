@@ -365,10 +365,6 @@ func (c *commandRuntime) start(comm Communicator) error {
 	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentType, c.getSpecType()))
 	uid := os.Geteuid()
 	workDir := c.current.WorkDirPath(paths.Run())
-	err := c.current.PrepareWorkDir(paths.Run())
-	if err != nil {
-		return err
-	}
 	path, err := filepath.Abs(c.getSpecBinaryPath())
 	if err != nil {
 		return fmt.Errorf("failed to determine absolute path: %w", err)

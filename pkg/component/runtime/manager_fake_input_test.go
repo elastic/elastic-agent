@@ -137,6 +137,11 @@ func (suite *FakeInputSuite) TestManager_Features() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subscriptionCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -337,6 +342,11 @@ func (suite *FakeInputSuite) TestManager_APM() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subscriptionCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -609,6 +619,12 @@ func (suite *FakeInputSuite) TestManager_Limits() {
 		Units: []component.Unit{},
 	}
 
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
+
 	subscriptionCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
 	subscriptionErrCh := make(chan error)
@@ -772,6 +788,12 @@ func (suite *FakeInputSuite) TestManager_BadUnitToGood() {
 			},
 		},
 	}
+
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -950,6 +972,14 @@ func (suite *FakeInputSuite) TestManager_GoodUnitToBad() {
 	}
 	goodUnitKey := ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "good-input"}
 
+	runPath := paths.Run()
+	for _, comp := range []component.Component{healthyComp, unhealthyComp} {
+		require.NoError(t, comp.PrepareWorkDir(runPath))
+		t.Cleanup(func() {
+			assert.NoError(t, comp.RemoveWorkDir(runPath))
+		})
+	}
+
 	// Wait for Manager to start up
 	timedWaitForReady(t, m, 1*time.Second)
 
@@ -1068,6 +1098,7 @@ func noDeadlockTestComponent(t *testing.T, index int) component.Component {
 }
 
 func (suite *FakeInputSuite) TestManager_NoDeadlock() {
+	runPath := paths.Run()
 	t := suite.T()
 	// NOTE: This is a long-running test that spams the runtime managers `Update` function to try and
 	// trigger a deadlock. This test takes 2 minutes to run trying to re-produce issue:
@@ -1106,6 +1137,10 @@ func (suite *FakeInputSuite) TestManager_NoDeadlock() {
 		defer close(updateResultChan)
 		for i := 0; updateLoopCtx.Err() == nil; i++ {
 			comp := noDeadlockTestComponent(t, i)
+			require.NoError(t, comp.PrepareWorkDir(runPath))
+			t.Cleanup(func() {
+				assert.NoError(t, comp.RemoveWorkDir(runPath))
+			})
 			m.Update(component.Model{Components: []component.Component{comp}})
 			err := <-m.errCh
 			updateResultChan <- err
@@ -1194,6 +1229,11 @@ func (suite *FakeInputSuite) TestManager_Configure() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -1327,6 +1367,11 @@ func (suite *FakeInputSuite) TestManager_RemoveUnit() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -1474,6 +1519,11 @@ func (suite *FakeInputSuite) TestManager_ActionState() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -1600,6 +1650,11 @@ func (suite *FakeInputSuite) TestManager_Restarts() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -1744,6 +1799,11 @@ func (suite *FakeInputSuite) TestManager_Restarts_ConfigKill() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -1890,6 +1950,11 @@ func (suite *FakeInputSuite) TestManager_KeepsRestarting() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -2036,6 +2101,11 @@ func (suite *FakeInputSuite) TestManager_RestartsOnMissedCheckins() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -2145,6 +2215,11 @@ func (suite *FakeInputSuite) TestManager_InvalidAction() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -2358,6 +2433,13 @@ func (suite *FakeInputSuite) TestManager_MultiComponent() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	for _, c := range components {
+		require.NoError(t, c.PrepareWorkDir(runPath))
+		t.Cleanup(func() {
+			assert.NoError(t, c.RemoveWorkDir(runPath))
+		})
+	}
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -2485,6 +2567,11 @@ func (suite *FakeInputSuite) TestManager_LogLevel() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -2687,6 +2774,19 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	for _, c := range components {
+		require.NoError(t, c.PrepareWorkDir(runPath))
+		t.Cleanup(func() {
+			assert.NoError(t, c.RemoveWorkDir(runPath))
+		})
+	}
+	for _, c := range components2 {
+		require.NoError(t, c.PrepareWorkDir(runPath))
+		t.Cleanup(func() {
+			assert.NoError(t, c.RemoveWorkDir(runPath))
+		})
+	}
 
 	select {
 	case err := <-managerErrCh:
@@ -2834,6 +2934,12 @@ func (suite *FakeInputSuite) TestManager_Chunk() {
 		Units: units,
 	}
 
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
+
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
 	if err := waitForReady(waitCtx, m); err != nil {
@@ -2912,8 +3018,6 @@ LOOP:
 
 	err = <-errCh
 	require.NoError(t, err)
-
-	require.DirExists(t, comp.WorkDirPath(paths.Run()))
 }
 
 func signalState(subErrCh chan error, state *ComponentState, acceptableStates []client.UnitState) {
