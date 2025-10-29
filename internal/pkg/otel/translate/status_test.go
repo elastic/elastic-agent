@@ -614,7 +614,7 @@ func TestOutputStatus(t *testing.T) {
 		err                   string
 	}{
 		{
-			name:                  "output status reporting enabled",
+			name:                  "output status reporting enabled - healthy exporter",
 			outputStatusReporting: true,
 			status: &status.AggregateStatus{
 				Event: componentstatus.NewEvent(componentstatus.StatusOK),
@@ -654,6 +654,54 @@ func TestOutputStatus(t *testing.T) {
 							},
 						},
 						{UnitID: "output-1", UnitType: client.UnitTypeOutput}: {
+							State:   client.UnitStateHealthy,
+							Message: client.UnitStateHealthy.String(),
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                  "output status reporting enabled - degraded exporter",
+			outputStatusReporting: true,
+			status: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					fmt.Sprintf("receiver:filebeat/%sinput-1", OtelNamePrefix): {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+					fmt.Sprintf("exporter:elasticsearch/%soutput-1", OtelNamePrefix): {
+						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+					},
+				},
+			},
+			expected: runtime.ComponentComponentState{
+				Component: baseComp,
+				State: runtime.ComponentState{
+					State:   client.UnitStateHealthy, // recoverable error
+					Message: "",
+					VersionInfo: runtime.ComponentVersionInfo{
+						Name:      OtelComponentName,
+						BuildHash: version.Commit(),
+						Meta: map[string]string{
+							"build_time": version.BuildTime().String(),
+							"commit":     version.Commit(),
+						},
+					},
+					Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+						{UnitID: "input-1", UnitType: client.UnitTypeInput}: {
+							State:   client.UnitStateHealthy,
+							Message: client.UnitStateHealthy.String(),
+							Payload: map[string]any{
+								"streams": map[string]map[string]string{
+									"stream-1": {
+										"error":  "",
+										"status": client.UnitStateHealthy.String(),
+									},
+								},
+							},
+						},
+						{UnitID: "output-1", UnitType: client.UnitTypeOutput}: {
 							State:   client.UnitStateDegraded,
 							Message: client.UnitStateDegraded.String(),
 						},
@@ -662,7 +710,55 @@ func TestOutputStatus(t *testing.T) {
 			},
 		},
 		{
-			name:                  "output status reporting disabled - healthy output",
+			name:                  "output status reporting disabled - healthy exporter",
+			outputStatusReporting: false,
+			status: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					fmt.Sprintf("receiver:filebeat/%sinput-1", OtelNamePrefix): {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+					fmt.Sprintf("exporter:elasticsearch/%soutput-1", OtelNamePrefix): {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+				},
+			},
+			expected: runtime.ComponentComponentState{
+				Component: baseComp,
+				State: runtime.ComponentState{
+					State:   client.UnitStateHealthy, // recoverable error
+					Message: "",
+					VersionInfo: runtime.ComponentVersionInfo{
+						Name:      OtelComponentName,
+						BuildHash: version.Commit(),
+						Meta: map[string]string{
+							"build_time": version.BuildTime().String(),
+							"commit":     version.Commit(),
+						},
+					},
+					Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+						{UnitID: "input-1", UnitType: client.UnitTypeInput}: {
+							State:   client.UnitStateHealthy,
+							Message: client.UnitStateHealthy.String(),
+							Payload: map[string]any{
+								"streams": map[string]map[string]string{
+									"stream-1": {
+										"error":  "",
+										"status": client.UnitStateHealthy.String(),
+									},
+								},
+							},
+						},
+						{UnitID: "output-1", UnitType: client.UnitTypeOutput}: {
+							State:   client.UnitStateHealthy,
+							Message: client.UnitStateHealthy.String(),
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                  "output status reporting disabled - degraded exporter",
 			outputStatusReporting: false,
 			status: &status.AggregateStatus{
 				Event: componentstatus.NewEvent(componentstatus.StatusOK),
@@ -701,6 +797,10 @@ func TestOutputStatus(t *testing.T) {
 								},
 							},
 						},
+						{UnitID: "output-1", UnitType: client.UnitTypeOutput}: {
+							State:   client.UnitStateHealthy,
+							Message: client.UnitStateHealthy.String(),
+						},
 					},
 				},
 			},
@@ -724,6 +824,7 @@ func TestOutputStatus(t *testing.T) {
 				assert.Equal(t, tt.expected.Component.ID, result.Component.ID)
 				assert.Equal(t, tt.expected.State.State, result.State.State)
 				assert.Equal(t, len(tt.expected.State.Units), len(result.State.Units))
+				assert.Equal(t, tt.expected.State.Units, result.State.Units)
 			}
 		})
 	}

@@ -210,7 +210,10 @@ func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus, comp component.
 			receiverStatuses[otelComponentID] = otelCompStatus
 		case "exporter":
 			if comp.OutputStatusReporting != nil && !comp.OutputStatusReporting.Enabled {
-				// If status reporting is disabled for this output, we skip adding its status.
+				// If status reporting is disabled for this output, we hard code it to "StatusOK".
+				exporterStatuses[otelComponentID] = &status.AggregateStatus{
+					Event: componentstatus.NewEvent(componentstatus.StatusOK),
+				}
 				continue
 			}
 			exporterStatuses[otelComponentID] = otelCompStatus
@@ -264,7 +267,7 @@ func unitMessageFromOtelStatus(otelUnitStatus *status.AggregateStatus) string {
 	}
 	unitStatus := otelStatusToUnitState(otelUnitStatus.Status())
 	if unitStatus == client.UnitStateHealthy {
-		return "Healthy"
+		return "HEALTHY"
 	}
 
 	return unitStatus.String()
