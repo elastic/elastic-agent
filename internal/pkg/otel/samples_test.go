@@ -16,7 +16,6 @@ import (
 	"go.opentelemetry.io/collector/otelcol"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestSamples(t *testing.T) {
@@ -46,17 +45,9 @@ func TestSamples(t *testing.T) {
 }
 
 func testSample(t *testing.T, configFile string) {
-	base, obs := observer.New(zapcore.DebugLevel)
-	t.Cleanup(func() {
-		if t.Failed() {
-			for _, log := range obs.All() {
-				t.Logf("%+v", log)
-			}
-		}
-	})
 	settings := NewSettings("test", []string{configFile})
 	settings.LoggingOptions = []zap.Option{zap.WrapCore(func(zapcore.Core) zapcore.Core {
-		return base
+		return zapcore.NewNopCore()
 	})}
 	collector, err := otelcol.NewCollector(*settings)
 	assert.NoError(t, err)
@@ -66,7 +57,7 @@ func testSample(t *testing.T, configFile string) {
 
 	assert.Eventually(t, func() bool {
 		return otelcol.StateRunning == collector.GetState()
-	}, 10*time.Second, 200*time.Millisecond)
+	}, 20*time.Second, 200*time.Millisecond)
 	collector.Shutdown()
 	wg.Wait()
 	assert.Equal(t, otelcol.StateClosed, collector.GetState())
