@@ -16,8 +16,7 @@ import (
 	"go.opentelemetry.io/collector/otelcol"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-
-	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestSamples(t *testing.T) {
@@ -47,7 +46,7 @@ func TestSamples(t *testing.T) {
 }
 
 func testSample(t *testing.T, configFile string) {
-	base, obs := loggertest.New("otel")
+	base, obs := observer.New(zapcore.DebugLevel)
 	t.Cleanup(func() {
 		if t.Failed() {
 			for _, log := range obs.All() {
@@ -57,7 +56,7 @@ func testSample(t *testing.T, configFile string) {
 	})
 	settings := NewSettings("test", []string{configFile})
 	settings.LoggingOptions = []zap.Option{zap.WrapCore(func(zapcore.Core) zapcore.Core {
-		return base.Core()
+		return base
 	})}
 	collector, err := otelcol.NewCollector(*settings)
 	assert.NoError(t, err)
