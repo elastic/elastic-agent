@@ -381,10 +381,9 @@ Example configuration:
 
 ```yaml
 exporters:
-  otlphttp/elastic:
+  elasticsearch/otel:
     endpoint: "https://example.elastic.co:443"
-    headers:
-      Authorization: "ApiKey <api-key>"
+    api_key: "<your-api-key>"
     tls:
       insecure: false
       ca_file: "/path/to/elastic-ca.crt"
@@ -398,10 +397,9 @@ For self-managed Elastic deployments, you can optionally enable mTLS to authenti
 
 ```yaml
 exporters:
-  otlphttp/elastic:
+  elasticsearch/otel:
     endpoint: "https://example.elastic.co:443"
-    headers:
-      Authorization: "ApiKey <api-key>"
+    api_key: "<your-api-key>"
     tls:
       ca_file: "/path/to/elastic-ca.crt"
       cert_file: "/path/to/client.crt"
