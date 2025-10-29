@@ -39,12 +39,28 @@ import (
 const OtelNamePrefix = "_agent-component/"
 
 // BeatMonitoringConfigGetter is a function that returns the monitoring configuration for a beat receiver.
-type BeatMonitoringConfigGetter func(unitID, binary string) map[string]any
-type exporterConfigTranslationFunc func(*config.C, *logp.Logger) (map[string]any, error)
+type (
+	BeatMonitoringConfigGetter    func(unitID, binary string) map[string]any
+	exporterConfigTranslationFunc func(*config.C, *logp.Logger) (map[string]any, error)
+)
 
 var (
-	OtelSupportedOutputTypes         = []string{"elasticsearch"}
-	OtelSupportedInputTypes          = []string{"filestream", "http/metrics", "beat/metrics", "system/metrics", "prometheus/metrics"}
+	OtelSupportedOutputTypes        = []string{"elasticsearch"}
+	OtelSupportedFilebeatInputTypes = []string{
+		"filestream",
+		"journald",
+		"log",
+		"winlog",
+	}
+	OtelSupportedMetricbeatInputTypes = []string{
+		"beat/metrics",
+		"http/metrics",
+		"kubernetes/metrics",
+		"linux/metrics",
+		"prometheus/metrics",
+		"system/metrics",
+	}
+	OtelSupportedInputTypes          = slices.Concat(OtelSupportedFilebeatInputTypes, OtelSupportedMetricbeatInputTypes)
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
 		otelcomponent.MustNewType("elasticsearch"): translateEsOutputToExporter,
 	}
@@ -179,13 +195,11 @@ func getCollectorConfigForComponent(
 	beatMonitoringConfigGetter BeatMonitoringConfigGetter,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
-
 	exportersConfig, outputQueueConfig, extensionConfig, err := getExportersConfigForComponent(comp, logger)
 	if err != nil {
 		return nil, err
 	}
 	receiversConfig, err := getReceiversConfigForComponent(comp, info, outputQueueConfig, beatMonitoringConfigGetter)
-
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +215,7 @@ func getCollectorConfigForComponent(
 	}
 
 	// we need to convert []string to []interface for this to work
-	extensionKey := make([]interface{}, len(maps.Keys(extensionConfig)))
+	extensionKey := make([]any, len(maps.Keys(extensionConfig)))
 	for i, v := range maps.Keys(extensionConfig) {
 		extensionKey[i] = v
 	}
@@ -269,13 +283,13 @@ func getReceiversConfigForComponent(
 		// adds additional context on logs emitted by beatreceivers to uniquely identify per component logs
 		"logging": map[string]any{
 			"with_fields": map[string]any{
-				"component": map[string]interface{}{
+				"component": map[string]any{
 					"id":      comp.ID,
 					"binary":  binaryName,
 					"dataset": dataset,
 					"type":    comp.InputType,
 				},
-				"log": map[string]interface{}{
+				"log": map[string]any{
 					"source": comp.ID,
 				},
 			},
