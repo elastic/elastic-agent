@@ -44,15 +44,34 @@ common:
         field: "apiKey"
         env_var: "EC_API_KEY"
   # key to hold the list of k8s version to test against
-  - k8s_test_versions: &k8s_test_versions
-    - &k8s_min_test_version v1.27.16
-    - v1.28.15
-    - v1.29.14
-    - v1.30.0
-    - v1.31.0
-    - v1.32.0
-    - v1.33.0
-    - &k8s_max_test_version v1.34.0
+  - k8s_test:
+    versions: &k8s_test_versions
+      - &k8s_min_test_version v1.27.16
+      - v1.28.15
+      - v1.29.14
+      - v1.30.0
+      - v1.31.0
+      - v1.32.0
+      - v1.33.0
+      - &k8s_max_test_version v1.34.0
+    env: &k8s_test_env
+      K8S_VERSION: "{{matrix.version}}"
+      ASDF_KIND_VERSION: "0.27.0"
+      DOCKER_VARIANTS: "{{matrix.variants}}"
+      TARGET_ARCH: "amd64"
+    agent: &k8s_test_agent
+      provider: "gcp"
+      machineType: "n2-standard-8"
+      image: "${IMAGE_UBUNTU_2404_X86_64}"
+      diskSizeGb: 80
+    command: &k8s_test_command |
+      buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
+      .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
+    artifact_paths: &k8s_test_artifact_paths
+      - build/**
+      - build/diagnostics/**
+      - build/*.pod_logs_dump/*
+
 
 steps:
   - label: "Custom ECH Testing"
@@ -521,25 +540,15 @@ steps:
         # Run this step only if we are **not** building a PR (we use all supported k8s versions)
         if: build.env("BUILDKITE_PULL_REQUEST") == null
         env:
-          K8S_VERSION: "{{matrix.version}}"
-          ASDF_KIND_VERSION: "0.27.0"
-          DOCKER_VARIANTS: "{{matrix.variants}}"
-          TARGET_ARCH: "amd64"
-        command: |
-          buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
-          .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
+          *k8s_test_env
+        command: *k8s_test_command
         artifact_paths:
-          - build/**
-          - build/diagnostics/**
-          - build/*.pod_logs_dump/*
+          *k8s_test_artifact_paths
         retry:
           automatic:
             limit: 1
         agents:
-          provider: "gcp"
-          machineType: "n2-standard-8"
-          image: "${IMAGE_UBUNTU_2404_X86_64}"
-          diskSizeGb: 80
+          *k8s_test_agent
         plugins:
           - *vault_ec_key_prod
         matrix:
@@ -556,25 +565,15 @@ steps:
         # Run this step only if we are building a PR (we use only min/max k8s versions)
         if: build.env("BUILDKITE_PULL_REQUEST") != null
         env:
-          K8S_VERSION: "{{matrix.version}}"
-          ASDF_KIND_VERSION: "0.27.0"
-          DOCKER_VARIANTS: "{{matrix.variants}}"
-          TARGET_ARCH: "amd64"
-        command: |
-          buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
-          .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
+          *k8s_test_env
+        command: *k8s_test_command
         artifact_paths:
-          - build/**
-          - build/diagnostics/**
-          - build/*.pod_logs_dump/*
+          *k8s_test_artifact_paths
         retry:
           automatic:
             limit: 1
         agents:
-          provider: "gcp"
-          machineType: "n2-standard-8"
-          image: "${IMAGE_UBUNTU_2404_X86_64}"
-          diskSizeGb: 80
+          *k8s_test_agent
         plugins:
           - *vault_ec_key_prod
         matrix:
