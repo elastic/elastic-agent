@@ -142,7 +142,7 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 			BuildHash: version.Commit(),
 		},
 	}
-	receiverStatuses, exporterStatuses, err := getUnitOtelStatuses(pipelineStatus)
+	receiverStatuses, exporterStatuses, err := getUnitOtelStatuses(pipelineStatus, comp)
 	if err != nil {
 		return runtime.ComponentComponentState{}, err
 	}
@@ -187,7 +187,7 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 }
 
 // getUnitOtelStatuses extracts the receiver and exporter status from otel pipeline status.
-func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus) (
+func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus, comp component.Component) (
 	receiverStatuses map[otelcomponent.ID]*status.AggregateStatus,
 	exporterStatuses map[otelcomponent.ID]*status.AggregateStatus,
 	err error) {
@@ -209,6 +209,10 @@ func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus) (
 		case "receiver":
 			receiverStatuses[otelComponentID] = otelCompStatus
 		case "exporter":
+			if comp.OutputStatusReporting != nil && !comp.OutputStatusReporting.Enabled {
+				// If status reporting is disabled for this output, we skip adding its status.
+				continue
+			}
 			exporterStatuses[otelComponentID] = otelCompStatus
 		}
 	}

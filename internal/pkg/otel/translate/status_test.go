@@ -586,3 +586,145 @@ func TestOtelStatusToUnitState(t *testing.T) {
 		})
 	}
 }
+
+func TestOutputStatus(t *testing.T) {
+	baseComp := component.Component{
+		ID:             "test-component",
+		RuntimeManager: component.OtelRuntimeManager,
+		Units: []component.Unit{
+			{
+				ID:   "input-1",
+				Type: client.UnitTypeInput,
+				Config: &proto.UnitExpectedConfig{
+					Streams: []*proto.Stream{{Id: "stream-1"}},
+				},
+			},
+			{
+				ID:   "output-1",
+				Type: client.UnitTypeOutput,
+			},
+		},
+	}
+
+	tests := []struct {
+		name                  string
+		status                *status.AggregateStatus
+		outputStatusReporting bool
+		expected              runtime.ComponentComponentState
+		err                   string
+	}{
+		{
+			name:                  "valid component status with OutputStatusReporting enabled",
+			outputStatusReporting: true,
+			status: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					fmt.Sprintf("receiver:filebeat/%sinput-1", OtelNamePrefix): {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+					fmt.Sprintf("exporter:elasticsearch/%soutput-1", OtelNamePrefix): {
+						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+					},
+				},
+			},
+			expected: runtime.ComponentComponentState{
+				Component: baseComp,
+				State: runtime.ComponentState{
+					State:   client.UnitStateDegraded, // recoverable error
+					Message: "StatusRecoverableError",
+					VersionInfo: runtime.ComponentVersionInfo{
+						Name:      OtelComponentName,
+						BuildHash: version.Commit(),
+						Meta: map[string]string{
+							"build_time": version.BuildTime().String(),
+							"commit":     version.Commit(),
+						},
+					},
+					Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+						{UnitID: "input-1", UnitType: client.UnitTypeInput}: {
+							State:   client.UnitStateHealthy,
+							Message: client.UnitStateHealthy.String(),
+							Payload: map[string]any{
+								"streams": map[string]map[string]string{
+									"stream-1": {
+										"error":  "",
+										"status": client.UnitStateHealthy.String(),
+									},
+								},
+							},
+						},
+						{UnitID: "output-1", UnitType: client.UnitTypeOutput}: {
+							State:   client.UnitStateDegraded,
+							Message: client.UnitStateDegraded.String(),
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                  "valid component status with OutputStatusReporting enabled",
+			outputStatusReporting: false,
+			status: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					fmt.Sprintf("receiver:filebeat/%sinput-1", OtelNamePrefix): {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+					fmt.Sprintf("exporter:elasticsearch/%soutput-1", OtelNamePrefix): {
+						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+					},
+				},
+			},
+			expected: runtime.ComponentComponentState{
+				Component: baseComp,
+				State: runtime.ComponentState{
+					State:   client.UnitStateDegraded, // recoverable error
+					Message: "StatusRecoverableError",
+					VersionInfo: runtime.ComponentVersionInfo{
+						Name:      OtelComponentName,
+						BuildHash: version.Commit(),
+						Meta: map[string]string{
+							"build_time": version.BuildTime().String(),
+							"commit":     version.Commit(),
+						},
+					},
+					Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+						{UnitID: "input-1", UnitType: client.UnitTypeInput}: {
+							State:   client.UnitStateHealthy,
+							Message: client.UnitStateHealthy.String(),
+							Payload: map[string]any{
+								"streams": map[string]map[string]string{
+									"stream-1": {
+										"error":  "",
+										"status": client.UnitStateHealthy.String(),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Make a copy of the base component and apply test-specific config
+			comp := baseComp
+			comp.OutputStatusReporting = &component.StatusReporting{
+				Enabled: tt.outputStatusReporting,
+			}
+
+			result, err := getComponentState(tt.status, comp)
+			if tt.err != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected.Component.ID, result.Component.ID)
+				assert.Equal(t, tt.expected.State.State, result.State.State)
+				assert.Equal(t, len(tt.expected.State.Units), len(result.State.Units))
+			}
+		})
+	}
+}
