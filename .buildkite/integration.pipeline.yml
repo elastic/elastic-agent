@@ -91,7 +91,7 @@ steps:
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
       - label: ":package: amd64: Containers"
-        key: packaging-containers-x86-64
+        key: packaging-containers-amd64
         env:
           PACKAGES: "docker"
           PLATFORMS: "linux/amd64"
@@ -124,7 +124,7 @@ steps:
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
       - label: ":package: amd64: FIPS Containers"
-        key: packaging-containers-x86-64-fips
+        key: packaging-containers-amd64-fips
         env:
           PACKAGES: "docker"
           PLATFORMS: "linux/amd64"
