@@ -614,24 +614,24 @@ func TestOutputStatus(t *testing.T) {
 		err                   string
 	}{
 		{
-			name:                  "valid component status with OutputStatusReporting enabled",
+			name:                  "output status reporting enabled",
 			outputStatusReporting: true,
 			status: &status.AggregateStatus{
-				Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
 					fmt.Sprintf("receiver:filebeat/%sinput-1", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					},
 					fmt.Sprintf("exporter:elasticsearch/%soutput-1", OtelNamePrefix): {
-						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					},
 				},
 			},
 			expected: runtime.ComponentComponentState{
 				Component: baseComp,
 				State: runtime.ComponentState{
-					State:   client.UnitStateDegraded, // recoverable error
-					Message: "StatusRecoverableError",
+					State:   client.UnitStateHealthy, // recoverable error
+					Message: "",
 					VersionInfo: runtime.ComponentVersionInfo{
 						Name:      OtelComponentName,
 						BuildHash: version.Commit(),
@@ -662,10 +662,10 @@ func TestOutputStatus(t *testing.T) {
 			},
 		},
 		{
-			name:                  "valid component status with OutputStatusReporting enabled",
+			name:                  "output status reporting disabled - healthy output",
 			outputStatusReporting: false,
 			status: &status.AggregateStatus{
-				Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
 					fmt.Sprintf("receiver:filebeat/%sinput-1", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
@@ -678,8 +678,8 @@ func TestOutputStatus(t *testing.T) {
 			expected: runtime.ComponentComponentState{
 				Component: baseComp,
 				State: runtime.ComponentState{
-					State:   client.UnitStateDegraded, // recoverable error
-					Message: "StatusRecoverableError",
+					State:   client.UnitStateHealthy, // recoverable error
+					Message: "",
 					VersionInfo: runtime.ComponentVersionInfo{
 						Name:      OtelComponentName,
 						BuildHash: version.Commit(),
