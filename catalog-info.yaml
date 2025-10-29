@@ -598,6 +598,10 @@ spec:
       repository: elastic/elastic-agent
       pipeline_file: .buildkite/pipeline.agentless-tests.yaml
       branch_configuration: "main"
+      # the pipeline can trigger multiple e2e tests from this branch (main),
+      # and we want them to run, so don't skip or cancel intermediate builds
+      skip_intermediate_builds: false
+      cancel_intermediate_builds: false
       provider_settings:
         build_pull_requests: false
         trigger_mode: none

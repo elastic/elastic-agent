@@ -14,7 +14,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"runtime"
 	"strings"
 	"testing"
@@ -377,7 +376,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 			"agent.ephemeral_id",
 			// agent.id is different because it's the id of the underlying beat
 			"agent.id",
-			// agent.version is different because we force version 9.0.0 in CI
+			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
 			"agent.version",
 			"data_stream.namespace",
 			"elastic_agent.id",
@@ -436,8 +435,12 @@ func TestAgentMetricsInput(t *testing.T) {
 		RuntimeExperimental string
 		Metricsets          []string
 	}
-	configTemplate := `agent.logging.level: info
-agent.logging.to_stderr: true
+	configTemplate := `agent:
+  logging:
+    level: debug
+    to_stderr: true
+  monitoring:
+    _runtime_experimental: {{.RuntimeExperimental}}
 inputs:
   # Collecting system metrics
   - type: system/metrics
@@ -473,7 +476,7 @@ outputs:
 		name                string
 		runtimeExperimental string
 	}{
-		{name: "agent"},
+		{name: "agent", runtimeExperimental: "process"},
 		{name: "otel", runtimeExperimental: "otel"},
 	}
 
@@ -511,17 +514,17 @@ outputs:
 			ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 			defer cancel()
 
-			fixture, cmd, output := prepareAgentCmd(t, ctx, configContents)
-
-			err = cmd.Start()
+			// set up a standalone agent
+			fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 			require.NoError(t, err)
 
-			t.Cleanup(func() {
-				if t.Failed() {
-					t.Log("Elastic-Agent output:")
-					t.Log(output.String())
-				}
-			})
+			err = fixture.Prepare(ctx)
+			require.NoError(t, err)
+			err = fixture.Configure(ctx, configContents)
+			require.NoError(t, err)
+
+			output, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true})
+			require.NoError(t, err, "failed to install agent: %s", output)
 
 			require.Eventually(t, func() bool {
 				err = fixture.IsHealthy(ctx)
@@ -566,9 +569,6 @@ outputs:
 					30*time.Second, 1*time.Second,
 					"Expected to find at least one document for metricset %s in index %s and runtime %q, got 0", mset, index, tt.runtimeExperimental)
 			}
-
-			cancel()
-			cmd.Wait()
 		})
 	}
 
@@ -589,6 +589,9 @@ outputs:
 			"data_stream.namespace",
 			"event.ingested",
 			"event.duration",
+
+			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
+			"agent.version",
 
 			// only in receiver doc
 			"agent.otelcol.component.id",
@@ -961,27 +964,6 @@ func getBeatStartLogRecords(logs string) []map[string]any {
 	return logRecords
 }
 
-func prepareAgentCmd(t *testing.T, ctx context.Context, config []byte) (*atesting.Fixture, *exec.Cmd, *strings.Builder) {
-	// set up a standalone agent
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-	require.NoError(t, err)
-
-	err = fixture.Prepare(ctx)
-	require.NoError(t, err)
-	err = fixture.Configure(ctx, config)
-	require.NoError(t, err)
-
-	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
-	require.NoError(t, err)
-	cmd.WaitDelay = 1 * time.Second
-
-	var output strings.Builder
-	cmd.Stderr = &output
-	cmd.Stdout = &output
-
-	return fixture, cmd, &output
-}
-
 func genIgnoredFields(goos string) []string {
 	switch goos {
 	case "windows":
@@ -1009,6 +991,7 @@ func TestSensitiveLogsESExporter(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: integration.Default,
 		Local: true,
+		Sudo:  true,
 		OS: []define.OS{
 			{Type: define.Windows},
 			{Type: define.Linux},
@@ -1097,32 +1080,13 @@ agent.logging.stderr: true
 	err = fixture.Configure(ctx, configBuffer.Bytes())
 	require.NoError(t, err)
 
-	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
-	require.NoError(t, err, "cannot prepare Elastic-Agent command: %w", err)
-
 	err = setStrictMapping(info.ESClient, index)
 	require.NoError(t, err, "could not set strict mapping due to %v", err)
 
 	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
-	output := strings.Builder{}
-	cmd.Stderr = &output
-	cmd.Stdout = &output
-
-	err = cmd.Start()
-	require.NoError(t, err)
-
-	// Make sure the Elastic-Agent process is not running before
-	// exiting the test
-	t.Cleanup(func() {
-		// Ignore the error because we cancelled the context,
-		// and that always returns an error
-		_ = cmd.Wait()
-		if t.Failed() {
-			t.Log("Elastic-Agent output:")
-			t.Log(output.String())
-		}
-	})
+	output, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true})
+	require.NoError(t, err, "Elastic Agent installation failed with error: %w, output: %s", err, string(output))
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error

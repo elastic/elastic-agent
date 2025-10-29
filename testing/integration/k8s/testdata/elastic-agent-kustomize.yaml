@@ -705,6 +705,8 @@ spec:
           value: elastic
         - name: ES_PASSWORD
           value: changeme
+        - name: CA_TRUSTED
+          value: ""
         - name: NODE_NAME
           valueFrom:
             fieldRef:

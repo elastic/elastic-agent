@@ -1634,6 +1634,8 @@ service:
 		"@timestamp",
 		"agent.ephemeral_id",
 		"agent.id",
+
+		// for short periods of time, the beats binary version can be out of sync with the beat receiver version
 		"agent.version",
 
 		// Missing from fbreceiver doc
@@ -1994,7 +1996,7 @@ receivers:
             - cpu
     output:
       otelconsumer:
-    queue.mem.flush.timeout: 0s	  
+    queue.mem.flush.timeout: 0s
 exporters:
   elasticsearch/log:
     endpoints:
@@ -2140,7 +2142,7 @@ receivers:
             - cpu
     output:
       otelconsumer:
-    queue.mem.flush.timeout: 0s	  
+    queue.mem.flush.timeout: 0s
 exporters:
   elasticsearch/log:
     endpoints:

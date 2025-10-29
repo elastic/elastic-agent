@@ -44,6 +44,10 @@ type ExecutionMode string
 const (
 	SubprocessExecutionMode ExecutionMode = "subprocess"
 	EmbeddedExecutionMode   ExecutionMode = "embedded"
+
+	// CollectorStopTimeout is the duration to wait for the collector to stop. Note: this needs to be shorter
+	// than 5 * time.Second (coordinator.managerShutdownTimeout) otherwise we might end up with a defunct process.
+	CollectorStopTimeout = 3 * time.Second
 )
 
 type collectorRecoveryTimer interface {
@@ -181,7 +185,7 @@ func NewOTelManager(
 		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
 		errCh:                      make(chan error, 1), // holds at most one error
 		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
-		componentStateCh:           make(chan []runtime.ComponentComponentState, 1),
+		componentStateCh:           make(chan []runtime.ComponentComponentState),
 		updateCh:                   make(chan configUpdate, 1),
 		doneChan:                   make(chan struct{}),
 		execution:                  exec,
@@ -241,10 +245,6 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				if m.proc != nil {
 					m.proc.Stop(m.stopTimeout)
 					m.proc = nil
-					updateErr := m.reportOtelStatusUpdate(ctx, nil)
-					if updateErr != nil {
-						reportErr(ctx, m.errCh, updateErr)
-					}
 				}
 
 				if m.mergedCollectorCfg == nil {
@@ -284,12 +284,6 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				if m.proc != nil {
 					m.proc.Stop(m.stopTimeout)
 					m.proc = nil
-					// don't wait here for <-collectorRunErr, already occurred
-					// clear status, no longer running
-					updateErr := m.reportOtelStatusUpdate(ctx, nil)
-					if updateErr != nil {
-						err = errors.Join(err, updateErr)
-					}
 				}
 				// pass the error to the errCh so the coordinator, unless it's a cancel error
 				if !errors.Is(err, context.Canceled) {
@@ -429,29 +423,18 @@ func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh c
 	if m.proc != nil {
 		m.proc.Stop(m.stopTimeout)
 		m.proc = nil
+		// We wait here for the collector to exit before possibly starting a new one. The execution indicates this
+		// by sending an error over the appropriate channel. It will also send a nil status that we'll either process
+		// after exiting from this function and going back to the main loop, or it will be overridden by the status
+		// from the newly started collector.
+		// This is the only blocking wait inside the main loop involving channels, so we need to be extra careful not to
+		// deadlock.
+		// TODO: Verify if we need to wait for the error at all. Stop() is already blocking.
 		select {
 		case <-collectorRunErr:
 		case <-ctx.Done():
 			// our caller ctx is Done
 			return ctx.Err()
-		}
-		// drain the internal status update channel
-		// this status handling is normally done in the main loop, but in this case we want to ensure that we emit a
-		// nil status after the collector has stopped
-		select {
-		case statusCh := <-collectorStatusCh:
-			updateErr := m.reportOtelStatusUpdate(ctx, statusCh)
-			if updateErr != nil {
-				m.logger.Error("failed to update otel status", zap.Error(updateErr))
-			}
-		case <-ctx.Done():
-			// our caller ctx is Done
-			return ctx.Err()
-		default:
-		}
-		err := m.reportOtelStatusUpdate(ctx, nil)
-		if err != nil {
-			return err
 		}
 	}
 
@@ -625,18 +608,10 @@ func (m *OTelManager) maybeUpdateMergedConfig(mergedCfg *confmap.Conf) (updated 
 	return !bytes.Equal(mergedCfgHash, previousConfigHash) || err != nil, err
 }
 
-// reportComponentStateUpdates sends component state updates to the component watch channel. It first drains
-// the channel to ensure that only the most recent status is kept, as intermediate statuses can be safely discarded.
-// This ensures the receiver always observes the latest reported status.
+// reportComponentStateUpdates sends component state updates to the component watch channel. It is synchronous and
+// blocking - the update must be received before this function returns. We are not allowed to drop older updates
+// in favor of newer ones here, as the coordinator expected incremental updates.
 func (m *OTelManager) reportComponentStateUpdates(ctx context.Context, componentUpdates []runtime.ComponentComponentState) {
-	select {
-	case <-ctx.Done():
-		// context is already done
-		return
-	case <-m.componentStateCh:
-	// drain the channel first
-	default:
-	}
 	select {
 	case m.componentStateCh <- componentUpdates:
 	case <-ctx.Done():

@@ -1044,43 +1044,42 @@ func TestIsSameReleaseVersion(t *testing.T) {
 
 func TestManualRollback(t *testing.T) {
 	const updatemarkerwatching456NoRollbackAvailable = `
-    version: 4.5.6
-    hash: newver
-    versioned_home: data/elastic-agent-4.5.6-newver
-    updated_on: 2025-07-11T10:11:12.131415Z
-    prev_version: 1.2.3
-    prev_hash: oldver
-    prev_versioned_home: data/elastic-agent-1.2.3-oldver
-    acked: false
-    action: null
-    details:
-        target_version: 4.5.6
-        state: UPG_WATCHING
-        metadata:
-            retry_until: null
-    desired_outcome: UPGRADE
-    `
+   version: 4.5.6
+   hash: newver
+   versioned_home: data/elastic-agent-4.5.6-newver
+   updated_on: 2025-07-11T10:11:12.131415Z
+   prev_version: 1.2.3
+   prev_hash: oldver
+   prev_versioned_home: data/elastic-agent-1.2.3-oldver
+   acked: false
+   action: null
+   details:
+       target_version: 4.5.6
+       state: UPG_WATCHING
+       metadata:
+           retry_until: null
+   `
 	const updatemarkerwatching456 = `
-    version: 4.5.6
-    hash: newver
-    versioned_home: data/elastic-agent-4.5.6-newver
-    updated_on: 2025-07-11T10:11:12.131415Z
-    prev_version: 1.2.3
-    prev_hash: oldver
-    prev_versioned_home: data/elastic-agent-1.2.3-oldver
-    acked: false
-    action: null
-    details:
-        target_version: 4.5.6
-        state: UPG_WATCHING
-        metadata:
-            retry_until: null
-    desired_outcome: UPGRADE
-    rollbacks_available:
-        - version: 1.2.3
-          home: data/elastic-agent-1.2.3-oldver
-          valid_until: 2025-07-18T10:11:12.131415Z
-    `
+   version: 4.5.6
+   hash: newver
+   versioned_home: data/elastic-agent-4.5.6-newver
+   updated_on: 2025-07-11T10:11:12.131415Z
+   prev_version: 1.2.3
+   prev_hash: oldver
+   prev_versioned_home: data/elastic-agent-1.2.3-oldver
+   acked: false
+   action: null
+   details:
+       target_version: 4.5.6
+       state: UPG_WATCHING
+       metadata:
+           retry_until: null
+   desired_outcome: UPGRADE
+   rollbacks_available:
+     "data/elastic-agent-1.2.3-oldver":
+       version: 1.2.3
+       valid_until: 2025-07-18T10:11:12.131415Z
+   `
 
 	parsed123Version, err := agtversion.ParseVersion("1.2.3")
 	require.NoError(t, err)
@@ -1292,6 +1291,7 @@ func TestManualRollback(t *testing.T) {
 			log, _ := loggertest.New(t.Name())
 			mockAgentInfo := info.NewMockAgent(t)
 			mockWatcherHelper := NewMockWatcherHelper(t)
+			mockRollbacksSource := newMockAvailableRollbacksSource(t)
 			topDir := t.TempDir()
 			err := os.MkdirAll(paths.DataFrom(topDir), 0777)
 			require.NoError(t, err, "error creating data directory in topDir %q", topDir)
@@ -1300,7 +1300,7 @@ func TestManualRollback(t *testing.T) {
 				tc.setup(t, topDir, mockAgentInfo, mockWatcherHelper)
 			}
 
-			upgrader, err := NewUpgrader(log, tc.artifactSettings, tc.upgradeSettings, mockAgentInfo, mockWatcherHelper)
+			upgrader, err := NewUpgrader(log, tc.artifactSettings, tc.upgradeSettings, mockAgentInfo, mockWatcherHelper, mockRollbacksSource)
 			require.NoError(t, err, "error instantiating upgrader")
 			_, err = upgrader.rollbackToPreviousVersion(t.Context(), topDir, tc.now, tc.version, nil)
 			tc.wantErr(t, err, "unexpected error returned by rollbackToPreviousVersion()")
@@ -1352,6 +1352,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 		upgraderMocker            upgraderMocker
 		checkArchiveCleanup       bool
 		checkVersionedHomeCleanup bool
+		setupMocks                func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper)
 	}
 
 	testCases := map[string]testCase{
@@ -1365,6 +1366,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				}
 			},
 			checkArchiveCleanup: true,
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+			},
 		},
 		"should return error if getPackageMetadata fails": {
 			isDiskSpaceErrorResult: false,
@@ -1378,6 +1382,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				}
 			},
 			checkArchiveCleanup: true,
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+			},
 		},
 		"should return error and cleanup downloaded archive if unpack fails before extracting": {
 			isDiskSpaceErrorResult: false,
@@ -1402,6 +1409,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				}
 			},
 			checkArchiveCleanup: true,
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+			},
 		},
 		"should return error and cleanup downloaded archive if unpack fails after extracting": {
 			isDiskSpaceErrorResult: false,
@@ -1431,6 +1441,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 			checkArchiveCleanup:       true,
 			checkVersionedHomeCleanup: true,
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+			},
 		},
 		"should return error and cleanup downloaded artifact and extracted archive if copyActionStore fails": {
 			isDiskSpaceErrorResult: false,
@@ -1462,6 +1475,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 			checkArchiveCleanup:       true,
 			checkVersionedHomeCleanup: true,
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+			},
 		},
 		"should return error and cleanup downloaded artifact and extracted archive if copyRunDirectory fails": {
 			isDiskSpaceErrorResult: false,
@@ -1497,6 +1513,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 			checkArchiveCleanup:       true,
 			checkVersionedHomeCleanup: true,
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+			},
 		},
 		"should return error and cleanup downloaded artifact and extracted archive if changeSymlink fails": {
 			isDiskSpaceErrorResult: false,
@@ -1528,7 +1547,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				upgrader.copyRunDirectory = func(log *logger.Logger, oldRunPath, newRunPath string) error {
 					return nil
 				}
-				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {
+				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, source availableRollbacksSource) error {
 					return nil
 				}
 				upgrader.changeSymlink = func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
@@ -1537,6 +1556,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 			checkArchiveCleanup:       true,
 			checkVersionedHomeCleanup: true,
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+			},
 		},
 		"should return error and cleanup downloaded artifact and extracted archive if markUpgrade fails": {
 			isDiskSpaceErrorResult: false,
@@ -1571,15 +1593,19 @@ func TestUpgradeErrorHandling(t *testing.T) {
 				upgrader.changeSymlink = func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error {
 					return nil
 				}
-				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string) error {
+				upgrader.rollbackInstall = func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, source availableRollbacksSource) error {
 					return nil
 				}
-				upgrader.markUpgrade = func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, rollbackWindow time.Duration) error {
+				upgrader.markUpgrade = func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]TTLMarker) error {
 					return testError
 				}
 			},
 			checkArchiveCleanup:       true,
 			checkVersionedHomeCleanup: true,
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+				mockRollbackSrc.EXPECT().Set(map[string]TTLMarker(nil)).Return(nil)
+			},
 		},
 		"should add disk space error to the error chain if downloadArtifact fails with disk space error": {
 			isDiskSpaceErrorResult: true,
@@ -1589,19 +1615,29 @@ func TestUpgradeErrorHandling(t *testing.T) {
 					returnError: testError,
 				}
 			},
+			setupMocks: func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *mockAvailableRollbacksSource, mockWatcherHelper *MockWatcherHelper) {
+				mockAgentInfo.EXPECT().Version().Return("9.0.0")
+			},
 		},
 	}
-
-	mockAgentInfo := info.NewMockAgent(t)
-	mockAgentInfo.On("Version").Return("9.0.0")
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			baseDir := t.TempDir()
 			paths.SetTop(baseDir)
 
+			mockAgentInfo := info.NewMockAgent(t)
+			mockRollbackSource := newMockAvailableRollbacksSource(t)
 			mockWatcherHelper := NewMockWatcherHelper(t)
-			upgrader, err := NewUpgrader(log, &artifact.Config{}, nil, mockAgentInfo, mockWatcherHelper)
+
+			if tc.setupMocks != nil {
+				// setup mocks
+				tc.setupMocks(t, mockAgentInfo, mockRollbackSource, mockWatcherHelper)
+			} else {
+				t.Log("skipping mocks setup as the testcase does not define a setupMocks()")
+			}
+
+			upgrader, err := NewUpgrader(log, &artifact.Config{}, nil, mockAgentInfo, mockWatcherHelper, mockRollbackSource)
 			require.NoError(t, err)
 
 			tc.upgraderMocker(upgrader, filepath.Join(baseDir, "mockArchive"), "versionedHome")

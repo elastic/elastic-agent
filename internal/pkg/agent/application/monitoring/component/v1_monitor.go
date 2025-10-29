@@ -490,8 +490,7 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentInfo
 		"streams":    streams,
 	}
 
-	// Make sure we don't set anything until the configuration is stable if the otel manager isn't enabled
-	if b.config.C.RuntimeManager != monitoringCfg.DefaultRuntimeManager {
+	if b.config.C.RuntimeManager == monitoringCfg.OtelRuntimeManager {
 		input["_runtime_experimental"] = b.config.C.RuntimeManager
 	}
 
@@ -578,14 +577,19 @@ func (b *BeatsMonitor) injectMetricsInput(
 				"namespace": monitoringNamespace,
 			},
 			"streams": []any{prometheusStream},
+			// hardcode this to run in the otel runtime
+			// it won't work in a beat process because we don't set the required environment variable there
+			"_runtime_experimental": monitoringCfg.OtelRuntimeManager,
 		})
 	}
 
 	// Make sure we don't set anything until the configuration is stable if the otel manager isn't enabled
-	if b.config.C.RuntimeManager != monitoringCfg.DefaultRuntimeManager {
+	if b.config.C.RuntimeManager == monitoringCfg.OtelRuntimeManager {
 		for _, input := range inputs {
 			inputMap := input.(map[string]interface{})
-			inputMap["_runtime_experimental"] = b.config.C.RuntimeManager
+			if _, found := inputMap["_runtime_experimental"]; !found {
+				inputMap["_runtime_experimental"] = b.config.C.RuntimeManager
+			}
 		}
 	}
 
