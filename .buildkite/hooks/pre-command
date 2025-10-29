@@ -35,8 +35,7 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-package" ]]; then
 fi
 
 if [[ ("$BUILDKITE_PIPELINE_SLUG" == "buildkite-elastic-agent-integration-matrix") || ("$BUILDKITE_PIPELINE_SLUG" == "beats-agent-serverless-tests") ]]; then
-  echo "Setting credentials"
-  # Set GCP credentials
+  echo "Setting GCP credentials"
   export GOOGLE_APPLICATION_GCP_SECRET=$(retry 5 vault kv get -format=json -field=data ${CI_GCP_OBS_PATH})
   echo "${GOOGLE_APPLICATION_GCP_SECRET}" > ./gcp.json
   export GOOGLE_APPLICATION_CREDENTIALS=$(realpath ./gcp.json)
