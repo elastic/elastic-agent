@@ -6,8 +6,6 @@ kind: Component
 metadata:
   name: elastic-agent
   description: Elastic Agent - single, unified way to add monitoring for logs, metrics, and other types of data to a host.
-  annotations:
-    sonarcloud.io/project-key: elastic_elastic-agent
 
 spec:
   type: tool
@@ -26,7 +24,6 @@ metadata:
     backstage.io/source-location: url:https://github.com/elastic/elastic-agent/
     buildkite.com/project-slug: elastic/agentless-serverless-release
     github.com/project-slug: elastic/elastic-agent
-    sonarqube.org/project-key: agentless
 
 spec:
   type: tool
@@ -601,6 +598,10 @@ spec:
       repository: elastic/elastic-agent
       pipeline_file: .buildkite/pipeline.agentless-tests.yaml
       branch_configuration: "main"
+      # the pipeline can trigger multiple e2e tests from this branch (main),
+      # and we want them to run, so don't skip or cancel intermediate builds
+      skip_intermediate_builds: false
+      cancel_intermediate_builds: false
       provider_settings:
         build_pull_requests: false
         trigger_mode: none

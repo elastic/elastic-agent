@@ -23,6 +23,37 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+
+:::{dropdown} Failed upgrades leave {{agent}} stuck until restart
+
+**Applies to: {{agent}} 8.18.7, 9.0.7** 
+
+On September 17, 2025, a known issue was discovered that can cause {{agent}} upgrades to get stuck if an upgrade attempt fails under specific conditions. This happens because the coordinator’s `overrideState` remains set, leaving the agent in a state that appears to be upgrading.
+
+**Conditions**
+
+This issue is triggered if the upgrade fails during one of the early checks inside `Coordinator.Upgrade`, for example:
+
+- The agent is not upgradeable
+- Capabilities check denies the upgrade
+- When {{agent}} is tamper-protected, Endpoint must validate that the upgrade action was correctly signed by Kibana to allow the upgrade. If the signature is missing, invalid, or the connection between {{agent}} and Endpoint was interrupted, the validation fails. This causes the agent coordinator's override state to become stuck until the agent is restarted.
+
+**Symptoms**
+
+- {{fleet}} shows the upgrade action in progress, even though the upgrade remains stuck
+- No further upgrade attempts succeed 
+- Elastic Agent status shows an override state indicating upgrade 
+
+**Workaround**
+
+Restart the {{agent}} to clear the coordinator’s `overrideState` and allow new upgrade attempts to proceed.
+
+**Resolution**
+This issue was fixed in [#9992](https://github.com/elastic/elastic-agent/pull/9992), which ensures that the coordinator clears its override state whenever an early failure occurs.
+
+The fix is included in versions 9.1.4 and 8.19.4, and planned for versions 9.0.8 and 8.18.8.
+:::
+
 :::{dropdown} [Windows] {{agent}} does not process Windows security events
 
 **Applies to: {{agent}} 8.19.0, 9.1.0 (Windows only)**
@@ -151,5 +182,38 @@ As a workaround, you can manually restore the `osquery.app/` directory as follow
    ```
 
 5. Proceed to install {{agent}} from the extracted directory as usual.
+
+:::
+
+:::{dropdown} Failed to start {{agent}} in OTel mode for Hosts onboarding
+
+**Applies to: {{agent}} 9.1.6 to 9.2.0**
+
+On October 24, 2025, a known issue was discovered where {{agent}} fails to start
+in OTel mode when deployed through the guided Observability onboarding flow in Kibana. The issue occurs because the sample configuration used by the {{agent}} was using incorrect configuration key.
+
+The Error looks like this in the logs:
+
+```shell
+Starting in otel mode
+failed to get config: cannot unmarshal the configuration: decoding failed due to the following error(s):
+
+'exporters' error reading configuration for "otlp/ingest": decoding failed due to the following error(s):
+
+'sending_queue' decoding failed due to the following error(s):
+
+'batch' decoding failed due to the following error(s):
+
+'' has invalid keys: flush_interval
+```
+
+**Workaround**
+
+To work around this issue, manually update the configuration of the generated `otel.yaml` file to replace the incorrect key `flush_interval` with the correct key `flush_timeout`.
+
+```yaml
+batch:
+  flush_timeout: 1s
+```
 
 :::

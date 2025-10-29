@@ -1,0 +1,44 @@
+# Component Documentation Registry
+# Maps component names to their documentation files
+# Used by tools.py to generate links to local documentation
+
+components:
+  # Exporters
+  elasticsearchexporter:
+    doc_path: "/reference/edot-collector/components/elasticsearchexporter.md"
+    title: "Elasticsearch exporter"
+    
+  # Receivers  
+  elasticapmintakereceiver:
+    doc_path: "/reference/edot-collector/components/elasticapmintakereceiver.md"
+    title: "Elastic APM intake receiver"
+
+  elasticapmprocessor:
+    doc_path: "/reference/edot-collector/components/elasticapmprocessor.md"
+    title: "Elastic APM processor"
+
+  filelogreceiver:
+    doc_path: "/reference/edot-collector/components/filelogreceiver.md"
+    title: "File log receiver"
+
+  apikeyauthextension:
+    doc_path: "/reference/edot-collector/config/authentication-methods.md"
+    title: "Authentication methods"
+
+  bearertokenauthextension:
+    doc_path: "/reference/edot-collector/config/authentication-methods.md"
+    title: "Authentication methods"
+
+  hostmetricsreceiver:
+    doc_path: "/reference/edot-collector/components/hostmetricsreceiver.md"
+    title: "Host metrics receiver"
+
+  # Processors
+  elasticapmprocessor:
+    doc_path: "/reference/edot-collector/components/elasticapmprocessor.md"
+    title: "Elastic APM processor"
+
+  # Add more components as documentation is created
+  # elasticapmconnector:
+  #   doc_path: "/reference/edot-collector/components/elasticapmconnector"
+  #   title: "Elastic APM connector"

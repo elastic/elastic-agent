@@ -11,6 +11,8 @@ import (
 
 	"go.elastic.co/apm/v2"
 
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
+
 	"github.com/elastic/go-ucfg"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -18,7 +20,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/dispatcher"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
@@ -35,6 +36,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	otelconfig "github.com/elastic/elastic-agent/internal/pkg/otel/config"
 	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/queue"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -62,7 +64,7 @@ func New(
 	fleetInitTimeout time.Duration,
 	disableMonitoring bool,
 	override CfgOverrider,
-	initialUpgradeDetails *details.Details,
+	initialUpdateMarker *upgrade.UpdateMarker,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
@@ -122,13 +124,24 @@ func New(
 		override(cfg)
 	}
 
+	otelExecMode := otelconfig.GetExecutionModeFromConfig(log, rawConfig)
+	isOtelExecModeSubprocess := otelExecMode == otelmanager.SubprocessExecutionMode
+
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
 	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled
-	upgrader, err := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, agentInfo)
+
+	availableRollbacksSource := upgrade.NewTTLMarkerRegistry(log, paths.Top())
+	upgrader, err := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, cfg.Settings.Upgrade, agentInfo, new(upgrade.AgentWatcherHelper), availableRollbacksSource)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create upgrader: %w", err)
 	}
-	monitor := monitoring.New(isMonitoringSupported, cfg.Settings.DownloadConfig.OS(), cfg.Settings.MonitoringConfig, agentInfo)
+	monitor := componentmonitoring.New(
+		isMonitoringSupported,
+		cfg.Settings.DownloadConfig.OS(),
+		cfg.Settings.MonitoringConfig,
+		agentInfo,
+		isOtelExecModeSubprocess,
+	)
 
 	runtime, err := runtime.NewManager(
 		log,
@@ -140,6 +153,12 @@ func New(
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)
+	}
+
+	// prepare initialUpgradeDetails for injecting it in coordinator later on
+	var initialUpgradeDetails *details.Details
+	if initialUpdateMarker != nil && initialUpdateMarker.Details != nil {
+		initialUpgradeDetails = initialUpdateMarker.Details
 	}
 
 	var configMgr coordinator.ConfigManager
@@ -240,7 +259,15 @@ func New(
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
-	otelManager, err := otelmanager.NewOTelManager(log.Named("otel_manager"), logLevel, baseLogger, otelmanager.EmbeddedExecutionMode, agentInfo, monitor.ComponentMonitoringConfig)
+	otelManager, err := otelmanager.NewOTelManager(
+		log.Named("otel_manager"),
+		logLevel, baseLogger,
+		otelExecMode,
+		agentInfo,
+		cfg.Settings.Collector,
+		monitor.ComponentMonitoringConfig,
+		otelmanager.CollectorStopTimeout,
+	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)
 	}

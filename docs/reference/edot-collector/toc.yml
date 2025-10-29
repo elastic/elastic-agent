@@ -1,0 +1,28 @@
+toc:
+  - file: index.md
+  - file: download.md
+  - file: modes.md
+  - file: config/index.md
+    children:
+      - file: config/default-config-standalone.md
+      - file: config/default-config-k8s.md
+      - file: config/configure-logs-collection.md
+      - file: config/configure-metrics-collection.md
+      - file: config/tail-based-sampling.md
+      - file: config/authentication-methods.md
+      - file: config/configure-profiles-collection.md
+      - file: config/proxy.md
+  - file: components.md
+    children:
+      - file: components/elasticsearchexporter.md
+      - file: components/elasticapmintakereceiver.md
+      - file: components/k8sclusterreceiver.md
+      - file: components/elasticapmprocessor.md
+      - file: components/filelogreceiver.md
+      - file: components/hostmetricsreceiver.md
+  - file: customization.md
+    children:
+      - file: custom-collector.md
+  - file: upstream-collector.md
+  - title: Troubleshooting
+    crosslink: docs-content://troubleshoot/ingest/opentelemetry/edot-collector/index.md

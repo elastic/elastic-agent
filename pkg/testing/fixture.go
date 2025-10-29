@@ -669,6 +669,7 @@ func (f *Fixture) Run(ctx context.Context, states ...State) error {
 
 // Exec provides a way of performing subcommand on the prepared Elastic Agent binary.
 func (f *Fixture) Exec(ctx context.Context, args []string, opts ...process.CmdOption) ([]byte, error) {
+	f.t.Helper()
 	err := f.EnsurePrepared(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare before exec: %w", err)
@@ -846,6 +847,12 @@ func (f *Fixture) ExecInspect(ctx context.Context, opts ...process.CmdOption) (A
 	}
 
 	return inspect, err
+}
+
+// ExecRestart executes the restart subcommand on the prepared Elastic Agent binary.
+func (f *Fixture) ExecRestart(ctx context.Context, opts ...process.CmdOption) error {
+	_, err := f.Exec(ctx, []string{"restart"}, opts...)
+	return err
 }
 
 // ExecVersion executes the version subcommand on the prepared Elastic Agent binary

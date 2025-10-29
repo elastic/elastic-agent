@@ -6,8 +6,8 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1757120457"
-  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1757120457"
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1760749288"
+  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1760749288"
 
 common:
   - vault_docker_login: &vault_docker_login
@@ -91,7 +91,7 @@ steps:
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
       - label: "Packaging: windows/amd64 zip"
-        key: packaging-windows
+        key: packaging-windows-amd64
         env:
           PACKAGES: "zip"
           PLATFORMS: "windows/amd64"
@@ -105,6 +105,22 @@ steps:
           provider: "gcp"
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
+
+      - label: "Packaging: windows/arm64 zip"
+        key: packaging-windows-arm64
+        env:
+          PACKAGES: "zip"
+          PLATFORMS: "windows/arm64"
+        command: ".buildkite/scripts/steps/integration-package.sh"
+        artifact_paths:
+          - build/distributions/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "aws"
+          instanceType: "c6g.4xlarge"
+          image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
       - label: "Packaging: Containers linux/amd64"
         key: packaging-containers-x86-64

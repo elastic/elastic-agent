@@ -50,7 +50,6 @@ import (
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	mockAcker "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/fleetapi/acker"
 )
 
 const (
@@ -551,7 +550,7 @@ func TestPreUpgradeCallback(t *testing.T) {
 		upgradeErr:  upgrade.ErrUpgradeSameVersion,
 	}
 
-	acker := mockAcker.NewAcker(t)
+	acker := acker.NewMockAcker(t)
 	coord, _, _ := createCoordinator(t, ctx,
 		ManagedCoordinator(true),
 		WithUpgradeManager(upgradeManager),
@@ -579,6 +578,7 @@ func TestPreUpgradeCallback(t *testing.T) {
 		}))
 
 	assert.ErrorIs(t, preUpgradeCallbackErr, upgradeErr)
+	assert.Nil(t, coord.overrideState)
 	assert.Equal(t, preUpgradeCallbackErr, upgradeErr, "expected pre upgrade callback error")
 	assert.Eventually(t, func() bool {
 		return coord.State().UpgradeDetails.State == details.StateFailed
@@ -1204,7 +1204,7 @@ func (f *fakeUpgradeManager) Reload(cfg *config.Config) error {
 	return nil
 }
 
-func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
+func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes ...string) (_ reexec.ShutdownCallbackFn, err error) {
 	f.upgradeCalled = true
 	if f.upgradeErr != nil {
 		return nil, f.upgradeErr

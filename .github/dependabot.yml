@@ -11,9 +11,9 @@ updates:
       - Team:Elastic-Agent-Control-Plane
       - backport-active-all
     allow:
-      # Only update internal dependencies for now while we evaluate this workflow.
       - dependency-name: "github.com/elastic/*"
       - dependency-name: "github.com/elastic/opentelemetry-collector-components/*"
+      - dependency-name: "helm.sh/helm/*"
     ignore:
       - dependency-name: "github.com/elastic/beats/*"
     open-pull-requests-limit: 10
@@ -32,3 +32,16 @@ updates:
       - Team:Elastic-Agent-Control-Plane
       - backport-active-all
     open-pull-requests-limit: 10
+
+  - package-ecosystem: "pip"
+    directory: "/docs/scripts/update-docs"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+    labels:
+      - automation
+      - skip-changelog
+      - Team:Docs
+      - documentation
+    open-pull-requests-limit: 5

@@ -13,18 +13,26 @@ import (
 	"go.opentelemetry.io/collector/receiver"
 
 	// Receivers:
+	apachereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver"
+	awss3receiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver"
 	dockerstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver"
 	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
 	hostmetricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver"
 	httpcheckreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver"
+	iisreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/iisreceiver"
 	jaegerreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver"
 	jmxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver"
 	k8sclusterreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver"
+	k8seventsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver"
 	k8sobjectsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver"
 	kubeletstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver"
+	mysqlreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/mysqlreceiver"
 	nginxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver"
+	postgresqlreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/postgresqlreceiver"
 	receivercreator "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator"
 	redisreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver"
+	sqlserverreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver"
 	zipkinreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver"
 	nopreceiver "go.opentelemetry.io/collector/receiver/nopreceiver"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
@@ -47,7 +55,8 @@ import (
 	"go.opentelemetry.io/collector/processor/batchprocessor"                                                          // for batching events
 	"go.opentelemetry.io/collector/processor/memorylimiterprocessor"
 
-	"github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor"
+	elasticapmprocessor "github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor"
+	elastictraceprocessor "github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor"
 
 	"github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor"
 
@@ -60,8 +69,11 @@ import (
 	"go.opentelemetry.io/collector/exporter/otlpexporter"
 	otlphttpexporter "go.opentelemetry.io/collector/exporter/otlphttpexporter"
 
+	"github.com/elastic/beats/v7/x-pack/otel/exporter/logstashexporter"
+
 	// Extensions
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension"
+	headersetterextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/headerssetterextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension"
 	healthcheckv2extension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector"
@@ -69,6 +81,8 @@ import (
 	pprofextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension"
 	filestorage "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage"
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
+
+	elasticdiagnostics "github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 
 	"github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension"
 	"github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension"
@@ -79,6 +93,8 @@ import (
 	forwardconnector "go.opentelemetry.io/collector/connector/forwardconnector"
 
 	elasticapmconnector "github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector"
+	profilingmetricsconnector "github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector"
+	beatsauthextension "github.com/elastic/opentelemetry-collector-components/extension/beatsauthextension"
 )
 
 func components(extensionFactories ...extension.Factory) func() (otelcol.Factories, error) {
@@ -94,6 +110,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			filelogreceiver.NewFactory(),
 			kubeletstatsreceiver.NewFactory(),
 			k8sclusterreceiver.NewFactory(),
+			k8seventsreceiver.NewFactory(),
 			hostmetricsreceiver.NewFactory(),
 			httpcheckreceiver.NewFactory(),
 			k8sobjectsreceiver.NewFactory(),
@@ -106,7 +123,18 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			mbreceiver.NewFactory(),
 			jmxreceiver.NewFactory(),
 			nopreceiver.NewFactory(),
+			apachereceiver.NewFactory(),
+			iisreceiver.NewFactory(),
+			mysqlreceiver.NewFactory(),
+			postgresqlreceiver.NewFactory(),
+			sqlserverreceiver.NewFactory(),
+			windowseventlogreceiver.NewFactory(),
+			awss3receiver.NewFactory(),
 		}
+
+		// some receivers are only available on certain OS.
+		receivers = addOsSpecificReceivers(receivers)
+
 		// some receivers should only be available when
 		// not in fips mode due to restrictions on crypto usage
 		receivers = addNonFipsReceivers(receivers)
@@ -128,7 +156,8 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			elasticinframetricsprocessor.NewFactory(),
 			resourcedetectionprocessor.NewFactory(),
 			memorylimiterprocessor.NewFactory(),
-			elastictraceprocessor.NewFactory(),
+			elasticapmprocessor.NewFactory(),
+			elastictraceprocessor.NewFactory(), // deprecated, will be removed in future
 			tailsamplingprocessor.NewFactory(),
 		)
 		if err != nil {
@@ -144,6 +173,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			loadbalancingexporter.NewFactory(),
 			otlphttpexporter.NewFactory(),
 			nopexporter.NewFactory(),
+			logstashexporter.NewFactory(),
 		}
 		// some exporters should only be available when
 		// not in fips mode due to restrictions on crypto usage
@@ -157,6 +187,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			routingconnector.NewFactory(),
 			spanmetricsconnector.NewFactory(),
 			elasticapmconnector.NewFactory(),
+			profilingmetricsconnector.NewFactory(),
 			forwardconnector.NewFactory(),
 		)
 		if err != nil {
@@ -174,6 +205,9 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			k8sobserver.NewFactory(),
 			apikeyauthextension.NewFactory(),
 			apmconfigextension.NewFactory(),
+			headersetterextension.NewFactory(),
+			beatsauthextension.NewFactory(),
+			elasticdiagnostics.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)
 		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)

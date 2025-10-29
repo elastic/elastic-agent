@@ -33,6 +33,7 @@ const (
 	flagPGPBytesPath   = "pgp-path"
 	flagPGPBytesURI    = "pgp-uri"
 	flagForce          = "force"
+	flagRollback       = "rollback"
 )
 
 var (
@@ -51,7 +52,7 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 		Run: func(c *cobra.Command, args []string) {
 			c.SetContext(context.Background())
 			if err := upgradeCmd(streams, c, args); err != nil {
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
 				os.Exit(1)
 			}
 		},
@@ -64,6 +65,7 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 	cmd.Flags().String(flagPGPBytesURI, "", "Path to a web location containing PGP to use for package verification")
 	cmd.Flags().String(flagPGPBytesPath, "", "Path to a file containing PGP to use for package verification")
 	cmd.Flags().BoolP(flagForce, "", false, "Advanced option to force an upgrade on a fleet managed agent")
+	cmd.Flags().BoolP(flagRollback, "", false, "Roll back an upgrade")
 	err := cmd.Flags().MarkHidden(flagForce)
 	if err != nil {
 		fmt.Fprintf(streams.Err, "error while setting upgrade force flag attributes: %s", err.Error())
@@ -152,6 +154,9 @@ func checkUpgradable(cond upgradeCond) error {
 }
 
 func upgradeCmdWithClient(input *upgradeInput) error {
+
+	upgradeOperation := "Upgrade"
+
 	cmd := input.cmd
 	c := input.c
 	version := input.args[0]
@@ -160,6 +165,15 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 	force, err := cmd.Flags().GetBool(flagForce)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve command flag information while trying to upgrade the agent: %w", err)
+	}
+
+	rollbackFlag, err := cmd.Flags().GetBool(flagRollback)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve command flag information %q while trying to upgrade the agent: %w", flagRollback, err)
+	}
+
+	if rollbackFlag {
+		upgradeOperation = "Rollback"
 	}
 
 	skipVerification, err := cmd.Flags().GetBool(flagSkipVerify)
@@ -181,7 +195,7 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 	if err != nil {
 		return fmt.Errorf("failed to check if upgrade is already in progress: %w", err)
 	}
-	if isBeingUpgraded {
+	if isBeingUpgraded && !rollbackFlag {
 		return errors.New("an upgrade is already in progress; please try again later.")
 	}
 
@@ -215,7 +229,7 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 		}
 	}
 	skipDefaultPgp, _ := cmd.Flags().GetBool(flagSkipDefaultPgp)
-	version, err = c.Upgrade(context.Background(), version, sourceURI, skipVerification, skipDefaultPgp, pgpChecks...)
+	version, err = c.Upgrade(context.Background(), version, rollbackFlag, sourceURI, skipVerification, skipDefaultPgp, pgpChecks...)
 	if err != nil {
 		s, ok := status.FromError(err)
 		// Sometimes the gRPC server shuts down before replying to the command which is expected
@@ -226,6 +240,8 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 			return errors.New(err, "Failed trigger upgrade of daemon")
 		}
 	}
-	fmt.Fprintf(input.streams.Out, "Upgrade triggered to version %s, Elastic Agent is currently restarting\n", version)
+
+	fmt.Fprintf(input.streams.Out, "%s triggered to version %s, Elastic Agent is currently restarting\n", upgradeOperation, version)
+
 	return nil
 }

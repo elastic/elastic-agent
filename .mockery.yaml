@@ -1,42 +1,37 @@
-with-expecter: True
-inpackage: false
-dir: testing/mocks/{{ replaceAll .InterfaceDirRelative "internal" "internal_"  }}
-mockname: "{{.InterfaceName}}"
-outpkg: "{{.PackageName}}"
-filename: "{{ snakecase .InterfaceName}}_mock.go"
+structname: '{{.Mock}}{{.InterfaceName | firstUpper}}'
+pkgname: '{{.SrcPackageName}}'
+template: testify
+filename: mocks.go
+template-data:
+  unroll-variadic: true
 packages:
-  github.com/elastic/elastic-agent/pkg/control/v2/client:
-    interfaces:
-      Client:
-  github.com/elastic/elastic-agent/internal/pkg/fleetapi/client:
-    interfaces:
-      Sender:
-  github.com/elastic/elastic-agent/internal/pkg/agent/storage:
-    interfaces:
-      Storage:
   github.com/elastic/elastic-agent/internal/pkg/agent/application/actions/handlers:
     interfaces:
-      Uploader:
-      diagnosticsProvider:
-        config:
-          mockname: "DiagnosticsProvider"
-      logLevelSetter:
-        config:
-          mockname: "LogLevelSetter"
-      upgradeCoordinator:
-        config:
-          mockname: "UpgradeCoordinator"
-  github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker:
-    interfaces:
-      Acker:
+      Uploader: {}
+      diagnosticsProvider: {}
+      logLevelSetter: {}
+      upgradeCoordinator: {}
   github.com/elastic/elastic-agent/internal/pkg/agent/application/info:
     interfaces:
-      Agent:
+      Agent: {}
+  github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade:
+    interfaces:
+      WatcherHelper: {}
+      watcherGrappler: {}
+      availableRollbacksSource: {}
   github.com/elastic/elastic-agent/internal/pkg/agent/cmd:
     interfaces:
-      agentWatcher:
-        config:
-          mockname: "AgentWatcher"
-      installationModifier:
-        config:
-          mockname: "InstallationModifier"
+      agentWatcher: {}
+      installationModifier: {}
+  github.com/elastic/elastic-agent/internal/pkg/agent/storage:
+    interfaces:
+      Storage: {}
+  github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker:
+    interfaces:
+      Acker: {}
+  github.com/elastic/elastic-agent/internal/pkg/fleetapi/client:
+    interfaces:
+      Sender: {}
+  github.com/elastic/elastic-agent/pkg/control/v2/client:
+    interfaces:
+      Client: {}

@@ -34,16 +34,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
+	"golang.org/x/sync/errgroup"
 
-	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/otiai10/copy"
-
-	devmachine "github.com/elastic/elastic-agent/dev-tools/devmachine"
+	"github.com/elastic/elastic-agent/dev-tools/devmachine"
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
+	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
 	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
 	"github.com/elastic/elastic-agent/dev-tools/packaging"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
@@ -73,9 +71,10 @@ import (
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
 
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"golang.org/x/sync/errgroup"
+	filecopy "github.com/otiai10/copy"
 	"gopkg.in/yaml.v3"
 
 	"helm.sh/helm/v3/pkg/action"
@@ -235,58 +234,13 @@ func (Dev) Package(ctx context.Context) {
 	Package(ctx)
 }
 
-func mocksPath() (string, error) {
-	repositoryRoot, err := findRepositoryRoot()
-	if err != nil {
-		return "", fmt.Errorf("finding repository root: %w", err)
-	}
-	return filepath.Join(repositoryRoot, "testing", "mocks"), nil
-}
-
-func (Dev) CleanMocks() error {
-	mPath, err := mocksPath()
-	if err != nil {
-		return fmt.Errorf("retrieving mocks path: %w", err)
-	}
-	err = os.RemoveAll(mPath)
-	if err != nil {
-		return fmt.Errorf("removing mocks: %w", err)
-	}
-	return nil
-}
-
 func (Dev) RegenerateMocks() error {
-	mg.Deps(Dev.CleanMocks)
 	err := sh.Run("mockery")
 	if err != nil {
 		return fmt.Errorf("generating mocks: %w", err)
 	}
 
-	// change CWD
-	workingDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("retrieving CWD: %w", err)
-	}
-	// restore the working directory when exiting the function
-	defer func() {
-		err := os.Chdir(workingDir)
-		if err != nil {
-			panic(fmt.Errorf("failed to restore working dir %q: %w", workingDir, err))
-		}
-	}()
-
-	mPath, err := mocksPath()
-	if err != nil {
-		return fmt.Errorf("retrieving mocks path: %w", err)
-	}
-
-	err = os.Chdir(mPath)
-	if err != nil {
-		return fmt.Errorf("changing current directory to %q: %w", mPath, err)
-	}
-
-	mg.Deps(devtools.AddLicenseHeaders)
-	mg.Deps(devtools.GoImports)
+	mg.Deps(devtools.Format)
 	return nil
 }
 
@@ -337,7 +291,7 @@ func (Build) WindowsArchiveRootBinary() error {
 		},
 		Env: map[string]string{
 			"GOOS":   "windows",
-			"GOARCH": "amd64",
+			"GOARCH": devtools.GOARCH,
 		},
 		LDFlags: []string{
 			"-s", // Strip all debug symbols from binary (does not affect Go stack traces).
@@ -438,6 +392,7 @@ func getTestBinariesPath() ([]string, error) {
 		filepath.Join(wd, "internal", "pkg", "agent", "install", "testblocking"),
 		filepath.Join(wd, "pkg", "core", "process", "testsignal"),
 		filepath.Join(wd, "internal", "pkg", "otel", "manager", "testing"),
+		filepath.Join(wd, "internal", "pkg", "agent", "application", "filelock", "testlocker"),
 	}
 	return testBinaryPkgs, nil
 }
@@ -449,6 +404,20 @@ func (Build) TestBinaries() error {
 		fmt.Errorf("cannot build test binaries: %w", err)
 	}
 
+	args := []string{"build", "-v"}
+	if runtime.GOOS == "darwin" {
+		osMajorVer, err := getMacOSMajorVersion()
+		if err != nil {
+			return fmt.Errorf("cannot determine darwin OS major version: %w", err)
+		}
+
+		if osMajorVer > 13 {
+			// Workaround for https://github.com/golang/go/issues/67854 until it
+			// is resolved.
+			args = append(args, "-ldflags", "-extldflags='-ld_classic'")
+		}
+	}
+
 	for _, pkg := range testBinaryPkgs {
 		binary := filepath.Base(pkg)
 		if runtime.GOOS == "windows" {
@@ -456,7 +425,12 @@ func (Build) TestBinaries() error {
 		}
 
 		outputName := filepath.Join(pkg, binary)
-		err := RunGo("build", "-o", outputName, filepath.Join(pkg))
+
+		finalArgs := make([]string, len(args))
+		copy(finalArgs, args)
+		finalArgs = append(finalArgs, "-o", outputName, filepath.Join(pkg))
+
+		err := RunGo(finalArgs...)
 		if err != nil {
 			return err
 		}
@@ -490,7 +464,7 @@ func (Check) Changes() error {
 	if len(out) != 0 {
 		fmt.Fprintln(os.Stderr, "Changes:")
 		fmt.Fprintln(os.Stderr, out)
-		return fmt.Errorf("uncommited changes")
+		return fmt.Errorf("uncommitted changes")
 	}
 	return nil
 }
@@ -955,7 +929,7 @@ func (Cloud) Image(ctx context.Context) {
 	os.Setenv(dockerVariants, "cloud")
 
 	if s, err := strconv.ParseBool(snapshot); err == nil && !s {
-		// only disable SNAPSHOT build when explicitely defined
+		// only disable SNAPSHOT build when explicitly defined
 		os.Setenv(snapshotEnv, "false")
 		devtools.Snapshot = false
 	} else {
@@ -1228,7 +1202,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	mg.Deps(agentBinaryTarget)
 
 	// compile the elastic-agent.exe proxy binary for the windows archive
-	if slices.Contains(platforms, "windows/amd64") {
+	if slices.Contains(platforms, "windows/amd64") || slices.Contains(platforms, "windows/arm64") {
 		mg.Deps(Build.WindowsArchiveRootBinary)
 	}
 
@@ -1832,8 +1806,8 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestURL string, versio
 
 		log.Printf("copying %q to %q", srcBinaryPath, dstBinaryPath)
 
-		err = copy.Copy(srcBinaryPath, dstBinaryPath, copy.Options{
-			PermissionControl: copy.PerservePermission,
+		err = filecopy.Copy(srcBinaryPath, dstBinaryPath, filecopy.Options{
+			PermissionControl: filecopy.PerservePermission,
 		})
 		if err != nil {
 			return fmt.Errorf("copying %q to %q: %w", srcBinaryPath, dstBinaryPath, err)
@@ -3202,7 +3176,7 @@ func createTestRunner(matrix bool, singleTest string, goTestFlags string, batche
 	}
 
 	provisionCfg := ess.ProvisionerConfig{
-		Identifier: fmt.Sprintf("at-%s", strings.Replace(strings.Split(email, "@")[0], ".", "-", -1)),
+		Identifier: fmt.Sprintf("at-%s", strings.ReplaceAll(strings.Split(email, "@")[0], ".", "-")),
 		APIKey:     essToken,
 		Region:     essRegion,
 	}
@@ -3450,7 +3424,7 @@ func authGCP(ctx context.Context) error {
 	var svcList []struct {
 		Email string `json:"email"`
 	}
-	serviceAcctName := fmt.Sprintf("%s-agent-testing", strings.Replace(parts[0], ".", "-", -1))
+	serviceAcctName := fmt.Sprintf("%s-agent-testing", strings.ReplaceAll(parts[0], ".", "-"))
 	iamAcctName := fmt.Sprintf("%s@%s.iam.gserviceaccount.com", serviceAcctName, project)
 	cmd = exec.CommandContext(ctx, cliName, "iam", "service-accounts", "list", "--format=json")
 	output, err = cmd.Output()
@@ -4158,4 +4132,19 @@ func loadYamlFile(path string) (map[string]any, error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+func getMacOSMajorVersion() (int, error) {
+	ver, err := sh.Output("sw_vers", "-productVersion")
+	if err != nil {
+		return 0, err
+	}
+
+	majorVerStr := strings.Split(ver, ".")[0]
+	majorVer, err := strconv.Atoi(majorVerStr)
+	if err != nil {
+		return 0, fmt.Errorf("unable to parse major version from %q: %w", ver, err)
+	}
+
+	return majorVer, nil
 }

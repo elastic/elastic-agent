@@ -41,10 +41,10 @@ inputs:
 #       data_stream.dataset: system.process
 #       # While running in unprivileged mode, process/process_summary metricsets can emit
 #       # partial metrics. Some metrics that require privileged access can be missing.
-#       # On Windows, non-administrator users may not be able to access protected processes, leading 
-#       # to missing details like command line and arguments. On Unix, non-root users can't access 
-#       # procfs without the right permissions. 
-#       # Errors like ERROR_ACCESS_DENIED, EPERM, and EACCESS may result in partial metrics. 
+#       # On Windows, non-administrator users may not be able to access protected processes, leading
+#       # to missing details like command line and arguments. On Unix, non-root users can't access
+#       # procfs without the right permissions.
+#       # Errors like ERROR_ACCESS_DENIED, EPERM, and EACCESS may result in partial metrics.
 #       # Enabling the config below will mark the metricset as degraded when this occurs.
 #       # You may want to enable it to identify potential permission-related issues.
 #       # If you're unable to provide the necessary access, you can disable this config to keep
@@ -104,6 +104,15 @@ inputs:
 #     # Frequency used to check the queue of events to be sent out to fleet.
 #     #reporting_check_frequency_sec: 30
 
+## configuration for the otel collector managed by elastic-agent
+# agent.collector:
+#   telemetry:
+#     # Endpoint on which the otel collector will expose its Prometheus metrics. Default is localhost with a random port.
+#     endpoint:
+#   healthcheck:
+#     # Endpoint on which the otel collector will expose its status. Default is localhost with a random port.
+#     endpoint:
+
 # agent.download:
 #   # source of the artifacts, requires elastic like structure and naming of the binaries
 #   # e.g /windows-x86.zip
@@ -123,7 +132,7 @@ inputs:
 #   # rollback settings
 #   rollback:
 #       # duration in which an upgraded Agent may be manually rolled back.
-#       window: 168h
+#       window: 0
 
 # agent.process:
 #   # timeout for creating new processes. when process is not successfully created by this timeout

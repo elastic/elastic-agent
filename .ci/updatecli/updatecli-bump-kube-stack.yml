@@ -1,0 +1,62 @@
+---
+name: Bump OpenTelemetry Kube Stack Helm Chart to latest versions
+
+scms:
+  elastic-agent:
+    kind: github
+    spec:
+      user: '{{ requiredEnv "GITHUB_ACTOR" }}'
+      username: '{{ requiredEnv "GITHUB_ACTOR" }}'
+      owner: '{{ .scm.owner }}'
+      repository: '{{ .scm.repository }}'
+      token: '{{ requiredEnv "GITHUB_TOKEN" }}'
+      commitusingapi: true
+      branch: '{{ .scm.branch }}'
+      force: false
+
+
+actions:
+  elastic-agent:
+    kind: github/pullrequest
+    scmid: elastic-agent
+    spec:
+      automerge: false
+      labels:
+        - backport-active-9
+        - dependencies
+        - skip-changelog
+        - Team:Elastic-Agent-Control-Plane
+      title: '[otel/kube-stack] Update the OpenTelemetry Kube Stack Helm Chart to latest versions'
+      description: |
+        Update the versions of the OpenTelemetry Kube Stack Helm Chart being used in the OpenTelemetry Onboarding configuration.
+
+sources:
+  opentelemetry-kube-stack-helm:
+    name: "Get latest OpenTelemetry Kube Stack Helm Chart release"
+    kind: helmchart
+    spec:
+      url: https://open-telemetry.github.io/opentelemetry-helm-charts
+      name: opentelemetry-kube-stack
+
+targets:
+  update-tested-kube-stack:
+    name: "Update tested OpenTelemetry Kube Stack Helm Chart in k8s.go"
+    kind: file
+    scmid: elastic-agent
+    sourceid: opentelemetry-kube-stack-helm
+    spec:
+      file: "testing/integration/k8s/k8s.go"
+      matchpattern: '(KubeStackChartVersion\s*=\s)".*"'
+      replacepattern: '$1"{{ source "opentelemetry-kube-stack-helm" }}"'
+
+  update-testdata:
+    name: 'Update local OpenTelemetry Kube Stack Helm Chart files'
+    dependson:
+      - update-tested-kube-stack
+    scmid: elastic-agent
+    kind: shell
+    spec:
+      command: .ci/scripts/update-integration-testdata.sh
+      environments:
+      - name: PATH
+      - name: HOME

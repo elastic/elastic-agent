@@ -259,10 +259,10 @@ Mutate an agent preset based on agent.fleet
 {{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_ENROLLMENT_TOKEN" "value" $.Values.agent.fleet.token) -}}
 {{- end -}}
 {{- if $.Values.agent.fleet.insecure -}}
-{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_INSECURE" "value" (quote $.Values.agent.fleet.insecure)) -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_INSECURE" "value" (printf "%t" $.Values.agent.fleet.insecure)) -}}
 {{- end -}}
 {{- if $.Values.agent.fleet.force -}}
-{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_FORCE" "value" (quote $.Values.agent.fleet.force)) -}}
+{{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_FORCE" "value" (printf "%t"  $.Values.agent.fleet.force)) -}}
 {{- end -}}
 {{- if $.Values.agent.fleet.tokenName -}}
 {{- $extraEnvs = append $extraEnvs (dict "name" "FLEET_TOKEN_NAME" "value" $.Values.agent.fleet.tokenName) -}}
