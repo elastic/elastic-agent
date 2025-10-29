@@ -1213,8 +1213,6 @@ func TestSensitiveIncludeSourceOnError(t *testing.T) {
 	require.NoError(t, err)
 
 	configTemplate := `
-agent.grpc:
-  port: 6799
 inputs:
   - type: filestream
     id: filestream-e2e
@@ -1267,7 +1265,7 @@ agent.logging.stderr: true
 
 	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
-	output, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true, Develop: true})
+	output, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true})
 	require.NoError(t, err, "Elastic Agent installation failed with error: %w, output: %s", err, string(output))
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
