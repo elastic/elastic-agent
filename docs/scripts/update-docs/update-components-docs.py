@@ -146,7 +146,7 @@ def get_otel_col_upstream_version():
     version_tag = f"v{latest_version}"
     
     # Always read from Git tag
-    go_mod_path = 'go.mod'
+    go_mod_path = 'internal/edot/go.mod'
     print(f"Reading go.mod from tag {version_tag}: {go_mod_path}")
     content = read_file_from_git_tag(go_mod_path, version_tag)
     if content is None:
@@ -169,7 +169,7 @@ def get_otel_components(version='main', component_docs_mapping=None):
     version_tag = f"v{latest_version}"
     
     # Always read from Git tag
-    go_mod_path = 'go.mod'
+    go_mod_path = 'internal/edot/go.mod'
     print(f"Reading go.mod from tag {version_tag}: {go_mod_path}")
     elastic_agent_go_mod = read_file_from_git_tag(go_mod_path, version_tag)
     if elastic_agent_go_mod is None:

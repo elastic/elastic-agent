@@ -81,7 +81,7 @@ jobs:
             - Uses data from the latest released version tag: `${{ steps.get_version.outputs.version }}`
             
             ## References
-            - **Source go.mod**: https://github.com/elastic/elastic-agent/blob/${{ steps.get_version.outputs.version }}/go.mod
+            - **Source go.mod**: https://github.com/elastic/elastic-agent/blob/${{ steps.get_version.outputs.version }}/internal/edot/go.mod
             - **Source core-components.yaml**: https://github.com/elastic/elastic-agent/blob/${{ steps.get_version.outputs.version }}/internal/edot/core-components.yaml
             - **Release tag**: https://github.com/elastic/elastic-agent/tree/${{ steps.get_version.outputs.version }}
             
