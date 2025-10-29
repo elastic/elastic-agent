@@ -29,9 +29,9 @@ The receiver connects to the Kubernetes API server and collects Kubernetes resou
 
 Typical use cases include:
 
-* Collecting Kubernetes events (`events.k8s.io` API group) for cluster monitoring and alerting.
-* Capturing other objects such as pods, deployments, or configmaps for audit and change tracking.
-* Enabling correlation between Kubernetes events and other telemetry in Elastic Observability to link operational changes with application-level telemetry.
+* Collecting Kubernetes objects such as pods, deployments, or configmaps for audit, configuration tracking, or troubleshooting.
+* Monitoring changes to Kubernetes resources over time (for example, drift detection or identifying failed deployments).
+* Correlating Kubernetes object changes with other telemetry in Elastic Observability (for example, linking a deployment update to an increase in application errors).
 
 
 ## Get started
@@ -47,26 +47,12 @@ receivers:
   k8sobjects:
     auth_type: serviceAccount
     objects:
-      - name: events
-        mode: watch
-        group: events.k8s.io
-```
-
-Each object on the list defines what resource to collect, from which namespaces, and using which mode (`pull` or `watch`). For example:
-
-```yaml
-receivers:
-  k8sobjects:
-    auth_type: serviceAccount
-    objects:
       - name: pods
         mode: pull
         interval: 15m
         label_selector: environment=production
-      - name: events
+      - name: deployments
         mode: watch
-        group: events.k8s.io
-        namespaces: [default]
 ```
 
 ### Include in a logs pipeline
@@ -82,19 +68,6 @@ service:
       exporters: [elasticsearch]
 ```
 
-### Using the Helm preset
-
-When deploying EDOT Collector using Helm, you can enable the Kubernetes events preset:
-
-```yaml
-presets:
-  kubernetesEvents:
-    enabled: true
-```
-
-This preset automatically adds a Kubernetes objects receiver that watches Kubernetes events and sends them to the logs pipeline.
-
-
 ### Mixed configuration
 
 This example demonstrates a more comprehensive setup that combines both collection modes and shows how to integrate the receiver into a complete pipeline:
@@ -104,15 +77,14 @@ receivers:
   k8sobjects:
     auth_type: serviceAccount
     objects:
-      - name: events
-        mode: watch
-        group: events.k8s.io
       - name: pods
+        mode: watch
+      - name: deployments
         mode: pull
         interval: 10m
 
 processors:
-  batch:
+  batch: # Uses default batching settings
 
 exporters:
   elasticsearch:
