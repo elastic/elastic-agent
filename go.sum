@@ -206,6 +206,8 @@ github.com/UNO-SOFT/zlog v0.8.1 h1:TEFkGJHtUfTRgMkLZiAjLSHALjwSBdw6/zByMC5GJt4=
 github.com/UNO-SOFT/zlog v0.8.1/go.mod h1:yqFOjn3OhvJ4j7ArJqQNA+9V+u6t9zSAyIZdWdMweWc=
 github.com/VictoriaMetrics/easyproto v0.1.4 h1:r8cNvo8o6sR4QShBXQd1bKw/VVLSQma/V2KhTBPf+Sc=
 github.com/VictoriaMetrics/easyproto v0.1.4/go.mod h1:QlGlzaJnDfFd8Lk6Ci/fuLxfTo3/GThPs2KH23mv710=
+github.com/VihasMakwana/beats/v7 v7.0.0-20251030105747-f337a5a74256 h1:L7Autv8PUElZvTHzncNLkpxatgiHAlfJbnbACPkUZzk=
+github.com/VihasMakwana/beats/v7 v7.0.0-20251030105747-f337a5a74256/go.mod h1:kIPiDHzoeg2aPTDZ2C5Srlx4YyK6+pTcmyE3ujhcUSk=
 github.com/aerospike/aerospike-client-go/v7 v7.7.1 h1:lcskBtPZYe6ESObhIEQEp4XO1axYZpaFD3ie4iwr6tg=
 github.com/aerospike/aerospike-client-go/v7 v7.7.1/go.mod h1:STlBtOkKT8nmp7iD+sEkr/JGEOu+4e2jGlNN0Jiu2a4=
 github.com/akavel/rsrc v0.10.2 h1:Zxm8V5eI1hW4gGaYsJQUhxpjkENuG91ki8B4zCrvEsw=
@@ -509,8 +511,6 @@ github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumpti
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic/go.mod h1:0vCBR1wgGwZeGmloJ+eCWIZF2S47grTXRzj2mftg2Nk=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
 github.com/elastic/bayeux v1.0.5/go.mod h1:CSI4iP7qeo5MMlkznGvYKftp8M7qqP/3nzmVZoXHY68=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251028191233-a28ab9dc65a4 h1:JsCXEA05QK2Ye85sxQecaDeCc83u51UBGfzJefy5bG0=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251028191233-a28ab9dc65a4/go.mod h1:XntfZKVAguGFKCkMrIpkBkNRpoxiVGuyM0rxYdsbmgE=
 github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae h1:OiShmbWAyGU0MS0ADJWr1/QgeLIZliMk9xsrFicR3/s=
 github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae/go.mod h1:D2IckZVXARugvikE4fv1glvaJMohKSZRzrPsxCjo9O0=
 github.com/elastic/elastic-agent-autodiscover v0.10.0 h1:WJ4zl9uSfk1kHmn2B/0byQBLIL607Zt4LNfOgV7+XN0=
