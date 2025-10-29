@@ -58,7 +58,8 @@ steps:
   - label: "Custom ECH Testing"
     key: integration-tests-ech
     depends_on:
-      - packaging-amd64
+      - packaging-containers-x86-64
+      - packaging-containers-arm64
     env:
       TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
       TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"

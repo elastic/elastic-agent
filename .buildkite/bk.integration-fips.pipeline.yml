@@ -20,6 +20,9 @@ common:
 
 steps:
   - label: Start ESS stack for FIPS integration tests
+    depends_on:
+      - packaging-containers-x86-64-fips
+      - packaging-containers-arm64-fips
     key: integration-fips-ess
     env:
       FIPS: "true"
