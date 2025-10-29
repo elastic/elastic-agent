@@ -124,7 +124,7 @@ func StartMockES(t *testing.T, percentDuplicate, percentTooMany, percentNonIndex
 		nil,
 		time.Now().Add(time.Hour),
 		0,
-		percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge))
+		percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge, 0))
 
 	s := httptest.NewServer(mux)
 	t.Cleanup(s.Close)

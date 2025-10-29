@@ -153,3 +153,36 @@ As a workaround, you can manually restore the `osquery.app/` directory as follow
 5. Proceed to install {{agent}} from the extracted directory as usual.
 
 :::
+
+:::{dropdown} Failed to start {{agent}} in OTel mode for Hosts onboarding
+
+**Applies to: {{agent}} 9.1.6 to 9.2.0**
+
+On October 24, 2025, a known issue was discovered where {{agent}} fails to start
+in OTel mode when deployed through the guided Observability onboarding flow in Kibana. The issue occurs because the sample configuration used by the {{agent}} was using incorrect configuration key.
+
+The Error looks like this in the logs:
+
+```shell
+Starting in otel mode
+failed to get config: cannot unmarshal the configuration: decoding failed due to the following error(s):
+
+'exporters' error reading configuration for "otlp/ingest": decoding failed due to the following error(s):
+
+'sending_queue' decoding failed due to the following error(s):
+
+'batch' decoding failed due to the following error(s):
+
+'' has invalid keys: flush_interval
+```
+
+**Workaround**
+
+To work around this issue, manually update the configuration of the generated `otel.yaml` file to replace the incorrect key `flush_interval` with the correct key `flush_timeout`.
+
+```yaml
+batch:
+  flush_timeout: 1s
+```
+
+:::
