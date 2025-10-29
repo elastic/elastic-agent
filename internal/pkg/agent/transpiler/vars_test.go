@@ -323,7 +323,8 @@ func TestVars_Replace(t *testing.T) {
 			if test.Error {
 				assert.Error(t, err)
 			} else if test.NoMatch {
-				assert.ErrorIs(t, err, ErrNoMatch)
+				var noMatchErr *noMatchError
+				assert.ErrorAs(t, err, &noMatchErr)
 			} else if test.NoMatchAllowed {
 				assert.ErrorIs(t, err, errNoMatchAllowed)
 			} else {
@@ -467,6 +468,21 @@ func TestVars_ReplaceWithFetchContextProvider(t *testing.T) {
 	res, err = vars.Replace("${kubernetes_secrets.test_namespace.testing_secret.secret_value}")
 	require.NoError(t, err)
 	assert.Equal(t, NewStrVal("mockedFetchContent"), res)
+}
+
+func TestNoMatchError_Var(t *testing.T) {
+	vars := mustMakeVarsWithDefault(map[string]interface{}{
+		"existing": map[string]interface{}{
+			"key": "value",
+		},
+	}, "")
+
+	_, err := vars.Replace("${missing.variable}")
+	require.Error(t, err)
+
+	var noMatchErr *noMatchError
+	require.ErrorAs(t, err, &noMatchErr)
+	assert.Equal(t, "${missing.variable}", noMatchErr.Var())
 }
 
 type contextProviderMock struct {
