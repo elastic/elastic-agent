@@ -47,6 +47,7 @@ func TestSamples(t *testing.T) {
 func testSample(t *testing.T, configFile string) {
 	settings := NewSettings("test", []string{configFile})
 	settings.LoggingOptions = []zap.Option{zap.WrapCore(func(zapcore.Core) zapcore.Core {
+		// TODO: Replace with observer core. Right now, it results in a race condition.
 		return zapcore.NewNopCore()
 	})}
 	collector, err := otelcol.NewCollector(*settings)
