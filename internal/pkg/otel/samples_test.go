@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/collector/featuregate"
 	"go.opentelemetry.io/collector/otelcol"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -29,6 +30,11 @@ func TestSamples(t *testing.T) {
 	t.Setenv("AUTOOPS_TOKEN", "token")
 	t.Setenv("AUTOOPS_TEMP_RESOURCE_ID", "temp")
 	t.Setenv("AUTOOPS_OTEL_URL", "http://localhost:4318")
+
+	assert.NoError(t, featuregate.GlobalRegistry().Set("service.profilesSupport", true))
+	defer func() {
+		assert.NoError(t, featuregate.GlobalRegistry().Set("service.profilesSupport", false))
+	}()
 
 	err := filepath.WalkDir(filepath.Join(".", "samples", runtime.GOOS), func(path string, d os.DirEntry, err error) error {
 		if err != nil {
