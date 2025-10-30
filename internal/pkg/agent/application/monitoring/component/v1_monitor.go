@@ -1190,8 +1190,8 @@ func dropFieldsProcessor(fields []any, ignoreMissing bool) map[string]any {
 	}
 }
 
-// dropElasticSearchExporterLogs returns a processor which logs that may contain sensitive data emitted by elasticsearch exporter
-func dropElasticSearchExporterLogs() map[string]any {
+// dropElasticSearchExporterLogs returns a processor which drops fields from logs emitted by elasticsearch exporter,  that may contain sensitive data.
+func dropSensitiveFieldsFromElasticSearchExporterLogs() map[string]any {
 	return map[string]interface{}{
 		"drop_fields": map[string]interface{}{
 			"fields": []any{"error.reason"},
