@@ -1,0 +1,58 @@
+name: Generate release notes
+
+on:
+  workflow_dispatch:
+    inputs:
+      bc_commit_sha:
+        description: 'Commit SHA for the BC'
+        type: string
+        required: true
+      version:
+        description: 'Version to be released (for example, `9.2.1`)'
+        type: string
+        required: true
+
+env:
+  product: Elastic Agent
+  labels: docs,forwardport-main,release,skip-changelog,Team:Docs
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  build-changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.bc_commit_sha }}
+      - name: Generate release notes
+        run: |
+          GOBIN=$PWD/bin go install github.com/elastic/elastic-agent-changelog-tool@latest
+          ./bin/elastic-agent-changelog-tool build --version ${{ inputs.version }}
+          ./bin/elastic-agent-changelog-tool cleanup
+          ./bin/elastic-agent-changelog-tool render --version ${{ inputs.version }}
+      - name: Get minor
+        id: get-minor
+        uses: actions/github-script@v8
+        with:
+          script: return "${{ inputs.version }}".replace(/^(\d+\.\d+).+$/m, "$1")
+          result-encoding: string
+      - name: Open PR
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: add the ${{ inputs.version }} ${{ env.product }} release notes
+          branch: ${{ inputs.version }}-release-notes
+          base: ${{ steps.get-minor.outputs.result }}
+          add-paths: |
+            changelog/
+            docs/
+          labels: ${{ env.labels }}
+          title: "Add ${{ env.product }} ${{ inputs.version }} release notes"
+          body: |
+            Adds ${{ env.product }} ${{ inputs.version }} release notes.
+
+            ## Checklist
+
+            - [ ] @${{ github.triggering_actor }} review this PR to make sure the correct items are included
+            - [ ] @elastic/ingest-docs-team review the language
+            - [ ] @${{ github.triggering_actor }} merge on release day
