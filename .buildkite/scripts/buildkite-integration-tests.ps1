@@ -71,7 +71,7 @@ try
     # while still enforcing a reasonable upper limit on total execution time.
     # See: https://pkg.go.dev/cmd/go#hdr-Testing_flags
     $gotestFlags = @("-test.shuffle=on", "-test.timeout=2h0m0s")
-    if(-not $env:BUILDKITE_PULL_REQUEST -eq "false")
+    if($env:BUILDKITE_PULL_REQUEST -ne "false")
     {
         $gotestFlags += "-test.short"
     }
