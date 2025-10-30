@@ -36,6 +36,8 @@ const (
 	ActionTypeDiagnostics = "REQUEST_DIAGNOSTICS"
 	// ActionTypeDiagnostics specifies a diagnostics action.
 	ActionTypeMigrate = "MIGRATE"
+	// ActionTypeDiagnostics specifies a diagnostics action.
+	ActionTypePrivilegeLevelChange = "PRIVILEGE_LEVEL_CHANGE"
 )
 
 // Error values that the Action interface can return
@@ -119,6 +121,8 @@ func NewAction(actionType string) Action {
 		action = &ActionUpgrade{}
 	case ActionTypeMigrate:
 		action = &ActionMigrate{}
+	case ActionTypePrivilegeLevelChange:
+		action = &ActionPrivilegeLevelChange{}
 	default:
 		action = &ActionUnknown{OriginalType: actionType}
 	}
@@ -642,6 +646,61 @@ func (a *ActionApp) MarshalMap() (map[string]interface{}, error) {
 	var res map[string]interface{}
 	err := mapstructure.Decode(a, &res)
 	return res, err
+}
+
+type ActionPrivilegeLevelChange struct {
+	ActionID   string                         `json:"id" yaml:"id"`
+	ActionType string                         `json:"type" yaml:"type"`
+	Data       ActionPrivilegeLevelChangeData `json:"data,omitempty"`
+
+	Err error `json:"-" yaml:"-" mapstructure:"-"`
+}
+
+// ID returns the ID of the Action.
+func (a *ActionPrivilegeLevelChange) ID() string {
+	return a.ActionID
+}
+
+// Type returns the type of the Action.
+func (a *ActionPrivilegeLevelChange) Type() string {
+	return a.ActionType
+}
+
+func (a *ActionPrivilegeLevelChange) String() string {
+	var s strings.Builder
+	s.WriteString("id: ")
+	s.WriteString(a.ActionID)
+	s.WriteString(", type: ")
+	s.WriteString(a.ActionType)
+	return s.String()
+}
+
+func (a *ActionPrivilegeLevelChange) AckEvent() AckEvent {
+	event := newAckEvent(a.ActionID, a.ActionType)
+	if a.Err != nil {
+		event.Error = a.Err.Error()
+	}
+	return event
+}
+
+type ActionPrivilegeLevelChangeData struct {
+	// Unprivileged Flag indicating whether target level is unprivileged. If not provided unprivileged is assumed.
+	Unprivileged bool `json,yaml:"unprivileged"`
+
+	// UserInfo Optional user info data.
+	UserInfo *UserInfo `json,yaml:"user_info,omitempty"`
+}
+
+// UserInfo Optional user info data.
+type UserInfo struct {
+	// Groupname Custom group used to access Elastic Agent files.
+	Groupname string `json,yaml:"groupname,omitempty"`
+
+	// Password for user specified by username.
+	Password string `json,yaml:"password,omitempty"`
+
+	// Username of custom user used to run Elastic Agent.
+	Username string `json,yaml:"username,omitempty"`
 }
 
 // UnmarshalJSON takes every raw representation of an action and try to decode them.

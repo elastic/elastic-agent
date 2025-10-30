@@ -11,9 +11,37 @@ import (
 	"os"
 	"os/exec"
 
+	"gopkg.in/ini.v1"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
+
+// GetDesiredUser retrieves user and group names as configured in a service file
+func GetDesiredUser() (string, string, error) {
+	serviceFilePath := fmt.Sprintf("/etc/systemd/system/%s.service", paths.ServiceName())
+	svcCfg, err := ini.Load(serviceFilePath)
+	if os.IsNotExist(err) {
+		// not running as a service
+		return "", "", nil
+	}
+	if err != nil {
+		return "", "", fmt.Errorf("failed to read service file %s: %w", serviceFilePath, err)
+	}
+
+	var username, groupname string
+
+	serviceSection := svcCfg.Section("Service")
+	if serviceSection.HasKey(SystemdUserNameKey) {
+		username = serviceSection.Key(SystemdUserNameKey).Value()
+	}
+
+	if serviceSection.HasKey(SystemdGroupNameKey) {
+		groupname = serviceSection.Key(SystemdGroupNameKey).Value()
+	}
+
+	return username, groupname, nil
+}
 
 // changeUser changes user associated with a service without reinstalling the service itself
 func changeUser(topPath string, ownership utils.FileOwner, username string, groupName string, _ string) error {
