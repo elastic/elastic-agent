@@ -11,7 +11,7 @@
 kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
-summary: Move component working directory management to coordinator
+summary: Fix issue where switching to OTEL runtime would cause data to be re-ingested
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
