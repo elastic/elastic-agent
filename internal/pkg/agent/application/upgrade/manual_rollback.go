@@ -42,9 +42,12 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 	var updateMarkerExistsBeforeRollback bool
 
 	if errors.Is(err, os.ErrNotExist) {
-		// there is no upgrade marker, we need to extract available rollbacks from agent installs
+		// there is no upgrade marker (the rollback was requested after the watcher grace period had elapsed), we need
+		// to extract available rollbacks from agent installs
 		watcherExecutable, versionedHomeToRollbackTo, err = rollbackUsingAgentInstalls(u.log, u.watcherHelper, u.availableRollbacksSource, topDir, now, version, u.markUpgrade)
 	} else {
+		// If upgrade marker is available, we need to gracefully stop any watcher process, read the available rollbacks from
+		// the upgrade marker and then proceed with rollback
 		updateMarkerExistsBeforeRollback = true
 		watcherExecutable, versionedHomeToRollbackTo, err = rollbackUsingUpgradeMarker(ctx, u.log, u.watcherHelper, topDir, now, version)
 	}

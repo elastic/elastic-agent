@@ -127,10 +127,6 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 		return nil
 	}
 
-	if prevVersionedHome == "" {
-		prevVersionedHome = filepath.Join("data", fmt.Sprintf("%s-%s", AgentName, prevHash))
-	}
-
 	// cleanup everything except version we're rolling back into
 	return Cleanup(log, topDirPath, settings.RemoveMarker, true, prevVersionedHome)
 }
