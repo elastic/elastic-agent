@@ -986,7 +986,7 @@ func genIgnoredFields(goos string) []string {
 
 // TestSensitiveLogsESExporter tests sensitive logs from ex-exporter are not sent to fleet
 func TestSensitiveLogsESExporter(t *testing.T) {
-	t.Skip("Enable this test after https://github.com/elastic/elastic-agent/issues/10423 is implemented with appropriate config")
+
 	// The ES exporter logs the original document on indexing failure only if
 	// the "telemetry::log_failed_docs_input" setting is enabled and the log level is set to debug.
 	info := define.Require(t, define.Requirements{
@@ -1000,6 +1000,7 @@ func TestSensitiveLogsESExporter(t *testing.T) {
 		},
 		Stack: &define.Stack{},
 	})
+	t.Skip("Enable this test after https://github.com/elastic/elastic-agent/issues/10423 is implemented with appropriate config")
 	tmpDir := t.TempDir()
 	numEvents := 50
 	// Create the data file to ingest

@@ -37,6 +37,12 @@ inputs:
         when:
           equals:
             log.type: event
+    - drop_fields:
+        fields:
+        - error.reason
+        when:
+          contains:
+            message: failed to index document
     - copy_fields:
         fields:
         - from: data_stream.dataset
