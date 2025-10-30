@@ -175,7 +175,7 @@ type Component struct {
 	// Component-level configuration
 	Component *proto.Component `yaml:"component,omitempty"`
 
-	OutputStatusReporting *StatusReporting
+	OutputStatusReporting *StatusReporting `yaml:"-"`
 }
 
 type StatusReporting struct {
