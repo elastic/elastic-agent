@@ -6,9 +6,13 @@ package coordinator
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/component"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -174,6 +178,17 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 			if other.Component.ID == state.Component.ID {
 				c.state.Components = append(c.state.Components[:i], c.state.Components[i+1:]...)
 				break
+			}
+		}
+		// If the component was stopped and isn't listed among components the coordinator knows about, it's safe to
+		// remove its working directory. Otherwise, we may just be moving it between runtimes.
+		if !slices.ContainsFunc(c.componentModel, func(c component.Component) bool {
+			return state.Component.ID == c.ID
+		}) {
+			c.logger.Debugf("removing working directory for component '%s'", state.Component.ID)
+			err := state.Component.RemoveWorkDir(paths.Run())
+			if err != nil {
+				c.logger.Warnf("failed to remove workdir for component %s: %v", state.Component.ID, err)
 			}
 		}
 	}
