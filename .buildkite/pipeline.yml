@@ -343,3 +343,22 @@ steps:
     build:
       commit: "${BUILDKITE_COMMIT}"
       branch: "${BUILDKITE_BRANCH}"
+
+  # Trigger for pull requests - Serverless Beats Tests
+  # this should help detecting issues earlier in the development cycle
+  - label: "Trigger Serverless Beats Tests"
+    if: build.pull_request.id != null
+    plugins:
+      - monorepo-diff#v1.2.0:
+          diff: "git diff --name-only origin/${GITHUB_PR_TARGET_BRANCH}...HEAD"
+          interpolation: false
+          watch:
+            - path:
+                - .buildkite/serverless.beats.tests.yml
+                - .buildkite/scripts/steps/beats_tests.sh
+                - .buildkite/hooks/pre-command
+              config:
+                trigger: "beats-agent-serverless-tests"
+                build:
+                  commit: "${BUILDKITE_COMMIT}"
+                  branch: "${BUILDKITE_BRANCH}"
