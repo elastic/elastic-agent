@@ -9,6 +9,7 @@ package ess
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -30,10 +31,6 @@ func TestStandaloneUpgrade_Flavor_Basic(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
-	if testing.Short() {
-		t.Skip("skipping test in short mode")
-	}
-
 	minVersion := upgradetest.Version_9_0_0_SNAPSHOT
 	currentVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
@@ -44,6 +41,10 @@ func TestStandaloneUpgrade_Flavor_Basic(t *testing.T) {
 
 	versionList, err := upgradetest.GetUpgradableVersions()
 	require.NoError(t, err)
+
+	// sort versionList in ascending order
+	slices.SortFunc(versionList, version.CompareNillableParsedSemVer)
+
 	endVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
@@ -82,6 +83,11 @@ func TestStandaloneUpgrade_Flavor_Basic(t *testing.T) {
 				testStandaloneUpgradeFlavorCheck(t, startVersion, define.Version(), true, false, checkFn)
 			})
 		}
+
+		if testing.Short() {
+			t.Log("skipping further tests in short mode")
+			break
+		}
 	}
 }
 
@@ -91,10 +97,6 @@ func TestStandaloneUpgrade_Flavor_Servers(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
-
-	if testing.Short() {
-		t.Skip("skipping test in short mode")
-	}
 
 	minVersion := upgradetest.Version_9_0_0_SNAPSHOT
 	currentVersion, err := version.ParseVersion(define.Version())
@@ -106,6 +108,10 @@ func TestStandaloneUpgrade_Flavor_Servers(t *testing.T) {
 
 	versionList, err := upgradetest.GetUpgradableVersions()
 	require.NoError(t, err)
+
+	// sort versionList in ascending order
+	slices.SortFunc(versionList, version.CompareNillableParsedSemVer)
+
 	endVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
@@ -143,6 +149,11 @@ func TestStandaloneUpgrade_Flavor_Servers(t *testing.T) {
 				testStandaloneUpgradeFlavorCheck(t, startVersion, define.Version(), true, true, checkFn)
 			})
 		}
+
+		if testing.Short() {
+			t.Log("skipping further tests in short mode")
+			break
+		}
 	}
 }
 
@@ -152,10 +163,6 @@ func TestStandaloneUpgrade_Flavor_UpgradeFromUnflavored(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
-
-	if testing.Short() {
-		t.Skip("skipping test in short mode")
-	}
 
 	minVersion := upgradetest.Version_9_0_0_SNAPSHOT
 	currentVersion, err := version.ParseVersion(define.Version())
@@ -167,6 +174,10 @@ func TestStandaloneUpgrade_Flavor_UpgradeFromUnflavored(t *testing.T) {
 
 	versionList, err := upgradetest.GetUpgradableVersions()
 	require.NoError(t, err)
+
+	// sort versionList in ascending order
+	slices.SortFunc(versionList, version.CompareNillableParsedSemVer)
+
 	endVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
@@ -203,6 +214,11 @@ func TestStandaloneUpgrade_Flavor_UpgradeFromUnflavored(t *testing.T) {
 			t.Run(fmt.Sprintf("Upgrade %s to %s (unprivileged)", startVersion, define.Version()), func(t *testing.T) {
 				testStandaloneUpgradeFlavorCheck(t, startVersion, define.Version(), true, false, checkFn)
 			})
+		}
+
+		if testing.Short() {
+			t.Log("skipping further tests in short mode")
+			break
 		}
 	}
 }
