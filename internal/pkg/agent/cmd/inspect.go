@@ -416,7 +416,7 @@ func getMonitoringFn(ctx context.Context, logger *logger.Logger, cfg map[string]
 	if err != nil {
 		return nil, fmt.Errorf("could not load agent info: %w", err)
 	}
-	monitor := componentmonitoring.New(agentCfg.Settings.V1MonitoringEnabled, agentCfg.Settings.DownloadConfig.OS(), agentCfg.Settings.MonitoringConfig, agentInfo, true)
+	monitor := componentmonitoring.New(agentCfg.Settings.V1MonitoringEnabled, agentCfg.Settings.DownloadConfig.OS(), agentCfg.Settings.MonitoringConfig, agentInfo)
 	return monitor.MonitoringConfig, nil
 }
 
