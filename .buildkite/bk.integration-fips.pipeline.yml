@@ -20,6 +20,9 @@ common:
 
 steps:
   - label: Start ESS stack for FIPS integration tests
+    depends_on:
+      - packaging-containers-amd64-fips
+      - packaging-containers-arm64-fips
     key: integration-fips-ess
     env:
       FIPS: "true"
@@ -46,13 +49,13 @@ steps:
     steps:
       - label: "fips:x86_64:sudo-{{matrix.sudo}}:{{matrix.groups}}"
         depends_on:
-          - packaging-ubuntu-x86-64-fips # Reuse artifacts produced in .buildkite/integration.pipeline.yml
+          - packaging-amd64-fips # Reuse artifacts produced in .buildkite/integration.pipeline.yml
         env:
           FIPS: "true"
           TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64-fips'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64-fips'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.groups}} {{matrix.sudo}}
         artifact_paths:
           - build/**
@@ -76,13 +79,13 @@ steps:
 
       - label: "fips:arm64:sudo-{{matrix.sudo}}:{{matrix.groups}}"
         depends_on:
-          - packaging-ubuntu-arm64-fips
+          - packaging-arm64-fips
         env:
           FIPS: "true"
           TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64-fips'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-arm64-fips'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.groups}} {{matrix.sudo}}
         artifact_paths:
           - build/**

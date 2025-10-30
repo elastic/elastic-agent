@@ -43,19 +43,49 @@ common:
         path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
         field: "apiKey"
         env_var: "EC_API_KEY"
+  # key to hold the list of k8s version to test against
+  - k8s_test:
+    versions: &k8s_test_versions
+      - &k8s_min_test_version v1.27.16
+      - v1.28.15
+      - v1.29.14
+      - v1.30.0
+      - v1.31.0
+      - v1.32.0
+      - v1.33.0
+      - &k8s_max_test_version v1.34.0
+    env: &k8s_test_env
+      K8S_VERSION: "{{matrix.version}}"
+      ASDF_KIND_VERSION: "0.27.0"
+      DOCKER_VARIANTS: "{{matrix.variants}}"
+      TARGET_ARCH: "amd64"
+    agent: &k8s_test_agent
+      provider: "gcp"
+      machineType: "n2-standard-8"
+      image: "${IMAGE_UBUNTU_2404_X86_64}"
+      diskSizeGb: 80
+    command: &k8s_test_command |
+      buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
+      .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
+    artifact_paths: &k8s_test_artifact_paths
+      - build/**
+      - build/diagnostics/**
+      - build/*.pod_logs_dump/*
+
 
 steps:
   - label: "Custom ECH Testing"
     key: integration-tests-ech
     depends_on:
-      - packaging-ubuntu-x86-64
+      - packaging-containers-amd64
+      - packaging-containers-arm64
     env:
       TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
       TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
       FORCE_ESS_CREATE: "true"
     command: |
       #!/usr/bin/env bash
-      buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
+      buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
       .buildkite/scripts/steps/integration_tests_tf.sh ech true
     artifact_paths:
       - build/**
@@ -98,11 +128,11 @@ steps:
     steps:
       - label: "Windows:2022:amd64:sudo"
         depends_on:
-          - packaging-windows-amd64
+          - packaging-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/leak"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows-amd64'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 fleet true
         artifact_paths:
           - build/**
@@ -119,11 +149,11 @@ steps:
 
       - label: "Windows:2025:amd64:sudo"
         depends_on:
-          - packaging-windows-amd64
+          - packaging-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/leak"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows-amd64'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 fleet true
         artifact_paths:
           - build/**
@@ -139,11 +169,11 @@ steps:
           - *vault_ec_key_prod
 
       - label: "Ubuntu:2404:amd64:sudo"
-        depends_on: packaging-ubuntu-x86-64
+        depends_on: packaging-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/leak"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.sh fleet true
         artifact_paths:
           - build/**
@@ -168,11 +198,11 @@ steps:
     steps:
       - label: "Win2022:sudo:{{matrix}}"
         depends_on:
-          - packaging-windows-amd64
+          - packaging-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows-amd64'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
         artifact_paths:
           - build/**
@@ -198,11 +228,11 @@ steps:
 
       - label: "Win2022:non-sudo:{{matrix}}"
         depends_on:
-          - packaging-windows-amd64
+          - packaging-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows-amd64'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
         artifact_paths:
           - build/**
@@ -221,11 +251,11 @@ steps:
 
       - label: "Win2025:sudo:{{matrix}}"
         depends_on:
-          - packaging-windows-amd64
+          - packaging-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows-amd64'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
         artifact_paths:
           - build/**
@@ -251,11 +281,11 @@ steps:
 
       - label: "Win2025:non-sudo:{{matrix}}"
         depends_on:
-          - packaging-windows-amd64
+          - packaging-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows-amd64'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
         artifact_paths:
           - build/**
@@ -281,11 +311,11 @@ steps:
       - integration-ess
     steps:
       - label: "x86_64:non-sudo: {{matrix}}"
-        depends_on: packaging-ubuntu-x86-64
+        depends_on: packaging-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
@@ -304,12 +334,12 @@ steps:
 
       - label: "x86_64:sudo: {{matrix}}"
         depends_on:
-          - packaging-ubuntu-x86-64
+          - packaging-amd64
         # due to deb group present in matrix tar.gz and deb packages artifacts are required
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64
+          buildkite-agent artifact download build/distributions/** . --step packaging-amd64
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
@@ -341,11 +371,11 @@ steps:
 
       - label: "arm:sudo: {{matrix}}"
         depends_on:
-          - packaging-ubuntu-arm64
+          - packaging-arm64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-arm64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
@@ -379,11 +409,11 @@ steps:
       - label: "arm:non-sudo: {{matrix}}"
         skip: true
         depends_on:
-          - packaging-ubuntu-arm64
+          - packaging-arm64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-arm64'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-arm64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
@@ -409,11 +439,11 @@ steps:
       - integration-ess
     steps:
       - label: "x86_64:non-sudo: {{matrix}}"
-        depends_on: packaging-ubuntu-x86-64
+        depends_on: packaging-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
           - build/**
@@ -432,12 +462,12 @@ steps:
 
       - label: "x86_64:sudo: {{matrix}}"
         depends_on:
-          - packaging-ubuntu-x86-64
+          - packaging-amd64
         # due to deb group present in matrix tar.gz and deb packages artifacts are required
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64
+          buildkite-agent artifact download build/distributions/** . --step packaging-amd64
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
           - build/**
@@ -478,11 +508,11 @@ steps:
     steps:
       - label: "x86_64:sudo:rpm"
         depends_on:
-          - packaging-ubuntu-x86-64
+          - packaging-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step packaging-ubuntu-x86-64
+          buildkite-agent artifact download build/distributions/** . --step packaging-amd64
           .buildkite/scripts/steps/integration_tests_tf.sh rpm true
         artifact_paths:
           - build/**
@@ -497,36 +527,28 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_RHEL_8}"
 
-  - group: "Kubernetes"
+  - group: ":kubernetes: Kubernetes"
     key: integration-tests-kubernetes
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Kubernetes"
     depends_on:
       - integration-ess
-      - packaging-containers-x86-64
+      - packaging-containers-amd64
     steps:
-      - label: "{{matrix.version}}:amd64:{{matrix.variants}}"
+      - label: ":git: :kubernetes: {{matrix.version}}:amd64:{{matrix.variants}}"
+        # Run this step only if we are **not** building a PR (we use all supported k8s versions)
+        if: build.env("BUILDKITE_PULL_REQUEST") == null
         env:
-          K8S_VERSION: "{{matrix.version}}"
-          ASDF_KIND_VERSION: "0.27.0"
-          DOCKER_VARIANTS: "{{matrix.variants}}"
-          TARGET_ARCH: "amd64"
-        command: |
-          buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-x86-64'
-          .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
+          *k8s_test_env
+        command: *k8s_test_command
         artifact_paths:
-          - build/**
-          - build/diagnostics/**
-          - build/*.pod_logs_dump/*
+          *k8s_test_artifact_paths
         retry:
           automatic:
             limit: 1
         agents:
-          provider: "gcp"
-          machineType: "n2-standard-4"
-          image: "${IMAGE_UBUNTU_2404_X86_64}"
-          diskSizeGb: 80
+          *k8s_test_agent
         plugins:
           - *vault_ec_key_prod
         matrix:
@@ -534,18 +556,44 @@ steps:
             variants:
             - "basic,slim,complete,service,elastic-otel-collector"
             - "wolfi,slim-wolfi,complete-wolfi,elastic-otel-collector-wolfi"
-
             # See the Kubernetes Compatible Versions for Elastic Agent in the Elastic
             # Support Matrix (https://www.elastic.co/support/matrix#matrix_kubernetes) for
             # the rationale on why these specific versions are chosen.
             version:
-              - v1.27.16
-              - v1.28.15
-              - v1.29.14
-              - v1.30.0
-              - v1.31.0
-              - v1.32.0
-              - v1.33.0
+              *k8s_test_versions
+      - label: ":open-pull-request: :kubernetes: {{matrix.version}}:amd64:{{matrix.variants}}"
+        # Run this step only if we are building a PR (we use only min/max k8s versions)
+        if: build.env("BUILDKITE_PULL_REQUEST") != null
+        env:
+          *k8s_test_env
+        command: *k8s_test_command
+        artifact_paths:
+          *k8s_test_artifact_paths
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          *k8s_test_agent
+        plugins:
+          - *vault_ec_key_prod
+        matrix:
+          setup:
+            variants:
+              - basic
+              - slim
+              - complete
+              - service
+              - elastic-otel-collector
+              - wolfi
+              - slim-wolfi
+              - complete-wolfi
+              - elastic-otel-collector-wolfi
+            # See the Kubernetes Compatible Versions for Elastic Agent in the Elastic
+            # Support Matrix (https://www.elastic.co/support/matrix#matrix_kubernetes) for
+            # the rationale on why these specific versions are chosen.
+            version:
+              - *k8s_min_test_version
+              - *k8s_max_test_version
 
   - group: "Serverless integration test"
     key: integration-tests-serverless
@@ -555,11 +603,11 @@ steps:
     steps:
       - label: "Windows:2022:amd64:sudo"
         depends_on:
-          - packaging-windows-amd64
+          - packaging-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/serverless"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows-amd64'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/buildkite-integration-tests.ps1 fleet true
         artifact_paths:
           - build/**
@@ -577,11 +625,11 @@ steps:
 
       - label: "Windows:2025:amd64:sudo"
         depends_on:
-          - packaging-windows-amd64
+          - packaging-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/serverless"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-windows-amd64'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/buildkite-integration-tests.ps1 fleet true
         artifact_paths:
           - build/**
@@ -597,11 +645,11 @@ steps:
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
       - label: "Ubuntu:2404:amd64:sudo"
-        depends_on: packaging-ubuntu-x86-64
+        depends_on: packaging-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/serverless"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-ubuntu-x86-64'
+          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           sudo -E .buildkite/scripts/buildkite-integration-tests.sh fleet true
         artifact_paths:
           - build/**
