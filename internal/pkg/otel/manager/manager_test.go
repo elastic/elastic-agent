@@ -1300,7 +1300,7 @@ func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
 								UnitType: client.UnitTypeInput,
 							}: {
 								State:   client.UnitStateHealthy,
-								Message: "HEALTHY",
+								Message: "Healthy",
 								Payload: map[string]any{
 									"streams": map[string]map[string]string{
 										"test-1": {
@@ -1319,7 +1319,7 @@ func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
 								UnitType: client.UnitTypeOutput,
 							}: {
 								State:   client.UnitStateHealthy,
-								Message: "HEALTHY",
+								Message: "Healthy",
 							},
 						},
 						VersionInfo: runtime.ComponentVersionInfo{

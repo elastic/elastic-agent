@@ -642,7 +642,7 @@ func TestOutputStatus(t *testing.T) {
 					Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
 						{UnitID: "input-1", UnitType: client.UnitTypeInput}: {
 							State:   client.UnitStateHealthy,
-							Message: client.UnitStateHealthy.String(),
+							Message: "Healthy",
 							Payload: map[string]any{
 								"streams": map[string]map[string]string{
 									"stream-1": {
@@ -654,7 +654,7 @@ func TestOutputStatus(t *testing.T) {
 						},
 						{UnitID: "output-1", UnitType: client.UnitTypeOutput}: {
 							State:   client.UnitStateHealthy,
-							Message: client.UnitStateHealthy.String(),
+							Message: "Healthy",
 						},
 					},
 				},
@@ -690,7 +690,7 @@ func TestOutputStatus(t *testing.T) {
 					Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
 						{UnitID: "input-1", UnitType: client.UnitTypeInput}: {
 							State:   client.UnitStateHealthy,
-							Message: client.UnitStateHealthy.String(),
+							Message: "Healthy",
 							Payload: map[string]any{
 								"streams": map[string]map[string]string{
 									"stream-1": {
@@ -738,7 +738,7 @@ func TestOutputStatus(t *testing.T) {
 					Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
 						{UnitID: "input-1", UnitType: client.UnitTypeInput}: {
 							State:   client.UnitStateHealthy,
-							Message: client.UnitStateHealthy.String(),
+							Message: "Healthy",
 							Payload: map[string]any{
 								"streams": map[string]map[string]string{
 									"stream-1": {
@@ -750,7 +750,7 @@ func TestOutputStatus(t *testing.T) {
 						},
 						{UnitID: "output-1", UnitType: client.UnitTypeOutput}: {
 							State:   client.UnitStateHealthy,
-							Message: client.UnitStateHealthy.String(),
+							Message: "Healthy",
 						},
 					},
 				},
@@ -786,7 +786,7 @@ func TestOutputStatus(t *testing.T) {
 					Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
 						{UnitID: "input-1", UnitType: client.UnitTypeInput}: {
 							State:   client.UnitStateHealthy,
-							Message: client.UnitStateHealthy.String(),
+							Message: "Healthy",
 							Payload: map[string]any{
 								"streams": map[string]map[string]string{
 									"stream-1": {
@@ -798,7 +798,7 @@ func TestOutputStatus(t *testing.T) {
 						},
 						{UnitID: "output-1", UnitType: client.UnitTypeOutput}: {
 							State:   client.UnitStateHealthy,
-							Message: client.UnitStateHealthy.String(),
+							Message: "Healthy",
 						},
 					},
 				},

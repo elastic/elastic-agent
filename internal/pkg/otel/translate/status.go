@@ -267,7 +267,7 @@ func unitMessageFromOtelStatus(otelUnitStatus *status.AggregateStatus) string {
 	}
 	unitStatus := otelStatusToUnitState(otelUnitStatus.Status())
 	if unitStatus == client.UnitStateHealthy {
-		return "HEALTHY"
+		return "Healthy"
 	}
 
 	return unitStatus.String()
