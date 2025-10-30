@@ -1277,7 +1277,7 @@ agent.logging.stderr: true
 	}, 1*time.Minute, 1*time.Second)
 
 	// Check 1:
-	// Ensure sensitive logs from ES exporter are not shipped to ES
+	// Ensure fields containing sensitive data from ES exporter are not shipped to ES
 	rawQuery := map[string]any{
 		"query": map[string]any{
 			"bool": map[string]any{
