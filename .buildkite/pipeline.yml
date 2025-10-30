@@ -343,9 +343,6 @@ steps:
     build:
       commit: "${BUILDKITE_COMMIT}"
       branch: "${BUILDKITE_BRANCH}"
-<<<<<<< HEAD
-=======
-
   # Trigger for pull requests - Serverless Beats Tests
   # this should help detecting issues earlier in the development cycle
   - label: "Trigger Serverless Beats Tests"
@@ -364,11 +361,3 @@ steps:
                 build:
                   commit: "${BUILDKITE_COMMIT}"
                   branch: "${BUILDKITE_BRANCH}"
-
-  # wait for CI to be done
-  - wait: ~
-
-  - label: "Publish to serverless"
-    branches: main
-    trigger: "agentless-serverless-release"
->>>>>>> 0a1cf18cf (fix(bk): serverless-beats-tests start failing after merging #10734 (#10906))
