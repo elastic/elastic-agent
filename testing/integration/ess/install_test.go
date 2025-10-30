@@ -563,6 +563,10 @@ func TestRepeatedInstallUninstallFleet(t *testing.T) {
 }
 
 func iterations() int {
+	if testing.Short() {
+		return 10
+	}
+
 	// If running in CI, reduce the number of iterations to speed up the test.
 	if os.Getenv("BUILDKITE_PULL_REQUEST") != "" {
 		return 50
