@@ -70,7 +70,12 @@ try
     # This 2-hour timeout provides enough room for future, potentially longer tests,
     # while still enforcing a reasonable upper limit on total execution time.
     # See: https://pkg.go.dev/cmd/go#hdr-Testing_flags
-    $gotestArgs = @("-tags=integration", "-test.shuffle=on", "-test.timeout=2h0m0s", "$env:TEST_PACKAGE", "-v", "-args", "-integration.groups=$GROUP_NAME", "-integration.sudo=$TEST_SUDO")
+    $gotestFlags = @("-test.shuffle=on", "-test.timeout=2h0m0s")
+    if(-not ([string]::IsNullOrEmpty($env:BUILDKITE_PULL_REQUEST)))
+    {
+        $gotestFlags += "-test.short"
+    }
+    $gotestArgs = @("-tags=integration", ${gotestFlags}, "$env:TEST_PACKAGE", "-v", "-args", "-integration.groups=$GROUP_NAME", "-integration.sudo=$TEST_SUDO")
     & gotestsum --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- @gotestArgs
     $TestsExitCode = $LASTEXITCODE
 
