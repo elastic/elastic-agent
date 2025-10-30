@@ -223,6 +223,7 @@ func TestGetOtelConfig(t *testing.T) {
 			"preset":           "balanced",
 			"queue.mem.events": 3200,
 			"ssl.enabled":      true,
+			"proxy_url":        "https://example.com",
 		}
 
 		for _, v := range extra {
@@ -235,6 +236,7 @@ func TestGetOtelConfig(t *testing.T) {
 		finalOutput := map[string]any{
 			"idle_connection_timeout": "3s",
 			"proxy_disable":           false,
+			"proxy_url":               "https://example.com",
 			"ssl": map[string]interface{}{
 				"ca_sha256":               []interface{}{},
 				"ca_trusted_fingerprint":  "",
@@ -292,22 +294,20 @@ func TestGetOtelConfig(t *testing.T) {
 				"block_on_overflow": true,
 				"wait_for_result":   true,
 				"batch": map[string]any{
-					"max_size": 1600,
-					"min_size": 0,
-					"sizer":    "items",
+					"flush_timeout": "10s",
+					"max_size":      1600,
+					"min_size":      0,
+					"sizer":         "items",
 				},
 			},
 			"logs_dynamic_id": map[string]any{
 				"enabled": true,
 			},
-			"timeout":           90 * time.Second,
-			"idle_conn_timeout": 3 * time.Second,
+			"telemetry": map[string]any{
+				"log_failed_docs_input": true,
+			},
 			"auth": map[string]any{
 				"authenticator": "beatsauth/_agent-component/" + outputName,
-			},
-			"tls": map[string]any{
-				"min_version": "1.2",
-				"max_version": "1.3",
 			},
 		}
 	}
