@@ -34,14 +34,8 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-package" ]]; then
   fi
 fi
 
-<<<<<<< HEAD
-if [[ "$BUILDKITE_STEP_KEY" == *"integration-tests"* ]]; then
-  echo "Setting credentials"
-  # Set GCP credentials
-=======
 if [[ ("$BUILDKITE_PIPELINE_SLUG" == "buildkite-elastic-agent-integration-matrix") || ("$BUILDKITE_PIPELINE_SLUG" == "beats-agent-serverless-tests") ]]; then
   echo "Setting GCP credentials"
->>>>>>> 0a1cf18cf (fix(bk): serverless-beats-tests start failing after merging #10734 (#10906))
   export GOOGLE_APPLICATION_GCP_SECRET=$(retry 5 vault kv get -format=json -field=data ${CI_GCP_OBS_PATH})
   echo "${GOOGLE_APPLICATION_GCP_SECRET}" > ./gcp.json
   export GOOGLE_APPLICATION_CREDENTIALS=$(realpath ./gcp.json)
