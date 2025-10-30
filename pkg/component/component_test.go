@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -3131,4 +3132,48 @@ func makeMapStructureErr(t *testing.T) error {
 		Meta struct{} `mapstructure:"meta"`
 	}
 	return mapstructure.Decode(data, &output)
+}
+
+func TestComponent_WorkDir(t *testing.T) {
+	c := &Component{ID: "my-component"}
+
+	t.Run("WorkDirName", func(t *testing.T) {
+		require.Equal(t, "my-component", c.WorkDirName())
+	})
+
+	t.Run("WorkDirPath", func(t *testing.T) {
+		require.Equal(t, filepath.Join("parent", "my-component"), c.WorkDirPath("parent"))
+	})
+
+	t.Run("Prepare and Remove", func(t *testing.T) {
+		tempDir := t.TempDir()
+
+		// Prepare
+		err := c.PrepareWorkDir(tempDir)
+		require.NoError(t, err)
+
+		workDir := c.WorkDirPath(tempDir)
+		info, err := os.Stat(workDir)
+		require.NoError(t, err)
+		require.True(t, info.IsDir())
+
+		// On non-windows, check permissions and ownership
+		// On windows, only directory creation is checked.
+		if runtime.GOOS != "windows" {
+			require.Equal(t, os.FileMode(workDirPathMod), info.Mode().Perm())
+		}
+
+		// Prepare again (idempotency)
+		err = c.PrepareWorkDir(tempDir)
+		require.NoError(t, err)
+
+		// Remove
+		err = c.RemoveWorkDir(tempDir)
+		require.NoError(t, err)
+		assert.NoDirExists(t, workDir)
+
+		// Remove again (idempotency)
+		err = c.RemoveWorkDir(tempDir)
+		require.NoError(t, err)
+	})
 }
