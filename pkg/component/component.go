@@ -179,7 +179,7 @@ type Component struct {
 }
 
 type StatusReporting struct {
-	Enabled bool `yaml:"enabled"`
+	Enabled bool
 }
 
 func (c Component) MarshalYAML() (interface{}, error) {

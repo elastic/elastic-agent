@@ -611,7 +611,6 @@ func TestOutputStatus(t *testing.T) {
 		status                *status.AggregateStatus
 		outputStatusReporting bool
 		expected              runtime.ComponentComponentState
-		err                   string
 	}{
 		{
 			name:                  "output status reporting enabled - healthy exporter",
@@ -816,16 +815,11 @@ func TestOutputStatus(t *testing.T) {
 			}
 
 			result, err := getComponentState(tt.status, comp)
-			if tt.err != "" {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.err)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tt.expected.Component.ID, result.Component.ID)
-				assert.Equal(t, tt.expected.State.State, result.State.State)
-				assert.Equal(t, len(tt.expected.State.Units), len(result.State.Units))
-				assert.Equal(t, tt.expected.State.Units, result.State.Units)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected.Component.ID, result.Component.ID)
+			assert.Equal(t, tt.expected.State.State, result.State.State)
+			assert.Equal(t, len(tt.expected.State.Units), len(result.State.Units))
+			assert.Equal(t, tt.expected.State.Units, result.State.Units)
 		})
 	}
 }
