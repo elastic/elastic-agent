@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/go-elasticsearch/v8"
 
 	"github.com/gofrs/uuid/v5"
@@ -1355,13 +1356,14 @@ func setStrictMapping(client *elasticsearch.Client, index string) error {
 // re-ingest logs.
 //
 // Flow
-// 1) Create policy in Kibana with just monitoring and download it
-// 2) Install with monitoring with "process" runtime
-// 3) restart agent, to roll log files
-// 4) Switch to monitoring "otel" runtime
-// 5) restart agent 3 times, making sure healthy between restarts
-// 6) query ES for monitoring logs with aggregation on fingerprint and line number, should be 0 duplicates
-// 7) uninstall
+//  1. Create policy in Kibana with just monitoring and "process" runtime
+//  2. Install and Enroll
+//  3. Switch to monitoring "otel" runtime
+//  4. restart agent 3 times, making sure healthy between restarts
+//  5. switch back to "process" runtime
+//  6. query ES for monitoring logs with aggregation on fingerprint and line number,
+//     ideally 0 duplicates but possible to have a small number
+//  7. uninstall
 func TestMonitoringNoDuplicates(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: integration.Default,
@@ -1375,96 +1377,61 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 		Sudo:  true,
 	})
 
-	installOpts := atesting.InstallOpts{
-		NonInteractive: true,
-		Privileged:     true,
-		Force:          true,
-		Develop:        true,
-	}
-
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t,
+		context.Background(),
+		time.Now().Add(5*time.Minute))
 	t.Cleanup(cancel)
 
-	policyCtx, policyCancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
-	t.Cleanup(policyCancel)
-
+	policyName := fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String())
 	createPolicyReq := kibana.AgentPolicy{
-		Name:        fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String()),
+		Name:        policyName,
 		Namespace:   info.Namespace,
 		Description: fmt.Sprintf("%s policy", t.Name()),
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
 			kibana.MonitoringEnabledLogs,
 			kibana.MonitoringEnabledMetrics,
 		},
+		Overrides: map[string]any{
+			"agent": map[string]any{
+				"monitoring": map[string]any{
+					"_runtime_experimental": "process",
+				},
+			},
+		},
 	}
-	policyResponse, err := info.KibanaClient.CreatePolicy(policyCtx, createPolicyReq)
+	policyResponse, err := info.KibanaClient.CreatePolicy(ctx, createPolicyReq)
 	require.NoError(t, err, "error creating policy")
 
-	downloadURL := fmt.Sprintf("/api/fleet/agent_policies/%s/download", policyResponse.ID)
-	resp, err := info.KibanaClient.Connection.SendWithContext(policyCtx, http.MethodGet, downloadURL, nil, nil, nil)
-	require.NoError(t, err, "error downloading policy")
-	policyBytes, err := io.ReadAll(resp.Body)
-	require.NoError(t, err, "error reading policy response")
-	defer resp.Body.Close()
-
-	apiKeyResponse, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "failed to get api key")
-	require.True(t, len(apiKeyResponse.Encoded) > 1, "api key is invalid %q", apiKeyResponse)
-	apiKey, err := getDecodedApiKey(apiKeyResponse)
-	require.NoError(t, err, "error decoding api key")
-
-	type PolicyOutputs struct {
-		Type   string   `yaml:"type"`
-		Hosts  []string `yaml:"hosts"`
-		Preset string   `yaml:"preset"`
-		ApiKey string   `yaml:"api_key"`
-	}
-	type PolicyStruct struct {
-		ID                string                   `yaml:"id"`
-		Revision          int                      `yaml:"revision"`
-		Outputs           map[string]PolicyOutputs `yaml:"outputs"`
-		Fleet             map[string]any           `yaml:"fleet"`
-		OutputPermissions map[string]any           `yaml:"output_permissions"`
-		Agent             struct {
-			Monitoring map[string]any `yaml:"monitoring"`
-			Rest       map[string]any `yaml:",inline"`
-		} `yaml:"agent"`
-		Inputs           []map[string]any `yaml:"inputs"`
-		Signed           map[string]any   `yaml:"signed"`
-		SecretReferences []map[string]any `yaml:"secret_references"`
-		Namespaces       []string         `yaml:"namespaces"`
-	}
-
-	policy := PolicyStruct{}
-	err = yaml.Unmarshal(policyBytes, &policy)
-	require.NoError(t, err, "error unmarshalling policy: %s", string(policyBytes))
-	d, prs := policy.Outputs["default"]
-	require.True(t, prs, "default must be in outputs")
-	d.ApiKey = string(apiKey)
-	policy.Outputs["default"] = d
-	policy.Agent.Monitoring["_runtime_experimental"] = "process"
-
-	updatedPolicyBytes, err := yaml.Marshal(policy)
-	require.NoErrorf(t, err, "error marshalling policy, struct was %v", policy)
-	t.Cleanup(func() {
-		if t.Failed() {
-			t.Logf("policy was %s", string(updatedPolicyBytes))
-		}
-	})
+	enrollmentToken, err := info.KibanaClient.CreateEnrollmentAPIKey(ctx,
+		kibana.CreateEnrollmentAPIKeyRequest{
+			PolicyID: policyResponse.ID,
+		})
 
 	fut, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
+
 	err = fut.Prepare(ctx)
 	require.NoError(t, err)
-	err = fut.Configure(ctx, updatedPolicyBytes)
-	require.NoError(t, err)
-	combinedOutput, err := fut.InstallWithoutEnroll(ctx, &installOpts)
-	require.NoErrorf(t, err, "error install without enroll: %s\ncombinedoutput:\n%s", err, string(combinedOutput))
 
-	// store timestamp to filter otel docs with timestamp greater than this value
+	fleetServerURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
+	require.NoError(t, err, "failed getting Fleet Server URL")
+
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Privileged:     true,
+		Force:          true,
+		EnrollOpts: atesting.EnrollOpts{
+			URL:             fleetServerURL,
+			EnrollmentToken: enrollmentToken.APIKey,
+		},
+	}
+	combinedOutput, err := fut.Install(ctx, &installOpts)
+	require.NoErrorf(t, err, "error install with enroll: %s\ncombinedoutput:\n%s", err, string(combinedOutput))
+
+	// store timestamp to filter duplicate docs with timestamp greater than this value
 	installTimestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
-	healthcheck := func(ctx context.Context, message string, runtime component.RuntimeManager, componentCount int, timestamp string) {
+	healthCheck := func(ctx context.Context, message string, runtime component.RuntimeManager, componentCount int, timestamp string) {
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
 			var statusErr error
 			status, statusErr := fut.ExecStatus(ctx)
@@ -1501,56 +1468,94 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 	}
 
 	// make sure running and logs are making it to ES
-	healthcheck(ctx, "control checkin v2 protocol has chunking enabled", component.ProcessRuntimeManager, 3, installTimestamp)
-
-	// restart process monitoring, gives us multiple files to track in registry
-	restartTimestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
-	restartBytes, err := fut.Exec(ctx, []string{"restart"})
-	require.NoErrorf(t, err, "Restart error: %s, output was: %s", err, string(restartBytes))
-	healthcheck(ctx, "control checkin v2 protocol has chunking enabled", component.ProcessRuntimeManager, 3, restartTimestamp)
-
-	// turn off monitoring
-	policy.Agent.Monitoring["enabled"] = false
-	updatedPolicyBytes, err = yaml.Marshal(policy)
-	require.NoErrorf(t, err, "error marshalling policy, struct was %v", policy)
-	err = fut.Configure(ctx, updatedPolicyBytes)
-	require.NoError(t, err)
-
-	// restart to make sure beat processes have exited
-	restartBytes, err = fut.Exec(ctx, []string{"restart"})
-	require.NoErrorf(t, err, "Restart error: %s, output was: %s", err, string(restartBytes))
-
-	// make sure agent is running. with no processes.
-	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		var statusErr error
-		status, statusErr := fut.ExecStatus(ctx)
-		assert.NoError(collect, statusErr)
-		assertBeatsHealthy(collect, &status, component.ProcessRuntimeManager, 0)
-	}, 1*time.Minute, 1*time.Second)
+	healthCheck(ctx,
+		"control checkin v2 protocol has chunking enabled",
+		component.ProcessRuntimeManager,
+		3,
+		installTimestamp)
 
 	// Switch to otel monitoring
-	policy.Agent.Monitoring["enabled"] = true
-	policy.Agent.Monitoring["_runtime_experimental"] = "otel"
-	updatedPolicyBytes, err = yaml.Marshal(policy)
-	require.NoErrorf(t, err, "error marshalling policy, struct was %v", policy)
-	err = fut.Configure(ctx, updatedPolicyBytes)
+	otelMonUpdateReq := kibana.AgentPolicyUpdateRequest{
+		Name:      policyName,
+		Namespace: info.Namespace,
+		Overrides: map[string]any{
+			"agent": map[string]any{
+				"monitoring": map[string]any{
+					"_runtime_experimental": "otel",
+				},
+			},
+		},
+	}
+
+	otelMonResp, err := info.KibanaClient.UpdatePolicy(ctx,
+		policyResponse.ID, otelMonUpdateReq)
 	require.NoError(t, err)
 
-	// make sure running and logs are making it to ES
 	otelTimestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
-	healthcheck(ctx, "Everything is ready. Begin running and processing data.", component.OtelRuntimeManager, 4, otelTimestamp)
+
+	// wait until policy is applied
+	policyCheck := func(expectedRevision int) {
+		require.Eventually(t, func() bool {
+			inspectOutput, err := fut.ExecInspect(ctx)
+			require.NoError(t, err)
+			return expectedRevision == inspectOutput.Revision
+		}, 3*time.Minute, 1*time.Second)
+	}
+	policyCheck(otelMonResp.Revision)
+
+	// make sure running and logs are making it to ES
+	healthCheck(ctx,
+		"Everything is ready. Begin running and processing data.",
+		component.OtelRuntimeManager,
+		4,
+		otelTimestamp)
 
 	// restart 3 times, checks path definition is stable
 	for range 3 {
 		restartTimestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 		restartBytes, err := fut.Exec(ctx, []string{"restart"})
-		require.NoErrorf(t, err, "Restart error: %s, output was: %s", err, string(restartBytes))
-		healthcheck(ctx, "Everything is ready. Begin running and processing data.", component.OtelRuntimeManager, 4, restartTimestamp)
+		require.NoErrorf(t,
+			err,
+			"Restart error: %s, output was: %s",
+			err,
+			string(restartBytes))
+		healthCheck(ctx,
+			"Everything is ready. Begin running and processing data.",
+			component.OtelRuntimeManager,
+			4,
+			restartTimestamp)
 	}
 
+	// Switch back to process monitoring
+	processMonUpdateReq := kibana.AgentPolicyUpdateRequest{
+		Name:      policyName,
+		Namespace: info.Namespace,
+		Overrides: map[string]any{
+			"agent": map[string]any{
+				"monitoring": map[string]any{
+					"_runtime_experimental": "process",
+				},
+			},
+		},
+	}
+
+	processMonResp, err := info.KibanaClient.UpdatePolicy(ctx,
+		policyResponse.ID, processMonUpdateReq)
+	require.NoError(t, err)
+
+	processTimestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+
+	// wait until policy is applied
+	policyCheck(processMonResp.Revision)
+
+	// make sure running and logs are making it to ES
+	healthCheck(ctx,
+		"control checkin v2 protocol has chunking enabled",
+		component.ProcessRuntimeManager,
+		3,
+		processTimestamp)
+
 	// duplicate check
-	dupCtx, dupCancel := context.WithTimeout(ctx, 10*time.Second)
-	defer dupCancel()
 	rawQuery := map[string]any{
 		"runtime_mappings": map[string]any{
 			"log.offset": map[string]any{
@@ -1573,6 +1578,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 		"aggs": map[string]any{
 			"duplicates": map[string]any{
 				"multi_terms": map[string]any{
+					"size":          500,
 					"min_doc_count": 2,
 					"terms": []map[string]any{
 						{"field": "log.file.fingerprint"},
@@ -1592,12 +1598,13 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 		es.Search.WithSize(0),
 		es.Search.WithBody(&buf),
 		es.Search.WithPretty(),
-		es.Search.WithContext(dupCtx),
+		es.Search.WithContext(ctx),
 	)
 	require.NoError(t, err)
 	require.Falsef(t, (res.StatusCode >= http.StatusMultipleChoices || res.StatusCode < http.StatusOK), "status should be 2xx was: %d", res.StatusCode)
 	resultBuf, err := io.ReadAll(res.Body)
 	require.NoError(t, err)
+
 	aggResults := map[string]any{}
 	err = json.Unmarshal(resultBuf, &aggResults)
 	aggs, ok := aggResults["aggregations"].(map[string]any)
@@ -1606,7 +1613,15 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 	require.Truef(t, ok, "'duplicates' wasn't a map[string]any, result was %s", string(resultBuf))
 	buckets, ok := dups["buckets"].([]any)
 	require.Truef(t, ok, "'buckets' wasn't a []any, result was %s", string(resultBuf))
-	require.Equalf(t, 0, len(buckets), "buckets contained duplicates, result was %s", string(resultBuf))
+
+	hits, ok := aggResults["hits"].(map[string]any)
+	require.Truef(t, ok, "'hits' wasn't a map[string]any, result was %s", string(resultBuf))
+	total, ok := hits["total"].(map[string]any)
+	require.Truef(t, ok, "'total' wasn't a map[string]any, result was %s", string(resultBuf))
+	value, ok := total["value"].(float64)
+	require.Truef(t, ok, "'total' wasn't an int, result was %s", string(resultBuf))
+
+	require.Equalf(t, 0, len(buckets), "len(buckets): %d, hits.total.value: %d, result was %s", len(buckets), value, string(resultBuf))
 
 	// Uninstall
 	combinedOutput, err = fut.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
