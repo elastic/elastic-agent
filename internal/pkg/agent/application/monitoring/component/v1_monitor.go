@@ -951,7 +951,7 @@ func processorsForAgentFilestream() []any {
 		// drop event logs
 		dropEventLogs(),
 		// drop potential sensitive fields emitted by elasticsearch exporter logs
-		dropElasticSearchExporterLogs(),
+		dropSensitiveFieldsFromElasticSearchExporterLogs(),
 	}
 	// if the event is from a component, use the component's dataset
 	processors = append(processors, useComponentDatasetProcessors()...)
