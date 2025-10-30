@@ -1,4 +1,4 @@
-version: 9.2.0+build202510291733
+version: 9.2.0+build202510300150
 entries:
     - kind: bug-fix
       summary: Fix EDOT -> mOTLP onboarding configuration.
