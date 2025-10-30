@@ -16,6 +16,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 
 	"go.opentelemetry.io/collector/component/componentstatus"
 
@@ -850,6 +851,22 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 			return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
 		}
 
+		if errors.Is(err, upgrade.ErrNoRollbacksAvailable) && action != nil && release.VersionWithSnapshot() == action.Data.Version {
+			// when manually rolling back the action store is not copied back, so it's likely that the rolled back agent
+			// will receive (again) the rollback action because it's using an ackToken from before the rollback action
+			// was received by the "upgraded" elastic-agent.
+			// This block here is to avoid setting an error state because the rollback requested no longer exist after
+			// having performed the rollback once.
+			// A better test would be to compare actionIDs but there's no way to persist the actionID of the rollback action
+			// from the upgraded agent to the rolled back agent (upgrade details is reset when the upgrade marker is deleted)
+			c.logger.Infow(
+				"Received a rollback action with the same version as current and no rollbacks available, ignoring the likely replayed action",
+				"action_id", action.ID())
+			c.ClearOverrideState()
+			det.SetState(details.StateRollback)
+			return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
+		}
+
 		c.logger.Errorw("upgrade failed", "error", logp.Error(err))
 		// If ErrInsufficientDiskSpace is in the error chain, we want to set the
 		// the error to ErrInsufficientDiskSpace so that the error message is
@@ -861,10 +878,17 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		det.Fail(err)
 		return err
 	}
+
 	if cb != nil {
 		det.SetState(details.StateRestarting)
 		c.ReExec(cb)
 	}
+
+	if uOpts.rollback {
+		// Ack the rollback action, since there's no restart callback returned, this is still run
+		return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
+	}
+
 	return nil
 }
 
