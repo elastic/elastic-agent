@@ -2,6 +2,12 @@
 source .buildkite/scripts/common.sh
 set +euo pipefail
 
+echo "--- Install dependencies"
+# See https://github.com/tailscale/go-cache-plugin
+go install github.com/tailscale/go-cache-plugin/cmd/go-cache-plugin@latest
+export GOCACHEPROG="go-cache-plugin -c 512 -u 48 -v --cache-dir=/tmp/gocache --bucket=elastic-agent-ci-go-cache --region=us-east-1"
+go-cache-plugin version
+
 echo "--- Unit tests"
 RACE_DETECTOR=true TEST_COVERAGE=true mage unitTest
 TESTS_EXIT_STATUS=$?
