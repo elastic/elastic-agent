@@ -488,8 +488,7 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentInfo
 		"streams":    streams,
 	}
 
-	// Make sure we don't set anything until the configuration is stable if the otel manager isn't enabled
-	if b.config.C.RuntimeManager != monitoringCfg.DefaultRuntimeManager {
+	if b.config.C.RuntimeManager == monitoringCfg.OtelRuntimeManager {
 		input["_runtime_experimental"] = b.config.C.RuntimeManager
 	}
 
@@ -583,7 +582,7 @@ func (b *BeatsMonitor) injectMetricsInput(
 	}
 
 	// Make sure we don't set anything until the configuration is stable if the otel manager isn't enabled
-	if b.config.C.RuntimeManager != monitoringCfg.DefaultRuntimeManager {
+	if b.config.C.RuntimeManager == monitoringCfg.OtelRuntimeManager {
 		for _, input := range inputs {
 			inputMap := input.(map[string]interface{})
 			if _, found := inputMap["_runtime_experimental"]; !found {
@@ -949,6 +948,8 @@ func processorsForAgentFilestream() []any {
 		dropPeriodicMetricsLogsProcessor(),
 		// drop event logs
 		dropEventLogs(),
+		// drop potential sensitive fields emitted by elasticsearch exporter logs
+		dropSensitiveFieldsFromElasticSearchExporterLogs(),
 	}
 	// if the event is from a component, use the component's dataset
 	processors = append(processors, useComponentDatasetProcessors()...)
@@ -1183,6 +1184,20 @@ func dropFieldsProcessor(fields []any, ignoreMissing bool) map[string]any {
 		"drop_fields": map[string]interface{}{
 			"fields":         fields,
 			"ignore_missing": ignoreMissing,
+		},
+	}
+}
+
+// dropElasticSearchExporterLogs returns a processor which drops fields from logs emitted by elasticsearch exporter,  that may contain sensitive data.
+func dropSensitiveFieldsFromElasticSearchExporterLogs() map[string]any {
+	return map[string]interface{}{
+		"drop_fields": map[string]interface{}{
+			"fields": []any{"error.reason"},
+			"when": map[string]interface{}{
+				"contains": map[string]interface{}{
+					"message": "failed to index document", // this message come from ES exporter
+				},
+			},
 		},
 	}
 }
