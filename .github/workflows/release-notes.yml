@@ -11,7 +11,8 @@ on:
         description: 'Version to be released (for example, `9.2.1`)'
         type: string
         required: true
-
+permissions:
+  contents: read
 env:
   product: Elastic Agent
   labels: docs,forwardport-main,release,skip-changelog,Team:Docs
@@ -28,9 +29,11 @@ jobs:
       - name: Generate release notes
         run: |
           GOBIN=$PWD/bin go install github.com/elastic/elastic-agent-changelog-tool@latest
-          ./bin/elastic-agent-changelog-tool build --version ${{ inputs.version }}
+          ./bin/elastic-agent-changelog-tool build --version "${VERSION}"
           ./bin/elastic-agent-changelog-tool cleanup
-          ./bin/elastic-agent-changelog-tool render --version ${{ inputs.version }}
+          ./bin/elastic-agent-changelog-tool render --version "${VERSION}"
+        env:
+          VERSION: ${{ inputs.version }}
       - name: Get minor
         id: get-minor
         uses: actions/github-script@v8
@@ -38,7 +41,7 @@ jobs:
           script: return "${{ inputs.version }}".replace(/^(\d+\.\d+).+$/m, "$1")
           result-encoding: string
       - name: Open PR
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e #v7.0.8
         with:
           commit-message: add the ${{ inputs.version }} ${{ env.product }} release notes
           branch: ${{ inputs.version }}-release-notes
