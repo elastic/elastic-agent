@@ -33,6 +33,19 @@ inputs:
         when:
           regexp:
             message: ^Non-zero metrics in the last
+<<<<<<< HEAD:internal/pkg/agent/application/monitoring/testdata/monitoring_config_full_otel.yaml
+=======
+    - drop_event:
+        when:
+          equals:
+            log.type: event
+    - drop_fields:
+        fields:
+        - error.reason
+        when:
+          contains:
+            message: failed to index document
+>>>>>>> d4dc1c787 (Enable `include_source_on_error` on elasticsearch exporter (#10894)):internal/pkg/agent/application/monitoring/component/testdata/monitoring_config_full_otel.yaml
     - copy_fields:
         fields:
         - from: data_stream.dataset
