@@ -178,6 +178,12 @@ type Component struct {
 
 	// Component-level configuration
 	Component *proto.Component `yaml:"component,omitempty"`
+
+	OutputStatusReporting *StatusReporting `yaml:"-"`
+}
+
+type StatusReporting struct {
+	Enabled bool
 }
 
 func (c Component) MarshalYAML() (interface{}, error) {
@@ -425,15 +431,16 @@ func (r *RuntimeSpecs) componentsForInputType(
 				// Populate the output units for this component
 				units = append(units, unitForOutput(output, componentID))
 				components = append(components, Component{
-					ID:             componentID,
-					Err:            componentErr,
-					InputSpec:      &inputSpec,
-					InputType:      inputType,
-					OutputType:     output.outputType,
-					Units:          units,
-					RuntimeManager: runtimeManager,
-					Features:       featureFlags.AsProto(),
-					Component:      componentConfig.AsProto(),
+					ID:                    componentID,
+					Err:                   componentErr,
+					InputSpec:             &inputSpec,
+					InputType:             inputType,
+					OutputType:            output.outputType,
+					Units:                 units,
+					RuntimeManager:        runtimeManager,
+					Features:              featureFlags.AsProto(),
+					Component:             componentConfig.AsProto(),
+					OutputStatusReporting: extractStatusReporting(output.config),
 				})
 			}
 		}
@@ -454,15 +461,16 @@ func (r *RuntimeSpecs) componentsForInputType(
 				// each component gets its own output, because of unit isolation
 				units = append(units, unitForOutput(output, componentID))
 				components = append(components, Component{
-					ID:             componentID,
-					Err:            componentErr,
-					InputSpec:      &inputSpec,
-					InputType:      inputType,
-					OutputType:     output.outputType,
-					Units:          units,
-					RuntimeManager: input.runtimeManager,
-					Features:       featureFlags.AsProto(),
-					Component:      componentConfig.AsProto(),
+					ID:                    componentID,
+					Err:                   componentErr,
+					InputSpec:             &inputSpec,
+					InputType:             inputType,
+					OutputType:            output.outputType,
+					Units:                 units,
+					RuntimeManager:        input.runtimeManager,
+					Features:              featureFlags.AsProto(),
+					Component:             componentConfig.AsProto(),
+					OutputStatusReporting: extractStatusReporting(output.config),
 				})
 			}
 		}
@@ -893,4 +901,27 @@ func stringToLogLevel(val string) (client.UnitLogLevel, error) {
 		return client.UnitLogLevelTrace, nil
 	}
 	return client.UnitLogLevelError, fmt.Errorf("unknown log level type: %s", val)
+}
+
+func extractStatusReporting(cfg map[string]interface{}) *StatusReporting {
+	const statusReportingKey = "status_reporting"
+	srRaw, ok := cfg[statusReportingKey]
+	if !ok {
+		return nil
+	}
+	srMap, ok := srRaw.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	enabledRaw, ok := srMap["enabled"]
+	if !ok {
+		return nil
+	}
+	enabled, ok := enabledRaw.(bool)
+	if !ok {
+		return nil
+	}
+	return &StatusReporting{
+		Enabled: enabled,
+	}
 }
