@@ -524,10 +524,7 @@ func translateEsOutputToExporter(cfg *config.C, logger *logp.Logger) (map[string
 	// we also want to use dynamic log ids
 	esConfig["logs_dynamic_id"] = map[string]any{"enabled": true}
 
-	// logs failed documents at debug level
-	esConfig["telemetry"] = map[string]any{
-		"log_failed_docs_input": true,
-	}
+	esConfig["include_source_on_error"] = true
 
 	return esConfig, nil
 }
