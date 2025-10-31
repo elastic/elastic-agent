@@ -60,7 +60,8 @@ linters:
         - github.com/insomniacslk/dhcp
         - github.com/meraki/dashboard-api-go/v3
         - go.opentelemetry.io/otel/exporters/prometheus
-      replace-local: false
+        - github.com/elastic/elastic-agent/internal/edot
+      replace-local: true
     gomodguard:
       blocked:
         modules:

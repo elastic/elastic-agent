@@ -34,14 +34,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.org/x/sync/errgroup"
+	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
+
+	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/otiai10/copy"
 
 	"github.com/elastic/elastic-agent/dev-tools/devmachine"
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
-	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
 	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
 	"github.com/elastic/elastic-agent/dev-tools/packaging"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
@@ -71,10 +73,9 @@ import (
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
 
-	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	filecopy "github.com/otiai10/copy"
+	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
 
 	"helm.sh/helm/v3/pkg/action"
@@ -322,6 +323,7 @@ func GolangCrossBuildOSS() error {
 func GolangCrossBuild() error {
 	params := devtools.DefaultGolangCrossBuildArgs()
 	params.OutputDir = "build/golang-crossbuild"
+	params.Package = "github.com/elastic/elastic-agent"
 	injectBuildVars(params.Vars)
 
 	if err := devtools.GolangCrossBuild(params); err != nil {
@@ -425,12 +427,7 @@ func (Build) TestBinaries() error {
 		}
 
 		outputName := filepath.Join(pkg, binary)
-
-		finalArgs := make([]string, len(args))
-		copy(finalArgs, args)
-		finalArgs = append(finalArgs, "-o", outputName, filepath.Join(pkg))
-
-		err := RunGo(finalArgs...)
+		err := devtools.Run(nil, nil, os.Stderr, "go", pkg, "build", "-v", "-o", outputName, pkg)
 		if err != nil {
 			return err
 		}
@@ -1806,8 +1803,8 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestURL string, versio
 
 		log.Printf("copying %q to %q", srcBinaryPath, dstBinaryPath)
 
-		err = filecopy.Copy(srcBinaryPath, dstBinaryPath, filecopy.Options{
-			PermissionControl: filecopy.PerservePermission,
+		err = copy.Copy(srcBinaryPath, dstBinaryPath, copy.Options{
+			PermissionControl: copy.PerservePermission,
 		})
 		if err != nil {
 			return fmt.Errorf("copying %q to %q: %w", srcBinaryPath, dstBinaryPath, err)
@@ -3626,7 +3623,7 @@ func (Otel) Readme() error {
 		return fmt.Errorf("failed to parse README template: %w", err)
 	}
 
-	data, err := otel.GetOtelDependencies("go.mod")
+	data, err := otel.GetOtelDependencies(filepath.Join("internal", "edot", "go.mod"))
 	if err != nil {
 		return fmt.Errorf("Failed to get OTel dependencies: %w", err)
 	}
