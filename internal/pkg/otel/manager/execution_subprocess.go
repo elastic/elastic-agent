@@ -79,7 +79,7 @@ type subprocessExecution struct {
 
 // startCollector starts a supervised collector and monitors its health. Process exit errors are sent to the
 // processErrCh channel. Other run errors, such as not able to connect to the health endpoint, are sent to the runErrCh channel.
-func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger.Logger, cfg *confmap.Conf, processErrCh chan error, statusCh chan *status.AggregateStatus) (collectorHandle, error) {
+func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger.Logger, cfg *confmap.Conf, processErrCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatus chan struct{}) (collectorHandle, error) {
 	if cfg == nil {
 		// configuration is required
 		return nil, errors.New("no configuration provided")
@@ -160,7 +160,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 		defer maxFailuresTimer.Stop()
 
 		// check the health of the collector every 10 seconds
-		const healthCheckPollDuration = 10 * time.Second
+		const healthCheckPollDuration = 1 * time.Second
 		healthCheckPollTimer := time.NewTimer(healthCheckPollDuration)
 		defer healthCheckPollTimer.Stop()
 		for {
@@ -175,7 +175,10 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 			} else {
 				maxFailuresTimer.Reset(maxFailuresDuration)
 				removeManagedHealthCheckExtensionStatus(statuses, r.healthCheckExtensionID)
-				r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
+				if !compareStatuses(currentStatus, statuses) {
+					currentStatus = statuses
+					r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
+				}
 			}
 
 			select {
@@ -183,6 +186,8 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 				// after the collector exits, we need to report a nil status
 				r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
 				return
+			case <-forceFetchStatus:
+				r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
 			case <-healthCheckPollTimer.C:
 				healthCheckPollTimer.Reset(healthCheckPollDuration)
 			case <-maxFailuresTimer.C:

@@ -589,18 +589,31 @@ func TestOtelStatusToUnitState(t *testing.T) {
 
 func TestOutputStatus(t *testing.T) {
 	baseComp := component.Component{
-		ID:             "test-component",
+		ID:             "filestream-default",
+		InputType:      "filestream",
+		OutputType:     "elasticsearch",
 		RuntimeManager: component.OtelRuntimeManager,
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "agentbeat",
+			Spec: component.InputSpec{
+				Command: &component.CommandSpec{
+					Args: []string{"filebeat"},
+				},
+			},
+		},
 		Units: []component.Unit{
 			{
-				ID:   "input-1",
+				ID:   "filestream-unit",
 				Type: client.UnitTypeInput,
 				Config: &proto.UnitExpectedConfig{
-					Streams: []*proto.Stream{{Id: "stream-1"}},
+					Streams: []*proto.Stream{
+						{Id: "test-1"},
+						{Id: "test-2"},
+					},
 				},
 			},
 			{
-				ID:   "output-1",
+				ID:   "filestream-default",
 				Type: client.UnitTypeOutput,
 			},
 		},
@@ -618,11 +631,16 @@ func TestOutputStatus(t *testing.T) {
 			status: &status.AggregateStatus{
 				Event: componentstatus.NewEvent(componentstatus.StatusOK),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
-					fmt.Sprintf("receiver:filebeat/%sinput-1", OtelNamePrefix): {
+					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
-					},
-					fmt.Sprintf("exporter:elasticsearch/%soutput-1", OtelNamePrefix): {
-						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							fmt.Sprintf("receiver:filebeat/%sfilestream-unit", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+						},
 					},
 				},
 			},
@@ -640,19 +658,23 @@ func TestOutputStatus(t *testing.T) {
 						},
 					},
 					Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
-						{UnitID: "input-1", UnitType: client.UnitTypeInput}: {
+						{UnitID: "filestream-unit", UnitType: client.UnitTypeInput}: {
 							State:   client.UnitStateHealthy,
 							Message: "Healthy",
 							Payload: map[string]any{
 								"streams": map[string]map[string]string{
-									"stream-1": {
+									"test-1": {
 										"error":  "",
-										"status": client.UnitStateHealthy.String(),
+										"status": "HEALTHY",
+									},
+									"test-2": {
+										"error":  "",
+										"status": "HEALTHY",
 									},
 								},
 							},
 						},
-						{UnitID: "output-1", UnitType: client.UnitTypeOutput}: {
+						{UnitID: "filestream-default", UnitType: client.UnitTypeOutput}: {
 							State:   client.UnitStateHealthy,
 							Message: "Healthy",
 						},
@@ -666,11 +688,16 @@ func TestOutputStatus(t *testing.T) {
 			status: &status.AggregateStatus{
 				Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
-					fmt.Sprintf("receiver:filebeat/%sinput-1", OtelNamePrefix): {
-						Event: componentstatus.NewEvent(componentstatus.StatusOK),
-					},
-					fmt.Sprintf("exporter:elasticsearch/%soutput-1", OtelNamePrefix): {
+					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							fmt.Sprintf("receiver:filebeat/%sfilestream-unit", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+							},
+						},
 					},
 				},
 			},
@@ -688,21 +715,25 @@ func TestOutputStatus(t *testing.T) {
 						},
 					},
 					Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
-						{UnitID: "input-1", UnitType: client.UnitTypeInput}: {
+						{UnitID: "filestream-unit", UnitType: client.UnitTypeInput}: {
 							State:   client.UnitStateHealthy,
 							Message: "Healthy",
 							Payload: map[string]any{
 								"streams": map[string]map[string]string{
-									"stream-1": {
+									"test-1": {
 										"error":  "",
-										"status": client.UnitStateHealthy.String(),
+										"status": "HEALTHY",
+									},
+									"test-2": {
+										"error":  "",
+										"status": "HEALTHY",
 									},
 								},
 							},
 						},
-						{UnitID: "output-1", UnitType: client.UnitTypeOutput}: {
+						{UnitID: "filestream-default", UnitType: client.UnitTypeOutput}: {
 							State:   client.UnitStateDegraded,
-							Message: client.UnitStateDegraded.String(),
+							Message: "DEGRADED",
 						},
 					},
 				},
@@ -714,11 +745,16 @@ func TestOutputStatus(t *testing.T) {
 			status: &status.AggregateStatus{
 				Event: componentstatus.NewEvent(componentstatus.StatusOK),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
-					fmt.Sprintf("receiver:filebeat/%sinput-1", OtelNamePrefix): {
+					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
-					},
-					fmt.Sprintf("exporter:elasticsearch/%soutput-1", OtelNamePrefix): {
-						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							fmt.Sprintf("receiver:filebeat/%sfilestream-unit", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+						},
 					},
 				},
 			},
@@ -736,19 +772,23 @@ func TestOutputStatus(t *testing.T) {
 						},
 					},
 					Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
-						{UnitID: "input-1", UnitType: client.UnitTypeInput}: {
+						{UnitID: "filestream-unit", UnitType: client.UnitTypeInput}: {
 							State:   client.UnitStateHealthy,
 							Message: "Healthy",
 							Payload: map[string]any{
 								"streams": map[string]map[string]string{
-									"stream-1": {
+									"test-1": {
 										"error":  "",
-										"status": client.UnitStateHealthy.String(),
+										"status": "HEALTHY",
+									},
+									"test-2": {
+										"error":  "",
+										"status": "HEALTHY",
 									},
 								},
 							},
 						},
-						{UnitID: "output-1", UnitType: client.UnitTypeOutput}: {
+						{UnitID: "filestream-default", UnitType: client.UnitTypeOutput}: {
 							State:   client.UnitStateHealthy,
 							Message: "Healthy",
 						},
@@ -762,11 +802,16 @@ func TestOutputStatus(t *testing.T) {
 			status: &status.AggregateStatus{
 				Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
-					fmt.Sprintf("receiver:filebeat/%sinput-1", OtelNamePrefix): {
-						Event: componentstatus.NewEvent(componentstatus.StatusOK),
-					},
-					fmt.Sprintf("exporter:elasticsearch/%soutput-1", OtelNamePrefix): {
+					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							fmt.Sprintf("receiver:filebeat/%sfilestream-unit", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+							},
+						},
 					},
 				},
 			},
@@ -784,19 +829,23 @@ func TestOutputStatus(t *testing.T) {
 						},
 					},
 					Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
-						{UnitID: "input-1", UnitType: client.UnitTypeInput}: {
+						{UnitID: "filestream-unit", UnitType: client.UnitTypeInput}: {
 							State:   client.UnitStateHealthy,
 							Message: "Healthy",
 							Payload: map[string]any{
 								"streams": map[string]map[string]string{
-									"stream-1": {
+									"test-1": {
 										"error":  "",
-										"status": client.UnitStateHealthy.String(),
+										"status": "HEALTHY",
+									},
+									"test-2": {
+										"error":  "",
+										"status": "HEALTHY",
 									},
 								},
 							},
 						},
-						{UnitID: "output-1", UnitType: client.UnitTypeOutput}: {
+						{UnitID: "filestream-default", UnitType: client.UnitTypeOutput}: {
 							State:   client.UnitStateHealthy,
 							Message: "Healthy",
 						},
@@ -814,7 +863,8 @@ func TestOutputStatus(t *testing.T) {
 				Enabled: tt.outputStatusReporting,
 			}
 
-			result, err := getComponentState(tt.status, comp)
+			status, err := AlterPipelineStatus(tt.status, []component.Component{comp})
+			result, err := getComponentState(status.ComponentStatusMap["pipeline:logs/_agent-component/filestream-default"], comp)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected.Component.ID, result.Component.ID)
 			assert.Equal(t, tt.expected.State.State, result.State.State)

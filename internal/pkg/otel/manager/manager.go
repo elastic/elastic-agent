@@ -204,6 +204,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 	// this channel is buffered because it's possible for the collector to send a status update while the manager is
 	// waiting for the collector to exit
 	collectorStatusCh := make(chan *status.AggregateStatus, 1)
+	forceFetchStatus := make(chan struct{}, 1)
 	for {
 		select {
 		case <-ctx.Done():
@@ -228,7 +229,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 			newRetries := m.recoveryRetries.Add(1)
 			m.logger.Infof("collector recovery restarting, total retries: %d", newRetries)
-			m.proc, err = m.execution.startCollector(ctx, m.baseLogger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh)
+			m.proc, err = m.execution.startCollector(ctx, m.baseLogger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh, forceFetchStatus)
 			if err != nil {
 				reportErr(ctx, m.errCh, err)
 				// reset the restart timer to the next backoff
@@ -260,7 +261,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 				// in this rare case the collector stopped running but a configuration was
 				// provided and the collector stopped with a clean exit
-				m.proc, err = m.execution.startCollector(ctx, m.baseLogger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh)
+				m.proc, err = m.execution.startCollector(ctx, m.baseLogger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh, forceFetchStatus)
 				if err != nil {
 					// failed to create the collector (this is different then
 					// it's failing to run). we do not retry creation on failure
@@ -321,7 +322,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				m.logger.Debugf(
 					"new config hash (%d) is different than the old config hash (%d), applying update",
 					m.mergedCollectorCfgHash, previousConfigHash)
-				applyErr := m.applyMergedConfig(ctx, collectorStatusCh, m.collectorRunErr)
+				applyErr := m.applyMergedConfig(ctx, collectorStatusCh, m.collectorRunErr, forceFetchStatus)
 				// only report the error if we actually apply the update
 				// otherwise, we could override an actual error with a nil in the channel when the collector
 				// state doesn't actually change
@@ -331,6 +332,12 @@ func (m *OTelManager) Run(ctx context.Context) error {
 					"new config hash (%d) is identical to the old config hash (%d), skipping update",
 					m.mergedCollectorCfgHash, previousConfigHash)
 			}
+			// drain the channel first
+			select {
+			case <-forceFetchStatus:
+			default:
+			}
+			forceFetchStatus <- struct{}{}
 
 		case otelStatus := <-collectorStatusCh:
 			err = m.reportOtelStatusUpdate(ctx, otelStatus)
@@ -419,7 +426,7 @@ func injectDiagnosticsExtension(config *confmap.Conf) error {
 	return config.Merge(confmap.NewFromStringMap(extensionCfg))
 }
 
-func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh chan *status.AggregateStatus, collectorRunErr chan error) error {
+func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh chan *status.AggregateStatus, collectorRunErr chan error, forceFetchStatus chan struct{}) error {
 	if m.proc != nil {
 		m.proc.Stop(m.stopTimeout)
 		m.proc = nil
@@ -447,7 +454,7 @@ func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh c
 	} else {
 		// either a new configuration or the first configuration
 		// that results in the collector being started
-		proc, err := m.execution.startCollector(ctx, m.baseLogger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh)
+		proc, err := m.execution.startCollector(ctx, m.baseLogger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatus)
 		if err != nil {
 			// failed to create the collector (this is different then
 			// it's failing to run). we do not retry creation on failure
@@ -525,6 +532,11 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 				delete(otelStatus.ComponentStatusMap, "extensions")
 			}
 		}
+	}
+
+	otelStatus, err := translate.AlterPipelineStatus(otelStatus, m.components)
+	if err != nil {
+		return nil, fmt.Errorf("failed to mute exporter states from otel status: %w", err)
 	}
 
 	// Extract component states from otel status

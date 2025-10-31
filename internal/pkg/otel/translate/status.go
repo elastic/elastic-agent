@@ -90,6 +90,103 @@ func DropComponentStateFromOtelStatus(otelStatus *status.AggregateStatus) (*stat
 	return newStatus, nil
 }
 
+// AlterPipelineStatus modifies the given otel status by muting exporter statuses for muted components.
+// It also updates parent pipeline statuses based on child components.
+func AlterPipelineStatus(
+	otelStatus *status.AggregateStatus,
+	components []component.Component,
+) (*status.AggregateStatus, error) {
+	if otelStatus == nil {
+		return nil, nil
+	}
+
+	newStatus := deepCopyStatus(otelStatus)
+
+	// Mute exporters
+	if err := muteExporters(newStatus, components); err != nil {
+		return nil, err
+	}
+
+	updateStatus(newStatus)
+
+	return newStatus, nil
+}
+
+// updateStatus recursively updates each AggregateStatus.Event
+// based on the statuses of its child components.
+func updateStatus(status *status.AggregateStatus) {
+	if status == nil {
+		return
+	}
+
+	ok := true
+
+	for _, child := range status.ComponentStatusMap {
+		updateStatus(child)
+
+		if child.Event.Status() != componentstatus.StatusOK {
+			ok = false
+		}
+	}
+
+	if len(status.ComponentStatusMap) > 0 {
+		if ok {
+			status.Event = componentstatus.NewEvent(componentstatus.StatusOK)
+		}
+	}
+}
+
+// muteExporters sets all exporter statuses to OK for muted pipelines/components.
+func muteExporters(agg *status.AggregateStatus, components []component.Component) error {
+	for pipelineStatusID, pipelineStatus := range agg.ComponentStatusMap {
+		pipelineID, err := parsePipelineID(pipelineStatusID)
+		if err != nil {
+			return err
+		}
+
+		componentID, found := strings.CutPrefix(pipelineID.Name(), OtelNamePrefix)
+		if !found || !isMuted(componentID, components) {
+			continue
+		}
+
+		// Mute exporters and parent pipeline
+		for compID, compStatus := range pipelineStatus.ComponentStatusMap {
+			kind, _, err := parseEntityStatusId(compID)
+			if err != nil {
+				return err
+			}
+			if kind == "exporter" {
+				compStatus.Event = componentstatus.NewEvent(componentstatus.StatusOK)
+			}
+		}
+	}
+	return nil
+}
+
+// parsePipelineID extracts a *pipeline.ID from a status ID string.
+func parsePipelineID(statusID string) (*pipeline.ID, error) {
+	_, pipelineIDStr, err := parseEntityStatusId(statusID)
+	if err != nil {
+		return nil, err
+	}
+	pID := &pipeline.ID{}
+	if err := pID.UnmarshalText([]byte(pipelineIDStr)); err != nil {
+		return nil, err
+	}
+	return pID, nil
+}
+
+func isMuted(componentID string, components []component.Component) bool {
+	for _, comp := range components {
+		if comp.ID == componentID {
+			if comp.OutputStatusReporting != nil && !comp.OutputStatusReporting.Enabled {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // getOtelRuntimePipelineStatuses finds otel pipeline statuses belonging to runtime components and returns them as a map
 // from component id to pipeline status.
 func getOtelRuntimePipelineStatuses(otelStatus *status.AggregateStatus) (map[string]*status.AggregateStatus, error) {
@@ -130,7 +227,9 @@ func getOtelRuntimePipelineStatuses(otelStatus *status.AggregateStatus) (map[str
 // getComponentState extracts the full status of a component from its respective otel pipeline status.
 func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Component) (runtime.ComponentComponentState, error) {
 	compState := runtime.ComponentState{
-		Units: make(map[runtime.ComponentUnitKey]runtime.ComponentUnitState),
+		State:   otelStatusToUnitState(pipelineStatus.Status()),
+		Message: otelStatusToUnitState(pipelineStatus.Status()).String(),
+		Units:   make(map[runtime.ComponentUnitKey]runtime.ComponentUnitState),
 		VersionInfo: runtime.ComponentVersionInfo{
 			Name: OtelComponentName,
 			Meta: map[string]string{ // mimic what beats return over the control protocol
@@ -160,10 +259,6 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		exporterStatus = slices.Collect(maps.Values(exporterStatuses))[0]
 	}
 
-	pipelineStatus = getPipelineStatus(pipelineStatus, receiverStatus, comp)
-	compState.State = otelStatusToUnitState(pipelineStatus.Status())
-	compState.Message = otelStatusToUnitState(pipelineStatus.Status()).String()
-
 	for _, unit := range comp.Units {
 		unitKey := runtime.ComponentUnitKey{
 			UnitID:   unit.ID,
@@ -186,22 +281,6 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		State:     compState,
 	}
 	return compStatus, nil
-}
-
-// getPipelineStatus determines the final pipeline status based on the receiver status and output status reporting settings.
-// If the receiver is in a non-OK state, the pipeline status is returned as-is.
-// If the output status reporting is disabled, the pipeline status is overridden to StatusOK.
-func getPipelineStatus(pipelineStatus, recevierStatus *status.AggregateStatus, comp component.Component) *status.AggregateStatus {
-	if recevierStatus != nil && recevierStatus.Status() != componentstatus.StatusOK {
-		return pipelineStatus
-	}
-	if comp.OutputStatusReporting != nil && !comp.OutputStatusReporting.Enabled {
-		// If status reporting is disabled for this output, we hard code it to "StatusOK".
-		return &status.AggregateStatus{
-			Event: componentstatus.NewEvent(componentstatus.StatusOK),
-		}
-	}
-	return pipelineStatus
 }
 
 // getUnitOtelStatuses extracts the receiver and exporter status from otel pipeline status.
@@ -227,13 +306,6 @@ func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus, comp component.
 		case "receiver":
 			receiverStatuses[otelComponentID] = otelCompStatus
 		case "exporter":
-			if comp.OutputStatusReporting != nil && !comp.OutputStatusReporting.Enabled {
-				// If status reporting is disabled for this output, we hard code it to "StatusOK".
-				exporterStatuses[otelComponentID] = &status.AggregateStatus{
-					Event: componentstatus.NewEvent(componentstatus.StatusOK),
-				}
-				continue
-			}
 			exporterStatuses[otelComponentID] = otelCompStatus
 		}
 	}
