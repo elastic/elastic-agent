@@ -538,7 +538,7 @@ steps:
     steps:
       - label: ":git: :kubernetes: {{matrix.version}}:amd64:{{matrix.variants}}"
         # Run this step only if we are **not** building a PR (we use all supported k8s versions)
-        if: build.env("BUILDKITE_PULL_REQUEST") == null
+        if: build.pull_request.id == null
         env:
           *k8s_test_env
         command: *k8s_test_command
@@ -563,7 +563,7 @@ steps:
               *k8s_test_versions
       - label: ":open-pull-request: :kubernetes: {{matrix.version}}:amd64:{{matrix.variants}}"
         # Run this step only if we are building a PR (we use only min/max k8s versions)
-        if: build.env("BUILDKITE_PULL_REQUEST") != null
+        if: build.pull_request.id != null
         env:
           *k8s_test_env
         command: *k8s_test_command
