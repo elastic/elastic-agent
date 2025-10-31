@@ -124,7 +124,7 @@ func updateStatus(status *status.AggregateStatus) {
 	for _, child := range status.ComponentStatusMap {
 		updateStatus(child)
 
-		if child.Event.Status() != componentstatus.StatusOK {
+		if child.Status() != componentstatus.StatusOK {
 			ok = false
 		}
 	}
@@ -139,6 +139,10 @@ func updateStatus(status *status.AggregateStatus) {
 // muteExporters sets all exporter statuses to OK for muted pipelines/components.
 func muteExporters(agg *status.AggregateStatus, components []component.Component) error {
 	for pipelineStatusID, pipelineStatus := range agg.ComponentStatusMap {
+		if pipelineStatusID == "extensions" {
+			// we do not want to report extension status
+			continue
+		}
 		pipelineID, err := parsePipelineID(pipelineStatusID)
 		if err != nil {
 			return err

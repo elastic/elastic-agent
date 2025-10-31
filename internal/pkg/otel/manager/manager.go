@@ -328,9 +328,8 @@ func (m *OTelManager) Run(ctx context.Context) error {
 					"new config hash (%d) is identical to the old config hash (%d), skipping update",
 					m.mergedCollectorCfgHash, previousConfigHash)
 			}
-			
-			// there was a config update. Force fetch the latest collector status
 
+			// there was a config update. Force fetch the latest collector status.
 			// drain the channel first
 			select {
 			case <-forceFetchStatus:

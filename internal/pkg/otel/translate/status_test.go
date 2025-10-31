@@ -864,6 +864,7 @@ func TestOutputStatus(t *testing.T) {
 			}
 
 			status, err := AlterPipelineStatus(tt.status, []component.Component{comp})
+			require.NoError(t, err)
 			result, err := getComponentState(status.ComponentStatusMap["pipeline:logs/_agent-component/filestream-default"], comp)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected.Component.ID, result.Component.ID)
