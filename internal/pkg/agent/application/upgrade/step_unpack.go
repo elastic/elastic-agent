@@ -123,7 +123,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string, copy 
 		return UnpackResult{}, fmt.Errorf("retrieving package metadata from %q: %w", archivePath, err)
 	}
 
-	hash = metadata.hash[:hashLen]
+	hash = metadata.hash[:HashLen]
 	var registry map[string][]string
 	if metadata.manifest != nil {
 		pm.mappings = metadata.manifest.Package.PathMappings
@@ -368,7 +368,7 @@ func untar(log *logger.Logger, archivePath, dataDir string, flavor string, copy 
 		return UnpackResult{}, fmt.Errorf("retrieving package metadata from %q: %w", archivePath, err)
 	}
 
-	hash = metadata.hash[:hashLen]
+	hash = metadata.hash[:HashLen]
 	var registry map[string][]string
 
 	if metadata.manifest != nil {
@@ -641,8 +641,8 @@ func readCommitHash(reader io.Reader) (string, error) {
 		return "", fmt.Errorf("reading agent commit hash file: %w", err)
 	}
 	hash := strings.TrimSpace(string(commitBytes))
-	if len(hash) < hashLen {
-		return "", fmt.Errorf("hash %q is shorter than minimum length %d", string(commitBytes), hashLen)
+	if len(hash) < HashLen {
+		return "", fmt.Errorf("hash %q is shorter than minimum length %d", string(commitBytes), HashLen)
 	}
 	return hash, nil
 }
@@ -767,5 +767,5 @@ func getFilesContentFromTar(archivePath string, files ...string) (map[string]io.
 // createVersionedHomeFromHash returns a versioned home path relative to topPath in the legacy format `elastic-agent-<hash>`
 // formatted using OS-dependent path separators
 func createVersionedHomeFromHash(hash string) string {
-	return filepath.Join("data", fmt.Sprintf("elastic-agent-%s", hash[:hashLen]))
+	return filepath.Join("data", fmt.Sprintf("elastic-agent-%s", hash[:HashLen]))
 }
