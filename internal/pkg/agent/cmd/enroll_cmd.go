@@ -176,7 +176,9 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 		enrollDelay,
 		*c.options,
 		c.configStore,
-		c.backoffFactory)
+		c.backoffFactory,
+		-1, // try indefinitely, let user cancel the action
+	)
 	if err != nil {
 		return fmt.Errorf("fail to enroll: %w", err)
 	}

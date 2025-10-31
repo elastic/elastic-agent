@@ -57,6 +57,7 @@ func EnrollWithBackoff(
 	options EnrollOptions,
 	configStore saver,
 	backoffFactory func(done <-chan struct{}) backoff.Backoff,
+	maxRetries int,
 ) error {
 	if backoffFactory == nil {
 		backoffFactory = func(done <-chan struct{}) backoff.Backoff {
@@ -92,9 +93,11 @@ func EnrollWithBackoff(
 	signal := make(chan struct{})
 	defer close(signal)
 	backExp := backoffFactory(signal)
+	retryNo := 0
 
 RETRYLOOP:
 	for {
+		retryNo++
 		switch {
 		case errors.Is(err, fleetapi.ErrTooManyRequests):
 			log.Warn("Too many requests on the remote server, will retry in a moment.")
@@ -102,7 +105,7 @@ RETRYLOOP:
 			log.Warn("Remote server is not ready to accept connections(Connection Refused), will retry in a moment.")
 		case errors.Is(err, fleetapi.ErrTemporaryServerError):
 			log.Warnf("Remote server failed to handle the request(%s), will retry in a moment.", err.Error())
-		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded), err == nil:
+		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded), errors.Is(err, fleetapi.ErrInvalidToken), err == nil, (maxRetries != -1 && retryNo > maxRetries):
 			break RETRYLOOP
 		case err != nil:
 			log.Warnf("Error detected: %s, will retry in a moment.", err.Error())
