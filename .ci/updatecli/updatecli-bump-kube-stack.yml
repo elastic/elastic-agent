@@ -37,6 +37,20 @@ sources:
     spec:
       url: https://open-telemetry.github.io/opentelemetry-helm-charts
       name: opentelemetry-kube-stack
+  current-kube-stack:
+    kind: file
+    spec:
+      file: "testing/integration/k8s/k8s.go"
+      matchpattern: 'KubeStackChartVersion\s*=\s"(.*)"'
+
+conditions:
+  is-new-version:
+    name: Succeeds if the latest OpenTelemetry Kube-Stack Helm Chart version is different than the one in testing/integration/k8s/k8s.go
+    kind: shell
+    disablesourceinput: true
+    scmid: elastic-agent
+    spec:
+      command: '[ {{ source "current-kube-stack" }} != {{ source "opentelemetry-kube-stack-helm" }} ]'
 
 targets:
   update-tested-kube-stack:
@@ -54,6 +68,7 @@ targets:
     dependson:
       - update-tested-kube-stack
     scmid: elastic-agent
+    sourceid: opentelemetry-kube-stack-helm
     kind: shell
     spec:
       command: .ci/scripts/update-integration-testdata.sh
