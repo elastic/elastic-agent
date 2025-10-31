@@ -373,9 +373,9 @@ The server expects incoming HTTP requests to include an API key with sufficient 
 
 ### Secure the connection between the EDOT Collector and Elastic
 
-In addition to securing communication between the {{edot}} SDKs and the `apmconfigextension`, you should secure the connection between the EDOT Collector and Elastic APM or {{es}} endpoints.
+In addition to securing communication between the {{edot}} SDKs and the `apmconfigextension`, you should secure the connection between the EDOT Collector and {{es}} endpoints.
 
-The EDOT Collector uses the `otlphttp/elastic` or `elasticsearch` exporter to send telemetry data to Elastic. Elastic recommends using HTTPS to encrypt the connection and verify the server's certificate.
+The EDOT Collector uses the `elasticsearch/otel` or `elasticsearch/ecs` exporter to send telemetry data to Elastic. Elastic recommends using HTTPS to encrypt the connection and verify the server's certificate.
 
 Example configuration:
 
@@ -386,14 +386,26 @@ exporters:
     api_key: "<your-api-key>"
     tls:
       insecure: false
-      ca_file: "/path/to/elastic-ca.crt"
 ```
 
-This setup encrypts data in transit and verifies the Elastic endpoint certificate.
+This setup encrypts data in transit and uses the system's default set of trusted certificate authorities to verify the Elastic endpoint certificate.
+
+For {{ecloud}}, this is the recommended approach. {{ecloud}} certificates are signed by a public certificate authority (ISRG Root X1, Let's Encrypt), which should already be trusted by your system.
+
+To override the default CA bundle, specify the CA file explicitly:
+
+```yaml
+tls:
+  insecure: false
+  ca_file: "/path/to/elastic-ca.crt"
+```
+:::{note}
+Avoid using the CA certificate provided in the {{ecloud}} console to verify the Elastic endpoint. It is not intended for this purpose and might not work as expected.
+:::
 
 #### Mutual TLS (mTLS)
 
-For self-managed Elastic deployments, you can optionally enable mTLS to authenticate both the Collector and the Elastic endpoint. For example:
+For self-managed Elastic deployments, you can optionally enable mTLS to authenticate both the Collector and the {{es}} endpoint. For example:
 
 ```yaml
 exporters:
@@ -409,4 +421,4 @@ exporters:
 
 mTLS ensures that only authorized collectors can send telemetry data.
 
-For Elastic Cloud and Serverless deployments, mTLS is not required. TLS and API key authentication are enforced automatically.
+For {{ecloud}} and {{serverless-full}} deployments, mTLS is not required. TLS and API key authentication are enforced automatically.
