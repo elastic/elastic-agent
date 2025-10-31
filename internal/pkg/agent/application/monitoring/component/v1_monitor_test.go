@@ -960,16 +960,10 @@ func TestMonitoringConfigForBeatsReceivers(t *testing.T) {
 
 func TestMonitoringWithOtelRuntime(t *testing.T) {
 	for _, tc := range []struct {
-		name           string
-		edotSubprocess bool
+		name string
 	}{
 		{
-			name:           "otel runtime inprocess",
-			edotSubprocess: false,
-		},
-		{
-			name:           "otel runtime subprocess",
-			edotSubprocess: true,
+			name: "otel runtime subprocess",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1002,10 +996,9 @@ func TestMonitoringWithOtelRuntime(t *testing.T) {
 			}
 
 			b := &BeatsMonitor{
-				enabled:                 true,
-				config:                  cfg,
-				agentInfo:               agentInfo,
-				isOtelRuntimeSubprocess: tc.edotSubprocess,
+				enabled:   true,
+				config:    cfg,
+				agentInfo: agentInfo,
 			}
 
 			components := []component.Component{
@@ -1049,11 +1042,7 @@ func TestMonitoringWithOtelRuntime(t *testing.T) {
 					}
 				}
 			}
-			if tc.edotSubprocess {
-				require.True(t, foundEdotSubprocessStream, "edot subprocess stream not found")
-			} else {
-				require.False(t, foundEdotSubprocessStream, "edot subprocess stream found")
-			}
+			require.True(t, foundEdotSubprocessStream, "edot subprocess stream not found")
 		})
 	}
 }
@@ -1128,7 +1117,7 @@ func TestMonitorReload(t *testing.T) {
 	monitorcfg.MonitorLogs = false
 	monitorcfg.MonitorMetrics = false
 
-	beatsMonitor := New(true, "", monitorcfg, nil, false)
+	beatsMonitor := New(true, "", monitorcfg, nil)
 	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, false)
 	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, false)
 
