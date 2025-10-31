@@ -36,7 +36,11 @@ import (
 
 // This is a prefix we add to all names of Otel entities in the configuration. Its purpose is to avoid collisions with
 // user-provided configuration
-const OtelNamePrefix = "_agent-component/"
+const (
+	OtelNamePrefix                      = "_agent-component/"
+	outputOtelOverrideFieldName         = "otel"
+	outputOtelOverrideExporterFieldName = "exporter"
+)
 
 // BeatMonitoringConfigGetter is a function that returns the monitoring configuration for a beat receiver.
 type (
@@ -426,6 +430,9 @@ func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, 
 		return nil, nil, nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
 	}
 
+	// if there's an otel override config, extract it, we'll apply it after the conversion
+	otelOverrideCfgC, err := extractOutputOtelOverrideConfig(outputCfgC)
+
 	// Config translation function can mutate queue settings defined under output config
 	exporterConfig, err := configTranslationFunc(outputCfgC, logger)
 	if err != nil {
@@ -442,6 +449,13 @@ func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, 
 			queueSettings = queue
 		}
 	}
+
+	// if there's an otel override section for the exporter, we should apply it
+	exporterOverrideCfg, err := getOutputOtelOverrideExporterConfig(otelOverrideCfgC)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	koanfmaps.Merge(exporterOverrideCfg, exporterConfig)
 
 	// beatsauth extension is not tested with output other than elasticsearch
 	if exporterType.String() == "elasticsearch" {
@@ -519,14 +533,47 @@ func translateEsOutputToExporter(cfg *config.C, logger *logp.Logger) (map[string
 	if err != nil {
 		return nil, err
 	}
-	// dynamic indexing works by default
 
-	// we also want to use dynamic log ids
+	// we want to use dynamic log ids
 	esConfig["logs_dynamic_id"] = map[string]any{"enabled": true}
 
 	esConfig["include_source_on_error"] = true
 
 	return esConfig, nil
+}
+
+func extractOutputOtelOverrideConfig(cfg *config.C) (*config.C, error) {
+	if !cfg.HasField(outputOtelOverrideFieldName) {
+		return nil, nil
+	}
+	otelCfg, err := cfg.Child(outputOtelOverrideFieldName, -1)
+	if err != nil {
+		return nil, err
+	}
+	_, err = cfg.Remove(outputOtelOverrideFieldName, -1)
+	if err != nil {
+		return nil, err
+	}
+	return otelCfg, nil
+}
+
+func getOutputOtelOverrideExporterConfig(otelOverrideCfg *config.C) (map[string]any, error) {
+	if otelOverrideCfg == nil {
+		return nil, nil
+	}
+	if !otelOverrideCfg.HasField(outputOtelOverrideExporterFieldName) {
+		return nil, nil
+	}
+	exporterCfgC, err := otelOverrideCfg.Child(outputOtelOverrideExporterFieldName, -1)
+	if err != nil {
+		return nil, err
+	}
+	exporterCfgMap := make(map[string]any)
+	err = exporterCfgC.Unpack(&exporterCfgMap)
+	if err != nil {
+		return nil, err
+	}
+	return exporterCfgMap, nil
 }
 
 func BeatDataPath(componentId string) string {
