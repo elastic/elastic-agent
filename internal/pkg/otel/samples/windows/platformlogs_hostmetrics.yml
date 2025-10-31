@@ -1,5 +1,4 @@
 receivers:
-  # Receiver for platform specific log files
   windowseventlog:
     channel: application
 
@@ -7,7 +6,14 @@ receivers:
   hostmetrics/system:
     collection_interval: 60s
     scrapers:
+      disk:
       filesystem:
+      cpu:
+        metrics:
+          system.cpu.utilization:
+            enabled: true
+          system.cpu.logical.count:
+            enabled: true
       memory:
         metrics:
           system.memory.utilization:
@@ -29,15 +35,6 @@ receivers:
       network:
       processes:
       load:
-
-  # Receiver for logs, traces, and metrics from SDKs
-  otlp/fromsdk:
-    protocols:
-      grpc:
-      http:
-
-connectors:
-  elasticapm:
 
 processors:
   resourcedetection:
@@ -71,9 +68,9 @@ processors:
           enabled: true
         os.type:
           enabled: true
-  elasticapm:
 
 exporters:
+  # Exporter to send logs and metrics to Elasticsearch
   elasticsearch/otel:
     endpoints: [ "${env:ELASTIC_ENDPOINT}" ]
     api_key: ${env:ELASTIC_API_KEY}
@@ -82,31 +79,10 @@ exporters:
 
 service:
   pipelines:
-    traces/fromsdk:
-      receivers: [otlp/fromsdk]
-      processors: [elasticapm]
-      exporters: [elasticapm, elasticsearch/otel]
-
-    metrics/fromsdk:
-      receivers: [otlp/fromsdk]
-      processors: []
-      exporters: [elasticsearch/otel]
-
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
       processors: [resourcedetection]
       exporters: [elasticsearch/otel]
-
-    metrics/aggregated-metrics:
-      receivers: [elasticapm]
-      processors: []
-      exporters: [elasticsearch/otel]
-
-    logs/fromsdk:
-      receivers: [otlp/fromsdk]
-      processors: []
-      exporters: [elasticapm, elasticsearch/otel]
-
     logs/platformlogs:
       receivers: [windowseventlog]
       processors: [resourcedetection]

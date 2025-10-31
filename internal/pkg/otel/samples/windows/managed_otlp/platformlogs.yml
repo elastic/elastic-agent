@@ -1,0 +1,65 @@
+receivers:
+  windowseventlog:
+    channel: application
+
+processors:
+  resourcedetection:
+    detectors: ["system"]
+    system:
+      hostname_sources: ["os"]
+      resource_attributes:
+        host.name:
+          enabled: true
+        host.id:
+          enabled: false
+        host.arch:
+          enabled: true
+        host.ip:
+          enabled: true
+        host.mac:
+          enabled: true
+        host.cpu.vendor.id:
+          enabled: true
+        host.cpu.family:
+          enabled: true
+        host.cpu.model.id:
+          enabled: true
+        host.cpu.model.name:
+          enabled: true
+        host.cpu.stepping:
+          enabled: true
+        host.cpu.cache.l2.size:
+          enabled: true
+        os.description:
+          enabled: true
+        os.type:
+          enabled: true
+
+exporters:
+  # Exporter to print the first 5 logs/metrics and then every 1000th
+  debug:
+    verbosity: detailed
+    sampling_initial: 5
+    sampling_thereafter: 1000
+
+# Exporter to send logs and metrics to Elasticsearch Managed OTLP Input
+  otlp/ingest:
+    endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
+    headers:
+      Authorization: ApiKey ${env:ELASTIC_API_KEY}
+    sending_queue:
+      enabled: true
+      sizer: bytes
+      queue_size: 50000000 # 50MB uncompressed
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 1_000_000 # 1MB uncompressed
+        max_size: 4_000_000 # 4MB uncompressed
+
+service:
+  pipelines:
+    logs/platformlogs:
+      receivers: [windowseventlog]
+      processors: [resourcedetection]
+      exporters: [debug, otlp/ingest]
