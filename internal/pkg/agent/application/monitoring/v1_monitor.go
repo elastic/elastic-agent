@@ -943,6 +943,13 @@ func processorsForAgentFilestream() []any {
 		dropEventsFromMonitoringComponentsProcessor(),
 		// drop periodic metrics logs (those are useful mostly in diagnostic dumps where we collect log files)
 		dropPeriodicMetricsLogsProcessor(),
+<<<<<<< HEAD:internal/pkg/agent/application/monitoring/v1_monitor.go
+=======
+		// drop event logs
+		dropEventLogs(),
+		// drop potential sensitive fields emitted by elasticsearch exporter logs
+		dropSensitiveFieldsFromElasticSearchExporterLogs(),
+>>>>>>> d4dc1c787 (Enable `include_source_on_error` on elasticsearch exporter (#10894)):internal/pkg/agent/application/monitoring/component/v1_monitor.go
 	}
 	// if the event is from a component, use the component's dataset
 	processors = append(processors, useComponentDatasetProcessors()...)
@@ -1181,6 +1188,36 @@ func dropFieldsProcessor(fields []any, ignoreMissing bool) map[string]any {
 	}
 }
 
+<<<<<<< HEAD:internal/pkg/agent/application/monitoring/v1_monitor.go
+=======
+// dropElasticSearchExporterLogs returns a processor which drops fields from logs emitted by elasticsearch exporter,  that may contain sensitive data.
+func dropSensitiveFieldsFromElasticSearchExporterLogs() map[string]any {
+	return map[string]interface{}{
+		"drop_fields": map[string]interface{}{
+			"fields": []any{"error.reason"},
+			"when": map[string]interface{}{
+				"contains": map[string]interface{}{
+					"message": "failed to index document", // this message come from ES exporter
+				},
+			},
+		},
+	}
+}
+
+// dropEventLogs returns a processor which drops all event that contains log.type:event field
+func dropEventLogs() map[string]any {
+	return map[string]interface{}{
+		"drop_event": map[string]interface{}{
+			"when": map[string]interface{}{
+				"equals": map[string]interface{}{
+					"log.type": "event",
+				},
+			},
+		},
+	}
+}
+
+>>>>>>> d4dc1c787 (Enable `include_source_on_error` on elasticsearch exporter (#10894)):internal/pkg/agent/application/monitoring/component/v1_monitor.go
 // dropEventsFromMonitoringComponentsProcessor returns a processor which drops all events from monitoring components.
 // We identify a monitoring component by looking at their ID. They all end in `-monitoring`, e.g:
 // - "beat/metrics-monitoring"
