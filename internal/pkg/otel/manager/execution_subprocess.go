@@ -79,7 +79,7 @@ type subprocessExecution struct {
 
 // startCollector starts a supervised collector and monitors its health. Process exit errors are sent to the
 // processErrCh channel. Other run errors, such as not able to connect to the health endpoint, are sent to the runErrCh channel.
-func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger.Logger, cfg *confmap.Conf, processErrCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatus chan struct{}) (collectorHandle, error) {
+func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, processErrCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatus chan struct{}) (collectorHandle, error) {
 	if cfg == nil {
 		// configuration is required
 		return nil, errors.New("no configuration provided")
@@ -110,9 +110,9 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 		return nil, fmt.Errorf("failed to marshal config to yaml: %w", err)
 	}
 
-	stdOut := runtimeLogger.NewLogWriterWithDefaults(logger.Core(), zapcore.Level(r.logLevel))
+	stdOut := runtimeLogger.NewLogWriterWithDefaults(baseLogger.Core(), zapcore.Level(r.logLevel))
 	// info level for stdErr because by default collector writes to stderr
-	stdErr := runtimeLogger.NewLogWriterWithDefaults(logger.Core(), zapcore.Level(r.logLevel))
+	stdErr := runtimeLogger.NewLogWriterWithDefaults(baseLogger.Core(), zapcore.Level(r.logLevel))
 
 	procCtx, procCtxCancel := context.WithCancel(ctx)
 	env := os.Environ()

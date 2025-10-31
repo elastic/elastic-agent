@@ -37,6 +37,7 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
+          machineType: "n2-standard-8"
         retry:
           automatic:
             limit: 1
@@ -56,6 +57,7 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
+          machineType: "n2-standard-8"
         retry:
           automatic:
             limit: 1
@@ -76,6 +78,7 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
+          machineType: "n2-standard-8"
         retry:
           automatic:
             limit: 1
@@ -112,7 +115,7 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_WIN_2022}"
-          machine_type: "n2-standard-8"
+          machineType: "n2-standard-8"
           disk_size: 200
           disk_type: "pd-ssd"
         retry:
@@ -132,7 +135,7 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_WIN_2016}"
-          machine_type: "n2-standard-8"
+          machineType: "n2-standard-8"
           disk_size: 200
           disk_type: "pd-ssd"
         retry:
@@ -192,7 +195,7 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_WIN_10}"
-          machine_type: "n2-standard-8"
+          machineType: "n2-standard-8"
           disk_type: "pd-ssd"
         retry:
           automatic:
@@ -211,7 +214,7 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_WIN_11}"
-          machine_type: "n2-standard-8"
+          machineType: "n2-standard-8"
           disk_type: "pd-ssd"
         retry:
           automatic:
@@ -343,6 +346,25 @@ steps:
     build:
       commit: "${BUILDKITE_COMMIT}"
       branch: "${BUILDKITE_BRANCH}"
+
+  # Trigger for pull requests - Serverless Beats Tests
+  # this should help detecting issues earlier in the development cycle
+  - label: "Trigger Serverless Beats Tests"
+    if: build.pull_request.id != null
+    plugins:
+      - monorepo-diff#v1.2.0:
+          diff: "git diff --name-only origin/${GITHUB_PR_TARGET_BRANCH}...HEAD"
+          interpolation: false
+          watch:
+            - path:
+                - .buildkite/serverless.beats.tests.yml
+                - .buildkite/scripts/steps/beats_tests.sh
+                - .buildkite/hooks/pre-command
+              config:
+                trigger: "beats-agent-serverless-tests"
+                build:
+                  commit: "${BUILDKITE_COMMIT}"
+                  branch: "${BUILDKITE_BRANCH}"
 
   # wait for CI to be done
   - wait: ~

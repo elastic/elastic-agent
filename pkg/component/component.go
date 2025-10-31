@@ -9,6 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"os"
+	"path/filepath"
+	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -39,6 +42,7 @@ const (
 	defaultUnitLogLevel                  = client.UnitLogLevelInfo
 	headersKey                           = "headers"
 	elasticsearchType                    = "elasticsearch"
+	workDirPathMod                       = 0770
 	ProcessRuntimeManager                = RuntimeManager("process")
 	OtelRuntimeManager                   = RuntimeManager("otel")
 	DefaultRuntimeManager RuntimeManager = ProcessRuntimeManager
@@ -242,6 +246,44 @@ func (c *Component) BinaryName() string {
 		return c.InputSpec.BinaryName
 	}
 	return ""
+}
+
+// WorkDirName returns the name of the component's working directory.
+func (c *Component) WorkDirName() string {
+	return c.ID
+}
+
+// WorkDirPath returns the full path of the component's working directory, placing it under the provided parent path.
+func (c *Component) WorkDirPath(parentDirPath string) string {
+	return filepath.Join(parentDirPath, c.WorkDirName())
+}
+
+// PrepareWorkDir prepares the component working directory under the provided parent path. This involves creating
+// it under the right ownership and ACLs. This method is idempotent.
+func (c *Component) PrepareWorkDir(parentDirPath string) error {
+	uid, gid := os.Geteuid(), os.Getegid()
+	path := c.WorkDirPath(parentDirPath)
+	err := os.MkdirAll(path, workDirPathMod)
+	if err != nil {
+		return fmt.Errorf("failed to create path %q: %w", path, err)
+	}
+	if runtime.GOOS == Windows {
+		return nil
+	}
+	err = os.Chown(path, uid, gid)
+	if err != nil {
+		return fmt.Errorf("failed to chown %q: %w", path, err)
+	}
+	err = os.Chmod(path, workDirPathMod)
+	if err != nil {
+		return fmt.Errorf("failed to chmod %q: %w", path, err)
+	}
+	return nil
+}
+
+// RemoveWorkDir removes the component working directory under the provided parent path. This method is idempotent.
+func (c *Component) RemoveWorkDir(parentDirPath string) error {
+	return os.RemoveAll(c.WorkDirPath(parentDirPath))
 }
 
 // Model is the components model with signed policy data
