@@ -2218,3 +2218,190 @@ service:
 
 	cancel()
 }
+
+func TestOutputStatusReporting(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithOSArchitecture("darwin", "arm64"))
+	require.NoError(t, err)
+
+	// Create the otel configuration file
+	type otelConfigOptions struct {
+		StatusReportingEnabled bool
+		ESEndpoint             string
+		ESApiKey               string
+	}
+	esEndpoint, err := integration.GetESHost()
+	require.NoError(t, err, "error getting elasticsearch endpoint")
+	esApiKey, err := createESApiKey(info.ESClient)
+	require.NoError(t, err, "error creating API key")
+	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	decodedApiKey, err := getDecodedApiKey(esApiKey)
+	require.NoError(t, err)
+	configTemplate := `
+inputs:
+  - type: system/metrics
+    id: http-metrics-test
+    use_output: default
+    _runtime_experimental: otel
+    streams:
+    - metricsets:
+       - cpu
+      period: 1s
+      data_stream:
+        dataset: e2e
+      namespace: "json_namespace"
+agent.reload:
+  period: 1s
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [{{.ESEndpoint}}]
+    api_key: "{{.ESApiKey}}"
+    preset: "balanced"
+    status_reporting:
+      enabled: {{.StatusReportingEnabled}}
+agent.monitoring:
+  metrics: false
+  logs: false
+  http:
+    enabled: true
+    port: 6792
+agent.grpc:
+    port: 6790
+`
+
+	index := ".ds-metrics-e2e-*"
+	var configBuffer bytes.Buffer
+	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+		otelConfigOptions{
+			ESEndpoint:             esEndpoint,
+			ESApiKey:               decodedApiKey,
+			StatusReportingEnabled: true,
+		})
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, []string{"-e"})
+	require.NoError(t, err, "cannot prepare Elastic-Agent command: %w", err)
+
+	output := strings.Builder{}
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	err = cmd.Start()
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 30*time.Second, 1*time.Second)
+
+	actualHits := &struct{ Hits int }{}
+	assert.Eventually(t,
+		func() bool {
+			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer findCancel()
+
+			query := map[string]interface{}{
+				"query": map[string]interface{}{
+					"exists": map[string]interface{}{
+						"field": "http.json_namespace.beat.cpu.system.ticks",
+					},
+				},
+			}
+
+			docs, err := estools.PerformQueryForRawQuery(findCtx, query, index, info.ESClient)
+			require.NoError(t, err)
+
+			actualHits.Hits = docs.Hits.Total.Value
+			actualHits.Hits = docs.Hits.Total.Value
+			return actualHits.Hits >= 1
+		},
+		2*time.Minute, 5*time.Second,
+		"Expected at least %d logs, got %v", 1, actualHits.Hits)
+
+	// Enable status reporting and use an invalid host.
+	// This should result in DEGRADED state
+	configBuffer.Reset()
+	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+		otelConfigOptions{
+			ESEndpoint:             "https://invalid:9200",
+			ESApiKey:               decodedApiKey,
+			StatusReportingEnabled: true,
+		})
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		status, err := fixture.ExecStatus(ctx)
+		if err != nil {
+			t.Logf("waiting for agent degraded: %s", err.Error())
+			return false
+		}
+		return status.State == int(cproto.State_DEGRADED)
+	}, 1*time.Minute, 1*time.Second)
+
+	// Disable status reporting and keep using an invalid host.
+	// This should result in HEALTHY state
+	configBuffer.Reset()
+	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+		otelConfigOptions{
+			ESEndpoint:             "https://invalid:9200",
+			ESApiKey:               decodedApiKey,
+			StatusReportingEnabled: false,
+		})
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 1*time.Minute, 1*time.Second)
+
+	// Again, enabled status reporting and keep using an invalid host.
+	// This should result in DEGRADED state
+	configBuffer.Reset()
+	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+		otelConfigOptions{
+			ESEndpoint:             "https://invalid:9200",
+			ESApiKey:               decodedApiKey,
+			StatusReportingEnabled: true,
+		})
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		status, err := fixture.ExecStatus(ctx)
+		if err != nil {
+			t.Logf("waiting for agent degraded: %s", err.Error())
+			return false
+		}
+		return status.State == int(cproto.State_DEGRADED)
+	}, 1*time.Minute, 1*time.Second)
+}
