@@ -159,7 +159,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 		maxFailuresTimer := time.NewTimer(maxFailuresDuration)
 		defer maxFailuresTimer.Stop()
 
-		// check the health of the collector every 10 seconds
+		// check the health of the collector every 1 second
 		const healthCheckPollDuration = 1 * time.Second
 		healthCheckPollTimer := time.NewTimer(healthCheckPollDuration)
 		defer healthCheckPollTimer.Stop()
