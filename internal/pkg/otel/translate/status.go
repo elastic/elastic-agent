@@ -149,11 +149,11 @@ func muteExporters(agg *status.AggregateStatus, components []component.Component
 		}
 
 		componentID, found := strings.CutPrefix(pipelineID.Name(), OtelNamePrefix)
-		if !found || !isMuted(componentID, components) {
+		if !found || !isOutputMuted(componentID, components) {
 			continue
 		}
 
-		// Mute exporters and parent pipeline
+		// Mute exporters for the pipeline for this component
 		for compID, compStatus := range pipelineStatus.ComponentStatusMap {
 			kind, _, err := parseEntityStatusId(compID)
 			if err != nil {
@@ -180,13 +180,16 @@ func parsePipelineID(statusID string) (*pipeline.ID, error) {
 	return pID, nil
 }
 
-func isMuted(componentID string, components []component.Component) bool {
+// isOutputMuted checks whether output status reporting is disabled for the given componentID
+func isOutputMuted(componentID string, components []component.Component) bool {
 	for _, comp := range components {
-		if comp.ID == componentID {
-			if comp.OutputStatusReporting != nil && !comp.OutputStatusReporting.Enabled {
-				return true
-			}
+		if comp.ID != componentID {
+			continue
 		}
+		if comp.OutputStatusReporting == nil {
+			return false
+		}
+		return !comp.OutputStatusReporting.Enabled
 	}
 	return false
 }
