@@ -4,7 +4,7 @@
 
 //go:build requirefips
 
-package pkg
+package otelcol
 
 import (
 	"context"

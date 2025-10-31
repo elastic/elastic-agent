@@ -7,7 +7,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	edotPkg "github.com/elastic/elastic-agent/internal/edot/pkg"
+	"github.com/elastic/elastic-agent/internal/edot/otelcol"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
@@ -19,7 +19,7 @@ func newComponentsCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 		SilenceUsage:  true, // do not display usage on error
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return edotPkg.Components(cmd)
+			return otelcol.Components(cmd)
 		},
 	}
 

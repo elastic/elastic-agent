@@ -11,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/internal/edot/pkg/agentprovider"
+	"github.com/elastic/elastic-agent/internal/edot/otelcol/agentprovider"
 )
 
 func TestPrepareCollectorSettings(t *testing.T) {

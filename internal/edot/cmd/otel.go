@@ -19,8 +19,8 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/service"
 
-	edotPkg "github.com/elastic/elastic-agent/internal/edot/pkg"
-	"github.com/elastic/elastic-agent/internal/edot/pkg/agentprovider"
+	edotOtelCol "github.com/elastic/elastic-agent/internal/edot/otelcol"
+	"github.com/elastic/elastic-agent/internal/edot/otelcol/agentprovider"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
@@ -126,7 +126,7 @@ func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool,
 	defer cancel()
 	go service.ProcessWindowsControlEvents(stopCollector)
 
-	return edotPkg.Run(ctx, stop, settings.otelSettings)
+	return edotOtelCol.Run(ctx, stop, settings.otelSettings)
 }
 
 type edotSettings struct {
@@ -145,9 +145,9 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 		if err != nil {
 			return settings, fmt.Errorf("failed to create config provider: %w", err)
 		}
-		settings.otelSettings = edotPkg.NewSettings(release.Version(), []string{configProvider.URI()},
-			edotPkg.WithConfigProviderFactory(configProvider.NewFactory()),
-			edotPkg.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)),
+		settings.otelSettings = edotOtelCol.NewSettings(release.Version(), []string{configProvider.URI()},
+			edotOtelCol.WithConfigProviderFactory(configProvider.NewFactory()),
+			edotOtelCol.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)),
 		)
 
 		// setup logger
@@ -185,7 +185,7 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 
 		settings.otelSettings.DisableGracefulShutdown = false
 	} else {
-		settings.otelSettings = edotPkg.NewSettings(release.Version(), configFiles, edotPkg.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)))
+		settings.otelSettings = edotOtelCol.NewSettings(release.Version(), configFiles, edotOtelCol.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)))
 	}
 	return settings, nil
 }
