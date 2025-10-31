@@ -119,7 +119,9 @@ func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool,
 	}
 
 	defer cancel()
-	go service.ProcessWindowsControlEvents(stopCollector)
+	if settings.otelSettings.DisableGracefulShutdown { // TODO: Harmonize these settings
+		service.HandleSignals(stopCollector, cancel)
+	}
 
 	return otel.Run(ctx, stop, settings.otelSettings)
 }
