@@ -2231,7 +2231,7 @@ func TestOutputStatusReporting(t *testing.T) {
 		Stack: &define.Stack{},
 	})
 
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithOSArchitecture("darwin", "arm64"))
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	// Create the otel configuration file
