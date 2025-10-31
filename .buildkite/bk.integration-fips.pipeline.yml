@@ -57,6 +57,8 @@ steps:
           - packaging-ubuntu-x86-64-fips # Reuse artifacts produced in .buildkite/integration.pipeline.yml
         env:
           FIPS: "true"
+          EC_ENDPOINT: "https://api.staging.elastic-gov.com"
+          ESS_REGION: "us-gov-east-1"
           TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
@@ -87,6 +89,8 @@ steps:
           - packaging-ubuntu-arm64-fips
         env:
           FIPS: "true"
+          EC_ENDPOINT: "https://api.staging.elastic-gov.com"
+          ESS_REGION: "us-gov-east-1"
           TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
@@ -116,6 +120,8 @@ steps:
         if: build.env("BUILDKITE_PULL_REQUEST") != "false" &&  build.env("GITHUB_PR_LABELS") =~ /.*(Testing:run:TestUpgradeIntegrationsServer).*/
         env:
           FIPS: "true"
+          EC_ENDPOINT: "https://api.staging.elastic-gov.com"
+          ESS_REGION: "us-gov-east-1"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           .buildkite/scripts/buildkite-integration-tests.sh ech-deployment false
