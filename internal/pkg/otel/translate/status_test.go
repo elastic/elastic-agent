@@ -664,7 +664,7 @@ func TestOutputStatus(t *testing.T) {
 			name:                  "output status reporting enabled - degraded exporter",
 			outputStatusReporting: true,
 			status: &status.AggregateStatus{
-				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+				Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
 					fmt.Sprintf("receiver:filebeat/%sinput-1", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
@@ -677,7 +677,7 @@ func TestOutputStatus(t *testing.T) {
 			expected: runtime.ComponentComponentState{
 				Component: baseComp,
 				State: runtime.ComponentState{
-					State:   client.UnitStateHealthy, // recoverable error
+					State:   client.UnitStateDegraded, // recoverable error
 					Message: "",
 					VersionInfo: runtime.ComponentVersionInfo{
 						Name:      OtelComponentName,
@@ -760,7 +760,7 @@ func TestOutputStatus(t *testing.T) {
 			name:                  "output status reporting disabled - degraded exporter",
 			outputStatusReporting: false,
 			status: &status.AggregateStatus{
-				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+				Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
 					fmt.Sprintf("receiver:filebeat/%sinput-1", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),

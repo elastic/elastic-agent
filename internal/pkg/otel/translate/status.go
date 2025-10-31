@@ -130,9 +130,7 @@ func getOtelRuntimePipelineStatuses(otelStatus *status.AggregateStatus) (map[str
 // getComponentState extracts the full status of a component from its respective otel pipeline status.
 func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Component) (runtime.ComponentComponentState, error) {
 	compState := runtime.ComponentState{
-		State:   otelStatusToUnitState(pipelineStatus.Status()),
-		Message: otelStatusToUnitState(pipelineStatus.Status()).String(),
-		Units:   make(map[runtime.ComponentUnitKey]runtime.ComponentUnitState),
+		Units: make(map[runtime.ComponentUnitKey]runtime.ComponentUnitState),
 		VersionInfo: runtime.ComponentVersionInfo{
 			Name: OtelComponentName,
 			Meta: map[string]string{ // mimic what beats return over the control protocol
@@ -162,6 +160,10 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		exporterStatus = slices.Collect(maps.Values(exporterStatuses))[0]
 	}
 
+	pipelineStatus = getPipelineStatus(pipelineStatus, receiverStatus, comp)
+	compState.State = otelStatusToUnitState(pipelineStatus.Status())
+	compState.Message = otelStatusToUnitState(pipelineStatus.Status()).String()
+
 	for _, unit := range comp.Units {
 		unitKey := runtime.ComponentUnitKey{
 			UnitID:   unit.ID,
@@ -184,6 +186,22 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		State:     compState,
 	}
 	return compStatus, nil
+}
+
+// getPipelineStatus determines the final pipeline status based on the receiver status and output status reporting settings.
+// If the receiver is in a non-OK state, the pipeline status is returned as-is.
+// If the output status reporting is disabled, the pipeline status is overridden to StatusOK.
+func getPipelineStatus(pipelineStatus, recevierStatus *status.AggregateStatus, comp component.Component) *status.AggregateStatus {
+	if recevierStatus != nil && recevierStatus.Status() != componentstatus.StatusOK {
+		return pipelineStatus
+	}
+	if comp.OutputStatusReporting != nil && !comp.OutputStatusReporting.Enabled {
+		// If status reporting is disabled for this output, we hard code it to "StatusOK".
+		return &status.AggregateStatus{
+			Event: componentstatus.NewEvent(componentstatus.StatusOK),
+		}
+	}
+	return pipelineStatus
 }
 
 // getUnitOtelStatuses extracts the receiver and exporter status from otel pipeline status.
