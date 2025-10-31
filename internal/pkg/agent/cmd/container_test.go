@@ -68,6 +68,70 @@ func TestEnvTimeout(t *testing.T) {
 	require.Equal(t, time.Second*10, res)
 }
 
+func TestContainerCfgOverrides_EnableBeatsReceiversMonitoring(t *testing.T) {
+	tests := []struct {
+		name     string
+		envValue string
+		expected string
+	}{
+		{
+			name:     "enabled",
+			envValue: "true",
+			expected: "otel",
+		},
+		{
+			name:     "enabled with 1",
+			envValue: "1",
+			expected: "otel",
+		},
+		{
+			name:     "disabled",
+			envValue: "false",
+			expected: "",
+		},
+		{
+			name:     "disabled with 0",
+			envValue: "0",
+			expected: "",
+		},
+		{
+			name:     "not set",
+			envValue: "",
+			expected: "",
+		},
+		{
+			name:     "invalid value",
+			envValue: "invalid",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.envValue != "" {
+				t.Setenv("ENABLE_BEATS_RECEIVERS_MONITORING", tt.envValue)
+			}
+
+			cfg := &configuration.Configuration{
+				Settings: configuration.DefaultSettingsConfig(),
+			}
+
+			originalRuntimeManager := cfg.Settings.MonitoringConfig.RuntimeManager
+
+			containerCfgOverrides(cfg)
+
+			if tt.expected == "" {
+				// Should preserve original RuntimeManager
+				require.Equal(t, originalRuntimeManager, cfg.Settings.MonitoringConfig.RuntimeManager)
+			} else {
+				// Should set RuntimeManager to expected value
+				require.NotNil(t, cfg.Settings.MonitoringConfig)
+				require.Equal(t, tt.expected, cfg.Settings.MonitoringConfig.RuntimeManager)
+			}
+		})
+	}
+}
+
 func TestContainerTestPaths(t *testing.T) {
 	cases := map[string]struct {
 		config   string

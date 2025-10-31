@@ -148,6 +148,11 @@ be used when the same credentials will be used across all the possible actions a
   KIBANA_CA - path to certificate authority to use with communicate with Kibana [$ELASTICSEARCH_CA]
   ELASTIC_AGENT_TAGS - user provided tags for the agent [linux,staging]
 
+* Beats Receivers
+  This enables the Beats Receivers for supported components.
+
+  ENABLE_BEATS_RECEIVERS - Set to 1 to enable the Beats Receivers for supported components in the policy.
+  ENABLE_BEATS_RECEIVERS_MONITORING - Set to 1 to enable using Beats Receivers for self-monitoring.
 
 * Elastic-Agent event logging
   If EVENTS_TO_STDERR is set to true log entries containing event data or whole raw events will be logged to stderr alongside
@@ -820,6 +825,15 @@ func containerCfgOverrides(cfg *configuration.Configuration) {
 	if eventsToStderr {
 		cfg.Settings.EventLoggingConfig.ToFiles = false
 		cfg.Settings.EventLoggingConfig.ToStderr = true
+	}
+
+	enableBeatsReceiversMonitoringEnv := envWithDefault("false", "ENABLE_BEATS_RECEIVERS_MONITORING")
+	enableBeatsReceiversMonitoring, err := strconv.ParseBool(enableBeatsReceiversMonitoringEnv)
+	if err != nil {
+		logp.Warn("cannot parse ENABLE_BEATS_RECEIVERS_MONITORING='%s' as boolean, using default monitoring runtime", enableBeatsReceiversMonitoringEnv)
+	}
+	if enableBeatsReceiversMonitoring {
+		cfg.Settings.MonitoringConfig.RuntimeManager = string(component.OtelRuntimeManager)
 	}
 
 	configuration.OverrideDefaultContainerGRPCPort(cfg.Settings.GRPC)
