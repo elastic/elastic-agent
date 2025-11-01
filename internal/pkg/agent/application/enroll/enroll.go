@@ -96,16 +96,18 @@ func EnrollWithBackoff(
 RETRYLOOP:
 	for {
 		switch {
+		case err == nil:
+			break RETRYLOOP
+		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+			break RETRYLOOP
 		case errors.Is(err, fleetapi.ErrTooManyRequests):
 			log.Warn("Too many requests on the remote server, will retry in a moment.")
 		case errors.Is(err, fleetapi.ErrConnRefused):
-			log.Warn("Remote server is not ready to accept connections(Connection Refused), will retry in a moment.")
+			log.Warn("Remote server is not ready to accept connections (Connection Refused), will retry in a moment.")
 		case errors.Is(err, fleetapi.ErrTemporaryServerError):
-			log.Warnf("Remote server failed to handle the request(%s), will retry in a moment.", err.Error())
-		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded), err == nil:
-			break RETRYLOOP
-		case err != nil:
-			log.Warnf("Error detected: %s, will retry in a moment.", err.Error())
+			log.Warnf("Remote server failed to handle the request (%s), will retry in a moment.", err)
+		default:
+			log.Warnf("Error detected: %s, will retry in a moment.", err)
 		}
 		if !backExp.Wait() {
 			break RETRYLOOP
