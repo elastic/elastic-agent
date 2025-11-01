@@ -1,5 +1,4 @@
 receivers:
-  # Receiver for platform specific log files
   windowseventlog:
     channel: application
 
@@ -36,9 +35,6 @@ receivers:
       grpc:
       http:
 
-connectors:
-  elasticapm:
-
 processors:
   resourcedetection:
     detectors: ["system"]
@@ -71,43 +67,58 @@ processors:
           enabled: true
         os.type:
           enabled: true
-  elasticapm:
 
 exporters:
-  elasticsearch/otel:
-    endpoints: [ "${env:ELASTIC_ENDPOINT}" ]
-    api_key: ${env:ELASTIC_API_KEY}
-    mapping:
-      mode: otel
+  otlp/ingest_logs:
+    endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
+    headers:
+      Authorization: ApiKey ${env:ELASTIC_API_KEY}
+    sending_queue:
+      enabled: true
+      sizer: bytes
+      queue_size: 50000000 # 50MB uncompressed
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 1_000_000 # 1MB uncompressed
+        max_size: 4_000_000 # 4MB uncompressed
+  otlp/ingest_metrics_traces:
+    endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
+    headers:
+      Authorization: ApiKey ${env:ELASTIC_API_KEY}
+    sending_queue:
+      enabled: true
+      sizer: bytes
+      queue_size: 50000000 # 50MB uncompressed
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 1_000_000 # 1MB uncompressed
+        max_size: 4_000_000 # 4MB uncompressed
 
 service:
   pipelines:
     traces/fromsdk:
       receivers: [otlp/fromsdk]
-      processors: [elasticapm]
-      exporters: [elasticapm, elasticsearch/otel]
+      processors: []
+      exporters: [otlp/ingest_metrics_traces]
 
     metrics/fromsdk:
       receivers: [otlp/fromsdk]
       processors: []
-      exporters: [elasticsearch/otel]
-
-    metrics/hostmetrics:
-      receivers: [hostmetrics/system]
-      processors: [resourcedetection]
-      exporters: [elasticsearch/otel]
-
-    metrics/aggregated-metrics:
-      receivers: [elasticapm]
-      processors: []
-      exporters: [elasticsearch/otel]
+      exporters: [otlp/ingest_metrics_traces]
 
     logs/fromsdk:
       receivers: [otlp/fromsdk]
       processors: []
-      exporters: [elasticapm, elasticsearch/otel]
+      exporters: [otlp/ingest_logs]
+
+    metrics/hostmetrics:
+      receivers: [hostmetrics/system]
+      processors: [resourcedetection]
+      exporters: [otlp/ingest_metrics_traces]
 
     logs/platformlogs:
       receivers: [windowseventlog]
       processors: [resourcedetection]
-      exporters: [elasticsearch/otel]
+      exporters: [otlp/ingest_logs]
