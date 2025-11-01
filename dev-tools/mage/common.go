@@ -214,7 +214,7 @@ func dockerInfo() (*DockerInfo, error) {
 func HaveDockerCompose() error {
 	_, err := exec.LookPath("docker-compose")
 	if err != nil {
-		return fmt.Errorf("docker-compose is not available")
+		return errors.New("docker-compose is not available")
 	}
 	return nil
 }
@@ -223,7 +223,7 @@ func HaveDockerCompose() error {
 func HaveKubectl() error {
 	_, err := exec.LookPath("kubectl")
 	if err != nil {
-		return fmt.Errorf("kubectl is not available")
+		return errors.New("kubectl is not available")
 	}
 	return nil
 }
@@ -969,7 +969,7 @@ func ReadGLIBCRequirement(elfFile string) (*SemanticVersion, error) {
 	}
 
 	if len(versionSet) == 0 {
-		return nil, fmt.Errorf("no GLIBC symbols found in binary (is this a static binary?)")
+		return nil, errors.New("no GLIBC symbols found in binary (is this a static binary?)")
 	}
 
 	versions := make([]SemanticVersion, 0, len(versionSet))

@@ -191,7 +191,7 @@ const (
 )
 
 // ErrUnknownProjectType is returned if an unknown ProjectType value is used.
-var ErrUnknownProjectType = fmt.Errorf("unknown ProjectType")
+var ErrUnknownProjectType = errors.New("unknown ProjectType")
 
 // EnvMap returns map containing the common settings variables and all variables
 // from the environment. args are appended to the output prior to adding the

@@ -40,8 +40,8 @@ const (
 
 // Error values that the Action interface can return
 var (
-	ErrNoStartTime  = fmt.Errorf("action has no start time")
-	ErrNoExpiration = fmt.Errorf("action has no expiration")
+	ErrNoStartTime  = errors.New("action has no start time")
+	ErrNoExpiration = errors.New("action has no expiration")
 )
 
 // Action base interface for all the implemented action from the fleet API.

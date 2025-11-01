@@ -73,7 +73,7 @@ func findRandomTCPPorts(count int) (ports []int, err error) {
 
 		port := l.Addr().(*net.TCPAddr).Port
 		if port == 0 {
-			return nil, fmt.Errorf("failed to find random port")
+			return nil, errors.New("failed to find random port")
 		}
 		ports = append(ports, port)
 	}

@@ -5,11 +5,11 @@
 package dispatcher
 
 import (
-	"fmt"
+	"errors"
 	"time"
 )
 
-var ErrNoRetry = fmt.Errorf("no retry attempts remaining")
+var ErrNoRetry = errors.New("no retry attempts remaining")
 
 type retryConfig struct {
 	steps []time.Duration
