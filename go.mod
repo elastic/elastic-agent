@@ -18,7 +18,11 @@ require (
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.10.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
+<<<<<<< HEAD
 	github.com/elastic/elastic-agent-libs v0.24.2
+=======
+	github.com/elastic/elastic-agent-libs v0.25.1
+>>>>>>> a24b6fa06 (build(deps): bump github.com/elastic/elastic-agent-libs from 0.25.0 to 0.25.1 (#10967))
 	github.com/elastic/elastic-agent-system-metrics v0.13.3
 	github.com/elastic/elastic-transport-go/v8 v8.7.0
 	github.com/elastic/go-elasticsearch/v8 v8.19.0
