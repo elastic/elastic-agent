@@ -2221,6 +2221,7 @@ service:
 
 func TestOutputStatusReporting(t *testing.T) {
 	define.Require(t, define.Requirements{
+		Sudo:  true,
 		Group: integration.Default,
 		Local: false,
 		Stack: nil,

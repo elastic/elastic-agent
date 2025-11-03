@@ -327,15 +327,17 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				m.logger.Debugf(
 					"new config hash (%d) is identical to the old config hash (%d), skipping update",
 					m.mergedCollectorCfgHash, previousConfigHash)
-			}
 
-			// there was a config update. Force fetch the latest collector status.
-			// drain the channel first
-			select {
-			case <-forceFetchStatusCh:
-			default:
+				// there was a config update, but the hash hasn't changed.
+				// Force fetch the latest collector status in case the user modified the output.status_reporting flag.
+				//
+				// drain the channel first
+				select {
+				case <-forceFetchStatusCh:
+				default:
+				}
+				forceFetchStatusCh <- struct{}{}
 			}
-			forceFetchStatusCh <- struct{}{}
 
 		case otelStatus := <-collectorStatusCh:
 			err = m.reportOtelStatusUpdate(ctx, otelStatus)
