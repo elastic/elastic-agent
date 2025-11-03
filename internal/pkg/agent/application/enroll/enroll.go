@@ -17,8 +17,6 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/DataDog/datadog-agent/pkg/util/log"
-
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -99,12 +97,12 @@ func EnrollWithBackoff(
 	enrollFn := func() error {
 		return enroll(ctx, log, persistentConfig, client, options, configStore)
 	}
-	err = retryEnroll(err, maxAttempts, enrollFn, client.URI(), backExp)
+	err = retryEnroll(err, maxAttempts, log, enrollFn, client.URI(), backExp)
 
 	return err
 }
 
-func retryEnroll(err error, maxAttempts int, enrollFn func() error, clientURI string, backExp backoff.Backoff) error {
+func retryEnroll(err error, maxAttempts int, log *logger.Logger, enrollFn func() error, clientURI string, backExp backoff.Backoff) error {
 	attemptNo := 1
 
 RETRYLOOP:

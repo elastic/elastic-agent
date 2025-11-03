@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 // fakeBackoff allows controlling the sequence of Wait() return values for tests.
@@ -39,7 +41,9 @@ func TestRetryEnroll_SucceedsAfterOneRetry(t *testing.T) {
 
 	fb := &fakeBackoff{results: []bool{true}}
 
-	err := retryEnroll(initialErr, 5, enrollFn, "http://localhost", fb)
+	l := logger.NewWithoutConfig("")
+
+	err := retryEnroll(initialErr, 5, l, enrollFn, "http://localhost", fb)
 	require.NoError(t, err)
 	require.Equal(t, 1, called)
 }
@@ -55,7 +59,9 @@ func TestRetryEnroll_BackoffStopsImmediately(t *testing.T) {
 
 	fb := &fakeBackoff{results: []bool{false}}
 
-	err := retryEnroll(initialErr, expectedAttempts, enrollFn, "http://localhost", fb)
+	l := logger.NewWithoutConfig("")
+
+	err := retryEnroll(initialErr, expectedAttempts, l, enrollFn, "http://localhost", fb)
 	require.Equal(t, expectedAttempts-1, called)
 	require.Error(t, err)                  // error is expected
 	require.NotErrorIs(t, err, initialErr) // subsequent failures are different
@@ -71,7 +77,9 @@ func TestRetryEnroll_BreaksOnContextCanceled(t *testing.T) {
 	}
 	fb := &fakeBackoff{results: []bool{true}}
 
-	err := retryEnroll(cancelErr, 5, enrollFn, "http://localhost", fb)
+	l := logger.NewWithoutConfig("")
+
+	err := retryEnroll(cancelErr, 5, l, enrollFn, "http://localhost", fb)
 	require.ErrorIs(t, err, context.Canceled)
 	require.Equal(t, called, 0)
 }
