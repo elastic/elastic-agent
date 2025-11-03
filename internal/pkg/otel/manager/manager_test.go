@@ -64,6 +64,229 @@ var (
 	}
 )
 
+<<<<<<< HEAD
+=======
+type testExecution struct {
+	mtx    sync.Mutex
+	exec   collectorExecution
+	handle collectorHandle
+}
+
+func (e *testExecution) startCollector(ctx context.Context, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
+	e.mtx.Lock()
+	defer e.mtx.Unlock()
+
+	var err error
+	e.handle, err = e.exec.startCollector(ctx, baseLogger, logger, cfg, errCh, statusCh, forceFetchStatusCh)
+	return e.handle, err
+}
+
+func (e *testExecution) getProcessHandle() collectorHandle {
+	e.mtx.Lock()
+	defer e.mtx.Unlock()
+
+	return e.handle
+}
+
+var _ collectorExecution = &mockExecution{}
+
+type mockExecution struct {
+	errCh            chan error
+	statusCh         chan *status.AggregateStatus
+	cfg              *confmap.Conf
+	collectorStarted chan struct{}
+}
+
+func (e *mockExecution) startCollector(
+	ctx context.Context,
+	_ *logger.Logger,
+	_ *logger.Logger,
+	cfg *confmap.Conf,
+	errCh chan error,
+	statusCh chan *status.AggregateStatus,
+	_ chan struct{},
+) (collectorHandle, error) {
+	e.errCh = errCh
+	e.statusCh = statusCh
+	e.cfg = cfg
+	stopCh := make(chan struct{})
+	collectorCtx, collectorCancel := context.WithCancel(ctx)
+	go func() {
+		<-collectorCtx.Done()
+		close(stopCh)
+		reportErr(ctx, errCh, nil)
+	}()
+	handle := &mockCollectorHandle{
+		stopCh: stopCh,
+		cancel: collectorCancel,
+	}
+	if e.collectorStarted != nil {
+		e.collectorStarted <- struct{}{}
+	}
+	return handle, nil
+}
+
+var _ collectorHandle = &mockCollectorHandle{}
+
+type mockCollectorHandle struct {
+	stopCh chan struct{}
+	cancel context.CancelFunc
+}
+
+func (h *mockCollectorHandle) Stop(waitTime time.Duration) {
+	h.cancel()
+	select {
+	case <-time.After(waitTime):
+	case <-h.stopCh:
+	}
+}
+
+// EventListener listens to the events from the OTelManager and stores the latest error and status.
+type EventListener struct {
+	mtx             sync.Mutex
+	err             *EventTime[error]
+	collectorStatus *EventTime[*status.AggregateStatus]
+	componentStates *EventTime[[]runtime.ComponentComponentState]
+}
+
+// Listen starts listening to the error and status channels. It updates the latest error and status in the
+// EventListener.
+func (e *EventListener) Listen(
+	ctx context.Context,
+	errorCh <-chan error,
+	collectorStatusCh <-chan *status.AggregateStatus,
+	componentStateCh <-chan []runtime.ComponentComponentState,
+) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case c := <-collectorStatusCh:
+			e.mtx.Lock()
+			e.collectorStatus = &EventTime[*status.AggregateStatus]{val: c, time: time.Now()}
+			e.mtx.Unlock()
+		case c := <-errorCh:
+			e.mtx.Lock()
+			e.err = &EventTime[error]{val: c, time: time.Now()}
+			e.mtx.Unlock()
+		case componentStates := <-componentStateCh:
+			e.mtx.Lock()
+			e.componentStates = &EventTime[[]runtime.ComponentComponentState]{val: componentStates, time: time.Now()}
+			e.mtx.Unlock()
+		}
+	}
+}
+
+// getError retrieves the latest error from the EventListener.
+func (e *EventListener) getError() error {
+	e.mtx.Lock()
+	defer e.mtx.Unlock()
+	return e.err.Value()
+}
+
+// getCollectorStatus retrieves the latest collector status from the EventListener.
+func (e *EventListener) getCollectorStatus() *status.AggregateStatus {
+	e.mtx.Lock()
+	defer e.mtx.Unlock()
+	return e.collectorStatus.Value()
+}
+
+// EnsureHealthy ensures that the OTelManager is healthy by checking the latest error and status.
+func (e *EventListener) EnsureHealthy(t *testing.T, u time.Time) {
+	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+		e.mtx.Lock()
+		latestErr := e.err
+		latestStatus := e.collectorStatus
+		e.mtx.Unlock()
+
+		// we expect to have a reported error which is nil and a reported status which is StatusOK
+		require.NotNil(collect, latestErr)
+		assert.Nil(collect, latestErr.Value())
+		assert.False(collect, latestErr.Before(u))
+		require.NotNil(collect, latestStatus)
+		require.NotNil(collect, latestStatus.Value())
+		assert.False(collect, latestStatus.Before(u))
+		require.Equal(collect, componentstatus.StatusOK, latestStatus.Value().Status())
+	}, 60*time.Second, 1*time.Second, "otel collector never got healthy")
+}
+
+// EnsureOffWithoutError ensures that the OTelManager is off without an error by checking the latest error and status.
+func (e *EventListener) EnsureOffWithoutError(t *testing.T, u time.Time) {
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		e.mtx.Lock()
+		latestErr := e.err
+		latestStatus := e.collectorStatus
+		e.mtx.Unlock()
+
+		// we expect to have a reported error which is nil and a reported status which is nil
+		require.NotNil(collect, latestErr)
+		assert.Nil(collect, latestErr.Value())
+		assert.False(collect, latestErr.Before(u))
+		require.NotNil(collect, latestStatus)
+		assert.Nil(collect, latestStatus.Value())
+		assert.False(collect, latestStatus.Before(u))
+	}, 60*time.Second, 1*time.Second, "otel collector never stopped without an error")
+}
+
+// EnsureOffWithError ensures that the OTelManager is off with an error by checking the latest error and status.
+func (e *EventListener) EnsureOffWithError(t *testing.T, u time.Time) {
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		e.mtx.Lock()
+		latestErr := e.err
+		latestStatus := e.collectorStatus
+		e.mtx.Unlock()
+
+		// we expect to have a reported error which is not nil and a reported status which is nil
+		require.False(collect, latestErr == nil || latestErr.Before(u) || latestErr.Value() == nil)
+		require.False(collect, latestStatus == nil || latestStatus.Before(u) || latestStatus.Value() != nil)
+	}, 60*time.Second, 1*time.Second, "otel collector never errored with an error")
+}
+
+// EventTime is a wrapper around a time.Time and a value of type T. It provides methods to compare the time and retrieve the value.
+type EventTime[T interface{}] struct {
+	time time.Time
+	val  T
+}
+
+// Before checks if the EventTime's time is before the given time u.
+func (t *EventTime[T]) Before(u time.Time) bool {
+	return t != nil && t.time.Before(u)
+}
+
+// Value retrieves the value of type T from the EventTime. If the EventTime is nil, it returns the zero value of T.
+func (t *EventTime[T]) Value() T {
+	if t == nil {
+		var zero T
+		return zero
+	}
+	return t.val
+}
+
+// Time retrieves the time associated with the EventTime. If the EventTime is nil, it returns the zero value of time.Time.
+func (t *EventTime[T]) Time() time.Time {
+	if t == nil {
+		return time.Time{}
+	}
+	return t.time
+}
+
+func countHealthCheckExtensionStatuses(status *status.AggregateStatus) uint {
+	extensions, ok := status.ComponentStatusMap["extensions"]
+	if !ok {
+		return 0
+	}
+
+	count := uint(0)
+	for key := range extensions.ComponentStatusMap {
+		if strings.HasPrefix(key, "extension:healthcheckv2/") {
+			count++
+		}
+	}
+
+	return count
+}
+
+>>>>>>> 83880d318 ([beatsreceivers] add option to mute exporter status (#10890))
 func TestOTelManager_Run(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
