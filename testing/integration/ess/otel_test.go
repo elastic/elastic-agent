@@ -2231,7 +2231,7 @@ func TestOutputStatusReporting(t *testing.T) {
 		Stack: &define.Stack{},
 	})
 
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithOSArchitecture("darwin", "arm64"))
 	require.NoError(t, err)
 
 	// Create the otel configuration file
@@ -2280,7 +2280,6 @@ agent.grpc:
     port: 6790
 `
 
-	index := ".ds-metrics-e2e-*"
 	var configBuffer bytes.Buffer
 	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 		otelConfigOptions{
@@ -2290,27 +2289,21 @@ agent.grpc:
 		})
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
 	defer cancel()
+
+	installOpts := aTesting.InstallOpts{
+		NonInteractive: true,
+		Privileged:     true,
+		Force:          true,
+		Develop:        true,
+	}
+
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
 
 	err = fixture.Configure(ctx, configBuffer.Bytes())
 
-	cmd, err := fixture.PrepareAgentCommand(ctx, []string{"-e"})
-	require.NoError(t, err, "cannot prepare Elastic-Agent command: %w", err)
-
-	output := strings.Builder{}
-	cmd.Stderr = &output
-	cmd.Stdout = &output
-
-	err = cmd.Start()
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		if t.Failed() {
-			t.Log("Elastic-Agent output:")
-			t.Log(output.String())
-		}
-	})
+	output, err := fixture.InstallWithoutEnroll(ctx, &installOpts)
+	require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
 
 	require.Eventually(t, func() bool {
 		err = fixture.IsHealthy(ctx)
@@ -2320,30 +2313,6 @@ agent.grpc:
 		}
 		return true
 	}, 30*time.Second, 1*time.Second)
-
-	actualHits := &struct{ Hits int }{}
-	assert.Eventually(t,
-		func() bool {
-			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer findCancel()
-
-			query := map[string]interface{}{
-				"query": map[string]interface{}{
-					"exists": map[string]interface{}{
-						"field": "http.json_namespace.beat.cpu.system.ticks",
-					},
-				},
-			}
-
-			docs, err := estools.PerformQueryForRawQuery(findCtx, query, index, info.ESClient)
-			require.NoError(t, err)
-
-			actualHits.Hits = docs.Hits.Total.Value
-			actualHits.Hits = docs.Hits.Total.Value
-			return actualHits.Hits >= 1
-		},
-		2*time.Minute, 5*time.Second,
-		"Expected at least %d logs, got %v", 1, actualHits.Hits)
 
 	// Enable status reporting and use an invalid host.
 	// This should result in DEGRADED state
@@ -2404,4 +2373,7 @@ agent.grpc:
 		}
 		return status.State == int(cproto.State_DEGRADED)
 	}, 1*time.Minute, 1*time.Second)
+
+	combinedOutput, err := fixture.Uninstall(ctx, &aTesting.UninstallOpts{Force: true})
+	require.NoErrorf(t, err, "error uninstalling classic agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
 }

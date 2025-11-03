@@ -532,7 +532,7 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 		}
 	}
 
-	otelStatus, err := translate.AlterPipelineStatus(otelStatus, m.components)
+	otelStatus, err := translate.MaybeMuteExporterStatus(otelStatus, m.components)
 	if err != nil {
 		return nil, fmt.Errorf("failed to mute exporter states from otel status: %w", err)
 	}

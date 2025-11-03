@@ -90,9 +90,9 @@ func DropComponentStateFromOtelStatus(otelStatus *status.AggregateStatus) (*stat
 	return newStatus, nil
 }
 
-// AlterPipelineStatus modifies the given otel status by muting exporter statuses for muted components.
+// MaybeMuteExporterStatus modifies the given otel status by muting exporter statuses for muted components.
 // It also updates parent pipeline statuses based on child components.
-func AlterPipelineStatus(
+func MaybeMuteExporterStatus(
 	otelStatus *status.AggregateStatus,
 	components []component.Component,
 ) (*status.AggregateStatus, error) {

@@ -863,7 +863,7 @@ func TestOutputStatus(t *testing.T) {
 				Enabled: tt.outputStatusReporting,
 			}
 
-			status, err := AlterPipelineStatus(tt.status, []component.Component{comp})
+			status, err := MaybeMuteExporterStatus(tt.status, []component.Component{comp})
 			require.NoError(t, err)
 			result, err := getComponentState(status.ComponentStatusMap["pipeline:logs/_agent-component/filestream-default"], comp)
 			require.NoError(t, err)
