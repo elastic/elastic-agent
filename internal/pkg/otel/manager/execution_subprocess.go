@@ -79,7 +79,7 @@ type subprocessExecution struct {
 
 // startCollector starts a supervised collector and monitors its health. Process exit errors are sent to the
 // processErrCh channel. Other run errors, such as not able to connect to the health endpoint, are sent to the runErrCh channel.
-func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, processErrCh chan error, statusCh chan *status.AggregateStatus) (collectorHandle, error) {
+func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, processErrCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
 	if cfg == nil {
 		// configuration is required
 		return nil, errors.New("no configuration provided")
@@ -186,6 +186,8 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 				// after the collector exits, we need to report a nil status
 				r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
 				return
+			case <-forceFetchStatusCh:
+				r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
 			case <-healthCheckPollTimer.C:
 				healthCheckPollTimer.Reset(healthCheckPollDuration)
 			case <-maxFailuresTimer.C:
