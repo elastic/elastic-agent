@@ -117,7 +117,7 @@ otlp/ingest:
     queue_size: 50000000 # 50MB uncompressed
     block_on_overflow: true
     batch:
-      flush_interval: 1s
+      flush_timeout: 1s
       min_size: 1_000_000 # 1MB uncompressed
       max_size: 4_000_000 # 4MB uncompressed
 ```
@@ -143,7 +143,7 @@ The following example configuration files are available for the Gateway mode:
 | Version | Configuration  |
 |---------|----------------|
 | 9.2     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.0/internal/pkg/otel/samples/linux/gateway.yml) |
-| 9.1     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.1.5/internal/pkg/otel/samples/linux/gateway.yml) |
+| 9.1     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.1.6/internal/pkg/otel/samples/linux/gateway.yml) |
 | 9.0     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.0.8/internal/pkg/otel/samples/linux/gateway.yml) |
 % end:edot-gateway-9x-table
 ::::

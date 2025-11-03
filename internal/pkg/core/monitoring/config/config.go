@@ -19,7 +19,7 @@ const (
 	DefaultHost           = "localhost"
 	ProcessRuntimeManager = "process"
 	OtelRuntimeManager    = "otel"
-	DefaultRuntimeManager = ProcessRuntimeManager
+	DefaultRuntimeManager = OtelRuntimeManager
 )
 
 // MonitoringConfig describes a configuration of a monitoring

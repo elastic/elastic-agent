@@ -306,9 +306,7 @@ func TestGetOtelConfig(t *testing.T) {
 			"logs_dynamic_id": map[string]any{
 				"enabled": true,
 			},
-			"telemetry": map[string]any{
-				"log_failed_docs_input": true,
-			},
+			"include_source_on_error": true,
 			"auth": map[string]any{
 				"authenticator": "beatsauth/_agent-component/" + outputName,
 			},
@@ -1190,10 +1188,10 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			name: "unsupported input type",
 			component: &component.Component{
 				ID:         "unsupported-input",
-				InputType:  "log", // unsupported
+				InputType:  "stdin", // unsupported
 				OutputType: "elasticsearch",
 			},
-			expectedError: "unsupported input type: log",
+			expectedError: "unsupported input type: stdin",
 		},
 		{
 			name: "unsupported configuration",
