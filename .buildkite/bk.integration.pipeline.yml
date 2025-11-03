@@ -6,12 +6,12 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1760749288"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1760749288"
-  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1760749288"
-  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1760749288"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1760749288"
-  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1760749288"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1761958868"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1761958868"
+  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1761958868"
+  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1761958868"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1761958868"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1761958868"
   ASDF_TERRAFORM_VERSION: 1.9.2
 
 # This section is used to define the plugins that will be used in the pipeline.
@@ -538,7 +538,7 @@ steps:
     steps:
       - label: ":git: :kubernetes: {{matrix.version}}:amd64:{{matrix.variants}}"
         # Run this step only if we are **not** building a PR (we use all supported k8s versions)
-        if: build.env("BUILDKITE_PULL_REQUEST") == null
+        if: build.pull_request.id == null
         env:
           *k8s_test_env
         command: *k8s_test_command
@@ -563,7 +563,7 @@ steps:
               *k8s_test_versions
       - label: ":open-pull-request: :kubernetes: {{matrix.version}}:amd64:{{matrix.variants}}"
         # Run this step only if we are building a PR (we use only min/max k8s versions)
-        if: build.env("BUILDKITE_PULL_REQUEST") != null
+        if: build.pull_request.id != null
         env:
           *k8s_test_env
         command: *k8s_test_command
