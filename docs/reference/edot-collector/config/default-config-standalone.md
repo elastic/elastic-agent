@@ -371,6 +371,53 @@ The server expects incoming HTTP requests to include an API key with sufficient 
 [Gateway mode]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/heads/main/internal/pkg/otel/samples/linux/gateway.yml
 
 
+### Secure SDK to Collector connection (TLS)
+
+To secure the connection between the {{edot}} SDKs and the EDOT Collector, configure TLS on both ends.
+
+#### SDK configuration
+
+Set the following environment variables in your application:
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT=https://collector.example.com:4318
+OTEL_EXPORTER_OTLP_INSECURE=false
+OTEL_EXPORTER_OTLP_CERTIFICATE=/etc/ssl/certs/collector-ca.crt
+```
+
+These settings:
+
+* Enable TLS (`INSECURE=false`)
+
+* Trust the Collector's certificate (`CERTIFICATE`)
+
+* Ensure the endpoint uses `https://`
+
+These settings work with .NET, Java, and Python SDKs.
+
+#### Collector receiver configuration
+
+Enable TLS in the OTLP receiver:
+
+```yaml
+receivers:
+      # Receives data from other Collectors in Agent mode
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317 # Listen on all interfaces
+            tls:
+              cert_file: "/etc/ssl/certs/collector-server.crt"
+              key_file: "/etc/ssl/private/collector-server.key"
+          http:
+            endpoint: 0.0.0.0:4318 # Listen on all interfaces
+            tls:
+              cert_file: "/etc/ssl/certs/collector-server.crt"
+              key_file: "/etc/ssl/private/collector-server.key"
+```
+
+This encrypts data between SDKs and the Collector over both gRPC and HTTP protocols.
+
 ### Secure the connection between the EDOT Collector and Elastic
 
 In addition to securing communication between the {{edot}} SDKs and the `apmconfigextension`, you should secure the connection between the EDOT Collector and {{es}} endpoints.
