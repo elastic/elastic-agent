@@ -1510,6 +1510,43 @@ func TestUnitToExporterConfig(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "success with otel extensions override",
+			unit: component.Unit{
+				ID:   "filestream-default",
+				Type: client.UnitTypeOutput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"hosts": []any{"es:9200"},
+					"otel": map[string]any{
+						"extensions": map[string]any{
+							"beatsauth": map[string]any{
+								"timeout": "5m",
+							},
+						},
+					},
+				}),
+			},
+			exporterType: esExporterType,
+			inputType:    "filestream",
+			expectedExportersCfg: map[string]any{
+				"elasticsearch/_agent-component/default": map[string]any{
+					"hosts":      []interface{}{"es:9200"},
+					"translated": true,
+					"auth": map[string]any{
+						"authenticator": "beatsauth/_agent-component/default",
+					},
+				},
+			},
+			expectedQueueSettings: nil,
+			expectedExtensionCfg: map[string]any{
+				"beatsauth/_agent-component/default": map[string]any{
+					"continue_on_error":       true,
+					"idle_connection_timeout": "3s",
+					"proxy_disable":           false,
+					"timeout":                 "5m",
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
