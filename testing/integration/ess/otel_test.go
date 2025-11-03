@@ -119,9 +119,6 @@ service:
 	err = fixture.ConfigureOtel(t.Context(), []byte(otelConfig))
 	require.NoError(t, err)
 
-	// remove elastic-agent.yml, otel should be independent
-	require.NoError(t, os.Remove(filepath.Join(fixture.WorkDir(), "elastic-agent.yml")))
-
 	cmd, err := fixture.PrepareAgentCommand(ctx, []string{"otel"})
 	require.NoError(t, err)
 

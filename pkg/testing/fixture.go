@@ -285,6 +285,11 @@ func (f *Fixture) ConfigureOtel(ctx context.Context, yamlConfig []byte) error {
 		return err
 	}
 
+	// remove elastic-agent.yml, otel should be independent
+	if removeErr := os.Remove(filepath.Join(f.WorkDir(), "elastic-agent.yml")); removeErr != nil && !os.IsNotExist(removeErr) {
+		return removeErr
+	}
+
 	cfgFilePath := filepath.Join(f.workDir, "otel.yml")
 	return os.WriteFile(cfgFilePath, yamlConfig, 0600)
 }
