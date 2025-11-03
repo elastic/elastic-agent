@@ -682,7 +682,7 @@ func (c *Coordinator) Migrate(
 		options,
 		store,
 		backoffFactory,
-		3, // try enrollment for 5 times and fail
+		3, // try enrollment for 3 times and fail
 	)
 	if err != nil {
 		restoreErr := RestoreConfig()
