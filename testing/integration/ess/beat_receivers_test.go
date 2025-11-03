@@ -927,7 +927,7 @@ func TestComponentWorkDir(t *testing.T) {
 	type configOptions struct {
 		RuntimeExperimental string
 	}
-	configTemplate := `agent.logging.level: info
+	configTemplate := `agent.logging.level: debug
 agent.logging.to_stderr: true
 agent.logging.to_files: false
 inputs:
