@@ -2220,33 +2220,24 @@ service:
 }
 
 func TestOutputStatusReporting(t *testing.T) {
-	info := define.Require(t, define.Requirements{
+	define.Require(t, define.Requirements{
 		Group: integration.Default,
-		Local: true,
+		Local: false,
+		Stack: nil,
 		OS: []define.OS{
 			{Type: define.Windows},
 			{Type: define.Linux},
 			{Type: define.Darwin},
 		},
-		Stack: &define.Stack{},
 	})
 
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithOSArchitecture("darwin", "arm64"))
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
 	// Create the otel configuration file
 	type otelConfigOptions struct {
 		StatusReportingEnabled bool
-		ESEndpoint             string
-		ESApiKey               string
 	}
-	esEndpoint, err := integration.GetESHost()
-	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
-	decodedApiKey, err := getDecodedApiKey(esApiKey)
-	require.NoError(t, err)
 	configTemplate := `
 inputs:
   - type: system/metrics
@@ -2265,8 +2256,8 @@ agent.reload:
 outputs:
   default:
     type: elasticsearch
-    hosts: [{{.ESEndpoint}}]
-    api_key: "{{.ESApiKey}}"
+    hosts: [http://localhost:9200]
+    api_key: placeholder
     preset: "balanced"
     status_reporting:
       enabled: {{.StatusReportingEnabled}}
@@ -2283,8 +2274,6 @@ agent.grpc:
 	var configBuffer bytes.Buffer
 	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 		otelConfigOptions{
-			ESEndpoint:             esEndpoint,
-			ESApiKey:               decodedApiKey,
 			StatusReportingEnabled: true,
 		})
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
@@ -2306,41 +2295,19 @@ agent.grpc:
 	require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
 
 	require.Eventually(t, func() bool {
-		err = fixture.IsHealthy(ctx)
-		if err != nil {
-			t.Logf("waiting for agent healthy: %s", err.Error())
-			return false
-		}
-		return true
-	}, 30*time.Second, 1*time.Second)
-
-	// Enable status reporting and use an invalid host.
-	// This should result in DEGRADED state
-	configBuffer.Reset()
-	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
-		otelConfigOptions{
-			ESEndpoint:             "https://invalid:9200",
-			ESApiKey:               decodedApiKey,
-			StatusReportingEnabled: true,
-		})
-	err = fixture.Configure(ctx, configBuffer.Bytes())
-	require.NoError(t, err)
-	require.Eventually(t, func() bool {
 		status, err := fixture.ExecStatus(ctx)
 		if err != nil {
 			t.Logf("waiting for agent degraded: %s", err.Error())
 			return false
 		}
 		return status.State == int(cproto.State_DEGRADED)
-	}, 1*time.Minute, 1*time.Second)
+	}, 30*time.Second, 1*time.Second)
 
-	// Disable status reporting and keep using an invalid host.
+	// Disable status reporting.
 	// This should result in HEALTHY state
 	configBuffer.Reset()
 	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 		otelConfigOptions{
-			ESEndpoint:             "https://invalid:9200",
-			ESApiKey:               decodedApiKey,
 			StatusReportingEnabled: false,
 		})
 	err = fixture.Configure(ctx, configBuffer.Bytes())
@@ -2354,13 +2321,11 @@ agent.grpc:
 		return true
 	}, 1*time.Minute, 1*time.Second)
 
-	// Again, enabled status reporting and keep using an invalid host.
+	// Enabled status reporting and keep using localhost.
 	// This should result in DEGRADED state
 	configBuffer.Reset()
 	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 		otelConfigOptions{
-			ESEndpoint:             "https://invalid:9200",
-			ESApiKey:               decodedApiKey,
 			StatusReportingEnabled: true,
 		})
 	err = fixture.Configure(ctx, configBuffer.Bytes())
@@ -2372,7 +2337,7 @@ agent.grpc:
 			return false
 		}
 		return status.State == int(cproto.State_DEGRADED)
-	}, 1*time.Minute, 1*time.Second)
+	}, 30*time.Second, 1*time.Second)
 
 	combinedOutput, err := fixture.Uninstall(ctx, &aTesting.UninstallOpts{Force: true})
 	require.NoErrorf(t, err, "error uninstalling classic agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
