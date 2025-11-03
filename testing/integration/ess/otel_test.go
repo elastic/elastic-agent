@@ -28,8 +28,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/go-elasticsearch/v8"
-
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommontest"
@@ -38,6 +36,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/integration"
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 const apmProcessingContent = `2023-06-19 05:20:50 ERROR This is a test error message
@@ -86,6 +85,64 @@ service:
       exporters:
         - debug
         - otlp/elastic`
+
+func TestOtelStartShutdown(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+	})
+
+	otelConfig := `receivers:
+  nop:
+exporters:
+  nop:
+service:
+  pipelines:
+    logs:
+      receivers:
+        - nop
+      exporters:
+        - nop
+`
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	err = fixture.ConfigureOtel(t.Context(), []byte(otelConfig))
+	require.NoError(t, err)
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, []string{"otel"})
+	require.NoError(t, err)
+
+	output := strings.Builder{}
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	require.NoError(t, cmd.Start(), "could not start otel collector")
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		assert.Contains(collect, output.String(), "Everything is ready")
+	}, time.Second*30, time.Second)
+
+	// stop the collector and check that it emitted logs indicating a graceful shutdown
+	require.NoError(t, cmd.Process.Signal(os.Interrupt))
+	require.NoError(t, cmd.Wait())
+	assert.Contains(t, output.String(), "Shutdown complete")
+}
 
 func TestOtelFileProcessing(t *testing.T) {
 	define.Require(t, define.Requirements{
@@ -2217,4 +2274,129 @@ service:
 	}, 2*time.Minute, 5*time.Second)
 
 	cancel()
+}
+
+func TestOutputStatusReporting(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Sudo:  true,
+		Group: integration.Default,
+		Local: false,
+		Stack: nil,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+	})
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	// Create the otel configuration file
+	type otelConfigOptions struct {
+		StatusReportingEnabled bool
+	}
+	configTemplate := `
+inputs:
+  - type: system/metrics
+    id: http-metrics-test
+    use_output: default
+    _runtime_experimental: otel
+    streams:
+    - metricsets:
+       - cpu
+      period: 1s
+      data_stream:
+        dataset: e2e
+      namespace: "json_namespace"
+agent.reload:
+  period: 1s
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [http://localhost:9200]
+    api_key: placeholder
+    preset: "balanced"
+    status_reporting:
+      enabled: {{.StatusReportingEnabled}}
+agent.monitoring:
+  metrics: false
+  logs: false
+  http:
+    enabled: true
+    port: 6792
+agent.grpc:
+    port: 6790
+`
+
+	var configBuffer bytes.Buffer
+	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+		otelConfigOptions{
+			StatusReportingEnabled: true,
+		})
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	installOpts := aTesting.InstallOpts{
+		NonInteractive: true,
+		Privileged:     true,
+		Force:          true,
+		Develop:        true,
+	}
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+
+	output, err := fixture.InstallWithoutEnroll(ctx, &installOpts)
+	require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
+
+	require.Eventually(t, func() bool {
+		status, err := fixture.ExecStatus(ctx)
+		if err != nil {
+			t.Logf("waiting for agent degraded: %s", err.Error())
+			return false
+		}
+		return status.State == int(cproto.State_DEGRADED)
+	}, 30*time.Second, 1*time.Second)
+
+	// Disable status reporting.
+	// This should result in HEALTHY state
+	configBuffer.Reset()
+	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+		otelConfigOptions{
+			StatusReportingEnabled: false,
+		})
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 1*time.Minute, 1*time.Second)
+
+	// Enabled status reporting and keep using localhost.
+	// This should result in DEGRADED state
+	configBuffer.Reset()
+	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+		otelConfigOptions{
+			StatusReportingEnabled: true,
+		})
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		status, err := fixture.ExecStatus(ctx)
+		if err != nil {
+			t.Logf("waiting for agent degraded: %s", err.Error())
+			return false
+		}
+		return status.State == int(cproto.State_DEGRADED)
+	}, 30*time.Second, 1*time.Second)
+
+	combinedOutput, err := fixture.Uninstall(ctx, &aTesting.UninstallOpts{Force: true})
+	require.NoErrorf(t, err, "error uninstalling classic agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
 }

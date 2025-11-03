@@ -37,6 +37,12 @@ inputs:
         when:
           equals:
             log.type: event
+    - drop_fields:
+        fields:
+        - error.reason
+        when:
+          contains:
+            message: failed to index document
     - copy_fields:
         fields:
         - from: data_stream.dataset
@@ -453,6 +459,67 @@ inputs:
         fields:
           binary: elastic-agent
           id: elastic-agent
+        target: component
+  - data_stream:
+      dataset: elastic_agent.elastic_agent
+      namespace: default
+      type: metrics
+    failure_threshold: 5
+    hosts:
+    - placeholder
+    id: metrics-monitoring-edot-collector
+    index: metrics-elastic_agent.elastic_agent-default
+    metricsets:
+    - json
+    namespace: agent
+    path: /stats
+    period: 1m0s
+    processors:
+    - add_fields:
+        fields:
+          dataset: elastic_agent.elastic_agent
+          namespace: default
+          type: metrics
+        target: data_stream
+    - add_fields:
+        fields:
+          dataset: elastic_agent.elastic_agent
+        target: event
+    - add_fields:
+        fields:
+          id: ""
+          process: elastic-agent/collector
+          snapshot: false
+          version: placeholder
+        target: elastic_agent
+    - add_fields:
+        fields:
+          id: ""
+        target: agent
+    - copy_fields:
+        fail_on_error: false
+        fields:
+        - from: http.agent.beat.cpu
+          to: system.process.cpu
+        - from: http.agent.beat.memstats.memory_sys
+          to: system.process.memory.size
+        - from: http.agent.beat.handles
+          to: system.process.fd
+        - from: http.agent.beat.cgroup
+          to: system.process.cgroup
+        - from: http.agent.apm-server
+          to: apm-server
+        - from: http.filebeat_input
+          to: filebeat_input
+        ignore_missing: true
+    - drop_fields:
+        fields:
+        - http
+        ignore_missing: true
+    - add_fields:
+        fields:
+          binary: elastic-agent
+          id: elastic-agent/collector
         target: component
   - data_stream:
       dataset: elastic_agent.elastic_agent
