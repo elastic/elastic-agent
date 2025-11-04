@@ -4,58 +4,23 @@ on:
   workflow_dispatch:
     inputs:
       bc_commit_sha:
-        description: 'Commit SHA for the BC'
+        description: 'Commit SHA for the build candidate'
         type: string
         required: true
       version:
         description: 'Version to be released (for example, `9.2.1`)'
         type: string
         required: true
-permissions:
-  contents: read
-env:
-  product: Elastic Agent
-  labels: docs,forwardport-main,release,skip-changelog,Team:Docs
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  build-changelog:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          ref: ${{ inputs.bc_commit_sha }}
-      - name: Generate release notes
-        run: |
-          GOBIN=$PWD/bin go install github.com/elastic/elastic-agent-changelog-tool@latest
-          ./bin/elastic-agent-changelog-tool build --version "${VERSION}"
-          ./bin/elastic-agent-changelog-tool cleanup
-          ./bin/elastic-agent-changelog-tool render --version "${VERSION}"
-        env:
-          VERSION: ${{ inputs.version }}
-      - name: Get minor
-        id: get-minor
-        uses: actions/github-script@v8
-        with:
-          script: return "${{ inputs.version }}".replace(/^(\d+\.\d+).+$/m, "$1")
-          result-encoding: string
-      - name: Open PR
-        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e #v7.0.8
-        with:
-          commit-message: add the ${{ inputs.version }} ${{ env.product }} release notes
-          branch: ${{ inputs.version }}-release-notes
-          base: ${{ steps.get-minor.outputs.result }}
-          add-paths: |
-            changelog/
-            docs/
-          labels: ${{ env.labels }}
-          title: "Add ${{ env.product }} ${{ inputs.version }} release notes"
-          body: |
-            Adds ${{ env.product }} ${{ inputs.version }} release notes.
-
-            ## Checklist
-
-            - [ ] @${{ github.triggering_actor }} review this PR to make sure the correct items are included
-            - [ ] @elastic/ingest-docs-team review the language
-            - [ ] @${{ github.triggering_actor }} merge on release day
+  build-release-notes:
+    uses: elastic/elastic-agent-changelog-tool/.github/workflows/generate-release-notes.yml@main
+    with:
+      product: Elastic Agent
+      labels: docs,forwardport-main,release,skip-changelog,Team:Docs
+      bc_commit_sha: ${{ inputs.bc_commit_sha }}
+      version: ${{ inputs.version }}
+      release_manager: ${{ github.triggering_actor }}
+    permissions:
+      contents: write
+      pull-requests: write
