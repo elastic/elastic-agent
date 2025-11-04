@@ -586,3 +586,291 @@ func TestOtelStatusToUnitState(t *testing.T) {
 		})
 	}
 }
+
+func TestOutputStatus(t *testing.T) {
+	baseComp := component.Component{
+		ID:             "filestream-default",
+		InputType:      "filestream",
+		OutputType:     "elasticsearch",
+		RuntimeManager: component.OtelRuntimeManager,
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "agentbeat",
+			Spec: component.InputSpec{
+				Command: &component.CommandSpec{
+					Args: []string{"filebeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "filestream-unit",
+				Type: client.UnitTypeInput,
+				Config: &proto.UnitExpectedConfig{
+					Streams: []*proto.Stream{
+						{Id: "test-1"},
+						{Id: "test-2"},
+					},
+				},
+			},
+			{
+				ID:   "filestream-default",
+				Type: client.UnitTypeOutput,
+			},
+		},
+	}
+
+	tests := []struct {
+		name                  string
+		status                *status.AggregateStatus
+		outputStatusReporting bool
+		expected              runtime.ComponentComponentState
+	}{
+		{
+			name:                  "output status reporting enabled - healthy exporter",
+			outputStatusReporting: true,
+			status: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							fmt.Sprintf("receiver:filebeat/%sfilestream-unit", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+						},
+					},
+				},
+			},
+			expected: runtime.ComponentComponentState{
+				Component: baseComp,
+				State: runtime.ComponentState{
+					State:   client.UnitStateHealthy, // recoverable error
+					Message: "",
+					VersionInfo: runtime.ComponentVersionInfo{
+						Name:      OtelComponentName,
+						BuildHash: version.Commit(),
+						Meta: map[string]string{
+							"build_time": version.BuildTime().String(),
+							"commit":     version.Commit(),
+						},
+					},
+					Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+						{UnitID: "filestream-unit", UnitType: client.UnitTypeInput}: {
+							State:   client.UnitStateHealthy,
+							Message: "Healthy",
+							Payload: map[string]any{
+								"streams": map[string]map[string]string{
+									"test-1": {
+										"error":  "",
+										"status": "HEALTHY",
+									},
+									"test-2": {
+										"error":  "",
+										"status": "HEALTHY",
+									},
+								},
+							},
+						},
+						{UnitID: "filestream-default", UnitType: client.UnitTypeOutput}: {
+							State:   client.UnitStateHealthy,
+							Message: "Healthy",
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                  "output status reporting enabled - degraded exporter",
+			outputStatusReporting: true,
+			status: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
+						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							fmt.Sprintf("receiver:filebeat/%sfilestream-unit", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+							},
+						},
+					},
+				},
+			},
+			expected: runtime.ComponentComponentState{
+				Component: baseComp,
+				State: runtime.ComponentState{
+					State:   client.UnitStateDegraded, // recoverable error
+					Message: "",
+					VersionInfo: runtime.ComponentVersionInfo{
+						Name:      OtelComponentName,
+						BuildHash: version.Commit(),
+						Meta: map[string]string{
+							"build_time": version.BuildTime().String(),
+							"commit":     version.Commit(),
+						},
+					},
+					Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+						{UnitID: "filestream-unit", UnitType: client.UnitTypeInput}: {
+							State:   client.UnitStateHealthy,
+							Message: "Healthy",
+							Payload: map[string]any{
+								"streams": map[string]map[string]string{
+									"test-1": {
+										"error":  "",
+										"status": "HEALTHY",
+									},
+									"test-2": {
+										"error":  "",
+										"status": "HEALTHY",
+									},
+								},
+							},
+						},
+						{UnitID: "filestream-default", UnitType: client.UnitTypeOutput}: {
+							State:   client.UnitStateDegraded,
+							Message: "DEGRADED",
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                  "output status reporting disabled - healthy exporter",
+			outputStatusReporting: false,
+			status: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							fmt.Sprintf("receiver:filebeat/%sfilestream-unit", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+						},
+					},
+				},
+			},
+			expected: runtime.ComponentComponentState{
+				Component: baseComp,
+				State: runtime.ComponentState{
+					State:   client.UnitStateHealthy, // recoverable error
+					Message: "",
+					VersionInfo: runtime.ComponentVersionInfo{
+						Name:      OtelComponentName,
+						BuildHash: version.Commit(),
+						Meta: map[string]string{
+							"build_time": version.BuildTime().String(),
+							"commit":     version.Commit(),
+						},
+					},
+					Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+						{UnitID: "filestream-unit", UnitType: client.UnitTypeInput}: {
+							State:   client.UnitStateHealthy,
+							Message: "Healthy",
+							Payload: map[string]any{
+								"streams": map[string]map[string]string{
+									"test-1": {
+										"error":  "",
+										"status": "HEALTHY",
+									},
+									"test-2": {
+										"error":  "",
+										"status": "HEALTHY",
+									},
+								},
+							},
+						},
+						{UnitID: "filestream-default", UnitType: client.UnitTypeOutput}: {
+							State:   client.UnitStateHealthy,
+							Message: "Healthy",
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                  "output status reporting disabled - degraded exporter",
+			outputStatusReporting: false,
+			status: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
+						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							fmt.Sprintf("receiver:filebeat/%sfilestream-unit", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+							},
+						},
+					},
+				},
+			},
+			expected: runtime.ComponentComponentState{
+				Component: baseComp,
+				State: runtime.ComponentState{
+					State:   client.UnitStateHealthy, // recoverable error
+					Message: "",
+					VersionInfo: runtime.ComponentVersionInfo{
+						Name:      OtelComponentName,
+						BuildHash: version.Commit(),
+						Meta: map[string]string{
+							"build_time": version.BuildTime().String(),
+							"commit":     version.Commit(),
+						},
+					},
+					Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+						{UnitID: "filestream-unit", UnitType: client.UnitTypeInput}: {
+							State:   client.UnitStateHealthy,
+							Message: "Healthy",
+							Payload: map[string]any{
+								"streams": map[string]map[string]string{
+									"test-1": {
+										"error":  "",
+										"status": "HEALTHY",
+									},
+									"test-2": {
+										"error":  "",
+										"status": "HEALTHY",
+									},
+								},
+							},
+						},
+						{UnitID: "filestream-default", UnitType: client.UnitTypeOutput}: {
+							State:   client.UnitStateHealthy,
+							Message: "Healthy",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Make a copy of the base component and apply test-specific config
+			comp := baseComp
+			comp.OutputStatusReporting = &component.StatusReporting{
+				Enabled: tt.outputStatusReporting,
+			}
+
+			status, err := MaybeMuteExporterStatus(tt.status, []component.Component{comp})
+			require.NoError(t, err)
+			result, err := getComponentState(status.ComponentStatusMap["pipeline:logs/_agent-component/filestream-default"], comp)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected.Component.ID, result.Component.ID)
+			assert.Equal(t, tt.expected.State.State, result.State.State)
+			assert.Equal(t, len(tt.expected.State.Units), len(result.State.Units))
+			assert.Equal(t, tt.expected.State.Units, result.State.Units)
+		})
+	}
+}

@@ -91,12 +91,12 @@ type testExecution struct {
 	handle collectorHandle
 }
 
-func (e *testExecution) startCollector(ctx context.Context, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus) (collectorHandle, error) {
+func (e *testExecution) startCollector(ctx context.Context, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
 
 	var err error
-	e.handle, err = e.exec.startCollector(ctx, baseLogger, logger, cfg, errCh, statusCh)
+	e.handle, err = e.exec.startCollector(ctx, baseLogger, logger, cfg, errCh, statusCh, forceFetchStatusCh)
 	return e.handle, err
 }
 
@@ -123,6 +123,7 @@ func (e *mockExecution) startCollector(
 	cfg *confmap.Conf,
 	errCh chan error,
 	statusCh chan *status.AggregateStatus,
+	_ chan struct{},
 ) (collectorHandle, error) {
 	e.errCh = errCh
 	e.statusCh = statusCh
