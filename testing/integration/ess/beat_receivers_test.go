@@ -1130,7 +1130,6 @@ func TestSensitiveLogsESExporter(t *testing.T) {
 		},
 		Stack: &define.Stack{},
 	})
-	t.Skip("Enable this test after https://github.com/elastic/elastic-agent/issues/10423 is implemented with appropriate config")
 	tmpDir := t.TempDir()
 	numEvents := 50
 	// Create the data file to ingest
@@ -1184,6 +1183,10 @@ outputs:
     type: elasticsearch
     hosts: [{{.ESEndpoint}}]
     api_key: "{{.ESApiKey}}"
+    otel:
+      exporter:
+        telemetry:
+          log_failed_docs_input: true
 agent:
   monitoring:
     enabled: true
