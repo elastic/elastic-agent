@@ -26,8 +26,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/go-elasticsearch/v8"
-
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommontest"
@@ -36,6 +34,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/integration"
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 const apmProcessingContent = `2023-06-19 05:20:50 ERROR This is a test error message
@@ -84,6 +83,66 @@ service:
       exporters:
         - debug
         - otlp/elastic`
+
+func TestOtelStartShutdown(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+	})
+
+	otelConfig := `receivers:
+  nop:
+exporters:
+  nop:
+service:
+  pipelines:
+    logs:
+      receivers:
+        - nop
+      exporters:
+        - nop
+`
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	err = fixture.ConfigureOtel(t.Context(), []byte(otelConfig))
+	require.NoError(t, err)
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, []string{"otel"})
+	require.NoError(t, err)
+
+	output := strings.Builder{}
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	require.NoError(t, cmd.Start(), "could not start otel collector")
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		assert.Contains(collect, output.String(), "Everything is ready")
+	}, time.Second*30, time.Second)
+
+	// stop the collector and check that it emitted logs indicating a graceful shutdown
+	require.NoError(t, cmd.Process.Signal(os.Interrupt))
+	if waitErr := cmd.Wait(); waitErr != nil {
+		assert.ErrorContains(t, waitErr, "signal: interrupt")
+	}
+	assert.Contains(t, output.String(), "Shutdown complete")
+}
 
 func TestOtelFileProcessing(t *testing.T) {
 	define.Require(t, define.Requirements{
