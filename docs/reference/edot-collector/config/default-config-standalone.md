@@ -369,3 +369,103 @@ The server expects incoming HTTP requests to include an API key with sufficient 
 [Logs &#124; Metrics &#124; App - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/logs_metrics_traces.yml
 [Logs &#124; Metrics &#124; App - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/managed_otlp/logs_metrics_traces.yml
 [Gateway mode]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/heads/main/internal/pkg/otel/samples/linux/gateway.yml
+
+
+### Secure SDK to Collector connection (TLS)
+
+To secure the connection between the {{edot}} SDKs and the EDOT Collector, configure TLS on both ends.
+
+#### SDK configuration
+
+Set the following environment variables in your application:
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT=https://collector.example.com:4318
+OTEL_EXPORTER_OTLP_INSECURE=false
+OTEL_EXPORTER_OTLP_CERTIFICATE=/etc/ssl/certs/collector-ca.crt
+```
+
+These settings:
+
+* Enable TLS (`INSECURE=false`)
+
+* Trust the Collector's certificate (`CERTIFICATE`)
+
+* Ensure the endpoint uses `https://`
+
+These settings work with .NET, Java, and Python SDKs.
+
+#### Collector receiver configuration
+
+Enable TLS in the OTLP receiver:
+
+```yaml
+receivers:
+      # Receives data from other Collectors in Agent mode
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317 # Listen on all interfaces
+            tls:
+              cert_file: "/etc/ssl/certs/collector-server.crt"
+              key_file: "/etc/ssl/private/collector-server.key"
+          http:
+            endpoint: 0.0.0.0:4318 # Listen on all interfaces
+            tls:
+              cert_file: "/etc/ssl/certs/collector-server.crt"
+              key_file: "/etc/ssl/private/collector-server.key"
+```
+
+This encrypts data between SDKs and the Collector over both gRPC and HTTP protocols.
+
+### Secure the connection between the EDOT Collector and Elastic
+
+In addition to securing communication between the {{edot}} SDKs and the `apmconfigextension`, you should secure the connection between the EDOT Collector and {{es}} endpoints.
+
+The EDOT Collector uses the `elasticsearch/otel` or `elasticsearch/ecs` exporter to send telemetry data to Elastic. Elastic recommends using HTTPS to encrypt the connection and verify the server's certificate.
+
+Example configuration:
+
+```yaml
+exporters:
+  elasticsearch/otel:
+    endpoint: "https://example.elastic.co:443"
+    api_key: "<your-api-key>"
+    tls:
+      insecure: false
+```
+
+This setup encrypts data in transit and uses the system's default set of trusted certificate authorities to verify the Elastic endpoint certificate.
+
+For {{ecloud}}, this is the recommended approach. {{ecloud}} certificates are signed by a public certificate authority (ISRG Root X1, Let's Encrypt), which should already be trusted by your system.
+
+To override the default CA bundle, specify the CA file explicitly:
+
+```yaml
+tls:
+  insecure: false
+  ca_file: "/path/to/elastic-ca.crt"
+```
+:::{note}
+Avoid using the CA certificate provided in the {{ecloud}} console to verify the Elastic endpoint. It is not intended for this purpose and might not work as expected.
+:::
+
+#### Mutual TLS (mTLS)
+
+For self-managed Elastic deployments, you can optionally enable mTLS to authenticate both the Collector and the {{es}} endpoint. For example:
+
+```yaml
+exporters:
+  elasticsearch/otel:
+    endpoint: "https://example.elastic.co:443"
+    api_key: "<your-api-key>"
+    tls:
+      ca_file: "/path/to/elastic-ca.crt"
+      cert_file: "/path/to/client.crt"
+      key_file: "/path/to/client.key"
+      insecure: false
+```
+
+mTLS ensures that only authorized collectors can send telemetry data.
+
+For {{ecloud}} and {{serverless-full}} deployments, mTLS is not required. TLS and API key authentication are enforced automatically.
