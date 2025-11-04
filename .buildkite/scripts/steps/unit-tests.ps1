@@ -17,6 +17,7 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "--- Unit tests"
 $env:TEST_COVERAGE = $true
 $env:RACE_DETECTOR = $true
+$env:GOPROXY = "https://${ARTIFACTORY_USER}:${ARTIFACTORY_API_KEY}@artifactory.elastic.dev/artifactory/api/go/go"
 mage unitTest
 # Copy coverage file to build directory so it can be downloaded as an artifact
 Write-Host "--- Prepare artifacts"
