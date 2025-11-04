@@ -117,6 +117,7 @@ func ExtractError(resp io.Reader) error {
 		if len(e.Message) == 0 {
 			return fmt.Errorf("status code: %d, fleet-server returned an error: %s", e.StatusCode, e.Error)
 		}
+
 		return fmt.Errorf(
 			"status code: %d, fleet-server returned an error: %s, message: %s",
 			e.StatusCode,

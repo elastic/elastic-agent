@@ -65,7 +65,7 @@ Data is exported directly to {{es}} using the [`elasticsearch`] exporter in `OTe
 
 The application pipeline in the EDOT Collector receives data from OTel SDKs through the [`OTLP`] receiver. While logs and metrics are exported verbatim into {{es}}, traces require two additional components.
 
-{applies_to}`edot_collector: ga 9.2` The [`elasticapm`] processor enriches trace data with additional attributes that improve the user experience in the {{product.observability}} UIs. In addition, the [`elasticapm`] connector generates pre-aggregated APM metrics from tracing data.
+{applies_to}`edot_collector: ga 9.2` The [`elasticapm` processor](../components/elasticapmprocessor.md) enriches trace data with additional attributes that improve the user experience in the {{product.observability}} UIs. In addition, the [`elasticapm` connector](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector) generates pre-aggregated APM metrics from tracing data.
 
 Application-related OTel data is ingested into {{es}} in OTel-native format using the [`elasticsearch`] exporter.
 
@@ -116,10 +116,10 @@ otlp/ingest:
     sizer: bytes
     queue_size: 50000000 # 50MB uncompressed
     block_on_overflow: true
-  batch:
-    flush_interval: 1s
-    min_size: 1_000_000 # 1MB uncompressed
-    max_size: 4_000_000 # 4MB uncompressed
+    batch:
+      flush_timeout: 1s
+      min_size: 1_000_000 # 1MB uncompressed
+      max_size: 4_000_000 # 4MB uncompressed
 ```
 
 The previous configuration leverages an in-memory queue and optimized batching defaults to improve throughput, minimize data loss, and maintain low end-to-end latency.
@@ -142,7 +142,8 @@ The following example configuration files are available for the Gateway mode:
 % start:edot-gateway-9x-table
 | Version | Configuration  |
 |---------|----------------|
-| 9.1     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.1.5/internal/pkg/otel/samples/linux/gateway.yml) |
+| 9.2     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.0/internal/pkg/otel/samples/linux/gateway.yml) |
+| 9.1     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.1.6/internal/pkg/otel/samples/linux/gateway.yml) |
 | 9.0     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.0.8/internal/pkg/otel/samples/linux/gateway.yml) |
 % end:edot-gateway-9x-table
 ::::
@@ -151,7 +152,7 @@ The following example configuration files are available for the Gateway mode:
 % start:edot-gateway-8x-table
 | Version | Configuration  |
 |---------|----------------|
-| 8.19    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.19.5/internal/pkg/otel/samples/linux/gateway.yml) |
+| 8.19    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.19.6/internal/pkg/otel/samples/linux/gateway.yml) |
 | 8.18    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.18.8/internal/pkg/otel/samples/linux/gateway.yml) |
 | 8.17    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.17.10/internal/pkg/otel/samples/linux/gateway.yml) |
 % end:edot-gateway-8x-table
@@ -356,8 +357,8 @@ The server expects incoming HTTP requests to include an API key with sufficient 
 [`hostmetrics`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/hostmetricsreceiver
 [`elasticsearch`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/elasticsearchexporter
 [`elasticinframetrics`]: https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticinframetricsprocessor
-[`elasticapm`]: https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticapmprocessor
-[`elasticapm`]: https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector
+[`elasticapm` processor]: https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticapmprocessor
+[`elasticapm` connector]: https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector
 [`resource`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourceprocessor
 [`resourcedetection`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor
 [`OTLP`]: https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver
@@ -368,3 +369,103 @@ The server expects incoming HTTP requests to include an API key with sufficient 
 [Logs &#124; Metrics &#124; App - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/logs_metrics_traces.yml
 [Logs &#124; Metrics &#124; App - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/managed_otlp/logs_metrics_traces.yml
 [Gateway mode]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/heads/main/internal/pkg/otel/samples/linux/gateway.yml
+
+
+### Secure SDK to Collector connection (TLS)
+
+To secure the connection between the {{edot}} SDKs and the EDOT Collector, configure TLS on both ends.
+
+#### SDK configuration
+
+Set the following environment variables in your application:
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT=https://collector.example.com:4318
+OTEL_EXPORTER_OTLP_INSECURE=false
+OTEL_EXPORTER_OTLP_CERTIFICATE=/etc/ssl/certs/collector-ca.crt
+```
+
+These settings:
+
+* Enable TLS (`INSECURE=false`)
+
+* Trust the Collector's certificate (`CERTIFICATE`)
+
+* Ensure the endpoint uses `https://`
+
+These settings work with .NET, Java, and Python SDKs.
+
+#### Collector receiver configuration
+
+Enable TLS in the OTLP receiver:
+
+```yaml
+receivers:
+      # Receives data from other Collectors in Agent mode
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317 # Listen on all interfaces
+            tls:
+              cert_file: "/etc/ssl/certs/collector-server.crt"
+              key_file: "/etc/ssl/private/collector-server.key"
+          http:
+            endpoint: 0.0.0.0:4318 # Listen on all interfaces
+            tls:
+              cert_file: "/etc/ssl/certs/collector-server.crt"
+              key_file: "/etc/ssl/private/collector-server.key"
+```
+
+This encrypts data between SDKs and the Collector over both gRPC and HTTP protocols.
+
+### Secure the connection between the EDOT Collector and Elastic
+
+In addition to securing communication between the {{edot}} SDKs and the `apmconfigextension`, you should secure the connection between the EDOT Collector and {{es}} endpoints.
+
+The EDOT Collector uses the `elasticsearch/otel` or `elasticsearch/ecs` exporter to send telemetry data to Elastic. Elastic recommends using HTTPS to encrypt the connection and verify the server's certificate.
+
+Example configuration:
+
+```yaml
+exporters:
+  elasticsearch/otel:
+    endpoint: "https://example.elastic.co:443"
+    api_key: "<your-api-key>"
+    tls:
+      insecure: false
+```
+
+This setup encrypts data in transit and uses the system's default set of trusted certificate authorities to verify the Elastic endpoint certificate.
+
+For {{ecloud}}, this is the recommended approach. {{ecloud}} certificates are signed by a public certificate authority (ISRG Root X1, Let's Encrypt), which should already be trusted by your system.
+
+To override the default CA bundle, specify the CA file explicitly:
+
+```yaml
+tls:
+  insecure: false
+  ca_file: "/path/to/elastic-ca.crt"
+```
+:::{note}
+Avoid using the CA certificate provided in the {{ecloud}} console to verify the Elastic endpoint. It is not intended for this purpose and might not work as expected.
+:::
+
+#### Mutual TLS (mTLS)
+
+For self-managed Elastic deployments, you can optionally enable mTLS to authenticate both the Collector and the {{es}} endpoint. For example:
+
+```yaml
+exporters:
+  elasticsearch/otel:
+    endpoint: "https://example.elastic.co:443"
+    api_key: "<your-api-key>"
+    tls:
+      ca_file: "/path/to/elastic-ca.crt"
+      cert_file: "/path/to/client.crt"
+      key_file: "/path/to/client.key"
+      insecure: false
+```
+
+mTLS ensures that only authorized collectors can send telemetry data.
+
+For {{ecloud}} and {{serverless-full}} deployments, mTLS is not required. TLS and API key authentication are enforced automatically.

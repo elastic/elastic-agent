@@ -91,12 +91,12 @@ type testExecution struct {
 	handle collectorHandle
 }
 
-func (e *testExecution) startCollector(ctx context.Context, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus) (collectorHandle, error) {
+func (e *testExecution) startCollector(ctx context.Context, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
 
 	var err error
-	e.handle, err = e.exec.startCollector(ctx, logger, cfg, errCh, statusCh)
+	e.handle, err = e.exec.startCollector(ctx, baseLogger, logger, cfg, errCh, statusCh, forceFetchStatusCh)
 	return e.handle, err
 }
 
@@ -119,9 +119,11 @@ type mockExecution struct {
 func (e *mockExecution) startCollector(
 	ctx context.Context,
 	_ *logger.Logger,
+	_ *logger.Logger,
 	cfg *confmap.Conf,
 	errCh chan error,
 	statusCh chan *status.AggregateStatus,
+	_ chan struct{},
 ) (collectorHandle, error) {
 	e.errCh = errCh
 	e.statusCh = statusCh
@@ -320,33 +322,6 @@ func TestOTelManager_Run(t *testing.T) {
 		testFn              func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error)
 	}{
 		{
-			name: "embedded collector config updates",
-			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				return newExecutionEmbedded(0), nil
-			},
-			restarter: newRestarterNoop(),
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
-				// ensure that it got healthy
-				cfg := confmap.NewFromStringMap(testConfig)
-				updateTime := time.Now()
-				m.Update(cfg, nil)
-				e.EnsureHealthy(t, updateTime)
-
-				// trigger update
-				updateTime = time.Now()
-				ok := cfg.Delete("service::telemetry::logs::level") // modify the config
-				require.True(t, ok)
-				m.Update(cfg, nil)
-				e.EnsureHealthy(t, updateTime)
-
-				// no configuration should stop the runner
-				updateTime = time.Now()
-				m.Update(nil, nil)
-				e.EnsureOffWithoutError(t, updateTime)
-				require.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
-			},
-		},
-		{
 			name: "subprocess collector config updates",
 			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
 				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
@@ -372,33 +347,6 @@ func TestOTelManager_Run(t *testing.T) {
 				e.EnsureOffWithoutError(t, updateTime)
 				assert.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 				assert.Equal(t, uint32(0), m.recoveryRetries.Load(), "recovery retries should be 0")
-			},
-		},
-		{
-			name: "embedded collector stopped gracefully outside manager",
-			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				return newExecutionEmbedded(0), nil
-			},
-			restarter: newRestarterNoop(),
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
-				// ensure that it got healthy
-				cfg := confmap.NewFromStringMap(testConfig)
-				updateTime := time.Now()
-				m.Update(cfg, nil)
-				e.EnsureHealthy(t, updateTime)
-
-				// stop it, this should be restarted by the manager
-				updateTime = time.Now()
-				execHandle := exec.getProcessHandle()
-				require.NotNil(t, execHandle, "execModeFn handle should not be nil")
-				execHandle.Stop(waitTimeForStop)
-				e.EnsureHealthy(t, updateTime)
-
-				// no configuration should stop the runner
-				updateTime = time.Now()
-				m.Update(nil, nil)
-				e.EnsureOffWithoutError(t, updateTime)
-				require.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 			},
 		},
 		{
@@ -651,47 +599,6 @@ func TestOTelManager_Run(t *testing.T) {
 			},
 		},
 		{
-			name: "embedded collector invalid config",
-			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				return newExecutionEmbedded(0), nil
-			},
-			restarter:           newRestarterNoop(),
-			skipListeningErrors: true,
-			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
-				// Errors channel is non-blocking, should be able to send an Update that causes an error multiple
-				// times without it blocking on sending over the errCh.
-				for range 3 {
-					cfg := confmap.New() // invalid config
-					m.Update(cfg, nil)
-
-					// delay between updates to ensure the collector will have to fail
-					<-time.After(100 * time.Millisecond)
-				}
-
-				// because of the retry logic and timing we need to ensure
-				// that this keeps retrying to see the error and only store
-				// an actual error
-				//
-				// a nil error just means that the collector is trying to restart
-				// which clears the error on the restart loop
-				timeoutCh := time.After(time.Second * 5)
-				var err error
-			outer:
-				for {
-					select {
-					case e := <-m.Errors():
-						if e != nil {
-							err = e
-							break outer
-						}
-					case <-timeoutCh:
-						break outer
-					}
-				}
-				assert.Error(t, err, "otel manager should have returned an error")
-			},
-		},
-		{
 			name: "subprocess collector invalid config",
 			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
 				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
@@ -818,12 +725,6 @@ func TestOTelManager_Logging(t *testing.T) {
 		execModeFn func(collectorRunErr chan error) (collectorExecution, error)
 	}{
 		{
-			name: "in-process execution",
-			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				return newExecutionEmbedded(0), nil
-			},
-		},
-		{
 			name: "subprocess execution",
 			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
 				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
@@ -832,7 +733,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// the execution mode passed here is overridden below so it is irrelevant
-			m, err := NewOTelManager(l, logp.DebugLevel, base, EmbeddedExecutionMode, nil, nil, nil, waitTimeForStop)
+			m, err := NewOTelManager(l, logp.DebugLevel, base, SubprocessExecutionMode, nil, nil, nil, waitTimeForStop)
 			require.NoError(t, err, "could not create otel manager")
 
 			executionMode, err := tc.execModeFn(m.collectorRunErr)
@@ -897,13 +798,6 @@ func TestOTelManager_Ports(t *testing.T) {
 		healthCheckEnabled bool
 	}{
 		{
-			name: "in-process execution",
-			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
-				return newExecutionEmbedded(metricsPort), nil
-			},
-			healthCheckEnabled: false,
-		},
-		{
 			name: "subprocess execution",
 			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
 				return newSubprocessExecution(logp.DebugLevel, testBinary, metricsPort, healthCheckPort)
@@ -928,7 +822,7 @@ func TestOTelManager_Ports(t *testing.T) {
 			m, err := NewOTelManager(
 				l,
 				logp.DebugLevel,
-				base, EmbeddedExecutionMode,
+				base, SubprocessExecutionMode,
 				nil,
 				&agentCollectorConfig,
 				nil,
