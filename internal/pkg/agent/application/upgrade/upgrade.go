@@ -227,6 +227,8 @@ func (u *Upgrader) Reload(rawConfig *config.Config) error {
 	u.settings = cfg.Settings.DownloadConfig
 	u.upgradeSettings = cfg.Settings.Upgrade
 
+	u.artifactDownloader = newArtifactDownloader(u.settings, u.log)
+
 	return nil
 }
 
