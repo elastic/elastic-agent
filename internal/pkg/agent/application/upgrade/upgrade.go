@@ -190,6 +190,13 @@ func (u *Upgrader) Reload(rawConfig *config.Config) error {
 	}
 
 	u.settings = cfg.Settings.DownloadConfig
+<<<<<<< HEAD
+=======
+	u.upgradeSettings = cfg.Settings.Upgrade
+
+	u.artifactDownloader = newArtifactDownloader(u.settings, u.log)
+
+>>>>>>> fa2a03d3e (Fix download settings reload (#10993))
 	return nil
 }
 
