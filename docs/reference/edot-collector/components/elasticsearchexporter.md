@@ -133,7 +133,7 @@ The `elasticsearch.index` attribute is removed from the final document if it exi
 
 ### Queuing and batching
 
-The {{es}} exporter supports the common `sending_queue` settings which support both queueing and batching. The default sending queue is configured to do async batching with the following configuration:
+The {{es}} exporter supports the common `sending_queue` settings, which enable both queuing and batching. The default sending queue is configured to do async batching with the following configuration:
 
 ```yaml
 sending_queue:
@@ -149,7 +149,7 @@ sending_queue:
     sizer: items
 ```
 
-The default configurations are chosen to be closer to the defaults with the exporter's previous inbuilt batching feature. For more details on the `sending_queue` settings, see the [exporterhelper documentation](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/exporterhelper/README.md).
+The default configurations are chosen to be closer to the defaults with the exporter's previous built-in batching feature. For more details on the `sending_queue` settings, refer to the [`exporterhelper` documentation](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/exporterhelper/README.md).
 
 You can customize the sending queue configuration:
 
@@ -217,7 +217,7 @@ The Elasticsearch exporter uses the [Elasticsearch Bulk API](https://www.elastic
 | `retry::retry_on_status` | `[429]` | Status codes that trigger request or document level retries. Request level retry and document level retry status codes are shared and cannot be configured separately. To avoid duplicates, it defaults to `[429]`. |
 
 :::{note}
-The `flush::interval` config is ignored when using `sending_queue` (enabled by default) or when `batcher::enabled` config is explicitly set to true or false.
+The `flush::interval` config is ignored when using `sending_queue` (enabled by default) or when `batcher::enabled` config is explicitly set.
 :::
 
 Starting from Elasticsearch 8.18 and higher, the [`include_source_on_error`](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk#operation-bulk-include_source_on_error) query parameter allows users to receive the source document in the error response if there were parsing errors in the bulk request. In the exporter, the equivalent configuration is also named `include_source_on_error`.
