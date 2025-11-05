@@ -929,7 +929,7 @@ func TestComponentWorkDir(t *testing.T) {
 	type configOptions struct {
 		RuntimeExperimental string
 	}
-	configTemplate := `agent.logging.level: info
+	configTemplate := `agent.logging.level: debug
 agent.logging.to_stderr: true
 agent.logging.to_files: false
 inputs:
@@ -980,13 +980,14 @@ agent.monitoring.enabled: false
 	var componentID, componentWorkDir string
 	var workDirCreated time.Time
 
-	// wait for component to appear in status
+	// wait for component to appear in status and be healthy
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error
 		status, statusErr := fixture.ExecStatus(ctx)
 		require.NoError(collect, statusErr)
 		require.Equal(collect, 1, len(status.Components))
 		componentStatus := status.Components[0]
+		assert.Equal(collect, cproto.State_HEALTHY, cproto.State(componentStatus.State))
 		componentID = componentStatus.ID
 	}, 2*time.Minute, 5*time.Second)
 
@@ -1003,13 +1004,17 @@ agent.monitoring.enabled: false
 	err = fixture.Configure(ctx, receiverConfig)
 	require.NoError(t, err)
 
+	// wait for component to appear in status and be healthy or degraded
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error
 		status, statusErr := fixture.ExecStatus(ctx)
 		require.NoError(collect, statusErr)
 		require.Equal(collect, 1, len(status.Components))
 		componentStatus := status.Components[0]
-		assert.Equal(collect, "beats-receiver", componentStatus.VersionInfo.Name)
+		require.Equal(collect, "beats-receiver", componentStatus.VersionInfo.Name)
+		componentState := cproto.State(componentStatus.State)
+		assert.Truef(collect, componentState == cproto.State_HEALTHY || componentState == cproto.State_DEGRADED,
+			"component state should be HEALTHY or DEGRADED, got %s", componentState.String())
 	}, 2*time.Minute, 5*time.Second)
 
 	// the component working directory should still exist
