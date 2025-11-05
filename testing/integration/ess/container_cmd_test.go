@@ -516,9 +516,6 @@ func TestContainerCMDAgentMonitoringRuntimeExperimental(t *testing.T) {
 			addLogIntegration(t, info, policyID, "/tmp/beats-receivers-test.log")
 			integration.GenerateLogFile(t, "/tmp/beats-receivers-test.log", time.Second/2, 50)
 
-			// all monitoring components use process runtime unless overridden
-			// setAgentMonitoringToProcess(t, info, policyID, policyName)
-
 			env := []string{
 				"FLEET_ENROLL=1",
 				"FLEET_URL=" + fleetURL,
@@ -551,7 +548,12 @@ func TestContainerCMDAgentMonitoringRuntimeExperimental(t *testing.T) {
 				status, err := agentFixture.ExecStatus(ctx, atesting.WithCmdOptions(withEnv(env)))
 				require.NoErrorf(t, err, "error getting agent status")
 
-				require.Len(t, status.Components, 5, "expected right number of components in agent status")
+				expectedComponentCount := 4 // process runtime
+				if tc.expectedRuntimeName == string(monitoringCfg.OtelRuntimeManager) {
+					expectedComponentCount = 5 // otel runtime
+				}
+
+				assert.Len(t, status.Components, expectedComponentCount, "expected right number of components in agent status")
 				for _, comp := range status.Components {
 					var compRuntime string
 					switch comp.VersionInfo.Name {
@@ -627,35 +629,4 @@ func addLogIntegration(t *testing.T, info *define.Info, policyID, logFilePath st
 		t.Log("================================================================================")
 		t.FailNow()
 	}
-}
-
-func setAgentMonitoringToProcess(t *testing.T, info *define.Info, policyID string, policyName string) {
-	reqBody := fmt.Sprintf(`
-{
-  "name": "%s",
-  "namespace": "default",
-  "overrides": {
-    "agent": {
-      "monitoring": {
-        "_runtime_experimental": "process"
-      }
-    }
-  }
-}
-`, policyName)
-
-	status, result, err := info.KibanaClient.Request(
-		http.MethodPut,
-		fmt.Sprintf("/api/fleet/agent_policies/%s", policyID),
-		nil,
-		nil,
-		bytes.NewBufferString(reqBody))
-	if err != nil {
-		t.Fatalf("could not execute request to update policy: %s", err)
-	}
-	if status != http.StatusOK {
-		t.Fatalf("updating policy failed. Status code %d, response:\n%s", status, string(result))
-	}
-
-	t.Logf("Successfully set monitoring to process runtime for policy %s", policyID)
 }
