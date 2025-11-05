@@ -19,10 +19,9 @@ echo "Installing awscli"
 mkdir -p "${HOME_BIN}"
 mkdir -p "${AWSCLI_INSTALL_DIR}"
 
-OS=$(uname -s| tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m| tr '[:upper:]' '[:lower:]')
 
-curl "https://awscli.amazonaws.com/awscli-exe-linux-${ARCH}.zip" -o "awscliv2.zip"
-unzip awscliv2.zip
-./aws/install --bin-dir "${HOME_BIN}" --install-dir "${AWSCLI_INSTALL_DIR}"
+curl -sSL "https://awscli.amazonaws.com/awscli-exe-linux-${ARCH}.zip" -o "awscliv2.zip"
+unzip -q awscliv2.zip
+sudo ./aws/install
 
