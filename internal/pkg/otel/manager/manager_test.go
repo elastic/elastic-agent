@@ -34,6 +34,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -91,12 +92,12 @@ type testExecution struct {
 	handle collectorHandle
 }
 
-func (e *testExecution) startCollector(ctx context.Context, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus) (collectorHandle, error) {
+func (e *testExecution) startCollector(ctx context.Context, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
 
 	var err error
-	e.handle, err = e.exec.startCollector(ctx, baseLogger, logger, cfg, errCh, statusCh)
+	e.handle, err = e.exec.startCollector(ctx, baseLogger, logger, cfg, errCh, statusCh, forceFetchStatusCh)
 	return e.handle, err
 }
 
@@ -123,6 +124,7 @@ func (e *mockExecution) startCollector(
 	cfg *confmap.Conf,
 	errCh chan error,
 	statusCh chan *status.AggregateStatus,
+	_ chan struct{},
 ) (collectorHandle, error) {
 	e.errCh = errCh
 	e.statusCh = statusCh
@@ -732,7 +734,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// the execution mode passed here is overridden below so it is irrelevant
-			m, err := NewOTelManager(l, logp.DebugLevel, base, SubprocessExecutionMode, nil, nil, nil, waitTimeForStop)
+			m, err := NewOTelManager(l, logp.DebugLevel, base, config.SubprocessExecutionMode, nil, nil, nil, waitTimeForStop)
 			require.NoError(t, err, "could not create otel manager")
 
 			executionMode, err := tc.execModeFn(m.collectorRunErr)
@@ -821,7 +823,7 @@ func TestOTelManager_Ports(t *testing.T) {
 			m, err := NewOTelManager(
 				l,
 				logp.DebugLevel,
-				base, SubprocessExecutionMode,
+				base, config.SubprocessExecutionMode,
 				nil,
 				&agentCollectorConfig,
 				nil,
@@ -944,7 +946,7 @@ func TestOTelManager_PortConflict(t *testing.T) {
 	m, err := NewOTelManager(
 		l,
 		logp.DebugLevel,
-		base, SubprocessExecutionMode,
+		base, config.SubprocessExecutionMode,
 		nil,
 		nil,
 		nil,
@@ -1565,7 +1567,7 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 		testLogger,
 		logp.DebugLevel,
 		testLogger,
-		SubprocessExecutionMode, // irrelevant, we'll override it
+		config.SubprocessExecutionMode, // irrelevant, we'll override it
 		agentInfo,
 		nil,
 		beatMonitoringConfigGetter,

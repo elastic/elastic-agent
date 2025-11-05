@@ -7,11 +7,14 @@ package application
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"go.elastic.co/apm/v2"
 
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 
 	"github.com/elastic/go-ucfg"
 
@@ -36,6 +39,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	otelconfig "github.com/elastic/elastic-agent/internal/pkg/otel/config"
 	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/queue"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -46,6 +50,11 @@ import (
 	"github.com/elastic/elastic-agent/pkg/limits"
 	"github.com/elastic/elastic-agent/version"
 )
+
+type rollbacksSource interface {
+	Set(map[string]upgrade.TTLMarker) error
+	Get() (map[string]upgrade.TTLMarker, error)
+}
 
 // CfgOverrider allows for application driven overrides of configuration read from disk.
 type CfgOverrider func(cfg *configuration.Configuration)
@@ -127,6 +136,10 @@ func New(
 	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled
 
 	availableRollbacksSource := upgrade.NewTTLMarkerRegistry(log, paths.Top())
+	if upgrade.IsUpgradeable() {
+		// If we are not running in a container, check and normalize the install descriptor before we start the agent
+		normalizeAgentInstalls(log, paths.Top(), time.Now(), initialUpdateMarker, availableRollbacksSource)
+	}
 	upgrader, err := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, cfg.Settings.Upgrade, agentInfo, new(upgrade.AgentWatcherHelper), availableRollbacksSource)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create upgrader: %w", err)
@@ -257,7 +270,7 @@ func New(
 	otelManager, err := otelmanager.NewOTelManager(
 		log.Named("otel_manager"),
 		logLevel, baseLogger,
-		otelmanager.SubprocessExecutionMode,
+		otelconfig.SubprocessExecutionMode,
 		agentInfo,
 		cfg.Settings.Collector,
 		monitor.ComponentMonitoringConfig,
@@ -289,6 +302,86 @@ func New(
 	}
 
 	return coord, configMgr, varsManager, nil
+}
+
+// normalizeAgentInstalls will attempt to normalize the agent installs and related TTL markers:
+// - if we just rolled back: the update marker is checked and in case of rollback we clean up the TTL marker of the rolled back version
+// - check all the entries:
+//   - verify that the home directory for that install still exists (remove TTL markers for what does not exist anymore)
+//   - check if the agent install: if it is no longer valid collect the versioned home and the TTL marker for deletion
+//
+// This function will NOT error out, it will log any errors it encounters as warnings but any error must be treated as non-fatal
+func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, initialUpdateMarker *upgrade.UpdateMarker, rollbackSource rollbacksSource) {
+	// Check if we rolled back and update the TTL markers
+	if initialUpdateMarker != nil && initialUpdateMarker.Details != nil && initialUpdateMarker.Details.State == details.StateRollback {
+		// Reset the TTL for the current version if we are coming off a rollback
+		rollbacks, err := rollbackSource.Get()
+		if err != nil {
+			log.Warnf("Error getting available rollbacks from rollbackSource during startup check: %s", err)
+			return
+		}
+
+		// remove the current versioned home TTL marker
+		delete(rollbacks, initialUpdateMarker.PrevVersionedHome)
+		err = rollbackSource.Set(rollbacks)
+		if err != nil {
+			log.Warnf("Error setting available rollbacks during normalization: %s", err)
+			return
+		}
+	}
+
+	// check if we need to cleanup old agent installs
+	rollbacks, err := rollbackSource.Get()
+	if err != nil {
+		log.Warnf("Error getting available rollbacks during startup check: %s", err)
+		return
+	}
+
+	var versionedHomesToCleanup []string
+	for versionedHome, ttlMarker := range rollbacks {
+
+		versionedHomeAbsPath := filepath.Join(topDir, versionedHome)
+
+		if versionedHomeAbsPath == paths.HomeFrom(topDir) {
+			// skip the current install
+			log.Warnf("Found a TTL marker for the currently running agent at %s. Skipping cleanup...", versionedHome)
+			continue
+		}
+
+		_, err = os.Stat(versionedHomeAbsPath)
+		if errors.Is(err, os.ErrNotExist) {
+			log.Warnf("Versioned home %s corresponding to agent TTL marker %+v  is not found on disk", versionedHomeAbsPath, ttlMarker)
+			versionedHomesToCleanup = append(versionedHomesToCleanup, versionedHome)
+			continue
+		}
+
+		if err != nil {
+			log.Warnf("error checking versioned home %s for agent install: %s", versionedHomeAbsPath, err.Error())
+			continue
+		}
+
+		if now.After(ttlMarker.ValidUntil) {
+			// the install directory exists but it's expired. Remove the files.
+			log.Infof("agent TTL marker %+v marks %q as expired, removing directory", ttlMarker, versionedHomeAbsPath)
+			if cleanupErr := install.RemoveBut(versionedHomeAbsPath, true); cleanupErr != nil {
+				log.Warnf("Error removing directory %q: %s", versionedHomeAbsPath, cleanupErr)
+			} else {
+				log.Infof("Directory %q was removed", versionedHomeAbsPath)
+				versionedHomesToCleanup = append(versionedHomesToCleanup, versionedHome)
+			}
+		}
+	}
+
+	if len(versionedHomesToCleanup) > 0 {
+		log.Infof("removing install descriptor(s) for %v", versionedHomesToCleanup)
+		for _, versionedHomeToCleanup := range versionedHomesToCleanup {
+			delete(rollbacks, versionedHomeToCleanup)
+		}
+		err = rollbackSource.Set(rollbacks)
+		if err != nil {
+			log.Warnf("Error removing install descriptor(s): %s", err)
+		}
+	}
 }
 
 func mergeFleetConfig(ctx context.Context, rawConfig *config.Config) (storage.Store, *configuration.Configuration, error) {

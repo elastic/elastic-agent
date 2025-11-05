@@ -121,7 +121,7 @@ var archiveFilesWithMoreComponents = []files{
 	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/" + agentCommitFile, content: "abcdefghijklmnopqrstuvwxyz", mode: fs.ModePerm & 0o640},
 	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
 	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
-	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/" + agentName, content: agentBinaryPlaceholderContent, mode: fs.ModePerm & 0o750},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/" + AgentName, content: agentBinaryPlaceholderContent, mode: fs.ModePerm & 0o750},
 	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/package.version", content: "1.2.3", mode: fs.ModePerm & 0o640},
 	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
 	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp1", binary: true, content: "Placeholder for component", mode: fs.ModePerm & 0o750},
@@ -142,7 +142,7 @@ var archiveFilesWithManifestNoSymlink = []files{
 	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/" + agentCommitFile, content: "abcdefghijklmnopqrstuvwxyz", mode: fs.ModePerm & 0o640},
 	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
 	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
-	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/" + agentName, content: agentBinaryPlaceholderContent, mode: fs.ModePerm & 0o750},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/" + AgentName, content: agentBinaryPlaceholderContent, mode: fs.ModePerm & 0o750},
 	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/package.version", content: "1.2.3", mode: fs.ModePerm & 0o640},
 	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
 	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp1", content: "Placeholder for component", mode: fs.ModePerm & 0o750},
@@ -153,7 +153,7 @@ var outOfOrderArchiveFilesNoManifestNoSymlink = []files{
 	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
 	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/" + agentCommitFile, content: "abcdefghijklmnopqrstuvwxyz", mode: fs.ModePerm & 0o640},
 	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/package.version", content: "1.2.3", mode: fs.ModePerm & 0o640},
-	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/" + agentName, content: agentBinaryPlaceholderContent, mode: fs.ModePerm & 0o750},
+	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/" + AgentName, content: agentBinaryPlaceholderContent, mode: fs.ModePerm & 0o750},
 	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
 	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef", mode: fs.ModeDir | (fs.ModePerm & 0o700)},
 	{fType: DIRECTORY, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components", mode: fs.ModeDir | (fs.ModePerm & 0o750)},
@@ -161,7 +161,7 @@ var outOfOrderArchiveFilesNoManifestNoSymlink = []files{
 	{fType: REGULAR, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/data/elastic-agent-abcdef/components/comp1.spec.yml", content: foo_component_spec, mode: fs.ModePerm & 0o640},
 }
 
-var agentArchiveSymLink = files{fType: SYMLINK, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/" + agentName, content: "data/elastic-agent-abcdef/" + agentName, mode: fs.ModeSymlink | (fs.ModePerm & 0o750)}
+var agentArchiveSymLink = files{fType: SYMLINK, path: "elastic-agent-1.2.3-SNAPSHOT-someos-x86_64/" + AgentName, content: "data/elastic-agent-abcdef/" + AgentName, mode: fs.ModeSymlink | (fs.ModePerm & 0o750)}
 
 type fileType uint
 
@@ -603,7 +603,7 @@ func checkExtractedFilesOutOfOrder(t *testing.T, versionedHome string) {
 	}
 	actualPermissions := fs.ModePerm & stat.Mode()
 	assert.Equalf(t, expectedPermissions, actualPermissions, "Wrong permissions set on versioned home %q: expected %O, got %O", versionedHome, expectedPermissions, actualPermissions)
-	agentExecutable := filepath.Join(versionedHome, agentName)
+	agentExecutable := filepath.Join(versionedHome, AgentName)
 	if assert.FileExistsf(t, agentExecutable, "agent executable %q is not found in versioned home directory %q", agentExecutable, versionedHome) {
 		fileBytes, err := os.ReadFile(agentExecutable)
 		if assert.NoErrorf(t, err, "error reading elastic-agent executable %q", agentExecutable) {
@@ -615,7 +615,7 @@ func checkExtractedFilesOutOfOrder(t *testing.T, versionedHome string) {
 func checkExtractedFilesWithManifest(t *testing.T, testDataDir string) {
 	versionedHome := filepath.Join(testDataDir, "elastic-agent-1.2.3-SNAPSHOT-abcdef")
 	require.DirExists(t, versionedHome, "mapped versioned home directory does not exists")
-	mappedAgentExecutable := filepath.Join(versionedHome, agentName)
+	mappedAgentExecutable := filepath.Join(versionedHome, AgentName)
 	if assert.FileExistsf(t, mappedAgentExecutable, "agent executable %q is not found in mapped versioned home directory %q", mappedAgentExecutable, versionedHome) {
 		fileBytes, err := os.ReadFile(mappedAgentExecutable)
 		if assert.NoErrorf(t, err, "error reading elastic-agent executable %q", mappedAgentExecutable) {

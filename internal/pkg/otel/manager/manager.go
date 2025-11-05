@@ -27,6 +27,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -39,11 +40,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-type ExecutionMode string
-
 const (
-	SubprocessExecutionMode ExecutionMode = "subprocess"
-
 	// CollectorStopTimeout is the duration to wait for the collector to stop. Note: this needs to be shorter
 	// than 5 * time.Second (coordinator.managerShutdownTimeout) otherwise we might end up with a defunct process.
 	CollectorStopTimeout = 3 * time.Second
@@ -128,7 +125,7 @@ func NewOTelManager(
 	logger *logger.Logger,
 	logLevel logp.Level,
 	baseLogger *logger.Logger,
-	mode ExecutionMode,
+	mode config.ExecutionMode,
 	agentInfo info.Agent,
 	agentCollectorConfig *configuration.CollectorConfig,
 	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter,
@@ -156,7 +153,7 @@ func NewOTelManager(
 	}
 
 	switch mode {
-	case SubprocessExecutionMode:
+	case config.SubprocessExecutionMode:
 		// NOTE: if we stop embedding the collector binary in elastic-agent, we need to
 		// change this
 		executable, err := os.Executable()
@@ -200,6 +197,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 	// this channel is buffered because it's possible for the collector to send a status update while the manager is
 	// waiting for the collector to exit
 	collectorStatusCh := make(chan *status.AggregateStatus, 1)
+	forceFetchStatusCh := make(chan struct{}, 1)
 	for {
 		select {
 		case <-ctx.Done():
@@ -224,7 +222,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 			newRetries := m.recoveryRetries.Add(1)
 			m.logger.Infof("collector recovery restarting, total retries: %d", newRetries)
-			m.proc, err = m.execution.startCollector(ctx, m.baseLogger, m.logger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh)
+			m.proc, err = m.execution.startCollector(ctx, m.baseLogger, m.logger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh, forceFetchStatusCh)
 			if err != nil {
 				reportErr(ctx, m.errCh, err)
 				// reset the restart timer to the next backoff
@@ -256,7 +254,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 				// in this rare case the collector stopped running but a configuration was
 				// provided and the collector stopped with a clean exit
-				m.proc, err = m.execution.startCollector(ctx, m.baseLogger, m.logger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh)
+				m.proc, err = m.execution.startCollector(ctx, m.baseLogger, m.logger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh, forceFetchStatusCh)
 				if err != nil {
 					// failed to create the collector (this is different then
 					// it's failing to run). we do not retry creation on failure
@@ -317,7 +315,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				m.logger.Debugf(
 					"new config hash (%d) is different than the old config hash (%d), applying update",
 					m.mergedCollectorCfgHash, previousConfigHash)
-				applyErr := m.applyMergedConfig(ctx, collectorStatusCh, m.collectorRunErr)
+				applyErr := m.applyMergedConfig(ctx, collectorStatusCh, m.collectorRunErr, forceFetchStatusCh)
 				// only report the error if we actually apply the update
 				// otherwise, we could override an actual error with a nil in the channel when the collector
 				// state doesn't actually change
@@ -326,6 +324,16 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				m.logger.Debugf(
 					"new config hash (%d) is identical to the old config hash (%d), skipping update",
 					m.mergedCollectorCfgHash, previousConfigHash)
+
+				// there was a config update, but the hash hasn't changed.
+				// Force fetch the latest collector status in case the user modified the output.status_reporting flag.
+				//
+				// drain the channel first
+				select {
+				case <-forceFetchStatusCh:
+				default:
+				}
+				forceFetchStatusCh <- struct{}{}
 			}
 
 		case otelStatus := <-collectorStatusCh:
@@ -415,7 +423,7 @@ func injectDiagnosticsExtension(config *confmap.Conf) error {
 	return config.Merge(confmap.NewFromStringMap(extensionCfg))
 }
 
-func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh chan *status.AggregateStatus, collectorRunErr chan error) error {
+func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh chan *status.AggregateStatus, collectorRunErr chan error, forceFetchStatusCh chan struct{}) error {
 	if m.proc != nil {
 		m.proc.Stop(m.stopTimeout)
 		m.proc = nil
@@ -443,7 +451,7 @@ func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh c
 	} else {
 		// either a new configuration or the first configuration
 		// that results in the collector being started
-		proc, err := m.execution.startCollector(ctx, m.baseLogger, m.logger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh)
+		proc, err := m.execution.startCollector(ctx, m.baseLogger, m.logger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
 		if err != nil {
 			// failed to create the collector (this is different then
 			// it's failing to run). we do not retry creation on failure
@@ -521,6 +529,11 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 				delete(otelStatus.ComponentStatusMap, "extensions")
 			}
 		}
+	}
+
+	otelStatus, err := translate.MaybeMuteExporterStatus(otelStatus, m.components)
+	if err != nil {
+		return nil, fmt.Errorf("failed to mute exporter states from otel status: %w", err)
 	}
 
 	// Extract component states from otel status

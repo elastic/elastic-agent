@@ -20,7 +20,12 @@ type collectorExecution interface {
 	// The collector will report status events in the statusCh channel and errors on errCh in a non-blocking fashion,
 	// draining the channel before writing to it.
 	// After the collector exits, it will emit an error describing the exit status (nil if successful) and a nil status.
-	startCollector(ctx context.Context, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus) (collectorHandle, error)
+	// Parameters:
+	//   - cfg: Configuration for the collector.
+	//   - errCh: Process exit errors are sent to the errCh channel
+	//   - statusCh: Collector's status updates are sent to statusCh channel.
+	//   - forceFetchStatusCh: Channel that is used to trigger a forced status update.
+	startCollector(ctx context.Context, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error)
 }
 
 type collectorHandle interface {
