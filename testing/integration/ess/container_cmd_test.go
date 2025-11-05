@@ -27,6 +27,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -444,10 +446,11 @@ func createMockESOutput(t *testing.T, info *define.Info, percentDuplicate, perce
 	return mockesURL, outputResp.Item.ID
 }
 
-// TestContainerCMDBeatsReceivers tests that when ENABLE_BEATS_RECEIVERS
-// is set, Elastic Agent uses the otel runtime to run the supported
-// components from the fleet policy.
-func TestContainerCMDBeatsReceivers(t *testing.T) {
+// TestContainerCMDAgentMonitoringRuntimeExperimental tests that when
+// AGENT_MONITORING_RUNTIME_EXPERIMENTAL is set, Elastic Agent uses the
+// respective runtime to run the agent.monitoring components from the
+// fleet policy.
+func TestContainerCMDAgentMonitoringRuntimeExperimental(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Stack: &define.Stack{},
 		Local: false,
@@ -459,155 +462,29 @@ func TestContainerCMDBeatsReceivers(t *testing.T) {
 	})
 
 	testCases := []struct {
-		name                    string
-		enableBeatsReceiversEnv string
-		expectedRuntimeName     string
+		name                      string
+		agentMonitoringRuntimeEnv string
+		expectedRuntimeName       string
 	}{
 		{
-			name:                    "ENABLE_BEATS_RECEIVERS set to 1",
-			enableBeatsReceiversEnv: "1",
-			expectedRuntimeName:     "beats-receiver",
+			name:                      "var set to otel",
+			agentMonitoringRuntimeEnv: monitoringCfg.OtelRuntimeManager,
+			expectedRuntimeName:       string(monitoringCfg.OtelRuntimeManager),
 		},
 		{
-			name:                    "ENABLE_BEATS_RECEIVERS set to true",
-			enableBeatsReceiversEnv: "true",
-			expectedRuntimeName:     "beats-receiver",
+			name:                      "var set to process",
+			agentMonitoringRuntimeEnv: monitoringCfg.ProcessRuntimeManager,
+			expectedRuntimeName:       string(monitoringCfg.ProcessRuntimeManager),
 		},
 		{
-			name:                    "ENABLE_BEATS_RECEIVERS not set",
-			enableBeatsReceiversEnv: "",
-			expectedRuntimeName:     "beat-v2-client",
+			name:                      "var set to invalid value",
+			agentMonitoringRuntimeEnv: "invalid",
+			expectedRuntimeName:       string(monitoringCfg.DefaultRuntimeManager),
 		},
 		{
-			name:                    "ENABLE_BEATS_RECEIVERS set to 0",
-			enableBeatsReceiversEnv: "0",
-			expectedRuntimeName:     "beat-v2-client",
-		},
-		{
-			name:                    "ENABLE_BEATS_RECEIVERS set to false",
-			enableBeatsReceiversEnv: "false",
-			expectedRuntimeName:     "beat-v2-client",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
-			defer cancel()
-
-			agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-			require.NoError(t, err)
-
-			err = agentFixture.Prepare(ctx)
-			require.NoError(t, err)
-
-			fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
-			if err != nil {
-				t.Fatalf("could not get Fleet URL: %s", err)
-			}
-
-			policyID, enrollmentToken := createPolicy(
-				t,
-				ctx,
-				agentFixture,
-				info,
-				fmt.Sprintf("test-beats-receivers-%s-%s", tc.name, uuid.Must(uuid.NewV4()).String()),
-				"")
-
-			addLogIntegration(t, info, policyID, "/tmp/beats-receivers-test.log")
-			integration.GenerateLogFile(t, "/tmp/beats-receivers-test.log", time.Second/2, 50)
-
-			env := []string{
-				"FLEET_ENROLL=1",
-				"FLEET_URL=" + fleetURL,
-				"FLEET_ENROLLMENT_TOKEN=" + enrollmentToken,
-				"STATE_PATH=" + agentFixture.WorkDir(),
-			}
-
-			// Set ENABLE_BEATS_RECEIVERS environment variable if specified
-			if tc.enableBeatsReceiversEnv != "" {
-				env = append(env, "ENABLE_BEATS_RECEIVERS="+tc.enableBeatsReceiversEnv)
-			}
-
-			cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, env)
-			t.Logf(">> running binary with: %v", cmd.Args)
-			if err := cmd.Start(); err != nil {
-				t.Fatalf("error running container cmd: %s", err)
-			}
-
-			require.Eventuallyf(t, func() bool {
-				err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv(env)))
-				return err == nil
-			},
-				2*time.Minute, time.Second,
-				"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",
-				err, agentOutput,
-			)
-
-			// Verify that components are using the expected runtime
-			require.EventuallyWithTf(t, func(ct *assert.CollectT) {
-				status, err := agentFixture.ExecStatus(ctx, atesting.WithCmdOptions(withEnv(env)))
-				require.NoErrorf(t, err, "error getting agent status")
-
-				require.Len(t, status.Components, 5, "expected right number of components in agent status")
-				logCompFound := false
-				for _, comp := range status.Components {
-					if comp.ID == "log-default" {
-						logCompFound = true
-						assert.Equalf(t, tc.expectedRuntimeName, comp.VersionInfo.Name, "unexpected runtime for component %s with id %s", comp.Name, comp.ID)
-					}
-				}
-				assert.True(t, logCompFound, "expected to find log-default component in agent status")
-			}, 1*time.Minute, 1*time.Second,
-				"components did not use expected runtime",
-			)
-		})
-	}
-}
-
-// TestContainerCMDBeatsReceiversMonitoring tests that when
-// ENABLE_BEATS_RECEIVERS_MONITORING is set, Elastic Agent uses the otel
-// runtime to run the agent.monitoring components from the fleet policy.
-func TestContainerCMDBeatsReceiversMonitoring(t *testing.T) {
-	info := define.Require(t, define.Requirements{
-		Stack: &define.Stack{},
-		Local: false,
-		Sudo:  true,
-		OS: []define.OS{
-			{Type: define.Linux},
-		},
-		Group: "container",
-	})
-
-	testCases := []struct {
-		name                              string
-		enableBeatsReceiversMonitoringEnv string
-		expectedRuntimeName               string
-	}{
-		{
-			name:                              "ENABLE_BEATS_RECEIVERS_MONITORING set to 1",
-			enableBeatsReceiversMonitoringEnv: "1",
-			expectedRuntimeName:               "beats-receiver",
-		},
-		{
-			name:                              "ENABLE_BEATS_RECEIVERS_MONITORING set to true",
-			enableBeatsReceiversMonitoringEnv: "true",
-			expectedRuntimeName:               "beats-receiver",
-		},
-		{
-			name:                              "ENABLE_BEATS_RECEIVERS_MONITORING not set",
-			enableBeatsReceiversMonitoringEnv: "",
-			expectedRuntimeName:               "beat-v2-client",
-		},
-		{
-			name:                              "ENABLE_BEATS_RECEIVERS_MONITORING set to 0",
-			enableBeatsReceiversMonitoringEnv: "0",
-			expectedRuntimeName:               "beat-v2-client",
-		},
-		{
-			name:                              "ENABLE_BEATS_RECEIVERS_MONITORING set to false",
-			enableBeatsReceiversMonitoringEnv: "false",
-			expectedRuntimeName:               "beat-v2-client",
+			name:                      "var not set",
+			agentMonitoringRuntimeEnv: "",
+			expectedRuntimeName:       monitoringCfg.DefaultRuntimeManager,
 		},
 	}
 
@@ -640,7 +517,7 @@ func TestContainerCMDBeatsReceiversMonitoring(t *testing.T) {
 			integration.GenerateLogFile(t, "/tmp/beats-receivers-test.log", time.Second/2, 50)
 
 			// all monitoring components use process runtime unless overridden
-			setAgentMonitoringToProcess(t, info, policyID, policyName)
+			// setAgentMonitoringToProcess(t, info, policyID, policyName)
 
 			env := []string{
 				"FLEET_ENROLL=1",
@@ -649,9 +526,9 @@ func TestContainerCMDBeatsReceiversMonitoring(t *testing.T) {
 				"STATE_PATH=" + agentFixture.WorkDir(),
 			}
 
-			// Set ENABLE_BEATS_RECEIVERS_MONITORING environment variable if specified
-			if tc.enableBeatsReceiversMonitoringEnv != "" {
-				env = append(env, "ENABLE_BEATS_RECEIVERS_MONITORING="+tc.enableBeatsReceiversMonitoringEnv)
+			// Set environment variable if specified
+			if tc.agentMonitoringRuntimeEnv != "" {
+				env = append(env, "AGENT_MONITORING_RUNTIME_EXPERIMENTAL="+tc.agentMonitoringRuntimeEnv)
 			}
 
 			cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, env)
@@ -674,16 +551,23 @@ func TestContainerCMDBeatsReceiversMonitoring(t *testing.T) {
 				status, err := agentFixture.ExecStatus(ctx, atesting.WithCmdOptions(withEnv(env)))
 				require.NoErrorf(t, err, "error getting agent status")
 
-				require.Len(t, status.Components, 4, "expected right number of components in agent status")
+				require.Len(t, status.Components, 5, "expected right number of components in agent status")
 				for _, comp := range status.Components {
-					t.Log("Component:", comp.ID, "uses runtime:", comp.VersionInfo.Name)
+					var compRuntime string
+					switch comp.VersionInfo.Name {
+					case "beats-receiver":
+						compRuntime = string(component.OtelRuntimeManager)
+					case "beat-v2-client":
+						compRuntime = string(component.ProcessRuntimeManager)
+					}
+					t.Logf("Component ID: %s, version info: %s, runtime: %s", comp.ID, comp.VersionInfo.Name, compRuntime)
 					switch comp.ID {
 					case "beat/metrics-monitoring", "filestream-monitoring", "http/metrics-monitoring", "prometheus/metrics-monitoring":
 						// Monitoring components should use the expected runtime
-						assert.Equalf(t, tc.expectedRuntimeName, comp.VersionInfo.Name, "unexpected runtime name for monitoring component %s with id %s", comp.Name, comp.ID)
+						assert.Equalf(t, tc.expectedRuntimeName, compRuntime, "unexpected runtime name for monitoring component %s with id %s", comp.Name, comp.ID)
 					default:
 						// Non-monitoring components should default to process runtime
-						assert.Equalf(t, "beat-v2-client", comp.VersionInfo.Name, "expected process runtime for non-monitoring component %s with id %s", comp.Name, comp.ID)
+						assert.Equalf(t, string(component.DefaultRuntimeManager), compRuntime, "expected default runtime for non-monitoring component %s with id %s", comp.Name, comp.ID)
 					}
 				}
 			}, 1*time.Minute, 1*time.Second,
