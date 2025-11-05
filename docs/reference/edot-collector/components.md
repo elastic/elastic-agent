@@ -20,14 +20,11 @@ The {{edot}} (EDOT) Collector includes embedded Collector components from the [O
 
 The components included in the EDOT Collector are categorized into **[Core]** and **[Extended]** components. The following table describes the current components included in the EDOT Collector, their source, and support status.
 
-<<<<<<< HEAD
-=======
 % The following table is automatically generated from the EDOT Collector source code.
 % Automation is handled by /docs/scripts/update-docs/update-components-docs.py, which
 % reads the go.mod file, the components.yml file, and then generates the table.
 % Note that while this runs on `main`, the table is updated based on the latest released version.
 
->>>>>>> 2fb7a5cdd (Refactor Collector components' metadata and add support for annotations (#11040))
 % start:edot-collector-components-table
 ## List of components
 
