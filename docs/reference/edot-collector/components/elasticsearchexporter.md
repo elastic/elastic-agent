@@ -138,15 +138,16 @@ The {{es}} exporter supports the common `sending_queue` settings, which enable b
 ```yaml
 sending_queue:
   enabled: true
-  num_consumers: runtime.NumCPU()
-  queue_size: <based on queue.mem.events>
+  sizer: requests
+  num_consumers: 10
+  queue_size: 10
   block_on_overflow: true
-  wait_for_result: true
+  wait_for_result: false
   batch:
     flush_timeout: 10s
-    min_size: 0
-    max_size: <based on flush::bytes>
-    sizer: items
+    min_size: 1e+6
+    max_size: 5e+6
+    sizer: bytes
 ```
 
 The default configurations are chosen to be closer to the defaults with the exporter's previous built-in batching feature. For more details on the `sending_queue` settings, refer to the [`exporterhelper` documentation](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/exporterhelper/README.md).
@@ -203,7 +204,7 @@ The Elasticsearch exporter uses the [Elasticsearch Bulk API](https://www.elastic
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `num_workers` | `runtime.NumCPU()` | Number of workers publishing bulk requests concurrently. Note this isn't applicable when using `sending_queue` (enabled by default) or when `batcher::enabled` is explicitly set. |
+| `num_workers` | `runtime.NumCPU()` | Note that this config is deprecated and will be used to configure `sending_queue::num_consumers` if `sending_queue::num_consumers` is not explicitly defined. Number of workers publishing bulk requests concurrently. |
 | `flush::bytes` | `5000000` | Write buffer flush size limit before compression. A bulk request are sent immediately when its buffer exceeds this limit. This value should be much lower than Elasticsearch's `http.max_content_length` config to avoid HTTP 413 Entity Too Large error. Keep this value under 5 MB. |
 | `flush::interval` | `10s` | Write buffer flush time limit. |
 | `retry::enabled` | `true` | Turns on or off request retry on error. Failed requests are retried with exponential backoff. |
