@@ -10,18 +10,22 @@ import (
 	"time"
 
 	"github.com/kardianos/service"
-	"github.com/schollz/progressbar/v3"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
+// ProgressDescriber is used to describe execution progress
+type ProgressDescriber interface {
+	Describe(string)
+}
+
 // SwitchExecutingMode switches the executing mode of the installed Elastic Agent.
 //
 // When username and groupName are blank then it switched back to root/Administrator and when a username/groupName is
 // provided then it switched to running with that username and groupName.
-func SwitchExecutingMode(topPath string, pt *progressbar.ProgressBar, username string, groupName string, password string) error {
+func SwitchExecutingMode(topPath string, pt ProgressDescriber, username string, groupName string, password string) error {
 	// ensure service is stopped
 	status, err := EnsureStoppedService(topPath, pt)
 	if err != nil {
@@ -38,41 +42,7 @@ func SwitchExecutingMode(topPath string, pt *progressbar.ProgressBar, username s
 	}()
 
 	// ensure user/group are created
-	var ownership utils.FileOwner
-	if username != "" && groupName != "" {
-		ownership, err = EnsureUserAndGroup(username, groupName, pt, username == ElasticUsername)
-		if err != nil {
-			// context for the error already provided in the EnsureUserAndGroup function
-			return err
-		}
-	}
-
-	// **start critical section**
-	// after this point changes will be made that can leave the installed Elastic Agent broken if they do not
-	// complete successfully
-
-	// perform platform specific work
-	err = switchPlatformMode(pt, ownership)
-
-	// fix all permissions to use the new ownership
-	pt.Describe("Adjusting permissions")
-	err = perms.FixPermissions(topPath, perms.WithOwnership(ownership))
-	if err != nil {
-		return fmt.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
-	}
-	if paths.ShellWrapperPath() != "" {
-		err = perms.FixPermissions(paths.ShellWrapperPath(), perms.WithOwnership(ownership))
-		if err != nil {
-			return fmt.Errorf("failed to perform permission changes on path %s: %w", paths.ShellWrapperPath(), err)
-		}
-	}
-
-	pt.Describe("Changing service user")
-	err = ChangeUser(topPath, ownership, username, groupName, password)
-	if err != nil && !errors.Is(err, ErrChangeUserUnsupported) {
-		return err
-	}
-
+	ownership, err := SwitchServiceUser(topPath, pt, username, groupName, password)
 	if errors.Is(err, ErrChangeUserUnsupported) {
 		// the service has to be uninstalled
 		pt.Describe("Removing service")
@@ -101,6 +71,9 @@ func SwitchExecutingMode(topPath string, pt *progressbar.ProgressBar, username s
 			return err
 		}
 		pt.Describe("Installed service")
+	} else if err != nil {
+		pt.Describe(fmt.Sprintf("Failed to switch service user: %s", err.Error()))
+		return err
 	}
 
 	// start the service
@@ -118,4 +91,48 @@ func SwitchExecutingMode(topPath string, pt *progressbar.ProgressBar, username s
 	// service is now re-created and started
 
 	return nil
+}
+
+// SwitchServiceUser switches the service user to the provided username and groupName.
+func SwitchServiceUser(topPath string, pt ProgressDescriber, username string, groupName string, password string) (utils.FileOwner, error) {
+	var ownership utils.FileOwner
+	if username != "" && groupName != "" {
+		var err error
+		ownership, err = EnsureUserAndGroup(username, groupName, pt, username == ElasticUsername)
+		if err != nil {
+			// context for the error already provided in the EnsureUserAndGroup function
+			return ownership, err
+		}
+	}
+
+	// **start critical section**
+	// after this point changes will be made that can leave the installed Elastic Agent broken if they do not
+	// complete successfully
+
+	// perform platform specific work
+	err := switchPlatformMode(pt, ownership)
+	if err != nil {
+		return ownership, fmt.Errorf("failed to perform platform specific work: %w", err)
+	}
+
+	// fix all permissions to use the new ownership
+	pt.Describe(fmt.Sprintf("Adjusting permissions with ownership %v", ownership))
+	err = perms.FixPermissions(topPath, perms.WithOwnership(ownership))
+	if err != nil {
+		return ownership, fmt.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
+	}
+	if paths.ShellWrapperPath() != "" {
+		err = perms.FixPermissions(paths.ShellWrapperPath(), perms.WithOwnership(ownership))
+		if err != nil {
+			return ownership, fmt.Errorf("failed to perform permission changes on path %s: %w", paths.ShellWrapperPath(), err)
+		}
+	}
+
+	pt.Describe("Changing service user")
+	err = ChangeUser(topPath, ownership, username, groupName, password)
+	if err != nil && !errors.Is(err, ErrChangeUserUnsupported) {
+		return ownership, err
+	}
+
+	return ownership, nil
 }
