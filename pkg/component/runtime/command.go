@@ -375,7 +375,7 @@ func (c *commandRuntime) start(comm Communicator) error {
 	}
 
 	if err := c.monitor.Prepare(c.current.ID); err != nil {
-		return err
+		return fmt.Errorf("failed to prepare component monitoring resources: %w", err)
 	}
 	args := c.monitor.EnrichArgs(c.current.ID, c.getSpecBinaryName(), cmdSpec.Args)
 
@@ -391,7 +391,7 @@ func (c *commandRuntime) start(comm Communicator) error {
 		process.WithEnv(env),
 		process.WithCmdOptions(attachOutErr(c.logStd, c.logErr), dirPath(workDir)))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to start process: %w", err)
 	}
 
 	c.proc = proc
@@ -430,7 +430,11 @@ func (c *commandRuntime) stop(ctx context.Context) error {
 	}(c.proc, cmdSpec.Timeouts.Stop)
 
 	c.log.Debugf("gracefully stopping pid %d", c.proc.PID)
-	return c.proc.Stop()
+
+	if stopErr := c.proc.Stop(); stopErr != nil {
+		return fmt.Errorf("failed to stop process %s: %w", c.proc.Cmd.String(), stopErr)
+	}
+	return nil
 }
 
 func (c *commandRuntime) startWatcher(info *process.Info, comm Communicator) {
