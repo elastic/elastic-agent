@@ -20,7 +20,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// TestCoreComponentsInGoMod verifies that all components listed in core-components.yaml
+// TestCoreComponentsInGoMod verifies that all components listed in components.yml
 // are present in the project dependencies.
 func TestCoreComponentsInGoMod(t *testing.T) {
 	// Extract components from project dependencies
@@ -30,9 +30,9 @@ func TestCoreComponentsInGoMod(t *testing.T) {
 	// Print found components for debugging
 	t.Logf("Found components in dependencies: %v", moduleComponents)
 
-	// Load components from core-components.yaml
+	// Load components from components.yml
 	yamlComponents, err := loadCoreComponentsYAML()
-	require.NoError(t, err, "Failed to load core-components.yaml")
+	require.NoError(t, err, "Failed to load components.yml")
 
 	// Verify all components in YAML are present in dependencies
 	for _, component := range yamlComponents {
@@ -100,7 +100,7 @@ func extractComponentsFromDeps() ([]string, error) {
 	return components, nil
 }
 
-// loadCoreComponentsYAML loads the components from core-components.yaml
+// loadCoreComponentsYAML loads the components from components.yml
 func loadCoreComponentsYAML() ([]string, error) {
 	// Get the directory of the current file
 	_, filename, _, ok := runtime.Caller(0)
@@ -108,7 +108,7 @@ func loadCoreComponentsYAML() ([]string, error) {
 		return nil, errors.New("failed to get current file path")
 	}
 	dir := filepath.Dir(filename)
-	yamlPath := filepath.Join(dir, "core-components.yaml")
+	yamlPath := filepath.Join(dir, "components.yml")
 
 	yamlFile, err := os.ReadFile(yamlPath)
 	if err != nil {
@@ -116,7 +116,7 @@ func loadCoreComponentsYAML() ([]string, error) {
 	}
 
 	var data struct {
-		Components []string `yaml:"components"`
+		Components []string `yaml:"core_components"`
 	}
 
 	err = yaml.Unmarshal(yamlFile, &data)
