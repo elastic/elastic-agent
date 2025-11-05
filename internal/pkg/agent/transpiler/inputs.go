@@ -21,7 +21,7 @@ const (
 )
 
 // RenderInputs renders dynamic inputs section
-func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
+func RenderInputs(inputs Node, varsArray []*Vars, allowMissingVars bool) (Node, error) {
 	l, ok := inputs.Value().(*List)
 	if !ok {
 		return nil, fmt.Errorf("inputs must be an array")
@@ -49,6 +49,10 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 			}
 			var noMatchErr *noMatchError
 			if errors.As(err, &noMatchErr) {
+				// if ignore missing vars is enabled, just continue
+				if allowMissingVars {
+					continue
+				}
 				// has a required variable that didn't exist
 				if _, exists := inputNoMatchErr[inputIdx]; !exists {
 					// store it; only if it never gets a match will it be an error

@@ -56,6 +56,7 @@ wait that amount of time before using the variables for the configuration.
 			opts.variables, _ = c.Flags().GetBool("variables")
 			opts.includeMonitoring, _ = c.Flags().GetBool("monitoring")
 			opts.variablesWait, _ = c.Flags().GetDuration("variables-wait")
+			opts.variablesAllowMissing, _ = c.Flags().GetBool("variables-allow-missing")
 
 			opts.variables = opts.variables || c.Flags().Changed("variables-wait")
 
@@ -71,6 +72,7 @@ wait that amount of time before using the variables for the configuration.
 	cmd.Flags().Bool("variables", false, "render configuration with variables substituted")
 	cmd.Flags().Bool("monitoring", false, "includes monitoring configuration (implies --variables)")
 	cmd.Flags().Duration("variables-wait", time.Duration(0), "wait this amount of time for variables before performing substitution (implies --variables)")
+	cmd.Flags().Bool("variables-allow-missing", false, "missing variables will not error instead the input will be removed (implies --variables)")
 
 	cmd.AddCommand(newInspectComponentsCommandWithArgs(s, streams))
 
@@ -110,6 +112,7 @@ variables for the configuration.
 			opts.showConfig, _ = c.Flags().GetBool("show-config")
 			opts.showSpec, _ = c.Flags().GetBool("show-spec")
 			opts.variablesWait, _ = c.Flags().GetDuration("variables-wait")
+			opts.variablesAllowMissing, _ = c.Flags().GetBool("variables-allow-missing")
 
 			ctx, cancel := context.WithCancel(context.Background())
 			service.HandleSignals(func() {}, cancel)
@@ -124,14 +127,16 @@ variables for the configuration.
 	cmd.Flags().Bool("show-config", false, "show the configuration for all units")
 	cmd.Flags().Bool("show-spec", false, "show the runtime specification for a component")
 	cmd.Flags().Duration("variables-wait", time.Duration(0), "wait this amount of time for variables before performing substitution")
+	cmd.Flags().Bool("variables-allow-missing", false, "missing variables will not error instead the input will be removed (implies --variables)")
 
 	return cmd
 }
 
 type inspectConfigOpts struct {
-	variables         bool
-	includeMonitoring bool
-	variablesWait     time.Duration
+	variables             bool
+	includeMonitoring     bool
+	variablesWait         time.Duration
+	variablesAllowMissing bool
 }
 
 func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, streams *cli.IOStreams) error {
@@ -161,7 +166,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		return nil
 	}
 
-	cfg, otel, lvl, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait, !isAdmin)
+	cfg, otel, lvl, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait, !isAdmin, opts.variablesAllowMissing)
 	if err != nil {
 		return fmt.Errorf("error fetching config with variables: %w", err)
 	}
@@ -274,10 +279,11 @@ func printConfig(cfg *config.Config, streams *cli.IOStreams) error {
 }
 
 type inspectComponentsOpts struct {
-	id            string
-	showConfig    bool
-	showSpec      bool
-	variablesWait time.Duration
+	id                    string
+	showConfig            bool
+	showSpec              bool
+	variablesWait         time.Duration
+	variablesAllowMissing bool
 }
 
 // returns true if the given Capabilities config blocks the given component.
@@ -291,7 +297,7 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 		return err
 	}
 
-	comps, err := getComponentsFromPolicy(ctx, l, cfgPath, opts.variablesWait)
+	comps, err := getComponentsFromPolicy(ctx, l, cfgPath, opts.variablesWait, opts.variablesAllowMissing)
 	if err != nil {
 		// error already includes the context
 		return err
@@ -362,7 +368,7 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 	return printComponents(allowed, blocked, streams)
 }
 
-func getComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath string, variablesWait time.Duration, platformModifiers ...component.PlatformModifier) ([]component.Component, error) {
+func getComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath string, variablesWait time.Duration, variablesAllowMissing bool, platformModifiers ...component.PlatformModifier) ([]component.Component, error) {
 	// Load the requirements before trying to load the configuration. These should always load
 	// even if the configuration is wrong.
 	platform, err := component.LoadPlatformDetail(platformModifiers...)
@@ -379,7 +385,7 @@ func getComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath stri
 		return nil, fmt.Errorf("error checking for root/Administrator privileges: %w", err)
 	}
 
-	m, otel, lvl, err := getConfigWithVariables(ctx, l, cfgPath, variablesWait, !isAdmin)
+	m, otel, lvl, err := getConfigWithVariables(ctx, l, cfgPath, variablesWait, !isAdmin, variablesAllowMissing)
 	if err != nil {
 		return nil, err
 	}
@@ -424,7 +430,7 @@ func getMonitoringFn(ctx context.Context, logger *logger.Logger, cfg map[string]
 	return monitor.MonitoringConfig, nil
 }
 
-func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath string, timeout time.Duration, unprivileged bool) (map[string]interface{}, *confmap.Conf, logp.Level, error) {
+func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath string, timeout time.Duration, unprivileged bool, variablesAllowMissing bool) (map[string]interface{}, *confmap.Conf, logp.Level, error) {
 
 	cfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true, unprivileged)
 	if err != nil {
@@ -452,7 +458,7 @@ func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath strin
 	// Render the inputs using the discovered inputs.
 	inputs, ok := transpiler.Lookup(ast, "inputs")
 	if ok {
-		renderedInputs, err := transpiler.RenderInputs(inputs, vars)
+		renderedInputs, err := transpiler.RenderInputs(inputs, vars, variablesAllowMissing)
 		if err != nil {
 			return nil, nil, lvl, fmt.Errorf("rendering inputs failed: %w", err)
 		}

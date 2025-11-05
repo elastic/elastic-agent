@@ -13,10 +13,11 @@ import (
 
 func TestRenderInputs(t *testing.T) {
 	testcases := map[string]struct {
-		input     Node
-		expected  Node
-		varsArray []*Vars
-		err       bool
+		input             Node
+		expected          Node
+		varsArray         []*Vars
+		err               bool
+		ignoreMissingVars bool
 	}{
 		"inputs not list": {
 			input: NewKey("inputs", NewStrVal("not list")),
@@ -803,6 +804,22 @@ func TestRenderInputs(t *testing.T) {
 				}),
 			},
 		},
+		"required var missing doesnt causes error when disabled": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("key", NewStrVal("${var1.missing}")),
+				}),
+			})),
+			expected: NewList([]Node{}),
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "value1",
+					},
+				}),
+			},
+			ignoreMissingVars: true,
+		},
 		"input fails on first vars but succeeds with following vars": {
 			input: NewKey("inputs", NewList([]Node{
 				NewDict([]Node{
@@ -839,7 +856,7 @@ func TestRenderInputs(t *testing.T) {
 
 	for name, test := range testcases {
 		t.Run(name, func(t *testing.T) {
-			v, err := RenderInputs(test.input, test.varsArray)
+			v, err := RenderInputs(test.input, test.varsArray, test.ignoreMissingVars)
 			if test.err {
 				require.Error(t, err)
 			} else {

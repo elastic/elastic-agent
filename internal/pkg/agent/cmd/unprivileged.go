@@ -128,7 +128,7 @@ func ensureNoServiceComponentIssues() error {
 	}
 	// this forces the component calculation to always compute with no root
 	// this allows any runtime preventions to error for a component when it has a no root support
-	comps, err := getComponentsFromPolicy(ctx, l, paths.ConfigFile(), 0, forceNonRoot)
+	comps, err := getComponentsFromPolicy(ctx, l, paths.ConfigFile(), 0, true, forceNonRoot)
 	if err != nil {
 		return fmt.Errorf("failed to create component model from policy: %w", err)
 	}
