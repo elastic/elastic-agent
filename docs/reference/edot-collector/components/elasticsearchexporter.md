@@ -167,10 +167,9 @@ exporters:
 ```
 
 ### Deprecated batcher configuration
-
-::::{applies-switch}
-
-:::{applies-item} stack: ga 9.0, deprecated 9.2
+```{applies_to}
+stack: ga 9.0, deprecated 9.2
+```
 
 :::{warning}
 The `batcher` configuration is deprecated and will be removed in a future version. Use `sending_queue::batch` instead.
@@ -187,7 +186,7 @@ Batching can be enabled and configured with the `batcher` section, using [common
 
 For example:
 
-```yaml subs=true
+```yaml
 exporters:
   elasticsearch:
     endpoint: https://elasticsearch:9200
@@ -197,8 +196,6 @@ exporters:
       max_size: 10000
       flush_timeout: 5s
 ```
-:::
-::::
 
 ## Bulk indexing
 
