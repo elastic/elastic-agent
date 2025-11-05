@@ -27,7 +27,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/crypto"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
@@ -67,60 +66,6 @@ func TestEnvTimeout(t *testing.T) {
 
 	res := envTimeout(key)
 	require.Equal(t, time.Second*10, res)
-}
-
-func TestContainerCfgOverrides_AgentMonitoringRuntimeExperimental(t *testing.T) {
-	tests := []struct {
-		name     string
-		envValue string
-		expected string
-	}{
-		{
-			name:     "otel",
-			envValue: "otel",
-			expected: string(monitoringCfg.OtelRuntimeManager),
-		},
-		{
-			name:     "process",
-			envValue: "process",
-			expected: string(monitoringCfg.ProcessRuntimeManager),
-		},
-		{
-			name:     "invalid",
-			envValue: "invalid",
-			expected: string(monitoringCfg.DefaultRuntimeManager),
-		},
-		{
-			name:     "empty",
-			envValue: "",
-			expected: string(monitoringCfg.DefaultRuntimeManager),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.envValue != "" {
-				t.Setenv("AGENT_MONITORING_RUNTIME_EXPERIMENTAL", tt.envValue)
-			}
-
-			cfg := &configuration.Configuration{
-				Settings: configuration.DefaultSettingsConfig(),
-			}
-
-			originalRuntimeManager := cfg.Settings.MonitoringConfig.RuntimeManager
-
-			containerCfgOverrides(cfg)
-
-			if tt.expected == "" {
-				// Should preserve original RuntimeManager
-				require.Equal(t, originalRuntimeManager, cfg.Settings.MonitoringConfig.RuntimeManager)
-			} else {
-				// Should set RuntimeManager to expected value
-				require.NotNil(t, cfg.Settings.MonitoringConfig)
-				require.Equal(t, tt.expected, cfg.Settings.MonitoringConfig.RuntimeManager)
-			}
-		})
-	}
 }
 
 func TestContainerTestPaths(t *testing.T) {

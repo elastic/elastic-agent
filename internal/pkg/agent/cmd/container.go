@@ -151,7 +151,7 @@ be used when the same credentials will be used across all the possible actions a
 * Beats Receivers
   The following experimental environment variables can be set to enable using Beats Receivers.
 
-  AGENT_MONITORING_RUNTIME_EXPERIMENTAL - Set to either "process" or "otel" to enable the respective runtime for the monitoring components.
+  AGENT_MONITORING_RUNTIME_EXPERIMENTAL - Set to either "process" or "otel" to use the respective runtime for the monitoring components.
 
 * Elastic-Agent event logging
   If EVENTS_TO_STDERR is set to true log entries containing event data or whole raw events will be logged to stderr alongside
@@ -824,12 +824,6 @@ func containerCfgOverrides(cfg *configuration.Configuration) {
 	if eventsToStderr {
 		cfg.Settings.EventLoggingConfig.ToFiles = false
 		cfg.Settings.EventLoggingConfig.ToStderr = true
-	}
-
-	agentMonitoringRuntimeEnv := envWithDefault("", "AGENT_MONITORING_RUNTIME_EXPERIMENTAL")
-	switch agentMonitoringRuntimeEnv {
-	case string(monitoringCfg.OtelRuntimeManager), string(monitoringCfg.ProcessRuntimeManager):
-		cfg.Settings.MonitoringConfig.RuntimeManager = agentMonitoringRuntimeEnv
 	}
 
 	configuration.OverrideDefaultContainerGRPCPort(cfg.Settings.GRPC)

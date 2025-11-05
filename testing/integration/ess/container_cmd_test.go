@@ -449,9 +449,9 @@ func createMockESOutput(t *testing.T, info *define.Info, percentDuplicate, perce
 // TestContainerCMDAgentMonitoringRuntimeExperimental tests that when
 // AGENT_MONITORING_RUNTIME_EXPERIMENTAL is set, Elastic Agent uses the
 // respective runtime to run the agent.monitoring components from the
-// fleet policy.
+// local configuration.
 func TestContainerCMDAgentMonitoringRuntimeExperimental(t *testing.T) {
-	info := define.Require(t, define.Requirements{
+	define.Require(t, define.Requirements{
 		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  true,
@@ -499,27 +499,15 @@ func TestContainerCMDAgentMonitoringRuntimeExperimental(t *testing.T) {
 			err = agentFixture.Prepare(ctx)
 			require.NoError(t, err)
 
-			fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
-			if err != nil {
-				t.Fatalf("could not get Fleet URL: %s", err)
-			}
+			mockesURL := integration.StartMockES(t, 0, 0, 0, 0)
 
-			policyName := fmt.Sprintf("test-beats-receivers-monitoring-%s-%s", tc.name, uuid.Must(uuid.NewV4()).String())
-			policyID, enrollmentToken := createPolicy(
-				t,
-				ctx,
-				agentFixture,
-				info,
-				policyName,
-				"")
+			// Create a local agent config file with monitoring enabled
+			agentConfig := createStandaloneAgentConfig(t, agentFixture.WorkDir(), mockesURL)
 
-			addLogIntegration(t, info, policyID, "/tmp/beats-receivers-test.log")
+			// Generate log file for the filestream input to process
 			integration.GenerateLogFile(t, "/tmp/beats-receivers-test.log", time.Second/2, 50)
 
 			env := []string{
-				"FLEET_ENROLL=1",
-				"FLEET_URL=" + fleetURL,
-				"FLEET_ENROLLMENT_TOKEN=" + enrollmentToken,
 				"STATE_PATH=" + agentFixture.WorkDir(),
 			}
 
@@ -528,15 +516,26 @@ func TestContainerCMDAgentMonitoringRuntimeExperimental(t *testing.T) {
 				env = append(env, "AGENT_MONITORING_RUNTIME_EXPERIMENTAL="+tc.agentMonitoringRuntimeEnv)
 			}
 
-			cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, env)
+			cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container", "-c", agentConfig}, env)
 			t.Logf(">> running binary with: %v", cmd.Args)
 			if err := cmd.Start(); err != nil {
 				t.Fatalf("error running container cmd: %s", err)
 			}
 
-			require.Eventuallyf(t, func() bool {
+			require.EventuallyWithT(t, func(ct *assert.CollectT) {
 				err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv(env)))
-				return err == nil
+				require.NoError(ct, err)
+
+				status, err := agentFixture.ExecStatus(ctx, atesting.WithCmdOptions(withEnv(env)))
+				require.NoError(ct, err)
+				t.Logf("Agent status: %+v", status.Components)
+
+				expectedComponentCount := 4 // process runtime
+				if tc.expectedRuntimeName == string(monitoringCfg.OtelRuntimeManager) {
+					expectedComponentCount = 5 // otel runtime
+				}
+
+				require.Len(ct, status.Components, expectedComponentCount, "expected right number of components in agent status")
 			},
 				2*time.Minute, time.Second,
 				"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",
@@ -548,12 +547,6 @@ func TestContainerCMDAgentMonitoringRuntimeExperimental(t *testing.T) {
 				status, err := agentFixture.ExecStatus(ctx, atesting.WithCmdOptions(withEnv(env)))
 				require.NoErrorf(t, err, "error getting agent status")
 
-				expectedComponentCount := 4 // process runtime
-				if tc.expectedRuntimeName == string(monitoringCfg.OtelRuntimeManager) {
-					expectedComponentCount = 5 // otel runtime
-				}
-
-				assert.Len(t, status.Components, expectedComponentCount, "expected right number of components in agent status")
 				for _, comp := range status.Components {
 					var compRuntime string
 					switch comp.VersionInfo.Name {
@@ -568,7 +561,7 @@ func TestContainerCMDAgentMonitoringRuntimeExperimental(t *testing.T) {
 						// Monitoring components should use the expected runtime
 						assert.Equalf(t, tc.expectedRuntimeName, compRuntime, "unexpected runtime name for monitoring component %s with id %s", comp.Name, comp.ID)
 					default:
-						// Non-monitoring components should default to process runtime
+						// Non-monitoring components should use the default runtime
 						assert.Equalf(t, string(component.DefaultRuntimeManager), compRuntime, "expected default runtime for non-monitoring component %s with id %s", comp.Name, comp.ID)
 					}
 				}
@@ -629,4 +622,43 @@ func addLogIntegration(t *testing.T, info *define.Info, policyID, logFilePath st
 		t.Log("================================================================================")
 		t.FailNow()
 	}
+}
+
+// createSimpleAgentMonitoringConfig creates a simple agent configuration file with monitoring enabled
+func createSimpleAgentMonitoringConfig(t *testing.T, workDir string, esAddr string) string {
+	configTemplate := `
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - %s
+
+agent:
+  logging:
+    level: debug
+  monitoring:
+    enabled: true
+    metrics: true
+
+inputs:
+  - id: system-metrics
+    type: system/metrics
+    use_output: default
+    streams:
+      - metricsets:
+        - cpu
+        data_stream.dataset: system.cpu
+      - metricsets:
+        - memory
+        data_stream.dataset: system.memory
+`
+
+	config := fmt.Sprintf(configTemplate, esAddr)
+	configPath := filepath.Join(workDir, "elastic-agent.yml")
+	err := os.WriteFile(configPath, []byte(config), 0644)
+	if err != nil {
+		t.Fatalf("failed to write agent config file: %s", err)
+	}
+
+	return configPath
 }
