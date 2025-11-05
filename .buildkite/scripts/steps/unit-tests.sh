@@ -4,6 +4,7 @@ set +euo pipefail
 
 echo "--- Unit tests"
 export GOPROXY="https://${ARTIFACTORY_USER}:${ARTIFACTORY_API_KEY}@artifactory.elastic.dev/artifactory/api/go/go"
+export GONOPROXY="gopkg.in/natefinch/lumberjack.v2"
 RACE_DETECTOR=true TEST_COVERAGE=true mage unitTest
 TESTS_EXIT_STATUS=$?
 echo "--- Prepare artifacts"
