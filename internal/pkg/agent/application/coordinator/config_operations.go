@@ -42,6 +42,7 @@ func backupConfig() error {
 
 	err := copy.Copy(configFile, backup, copy.Options{
 		PermissionControl: copy.AddPermission(0600),
+		Sync:              true,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to backup config file %s -> %s: %w", configFile, backup, err)
@@ -55,6 +56,10 @@ func cleanBackupConfig() error {
 	backup := paths.AgentConfigFile() + backupSuffix
 	if err := os.RemoveAll(backup); err != nil && !os.IsNotExist(err) {
 		return err
+	}
+
+	if err := file.SyncParent(backup); err != nil {
+		return fmt.Errorf("failed to safe rotate backup config file: %w", err)
 	}
 
 	return nil
