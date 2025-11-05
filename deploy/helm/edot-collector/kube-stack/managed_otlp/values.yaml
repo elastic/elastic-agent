@@ -604,7 +604,7 @@ instrumentation:
     type: parentbased_traceidratio # Sampler type
     argument: "1.0" # Sampling rate set to 100% (all traces are sampled).
   java:
-    image: docker.elastic.co/observability/elastic-otel-javaagent:1.6.0
+    image: docker.elastic.co/observability/elastic-otel-javaagent:1.7.0
   nodejs:
     image: docker.elastic.co/observability/elastic-otel-node:1.6.0
   dotnet:
