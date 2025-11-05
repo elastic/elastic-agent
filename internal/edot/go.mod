@@ -7,8 +7,8 @@ require github.com/elastic/elastic-agent v0.0.0
 replace github.com/elastic/elastic-agent => ../../
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251029082016-ed6848fefe22
-	github.com/elastic/elastic-agent-libs v0.25.0
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251104195902-4ded660aa9fc
+	github.com/elastic/elastic-agent-libs v0.26.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.20.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.1.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.8.0
