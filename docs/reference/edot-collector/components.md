@@ -60,7 +60,7 @@ These components are included in EDOT Collector version 9.2.0.
 | [zipkinreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/zipkinreceiver) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.137.0 |
 |***Exporters***||||
 | [debugexporter](https://github.com/open-telemetry/opentelemetry-collector/tree/main/exporter/debugexporter) | [OTel Core Repo](https://github.com/open-telemetry/opentelemetry-collector) | [Extended] | v0.137.0 |
-| [elasticsearchexporter](/reference/edot-collector/components/elasticsearchexporter.md)^1^ | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Core] | v0.137.0 |
+| [elasticsearchexporter](/reference/edot-collector/components/elasticsearchexporter.md) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Core] | v0.137.0 |
 | [fileexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/fileexporter) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.137.0 |
 | [kafkaexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/kafkaexporter) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.137.0 |
 | [loadbalancingexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/loadbalancingexporter) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.137.0 |
@@ -109,7 +109,7 @@ These components are included in EDOT Collector version 9.2.0.
 | [httpsprovider](https://github.com/open-telemetry/opentelemetry-collector/tree/main/confmap/provider/httpsprovider) | [OTel Core Repo](https://github.com/open-telemetry/opentelemetry-collector) | [Core] | v1.35.0 |
 | [yamlprovider](https://github.com/open-telemetry/opentelemetry-collector/tree/main/confmap/provider/yamlprovider) | [OTel Core Repo](https://github.com/open-telemetry/opentelemetry-collector) | [Core] | v1.43.0 |
 
-^1^ `elasticsearchexporter`: Some Elasticsearch modes, such as `raw`, are not covered by Elastic Support.
+
 % end:edot-collector-components-table
 
 [Extended]: opentelemetry://reference/compatibility/nomenclature.md#extended-components

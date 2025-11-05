@@ -101,7 +101,7 @@ deprecated:
 #         See [documentation](link) for more details.
 
 annotations:
-  elasticsearchexporter:
-    comment: |
-      Some Elasticsearch modes, such as `raw`, are not covered by Elastic Support.
+#  elasticsearchexporter:
+#    comment: |
+#      Some Elasticsearch modes, such as `raw`, are not covered by Elastic Support.
 
