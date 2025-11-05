@@ -78,45 +78,31 @@ def get_core_components(version='main'):
     latest_version = get_latest_version()
     version_tag = f"v{latest_version}"
     
-    # Try to read from Git tag, fall back to local file if not found
+    # Always read from Git tag
     components_path = 'internal/pkg/otel/components.yml'
-    components_local_path = '../../../internal/pkg/otel/components.yml'
     print(f"Reading core components from tag {version_tag}: {components_path}")
     content = read_file_from_git_tag(components_path, version_tag)
     if content is None:
-        # Fall back to local file for testing
-        print(f"Warning: Could not read from tag {version_tag}, trying local file...")
-        try:
-            with open(components_local_path, 'r') as f:
-                content = f.read()
-        except FileNotFoundError:
-            raise ValueError(f"Could not read components file from tag {version_tag} or local file. Ensure the file exists.")
+        raise ValueError(f"Could not read components file from tag {version_tag}. Ensure the tag exists and contains the file.")
         
     try:
         data = yaml.safe_load(content)
         return data.get('core_components', [])
     except yaml.YAMLError as e:
-        raise ValueError(f"Error parsing components.yml: {e}")
+        raise ValueError(f"Error parsing components.yml from tag {version_tag}: {e}")
 
 def get_deprecated_components(version='main'):
     """Read and parse the components.yml file to determine deprecated status"""
     latest_version = get_latest_version()
     version_tag = f"v{latest_version}"
     
-    # Try to read from Git tag, fall back to local file if not found
+    # Always read from Git tag
     components_path = 'internal/pkg/otel/components.yml'
-    components_local_path = '../../../internal/pkg/otel/components.yml'
     print(f"Reading deprecated components from tag {version_tag}: {components_path}")
     content = read_file_from_git_tag(components_path, version_tag)
     if content is None:
-        # Fall back to local file for testing
-        print(f"Warning: Could not read from tag {version_tag}, trying local file...")
-        try:
-            with open(components_local_path, 'r') as f:
-                content = f.read()
-        except FileNotFoundError:
-            print(f"Warning: Could not read components file from tag {version_tag} or local file. Assuming no deprecated components.")
-            return []
+        print(f"Warning: Could not read components file from tag {version_tag}. Assuming no deprecated components.")
+        return []
         
     try:
         data = yaml.safe_load(content)
@@ -124,7 +110,7 @@ def get_deprecated_components(version='main'):
         # Handle case where 'deprecated:' exists but has no items (returns None)
         return deprecated if deprecated is not None else []
     except yaml.YAMLError as e:
-        print(f"Warning: Error parsing components.yml: {e}")
+        print(f"Warning: Error parsing components.yml from tag {version_tag}: {e}")
         return []
 
 def get_component_annotations(version='main'):
@@ -132,20 +118,13 @@ def get_component_annotations(version='main'):
     latest_version = get_latest_version()
     version_tag = f"v{latest_version}"
     
-    # Try to read from Git tag, fall back to local file if not found
+    # Always read from Git tag
     components_path = 'internal/pkg/otel/components.yml'
-    components_local_path = '../../../internal/pkg/otel/components.yml'
     print(f"Reading component annotations from tag {version_tag}: {components_path}")
     content = read_file_from_git_tag(components_path, version_tag)
     if content is None:
-        # Fall back to local file for testing
-        print(f"Warning: Could not read from tag {version_tag}, trying local file...")
-        try:
-            with open(components_local_path, 'r') as f:
-                content = f.read()
-        except FileNotFoundError:
-            print(f"Warning: Could not read components file from tag {version_tag} or local file. Assuming no annotations.")
-            return {}
+        print(f"Warning: Could not read components file from tag {version_tag}. Assuming no annotations.")
+        return {}
         
     try:
         data = yaml.safe_load(content)
@@ -153,7 +132,7 @@ def get_component_annotations(version='main'):
         # Handle case where 'annotations:' exists but has no items (returns None)
         return annotations if annotations is not None else {}
     except yaml.YAMLError as e:
-        print(f"Warning: Error parsing components.yml: {e}")
+        print(f"Warning: Error parsing components.yml from tag {version_tag}: {e}")
         return {}
 
 def dep_to_component(dep):
