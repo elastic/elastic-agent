@@ -425,7 +425,7 @@ func (c *commandRuntime) stop(ctx context.Context) error {
 	c.log.Debugf("gracefully stopping pid %d", c.proc.PID)
 
 	if stopErr := c.proc.Stop(); stopErr != nil {
-		return fmt.Errorf("failed to stop process %s: %w", c.proc.Cmd.String(), stopErr)
+		return fmt.Errorf("failed to stop process %d: %w", c.proc.Process.Pid, stopErr)
 	}
 	return nil
 }
