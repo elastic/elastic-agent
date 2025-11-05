@@ -11,11 +11,13 @@ components:
   - hostmetricsreceiver
   - k8sclusterreceiver
   - k8sobjectsreceiver
+  - kafkareceiver
   - kubeletstatsreceiver
   - otlpreceiver
 
 # Exporters
   - elasticsearchexporter
+  - kafkaexporter
   - otlpexporter
   - otlphttpexporter
 
