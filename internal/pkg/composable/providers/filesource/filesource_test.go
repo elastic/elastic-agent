@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
@@ -180,4 +181,243 @@ func TestContextProvider(t *testing.T) {
 			break
 		}
 	}
+}
+
+func TestContextProvider_KubernetesSymlinks(t *testing.T) {
+	const testTimeout = 3 * time.Second
+
+	// Create directory structure that mimics Kubernetes secrets
+	tmpDir := t.TempDir()
+
+	// Create initial timestamped directory with secret content
+	dataDir1 := filepath.Join(tmpDir, "..2024_01_01_12_00")
+	require.NoError(t, os.Mkdir(dataDir1, 0o755))
+
+	value1 := "secret-token-v1"
+	tokenFile1 := filepath.Join(dataDir1, "token")
+	require.NoError(t, os.WriteFile(tokenFile1, []byte(value1), 0o644))
+
+	value2 := "secret-cert-v1"
+	certFile1 := filepath.Join(dataDir1, "ca.crt")
+	require.NoError(t, os.WriteFile(certFile1, []byte(value2), 0o644))
+
+	// Create ..data symlink pointing to the timestamped directory
+	dataSymlink := filepath.Join(tmpDir, "..data")
+	require.NoError(t, os.Symlink(dataDir1, dataSymlink))
+
+	// Create top-level symlinks (what the user actually references)
+	tokenSymlink := filepath.Join(tmpDir, "token")
+	require.NoError(t, os.Symlink(filepath.Join("..data", "token"), tokenSymlink))
+
+	certSymlink := filepath.Join(tmpDir, "ca.crt")
+	require.NoError(t, os.Symlink(filepath.Join("..data", "ca.crt"), certSymlink))
+
+	// Setup logger and provider
+	log, err := logger.New("filesource_test", false)
+	require.NoError(t, err)
+
+	osPath := func(path string) string {
+		return path
+	}
+	if runtime.GOOS == "windows" {
+		osPath = func(path string) string {
+			return strings.ToLower(path)
+		}
+	}
+
+	c, err := config.NewConfigFrom(map[string]interface{}{
+		"sources": map[string]interface{}{
+			"token": map[string]interface{}{
+				"path": osPath(tokenSymlink),
+			},
+			"cert": map[string]interface{}{
+				"path": osPath(certSymlink),
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	builder, _ := composable.Providers.GetContextProvider("filesource")
+	provider, err := builder(log, c, true)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	comm := ctesting.NewContextComm(ctx)
+	setChan := make(chan map[string]interface{})
+	comm.CallOnSet(func(value map[string]interface{}) {
+		t.Logf("Set called with: token=%v, cert=%v", value["token"], value["cert"])
+		setChan <- value
+	})
+
+	go func() {
+		_ = provider.Run(ctx, comm)
+	}()
+
+	// Wait for initial values
+	var current map[string]interface{}
+	select {
+	case current = <-setChan:
+	case <-time.After(testTimeout):
+		require.FailNow(t, "timeout waiting for provider to call Set")
+	}
+
+	require.Equal(t, value1, current["token"], "initial token value should match")
+	require.Equal(t, value2, current["cert"], "initial cert value should match")
+
+	// Simulate Kubernetes secret update:
+	// 1. Create new timestamped directory with updated content
+	dataDir2 := filepath.Join(tmpDir, "..2024_01_01_13_00")
+	require.NoError(t, os.Mkdir(dataDir2, 0o755))
+
+	value1Updated := "secret-token-v2"
+	tokenFile2 := filepath.Join(dataDir2, "token")
+	require.NoError(t, os.WriteFile(tokenFile2, []byte(value1Updated), 0o644))
+
+	value2Updated := "secret-cert-v2"
+	certFile2 := filepath.Join(dataDir2, "ca.crt")
+	require.NoError(t, os.WriteFile(certFile2, []byte(value2Updated), 0o644))
+
+	// 2. Atomically replace ..data symlink (this is what Kubernetes does)
+	// Create temporary symlink, then rename it to replace the old one atomically
+	dataTmpSymlink := filepath.Join(tmpDir, "..data_tmp")
+	require.NoError(t, os.Symlink(dataDir2, dataTmpSymlink))
+	require.NoError(t, os.Rename(dataTmpSymlink, dataSymlink))
+
+	// Note: The top-level symlinks (token, ca.crt) are NOT modified
+	// They still point to ..data/token and ..data/ca.crt
+	// Only the ..data symlink target changed
+
+	// Wait for the provider to detect the update
+	// This should happen because fsnotify should see the ..data symlink change
+	updateDetected := false
+	deadline := time.After(testTimeout)
+	for !updateDetected {
+		select {
+		case updated := <-setChan:
+			// Check if we got the updated values
+			if updated["token"] == value1Updated && updated["cert"] == value2Updated {
+				updateDetected = true
+				t.Log("Successfully detected Kubernetes-style symlink update")
+			} else {
+				t.Logf("Got update but values don't match yet: token=%v, cert=%v", updated["token"], updated["cert"])
+			}
+		case <-deadline:
+			require.FailNow(t, "timeout waiting for provider to detect Kubernetes-style symlink update")
+		}
+	}
+
+	require.True(t, updateDetected, "provider should detect Kubernetes-style symlink updates")
+}
+
+func TestContextProvider_KubernetesSymlinks_DebugEvents(t *testing.T) {
+	const testTimeout = 3 * time.Second
+
+	// Create directory structure that mimics Kubernetes secrets
+	tmpDir := t.TempDir()
+
+	// Create initial timestamped directory with secret content
+	dataDir1 := filepath.Join(tmpDir, "..2024_01_01_12_00")
+	require.NoError(t, os.Mkdir(dataDir1, 0o755))
+
+	value1 := "secret-token-v1"
+	tokenFile1 := filepath.Join(dataDir1, "token")
+	require.NoError(t, os.WriteFile(tokenFile1, []byte(value1), 0o644))
+
+	// Create ..data symlink pointing to the timestamped directory
+	dataSymlink := filepath.Join(tmpDir, "..data")
+	require.NoError(t, os.Symlink(dataDir1, dataSymlink))
+
+	// Create top-level symlink (what the user actually references)
+	tokenSymlink := filepath.Join(tmpDir, "token")
+	require.NoError(t, os.Symlink(filepath.Join("..data", "token"), tokenSymlink))
+
+	// Setup fsnotify watcher to see what events are generated
+	watcher, err := fsnotify.NewWatcher()
+	require.NoError(t, err)
+	defer watcher.Close()
+
+	// Watch the parent directory (like the provider does)
+	err = watcher.Add(tmpDir)
+	require.NoError(t, err)
+	t.Logf("Watching directory: %s", tmpDir)
+
+	// Channel to collect events
+	events := make(chan fsnotify.Event, 10)
+	go func() {
+		for {
+			select {
+			case e, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				t.Logf("fsnotify event: %s %s", e.Op, e.Name)
+				events <- e
+			case err, ok := <-watcher.Errors:
+				if ok {
+					t.Logf("fsnotify error: %s", err)
+				}
+			}
+		}
+	}()
+
+	// Now let's manually watch and see what events come through
+	t.Logf("tmpDir: %s", tmpDir)
+	t.Logf("dataDir1: %s", dataDir1)
+	t.Logf("dataSymlink: %s", dataSymlink)
+	t.Logf("tokenSymlink: %s", tokenSymlink)
+
+	// Read initial value through symlink
+	content, err := os.ReadFile(tokenSymlink)
+	require.NoError(t, err)
+	require.Equal(t, value1, string(content))
+	t.Logf("Initial read through symlink: %s", string(content))
+
+	// Create new timestamped directory with updated content
+	dataDir2 := filepath.Join(tmpDir, "..2024_01_01_13_00")
+	require.NoError(t, os.Mkdir(dataDir2, 0o755))
+
+	value1Updated := "secret-token-v2"
+	tokenFile2 := filepath.Join(dataDir2, "token")
+	require.NoError(t, os.WriteFile(tokenFile2, []byte(value1Updated), 0o644))
+
+	// Atomically replace ..data symlink
+	dataTmpSymlink := filepath.Join(tmpDir, "..data_tmp")
+	require.NoError(t, os.Symlink(dataDir2, dataTmpSymlink))
+	t.Logf("Created temporary symlink: %s -> %s", dataTmpSymlink, dataDir2)
+
+	require.NoError(t, os.Rename(dataTmpSymlink, dataSymlink))
+	t.Logf("Renamed %s to %s", dataTmpSymlink, dataSymlink)
+
+	// Wait a bit and collect any fsnotify events
+	time.Sleep(100 * time.Millisecond)
+	t.Logf("Checking for events after symlink update...")
+	eventCount := 0
+	timeout := time.After(200 * time.Millisecond)
+collectEvents:
+	for {
+		select {
+		case e := <-events:
+			eventCount++
+			t.Logf("Event %d: %s %s", eventCount, e.Op, e.Name)
+		case <-timeout:
+			break collectEvents
+		}
+	}
+	t.Logf("Total events received: %d", eventCount)
+
+	// Read updated value through symlink
+	content, err = os.ReadFile(tokenSymlink)
+	require.NoError(t, err)
+	require.Equal(t, value1Updated, string(content))
+	t.Logf("Updated read through symlink: %s", string(content))
+
+	// Check symlink targets
+	target, err := os.Readlink(tokenSymlink)
+	require.NoError(t, err)
+	t.Logf("tokenSymlink points to: %s", target)
+
+	dataTarget, err := os.Readlink(dataSymlink)
+	require.NoError(t, err)
+	t.Logf("dataSymlink points to: %s", dataTarget)
 }
