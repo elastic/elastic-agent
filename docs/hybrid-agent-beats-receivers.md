@@ -36,6 +36,8 @@ https://github.com/elastic/kibana/issues/233186 is implemented. Before that chan
 overrides API can be used to add `_runtime_experimental: "otel"` to the `agent.monitoring` section of the policy.
 See https://support.elastic.dev/knowledge/view/06b69893 for details on the policy overrides API.
 
+For the Elastic Agent container images, the `AGENT_MONITORING_RUNTIME_EXPERIMENTAL` environment variable can be set to either `process` or `otel` to override the default runtime used for agent monitoring.
+
 Executing the `elastic-agent diagnostics` command in this mode will now produce an `otel-final.yml` file showing the generated
 collector configuration used to run the Beat receivers.
 
