@@ -28,21 +28,28 @@ steps:
     steps:
       - label: "Unit tests - Ubuntu 22.04"
         key: "unit-tests-2204"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          image: "${IMAGE_UBUNTU_2204_X86_64}"
-          machineType: "n2-standard-8"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
+        plugins:
+          - monorepo-diff#v1.2.0:
+              diff: "git diff --name-only HEAD~1"
+              interpolation: false
+              watch:
+                - path: '**/*.go'
+                  config:
+                    command: ".buildkite/scripts/steps/unit-tests.sh"
+                    artifact_paths:
+                      - "build/TEST-*.html"
+                      - "build/TEST-*.xml"
+                      - "build/diagnostics/*"
+                      - "coverage-*.out"
+                    agents:
+                      provider: "gcp"
+                      image: "${IMAGE_UBUNTU_2204_X86_64}"
+                      machineType: "n2-standard-8"
+                    retry:
+                      automatic:
+                        limit: 1
+                      manual:
+                        allowed: true
 
       - label: "Unit tests - Ubuntu 22.04 with requirefips build tag"
         key: "unit-tests-2204-fips-tag"
