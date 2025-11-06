@@ -1,0 +1,28 @@
+version: 9.2.0+build202510300150
+entries:
+    - kind: bug-fix
+      summary: Fix EDOT -> mOTLP onboarding configuration.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10822
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1760996948
+      file:
+        name: 1760996948-motlp-fix-field.yaml
+        checksum: 1b3752a010b52b36481cfeb733d9243b1ab606ed
+    - kind: bug-fix
+      summary: Fix quoting of boolean values in Helm charts.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10681
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1760996949
+      file:
+        name: 1760996949-helm-bool.yaml
+        checksum: eabea6e5bf17bb542258bec7df9f2db9b06f618b

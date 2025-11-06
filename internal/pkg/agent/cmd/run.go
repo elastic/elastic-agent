@@ -19,6 +19,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 
 	"go.elastic.co/apm/v2"
 	apmtransport "go.elastic.co/apm/v2/transport"
@@ -31,7 +32,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/service"
 	"github.com/elastic/elastic-agent-system-metrics/report"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
-	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -43,7 +43,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
@@ -52,6 +51,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/server"
@@ -89,6 +89,7 @@ func newRunCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 			testingMode, _ := cmd.Flags().GetBool("testing-mode")
 			if err := run(nil, testingMode, fleetInitTimeout); err != nil && !errors.Is(err, context.Canceled) {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
+				logExternal(fmt.Sprintf("%s run failed: %s", paths.BinaryName, err))
 				return err
 			}
 			return nil
@@ -166,7 +167,7 @@ func runElasticAgentCritical(
 	var errs []error
 
 	// early handleUpgrade, but don't error yet
-	upgradeDetailsFromMarker, err := handleUpgrade()
+	initialUpdateMarker, err := handleUpgrade()
 	if err != nil {
 		errs = append(errs, fmt.Errorf("failed to handle upgrade: %w", err))
 	}
@@ -232,7 +233,7 @@ func runElasticAgentCritical(
 	}
 
 	// actually run the agent now
-	err = runElasticAgent(ctx, cancel, baseLogger, l, cfg, override, stop, testingMode, fleetInitTimeout, upgradeDetailsFromMarker, modifiers...)
+	err = runElasticAgent(ctx, cancel, baseLogger, l, cfg, override, stop, testingMode, fleetInitTimeout, initialUpdateMarker, modifiers...)
 	return logReturn(l, err)
 }
 
@@ -247,7 +248,7 @@ func runElasticAgent(
 	stop chan bool,
 	testingMode bool,
 	fleetInitTimeout time.Duration,
-	upgradeDetailsFromMarker *details.Details,
+	initialUpgradeMarker *upgrade.UpdateMarker,
 	modifiers ...component.PlatformModifier,
 ) error {
 	logLvl := logger.DefaultLogLevel
@@ -259,6 +260,46 @@ func runElasticAgent(
 	isRoot, err := utils.HasRoot()
 	if err != nil {
 		return fmt.Errorf("failed to check for root/Administrator privileges: %w", err)
+	}
+
+	// fix permissions
+	if isRoot {
+		userName, groupName, err := install.GetDesiredUser()
+		if err != nil {
+			return fmt.Errorf("failed to determine target user: %w", err) // in general this should not happen
+		}
+
+		var ownership utils.FileOwner
+		if userName != "" {
+			uid, err := install.FindUID(userName)
+			if err != nil {
+				return fmt.Errorf("failed to find user: %w", err)
+			}
+			ownership.UID = uid
+		}
+
+		if groupName != "" {
+			gid, err := install.FindGID(groupName)
+			if err != nil {
+				return fmt.Errorf("failed to find group: %w", err)
+			}
+			ownership.GID = gid
+		}
+
+		topPath := paths.Top()
+		err = perms.FixPermissions(topPath, perms.WithOwnership(ownership))
+		if err != nil {
+			return fmt.Errorf("failed to perform permission changes on path %s: %w", topPath, err)
+		}
+
+		if err := dropRootPrivileges(l, ownership); err != nil {
+			return fmt.Errorf("failed to drop permissions to user %q(%v):%q(%v): %w",
+				userName, ownership.UID,
+				groupName, ownership.GID,
+				err,
+			)
+		}
+
 	}
 
 	l.Infow("Elastic Agent started",
@@ -351,7 +392,7 @@ func runElasticAgent(
 
 	isBootstrap := configuration.IsFleetServerBootstrap(cfg.Fleet)
 	coord, configMgr, _, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode,
-		fleetInitTimeout, isBootstrap, override, upgradeDetailsFromMarker, modifiers...)
+		fleetInitTimeout, isBootstrap, override, initialUpgradeMarker, modifiers...)
 	if err != nil {
 		return err
 	}
@@ -734,7 +775,7 @@ func setupMetrics(
 // handleUpgrade checks if agent is being run as part of an
 // ongoing upgrade operation, i.e. being re-exec'd and performs
 // any upgrade-specific work, if needed.
-func handleUpgrade() (*details.Details, error) {
+func handleUpgrade() (*upgrade.UpdateMarker, error) {
 	upgradeMarker, err := upgrade.LoadMarker(paths.Data())
 	if err != nil {
 		return nil, fmt.Errorf("unable to load upgrade marker to check if Agent is being upgraded: %w", err)
@@ -753,7 +794,7 @@ func handleUpgrade() (*details.Details, error) {
 		return nil, err
 	}
 
-	return upgradeMarker.Details, nil
+	return upgradeMarker, nil
 }
 
 func ensureInstallMarkerPresent() error {

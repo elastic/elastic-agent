@@ -79,7 +79,7 @@ type subprocessExecution struct {
 
 // startCollector starts a supervised collector and monitors its health. Process exit errors are sent to the
 // processErrCh channel. Other run errors, such as not able to connect to the health endpoint, are sent to the runErrCh channel.
-func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger.Logger, cfg *confmap.Conf, processErrCh chan error, statusCh chan *status.AggregateStatus) (collectorHandle, error) {
+func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, processErrCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
 	if cfg == nil {
 		// configuration is required
 		return nil, errors.New("no configuration provided")
@@ -110,9 +110,9 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 		return nil, fmt.Errorf("failed to marshal config to yaml: %w", err)
 	}
 
-	stdOut := runtimeLogger.NewLogWriterWithDefaults(logger.Core(), zapcore.Level(r.logLevel))
+	stdOut := runtimeLogger.NewLogWriterWithDefaults(baseLogger.Core(), zapcore.Level(r.logLevel))
 	// info level for stdErr because by default collector writes to stderr
-	stdErr := runtimeLogger.NewLogWriterWithDefaults(logger.Core(), zapcore.Level(r.logLevel))
+	stdErr := runtimeLogger.NewLogWriterWithDefaults(baseLogger.Core(), zapcore.Level(r.logLevel))
 
 	procCtx, procCtxCancel := context.WithCancel(ctx)
 	env := os.Environ()
@@ -168,7 +168,8 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 			if err != nil {
 				switch {
 				case errors.Is(err, context.Canceled):
-					r.reportSubprocessCollectorStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStopped, nil))
+					// after the collector exits, we need to report a nil status
+					r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
 					return
 				}
 			} else {
@@ -182,8 +183,11 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 
 			select {
 			case <-procCtx.Done():
-				r.reportSubprocessCollectorStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStopped, nil))
+				// after the collector exits, we need to report a nil status
+				r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
 				return
+			case <-forceFetchStatusCh:
+				r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
 			case <-healthCheckPollTimer.C:
 				healthCheckPollTimer.Reset(healthCheckPollDuration)
 			case <-maxFailuresTimer.C:
@@ -201,6 +205,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 
 	go func() {
 		procState, procErr := processInfo.Process.Wait()
+		logger.Debugf("wait for pid %d returned", processInfo.PID)
 		procCtxCancel()
 		<-healthCheckDone
 		close(ctl.processDoneCh)
@@ -225,6 +230,10 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 
 // cloneCollectorStatus creates a deep copy of the provided AggregateStatus.
 func cloneCollectorStatus(aStatus *status.AggregateStatus) *status.AggregateStatus {
+	if aStatus == nil {
+		return nil
+	}
+
 	st := &status.AggregateStatus{
 		Event: aStatus.Event,
 	}
@@ -303,19 +312,26 @@ func (s *procHandle) Stop(waitTime time.Duration) {
 	default:
 	}
 
+	s.log.Debugf("gracefully stopping pid %d", s.processInfo.PID)
 	if err := s.processInfo.Stop(); err != nil {
 		s.log.Warnf("failed to send stop signal to the supervised collector: %v", err)
 		// we failed to stop the process just kill it and return
-		_ = s.processInfo.Kill()
-		return
+	} else {
+		select {
+		case <-time.After(waitTime):
+			s.log.Warnf("timeout waiting (%s) for the supervised collector to stop, killing it", waitTime.String())
+		case <-s.processDoneCh:
+			// process has already exited
+			return
+		}
 	}
 
+	// since we are here this means that the process either got an error at stop or did not stop within the timeout,
+	// kill it and give one more mere second for the process wait to be called
+	_ = s.processInfo.Kill()
 	select {
-	case <-time.After(waitTime):
-		s.log.Warnf("timeout waiting (%s) for the supervised collector to stop, killing it", waitTime.String())
-		// our caller ctx is Done; kill the process just in case
-		_ = s.processInfo.Kill()
+	case <-time.After(1 * time.Second):
+		s.log.Warnf("supervised collector subprocess didn't exit in time after killing it")
 	case <-s.processDoneCh:
-		// process has already exited
 	}
 }
