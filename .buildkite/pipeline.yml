@@ -20,17 +20,18 @@ common:
 - base_cache_settings: &base_cache_settings
     manifest: go.sum
     backend: s3
-    restore: all
-    save: file
+    restore: pipeline
+    save:
+    - file
+    - branch
     compression: zstd
-- cache_unix: &cache_unix
-    cache#v1.8.0:
-      <<: *base_cache_settings
-      path: /opt/buildkite-agent/.cache/go-build
-- cache_windows: &cache_windows
-    cache#v1.8.0:
-      <<: *base_cache_settings
-      path: C:\Users\buildkite\AppData\Local\go-build
+- unix_cache_settings: &unix_cache_settings
+    <<: *base_cache_settings
+    path: /opt/buildkite-agent/.cache/go-build
+- windows_cache_settings: &windows_cache_settings
+    <<: *base_cache_settings
+    path: C:\Users\buildkite\AppData\Local\go-build
+
 steps:
   - label: "check-ci"
     key: "check-ci"
@@ -59,7 +60,9 @@ steps:
           machineType: "n2-standard-8"
         plugins:
           - *aws_oidc
-          - *cache_unix
+          - cache#v1.8.0:
+              <<: *unix_cache_settings
+              key-extra: "linux/amd64"
         retry:
           automatic:
             limit: 1
@@ -82,7 +85,9 @@ steps:
           machineType: "n2-standard-8"
         plugins:
         - *aws_oidc
-        - *cache_unix
+        - cache#v1.8.0:
+            <<: *unix_cache_settings
+            key-extra: "linux/amd64"
         retry:
           automatic:
             limit: 1
@@ -108,7 +113,9 @@ steps:
           machineType: "n2-standard-8"
         plugins:
         - *aws_oidc
-        - *cache_unix
+        - cache#v1.8.0:
+            <<: *unix_cache_settings
+            key-extra: "linux/amd64"
         retry:
           automatic:
             limit: 1
@@ -130,7 +137,9 @@ steps:
           instanceType: "m6g.xlarge"
         plugins:
         - *aws_oidc
-        - *cache_unix
+        - cache#v1.8.0:
+            <<: *unix_cache_settings
+            key-extra: "linux/arm64"
         retry:
           automatic:
             limit: 1
@@ -153,7 +162,9 @@ steps:
           disk_type: "pd-ssd"
         plugins:
         - *aws_oidc
-        - *cache_windows
+        - cache#v1.8.0:
+            <<: *windows_cache_settings
+            key-extra: "windows/amd64"
         retry:
           automatic:
             limit: 1
@@ -176,7 +187,9 @@ steps:
           disk_type: "pd-ssd"
         plugins:
         - *aws_oidc
-        - *cache_windows
+        - cache#v1.8.0:
+            <<: *windows_cache_settings
+            key-extra: "windows/amd64"
         retry:
           automatic:
             limit: 1
@@ -198,7 +211,9 @@ steps:
           imagePrefix: generic-base-15-arm-002
         plugins:
         - *aws_oidc
-        - *cache_unix
+        - cache#v1.8.0:
+            <<: *unix_cache_settings
+            key-extra: "macos/arm64"
         retry:
           automatic:
             limit: 1
@@ -219,7 +234,9 @@ steps:
           imagePrefix: generic-13-ventura-x64
         plugins:
         - *aws_oidc
-        - *cache_unix
+        - cache#v1.8.0:
+            <<: *unix_cache_settings
+            key-extra: "macos/arm64"
         retry:
           automatic:
             limit: 1
@@ -244,7 +261,9 @@ steps:
           disk_type: "pd-ssd"
         plugins:
         - *aws_oidc
-        - *cache_windows
+        - cache#v1.8.0:
+            <<: *windows_cache_settings
+            key-extra: "windows/amd64"
         retry:
           automatic:
             limit: 1
@@ -266,7 +285,9 @@ steps:
           disk_type: "pd-ssd"
         plugins:
         - *aws_oidc
-        - *cache_windows
+        - cache#v1.8.0:
+            <<: *windows_cache_settings
+            key-extra: "windows/amd64"
         retry:
           automatic:
             limit: 1
@@ -315,7 +336,9 @@ steps:
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         plugins:
         - *aws_oidc
-        - *cache_unix
+        - cache#v1.8.0:
+            <<: *unix_cache_settings
+            key-extra: "linux/amd64"
         matrix:
           setup:
             k8s_version:
