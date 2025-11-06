@@ -183,6 +183,10 @@ func TestContextProvider(t *testing.T) {
 }
 
 func TestContextProvider_KubernetesSymlinks(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping Kubernetes symlink test on Windows, because atomic replacing a symlink using os.Rename doesn't work")
+	}
+
 	const testTimeout = 3 * time.Second
 
 	// Create directory structure that mimics Kubernetes secrets
