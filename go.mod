@@ -28,7 +28,7 @@ require (
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.20.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.1.0
-	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.8.0
+	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.21.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.8.0
 	github.com/elastic/opentelemetry-collector-components/extension/beatsauthextension v0.5.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.4.0
@@ -118,7 +118,7 @@ require (
 	go.opentelemetry.io/collector/exporter/nopexporter v0.137.0
 	go.opentelemetry.io/collector/exporter/otlpexporter v0.137.0
 	go.opentelemetry.io/collector/exporter/otlphttpexporter v0.137.0
-	go.opentelemetry.io/collector/extension/extensiontest v0.137.0
+	go.opentelemetry.io/collector/extension/extensiontest v0.138.0
 	go.opentelemetry.io/collector/extension/memorylimiterextension v0.137.0
 	go.opentelemetry.io/collector/pipeline v1.44.0
 	go.opentelemetry.io/collector/processor/batchprocessor v0.137.0
@@ -128,14 +128,14 @@ require (
 	go.opentelemetry.io/ebpf-profiler v0.0.202540
 	go.uber.org/zap v1.27.0
 	go.yaml.in/yaml/v3 v3.0.4
-	golang.org/x/crypto v0.42.0
+	golang.org/x/crypto v0.43.0
 	golang.org/x/exp v0.0.0-20250911091902-df9299821621
 	golang.org/x/mod v0.28.0
-	golang.org/x/net v0.44.0
+	golang.org/x/net v0.45.0
 	golang.org/x/sync v0.17.0
-	golang.org/x/sys v0.36.0
-	golang.org/x/term v0.35.0
-	golang.org/x/text v0.29.0
+	golang.org/x/sys v0.37.0
+	golang.org/x/term v0.36.0
+	golang.org/x/text v0.30.0
 	golang.org/x/time v0.12.0
 	golang.org/x/tools v0.37.0
 	google.golang.org/api v0.239.0
