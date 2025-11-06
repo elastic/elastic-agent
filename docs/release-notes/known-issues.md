@@ -218,14 +218,15 @@ batch:
 
 :::
 
-:::{dropdown} Failed to reload {{agent}} download settings including proxy URL and custom binary location.
+:::{dropdown} Upgrade failures caused by failure to reload {{agent}} download settings
 
 **Applies to: {{agent}} 8.18.7, 8.18.8, 8.19.4, 8.19.5, 8.19.6, 9.0.7, 9.0.8, 9.1.4, 9.1.5, 9.1.6, 9.2.0**
 
 On November 3, 2025, a known issue was discovered where {{agent}} fails to use
 custom `Agent Binary Download` settings defined in the Fleet policy. The issue
 occurs because the artifact downloader would not refresh its own settings to use
-the latest version of the settings from policy to download.
+the latest version of the settings from policy to download. This will impact proxy
+and custom binary location settings.
 
 For more information, check [Issue #8245](https://github.com/elastic/elastic-agent/issues/8245).
 
