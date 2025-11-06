@@ -566,8 +566,8 @@ func TestContainerCMDAgentMonitoringRuntimeExperimental(t *testing.T) {
 }
 
 // TestContainerCMDAgentMonitoringRuntimeExperimentalPolicy tests that when
-// AGENT_MONITORING_RUNTIME_EXPERIMENTAL is set, the fleet policy takes
-// precedence over the env var.
+// AGENT_MONITORING_RUNTIME_EXPERIMENTAL is set, the agent.monitoring
+// from the fleet policy takes precedence over the environment variable.
 func TestContainerCMDAgentMonitoringRuntimeExperimentalPolicy(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Stack: &define.Stack{},
