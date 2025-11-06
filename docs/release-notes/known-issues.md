@@ -26,7 +26,7 @@ Known issues are significant defects or limitations that may impact your impleme
 
 :::{dropdown} Failed upgrades leave {{agent}} stuck until restart
 
-**Applies to: {{agent}} 8.18.7, 9.0.7** 
+**Applies to: {{agent}} 8.18.7, 9.0.7**
 
 On September 17, 2025, a known issue was discovered that can cause {{agent}} upgrades to get stuck if an upgrade attempt fails under specific conditions. This happens because the coordinator’s `overrideState` remains set, leaving the agent in a state that appears to be upgrading.
 
@@ -41,8 +41,8 @@ This issue is triggered if the upgrade fails during one of the early checks insi
 **Symptoms**
 
 - {{fleet}} shows the upgrade action in progress, even though the upgrade remains stuck
-- No further upgrade attempts succeed 
-- Elastic Agent status shows an override state indicating upgrade 
+- No further upgrade attempts succeed
+- Elastic Agent status shows an override state indicating upgrade
 
 **Workaround**
 
@@ -132,7 +132,7 @@ Until a bug fix is available in a later release, you can resolve the issue tempo
 
 On May 26th, 2025, a known issue was discovered that causes the `osquery` integration to fail on new {{agent}} installations on macOS. During the installation process, the required `osquery.app/` directory is removed, which prevents the integration from starting.
 
-For more information, check [Issue #8245](https://github.com/elastic/elastic-agent/issues/8245).
+For more information, check [Issue #10994](https://github.com/elastic/elastic-agent/issues/10994).
 
 **Workaround**
 
@@ -215,5 +215,28 @@ To work around this issue, manually update the configuration of the generated `o
 batch:
   flush_timeout: 1s
 ```
+
+:::
+
+:::{dropdown} Failed to reload {{agent}} download settings including proxy URL and custom binary location.
+
+**Applies to: {{agent}} 8.18.7, 8.18.8, 8.19.4, 8.19.5, 8.19.6, 9.0.7, 9.0.8, 9.1.4, 9.1.5, 9.1.6, 9.2.0**
+
+On November 3, 2025, a known issue was discovered where {{agent}} fails to use
+custom `Agent Binary Download` settings defined in the Fleet policy. The issue
+occurs because the artifact downloader would not refresh its own settings to use
+the latest version of the settings from policy to download.
+
+For more information, check [Issue #8245](https://github.com/elastic/elastic-agent/issues/8245).
+
+**Workaround**
+
+Possible workaround require access on the hosts to unlock the situation:
+
+1. Define temporarily [`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` env variables](https://www.elastic.co/docs/reference/fleet/host-proxy-env-vars) on the Elastic Agent service - then restart Elastic Agent. **ATTENTION:** you will need to provide a correct `NO_PROXY` value in order to force Elastic Agent to use the proxy ONLY when accessing the URL of the artifacts, otherwise it will affect ANY HTTP communication to go through the proxy. Then restart the Elastic Agent and re-attempt the upgrade.
+
+Temporarily grant access to the public Artifacts repository (or the self-hosted one) without the need of the HTTP proxy. This might imply updating firewalls or host settings.
+
+Re-install Elastic Agent downloading the file locally via other methods. Note: this implies a re-enrollment & re-installation, losing the local state and therefore triggering possible re-ingestion of data.
 
 :::
