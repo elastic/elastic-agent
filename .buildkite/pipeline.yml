@@ -81,6 +81,9 @@ steps:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
           machineType: "n2-standard-8"
+        plugins:
+        - *aws_oidc
+        - *cache_unix
         retry:
           automatic:
             limit: 1
@@ -104,6 +107,9 @@ steps:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
           machineType: "n2-standard-8"
+        plugins:
+        - *aws_oidc
+        - *cache_unix
         retry:
           automatic:
             limit: 1
@@ -123,6 +129,9 @@ steps:
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
           diskSizeGb: 200
           instanceType: "m6g.xlarge"
+        plugins:
+        - *aws_oidc
+        - *cache_unix
         retry:
           automatic:
             limit: 1
@@ -143,6 +152,9 @@ steps:
           machineType: "n2-standard-8"
           disk_size: 200
           disk_type: "pd-ssd"
+        plugins:
+        - *aws_oidc
+        - *cache_windows
         retry:
           automatic:
             limit: 1
@@ -163,6 +175,9 @@ steps:
           machineType: "n2-standard-8"
           disk_size: 200
           disk_type: "pd-ssd"
+        plugins:
+        - *aws_oidc
+        - *cache_windows
         retry:
           automatic:
             limit: 1
@@ -182,6 +197,9 @@ steps:
         agents:
           provider: orka
           imagePrefix: generic-base-15-arm-002
+        plugins:
+        - *aws_oidc
+        - *cache_unix
         retry:
           automatic:
             limit: 1
@@ -200,6 +218,9 @@ steps:
         agents:
           provider: orka
           imagePrefix: generic-13-ventura-x64
+        plugins:
+        - *aws_oidc
+        - *cache_unix
         retry:
           automatic:
             limit: 1
@@ -222,6 +243,9 @@ steps:
           image: "${IMAGE_WIN_10}"
           machineType: "n2-standard-8"
           disk_type: "pd-ssd"
+        plugins:
+        - *aws_oidc
+        - *cache_windows
         retry:
           automatic:
             limit: 1
@@ -241,6 +265,9 @@ steps:
           image: "${IMAGE_WIN_11}"
           machineType: "n2-standard-8"
           disk_type: "pd-ssd"
+        plugins:
+        - *aws_oidc
+        - *cache_windows
         retry:
           automatic:
             limit: 1
@@ -287,6 +314,9 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
+        plugins:
+        - *aws_oidc
+        - *cache_unix
         matrix:
           setup:
             k8s_version:
