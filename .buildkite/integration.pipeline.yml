@@ -60,7 +60,7 @@ steps:
       - label: ":package: arm64: zip,tar.gz"
         key: packaging-arm64
         env:
-          PLATFORMS: "windows/arm64,linux/arm64"
+          PLATFORMS: "linux/arm64"
           PACKAGES: "tar.gz,zip"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
