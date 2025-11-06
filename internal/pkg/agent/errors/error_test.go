@@ -49,7 +49,6 @@ func TestErrorsIs(t *testing.T) {
 		{"agent in error wrap", agentInErr, simpleWrap, true},
 		{"agent in error root", agentInErr, simpleErr, true},
 		{"agent in error nil check", agentInErr, nil, false},
-		{"agent in error nil check", agentInErr, nil, false},
 	}
 
 	for _, tc := range tt {
