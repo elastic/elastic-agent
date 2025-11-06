@@ -90,6 +90,110 @@ func DropComponentStateFromOtelStatus(otelStatus *status.AggregateStatus) (*stat
 	return newStatus, nil
 }
 
+// MaybeMuteExporterStatus modifies the given otel status by muting exporter statuses for muted components.
+// It also updates parent pipeline statuses based on child components.
+func MaybeMuteExporterStatus(
+	otelStatus *status.AggregateStatus,
+	components []component.Component,
+) (*status.AggregateStatus, error) {
+	if otelStatus == nil {
+		return nil, nil
+	}
+
+	newStatus := deepCopyStatus(otelStatus)
+
+	// Mute exporters
+	if err := muteExporters(newStatus, components); err != nil {
+		return nil, err
+	}
+
+	updateStatus(newStatus)
+
+	return newStatus, nil
+}
+
+// updateStatus recursively updates each AggregateStatus.Event
+// based on the statuses of its child components.
+func updateStatus(status *status.AggregateStatus) {
+	if status == nil {
+		return
+	}
+
+	ok := true
+
+	for _, child := range status.ComponentStatusMap {
+		updateStatus(child)
+
+		if child.Status() != componentstatus.StatusOK {
+			ok = false
+		}
+	}
+
+	if len(status.ComponentStatusMap) > 0 {
+		if ok {
+			status.Event = componentstatus.NewEvent(componentstatus.StatusOK)
+		}
+	}
+}
+
+// muteExporters sets all exporter statuses to OK for muted pipelines/components.
+func muteExporters(agg *status.AggregateStatus, components []component.Component) error {
+	for pipelineStatusID, pipelineStatus := range agg.ComponentStatusMap {
+		if pipelineStatusID == "extensions" {
+			// we do not want to report extension status
+			continue
+		}
+		pipelineID, err := parsePipelineID(pipelineStatusID)
+		if err != nil {
+			return err
+		}
+
+		componentID, found := strings.CutPrefix(pipelineID.Name(), OtelNamePrefix)
+		if !found || !isOutputMuted(componentID, components) {
+			continue
+		}
+
+		// Mute exporters for the pipeline for this component
+		for compID, compStatus := range pipelineStatus.ComponentStatusMap {
+			kind, _, err := parseEntityStatusId(compID)
+			if err != nil {
+				return err
+			}
+			if kind == "exporter" {
+				compStatus.Event = componentstatus.NewEvent(componentstatus.StatusOK)
+			}
+		}
+	}
+	return nil
+}
+
+// parsePipelineID extracts a *pipeline.ID from a status ID string.
+func parsePipelineID(statusID string) (*pipeline.ID, error) {
+	_, pipelineIDStr, err := parseEntityStatusId(statusID)
+	if err != nil {
+		return nil, err
+	}
+	pID := &pipeline.ID{}
+	if err := pID.UnmarshalText([]byte(pipelineIDStr)); err != nil {
+		return nil, err
+	}
+	return pID, nil
+}
+
+// isOutputMuted checks whether output status reporting is disabled for the given componentID
+func isOutputMuted(componentID string, components []component.Component) bool {
+	for _, comp := range components {
+		if comp.ID != componentID {
+			continue
+		}
+		if comp.OutputStatusReporting == nil {
+			return false
+		}
+		return !comp.OutputStatusReporting.Enabled
+	}
+	return false
+}
+
 // getOtelRuntimePipelineStatuses finds otel pipeline statuses belonging to runtime components and returns them as a map
 // from component id to pipeline status.
 func getOtelRuntimePipelineStatuses(otelStatus *status.AggregateStatus) (map[string]*status.AggregateStatus, error) {
@@ -142,7 +246,7 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 			BuildHash: version.Commit(),
 		},
 	}
-	receiverStatuses, exporterStatuses, err := getUnitOtelStatuses(pipelineStatus)
+	receiverStatuses, exporterStatuses, err := getUnitOtelStatuses(pipelineStatus, comp)
 	if err != nil {
 		return runtime.ComponentComponentState{}, err
 	}
@@ -187,7 +291,7 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 }
 
 // getUnitOtelStatuses extracts the receiver and exporter status from otel pipeline status.
-func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus) (
+func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus, comp component.Component) (
 	receiverStatuses map[otelcomponent.ID]*status.AggregateStatus,
 	exporterStatuses map[otelcomponent.ID]*status.AggregateStatus,
 	err error) {

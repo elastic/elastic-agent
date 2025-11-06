@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
-	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -92,20 +91,16 @@ func (h *Unenroll) handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 		a = nil
 	}
 
-	// Generate empty policy change, this removing all the running components
-	unenrollPolicy := newPolicyChange(ctx, config.New(), a, acker, true, false)
-	h.ch <- unenrollPolicy
-
 	// backup action for future start to avoid starting fleet gateway loop
-	h.stateStore.SetAction(a)
-	if err := h.stateStore.Save(); err != nil {
-		h.log.Warnf("Failed to update state store: %v", err)
+	backupCallback := func() {
+		h.stateStore.SetAction(a)
+		if err := h.stateStore.Save(); err != nil {
+			h.log.Warnf("Failed to update state store: %v", err)
+		}
 	}
 
-	unenrollCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	unenrollPolicy.WaitAck(unenrollCtx)
+	// Generate empty policy change, this removing all the running components
+	stopComponents(ctx, h.ch, a, acker, backupCallback)
 
 	// close fleet gateway loop
 	for _, c := range h.closers {

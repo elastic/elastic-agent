@@ -94,11 +94,10 @@ var (
 // BeatsMonitor provides config values for monitoring of agent clients (beats, endpoint, etc)
 // by injecting the monitoring config into an existing fleet config
 type BeatsMonitor struct {
-	enabled                 bool // feature flag disabling whole v1 monitoring story
-	config                  *monitoringConfig
-	operatingSystem         string
-	agentInfo               info.Agent
-	isOtelRuntimeSubprocess bool
+	enabled         bool // feature flag disabling whole v1 monitoring story
+	config          *monitoringConfig
+	operatingSystem string
+	agentInfo       info.Agent
 }
 
 // componentInfo is the information necessary to generate monitoring configuration for a component. We don't just use
@@ -117,15 +116,14 @@ type monitoringConfig struct {
 }
 
 // New creates a new BeatsMonitor instance.
-func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, agentInfo info.Agent, isOtelRuntimeSubprocess bool) *BeatsMonitor {
+func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, agentInfo info.Agent) *BeatsMonitor {
 	return &BeatsMonitor{
 		enabled: enabled,
 		config: &monitoringConfig{
 			C: cfg,
 		},
-		operatingSystem:         operatingSystem,
-		agentInfo:               agentInfo,
-		isOtelRuntimeSubprocess: isOtelRuntimeSubprocess,
+		operatingSystem: operatingSystem,
+		agentInfo:       agentInfo,
 	}
 }
 
@@ -724,7 +722,7 @@ func (b *BeatsMonitor) getHttpStreams(
 	}
 	httpStreams = append(httpStreams, agentStream)
 
-	if usingOtelRuntime(componentInfos) && b.isOtelRuntimeSubprocess {
+	if usingOtelRuntime(componentInfos) {
 		edotSubprocessStream := map[string]any{
 			idKey: fmt.Sprintf("%s-edot-collector", monitoringMetricsUnitID),
 			"data_stream": map[string]interface{}{
@@ -950,6 +948,8 @@ func processorsForAgentFilestream() []any {
 		dropPeriodicMetricsLogsProcessor(),
 		// drop event logs
 		dropEventLogs(),
+		// drop potential sensitive fields emitted by elasticsearch exporter logs
+		dropSensitiveFieldsFromElasticSearchExporterLogs(),
 	}
 	// if the event is from a component, use the component's dataset
 	processors = append(processors, useComponentDatasetProcessors()...)
@@ -1184,6 +1184,20 @@ func dropFieldsProcessor(fields []any, ignoreMissing bool) map[string]any {
 		"drop_fields": map[string]interface{}{
 			"fields":         fields,
 			"ignore_missing": ignoreMissing,
+		},
+	}
+}
+
+// dropElasticSearchExporterLogs returns a processor which drops fields from logs emitted by elasticsearch exporter,  that may contain sensitive data.
+func dropSensitiveFieldsFromElasticSearchExporterLogs() map[string]any {
+	return map[string]interface{}{
+		"drop_fields": map[string]interface{}{
+			"fields": []any{"error.reason"},
+			"when": map[string]interface{}{
+				"contains": map[string]interface{}{
+					"message": "failed to index document", // this message come from ES exporter
+				},
+			},
 		},
 	}
 }
