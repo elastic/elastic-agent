@@ -12,3 +12,4 @@ autoOps:
   es_api_key: "REPLACE_ME_API_KEY"
   elastic_cloud_connected_mode_api_key: "CCM-API-KEY"
   elastic_cloud_connected_mode_api_url: "CCM-API-URL"
+  autoops_es_url: "https://ccm-test-eu-west-1.es.us-east-2.aws.elastic-cloud.com"
