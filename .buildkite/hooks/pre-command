@@ -57,7 +57,7 @@ if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-binary-dra" ]]; then
   fi
 fi
 
-if [[ "$BUILDKITE_STEP_KEY" == *"test"* ]]; then
+if [[ "$BUILDKITE_STEP_KEY" == *"test"* || "${BUILDKITE_GROUP_KEY:-}" == *"test"* ]]; then
   .buildkite/scripts/install-awscli.sh
 fi
 
