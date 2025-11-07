@@ -37,6 +37,7 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
+          machineType: "n2-standard-8"
         retry:
           automatic:
             limit: 1
@@ -56,6 +57,7 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
+          machineType: "n2-standard-8"
         retry:
           automatic:
             limit: 1
@@ -78,6 +80,7 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
+          machineType: "n2-standard-8"
         retry:
           automatic:
             limit: 1
@@ -114,7 +117,7 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_WIN_2022}"
-          machine_type: "n2-standard-8"
+          machineType: "n2-standard-8"
           disk_size: 200
           disk_type: "pd-ssd"
         retry:
@@ -134,7 +137,7 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_WIN_2016}"
-          machine_type: "n2-standard-8"
+          machineType: "n2-standard-8"
           disk_size: 200
           disk_type: "pd-ssd"
         retry:
@@ -194,7 +197,7 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_WIN_10}"
-          machine_type: "n2-standard-8"
+          machineType: "n2-standard-8"
           disk_type: "pd-ssd"
         retry:
           automatic:
@@ -213,7 +216,7 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_WIN_11}"
-          machine_type: "n2-standard-8"
+          machineType: "n2-standard-8"
           disk_type: "pd-ssd"
         retry:
           automatic:
