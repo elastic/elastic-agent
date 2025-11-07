@@ -57,7 +57,7 @@ func (a *agentInfo) AgentID() string {
 func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log *logp.Logger, pt ProgressDescriber, skipFleetAudit bool) error {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("unable to get current working directory")
+		return errors.New("unable to get current working directory")
 	}
 
 	if runtime.GOOS == "windows" && paths.HasPrefix(cwd, topPath) {
@@ -231,7 +231,7 @@ func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt Progres
 		}
 	}
 	pt.Describe("notify Fleet: failed")
-	return fmt.Errorf("notify Fleet: failed")
+	return errors.New("notify Fleet: failed")
 }
 
 // EnsureStoppedService ensures that the installed service is stopped.

@@ -6,6 +6,7 @@ package upgrade
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -59,7 +60,7 @@ func TestWatcher_LostConnection(t *testing.T) {
 
 	// error on watch (counts as lost connect)
 	mockHandler := func(srv cproto.ElasticAgentControl_StateWatchServer) error {
-		return fmt.Errorf("forced error")
+		return errors.New("forced error")
 	}
 	mock := &mockDaemon{watch: mockHandler}
 	require.NoError(t, mock.Start())
@@ -925,7 +926,7 @@ func TestTakeOverWatcher(t *testing.T) {
 				locker := filelock.NewAppLocker(workdir, watcherApplockerFileName)
 				err := locker.TryLock()
 				require.NoError(t, err, "error setting up the applocker")
-				mockWatcherGrappler.EXPECT().TakeDownWatcher(mock.Anything, mock.Anything).Return(fmt.Errorf("some takedown error")).Once()
+				mockWatcherGrappler.EXPECT().TakeDownWatcher(mock.Anything, mock.Anything).Return(errors.New("some takedown error")).Once()
 				mockWatcherGrappler.EXPECT().TakeDownWatcher(mock.Anything, mock.Anything).Run(func(_ context.Context, _ *logp.Logger) {
 					unlockErr := locker.Unlock()
 					assert.NoError(t, unlockErr, "error unlocking the applocker")

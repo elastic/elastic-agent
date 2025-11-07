@@ -153,7 +153,7 @@ func (r *ArtifactURLResolver) Resolve() (string, string, error) {
 			slog.String("name", artifactName),
 			slog.String("version", version),
 		)
-		return "", "", fmt.Errorf("object not found in Artifact API")
+		return "", "", errors.New("object not found in Artifact API")
 	}
 
 	downloadURL, ok := downloadObject.Path("url").Data().(string)
@@ -408,7 +408,7 @@ func (asur *ArtifactsSnapshotURLResolver) Resolve() (string, string, error) {
 func findSnapshotPackage(jsonParsed map[string]interface{}, fullName string) (string, string, error) {
 	projects, ok := jsonParsed["projects"].(map[string]interface{})
 	if !ok {
-		return "", "", fmt.Errorf("key 'projects' does not exist")
+		return "", "", errors.New("key 'projects' does not exist")
 	}
 
 	for _, project := range projects {
@@ -498,7 +498,7 @@ func (r *ReleaseURLResolver) Resolve() (string, string, error) {
 	}
 
 	if !found {
-		return "", "", fmt.Errorf("download could not be found at the Elastic downloads API")
+		return "", "", errors.New("download could not be found at the Elastic downloads API")
 	}
 
 	return url, shaURL, nil

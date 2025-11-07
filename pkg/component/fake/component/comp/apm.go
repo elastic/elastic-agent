@@ -95,7 +95,7 @@ func (ats *apmTracesSender) Update(cfg *proto.APMConfig, timeout time.Duration) 
 	case ats.cfgUpd <- cfg:
 		return nil
 	case <-time.After(timeout):
-		return fmt.Errorf("config update timed out")
+		return errors.New("config update timed out")
 	}
 }
 

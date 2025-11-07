@@ -6,6 +6,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -113,7 +114,7 @@ func collectDiagnostics(ctx context.Context, streams *cli.IOStreams, cpuProfile,
 	}
 
 	if len(compDiags) == 0 && len(unitDiags) == 0 && len(agentDiag) == 0 {
-		return nil, nil, nil, fmt.Errorf("no diags could be fetched")
+		return nil, nil, nil, errors.New("no diags could be fetched")
 	}
 
 	return agentDiag, unitDiags, compDiags, nil

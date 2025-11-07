@@ -12,6 +12,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -146,7 +147,7 @@ func (r *KubeRemote) Run(env map[string]string, stdout io.Writer, stderr io.Writ
 
 	// return error on failure
 	if pod.Status.Phase == apiv1.PodFailed {
-		return fmt.Errorf("execute pod test failed")
+		return errors.New("execute pod test failed")
 	}
 	return nil
 }
@@ -584,7 +585,7 @@ func isContainerRunning(pod *apiv1.Pod, containerName string) (bool, error) {
 			} else if status.State.Terminated != nil {
 				return false, nil
 			} else {
-				return false, fmt.Errorf("unknown container state")
+				return false, errors.New("unknown container state")
 			}
 		}
 	}

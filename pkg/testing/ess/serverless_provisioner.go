@@ -7,6 +7,7 @@ package ess
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -188,7 +189,7 @@ func (prov *ServerlessProvisioner) Delete(ctx context.Context, stack common.Stac
 
 // Upgrade does not apply to Serverless projects!
 func (prov *ServerlessProvisioner) Upgrade(ctx context.Context, stack common.Stack, newVersion string) error {
-	return fmt.Errorf("upgrade is not supported for serverless projects")
+	return errors.New("upgrade is not supported for serverless projects")
 }
 
 // CheckCloudRegion checks to see if the provided region is valid for the serverless
@@ -231,7 +232,7 @@ func (prov *ServerlessProvisioner) CheckCloudRegion(ctx context.Context) error {
 	}
 	if !found {
 		if len(regions) == 0 {
-			return fmt.Errorf("no regions found for cloudless API")
+			return errors.New("no regions found for cloudless API")
 		}
 		newRegion := regions[0].ID
 		prov.log.Logf("WARNING: Region %s is not available for serverless, selecting %s. Other regions are:", prov.cfg.Region, newRegion)
@@ -246,23 +247,23 @@ func (prov *ServerlessProvisioner) CheckCloudRegion(ctx context.Context) error {
 
 func (prov *ServerlessProvisioner) getDeploymentInfo(stack common.Stack) (string, string, error) {
 	if stack.Internal == nil {
-		return "", "", fmt.Errorf("missing internal information")
+		return "", "", errors.New("missing internal information")
 	}
 	deploymentIDRaw, ok := stack.Internal["deployment_id"]
 	if !ok {
-		return "", "", fmt.Errorf("missing internal deployment_id")
+		return "", "", errors.New("missing internal deployment_id")
 	}
 	deploymentID, ok := deploymentIDRaw.(string)
 	if !ok {
-		return "", "", fmt.Errorf("internal deployment_id not a string")
+		return "", "", errors.New("internal deployment_id not a string")
 	}
 	deploymentTypeRaw, ok := stack.Internal["deployment_type"]
 	if !ok {
-		return "", "", fmt.Errorf("missing internal deployment_type")
+		return "", "", errors.New("missing internal deployment_type")
 	}
 	deploymentType, ok := deploymentTypeRaw.(string)
 	if !ok {
-		return "", "", fmt.Errorf("internal deployment_type is not a string")
+		return "", "", errors.New("internal deployment_type is not a string")
 	}
 	return deploymentID, deploymentType, nil
 }

@@ -47,7 +47,7 @@ type AuditUnenrollRequest struct {
 // Validate will ensure the timestamp is set and the reason is an allowed value.
 func (e *AuditUnenrollRequest) Validate() error {
 	if e.Timestamp.IsZero() {
-		return &ReqError{fmt.Errorf("request timestamp not set")}
+		return &ReqError{errors.New("request timestamp not set")}
 	}
 	switch e.Reason {
 	case ReasonUninstall:

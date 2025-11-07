@@ -84,10 +84,10 @@ func unprivilegedCmd(streams *cli.IOStreams, cmd *cobra.Command) (err error) {
 	if !force {
 		confirm, err := cli.Confirm("This will restart the running Elastic Agent and convert it to run in unprivileged mode. Do you want to continue?", true)
 		if err != nil {
-			return fmt.Errorf("problem reading prompt response")
+			return errors.New("problem reading prompt response")
 		}
 		if !confirm {
-			return fmt.Errorf("unprivileged switch was cancelled by the user")
+			return errors.New("unprivileged switch was cancelled by the user")
 		}
 	}
 
