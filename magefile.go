@@ -260,7 +260,7 @@ func (Build) GenerateConfig() error {
 	return sh.Copy(filepath.Join(buildDir, configFile), filepath.Join(metaDir, configFile))
 }
 
-// WindowsArchiveRootBinary compiles a binary to be placed at the root of the windows elastic-agent archive. This binary
+// windowsArchiveRootBinaryForGoArch compiles a binary to be placed at the root of the windows elastic-agent archive. This binary
 // is a thin proxy to the actual elastic-agent binary that resides in the data/elastic-agent-{commit-short-sha}
 // directory of the archive.
 func (Build) windowsArchiveRootBinaryForGoArch(goarch string) error {
