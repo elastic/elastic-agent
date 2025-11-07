@@ -8,17 +8,18 @@
 # - security: impacts on the security of a product or a user’s deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
-kind: enhancement
+kind: bug-fix
 
 # Change summary; a 80ish characters long description of the change.
-summary: Run self-monitoring as otel receivers by default
+summary: Reduce memory usage by executing Elastic Agent self-monitoring inputs as OpenTelemetry collector receivers by default.
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
 description: |
-  The inputs used for Elastic Agent's self-monitoring now run as receivers inside a managed otel collector.
-  This can be switched back by setting `agent.monitoring._runtime_experimental: process`.
+  Self-monitoring inputs which were previously executed as Beat sub-processes are now executed as receivers in a single OpenTelemetry collector sub-process.
+  For a Fleet managed Elastic Agent running the default System integration, steady state memory usage is reduced by 11.5% (79.1 MB) on Linux, 34.5% (185.77 MB) on Windows, and 23.0% (115.9 MB) on MacOS.
+  This is the first phase of work reducing the Elastic Agent's memory footprint, memory reductions will continue in future releases.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
