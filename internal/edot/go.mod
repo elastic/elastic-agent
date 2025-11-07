@@ -7,7 +7,7 @@ require github.com/elastic/elastic-agent v0.0.0
 replace github.com/elastic/elastic-agent => ../../
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251104195902-4ded660aa9fc
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251106144139-f8a4087a3e16
 	github.com/elastic/elastic-agent-libs v0.26.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.20.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.1.0
@@ -285,6 +285,7 @@ require (
 	github.com/elastic/go-sysinfo v1.15.4 // indirect
 	github.com/elastic/go-ucfg v0.8.9-0.20250307075119-2a22403faaea // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
+	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/lunes v0.1.0 // indirect
 	github.com/elastic/mito v1.23.0 // indirect
