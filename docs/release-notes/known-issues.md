@@ -238,7 +238,7 @@ Possible workaround require access on the hosts to unlock the situation:
 
 2. Temporarily grant access to the public Artifacts repository (or the self-hosted one) without the need of the HTTP proxy. This might imply updating firewalls or host settings.
 
-3. Re-install Elastic Agent downloading the file locally via other methods. You can download the agent upgrade `.zip` or
+3. Upgrade Elastic by Agent downloading the file locally via other methods. You can download the agent upgrade `.zip` or
 `.tar.gz` along with the `.sha512` and `.asc` files and use the upgrade command with a `file://` URI to upgrade from
 local disk.
 
