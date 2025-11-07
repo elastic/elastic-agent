@@ -141,9 +141,24 @@ targets:
     spec:
       content: 'go {{ source "gomod" }}'
       file: wrapper/windows/archive-proxy/go.mod
+<<<<<<< HEAD
       matchpattern: 'go \d+.\d+'
   update-gomod-toolchain-version:
     name: "Update go.mod toolchain version"
+=======
+      matchpattern: 'go \d+.\d+.\d+'
+  update-edot-gomod-full-version:
+    name: "Update internal/edot/go.mod version"
+    sourceid: latestGoVersion
+    scmid: githubConfig
+    kind: file
+    spec:
+      content: 'go {{ source "latestGoVersion" }}'
+      file: internal/edot/go.mod
+      matchpattern: 'go \d+.\d+.\d+'
+  update-buildkite-pipeline:
+    name: "Update .buildkite/pipeline.yml"
+>>>>>>> c1777a5ce (feat: move edot in a separate package (#10922))
     sourceid: latestGoVersion
     scmid: githubConfig
     kind: file

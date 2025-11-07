@@ -59,7 +59,13 @@ linters:
         - github.com/google/gopacket
         - github.com/insomniacslk/dhcp
         - github.com/meraki/dashboard-api-go/v3
+<<<<<<< HEAD
       replace-local: false
+=======
+        - go.opentelemetry.io/otel/exporters/prometheus
+        - github.com/elastic/elastic-agent/internal/edot
+      replace-local: true
+>>>>>>> c1777a5ce (feat: move edot in a separate package (#10922))
     gomodguard:
       blocked:
         modules:

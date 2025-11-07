@@ -36,8 +36,13 @@ import (
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
 
+<<<<<<< HEAD
 	"github.com/otiai10/copy"
 	"golang.org/x/sync/errgroup"
+=======
+	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/otiai10/copy"
+>>>>>>> c1777a5ce (feat: move edot in a separate package (#10922))
 
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
@@ -72,9 +77,12 @@ import (
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
 
-	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
+<<<<<<< HEAD
+=======
+	"golang.org/x/sync/errgroup"
+>>>>>>> c1777a5ce (feat: move edot in a separate package (#10922))
 	"gopkg.in/yaml.v3"
 
 	"helm.sh/helm/v3/pkg/action"
@@ -319,6 +327,7 @@ func GolangCrossBuildOSS() error {
 func GolangCrossBuild() error {
 	params := devtools.DefaultGolangCrossBuildArgs()
 	params.OutputDir = "build/golang-crossbuild"
+	params.Package = "github.com/elastic/elastic-agent"
 	injectBuildVars(params.Vars)
 
 	if err := devtools.GolangCrossBuild(params); err != nil {
@@ -420,7 +429,11 @@ func (Build) TestBinaries() error {
 		}
 
 		outputName := filepath.Join(pkg, binary)
+<<<<<<< HEAD
 		err := RunGo("build", "-v", "-o", outputName, filepath.Join(pkg))
+=======
+		err := devtools.Run(nil, nil, os.Stderr, "go", pkg, "build", "-v", "-o", outputName, pkg)
+>>>>>>> c1777a5ce (feat: move edot in a separate package (#10922))
 		if err != nil {
 			return err
 		}
@@ -3606,7 +3619,7 @@ func (Otel) Readme() error {
 		return fmt.Errorf("failed to parse README template: %w", err)
 	}
 
-	data, err := otel.GetOtelDependencies("go.mod")
+	data, err := otel.GetOtelDependencies(filepath.Join("internal", "edot", "go.mod"))
 	if err != nil {
 		return fmt.Errorf("Failed to get OTel dependencies: %w", err)
 	}
