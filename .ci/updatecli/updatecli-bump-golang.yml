@@ -1,6 +1,7 @@
 # update-cli configuration for automated go updates
 ---
 name: Bump golang-version to latest version
+pipelineid: 'bump-golang-version'
 
 scms:
   githubConfig:
@@ -26,10 +27,6 @@ actions:
         - dependencies
         - backport-active-all
       title: '[Automation] Bump Golang version to {{ source "latestGoVersion" }}'
-      description: |
-        It requires the version to be bumped first in golang-crossbuild project, then a new release will be added to:
-        https://github.com/elastic/golang-crossbuild/releases/tag/v{{ source "latestGoVersion" }}.
-        Otherwise it will fail until the docker images are available.
 
 sources:
   minor:
@@ -43,20 +40,20 @@ sources:
       command: cat .go-version
 
   latestGoVersion:
-    name: Get Latest Go Release
+    name: Get Latest Golang-crossbuild Release
     kind: githubrelease
     dependson:
       - minor
     transformers:
-      - trimprefix: go
+      - trimprefix: v
     spec:
-      owner: golang
-      repository: go
+      owner: elastic
+      repository: golang-crossbuild
       token: '{{ requiredEnv "GITHUB_TOKEN" }}'
       username: '{{ requiredEnv "GITHUB_ACTOR" }}'
       versionfilter:
         kind: regex
-        pattern: go1\.{{ source "minor" }}\.(\d*)$
+        pattern: v1\.{{ source "minor" }}\.(\d*)$
 
 conditions:
   dockerTag:
