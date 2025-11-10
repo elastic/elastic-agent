@@ -333,7 +333,6 @@ func resolveSymlinkChain(path string) []string {
 	// Now walk through the target path and find intermediate symlinks
 	// For example, if target is "/var/secrets/..data/token", we want to check if "..data" is a symlink
 	targetDir := filepath.Dir(target)
-	targetBase := filepath.Base(target)
 
 	// Check each component of the target directory path for symlinks
 	components := strings.Split(filepath.Clean(targetDir), string(filepath.Separator))
@@ -361,12 +360,11 @@ func resolveSymlinkChain(path string) []string {
 		}
 	}
 
-	// Also check if the final target file exists and is a symlink (nested symlinks)
-	finalTarget := filepath.Join(targetDir, targetBase)
-	_, err = os.Readlink(finalTarget)
+	// Also check if the target file itself is a symlink (nested symlinks)
+	_, err = os.Readlink(target)
 	if err == nil {
 		// The target itself is also a symlink, recursively resolve it
-		nestedIntermediates := resolveSymlinkChain(finalTarget)
+		nestedIntermediates := resolveSymlinkChain(target)
 		intermediates = append(intermediates, nestedIntermediates...)
 	}
 
