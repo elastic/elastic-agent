@@ -10,7 +10,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/cmd"
+	"github.com/elastic/elastic-agent/internal/edot/cmd"
 )
 
 // This is a test binary used by the OTEL manager unit tests.
