@@ -29,17 +29,15 @@ type esToOTelOptions struct {
 	elasticsearch.ElasticsearchConfig `config:",inline"`
 	outputs.HostWorkerCfg             `config:",inline"`
 
-	Index    string `config:"index"`
-	Pipeline string `config:"pipeline"`
-	Preset   string `config:"preset"`
+	Index  string `config:"index"`
+	Preset string `config:"preset"`
 }
 
 var defaultOptions = esToOTelOptions{
 	ElasticsearchConfig: elasticsearch.DefaultConfig(),
 
-	Index:    "", // Dynamic routing is disabled if index is set
-	Pipeline: "",
-	Preset:   "custom", // default is custom if not set
+	Index:  "",       // Dynamic routing is disabled if index is set
+	Preset: "custom", // default is custom if not set
 	HostWorkerCfg: outputs.HostWorkerCfg{
 		Workers: 1,
 	},
