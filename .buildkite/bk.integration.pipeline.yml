@@ -510,12 +510,11 @@ steps:
               - deb
               - container
 
-
-  - group: "Stateful:Debian"
-    key: integration-tests-debian
+  - group: "Stateful:RHEL"
+    key: integration-tests-rhel
     notify:
       - github_commit_status:
-          context: "buildkite/elastic-agent-extended-testing - Debian"
+          context: "buildkite/elastic-agent-extended-testing - RHEL"
     depends_on:
       - integration-ess
     steps:
