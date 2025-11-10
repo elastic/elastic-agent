@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent/internal/edot
 
-go 1.24.9
+go 1.24.10
 
 require github.com/elastic/elastic-agent v0.0.0
 
