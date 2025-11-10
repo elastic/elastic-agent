@@ -311,7 +311,7 @@ retry:
   initial_interval: 1s
   max_interval: 1m0s
   max_retries: 3
-max_conns_per_host: 1
+max_conns_per_host: 2
 user: elastic
 sending_queue:
   batch:
