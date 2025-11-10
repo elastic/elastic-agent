@@ -440,7 +440,7 @@ steps:
     depends_on:
       - integration-ess
     steps:
-      - label: "x86_64:non-sudo: {{matrix.group}} - ${matrix.image}"
+      - label: "x86_64:non-sudo: {{matrix.group}} - {{matrix.image}}"
         depends_on: packaging-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
@@ -467,7 +467,7 @@ steps:
             group:
               - default
 
-      - label: "x86_64:sudo: {{matrix.group}} - ${matrix.image}"
+      - label: "x86_64:sudo: {{matrix.group}} - {{matrix.image}}"
         depends_on:
           - packaging-amd64
         # due to deb group present in matrix tar.gz and deb packages artifacts are required
