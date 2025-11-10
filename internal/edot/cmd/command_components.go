@@ -7,8 +7,8 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/elastic-agent/internal/edot/otelcol"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/internal/pkg/otel"
 )
 
 func newComponentsCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
@@ -19,11 +19,11 @@ func newComponentsCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 		SilenceUsage:  true, // do not display usage on error
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return otel.Components(cmd)
+			return otelcol.Components(cmd)
 		},
 	}
 
-	setupOtelFlags(cmd.Flags())
+	SetupOtelFlags(cmd.Flags())
 	cmd.SetHelpFunc(func(c *cobra.Command, s []string) {
 		hideInheritedFlags(c)
 		c.Root().HelpFunc()(c, s)

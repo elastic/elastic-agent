@@ -17,7 +17,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/internal/pkg/otel"
+	"github.com/elastic/elastic-agent/internal/edot/otelcol"
 )
 
 type componentsOutput struct {
@@ -50,7 +50,7 @@ func TestComponentsCommand(t *testing.T) {
 
 	b := bytes.NewBufferString("")
 	cmd.SetOut(b)
-	err = otel.Components(cmd)
+	err = otelcol.Components(cmd)
 	require.NoError(t, err)
 	outputComponents := &componentsOutput{}
 	err = yaml.Unmarshal(b.Bytes(), outputComponents)

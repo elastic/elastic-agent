@@ -9,8 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/elastic-agent/internal/edot/otelcol"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/internal/pkg/otel"
 )
 
 func newValidateCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
@@ -21,7 +21,7 @@ func newValidateCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 		SilenceUsage:  true, // do not display usage on error
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfgFiles, err := getConfigFiles(cmd, false)
+			cfgFiles, err := GetConfigFiles(cmd, false)
 			if err != nil {
 				return err
 			}
@@ -29,7 +29,7 @@ func newValidateCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 		},
 	}
 
-	setupOtelFlags(cmd.Flags())
+	SetupOtelFlags(cmd.Flags())
 	cmd.SetHelpFunc(func(c *cobra.Command, s []string) {
 		hideInheritedFlags(c)
 		c.Root().HelpFunc()(c, s)
@@ -39,5 +39,5 @@ func newValidateCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 }
 
 func validateOtelConfig(ctx context.Context, cfgFiles []string) error {
-	return otel.Validate(ctx, cfgFiles)
+	return otelcol.Validate(ctx, cfgFiles)
 }

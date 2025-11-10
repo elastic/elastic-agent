@@ -27,6 +27,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -39,11 +40,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-type ExecutionMode string
-
 const (
-	SubprocessExecutionMode ExecutionMode = "subprocess"
-
 	// CollectorStopTimeout is the duration to wait for the collector to stop. Note: this needs to be shorter
 	// than 5 * time.Second (coordinator.managerShutdownTimeout) otherwise we might end up with a defunct process.
 	CollectorStopTimeout = 3 * time.Second
@@ -128,7 +125,7 @@ func NewOTelManager(
 	logger *logger.Logger,
 	logLevel logp.Level,
 	baseLogger *logger.Logger,
-	mode ExecutionMode,
+	mode config.ExecutionMode,
 	agentInfo info.Agent,
 	agentCollectorConfig *configuration.CollectorConfig,
 	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter,
@@ -156,7 +153,7 @@ func NewOTelManager(
 	}
 
 	switch mode {
-	case SubprocessExecutionMode:
+	case config.SubprocessExecutionMode:
 		// NOTE: if we stop embedding the collector binary in elastic-agent, we need to
 		// change this
 		executable, err := os.Executable()

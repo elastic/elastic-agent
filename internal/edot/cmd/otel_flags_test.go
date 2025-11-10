@@ -16,7 +16,7 @@ import (
 
 func TestOtelFlagsSetup(t *testing.T) {
 	fs := new(pflag.FlagSet)
-	setupOtelFlags(fs)
+	SetupOtelFlags(fs)
 
 	expectedFlags := []string{
 		otelConfigFlagName,
@@ -30,7 +30,7 @@ func TestOtelFlagsSetup(t *testing.T) {
 }
 
 func TestGetConfigFiles(t *testing.T) {
-	cmd := newOtelCommandWithArgs(nil, nil)
+	cmd := NewOtelCommandWithArgs(nil, nil)
 	configFile := "sample.yaml"
 	require.NoError(t, cmd.Flag(otelConfigFlagName).Value.Set(configFile))
 
@@ -40,13 +40,13 @@ func TestGetConfigFiles(t *testing.T) {
 	require.NoError(t, cmd.Flag(otelSetFlagName).Value.Set(setVal))
 
 	expectedConfigFiles := append([]string{configFile}, sets...)
-	configFiles, err := getConfigFiles(cmd, false)
+	configFiles, err := GetConfigFiles(cmd, false)
 	require.NoError(t, err)
 	require.Equal(t, expectedConfigFiles, configFiles)
 }
 
 func TestGetConfigFilesWithDefault(t *testing.T) {
-	cmd := newOtelCommandWithArgs(nil, nil)
+	cmd := NewOtelCommandWithArgs(nil, nil)
 
 	setVal := "set=val"
 	sets, err := getSets([]string{setVal})
@@ -54,15 +54,15 @@ func TestGetConfigFilesWithDefault(t *testing.T) {
 	require.NoError(t, cmd.Flag(otelSetFlagName).Value.Set(setVal))
 
 	expectedConfigFiles := append([]string{paths.OtelConfigFile()}, sets...)
-	configFiles, err := getConfigFiles(cmd, true)
+	configFiles, err := GetConfigFiles(cmd, true)
 	require.NoError(t, err)
 	require.Equal(t, expectedConfigFiles, configFiles)
 }
 
 func TestGetConfigErrorWhenNoConfig(t *testing.T) {
-	cmd := newOtelCommandWithArgs(nil, nil)
+	cmd := NewOtelCommandWithArgs(nil, nil)
 
-	_, err := getConfigFiles(cmd, false)
+	_, err := GetConfigFiles(cmd, false)
 	require.Error(t, err)
 }
 

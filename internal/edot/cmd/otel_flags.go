@@ -22,7 +22,7 @@ const (
 	otelSetFlagName    = "set"
 )
 
-func setupOtelFlags(flags *pflag.FlagSet) {
+func SetupOtelFlags(flags *pflag.FlagSet) {
 	flags.StringArray(otelConfigFlagName, []string{}, "Locations to the config file(s), note that only a"+
 		" single location can be set per flag entry e.g. `--config=file:/path/to/first --config=file:path/to/second`.")
 
@@ -50,7 +50,7 @@ func setupOtelFlags(flags *pflag.FlagSet) {
 	flags.AddGoFlagSet(goFlags)
 }
 
-func getConfigFiles(cmd *cobra.Command, useDefault bool) ([]string, error) {
+func GetConfigFiles(cmd *cobra.Command, useDefault bool) ([]string, error) {
 	configFiles, err := cmd.Flags().GetStringArray(otelConfigFlagName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve config flags: %w", err)

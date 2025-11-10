@@ -19,10 +19,10 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/service"
 
+	edotOtelCol "github.com/elastic/elastic-agent/internal/edot/otelcol"
+	"github.com/elastic/elastic-agent/internal/edot/otelcol/agentprovider"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/internal/pkg/otel"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/agentprovider"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
@@ -30,13 +30,18 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
+const (
+	agentBaseDirectory    = "/usr/share/elastic-agent"    // directory that holds all elastic-agent related files
+	defaultStateDirectory = agentBaseDirectory + "/state" // directory that will hold the state data
+)
+
+func NewOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "otel",
 		Short: "Start the Elastic Agent in otel mode",
 		Long:  "This command starts the Elastic Agent in otel mode.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfgFiles, err := getConfigFiles(cmd, true)
+			cfgFiles, err := GetConfigFiles(cmd, true)
 			if err != nil {
 				return err
 			}
@@ -70,7 +75,7 @@ func newOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Comman
 		c.Root().HelpFunc()(c, s)
 	})
 
-	setupOtelFlags(cmd.Flags())
+	SetupOtelFlags(cmd.Flags())
 	cmd.AddCommand(newValidateCommandWithArgs(args, streams))
 	cmd.AddCommand(newComponentsCommandWithArgs(args, streams))
 	cmd.AddCommand(newOtelDiagnosticsCommand(streams))
@@ -123,7 +128,7 @@ func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool,
 		service.HandleSignals(stopCollector, cancel)
 	}
 
-	return otel.Run(ctx, stop, settings.otelSettings)
+	return edotOtelCol.Run(ctx, stop, settings.otelSettings)
 }
 
 type edotSettings struct {
@@ -142,9 +147,9 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 		if err != nil {
 			return settings, fmt.Errorf("failed to create config provider: %w", err)
 		}
-		settings.otelSettings = otel.NewSettings(release.Version(), []string{configProvider.URI()},
-			otel.WithConfigProviderFactory(configProvider.NewFactory()),
-			otel.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)),
+		settings.otelSettings = edotOtelCol.NewSettings(release.Version(), []string{configProvider.URI()},
+			edotOtelCol.WithConfigProviderFactory(configProvider.NewFactory()),
+			edotOtelCol.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)),
 		)
 
 		// setup logger
@@ -182,7 +187,7 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 
 		settings.otelSettings.DisableGracefulShutdown = false
 	} else {
-		settings.otelSettings = otel.NewSettings(release.Version(), configFiles, otel.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)))
+		settings.otelSettings = edotOtelCol.NewSettings(release.Version(), configFiles, edotOtelCol.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)))
 	}
 	return settings, nil
 }

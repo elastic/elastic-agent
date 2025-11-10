@@ -2,13 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build !linux
-// +build !linux
+package cmd
 
-package otel
-
-import "go.opentelemetry.io/collector/receiver"
-
-func addOsSpecificReceivers(receivers []receiver.Factory) []receiver.Factory {
-	return receivers
-}
+const (
+	troubleshootMessage = "For help, please see our troubleshooting guide at https://www.elastic.co/docs/troubleshoot/ingest/fleet/common-problems"
+)
