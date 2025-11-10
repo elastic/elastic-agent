@@ -484,7 +484,7 @@ func TestContainerCMDAgentMonitoringRuntimeExperimental(t *testing.T) {
 		{
 			name:                      "var not set",
 			agentMonitoringRuntimeEnv: "",
-			expectedRuntimeName:       monitoringCfg.DefaultRuntimeManager,
+			expectedRuntimeName:       string(monitoringCfg.DefaultRuntimeManager),
 		},
 	}
 
@@ -552,7 +552,7 @@ func TestContainerCMDAgentMonitoringRuntimeExperimental(t *testing.T) {
 					switch comp.ID {
 					case "beat/metrics-monitoring", "filestream-monitoring", "http/metrics-monitoring", "prometheus/metrics-monitoring":
 						// Monitoring components should use the expected runtime
-						assert.Equalf(t, tc.expectedRuntimeName, compRuntime, "unexpected runtime name for monitoring component %s with id %s", comp.Name, comp.ID)
+						assert.Equalf(t, tc.expectedRuntimeName, compRuntime, "expected correct runtime name for monitoring component %s with id %s", comp.Name, comp.ID)
 					default:
 						// Non-monitoring components should use the default runtime
 						assert.Equalf(t, string(component.DefaultRuntimeManager), compRuntime, "expected default runtime for non-monitoring component %s with id %s", comp.Name, comp.ID)
@@ -619,7 +619,8 @@ func TestContainerCMDAgentMonitoringRuntimeExperimentalPolicy(t *testing.T) {
 			addLogIntegration(t, info, policyID, "/tmp/beats-receivers-test.log")
 			integration.GenerateLogFile(t, "/tmp/beats-receivers-test.log", time.Second/2, 50)
 
-			setAgentMonitoringToProcess(t, info, policyID, policyName)
+			// set monitoring runtime to process via policy
+			setAgentMonitoringRuntime(t, info, policyID, policyName, monitoringCfg.ProcessRuntimeManager)
 
 			env := []string{
 				"FLEET_ENROLL=1",
@@ -776,7 +777,7 @@ inputs:
 	return configPath
 }
 
-func setAgentMonitoringToProcess(t *testing.T, info *define.Info, policyID string, policyName string) {
+func setAgentMonitoringRuntime(t *testing.T, info *define.Info, policyID string, policyName string, runtime string) {
 	reqBody := fmt.Sprintf(`
 {
   "name": "%s",
@@ -784,12 +785,12 @@ func setAgentMonitoringToProcess(t *testing.T, info *define.Info, policyID strin
   "overrides": {
     "agent": {
       "monitoring": {
-        "_runtime_experimental": "process"
+        "_runtime_experimental": "%s"
       }
     }
   }
 }
-`, policyName)
+`, policyName, runtime)
 
 	status, result, err := info.KibanaClient.Request(
 		http.MethodPut,
