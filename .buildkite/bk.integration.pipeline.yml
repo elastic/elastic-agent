@@ -491,8 +491,8 @@ steps:
         matrix:
           setup:
             image:
-              - "platform-ingest-elastic-agent-debian-11-1762787639"
-              - "platform-ingest-elastic-agent-debian-13-1762787639"
+              - "${IMAGE_DEBIAN_11}"
+              - "${IMAGE_DEBIAN_13}"
             group:
               - default
               - upgrade
@@ -541,8 +541,8 @@ steps:
         matrix:
           setup:
             image:
-              - "platform-ingest-elastic-agent-rhel-8-1762787639"
-              - "platform-ingest-elastic-agent-rhel-10-1762787639"
+              - "${IMAGE_RHEL_8}"
+              - "${IMAGE_RHEL_10}"
 
   - group: ":kubernetes: Kubernetes"
     key: integration-tests-kubernetes
