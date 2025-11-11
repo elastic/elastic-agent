@@ -1,0 +1,54 @@
+version: 9.1.7
+entries:
+    - kind: enhancement
+      summary: Update OTel Collector components to v0.135.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9858
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1757406841
+      file:
+        name: 1757406841-update-otel-components-to-v0.135.0.yaml
+        checksum: 5f87d4e5d30bc96a2712999ea6b042f92bd3f9f8
+    - kind: bug-fix
+      summary: Fix quoting of boolean values in Helm charts.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10681
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1760996949
+      file:
+        name: 1760996949-helm-bool.yaml
+        checksum: eabea6e5bf17bb542258bec7df9f2db9b06f618b
+    - kind: bug-fix
+      summary: Fix signal handling for the EDOT Collector
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10908
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1761917853
+      file:
+        name: 1761917853-fix-otel-signal-handling.yaml
+        checksum: 678e580a5cf5964461f6ce2876136a0bb3cfd1b6
+    - kind: bug-fix
+      summary: Reload agent binary source settings as configured in Fleet
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10993
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1762196103
+      file:
+        name: 1762196103-recreate-artifactdownloader-with-updated-settings.yaml
+        checksum: 1a2db4c24fdabe78a4cdcd949b38918c4951bd7d
