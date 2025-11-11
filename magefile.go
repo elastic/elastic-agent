@@ -1263,14 +1263,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 					if mg.Verbose() {
 						log.Printf(">>> Looking for component %s/%s", spec.BinaryName, platform)
 					}
-					for _, pkgType := range packageTypes {
-						if mg.Verbose() {
-							log.Printf(">>> Evaluating pkgType %v for component %s/%s", pkgType, spec.BinaryName, platform)
-						}
-						if !spec.SupportsPackageType(pkgcommon.PackageType(pkgType)) {
-							log.Printf(">>> PkgType %v for component %s/%s not supported. Skipping...", pkgType, spec.BinaryName, platform)
-							continue
-						}
+					if supportsAtLeastOnePackageType(platform, spec, packageTypes) {
 						targetPath := filepath.Join(archivePath, manifest.PlatformPackages[platform])
 						os.MkdirAll(targetPath, 0o755)
 						packageName := spec.GetPackageName(packageVersion, platform)
@@ -1365,6 +1358,23 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 		archivePath = movePackagesToArchive(dropPath, platforms, packageVersion, dependencies)
 	}
 	return archivePath, dropPath, dependencies
+}
+
+func supportsAtLeastOnePackageType(platform string, spec packaging.BinarySpec, packageTypes []devtools.PackageType) bool {
+	for _, pkgType := range packageTypes {
+		if mg.Verbose() {
+			log.Printf(">>> Evaluating pkgType %v for component %s/%s", pkgType, spec.BinaryName, platform)
+		}
+		if !spec.SupportsPackageType(pkgcommon.PackageType(pkgType)) {
+			continue
+		}
+		if mg.Verbose() {
+			log.Printf(">>> Selecting component %s/%s because of pkgType %s", spec.BinaryName, platform, pkgType)
+		}
+		return true
+	}
+	log.Printf(">>> Component %s/%s not supported for any of the selected package types %v. Skipping...", spec.BinaryName, platform, packageTypes)
+	return false
 }
 
 func removePythonWheels(matches []string, version string, dependencies []packaging.BinarySpec) []string {
