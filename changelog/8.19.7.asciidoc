@@ -1,0 +1,35 @@
+// begin 8.19.7 relnotes
+
+[[release-notes-8.19.7]]
+==  8.19.7
+
+Review important information about the  8.19.7 release.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[bug-fixes-8.19.7]]
+=== Bug fixes
+
+
+
+
+* Fix quoting of boolean values in Helm charts. https://github.com/elastic/elastic-agent/pull/10681[#10681] 
+* Fix issue where switching to OTEL runtime would cause data to be re-ingested. https://github.com/elastic/elastic-agent/pull/10857[#10857] 
+* Fix signal handling for the EDOT Collector. https://github.com/elastic/elastic-agent/pull/10908[#10908] 
+* Reload agent binary source settings as configured in Fleet. https://github.com/elastic/elastic-agent/pull/10993[#10993] 
+
+// end 8.19.7 relnotes
