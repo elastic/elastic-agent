@@ -26,11 +26,29 @@ The EDOT Collector can run in [Agent](https://opentelemetry.io/docs/collector/de
 
 The following sample config files for Agent mode are available:
 
+::::{tab-set}
+
+:::{tab-item} Linux
+
 | Use Cases | Direct ingestion into {{es}} | Managed OTLP Endpoint |
 |---|---|---|
 | Platform logs | [Logs - ES] | [Logs - OTLP] |
 | Platform logs and host metrics | [Logs &#124; Metrics - ES] | [Logs &#124; Metrics - OTLP] |
 | Platform logs, host metrics, <br> and application telemetry | [Logs &#124; Metrics &#124; App - ES]<br>(*default*) | [Logs &#124; Metrics &#124; App - OTLP]<br>(*default*) |
+
+:::
+
+:::{tab-item} Windows
+
+| Use Cases | Direct ingestion into {{es}} | Managed OTLP Endpoint |
+|---|---|---|
+| Platform logs | [Logs - ES (Windows)] | [Logs - OTLP (Windows)] |
+| Platform logs and host metrics | [Logs &#124; Metrics - ES (Windows)] | [Logs &#124; Metrics - OTLP (Windows)] |
+| Platform logs, host metrics, <br> and application telemetry | [Logs &#124; Metrics &#124; App - ES (Windows)]<br>(*default*) | [Logs &#124; Metrics &#124; App - OTLP (Windows)]<br>(*default*) |
+
+:::
+
+::::
 
 Use the previous example configurations as a reference when configuring your contrib Collector or customizing your EDOT Collector configuration.
 
@@ -44,14 +62,14 @@ Learn more about the configuration options for the `elasticsearch` exporter in t
 
 The `elasticsearch` exporter comes with two relevant data ingestion modes:
 
-- `ecs`: Writes data in backwards compatible Elastic Common Schema (ECS) format. Original attribute names and semantics might be lost during translation.
+- `ecs`: Writes data in backwards compatible {{product.ecs}} format. Original attribute names and semantics might be lost during translation.
 - `otel`: OTel attribute names and semantics are preserved.
 
 The goal of EDOT is to preserve OTel data formats and semantics as much as possible, so `otel` is the default mode for the EDOT Collector. Some use cases might require data to be exported in ECS format for backwards compatibility.
 
 #### Logs collection pipeline
 
-For logs collection, the default configuration uses the [`filelog`] receiver to read log entries from files. In addition, the [`resourcedetection`] processor enriches the log entries with metadata about the corresponding host and operating system.
+For logs collection, the default configuration uses the [`filelog`] receiver to read log entries from files. Also, the [`resourcedetection`] processor enriches the log entries with metadata about the corresponding host and operating system.
 
 :::{note}
 The `from_context: client_metadata` option in the `resource` processor only applies to transport-level metadata. It cannot extract custom application attributes.
@@ -368,6 +386,12 @@ The server expects incoming HTTP requests to include an API key with sufficient 
 [Logs &#124; Metrics - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/managed_otlp/platformlogs_hostmetrics.yml
 [Logs &#124; Metrics &#124; App - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/logs_metrics_traces.yml
 [Logs &#124; Metrics &#124; App - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/managed_otlp/logs_metrics_traces.yml
+[Logs - ES (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/windows/platformlogs.yml
+[Logs - OTLP (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/windows/managed_otlp/platformlogs.yml
+[Logs &#124; Metrics - ES (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/windows/platformlogs_hostmetrics.yml
+[Logs &#124; Metrics - OTLP (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/windows/managed_otlp/platformlogs_hostmetrics.yml
+[Logs &#124; Metrics &#124; App - ES (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/windows/logs_metrics_traces.yml
+[Logs &#124; Metrics &#124; App - OTLP (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/windows/managed_otlp/logs_metrics_traces.yml
 [Gateway mode]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/heads/main/internal/pkg/otel/samples/linux/gateway.yml
 
 
