@@ -1,0 +1,42 @@
+version: 9.2.2-TEST-ONLY
+entries:
+    - kind: feature
+      summary: Add support for downgrading a running Agent's privileges from Fleet
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11142
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1759318728
+      file:
+        name: 1759318728-support-for-privilege_level_change.yaml
+        checksum: 0b210d946ffb6bb3dcb0edb5154da676715ab8cc
+    - kind: feature
+      summary: Add awss3receiver
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10515
+      issue:
+        - https://github.com/elastic/obs-integration-team/issues/604
+      impact: ""
+      action: ""
+      timestamp: 1760341895
+      file:
+        name: 1760341895-edot-add-awss3receiver.yaml
+        checksum: bf127645f0d12f626d51a9d2bd9e50c55e40636e
+    - kind: feature
+      summary: edot-add-awslogsencodingextension
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11107
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1762782544
+      file:
+        name: 1762782544-edot-add-awslogsencodingextension.yaml
+        checksum: 4567bd63f0a8d715d18a21521fd80239bf24ea91
