@@ -63,9 +63,18 @@ func (c *contextProvider) Run(ctx context.Context, comm corecomp.ContextProvider
 	}
 	defer watcher.Close()
 
-	// invert the mapping to map paths to source names
+	// Build mapping from paths (including intermediate symlinks) to source names
+	// and keep track of the original source paths for reading
+	// For Kubernetes secrets: both "token" and "..data/" will map to the same source,
+	// but we always read from the original "token" path
 	inverted := make(map[string][]string, len(c.cfg.Sources))
+	sourcePaths := make(map[string]string, len(c.cfg.Sources)) // sourceName -> original path
+
 	for sourceName, sourceCfg := range c.cfg.Sources {
+		// Store the original path for this source
+		sourcePaths[sourceName] = sourceCfg.Path
+
+		// Add the direct path
 		sources, ok := inverted[sourceCfg.Path]
 		if !ok {
 			sources = []string{sourceName}
@@ -73,6 +82,21 @@ func (c *contextProvider) Run(ctx context.Context, comm corecomp.ContextProvider
 			sources = append(sources, sourceName)
 		}
 		inverted[sourceCfg.Path] = sources
+
+		// Also add any intermediate symlinks in the resolution chain
+		// This handles Kubernetes secrets where token -> ..data/token -> ..2024_01_01/token
+		intermediates := resolveSymlinkChain(sourceCfg.Path)
+		for _, intermediate := range intermediates {
+			sources, ok := inverted[intermediate]
+			if !ok {
+				sources = []string{sourceName}
+			} else {
+				if !slices.Contains(sources, sourceName) {
+					sources = append(sources, sourceName)
+				}
+			}
+			inverted[intermediate] = sources
+		}
 	}
 
 	// determine the paths to watch (watch is performed on the directories that contain the file)
@@ -97,11 +121,9 @@ func (c *contextProvider) Run(ctx context.Context, comm corecomp.ContextProvider
 	// the updated file changes will not be missed
 	current := make(map[string]interface{}, len(c.cfg.Sources))
 	readAll := func() error {
-		for path, sources := range inverted {
+		for sourceName, path := range sourcePaths {
 			value := c.readContents(path)
-			for _, source := range sources {
-				current[source] = value
-			}
+			current[sourceName] = value
 		}
 		err = comm.Set(current)
 		if err != nil {
@@ -153,12 +175,15 @@ func (c *contextProvider) Run(ctx context.Context, comm corecomp.ContextProvider
 				switch {
 				case e.Op&(fsnotify.Create|fsnotify.Write|fsnotify.Remove) != 0:
 					// file was created, updated, or deleted (update the value)
+					// when an intermediate symlink changes (e.g., ..data), we need to
+					// re-read all sources that depend on it using their original paths
 					changed := false
-					value := c.readContents(path)
-					for _, source := range sources {
-						previous := current[source]
+					for _, sourceName := range sources {
+						sourcePath := sourcePaths[sourceName]
+						value := c.readContents(sourcePath)
+						previous := current[sourceName]
 						if previous != value {
-							current[source] = value
+							current[sourceName] = value
 							changed = true
 						}
 					}
@@ -283,4 +308,65 @@ func drainQueue(e <-chan fsnotify.Event) {
 			return
 		}
 	}
+}
+
+// resolveSymlinkChain resolves a path and returns all intermediate symlink paths
+// that should be watched to detect changes. This is critical for Kubernetes secrets
+// where the structure is: token -> ..data/token -> ..2024_01_01/token
+// When Kubernetes updates the secret, it replaces ..data, so we need to watch it.
+func resolveSymlinkChain(path string) []string {
+	var intermediates []string
+	dir := filepath.Dir(path)
+
+	// Check if the file itself is a symlink
+	target, err := os.Readlink(path)
+	if err != nil {
+		// Not a symlink or doesn't exist, nothing to track
+		return intermediates
+	}
+
+	// If it's a relative symlink, resolve it relative to the parent directory
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(dir, target)
+	}
+
+	// Now walk through the target path and find intermediate symlinks
+	// For example, if target is "/var/secrets/..data/token", we want to check if "..data" is a symlink
+	targetDir := filepath.Dir(target)
+
+	// Check each component of the target directory path for symlinks
+	components := strings.Split(filepath.Clean(targetDir), string(filepath.Separator))
+	currentPath := ""
+	if filepath.IsAbs(targetDir) {
+		currentPath = string(filepath.Separator)
+	}
+
+	for _, component := range components {
+		if component == "" {
+			continue
+		}
+		currentPath = filepath.Join(currentPath, component)
+
+		// Check if this component is a symlink
+		_, err = os.Readlink(currentPath)
+		if err == nil {
+			// This is a symlink, add it to our watch list
+			cleanPath := filepath.Clean(currentPath)
+			// Windows paths are case-insensitive
+			if runtime.GOOS == "windows" {
+				cleanPath = strings.ToLower(cleanPath)
+			}
+			intermediates = append(intermediates, cleanPath)
+		}
+	}
+
+	// Also check if the target file itself is a symlink (nested symlinks)
+	_, err = os.Readlink(target)
+	if err == nil {
+		// The target itself is also a symlink, recursively resolve it
+		nestedIntermediates := resolveSymlinkChain(target)
+		intermediates = append(intermediates, nestedIntermediates...)
+	}
+
+	return intermediates
 }
