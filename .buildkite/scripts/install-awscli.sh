@@ -26,5 +26,8 @@ elif [[ "$OSTYPE" == "darwin" ]]; then
 fi
 
 hash -r
+echo "Shell: $SHELL"
+echo "Updating PATH to include AWS CLI..."
+export PATH="/usr/local/aws-cli/v2/current/bin:$PATH"
 echo "AWS CLI installed. Version:"
 aws --version
