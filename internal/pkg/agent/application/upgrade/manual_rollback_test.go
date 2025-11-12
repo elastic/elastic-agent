@@ -23,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -321,7 +322,7 @@ func TestManualRollback(t *testing.T) {
 		{
 			name: "no update marker, available install for rollback with valid TTL - rollback",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *mockAvailableRollbacksSource) {
-				rollbacksSource.EXPECT().Get().Return(map[string]TTLMarker{
+				rollbacksSource.EXPECT().Get().Return(map[string]ttl.TTLMarker{
 					"data/elastic-agent-1.2.3-oldver": {
 						Version:    "1.2.3",
 						Hash:       "oldver",
@@ -372,7 +373,7 @@ func TestManualRollback(t *testing.T) {
 			name: "no update marker, available install for rollback with expired TTL - error",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *mockAvailableRollbacksSource) {
 				rollbacksSource.EXPECT().Get().Return(
-					map[string]TTLMarker{
+					map[string]ttl.TTLMarker{
 						"data/elastic-agent-1.2.3-oldver": {
 							Version:    "1.2.3",
 							Hash:       "oldver",
@@ -402,7 +403,7 @@ func TestManualRollback(t *testing.T) {
 			name: "no update marker, no available install for the version - error",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *mockAvailableRollbacksSource) {
 				rollbacksSource.EXPECT().Get().Return(
-					map[string]TTLMarker{
+					map[string]ttl.TTLMarker{
 						"data/elastic-agent-1.2.3-oldver": {
 							Version:    "1.2.3",
 							Hash:       "oldver",
@@ -447,7 +448,7 @@ func TestManualRollback(t *testing.T) {
 			name: "no update marker, invoking watcher fails - error",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *mockAvailableRollbacksSource) {
 				rollbacksSource.EXPECT().Get().Return(
-					map[string]TTLMarker{
+					map[string]ttl.TTLMarker{
 						"data/elastic-agent-1.2.3-oldver": {
 							Version:    "1.2.3",
 							Hash:       "oldver",
