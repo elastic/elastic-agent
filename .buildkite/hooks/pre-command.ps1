@@ -1,4 +1,4 @@
 # Shorten BUILDKITE_MESSAGE if needed to avoid filling the Windows env var buffer
 $env:BUILDKITE_MESSAGE = $env:BUILDKITE_MESSAGE.Substring(0, [System.Math]::Min(2048, $env:BUILDKITE_MESSAGE.Length))
 choco install awscli jq -y
-Add-MachinePathItem "C:\Program Files\Amazon\AWSCLIV2"
+$env:Path += "c:\Program Files\Amazon\AWSCLIV2\aws.exe"
