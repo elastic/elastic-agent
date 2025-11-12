@@ -374,6 +374,13 @@ require (
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/lunes v0.1.0 // indirect
 	github.com/elastic/mito v1.23.0 // indirect
+<<<<<<< HEAD
+=======
+	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.20.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.1.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.8.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.8.0 // indirect
+>>>>>>> e284aff84 (Point beatsauth extension to beats repo (#11120))
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.8.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.24.0 // indirect
