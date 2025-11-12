@@ -14,7 +14,7 @@ on:
 
 jobs:
   build-release-notes:
-    uses: elastic/elastic-agent-changelog-tool/.github/workflows/generate-release-notes.yml@main
+    uses: elastic/elastic-agent-changelog-tool/.github/workflows/generate-release-notes.yml@cmcg-update-auto-branch-name
     with:
       product: Elastic Agent
       labels: docs,forwardport-main,release,skip-changelog,Team:Docs
