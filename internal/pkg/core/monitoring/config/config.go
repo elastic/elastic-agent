@@ -5,6 +5,7 @@
 package config
 
 import (
+	"os"
 	"strings"
 	"time"
 
@@ -111,6 +112,13 @@ type BufferConfig struct {
 
 // DefaultConfig creates a config with pre-set default values.
 func DefaultConfig() *MonitoringConfig {
+	monRuntimeManager := DefaultRuntimeManager
+	monRuntimeEnv := os.Getenv("AGENT_MONITORING_RUNTIME_EXPERIMENTAL")
+	switch monRuntimeEnv {
+	case ProcessRuntimeManager, OtelRuntimeManager:
+		monRuntimeManager = monRuntimeEnv
+	}
+
 	return &MonitoringConfig{
 		Enabled:        true,
 		MonitorLogs:    true,
@@ -125,7 +133,7 @@ func DefaultConfig() *MonitoringConfig {
 		Namespace:      defaultNamespace,
 		APM:            defaultAPMConfig(),
 		Diagnostics:    defaultDiagnostics(),
-		RuntimeManager: DefaultRuntimeManager,
+		RuntimeManager: monRuntimeManager,
 	}
 }
 
