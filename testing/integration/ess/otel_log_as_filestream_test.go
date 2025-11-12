@@ -13,7 +13,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 	"text/template"
 	"time"
@@ -57,17 +56,18 @@ func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
 	libbeatinteg.WriteLogFile(t, logFilepath, numEvents, false)
 
 	exporterOutputPath := filepath.Join(tmpDir, "output.json")
-	t.Cleanup(func() {
-		if t.Failed() {
-			contents, err := os.ReadFile(exporterOutputPath)
-			if err != nil {
-				t.Logf("No exporter output file")
-				return
-			}
-			t.Logf("Otel output file path: %s", exporterOutputPath)
-			t.Logf("Contents of exporter output file:\n%s\n", string(contents))
-		}
-	})
+	// t.Cleanup(func() {
+	// 	if t.Failed() {
+	// 		contents, err := os.ReadFile(exporterOutputPath)
+	// 		if err != nil {
+	// 			t.Logf("No exporter output file")
+	// 			return
+	// 		}
+	// 		t.Logf("Otel output file path: %s", exporterOutputPath)
+	// 		t.Logf("Contents of exporter output file:\n%s\n", string(contents))
+	// 	}
+	// })
+
 	otelConfigPath := filepath.Join(tmpDir, "otel.yml")
 	otelConfigTemplate := `receivers:
   filebeatreceiver:
@@ -101,6 +101,11 @@ service:
     logs:
       receivers: [filebeatreceiver]
       exporters: [elasticsearch]
+  telemetry:
+    logs:
+      level: DEBUG
+      encoding: json
+      disable_stacktrace: true
 `
 
 	esClient := info.ESClient
@@ -127,16 +132,16 @@ service:
 					Namespace:   info.Namespace,
 				}))
 	require.NoError(t, os.WriteFile(otelConfigPath, otelConfigBuffer.Bytes(), 0o600))
-	t.Cleanup(func() {
-		if t.Failed() {
-			contents, err := os.ReadFile(otelConfigPath)
-			if err != nil {
-				t.Logf("no otel config file")
-				return
-			}
-			t.Logf("Contents of otel config file:\n%s\n", string(contents))
-		}
-	})
+	// t.Cleanup(func() {
+	// 	if t.Failed() {
+	// 		contents, err := os.ReadFile(otelConfigPath)
+	// 		if err != nil {
+	// 			t.Logf("no otel config file")
+	// 			return
+	// 		}
+	// 		t.Logf("Contents of otel config file:\n%s\n", string(contents))
+	// 	}
+	// })
 
 	fixture, err := define.NewFixtureFromLocalBuild(
 		t,
@@ -149,12 +154,43 @@ service:
 	err = fixture.Prepare(ctx, fakeComponent)
 	require.NoError(t, err)
 
-	var fixtureWg sync.WaitGroup
-	fixtureWg.Add(1)
-	go func() {
-		defer fixtureWg.Done()
-		err = fixture.RunOtelWithClient(ctx)
-	}()
+	cmd, err := fixture.PrepareAgentCommand(
+		ctx,
+		[]string{"otel", "--config", otelConfigPath, "-e"},
+	)
+	require.NoError(t, err)
+
+	// var fixtureWg sync.WaitGroup
+	// fixtureWg.Add(1)
+	// go func() {
+	// 	defer fixtureWg.Done()
+	// err = fixture.RunOtelWithClient(ctx)
+
+	f, err := os.CreateTemp("", t.Name())
+	if err != nil {
+		t.Fatalf("cannot create file: %s", err)
+	}
+
+	t.Cleanup(func() {
+		t.Logf("Output file: %s", f.Name())
+	})
+
+	defer f.Close()
+
+	cmd.Stderr = f
+	cmd.Stdout = f
+
+	if err := cmd.Start(); err != nil {
+		t.Errorf("cannot start Elastic Agent in OTel mode: %s", err)
+	}
+
+	// out, err := cmd.CombinedOutput()
+	// if err != nil {
+	// 	t.Errorf("combined output returned error: %#v", err)
+	// }
+	// fmt.Println(string(out))
+
+	// }()
 
 	require.Eventually(t,
 		func() bool {
@@ -175,13 +211,22 @@ service:
 		30*time.Second, 1*time.Second,
 		"Expected %v logs", numEvents)
 
-	cancel()
-	fixtureWg.Wait()
-	require.True(
-		t,
-		err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded),
-		"Retrieved unexpected error: %s",
-		err.Error())
+	t.Log("==================== Sending Interrupt signal")
+	if err := cmd.Process.Signal(os.Interrupt); err != nil {
+		t.Fatalf("cannot send interrupt signal to Elastic Agent: %s", err)
+	}
+
+	t.Log("==================== Waiting process to return")
+	if err := cmd.Wait(); err != nil {
+		t.Fatalf("Elastic Agent exited with an error: %s", err)
+	}
+	// cancel()
+	// fixtureWg.Wait()
+	// require.True(
+	// 	t,
+	// 	err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded),
+	// 	"Retrieved unexpected error: %s",
+	// 	err)
 
 	//================================================== Run again
 	// t.Log("================================================== RUNNING AGAIN")
