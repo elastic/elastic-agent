@@ -275,6 +275,9 @@ func getReceiversConfigForComponent(
 		receiverConfig["queue"] = outputQueueConfig
 	}
 
+	// indicate that beat receivers are managed by the elastic-agent
+	receiverConfig["management.otel.enabled"] = true
+
 	// add monitoring config if necessary
 	monitoringConfig := beatMonitoringConfigGetter(comp.ID, beatName)
 	koanfmaps.Merge(monitoringConfig, receiverConfig)
