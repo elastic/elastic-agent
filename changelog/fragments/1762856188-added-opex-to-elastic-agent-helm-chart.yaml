@@ -28,7 +28,7 @@ summary: added opex to elastic-agent helm chart, This change will add the Opex-C
 
 # REQUIRED for all kinds
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
-component:
+component: elastic-agent
 
 # AUTOMATED
 # OPTIONAL to manually add other PR URLs
