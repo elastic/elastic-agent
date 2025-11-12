@@ -160,22 +160,8 @@ service:
 	)
 	require.NoError(t, err)
 
-	// var fixtureWg sync.WaitGroup
-	// fixtureWg.Add(1)
-	// go func() {
-	// 	defer fixtureWg.Done()
-	// err = fixture.RunOtelWithClient(ctx)
-
-	f, err := os.CreateTemp("", t.Name())
-	if err != nil {
-		t.Fatalf("cannot create file: %s", err)
-	}
-
-	t.Cleanup(func() {
-		t.Logf("Output file: %s", f.Name())
-	})
-
-	defer f.Close()
+	f := NewLogFile(t)
+	f.KeepLogFile = true
 
 	cmd.Stderr = f
 	cmd.Stdout = f
@@ -184,13 +170,12 @@ service:
 		t.Errorf("cannot start Elastic Agent in OTel mode: %s", err)
 	}
 
-	// out, err := cmd.CombinedOutput()
-	// if err != nil {
-	// 	t.Errorf("combined output returned error: %#v", err)
-	// }
-	// fmt.Println(string(out))
-
-	// }()
+	f.WaitLogsContains(
+		t,
+		"Log input running as Log input",
+		20*time.Second,
+		"Log input did not start as Log input",
+	)
 
 	require.Eventually(t,
 		func() bool {
@@ -220,16 +205,10 @@ service:
 	if err := cmd.Wait(); err != nil {
 		t.Fatalf("Elastic Agent exited with an error: %s", err)
 	}
-	// cancel()
-	// fixtureWg.Wait()
-	// require.True(
-	// 	t,
-	// 	err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded),
-	// 	"Retrieved unexpected error: %s",
-	// 	err)
 
 	//================================================== Run again
 	// t.Log("================================================== RUNNING AGAIN")
+
 }
 
 func countOtelEvents(t *testing.T, path string) int {
