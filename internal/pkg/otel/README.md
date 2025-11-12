@@ -83,7 +83,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.137.0/processor/batchprocessor/README.md) | v0.137.0 |
 | [cumulativetodeltaprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/cumulativetodeltaprocessor/v0.137.0/processor/cumulativetodeltaprocessor/README.md) | v0.137.0 |
 | [elasticapmprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticapmprocessor/v0.4.0/processor/elasticapmprocessor/README.md) | v0.4.0 |
-| [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.18.0/processor/elasticinframetricsprocessor/README.md) | v0.18.0 |
+| [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.20.0/processor/elasticinframetricsprocessor/README.md) | v0.20.0 |
 | [elastictraceprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elastictraceprocessor/v0.13.0/processor/elastictraceprocessor/README.md) | v0.13.0 |
 | [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.137.0/processor/filterprocessor/README.md) | v0.137.0 |
 | [geoipprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/geoipprocessor/v0.137.0/processor/geoipprocessor/README.md) | v0.137.0 |
@@ -115,7 +115,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| [elasticapmconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/elasticapmconnector/v0.8.0/connector/elasticapmconnector/README.md) | v0.8.0 |
+| [elasticapmconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/elasticapmconnector/v0.20.0/connector/elasticapmconnector/README.md) | v0.20.0 |
 | [forwardconnector](https://github.com/open-telemetry/opentelemetry-collector/blob/connector/forwardconnector/v0.137.0/connector/forwardconnector/README.md) | v0.137.0 |
 | [profilingmetricsconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/profilingmetricsconnector/v0.1.0/connector/profilingmetricsconnector/README.md) | v0.1.0 |
 | [routingconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/routingconnector/v0.137.0/connector/routingconnector/README.md) | v0.137.0 |
