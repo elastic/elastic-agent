@@ -161,7 +161,7 @@ The following example configuration files are available for the Gateway mode:
 | Version | Configuration  |
 |---------|----------------|
 | 9.2     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.1/internal/pkg/otel/samples/linux/gateway.yml) |
-| 9.1     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.1.6/internal/pkg/otel/samples/linux/gateway.yml) |
+| 9.1     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.1.7/internal/pkg/otel/samples/linux/gateway.yml) |
 | 9.0     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.0.8/internal/pkg/otel/samples/linux/gateway.yml) |
 % end:edot-gateway-9x-table
 ::::
@@ -170,7 +170,7 @@ The following example configuration files are available for the Gateway mode:
 % start:edot-gateway-8x-table
 | Version | Configuration  |
 |---------|----------------|
-| 8.19    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.19.6/internal/pkg/otel/samples/linux/gateway.yml) |
+| 8.19    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.19.7/internal/pkg/otel/samples/linux/gateway.yml) |
 | 8.18    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.18.8/internal/pkg/otel/samples/linux/gateway.yml) |
 | 8.17    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.17.10/internal/pkg/otel/samples/linux/gateway.yml) |
 % end:edot-gateway-8x-table
