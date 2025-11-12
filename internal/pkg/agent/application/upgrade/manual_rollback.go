@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -88,7 +89,7 @@ func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper,
 	}
 	// check for the version we want to rollback to
 	var targetInstall string
-	var targetTTLMarker TTLMarker
+	var targetTTLMarker ttl.TTLMarker
 	for versionedHome, ttlMarker := range availableRollbacks {
 		if ttlMarker.Version == rollbackVersion && now.Before(ttlMarker.ValidUntil) {
 			// found a valid target
@@ -242,7 +243,7 @@ func extractAgentInstallsFromMarker(updateMarker *UpdateMarker) (previous agentI
 	return previous, current, nil
 }
 
-func getAvailableRollbacks(rollbackWindow time.Duration, now time.Time, currentVersion string, parsedCurrentVersion *version.ParsedSemVer, currentVersionedHome string, currentHash string) map[string]TTLMarker {
+func getAvailableRollbacks(rollbackWindow time.Duration, now time.Time, currentVersion string, parsedCurrentVersion *version.ParsedSemVer, currentVersionedHome string, currentHash string) map[string]ttl.TTLMarker {
 	if rollbackWindow == disableRollbackWindow {
 		// if there's no rollback window it means that no rollback should survive the watcher cleanup at the end of the grace period.
 		return nil
@@ -255,8 +256,8 @@ func getAvailableRollbacks(rollbackWindow time.Duration, now time.Time, currentV
 
 	// when multiple rollbacks will be supported, read the existing descriptor
 	// at this stage we can get by with a single rollback
-	res := make(map[string]TTLMarker, 1)
-	res[currentVersionedHome] = TTLMarker{
+	res := make(map[string]ttl.TTLMarker, 1)
+	res[currentVersionedHome] = ttl.TTLMarker{
 		Version:    currentVersion,
 		Hash:       currentHash,
 		ValidUntil: now.Add(rollbackWindow),
