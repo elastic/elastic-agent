@@ -28,7 +28,7 @@ The components included in the EDOT Collector are categorized into **[Core]** an
 % start:edot-collector-components-table
 ## List of components
 
-These components are included in EDOT Collector version 9.2.0.
+These components are included in EDOT Collector version 9.2.1.
 
 | Component | GitHub Repo | Support status | Version |
 |:---|:---|:---|:---|

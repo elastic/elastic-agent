@@ -13,13 +13,13 @@ products:
   - id: edot-collector
 ---
 
-# Build a Custom EDOT-like Collector
+# Build a custom EDOT-like collector
 
 You can build and configure a [custom Collector](https://opentelemetry.io/docs/collector/custom-collector/) or extend the [OpenTelemetry Collector Contrib ](https://github.com/open-telemetry/opentelemetry-collector-contrib) distribution to collect logs and metrics and send them to Elastic Observability.
 
 For a more seamless experience, use the Elastic Distribution of the OpenTelemetry Collector. Refer to the [configuration](/reference/edot-collector/config/index.md) docs for more information on configuring the EDOT Collector.
 
-## Build a custom Collector
+## Build a custom collector
 
 To build a custom Collector to collect your telemetry data and send it to Elastic Observability, you need to:
 
@@ -49,7 +49,7 @@ The following example, `builder-config.yml`, contains the components needed to s
 % Note that while this runs on `main`, the OCB configuration is updated based on the latest released version.
 
 % start:edot-collector-components-ocb
-This OCB configuration is for EDOT Collector version 9.2.0.
+This OCB configuration is for EDOT Collector version 9.2.1.
 
 ```yaml
 dist:
