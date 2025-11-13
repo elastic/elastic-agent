@@ -22,12 +22,12 @@ if [[ "$OSTYPE" == "linux-gnu" ]]; then
   sudo ./aws/install
 elif [[ "$OSTYPE" == "darwin" ]]; then
   curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
-  sudo installer -pkg AWSCLIV2.pkg -target /
+  sudo installer -pkg AWSCLIV2.pkg -target / -verbose -dumplog
+  hash -r
+  echo "Shell: $SHELL"
+  echo "Updating PATH to include AWS CLI..."
+  export PATH="/usr/local/aws-cli/v2/current/bin:$PATH"
+  ls -al /usr/local/aws-cli/v2/current/bin
 fi
-
-hash -r
-echo "Shell: $SHELL"
-echo "Updating PATH to include AWS CLI..."
-export PATH="/usr/local/aws-cli/v2/current/bin:$PATH"
 echo "AWS CLI installed. Version:"
 aws --version
