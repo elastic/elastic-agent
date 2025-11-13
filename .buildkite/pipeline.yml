@@ -31,7 +31,7 @@ common:
     path: /opt/buildkite-agent/.cache/go-build
 - windows_cache_settings: &windows_cache_settings
     <<: *base_cache_settings
-    path: C:\Users\buildkite\AppData\Local\go-build
+    path: /c/Users/buildkite/AppData/Local/go-build
 
 steps:
   - label: "check-ci"
