@@ -524,9 +524,7 @@ func TestOtelLogsIngestion(t *testing.T) {
 
 	esClient := info.ESClient
 	require.NotNil(t, esClient)
-	esApiKey, err := createESApiKey(esClient)
-	require.NoError(t, err, "failed to get api key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, esClient)
 
 	logsIngestionConfig := logsIngestionConfigTemplate
 	logsIngestionConfig = strings.ReplaceAll(logsIngestionConfig, "{{.ESApiKey}}", esApiKey.Encoded)
@@ -642,9 +640,7 @@ func TestOtelAPMIngestion(t *testing.T) {
 	require.True(t, len(esHost) > 0)
 
 	esClient := info.ESClient
-	esApiKey, err := createESApiKey(esClient)
-	require.NoError(t, err, "failed to get api key")
-	require.True(t, len(esApiKey.APIKey) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, esClient)
 
 	apmArgs := []string{
 		"run",
@@ -753,8 +749,21 @@ func TestOtelAPMIngestion(t *testing.T) {
 	apmFixtureWg.Wait()
 }
 
-func createESApiKey(esClient *elasticsearch.Client) (estools.APIKeyResponse, error) {
-	return estools.CreateAPIKey(context.Background(), esClient, estools.APIKeyRequest{Name: "test-api-key", Expiration: "1d"})
+func createESApiKey(t *testing.T, esClient *elasticsearch.Client) estools.APIKeyResponse {
+	esApiKey, err := estools.CreateAPIKey(
+		t.Context(),
+		esClient,
+		estools.APIKeyRequest{Name: "test-api-key", Expiration: "1d"},
+	)
+
+	require.NoError(t, err, "error creating API key")
+	require.Truef(
+		t,
+		len(esApiKey.APIKey) > 1 && len(esApiKey.Encoded) > 1,
+		"api key is invalid %q",
+		esApiKey)
+
+	return esApiKey
 }
 
 // getDecodedApiKey returns a decoded API key appropriate for use in beats configurations.
@@ -944,9 +953,8 @@ func TestOtelFBReceiverE2E(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
+
 	index := "logs-integration-default"
 	otelConfigTemplate := `receivers:
   filebeatreceiver:
@@ -1094,9 +1102,7 @@ func TestOtelFilestreamInput(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 	decodedApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err)
 	configTemplate := `
@@ -1239,9 +1245,7 @@ func TestOTelHTTPMetricsInput(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 	decodedApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err)
 	configTemplate := `
@@ -1367,9 +1371,8 @@ func TestOtelMBReceiverE2E(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
+
 	index := "logs-integration-default"
 	otelConfigTemplate := `receivers:
   metricbeatreceiver:
@@ -1524,9 +1527,7 @@ func TestHybridAgentE2E(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 
 	configTemplate := `agent.logging.level: info
 agent.logging.to_stderr: true
@@ -1786,9 +1787,8 @@ func TestFBOtelRestartE2E(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
+
 	// Use a unique index to avoid conflicts with other parallel runners
 	index := strings.ToLower("logs-generic-default-" + randStr(8))
 	otelConfigTemplate := `receivers:
@@ -2005,9 +2005,7 @@ func TestOtelBeatsAuthExtension(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 	index := "logs-integration-" + info.Namespace
 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -2161,9 +2159,7 @@ func TestOtelBeatsAuthExtensionInvalidCertificates(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 	index := "logs-integration-" + info.Namespace
 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())

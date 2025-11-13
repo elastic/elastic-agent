@@ -98,9 +98,7 @@ service:
 `
 
 	esClient := info.ESClient
-	esApiKey, err := createESApiKey(esClient)
-	require.NoError(t, err, "failed to get api key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, esClient)
 	esHost, err := integration.GetESHost()
 	require.NoError(t, err, "failed to get ES host")
 	require.True(t, len(esHost) > 0)
