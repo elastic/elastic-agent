@@ -39,6 +39,28 @@ type InputRuntimeSpec struct {
 	Spec       InputSpec `yaml:"spec"`
 }
 
+// BeatName returns the beat binary name that would be used to run the component.
+func (s *InputRuntimeSpec) BeatName() string {
+	if s.RealBinaryName() != "agentbeat" {
+		return ""
+	}
+	if s.Spec.Command == nil {
+		return ""
+	}
+	return s.Spec.Command.Args[0]
+}
+
+// RealBinaryName returns the binary name used for the component.
+//
+// This can differ from the actual binary name that is on disk, when the input specification states that the
+// command has a different name.
+func (s *InputRuntimeSpec) RealBinaryName() string {
+	if s.Spec.Command != nil && s.Spec.Command.Name != "" {
+		return s.Spec.Command.Name
+	}
+	return s.BinaryName
+}
+
 // RuntimeSpecs return all the specifications for inputs that are supported on the current platform.
 type RuntimeSpecs struct {
 	// platform that was loaded

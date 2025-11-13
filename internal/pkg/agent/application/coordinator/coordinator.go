@@ -249,7 +249,8 @@ type Coordinator struct {
 	agentInfo info.Agent
 	isManaged bool
 
-	cfg        *configuration.Configuration
+	initialCfg *configuration.Configuration
+	currentCfg *configuration.Configuration
 	specs      component.RuntimeSpecs
 	fleetAcker acker.Acker
 
@@ -458,7 +459,8 @@ func New(
 	}
 	c := &Coordinator{
 		logger:     logger,
-		cfg:        cfg,
+		initialCfg: cfg,
+		currentCfg: cfg,
 		agentInfo:  agentInfo,
 		isManaged:  isManaged,
 		specs:      specs,
@@ -1154,10 +1156,10 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			Description: "current local configuration of the running Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
-				if c.cfg == nil {
+				if c.initialCfg == nil {
 					return []byte("error: failed no local configuration")
 				}
-				o, err := yaml.Marshal(c.cfg)
+				o, err := yaml.Marshal(c.initialCfg)
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
 				}
@@ -1636,6 +1638,12 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 	}
 	c.setProtection(protectionConfig)
 
+	currentCfg, err := configuration.NewFromConfig(cfg)
+	if err != nil {
+		return fmt.Errorf("invalid configuration: %w", err)
+	}
+	c.currentCfg = currentCfg
+
 	if c.vars != nil {
 		return c.refreshComponentModel(ctx)
 	}
@@ -1945,6 +1953,7 @@ func (c *Coordinator) generateComponentModel() (err error) {
 
 	comps, err := c.specs.ToComponents(
 		cfg,
+		c.currentCfg.Settings.Internal.Runtime,
 		configInjector,
 		c.state.LogLevel,
 		c.agentInfo,
