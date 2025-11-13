@@ -19,19 +19,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// LogFile wraps a *logp.LogFile and makes it more suitable for tests.
+// LogFile wraps a *os.File and makes it more suitable for tests.
 // Key features:
-//   - All logs are saved on a single temporary log file
-//   - On failures, the log file is kept and its path printed
-//   - Methods to search and wait for log entries are provided,
+//   - On failures, the file is kept and its path printed
+//   - Methods to search and wait for substrings in lines are provided,
 //     they keep track of the offset, ensuring ordering when
-//     when searching for logs
+//     when searching.
 type LogFile struct {
 	*os.File
-	offset      int64
-	KeepLogFile bool
+	offset               int64
+	KeepLogFileOnSuccess bool
 }
 
+// NewLogFile returns a new LogFile, path must be the components of a path,
+// they will be joined using the OS path separator.
+// If path is not provided, os.TempDir is used as the base path for the file.
 func NewLogFile(t testing.TB, path ...string) *LogFile {
 	dir := filepath.Join(path...)
 	if dir == "" {
@@ -62,7 +64,7 @@ func NewLogFile(t testing.TB, path ...string) *LogFile {
 
 		// If the test failed, print the log file location,
 		// otherwise remove it.
-		if t.Failed() || lf.KeepLogFile {
+		if t.Failed() || lf.KeepLogFileOnSuccess {
 			t.Logf("Full logs written to %s", f.Name())
 			return
 		}

@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	libbeatinteg "github.com/elastic/beats/v7/libbeat/tests/integration"
+	libbeattesting "github.com/elastic/beats/v7/libbeat/tests/integration"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -53,7 +53,7 @@ func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
     filebeat:
       inputs:
         - type: log
-          id: foo
+          id: a-unique-id
           allow_deprecated_use: true
           paths:
             {{.LogFilepath}}
@@ -115,15 +115,16 @@ service:
 	}
 
 	rootDir, err := filepath.Abs(filepath.Join("..", "..", "..", "build"))
-	if err != nil {
-		t.Fatalf("cannot get absolute path: %s", err)
-	}
+	require.NoError(t, err, "cannot get absolute path of rootDir")
 
-	tmpDir := libbeatinteg.CreateTempDir(t, rootDir)
+	tmpDir := libbeattesting.CreateTempDir(t, rootDir)
 	inputFilePath, err := filepath.Abs(filepath.Join(tmpDir, "log.log"))
+
+	// Generate a string we can use to search in the logs,
+	// without it tests on Windows will fail
 	inputFilePathStr := strings.ReplaceAll(inputFilePath, `\`, `\\`)
 
-	libbeatinteg.WriteLogFile(t, inputFilePath, 50, false)
+	libbeattesting.WriteLogFile(t, inputFilePath, 50, false)
 
 	esApiKey := createESApiKey(t, info.ESClient)
 	esHost, err := integration.GetESHost()
@@ -133,7 +134,7 @@ service:
 	defer cancel()
 
 	agentLogFile := NewLogFile(t, tmpDir)
-	agentLogFile.KeepLogFile = true
+	agentLogFile.KeepLogFileOnSuccess = true
 
 	cfg := map[string]any{
 		"HomeDir":      tmpDir,
@@ -149,9 +150,9 @@ service:
 		define.Version())
 	require.NoError(t, err, "cannot create Elastic Agent fixture")
 
-	// Start Filebeat receiver running the Log input
+	// Start Elastic Agent/Filebeat receiver running the Log input
 	otelConfigPath := filepath.Join(tmpDir, "otel.yml")
-	cmd := StartEAOtel(t, ctx, otelConfigTemplate, otelConfigPath, cfg, fixture, agentLogFile.File)
+	cmd := StartElasticAgentOtel(t, ctx, otelConfigTemplate, otelConfigPath, cfg, fixture, agentLogFile.File)
 	agentLogFile.WaitLogsContains(
 		t,
 		"Log input (deprecated) running as Log input (deprecated)",
@@ -161,11 +162,11 @@ service:
 
 	// Wait for all events to be ingested and stop Elastic Agent
 	waitEventsInES(50)
-	StopEAOtel(t, cmd, agentLogFile)
+	StopElasticAgentOtel(t, cmd, agentLogFile)
 
 	// Enable the feature flag and start Elastic Agent
 	cfg["AsFilestream"] = true
-	cmd = StartEAOtel(t, ctx, otelConfigTemplate, otelConfigPath, cfg, fixture, agentLogFile.File)
+	cmd = StartElasticAgentOtel(t, ctx, otelConfigTemplate, otelConfigPath, cfg, fixture, agentLogFile.File)
 
 	// Ensure the Filesteam input starts
 	agentLogFile.WaitLogsContains(
@@ -183,7 +184,7 @@ service:
 	)
 
 	// Add 50 events to the file, it now contains 100 events
-	libbeatinteg.WriteLogFile(t, inputFilePath, 50, true)
+	libbeattesting.WriteLogFile(t, inputFilePath, 50, true)
 
 	agentLogFile.WaitLogsContains(
 		t,
@@ -200,10 +201,10 @@ service:
 
 	// Ensure all 100 events have been ingested and stop Elastic Agent
 	waitEventsInES(100)
-	StopEAOtel(t, cmd, agentLogFile)
+	StopElasticAgentOtel(t, cmd, agentLogFile)
 
 	// Start Elastic Agent again to ensure it is correctly tracking the state
-	cmd = StartEAOtel(t, ctx, otelConfigTemplate, otelConfigPath, cfg, fixture, agentLogFile.File)
+	cmd = StartElasticAgentOtel(t, ctx, otelConfigTemplate, otelConfigPath, cfg, fixture, agentLogFile.File)
 	agentLogFile.WaitLogsContains(
 		t,
 		"Log input (deprecated) running as Filestream input",
@@ -225,13 +226,13 @@ service:
 		"Filestream did not reach EOF")
 
 	// Stop Elastic Agent
-	StopEAOtel(t, cmd, agentLogFile)
+	StopElasticAgentOtel(t, cmd, agentLogFile)
 
 	// Ensure there was no data duplication
 	waitEventsInES(100)
 }
 
-func StartEAOtel(
+func StartElasticAgentOtel(
 	t *testing.T,
 	ctx context.Context,
 	otelConfigTemplate string,
@@ -268,7 +269,7 @@ func StartEAOtel(
 	return cmd
 }
 
-func StopEAOtel(t *testing.T, cmd *exec.Cmd, f *LogFile) {
+func StopElasticAgentOtel(t *testing.T, cmd *exec.Cmd, f *LogFile) {
 	require.NoError(
 		t,
 		process.Terminate(cmd.Process),
