@@ -102,7 +102,7 @@ components:
     # using the beat_version or similar
     # We don't support that yet, so we are defining a rootDir that will error out if rendered. This is not a problem since
     # we don't extract/manipulate the archive during packaging, it has its own special handling in the 'service' docker image
-    rootDir: elasticsearch_connectors-{{beat_version}}
+    rootDir: connectors-{{beat_version}}
     binaryName: connectors
     fips: false
     platforms:
@@ -1207,7 +1207,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/windows-archive-root-binary/elastic-agent-archive-root.exe
+            source: ./build/windows-{{.Platform.Arch}}-archive-root-binary/elastic-agent-archive-root.exe
           'package.version':
             content: >
               {{ agent_package_version }}
