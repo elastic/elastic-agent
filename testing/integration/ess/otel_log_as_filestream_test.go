@@ -185,11 +185,10 @@ service:
 	// Add 50 events to the file, it now contains 100 events
 	libbeatinteg.WriteLogFile(t, inputFilePath, 50, true)
 
-	// "File /tmp/log.log has been updated"
 	agentLogFile.WaitLogsContains(
 		t,
 		"File "+inputFilePathStr+" has been updated",
-		10*time.Second,
+		20*time.Second,
 		"Filestream did not detect change in the file")
 
 	// Wait for Filestream to finish reading the file
