@@ -16,6 +16,8 @@ echo "Installing awscli"
 
 ARCH=$(uname -m| tr '[:upper:]' '[:lower:]')
 
+echo "ARCH: $ARCH OSTYPE: $OSTYPE SHELL: $SHELL"
+
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
   curl -sSL "https://awscli.amazonaws.com/awscli-exe-linux-${ARCH}.zip" -o "awscliv2.zip"
   unzip -q awscliv2.zip
