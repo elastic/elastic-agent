@@ -82,16 +82,7 @@ func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGat
 
 		stateStore := newStateStore(t, log)
 
-		gateway, err := newFleetGatewayWithScheduler(
-			log,
-			settings,
-			agentInfo,
-			client,
-			scheduler,
-			noop.New(),
-			stateStore,
-			NewCheckinStateFetcher(emptyStateFetcher),
-		)
+		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher))
 
 		require.NoError(t, err)
 
@@ -221,16 +212,7 @@ func TestFleetGateway(t *testing.T) {
 		log, _ := logger.New("tst", false)
 		stateStore := newStateStore(t, log)
 
-		gateway, err := newFleetGatewayWithScheduler(
-			log,
-			settings,
-			agentInfo,
-			client,
-			scheduler,
-			noop.New(),
-			stateStore,
-			NewCheckinStateFetcher(emptyStateFetcher),
-		)
+		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher))
 		require.NoError(t, err)
 
 		waitFn := ackSeq(
@@ -270,19 +252,10 @@ func TestFleetGateway(t *testing.T) {
 		log, _ := logger.New("tst", false)
 		stateStore := newStateStore(t, log)
 
-		gateway, err := newFleetGatewayWithScheduler(
-			log,
-			&fleetGatewaySettings{
-				Duration: d,
-				Backoff:  &backoffSettings{Init: 1 * time.Second, Max: 30 * time.Second},
-			},
-			agentInfo,
-			client,
-			scheduler,
-			noop.New(),
-			stateStore,
-			NewCheckinStateFetcher(emptyStateFetcher),
-		)
+		gateway, err := newFleetGatewayWithScheduler(log, &fleetGatewaySettings{
+			Duration: d,
+			Backoff:  &backoffSettings{Init: 1 * time.Second, Max: 30 * time.Second},
+		}, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher))
 		require.NoError(t, err)
 
 		ch2 := client.Answer(func(_ context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
@@ -332,16 +305,7 @@ func TestFleetGateway(t *testing.T) {
 			}
 		}
 
-		gateway, err := newFleetGatewayWithScheduler(
-			log,
-			settings,
-			agentInfo,
-			client,
-			scheduler,
-			noop.New(),
-			stateStore,
-			NewCheckinStateFetcher(stateFetcher),
-		)
+		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(stateFetcher))
 
 		require.NoError(t, err)
 
@@ -401,16 +365,7 @@ func TestFleetGateway(t *testing.T) {
 		err := stateStore.Save()
 		require.NoError(t, err)
 
-		gateway, err := newFleetGatewayWithScheduler(
-			log,
-			settings,
-			agentInfo,
-			client,
-			scheduler,
-			noop.New(),
-			stateStore,
-			NewCheckinStateFetcher(emptyStateFetcher),
-		)
+		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher))
 		require.NoError(t, err)
 
 		waitFn := ackSeq(
@@ -459,19 +414,10 @@ func TestFleetGateway(t *testing.T) {
 
 		stateFetcher := NewFastCheckinStateFetcher(log, emptyStateFetcher, stateChannel)
 
-		gateway, err := newFleetGatewayWithScheduler(
-			log,
-			&fleetGatewaySettings{
-				Duration: 5 * time.Second,
-				Backoff:  &backoffSettings{Init: 10 * time.Millisecond, Max: 30 * time.Second},
-			},
-			agentInfo,
-			client,
-			scheduler,
-			noop.New(),
-			stateStore,
-			stateFetcher,
-		)
+		gateway, err := newFleetGatewayWithScheduler(log, &fleetGatewaySettings{
+			Duration: 5 * time.Second,
+			Backoff:  &backoffSettings{Init: 10 * time.Millisecond, Max: 30 * time.Second},
+		}, agentInfo, client, scheduler, noop.New(), stateStore, stateFetcher)
 		require.NoError(t, err)
 
 		requestSent := make(chan struct{}, 10)

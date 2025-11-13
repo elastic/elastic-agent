@@ -451,7 +451,7 @@ func TestEndpointPreUpgradeCallback(t *testing.T) {
 			}
 
 			upgradeCalledChan := make(chan struct{})
-			mockCoordinator.EXPECT().Upgrade(mock.Anything, tc.upgradeAction.Data.Version, tc.upgradeAction.Data.SourceURI, mock.Anything, mock.Anything).
+			mockCoordinator.EXPECT().Upgrade(mock.Anything, tc.upgradeAction.Data.Version, tc.upgradeAction.Data.SourceURI, mock.Anything, mock.Anything, mock.Anything).
 				RunAndReturn(func(ctx context.Context, s string, s2 string, actionUpgrade *fleetapi.ActionUpgrade, opt ...coordinator.UpgradeOpt) error {
 					upgradeCalledChan <- struct{}{}
 					return tc.coordUpgradeErr
