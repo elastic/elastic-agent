@@ -12,52 +12,42 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"text/template"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	libbeatinteg "github.com/elastic/beats/v7/libbeat/tests/integration"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/integration"
 )
 
+// TestFilebeatReceiverLogAsFilestream test beats receivers as follow:
+//  1. Runs Filebeat Receiver with the Log input
+//  2. Ensures all events are ingested
+//  3. Stops Filebeat Receiver
+//  4. Starts Filebeat Receiver with the global feature flag enabled
+//  5. Adds more data to the file
+//  6. Ensures all data is ingested and no duplication happens
 func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Stack: &define.Stack{},
 		Group: integration.Default,
 		Local: true,
 		OS: []define.OS{
-			// {Type: define.Windows},
+			{Type: define.Windows},
 			{Type: define.Linux},
-			// {Type: define.Darwin},
+			{Type: define.Darwin},
 		},
 	})
 
-	tmpDir := t.TempDir()
-	tmpDir = os.TempDir()
-	logFilepath := filepath.Join(tmpDir, "log.log")
-	numEvents := 50
-	libbeatinteg.WriteLogFile(t, logFilepath, numEvents, false)
-
-	exporterOutputPath := filepath.Join(tmpDir, "output.json")
-	t.Cleanup(func() {
-		if t.Failed() {
-			contents, err := os.ReadFile(exporterOutputPath)
-			if err != nil {
-				t.Logf("No exporter output file")
-				return
-			}
-			t.Logf("Otel output file path: %s", exporterOutputPath)
-			t.Logf("Contents of exporter output file:\n%s\n", string(contents))
-		}
-	})
-
-	otelConfigPath := filepath.Join(tmpDir, "otel.yml")
 	otelConfigTemplate := `receivers:
   filebeatreceiver:
     filebeat:
@@ -97,110 +87,152 @@ service:
       disable_stacktrace: true
 `
 
-	esClient := info.ESClient
-	esApiKey := createESApiKey(t, esClient)
+	waitEventsInES := func(want int) {
+		t.Helper()
+
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer findCancel()
+
+			docs, err := estools.GetLogsForIndexWithContext(
+				findCtx,
+				info.ESClient,
+				".ds-logs-generic-default*",
+				map[string]any{
+					"Body.fields.find_me": info.Namespace,
+				})
+			require.NoError(c, err)
+
+			got := docs.Hits.Total.Value
+			require.Equalf(
+				c,
+				want,
+				got,
+				"expecting %d events, got %d",
+				want,
+				got)
+		}, 30*time.Second, time.Second, "did not find the expected number of events")
+	}
+
+	rootDir, err := filepath.Abs(filepath.Join("..", "..", "..", "build"))
+	if err != nil {
+		t.Fatalf("cannot get absolute path: %s", err)
+	}
+
+	tmpDir := libbeatinteg.CreateTempDir(t, rootDir)
+	inputFilePath, err := filepath.Abs(filepath.Join(tmpDir, "log.log"))
+	inputFilePathStr := strings.ReplaceAll(inputFilePath, `\`, `\\`)
+
+	libbeatinteg.WriteLogFile(t, inputFilePath, 50, false)
+
+	esApiKey := createESApiKey(t, info.ESClient)
 	esHost, err := integration.GetESHost()
 	require.NoError(t, err, "failed to get ES host")
-	require.True(t, len(esHost) > 0)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(1*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(2*time.Minute))
 	defer cancel()
 
-	fixture, err := define.NewFixtureFromLocalBuild(
-		t,
-		define.Version())
-	require.NoError(t, err)
-
-	f := NewLogFile(t)
-	f.KeepLogFile = true
+	agentLogFile := NewLogFile(t, tmpDir)
+	agentLogFile.KeepLogFile = true
 
 	cfg := map[string]any{
-		"Output":       exporterOutputPath,
 		"HomeDir":      tmpDir,
-		"LogFilepath":  logFilepath,
+		"LogFilepath":  inputFilePath,
 		"ESApiKey":     esApiKey.Encoded,
 		"ESEndpoint":   esHost,
 		"Namespace":    info.Namespace,
 		"AsFilestream": false,
 	}
 
-	cmd := start(t, ctx, otelConfigTemplate, otelConfigPath, cfg, fixture, f.File)
-	f.WaitLogsContains(
+	fixture, err := define.NewFixtureFromLocalBuild(
 		t,
-		"Log input running as Log input",
+		define.Version())
+	require.NoError(t, err, "cannot create Elastic Agent fixture")
+
+	// Start Filebeat receiver running the Log input
+	otelConfigPath := filepath.Join(tmpDir, "otel.yml")
+	cmd := StartEAOtel(t, ctx, otelConfigTemplate, otelConfigPath, cfg, fixture, agentLogFile.File)
+	agentLogFile.WaitLogsContains(
+		t,
+		"Log input (deprecated) running as Log input (deprecated)",
 		20*time.Second,
 		"Log input did not start as Log input",
 	)
 
-	require.Eventually(t,
-		func() bool {
-			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer findCancel()
+	// Wait for all events to be ingested and stop Elastic Agent
+	waitEventsInES(50)
+	StopEAOtel(t, cmd, agentLogFile)
 
-			docs, err := estools.GetLogsForIndexWithContext(
-				findCtx,
-				esClient,
-				".ds-logs-generic-default*",
-				map[string]any{
-					"Body.fields.find_me": info.Namespace,
-				})
-			require.NoError(t, err)
-
-			return docs.Hits.Total.Value == numEvents
-		},
-		30*time.Second, 1*time.Second,
-		"Expected %v logs", numEvents)
-
-	stop(t, cmd, f)
-
-	//================================================== Run again
-	t.Log("================================================== RUNNING AGAIN")
-	cmd = start(t, ctx, otelConfigTemplate, otelConfigPath, cfg, fixture, f.File)
-
-	t.Log("==================== Waiting for the second start")
-	f.WaitLogsContains(
-		t,
-		"Log input running as Log input",
-		20*time.Second,
-		"Log input did not start as Log input",
-	)
-
-	// Ensure no new data has been added
-	f.WaitLogsContains(
-		t,
-		"File didn't change: /tmp/log.log",
-		20*time.Second,
-		"did not reach EOF")
-
-	stop(t, cmd, f)
-
+	// Enable the feature flag and start Elastic Agent
 	cfg["AsFilestream"] = true
-	cmd = start(t, ctx, otelConfigTemplate, otelConfigPath, cfg, fixture, f.File)
-	t.Log("==================== Waiting for the third start")
-	f.WaitLogsContains(
+	cmd = StartEAOtel(t, ctx, otelConfigTemplate, otelConfigPath, cfg, fixture, agentLogFile.File)
+
+	// Ensure the Filesteam input starts
+	agentLogFile.WaitLogsContains(
 		t,
-		"Log input running as Filestream input",
+		"Log input (deprecated) running as Filestream input",
 		20*time.Second,
 		"Log input did not start as Filestream input",
 	)
 
-	f.WaitLogsContains(
+	agentLogFile.WaitLogsContains(
 		t,
 		"Input 'filestream' starting",
 		20*time.Second,
 		"Filestream did not start",
 	)
 
-	f.WaitLogsContains(
+	// Add 50 events to the file, it now contains 100 events
+	libbeatinteg.WriteLogFile(t, inputFilePath, 50, true)
+
+	// "File /tmp/log.log has been updated"
+	agentLogFile.WaitLogsContains(
 		t,
-		"End of file reached: /tmp/log.log; Backoff now.",
+		"File "+inputFilePathStr+" has been updated",
+		10*time.Second,
+		"Filestream did not detect change in the file")
+
+	// Wait for Filestream to finish reading the file
+	agentLogFile.WaitLogsContains(
+		t,
+		"End of file reached: "+inputFilePathStr+"; Backoff now",
 		20*time.Second,
 		"Filestream did not reach EOF")
 
-	stop(t, cmd, f)
+	// Ensure all 100 events have been ingested and stop Elastic Agent
+	waitEventsInES(100)
+	StopEAOtel(t, cmd, agentLogFile)
+
+	// Start Elastic Agent again to ensure it is correctly tracking the state
+	cmd = StartEAOtel(t, ctx, otelConfigTemplate, otelConfigPath, cfg, fixture, agentLogFile.File)
+	agentLogFile.WaitLogsContains(
+		t,
+		"Log input (deprecated) running as Filestream input",
+		20*time.Second,
+		"Log input did not start as Filestream input",
+	)
+
+	agentLogFile.WaitLogsContains(
+		t,
+		"Input 'filestream' starting",
+		20*time.Second,
+		"Filestream did not start",
+	)
+
+	agentLogFile.WaitLogsContains(
+		t,
+		"End of file reached: "+inputFilePathStr+"; Backoff now.",
+		20*time.Second,
+		"Filestream did not reach EOF")
+
+	// Stop Elastic Agent
+	StopEAOtel(t, cmd, agentLogFile)
+
+	// Ensure there was no data duplication
+	waitEventsInES(100)
 }
 
-func start(
+func StartEAOtel(
 	t *testing.T,
 	ctx context.Context,
 	otelConfigTemplate string,
@@ -217,36 +249,37 @@ func start(
 			Execute(
 				&otelConfigBuffer,
 				cfg))
-	require.NoError(t, os.WriteFile(otelConfigPath, otelConfigBuffer.Bytes(), 0o600))
 
-	t.Log("================================================== Start starting")
+	require.NoError(
+		t,
+		os.WriteFile(otelConfigPath, otelConfigBuffer.Bytes(), 0o600),
+		"cannot write configuration file")
 
 	cmd, err := fixture.PrepareAgentCommand(
 		ctx,
 		[]string{"otel", "--config", otelConfigPath},
 	)
-	require.NoError(t, err)
+	require.NoError(t, err, "cannot prepare Elastic Agent command")
 
 	cmd.Stderr = f
 	cmd.Stdout = f
 
-	if err := cmd.Start(); err != nil {
-		t.Errorf("cannot start Elastic Agent in OTel mode: %s", err)
-	}
+	require.NoError(t, cmd.Start(), "cannot start Elastic Agent in OTel mode")
 
 	return cmd
 }
 
-func stop(t *testing.T, cmd *exec.Cmd, f *LogFile) {
-	t.Log("==================== Sending Interrupt signal")
-	if err := cmd.Process.Signal(os.Interrupt); err != nil {
-		t.Fatalf("cannot send interrupt signal to Elastic Agent: %s", err)
-	}
+func StopEAOtel(t *testing.T, cmd *exec.Cmd, f *LogFile) {
+	require.NoError(
+		t,
+		process.Terminate(cmd.Process),
+		"cannot send terminate signal to Elastic Agent")
 
-	t.Log("==================== Waiting process to return")
-	if err := cmd.Wait(); err != nil {
-		t.Fatalf("Elastic Agent exited with an error: %s", err)
-	}
+	require.NoError(t, cmd.Wait(), "Elastic Agent exited with an error")
 
-	f.WaitLogsContains(t, "Shutdown complete.", time.Second, "Filebeat Receiver didn't shutdown")
+	f.WaitLogsContains(
+		t,
+		"Shutdown complete.",
+		time.Second,
+		"Filebeat Receiver didn't shutdown")
 }

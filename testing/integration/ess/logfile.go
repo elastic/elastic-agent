@@ -42,7 +42,7 @@ func NewLogFile(t testing.TB, path ...string) *LogFile {
 		t.Fatalf("cannot create folder for logs: %s", err)
 	}
 
-	f, err := os.CreateTemp(dir, "a-log-file-*.log")
+	f, err := os.CreateTemp(dir, "elastic-agent-*.ndjson")
 	if err != nil {
 		t.Fatalf("cannot create log file: %s", err)
 	}
