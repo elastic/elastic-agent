@@ -22,7 +22,7 @@ if [[ "$OSTYPE" == "linux-gnu" ]]; then
   curl -sSL "https://awscli.amazonaws.com/awscli-exe-linux-${ARCH}.zip" -o "awscliv2.zip"
   unzip -q awscliv2.zip
   sudo ./aws/install
-elif [[ "$OSTYPE" == "darwin" ]]; then
+elif [[ "$OSTYPE" == "darwin"* ]]; then
   curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
   sudo installer -pkg AWSCLIV2.pkg -target / -verbose -dumplog
   hash -r
