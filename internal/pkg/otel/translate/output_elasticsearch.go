@@ -108,6 +108,12 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 		hosts = append(hosts, esURL)
 	}
 
+	// if loadbalance is false, only configure a single endpoint on ES exporter
+	// This is required so that go-elasticsearch client does not send requests to all endpoints in round-robin mmanner
+	// loadbalance:false is handled by beatsauth extension
+	if !escfg.LoadBalance {
+		hosts = hosts[:0]
+	}
 	otelYAMLCfg := map[string]any{
 		"endpoints": hosts, // hosts, protocol, path, port
 
@@ -181,8 +187,6 @@ func checkUnsupportedConfig(cfg *config.C, logger *logp.Logger) error {
 		return fmt.Errorf("parameters is currently not supported: %w", errors.ErrUnsupported)
 	} else if value, err := cfg.Bool("allow_older_versions", -1); err == nil && !value {
 		return fmt.Errorf("allow_older_versions:false is currently not supported: %w", errors.ErrUnsupported)
-	} else if cfg.HasField("loadbalance") {
-		return fmt.Errorf("loadbalance is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("non_indexable_policy") {
 		return fmt.Errorf("non_indexable_policy is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("escape_html") {

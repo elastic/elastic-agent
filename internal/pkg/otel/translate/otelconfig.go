@@ -15,6 +15,7 @@ import (
 	koanfmaps "github.com/knadh/koanf/maps"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
@@ -623,7 +624,8 @@ func BeatDataPath(componentId string) string {
 // getBeatsAuthExtensionConfig sets http transport settings on beatsauth
 // currently this is only supported for elasticsearch output
 func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
-	defaultTransportSettings := elasticsearch.ESDefaultTransportSettings()
+
+	defaultSettings := beatsAuthDefaultConfig
 
 	var resultMap map[string]any
 	if err := outputCfg.Unpack(&resultMap); err != nil {
@@ -631,7 +633,7 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 	}
 
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		Result:          &defaultTransportSettings,
+		Result:          &defaultSettings,
 		TagName:         "config",
 		SquashTagOption: "inline",
 		DecodeHook:      cfgDecodeHookFunc(),
@@ -644,15 +646,15 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 		return nil, err
 	}
 
-	newConfig, err := config.NewConfigFrom(defaultTransportSettings)
+	newConfig, err := config.NewConfigFrom(defaultSettings)
 	if err != nil {
 		return nil, err
 	}
 
 	// proxy_url on newConfig is of type url.URL. Beatsauth extension expects it to be of string type instead
 	// this logic here converts url.URL to string type similar to what a user would set on filebeat config
-	if defaultTransportSettings.Proxy.URL != nil {
-		err = newConfig.SetString("proxy_url", -1, defaultTransportSettings.Proxy.URL.String())
+	if defaultSettings.Transport.Proxy.URL != nil {
+		err = newConfig.SetString("proxy_url", -1, defaultSettings.Transport.Proxy.URL.String())
 		if err != nil {
 			return nil, fmt.Errorf("error settingg proxy url:%w ", err)
 		}
@@ -669,4 +671,19 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 	newMap["continue_on_error"] = true
 
 	return newMap, nil
+}
+
+var beatsAuthDefaultConfig = beatsAuthConfig{
+	Transport:   elasticsearch.ESDefaultTransportSettings(),
+	LoadBalance: true,
+	Path:        "",
+	Protocol:    "http",
+}
+
+type beatsAuthConfig struct {
+	Transport   httpcommon.HTTPTransportSettings `config:",inline"`
+	LoadBalance bool                             `config:"loadbalance"`
+	Endpoints   []string                         `config:"hosts"`
+	Path        string                           `config:"path"`
+	Protocol    string                           `config:"protocol"`
 }

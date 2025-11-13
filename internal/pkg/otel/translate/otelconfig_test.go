@@ -258,7 +258,11 @@ func TestGetOtelConfig(t *testing.T) {
 				"supported_protocols":     []interface{}{},
 				"verification_mode":       uint64(0),
 			},
-			"timeout": "1m30s",
+			"timeout":     "1m30s",
+			"loadbalance": true,
+			"endpoints":   []interface{}{},
+			"path":        "",
+			"protocol":    "http",
 		}
 		for _, v := range extra {
 			// accepts one level deep parameters to replace
