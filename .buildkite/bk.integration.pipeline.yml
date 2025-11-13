@@ -8,8 +8,10 @@ env:
   # Please do not change them manually.
   IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1761958868"
   IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1761958868"
-  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1761958868"
-  IMAGE_DEBIAN_12: "platform-ingest-elastic-agent-debian-12-1761958868"
+  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1762801856"
+  IMAGE_RHEL_10: "platform-ingest-elastic-agent-rhel-10-1762801856"
+  IMAGE_DEBIAN_11: "platform-ingest-elastic-agent-debian-11-1762801856"
+  IMAGE_DEBIAN_13: "platform-ingest-elastic-agent-debian-13-1762801856"
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1761958868"
   IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1761958868"
   ASDF_TERRAFORM_VERSION: 1.9.2
@@ -438,13 +440,13 @@ steps:
     depends_on:
       - integration-ess
     steps:
-      - label: "x86_64:non-sudo: {{matrix}}"
+      - label: "x86_64:non-sudo: {{matrix.group}} - {{matrix.image}}"
         depends_on: packaging-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
-          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.group}} false
         artifact_paths:
           - build/**
           - build/diagnostics/**
@@ -454,13 +456,18 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
-          image: "${IMAGE_DEBIAN_12}"
+          image: "{{matrix.image}}"
         plugins:
           - *vault_ec_key_prod
         matrix:
-          - default
+          setup:
+            image:
+              - "${IMAGE_DEBIAN_11}"
+              - "${IMAGE_DEBIAN_13}"
+            group:
+              - default
 
-      - label: "x86_64:sudo: {{matrix}}"
+      - label: "x86_64:sudo: {{matrix.group}} - {{matrix.image}}"
         depends_on:
           - packaging-amd64
         # due to deb group present in matrix tar.gz and deb packages artifacts are required
@@ -468,7 +475,7 @@ steps:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/** . --step packaging-amd64
-          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.group}} true
         artifact_paths:
           - build/**
           - build/diagnostics/**
@@ -478,35 +485,40 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
-          image: "${IMAGE_DEBIAN_12}"
+          image: "{{matrix.image}}"
         plugins:
           - *vault_ec_key_prod
         matrix:
-          - default
-          - upgrade
-          - upgrade-flavor
-          - standalone-upgrade
-          - fleet
-          - fleet-endpoint-security
-          - fleet-airgapped
-          - fleet-airgapped-privileged
-          - fleet-privileged
-          - fleet-upgrade-to-pr-build
-          - install-uninstall
-          # FQDN test failing at debian 12. Relevant issue https://github.com/elastic/elastic-agent/issues/7476
-          #- fqdn
-          - deb
-          - container
+          setup:
+            image:
+              - "${IMAGE_DEBIAN_11}"
+              - "${IMAGE_DEBIAN_13}"
+            group:
+              - default
+              - upgrade
+              - upgrade-flavor
+              - standalone-upgrade
+              - fleet
+              - fleet-endpoint-security
+              - fleet-airgapped
+              - fleet-airgapped-privileged
+              - fleet-privileged
+              - fleet-upgrade-to-pr-build
+              - install-uninstall
+              # FQDN test failing at debian 12. Relevant issue https://github.com/elastic/elastic-agent/issues/7476
+              #- fqdn
+              - deb
+              - container
 
-  - group: "Stateful(Sudo):RHEL8"
-    key: integration-tests-rhel8
+  - group: "Stateful:RHEL"
+    key: integration-tests-rhel
     notify:
       - github_commit_status:
-          context: "buildkite/elastic-agent-extended-testing - RHEL8"
+          context: "buildkite/elastic-agent-extended-testing - RHEL"
     depends_on:
       - integration-ess
     steps:
-      - label: "x86_64:sudo:rpm"
+      - label: "x86_64:sudo:rpm - {{matrix.image}}"
         depends_on:
           - packaging-amd64
         env:
@@ -525,7 +537,12 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
-          image: "${IMAGE_RHEL_8}"
+          image: "{{matrix.image}}"
+        matrix:
+          setup:
+            image:
+              - "${IMAGE_RHEL_8}"
+              - "${IMAGE_RHEL_10}"
 
   - group: ":kubernetes: Kubernetes"
     key: integration-tests-kubernetes
@@ -669,9 +686,10 @@ steps:
     depends_on:
       - integration-tests-ubuntu
       - integration-tests-win
-      - integration-tests-rhel8
+      - integration-tests-rhel
       - integration-tests-kubernetes
       - extended-integration-tests
+      - integration-tests-debian
     allow_dependency_failure: true
     command: |
       buildkite-agent artifact download "test_infra/ess/**" . --step "integration-ess"
@@ -689,9 +707,10 @@ steps:
       - integration-tests-ech
       - integration-tests-ubuntu
       - integration-tests-win
-      - integration-tests-rhel8
+      - integration-tests-rhel
       - integration-tests-kubernetes
       - integration-tests-serverless
+      - integration-tests-debian
     allow_dependency_failure: true
     command: |
       buildkite-agent artifact download "build/*.xml" .
