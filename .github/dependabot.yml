@@ -12,7 +12,6 @@ updates:
       - backport-active-all
     allow:
       - dependency-name: "github.com/elastic/*"
-      - dependency-name: "github.com/elastic/opentelemetry-collector-components/*"
       - dependency-name: "helm.sh/helm/*"
     ignore:
       - dependency-name: "github.com/elastic/beats/*"
