@@ -1198,7 +1198,7 @@ specs:
         <<: *elastic_license_for_binaries
         files:
           '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/windows-archive-root-binary/elastic-agent-archive-root.exe
+            source: ./build/windows-{{.Platform.Arch}}-archive-root-binary/elastic-agent-archive-root.exe
           'package.version':
             content: >
               {{ agent_package_version }}

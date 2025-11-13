@@ -260,11 +260,11 @@ func (Build) GenerateConfig() error {
 	return sh.Copy(filepath.Join(buildDir, configFile), filepath.Join(metaDir, configFile))
 }
 
-// WindowsArchiveRootBinary compiles a binary to be placed at the root of the windows elastic-agent archive. This binary
+// windowsArchiveRootBinaryForGoArch compiles a binary to be placed at the root of the windows elastic-agent archive. This binary
 // is a thin proxy to the actual elastic-agent binary that resides in the data/elastic-agent-{commit-short-sha}
 // directory of the archive.
-func (Build) WindowsArchiveRootBinary() error {
-	fmt.Println("--- Compiling root binary for windows archive")
+func (Build) windowsArchiveRootBinaryForGoArch(goarch string) error {
+	fmt.Printf("--- Compiling root binary for %s windows archive\n", goarch)
 	hashShort, err := devtools.CommitHashShort()
 	if err != nil {
 		return fmt.Errorf("error getting commit hash: %w", err)
@@ -278,7 +278,7 @@ func (Build) WindowsArchiveRootBinary() error {
 
 	args := devtools.BuildArgs{
 		Name:        outputName,
-		OutputDir:   filepath.Join(buildDir, "windows-archive-root-binary"),
+		OutputDir:   filepath.Join(buildDir, fmt.Sprintf("windows-%s-archive-root-binary", goarch)),
 		InputFiles:  []string{"wrapper/windows/archive-proxy/main.go"},
 		CGO:         false,
 		WinMetadata: true,
@@ -291,7 +291,11 @@ func (Build) WindowsArchiveRootBinary() error {
 		},
 		Env: map[string]string{
 			"GOOS":   "windows",
+<<<<<<< HEAD
 			"GOARCH": "amd64",
+=======
+			"GOARCH": goarch,
+>>>>>>> 318ad8ff7 (Compile the Windows archive proxy for the target GOARCH instead of the host GOARCH (#11054))
 		},
 		LDFlags: []string{
 			"-s", // Strip all debug symbols from binary (does not affect Go stack traces).
@@ -307,6 +311,13 @@ func (Build) WindowsArchiveRootBinary() error {
 	}
 
 	return devtools.Build(args)
+}
+
+// WindowsArchiveRootBinary compiles a binary to be placed at the root of the windows elastic-agent archive. This binary
+// is a thin proxy to the actual elastic-agent binary that resides in the data/elastic-agent-{commit-short-sha}
+// directory of the archive.
+func (Build) WindowsArchiveRootBinary() {
+	mg.Deps(mg.F(Build.windowsArchiveRootBinaryForGoArch, devtools.GOARCH))
 }
 
 // GolangCrossBuildOSS build the Beat binary inside of the golang-builder.
@@ -538,7 +549,7 @@ func Package(ctx context.Context) error {
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
-	platforms := devtools.Platforms.Names()
+	platforms := devtools.Platforms
 	if len(platforms) == 0 {
 		panic("elastic-agent package is expected to build at least one platform package")
 	}
@@ -1103,8 +1114,8 @@ func runAgent(ctx context.Context, env map[string]string) error {
 		}
 
 		// produce docker package
-		packageAgent(ctx, []string{
-			"linux/amd64",
+		packageAgent(ctx, devtools.BuildPlatformList{
+			devtools.BuildPlatform{Name: "linux/amd64"},
 		}, dependenciesVersion, nil, mg.F(devtools.UseElasticAgentDemoPackaging), mg.F(CrossBuild), devtools.SelectedPackageTypes)
 
 		dockerPackagePath := filepath.Join("build", "package", "elastic-agent", "elastic-agent-linux-amd64.docker", "docker-build")
@@ -1152,7 +1163,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-func packageAgent(ctx context.Context, platforms []string, dependenciesVersion string, manifestResponse *manifest.Build, agentPackaging, agentBinaryTarget mg.Fn, packageTypes []mage.PackageType) error {
+func packageAgent(ctx context.Context, platforms devtools.BuildPlatformList, dependenciesVersion string, manifestResponse *manifest.Build, agentPackaging, agentBinaryTarget mg.Fn, packageTypes []mage.PackageType) error {
 	fmt.Println("--- Package Elastic-Agent")
 
 	if mg.Verbose() {
@@ -1174,7 +1185,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	keepArchive := os.Getenv("KEEP_ARCHIVE") != ""
 
 	// download/copy all the necessary dependencies for packaging elastic-agent
-	archivePath, dropPath, dependencies := collectPackageDependencies(platforms, dependenciesVersion, packageTypes, dependencies)
+	archivePath, dropPath, dependencies := collectPackageDependencies(platforms.Names(), dependenciesVersion, packageTypes, dependencies)
 
 	// cleanup after build
 	if !keepArchive {
@@ -1192,7 +1203,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	defer os.RemoveAll(flatPath)
 
 	// extract all dependencies from their archives into flat dir
-	flattenDependencies(platforms, dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse, dependencies)
+	flattenDependencies(platforms.Names(), dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse, dependencies)
 
 	// package agent
 	log.Println("--- Running post packaging ")
@@ -1200,8 +1211,15 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	mg.Deps(agentBinaryTarget)
 
 	// compile the elastic-agent.exe proxy binary for the windows archive
+<<<<<<< HEAD
 	if slices.Contains(platforms, "windows/amd64") {
 		mg.Deps(Build.WindowsArchiveRootBinary)
+=======
+	for _, p := range platforms {
+		if p.GOOS() == "windows" {
+			mg.Deps(mg.F(Build.windowsArchiveRootBinaryForGoArch, p.GOARCH()))
+		}
+>>>>>>> 318ad8ff7 (Compile the Windows archive proxy for the target GOARCH instead of the host GOARCH (#11054))
 	}
 
 	mg.SerialDeps(devtools.Package, TestPackages)
@@ -1528,7 +1546,7 @@ func PackageUsingDRA(ctx context.Context) error {
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
-	platforms := devtools.Platforms.Names()
+	platforms := devtools.Platforms
 	if len(platforms) == 0 {
 		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")
 	}
