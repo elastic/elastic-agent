@@ -36,13 +36,8 @@ import (
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
 
-<<<<<<< HEAD
-	"github.com/otiai10/copy"
-	"golang.org/x/sync/errgroup"
-=======
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/otiai10/copy"
->>>>>>> c1777a5ce (feat: move edot in a separate package (#10922))
 
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
@@ -79,10 +74,7 @@ import (
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-<<<<<<< HEAD
-=======
 	"golang.org/x/sync/errgroup"
->>>>>>> c1777a5ce (feat: move edot in a separate package (#10922))
 	"gopkg.in/yaml.v3"
 
 	"helm.sh/helm/v3/pkg/action"
@@ -429,11 +421,7 @@ func (Build) TestBinaries() error {
 		}
 
 		outputName := filepath.Join(pkg, binary)
-<<<<<<< HEAD
-		err := RunGo("build", "-v", "-o", outputName, filepath.Join(pkg))
-=======
 		err := devtools.Run(nil, nil, os.Stderr, "go", pkg, "build", "-v", "-o", outputName, pkg)
->>>>>>> c1777a5ce (feat: move edot in a separate package (#10922))
 		if err != nil {
 			return err
 		}

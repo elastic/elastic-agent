@@ -96,12 +96,8 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.AddCommand(newDiagnosticsCommand(args, streams))
 	cmd.AddCommand(newComponentCommandWithArgs(args, streams))
 	cmd.AddCommand(newLogsCommandWithArgs(args, streams))
-<<<<<<< HEAD
-	cmd.AddCommand(newOtelCommandWithArgs(args, streams))
-=======
 	cmd.AddCommand(edotCmd.NewOtelCommandWithArgs(args, streams))
 	cmd.AddCommand(newApplyFlavorCommandWithArgs(args, streams))
->>>>>>> c1777a5ce (feat: move edot in a separate package (#10922))
 
 	// windows special hidden sub-command (only added on Windows)
 	reexec := newReExecWindowsCommand(args, streams)
