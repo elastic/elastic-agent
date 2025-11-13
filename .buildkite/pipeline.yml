@@ -31,12 +31,15 @@ common:
     - file
     - branch
     compression: zstd
-- unix_cache_settings: &unix_cache_settings
+- linux_cache_settings: &linux_cache_settings
     <<: *base_cache_settings
     path: /opt/buildkite-agent/.cache/go-build
 - windows_cache_settings: &windows_cache_settings
     <<: *base_cache_settings
     path: /c/Users/buildkite/AppData/Local/go-build
+- macos_cache_settings: &macos_cache_settings
+    <<: *base_cache_settings
+    path: /Users/admin/Library/Caches/go-build
 
 steps:
   - label: "check-ci"
@@ -67,7 +70,7 @@ steps:
         plugins:
           - *aws_oidc
           - cache#v1.8.0:
-              <<: *unix_cache_settings
+              <<: *linux_cache_settings
               key-extra: "linux/amd64"
         retry:
           automatic:
@@ -92,7 +95,7 @@ steps:
         plugins:
         - *aws_oidc
         - cache#v1.8.0:
-            <<: *unix_cache_settings
+            <<: *linux_cache_settings
             key-extra: "linux/amd64"
         retry:
           automatic:
@@ -120,7 +123,7 @@ steps:
         plugins:
         - *aws_oidc
         - cache#v1.8.0:
-            <<: *unix_cache_settings
+            <<: *linux_cache_settings
             key-extra: "linux/amd64"
         retry:
           automatic:
@@ -144,7 +147,7 @@ steps:
         plugins:
         - *aws_oidc
         - cache#v1.8.0:
-            <<: *unix_cache_settings
+            <<: *linux_cache_settings
             key-extra: "linux/arm64"
         retry:
           automatic:
@@ -218,7 +221,7 @@ steps:
         plugins:
         - *aws_oidc
         - cache#v1.8.0:
-            <<: *unix_cache_settings
+            <<: *macos_cache_settings
             key-extra: "macos/arm64"
         retry:
           automatic:
@@ -241,7 +244,7 @@ steps:
         plugins:
         - *aws_oidc
         - cache#v1.8.0:
-            <<: *unix_cache_settings
+            <<: *macos_cache_settings
             key-extra: "macos/arm64"
         retry:
           automatic:
