@@ -7,7 +7,7 @@ require github.com/elastic/elastic-agent v0.0.0
 replace github.com/elastic/elastic-agent => ../../
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251111213350-d70a32b8789f
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251112213255-637949be4421
 	github.com/elastic/elastic-agent-libs v0.26.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.20.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.1.0
@@ -169,6 +169,7 @@ require (
 	github.com/Showmax/go-fqdn v1.0.0 // indirect
 	github.com/VictoriaMetrics/easyproto v0.1.4 // indirect
 	github.com/aerospike/aerospike-client-go/v7 v7.7.1 // indirect
+	github.com/akavel/rsrc v0.10.2 // indirect
 	github.com/alecthomas/participle/v2 v2.1.4 // indirect
 	github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
@@ -221,6 +222,7 @@ require (
 	github.com/beevik/ntp v1.4.3 // indirect
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/blakesmith/ar v0.0.0-20150311145944-8bd4349a67f2 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.9.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
@@ -393,6 +395,7 @@ require (
 	github.com/jcmturner/gokrb5/v8 v8.4.4 // indirect
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
 	github.com/jonboulle/clockwork v0.5.0 // indirect
+	github.com/josephspurrier/goversioninfo v1.5.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/josharian/native v1.1.0 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
