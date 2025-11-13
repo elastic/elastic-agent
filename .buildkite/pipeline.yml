@@ -340,11 +340,6 @@ steps:
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
-        plugins:
-        - *aws_oidc
-        - cache#v1.8.0:
-            <<: *unix_cache_settings
-            key-extra: "linux/amd64"
         matrix:
           setup:
             k8s_version:
