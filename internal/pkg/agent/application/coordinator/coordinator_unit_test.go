@@ -496,6 +496,7 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 		otelMgr:    &fakeOTelManager{},
 
 		// Set valid but empty initial values for ast and vars
+		cfg:                configuration.DefaultConfiguration(),
 		vars:               emptyVars(t),
 		ast:                emptyAST(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
@@ -613,6 +614,7 @@ func TestCoordinatorReportsComponentModelError(t *testing.T) {
 		otelMgr:    &fakeOTelManager{},
 
 		// Set valid but empty initial values for ast and vars
+		cfg:                configuration.DefaultConfiguration(),
 		vars:               emptyVars(t),
 		ast:                emptyAST(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
@@ -717,6 +719,7 @@ func TestCoordinatorPolicyChangeUpdatesMonitorReloader(t *testing.T) {
 		},
 		runtimeMgr:         runtimeManager,
 		otelMgr:            &fakeOTelManager{},
+		cfg:                configuration.DefaultConfiguration(),
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 		secretMarkerFunc:   mockSecretMarkerFunc,
@@ -859,6 +862,7 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManager(t *testing.T) {
 		},
 		runtimeMgr:         runtimeManager,
 		otelMgr:            otelManager,
+		cfg:                configuration.DefaultConfiguration(),
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 		secretMarkerFunc:   testSecretMarkerFunc,
@@ -1033,6 +1037,7 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 		runtimeMgr:         runtimeManager,
 		otelMgr:            otelManager,
 		specs:              specs,
+		cfg:                configuration.DefaultConfiguration(),
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 		secretMarkerFunc:   testSecretMarkerFunc,
@@ -1212,6 +1217,7 @@ func TestCoordinatorManagesComponentWorkDirs(t *testing.T) {
 		runtimeMgr:         runtimeManager,
 		otelMgr:            otelManager,
 		specs:              specs,
+		cfg:                configuration.DefaultConfiguration(),
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 		secretMarkerFunc:   testSecretMarkerFunc,
@@ -1349,9 +1355,9 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 			// manager, so it receives the update result.
 			runtimeManagerError: updateErrChan,
 		},
-		runtimeMgr: runtimeManager,
-		otelMgr:    &fakeOTelManager{},
-
+		runtimeMgr:         runtimeManager,
+		otelMgr:            &fakeOTelManager{},
+		cfg:                configuration.DefaultConfiguration(),
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 		secretMarkerFunc:   testSecretMarkerFunc,
@@ -1414,6 +1420,7 @@ func TestCoordinatorReportsOTelManagerUpdateFailure(t *testing.T) {
 		},
 		runtimeMgr:         runtimeManager,
 		otelMgr:            otelManager,
+		cfg:                configuration.DefaultConfiguration(),
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 		secretMarkerFunc:   testSecretMarkerFunc,
@@ -1479,6 +1486,7 @@ func TestCoordinatorAppliesVarsToPolicy(t *testing.T) {
 		},
 		runtimeMgr:         runtimeManager,
 		otelMgr:            &fakeOTelManager{},
+		cfg:                configuration.DefaultConfiguration(),
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 		secretMarkerFunc:   testSecretMarkerFunc,

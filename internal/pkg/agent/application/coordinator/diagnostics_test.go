@@ -95,6 +95,7 @@ agent:
   download: null
   grpc: null
   id: ""
+  internal: null
   path: ""
   process: null
   reload: null

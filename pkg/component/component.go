@@ -37,6 +37,48 @@ type HeadersProvider interface {
 
 type RuntimeManager string
 
+type RuntimeConfig struct {
+	Default   string            `yaml:"default" config:"default" json:"default"`
+	InputType map[string]string `yaml:",inline,omitempty" config:",inline,omitempty" json:",inline,omitempty"`
+}
+
+func DefaultRuntimeConfig() *RuntimeConfig {
+	return &RuntimeConfig{
+		Default: string(DefaultRuntimeManager),
+	}
+}
+
+func (r *RuntimeConfig) Validate() error {
+	validateRuntime := func(val string) error {
+		switch RuntimeManager(val) {
+		case OtelRuntimeManager, ProcessRuntimeManager:
+			return nil
+		default:
+			return fmt.Errorf("invalid runtime manager: %s, must be either %s or %s",
+				val, OtelRuntimeManager, ProcessRuntimeManager)
+		}
+	}
+	if err := validateRuntime(r.Default); err != nil {
+		return err
+	}
+	for _, val := range r.InputType {
+		if err := validateRuntime(val); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *RuntimeConfig) RuntimeManagerForInputType(inputType string) RuntimeManager {
+	if manager, ok := r.InputType[inputType]; ok {
+		return RuntimeManager(manager)
+	}
+	if r.Default != "" {
+		return RuntimeManager(r.Default)
+	}
+	return DefaultRuntimeManager
+}
+
 const (
 	// defaultUnitLogLevel is the default log level that a unit will get if one is not defined.
 	defaultUnitLogLevel                  = client.UnitLogLevelInfo
@@ -339,12 +381,13 @@ type Model struct {
 // the current runtime specification.
 func (r *RuntimeSpecs) ToComponents(
 	policy map[string]interface{},
+	runtimeCfg *RuntimeConfig,
 	monitoringInjector GenerateMonitoringCfgFn,
 	ll logp.Level,
 	headers HeadersProvider,
 	currentServiceCompInts map[string]uint64,
 ) ([]Component, error) {
-	components, err := r.PolicyToComponents(policy, ll, headers)
+	components, err := r.PolicyToComponents(policy, runtimeCfg, ll, headers)
 	if err != nil {
 		return nil, err
 	}
@@ -357,7 +400,7 @@ func (r *RuntimeSpecs) ToComponents(
 
 		if monitoringCfg != nil {
 			// monitoring is enabled
-			monitoringComps, err := r.PolicyToComponents(monitoringCfg, ll, headers)
+			monitoringComps, err := r.PolicyToComponents(monitoringCfg, runtimeCfg, ll, headers)
 			if err != nil {
 				return nil, fmt.Errorf("failed to generate monitoring components: %w", err)
 			}
@@ -499,6 +542,7 @@ func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *feature
 // PolicyToComponents takes the policy and generates a component model.
 func (r *RuntimeSpecs) PolicyToComponents(
 	policy map[string]interface{},
+	runtimeCfg *RuntimeConfig,
 	ll logp.Level,
 	headers HeadersProvider,
 ) ([]Component, error) {
@@ -508,7 +552,7 @@ func (r *RuntimeSpecs) PolicyToComponents(
 		return nil, fmt.Errorf("could not parse feature flags from policy: %w", err)
 	}
 
-	outputsMap, err := toIntermediate(policy, r.aliasMapping, ll, headers)
+	outputsMap, err := toIntermediate(policy, runtimeCfg, r.aliasMapping, ll, headers)
 	if err != nil {
 		return nil, err
 	}
@@ -576,7 +620,13 @@ func injectInputPolicyID(fleetPolicy map[string]interface{}, inputConfig map[str
 
 // toIntermediate takes the policy and returns it into an intermediate representation that is easier to map into a set
 // of components.
-func toIntermediate(policy map[string]interface{}, aliasMapping map[string]string, ll logp.Level, headers HeadersProvider) (map[string]outputI, error) {
+func toIntermediate(
+	policy map[string]interface{},
+	runtimeCfg *RuntimeConfig,
+	aliasMapping map[string]string,
+	ll logp.Level,
+	headers HeadersProvider,
+) (map[string]outputI, error) {
 	const (
 		outputsKey        = "outputs"
 		enabledKey        = "enabled"
@@ -728,7 +778,7 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 			return nil, fmt.Errorf("invalid 'inputs.%d.log_level', %w", idx, err)
 		}
 
-		runtimeManager := DefaultRuntimeManager
+		runtimeManager := runtimeCfg.RuntimeManagerForInputType(t)
 		// determine the runtime manager for the input
 		if runtimeManagerRaw, ok := input[runtimeManagerKey]; ok {
 			runtimeManagerStr, ok := runtimeManagerRaw.(string)
