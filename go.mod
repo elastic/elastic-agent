@@ -61,7 +61,6 @@ require (
 	go.opentelemetry.io/collector/confmap v1.43.0
 	go.opentelemetry.io/collector/extension v1.43.0
 	go.opentelemetry.io/collector/extension/extensiontest v0.137.0
-	go.opentelemetry.io/collector/featuregate v1.43.0
 	go.opentelemetry.io/collector/pipeline v1.43.0
 	go.uber.org/zap v1.27.0
 	go.yaml.in/yaml/v3 v3.0.4
@@ -101,7 +100,7 @@ require (
 	go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.43.0 // indirect
 	go.opentelemetry.io/collector/connector v0.137.0 // indirect
 	go.opentelemetry.io/collector/exporter v1.43.0 // indirect
-	go.opentelemetry.io/collector/otelcol v0.137.0
+	go.opentelemetry.io/collector/otelcol v0.137.0 // indirect
 	go.opentelemetry.io/collector/receiver v1.43.0 // indirect
 )
 
@@ -676,6 +675,7 @@ require (
 	go.opentelemetry.io/collector/extension/extensionmiddleware v0.137.0 // indirect
 	go.opentelemetry.io/collector/extension/memorylimiterextension v0.137.0 // indirect
 	go.opentelemetry.io/collector/extension/xextension v0.137.0 // indirect
+	go.opentelemetry.io/collector/featuregate v1.43.0 // indirect
 	go.opentelemetry.io/collector/filter v0.137.0 // indirect
 	go.opentelemetry.io/collector/internal/fanoutconsumer v0.137.0 // indirect
 	go.opentelemetry.io/collector/internal/memorylimiter v0.137.0 // indirect
