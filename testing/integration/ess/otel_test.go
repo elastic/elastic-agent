@@ -973,10 +973,11 @@ exporters:
       - {{.ESEndpoint}}
     api_key: {{.ESApiKey}}
     logs_index: {{.Index}}
-    batcher:
+    sending_queue:
       enabled: true
-      flush_timeout: 1s
-      min_size: {{.MinItems}}
+      batch:
+        flush_timeout: 1s
+        min_size: {{.MinItems}}
     mapping:
       mode: bodymap
 service:
@@ -1396,10 +1397,11 @@ exporters:
       - {{.ESEndpoint}}
     api_key: {{.ESApiKey}}
     logs_index: {{.Index}}
-    batcher:
+    sending_queue:
       enabled: true
-      flush_timeout: 1s
-      min_size: {{.MinItems}}
+      batch:
+        flush_timeout: 1s
+        min_size: {{.MinItems}}
     mapping:
       mode: bodymap
 service:
@@ -1588,9 +1590,10 @@ exporters:
     compression: none
     api_key: {{.ESApiKey}}
     logs_index: {{.FBReceiverIndex}}
-    batcher:
+    sending_queue:
       enabled: true
-      flush_timeout: 1s
+      batch:
+        flush_timeout: 1s
     mapping:
       mode: bodymap
 service:
@@ -1823,9 +1826,10 @@ exporters:
       - {{.ESEndpoint}}
     api_key: {{.ESApiKey}}
     logs_index: {{.Index}}
-    batcher:
+    sending_queue:
       enabled: true
-      flush_timeout: 1s
+      batch:
+        flush_timeout: 1s
     mapping:
       mode: bodymap
     logs_dynamic_id:
@@ -2060,10 +2064,11 @@ exporters:
       - {{.ESEndpoint}}
     api_key: {{.ESApiKey}}
     logs_index: {{.Index}}
-    batcher:
+    sending_queue:
       enabled: true
-      flush_timeout: 1s
-      min_size: 1
+      batch:
+        flush_timeout: 1s
+        min_size: 1
     tls:
       ca_file: {{ .CAFile }}
     auth:
@@ -2206,10 +2211,11 @@ exporters:
       - {{.ESEndpoint}}
     api_key: {{.ESApiKey}}
     logs_index: {{.Index}}
-    batcher:
+    sending_queue:
       enabled: true
-      flush_timeout: 1s
-      min_size: 1
+      batch:
+        flush_timeout: 1s
+        min_size: 1
     auth:
       authenticator: beatsauth
     mapping:
