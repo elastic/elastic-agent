@@ -1917,7 +1917,7 @@ service:
 			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer findCancel()
 
-			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]interface{}{
+			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]any{
 				"log.file.path": inputFilePath,
 			})
 			require.NoError(t, err)
@@ -1950,28 +1950,28 @@ service:
 
 	require.EventuallyWithT(
 		t,
-		func(c *assert.CollectT) {
+		func(t *assert.CollectT) {
 			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer findCancel()
 
-			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]interface{}{
+			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]any{
 				"log.file.path": inputFilePath,
 			})
-			require.NoError(c, err)
+			require.NoError(t, err)
 
 			uniqueIngestedLogs := make(map[string]struct{})
 			for _, hit := range docs.Hits.Hits {
 				message, found := hit.Source["message"]
-				require.True(c, found, "expected message field in document %q", hit.Source)
+				require.True(t, found, "expected message field in document %q", hit.Source)
 				msg, ok := message.(string)
-				require.True(c, ok, "expected message field to be a string, got %T", message)
-				require.NotContainsf(c, uniqueIngestedLogs, msg, "found duplicated log message %q", msg)
+				require.True(t, ok, "expected message field to be a string, got %T", message)
+				require.NotContainsf(t, uniqueIngestedLogs, msg, "found duplicated log message %q", msg)
 				uniqueIngestedLogs[msg] = struct{}{}
 			}
 
 			want := inputLinesCounter.Load()
 			got := docs.Hits.Total.Value
-			require.EqualValues(c, want, got, "expecting %d hits got %d hits", want, got)
+			require.EqualValues(t, want, got, "expecting %d hits got %d hits", want, got)
 		},
 		20*time.Second,
 		time.Second,
