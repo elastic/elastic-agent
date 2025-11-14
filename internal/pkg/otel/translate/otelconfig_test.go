@@ -309,6 +309,9 @@ func TestGetOtelConfig(t *testing.T) {
 			"logs_dynamic_id": map[string]any{
 				"enabled": true,
 			},
+			"logs_dynamic_pipeline": map[string]any{
+				"enabled": true,
+			},
 			"include_source_on_error": true,
 			"auth": map[string]any{
 				"authenticator": "beatsauth/_agent-component/" + outputName,
