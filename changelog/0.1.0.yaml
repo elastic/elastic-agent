@@ -1,0 +1,70 @@
+version: 0.1.0
+entries:
+    - kind: feature
+      summary: Add awss3receiver
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10515
+      issue:
+        - https://github.com/elastic/obs-integration-team/issues/604
+      impact: ""
+      action: ""
+      timestamp: 1760341895
+      file:
+        name: 1760341895-edot-add-awss3receiver.yaml
+        checksum: bf127645f0d12f626d51a9d2bd9e50c55e40636e
+    - kind: bug-fix
+      summary: Fix quoting of boolean values in Helm charts.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10681
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1760996949
+      file:
+        name: 1760996949-helm-bool.yaml
+        checksum: eabea6e5bf17bb542258bec7df9f2db9b06f618b
+    - kind: feature
+      summary: Add sample config files for Windows ES and mOTLP ingestion.
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10728
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/10540
+      impact: ""
+      action: ""
+      timestamp: 1761201534
+      file:
+        name: 1761201534-add-mOTLP-and-ES-sample-in-EDOT-for-Windows.yaml
+        checksum: 459b3525232d5c5777f698626316c28259d5b170
+    - kind: enhancement
+      summary: Run self-monitoring as otel receivers by default
+      description: |
+        The inputs used for Elastic Agent's self-monitoring now run as receivers inside a managed otel collector.
+        This can be switched back by setting `agent.monitoring._runtime_experimental: process`.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10594
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1761660612
+      file:
+        name: 1761660612-enable-otel-self-monitoring.yaml
+        checksum: 2d833dafa01aca4e56fda6c3977dc21e6a53882a
+    - kind: feature
+      summary: added opex to elastic-agent helm chart, This change will add the Opex-CCM support to the offical elastic-agent helm chart deployment.
+      description: ""
+      component: ""
+      pr: []
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1762856188
+      file:
+        name: 1762856188-added-opex-to-elastic-agent-helm-chart.yaml
+        checksum: ad2ceef6e956b590c4d92eaff52040fd57fc4dd2
