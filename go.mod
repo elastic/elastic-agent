@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent
 
-go 1.24.9
+go 1.24.10
 
 require (
 	github.com/Jeffail/gabs/v2 v2.6.0
@@ -14,11 +14,11 @@ require (
 	github.com/docker/docker v28.4.0+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251112202822-3158befb6c2f
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251113200410-43cd4e665c7f
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.10.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
-	github.com/elastic/elastic-agent-libs v0.25.1
+	github.com/elastic/elastic-agent-libs v0.26.0
 	github.com/elastic/elastic-agent-system-metrics v0.13.3
 	github.com/elastic/elastic-transport-go/v8 v8.7.0
 	github.com/elastic/go-elasticsearch/v8 v8.19.0
