@@ -50,8 +50,20 @@ type BeatMonitoringConfigGetter func(unitID, binary string) map[string]any
 type exporterConfigTranslationFunc func(*config.C, *logp.Logger) (map[string]any, error)
 
 var (
+<<<<<<< HEAD
 	OtelSupportedOutputTypes         = []string{"elasticsearch"}
 	OtelSupportedInputTypes          = []string{"filestream", "http/metrics", "beat/metrics", "system/metrics", "prometheus/metrics"}
+=======
+	OtelSupportedOutputTypes        = []string{"elasticsearch"}
+	OtelSupportedFilebeatInputTypes = []string{
+		"filestream",
+		"journald",
+		"log",
+		"winlog",
+	}
+
+	OtelSupportedInputTypes          = OtelSupportedFilebeatInputTypes
+>>>>>>> 6d12db919 (Add support for all metricbeat input types (#11184))
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
 		otelcomponent.MustNewType("elasticsearch"): translateEsOutputToExporter,
 	}
@@ -117,7 +129,9 @@ func VerifyComponentIsOtelSupported(comp *component.Component) error {
 		return fmt.Errorf("unsupported output type: %s", comp.OutputType)
 	}
 
-	if !slices.Contains(OtelSupportedInputTypes, comp.InputType) {
+	// check if given input is supported in OTel runtime
+	// this includes all metricbeat inputs and some filebeat inputs for now
+	if !slices.Contains(OtelSupportedInputTypes, comp.InputType) && !strings.HasSuffix(comp.InputType, "/metrics") {
 		return fmt.Errorf("unsupported input type: %s", comp.InputType)
 	}
 
