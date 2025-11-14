@@ -974,7 +974,8 @@ exporters:
     api_key: {{.ESApiKey}}
     logs_index: {{.Index}}
     sending_queue:
-      enabled: true
+      wait_for_result: true # Avoid losing data on shutdown
+      block_on_overflow: true
       batch:
         flush_timeout: 1s
         min_size: {{.MinItems}}
@@ -1398,7 +1399,8 @@ exporters:
     api_key: {{.ESApiKey}}
     logs_index: {{.Index}}
     sending_queue:
-      enabled: true
+      wait_for_result: true # Avoid losing data on shutdown
+      block_on_overflow: true
       batch:
         flush_timeout: 1s
         min_size: {{.MinItems}}
@@ -1591,7 +1593,8 @@ exporters:
     api_key: {{.ESApiKey}}
     logs_index: {{.FBReceiverIndex}}
     sending_queue:
-      enabled: true
+      wait_for_result: true # Avoid losing data on shutdown
+      block_on_overflow: true
       batch:
         flush_timeout: 1s
     mapping:
@@ -1828,7 +1831,6 @@ exporters:
     api_key: {{.ESApiKey}}
     logs_index: {{.Index}}
     sending_queue:
-      enabled: true
       wait_for_result: true # Avoid losing data on shutdown
       block_on_overflow: true
       batch:
@@ -2057,7 +2059,8 @@ exporters:
     api_key: {{.ESApiKey}}
     logs_index: {{.Index}}
     sending_queue:
-      enabled: true
+      wait_for_result: true # Avoid losing data on shutdown
+      block_on_overflow: true
       batch:
         flush_timeout: 1s
         min_size: 1
@@ -2204,7 +2207,8 @@ exporters:
     api_key: {{.ESApiKey}}
     logs_index: {{.Index}}
     sending_queue:
-      enabled: true
+      wait_for_result: true # Avoid losing data on shutdown
+      block_on_overflow: true
       batch:
         flush_timeout: 1s
         min_size: 1
