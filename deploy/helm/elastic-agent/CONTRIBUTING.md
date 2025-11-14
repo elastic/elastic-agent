@@ -9,7 +9,7 @@ to modify or contribute to the Elastic Agent Helm chart.
 
 ## Testing Your Changes Locally
 
-By default the agent is installed on the `kube-system` namespace. Thus you'll
+By default, the agent is installed on the `kube-system` namespace. Thus you'll
 need to pass `-n kube-system` to the `helm` invocations that interact with the
 k8s cluster.
 
@@ -68,7 +68,7 @@ find you changes, copy it, restore the README.md and manually add your changes.
 
 When you add new values to `values.yaml`, make sure to:
 1. Add appropriate comments above the value (helm-docs uses these)
-2. Update the schema in `values.schema.json` if needed
+2. Update the schema in `values.schema.json` accordingly
 
 Example format in `values.yaml`:
 ```yaml
