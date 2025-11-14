@@ -32,7 +32,7 @@ common:
     save:
     - file
     - branch
-    compression: zstd
+    compression: tgz
 - linux_cache_settings: &linux_cache_settings
     <<: *base_cache_settings
     path: /opt/buildkite-agent/.cache/go-build
@@ -42,7 +42,6 @@ common:
 - macos_cache_settings: &macos_cache_settings
     <<: *base_cache_settings
     path: /Users/admin/Library/Caches/go-build
-    compression: tgz
 
 steps:
   - label: "check-ci"
