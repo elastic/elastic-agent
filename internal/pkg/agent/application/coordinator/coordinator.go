@@ -1939,6 +1939,7 @@ func (c *Coordinator) generateComponentModel() (err error) {
 
 	comps, err := c.specs.ToComponents(
 		cfg,
+		c.cfg.Settings.Internal.Runtime,
 		configInjector,
 		c.state.LogLevel,
 		c.agentInfo,
