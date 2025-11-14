@@ -13,10 +13,11 @@ import (
 
 func TestRenderInputs(t *testing.T) {
 	testcases := map[string]struct {
-		input     Node
-		expected  Node
-		varsArray []*Vars
-		err       bool
+		input             Node
+		expected          Node
+		varsArray         []*Vars
+		err               bool
+		ignoreMissingVars bool
 	}{
 		"inputs not list": {
 			input: NewKey("inputs", NewStrVal("not list")),
@@ -110,7 +111,7 @@ func TestRenderInputs(t *testing.T) {
 					NewKey("key", NewStrVal("${var1.missing|var1.diff}")),
 				}),
 				NewDict([]Node{
-					NewKey("key", NewStrVal("${var1.removed}")),
+					NewKey("key", NewStrVal("${var1.removed|?}")),
 				}),
 			})),
 			expected: NewList([]Node{
@@ -296,7 +297,7 @@ func TestRenderInputs(t *testing.T) {
 				}),
 				mustMakeVars(map[string]interface{}{
 					"var1": map[string]interface{}{
-						"missing": "other",
+						"name": "value4",
 					},
 				}),
 			},
@@ -788,11 +789,74 @@ func TestRenderInputs(t *testing.T) {
 					nil),
 			},
 		},
+		"required var missing causes error": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("key", NewStrVal("${var1.missing}")),
+				}),
+			})),
+			err: true,
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "value1",
+					},
+				}),
+			},
+		},
+		"required var missing doesnt causes error when disabled": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("key", NewStrVal("${var1.missing}")),
+				}),
+			})),
+			expected: NewList([]Node{}),
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "value1",
+					},
+				}),
+			},
+			ignoreMissingVars: true,
+		},
+		"input fails on first vars but succeeds with following vars": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("key", NewStrVal("${var1.name}")),
+				}),
+			})),
+			expected: NewList([]Node{
+				NewDict([]Node{
+					NewKey("key", NewStrVal("value1")),
+				}),
+				NewDict([]Node{
+					NewKey("key", NewStrVal("value2")),
+				}),
+			}),
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"other": "value3",
+					},
+				}),
+				mustMakeVars(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "value1",
+					},
+				}),
+				mustMakeVars(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "value2",
+					},
+				}),
+			},
+		},
 	}
 
 	for name, test := range testcases {
 		t.Run(name, func(t *testing.T) {
-			v, err := RenderInputs(test.input, test.varsArray)
+			v, err := RenderInputs(test.input, test.varsArray, test.ignoreMissingVars)
 			if test.err {
 				require.Error(t, err)
 			} else {

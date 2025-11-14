@@ -17,10 +17,26 @@ import (
 
 const varsSeparator = "."
 
-var varsRegex = regexp.MustCompile(`\$\$?{([\p{L}\d\s\\\-_|.'":\/]*)}`)
+var varsRegex = regexp.MustCompile(`\$\$?{([\p{L}\d\s\\\-_|.'":\/\?]*)}`)
 
-// ErrNoMatch is return when the replace didn't fail, just that no vars match to perform the replace.
-var ErrNoMatch = errors.New("no matching vars")
+// noMatchError is returned when a variable replacement fails because no matching vars were found.
+// It provides access to the variable representation that didn't match via the Var() method.
+type noMatchError struct {
+	variables string
+}
+
+// Error implements the error interface.
+func (e *noMatchError) Error() string {
+	return fmt.Sprintf("no matching vars: %s", e.variables)
+}
+
+// Var returns the variable representation that didn't match.
+func (e *noMatchError) Var() string {
+	return e.variables
+}
+
+// errNoMatchAllowed is returned when the replace didn't fail, no vars match to perform the replace, but the variable was marked as optional with |?.
+var errNoMatchAllowed = errors.New("no matching vars allowed")
 
 // Vars is a context of variables that also contain a list of processors that go with the mapping.
 type Vars struct {
@@ -124,7 +140,7 @@ func replaceVars(value string, replacer func(variable string) (Node, Processors,
 				continue
 			}
 			// match on a non-escaped var
-			vars, err := extractVars(value[r[i+2]:r[i+3]], defaultProvider)
+			vars, optional, err := extractVars(value[r[i+2]:r[i+3]], defaultProvider)
 			if err != nil {
 				return nil, fmt.Errorf(`error parsing variable "%s": %w`, value[r[i]:r[i+1]], err)
 			}
@@ -155,7 +171,10 @@ func replaceVars(value string, replacer func(variable string) (Node, Processors,
 				}
 			}
 			if !set && reqMatch {
-				return NewStrVal(""), fmt.Errorf("%w: %s", ErrNoMatch, toRepresentation(vars))
+				if optional {
+					return NewStrVal(""), fmt.Errorf("%w: %s", errNoMatchAllowed, toRepresentation(vars, optional))
+				}
+				return NewStrVal(""), &noMatchError{variables: toRepresentation(vars, optional)}
 			}
 			lastIndex = r[1]
 		}
@@ -163,7 +182,7 @@ func replaceVars(value string, replacer func(variable string) (Node, Processors,
 	return NewStrValWithProcessors(result+value[lastIndex:], processors), nil
 }
 
-func toRepresentation(vars []varI) string {
+func toRepresentation(vars []varI, optional bool) string {
 	var sb strings.Builder
 	sb.WriteString("${")
 	for i, val := range vars {
@@ -178,6 +197,9 @@ func toRepresentation(vars []varI) string {
 				sb.WriteString("|")
 			}
 		}
+	}
+	if optional {
+		sb.WriteString("|?")
 	}
 	sb.WriteString("}")
 	return sb.String()
@@ -230,28 +252,29 @@ func (v *constString) Value() string {
 	return v.value
 }
 
-func extractVars(i string, defaultProvider string) ([]varI, error) {
+func extractVars(i string, defaultProvider string) ([]varI, bool, error) {
 	const out = rune(0)
 
 	quote := out
 	constant := false
 	escape := false
+	optional := false
 	is := make([]rune, 0, len(i))
 	res := make([]varI, 0)
 	for _, r := range i {
 		if r == '|' || r == ':' {
 			if escape {
 				if r == '|' {
-					return nil, fmt.Errorf(`variable pipe cannot be escaped; remove '\' before '|'`)
+					return nil, false, fmt.Errorf(`variable pipe cannot be escaped; remove '\' before '|'`)
 				}
-				return nil, fmt.Errorf(`default pipe cannot be escaped; remove '\' before ':'`)
+				return nil, false, fmt.Errorf(`default pipe cannot be escaped; remove '\' before ':'`)
 			}
 			if quote == out {
 				if constant {
 					res = append(res, &constString{string(is)})
 				} else if len(is) > 0 {
 					if is[len(is)-1] == '.' {
-						return nil, fmt.Errorf("variable cannot end with '.'")
+						return nil, false, fmt.Errorf("variable cannot end with '.'")
 					}
 					res = append(res, &varString{maybeAddDefaultProvider(string(is), defaultProvider)})
 				}
@@ -287,17 +310,20 @@ func extractVars(i string, defaultProvider string) ([]varI, error) {
 		}
 	}
 	if quote != out {
-		return nil, fmt.Errorf(`starting %s is missing ending %s`, string(quote), string(quote))
+		return nil, false, fmt.Errorf(`starting %s is missing ending %s`, string(quote), string(quote))
 	}
-	if constant {
+	// Check if the final segment is just "?" which marks the variable as optional
+	if !constant && len(is) == 1 && is[0] == '?' {
+		optional = true
+	} else if constant {
 		res = append(res, &constString{string(is)})
 	} else if len(is) > 0 {
 		if is[len(is)-1] == '.' {
-			return nil, fmt.Errorf("variable cannot end with '.'")
+			return nil, false, fmt.Errorf("variable cannot end with '.'")
 		}
 		res = append(res, &varString{maybeAddDefaultProvider(string(is), defaultProvider)})
 	}
-	return res, nil
+	return res, optional, nil
 }
 
 func varPrefixMatched(val string, key string) bool {

@@ -44,252 +44,277 @@ func TestVars_Replace(t *testing.T) {
 		},
 	}, "other")
 	tests := []struct {
-		Input   string
-		Result  Node
-		Error   bool
-		NoMatch bool
+		Input          string
+		Result         Node
+		Error          bool
+		NoMatch        bool
+		NoMatchAllowed bool
 	}{
 		{
-			"${un-der_score.key1}",
-			NewStrVal("data1"),
-			false,
-			false,
+			Input:   "${un-der_score.key1}",
+			Result:  NewStrVal("data1"),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			"${un-der_score.with-dash}",
-			NewStrVal("dash-value"),
-			false,
-			false,
+			Input:   "${un-der_score.with-dash}",
+			Result:  NewStrVal("dash-value"),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			"${un-der_score.missing}",
-			NewStrVal(""),
-			false,
-			true,
+			Input:   "${un-der_score.missing}",
+			Result:  NewStrVal(""),
+			Error:   false,
+			NoMatch: true,
 		},
 		{
-			"${un-der_score.missing|un-der_score.key2}",
-			NewStrVal("data2"),
-			false,
-			false,
+			Input:   "${un-der_score.missing|un-der_score.key2}",
+			Result:  NewStrVal("data2"),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			"${un-der_score.missing|un-der_score.missing2|other.data}",
-			NewStrVal("info"),
-			false,
-			false,
+			Input:   "${un-der_score.missing|un-der_score.missing2|other.data}",
+			Result:  NewStrVal("info"),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
 			// data will be resolved to other.data since 'other' is the default provider
 			// set at variable creation (see mustMakeVarsWithDefault call)
-			"${un-der_score.missing|un-der_score.missing2|data}",
-			NewStrVal("info"),
-			false,
-			false,
+			Input:   "${un-der_score.missing|un-der_score.missing2|data}",
+			Result:  NewStrVal("info"),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`${un-der_score.missing\|'fallback'}`,
-			NewStrVal(""),
-			true,
-			false,
+			Input:   `${un-der_score.missing\|'fallback'}`,
+			Result:  NewStrVal(""),
+			Error:   true,
+			NoMatch: false,
 		},
 		{
-			"${un-der_score.missing|'fallback'}",
-			NewStrVal("fallback"),
-			false,
-			false,
+			Input:   "${un-der_score.missing|'fallback'}",
+			Result:  NewStrVal("fallback"),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`${un-der_score.missing|||||||||"fallback"}`,
-			NewStrVal("fallback"),
-			false,
-			false,
+			Input:   `${un-der_score.missing|||||||||"fallback"}`,
+			Result:  NewStrVal("fallback"),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`${"with:colon"}`,
-			NewStrVal("with:colon"),
-			false,
-			false,
+			Input:   `${"with:colon"}`,
+			Result:  NewStrVal("with:colon"),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`${"direct"}`,
-			NewStrVal("direct"),
-			false,
-			false,
+			Input:   `${"direct"}`,
+			Result:  NewStrVal("direct"),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`${un-der_score.missing|'with:colon'}`,
-			NewStrVal("with:colon"),
-			false,
-			false,
+			Input:   `${un-der_score.missing|'with:colon'}`,
+			Result:  NewStrVal("with:colon"),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`${un-der_score.}`,
-			NewStrVal(""),
-			true,
-			false,
+			Input:   `${un-der_score.}`,
+			Result:  NewStrVal(""),
+			Error:   true,
+			NoMatch: false,
 		},
 		{
-			`${un-der_score.missing|"oth}`,
-			NewStrVal(""),
-			true,
-			false,
+			Input:   `${un-der_score.missing|"oth}`,
+			Result:  NewStrVal(""),
+			Error:   true,
+			NoMatch: false,
 		},
 		{
-			`${un-der_score.missing`,
-			NewStrVal(""),
-			true,
-			false,
+			Input:   `${un-der_score.missing`,
+			Result:  NewStrVal(""),
+			Error:   true,
+			NoMatch: false,
 		},
 		{
-			`${un-der_score.missing  ${other}`,
-			NewStrVal(""),
-			true,
-			false,
+			Input:   `${un-der_score.missing  ${other}`,
+			Result:  NewStrVal(""),
+			Error:   true,
+			NoMatch: false,
 		},
 		{
-			`${}`,
-			NewStrVal(""),
-			true,
-			false,
+			Input:   `${}`,
+			Result:  NewStrVal(""),
+			Error:   true,
+			NoMatch: false,
 		},
 		{
-			"around ${un-der_score.key1} the var",
-			NewStrVal("around data1 the var"),
-			false,
-			false,
+			Input:   "around ${un-der_score.key1} the var",
+			Result:  NewStrVal("around data1 the var"),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			"multi ${un-der_score.key1} var ${ un-der_score.missing |     un-der_score.key2      } around",
-			NewStrVal("multi data1 var data2 around"),
-			false,
-			false,
+			Input:   "multi ${un-der_score.key1} var ${ un-der_score.missing |     un-der_score.key2      } around",
+			Result:  NewStrVal("multi data1 var data2 around"),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`multi ${un-der_score.key1} var ${  un-der_score.missing|  'other"s with space'  } around`,
-			NewStrVal(`multi data1 var other"s with space around`),
-			false,
-			false,
+			Input:   `multi ${un-der_score.key1} var ${  un-der_score.missing|  'other"s with space'  } around`,
+			Result:  NewStrVal(`multi data1 var other"s with space around`),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`start ${  un-der_score.missing|  'others | with space'  } end`,
-			NewStrVal(`start others | with space end`),
-			false,
-			false,
+			Input:   `start ${  un-der_score.missing|  'others | with space'  } end`,
+			Result:  NewStrVal(`start others | with space end`),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`start ${  un-der_score.missing|  'other\'s with space'  } end`,
-			NewStrVal(`start other's with space end`),
-			false,
-			false,
+			Input:   `start ${  un-der_score.missing|  'other\'s with space'  } end`,
+			Result:  NewStrVal(`start other's with space end`),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`${un-der_score.list}`,
-			NewList([]Node{
+			Input: `${un-der_score.list}`,
+			Result: NewList([]Node{
 				NewStrVal("array1"),
 				NewStrVal("array2"),
 			}),
-			false,
-			false,
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`${un-der_score.with/slash}`,
-			NewStrVal(`some/path`),
-			false,
-			false,
+			Input:   `${un-der_score.with/slash}`,
+			Result:  NewStrVal(`some/path`),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`list inside string ${un-der_score.list} strings array`,
-			NewStrVal(`list inside string [array1,array2] strings array`),
-			false,
-			false,
+			Input:   `list inside string ${un-der_score.list} strings array`,
+			Result:  NewStrVal(`list inside string [array1,array2] strings array`),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`${un-der_score.dict}`,
-			NewDict([]Node{
+			Input: `${un-der_score.dict}`,
+			Result: NewDict([]Node{
 				NewKey("key1", NewStrVal("value1")),
 				NewKey("key2", NewStrVal("value2")),
 			}),
-			false,
-			false,
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`dict inside string ${un-der_score.dict} strings dict`,
-			NewStrVal(`dict inside string {key1:value1},{key2:value2} strings dict`),
-			false,
-			false,
+			Input:   `dict inside string ${un-der_score.dict} strings dict`,
+			Result:  NewStrVal(`dict inside string {key1:value1},{key2:value2} strings dict`),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`start $${keep} ${un-der_score.key1} $${un-der_score.key1}`,
-			NewStrVal(`start ${keep} data1 ${un-der_score.key1}`),
-			false,
-			false,
+			Input:   `start $${keep} ${un-der_score.key1} $${un-der_score.key1}`,
+			Result:  NewStrVal(`start ${keep} data1 ${un-der_score.key1}`),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`${special.key1}`,
-			NewStrVal("$1$$2"),
-			false,
-			false,
+			Input:   `${special.key1}`,
+			Result:  NewStrVal("$1$$2"),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`${special.key2}`,
-			NewStrVal("1$2$$"),
-			false,
-			false,
+			Input:   `${special.key2}`,
+			Result:  NewStrVal("1$2$$"),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`${special.key3}`,
-			NewStrVal("${abcd}"),
-			false,
-			false,
+			Input:   `${special.key3}`,
+			Result:  NewStrVal("${abcd}"),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`${special.key4}`,
-			NewStrVal("$${abcd}"),
-			false,
-			false,
+			Input:   `${special.key4}`,
+			Result:  NewStrVal("$${abcd}"),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`${special.key5}`,
-			NewStrVal("${"),
-			false,
-			false,
+			Input:   `${special.key5}`,
+			Result:  NewStrVal("${"),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`${special.key6}`,
-			NewStrVal("$${"),
-			false,
-			false,
+			Input:   `${special.key6}`,
+			Result:  NewStrVal("$${"),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			"${missing.key:}",
-			NewStrVal(""),
-			false,
-			false,
+			Input:   "${missing.key:}",
+			Result:  NewStrVal(""),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			`${missing.key\:constant_string}`,
-			NewStrVal(""),
-			true,
-			false,
+			Input:   `${missing.key\:constant_string}`,
+			Result:  NewStrVal(""),
+			Error:   true,
+			NoMatch: false,
 		},
 		{
-			"${missing.key:constant_string}",
-			NewStrVal("constant_string"),
-			false,
-			false,
+			Input:   "${missing.key:constant_string}",
+			Result:  NewStrVal("constant_string"),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			"${missing.key|missing.key2:constant_string}",
-			NewStrVal("constant_string"),
-			false,
-			false,
+			Input:   "${missing.key|missing.key2:constant_string}",
+			Result:  NewStrVal("constant_string"),
+			Error:   false,
+			NoMatch: false,
 		},
 		{
-			"${un-der_score.with-dash:not_used}",
-			NewStrVal("dash-value"),
-			false,
-			false,
+			Input:   "${un-der_score.with-dash:not_used}",
+			Result:  NewStrVal("dash-value"),
+			Error:   false,
+			NoMatch: false,
+		},
+		// cases for `|?` optional syntax
+		{
+			Input:          "${un-der_score.missing|?}",
+			Result:         NewStrVal(""),
+			NoMatchAllowed: true,
+		},
+		{
+			Input:          "${un-der_score.missing|un-der_score.missing2|?}",
+			Result:         NewStrVal(""),
+			NoMatchAllowed: true,
+		},
+		{
+			Input:  "${un-der_score.key1|?}",
+			Result: NewStrVal("data1"),
+		},
+		{
+			Input:  "${un-der_score.missing|un-der_score.key2|?}",
+			Result: NewStrVal("data2"),
+		},
+		{
+			Input:          "prefix ${un-der_score.missing|?} suffix",
+			Result:         NewStrVal("prefix  suffix"),
+			NoMatchAllowed: true,
 		},
 	}
 	for _, test := range tests {
@@ -298,7 +323,10 @@ func TestVars_Replace(t *testing.T) {
 			if test.Error {
 				assert.Error(t, err)
 			} else if test.NoMatch {
-				assert.ErrorIs(t, err, ErrNoMatch)
+				var noMatchErr *noMatchError
+				assert.ErrorAs(t, err, &noMatchErr)
+			} else if test.NoMatchAllowed {
+				assert.ErrorIs(t, err, errNoMatchAllowed)
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, test.Result, res)
@@ -440,6 +468,21 @@ func TestVars_ReplaceWithFetchContextProvider(t *testing.T) {
 	res, err = vars.Replace("${kubernetes_secrets.test_namespace.testing_secret.secret_value}")
 	require.NoError(t, err)
 	assert.Equal(t, NewStrVal("mockedFetchContent"), res)
+}
+
+func TestNoMatchError_Var(t *testing.T) {
+	vars := mustMakeVarsWithDefault(map[string]interface{}{
+		"existing": map[string]interface{}{
+			"key": "value",
+		},
+	}, "")
+
+	_, err := vars.Replace("${missing.variable}")
+	require.Error(t, err)
+
+	var noMatchErr *noMatchError
+	require.ErrorAs(t, err, &noMatchErr)
+	assert.Equal(t, "${missing.variable}", noMatchErr.Var())
 }
 
 type contextProviderMock struct {
