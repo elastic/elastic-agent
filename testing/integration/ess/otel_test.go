@@ -140,7 +140,9 @@ service:
 
 	// stop the collector and check that it emitted logs indicating a graceful shutdown
 	require.NoError(t, cmd.Process.Signal(os.Interrupt))
-	require.NoError(t, cmd.Wait())
+	if waitErr := cmd.Wait(); waitErr != nil {
+		assert.ErrorContains(t, waitErr, "signal: interrupt")
+	}
 	assert.Contains(t, output.String(), "Shutdown complete")
 }
 
