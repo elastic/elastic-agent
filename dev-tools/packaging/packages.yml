@@ -500,6 +500,11 @@ shared:
     extra_vars:
       from: 'docker.elastic.co/wolfi/chainguard-base-fips:latest'
 
+  - &docker_windows_spec
+    docker_variant: 'basic'
+    extra_vars:
+      from: '--platform=windows/amd64 mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022'
+
   - &docker_elastic_spec
     extra_vars:
       repository: 'docker.elastic.co/elastic-agent'
@@ -550,6 +555,23 @@ shared:
       'hints.inputs.d':
         source: '{{ repo.RootDir }}/deploy/kubernetes/elastic-agent-standalone/templates.d'
         mode: 0755
+
+  - &agent_windows_docker_spec
+    <<: *agent_windows_binary_spec
+    extra_vars:
+      dockerfile: 'Dockerfile.windows.elastic-agent.tmpl'
+      docker_entrypoint: 'docker-entrypoint.windows.elastic-agent.tmpl'
+      user: '{{ .BeatName }}'
+      beats_install_path: "install"
+    files:
+      'elastic-agent.yml':
+        source: 'elastic-agent.docker.yml'
+        mode: 0600
+        config: true
+      '.elastic-agent.active.commit':
+        content: >
+          {{ commit }}
+        mode: 0644
 
   # cloud build to beats-ci repository
   - &agent_docker_cloud_spec
@@ -1212,6 +1234,20 @@ specs:
             content: >
               {{ agent_package_version }}
             mode: 0644
+
+    ######## Windows Docker images #########
+    - os: windows
+      arch: amd64
+      types: [docker]
+      spec:
+        <<: *docker_windows_spec
+        <<: *agent_windows_docker_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+        files:
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+    ######## End Windows Docker images #########
 
     - os: darwin
       types: [tgz]
