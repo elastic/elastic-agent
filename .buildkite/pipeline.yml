@@ -40,7 +40,7 @@ common:
 - macos_cache_settings: &macos_cache_settings
     <<: *base_cache_settings
     path: /Users/admin/Library/Caches/go-build
-    compression: gzip
+    compression: tgz
 
 steps:
   - label: "check-ci"
