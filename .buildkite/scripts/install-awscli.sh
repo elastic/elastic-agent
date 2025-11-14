@@ -10,6 +10,7 @@ if command -v aws
 then
     set +e
     echo "Found awscli."
+    exit 0
 fi
 
 echo "Installing awscli"
