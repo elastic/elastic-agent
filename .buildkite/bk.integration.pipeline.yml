@@ -60,7 +60,7 @@ common:
       save:
       - file
       - branch
-      compression: zstd
+      compression: tgz
   - linux_cache_settings: &linux_cache_settings
       <<: *base_cache_settings
       path: /opt/buildkite-agent/.cache/go-build
@@ -70,7 +70,6 @@ common:
   - macos_cache_settings: &macos_cache_settings
       <<: *base_cache_settings
       path: /Users/admin/Library/Caches/go-build
-      compression: tgz
   # key to hold the list of k8s version to test against
   - k8s_test:
     versions: &k8s_test_versions
