@@ -1817,6 +1817,12 @@ func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtime
 		case component.OtelRuntimeManager:
 			otelComponents = append(otelComponents, comp)
 		case component.ProcessRuntimeManager:
+			// Hack to fix https://github.com/elastic/elastic-agent/issues/11169
+			// TODO: Remove this after https://github.com/elastic/elastic-agent/issues/10220 is resolved
+			if comp.ID == "prometheus/metrics-monitoring" {
+				c.logger.Warnf("The Otel prometheus metrics monitoring input can't run in a beats process, skipping")
+				continue
+			}
 			runtimeComponents = append(runtimeComponents, comp)
 		default:
 			// this should be impossible if we parse the configuration correctly
