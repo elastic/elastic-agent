@@ -343,6 +343,7 @@ type Model struct {
 // the current runtime specification.
 func (r *RuntimeSpecs) ToComponents(
 	policy map[string]interface{},
+	modifiers []ComponentsModifier,
 	monitoringInjector GenerateMonitoringCfgFn,
 	ll logp.Level,
 	headers HeadersProvider,
@@ -351,6 +352,14 @@ func (r *RuntimeSpecs) ToComponents(
 	components, err := r.PolicyToComponents(policy, ll, headers)
 	if err != nil {
 		return nil, err
+	}
+
+	// Do this here so the monitoring injector has a more accurate view of what components are running
+	for _, modifier := range modifiers {
+		components, err = modifier(components, policy)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if monitoringInjector != nil {
@@ -364,6 +373,13 @@ func (r *RuntimeSpecs) ToComponents(
 			monitoringComps, err := r.PolicyToComponents(monitoringCfg, ll, headers)
 			if err != nil {
 				return nil, fmt.Errorf("failed to generate monitoring components: %w", err)
+			}
+
+			for _, modifier := range modifiers {
+				monitoringComps, err = modifier(monitoringComps, policy)
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			components = append(components, monitoringComps...)

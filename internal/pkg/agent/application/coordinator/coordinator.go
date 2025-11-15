@@ -1808,7 +1808,6 @@ func (c *Coordinator) updateManagersWithConfig(model *component.Model) {
 func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtimeModel *component.Model, otelModel *component.Model) {
 	var otelComponents, runtimeComponents []component.Component
 	for _, comp := range model.Components {
-		c.maybeOverrideRuntimeForComponent(&comp)
 		switch comp.RuntimeManager {
 		case component.OtelRuntimeManager:
 			otelComponents = append(otelComponents, comp)
@@ -1840,7 +1839,7 @@ func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtime
 // Normally, we use the runtime set in the component itself via the configuration, but
 // we may also fall back to the process runtime if the otel runtime is unsupported for
 // some reason. One example is the output using unsupported config options.
-func (c *Coordinator) maybeOverrideRuntimeForComponent(comp *component.Component) {
+func maybeOverrideRuntimeForComponent(logger *logger.Logger, comp *component.Component) {
 	if comp.RuntimeManager == component.ProcessRuntimeManager {
 		// do nothing, the process runtime can handle any component
 		return
@@ -1849,7 +1848,7 @@ func (c *Coordinator) maybeOverrideRuntimeForComponent(comp *component.Component
 		// check if the component is actually supported
 		err := translate.VerifyComponentIsOtelSupported(comp)
 		if err != nil {
-			c.logger.Warnf("otel runtime is not supported for component %s, switching to process runtime, reason: %v", comp.ID, err)
+			logger.Warnf("otel runtime is not supported for component %s, switching to process runtime, reason: %v", comp.ID, err)
 			comp.RuntimeManager = component.ProcessRuntimeManager
 		}
 	}
@@ -1939,8 +1938,15 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		existingCompState[comp.Component.ID] = comp.State.Pid
 	}
 
+	otelRuntimeModifier := func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
+		for i := range comps {
+			maybeOverrideRuntimeForComponent(c.logger, &comps[i])
+		}
+		return comps, nil
+	}
 	comps, err := c.specs.ToComponents(
 		cfg,
+		append(c.modifiers, otelRuntimeModifier),
 		configInjector,
 		c.state.LogLevel,
 		c.agentInfo,
@@ -1952,13 +1958,6 @@ func (c *Coordinator) generateComponentModel() (err error) {
 
 	// Filter any disallowed inputs/outputs from the components
 	comps = c.filterByCapabilities(comps)
-
-	for _, modifier := range c.modifiers {
-		comps, err = modifier(comps, cfg)
-		if err != nil {
-			return fmt.Errorf("failed to modify components: %w", err)
-		}
-	}
 
 	// If we made it this far, update our internal derived values and
 	// return with no error
