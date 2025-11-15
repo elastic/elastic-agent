@@ -224,10 +224,6 @@ type VarsManager interface {
 	Watch() <-chan []*transpiler.Vars
 }
 
-// ComponentsModifier is a function that takes the computed components model and modifies it before
-// passing it into the components runtime manager.
-type ComponentsModifier func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error)
-
 // managerShutdownTimeout is how long the coordinator will wait during shutdown
 // to receive termination states from its managers.
 // Note: The current timeout (5s) is shorter than the default stop timeout for
@@ -267,7 +263,7 @@ type Coordinator struct {
 	otelCfg *confmap.Conf
 
 	caps      capabilities.Capabilities
-	modifiers []ComponentsModifier
+	modifiers []component.ComponentsModifier
 
 	// The current state of the Coordinator. This value and its subfields are
 	// safe to read directly from within the main Coordinator goroutine.
@@ -439,7 +435,7 @@ func New(
 	otelMgr OTelManager,
 	fleetAcker acker.Acker,
 	initialUpgradeDetails *details.Details,
-	modifiers ...ComponentsModifier,
+	modifiers ...component.ComponentsModifier,
 ) *Coordinator {
 	var fleetState cproto.State
 	var fleetMessage string

@@ -286,6 +286,10 @@ func (c *Component) RemoveWorkDir(parentDirPath string) error {
 	return os.RemoveAll(c.WorkDirPath(parentDirPath))
 }
 
+// ComponentsModifier is a function that takes the computed components model and modifies it before
+// passing it into the components runtime manager.
+type ComponentsModifier func(comps []Component, cfg map[string]interface{}) ([]Component, error)
+
 // Model is the components model with signed policy data
 // This replaces former top level []Components with the top Model that captures signed policy data.
 // The signed data is a part of the policy since 8.8.0 release and contains the signed policy fragments and the signature that can be validated.
