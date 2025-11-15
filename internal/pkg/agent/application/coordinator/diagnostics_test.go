@@ -84,6 +84,7 @@ func TestDiagnosticLocalConfig(t *testing.T) {
 						ServerCA:          "/path/to/server/ca",
 					},
 				},
+				MetricsPeriod: monitoringCfg.DefaultMetricsCollectionInterval,
 			},
 		},
 	}
@@ -105,11 +106,12 @@ agent:
     http: null
     logs: false
     metrics: false
-    metrics_period: ""
+    metrics_period: "1m0s"
     namespace: ""
     pprof: null
     failure_threshold: null
     traces: true
+    use_output: ""
     apm:
       hosts:
         - host1
