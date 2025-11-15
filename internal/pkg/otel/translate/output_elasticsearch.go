@@ -29,17 +29,15 @@ type esToOTelOptions struct {
 	elasticsearch.ElasticsearchConfig `config:",inline"`
 	outputs.HostWorkerCfg             `config:",inline"`
 
-	Index    string `config:"index"`
-	Pipeline string `config:"pipeline"`
-	Preset   string `config:"preset"`
+	Index  string `config:"index"`
+	Preset string `config:"preset"`
 }
 
 var defaultOptions = esToOTelOptions{
 	ElasticsearchConfig: elasticsearch.DefaultConfig(),
 
-	Index:    "", // Dynamic routing is disabled if index is set
-	Pipeline: "",
-	Preset:   "custom", // default is custom if not set
+	Index:  "",       // Dynamic routing is disabled if index is set
+	Preset: "custom", // default is custom if not set
 	HostWorkerCfg: outputs.HostWorkerCfg{
 		Workers: 1,
 	},
@@ -52,7 +50,7 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 	escfg := defaultOptions
 
 	// check for unsupported config
-	err := checkUnsupportedConfig(output, logger)
+	err := checkUnsupportedConfig(output)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +114,7 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 		// where it could spin as many goroutines as it liked.
 		// Given that batcher implementation can change and it has a history of such changes,
 		// let's keep max_conns_per_host setting for now and remove it once exporterhelper is stable.
-		"max_conns_per_host": escfg.NumWorkers(),
+		"max_conns_per_host": getTotalNumWorkers(escfg), // num_workers * len(hosts) if loadbalance is true
 
 		// Retry
 		"retry": map[string]any{
@@ -137,11 +135,14 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 			"queue_size":        getQueueSize(logger, output),
 			"block_on_overflow": true,
 			"wait_for_result":   true,
-			"num_consumers":     escfg.NumWorkers(),
+			"num_consumers":     getTotalNumWorkers(escfg), // num_workers * len(hosts) if loadbalance is true
 		},
 
 		"mapping": map[string]any{
 			"mode": "bodymap",
+		},
+		"logs_dynamic_pipeline": map[string]any{
+			"enabled": true,
 		},
 	}
 
@@ -159,8 +160,7 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 	setIfNotNil(otelYAMLCfg, "password", escfg.Password)                                         // password
 	setIfNotNil(otelYAMLCfg, "api_key", base64.StdEncoding.EncodeToString([]byte(escfg.APIKey))) // api_key
 
-	setIfNotNil(otelYAMLCfg, "headers", escfg.Headers)   // headers
-	setIfNotNil(otelYAMLCfg, "pipeline", escfg.Pipeline) // pipeline
+	setIfNotNil(otelYAMLCfg, "headers", escfg.Headers) // headers
 	// Dynamic routing is disabled if output.elasticsearch.index is set
 	setIfNotNil(otelYAMLCfg, "logs_index", escfg.Index) // index
 
@@ -171,22 +171,27 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 	return otelYAMLCfg, nil
 }
 
+func getTotalNumWorkers(escfg esToOTelOptions) int {
+	// calculate total workers
+	totalWorkers := escfg.NumWorkers()
+	if escfg.LoadBalance && len(escfg.Hosts) > 1 {
+		totalWorkers = (escfg.NumWorkers() * len(escfg.Hosts))
+	}
+	return totalWorkers
+}
+
 // log warning for unsupported config
-func checkUnsupportedConfig(cfg *config.C, logger *logp.Logger) error {
+func checkUnsupportedConfig(cfg *config.C) error {
 	if cfg.HasField("indices") {
 		return fmt.Errorf("indices is currently not supported: %w", errors.ErrUnsupported)
-	} else if cfg.HasField("pipelines") {
-		return fmt.Errorf("pipelines is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("parameters") {
 		return fmt.Errorf("parameters is currently not supported: %w", errors.ErrUnsupported)
 	} else if value, err := cfg.Bool("allow_older_versions", -1); err == nil && !value {
 		return fmt.Errorf("allow_older_versions:false is currently not supported: %w", errors.ErrUnsupported)
-	} else if cfg.HasField("loadbalance") {
-		return fmt.Errorf("loadbalance is currently not supported: %w", errors.ErrUnsupported)
+	} else if value, err := cfg.Bool("loadbalance", -1); err == nil && !value {
+		return fmt.Errorf("ladbalance:false is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("non_indexable_policy") {
 		return fmt.Errorf("non_indexable_policy is currently not supported: %w", errors.ErrUnsupported)
-	} else if cfg.HasField("escape_html") {
-		return fmt.Errorf("escape_html is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("kerberos") {
 		return fmt.Errorf("kerberos is currently not supported: %w", errors.ErrUnsupported)
 	}

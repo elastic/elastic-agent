@@ -34,7 +34,6 @@ path: /foo/bar
 username: elastic
 password: changeme
 index: "some-index"
-pipeline: "some-ingest-pipeline"
 backoff:
   init: 42s
   max: 420s
@@ -48,9 +47,10 @@ endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
 logs_index: some-index
-max_conns_per_host: 30
+logs_dynamic_pipeline:
+  enabled: true
+max_conns_per_host: 60
 password: changeme
-pipeline: some-ingest-pipeline
 retry:
   enabled: true
   initial_interval: 42s
@@ -64,7 +64,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 30
+  num_consumers: 60
   queue_size: 3200
   wait_for_result: true
 user: elastic
@@ -97,6 +97,8 @@ api_key: "TiNAGG4BaaMdaH1tRfuU:KnR6yE41RrSowb0kQ0HWoA"
 endpoints:
   - http://localhost:9200
 logs_index: some-index
+logs_dynamic_pipeline:
+  enabled: true
 retry:
   enabled: true
   initial_interval: 1s
@@ -143,6 +145,8 @@ preset: %s
 `
 
 		commonOTelCfg := `
+logs_dynamic_pipeline:
+  enabled: true    
 endpoints:
   - http://localhost:9200
 retry:
@@ -201,6 +205,8 @@ sending_queue:
 			{
 				presetName: "scale",
 				output: `
+logs_dynamic_pipeline:
+  enabled: true        
 endpoints:
   - http://localhost:9200
 retry:
@@ -293,6 +299,8 @@ index: "some-index"
 compression_level: %d`
 
 	otelConfig := `
+logs_dynamic_pipeline:
+  enabled: true 
 endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
@@ -303,7 +311,7 @@ retry:
   initial_interval: 1s
   max_interval: 1m0s
   max_retries: 3
-max_conns_per_host: 1
+max_conns_per_host: 2
 user: elastic
 sending_queue:
   batch:
@@ -313,7 +321,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
+  num_consumers: 2
   queue_size: 3200
   wait_for_result: true
 mapping:
