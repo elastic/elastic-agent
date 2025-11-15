@@ -303,9 +303,16 @@ func TestGetOtelConfig(t *testing.T) {
 			"logs_dynamic_id": map[string]any{
 				"enabled": true,
 			},
+<<<<<<< HEAD
 			"telemetry": map[string]any{
 				"log_failed_docs_input": true,
 			},
+=======
+			"logs_dynamic_pipeline": map[string]any{
+				"enabled": true,
+			},
+			"include_source_on_error": true,
+>>>>>>> 881f85d3e ([beatreceiver] support `loadbalace:true` option (#11105))
 			"auth": map[string]any{
 				"authenticator": "beatsauth/_agent-component/" + outputName,
 			},
