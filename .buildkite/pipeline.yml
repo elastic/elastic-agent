@@ -12,6 +12,18 @@ env:
   IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-1761958868"
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1761958868"
 
+common:
+  artifactory_user: &artifactory_user
+    elastic/vault-secrets#v0.1.0:
+      path: "secret/ci/elastic-elastic-agent/artifactory"
+      field: "user"
+      env_var: "ARTIFACTORY_USER"
+  artifactory_api_key: &artifactory_secret
+    elastic/vault-secrets#v0.1.0:
+      path: "secret/ci/elastic-elastic-agent/artifactory"
+      field: "api_key"
+      env_var: "ARTIFACTORY_API_KEY"
+
 steps:
   - label: "check-ci"
     key: "check-ci"
@@ -27,6 +39,9 @@ steps:
     key: "unit-tests"
     steps:
       - label: "Unit tests - Ubuntu 22.04"
+        plugins:
+        - *artifactory_user
+        - *artifactory_secret
         key: "unit-tests-2204"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         artifact_paths:
@@ -45,6 +60,9 @@ steps:
             allowed: true
 
       - label: "Unit tests - Ubuntu 22.04 with requirefips build tag"
+        plugins:
+        - *artifactory_user
+        - *artifactory_secret
         key: "unit-tests-2204-fips-tag"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         env:
@@ -65,6 +83,9 @@ steps:
             allowed: true
 
       - label: "Unit tests - fips140=only Ubuntu 22.04"
+        plugins:
+        - *artifactory_user
+        - *artifactory_secret
         key: "unit-tests-2204-fips140-only"
         # Note: The GODEBUG=fips140=only environment variable must be set in the command itself (as opposed to
         # in the env block) so that it is applied *only* to the 'go' command invoked by the script, and
@@ -88,6 +109,9 @@ steps:
             allowed: true
 
       - label: "Unit tests - Ubuntu 22.04 ARM64"
+        plugins:
+        - *artifactory_user
+        - *artifactory_secret
         key: "unit-tests-2204-arm64"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         artifact_paths:
@@ -107,6 +131,9 @@ steps:
             allowed: true
 
       - label: "Unit tests - Windows 2022"
+        plugins:
+        - *artifactory_user
+        - *artifactory_secret
         key: "unit-tests-win2022"
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
@@ -127,6 +154,9 @@ steps:
             allowed: true
 
       - label: "Unit tests - Windows 2016"
+        plugins:
+        - *artifactory_user
+        - *artifactory_secret
         key: "unit-tests-win2016"
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
@@ -150,6 +180,9 @@ steps:
     key: "macos-unit-tests"
     steps:
       - label: "Unit tests - macOS 15 ARM"
+        plugins:
+        - *artifactory_user
+        - *artifactory_secret
         command: ".buildkite/scripts/steps/unit-tests.sh"
         artifact_paths:
           - "build/TEST-*.html"
@@ -167,6 +200,9 @@ steps:
 
       # Runs only on main and release branches
       - label: "Unit tests - macOS 13"
+        plugins:
+        - *artifactory_user
+        - *artifactory_secret
         command: ".buildkite/scripts/steps/unit-tests.sh"
         branches: "main 8.* 9.*"
         artifact_paths:
@@ -187,6 +223,9 @@ steps:
     key: "extended-windows"
     steps:
       - label: "Unit tests - Windows 10"
+        plugins:
+        - *artifactory_user
+        - *artifactory_secret
         key: "unit-tests-win10"
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
@@ -206,6 +245,9 @@ steps:
             allowed: true
 
       - label: "Unit tests - Windows 11"
+        plugins:
+        - *artifactory_user
+        - *artifactory_secret
         key: "unit-tests-win11"
         command: .buildkite/scripts/steps/unit-tests.ps1
         artifact_paths:
