@@ -1490,7 +1490,7 @@ outputs:
   default:
     type: elasticsearch
 inputs:
-  - id: ${TEST_VAR}
+  - id: ${TEST_VAR|?}
     type: filestream
     use_output: default
 `)

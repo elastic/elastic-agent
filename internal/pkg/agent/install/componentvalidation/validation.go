@@ -34,7 +34,7 @@ func EnsureNoServiceComponentIssues() error {
 	}
 	// this forces the component calculation to always compute with no root
 	// this allows any runtime preventions to error for a component when it has a no root support
-	comps, err := GetComponentsFromPolicy(ctx, l, paths.ConfigFile(), 0, forceNonRoot)
+	comps, err := GetComponentsFromPolicy(ctx, l, paths.ConfigFile(), 0, true, forceNonRoot)
 	if err != nil {
 		return fmt.Errorf("failed to create component model from policy: %w", err)
 	}
@@ -68,7 +68,7 @@ func forceNonRoot(detail component.PlatformDetail) component.PlatformDetail {
 	return detail
 }
 
-func GetComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath string, variablesWait time.Duration, platformModifiers ...component.PlatformModifier) ([]component.Component, error) {
+func GetComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath string, variablesWait time.Duration, allowMissingVars bool, platformModifiers ...component.PlatformModifier) ([]component.Component, error) {
 	// Load the requirements before trying to load the configuration. These should always load
 	// even if the configuration is wrong.
 	platform, err := component.LoadPlatformDetail(platformModifiers...)
@@ -85,7 +85,7 @@ func GetComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath stri
 		return nil, fmt.Errorf("error checking for root/Administrator privileges: %w", err)
 	}
 
-	m, otel, lvl, err := GetConfigWithVariables(ctx, l, cfgPath, variablesWait, !isAdmin)
+	m, otel, lvl, err := GetConfigWithVariables(ctx, l, cfgPath, variablesWait, !isAdmin, allowMissingVars)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func GetMonitoringFn(ctx context.Context, logger *logger.Logger, cfg map[string]
 	return monitor.MonitoringConfig, nil
 }
 
-func GetConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath string, timeout time.Duration, unprivileged bool) (map[string]interface{}, *confmap.Conf, logp.Level, error) {
+func GetConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath string, timeout time.Duration, unprivileged bool, allowMissingVars bool) (map[string]interface{}, *confmap.Conf, logp.Level, error) {
 
 	cfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true, unprivileged)
 	if err != nil {
@@ -157,7 +157,7 @@ func GetConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath strin
 	// Render the inputs using the discovered inputs.
 	inputs, ok := transpiler.Lookup(ast, "inputs")
 	if ok {
-		renderedInputs, err := transpiler.RenderInputs(inputs, vars)
+		renderedInputs, err := transpiler.RenderInputs(inputs, vars, allowMissingVars)
 		if err != nil {
 			return nil, nil, lvl, fmt.Errorf("rendering inputs failed: %w", err)
 		}
