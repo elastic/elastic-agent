@@ -657,8 +657,8 @@ func restartAgentNTimes(t *testing.T, noOfRestarts int, sleepBetweenIterations t
 
 	for restartIdx := 0; restartIdx < noOfRestarts; restartIdx++ {
 		time.Sleep(sleepBetweenIterations)
-
 		t.Logf("Stopping agent via service to simulate crashing")
+		stopRequested := time.Now()
 		err := install.StopService(topPath, install.DefaultStopTimeout, install.DefaultStopInterval)
 		if err != nil && runtime.GOOS == define.Windows && strings.Contains(err.Error(), "The service has not been started.") {
 			// Due to the quick restarts every 10 seconds its possible that this is faster than Windows
@@ -678,10 +678,11 @@ func restartAgentNTimes(t *testing.T, noOfRestarts int, sleepBetweenIterations t
 			}
 			return status != service.StatusRunning
 		}, 5*time.Minute, 1*time.Second, "service never fully stopped (status: %v): %s", status, statusErr)
-		t.Logf("Stopped agent via service to simulate crashing")
+		t.Logf("Stopped agent via service. Took roughly %s", time.Since(stopRequested))
 
 		// start it again
 		t.Logf("Starting agent via service to simulate crashing")
+		startRequested := time.Now()
 		err = install.StartService(topPath)
 		require.NoError(t, err)
 
@@ -693,6 +694,6 @@ func restartAgentNTimes(t *testing.T, noOfRestarts int, sleepBetweenIterations t
 			}
 			return status == service.StatusRunning
 		}, 5*time.Minute, 1*time.Second, "service never fully started (status: %v): %s", status, statusErr)
-		t.Logf("Started agent via service to simulate crashing")
+		t.Logf("Started agent after stopping to simulate crashing. Took roughly %s", time.Since(startRequested))
 	}
 }
