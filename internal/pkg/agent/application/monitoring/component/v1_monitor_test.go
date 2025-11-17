@@ -42,7 +42,10 @@ func TestMonitoringFull(t *testing.T) {
 			},
 		},
 		"outputs": map[string]any{
-			"default": map[string]any{},
+			"default": map[string]any{
+				"hosts": []string{"localhost:9200"},
+				"type":  "elasticsearch",
+			},
 		},
 	}
 
@@ -991,7 +994,10 @@ func TestMonitoringWithOtelRuntime(t *testing.T) {
 					},
 				},
 				"outputs": map[string]any{
-					"default": map[string]any{},
+					"default": map[string]any{
+						"hosts": []string{"localhost:9200"},
+						"type":  "elasticsearch",
+					},
 				},
 			}
 
@@ -1133,4 +1139,117 @@ agent.monitoring:
 
 	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, true)
 	assert.Equal(t, beatsMonitor.config.C.MonitorMetrics, true)
+}
+
+func TestMonitoringConfigOtelOutputSupport(t *testing.T) {
+	agentInfo, err := info.NewAgentInfo(context.Background(), false)
+	require.NoError(t, err, "Error creating agent info")
+
+	testCases := []struct {
+		name                       string
+		outputConfig               map[string]any
+		expectPrometheusMonitoring bool
+		monitoringRuntimeManager   string
+	}{
+		{
+			name: "kafka output - should NOT have prometheus monitoring",
+			outputConfig: map[string]any{
+				"type":  "kafka",
+				"hosts": []string{"localhost:9092"},
+			},
+			expectPrometheusMonitoring: false,
+			monitoringRuntimeManager:   monitoringcfg.ProcessRuntimeManager,
+		},
+		{
+			name: "elasticsearch output - should have prometheus monitoring",
+			outputConfig: map[string]any{
+				"type":  "elasticsearch",
+				"hosts": []string{"localhost:9200"},
+			},
+			expectPrometheusMonitoring: true,
+			monitoringRuntimeManager:   monitoringcfg.OtelRuntimeManager,
+		},
+		{
+			name: "elasticsearch with unsupported config - should NOT have prometheus monitoring",
+			outputConfig: map[string]any{
+				"type":    "elasticsearch",
+				"hosts":   []string{"localhost:9200"},
+				"indices": []any{},
+			},
+			expectPrometheusMonitoring: false,
+			monitoringRuntimeManager:   monitoringcfg.ProcessRuntimeManager,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testMon := BeatsMonitor{
+				enabled: true,
+				config: &monitoringConfig{
+					C: &monitoringcfg.MonitoringConfig{
+						Enabled:        true,
+						MonitorMetrics: true,
+						MonitorLogs:    false,
+						HTTP: &monitoringcfg.MonitoringHTTPConfig{
+							Enabled: false,
+						},
+						RuntimeManager: monitoringcfg.OtelRuntimeManager,
+					},
+				},
+				agentInfo: agentInfo,
+			}
+
+			policy := map[string]any{
+				"agent": map[string]any{
+					"monitoring": map[string]any{
+						"metrics": true,
+						"http": map[string]any{
+							"enabled": false,
+						},
+					},
+				},
+				"outputs": map[string]any{
+					"default": tc.outputConfig,
+				},
+			}
+
+			// Add a component that uses the OTel runtime to trigger prometheus monitoring
+			components := []component.Component{
+				{
+					ID: "filestream-otel",
+					InputSpec: &component.InputRuntimeSpec{
+						BinaryName: "filebeat",
+						Spec: component.InputSpec{
+							Command: &component.CommandSpec{
+								Name: "filebeat",
+							},
+						},
+					},
+					RuntimeManager: component.OtelRuntimeManager,
+				},
+			}
+
+			outCfg, err := testMon.MonitoringConfig(policy, components, map[string]uint64{})
+			require.NoError(t, err)
+
+			// Check for prometheus/metrics input
+			inputs := outCfg["inputs"].([]any)
+			foundPrometheusInput := false
+			for _, input := range inputs {
+				var inputStruct struct {
+					ID      string `mapstructure:"id"`
+					Type    string `mapstructure:"type"`
+					Runtime string `mapstructure:"_runtime_experimental"`
+				}
+				require.NoError(t, mapstructure.Decode(input, &inputStruct))
+				foundPrometheusInput = foundPrometheusInput || inputStruct.Type == "prometheus/metrics"
+				assert.Equalf(t, tc.monitoringRuntimeManager, inputStruct.Runtime,
+					"expected monitoring runtime manager %s for input %s, got %s",
+					tc.monitoringRuntimeManager, inputStruct.ID, inputStruct.Runtime)
+			}
+
+			assert.Equal(t, tc.expectPrometheusMonitoring, foundPrometheusInput,
+				"Prometheus monitoring presence mismatch for output type")
+		})
+	}
 }
