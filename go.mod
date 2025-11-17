@@ -99,7 +99,7 @@ require (
 	go.opentelemetry.io/collector/confmap/provider/envprovider v1.45.0 // indirect
 	go.opentelemetry.io/collector/confmap/provider/fileprovider v1.45.0 // indirect
 	go.opentelemetry.io/collector/confmap/provider/httpprovider v1.45.0 // indirect
-	go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.43.0 // indirect
+	go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.45.0 // indirect
 	go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.45.0 // indirect
 	go.opentelemetry.io/collector/connector v0.139.0 // indirect
 	go.opentelemetry.io/collector/exporter v1.45.0 // indirect
