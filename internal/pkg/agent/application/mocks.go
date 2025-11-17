@@ -9,8 +9,9 @@
 package application
 
 import (
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	mock "github.com/stretchr/testify/mock"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 )
 
 // newMockRollbacksSource creates a new instance of mockRollbacksSource. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
