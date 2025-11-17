@@ -243,8 +243,8 @@ github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPd
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
 github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 h1:DklsrG3dyBCFEj5IhUbnKptjxatkF07cF2ak3yi77so=
 github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2/go.mod h1:WaHUgvxTVq04UNunO+XhnAqY/wQc+bxr74GqbsZ/Jqw=
-github.com/aws/aws-lambda-go v1.49.0 h1:z4VhTqkFZPM3xpEtTqWqRqsRH4TZBMJqTkRiBPYLqIQ=
-github.com/aws/aws-lambda-go v1.49.0/go.mod h1:dpMpZgvWx5vuQJfBt0zqBha60q7Dd7RfgJv23DymV8A=
+github.com/aws/aws-lambda-go v1.50.0 h1:0GzY18vT4EsCvIyk3kn3ZH5Jg30NRlgYaai1w0aGPMU=
+github.com/aws/aws-lambda-go v1.50.0/go.mod h1:dpMpZgvWx5vuQJfBt0zqBha60q7Dd7RfgJv23DymV8A=
 github.com/aws/aws-msk-iam-sasl-signer-go v1.0.4 h1:2jAwFwA0Xgcx94dUId+K24yFabsKYDtAhCgyMit6OqE=
 github.com/aws/aws-msk-iam-sasl-signer-go v1.0.4/go.mod h1:MVYeeOhILFFemC/XlYTClvBjYZrg/EPd3ts885KrNTI=
 github.com/aws/aws-sdk-go-v2 v1.39.4 h1:qTsQKcdQPHnfGYBBs+Btl8QwxJeoWcOcPcixK90mRhg=
@@ -1220,8 +1220,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokena
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.139.0/go.mod h1:SpIy4uzTAvb2py2eh2Xg/yDRFX0AZDykAHiT4WzPQHo=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding v0.139.0 h1:1QFqedMedvZsRpmQaO5oWr5pJi7+3i5OwEM+IAP/Tkk=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding v0.139.0/go.mod h1:9mpukHt/0N6vy/8/gvI6+bg6I2dLd2LR1mT0kDVKPNs=
-github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/awslogsencodingextension v0.137.0 h1:4D1EX2uesc8upD6CnpiB5z5cMzQgno3D3kGnP1jcS4Y=
-github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/awslogsencodingextension v0.137.0/go.mod h1:Cyd89KD73XpK9btCkN+gX0iP2Ma6ZDSM0iU5S1g61Ic=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/awslogsencodingextension v0.139.0 h1:fwokMIFrk3UygH+7r5hVyG6RazxnCL9QZ/JFY4Iwlps=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/awslogsencodingextension v0.139.0/go.mod h1:D2zMKOgTBDenXsoRyLBqgJ5ITIfMlbwGdMouKKCrvl8=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/otlpencodingextension v0.139.0 h1:vZ7KJwUsS/nwZLc//vByccWV2xOOmkrLcQ4PchYwY+k=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/otlpencodingextension v0.139.0/go.mod h1:5aszmchJt3fNr1eWTZUD+NItZmNbltOpP7flOcVc+5Q=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/headerssetterextension v0.139.0 h1:xaZsP6s0TRQRgly/kBCJvputnLmE781MuWEXkBL+Wa8=
