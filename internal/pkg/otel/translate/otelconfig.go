@@ -58,15 +58,8 @@ var (
 		"log",
 		"winlog",
 	}
-	OtelSupportedMetricbeatInputTypes = []string{
-		"beat/metrics",
-		"http/metrics",
-		"kubernetes/metrics",
-		"linux/metrics",
-		"prometheus/metrics",
-		"system/metrics",
-	}
-	OtelSupportedInputTypes          = slices.Concat(OtelSupportedFilebeatInputTypes, OtelSupportedMetricbeatInputTypes)
+
+	OtelSupportedInputTypes          = OtelSupportedFilebeatInputTypes
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
 		otelcomponent.MustNewType("elasticsearch"): translateEsOutputToExporter,
 	}
@@ -132,7 +125,9 @@ func VerifyComponentIsOtelSupported(comp *component.Component) error {
 		return fmt.Errorf("unsupported output type: %s", comp.OutputType)
 	}
 
-	if !slices.Contains(OtelSupportedInputTypes, comp.InputType) {
+	// check if given input is supported in OTel runtime
+	// this includes all metricbeat inputs and some filebeat inputs for now
+	if !slices.Contains(OtelSupportedInputTypes, comp.InputType) && !strings.HasSuffix(comp.InputType, "/metrics") {
 		return fmt.Errorf("unsupported input type: %s", comp.InputType)
 	}
 
