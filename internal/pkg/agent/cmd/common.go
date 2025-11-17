@@ -12,6 +12,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	edotCmd "github.com/elastic/elastic-agent/internal/edot/cmd"
+
 	// import logp flags
 	_ "github.com/elastic/elastic-agent-libs/logp/configure"
 
@@ -94,7 +96,7 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.AddCommand(newDiagnosticsCommand(args, streams))
 	cmd.AddCommand(newComponentCommandWithArgs(args, streams))
 	cmd.AddCommand(newLogsCommandWithArgs(args, streams))
-	cmd.AddCommand(newOtelCommandWithArgs(args, streams))
+	cmd.AddCommand(edotCmd.NewOtelCommandWithArgs(args, streams))
 
 	// windows special hidden sub-command (only added on Windows)
 	reexec := newReExecWindowsCommand(args, streams)
