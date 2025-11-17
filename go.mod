@@ -26,9 +26,9 @@ require (
 	github.com/elastic/go-sysinfo v1.15.4
 	github.com/elastic/go-ucfg v0.8.9-0.20250307075119-2a22403faaea
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
-	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.20.0
-	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.8.0
-	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.8.0
+	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.7.0
+	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.5.0
+	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.7.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.17.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.10.0
 	github.com/fatih/color v1.18.0
@@ -78,10 +78,10 @@ require (
 	go.elastic.co/apm/v2 v2.7.1
 	go.elastic.co/ecszap v1.0.3
 	go.elastic.co/go-licence-detector v0.7.0
-	go.opentelemetry.io/collector/component/componentstatus v0.138.0
+	go.opentelemetry.io/collector/component/componentstatus v0.135.0
 	go.opentelemetry.io/collector/component/componenttest v0.138.0
 	go.opentelemetry.io/collector/connector/forwardconnector v0.135.0
-	go.opentelemetry.io/collector/extension/extensiontest v0.137.0
+	go.opentelemetry.io/collector/extension/extensiontest v0.135.0
 	go.opentelemetry.io/collector/pipeline v1.44.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.135.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.135.0
