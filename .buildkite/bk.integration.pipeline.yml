@@ -12,8 +12,8 @@ env:
   IMAGE_RHEL_10: "platform-ingest-elastic-agent-rhel-10-1762801856"
   IMAGE_DEBIAN_11: "platform-ingest-elastic-agent-debian-11-1762801856"
   IMAGE_DEBIAN_13: "platform-ingest-elastic-agent-debian-13-1762801856"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1761958868"
-  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1761958868"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1762801856"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1762801856"
   ASDF_TERRAFORM_VERSION: 1.9.2
 
 # This section is used to define the plugins that will be used in the pipeline.
