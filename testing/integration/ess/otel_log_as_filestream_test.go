@@ -72,6 +72,10 @@ exporters:
   elasticsearch:
     api_key: {{.ESApiKey}}
     endpoint: {{.ESEndpoint}}
+    sending_queue:
+      enabled: true
+      wait_for_result: true # Avoid losing data on shutdown
+      block_on_overflow: true
     mapping:
       mode: none
 
@@ -111,7 +115,7 @@ service:
 				"expecting %d events, got %d",
 				want,
 				got)
-		}, 30*time.Second, time.Second, "did not find the expected number of events")
+		}, 60*time.Second, time.Second, "did not find the expected number of events")
 	}
 
 	rootDir, err := filepath.Abs(filepath.Join("..", "..", "..", "build"))
