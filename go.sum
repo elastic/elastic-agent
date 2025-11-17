@@ -327,8 +327,8 @@ github.com/bboreham/go-loser v0.0.0-20230920113527-fcc2c21820a3 h1:6df1vn4bBlDDo
 github.com/bboreham/go-loser v0.0.0-20230920113527-fcc2c21820a3/go.mod h1:CIWtjkly68+yqLPbvwwR/fjNJA/idrtULjZWh2v1ys0=
 github.com/beevik/ntp v1.4.3 h1:PlbTvE5NNy4QHmA4Mg57n7mcFTmr1W1j3gcK7L1lqho=
 github.com/beevik/ntp v1.4.3/go.mod h1:Unr8Zg+2dRn7d8bHFuehIMSvvUYssHMxW3Q5Nx4RW5Q=
-github.com/belimawr/beats/v7 v7.0.0-alpha2.0.20251113165107-c90e90cb0a8c h1:vKLWg1qZ7gmTpl07M/+FR5X6LwraPnRIjEdeci7dozs=
-github.com/belimawr/beats/v7 v7.0.0-alpha2.0.20251113165107-c90e90cb0a8c/go.mod h1:w0cm93er1O75o3byGAt6vzfmAVdHJaco4/gFJ2DtnWo=
+github.com/belimawr/beats/v7 v7.0.0-alpha2.0.20251114165358-f06437940a8a h1:YGIcv5zcGb2yIYLv+6FUeqfOeKGdEHng1Uz4SvRGaSQ=
+github.com/belimawr/beats/v7 v7.0.0-alpha2.0.20251114165358-f06437940a8a/go.mod h1:c8O8MuFlYOkEbT1qdC/iaiTHD2u2mCrCJZtkl4+shTg=
 github.com/benbjohnson/clock v1.3.5 h1:VvXlSJBzZpA/zum6Sj74hxwYI2DIxRWuNIoXAzHZz5o=
 github.com/benbjohnson/clock v1.3.5/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
