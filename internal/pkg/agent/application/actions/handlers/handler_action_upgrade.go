@@ -61,7 +61,6 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 
 	uOpts := []coordinator.UpgradeOpt{
 		coordinator.WithRollback(action.Data.Rollback),
-		coordinator.WithSkipVerifyOverride(true), // FIXME this is only for testing, remove before merging
 	}
 	if h.tamperProtectionFn() {
 		// Find inputs that want to receive UPGRADE action

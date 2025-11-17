@@ -12,6 +12,7 @@ import (
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -77,6 +78,10 @@ type stateStore interface {
 	Action() fleetapi.Action
 }
 
+type rollbacksSource interface {
+	Get() (map[string]ttl.TTLMarker, error)
+}
+
 type FleetGateway struct {
 	log                *logger.Logger
 	client             client.Sender
@@ -90,18 +95,11 @@ type FleetGateway struct {
 	stateFetcher       StateFetcher
 	errCh              chan error
 	actionCh           chan []fleetapi.Action
+	rollbackSource     rollbacksSource
 }
 
 // New creates a new fleet gateway
-func New(
-	log *logger.Logger,
-	agentInfo agentInfo,
-	client client.Sender,
-	acker acker.Acker,
-	stateStore stateStore,
-	stateFetcher StateFetcher,
-	cfg configuration.FleetCheckin,
-) (*FleetGateway, error) {
+func New(log *logger.Logger, agentInfo agentInfo, client client.Sender, acker acker.Acker, stateStore stateStore, stateFetcher StateFetcher, cfg configuration.FleetCheckin, source rollbacksSource) (*FleetGateway, error) {
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	st := defaultGatewaySettings
 	st.Backoff = getBackoffSettings(cfg)
@@ -114,30 +112,23 @@ func New(
 		acker,
 		stateStore,
 		stateFetcher,
+		source,
 	)
 }
 
-func newFleetGatewayWithScheduler(
-	log *logger.Logger,
-	settings *fleetGatewaySettings,
-	agentInfo agentInfo,
-	client client.Sender,
-	scheduler scheduler.Scheduler,
-	acker acker.Acker,
-	stateStore stateStore,
-	stateFetcher StateFetcher,
-) (*FleetGateway, error) {
+func newFleetGatewayWithScheduler(log *logger.Logger, settings *fleetGatewaySettings, agentInfo agentInfo, client client.Sender, scheduler scheduler.Scheduler, acker acker.Acker, stateStore stateStore, stateFetcher StateFetcher, source rollbacksSource) (*FleetGateway, error) {
 	return &FleetGateway{
-		log:          log,
-		client:       client,
-		settings:     settings,
-		agentInfo:    agentInfo,
-		scheduler:    scheduler,
-		acker:        acker,
-		stateFetcher: stateFetcher,
-		stateStore:   stateStore,
-		errCh:        make(chan error),
-		actionCh:     make(chan []fleetapi.Action, 1),
+		log:            log,
+		client:         client,
+		settings:       settings,
+		agentInfo:      agentInfo,
+		scheduler:      scheduler,
+		acker:          acker,
+		stateFetcher:   stateFetcher,
+		stateStore:     stateStore,
+		errCh:          make(chan error),
+		actionCh:       make(chan []fleetapi.Action, 1),
+		rollbackSource: source,
 	}, nil
 }
 
@@ -376,6 +367,29 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	agentPolicyID := getPolicyID(action)
 	policyRevisionIDX := getPolicyRevisionIDX(action)
 
+	// get available rollbacks
+	rollbacks, err := f.rollbackSource.Get()
+	if err != nil {
+		f.log.Warnf("error getting available rollbacks: %s", err.Error())
+		// this should already be nil but let's make sure that we don't include rollbacks in checkin body when encountering errors
+		rollbacks = nil
+	}
+
+	var validRollbacks []fleetapi.CheckinRollback
+	if len(rollbacks) > 0 {
+		now := time.Now()
+		validRollbacks = make([]fleetapi.CheckinRollback, 0, len(rollbacks))
+		for _, rollback := range rollbacks {
+			if rollback.ValidUntil.After(now) {
+				// map the `ttl.Marker` to the `fleetapi.CheckinRollback`
+				validRollbacks = append(validRollbacks, fleetapi.CheckinRollback{
+					Version:    rollback.Version,
+					ValidUntil: rollback.ValidUntil,
+				})
+			}
+		}
+	}
+
 	// checkin
 	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client)
 	req := &fleetapi.CheckinRequest{
@@ -387,6 +401,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 		UpgradeDetails:    state.UpgradeDetails,
 		AgentPolicyID:     agentPolicyID,
 		PolicyRevisionIDX: policyRevisionIDX,
+		Rollbacks:         validRollbacks,
 	}
 
 	resp, took, err := cmd.Execute(stateCtx, req)
