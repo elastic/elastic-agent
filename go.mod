@@ -815,4 +815,4 @@ replace (
 // Needed to prevent https://github.com/open-telemetry/opentelemetry-go/issues/7039
 replace go.opentelemetry.io/otel/exporters/prometheus => go.opentelemetry.io/otel/exporters/prometheus v0.58.0
 
-replace github.com/elastic/beats/v7 => github.com/belimawr/beats/v7 v7.0.0-alpha2.0.20251114133743-0055a078bd86
+replace github.com/elastic/beats/v7 => github.com/belimawr/beats/v7 v7.0.0-alpha2.0.20251117171939-0c199b56a7dc
