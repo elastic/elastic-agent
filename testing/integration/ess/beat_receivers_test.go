@@ -1444,7 +1444,7 @@ agent.logging.stderr: true
 
 			assert.GreaterOrEqual(ct, monitoringDoc.Hits.Total.Value, 1)
 		},
-		2*time.Second, 5*time.Second,
+		2*time.Minute, 5*time.Second,
 		"Expected at least %d log, got %d", 1, monitoringDoc.Hits.Total.Value)
 
 	// assert that error.reason is not part of monitoring logs
