@@ -1,6 +1,6 @@
 ---
 navigation_title: Kubelet stats receiver
-description: The Kubelet stats receiver is an OpenTelemetry Collector component that collects node, pod, container, and volume resource metrics from the Kubernetes Kubelet using the `kubeletstats` receiver.
+description: The Kubelet stats receiver is an OpenTelemetry Collector component that collects node, pod, container, and volume resource metrics from the Kubernetes Kubelet.
 applies_to:
   stack:
   serverless:
@@ -19,7 +19,7 @@ The Kubelet stats receiver collects Kubernetes node, pod, container, and volume 
 
 This receiver queries the Kubelet’s `/stats/summary` endpoint and converts the retrieved usage statistics into OpenTelemetry metrics.
 
-For the upstream component documentation, see the [kubeletstatsreceiver README](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/kubeletstatsreceiver).
+For the contrib component documentation, see the [kubeletstatsreceiver README](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/kubeletstatsreceiver).
 
 ## Typical use cases
 
@@ -77,7 +77,7 @@ The following configuration parameters determine how the Kubelet stats receiver 
 | `metric_groups` | Controls which metric groups to collect (`node`, `pod`, `container`, `volume`). |
 | `insecure_skip_verify` | Whether to skip TLS certificate verification. For production, configure proper TLS if possible. |
 
-For all available settings, refer to the [upstream configuration documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/kubeletstatsreceiver#configuration).
+For all available settings, refer to the [contrib configuration documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/kubeletstatsreceiver#configuration).
 
 ## How it works in the EDOT Collector
 
@@ -87,7 +87,7 @@ In EDOT, the Kubelet stats receiver is typically used when:
 * You want per-node and per-pod usage metrics without installing additional agents.
 * The `kubernetes` or `system` metrics pipelines need pod-level resource context.
 
-EDOT applies no custom modifications to the upstream receiver (its behavior is identical to upstream). It is pre-included and validated as supported within the EDOT distribution.
+EDOT applies no custom modifications to the contrib receiver (its behavior is identical to contrib). It is pre-included and validated as supported within the EDOT distribution.
 
 ## Example: Collect node and pod metrics in Kubernetes
 
