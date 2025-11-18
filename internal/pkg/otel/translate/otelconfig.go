@@ -23,6 +23,7 @@ import (
 	"go.opentelemetry.io/collector/pipeline"
 	"golang.org/x/exp/maps"
 
+	"github.com/elastic/beats/v7/libbeat/common/transport/kerberos"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
 	"github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
@@ -620,7 +621,7 @@ func BeatDataPath(componentId string) string {
 // currently this is only supported for elasticsearch output
 func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 
-	defaultSettings := beatsAuthDefaultConfig
+	defaultAuthSettings := beatsAuthDefaultConfig
 
 	var resultMap map[string]any
 	if err := outputCfg.Unpack(&resultMap); err != nil {
@@ -628,7 +629,7 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 	}
 
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		Result:          &defaultSettings,
+		Result:          &defaultAuthSettings,
 		TagName:         "config",
 		SquashTagOption: "inline",
 		DecodeHook:      cfgDecodeHookFunc(),
@@ -641,15 +642,15 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 		return nil, err
 	}
 
-	newConfig, err := config.NewConfigFrom(defaultSettings)
+	newConfig, err := config.NewConfigFrom(defaultAuthSettings)
 	if err != nil {
 		return nil, err
 	}
 
 	// proxy_url on newConfig is of type url.URL. Beatsauth extension expects it to be of string type instead
 	// this logic here converts url.URL to string type similar to what a user would set on filebeat config
-	if defaultSettings.Transport.Proxy.URL != nil {
-		err = newConfig.SetString("proxy_url", -1, defaultSettings.Transport.Proxy.URL.String())
+	if defaultAuthSettings.Transport.Proxy.URL != nil {
+		err = newConfig.SetString("proxy_url", -1, defaultAuthSettings.Transport.Proxy.URL.String())
 		if err != nil {
 			return nil, fmt.Errorf("error settingg proxy url:%w ", err)
 		}
@@ -669,16 +670,10 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 }
 
 var beatsAuthDefaultConfig = beatsAuthConfig{
-	Transport:   elasticsearch.ESDefaultTransportSettings(),
-	LoadBalance: true,
-	Path:        "",
-	Protocol:    "http",
+	Transport: elasticsearch.ESDefaultTransportSettings(),
 }
 
 type beatsAuthConfig struct {
-	Transport   httpcommon.HTTPTransportSettings `config:",inline"`
-	LoadBalance bool                             `config:"loadbalance"`
-	Endpoints   []string                         `config:"hosts"`
-	Path        string                           `config:"path"`
-	Protocol    string                           `config:"protocol"`
+	Transport httpcommon.HTTPTransportSettings `config:",inline"`
+	Kerberos  *kerberos.Config                 `config:"kerberos"`
 }
