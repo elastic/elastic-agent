@@ -18,13 +18,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const binaryName = "otelcol"
+// binaryName is the name of the executable to run
+// This temporarily has a '-component' prefix because the Elastic Agent can be build in two ways and this
+// allows this to work with the way Elastic Agent is packaged without large changes that will be removed
+// in the future once this becomes the default way.
+const binaryName = "otelcol-component.exe"
 
 func newOtelCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 	return &cobra.Command{
-		Use: "otel",
+		Use:                "otel",
+		DisableFlagParsing: true,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			executable := filepath.Join(paths.Components(), binaryName)
+			executable := filepath.Join(paths.Home(), binaryName)
 			cmd := exec.Command(executable, os.Args[2:]...)
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr

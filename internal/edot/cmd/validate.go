@@ -33,9 +33,6 @@ func newValidateCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 	origHelpFunc := cmd.HelpFunc()
 	cmd.SetHelpFunc(func(c *cobra.Command, s []string) {
 		hideInheritedFlags(c)
-		if c.HasParent() {
-			c.Parent().HelpFunc()(c, s)
-		}
 		origHelpFunc(c, s)
 	})
 
