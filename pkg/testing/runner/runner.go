@@ -277,8 +277,10 @@ func (r *Runner) runK8sInstances(ctx context.Context, instances []StateInstance)
 		// run the actual tests on the host
 		result, runErr := batch.OS.Runner.Run(ctx, r.cfg.VerboseMode, nil, logger, r.cfg.AgentVersion, prefix, batch.Batch, env)
 		if runErr != nil {
-			logger.Logf("Failed to execute tests on instance: %s", err)
-			err = fmt.Errorf("failed to execute tests on instance %s: %w", instance.Name, err)
+			logger.Logf("Failed to execute tests on instance: %s",
+				runErr)
+			err = fmt.Errorf("failed to execute tests on instance %s: %w",
+				instance.Name, runErr)
 		}
 		resultsMx.Lock()
 		results[batch.ID] = result

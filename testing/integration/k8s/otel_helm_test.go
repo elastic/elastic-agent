@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
@@ -183,14 +184,17 @@ func k8sStepHelmDeployWithValueOptions(chartPath string, releaseName string, val
 // k8sStepCheckRunningPods checks the status of the agent inside the pods returned by the selector
 func k8sStepCheckRunningPods(podLabelSelector string, expectedPodNumber int, containerName string) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		require.Eventually(t, func() bool {
+		require.EventuallyWithTf(t, func(t *assert.CollectT) {
 			perNodePodList := &corev1.PodList{}
 			err := kCtx.client.Resources(namespace).List(ctx, perNodePodList, func(opt *metav1.ListOptions) {
 				opt.LabelSelector = podLabelSelector
 			})
 			require.NoError(t, err, "failed to list pods with selector ", perNodePodList)
-			checkedAgentContainers := 0
 
+			require.Greaterf(t, len(perNodePodList.Items), 0,
+				"no pod found for label selector %q", podLabelSelector)
+
+			checkedAgentContainers := 0
 			for _, pod := range perNodePodList.Items {
 				if pod.Status.Phase != corev1.PodRunning {
 					continue
@@ -206,14 +210,23 @@ func k8sStepCheckRunningPods(podLabelSelector string, expectedPodNumber int, con
 					}
 				}
 			}
-			return checkedAgentContainers >= expectedPodNumber
-		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least %d agent containers should be checked", expectedPodNumber))
+
+			require.GreaterOrEqualf(t, checkedAgentContainers, expectedPodNumber,
+				"at least %d agent containers with name %q should be checked",
+				expectedPodNumber, containerName)
+		}, 5*time.Minute, 10*time.Second, fmt.Sprintf(
+			"at least %d agent containers with name %q should be checked",
+			expectedPodNumber, containerName))
 	}
 }
 
 func k8sStepDeployJavaApp() k8sTestStep {
+	return k8sStepDeployApp("java_app.yaml")
+}
+
+func k8sStepDeployApp(manifest string) func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		javaApp, err := os.ReadFile(filepath.Join("testdata", "java_app.yaml"))
+		javaApp, err := os.ReadFile(filepath.Join("testdata", manifest))
 		require.NoError(t, err)
 
 		objects, err := testK8s.LoadFromYAML(bufio.NewReader(bytes.NewReader(javaApp)))
@@ -228,11 +241,15 @@ func k8sStepDeployJavaApp() k8sTestStep {
 // are created and documents being written
 func k8sStepCheckDatastreamsHits(info *define.Info, dsType, dataset, datastreamNamespace string) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		require.Eventually(t, func() bool {
+		require.EventuallyWithT(t, func(t *assert.CollectT) {
 			query := queryK8sNamespaceDataStream(dsType, dataset, datastreamNamespace, namespace)
+
 			docs, err := estools.PerformQueryForRawQuery(ctx, query, fmt.Sprintf(".ds-%s*", dsType), info.ESClient)
 			require.NoError(t, err, "failed to get %s datastream documents", fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace))
-			return docs.Hits.Total.Value > 0
-		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least one document should be available for %s datastream", fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace)))
+			require.Greater(t, docs.Hits.Total.Value, 0,
+				fmt.Sprintf("at least one document should be available for %s datastream",
+					fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace)))
+		}, 5*time.Second, 10*time.Second, fmt.Sprintf("no documets found on datastream %s",
+			fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace)))
 	}
 }
