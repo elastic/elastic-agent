@@ -13,9 +13,10 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/spf13/cobra"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/spf13/cobra"
 )
 
 // binaryName is the name of the executable to run
