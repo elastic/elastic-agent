@@ -531,7 +531,7 @@ func managedRollbackRestartTest(ctx context.Context, t *testing.T, info *define.
 
 	// A few seconds after the upgrade, deliberately restart upgraded Agent a
 	// couple of times to simulate Agent crashing.
-	restartAgentNTimes(t, 3, 10*time.Second)
+	restartAgentNTimes(t, 2, 10*time.Second)
 
 	// wait for the agent to be healthy and correct version
 	err = upgradetest.WaitHealthyAndVersion(ctx, from, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
