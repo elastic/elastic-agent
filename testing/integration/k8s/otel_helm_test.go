@@ -166,19 +166,24 @@ func TestOtelKubeStackHelm(t *testing.T) {
 
 func k8sStepHelmDeployWithValueOptions(chartPath string, releaseName string, values values.Options) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		// Initialize a map to hold the parsed data
-		helmValues := make(map[string]any)
-
-		settings := cli.New()
-		settings.SetNamespace(namespace)
-		providers := getter.All(settings)
-		helmValues, err := values.MergeValues(providers)
-		if err != nil {
-			require.NoError(t, err, "failed to helm values")
-		}
+		helmValues := mergeValues(t, namespace, values)
 
 		k8sStepHelmDeploy(chartPath, releaseName, helmValues)(t, ctx, kCtx, namespace)
 	}
+}
+
+func mergeValues(t *testing.T, namespace string, values values.Options) map[string]any {
+	// Initialize a map to hold the parsed data
+	helmValues := make(map[string]any)
+
+	settings := cli.New()
+	settings.SetNamespace(namespace)
+	providers := getter.All(settings)
+	helmValues, err := values.MergeValues(providers)
+	if err != nil {
+		require.NoError(t, err, "failed to helm values")
+	}
+	return helmValues
 }
 
 // k8sStepCheckRunningPods checks the status of the agent inside the pods returned by the selector

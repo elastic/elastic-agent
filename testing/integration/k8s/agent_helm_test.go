@@ -33,52 +33,54 @@ func TestAgentKubeStackHelm(t *testing.T) {
 		Group: define.Kubernetes,
 	})
 
+	containerRegex, err := regexp.Compile(`^/var/log/containers/.*flog.*\.log$`)
+	require.NoError(t, err, "failed to compile container log regex")
 	plainRegex, err := regexp.Compile(`\d+\.log\.\d{8}-\d{6}$`)
-	require.NoError(t, err, "failed to compile regex")
+	require.NoError(t, err, "failed to compile rotated plain log regex")
 	gzRegex, err := regexp.Compile(`\d+\.log\.\d{8}-\d{6}\.gz$`)
-	require.NoError(t, err, "failed to compile regex")
+	require.NoError(t, err, "failed to compile rotated gzip regex")
 
 	kCtx := k8sGetContext(t, info)
+
+	defaultValues := values.Options{
+		ValueFiles: []string{"../../../deploy/helm/elastic-agent/values.yaml"},
+		Values: []string{
+			fmt.Sprintf("agent.image.repository=%s", kCtx.agentImageRepo),
+			fmt.Sprintf("agent.image.tag=%s", kCtx.agentImageTag),
+
+			"outputs.default.type=ESPlainAuthAPI",
+			fmt.Sprintf("outputs.default.url=%s", kCtx.esHost),
+			fmt.Sprintf("outputs.default.api_key=%s", kCtx.esAPIKey),
+
+			// Enable k8s and container logs
+			"kubernetes.enabled=true",
+			"kubernetes.containers.logs.enabled=true",
+
+			// Disable others
+			"kubernetes.state.enabled=false",
+			"kubernetes.metrics.enabled=false",
+			"kubernetes.apiserver.enabled=false",
+			"kubernetes.proxy.enabled=false",
+			"kubernetes.scheduler.enabled=false",
+			"kubernetes.controller_manager.enabled=false",
+			"kubernetes.containers.metrics.enabled=false",
+			"kubernetes.containers.state.enabled=false",
+			"kubernetes.containers.audit_logs.enabled=false",
+			"kubernetes.pods.enabled=false",
+		},
+	}
 
 	steps := []k8sTestStep{
 		k8sStepCreateNamespace(),
 
-		// 1st - deploy flog so logs can be rotated before filebeat starts
-		// ingesting them
+		// 1st - deploy flog
 		func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
 			k8sStepDeployApp("flog.yaml")(t, ctx, kCtx, namespace)
-			time.Sleep(30 * time.Second) // wait for logs to be rotated
 		},
 
-		// 2nd - deploy the agent
+		// 2nd - deploy the agent without rotated logs enabled
 		k8sStepHelmDeployWithValueOptions(AgentHelmChartPath, "elastic-agent",
-			values.Options{
-				ValueFiles: []string{"../../../deploy/helm/elastic-agent/values.yaml"},
-				Values: []string{
-					fmt.Sprintf("agent.image.repository=%s", kCtx.agentImageRepo),
-					fmt.Sprintf("agent.image.tag=%s", kCtx.agentImageTag),
-
-					"outputs.default.type=ESPlainAuthAPI",
-					fmt.Sprintf("outputs.default.url=%s", kCtx.esHost),
-					fmt.Sprintf("outputs.default.api_key=%s", kCtx.esAPIKey),
-
-					"kubernetes.enabled=true",
-					"kubernetes.containers.logs.enabled=true",
-					"kubernetes.containers.logs.rotated_logs=true",
-
-					// Disable everything else
-					"kubernetes.state.enabled=false",
-					"kubernetes.metrics.enabled=false",
-					"kubernetes.apiserver.enabled=false",
-					"kubernetes.proxy.enabled=false",
-					"kubernetes.scheduler.enabled=false",
-					"kubernetes.controller_manager.enabled=false",
-					"kubernetes.containers.metrics.enabled=false",
-					"kubernetes.containers.state.enabled=false",
-					"kubernetes.containers.audit_logs.enabled=false",
-					"kubernetes.pods.enabled=false",
-				},
-			},
+			defaultValues,
 		),
 
 		// 3rd - check that the agent pod is running
@@ -86,82 +88,34 @@ func TestAgentKubeStackHelm(t *testing.T) {
 			"name=agent-pernode-elastic-agent",
 			1, "agent"),
 
-		// 4th - verify rotated logs are ingested
-		func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-			dsType := "logs"
-			dataset := "kubernetes.container_logs"
-			datastreamNamespace := "default"
+		// 4th - verify logs are ingested from `/var/log/containers/`
+		k8sStepCheckLogFilesIngested(info,
+			"logs", "kubernetes.container_logs", "default", "/var/log/containers/*flog*.log",
+			expectedLogFile{regex: containerRegex,
+				description: "container log (" + containerRegex.String() + ")"},
+		),
 
-			require.EventuallyWithT(t, func(t *assert.CollectT) {
-				query := map[string]any{
-					"size":    0,
-					"_source": []string{"message"},
-					"query": map[string]any{
-						"bool": map[string]any{
-							"filter": []any{
-								map[string]any{
-									"term": map[string]any{
-										"data_stream.dataset": dataset,
-									},
-								},
-								map[string]any{
-									"term": map[string]any{
-										"data_stream.namespace": datastreamNamespace,
-									},
-								},
-								map[string]any{
-									"term": map[string]any{
-										"data_stream.type": dsType,
-									},
-								},
-								map[string]any{
-									"wildcard": map[string]any{
-										"log.file.path": map[string]any{
-											"value": "/var/log/pods/*flog*",
-										},
-									},
-								},
-							},
-						},
-					},
-					"aggs": map[string]any{
-						"files_count": map[string]any{
-							"terms": map[string]any{
-								"field": "log.file.path",
-							},
-						},
-					},
-				}
+		// 5th - upgrade the agent to enable rotated logs
+		k8sStepHelmUpgrade(AgentHelmChartPath, "elastic-agent",
+			values.Options{
+				ValueFiles: defaultValues.ValueFiles,
+				Values: append(defaultValues.Values,
+					"kubernetes.containers.logs.rotated_logs=true"),
+			}),
 
-				resp, err := PerformQuery(
-					ctx, query, fmt.Sprintf(".ds-%s*", dsType), info.ESClient)
-				require.NoError(t, err,
-					"failed to query %s datastream",
-					fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace))
+		// 6th - check that the agent pod is running
+		k8sStepCheckRunningPods(
+			"name=agent-pernode-elastic-agent",
+			1, "agent"),
 
-				var foundPlain, foundGz bool
-				var files []string
-				for _, bucket := range resp.Aggregations.FilesCount.Buckets {
-					files = append(files, bucket.Key)
-					if plainRegex.MatchString(bucket.Key) {
-						foundPlain = true
-						continue
-					}
-					if gzRegex.MatchString(bucket.Key) {
-						foundGz = true
-						continue
-					}
-				}
-
-				assert.True(t, foundPlain,
-					"expected to find plain text rotated log, found only: %v",
-					files)
-				assert.True(t, foundGz,
-					"expected to find gzipped rotated logs, found only: %v",
-					files)
-			}, 3*time.Minute, 10*time.Second, fmt.Sprintf("no documets found on datastream %s",
-				fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace)))
-		},
+		// 7th - verify rotated logs are ingested
+		k8sStepCheckLogFilesIngested(info,
+			"logs", "kubernetes.container_logs", "default", "/var/log/pods/*flog*",
+			expectedLogFile{regex: plainRegex,
+				description: "plain text rotated log (" + plainRegex.String() + ")"},
+			expectedLogFile{regex: gzRegex,
+				description: "gzipped rotated log (" + gzRegex.String() + ")"},
+		),
 	}
 
 	ctx := context.Background()
@@ -169,5 +123,90 @@ func TestAgentKubeStackHelm(t *testing.T) {
 
 	for _, step := range steps {
 		step(t, ctx, kCtx, testNamespace)
+	}
+}
+
+// expectedLogFile represents a log file pattern to verify in Elasticsearch
+type expectedLogFile struct {
+	regex       *regexp.Regexp
+	description string
+}
+
+// k8sStepCheckLogFilesIngested creates a test step that verifies rotated logs are ingested
+// by querying Elasticsearch and checking for files matching the provided regex patterns.
+func k8sStepCheckLogFilesIngested(
+	info *define.Info,
+	dsType, dataset, datastreamNamespace, wildcardPath string,
+	expectedFiles ...expectedLogFile,
+) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		require.EventuallyWithT(t, func(t *assert.CollectT) {
+			query := map[string]any{
+				"size":    0,
+				"_source": []string{"message"},
+				"query": map[string]any{
+					"bool": map[string]any{
+						"filter": []any{
+							map[string]any{
+								"term": map[string]any{
+									"data_stream.dataset": dataset,
+								},
+							},
+							map[string]any{
+								"term": map[string]any{
+									"data_stream.namespace": datastreamNamespace,
+								},
+							},
+							map[string]any{
+								"term": map[string]any{
+									"data_stream.type": dsType,
+								},
+							},
+							map[string]any{
+								"wildcard": map[string]any{
+									"log.file.path": map[string]any{
+										"value": wildcardPath,
+									},
+								},
+							},
+						},
+					},
+				},
+				"aggs": map[string]any{
+					"files_count": map[string]any{
+						"terms": map[string]any{
+							"field": "log.file.path",
+						},
+					},
+				},
+			}
+
+			resp, err := PerformQuery(
+				ctx, query, fmt.Sprintf(".ds-%s*", dsType), info.ESClient)
+			require.NoError(t, err,
+				"failed to query %s datastream",
+				fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace))
+
+			// Track which expected files were found
+			found := make([]bool, len(expectedFiles))
+			var files []string
+
+			for _, bucket := range resp.Aggregations.FilesCount.Buckets {
+				files = append(files, bucket.Key)
+				for i, expected := range expectedFiles {
+					if expected.regex.MatchString(bucket.Key) {
+						found[i] = true
+					}
+				}
+			}
+
+			// Assert all expected files were found
+			for i, expected := range expectedFiles {
+				assert.True(t, found[i],
+					"expected to find %s, found only: %v",
+					expected.description, files)
+			}
+		}, 3*time.Minute, 10*time.Second, fmt.Sprintf("no documets found on datastream %s",
+			fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace)))
 	}
 }
