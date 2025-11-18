@@ -5,10 +5,12 @@
 package translate
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
 	"strings"
+	"syscall"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	otelcomponent "go.opentelemetry.io/collector/component"
@@ -39,6 +41,15 @@ func GetAllComponentStates(otelStatus *status.AggregateStatus, components []comp
 				if compState, statusErr = getComponentState(pipelineStatus, comp); statusErr != nil {
 					return nil, statusErr
 				}
+			} else if healthcheckNotAvailable(otelStatus) {
+				// healthcheck extension is not yet started. We return a STARTING state.
+				compState = runtime.ComponentComponentState{
+					Component: comp,
+					State: runtime.ComponentState{
+						State:   client.UnitStateStarting,
+						Message: "Starting",
+					},
+				}
 			} else {
 				// If the component is not found in the OTel status, we return a stopped state.
 				compState = runtime.ComponentComponentState{
@@ -52,6 +63,18 @@ func GetAllComponentStates(otelStatus *status.AggregateStatus, components []comp
 		}
 	}
 	return componentStates, nil
+}
+
+func healthcheckNotAvailable(otelStatus *status.AggregateStatus) bool {
+	if otelStatus == nil {
+		return false
+	}
+	// For now, we only check for ECONNREFUSED to determine healtcheck extension's availibilty.
+	// We don't expect the healthcheck extension to return any error when it's running.
+	if errors.Is(otelStatus.Err(), syscall.ECONNREFUSED) {
+		return true
+	}
+	return false
 }
 
 // DropComponentStateFromOtelStatus removes the statuses of otel pipelines representing runtime components from the

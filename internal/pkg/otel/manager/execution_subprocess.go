@@ -171,6 +171,13 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 					// after the collector exits, we need to report a nil status
 					r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
 					return
+				default:
+					// if we face any other error (most likely, connection refused), emit a status with the error.
+					logger.Debugf("Received an unexpected error: %v. Emitting empty status", err)
+					status := &status.AggregateStatus{
+						Event: componentstatus.NewEvent(componentstatus.StatusNone, componentstatus.WithError(err)),
+					}
+					r.reportSubprocessCollectorStatus(ctx, statusCh, status)
 				}
 			} else {
 				maxFailuresTimer.Reset(maxFailuresDuration)
