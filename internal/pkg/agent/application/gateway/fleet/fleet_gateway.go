@@ -7,6 +7,8 @@ package fleet
 import (
 	"context"
 	stderrors "errors"
+	"maps"
+	"slices"
 	"sync"
 	"time"
 
@@ -23,7 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/otelhelpers"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -263,8 +265,8 @@ func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 	return nil, ctx.Err()
 }
 
-func (f *FleetGateway) convertToCheckinComponents(components []runtime.ComponentComponentState, collector *status.AggregateStatus) []fleetapi.CheckinComponent {
-	if components == nil {
+func convertToCheckinComponents(components []runtime.ComponentComponentState, collector *status.AggregateStatus) []fleetapi.CheckinComponent {
+	if components == nil && (collector == nil || len(collector.ComponentStatusMap) == 0) {
 		return nil
 	}
 	stateString := func(s eaclient.UnitState) string {
@@ -277,6 +279,20 @@ func (f *FleetGateway) convertToCheckinComponents(components []runtime.Component
 	unitTypeString := func(t eaclient.UnitType) string {
 		if typ := t.String(); typ != "unknown" {
 			return typ
+		}
+		return ""
+	}
+
+	otelComponentTypeString := func(componentStatusId string) string {
+		kind, _, err := translate.ParseEntityStatusId(componentStatusId)
+		if err != nil {
+			return ""
+		}
+		switch kind {
+		case "receiver":
+			return "input"
+		case "exporter":
+			return "output"
 		}
 		return ""
 	}
@@ -318,8 +334,10 @@ func (f *FleetGateway) convertToCheckinComponents(components []runtime.Component
 	// OTel status is placed as a component for each top-level component in OTel
 	// and each subcomponent is a unit.
 	if collector != nil {
-		for id, item := range collector.ComponentStatusMap {
-			state, msg := otelhelpers.StateWithMessage(item)
+		sortedIds := slices.Sorted(maps.Keys(collector.ComponentStatusMap))
+		for _, id := range sortedIds {
+			item := collector.ComponentStatusMap[id]
+			state, msg := translate.StateWithMessage(item)
 
 			checkinComponent := fleetapi.CheckinComponent{
 				ID:      id,
@@ -330,12 +348,15 @@ func (f *FleetGateway) convertToCheckinComponents(components []runtime.Component
 
 			if len(item.ComponentStatusMap) > 0 {
 				units := make([]fleetapi.CheckinUnit, 0, len(item.ComponentStatusMap))
-				for unitId, unitItem := range item.ComponentStatusMap {
-					unitState, unitMsg := otelhelpers.StateWithMessage(unitItem)
+				sortedUnitIds := slices.Sorted(maps.Keys(item.ComponentStatusMap))
+				for _, unitId := range sortedUnitIds {
+					unitItem := item.ComponentStatusMap[unitId]
+					unitState, unitMsg := translate.StateWithMessage(unitItem)
 					units = append(units, fleetapi.CheckinUnit{
 						ID:      unitId,
 						Status:  stateString(unitState),
 						Message: unitMsg,
+						Type:    otelComponentTypeString(unitId),
 					})
 				}
 				checkinComponent.Units = units
@@ -365,7 +386,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	state, stateCtx := f.stateFetcher.FetchState(ctx)
 
 	// convert components into checkin components structure
-	components := f.convertToCheckinComponents(state.Components, state.Collector)
+	components := convertToCheckinComponents(state.Components, state.Collector)
 
 	f.log.Debugf("correcting agent loglevel from %s to %s using coordinator state", ecsMeta.Elastic.Agent.LogLevel, state.LogLevel.String())
 	// Fix loglevel with the current log level used by coordinator

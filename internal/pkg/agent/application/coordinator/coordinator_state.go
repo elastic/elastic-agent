@@ -18,7 +18,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/otelhelpers"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 )
@@ -245,10 +245,10 @@ func (c *Coordinator) generateReportableState() (s State) {
 	} else if c.varsMgrErr != nil {
 		s.State = agentclient.Failed
 		s.Message = fmt.Sprintf("Vars manager: %s", c.varsMgrErr.Error())
-	} else if hasState(s.Components, client.UnitStateFailed) || otelhelpers.HasStatus(s.Collector, componentstatus.StatusFatalError) || otelhelpers.HasStatus(s.Collector, componentstatus.StatusPermanentError) {
+	} else if hasState(s.Components, client.UnitStateFailed) || translate.HasStatus(s.Collector, componentstatus.StatusFatalError) || translate.HasStatus(s.Collector, componentstatus.StatusPermanentError) {
 		s.State = agentclient.Degraded
 		s.Message = "1 or more components/units in a failed state"
-	} else if hasState(s.Components, client.UnitStateDegraded) || otelhelpers.HasStatus(s.Collector, componentstatus.StatusRecoverableError) {
+	} else if hasState(s.Components, client.UnitStateDegraded) || translate.HasStatus(s.Collector, componentstatus.StatusRecoverableError) {
 		s.State = agentclient.Degraded
 		s.Message = "1 or more components/units in a degraded state"
 	} else {
