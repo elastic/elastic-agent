@@ -72,6 +72,7 @@ exporters:
   elasticsearch:
     api_key: {{.ESApiKey}}
     endpoint: {{.ESEndpoint}}
+    logs_index: {{.Namespace}}
     sending_queue:
       enabled: true
       wait_for_result: true # Avoid losing data on shutdown
@@ -98,13 +99,10 @@ service:
 			findCtx, findCancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer findCancel()
 
-			docs, err := estools.GetLogsForIndexWithContext(
+			docs, err := estools.GetAllLogsForIndexWithContext(
 				findCtx,
 				info.ESClient,
-				".ds-logs-generic-default*",
-				map[string]any{
-					"Body.fields.find_me": info.Namespace,
-				})
+				info.Namespace)
 			require.NoError(c, err)
 
 			got := docs.Hits.Total.Value
