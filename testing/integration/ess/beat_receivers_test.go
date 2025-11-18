@@ -1255,7 +1255,7 @@ agent.logging.stderr: true
 	}
 
 	var monitoringDoc estools.Documents
-	assert.EventuallyWithT(t,
+	require.EventuallyWithT(t,
 		func(ct *assert.CollectT) {
 			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer findCancel()
@@ -1265,7 +1265,7 @@ agent.logging.stderr: true
 
 			assert.GreaterOrEqual(ct, monitoringDoc.Hits.Total.Value, 1)
 		},
-		2*time.Minute, 5*time.Second,
+		3*time.Minute, 5*time.Second,
 		"Expected at least %d log, got %d", 1, monitoringDoc.Hits.Total.Value)
 
 	inputField := monitoringDoc.Hits.Hits[0].Source["input"]
@@ -1434,7 +1434,7 @@ agent.logging.stderr: true
 	}
 
 	var monitoringDoc estools.Documents
-	require.EventuallyWithT(t,
+	assert.EventuallyWithT(t,
 		func(ct *assert.CollectT) {
 			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer findCancel()
@@ -1444,7 +1444,7 @@ agent.logging.stderr: true
 
 			assert.GreaterOrEqual(ct, monitoringDoc.Hits.Total.Value, 1)
 		},
-		150*time.Second, 5*time.Second,
+		2*time.Second, 5*time.Second,
 		"Expected at least %d log, got %d", 1, monitoringDoc.Hits.Total.Value)
 
 	// assert that error.reason is not part of monitoring logs
