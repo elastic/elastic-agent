@@ -75,8 +75,8 @@ import (
 	spanmetricsconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector"
 	forwardconnector "go.opentelemetry.io/collector/connector/forwardconnector"
 
+	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
 	elasticapmconnector "github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector"
-	beatsauthextension "github.com/elastic/opentelemetry-collector-components/extension/beatsauthextension"
 )
 
 func components(extensionFactories ...extension.Factory) func() (otelcol.Factories, error) {

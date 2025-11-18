@@ -547,8 +547,6 @@ github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextens
 github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.5.0/go.mod h1:cFYEgKv+BsimfqeeyfRTTGP/AoHbhwhhJH44W9S/x5Y=
 github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.7.0 h1:QdBoEpDp5PKVlrQ7n+eTDG+tDpBmLBppcVhsuvKyXik=
 github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.7.0/go.mod h1:CnfDctsjylpmo2yYJfQVZn8U7EXy7hmTnvdApiUL680=
-github.com/elastic/opentelemetry-collector-components/extension/beatsauthextension v0.3.0 h1:0+WK9lHE5HflQFUSghnpBAto7jQItDw5o+uTSGKHMlo=
-github.com/elastic/opentelemetry-collector-components/extension/beatsauthextension v0.3.0/go.mod h1:OdiJntTK9K7urGZ1hwAi2v/Ha3jsBKv8Yu2QLSCn6Yc=
 github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced h1:XcWi/S3OoeE5Qwmj381AoO3nr3AVXl4Z4QO0mqyjlzU=
 github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced/go.mod h1:8e9NcGfE2xeor8r+WV9a+hKBEkzJEDnqZN7tqb3GUe8=
 github.com/elastic/opentelemetry-collector-components/internal/testutil v0.0.0-20250613082151-282de5af1c9b h1:NWuTKdMCJlU9ehRH8V0w1Kk1QI5Vn+9OcJWIO9wI+pE=
