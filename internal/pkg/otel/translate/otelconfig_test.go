@@ -258,11 +258,6 @@ func TestGetOtelConfig(t *testing.T) {
 				"supported_protocols":     []interface{}{},
 				"verification_mode":       uint64(0),
 			},
-			"timeout":     "1m30s",
-			"loadbalance": true,
-			"endpoints":   []interface{}{},
-			"path":        "",
-			"protocol":    "http",
 		}
 		for _, v := range extra {
 			// accepts one level deep parameters to replace
@@ -1316,10 +1311,10 @@ func TestGetBeatsAuthExtensionConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "with ssl enabled and verification_mode full",
+			name: "with ssl enabled and verification_mode certificate",
 			outputCfg: map[string]any{
 				"ssl.enabled":           true,
-				"ssl.verification_mode": "full",
+				"ssl.verification_mode": "certificate",
 			},
 			expected: map[string]any{
 				"continue_on_error":       true,
@@ -1338,9 +1333,53 @@ func TestGetBeatsAuthExtensionConfig(t *testing.T) {
 					"key_passphrase_path":     "",
 					"renegotiation":           int64(0),
 					"supported_protocols":     []interface{}{},
+					"verification_mode":       uint64(2),
+				},
+				"timeout": "1m30s",
+			},
+		},
+		{
+			name: "with kerberos is enabled",
+			outputCfg: map[string]any{
+				"kerberos": map[string]any{
+					"auth_type":   "password",
+					"config_path": "temp/krb5.conf",
+					"username":    "beats",
+					"password":    "testing",
+					"realm":       "elastic",
+				},
+			},
+			expected: map[string]any{
+				"continue_on_error":       true,
+				"idle_connection_timeout": "3s",
+				"ssl": map[string]interface{}{
+					"ca_sha256":               []interface{}{},
+					"ca_trusted_fingerprint":  "",
+					"certificate":             "",
+					"certificate_authorities": []interface{}{},
+					"cipher_suites":           []interface{}{},
+					"curve_types":             []interface{}{},
+					"enabled":                 true,
+					"key":                     "",
+					"key_passphrase":          "",
+					"key_passphrase_path":     "",
+					"renegotiation":           int64(0),
+					"supported_protocols":     []interface{}{},
 					"verification_mode":       uint64(0),
 				},
 				"timeout": "1m30s",
+				"kerberos": map[string]any{
+					"enabled":          nil,
+					"auth_type":        "password",
+					"config_path":      "temp/krb5.conf",
+					"username":         "beats",
+					"password":         "testing",
+					"realm":            "elastic",
+					"enable_krb5_fast": false,
+					"service_name":     "",
+					"keytab":           "",
+				},
+				"proxy_disable": false,
 			},
 		},
 	}
