@@ -243,9 +243,9 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	err = classicFixture.Configure(ctx, updatedPolicyBytes)
 	require.NoError(t, err, "error configuring fixture")
 
+	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	output, err := classicFixture.InstallWithoutEnroll(ctx, &installOpts)
 	require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
-	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error
