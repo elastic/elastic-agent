@@ -60,6 +60,8 @@ func TestStandaloneUpgradeRollback(t *testing.T) {
 		Sudo:  true,  // requires Agent installation
 	})
 
+	t.Skip("Skipping due to flakiness, see https://github.com/elastic/elastic-agent/issues/11267")
+
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
 
