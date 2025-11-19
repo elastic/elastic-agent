@@ -14,6 +14,8 @@ import (
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -265,7 +267,7 @@ func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 	return nil, ctx.Err()
 }
 
-func convertToCheckinComponents(components []runtime.ComponentComponentState, collector *status.AggregateStatus) []fleetapi.CheckinComponent {
+func convertToCheckinComponents(logger *logp.Logger, components []runtime.ComponentComponentState, collector *status.AggregateStatus) []fleetapi.CheckinComponent {
 	if components == nil && (collector == nil || len(collector.ComponentStatusMap) == 0) {
 		return nil
 	}
@@ -286,6 +288,7 @@ func convertToCheckinComponents(components []runtime.ComponentComponentState, co
 	otelComponentTypeString := func(componentStatusId string) string {
 		kind, _, err := translate.ParseEntityStatusId(componentStatusId)
 		if err != nil {
+			logger.Warnf("failed to parse component status id '%s': %v", componentStatusId, err)
 			return ""
 		}
 		switch kind {
@@ -386,7 +389,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	state, stateCtx := f.stateFetcher.FetchState(ctx)
 
 	// convert components into checkin components structure
-	components := convertToCheckinComponents(state.Components, state.Collector)
+	components := convertToCheckinComponents(f.log, state.Components, state.Collector)
 
 	f.log.Debugf("correcting agent loglevel from %s to %s using coordinator state", ecsMeta.Elastic.Agent.LogLevel, state.LogLevel.String())
 	// Fix loglevel with the current log level used by coordinator
