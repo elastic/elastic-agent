@@ -52,42 +52,42 @@ outputs:
     # @section -- 1.1 - Output Object
     # @key -- outputs.{name}.ssl
     #ssl:
-      # -- enable SSL/TLS for the output
-      # @section -- 1.1 - Output Object
-      # @key -- outputs.{name}.ssl.enabled
-      #enabled: false
-      # -- path to the CA certificate for the output
-      # @section -- 1.1 - Output Object
-      # @key -- outputs.{name}.ssl.certificateAuthorities
-      #certificateAuthorities: ""
-      # verification mode for the output
-      # @section -- 1.1 - Output Object
-      # @key -- outputs.{name}.ssl.verification_mode
-      #verification_mode: certificate
-      # -- path to the client certificate for the output
-      # @section -- 1.1 - Output Object
-      # @key -- outputs.{name}.ssl.certificate
-      #certificate:
-        # -- contents to the client certificate for the output
-        # @section -- 1.1 - Output Object
-        # @key -- outputs.{name}.ssl.certificate.value
-        #value: ""      
-      # -- path to the client private key for the output
-      # @section -- 1.1 - Output Object
-      # @key -- outputs.{name}.ssl.key
-      #key: 
-        # -- path to the client private key for the output
-        # @section -- 1.1 - Output Object
-        # @key -- outputs.{name}.ssl.key.valueFromSecret
-        #valueFromSecret:
-          # -- Secret name for the client private key for the output
-          # @section -- 1.1 - Output Object
-          # @key -- outputs.{name}.ssl.key.valueFromSecret.name
-          #name: ""
-          # -- Key in the secret for the client private key for the output
-          # @section -- 1.1 - Output Object
-          # @key -- outputs.{name}.ssl.key.valueFromSecret.key
-          #key: ""
+    # -- enable SSL/TLS for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.enabled
+    #  enabled: false
+    # -- path to the CA certificate for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.certificateAuthorities
+    #  certificateAuthorities: ""
+    # verification mode for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.verification_mode
+    #  verification_mode: certificate
+    # -- path to the client certificate for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.certificate
+    #  certificate:
+    # -- contents to the client certificate for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.certificate.value
+    #  value: ""      
+    # -- path to the client private key for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.key
+    #  key: 
+    # -- path to the client private key for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.key.valueFromSecret
+    #    valueFromSecret:
+    # -- Secret name for the client private key for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.key.valueFromSecret.name
+    #     name: ""
+    # -- Key in the secret for the client private key for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.key.valueFromSecret.key
+    #      key: ""
 kubernetes:
   # -- enable Kubernetes integration.
   # @section -- 2 - Kubernetes integration
