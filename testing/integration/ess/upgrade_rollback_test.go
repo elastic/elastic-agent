@@ -97,6 +97,8 @@ outputs:
   default:
     type: elasticsearch
     hosts: [127.0.0.1:9200]
+    status_reporting:
+      enabled: false
 
 inputs:
   - condition: '${agent.version.version} == "%s"'
