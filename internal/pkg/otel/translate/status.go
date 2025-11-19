@@ -41,7 +41,7 @@ func GetAllComponentStates(otelStatus *status.AggregateStatus, components []comp
 				if compState, statusErr = getComponentState(pipelineStatus, comp); statusErr != nil {
 					return nil, statusErr
 				}
-			} else if healthcheckNotAvailable(otelStatus) {
+			} else if isHealthcheckUnavailable(otelStatus) {
 				// healthcheck extension is not yet started. We return a STARTING state.
 				compState = runtime.ComponentComponentState{
 					Component: comp,
@@ -65,7 +65,7 @@ func GetAllComponentStates(otelStatus *status.AggregateStatus, components []comp
 	return componentStates, nil
 }
 
-func healthcheckNotAvailable(otelStatus *status.AggregateStatus) bool {
+func isHealthcheckUnavailable(otelStatus *status.AggregateStatus) bool {
 	if otelStatus == nil {
 		return false
 	}
