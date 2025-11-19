@@ -298,6 +298,8 @@ func TestFleetManagedUpgradeRollbackOnRestarts(t *testing.T) {
 		Stack: &define.Stack{},
 	})
 
+	t.Skip("Skipping due to flakiness, see https://github.com/elastic/elastic-agent/issues/10917")
+
 	type fixturesSetupFunc func(t *testing.T) (from *atesting.Fixture, to *atesting.Fixture)
 	testcases := []struct {
 		name          string
