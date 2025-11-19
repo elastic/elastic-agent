@@ -17,9 +17,9 @@ products:
 
 The Kubelet stats receiver collects Kubernetes node, pod, container, and volume metrics directly from the Kubelet API. It is enabled by default in several {{product.observability}} Kubernetes pipelines and is a core component of the {{edot}} Collector distribution.
 
-This receiver queries the Kubelet’s `/stats/summary` endpoint and converts the retrieved usage statistics into OpenTelemetry metrics.
+This receiver queries the Kubelet's `/stats/summary` endpoint and converts the retrieved usage statistics into OpenTelemetry metrics. When configured, it automatically surfaces pre-built dashboards in {{product.observability}} for visualizing node CPU and memory usage, pod throttling, container metrics, and network/filesystem usage.
 
-For the contrib component documentation, see the [kubeletstatsreceiver README](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/kubeletstatsreceiver).
+For full contrib details, refer to the [OpenTelemetry kubeletstats receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/kubeletstatsreceiver).
 
 ## Typical use cases
 
@@ -91,7 +91,7 @@ EDOT applies no custom modifications to the contrib receiver (its behavior is id
 
 ## Example: Collect node and pod metrics in Kubernetes
 
-When running the EDOT Collector as a DaemonSet:
+When you run the EDOT Collector as a DaemonSet, you can enable the Kubelet stats receiver with a minimal configuration like this:
 
 ```yaml
 receivers:
@@ -100,14 +100,12 @@ receivers:
     metric_groups: [node, pod, container]
 ```
 
-This enables dashboards for:
+This configuration collects:
 
 * Node CPU and memory usage  
 * Pod throttling  
 * Container memory working set  
-* Network and filesystem usage per node, pod, and container  
-
-These dashboards are surfaced automatically in {{product.observability}}.
+* Network and filesystem usage per node, pod, and container
 
 ## Caveats and limitations
 
