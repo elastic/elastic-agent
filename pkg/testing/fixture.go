@@ -55,6 +55,7 @@ type Fixture struct {
 	srcPackage string
 	workDir    string
 	extractDir string
+	socketPath string
 
 	installed   bool
 	installOpts *InstallOpts
@@ -186,10 +187,19 @@ func NewFixture(t *testing.T, version string, opts ...FixtureOpt) (*Fixture, err
 }
 
 // Client returns the Elastic Agent communication client.
+// This client is shared across multiple calls to Client()
 func (f *Fixture) Client() client.Client {
 	f.cMx.RLock()
 	defer f.cMx.RUnlock()
 	return f.c
+}
+
+// NewClient returns a new Elastic Agent communication client.
+// The client is NOT shared across multiple calls but a new instance is allocated every time
+func (f *Fixture) NewClient() client.Client {
+	f.cMx.Lock()
+	defer f.cMx.Unlock()
+	return client.New(client.WithAddress(f.socketPath))
 }
 
 // Version returns the Elastic Agent version.
@@ -1136,6 +1146,12 @@ func (f *Fixture) prepareComponents(workDir string, components ...UsableComponen
 	return nil
 }
 
+func (f *Fixture) setSocketPath(socketPath string) {
+	f.cMx.Lock()
+	defer f.cMx.Unlock()
+	f.socketPath = socketPath
+}
+
 func (f *Fixture) setClient(c client.Client) {
 	f.cMx.Lock()
 	defer f.cMx.Unlock()
@@ -1605,6 +1621,7 @@ type AgentBinaryVersion struct {
 	Commit    string `yaml:"commit"`
 	BuildTime string `yaml:"build_time"`
 	Snapshot  bool   `yaml:"snapshot"`
+	Fips      bool   `yaml:"fips"`
 }
 
 // String returns the version string.
