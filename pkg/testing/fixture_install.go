@@ -278,6 +278,7 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 		socketPath = paths.ControlSocketFromPath(runtime.GOOS, f.workDir)
 	}
 	c := client.New(client.WithAddress(socketPath))
+	f.setSocketPath(socketPath)
 	f.setClient(c)
 
 	f.t.Cleanup(func() {
