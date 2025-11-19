@@ -20,6 +20,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
 
@@ -1126,7 +1128,7 @@ func TestConvertToCheckingComponents(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := convertToCheckinComponents(tt.components, tt.collector)
+			result := convertToCheckinComponents(logp.NewNopLogger(), tt.components, tt.collector)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
