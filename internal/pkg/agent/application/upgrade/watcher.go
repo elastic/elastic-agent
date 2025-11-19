@@ -86,6 +86,7 @@ func (ch *AgentWatcher) Run(ctx context.Context) {
 
 	ch.connectCounter = 0
 	ch.lostCounter = 0
+	ch.lastPid = -1
 
 	// tracking of an error runs in a separate goroutine, because
 	// the call to `watch.Recv` blocks and a timer is needed
@@ -143,7 +144,6 @@ func (ch *AgentWatcher) Run(ctx context.Context) {
 
 LOOP:
 	for {
-		ch.lastPid = -1
 		connectTimer := time.NewTimer(ch.checkInterval)
 		select {
 		case <-ctx.Done():
