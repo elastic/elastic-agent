@@ -39,6 +39,11 @@ type CheckinComponent struct {
 	Units   []CheckinUnit `json:"units,omitempty"`
 }
 
+type CheckinRollback struct {
+	Version    string    `json:"version"`
+	ValidUntil time.Time `json:"valid_until"`
+}
+
 // CheckinRequest consists of multiple events reported to fleet ui.
 type CheckinRequest struct {
 	Status            string             `json:"status"`
@@ -49,6 +54,7 @@ type CheckinRequest struct {
 	UpgradeDetails    *details.Details   `json:"upgrade_details,omitempty"`
 	AgentPolicyID     string             `json:"agent_policy_id,omitempty"`
 	PolicyRevisionIDX int64              `json:"policy_revision_idx,omitempty"`
+	Rollbacks         []CheckinRollback  `json:"rollbacks,omitempty"`
 }
 
 // SerializableEvent is a representation of the event to be send to the Fleet Server API via the checkin

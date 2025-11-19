@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -337,7 +338,7 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 				oldAgentInstallPath := createFakeAgentInstall(t, topDir, "1.2.3", "oldversionhash", true)
 
 				mockRollbackSource := newMockRollbacksSource(t)
-				mockRollbackSource.EXPECT().Get().Return(map[string]upgrade.TTLMarker{
+				mockRollbackSource.EXPECT().Get().Return(map[string]ttl.TTLMarker{
 					oldAgentInstallPath: {
 						Version:    "1.2.3",
 						Hash:       "oldversionhash",
@@ -366,7 +367,7 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 				}
 
 				// expect code to clear the rollback
-				mockRollbackSource.EXPECT().Set(map[string]upgrade.TTLMarker{}).Return(nil)
+				mockRollbackSource.EXPECT().Set(map[string]ttl.TTLMarker{}).Return(nil)
 				return updateMarker, mockRollbackSource
 			},
 			postNormalizeAssertions: nil,
@@ -379,7 +380,7 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 
 				mockRollbackSource := newMockRollbacksSource(t)
 				nonExistingVersionedHome := filepath.Join("data", "thisdirectorydoesnotexist")
-				mockRollbackSource.EXPECT().Get().Return(map[string]upgrade.TTLMarker{
+				mockRollbackSource.EXPECT().Get().Return(map[string]ttl.TTLMarker{
 					oldAgentInstallPath: {
 						Version:    "1.2.3",
 						Hash:       "oldversionhash",
@@ -392,7 +393,7 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 					},
 				}, nil)
 
-				mockRollbackSource.EXPECT().Set(map[string]upgrade.TTLMarker{
+				mockRollbackSource.EXPECT().Set(map[string]ttl.TTLMarker{
 					oldAgentInstallPath: {
 						Version:    "1.2.3",
 						Hash:       "oldversionhash",
@@ -415,7 +416,7 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 
 				mockRollbackSource := newMockRollbacksSource(t)
 				mockRollbackSource.EXPECT().Get().Return(
-					map[string]upgrade.TTLMarker{
+					map[string]ttl.TTLMarker{
 						oldAgentInstallPath: {
 							Version:    "1.2.3",
 							Hash:       "oldver",
@@ -425,7 +426,7 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 					nil,
 				)
 				// expect removal of the existing ttlmarker
-				mockRollbackSource.EXPECT().Set(map[string]upgrade.TTLMarker{}).Return(nil)
+				mockRollbackSource.EXPECT().Set(map[string]ttl.TTLMarker{}).Return(nil)
 				return nil, mockRollbackSource
 			},
 			postNormalizeAssertions: func(t *testing.T, topDir string, _ *upgrade.UpdateMarker) {
