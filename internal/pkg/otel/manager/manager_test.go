@@ -16,7 +16,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -1687,7 +1686,7 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 	testComp := testComponent("test")
 	components := []component.Component{testComp}
 	otelStatus := &status.AggregateStatus{
-		Event: componentstatus.NewEvent(componentstatus.StatusNone, componentstatus.WithError(syscall.ECONNREFUSED)),
+		Event: componentstatus.NewEvent(componentstatus.StatusStarting),
 	}
 	// start the collector by giving it a mock config
 	mgr.Update(nil, components)
