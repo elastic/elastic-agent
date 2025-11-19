@@ -28,10 +28,10 @@ func newOtelCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 	return &cobra.Command{
 		Use:                "otel",
 		DisableFlagParsing: true,
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, cmdArgs []string) error {
 			executable := filepath.Join(paths.Home(), binaryName)
 			args := []string{binaryName}
-			args = append(args, os.Args[2:]...) // uses os.Args to preserve original args
+			args = append(args, cmdArgs...)
 			err := unix.Exec(executable, args, os.Environ())
 			if err != nil {
 				return fmt.Errorf("failed to exec %s: %w", executable, err)

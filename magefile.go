@@ -1158,7 +1158,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-func packageAgent(ctx context.Context, platforms devtools.BuildPlatformList, dependenciesVersion string, manifestResponse *manifest.Build, packageTypes []mage.PackageType, agentPackaging mg.Fn, agentBinaryTargets ...interface{}) error {
+func packageAgent(ctx context.Context, platforms devtools.BuildPlatformList, dependenciesVersion string, manifestResponse *manifest.Build, packageTypes []mage.PackageType, agentPackaging mg.Fn, agentBinaryTargets ...mg.Fn) error {
 	fmt.Println("--- Package Elastic-Agent")
 
 	if mg.Verbose() {
@@ -1203,7 +1203,14 @@ func packageAgent(ctx context.Context, platforms devtools.BuildPlatformList, dep
 	// package agent
 	log.Println("--- Running post packaging ")
 	mg.Deps(Update)
-	mg.Deps(agentBinaryTargets...)
+
+	// direct casting of []mg.Fn to []interface{} is not allowed, but to ensure the function
+	// signature requires the `[]mg.Fn` and not `[]interface{}` this is done here.
+	binaryTargets := make([]interface{}, 0, len(agentBinaryTargets))
+	for _, target := range agentBinaryTargets {
+		binaryTargets = append(binaryTargets, target)
+	}
+	mg.Deps(binaryTargets...)
 
 	// compile the elastic-agent.exe proxy binary for the windows archive
 	for _, p := range platforms {
@@ -4188,12 +4195,12 @@ func getMacOSMajorVersion() (int, error) {
 	return majorVer, nil
 }
 
-func getAgentBuildTargets() []interface{} {
+func getAgentBuildTargets() []mg.Fn {
 	// add otel:crossBuild as pre-build for packaging when OTEL_COMPONENT=true
-	buildTargets := make([]interface{}, 0, 2)
+	buildTargets := make([]mg.Fn, 0, 2)
 	if mage.OTELComponentBuild {
-		buildTargets = append(buildTargets, Otel.CrossBuild)
+		buildTargets = append(buildTargets, mg.F(Otel.CrossBuild))
 	}
-	buildTargets = append(buildTargets, CrossBuild)
+	buildTargets = append(buildTargets, mg.F(CrossBuild))
 	return buildTargets
 }
