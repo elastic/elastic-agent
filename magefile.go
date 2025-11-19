@@ -34,14 +34,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.org/x/sync/errgroup"
+	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
+
+	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/otiai10/copy"
 
 	"github.com/elastic/elastic-agent/dev-tools/devmachine"
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
-	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
 	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
 	"github.com/elastic/elastic-agent/dev-tools/packaging"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
@@ -71,10 +73,9 @@ import (
 	// mage:import
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/test"
 
-	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	filecopy "github.com/otiai10/copy"
+	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
 
 	"helm.sh/helm/v3/pkg/action"
@@ -260,11 +261,11 @@ func (Build) GenerateConfig() error {
 	return sh.Copy(filepath.Join(buildDir, configFile), filepath.Join(metaDir, configFile))
 }
 
-// WindowsArchiveRootBinary compiles a binary to be placed at the root of the windows elastic-agent archive. This binary
+// windowsArchiveRootBinaryForGoArch compiles a binary to be placed at the root of the windows elastic-agent archive. This binary
 // is a thin proxy to the actual elastic-agent binary that resides in the data/elastic-agent-{commit-short-sha}
 // directory of the archive.
-func (Build) WindowsArchiveRootBinary() error {
-	fmt.Println("--- Compiling root binary for windows archive")
+func (Build) windowsArchiveRootBinaryForGoArch(goarch string) error {
+	fmt.Printf("--- Compiling root binary for %s windows archive\n", goarch)
 	hashShort, err := devtools.CommitHashShort()
 	if err != nil {
 		return fmt.Errorf("error getting commit hash: %w", err)
@@ -278,7 +279,7 @@ func (Build) WindowsArchiveRootBinary() error {
 
 	args := devtools.BuildArgs{
 		Name:        outputName,
-		OutputDir:   filepath.Join(buildDir, "windows-archive-root-binary"),
+		OutputDir:   filepath.Join(buildDir, fmt.Sprintf("windows-%s-archive-root-binary", goarch)),
 		InputFiles:  []string{"wrapper/windows/archive-proxy/main.go"},
 		CGO:         false,
 		WinMetadata: true,
@@ -291,7 +292,7 @@ func (Build) WindowsArchiveRootBinary() error {
 		},
 		Env: map[string]string{
 			"GOOS":   "windows",
-			"GOARCH": devtools.GOARCH,
+			"GOARCH": goarch,
 		},
 		LDFlags: []string{
 			"-s", // Strip all debug symbols from binary (does not affect Go stack traces).
@@ -309,6 +310,13 @@ func (Build) WindowsArchiveRootBinary() error {
 	return devtools.Build(args)
 }
 
+// WindowsArchiveRootBinary compiles a binary to be placed at the root of the windows elastic-agent archive. This binary
+// is a thin proxy to the actual elastic-agent binary that resides in the data/elastic-agent-{commit-short-sha}
+// directory of the archive.
+func (Build) WindowsArchiveRootBinary() {
+	mg.Deps(mg.F(Build.windowsArchiveRootBinaryForGoArch, devtools.GOARCH))
+}
+
 // GolangCrossBuildOSS build the Beat binary inside of the golang-builder.
 // Do not use directly, use crossBuild instead.
 func GolangCrossBuildOSS() error {
@@ -322,6 +330,7 @@ func GolangCrossBuildOSS() error {
 func GolangCrossBuild() error {
 	params := devtools.DefaultGolangCrossBuildArgs()
 	params.OutputDir = "build/golang-crossbuild"
+	params.Package = "github.com/elastic/elastic-agent"
 	injectBuildVars(params.Vars)
 
 	if err := devtools.GolangCrossBuild(params); err != nil {
@@ -425,12 +434,7 @@ func (Build) TestBinaries() error {
 		}
 
 		outputName := filepath.Join(pkg, binary)
-
-		finalArgs := make([]string, len(args))
-		copy(finalArgs, args)
-		finalArgs = append(finalArgs, "-o", outputName, filepath.Join(pkg))
-
-		err := RunGo(finalArgs...)
+		err := devtools.Run(nil, nil, os.Stderr, "go", pkg, "build", "-v", "-o", outputName, pkg)
 		if err != nil {
 			return err
 		}
@@ -540,7 +544,7 @@ func Package(ctx context.Context) error {
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
-	platforms := devtools.Platforms.Names()
+	platforms := devtools.Platforms
 	if len(platforms) == 0 {
 		panic("elastic-agent package is expected to build at least one platform package")
 	}
@@ -1105,8 +1109,8 @@ func runAgent(ctx context.Context, env map[string]string) error {
 		}
 
 		// produce docker package
-		packageAgent(ctx, []string{
-			"linux/amd64",
+		packageAgent(ctx, devtools.BuildPlatformList{
+			devtools.BuildPlatform{Name: "linux/amd64"},
 		}, dependenciesVersion, nil, mg.F(devtools.UseElasticAgentDemoPackaging), mg.F(CrossBuild), devtools.SelectedPackageTypes)
 
 		dockerPackagePath := filepath.Join("build", "package", "elastic-agent", "elastic-agent-linux-amd64.docker", "docker-build")
@@ -1154,7 +1158,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-func packageAgent(ctx context.Context, platforms []string, dependenciesVersion string, manifestResponse *manifest.Build, agentPackaging, agentBinaryTarget mg.Fn, packageTypes []mage.PackageType) error {
+func packageAgent(ctx context.Context, platforms devtools.BuildPlatformList, dependenciesVersion string, manifestResponse *manifest.Build, agentPackaging, agentBinaryTarget mg.Fn, packageTypes []mage.PackageType) error {
 	fmt.Println("--- Package Elastic-Agent")
 
 	if mg.Verbose() {
@@ -1176,7 +1180,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	keepArchive := os.Getenv("KEEP_ARCHIVE") != ""
 
 	// download/copy all the necessary dependencies for packaging elastic-agent
-	archivePath, dropPath, dependencies := collectPackageDependencies(platforms, dependenciesVersion, packageTypes, dependencies)
+	archivePath, dropPath, dependencies := collectPackageDependencies(platforms.Names(), dependenciesVersion, packageTypes, dependencies)
 
 	// cleanup after build
 	if !keepArchive {
@@ -1194,7 +1198,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	defer os.RemoveAll(flatPath)
 
 	// extract all dependencies from their archives into flat dir
-	flattenDependencies(platforms, dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse, dependencies)
+	flattenDependencies(platforms.Names(), dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse, dependencies)
 
 	// package agent
 	log.Println("--- Running post packaging ")
@@ -1202,8 +1206,10 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	mg.Deps(agentBinaryTarget)
 
 	// compile the elastic-agent.exe proxy binary for the windows archive
-	if slices.Contains(platforms, "windows/amd64") || slices.Contains(platforms, "windows/arm64") {
-		mg.Deps(Build.WindowsArchiveRootBinary)
+	for _, p := range platforms {
+		if p.GOOS() == "windows" {
+			mg.Deps(mg.F(Build.windowsArchiveRootBinaryForGoArch, p.GOARCH()))
+		}
 	}
 
 	mg.SerialDeps(devtools.Package, TestPackages)
@@ -1266,14 +1272,7 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 					if mg.Verbose() {
 						log.Printf(">>> Looking for component %s/%s", spec.BinaryName, platform)
 					}
-					for _, pkgType := range packageTypes {
-						if mg.Verbose() {
-							log.Printf(">>> Evaluating pkgType %v for component %s/%s", pkgType, spec.BinaryName, platform)
-						}
-						if !spec.SupportsPackageType(pkgcommon.PackageType(pkgType)) {
-							log.Printf(">>> PkgType %v for component %s/%s not supported. Skipping...", pkgType, spec.BinaryName, platform)
-							continue
-						}
+					if supportsAtLeastOnePackageType(platform, spec, packageTypes) {
 						targetPath := filepath.Join(archivePath, manifest.PlatformPackages[platform])
 						os.MkdirAll(targetPath, 0o755)
 						packageName := spec.GetPackageName(packageVersion, platform)
@@ -1368,6 +1367,23 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 		archivePath = movePackagesToArchive(dropPath, platforms, packageVersion, dependencies)
 	}
 	return archivePath, dropPath, dependencies
+}
+
+func supportsAtLeastOnePackageType(platform string, spec packaging.BinarySpec, packageTypes []devtools.PackageType) bool {
+	for _, pkgType := range packageTypes {
+		if mg.Verbose() {
+			log.Printf(">>> Evaluating pkgType %v for component %s/%s", pkgType, spec.BinaryName, platform)
+		}
+		if !spec.SupportsPackageType(pkgcommon.PackageType(pkgType)) {
+			continue
+		}
+		if mg.Verbose() {
+			log.Printf(">>> Selecting component %s/%s because of pkgType %s", spec.BinaryName, platform, pkgType)
+		}
+		return true
+	}
+	log.Printf(">>> Component %s/%s not supported for any of the selected package types %v. Skipping...", spec.BinaryName, platform, packageTypes)
+	return false
 }
 
 func removePythonWheels(matches []string, version string, dependencies []packaging.BinarySpec) []string {
@@ -1530,7 +1546,7 @@ func PackageUsingDRA(ctx context.Context) error {
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
-	platforms := devtools.Platforms.Names()
+	platforms := devtools.Platforms
 	if len(platforms) == 0 {
 		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")
 	}
@@ -1806,8 +1822,8 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestURL string, versio
 
 		log.Printf("copying %q to %q", srcBinaryPath, dstBinaryPath)
 
-		err = filecopy.Copy(srcBinaryPath, dstBinaryPath, filecopy.Options{
-			PermissionControl: filecopy.PerservePermission,
+		err = copy.Copy(srcBinaryPath, dstBinaryPath, copy.Options{
+			PermissionControl: copy.PerservePermission,
 		})
 		if err != nil {
 			return fmt.Errorf("copying %q to %q: %w", srcBinaryPath, dstBinaryPath, err)
@@ -3626,7 +3642,7 @@ func (Otel) Readme() error {
 		return fmt.Errorf("failed to parse README template: %w", err)
 	}
 
-	data, err := otel.GetOtelDependencies("go.mod")
+	data, err := otel.GetOtelDependencies(filepath.Join("internal", "edot", "go.mod"))
 	if err != nil {
 		return fmt.Errorf("Failed to get OTel dependencies: %w", err)
 	}

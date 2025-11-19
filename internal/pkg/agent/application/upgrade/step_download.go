@@ -113,7 +113,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, parsedVersion
 		factory = newDownloader
 		a.log.Infow("Downloading upgrade artifact", "version", parsedVersion,
 			"source_uri", settings.SourceURI, "drop_path", settings.DropPath,
-			"target_path", settings.TargetDirectory, "install_path", settings.InstallPath)
+			"target_path", settings.TargetDirectory, "install_path", settings.InstallPath, "proxy_uri", settings.Proxy.URL, "proxy_disable", settings.Proxy.Disable)
 	}
 	if downloaderFunc == nil {
 		downloaderFunc = a.downloadWithRetries
