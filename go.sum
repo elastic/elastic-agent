@@ -321,8 +321,6 @@ github.com/bboreham/go-loser v0.0.0-20230920113527-fcc2c21820a3 h1:6df1vn4bBlDDo
 github.com/bboreham/go-loser v0.0.0-20230920113527-fcc2c21820a3/go.mod h1:CIWtjkly68+yqLPbvwwR/fjNJA/idrtULjZWh2v1ys0=
 github.com/beevik/ntp v1.4.3 h1:PlbTvE5NNy4QHmA4Mg57n7mcFTmr1W1j3gcK7L1lqho=
 github.com/beevik/ntp v1.4.3/go.mod h1:Unr8Zg+2dRn7d8bHFuehIMSvvUYssHMxW3Q5Nx4RW5Q=
-github.com/belimawr/beats/v7 v7.0.0-alpha2.0.20251117171939-0c199b56a7dc h1:XM1/dvRig7nNesoyoeMZES+PUxx3NYJlDeYTxuRCiDY=
-github.com/belimawr/beats/v7 v7.0.0-alpha2.0.20251117171939-0c199b56a7dc/go.mod h1:vi0GwBMUQ3B+3RmJ8V988soZvt3IK9UddCTWf42zjnk=
 github.com/benbjohnson/clock v1.3.5 h1:VvXlSJBzZpA/zum6Sj74hxwYI2DIxRWuNIoXAzHZz5o=
 github.com/benbjohnson/clock v1.3.5/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
@@ -505,6 +503,8 @@ github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumpti
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic/go.mod h1:0vCBR1wgGwZeGmloJ+eCWIZF2S47grTXRzj2mftg2Nk=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
 github.com/elastic/bayeux v1.0.5/go.mod h1:CSI4iP7qeo5MMlkznGvYKftp8M7qqP/3nzmVZoXHY68=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251119192840-2bacf0afc91e h1:twWVa+OLBvjD0tgLVkm1Vb8TVwHF6beEf7YF3zmtJr8=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251119192840-2bacf0afc91e/go.mod h1:SXLtb9HSmYlEpFxnUwrF8WHt8M6L6tN1yEKfr7tUs7I=
 github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae h1:OiShmbWAyGU0MS0ADJWr1/QgeLIZliMk9xsrFicR3/s=
 github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae/go.mod h1:D2IckZVXARugvikE4fv1glvaJMohKSZRzrPsxCjo9O0=
 github.com/elastic/elastic-agent-autodiscover v0.10.0 h1:WJ4zl9uSfk1kHmn2B/0byQBLIL607Zt4LNfOgV7+XN0=
@@ -513,8 +513,8 @@ github.com/elastic/elastic-agent-client/v7 v7.17.2 h1:Cl2TeABqWZgW40t5fchGWT/sRk
 github.com/elastic/elastic-agent-client/v7 v7.17.2/go.mod h1:5irRFqp6HLqtu1S+OeY0jg8x7K6PLL+DW+PwVk1vJnk=
 github.com/elastic/elastic-agent-libs v0.26.1 h1:ywjSQajyjiv7zQTsyZjghIVb7PpPCrXZRUOhbV3KdFM=
 github.com/elastic/elastic-agent-libs v0.26.1/go.mod h1:o/iXtbHYaojpG4BOY7Z3hFMQAgEoqq2owO17JPGpf3A=
-github.com/elastic/elastic-agent-system-metrics v0.13.3 h1:VlY3Ezuwi5bPZRsAM97WaJEW78XkXgqmPHcTl1WGMRw=
-github.com/elastic/elastic-agent-system-metrics v0.13.3/go.mod h1:lB8veYWYBlA9eF6TahmPN87G1IEgWlbep7QSqLSW90U=
+github.com/elastic/elastic-agent-system-metrics v0.13.4 h1:gX8VdlQyakPcPKFpD7uHv2QLRDyguuKfZgu0LE27V7c=
+github.com/elastic/elastic-agent-system-metrics v0.13.4/go.mod h1:lB8veYWYBlA9eF6TahmPN87G1IEgWlbep7QSqLSW90U=
 github.com/elastic/elastic-agent/internal/edot v0.0.0-20251114132921-c463803c5568 h1:48WdmnvdvvDbmUfoBcw+/mcs8f2rGPUgunKcqm9BT2k=
 github.com/elastic/elastic-agent/internal/edot v0.0.0-20251114132921-c463803c5568/go.mod h1:yAoFRZlYgtvBzCCr+Bkf6Rw9ILNH/PX3Pw/7BoEM9r8=
 github.com/elastic/elastic-transport-go/v8 v8.7.0 h1:OgTneVuXP2uip4BA658Xi6Hfw+PeIOod2rY3GVMGoVE=
