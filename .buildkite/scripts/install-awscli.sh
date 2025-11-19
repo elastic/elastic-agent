@@ -23,8 +23,8 @@ if [[ "$OSTYPE" == "linux-gnu" ]]; then
   curl -sSL "https://awscli.amazonaws.com/awscli-exe-linux-${ARCH}.zip" -o "awscliv2.zip"
   unzip -q awscliv2.zip
   sudo ./aws/install
-  if ! command -v aws; then
-      export PATH="/usr/local/bin:${PATH}"
+  if ! command -v aws; then # on RHEL, /usr/local/bin isn't in the PATH
+      sudo ln -s /usr/local/bin/aws /usr/bin/aws
   fi
 elif [[ "$OSTYPE" == "darwin"* ]]; then
   curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
