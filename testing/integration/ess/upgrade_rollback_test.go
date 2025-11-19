@@ -97,6 +97,8 @@ outputs:
   default:
     type: elasticsearch
     hosts: [127.0.0.1:9200]
+    status_reporting:
+      enabled: false
 
 inputs:
   - condition: '${agent.version.version} == "%s"'
@@ -529,9 +531,13 @@ func managedRollbackRestartTest(ctx context.Context, t *testing.T, info *define.
 	// we expect ErrSkipGrace at this point, meaning that we finished installing but didn't wait for agent to become healthy
 	require.ErrorIs(t, err, ErrSkipGrace, "managed upgrade failed with unexpected error")
 
-	// A few seconds after the upgrade, deliberately restart upgraded Agent a
-	// couple of times to simulate Agent crashing.
-	restartAgentNTimes(t, 3, 10*time.Second)
+	installedAgentClient := from.NewClient()
+	targetVersion, err := to.ExecVersion(ctx)
+	require.NoError(t, err, "failed to get target version")
+	restartContext, cancel := context.WithTimeout(t.Context(), 1*time.Minute)
+	defer cancel()
+	// restart the agent only if it matches the (upgraded) target version
+	restartAgentVersion(restartContext, t, installedAgentClient, targetVersion.Binary, 10*time.Second)
 
 	// wait for the agent to be healthy and correct version
 	err = upgradetest.WaitHealthyAndVersion(ctx, from, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
@@ -657,42 +663,95 @@ func restartAgentNTimes(t *testing.T, noOfRestarts int, sleepBetweenIterations t
 
 	for restartIdx := 0; restartIdx < noOfRestarts; restartIdx++ {
 		time.Sleep(sleepBetweenIterations)
-
-		t.Logf("Stopping agent via service to simulate crashing")
-		err := install.StopService(topPath, install.DefaultStopTimeout, install.DefaultStopInterval)
-		if err != nil && runtime.GOOS == define.Windows && strings.Contains(err.Error(), "The service has not been started.") {
-			// Due to the quick restarts every 10 seconds its possible that this is faster than Windows
-			// can handle. Decrementing restartIdx means that the loop will occur again.
-			t.Logf("Got an allowed error on Windows: %s", err)
-			err = nil
-		}
-		require.NoError(t, err)
-
-		// ensure that it's stopped before starting it again
-		var status service.Status
-		var statusErr error
-		require.Eventuallyf(t, func() bool {
-			status, statusErr = install.StatusService(topPath)
-			if statusErr != nil {
-				return false
-			}
-			return status != service.StatusRunning
-		}, 5*time.Minute, 1*time.Second, "service never fully stopped (status: %v): %s", status, statusErr)
-		t.Logf("Stopped agent via service to simulate crashing")
-
-		// start it again
-		t.Logf("Starting agent via service to simulate crashing")
-		err = install.StartService(topPath)
-		require.NoError(t, err)
-
-		// ensure that it's started before next loop
-		require.Eventuallyf(t, func() bool {
-			status, statusErr = install.StatusService(topPath)
-			if statusErr != nil {
-				return false
-			}
-			return status == service.StatusRunning
-		}, 5*time.Minute, 1*time.Second, "service never fully started (status: %v): %s", status, statusErr)
-		t.Logf("Started agent via service to simulate crashing")
+		restartAgent(t, topPath, 5*time.Minute)
 	}
+}
+
+func restartAgent(t *testing.T, topPath string, operationTimeout time.Duration) {
+	t.Logf("Stopping agent via service to simulate crashing")
+	stopRequested := time.Now()
+	err := install.StopService(topPath, install.DefaultStopTimeout, install.DefaultStopInterval)
+	if err != nil && runtime.GOOS == define.Windows && strings.Contains(err.Error(), "The service has not been started.") {
+		// Due to the quick restarts every sleepBetweenIterations its possible that this is faster than Windows
+		// can handle. Decrementing restartIdx means that the loop will occur again.
+		t.Logf("Got an allowed error on Windows: %s", err)
+		err = nil
+	}
+	require.NoError(t, err)
+
+	// ensure that it's stopped before starting it again
+	var status service.Status
+	var statusErr error
+	require.Eventuallyf(t, func() bool {
+		status, statusErr = install.StatusService(topPath)
+		if statusErr != nil {
+			return false
+		}
+		return status != service.StatusRunning
+	}, operationTimeout, 500*time.Millisecond, "service never fully stopped (status: %v): %s", status, statusErr)
+	t.Logf("Stopped agent via service. Took roughly %s", time.Since(stopRequested))
+
+	// start it again
+	t.Logf("Starting agent via service to simulate crashing")
+	startRequested := time.Now()
+	err = install.StartService(topPath)
+	require.NoError(t, err)
+
+	// ensure that it's started before next loop
+	require.Eventuallyf(t, func() bool {
+		status, statusErr = install.StatusService(topPath)
+		if statusErr != nil {
+			return false
+		}
+		return status == service.StatusRunning
+	}, operationTimeout, 500*time.Millisecond, "service never fully started (status: %v): %s", status, statusErr)
+	t.Logf("Started agent after stopping to simulate crashing. Took roughly %s", time.Since(startRequested))
+}
+
+func restartAgentVersion(ctx context.Context, t *testing.T, client client.Client, targetVersion atesting.AgentBinaryVersion, restartInterval time.Duration) {
+	topPath := paths.Top()
+
+	ticker := time.NewTicker(restartInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			t.Log("restart context is done, returning")
+			return
+
+		case <-ticker.C:
+			if !versionMatch(ctx, t, client, targetVersion) {
+				// version of running agent does not match the target, continue to the next iteration
+				continue
+			}
+
+			restartAgent(t, topPath, restartInterval)
+		}
+
+	}
+}
+
+func versionMatch(ctx context.Context, t *testing.T, c client.Client, targetVersion atesting.AgentBinaryVersion) bool {
+	err := c.Connect(ctx)
+	if err != nil {
+		t.Logf("failed to connect to agent: %v", err)
+		return false
+	}
+	defer c.Disconnect()
+
+	actualVersion, err := c.Version(ctx)
+	if err != nil {
+		t.Logf("failed to detect agent version: %v", err)
+		return false
+	}
+
+	if actualVersion.Version != targetVersion.Version ||
+		actualVersion.Snapshot != targetVersion.Snapshot ||
+		actualVersion.Commit != targetVersion.Commit ||
+		actualVersion.Fips != targetVersion.Fips {
+		t.Logf("actual agent version %+v does not match target agent version %+v, skipping restart", actualVersion, targetVersion)
+		return false
+	}
+	return true
 }
