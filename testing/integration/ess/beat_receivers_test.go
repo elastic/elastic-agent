@@ -817,6 +817,12 @@ agent.monitoring.enabled: false
 	}
 }
 
+// Log lines TestBeatsReceiverProcessRuntimeFallback checks for
+const (
+	otelRuntimeUnsupportedLogLineStart = "otel runtime is not supported"
+	prometheusInputSkippedLogLine      = "The Otel prometheus metrics monitoring input can't run in a beats process, skipping"
+)
+
 // TestBeatsReceiverProcessRuntimeFallback verifies that we fall back to the process runtime if the otel runtime
 // does not support the requested configuration.
 func TestBeatsReceiverProcessRuntimeFallback(t *testing.T) {
@@ -890,10 +896,10 @@ outputs:
 		}
 
 		if message, ok := logRecord["message"].(string); ok {
-			if strings.HasPrefix(message, "otel runtime is not supported") {
+			if strings.HasPrefix(message, otelRuntimeUnsupportedLogLineStart) {
 				unsupportedLogRecords = append(unsupportedLogRecords, logRecord)
 			}
-			if strings.HasPrefix(message, "The Otel prometheus metrics monitoring input can't run in a beats process, skipping") {
+			if strings.HasPrefix(message, prometheusInputSkippedLogLine) {
 				prometheusUnsupportedLogRecord = logRecord
 			}
 		}
