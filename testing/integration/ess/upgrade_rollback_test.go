@@ -531,7 +531,9 @@ func managedRollbackRestartTest(ctx context.Context, t *testing.T, info *define.
 
 	// A few seconds after the upgrade, deliberately restart upgraded Agent a
 	// couple of times to simulate Agent crashing.
-	restartAgentNTimes(t, 2, 10*time.Second)
+	noOfRestarts := 3
+
+	restartAgentNTimes(t, noOfRestarts, 10*time.Second)
 
 	// wait for the agent to be healthy and correct version
 	err = upgradetest.WaitHealthyAndVersion(ctx, from, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
@@ -661,7 +663,7 @@ func restartAgentNTimes(t *testing.T, noOfRestarts int, sleepBetweenIterations t
 		stopRequested := time.Now()
 		err := install.StopService(topPath, install.DefaultStopTimeout, install.DefaultStopInterval)
 		if err != nil && runtime.GOOS == define.Windows && strings.Contains(err.Error(), "The service has not been started.") {
-			// Due to the quick restarts every 10 seconds its possible that this is faster than Windows
+			// Due to the quick restarts every sleepBetweenIterations its possible that this is faster than Windows
 			// can handle. Decrementing restartIdx means that the loop will occur again.
 			t.Logf("Got an allowed error on Windows: %s", err)
 			err = nil
