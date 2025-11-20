@@ -17,6 +17,8 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
@@ -126,6 +128,7 @@ func TestMonitoringFull(t *testing.T) {
 					},
 				},
 				agentInfo: agentInfo,
+				logger:    logp.NewNopLogger(),
 			}
 
 			expectedConfigBytes, err := os.ReadFile(tc.ExpectedConfigPath)
@@ -176,6 +179,7 @@ func TestMonitoringWithEndpoint(t *testing.T) {
 			},
 		},
 		agentInfo: agentInfo,
+		logger:    logp.NewNopLogger(),
 	}
 
 	policy := map[string]any{
@@ -350,6 +354,7 @@ func TestMonitoringConfigMetricsInterval(t *testing.T) {
 				config:          tc.monitoringCfg,
 				operatingSystem: runtime.GOOS,
 				agentInfo:       agentInfo,
+				logger:          logp.NewNopLogger(),
 			}
 			got, err := b.MonitoringConfig(tc.policy, components, map[string]uint64{}) // put a componentID/binary mapping to have something in the beats monitoring input
 			assert.NoError(t, err)
@@ -583,6 +588,7 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 				config:          tc.monitoringCfg,
 				operatingSystem: runtime.GOOS,
 				agentInfo:       agentInfo,
+				logger:          logp.NewNopLogger(),
 			}
 			got, err := b.MonitoringConfig(tc.policy, components, map[string]uint64{}) // put a componentID/binary mapping to have something in the beats monitoring input
 			assert.NoError(t, err)
@@ -758,6 +764,7 @@ func TestErrorMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 				config:          tc.monitoringCfg,
 				operatingSystem: runtime.GOOS,
 				agentInfo:       agentInfo,
+				logger:          logp.NewNopLogger(),
 			}
 
 			_, err := b.MonitoringConfig(tc.policy, components, map[string]uint64{}) // put a componentID/binary mapping to have something in the beats monitoring input
@@ -797,6 +804,7 @@ func TestMonitoringConfigComponentFields(t *testing.T) {
 		enabled:   true,
 		config:    cfg,
 		agentInfo: agentInfo,
+		logger:    logp.NewNopLogger(),
 	}
 
 	components := []component.Component{
@@ -907,6 +915,7 @@ func TestMonitoringConfigForBeatsReceivers(t *testing.T) {
 		enabled:   true,
 		config:    cfg,
 		agentInfo: agentInfo,
+		logger:    logp.NewNopLogger(),
 	}
 
 	components := []component.Component{
@@ -1005,6 +1014,7 @@ func TestMonitoringWithOtelRuntime(t *testing.T) {
 				enabled:   true,
 				config:    cfg,
 				agentInfo: agentInfo,
+				logger:    logp.NewNopLogger(),
 			}
 
 			components := []component.Component{
@@ -1090,6 +1100,7 @@ func TestEnrichArgs(t *testing.T) {
 			b := &BeatsMonitor{
 				enabled: test.enabled,
 				config:  &test.config,
+				logger:  logp.NewNopLogger(),
 			}
 			args := b.EnrichArgs(unitID, test.binaryName, nil)
 			// replace socket path with placeholder, it's annoying to do cross-platform tests on these
@@ -1123,7 +1134,7 @@ func TestMonitorReload(t *testing.T) {
 	monitorcfg.MonitorLogs = false
 	monitorcfg.MonitorMetrics = false
 
-	beatsMonitor := New(true, "", monitorcfg, nil)
+	beatsMonitor := New(true, "", monitorcfg, nil, logp.NewNopLogger())
 	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, false)
 	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, false)
 
@@ -1197,6 +1208,7 @@ func TestMonitoringConfigOtelOutputSupport(t *testing.T) {
 					},
 				},
 				agentInfo: agentInfo,
+				logger:    logp.NewNopLogger(),
 			}
 
 			policy := map[string]any{

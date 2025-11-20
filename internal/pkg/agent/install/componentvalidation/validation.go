@@ -125,7 +125,13 @@ func GetMonitoringFn(ctx context.Context, logger *logger.Logger, cfg map[string]
 		return nil, fmt.Errorf("could not load agent info: %w", err)
 	}
 
-	monitor := componentmonitoring.New(agentCfg.Settings.V1MonitoringEnabled, agentCfg.Settings.DownloadConfig.OS(), agentCfg.Settings.MonitoringConfig, agentInfo)
+	monitor := componentmonitoring.New(
+		agentCfg.Settings.V1MonitoringEnabled,
+		agentCfg.Settings.DownloadConfig.OS(),
+		agentCfg.Settings.MonitoringConfig,
+		agentInfo,
+		logger,
+	)
 	return monitor.MonitoringConfig, nil
 }
 
