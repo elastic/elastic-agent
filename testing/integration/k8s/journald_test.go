@@ -211,6 +211,12 @@ func journaldTest(
 		t.Errorf("context error: %v", ctx.Err())
 	}
 
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Logf("Index: %q, filter condition: %q=%q", index, field, value)
+		}
+	})
+
 	// Query the index and filter by the input type
 	docs := integration.FindESDocs(t, func() (estools.Documents, error) {
 		return estools.GetLogsForIndexWithContext(
