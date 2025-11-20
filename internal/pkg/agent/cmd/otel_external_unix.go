@@ -19,10 +19,7 @@ import (
 )
 
 // binaryName is the name of the executable to run
-// This temporarily has a '-component' prefix because the Elastic Agent can be build in two ways and this
-// allows this to work with the way Elastic Agent is packaged without large changes that will be removed
-// in the future once this becomes the default way.
-const binaryName = "otelcol-component"
+const binaryName = "elastic-otel-collector"
 
 func newOtelCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 	return &cobra.Command{

@@ -3630,13 +3630,13 @@ func hasCleanOnExit() bool {
 	return b
 }
 
-// GolangCrossBuild builds the otelcol binary in the golang-crossbuild container.
+// GolangCrossBuild builds the elastic-otel-collector binary in the golang-crossbuild container.
 // Don't call directly; called from otel:crossBuild.
 func (Otel) GolangCrossBuild() error {
 	mg.Deps(EnsureCrossBuildOutputDir)
 
 	params := devtools.DefaultGolangCrossBuildArgs()
-	params.Name = "otelcol-" + mage.Platform.GOOS + "-" + mage.Platform.Arch
+	params.Name = "elastic-otel-collector-" + mage.Platform.GOOS + "-" + mage.Platform.Arch
 	params.OutputDir = "build/golang-crossbuild"
 	params.Package = "github.com/elastic/elastic-agent/internal/edot"
 	injectBuildVars(params.Vars)
@@ -3648,9 +3648,9 @@ func (Otel) GolangCrossBuild() error {
 	return nil
 }
 
-// CrossBuild builds the otelcol binary in the golang-crossbuild container.
+// CrossBuild builds the elastic-otel-collector binary in the golang-crossbuild container.
 func (Otel) CrossBuild() error {
-	return devtools.CrossBuild(devtools.WithName("otelcol"), devtools.WithTarget("otel:golangCrossBuild"))
+	return devtools.CrossBuild(devtools.WithName("elastic-otel-collector"), devtools.WithTarget("otel:golangCrossBuild"))
 }
 
 func (Otel) Readme() error {
