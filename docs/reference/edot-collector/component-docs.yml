@@ -38,7 +38,9 @@ components:
     doc_path: "/reference/edot-collector/components/elasticapmprocessor.md"
     title: "Elastic APM processor"
 
+  # Connectors
+  elasticapmconnector:
+    doc_path: "/reference/edot-collector/components/elasticapmconnector.md"
+    title: "Elastic APM connector"
+
   # Add more components as documentation is created
-  # elasticapmconnector:
-  #   doc_path: "/reference/edot-collector/components/elasticapmconnector"
-  #   title: "Elastic APM connector"
