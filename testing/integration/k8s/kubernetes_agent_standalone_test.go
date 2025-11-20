@@ -767,8 +767,8 @@ func TestKubernetesAgentHelm(t *testing.T) {
 					},
 					"outputs": map[string]any{
 						"default": map[string]any{
-							"type":    "Logstash",
-							"hosts":   [1]string{"logstash-agent:5044"},
+							"type":  "Logstash",
+							"hosts": [1]string{"logstash-agent:5044"},
 							"ssl": map[string]any{
 								"certificateAuthorities": []map[string]any{{
 									"valueFromSecret": map[string]any{
@@ -1257,7 +1257,6 @@ func k8sStepLogstashCreate() k8sTestStep {
 	}
 }
 
-
 func k8sStepLogstashDelete() k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
 		logstashPod := &corev1.Pod{}
@@ -1268,6 +1267,7 @@ func k8sStepLogstashDelete() k8sTestStep {
 		require.NoError(t, err, "failed to delete logstash k8s objects")
 	}
 }
+
 func k8sStepLogstashCheckStatus(logstashPodLabelSelector string, logstashExpected bool) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
 		logstashPodList := &corev1.PodList{}
@@ -1283,8 +1283,10 @@ func k8sStepLogstashCheckStatus(logstashPodLabelSelector string, logstashExpecte
 			if (pod.Status.Phase == corev1.PodRunning) && !logstashExpected {
 				t.Errorf("logstash pod %s is running but it should not", pod.Name)
 			}
+		}
 	}
 }
+
 func k8sStepHintsRedisCreate() k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
 		r, err := os.Open("testdata/k8s.hints.redis.yaml")
