@@ -5,7 +5,7 @@ go 1.24.10
 replace github.com/elastic/elastic-agent => ../../
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251118185621-a2448db20720
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251119204152-c728c08086a3
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.26.1
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.8.0
@@ -276,7 +276,7 @@ require (
 	github.com/elastic/bayeux v1.0.5 // indirect
 	github.com/elastic/elastic-agent-autodiscover v0.10.0 // indirect
 	github.com/elastic/elastic-agent-client/v7 v7.17.2 // indirect
-	github.com/elastic/elastic-agent-system-metrics v0.13.3 // indirect
+	github.com/elastic/elastic-agent-system-metrics v0.13.4 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.7.0 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
 	github.com/elastic/go-docappender/v2 v2.11.2 // indirect
