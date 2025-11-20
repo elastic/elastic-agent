@@ -258,7 +258,7 @@ require (
 	github.com/elastic/elastic-agent-autodiscover v0.10.0 // indirect
 	github.com/elastic/elastic-agent-client/v7 v7.17.2 // indirect
 	github.com/elastic/elastic-agent-system-metrics v0.13.3 // indirect
-	github.com/elastic/elastic-transport-go/v8 v8.7.0 // indirect
+	github.com/elastic/elastic-transport-go/v8 v8.8.0 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
 	github.com/elastic/go-docappender/v2 v2.11.2 // indirect
 	github.com/elastic/go-elasticsearch/v8 v8.19.0 // indirect
