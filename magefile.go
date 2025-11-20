@@ -34,7 +34,14 @@ import (
 	"sync/atomic"
 	"time"
 
+<<<<<<< HEAD
 	"golang.org/x/sync/errgroup"
+=======
+	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
+
+	"github.com/jedib0t/go-pretty/v6/table"
+	filecopy "github.com/otiai10/copy"
+>>>>>>> fd86b05cb (Restore workaround for https://github.com/golang/go/issues/67854 (#11258))
 
 	"github.com/elastic/elastic-agent/dev-tools/devmachine"
 	"github.com/elastic/elastic-agent/dev-tools/mage"
@@ -423,7 +430,10 @@ func (Build) TestBinaries() error {
 		}
 
 		outputName := filepath.Join(pkg, binary)
+<<<<<<< HEAD
 
+=======
+>>>>>>> fd86b05cb (Restore workaround for https://github.com/golang/go/issues/67854 (#11258))
 		finalArgs := make([]string, len(args))
 		copy(finalArgs, args)
 		finalArgs = append(finalArgs, "-o", outputName, filepath.Join(pkg))
