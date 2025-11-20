@@ -104,6 +104,7 @@ type BeatsMonitor struct {
 	config          *monitoringConfig
 	operatingSystem string
 	agentInfo       info.Agent
+	logger          *logp.Logger
 }
 
 // componentInfo is the information necessary to generate monitoring configuration for a component. We don't just use
@@ -122,7 +123,13 @@ type monitoringConfig struct {
 }
 
 // New creates a new BeatsMonitor instance.
-func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, agentInfo info.Agent) *BeatsMonitor {
+func New(
+	enabled bool,
+	operatingSystem string,
+	cfg *monitoringCfg.MonitoringConfig,
+	agentInfo info.Agent,
+	logger *logp.Logger,
+) *BeatsMonitor {
 	return &BeatsMonitor{
 		enabled: enabled,
 		config: &monitoringConfig{
@@ -130,6 +137,7 @@ func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConf
 		},
 		operatingSystem: operatingSystem,
 		agentInfo:       agentInfo,
+		logger:          logger,
 	}
 }
 
@@ -242,11 +250,13 @@ func (b *BeatsMonitor) MonitoringConfig(
 		return nil, nil
 	}
 
-	outputOtelSupported := isOutputOtelSupported(outputCfg)
+	outputOtelSupportedErr := verifyOutputOtelSupported(outputCfg)
 	monitoringRuntime := component.RuntimeManager(b.config.C.RuntimeManager)
-	if !outputOtelSupported {
+	if outputOtelSupportedErr != nil {
+		b.logger.Warnf("otel runtime is not supported for monitoring output, switching to process runtime, reason: %v", outputOtelSupportedErr)
 		monitoringRuntime = monitoringCfg.ProcessRuntimeManager
 	}
+	outputOtelSupported := outputOtelSupportedErr == nil
 	componentInfos := b.getComponentInfos(components, monitoringRuntime, outputOtelSupported, componentIDPidMap)
 
 	// initializes inputs collection so injectors don't have to deal with it
@@ -482,13 +492,18 @@ func (b *BeatsMonitor) getComponentInfos(
 	}
 	// If any other component uses the Otel runtime, also add a component to monitor its telemetry.
 	// This component only works in the Otel runtime, so we can't add it if the output doesn't support it.
-	if b.config.C.MonitorMetrics && usingOtelRuntime(componentInfos) && outputOtelSupported {
-		componentInfos = append(componentInfos,
-			componentInfo{
-				ID:             prometheusMonitoringComponentId,
-				BinaryName:     metricBeatName,
-				RuntimeManager: component.OtelRuntimeManager,
-			})
+	if b.config.C.MonitorMetrics && usingOtelRuntime(componentInfos) {
+		if outputOtelSupported {
+			componentInfos = append(componentInfos,
+				componentInfo{
+					ID:             prometheusMonitoringComponentId,
+					BinaryName:     metricBeatName,
+					RuntimeManager: component.OtelRuntimeManager,
+				})
+		} else {
+			b.logger.Warn("The Otel prometheus metrics monitoring input can't run in a beats process, skipping")
+		}
+
 	}
 	// sort the components to ensure a consistent order of inputs in the configuration
 	slices.SortFunc(componentInfos, func(a, b componentInfo) int {
@@ -1525,14 +1540,13 @@ func isSupportedBeatsBinary(binaryName string) bool {
 	return false
 }
 
-func isOutputOtelSupported(outputCfg map[string]any) bool {
+func verifyOutputOtelSupported(outputCfg map[string]any) error {
 	parsed, err := component.ParseOutput(monitoringOutput, outputCfg, logp.InfoLevel, nil)
 	if err != nil {
-		return false
+		return err
 	}
 
-	err = translate.VerifyOutputIsOtelSupported(parsed.OutputType, outputCfg)
-	return err == nil
+	return translate.VerifyOutputIsOtelSupported(parsed.OutputType, outputCfg)
 }
 
 func monitoringDrop(path string) (drop string) {

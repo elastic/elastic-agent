@@ -149,6 +149,7 @@ func New(
 		cfg.Settings.DownloadConfig.OS(),
 		cfg.Settings.MonitoringConfig,
 		agentInfo,
+		log,
 	)
 
 	runtime, err := runtime.NewManager(
