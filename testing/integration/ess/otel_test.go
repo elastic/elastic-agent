@@ -22,7 +22,6 @@ import (
 	"text/template"
 	"time"
 
-	libbeattesting "github.com/elastic/beats/v7/libbeat/tests/integration"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
 	"github.com/google/go-cmp/cmp"
@@ -529,10 +528,7 @@ func TestOtelLogsIngestion(t *testing.T) {
 
 	// Ensure everything is saved in case of test failure
 	// this folder is also collected on CI.
-	rootDir, err := filepath.Abs(filepath.Join("..", "..", "..", "build"))
-	require.NoError(t, err, "cannot get absolute path of rootDir")
-
-	tempDir := libbeattesting.CreateTempDir(t, rootDir)
+	tempDir := aTesting.TempDir(t, "..", "..", "..", "build")
 	inputFilePath := filepath.Join(tempDir, "input.log")
 	otelLogFilePath := filepath.Join(tempDir, "elastic-agent.ndjson")
 
