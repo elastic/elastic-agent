@@ -5,7 +5,7 @@ go 1.24.10
 replace github.com/elastic/elastic-agent => ../../
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251119204152-c728c08086a3
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251120224918-e1c641b60b52
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.26.1
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.20.0
