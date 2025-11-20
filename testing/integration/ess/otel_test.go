@@ -964,10 +964,12 @@ exporters:
       - {{.ESEndpoint}}
     api_key: {{.ESApiKey}}
     logs_index: {{.Index}}
-    batcher:
-      enabled: true
-      flush_timeout: 1s
-      min_size: {{.MinItems}}
+    sending_queue:
+      wait_for_result: true # Avoid losing data on shutdown
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: {{.MinItems}}
     mapping:
       mode: bodymap
 service:
@@ -1387,10 +1389,12 @@ exporters:
       - {{.ESEndpoint}}
     api_key: {{.ESApiKey}}
     logs_index: {{.Index}}
-    batcher:
-      enabled: true
-      flush_timeout: 1s
-      min_size: {{.MinItems}}
+    sending_queue:
+      wait_for_result: true # Avoid losing data on shutdown
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: {{.MinItems}}
     mapping:
       mode: bodymap
 service:
@@ -1579,9 +1583,11 @@ exporters:
     compression: none
     api_key: {{.ESApiKey}}
     logs_index: {{.FBReceiverIndex}}
-    batcher:
-      enabled: true
-      flush_timeout: 1s
+    sending_queue:
+      wait_for_result: true # Avoid losing data on shutdown
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
     mapping:
       mode: bodymap
 service:
@@ -1761,7 +1767,8 @@ func TestFBOtelRestartE2E(t *testing.T) {
 		},
 		Stack: &define.Stack{},
 	})
-	tmpDir := t.TempDir()
+
+	tmpDir := aTesting.TempDir(t, "..", "..", "..", "build")
 
 	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
 	require.NoError(t, err, "failed to create temp file to hold data to ingest")
@@ -1814,9 +1821,11 @@ exporters:
       - {{.ESEndpoint}}
     api_key: {{.ESApiKey}}
     logs_index: {{.Index}}
-    batcher:
-      enabled: true
-      flush_timeout: 1s
+    sending_queue:
+      wait_for_result: true # Avoid losing data on shutdown
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
     mapping:
       mode: bodymap
     logs_dynamic_id:
@@ -1829,6 +1838,16 @@ service:
       exporters:
         - elasticsearch/log
         #- debug
+  telemetry:
+    logs:
+      level: DEBUG
+      encoding: json
+      disable_stacktrace: true
+      # Save the logs in a file that is kept if the test fails
+      output_paths:
+        - {{.HomeDir}}/elastic-agent-logs.ndjson
+      error_output_paths:
+        - {{.HomeDir}}/elastic-agent-error-logs.ndjosn
 `
 	otelConfigPath := filepath.Join(tmpDir, "otel.yml")
 	var otelConfigBuffer bytes.Buffer
@@ -1842,16 +1861,6 @@ service:
 				Index:      index,
 			}))
 	require.NoError(t, os.WriteFile(otelConfigPath, otelConfigBuffer.Bytes(), 0o600))
-	t.Cleanup(func() {
-		if t.Failed() {
-			contents, err := os.ReadFile(otelConfigPath)
-			if err != nil {
-				t.Logf("No otel configuration file at %s", otelConfigPath)
-				return
-			}
-			t.Logf("Contents of otel config file:\n%s\n", string(contents))
-		}
-	})
 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", otelConfigPath}))
 	require.NoError(t, err)
@@ -1881,17 +1890,6 @@ service:
 		assert.NoError(t, err, "failed to close input file")
 	}()
 
-	t.Cleanup(func() {
-		if t.Failed() {
-			contents, err := os.ReadFile(inputFilePath)
-			if err != nil {
-				t.Logf("no data file to import at %s", inputFilePath)
-				return
-			}
-			t.Logf("contents of import file:\n%s\n", string(contents))
-		}
-	})
-
 	// Start the collector, ingest some logs and then stop it
 	stoppedCh := make(chan int, 1)
 	fCtx, cancel := context.WithDeadline(ctx, time.Now().Add(1*time.Minute))
@@ -1904,19 +1902,23 @@ service:
 		close(stoppedCh)
 	}()
 
-	// Make sure we ingested at least 10 logs before stopping the collector
-	var hits int
-	require.Eventually(t, func() bool {
-		findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer findCancel()
+	require.EventuallyWithT(
+		t,
+		func(t *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer findCancel()
 
-		docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]interface{}{
-			"log.file.path": inputFilePath,
-		})
-		require.NoError(t, err)
-		hits += int(docs.Hits.Total.Value)
-		return hits >= 10
-	}, 1*time.Minute, 1*time.Second, "Expected to ingest at least 10 logs, got %d", hits)
+			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]any{
+				"log.file.path": inputFilePath,
+			})
+			require.NoError(t, err)
+			got := int(docs.Hits.Total.Value)
+
+			require.GreaterOrEqual(t, got, 10, "")
+		},
+		time.Minute,
+		time.Second,
+		"Expecting to ingest at least 10 logs")
 	cancel()
 
 	select {
@@ -1937,26 +1939,19 @@ service:
 		err = fixture.RunOtelWithClient(fCtx)
 	}()
 
-	// Make sure all the logs are ingested
-	actualHits := &struct {
-		Hits       int
-		UniqueHits int
-	}{}
-	require.Eventually(t,
-		func() bool {
+	require.EventuallyWithT(
+		t,
+		func(t *assert.CollectT) {
 			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer findCancel()
 
-			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]interface{}{
+			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]any{
 				"log.file.path": inputFilePath,
 			})
 			require.NoError(t, err)
 
-			actualHits.Hits = docs.Hits.Total.Value
-
 			uniqueIngestedLogs := make(map[string]struct{})
 			for _, hit := range docs.Hits.Hits {
-				t.Log("Hit: ", hit.Source["message"])
 				message, found := hit.Source["message"]
 				require.True(t, found, "expected message field in document %q", hit.Source)
 				msg, ok := message.(string)
@@ -1964,11 +1959,14 @@ service:
 				require.NotContainsf(t, uniqueIngestedLogs, msg, "found duplicated log message %q", msg)
 				uniqueIngestedLogs[msg] = struct{}{}
 			}
-			actualHits.UniqueHits = len(uniqueIngestedLogs)
-			return actualHits.UniqueHits == int(inputLinesCounter.Load())
+
+			want := inputLinesCounter.Load()
+			got := docs.Hits.Total.Value
+			require.EqualValues(t, want, got, "expecting %d hits got %d hits", want, got)
 		},
-		20*time.Second, 1*time.Second,
-		"Expected %d logs, got %v", int(inputLinesCounter.Load()), actualHits)
+		20*time.Second,
+		time.Second,
+		"Did not find the expected number of logs")
 
 	cancel()
 	fixtureWg.Wait()
@@ -2051,10 +2049,12 @@ exporters:
       - {{.ESEndpoint}}
     api_key: {{.ESApiKey}}
     logs_index: {{.Index}}
-    batcher:
-      enabled: true
-      flush_timeout: 1s
-      min_size: 1
+    sending_queue:
+      wait_for_result: true # Avoid losing data on shutdown
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 1
     tls:
       ca_file: {{ .CAFile }}
     auth:
@@ -2131,3 +2131,268 @@ service:
 
 	cancel()
 }
+<<<<<<< HEAD
+=======
+
+func TestOtelBeatsAuthExtensionInvalidCertificates(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			// {Type: define.Windows}, we don't support otel on Windows yet
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	// Create the otel configuration file
+	type otelConfigOptions struct {
+		ESEndpoint string
+		ESApiKey   string
+		Index      string
+	}
+	esEndpoint, err := integration.GetESHost()
+	require.NoError(t, err, "error getting elasticsearch endpoint")
+	esApiKey, err := createESApiKey(info.ESClient)
+	require.NoError(t, err, "error creating API key")
+	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	index := "logs-integration-" + info.Namespace
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	otelConfigTemplate := `
+extensions:
+  beatsauth:
+    continue_on_error: true
+    ssl:
+      enabled: true
+      verification_mode: none
+      certificate: /nonexistent.pem
+      key: /nonexistent.key
+      key_passphrase: null
+      key_passphrase_path: null
+      verification_mode: none
+receivers:
+  metricbeatreceiver:
+    metricbeat:
+      modules:
+        - module: system
+          enabled: true
+          period: 1s
+          processes:
+            - '.*'
+          metricsets:
+            - cpu
+    output:
+      otelconsumer:
+    queue.mem.flush.timeout: 0s
+exporters:
+  elasticsearch/log:
+    endpoints:
+      - {{.ESEndpoint}}
+    api_key: {{.ESApiKey}}
+    logs_index: {{.Index}}
+    sending_queue:
+      wait_for_result: true # Avoid losing data on shutdown
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 1
+    auth:
+      authenticator: beatsauth
+    mapping:
+      mode: bodymap
+service:
+  extensions: [beatsauth]
+  pipelines:
+    logs:
+      receivers:
+        - metricbeatreceiver
+      exporters:
+        - elasticsearch/log
+`
+	var otelConfigBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("otelConfig").Parse(otelConfigTemplate)).Execute(&otelConfigBuffer,
+			otelConfigOptions{
+				ESEndpoint: esEndpoint,
+				ESApiKey:   esApiKey.Encoded,
+				Index:      index,
+			}))
+
+	// configure elastic-agent.yml
+	err = fixture.Configure(ctx, otelConfigBuffer.Bytes())
+
+	// prepare agent command
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err, "cannot prepare Elastic-Agent command: %w", err)
+
+	output := strings.Builder{}
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	// start elastic-agent
+	err = cmd.Start()
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+		require.NotNil(collect, status.Collector)
+		require.NotNil(collect, status.Collector.ComponentStatusMap)
+
+		pipelines, exists := status.Collector.ComponentStatusMap["pipeline:logs"]
+		require.True(collect, exists)
+
+		receiver, exists := pipelines.ComponentStatusMap["receiver:metricbeatreceiver"]
+		require.True(collect, exists)
+		require.EqualValues(collect, receiver.Status, cproto.State_HEALTHY)
+
+		exporter, exists := pipelines.ComponentStatusMap["exporter:elasticsearch/log"]
+		require.True(collect, exists)
+		require.EqualValues(collect, exporter.Status, cproto.State_DEGRADED)
+	}, 2*time.Minute, 5*time.Second)
+
+	cancel()
+}
+
+func TestOutputStatusReporting(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Sudo:  true,
+		Group: integration.Default,
+		Local: false,
+		Stack: nil,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+	})
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	// Create the otel configuration file
+	type otelConfigOptions struct {
+		StatusReportingEnabled bool
+	}
+	configTemplate := `
+inputs:
+  - type: system/metrics
+    id: http-metrics-test
+    use_output: default
+    _runtime_experimental: otel
+    streams:
+    - metricsets:
+       - cpu
+      period: 1s
+      data_stream:
+        dataset: e2e
+      namespace: "json_namespace"
+agent.reload:
+  period: 1s
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [http://localhost:9200]
+    api_key: placeholder
+    preset: "balanced"
+    status_reporting:
+      enabled: {{.StatusReportingEnabled}}
+agent.monitoring:
+  metrics: false
+  logs: false
+  http:
+    enabled: true
+    port: 6792
+agent.grpc:
+    port: 6790
+`
+
+	var configBuffer bytes.Buffer
+	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+		otelConfigOptions{
+			StatusReportingEnabled: true,
+		})
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	installOpts := aTesting.InstallOpts{
+		NonInteractive: true,
+		Privileged:     true,
+		Force:          true,
+		Develop:        true,
+	}
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+
+	output, err := fixture.InstallWithoutEnroll(ctx, &installOpts)
+	require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
+
+	require.Eventually(t, func() bool {
+		status, err := fixture.ExecStatus(ctx)
+		if err != nil {
+			t.Logf("waiting for agent degraded: %s", err.Error())
+			return false
+		}
+		return status.State == int(cproto.State_DEGRADED)
+	}, 30*time.Second, 1*time.Second)
+
+	// Disable status reporting.
+	// This should result in HEALTHY state
+	configBuffer.Reset()
+	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+		otelConfigOptions{
+			StatusReportingEnabled: false,
+		})
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 1*time.Minute, 1*time.Second)
+
+	// Enabled status reporting and keep using localhost.
+	// This should result in DEGRADED state
+	configBuffer.Reset()
+	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+		otelConfigOptions{
+			StatusReportingEnabled: true,
+		})
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		status, err := fixture.ExecStatus(ctx)
+		if err != nil {
+			t.Logf("waiting for agent degraded: %s", err.Error())
+			return false
+		}
+		return status.State == int(cproto.State_DEGRADED)
+	}, 30*time.Second, 1*time.Second)
+
+	combinedOutput, err := fixture.Uninstall(ctx, &aTesting.UninstallOpts{Force: true})
+	require.NoErrorf(t, err, "error uninstalling classic agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
+}
+>>>>>>> ad43a0dbd (Update OTel dependencies to 0.139.0/v1.45.0 and Elastic ones to v0.20.0/v0.21.0 (#11025))

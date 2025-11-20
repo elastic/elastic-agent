@@ -60,3 +60,8 @@ fleet.yml.lock
 fleet.yml.old
 pkg/component/fake/component/component
 internal/pkg/agent/install/testblocking/testblocking
+<<<<<<< HEAD
+=======
+internal/pkg/otel/manager/testing/testing
+pkg/core/process/testsignal/testsignal
+>>>>>>> ad43a0dbd (Update OTel dependencies to 0.139.0/v1.45.0 and Elastic ones to v0.20.0/v0.21.0 (#11025))
