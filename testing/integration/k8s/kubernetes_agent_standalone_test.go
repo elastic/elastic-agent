@@ -743,6 +743,67 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", false),
 			},
 		},
+		{
+			name: "helm standalone agent default kubernetes unprivileged with logstash output",
+			steps: []k8sTestStep{
+				k8sStepCreateNamespace(),
+				k8sStepLogstashCreate(),
+				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
+					"kubernetes": map[string]any{
+						"enabled": true,
+						"state": map[string]any{
+							"agentAsSidecar": map[string]any{
+								"enabled": true,
+							},
+						},
+					},
+					"agent": map[string]any{
+						"unprivileged": true,
+						"image": map[string]any{
+							"repository": kCtx.agentImageRepo,
+							"tag":        kCtx.agentImageTag,
+							"pullPolicy": "Never",
+						},
+					},
+					"outputs": map[string]any{
+						"default": map[string]any{
+							"type":    "Logstash",
+							"hosts":     ["logstash-agent:5044"],
+							"ssl": map[string]any{
+								"certificateAuthorities": [{
+									"valueFromSecret": map[string]any{
+										"name": "agent-certs",
+										"key":  "ca.crt",
+									},
+								}],
+								"certificate": {
+									"valueFromSecret": map[string]any{
+										"name": "agent-certs",
+										"key":  "tls.crt",
+								},
+								"key": {
+									"valueFromSecret": map[string]any{
+										"name": "agent-certs",
+										"key":  "tls.key",
+									},
+								},
+								"verificationMode": "certificate"
+							},
+						},
+					},
+				}),
+				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+				k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
+				k8sStepCheckAgentStatus("app.kubernetes.io/name=kube-state-metrics", 1, "agent", nil),
+				k8sStepLogstashCheckStatus("app.kubernetes.io/name=logstash-agent", true),
+				k8sStepCheckRestrictUpgrade("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+				k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
+				k8sStepRunInnerTests("app.kubernetes.io/name=kube-state-metrics", 1, "agent"),
+				k8sStepLogstashDelete(),
+				k8sStepLogstashCheckStatus("app.kubernetes.io/name=logstash-agent", false),
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1178,6 +1239,51 @@ func k8sStepHelmDeploy(chartPath string, releaseName string, values map[string]a
 	}
 }
 
+func k8sStepLogstashCreate() k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		r, err := os.Open("testdata/logstash.yaml")
+		require.NoError(t, err, "failed to open logstash k8s test data")
+
+		logstashObjs, err := testK8s.LoadFromYAML(bufio.NewReader(r))
+		require.NoError(t, err, "failed to convert logstash yaml to k8s objects")
+		t.Cleanup(func() {
+			err = k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, logstashObjs...)
+			require.NoError(t, err, "failed to delete logstash k8s objects")
+		})
+
+		err = k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true, waitTimeout: 120 * time.Second, namespace: namespace}, logstashObjs...)
+		require.NoError(t, err, "failed to create logstash k8s objects")
+	}
+}
+
+
+func k8sStepLogstashDelete() k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		logstashPod := &corev1.Pod{}
+		err := kCtx.client.Resources(namespace).Get(ctx, "logstash-agent", namespace, logstashPod)
+		require.NoError(t, err, "failed to get logstash pod")
+
+		err = k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, logstashPod)
+		require.NoError(t, err, "failed to delete logstash k8s objects")
+	}
+}
+func k8sStepLogstashCheckStatus(logstashPodLabelSelector string, logstashExpected bool) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		logstashPodList := &corev1.PodList{}
+		err := kCtx.client.Resources(namespace).List(ctx, logstashPodList, func(opt *metav1.ListOptions) {
+			opt.LabelSelector = logstashPodLabelSelector
+		})
+		require.NoError(t, err, "failed to list logstash pods with selector ", logstashPodLabelSelector)
+		require.NotEmpty(t, logstashPodList.Items, "no agent pods found with selector ", logstashPodLabelSelector)
+		for _, pod := range logstashPodList.Items {
+			if (pod.Status.Phase != corev1.PodRunning) && logstashExpected {
+				t.Errorf("logstash pod %s is not running", pod.Name)
+			}
+			if (pod.Status.Phase == corev1.PodRunning) && !logstashExpected {
+				t.Errorf("logstash pod %s is running but it should not", pod.Name)
+			}
+	}
+}
 func k8sStepHintsRedisCreate() k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
 		r, err := os.Open("testdata/k8s.hints.redis.yaml")
