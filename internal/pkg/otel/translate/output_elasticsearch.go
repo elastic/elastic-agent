@@ -193,8 +193,6 @@ func checkUnsupportedConfig(cfg *config.C) error {
 		return fmt.Errorf("ladbalance:false is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("non_indexable_policy") {
 		return fmt.Errorf("non_indexable_policy is currently not supported: %w", errors.ErrUnsupported)
-	} else if cfg.HasField("kerberos") {
-		return fmt.Errorf("kerberos is currently not supported: %w", errors.ErrUnsupported)
 	}
 
 	return nil
