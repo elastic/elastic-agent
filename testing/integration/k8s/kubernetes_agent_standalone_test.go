@@ -768,26 +768,27 @@ func TestKubernetesAgentHelm(t *testing.T) {
 					"outputs": map[string]any{
 						"default": map[string]any{
 							"type":    "Logstash",
-							"hosts":     ["logstash-agent:5044"],
+							"hosts":   [1]string{"logstash-agent:5044"},
 							"ssl": map[string]any{
-								"certificateAuthorities": [{
+								"certificateAuthorities": []map[string]any{{
 									"valueFromSecret": map[string]any{
 										"name": "agent-certs",
 										"key":  "ca.crt",
 									},
-								}],
-								"certificate": {
+								}},
+								"certificate": map[string]any{
 									"valueFromSecret": map[string]any{
 										"name": "agent-certs",
 										"key":  "tls.crt",
+									},
 								},
-								"key": {
+								"key": map[string]any{
 									"valueFromSecret": map[string]any{
 										"name": "agent-certs",
 										"key":  "tls.key",
 									},
 								},
-								"verificationMode": "certificate"
+								"verificationMode": "certificate",
 							},
 						},
 					},
