@@ -1710,7 +1710,7 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 	require.Len(t, componentStates, 1)
 	componentState := componentStates[0]
 	assert.Equal(t, componentState.State.State, client.UnitStateStarting)
-	assert.Equal(t, componentState.State.Message, "Starting")
+	assert.Equal(t, componentState.State.Message, "STARTING")
 
 	// stop the component by sending a nil config
 	mgr.Update(nil, nil)
