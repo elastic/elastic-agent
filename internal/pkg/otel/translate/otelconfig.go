@@ -660,7 +660,7 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 	if defaultAuthSettings.Kerberos != nil {
 		err = newConfig.SetString("kerberos.auth_type", -1, defaultAuthSettings.Kerberos.AuthType.String())
 		if err != nil {
-			return nil, fmt.Errorf("error settingg kerberos auth type url:%w ", err)
+			return nil, fmt.Errorf("error setting kerberos auth type url:%w ", err)
 		}
 	}
 
