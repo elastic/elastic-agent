@@ -856,6 +856,7 @@ outputs:
     hosts: [http://localhost:9200]
     api_key: placeholder
     indices: [] # not supported by the elasticsearch exporter
+agent.monitoring._runtime_experimental: otel
 `
 
 	// this is the context for the whole test, with a global timeout defined
