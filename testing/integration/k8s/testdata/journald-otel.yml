@@ -34,3 +34,8 @@ service:
       processors: [resource]
       exporters:
         - elasticsearch
+  telemetry:
+    logs:
+      level: DEBUG
+      encoding: json
+      disable_stacktrace: true
