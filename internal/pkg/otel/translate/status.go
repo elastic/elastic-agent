@@ -39,12 +39,20 @@ func GetAllComponentStates(otelStatus *status.AggregateStatus, components []comp
 				if compState, statusErr = getComponentState(pipelineStatus, comp); statusErr != nil {
 					return nil, statusErr
 				}
-			} else if otelStatus != nil && otelStatus.Event.Status() == componentstatus.StatusStarting {
+			} else if otelStatus != nil && otelStatus.Event != nil && otelStatus.Status() == componentstatus.StatusStarting {
 				compState = runtime.ComponentComponentState{
 					Component: comp,
 					State: runtime.ComponentState{
 						State:   client.UnitStateStarting,
 						Message: "Starting",
+						VersionInfo: runtime.ComponentVersionInfo{
+							Name: OtelComponentName,
+							Meta: map[string]string{ // mimic what beats return over the control protocol
+								"build_time": version.BuildTime().String(),
+								"commit":     version.Commit(),
+							},
+							BuildHash: version.Commit(),
+						},
 					},
 				}
 			} else {
