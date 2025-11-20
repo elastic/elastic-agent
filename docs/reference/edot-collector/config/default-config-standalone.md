@@ -83,7 +83,7 @@ Data is exported directly to {{es}} using the [`elasticsearch`] exporter in `OTe
 
 The application pipeline in the EDOT Collector receives data from OTel SDKs through the [`OTLP`] receiver. While logs and metrics are exported verbatim into {{es}}, traces require two additional components.
 
-{applies_to}`edot_collector: ga 9.2` The [`elasticapm` processor](../components/elasticapmprocessor.md) enriches trace data with additional attributes that improve the user experience in the {{product.observability}} UIs. In addition, the [`elasticapm` connector](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector) generates pre-aggregated APM metrics from tracing data.
+{applies_to}`edot_collector: ga 9.2` The [`elasticapm` processor](../components/elasticapmprocessor.md) enriches trace data with additional attributes that improve the user experience in the {{product.observability}} UIs. In addition, the [`elasticapm` connector](../components/elasticapmconnector.md) generates pre-aggregated APM metrics from tracing data.
 
 Application-related OTel data is ingested into {{es}} in OTel-native format using the [`elasticsearch`] exporter.
 
@@ -376,7 +376,7 @@ The server expects incoming HTTP requests to include an API key with sufficient 
 [`elasticsearch`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/elasticsearchexporter
 [`elasticinframetrics`]: https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticinframetricsprocessor
 [`elasticapm` processor]: https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticapmprocessor
-[`elasticapm` connector]: https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector
+[`elasticapm` connector]: ../components/elasticapmconnector.md
 [`resource`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourceprocessor
 [`resourcedetection`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor
 [`OTLP`]: https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver
