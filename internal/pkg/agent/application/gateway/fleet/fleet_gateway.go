@@ -100,7 +100,7 @@ func New(
 	acker acker.Acker,
 	stateStore stateStore,
 	stateFetcher StateFetcher,
-	cfg configuration.FleetCheckin,
+	cfg *configuration.FleetCheckin,
 ) (*FleetGateway, error) {
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	st := defaultGatewaySettings
@@ -615,8 +615,12 @@ func (s *CheckinStateFetcher) FetchState(ctx context.Context) (coordinator.State
 func (s *CheckinStateFetcher) Done()                                     {}
 func (s *CheckinStateFetcher) StartStateWatch(ctx context.Context) error { return nil }
 
-func getBackoffSettings(cfg configuration.FleetCheckin) *backoffSettings {
+func getBackoffSettings(cfg *configuration.FleetCheckin) *backoffSettings {
 	bo := defaultFleetBackoffSettings
+
+	if cfg == nil {
+		return &defaultFleetBackoffSettings
+	}
 
 	if cfg.RequestBackoffInit > 0 {
 		bo.Init = cfg.RequestBackoffInit
