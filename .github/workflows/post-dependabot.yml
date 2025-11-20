@@ -8,6 +8,8 @@ on:
   push:
     branches:
       - "dependabot/go_modules/**"
+  workflow_call:
+
 
 jobs:
   update-notice:
