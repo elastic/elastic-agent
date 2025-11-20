@@ -174,6 +174,8 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 
 	dirPrefix := fmt.Sprintf("%s-", AgentName)
 
+	log.Infof("versioned homes to keep: %v", versionedHomesToKeep)
+
 	var cumulativeError error
 	relativeHomePaths := make([]string, len(versionedHomesToKeep))
 	for i, h := range versionedHomesToKeep {
@@ -184,6 +186,8 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 		}
 		relativeHomePaths[i] = relHomePath
 	}
+
+	log.Infof("Starting cleanup of versioned homes. Keeping: %v", relativeHomePaths)
 
 	for _, dir := range subdirs {
 		if slices.Contains(relativeHomePaths, dir) {
