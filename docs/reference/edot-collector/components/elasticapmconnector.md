@@ -15,7 +15,7 @@ products:
 
 # Elastic {{product.apm}} connector
 
-The Elastic {{product.apm}} connector generates pre-aggregated metrics from OpenTelemetry trace data. These metrics provide essential performance insights and enable key {{product.apm}} features like service maps, transaction histograms, and service-level indicators, all while significantly reducing storage requirements compared to raw trace data.
+The Elastic {{product.apm}} connector generates pre-aggregated metrics from OpenTelemetry trace data. These metrics enable key {{product.apm}} features like service maps, transaction histograms, and service-level indicators with fast query performance. Instead of calculating metrics on the fly from potentially millions of transactions, the {{product.apm}} UIs can query pre-computed metric documents for quick data visualization.
 
 The connector works together with the [Elastic {{product.apm}} processor](elasticapmprocessor.md), which enriches OpenTelemetry traces with Elastic-specific attributes to ensure optimal compatibility with Elastic {{product.apm}} UIs.
 
