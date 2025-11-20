@@ -1352,22 +1352,7 @@ func TestGetBeatsAuthExtensionConfig(t *testing.T) {
 			expected: map[string]any{
 				"continue_on_error":       true,
 				"idle_connection_timeout": "3s",
-				"ssl": map[string]interface{}{
-					"ca_sha256":               []interface{}{},
-					"ca_trusted_fingerprint":  "",
-					"certificate":             "",
-					"certificate_authorities": []interface{}{},
-					"cipher_suites":           []interface{}{},
-					"curve_types":             []interface{}{},
-					"enabled":                 true,
-					"key":                     "",
-					"key_passphrase":          "",
-					"key_passphrase_path":     "",
-					"renegotiation":           int64(0),
-					"supported_protocols":     []interface{}{},
-					"verification_mode":       uint64(0),
-				},
-				"timeout": "1m30s",
+				"timeout":                 "1m30s",
 				"kerberos": map[string]any{
 					"enabled":          nil,
 					"auth_type":        "password",

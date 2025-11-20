@@ -15,7 +15,6 @@ import (
 	koanfmaps "github.com/knadh/koanf/maps"
 
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
@@ -23,11 +22,11 @@ import (
 	"go.opentelemetry.io/collector/pipeline"
 	"golang.org/x/exp/maps"
 
-	"github.com/elastic/beats/v7/libbeat/common/transport/kerberos"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
 	"github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
 	"github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
+	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -621,7 +620,9 @@ func BeatDataPath(componentId string) string {
 // currently this is only supported for elasticsearch output
 func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 
-	defaultAuthSettings := beatsAuthDefaultConfig
+	defaultAuthSettings := beatsauthextension.BeatsAuthConfig{
+		Transport: elasticsearch.ESDefaultTransportSettings(),
+	}
 
 	var resultMap map[string]any
 	if err := outputCfg.Unpack(&resultMap); err != nil {
@@ -657,7 +658,10 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 	}
 
 	if defaultAuthSettings.Kerberos != nil {
-		err = newConfig.SetString("kerberos.auth_type")
+		err = newConfig.SetString("kerberos.auth_type", -1, defaultAuthSettings.Kerberos.AuthType.String())
+		if err != nil {
+			return nil, fmt.Errorf("error settingg kerberos auth type url:%w ", err)
+		}
 	}
 
 	var newMap map[string]any
@@ -671,13 +675,4 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 	newMap["continue_on_error"] = true
 
 	return newMap, nil
-}
-
-var beatsAuthDefaultConfig = beatsAuthConfig{
-	Transport: elasticsearch.ESDefaultTransportSettings(),
-}
-
-type beatsAuthConfig struct {
-	Transport httpcommon.HTTPTransportSettings `config:",inline"`
-	Kerberos  *kerberos.Config                 `config:"kerberos"`
 }
