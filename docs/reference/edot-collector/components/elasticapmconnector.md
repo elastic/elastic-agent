@@ -105,19 +105,7 @@ All metrics are generated with appropriate aggregation periods and follow Elasti
 
 ## Aggregation intervals
 
-The connector aggregates metrics over configurable time intervals. The default aggregation period is 1 minute, which provides a good balance between metric granularity and storage efficiency.
-
-You can adjust the aggregation interval using the `aggregation_interval` setting:
-
-```yaml
-connectors:
-  elasticapm:
-    aggregation_interval: 1m
-```
-
-:::{note}
-Shorter aggregation intervals provide more granular metrics but increase storage requirements. Longer intervals reduce storage needs but might lose important short-term patterns.
-:::
+The connector aggregates metrics over multiple time intervals to provide different granularities for analysis. By default, metrics are aggregated at three intervals: 1 minute, 10 minutes, and 60 minutes.
 
 ## Best practices
 
@@ -139,7 +127,7 @@ Follow these recommendations when using the Elastic {{product.apm}} connector:
 
 Be aware of these constraints and behaviors when using the Elastic {{product.apm}} connector:
 
-* **Required for Elastic {{product.apm}} metrics**: Without the Elastic {{product.apm}} connector, you'll only have raw trace data in {{es}}. Service maps, transaction histograms, and other metric-driven {{product.apm}} features require the pre-aggregated metrics that this connector generates.
+* **Required for Elastic {{product.apm}} metrics**: Without the Elastic {{product.apm}} connector, you'll only have raw trace data in {{es}}. Service maps, transaction histograms, and other metric-driven {{product.apm}} features might require the pre-aggregated metrics that this connector generates.
 
 * **Not available in contrib OTel Collector**: The Elastic {{product.apm}} connector is an Elastic-specific component not included in the standard OpenTelemetry Collector or Collector Contrib distributions. To use it, you must either use EDOT Collector or [build a custom collector](../custom-collector.md) that includes Elastic's components.
 
