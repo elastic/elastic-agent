@@ -83,11 +83,11 @@ These components are included in EDOT Collector version 9.2.0.
 | [tailsamplingprocessor ](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.137.0 |
 | [transformprocessor ](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/transformprocessor) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Core] | v0.137.0 |
 |***Connectors***||||
-| [elasticapmconnector ](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Core] | v0.8.0 |
-| [forwardconnector ](https://github.com/open-telemetry/opentelemetry-collector/tree/main/connector/forwardconnector) | [OTel Core Repo](https://github.com/open-telemetry/opentelemetry-collector) | [Extended] | v0.137.0 |
-| [profilingmetricsconnector ](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/profilingmetricsconnector) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Extended] | v0.1.0 |
-| [routingconnector ](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/connector/routingconnector) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Core] | v0.137.0 |
-| [spanmetricsconnector ](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/connector/spanmetricsconnector) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.137.0 |
+| [elasticapmconnector](/reference/edot-collector/components/elasticapmconnector.md) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Core] | v0.8.0 |
+| [forwardconnector](https://github.com/open-telemetry/opentelemetry-collector/tree/main/connector/forwardconnector) | [OTel Core Repo](https://github.com/open-telemetry/opentelemetry-collector) | [Extended] | v0.137.0 |
+| [profilingmetricsconnector](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/profilingmetricsconnector) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Extended] | v0.1.0 |
+| [routingconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/connector/routingconnector) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Core] | v0.137.0 |
+| [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/connector/spanmetricsconnector) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.137.0 |
 |***Extensions***||||
 | [apikeyauthextension ](/reference/edot-collector/config/authentication-methods.md) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Extended] | v0.8.0 |
 | [apmconfigextension ](https://github.com/elastic/opentelemetry-collector-components/tree/main/extension/apmconfigextension) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Extended] | v0.8.0 |
