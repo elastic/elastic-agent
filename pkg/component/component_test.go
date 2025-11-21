@@ -3969,7 +3969,8 @@ func TestToComponentsWithRuntimeConfig(t *testing.T) {
 				otelCount := 0
 				processCount := 0
 				for _, comp := range components {
-					if comp.RuntimeManager == OtelRuntimeManager {
+					switch comp.RuntimeManager {
+					case OtelRuntimeManager:
 						otelCount++
 						// Should have 1 input (filestream-2 with explicit _runtime_experimental)
 						inputUnits := 0
@@ -3979,7 +3980,7 @@ func TestToComponentsWithRuntimeConfig(t *testing.T) {
 							}
 						}
 						assert.Equal(t, 1, inputUnits, "otel component should have 1 input unit")
-					} else if comp.RuntimeManager == ProcessRuntimeManager {
+					case ProcessRuntimeManager:
 						processCount++
 						// Should have 2 inputs (filestream-0 and filestream-1 using global default)
 						inputUnits := 0
