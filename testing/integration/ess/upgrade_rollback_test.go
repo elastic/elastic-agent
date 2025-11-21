@@ -406,7 +406,6 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 		},
 	}
 
-
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
