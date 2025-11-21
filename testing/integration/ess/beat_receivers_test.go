@@ -819,7 +819,7 @@ agent.monitoring.enabled: false
 
 // Log lines TestBeatsReceiverProcessRuntimeFallback checks for
 const (
-	otelRuntimeUnsupportedLogLineStart                 = "otel runtime is not supported"
+	otelRuntimeUnsupportedLogLineStart                 = "otel runtime is not supported for component"
 	otelRuntimeMonitoringOutputUnsupportedLogLineStart = "otel runtime is not supported for monitoring output"
 	prometheusInputSkippedLogLine                      = "The Otel prometheus metrics monitoring input can't run in a beats process, skipping"
 )
@@ -842,9 +842,15 @@ func TestBeatsReceiverProcessRuntimeFallback(t *testing.T) {
 	config := `agent.logging.to_stderr: true
 agent.logging.to_files: false
 inputs:
-  # Collecting system metrics
   - type: system/metrics
     id: unique-system-metrics-input
+    _runtime_experimental: otel
+    streams:
+      - metricsets:
+        - cpu
+  - type: system/metrics
+    id: unique-system-metrics-input-2
+    use_output: supported
     _runtime_experimental: otel
     streams:
       - metricsets:
@@ -855,6 +861,12 @@ outputs:
     hosts: [http://localhost:9200]
     api_key: placeholder
     indices: [] # not supported by the elasticsearch exporter
+  supported:
+    type: elasticsearch
+    hosts: [http://localhost:9200]
+    api_key: placeholder
+    status_reporting:
+      enabled: false
 `
 
 	// this is the context for the whole test, with a global timeout defined
@@ -877,8 +889,24 @@ outputs:
 		var statusErr error
 		status, statusErr := fixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
-		// we should be running beats processes even though the otel runtime was requested
-		assertBeatsHealthy(collect, &status, component.ProcessRuntimeManager, 4)
+		// we should be running beats processes for components with default output even though the otel runtime was requested
+		// agent should be healthy
+		assert.Equal(collect, int(cproto.State_HEALTHY), status.State)
+		assert.Equal(collect, 5, len(status.Components))
+
+		// all the components should be healthy, their units should be healthy, and they should identify
+		// themselves as running in the process runtime if they're using the default or monitoring outputs
+		for _, comp := range status.Components {
+			assert.Equal(collect, int(cproto.State_HEALTHY), comp.State)
+			expectedComponentVersionInfoName := componentVersionInfoNameForRuntime(component.OtelRuntimeManager)
+			if strings.HasSuffix(comp.ID, "default") || strings.HasSuffix(comp.ID, "monitoring") {
+				expectedComponentVersionInfoName = componentVersionInfoNameForRuntime(component.ProcessRuntimeManager)
+			}
+			assert.Equal(collect, expectedComponentVersionInfoName, comp.VersionInfo.Name)
+			for _, unit := range comp.Units {
+				assert.Equal(collect, int(cproto.State_HEALTHY), unit.State)
+			}
+		}
 	}, 1*time.Minute, 1*time.Second)
 	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
 	require.NoError(t, err)
@@ -917,7 +945,7 @@ outputs:
 		}
 	})
 
-	assert.Len(t, unsupportedLogRecords, 5, "one log line for each component we try to run")
+	assert.Len(t, unsupportedLogRecords, 1, "one log line for each component we try to run")
 	assert.NotEmpty(t, prometheusUnsupportedLogRecord, "should get a log line about Otel prometheus metrics input being skipped")
 	assert.NotEmpty(t, monitoringOutputUnsupportedLogRecord, "should get a log line about monitoring output not being supported")
 }
@@ -1068,13 +1096,8 @@ func assertCollectorComponentsHealthy(t *assert.CollectT, status *atesting.Agent
 }
 
 func assertBeatsHealthy(t *assert.CollectT, status *atesting.AgentStatusOutput, runtime component.RuntimeManager, componentCount int) {
-	var componentVersionInfoName string
-	switch runtime {
-	case "otel":
-		componentVersionInfoName = "beats-receiver"
-	default:
-		componentVersionInfoName = "beat-v2-client"
-	}
+	t.Helper()
+	componentVersionInfoName := componentVersionInfoNameForRuntime(runtime)
 
 	// agent should be healthy
 	assert.Equal(t, int(cproto.State_HEALTHY), status.State)
@@ -1797,4 +1820,17 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 	// Uninstall
 	combinedOutput, err = fut.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 	require.NoErrorf(t, err, "error uninstalling beat receiver agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
+}
+
+func componentVersionInfoNameForRuntime(runtime component.RuntimeManager) string {
+	var componentVersionInfoName string
+	switch runtime {
+	case component.OtelRuntimeManager:
+		componentVersionInfoName = "beats-receiver"
+	case component.ProcessRuntimeManager:
+		componentVersionInfoName = "beat-v2-client"
+	default:
+		componentVersionInfoName = componentVersionInfoNameForRuntime(component.DefaultRuntimeManager)
+	}
+	return componentVersionInfoName
 }
