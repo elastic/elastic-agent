@@ -818,4 +818,4 @@ replace go.opentelemetry.io/otel/exporters/prometheus => go.opentelemetry.io/ote
 
 replace github.com/elastic/elastic-agent/internal/edot => ./internal/edot
 
-replace github.com/elastic/beats/v7 => github.com/belimawr/beats/v7 v7.0.0-alpha2.0.20251118162517-f57e2d758792
+replace github.com/elastic/beats/v7 => github.com/belimawr/beats/v7 v7.0.0-alpha2.0.20251121133217-d165778609a4
