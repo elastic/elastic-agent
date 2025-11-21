@@ -76,35 +76,6 @@ common:
 
 
 steps:
-<<<<<<< HEAD
-=======
-  - label: "Custom ECH Testing"
-    key: integration-tests-ech
-    depends_on:
-      - packaging-containers-amd64
-      - packaging-containers-arm64
-    env:
-      TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
-      TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
-      FORCE_ESS_CREATE: "true"
-    command: |
-      #!/usr/bin/env bash
-      buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-amd64'
-      .buildkite/scripts/steps/integration_tests_tf.sh ech true
-    artifact_paths:
-      - build/*
-      - build/diagnostics/**
-    retry:
-      automatic:
-        limit: 1
-    agents:
-      provider: "gcp"
-      machineType: "n2-standard-8"
-      image: "${IMAGE_UBUNTU_2404_X86_64}"
-    plugins:
-      - *vault_ec_key_prod
-
->>>>>>> 3cedabfc0 (Avoid downloading/uploading unnecessary artifacts in CI runs (#11327))
   - label: Start ESS stack for integration tests
     key: integration-ess
     notify:
