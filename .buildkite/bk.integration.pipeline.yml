@@ -70,7 +70,7 @@ common:
       buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
       .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
     artifact_paths: &k8s_test_artifact_paths
-      - build/**
+      - build/*
       - build/diagnostics/**
       - build/*.pod_logs_dump/*
 
@@ -90,7 +90,7 @@ steps:
       buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
       .buildkite/scripts/steps/integration_tests_tf.sh ech true
     artifact_paths:
-      - build/**
+      - build/*
       - build/diagnostics/**
     retry:
       automatic:
@@ -137,7 +137,7 @@ steps:
           buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 fleet true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         agents:
           provider: "gcp"
@@ -158,7 +158,7 @@ steps:
           buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 fleet true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -178,7 +178,7 @@ steps:
           buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.sh fleet true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -207,7 +207,7 @@ steps:
           buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         agents:
           provider: "gcp"
@@ -237,7 +237,7 @@ steps:
           buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         agents:
           provider: "gcp"
@@ -260,7 +260,7 @@ steps:
           buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         agents:
           provider: "gcp"
@@ -290,7 +290,7 @@ steps:
           buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -320,7 +320,7 @@ steps:
           buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -344,7 +344,7 @@ steps:
           buildkite-agent artifact download build/distributions/** . --step packaging-amd64
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -380,7 +380,7 @@ steps:
           buildkite-agent artifact download build/distributions/** . --step 'packaging-arm64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         agents:
           provider: "aws"
@@ -418,7 +418,7 @@ steps:
           buildkite-agent artifact download build/distributions/** . --step 'packaging-arm64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -448,7 +448,7 @@ steps:
           buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.group}} false
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -477,7 +477,7 @@ steps:
           buildkite-agent artifact download build/distributions/** . --step packaging-amd64
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.group}} true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -527,7 +527,7 @@ steps:
           buildkite-agent artifact download build/distributions/** . --step packaging-amd64
           .buildkite/scripts/steps/integration_tests_tf.sh rpm true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -627,7 +627,7 @@ steps:
           buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/buildkite-integration-tests.ps1 fleet true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -649,7 +649,7 @@ steps:
           buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           .buildkite/scripts/buildkite-integration-tests.ps1 fleet true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -669,7 +669,7 @@ steps:
           buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
           sudo -E .buildkite/scripts/buildkite-integration-tests.sh fleet true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
