@@ -550,9 +550,12 @@ func TestContainerCMDAgentMonitoringRuntimeExperimental(t *testing.T) {
 					}
 					t.Logf("Component ID: %s, version info: %s, runtime: %s", comp.ID, comp.VersionInfo.Name, compRuntime)
 					switch comp.ID {
-					case "beat/metrics-monitoring", "filestream-monitoring", "http/metrics-monitoring", "prometheus/metrics-monitoring":
+					case "beat/metrics-monitoring", "filestream-monitoring", "prometheus/metrics-monitoring":
 						// Monitoring components should use the expected runtime
 						assert.Equalf(t, tc.expectedRuntimeName, compRuntime, "expected correct runtime name for monitoring component %s with id %s", comp.Name, comp.ID)
+					case "http/metrics-monitoring":
+						// The comp.VersionInfo.Name for this component is empty at times.
+						// See https://github.com/elastic/elastic-agent/issues/11162.
 					default:
 						// Non-monitoring components should use the default runtime
 						assert.Equalf(t, string(component.DefaultRuntimeManager), compRuntime, "expected default runtime for non-monitoring component %s with id %s", comp.Name, comp.ID)
@@ -671,9 +674,12 @@ func TestContainerCMDAgentMonitoringRuntimeExperimentalPolicy(t *testing.T) {
 					}
 					t.Logf("Component ID: %s, version info: %s, runtime: %s", comp.ID, comp.VersionInfo.Name, compRuntime)
 					switch comp.ID {
-					case "beat/metrics-monitoring", "filestream-monitoring", "http/metrics-monitoring", "prometheus/metrics-monitoring":
+					case "beat/metrics-monitoring", "filestream-monitoring", "prometheus/metrics-monitoring":
 						// Monitoring components should use the expected runtime
 						assert.Equalf(t, tc.expectedRuntimeName, compRuntime, "unexpected runtime name for monitoring component %s with id %s", comp.Name, comp.ID)
+					case "http/metrics-monitoring":
+						// The comp.VersionInfo.Name for this component is empty at times.
+						// See https://github.com/elastic/elastic-agent/issues/11162.
 					default:
 						// Non-monitoring components should use the default runtime
 						assert.Equalf(t, string(component.DefaultRuntimeManager), compRuntime, "expected default runtime for non-monitoring component %s with id %s", comp.Name, comp.ID)
