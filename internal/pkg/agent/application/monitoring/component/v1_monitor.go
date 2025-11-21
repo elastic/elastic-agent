@@ -531,7 +531,7 @@ func (b *BeatsMonitor) injectLogsInput(
 		"type":                  "filestream",
 		useOutputKey:            monitoringOutput,
 		"streams":               streams,
-		"_runtime_experimental": monitoringRuntime,
+		"_runtime_experimental": string(monitoringRuntime),
 	}
 
 	inputs := []any{input}
@@ -594,7 +594,7 @@ func (b *BeatsMonitor) injectMetricsInput(
 				"namespace": monitoringNamespace,
 			},
 			"streams":               beatsStreams,
-			"_runtime_experimental": monitoringRuntime,
+			"_runtime_experimental": string(monitoringRuntime),
 		},
 		map[string]interface{}{
 			idKey:        fmt.Sprintf("%s-agent", monitoringMetricsUnitID),
@@ -605,7 +605,7 @@ func (b *BeatsMonitor) injectMetricsInput(
 				"namespace": monitoringNamespace,
 			},
 			"streams":               httpStreams,
-			"_runtime_experimental": monitoringRuntime,
+			"_runtime_experimental": string(monitoringRuntime),
 		},
 	}
 
