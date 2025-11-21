@@ -116,6 +116,84 @@ func TestKubernetesJournaldInput(t *testing.T) {
 		"journald")
 }
 
+<<<<<<< HEAD
+=======
+func TestKubernetesJournaldInputOtel(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack: &define.Stack{},
+		Local: false,
+		Sudo:  false,
+		OS: []define.OS{
+			{Type: define.Kubernetes, DockerVariant: "elastic-otel-collector"},
+		},
+		Group: define.Kubernetes,
+	})
+
+	otelConfigYAML, err := os.ReadFile(filepath.Join("testdata", "journald-otel.yml"))
+	require.NoError(t, err, "failed to read journald input template")
+
+	kCtx := k8sGetContext(t, info)
+	namespace := kCtx.getNamespace(t)
+	hostPathType := corev1.HostPathDirectory
+
+	steps := []k8sTestStep{
+		k8sStepCreateNamespace(),
+		k8sStepDeployKustomize(
+			"elastic-agent-standalone",
+			k8sKustomizeOverrides{
+				agentContainerArgs: []string{"--config", "/etc/elastic-agent/agent.yml"},
+				agentContainerExtraEnv: []corev1.EnvVar{
+					{
+						Name:  "EA_POLICY_NAMESPACE",
+						Value: namespace,
+					},
+					{
+						Name:  "ES_API_KEY_ENCODED",
+						Value: kCtx.esEncodedAPIKey,
+					},
+				},
+				agentContainerVolumeMounts: []corev1.VolumeMount{
+					{
+						Name:      "journald-mount",
+						MountPath: "/opt/journal",
+						ReadOnly:  true,
+					},
+				},
+				agentPodVolumes: []corev1.Volume{
+					{
+						Name: "journald-mount",
+						VolumeSource: corev1.VolumeSource{
+							HostPath: &corev1.HostPathVolumeSource{
+								Path: "/run/log/journal",
+								Type: &hostPathType,
+							},
+						},
+					},
+				},
+			},
+			func(obj k8s.Object) {
+				// update the configmap to use the journald input
+				switch objWithType := obj.(type) {
+				case *corev1.ConfigMap:
+					_, ok := objWithType.Data["agent.yml"]
+					if ok {
+						objWithType.Data["agent.yml"] = string(otelConfigYAML)
+					}
+				}
+			}),
+	}
+
+	journaldTest(
+		t,
+		info.ESClient,
+		kCtx,
+		steps,
+		namespace,
+		"Body.input.type",
+		"journald")
+}
+
+>>>>>>> efafc2a65 (Use unique index for TestKubernetesJournaldInputOtel (#11316))
 func journaldTest(
 	t *testing.T,
 	esClient *elasticsearch.Client,
