@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -1275,10 +1276,45 @@ func k8sStepLogstashCheckStatus(logstashPodLabelSelector string, logstashExpecte
 			opt.LabelSelector = logstashPodLabelSelector
 		})
 		require.NoError(t, err, "failed to list logstash pods with selector ", logstashPodLabelSelector)
-		require.NotEmpty(t, logstashPodList.Items, "no agent pods found with selector ", logstashPodLabelSelector)
+		require.NotEmpty(t, logstashPodList.Items, "no logstash pods found with selector ", logstashPodLabelSelector)
 		for _, pod := range logstashPodList.Items {
 			if (pod.Status.Phase != corev1.PodRunning) && logstashExpected {
 				t.Errorf("logstash pod %s is not running", pod.Name)
+				ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+				defer cancel()
+				checkStatus := func() error {
+					var err error
+					var stdout, stderr bytes.Buffer
+					stdout.Reset()
+					stderr.Reset()
+					var result map[string]interface{}
+					if err := kCtx.client.Resource().ExecInPod(ctx, namespace, pod.Name, "logstash",
+						[]string{"curl", "localhost:9600/_pretty"}, stdout, stderr); err != nil {
+						return err
+					}
+					if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+						return err
+					}
+					if status, found := result["status"]; found {
+						if status != "green" {
+							return fmt.Errorf("logstash internal status is not green: %s", status)
+						}
+					} else {
+						return fmt.Errorf("status not found in logstash API response")
+					}
+					return err
+				}
+				for {
+					err := checkStatus()
+					if err == nil {
+						return nil
+					}
+					if ctx.Err() != nil {
+						// timeout waiting for agent to become healthy
+						return errors.Join(err, errors.New("timeout waiting for agent to become healthy"))
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
 			}
 			if (pod.Status.Phase == corev1.PodRunning) && !logstashExpected {
 				t.Errorf("logstash pod %s is running but it should not", pod.Name)

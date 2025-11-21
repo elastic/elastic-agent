@@ -15,6 +15,7 @@ spec:
     metadata:
       labels:
         app: logstash-agent
+        app.kubernetes.io/name: logstash-agent # don't change this as integration tests depend on it
     spec:
       securityContext:
         runAsUser: 1000
