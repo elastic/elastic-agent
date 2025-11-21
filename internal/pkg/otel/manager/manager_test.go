@@ -1663,7 +1663,7 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 		testLogger,
 		logp.DebugLevel,
 		testLogger,
-		config.SubprocessExecutionMode, // irrelevant, we'll override it
+		SubprocessExecutionMode, // irrelevant, we'll override it
 		agentInfo,
 		nil,
 		beatMonitoringConfigGetter,
