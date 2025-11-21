@@ -1649,6 +1649,90 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 	}, time.Millisecond, time.Second*5)
 }
 
+func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
+	testLogger, _ := loggertest.New("test")
+	agentInfo := &info.AgentInfo{}
+	beatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
+	collectorStarted := make(chan struct{})
+
+	execution := &mockExecution{
+		collectorStarted: collectorStarted,
+	}
+
+	// Create manager with test dependencies
+	mgr, err := NewOTelManager(
+		testLogger,
+		logp.DebugLevel,
+		testLogger,
+		config.SubprocessExecutionMode, // irrelevant, we'll override it
+		agentInfo,
+		nil,
+		beatMonitoringConfigGetter,
+		time.Second,
+	)
+	require.NoError(t, err)
+	mgr.recoveryTimer = newRestarterNoop()
+	mgr.execution = execution
+
+	// Start manager in a goroutine
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	defer cancel()
+
+	go func() {
+		err := mgr.Run(ctx)
+		assert.ErrorIs(t, err, context.Canceled)
+	}()
+
+	testComp := testComponent("test")
+	components := []component.Component{testComp}
+	otelStatus := &status.AggregateStatus{
+		Event: componentstatus.NewEvent(componentstatus.StatusStarting),
+	}
+	// start the collector by giving it a mock config
+	mgr.Update(nil, components)
+	select {
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for collector status update")
+	case <-execution.collectorStarted:
+	}
+
+	// send the status from the execution
+	select {
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for collector status update")
+	case execution.statusCh <- otelStatus:
+	}
+
+	// verify we get the component Starting state from the manager
+	componentStates, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchComponents(), mgr.Errors())
+	require.NoError(t, err)
+	require.NotNil(t, componentStates)
+	require.Len(t, componentStates, 1)
+	componentState := componentStates[0]
+	assert.Equal(t, componentState.State.State, client.UnitStateStarting)
+	assert.Equal(t, componentState.State.Message, "STARTING")
+
+	// stop the component by sending a nil config
+	mgr.Update(nil, nil)
+
+	// then send a nil status, indicating the collector is not running the component anymore
+	// do this a few times to see if the STOPPED state isn't lost along the way
+	for range 3 {
+		reportCollectorStatus(ctx, execution.statusCh, nil)
+		time.Sleep(time.Millisecond * 100) //  TODO: Replace this with synctest after we upgrade to Go 1.25
+	}
+
+	// verify that we get a STOPPED state for the component
+	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+		componentStates, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchComponents(), mgr.Errors())
+		require.NoError(collect, err)
+		require.NotNil(collect, componentStates)
+		require.Len(collect, componentStates, 1)
+		componentState := componentStates[0]
+		assert.Equal(collect, componentState.State.State, client.UnitStateStopped)
+	}, time.Millisecond, time.Second*5)
+}
+
 func getFromChannelOrErrorWithContext[T any](t *testing.T, ctx context.Context, ch <-chan T, errCh <-chan error) (T, error) {
 	t.Helper()
 	var result T
