@@ -35,7 +35,7 @@ jobs:
           install-only: true
 
       - name: Update EDOT go.mod if necessary
-        run: go mod tidy
+        run: cd internal/edot && go mod tidy
 
       - name: check for modified edot go.mod
         id: edot-check

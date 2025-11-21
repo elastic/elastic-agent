@@ -131,7 +131,7 @@ func TestCommaParsing(t *testing.T) {
 func dumpToYAML(t *testing.T, out string, in interface{}) {
 	b, err := yaml.Marshal(in)
 	require.NoError(t, err)
-	err = os.WriteFile(out, b, 0600)
+	err = os.WriteFile(out, b, 0o600)
 	require.NoError(t, err)
 }
 
