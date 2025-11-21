@@ -1288,7 +1288,7 @@ func k8sStepLogstashCheckStatus(logstashPodLabelSelector string, logstashExpecte
 					stdout.Reset()
 					stderr.Reset()
 					var result map[string]interface{}
-					if err := kCtx.client.Resource().ExecInPod(ctx, namespace, pod.Name, "logstash",
+					if err := kCtx.client.Resources().ExecInPod(ctx, namespace, pod.Name, "logstash",
 						[]string{"curl", "localhost:9600/_pretty"}, stdout, stderr); err != nil {
 						return err
 					}
@@ -1305,13 +1305,11 @@ func k8sStepLogstashCheckStatus(logstashPodLabelSelector string, logstashExpecte
 					return err
 				}
 				for {
-					err := checkStatus()
-					if err == nil {
-						return nil
-					}
+					_ := checkStatus()
 					if ctx.Err() != nil {
 						// timeout waiting for agent to become healthy
-						return errors.Join(err, errors.New("timeout waiting for agent to become healthy"))
+						errors.Join(err, errors.New("timeout waiting for logstash to become healthy"))
+						require.NoError(t, err, "logstash pod %s did not become healthy in time", pod.Name)
 					}
 					time.Sleep(100 * time.Millisecond)
 				}
@@ -1319,6 +1317,7 @@ func k8sStepLogstashCheckStatus(logstashPodLabelSelector string, logstashExpecte
 			if (pod.Status.Phase == corev1.PodRunning) && !logstashExpected {
 				t.Errorf("logstash pod %s is running but it should not", pod.Name)
 			}
+
 		}
 	}
 }
