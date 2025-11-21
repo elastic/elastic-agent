@@ -2,9 +2,7 @@
 version: 2
 updates:
   - package-ecosystem: "gomod"
-    directories:
-      - "/"
-      - "/internal/edot"
+    directory: "/"
     schedule:
       interval: "daily"
     labels:
