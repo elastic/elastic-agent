@@ -476,6 +476,11 @@ exporters:
     sending_queue:
       wait_for_result: true
       block_on_overflow: true
+      enabled: true
+      batch:
+        min_size: 2000
+        max_size: 10000
+        flush_timeout: 1s
     mapping:
       mode: none
 
@@ -581,10 +586,9 @@ func TestOtelLogsIngestion(t *testing.T) {
 		require.NoError(t, err)
 	}
 	inputFile.Close()
-	t.Cleanup(func() {
-		_ = os.Remove(inputFilePath)
-	})
 
+	// It takes about 45s to ingest all files on local tests,
+	// so set the timeout to 5min to be on the safe side.
 	require.EventuallyWithT(
 		t,
 		func(c *assert.CollectT) {
@@ -603,7 +607,7 @@ func TestOtelLogsIngestion(t *testing.T) {
 				"expecting %d events",
 				logsCount)
 		},
-		2*time.Minute,
+		5*time.Minute,
 		time.Second,
 		"did not find the expected number of events")
 
