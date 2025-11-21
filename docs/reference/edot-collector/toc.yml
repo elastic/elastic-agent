@@ -18,6 +18,7 @@ toc:
       - file: components/elasticapmintakereceiver.md
       - file: components/k8sclusterreceiver.md
       - file: components/elasticapmprocessor.md
+      - file: components/elasticapmconnector.md
       - file: components/filelogreceiver.md
       - file: components/k8sobjectsreceiver.md
       - file: components/hostmetricsreceiver.md
