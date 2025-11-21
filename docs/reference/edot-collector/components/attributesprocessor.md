@@ -46,6 +46,18 @@ The attributes processor is commonly used in {{product.observability}} pipelines
 
 * Override or enrich resource attributes for standardizing deployment names, namespaces, or service metadata.
 
+## Key configuration options
+
+The following are the most important settings when configuring the attributes processor:
+
+| Option | Description |
+|--------|-------------|
+| `actions` | A list of attribute modifications to apply. Each action uses the upstream-supported action types: `insert`, `update`, `upsert`, `delete`, `hash`, `extract`, `convert`, `rename`. |
+| `include` / `exclude` | Rules for matching telemetry based on service name, span name, resource attributes, log severity, or metric name. |
+| `match_type` | How attribute comparison is evaluated (`strict`, `regexp`, `expr`). |
+
+For the complete list of configuration options and action-specific settings, refer to the [contrib `attributesprocessor` documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/attributesprocessor).
+
 ## Example configuration
 
 The following example deletes a sensitive attribute, renames an attribute, inserts a cluster ID, and hashes an IP address before export:
@@ -96,18 +108,6 @@ processors:
 ```
 
 This example removes an authorization header only from telemetry produced by the `checkout-service`.
-
-## Key configuration options
-
-The following are the most important settings when configuring the attributes processor:
-
-| Option | Description |
-|--------|-------------|
-| `actions` | A list of attribute modifications to apply. Each action uses the upstream-supported action types: `insert`, `update`, `upsert`, `delete`, `hash`, `extract`, `convert`, `rename`. |
-| `include` / `exclude` | Rules for matching telemetry based on service name, span name, resource attributes, log severity, or metric name. |
-| `match_type` | How attribute comparison is evaluated (`strict`, `regexp`, `expr`). |
-
-For the complete list of configuration options and action-specific settings, refer to the [contrib `attributesprocessor` documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/attributesprocessor).
 
 ## Best practices
 
