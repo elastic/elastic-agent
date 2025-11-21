@@ -102,6 +102,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 					fmt.Fprintf(streams.Err, "Rollback command failed: %v\n", err)
 					os.Exit(errorRollbackFailed)
 				}
+				return
 			}
 
 			if err = withAppLocker(log, func() error {
