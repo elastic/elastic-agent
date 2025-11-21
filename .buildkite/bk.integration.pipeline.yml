@@ -446,7 +446,7 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-arm64* . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.group}} false
         artifact_paths:
           - build/*
@@ -475,7 +475,7 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-arm64* . --step packaging-amd64
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-amd64
           buildkite-agent artifact download build/distributions/elastic-agent-*-amd64.deb* . --step packaging-amd64
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.group}} true
         artifact_paths:
