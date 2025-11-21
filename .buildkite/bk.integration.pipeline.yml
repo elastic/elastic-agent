@@ -70,12 +70,41 @@ common:
       buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
       .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
     artifact_paths: &k8s_test_artifact_paths
-      - build/**
+      - build/*
       - build/diagnostics/**
       - build/*.pod_logs_dump/*
 
 
 steps:
+<<<<<<< HEAD
+=======
+  - label: "Custom ECH Testing"
+    key: integration-tests-ech
+    depends_on:
+      - packaging-containers-amd64
+      - packaging-containers-arm64
+    env:
+      TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+      TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
+      FORCE_ESS_CREATE: "true"
+    command: |
+      #!/usr/bin/env bash
+      buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-amd64'
+      .buildkite/scripts/steps/integration_tests_tf.sh ech true
+    artifact_paths:
+      - build/*
+      - build/diagnostics/**
+    retry:
+      automatic:
+        limit: 1
+    agents:
+      provider: "gcp"
+      machineType: "n2-standard-8"
+      image: "${IMAGE_UBUNTU_2404_X86_64}"
+    plugins:
+      - *vault_ec_key_prod
+
+>>>>>>> 3cedabfc0 (Avoid downloading/uploading unnecessary artifacts in CI runs (#11327))
   - label: Start ESS stack for integration tests
     key: integration-ess
     notify:
@@ -108,10 +137,10 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/leak"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64*  . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 fleet true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         agents:
           provider: "gcp"
@@ -129,10 +158,10 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/leak"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 fleet true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -149,10 +178,10 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/leak"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.sh fleet true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -178,10 +207,10 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         agents:
           provider: "gcp"
@@ -208,10 +237,10 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         agents:
           provider: "gcp"
@@ -231,10 +260,10 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         agents:
           provider: "gcp"
@@ -261,10 +290,10 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -291,10 +320,10 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -315,10 +344,11 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step packaging-amd64
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-amd64
+          buildkite-agent artifact download build/distributions/elastic-agent-*-amd64.deb* . --step packaging-amd64
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -351,10 +381,10 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-arm64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-arm64* . --step 'packaging-arm64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         agents:
           provider: "aws"
@@ -389,10 +419,10 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-arm64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-arm64* . --step 'packaging-arm64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -419,10 +449,10 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-amd64'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.group}} false
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -448,10 +478,11 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step packaging-amd64
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-amd64
+          buildkite-agent artifact download build/distributions/elastic-agent-*-amd64.deb* . --step packaging-amd64
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.group}} true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -498,10 +529,10 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step packaging-amd64
+          buildkite-agent artifact download build/distributions/elastic-agent-*-x86_64.rpm* . --step packaging-amd64
           .buildkite/scripts/steps/integration_tests_tf.sh rpm true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -598,10 +629,10 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/serverless"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
           .buildkite/scripts/buildkite-integration-tests.ps1 fleet true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -620,10 +651,10 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/serverless"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
           .buildkite/scripts/buildkite-integration-tests.ps1 fleet true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -640,10 +671,10 @@ steps:
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/serverless"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-amd64'
           sudo -E .buildkite/scripts/buildkite-integration-tests.sh fleet true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
