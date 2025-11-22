@@ -20,6 +20,10 @@ The {{edot}} (EDOT) Collector includes embedded Collector components from the [O
 
 The components included in the EDOT Collector are categorized into **[Core]** and **[Extended]** components. The following table describes the current components included in the EDOT Collector, their source, and support status.
 
+::::{note}
+Components marked as "Deprecated" in the table are retained in EDOT Collector 9.x to maintain backwards compatibility during the official deprecation window. If you're running EDOT Collector 9.x with {{product.elastic-stack}} 8.18 or 8.19, continue using these deprecated components as specified in the configuration for your Stack version. For more details, refer to [Configuration compatibility with {{product.elastic-stack}} versions](/reference/edot-collector/config/default-config-standalone.md#configuration-compatibility-with-elastic-stack-versions).
+::::
+
 % The following table is automatically generated from the EDOT Collector source code.
 % Automation is handled by /docs/scripts/update-docs/update-components-docs.py, which
 % reads the go.mod file, the components.yml file, and then generates the table.

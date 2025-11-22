@@ -93,6 +93,8 @@ Both the `elasticapm` processor and the `elasticapm` connector are required for 
 * Use the EDOT Collector with the available configuration to ingest data into {{es}}.
 * [Build a custom, EDOT-like Collector](/reference/edot-collector/custom-collector.md) for ingesting data into {{es}}.
 * Use Elastic's [managed OTLP endpoint](docs-content://solutions/observability/get-started/opentelemetry/quickstart/serverless/index.md) that does the enrichment for you.
+
+If you're running EDOT Collector 9.x with Elastic Stack 8.18 or 8.19, use the deprecated `elastictrace` processor instead of `elasticapm` processor as specified in the configuration for your Stack version.
 :::
 
 #### Host metrics collection pipeline
@@ -102,6 +104,12 @@ The host metrics pipeline uses the [`hostmetrics`] receiver to collect `disk`, `
 For backwards compatibility, host metrics are translated into ECS-compatible system metrics using the [`elasticinframetrics`] processor. Finally, metrics are ingested in `ecs` format through the [`elasticsearch`] exporter.
 
 The [`resourcedetection`] processor enriches the metrics with meta information about the corresponding host and operating system. The [`attributes`] and [`resource`] processor are used to set some fields for proper routing of the ECS-based system metrics data into corresponding {{es}} data streams.
+
+:::{note}
+:applies_to: edot_collector: ga 9.2
+
+The `elasticinframetrics` processor is deprecated in EDOT Collector 9.2 but is retained for backwards compatibility. If you're running EDOT Collector 9.x with {{product.elastic-stack}} 8.18 or 8.19, continue using this processor as specified in the configuration for your Stack version.
+:::
 
 ::::{important}
 :::{include} ../_snippets/process-config.md
@@ -239,7 +247,8 @@ processors:
 
 :::{note}
 :applies_to: edot_collector: ga 9.2
-The `elasticapm` processor replaces the deprecated `elastictrace` processor.
+
+The `elasticapm` processor replaces the deprecated `elastictrace` processor. If you're running EDOT Collector 9.x with Elastic Stack 8.18 or 8.19, use the `elastictrace` processor and the `elasticinframetrics` processor as specified in the Gateway configuration for your Stack version.
 :::
 
 ### Data export
@@ -493,3 +502,17 @@ exporters:
 mTLS ensures that only authorized collectors can send telemetry data.
 
 For {{ecloud}} and {{serverless-full}} deployments, mTLS is not required. TLS and API key authentication are enforced automatically.
+
+## Configuration compatibility with Elastic Stack versions
+
+While EDOT Collector 9.x is compatible with {{product.elastic-stack}} 8.18 and 8.19, users running these Stack versions should use the EDOT Collector configuration aligned with their Stack version to ensure the end-to-end experience works properly with {{product.kibana}} Observability UIs.
+
+::::{important}
+If you're upgrading EDOT Collector to 9.x but keeping your {{product.elastic-stack}} on 8.18 or 8.19:
+
+- Use the configuration examples for your Stack version (8.18 or 8.19), not the latest 9.x configuration.
+- Continue using deprecated components (such as `elasticinframetrics` and `elastictrace` processors) that are included in the configuration for your Stack version.
+- These deprecated components are retained in EDOT Collector 9.x specifically to maintain backwards compatibility during the official deprecation window.
+
+For Gateway mode configurations by Stack version, refer to the [Gateway mode section](#gateway-mode).
+::::
