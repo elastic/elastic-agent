@@ -88,6 +88,9 @@ func testTagsFromEnv() []string {
 	if FIPSBuild {
 		tags = append(tags, "requirefips", "ms_tls13kdf")
 	}
+	if OTELComponentBuild {
+		tags = append(tags, "otelexternal")
+	}
 	return tags
 }
 
