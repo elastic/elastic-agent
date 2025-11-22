@@ -186,8 +186,8 @@ func TestKubernetesJournaldInputOtel(t *testing.T) {
 		info.ESClient,
 		kCtx,
 		steps,
-		fmt.Sprintf("logs-generic.otel-%s", namespace),
-		"body.structured.input.type",
+		namespace,
+		"Body.input.type",
 		"journald")
 }
 
