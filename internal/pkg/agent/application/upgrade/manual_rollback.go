@@ -102,6 +102,13 @@ func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper,
 		return "", "", fmt.Errorf("version %q not listed among the available rollbacks: %w", rollbackVersion, ErrNoRollbacksAvailable)
 	}
 
+	if filepath.IsAbs(targetInstall) {
+		targetInstall, err = filepath.Rel(topDir, targetInstall)
+		if err != nil {
+			return "", "", fmt.Errorf("error calculating path of install %q relative to %q: %w", targetInstall, topDir, err)
+		}
+	}
+
 	prevAgentParsedVersion, err := version.ParseVersion(targetTTLMarker.Version)
 	if err != nil {
 		return "", "", fmt.Errorf("parsing version of target install %+v: %w", targetInstall, err)
