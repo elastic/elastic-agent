@@ -422,7 +422,7 @@ func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Confi
 	if err != nil {
 		return nil, aerrors.New("failed to create a map from config", err)
 	}
-	allComps, err := specs.ToComponents(mm, nil, logp.InfoLevel, nil, map[string]uint64{})
+	allComps, err := specs.ToComponents(mm, nil, nil, logp.InfoLevel, nil, map[string]uint64{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to render components: %w", err)
 	}

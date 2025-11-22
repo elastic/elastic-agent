@@ -915,4 +915,7 @@ inputs:
   type: system/metrics
   use_output: monitoring
 outputs:
-  monitoring: {}
+  monitoring:
+    hosts:
+    - localhost:9200
+    type: elasticsearch

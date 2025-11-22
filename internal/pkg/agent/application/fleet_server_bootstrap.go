@@ -50,7 +50,7 @@ var injectFleetServerInput = config.MustNewConfigFrom(map[string]interface{}{
 
 // FleetServerComponentModifier modifies the comps to inject extra information from the policy into
 // the Fleet Server component and units needed to run Fleet Server correctly.
-func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig) coordinator.ComponentsModifier {
+func FleetServerComponentModifier(serverCfg *configuration.FleetServerConfig) component.ComponentsModifier {
 	return func(comps []component.Component, _ map[string]interface{}) ([]component.Component, error) {
 		for i, comp := range comps {
 			if comp.InputSpec != nil && comp.InputSpec.InputType == fleetServer && comp.Err == nil {
@@ -118,7 +118,7 @@ func addBootstrapCfg(dst map[string]interface{}, es *configuration.Elasticsearch
 
 // InjectFleetConfigComponentModifier The modifier that injects the fleet configuration for the components
 // that need to be able to connect to fleet server.
-func InjectFleetConfigComponentModifier(fleetCfg *configuration.FleetAgentConfig, agentInfo info.Agent) coordinator.ComponentsModifier {
+func InjectFleetConfigComponentModifier(fleetCfg *configuration.FleetAgentConfig, agentInfo info.Agent) component.ComponentsModifier {
 	return func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
 		hostsStr := fleetCfg.Client.GetHosts()
 		fleetHosts := make([]interface{}, 0, len(hostsStr))
