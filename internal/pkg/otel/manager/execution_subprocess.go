@@ -171,6 +171,9 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 					// after the collector exits, we need to report a nil status
 					r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
 					return
+				default:
+					// if we face any other error (most likely, connection refused), log the error.
+					logger.Debugf("Received an unexpected error while fetching component status: %v", err)
 				}
 			} else {
 				maxFailuresTimer.Reset(maxFailuresDuration)
