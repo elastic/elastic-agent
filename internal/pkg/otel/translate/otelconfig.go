@@ -267,7 +267,7 @@ func getReceiversConfigForComponent(
 	// Beat config inside a beat receiver is nested under an additional key. Not sure if this simple translation is
 	// always safe. We should either ensure this is always the case, or have an explicit mapping.
 	beatName := strings.TrimSuffix(receiverType.String(), "receiver")
-	binaryName := GetBeatNameForComponent(comp)
+	binaryName := comp.BeatName()
 	dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
 
 	receiverConfig := map[string]any{
@@ -360,19 +360,10 @@ func getExportersConfigForComponent(comp *component.Component, logger *logp.Logg
 	return exportersConfig, queueSettings, extensionConfig, nil
 }
 
-// GetBeatNameForComponent returns the beat binary name that would be used to run this component.
-func GetBeatNameForComponent(comp *component.Component) string {
-	// TODO: Add this information directly to the spec?
-	if comp.InputSpec == nil || comp.InputSpec.BinaryName != "agentbeat" {
-		return ""
-	}
-	return comp.InputSpec.Spec.Command.Args[0]
-}
-
 // getSignalForComponent returns the otel signal for the given component. Currently, this is always logs, even for
 // metricbeat.
 func getSignalForComponent(comp *component.Component) (pipeline.Signal, error) {
-	beatName := GetBeatNameForComponent(comp)
+	beatName := comp.BeatName()
 	switch beatName {
 	case "filebeat", "metricbeat":
 		return pipeline.SignalLogs, nil
@@ -383,7 +374,7 @@ func getSignalForComponent(comp *component.Component) (pipeline.Signal, error) {
 
 // getReceiverTypeForComponent returns the receiver type for the given component.
 func getReceiverTypeForComponent(comp *component.Component) (otelcomponent.Type, error) {
-	beatName := GetBeatNameForComponent(comp)
+	beatName := comp.BeatName()
 	switch beatName {
 	case "filebeat":
 		return otelcomponent.MustNewType("filebeatreceiver"), nil
@@ -524,7 +515,7 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 // getDefaultDatastreamTypeForComponent returns the default datastream type for a given component.
 // This is needed to translate from the agent policy config format to the beats config format.
 func getDefaultDatastreamTypeForComponent(comp *component.Component) (string, error) {
-	beatName := GetBeatNameForComponent(comp)
+	beatName := comp.BeatName()
 	switch beatName {
 	case "filebeat":
 		return "logs", nil
