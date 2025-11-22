@@ -14,6 +14,7 @@ toc:
       - file: config/proxy.md
   - file: components.md
     children:
+      - file: components/apmconfigextension.md
       - file: components/elasticsearchexporter.md
       - file: components/elasticapmintakereceiver.md
       - file: components/k8sclusterreceiver.md
