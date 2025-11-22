@@ -70,7 +70,7 @@ func DropComponentStateFromOtelStatus(otelStatus *status.AggregateStatus) (*stat
 			continue
 		}
 		pipelineId := &pipeline.ID{}
-		componentKind, pipelineIdStr, parseErr := parseEntityStatusId(pipelineStatusId)
+		componentKind, pipelineIdStr, parseErr := ParseEntityStatusId(pipelineStatusId)
 		if parseErr != nil {
 			return nil, parseErr
 		}
@@ -112,6 +112,56 @@ func MaybeMuteExporterStatus(
 	updateStatus(newStatus)
 
 	return newStatus, nil
+}
+
+// HasStatus returns true when the status contains that component status.
+func HasStatus(current *status.AggregateStatus, s componentstatus.Status) bool {
+	if current == nil {
+		return false
+	}
+	if current.Status() == s {
+		return true
+	}
+	for _, comp := range current.ComponentStatusMap {
+		return HasStatus(comp, s)
+	}
+	return false
+}
+
+// StateWithMessage returns a `client.UnitState` and message for the current status.
+func StateWithMessage(current *status.AggregateStatus) (client.UnitState, string) {
+	s := current.Status()
+	switch s {
+	case componentstatus.StatusNone:
+		// didn't report a status, we assume with no status
+		// that it is healthy
+		return client.UnitStateHealthy, "Healthy"
+	case componentstatus.StatusStarting:
+		return client.UnitStateStarting, "Starting"
+	case componentstatus.StatusOK:
+		return client.UnitStateHealthy, "Healthy"
+	case componentstatus.StatusRecoverableError:
+		if current.Err() != nil {
+			return client.UnitStateDegraded, fmt.Sprintf("Recoverable: %s", current.Err())
+		}
+		return client.UnitStateDegraded, "Unknown recoverable error"
+	case componentstatus.StatusPermanentError:
+		if current.Err() != nil {
+			return client.UnitStateFailed, fmt.Sprintf("Permanent: %s", current.Err())
+		}
+		return client.UnitStateFailed, "Unknown permanent error"
+	case componentstatus.StatusFatalError:
+		if current.Err() != nil {
+			return client.UnitStateFailed, fmt.Sprintf("Fatal: %s", current.Err())
+		}
+		return client.UnitStateFailed, "Unknown fatal error"
+	case componentstatus.StatusStopping:
+		return client.UnitStateStopping, "Stopping"
+	case componentstatus.StatusStopped:
+		return client.UnitStateStopped, "Stopped"
+	}
+	// if we hit this case, then a new status was added that we don't know about
+	return client.UnitStateFailed, fmt.Sprintf("Unknown component status: %s", s)
 }
 
 // updateStatus recursively updates each AggregateStatus.Event
@@ -157,7 +207,7 @@ func muteExporters(agg *status.AggregateStatus, components []component.Component
 
 		// Mute exporters for the pipeline for this component
 		for compID, compStatus := range pipelineStatus.ComponentStatusMap {
-			kind, _, err := parseEntityStatusId(compID)
+			kind, _, err := ParseEntityStatusId(compID)
 			if err != nil {
 				return err
 			}
@@ -171,7 +221,7 @@ func muteExporters(agg *status.AggregateStatus, components []component.Component
 
 // parsePipelineID extracts a *pipeline.ID from a status ID string.
 func parsePipelineID(statusID string) (*pipeline.ID, error) {
-	_, pipelineIDStr, err := parseEntityStatusId(statusID)
+	_, pipelineIDStr, err := ParseEntityStatusId(statusID)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +261,7 @@ func getOtelRuntimePipelineStatuses(otelStatus *status.AggregateStatus) (map[str
 			continue
 		}
 		pipelineId := &pipeline.ID{}
-		componentKind, pipelineIdStr, parseErr := parseEntityStatusId(pipelineStatusId)
+		componentKind, pipelineIdStr, parseErr := ParseEntityStatusId(pipelineStatusId)
 		if parseErr != nil {
 			return nil, parseErr
 		}
@@ -235,9 +285,10 @@ func getOtelRuntimePipelineStatuses(otelStatus *status.AggregateStatus) (map[str
 
 // getComponentState extracts the full status of a component from its respective otel pipeline status.
 func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Component) (runtime.ComponentComponentState, error) {
+	pipelineState, pipelineMessage := StateWithMessage(pipelineStatus)
 	compState := runtime.ComponentState{
-		State:   otelStatusToUnitState(pipelineStatus.Status()),
-		Message: otelStatusToUnitState(pipelineStatus.Status()).String(),
+		State:   pipelineState,
+		Message: pipelineMessage,
 		Units:   make(map[runtime.ComponentUnitKey]runtime.ComponentUnitState),
 		VersionInfo: runtime.ComponentVersionInfo{
 			Name: OtelComponentName,
@@ -334,7 +385,7 @@ func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus, comp component.
 
 	for otelCompStatusId, otelCompStatus := range pipelineStatus.ComponentStatusMap {
 		var otelComponentID otelcomponent.ID
-		componentKind, otelComponentIDStr, parseErr := parseEntityStatusId(otelCompStatusId)
+		componentKind, otelComponentIDStr, parseErr := ParseEntityStatusId(otelCompStatusId)
 		if parseErr != nil {
 			return nil, nil, parseErr
 		}
@@ -356,8 +407,7 @@ func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus, comp component.
 
 // getComponentUnitState extracts component unit state from otel status.
 func getComponentUnitState(otelUnitStatus *status.AggregateStatus, unit component.Unit) runtime.ComponentUnitState {
-	unitStatus := otelStatusToUnitState(otelUnitStatus.Status())
-	unitMessage := unitMessageFromOtelStatus(otelUnitStatus)
+	unitStatus, unitMessage := StateWithMessage(otelUnitStatus)
 	var streamStatus map[string]map[string]string
 
 	if unit.Config != nil {
@@ -366,7 +416,7 @@ func getComponentUnitState(otelUnitStatus *status.AggregateStatus, unit componen
 			// For now, set the stream status to the same as the unit status.
 			var errorString string
 			if otelUnitStatus.Err() != nil {
-				errorString = otelUnitStatus.Err().Error()
+				errorString = unitMessage
 			}
 			streamStatus[stream.Id] = map[string]string{
 				"error":  errorString,
@@ -389,48 +439,11 @@ func getComponentUnitState(otelUnitStatus *status.AggregateStatus, unit componen
 	}
 }
 
-// unitMessageFromOtelStatus converts otel status to component unit message.
-// This is a partial reimplementation of part of the logic in
-// https://github.com/elastic/beats/blob/main/x-pack/libbeat/management/unit.go#L208
-func unitMessageFromOtelStatus(otelUnitStatus *status.AggregateStatus) string {
-	if otelUnitStatus.Err() != nil {
-		return otelUnitStatus.Err().Error()
-	}
-	unitStatus := otelStatusToUnitState(otelUnitStatus.Status())
-	if unitStatus == client.UnitStateHealthy {
-		return "Healthy"
-	}
-
-	return unitStatus.String()
-}
-
-// otelStatusToUnitState translates otel status to component unit state.
-func otelStatusToUnitState(status componentstatus.Status) client.UnitState {
-	statusMap := map[componentstatus.Status]client.UnitState{
-		componentstatus.StatusNone: client.UnitStateDegraded,
-		// StatusStarting indicates the component is starting.
-		componentstatus.StatusStarting: client.UnitStateStarting,
-		// StatusOK indicates the component is running without issues.
-		componentstatus.StatusOK: client.UnitStateHealthy,
-		// StatusRecoverableError indicates that the component has experienced a transient error and may recover.
-		componentstatus.StatusRecoverableError: client.UnitStateDegraded,
-		// StatusPermanentError indicates that the component has detected a condition at runtime that will need human intervention to fix. The collector will continue to run in a degraded mode.
-		componentstatus.StatusPermanentError: client.UnitStateFailed,
-		// StatusFatalError indicates that the collector has experienced a fatal runtime error and will shut down.
-		componentstatus.StatusFatalError: client.UnitStateFailed,
-		// StatusStopping indicates that the component is in the process of shutting down.
-		componentstatus.StatusStopping: client.UnitStateStopping,
-		// StatusStopped indicates that the component has completed shutdown.
-		componentstatus.StatusStopped: client.UnitStateStopped,
-	}
-	return statusMap[status]
-}
-
-// parseEntityStatusId parses an entity status ID into its kind and entity ID. An entity can be a pipeline or otel component.
+// ParseEntityStatusId parses an entity status ID into its kind and entity ID. An entity can be a pipeline or otel component.
 // The ID is expected to be in the format "kind:entityId", where kind is either "pipeline" or the otel component type (e.g., "receiver", "exporter").
 // The returned entityId may be empty - this is true for the top-level "extensions" key.
 // This format is used by the healthcheckv2 extension.
-func parseEntityStatusId(id string) (kind string, entityId string, err error) {
+func ParseEntityStatusId(id string) (kind string, entityId string, err error) {
 	if id == "extensions" {
 		return "extensions", "", nil
 	}
