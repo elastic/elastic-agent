@@ -7,6 +7,7 @@ replace github.com/elastic/elastic-agent => ../../
 require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251119204152-c728c08086a3
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
+<<<<<<< HEAD
 	github.com/elastic/elastic-agent-libs v0.26.1
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.8.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.1.0
@@ -44,6 +45,47 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver v0.137.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver v0.137.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.137.0
+=======
+	github.com/elastic/elastic-agent-libs v0.26.2
+	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.20.0
+	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.20.0
+	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.22.0
+	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.20.0
+	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.21.0
+	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.20.0
+	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.20.0
+	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.21.0
+	github.com/gofrs/uuid/v5 v5.4.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/awslogsencodingextension v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/headerssetterextension v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/iisreceiver v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/mysqlreceiver v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/postgresqlreceiver v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.139.0
+>>>>>>> 9c0f97ce2 (build(deps): bump github.com/elastic/elastic-agent-libs from 0.26.1 to 0.26.2 (#11353))
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/pflag v1.0.9
 	github.com/stretchr/testify v1.11.1
@@ -295,10 +337,16 @@ require (
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/lunes v0.1.0 // indirect
 	github.com/elastic/mito v1.23.0 // indirect
+<<<<<<< HEAD
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.8.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.24.0 // indirect
 	github.com/elastic/pkcs8 v1.0.0 // indirect
+=======
+	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20251113000200-a6f7cddc8520 // indirect
+	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.20.0 // indirect
+	github.com/elastic/opentelemetry-lib v0.26.0 // indirect
+>>>>>>> 9c0f97ce2 (build(deps): bump github.com/elastic/elastic-agent-libs from 0.26.1 to 0.26.2 (#11353))
 	github.com/elastic/sarama v1.19.1-0.20250603175145-7672917f26b6 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.32.4 // indirect
