@@ -374,3 +374,5 @@ steps:
   - label: "Publish to serverless"
     branches: main
     trigger: "agentless-serverless-release"
+    build:
+      commit: "${BUILDKITE_COMMIT}"
