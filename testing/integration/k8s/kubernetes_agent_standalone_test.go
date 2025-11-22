@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -743,6 +744,68 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", false),
 			},
 		},
+		{
+			name: "helm standalone agent default kubernetes unprivileged with logstash output",
+			steps: []k8sTestStep{
+				k8sStepCreateNamespace(),
+				k8sStepLogstashCreate(),
+				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
+					"kubernetes": map[string]any{
+						"enabled": true,
+						"state": map[string]any{
+							"agentAsSidecar": map[string]any{
+								"enabled": true,
+							},
+						},
+					},
+					"agent": map[string]any{
+						"unprivileged": true,
+						"image": map[string]any{
+							"repository": kCtx.agentImageRepo,
+							"tag":        kCtx.agentImageTag,
+							"pullPolicy": "Never",
+						},
+					},
+					"outputs": map[string]any{
+						"default": map[string]any{
+							"type":  "Logstash",
+							"hosts": [1]string{"logstash-agent:5044"},
+							"ssl": map[string]any{
+								"certificateAuthorities": []map[string]any{{
+									"valueFromSecret": map[string]any{
+										"name": "agent-certs",
+										"key":  "ca.crt",
+									},
+								}},
+								"certificate": map[string]any{
+									"valueFromSecret": map[string]any{
+										"name": "agent-certs",
+										"key":  "tls.crt",
+									},
+								},
+								"key": map[string]any{
+									"valueFromSecret": map[string]any{
+										"name": "agent-certs",
+										"key":  "tls.key",
+									},
+								},
+								"verificationMode": "certificate",
+							},
+						},
+					},
+				}),
+				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+				k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
+				k8sStepCheckAgentStatus("app.kubernetes.io/name=kube-state-metrics", 1, "agent", nil),
+				k8sStepLogstashCheckStatus("app.kubernetes.io/name=logstash-agent", true),
+				k8sStepCheckRestrictUpgrade("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+				k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
+				k8sStepRunInnerTests("app.kubernetes.io/name=kube-state-metrics", 1, "agent"),
+				k8sStepLogstashDelete(),
+				k8sStepLogstashCheckStatus("app.kubernetes.io/name=logstash-agent", false),
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1175,6 +1238,87 @@ func k8sStepHelmDeploy(chartPath string, releaseName string, values map[string]a
 		installAction.WaitForJobs = true
 		_, err = installAction.Run(helmChart, values)
 		require.NoError(t, err, "failed to install helm chart")
+	}
+}
+
+func k8sStepLogstashCreate() k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		r, err := os.Open("testdata/logstash.yaml")
+		require.NoError(t, err, "failed to open logstash k8s test data")
+
+		logstashObjs, err := testK8s.LoadFromYAML(bufio.NewReader(r))
+		require.NoError(t, err, "failed to convert logstash yaml to k8s objects")
+		t.Cleanup(func() {
+			err = k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, logstashObjs...)
+			require.NoError(t, err, "failed to delete logstash k8s objects")
+		})
+
+		err = k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true, waitTimeout: 120 * time.Second, namespace: namespace}, logstashObjs...)
+		require.NoError(t, err, "failed to create logstash k8s objects")
+	}
+}
+
+func k8sStepLogstashDelete() k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		logstashPod := &corev1.Pod{}
+		err := kCtx.client.Resources(namespace).Get(ctx, "logstash-agent", namespace, logstashPod)
+		require.NoError(t, err, "failed to get logstash pod")
+
+		err = k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, logstashPod)
+		require.NoError(t, err, "failed to delete logstash k8s objects")
+	}
+}
+
+func k8sStepLogstashCheckStatus(logstashPodLabelSelector string, logstashExpected bool) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		logstashPodList := &corev1.PodList{}
+		err := kCtx.client.Resources(namespace).List(ctx, logstashPodList, func(opt *metav1.ListOptions) {
+			opt.LabelSelector = logstashPodLabelSelector
+		})
+		require.NoError(t, err, "failed to list logstash pods with selector ", logstashPodLabelSelector)
+		require.NotEmpty(t, logstashPodList.Items, "no logstash pods found with selector ", logstashPodLabelSelector)
+		for _, pod := range logstashPodList.Items {
+			if (pod.Status.Phase != corev1.PodRunning) && logstashExpected {
+				t.Errorf("logstash pod %s is not running", pod.Name)
+				ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+				defer cancel()
+				checkStatus := func() error {
+					var err error
+					var stdout, stderr bytes.Buffer
+					stdout.Reset()
+					stderr.Reset()
+					var result map[string]interface{}
+					if err := kCtx.client.Resources().ExecInPod(ctx, namespace, pod.Name, "logstash",
+						[]string{"curl", "localhost:9600/_pretty"}, stdout, stderr); err != nil {
+						return err
+					}
+					if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+						return err
+					}
+					if status, found := result["status"]; found {
+						if status != "green" {
+							return fmt.Errorf("logstash internal status is not green: %s", status)
+						}
+					} else {
+						return fmt.Errorf("status not found in logstash API response")
+					}
+					return err
+				}
+				for {
+					_ := checkStatus()
+					if ctx.Err() != nil {
+						// timeout waiting for agent to become healthy
+						errors.Join(err, errors.New("timeout waiting for logstash to become healthy"))
+						require.NoError(t, err, "logstash pod %s did not become healthy in time", pod.Name)
+					}
+					time.Sleep(100 * time.Millisecond)
+				}
+			}
+			if (pod.Status.Phase == corev1.PodRunning) && !logstashExpected {
+				t.Errorf("logstash pod %s is running but it should not", pod.Name)
+			}
+
+		}
 	}
 }
 
