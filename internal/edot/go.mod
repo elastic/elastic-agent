@@ -276,8 +276,13 @@ require (
 	github.com/elastic/bayeux v1.0.5 // indirect
 	github.com/elastic/elastic-agent-autodiscover v0.10.0 // indirect
 	github.com/elastic/elastic-agent-client/v7 v7.17.2 // indirect
+<<<<<<< HEAD
 	github.com/elastic/elastic-agent-system-metrics v0.13.4 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.7.0 // indirect
+=======
+	github.com/elastic/elastic-agent-system-metrics v0.13.3 // indirect
+	github.com/elastic/elastic-transport-go/v8 v8.8.0 // indirect
+>>>>>>> 016403a95 (build(deps): bump github.com/elastic/elastic-transport-go/v8 from 8.7.0 to 8.8.0 (#11262))
 	github.com/elastic/go-concert v0.3.1 // indirect
 	github.com/elastic/go-docappender/v2 v2.11.2 // indirect
 	github.com/elastic/go-elasticsearch/v8 v8.19.0 // indirect
