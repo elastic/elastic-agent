@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flog-log-generator
+  labels:
+    app: flog-log-generator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flog-log-generator
+
+  template:
+    metadata:
+      labels:
+        app: flog-log-generator
+
+    spec:
+      containers:
+        - name: flog-unstructured-cont-rot
+          image: mingrammer/flog
+          #          too small "-d" won't give kubelet time to rotate the files
+          args: ["-t", "stdout", "-d", "1us", "-l"]
