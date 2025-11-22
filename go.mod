@@ -243,6 +243,7 @@ require (
 	github.com/bitfield/gotestdox v0.2.2 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.9.1 // indirect
+	github.com/brianvoe/gofakeit v3.18.0+incompatible // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/cilium/ebpf v0.19.0 // indirect
@@ -815,3 +816,5 @@ replace (
 replace go.opentelemetry.io/otel/exporters/prometheus => go.opentelemetry.io/otel/exporters/prometheus v0.58.0
 
 replace github.com/elastic/elastic-agent/internal/edot => ./internal/edot
+
+replace github.com/elastic/beats/v7 => github.com/belimawr/beats/v7 v7.0.0-alpha2.0.20251121133217-d165778609a4
