@@ -167,6 +167,53 @@ func TestGetAllComponentState(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:       "component state starting",
+			components: []component.Component{fileStreamOtelComponent},
+			otelStatus: &status.AggregateStatus{
+				Event:              componentstatus.NewEvent(componentstatus.StatusStarting),
+				ComponentStatusMap: map[string]*status.AggregateStatus{},
+			},
+			expected: []runtime.ComponentComponentState{
+				{
+					Component: fileStreamOtelComponent,
+					State: runtime.ComponentState{
+						State:   client.UnitStateStarting,
+						Message: "STARTING",
+						Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+							runtime.ComponentUnitKey{UnitID: "filestream-unit", UnitType: client.UnitTypeInput}: {
+								State:   client.UnitStateStarting,
+								Message: "STARTING",
+								Payload: map[string]any{
+									"streams": map[string]map[string]string{
+										"test-1": {
+											"error":  "",
+											"status": client.UnitStateStarting.String(),
+										},
+										"test-2": {
+											"error":  "",
+											"status": client.UnitStateStarting.String(),
+										},
+									},
+								},
+							},
+							runtime.ComponentUnitKey{UnitID: "filestream-default", UnitType: client.UnitTypeOutput}: {
+								State:   client.UnitStateStarting,
+								Message: "STARTING",
+							},
+						},
+						VersionInfo: runtime.ComponentVersionInfo{
+							Name:      OtelComponentName,
+							BuildHash: version.Commit(),
+							Meta: map[string]string{
+								"build_time": version.BuildTime().String(),
+								"commit":     version.Commit(),
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
