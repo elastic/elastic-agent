@@ -114,7 +114,7 @@ RETRYLOOP:
 		case errors.Is(err, fleetapi.ErrConnRefused):
 			log.Warn("Remote server is not ready to accept connections(Connection Refused), will retry in a moment.")
 		case errors.Is(err, fleetapi.ErrTemporaryServerError):
-			log.Warnf("Remote server failed to handle the request (%s), will retry in a moment.", err)
+			log.Warnf("Remote server failed to handle the request (%s), will retry in a moment.", err.Error())
 
 		// Non-retryable or stop conditions
 		case err == nil,
