@@ -219,7 +219,11 @@ func TestCleanup(t *testing.T) {
 			require.NoError(t, err, "error loading update marker")
 			require.NotNil(t, marker, "loaded marker must not be nil")
 			t.Logf("Loaded update marker %+v", marker)
-			tt.wantErr(t, cleanup(testLogger, testTop, marker.VersionedHome, marker.Hash, tt.args.removeMarker, tt.args.keepLogs, 0), fmt.Sprintf("Cleanup(%v, %v, %v, %v)", marker.VersionedHome, marker.Hash, tt.args.removeMarker, tt.args.keepLogs))
+			versionedHome := marker.VersionedHome
+			if versionedHome == "" {
+				versionedHome = filepath.Join("data", fmt.Sprintf("elastic-agent-%s", marker.Hash[:6]))
+			}
+			tt.wantErr(t, cleanup(testLogger, testTop, tt.args.removeMarker, tt.args.keepLogs, 0, versionedHome), fmt.Sprintf("Cleanup(%v, %v, %v, %v)", marker.Hash, tt.args.removeMarker, tt.args.keepLogs, versionedHome))
 			tt.checkAfterCleanup(t, testTop)
 		})
 	}
@@ -335,7 +339,7 @@ func TestRollback(t *testing.T) {
 func TestRollbackWithOpts(t *testing.T) {
 	type hookFuncWithLogs func(t *testing.T, logs *observer.ObservedLogs, topDir string)
 
-	agentExecutableName := agentName
+	agentExecutableName := AgentName
 	if runtime.GOOS == "windows" {
 		agentExecutableName += ".exe"
 	}
@@ -389,6 +393,7 @@ func TestRollbackWithOpts(t *testing.T) {
 				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
 				assert.NoError(t, err, "reading topPath elastic-agent link")
 				assert.Equal(t, paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName), linkTarget)
+				assert.FileExists(t, filepath.Join(topDir, "data", markerFilename))
 			},
 		},
 		"SkipRestart: no cleanup, no restart": {
@@ -421,6 +426,7 @@ func TestRollbackWithOpts(t *testing.T) {
 				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
 				assert.NoError(t, err, "reading topPath elastic-agent link")
 				assert.Equal(t, paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName), linkTarget)
+				assert.FileExists(t, filepath.Join(topDir, "data", markerFilename))
 			},
 		},
 		"Prerestart hook not fatal error: rollback, cleanup and restart as normal": {
@@ -467,6 +473,7 @@ func TestRollbackWithOpts(t *testing.T) {
 				if assert.Len(t, snippetLogs, 1) {
 					assert.Equal(t, zapcore.WarnLevel, snippetLogs[0].Level)
 				}
+				assert.FileExists(t, filepath.Join(topDir, "data", markerFilename))
 			},
 		},
 		"Prerestart hook fatal error: rollback then return the error (no restart, no cleanup)": {
@@ -503,6 +510,47 @@ func TestRollbackWithOpts(t *testing.T) {
 				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
 				assert.NoError(t, err, "reading topPath elastic-agent link")
 				assert.Equal(t, paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName), linkTarget)
+				assert.FileExists(t, filepath.Join(topDir, "data", markerFilename))
+			},
+		},
+		"RemoveMarker true: delete the upgrade marker": {
+			agentInstallsSetup: setupAgentInstallations{
+				installedAgents: []testAgentInstall{
+					{
+						version:          version123Snapshot,
+						useVersionInPath: true,
+					},
+					{
+						version:          version456Snapshot,
+						useVersionInPath: true,
+					},
+				},
+			},
+			setupMocks: func(mockClient *client.MockClient) {
+				mockClient.EXPECT().Connect(
+					mock.AnythingOfType("*context.timerCtx"),
+					mock.AnythingOfType("*grpc.funcDialOption"),
+					mock.AnythingOfType("*grpc.funcDialOption"),
+				).Return(nil)
+				mockClient.EXPECT().Disconnect().Return()
+				mockClient.EXPECT().Restart(mock.Anything).Return(nil).Once()
+			},
+			args: args{
+				prevVersionedHome: "data/elastic-agent-1.2.3-SNAPSHOT-abcdef",
+				prevHash:          "abcdef",
+				rollbackOptions: []RollbackOpt{
+					func(rs *RollbackSettings) {
+						rs.SetRemoveMarker(true)
+					},
+				}},
+			wantErr: assert.NoError,
+			checkAfterRollback: func(t *testing.T, logs *observer.ObservedLogs, topDir string) {
+				assertAgentInstallExists(t, filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName)
+				assertAgentInstallCleaned(t, filepath.Join(topDir, "data", "elastic-agent-4.5.6-SNAPSHOT-ghijkl"), agentExecutableName)
+				linkTarget, err := os.Readlink(filepath.Join(topDir, agentExecutableName))
+				assert.NoError(t, err, "reading topPath elastic-agent link")
+				assert.Equal(t, paths.BinaryPath(filepath.Join(topDir, "data", "elastic-agent-1.2.3-SNAPSHOT-abcdef"), agentExecutableName), linkTarget)
+				assert.NoFileExists(t, filepath.Join(topDir, "data", markerFilename))
 			},
 		},
 	}
@@ -510,7 +558,7 @@ func TestRollbackWithOpts(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			testLogger, obsLogs := loggertest.New(t.Name())
 			testTop := t.TempDir()
-			setupAgents(t, testLogger, testTop, tt.agentInstallsSetup, false)
+			setupAgents(t, testLogger, testTop, tt.agentInstallsSetup, true)
 
 			// mock client
 			mockClient := client.NewMockClient(t)
@@ -547,7 +595,7 @@ func checkFilesAfterCleanup(t *testing.T, topDir, newAgentHome string, oldAgentH
 
 	// check the new agent home
 	assert.DirExists(t, filepath.Join(topDir, newAgentHome), "new agent directory should exist after cleanup")
-	agentExecutable := agentName
+	agentExecutable := AgentName
 	if runtime.GOOS == "windows" {
 		agentExecutable += ".exe"
 	}
@@ -576,11 +624,11 @@ func checkFilesAfterRollback(t *testing.T, topDir, oldAgentHome, newAgentHome st
 	// some things should have been removed from the new agent directory
 	assert.NoDirExists(t, filepath.Join(topDir, newAgentHome, "components"), "new agent components directory should have been cleaned up in the rollback")
 	assert.NoDirExists(t, filepath.Join(topDir, newAgentHome, "run"), "new agent run directory should have been cleaned up in the rollback")
-	assert.NoFileExists(t, filepath.Join(topDir, newAgentHome, agentName), "new agent binary should have been cleaned up in the rollback")
+	assert.NoFileExists(t, filepath.Join(topDir, newAgentHome, AgentName), "new agent binary should have been cleaned up in the rollback")
 
 	// check the old agent home
 	assert.DirExists(t, filepath.Join(topDir, oldAgentHome), "old agent directory should exist after rollback")
-	agentExecutable := agentName
+	agentExecutable := AgentName
 	if runtime.GOOS == "windows" {
 		agentExecutable += ".exe"
 	}
@@ -645,10 +693,10 @@ func setupAgents(t *testing.T, log *logger.Logger, topDir string, installations 
 func createFakeAgentInstall(t *testing.T, topDir, version, hash string, useVersionInPath bool) string {
 
 	// create versioned home
-	versionedHome := fmt.Sprintf("elastic-agent-%s", hash[:hashLen])
+	versionedHome := fmt.Sprintf("elastic-agent-%s", hash[:HashLen])
 	if useVersionInPath {
 		// use the version passed as parameter
-		versionedHome = fmt.Sprintf("elastic-agent-%s-%s", version, hash[:hashLen])
+		versionedHome = fmt.Sprintf("elastic-agent-%s-%s", version, hash[:HashLen])
 	}
 	relVersionedHomePath := filepath.Join("data", versionedHome)
 	absVersionedHomePath := filepath.Join(topDir, relVersionedHomePath)
@@ -673,7 +721,7 @@ func createFakeAgentInstall(t *testing.T, topDir, version, hash string, useVersi
 	require.NoError(t, err, "error creating fake install run directory %q", absRunDirPath)
 
 	// put some placeholder for files
-	agentExecutableName := agentName
+	agentExecutableName := AgentName
 	if runtime.GOOS == "windows" {
 		agentExecutableName += ".exe"
 	}
@@ -688,8 +736,8 @@ func createFakeAgentInstall(t *testing.T, topDir, version, hash string, useVersi
 }
 
 func createLink(t *testing.T, topDir string, currentAgentVersionedHome string) {
-	linkTarget := paths.BinaryPath(currentAgentVersionedHome, agentName)
-	linkName := agentName
+	linkTarget := paths.BinaryPath(currentAgentVersionedHome, AgentName)
+	linkName := AgentName
 	if runtime.GOOS == "windows" {
 		linkTarget += ".exe"
 		linkName += ".exe"
@@ -725,6 +773,6 @@ func createUpdateMarker(t *testing.T, log *logger.Logger, topDir, newAgentVersio
 		time.Now(),
 		newAgentInstall,
 		oldAgentInstall,
-		nil, nil, disableRollbackWindow)
+		nil, nil, nil)
 	require.NoError(t, err, "error writing fake update marker")
 }

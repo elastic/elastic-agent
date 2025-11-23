@@ -86,6 +86,7 @@ func (ch *AgentWatcher) Run(ctx context.Context) {
 
 	ch.connectCounter = 0
 	ch.lostCounter = 0
+	ch.lastPid = -1
 
 	// tracking of an error runs in a separate goroutine, because
 	// the call to `watch.Recv` blocks and a timer is needed
@@ -143,7 +144,6 @@ func (ch *AgentWatcher) Run(ctx context.Context) {
 
 LOOP:
 	for {
-		ch.lastPid = -1
 		connectTimer := time.NewTimer(ch.checkInterval)
 		select {
 		case <-ctx.Done():
@@ -358,10 +358,10 @@ func selectWatcherExecutable(topDir string, previous agentInstall, current agent
 	// check if the upgraded version is less than the previous (currently installed) version
 	if current.parsedVersion.Less(*previous.parsedVersion) {
 		// use the current agent executable for watch, if downgrading the old agent doesn't understand the current agent's path structure.
-		return paths.BinaryPath(filepath.Join(topDir, previous.versionedHome), agentName)
+		return paths.BinaryPath(filepath.Join(topDir, previous.versionedHome), AgentName)
 	} else {
 		// use the new agent executable as it should be able to parse the new update marker
-		return paths.BinaryPath(filepath.Join(topDir, current.versionedHome), agentName)
+		return paths.BinaryPath(filepath.Join(topDir, current.versionedHome), AgentName)
 	}
 }
 

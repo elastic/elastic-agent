@@ -11,15 +11,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/schollz/progressbar/v3"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-func switchPlatformMode(pt *progressbar.ProgressBar, ownership utils.FileOwner) error {
+func switchPlatformMode(pt ProgressDescriber, ownership utils.FileOwner) error {
 	ctx := context.Background()
 
 	unprivilegedVault, err := checkForUnprivilegedVault(ctx)

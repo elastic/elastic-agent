@@ -175,7 +175,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	} else {
 		stateFetcher = fleetgateway.NewCheckinStateFetcher(m.coord.State)
 	}
-	m.log.Infof("running managed config manager with checkin mode: %s", m.cfg.Fleet.Checkin.Mode)
+	m.log.Infof("running managed config manager with checkin mode: %s", m.cfg.Fleet.Checkin.GetMode())
 
 	gateway, err := fleetgateway.New(
 		m.log,
@@ -400,6 +400,11 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 	m.dispatcher.MustRegister(
 		&fleetapi.ActionMigrate{},
 		handlers.NewMigrate(m.log, m.agentInfo, m.coord),
+	)
+
+	m.dispatcher.MustRegister(
+		&fleetapi.ActionPrivilegeLevelChange{},
+		handlers.NewPrivilegeLevelChange(m.log, m.coord, m.ch),
 	)
 
 	m.dispatcher.MustRegister(

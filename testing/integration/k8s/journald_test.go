@@ -186,8 +186,8 @@ func TestKubernetesJournaldInputOtel(t *testing.T) {
 		info.ESClient,
 		kCtx,
 		steps,
-		fmt.Sprintf("logs-generic.otel-%s", namespace),
-		"body.structured.input.type",
+		namespace,
+		"Body.input.type",
 		"journald")
 }
 
@@ -210,6 +210,12 @@ func journaldTest(
 	if ctx.Err() != nil {
 		t.Errorf("context error: %v", ctx.Err())
 	}
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Logf("Index: %q, filter condition: %q=%q", index, field, value)
+		}
+	})
 
 	// Query the index and filter by the input type
 	docs := integration.FindESDocs(t, func() (estools.Documents, error) {

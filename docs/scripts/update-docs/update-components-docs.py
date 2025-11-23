@@ -22,11 +22,16 @@ import tempfile
 
 TABLE_TAG = 'edot-collector-components-table'
 DEPS_TAG = 'edot-collector-components-ocb'
+GATEWAY_9X_TAG = 'edot-gateway-9x-table'
+GATEWAY_8X_TAG = 'edot-gateway-8x-table'
 
 EDOT_COLLECTOR_DIR = '../../../docs/reference/edot-collector'
 TEMPLATE_COLLECTOR_COMPONENTS_TABLE = 'templates/components-table.jinja2'
 TEMPLATE_COLLECTOR_OCB_FILE = 'templates/ocb.jinja2'
+TEMPLATE_GATEWAY_TABLE = 'templates/gateway-table.jinja2'
 COMPONENT_DOCS_YAML = '../../../docs/reference/edot-collector/component-docs.yml'
+DEFAULT_CONFIG_FILE = '../../../docs/reference/edot-collector/config/default-config-standalone.md'
+COMPONENTS_YAML = '../../../internal/pkg/otel/components.yml'
 
 
 def read_file_from_git_tag(file_path, tag):
@@ -69,22 +74,66 @@ def get_latest_version():
         raise ValueError(f"Failed to discover latest version from Git tags: {e}")
 
 def get_core_components(version='main'):
-    """Read and parse the core-components.yaml file to determine support status"""
+    """Read and parse the components.yml file to determine support status"""
     latest_version = get_latest_version()
     version_tag = f"v{latest_version}"
     
     # Always read from Git tag
-    core_components_path = 'internal/pkg/otel/core-components.yaml'
-    print(f"Reading core components from tag {version_tag}: {core_components_path}")
-    content = read_file_from_git_tag(core_components_path, version_tag)
+    components_path = 'internal/pkg/otel/components.yml'
+    print(f"Reading core components from tag {version_tag}: {components_path}")
+    content = read_file_from_git_tag(components_path, version_tag)
     if content is None:
-        raise ValueError(f"Could not read core components file from tag {version_tag}. Ensure the tag exists and contains the file.")
+        raise ValueError(f"Could not read components file from tag {version_tag}. Ensure the tag exists and contains the file.")
         
     try:
         data = yaml.safe_load(content)
-        return data.get('components', [])
+        return data.get('core_components', [])
     except yaml.YAMLError as e:
-        raise ValueError(f"Error parsing core-components.yaml from tag {version_tag}: {e}")
+        raise ValueError(f"Error parsing components.yml from tag {version_tag}: {e}")
+
+def get_deprecated_components(version='main'):
+    """Read and parse the components.yml file to determine deprecated status"""
+    latest_version = get_latest_version()
+    version_tag = f"v{latest_version}"
+    
+    # Always read from Git tag
+    components_path = 'internal/pkg/otel/components.yml'
+    print(f"Reading deprecated components from tag {version_tag}: {components_path}")
+    content = read_file_from_git_tag(components_path, version_tag)
+    if content is None:
+        print(f"Warning: Could not read components file from tag {version_tag}. Assuming no deprecated components.")
+        return []
+        
+    try:
+        data = yaml.safe_load(content)
+        deprecated = data.get('deprecated', [])
+        # Handle case where 'deprecated:' exists but has no items (returns None)
+        return deprecated if deprecated is not None else []
+    except yaml.YAMLError as e:
+        print(f"Warning: Error parsing components.yml from tag {version_tag}: {e}")
+        return []
+
+def get_component_annotations(version='main'):
+    """Read and parse the components.yml file to get component annotations"""
+    latest_version = get_latest_version()
+    version_tag = f"v{latest_version}"
+    
+    # Always read from Git tag
+    components_path = 'internal/pkg/otel/components.yml'
+    print(f"Reading component annotations from tag {version_tag}: {components_path}")
+    content = read_file_from_git_tag(components_path, version_tag)
+    if content is None:
+        print(f"Warning: Could not read components file from tag {version_tag}. Assuming no annotations.")
+        return {}
+        
+    try:
+        data = yaml.safe_load(content)
+        annotations = data.get('annotations', {})
+        # Handle case where 'annotations:' exists but has no items (returns None)
+        return annotations if annotations is not None else {}
+    except yaml.YAMLError as e:
+        print(f"Warning: Error parsing components.yml from tag {version_tag}: {e}")
+        return {}
 
 def dep_to_component(dep):
     url = dep[:dep.rfind(' v')].strip()
@@ -105,7 +154,7 @@ def dep_to_component(dep):
             repo_link = '[OTel Core Repo](https://github.com/open-telemetry/opentelemetry-collector)'
         
     comp = {
-        'name': dep[(dep.rfind('/')+1):(dep.rfind(' ')+1)],
+        'name': dep[(dep.rfind('/')+1):dep.rfind(' ')].strip(),
         'version': dep[(dep.rfind(' ')+1):],
         'html_url': html_url,
         'repo_link': repo_link,
@@ -151,18 +200,47 @@ def get_otel_components(version='main', component_docs_mapping=None):
     # Get the list of core components
     core_components = get_core_components(version)
     print(f"Found {len(core_components)} core components")
+    
+    # Get the list of deprecated components
+    deprecated_components = get_deprecated_components(version)
+    print(f"Found {len(deprecated_components)} deprecated components")
+    
+    # Get component annotations
+    component_annotations = get_component_annotations(version)
+    print(f"Found {len(component_annotations)} component annotations")
 
     lines = elastic_agent_go_mod.splitlines()
     components_type = ['receiver', 'connector', 'processor', 'exporter', 'extension', 'provider']
     otel_deps = [line for line in lines if (not line.endswith('// indirect') and ("=>" not in line) and (any(f'/{comp}/' in line for comp in components_type)))]
     otel_components = list(map(dep_to_component, otel_deps))
     
-    # Add support status and documentation links to each component
+    # Create annotation numbering
+    annotation_counter = 1
+    annotation_list = []
+    component_annotation_map = {}
+    
+    # Build annotation mapping - assign numbers sequentially
+    for comp in otel_components:
+        comp_name = comp['name'].strip()
+        if comp_name in component_annotations:
+            component_annotation_map[comp_name] = annotation_counter
+            annotation_list.append({
+                'number': annotation_counter,
+                'component_name': comp_name,
+                'text': component_annotations[comp_name].get('comment', '').strip()
+            })
+            annotation_counter += 1
+    
+    # Add support status, documentation links, and annotation numbers to each component
     for comp in otel_components:
         # Extract the component name without the suffix (e.g., 'filelogreceiver' from 'filelogreceiver ')
         comp_name = comp['name'].strip()
+        
+        # Check if this component is deprecated (takes precedence)
+        if comp_name in deprecated_components:
+            comp['support_status'] = 'Deprecated'
         # Check if this component is in the core components list
-        if comp_name in core_components:
+        elif comp_name in core_components:
             comp['support_status'] = '[Core]'
         else:
             comp['support_status'] = '[Extended]'
@@ -172,6 +250,12 @@ def get_otel_components(version='main', component_docs_mapping=None):
             comp['doc_link'] = component_docs_mapping[comp_name]['doc_path']
         else:
             comp['doc_link'] = None
+        
+        # Add annotation number if component has annotation
+        if comp_name in component_annotation_map:
+            comp['annotation_number'] = component_annotation_map[comp_name]
+        else:
+            comp['annotation_number'] = None
 
     components_grouped = defaultdict(list)
 
@@ -185,8 +269,11 @@ def get_otel_components(version='main', component_docs_mapping=None):
 
     for key, group in components_grouped.items():
         components_grouped[key] = sorted(group, key=lambda comp: comp['name'])
-        
-    return components_grouped
+    
+    return {
+        'grouped_components': components_grouped,
+        'annotations': annotation_list
+    }
 
 def find_files_with_substring(directory, substring):
     matching_files = []
@@ -269,6 +356,110 @@ def get_component_docs_mapping(source_file):
         print(f"Error reading component docs YAML file: {exc}")
         return {}
 
+def get_all_version_tags():
+    """Get all version tags from the repository"""
+    try:
+        result = subprocess.run(
+            ['git', 'tag', '--list', 'v*'],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        return [tag.strip() for tag in result.stdout.strip().split('\n') if tag.strip()]
+    except subprocess.CalledProcessError as e:
+        print(f"Error getting version tags: {e}")
+        return []
+
+def parse_version(tag):
+    """Parse a version tag into (major, minor, patch) tuple"""
+    match = re.match(r'^v(\d+)\.(\d+)\.(\d+)$', tag)
+    if match:
+        return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    return None
+
+def get_latest_minor_versions(major_version):
+    """Get the latest patch version for each minor version of a major version"""
+    all_tags = get_all_version_tags()
+    versions = {}
+    
+    for tag in all_tags:
+        parsed = parse_version(tag)
+        if parsed and parsed[0] == major_version:
+            major, minor, patch = parsed
+            minor_key = f"{major}.{minor}"
+            
+            # Keep only the latest patch for each minor version
+            if minor_key not in versions or parsed[2] > versions[minor_key]['patch']:
+                versions[minor_key] = {
+                    'minor': minor,
+                    'patch': patch,
+                    'tag': tag
+                }
+    
+    # Sort by minor version (descending)
+    return sorted(versions.values(), key=lambda x: x['minor'], reverse=True)
+
+def get_minor_versions_above(major_version, min_minor):
+    """Get the latest patch for each minor version >= min_minor for a major version
+    
+    Args:
+        major_version: The major version number (e.g., 8 or 9)
+        min_minor: Minimum minor version to include (e.g., 0 for 9.0+, 17 for 8.17+)
+    
+    Returns:
+        List of version info dicts sorted by minor version (descending)
+    """
+    all_versions = get_latest_minor_versions(major_version)
+    # Filter to only include versions >= min_minor
+    filtered = [v for v in all_versions if v['minor'] >= min_minor]
+    return filtered
+
+def check_file_exists_at_tag(file_path, tag):
+    """Check if a file exists at a specific Git tag"""
+    try:
+        subprocess.run(
+            ['git', 'cat-file', '-e', f'{tag}:{file_path}'],
+            capture_output=True,
+            check=True
+        )
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+def get_gateway_versions(major_version, min_minor):
+    """Get version data for gateway configuration table
+    
+    Args:
+        major_version: The major version number (8 or 9)
+        min_minor: Minimum minor version to include
+    
+    Returns:
+        List of dicts with 'version' and 'tag' for valid versions
+    """
+    print(f"Generating {major_version}.x table (versions >= {major_version}.{min_minor})")
+    
+    # Get all minor versions >= min_minor with their latest patches
+    versions = get_minor_versions_above(major_version, min_minor)
+    
+    # Filter to only versions where gateway.yml exists
+    gateway_file = 'internal/pkg/otel/samples/linux/gateway.yml'
+    valid_versions = []
+    
+    for version_info in versions:
+        version_str = f"{major_version}.{version_info['minor']}"
+        tag_name = version_info['tag']
+        
+        if check_file_exists_at_tag(gateway_file, tag_name):
+            valid_versions.append({
+                'version': version_str,
+                'tag': tag_name
+            })
+            print(f"  {version_str} → {tag_name}")
+        else:
+            print(f"  Skipping {version_str}: gateway.yml not found at {tag_name}")
+    
+    return valid_versions
+
 def check_markdown():
     col_version = get_collector_version()
     print(f"Collector version: {col_version}")
@@ -278,15 +469,16 @@ def check_markdown():
     print(f"Loaded {len(component_docs_mapping)} component documentation mappings")
     
     # Read components from local files
-    components = get_otel_components(col_version, component_docs_mapping)
+    components_result = get_otel_components(col_version, component_docs_mapping)
     
-    if components is None:
+    if components_result is None:
         print("Failed to read components from local files")
         return False
         
     otel_col_version = get_otel_col_upstream_version()
     data = {
-        'grouped_components': components,
+        'grouped_components': components_result['grouped_components'],
+        'annotations': components_result['annotations'],
         'otel_col_version': otel_col_version,
         'version': {
             'edot_collector': col_version
@@ -306,15 +498,16 @@ def generate_markdown():
     print(f"Loaded {len(component_docs_mapping)} component documentation mappings")
     
     # Read components from local files
-    components = get_otel_components(col_version, component_docs_mapping)
+    components_result = get_otel_components(col_version, component_docs_mapping)
     
-    if components is None:
+    if components_result is None:
         print("Failed to read components from local files")
         return
         
     otel_col_version = get_otel_col_upstream_version()
     data = {
-        'grouped_components': components,
+        'grouped_components': components_result['grouped_components'],
+        'annotations': components_result['annotations'],
         'otel_col_version': otel_col_version,
         'version': {
             'edot_collector': col_version
@@ -322,6 +515,35 @@ def generate_markdown():
     }
     render_components_into_file(EDOT_COLLECTOR_DIR, data, TEMPLATE_COLLECTOR_COMPONENTS_TABLE, TABLE_TAG)
     render_components_into_file(EDOT_COLLECTOR_DIR, data, TEMPLATE_COLLECTOR_OCB_FILE, DEPS_TAG)
+    
+    # Update gateway configuration tables
+    print("\nUpdating gateway configuration tables...")
+    
+    # Generate 9.x table (9.0 and above)
+    gateway_9x_versions = get_gateway_versions(major_version=9, min_minor=0)
+    gateway_9x_data = {'versions': gateway_9x_versions}
+    
+    print()
+    
+    # Generate 8.x table (8.17 and above)
+    gateway_8x_versions = get_gateway_versions(major_version=8, min_minor=17)
+    gateway_8x_data = {'versions': gateway_8x_versions}
+    
+    # Render tables using template
+    render_components_into_file(
+        os.path.dirname(DEFAULT_CONFIG_FILE), 
+        gateway_9x_data, 
+        TEMPLATE_GATEWAY_TABLE, 
+        GATEWAY_9X_TAG
+    )
+    render_components_into_file(
+        os.path.dirname(DEFAULT_CONFIG_FILE), 
+        gateway_8x_data, 
+        TEMPLATE_GATEWAY_TABLE, 
+        GATEWAY_8X_TAG
+    )
+    
+    print("\nGateway configuration tables updated successfully!")
 
 if __name__ == "__main__":
     import sys

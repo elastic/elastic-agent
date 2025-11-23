@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -41,12 +42,13 @@ func Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPa
 var FatalRollbackError = errors.New("fatal rollback error")
 
 type RollbackSettings struct {
-	skipCleanup    bool
-	skipRestart    bool
-	preRestartHook RollbackHook
+	SkipCleanup    bool
+	SkipRestart    bool
+	PreRestartHook RollbackHook
+	RemoveMarker   bool
 }
 
-func newRollbackSettings(opts ...RollbackOpt) *RollbackSettings {
+func NewRollbackSettings(opts ...RollbackOpt) *RollbackSettings {
 	rs := new(RollbackSettings)
 	for _, opt := range opts {
 		opt(rs)
@@ -57,32 +59,36 @@ func newRollbackSettings(opts ...RollbackOpt) *RollbackSettings {
 type RollbackOpt func(*RollbackSettings)
 
 func (r *RollbackSettings) SetSkipCleanup(skipCleanup bool) {
-	r.skipCleanup = skipCleanup
+	r.SkipCleanup = skipCleanup
 }
 
 func (r *RollbackSettings) SetSkipRestart(skipRestart bool) {
-	r.skipRestart = skipRestart
+	r.SkipRestart = skipRestart
 }
 
 func (r *RollbackSettings) SetPreRestartHook(preRestartHook RollbackHook) {
-	r.preRestartHook = preRestartHook
+	r.PreRestartHook = preRestartHook
+}
+
+func (r *RollbackSettings) SetRemoveMarker(removeMarker bool) {
+	r.RemoveMarker = removeMarker
 }
 
 func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, topDirPath string, prevVersionedHome string, prevHash string, opts ...RollbackOpt) error {
 
-	settings := newRollbackSettings(opts...)
+	settings := NewRollbackSettings(opts...)
 
-	symlinkPath := filepath.Join(topDirPath, agentName)
+	symlinkPath := filepath.Join(topDirPath, AgentName)
 
-	var symlinkTarget string
-	if prevVersionedHome != "" {
-		symlinkTarget = paths.BinaryPath(filepath.Join(topDirPath, prevVersionedHome), agentName)
-	} else {
+	if prevVersionedHome == "" {
 		// fallback for upgrades that didn't use the manifest and path remapping
-		hashedDir := fmt.Sprintf("%s-%s", agentName, prevHash)
-		// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
-		symlinkTarget = paths.BinaryPath(filepath.Join(paths.DataFrom(topDirPath), hashedDir), agentName)
+		hashedDir := fmt.Sprintf("%s-%s", AgentName, prevHash)
+		prevVersionedHome = filepath.Join("data", hashedDir)
 	}
+
+	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
+	symlinkTarget := paths.BinaryPath(filepath.Join(topDirPath, prevVersionedHome), AgentName)
+
 	// change symlink
 	if err := changeSymlink(log, topDirPath, symlinkPath, symlinkTarget); err != nil {
 		return err
@@ -94,8 +100,8 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 	}
 
 	// Hook
-	if settings.preRestartHook != nil {
-		hookErr := settings.preRestartHook(ctx, log, topDirPath)
+	if settings.PreRestartHook != nil {
+		hookErr := settings.PreRestartHook(ctx, log, topDirPath)
 		if hookErr != nil {
 			if errors.Is(hookErr, FatalRollbackError) {
 				return fmt.Errorf("pre-restart hook failed: %w", hookErr)
@@ -105,7 +111,7 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 		}
 	}
 
-	if settings.skipRestart {
+	if settings.SkipRestart {
 		log.Info("Skipping restart")
 		return nil
 	}
@@ -116,22 +122,22 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 		return err
 	}
 
-	if settings.skipCleanup {
+	if settings.SkipCleanup {
 		log.Info("Skipping cleanup")
 		return nil
 	}
 
 	// cleanup everything except version we're rolling back into
-	return Cleanup(log, topDirPath, prevVersionedHome, prevHash, false, true)
+	return Cleanup(log, topDirPath, settings.RemoveMarker, true, prevVersionedHome)
 }
 
 // Cleanup removes all artifacts and files related to a specified version.
-func Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool) error {
-	return cleanup(log, topDirPath, currentVersionedHome, currentHash, removeMarker, keepLogs, afterRestartDelay)
+func Cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool, versionedHomesToKeep ...string) error {
+	return cleanup(log, topDirPath, removeMarker, keepLogs, afterRestartDelay, versionedHomesToKeep...)
 }
 
-func cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool, delay time.Duration) error {
-	log.Infow("Cleaning up upgrade", "hash", currentHash, "remove_marker", removeMarker)
+func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool, delay time.Duration, versionedHomesToKeep ...string) error {
+	log.Infow("Cleaning up upgrade", "remove_marker", removeMarker)
 	<-time.After(delay)
 
 	// data directory path
@@ -166,20 +172,20 @@ func cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash s
 	log.Infow("Removing previous symlink path", "file.path", prevSymlinkPath(topDirPath))
 	_ = os.Remove(prevSymlink)
 
-	dirPrefix := fmt.Sprintf("%s-", agentName)
-	var currentDir string
-	if currentVersionedHome != "" {
-		currentDir, err = filepath.Rel("data", currentVersionedHome)
+	dirPrefix := fmt.Sprintf("%s-", AgentName)
+
+	relativeHomePaths := make([]string, len(versionedHomesToKeep))
+	for i, h := range versionedHomesToKeep {
+		relHomePath, err := filepath.Rel("data", h)
 		if err != nil {
-			return fmt.Errorf("extracting elastic-agent path relative to data directory from %s: %w", currentVersionedHome, err)
+			return fmt.Errorf("extracting elastic-agent path relative to data directory from %s: %w", h, err)
 		}
-	} else {
-		currentDir = fmt.Sprintf("%s-%s", agentName, currentHash)
+		relativeHomePaths[i] = relHomePath
 	}
 
 	var errs []error
 	for _, dir := range subdirs {
-		if dir == currentDir {
+		if slices.Contains(relativeHomePaths, dir) {
 			continue
 		}
 

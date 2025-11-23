@@ -24,6 +24,8 @@ extensions:
         key: X-Scope-OrgID
         from_context: tenant_id
         default_value: Org-ID
+  awslogs_encoding/elbaccess:
+    format: elbaccess
 
 processors:
   attributes:
@@ -81,6 +83,14 @@ receivers:
     username: test
     password: test
   docker_stats:
+  awss3:
+    starttime: "2024-01-01 01:00"
+    endtime: "2024-01-02"
+    s3downloader:
+      s3_bucket: 'test'
+      s3_prefix: 'test'
+    encodings:
+      - extension: awslogs_encoding/elbaccess
 
 
 connectors:
@@ -116,6 +126,7 @@ service:
     - memory_limiter
     - health_check
     - headers_setter
+    - awslogs_encoding/elbaccess
   pipelines:
     logs:
       exporters:

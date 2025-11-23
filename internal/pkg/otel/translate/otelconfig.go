@@ -23,9 +23,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
-	"github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
-	"github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -36,15 +34,30 @@ import (
 
 // This is a prefix we add to all names of Otel entities in the configuration. Its purpose is to avoid collisions with
 // user-provided configuration
-const OtelNamePrefix = "_agent-component/"
+const (
+	OtelNamePrefix                        = "_agent-component/"
+	BeatsAuthExtensionType                = "beatsauth"
+	outputOtelOverrideFieldName           = "otel"
+	outputOtelOverrideExporterFieldName   = "exporter"
+	outputOtelOverrideExtensionsFieldName = "extensions"
+)
 
 // BeatMonitoringConfigGetter is a function that returns the monitoring configuration for a beat receiver.
-type BeatMonitoringConfigGetter func(unitID, binary string) map[string]any
-type exporterConfigTranslationFunc func(*config.C, *logp.Logger) (map[string]any, error)
+type (
+	BeatMonitoringConfigGetter    func(unitID, binary string) map[string]any
+	exporterConfigTranslationFunc func(*config.C, *logp.Logger) (map[string]any, error)
+)
 
 var (
-	OtelSupportedOutputTypes         = []string{"elasticsearch"}
-	OtelSupportedInputTypes          = []string{"filestream", "http/metrics", "beat/metrics", "system/metrics", "prometheus/metrics"}
+	OtelSupportedOutputTypes        = []string{"elasticsearch"}
+	OtelSupportedFilebeatInputTypes = []string{
+		"filestream",
+		"journald",
+		"log",
+		"winlog",
+	}
+
+	OtelSupportedInputTypes          = OtelSupportedFilebeatInputTypes
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
 		otelcomponent.MustNewType("elasticsearch"): translateEsOutputToExporter,
 	}
@@ -110,7 +123,9 @@ func VerifyComponentIsOtelSupported(comp *component.Component) error {
 		return fmt.Errorf("unsupported output type: %s", comp.OutputType)
 	}
 
-	if !slices.Contains(OtelSupportedInputTypes, comp.InputType) {
+	// check if given input is supported in OTel runtime
+	// this includes all metricbeat inputs and some filebeat inputs for now
+	if !slices.Contains(OtelSupportedInputTypes, comp.InputType) && !strings.HasSuffix(comp.InputType, "/metrics") {
 		return fmt.Errorf("unsupported input type: %s", comp.InputType)
 	}
 
@@ -167,7 +182,7 @@ func getExporterID(exporterType otelcomponent.Type, outputName string) otelcompo
 // outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
 func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
 	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
-	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("beatsauth"), extensionName)
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(BeatsAuthExtensionType), extensionName)
 }
 
 // getCollectorConfigForComponent returns the Otel collector config required to run the given component.
@@ -179,13 +194,11 @@ func getCollectorConfigForComponent(
 	beatMonitoringConfigGetter BeatMonitoringConfigGetter,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
-
 	exportersConfig, outputQueueConfig, extensionConfig, err := getExportersConfigForComponent(comp, logger)
 	if err != nil {
 		return nil, err
 	}
 	receiversConfig, err := getReceiversConfigForComponent(comp, info, outputQueueConfig, beatMonitoringConfigGetter)
-
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +214,7 @@ func getCollectorConfigForComponent(
 	}
 
 	// we need to convert []string to []interface for this to work
-	extensionKey := make([]interface{}, len(maps.Keys(extensionConfig)))
+	extensionKey := make([]any, len(maps.Keys(extensionConfig)))
 	for i, v := range maps.Keys(extensionConfig) {
 		extensionKey[i] = v
 	}
@@ -269,13 +282,13 @@ func getReceiversConfigForComponent(
 		// adds additional context on logs emitted by beatreceivers to uniquely identify per component logs
 		"logging": map[string]any{
 			"with_fields": map[string]any{
-				"component": map[string]interface{}{
+				"component": map[string]any{
 					"id":      comp.ID,
 					"binary":  binaryName,
 					"dataset": dataset,
 					"type":    comp.InputType,
 				},
-				"log": map[string]interface{}{
+				"log": map[string]any{
 					"source": comp.ID,
 				},
 			},
@@ -373,9 +386,9 @@ func getReceiverTypeForComponent(comp *component.Component) (otelcomponent.Type,
 	beatName := GetBeatNameForComponent(comp)
 	switch beatName {
 	case "filebeat":
-		return otelcomponent.MustNewType(fbreceiver.Name), nil
+		return otelcomponent.MustNewType("filebeatreceiver"), nil
 	case "metricbeat":
-		return otelcomponent.MustNewType(mbreceiver.Name), nil
+		return otelcomponent.MustNewType("metricbeatreceiver"), nil
 	default:
 		return otelcomponent.Type{}, fmt.Errorf("unknown otel receiver type for input type: %s", comp.InputType)
 	}
@@ -412,6 +425,12 @@ func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, 
 		return nil, nil, nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
 	}
 
+	// if there's an otel override config, extract it, we'll apply it after the conversion
+	otelOverrideCfgC, err := extractOutputOtelOverrideConfig(outputCfgC)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	// Config translation function can mutate queue settings defined under output config
 	exporterConfig, err := configTranslationFunc(outputCfgC, logger)
 	if err != nil {
@@ -429,6 +448,19 @@ func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, 
 		}
 	}
 
+	// if there's an otel override section for the exporter, we should apply it
+	exporterOverrideCfg, err := getOutputOtelOverrideExporterConfig(otelOverrideCfgC)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	koanfmaps.Merge(exporterOverrideCfg, exporterConfig)
+
+	// if there's an otel override section for extensions, extract it and apply it to individual extension configs
+	extensionsOverrideCfg, err := getOutputOtelOverrideExtensionsConfig(otelOverrideCfgC)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	// beatsauth extension is not tested with output other than elasticsearch
 	if exporterType.String() == "elasticsearch" {
 		// get extension ID
@@ -436,6 +468,10 @@ func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, 
 		extensionConfig, err := getBeatsAuthExtensionConfig(outputCfgC)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("error supporting http parameters for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
+		}
+
+		if beatsauthOverrideCfg, found := extensionsOverrideCfg[BeatsAuthExtensionType]; found {
+			koanfmaps.Merge(beatsauthOverrideCfg, extensionConfig)
 		}
 
 		// sets extensionCfg
@@ -505,17 +541,72 @@ func translateEsOutputToExporter(cfg *config.C, logger *logp.Logger) (map[string
 	if err != nil {
 		return nil, err
 	}
-	// dynamic indexing works by default
 
-	// we also want to use dynamic log ids
+	// we want to use dynamic log ids
 	esConfig["logs_dynamic_id"] = map[string]any{"enabled": true}
 
-	// logs failed documents at debug level
-	esConfig["telemetry"] = map[string]any{
-		"log_failed_docs_input": true,
-	}
+	esConfig["include_source_on_error"] = true
 
 	return esConfig, nil
+}
+
+// extractOutputOtelOverrideConfig removes the configuration under the otel override key from the provided configuration
+// and returns it.
+func extractOutputOtelOverrideConfig(cfg *config.C) (*config.C, error) {
+	if !cfg.HasField(outputOtelOverrideFieldName) {
+		return nil, nil
+	}
+	otelCfg, err := cfg.Child(outputOtelOverrideFieldName, -1)
+	if err != nil {
+		return nil, err
+	}
+	_, err = cfg.Remove(outputOtelOverrideFieldName, -1)
+	if err != nil {
+		return nil, err
+	}
+	return otelCfg, nil
+}
+
+// getOutputOtelOverrideExporterConfig returns the exporter override configuration from the given otel override
+// configuration as a map[string]any. It does not modify the input.
+func getOutputOtelOverrideExporterConfig(otelOverrideCfg *config.C) (map[string]any, error) {
+	if otelOverrideCfg == nil {
+		return nil, nil
+	}
+	if !otelOverrideCfg.HasField(outputOtelOverrideExporterFieldName) {
+		return nil, nil
+	}
+	exporterCfgC, err := otelOverrideCfg.Child(outputOtelOverrideExporterFieldName, -1)
+	if err != nil {
+		return nil, err
+	}
+	exporterCfgMap := make(map[string]any)
+	err = exporterCfgC.Unpack(&exporterCfgMap)
+	if err != nil {
+		return nil, err
+	}
+	return exporterCfgMap, nil
+}
+
+// getOutputOtelOverrideExporterConfig returns the override configuration for extensions from the given otel override
+// configuration. The return value is a map keyed by extension types, with configuration overrides as values.
+func getOutputOtelOverrideExtensionsConfig(otelOverrideCfg *config.C) (map[string]map[string]any, error) {
+	if otelOverrideCfg == nil {
+		return nil, nil
+	}
+	if !otelOverrideCfg.HasField(outputOtelOverrideExtensionsFieldName) {
+		return nil, nil
+	}
+	extensionsCfgC, err := otelOverrideCfg.Child(outputOtelOverrideExtensionsFieldName, -1)
+	if err != nil {
+		return nil, err
+	}
+	extensionsCfgMap := make(map[string]map[string]any)
+	err = extensionsCfgC.Unpack(&extensionsCfgMap)
+	if err != nil {
+		return nil, err
+	}
+	return extensionsCfgMap, nil
 }
 
 func BeatDataPath(componentId string) string {
@@ -549,6 +640,15 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 	newConfig, err := config.NewConfigFrom(defaultTransportSettings)
 	if err != nil {
 		return nil, err
+	}
+
+	// proxy_url on newConfig is of type url.URL. Beatsauth extension expects it to be of string type instead
+	// this logic here converts url.URL to string type similar to what a user would set on filebeat config
+	if defaultTransportSettings.Proxy.URL != nil {
+		err = newConfig.SetString("proxy_url", -1, defaultTransportSettings.Proxy.URL.String())
+		if err != nil {
+			return nil, fmt.Errorf("error settingg proxy url:%w ", err)
+		}
 	}
 
 	var newMap map[string]any
