@@ -108,12 +108,11 @@ func retryEnroll(err error, maxAttempts int, log *logger.Logger, enrollFn func()
 RETRYLOOP:
 	for {
 		attemptNo++
-
 		switch {
 		case errors.Is(err, fleetapi.ErrTooManyRequests):
 			log.Warn("Too many requests on the remote server, will retry in a moment.")
 		case errors.Is(err, fleetapi.ErrConnRefused):
-			log.Warn("Remote server is not ready to accept connections (Connection Refused), will retry in a moment.")
+			log.Warn("Remote server is not ready to accept connections(Connection Refused), will retry in a moment.")
 		case errors.Is(err, fleetapi.ErrTemporaryServerError):
 			log.Warnf("Remote server failed to handle the request (%s), will retry in a moment.", err)
 
@@ -132,7 +131,6 @@ RETRYLOOP:
 		if !backExp.Wait() {
 			break RETRYLOOP
 		}
-
 		log.Infof("Retrying enrollment to URL: %s", clientURI)
 		err = enrollFn()
 	}
