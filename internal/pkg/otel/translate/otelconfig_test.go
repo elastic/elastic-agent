@@ -407,9 +407,6 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 			},
-			"output": map[string]any{
-				"otelconsumer": map[string]any{},
-			},
 			"path": map[string]any{
 				"data": filepath.Join(paths.Run(), id),
 			},
@@ -743,9 +740,6 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
-						"output": map[string]any{
-							"otelconsumer": map[string]any{},
-						},
 						"path": map[string]any{
 							"data": filepath.Join(paths.Run(), "beat-metrics-monitoring"),
 						},
@@ -853,9 +847,6 @@ func TestGetOtelConfig(t *testing.T) {
 									"processors": defaultProcessors("test-1", "generic-1", "metrics"),
 								},
 							},
-						},
-						"output": map[string]any{
-							"otelconsumer": map[string]any{},
 						},
 						"path": map[string]any{
 							"data": filepath.Join(paths.Run(), "system-metrics"),
