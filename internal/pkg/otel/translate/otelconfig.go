@@ -14,6 +14,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	koanfmaps "github.com/knadh/koanf/maps"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
@@ -23,11 +24,8 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
-	"github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
-	"github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -389,9 +387,9 @@ func getReceiverTypeForComponent(comp *component.Component) (otelcomponent.Type,
 	beatName := GetBeatNameForComponent(comp)
 	switch beatName {
 	case "filebeat":
-		return otelcomponent.MustNewType(fbreceiver.Name), nil
+		return otelcomponent.MustNewType("filebeatreceiver"), nil
 	case "metricbeat":
-		return otelcomponent.MustNewType(mbreceiver.Name), nil
+		return otelcomponent.MustNewType("metricbeatreceiver"), nil
 	default:
 		return otelcomponent.Type{}, fmt.Errorf("unknown otel receiver type for input type: %s", comp.InputType)
 	}
