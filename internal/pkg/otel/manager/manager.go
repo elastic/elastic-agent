@@ -69,7 +69,11 @@ type OTelManager struct {
 	// baseLogger is the base logger for the otel collector, and doesn't include any agent-specific fields.
 	baseLogger *logger.Logger
 	logger     *logger.Logger
-	errCh      chan error
+
+	// errCh should only be used to send critical errors that will mark the entire elastic-agent as failed
+	// if it's an issue with starting or running the collector those should not be critical errors, instead
+	// they should be reported as failed components to the elastic-agent
+	errCh chan error
 
 	// Agent info and monitoring config getter for otel config generation
 	agentInfo                  info.Agent
@@ -224,11 +228,13 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			m.logger.Infof("collector recovery restarting, total retries: %d", newRetries)
 			m.proc, err = m.execution.startCollector(ctx, m.baseLogger, m.logger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh, forceFetchStatusCh)
 			if err != nil {
+				// TODO: Have this set the components status and should not call reportErr
 				reportErr(ctx, m.errCh, err)
 				// reset the restart timer to the next backoff
 				recoveryDelay := m.recoveryTimer.ResetNext()
 				m.logger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
 			} else {
+				// TODO: Remove this once the above happens (possibly, need to confirm if this is always needed)
 				reportErr(ctx, m.errCh, nil)
 			}
 
@@ -295,6 +301,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			m.recoveryRetries.Store(0)
 			mergedCfg, err := buildMergedConfig(cfgUpdate, m.agentInfo, m.beatMonitoringConfigGetter, m.baseLogger)
 			if err != nil {
+				// critical error, merging the configuration should always work
 				reportErr(ctx, m.errCh, err)
 				continue
 			}
@@ -339,6 +346,8 @@ func (m *OTelManager) Run(ctx context.Context) error {
 		case otelStatus := <-collectorStatusCh:
 			err = m.reportOtelStatusUpdate(ctx, otelStatus)
 			if err != nil {
+				// critical error and not handling the status update correctly
+				// can't properly report status if this fails, so we report it as critical
 				reportErr(ctx, m.errCh, err)
 			}
 		}
