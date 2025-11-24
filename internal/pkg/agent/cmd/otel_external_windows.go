@@ -27,7 +27,7 @@ func newOtelCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 		Use:                "otel",
 		DisableFlagParsing: true,
 		RunE: func(_ *cobra.Command, cmdArgs []string) error {
-			executable := filepath.Join(paths.Home(), binaryName)
+			executable := filepath.Join(filepath.Dir(paths.Components()), binaryName)
 			cmd := exec.Command(executable, cmdArgs...)
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
