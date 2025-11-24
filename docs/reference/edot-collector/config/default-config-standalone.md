@@ -244,15 +244,12 @@ processors:
   elastictrace: {}
 ```
 
-<<<<<<< HEAD
-=======
 :::{note}
 :applies_to: edot_collector: ga 9.2
 
 The `elasticapm` processor replaces the deprecated `elastictrace` processor. If you're running EDOT Collector 9.x with Elastic Stack 8.18 or 8.19, use the `elastictrace` processor and the `elasticinframetrics` processor as specified in the Gateway configuration for your Stack version.
 :::
 
->>>>>>> 319e0f566 (Add notes on configuration compatibility (#11328))
 ### Data export
 
 The Gateway exports data to Elasticsearch in two formats:
