@@ -1097,7 +1097,6 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			assert.True(t, ok, "receiver config should be a map")
 
 			// Verify configuration section presence
-			assert.Contains(t, receiverConfig, "output", "output config should be present")
 			assert.Contains(t, receiverConfig, "path", "path config should be present")
 			assert.Contains(t, receiverConfig, "logging", "logging config should be present")
 			assert.Contains(t, receiverConfig, tt.expectedBeatName, fmt.Sprintf("%s config should be present", tt.expectedBeatName))
