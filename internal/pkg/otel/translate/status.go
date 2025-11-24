@@ -39,6 +39,8 @@ func GetAllComponentStates(otelStatus *status.AggregateStatus, components []comp
 				if compState, statusErr = getComponentState(pipelineStatus, comp); statusErr != nil {
 					return nil, statusErr
 				}
+			} else if otelStatus != nil && otelStatus.Event != nil && otelStatus.Status() == componentstatus.StatusStarting {
+				compState = getComponentStartingState(comp)
 			} else {
 				// If the component is not found in the OTel status, we return a stopped state.
 				compState = runtime.ComponentComponentState{
@@ -288,6 +290,38 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		State:     compState,
 	}
 	return compStatus, nil
+}
+
+// getComponentStartingState returns a ComponentComponentState with all units in the starting state,
+// including version info and initial status for each unit.
+func getComponentStartingState(comp component.Component) runtime.ComponentComponentState {
+	compState := runtime.ComponentState{
+		State:   client.UnitStateStarting,
+		Message: client.UnitStateStarting.String(),
+		Units:   make(map[runtime.ComponentUnitKey]runtime.ComponentUnitState),
+		VersionInfo: runtime.ComponentVersionInfo{
+			Name: OtelComponentName,
+			Meta: map[string]string{ // mimic what beats return over the control protocol
+				"build_time": version.BuildTime().String(),
+				"commit":     version.Commit(),
+			},
+			BuildHash: version.Commit(),
+		},
+	}
+	for _, unit := range comp.Units {
+		unitKey := runtime.ComponentUnitKey{
+			UnitID:   unit.ID,
+			UnitType: unit.Type,
+		}
+		compState.Units[unitKey] = getComponentUnitState(&status.AggregateStatus{
+			Event:              componentstatus.NewEvent(componentstatus.StatusStarting),
+			ComponentStatusMap: map[string]*status.AggregateStatus{},
+		}, unit)
+	}
+	return runtime.ComponentComponentState{
+		Component: comp,
+		State:     compState,
+	}
 }
 
 // getUnitOtelStatuses extracts the receiver and exporter status from otel pipeline status.
