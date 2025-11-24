@@ -183,7 +183,7 @@ func TestGetAllComponentState(t *testing.T) {
 						Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
 							runtime.ComponentUnitKey{UnitID: "filestream-unit", UnitType: client.UnitTypeInput}: {
 								State:   client.UnitStateStarting,
-								Message: "STARTING",
+								Message: "Starting",
 								Payload: map[string]any{
 									"streams": map[string]map[string]string{
 										"test-1": {
@@ -199,7 +199,7 @@ func TestGetAllComponentState(t *testing.T) {
 							},
 							runtime.ComponentUnitKey{UnitID: "filestream-default", UnitType: client.UnitTypeOutput}: {
 								State:   client.UnitStateStarting,
-								Message: "STARTING",
+								Message: "Starting",
 							},
 						},
 						VersionInfo: runtime.ComponentVersionInfo{
