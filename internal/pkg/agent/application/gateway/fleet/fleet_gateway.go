@@ -7,8 +7,6 @@ package fleet
 import (
 	"context"
 	stderrors "errors"
-	"maps"
-	"slices"
 	"sync"
 	"time"
 
@@ -337,9 +335,7 @@ func convertToCheckinComponents(logger *logp.Logger, components []runtime.Compon
 	// OTel status is placed as a component for each top-level component in OTel
 	// and each subcomponent is a unit.
 	if collector != nil {
-		sortedIds := slices.Sorted(maps.Keys(collector.ComponentStatusMap))
-		for _, id := range sortedIds {
-			item := collector.ComponentStatusMap[id]
+		for id, item := range collector.ComponentStatusMap {
 			state, msg := translate.StateWithMessage(item)
 
 			checkinComponent := fleetapi.CheckinComponent{
@@ -351,9 +347,7 @@ func convertToCheckinComponents(logger *logp.Logger, components []runtime.Compon
 
 			if len(item.ComponentStatusMap) > 0 {
 				units := make([]fleetapi.CheckinUnit, 0, len(item.ComponentStatusMap))
-				sortedUnitIds := slices.Sorted(maps.Keys(item.ComponentStatusMap))
-				for _, unitId := range sortedUnitIds {
-					unitItem := item.ComponentStatusMap[unitId]
+				for unitId, unitItem := range item.ComponentStatusMap {
 					unitState, unitMsg := translate.StateWithMessage(unitItem)
 					units = append(units, fleetapi.CheckinUnit{
 						ID:      unitId,

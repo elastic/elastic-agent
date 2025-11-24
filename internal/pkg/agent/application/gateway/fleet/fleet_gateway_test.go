@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -1129,6 +1131,15 @@ func TestConvertToCheckingComponents(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := convertToCheckinComponents(logp.NewNopLogger(), tt.components, tt.collector)
+			// Testify diffs are nicer if we sort and compare directly vs using ElementsMathc
+			slices.SortFunc(result, func(a, b fleetapi.CheckinComponent) int {
+				return strings.Compare(a.ID, b.ID)
+			})
+			for _, c := range result {
+				slices.SortFunc(c.Units, func(a, b fleetapi.CheckinUnit) int {
+					return strings.Compare(a.ID, b.ID)
+				})
+			}
 			assert.Equal(t, tt.expected, result)
 		})
 	}
