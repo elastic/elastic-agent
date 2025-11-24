@@ -618,7 +618,7 @@ func BeatDataPath(componentId string) string {
 // currently this is only supported for elasticsearch output
 func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 
-	defaultAuthSettings := beatsauthextension.BeatsAuthConfig{
+	authSettings := beatsauthextension.BeatsAuthConfig{
 		Transport: elasticsearch.ESDefaultTransportSettings(),
 	}
 
@@ -628,7 +628,7 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 	}
 
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		Result:          &defaultAuthSettings,
+		Result:          &authSettings,
 		TagName:         "config",
 		SquashTagOption: "inline",
 		DecodeHook:      cfgDecodeHookFunc(),
@@ -641,22 +641,22 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 		return nil, err
 	}
 
-	newConfig, err := config.NewConfigFrom(defaultAuthSettings)
+	newConfig, err := config.NewConfigFrom(authSettings)
 	if err != nil {
 		return nil, err
 	}
 
 	// proxy_url on newConfig is of type url.URL. Beatsauth extension expects it to be of string type instead
 	// this logic here converts url.URL to string type similar to what a user would set on filebeat config
-	if defaultAuthSettings.Transport.Proxy.URL != nil {
-		err = newConfig.SetString("proxy_url", -1, defaultAuthSettings.Transport.Proxy.URL.String())
+	if authSettings.Transport.Proxy.URL != nil {
+		err = newConfig.SetString("proxy_url", -1, authSettings.Transport.Proxy.URL.String())
 		if err != nil {
 			return nil, fmt.Errorf("error settingg proxy url:%w ", err)
 		}
 	}
 
-	if defaultAuthSettings.Kerberos != nil {
-		err = newConfig.SetString("kerberos.auth_type", -1, defaultAuthSettings.Kerberos.AuthType.String())
+	if authSettings.Kerberos != nil {
+		err = newConfig.SetString("kerberos.auth_type", -1, authSettings.Kerberos.AuthType.String())
 		if err != nil {
 			return nil, fmt.Errorf("error setting kerberos auth type url:%w ", err)
 		}
