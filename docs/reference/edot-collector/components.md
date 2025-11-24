@@ -20,6 +20,10 @@ The {{edot}} (EDOT) Collector includes embedded Collector components from the [O
 
 The components included in the EDOT Collector are categorized into **[Core]** and **[Extended]** components. The following table describes the current components included in the EDOT Collector, their source, and support status.
 
+::::{note}
+Components marked as "Deprecated" in the table are retained in EDOT Collector 9.x to maintain backwards compatibility during the official deprecation window. If you're running EDOT Collector 9.x with {{product.elastic-stack}} 8.18 or 8.19, continue using these deprecated components as specified in the configuration for your Stack version. For more details, refer to [Configuration compatibility with {{product.elastic-stack}} versions](/reference/edot-collector/config/default-config-standalone.md#configuration-compatibility-with-elastic-stack-versions).
+::::
+
 % The following table is automatically generated from the EDOT Collector source code.
 % Automation is handled by /docs/scripts/update-docs/update-components-docs.py, which
 % reads the go.mod file, the components.yml file, and then generates the table.
@@ -83,7 +87,7 @@ These components are included in EDOT Collector version 9.2.1.
 | [tailsamplingprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.137.0 |
 | [transformprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/transformprocessor) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Core] | v0.137.0 |
 |***Connectors***||||
-| [elasticapmconnector](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Core] | v0.8.0 |
+| [elasticapmconnector](/reference/edot-collector/components/elasticapmconnector.md) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Core] | v0.8.0 |
 | [forwardconnector](https://github.com/open-telemetry/opentelemetry-collector/tree/main/connector/forwardconnector) | [OTel Core Repo](https://github.com/open-telemetry/opentelemetry-collector) | [Extended] | v0.137.0 |
 | [profilingmetricsconnector](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/profilingmetricsconnector) | [Elastic Repo](https://github.com/elastic/opentelemetry-collector-components) | [Extended] | v0.1.0 |
 | [routingconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/connector/routingconnector) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Core] | v0.137.0 |
