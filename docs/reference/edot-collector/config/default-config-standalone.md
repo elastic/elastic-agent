@@ -75,6 +75,8 @@ Both the `elasticapm` processor and the `elasticapm` connector are required for 
 * Use the EDOT Collector with the available configuration to ingest data into {{es}}.
 * [Build a custom, EDOT-like Collector](/reference/edot-collector/custom-collector.md) for ingesting data into {{es}}.
 * Use Elastic's [managed OTLP endpoint](docs-content://solutions/observability/get-started/opentelemetry/quickstart/serverless/index.md) that does the enrichment for you.
+
+If you're running EDOT Collector 9.x with Elastic Stack 8.18 or 8.19, use the deprecated `elastictrace` processor instead of `elasticapm` processor as specified in the configuration for your Stack version.
 :::
 
 #### Host metrics collection pipeline
@@ -84,6 +86,12 @@ The host metrics pipeline uses the [`hostmetrics`] receiver to collect `disk`, `
 For backwards compatibility, host metrics are translated into ECS-compatible system metrics using the [`elasticinframetrics`] processor. Finally, metrics are ingested in `ecs` format through the [`elasticsearch`] exporter.
 
 The [`resourcedetection`] processor enriches the metrics with meta information about the corresponding host and operating system. The [`attributes`] and [`resource`] processor are used to set some fields for proper routing of the ECS-based system metrics data into corresponding {{es}} data streams.
+
+:::{note}
+:applies_to: edot_collector: ga 9.2
+
+The `elasticinframetrics` processor is deprecated in EDOT Collector 9.2 but is retained for backwards compatibility. If you're running EDOT Collector 9.x with {{product.elastic-stack}} 8.18 or 8.19, continue using this processor as specified in the configuration for your Stack version.
+:::
 
 ::::{important}
 :::{include} ../_snippets/process-config.md
@@ -221,7 +229,8 @@ processors:
 
 :::{note}
 :applies_to: edot_collector: ga 9.2
-The `elasticapm` processor replaces the deprecated `elastictrace` processor.
+
+The `elasticapm` processor replaces the deprecated `elastictrace` processor. If you're running EDOT Collector 9.x with Elastic Stack 8.18 or 8.19, use the `elastictrace` processor and the `elasticinframetrics` processor as specified in the Gateway configuration for your Stack version.
 :::
 
 ### Data export
@@ -369,3 +378,120 @@ The server expects incoming HTTP requests to include an API key with sufficient 
 [Logs &#124; Metrics &#124; App - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/logs_metrics_traces.yml
 [Logs &#124; Metrics &#124; App - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/managed_otlp/logs_metrics_traces.yml
 [Gateway mode]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/heads/main/internal/pkg/otel/samples/linux/gateway.yml
+<<<<<<< HEAD
+=======
+
+
+### Secure SDK to Collector connection (TLS)
+
+To secure the connection between the {{edot}} SDKs and the EDOT Collector, configure TLS on both ends.
+
+#### SDK configuration
+
+Set the following environment variables in your application:
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT=https://collector.example.com:4318
+OTEL_EXPORTER_OTLP_INSECURE=false
+OTEL_EXPORTER_OTLP_CERTIFICATE=/etc/ssl/certs/collector-ca.crt
+```
+
+These settings:
+
+* Enable TLS (`INSECURE=false`)
+
+* Trust the Collector's certificate (`CERTIFICATE`)
+
+* Ensure the endpoint uses `https://`
+
+These settings work with .NET, Java, and Python SDKs.
+
+#### Collector receiver configuration
+
+Enable TLS in the OTLP receiver:
+
+```yaml
+receivers:
+      # Receives data from other Collectors in Agent mode
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317 # Listen on all interfaces
+            tls:
+              cert_file: "/etc/ssl/certs/collector-server.crt"
+              key_file: "/etc/ssl/private/collector-server.key"
+          http:
+            endpoint: 0.0.0.0:4318 # Listen on all interfaces
+            tls:
+              cert_file: "/etc/ssl/certs/collector-server.crt"
+              key_file: "/etc/ssl/private/collector-server.key"
+```
+
+This encrypts data between SDKs and the Collector over both gRPC and HTTP protocols.
+
+### Secure the connection between the EDOT Collector and Elastic
+
+In addition to securing communication between the {{edot}} SDKs and the `apmconfigextension`, you should secure the connection between the EDOT Collector and {{es}} endpoints.
+
+The EDOT Collector uses the `elasticsearch/otel` or `elasticsearch/ecs` exporter to send telemetry data to Elastic. Elastic recommends using HTTPS to encrypt the connection and verify the server's certificate.
+
+Example configuration:
+
+```yaml
+exporters:
+  elasticsearch/otel:
+    endpoint: "https://example.elastic.co:443"
+    api_key: "<your-api-key>"
+    tls:
+      insecure: false
+```
+
+This setup encrypts data in transit and uses the system's default set of trusted certificate authorities to verify the Elastic endpoint certificate.
+
+For {{ecloud}}, this is the recommended approach. {{ecloud}} certificates are signed by a public certificate authority (ISRG Root X1, Let's Encrypt), which should already be trusted by your system.
+
+To override the default CA bundle, specify the CA file explicitly:
+
+```yaml
+tls:
+  insecure: false
+  ca_file: "/path/to/elastic-ca.crt"
+```
+:::{note}
+Avoid using the CA certificate provided in the {{ecloud}} console to verify the Elastic endpoint. It is not intended for this purpose and might not work as expected.
+:::
+
+#### Mutual TLS (mTLS)
+
+For self-managed Elastic deployments, you can optionally enable mTLS to authenticate both the Collector and the {{es}} endpoint. For example:
+
+```yaml
+exporters:
+  elasticsearch/otel:
+    endpoint: "https://example.elastic.co:443"
+    api_key: "<your-api-key>"
+    tls:
+      ca_file: "/path/to/elastic-ca.crt"
+      cert_file: "/path/to/client.crt"
+      key_file: "/path/to/client.key"
+      insecure: false
+```
+
+mTLS ensures that only authorized collectors can send telemetry data.
+
+For {{ecloud}} and {{serverless-full}} deployments, mTLS is not required. TLS and API key authentication are enforced automatically.
+
+## Configuration compatibility with Elastic Stack versions
+
+While EDOT Collector 9.x is compatible with {{product.elastic-stack}} 8.18 and 8.19, users running these Stack versions should use the EDOT Collector configuration aligned with their Stack version to ensure the end-to-end experience works properly with {{product.kibana}} Observability UIs.
+
+::::{important}
+If you're upgrading EDOT Collector to 9.x but keeping your {{product.elastic-stack}} on 8.18 or 8.19:
+
+- Use the configuration examples for your Stack version (8.18 or 8.19), not the latest 9.x configuration.
+- Continue using deprecated components (such as `elasticinframetrics` and `elastictrace` processors) that are included in the configuration for your Stack version.
+- These deprecated components are retained in EDOT Collector 9.x specifically to maintain backwards compatibility during the official deprecation window.
+
+For Gateway mode configurations by Stack version, refer to the [Gateway mode section](#gateway-mode).
+::::
+>>>>>>> 319e0f566 (Add notes on configuration compatibility (#11328))
