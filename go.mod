@@ -14,9 +14,9 @@ require (
 	github.com/docker/docker v28.5.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251120193515-55629bc7b87a
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251124065929-62c186877b48
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
-	github.com/elastic/elastic-agent-autodiscover v0.10.0
+	github.com/elastic/elastic-agent-autodiscover v0.10.1
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
 	github.com/elastic/elastic-agent-libs v0.26.1
 	github.com/elastic/elastic-agent-system-metrics v0.13.4
