@@ -25,13 +25,13 @@ For full contrib details, refer to the [OpenTelemetry kubeletstats receiver docu
 
 Use the Kubelet stats receiver when you need:
 
-* Node-level resource usage - CPU, memory, network, and filesystem metrics for Kubernetes nodes.
+* CPU, memory, network, and filesystem metrics for Kubernetes nodes.
 
-* Pod and container resource usage - fine-grained container CPU/memory usage for workloads running on each node.
+* Fine-grained container CPU/memory usage for workloads running on each node.
 
-* Volume metrics - filesystem and ephemeral storage usage for pods and containers.
+* Filesystem and ephemeral storage usage for pods and containers.
 
-* {{product.observability}} correlation - combine node- and pod-level metrics with logs and traces to troubleshoot performance issues, resource saturation, and pod eviction behavior.
+* To combine node- and pod-level metrics with logs and traces to troubleshoot performance issues, resource saturation, and pod eviction behavior.
 
 ## Configuration
 
