@@ -33,6 +33,47 @@ COMPONENT_DOCS_YAML = '../../../docs/reference/edot-collector/component-docs.yml
 DEFAULT_CONFIG_FILE = '../../../docs/reference/edot-collector/config/default-config-standalone.md'
 COMPONENTS_YAML = '../../../internal/pkg/otel/components.yml'
 
+# Path migration: EDOT code moved from internal/pkg/otel to internal/edot
+# in PR #10922 (merged Nov 7, 2025, backported to 8.19, 9.1, 9.2)
+# - go.mod with OTEL components moved to internal/edot/go.mod
+# - components.yml remains at internal/pkg/otel/components.yml
+GOMOD_NEW_PATH = 'internal/edot/go.mod'
+GOMOD_OLD_PATH = 'go.mod'
+COMPONENTS_YAML_PATH = 'internal/pkg/otel/components.yml'
+
+
+def check_file_exists_at_tag(file_path, tag):
+    """Check if a file exists at a specific Git tag"""
+    try:
+        subprocess.run(
+            ['git', 'cat-file', '-e', f'{tag}:{file_path}'],
+            capture_output=True,
+            check=True
+        )
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def get_gomod_path_for_tag(tag):
+    """Determine the correct path for go.mod with OTEL components based on the tag.
+    
+    The EDOT go.mod file was created at internal/edot/go.mod in PR #10922.
+    Prior to that, OTEL components were in the root go.mod.
+    
+    Args:
+        tag: Git tag to check
+        
+    Returns:
+        The correct path string for go.mod at that tag
+    """
+    # Try new path first (for newer versions)
+    if check_file_exists_at_tag(GOMOD_NEW_PATH, tag):
+        return GOMOD_NEW_PATH
+    # Fall back to old path
+    else:
+        return GOMOD_OLD_PATH
+
 
 def read_file_from_git_tag(file_path, tag):
     """Read a file from a specific Git tag"""
@@ -78,8 +119,8 @@ def get_core_components(version='main'):
     latest_version = get_latest_version()
     version_tag = f"v{latest_version}"
     
-    # Always read from Git tag
-    components_path = 'internal/pkg/otel/components.yml'
+    # components.yml path hasn't changed
+    components_path = COMPONENTS_YAML_PATH
     print(f"Reading core components from tag {version_tag}: {components_path}")
     content = read_file_from_git_tag(components_path, version_tag)
     if content is None:
@@ -96,8 +137,8 @@ def get_deprecated_components(version='main'):
     latest_version = get_latest_version()
     version_tag = f"v{latest_version}"
     
-    # Always read from Git tag
-    components_path = 'internal/pkg/otel/components.yml'
+    # components.yml path hasn't changed
+    components_path = COMPONENTS_YAML_PATH
     print(f"Reading deprecated components from tag {version_tag}: {components_path}")
     content = read_file_from_git_tag(components_path, version_tag)
     if content is None:
@@ -118,8 +159,8 @@ def get_component_annotations(version='main'):
     latest_version = get_latest_version()
     version_tag = f"v{latest_version}"
     
-    # Always read from Git tag
-    components_path = 'internal/pkg/otel/components.yml'
+    # components.yml path hasn't changed
+    components_path = COMPONENTS_YAML_PATH
     print(f"Reading component annotations from tag {version_tag}: {components_path}")
     content = read_file_from_git_tag(components_path, version_tag)
     if content is None:
@@ -167,8 +208,8 @@ def get_otel_col_upstream_version():
     latest_version = get_latest_version()
     version_tag = f"v{latest_version}"
     
-    # Always read from Git tag
-    go_mod_path = 'go.mod'
+    # Determine correct go.mod path for this version (handles path migration)
+    go_mod_path = get_gomod_path_for_tag(version_tag)
     print(f"Reading go.mod from tag {version_tag}: {go_mod_path}")
     content = read_file_from_git_tag(go_mod_path, version_tag)
     if content is None:
@@ -190,8 +231,8 @@ def get_otel_components(version='main', component_docs_mapping=None):
     latest_version = get_latest_version()
     version_tag = f"v{latest_version}"
     
-    # Always read from Git tag
-    go_mod_path = 'go.mod'
+    # Determine correct go.mod path for this version (handles path migration)
+    go_mod_path = get_gomod_path_for_tag(version_tag)
     print(f"Reading go.mod from tag {version_tag}: {go_mod_path}")
     elastic_agent_go_mod = read_file_from_git_tag(go_mod_path, version_tag)
     if elastic_agent_go_mod is None:
@@ -413,18 +454,6 @@ def get_minor_versions_above(major_version, min_minor):
     # Filter to only include versions >= min_minor
     filtered = [v for v in all_versions if v['minor'] >= min_minor]
     return filtered
-
-def check_file_exists_at_tag(file_path, tag):
-    """Check if a file exists at a specific Git tag"""
-    try:
-        subprocess.run(
-            ['git', 'cat-file', '-e', f'{tag}:{file_path}'],
-            capture_output=True,
-            check=True
-        )
-        return True
-    except subprocess.CalledProcessError:
-        return False
 
 def get_gateway_versions(major_version, min_minor):
     """Get version data for gateway configuration table
