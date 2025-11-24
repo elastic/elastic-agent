@@ -20,7 +20,7 @@ if [ -z "$TEST_SUDO" ]; then
   exit 1
 fi
 
-ESS_REGION=${ESS_REGION:=""}
+ESS_REGION=${ESS_REGION:-""}
 
 # Override the stack version from `.package-version` contents
 # There is a time when the current snapshot is not available on cloud yet, so we cannot use the latest version automatically
