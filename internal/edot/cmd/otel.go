@@ -70,9 +70,10 @@ func NewOtelCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Comman
 		SilenceErrors: true,
 	}
 
+	origHelp := cmd.HelpFunc()
 	cmd.SetHelpFunc(func(c *cobra.Command, s []string) {
 		hideInheritedFlags(c)
-		c.Root().HelpFunc()(c, s)
+		origHelp(c, s)
 	})
 
 	SetupOtelFlags(cmd.Flags())
