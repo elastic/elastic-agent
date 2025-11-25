@@ -9,10 +9,14 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/otelcol"
+	"go.opentelemetry.io/collector/pipeline"
 )
 
 // for testing purposes
@@ -91,7 +95,105 @@ func otelConfigToStatus(cfg *confmap.Conf, err error) (*status.AggregateStatus, 
 		return nil, fmt.Errorf("could not marshal configuration: %w", err)
 	}
 
-	// TODO: Convert here.
+	// aggregators are used to create the overall status structure
+	// aggGeneric is used to for a generic aggregator status where all instances get the same error
+	// aggSpecific is used to provide status to the specific instance that caused the error
+	// aggSpecific is only used if matchOccurred is true
+	aggGeneric := status.NewAggregator(status.PriorityPermanent)
+	aggSpecific := status.NewAggregator(status.PriorityPermanent)
+	matchOccurred := false
 
-	return nil, nil
+	// extensions
+	for _, id := range c.Service.Extensions {
+		instanceID := componentstatus.NewInstanceID(id, component.KindExtension)
+		aggGeneric.RecordStatus(instanceID, componentstatus.NewFatalErrorEvent(err))
+		if recordSpecificErr(aggSpecific, instanceID, err) {
+			matchOccurred = true
+		}
+	}
+
+	// track connectors
+	connectors := make(map[component.ID]struct{})
+	connectorsAsReceiver := make(map[component.ID][]pipeline.ID)
+	connectorsAsExporter := make(map[component.ID][]pipeline.ID)
+
+	// pipelines
+	for pipelineID, pipelineCfg := range c.Service.Pipelines {
+		for _, recvID := range pipelineCfg.Receivers {
+			instanceID := componentstatus.NewInstanceID(recvID, component.KindReceiver, pipelineID)
+			_, isConnector := c.Connectors[recvID]
+			if isConnector {
+				connectors[recvID] = struct{}{}
+				connectorsAsReceiver[recvID] = append(connectorsAsReceiver[recvID], pipelineID)
+			}
+			aggGeneric.RecordStatus(instanceID, componentstatus.NewFatalErrorEvent(err))
+			if recordSpecificErr(aggSpecific, instanceID, err) {
+				matchOccurred = true
+			}
+		}
+		for _, procID := range pipelineCfg.Processors {
+			instanceID := componentstatus.NewInstanceID(procID, component.KindProcessor, pipelineID)
+			aggGeneric.RecordStatus(instanceID, componentstatus.NewFatalErrorEvent(err))
+			if recordSpecificErr(aggSpecific, instanceID, err) {
+				matchOccurred = true
+			}
+		}
+		for _, exporterID := range pipelineCfg.Exporters {
+			instanceID := componentstatus.NewInstanceID(exporterID, component.KindExporter, pipelineID)
+			_, isConnector := c.Connectors[exporterID]
+			if isConnector {
+				connectors[exporterID] = struct{}{}
+				connectorsAsExporter[exporterID] = append(connectorsAsExporter[exporterID], pipelineID)
+			}
+			aggGeneric.RecordStatus(instanceID, componentstatus.NewFatalErrorEvent(err))
+			if recordSpecificErr(aggSpecific, instanceID, err) {
+				matchOccurred = true
+			}
+		}
+	}
+
+	// connectors
+	for connID := range connectors {
+		extraMatchStr := fmt.Sprintf("connector %q used as", connID)
+		for _, eID := range connectorsAsExporter[connID] {
+			for _, rID := range connectorsAsReceiver[connID] {
+				instanceID := componentstatus.NewInstanceID(
+					connID, component.KindConnector, eID, rID,
+				)
+				aggGeneric.RecordStatus(instanceID, componentstatus.NewFatalErrorEvent(err))
+				if recordSpecificErr(aggSpecific, instanceID, err, extraMatchStr) {
+					matchOccurred = true
+				}
+			}
+		}
+	}
+
+	if matchOccurred {
+		// specific for the matched error
+		aggStatus, _ := aggSpecific.AggregateStatus(status.ScopeAll, status.Verbose)
+		return aggStatus, nil
+	}
+	// no match found so generic failed on all instances
+	aggStatus, _ := aggGeneric.AggregateStatus(status.ScopeAll, status.Verbose)
+	return aggStatus, nil
+}
+
+func recordSpecificErr(agg *status.Aggregator, instanceID *componentstatus.InstanceID, err error, extraMatchStrs ...string) bool {
+	matcherStr := fmt.Sprintf("failed to start %q %s:", instanceID.ComponentID().String(), strings.ToLower(instanceID.Kind().String()))
+	if strings.Contains(err.Error(), matcherStr) {
+		// specific so this instance gets the reported error
+		agg.RecordStatus(instanceID, componentstatus.NewFatalErrorEvent(err))
+		return true
+	}
+	// extra matchers
+	for _, matchStr := range extraMatchStrs {
+		if strings.Contains(err.Error(), matchStr) {
+			// specific so this instance gets the reported error
+			agg.RecordStatus(instanceID, componentstatus.NewFatalErrorEvent(err))
+			return true
+		}
+	}
+	// not specific to this instance, so we record this one as starting
+	agg.RecordStatus(instanceID, componentstatus.NewEvent(componentstatus.StatusStarting))
+	return false
 }
