@@ -104,7 +104,7 @@ func TestGetAllComponentState(t *testing.T) {
 					Component: fileStreamOtelComponent,
 					State: runtime.ComponentState{
 						State:   client.UnitStateHealthy,
-						Message: "HEALTHY",
+						Message: "Healthy",
 						Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
 							runtime.ComponentUnitKey{UnitID: "filestream-unit", UnitType: client.UnitTypeInput}: {
 								State:   client.UnitStateHealthy,
@@ -183,7 +183,7 @@ func TestGetAllComponentState(t *testing.T) {
 						Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
 							runtime.ComponentUnitKey{UnitID: "filestream-unit", UnitType: client.UnitTypeInput}: {
 								State:   client.UnitStateStarting,
-								Message: "STARTING",
+								Message: "Starting",
 								Payload: map[string]any{
 									"streams": map[string]map[string]string{
 										"test-1": {
@@ -199,7 +199,7 @@ func TestGetAllComponentState(t *testing.T) {
 							},
 							runtime.ComponentUnitKey{UnitID: "filestream-default", UnitType: client.UnitTypeOutput}: {
 								State:   client.UnitStateStarting,
-								Message: "STARTING",
+								Message: "Starting",
 							},
 						},
 						VersionInfo: runtime.ComponentVersionInfo{
@@ -527,15 +527,15 @@ func TestGetComponentUnitState(t *testing.T) {
 			},
 			expected: runtime.ComponentUnitState{
 				State:   client.UnitStateDegraded,
-				Message: "recoverable error",
+				Message: "Recoverable: recoverable error",
 				Payload: map[string]any{
 					"streams": map[string]map[string]string{
 						"stream-1": {
-							"error":  "recoverable error",
+							"error":  "Recoverable: recoverable error",
 							"status": client.UnitStateDegraded.String(),
 						},
 						"stream-2": {
-							"error":  "recoverable error",
+							"error":  "Recoverable: recoverable error",
 							"status": client.UnitStateDegraded.String(),
 						},
 					},
@@ -571,65 +571,188 @@ func TestParseEntityStatusId(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		componentKind, pipelineId, err := parseEntityStatusId(test.id)
+		componentKind, pipelineId, err := ParseEntityStatusId(test.id)
 		assert.Equal(t, test.expectedErr, err)
 		assert.Equal(t, test.expectedKind, componentKind, "component kind")
 		assert.Equal(t, test.expectedEntityID, pipelineId, "pipeline id")
 	}
 }
 
-func TestOtelStatusToUnitState(t *testing.T) {
-	tests := []struct {
-		name     string
-		status   componentstatus.Status
-		expected client.UnitState
+func TestHasStatus(t *testing.T) {
+	scenarios := []struct {
+		Name   string
+		Result bool
+		Has    componentstatus.Status
+		Status *status.AggregateStatus
 	}{
 		{
-			name:     "StatusNone",
-			status:   componentstatus.StatusNone,
-			expected: client.UnitStateDegraded,
+			Name:   "empty",
+			Result: false,
+			Has:    componentstatus.StatusOK,
+			Status: nil,
 		},
 		{
-			name:     "StatusStarting",
-			status:   componentstatus.StatusStarting,
-			expected: client.UnitStateStarting,
+			Name:   "has status",
+			Result: true,
+			Has:    componentstatus.StatusOK,
+			Status: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+			},
 		},
 		{
-			name:     "StatusOK",
-			status:   componentstatus.StatusOK,
-			expected: client.UnitStateHealthy,
+			Name:   "doesn't have status",
+			Result: false,
+			Has:    componentstatus.StatusRecoverableError,
+			Status: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+			},
 		},
 		{
-			name:     "StatusRecoverableError",
-			status:   componentstatus.StatusRecoverableError,
-			expected: client.UnitStateDegraded,
+			Name:   "sub-component has status",
+			Result: true,
+			Has:    componentstatus.StatusRecoverableError,
+			Status: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					"test-component": &status.AggregateStatus{
+						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+					},
+				},
+			},
 		},
 		{
-			name:     "StatusPermanentError",
-			status:   componentstatus.StatusPermanentError,
-			expected: client.UnitStateFailed,
+			Name:   "sub-component doesn't have status",
+			Result: false,
+			Has:    componentstatus.StatusPermanentError,
+			Status: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					"test-component": &status.AggregateStatus{
+						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+					},
+				},
+			},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.Name, func(t *testing.T) {
+			observed := HasStatus(scenario.Status, scenario.Has)
+			assert.Equal(t, scenario.Result, observed)
+		})
+	}
+}
+
+func TestStateWithMessage(t *testing.T) {
+	tests := []struct {
+		name          string
+		otelStatus    *status.AggregateStatus
+		expectedState client.UnitState
+		expectedMsg   string
+	}{
+		{
+			name: "StatusNone",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusNone),
+			},
+			expectedState: client.UnitStateHealthy,
+			expectedMsg:   "Healthy",
 		},
 		{
-			name:     "StatusFatalError",
-			status:   componentstatus.StatusFatalError,
-			expected: client.UnitStateFailed,
+			name: "StatusStarting",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusStarting),
+			},
+			expectedState: client.UnitStateStarting,
+			expectedMsg:   "Starting",
 		},
 		{
-			name:     "StatusStopping",
-			status:   componentstatus.StatusStopping,
-			expected: client.UnitStateStopping,
+			name: "StatusOK",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+			},
+			expectedState: client.UnitStateHealthy,
+			expectedMsg:   "Healthy",
 		},
 		{
-			name:     "StatusStopped",
-			status:   componentstatus.StatusStopped,
-			expected: client.UnitStateStopped,
+			name: "StatusRecoverableError",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewRecoverableErrorEvent(errors.New("test recoverable error")),
+			},
+			expectedState: client.UnitStateDegraded,
+			expectedMsg:   "Recoverable: test recoverable error",
+		},
+		{
+			name: "StatusRecoverableError without error",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+			},
+			expectedState: client.UnitStateDegraded,
+			expectedMsg:   "Unknown recoverable error",
+		},
+		{
+			name: "StatusPermanentError",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewPermanentErrorEvent(errors.New("test permanent error")),
+			},
+			expectedState: client.UnitStateFailed,
+			expectedMsg:   "Permanent: test permanent error",
+		},
+		{
+			name: "StatusPermanentError without error",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusPermanentError),
+			},
+			expectedState: client.UnitStateFailed,
+			expectedMsg:   "Unknown permanent error",
+		},
+		{
+			name: "StatusFatalError",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewFatalErrorEvent(errors.New("test fatal error")),
+			},
+			expectedState: client.UnitStateFailed,
+			expectedMsg:   "Fatal: test fatal error",
+		},
+		{
+			name: "StatusFatalError without error",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusFatalError),
+			},
+			expectedState: client.UnitStateFailed,
+			expectedMsg:   "Unknown fatal error",
+		},
+		{
+			name: "StatusStopping",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusStopping),
+			},
+			expectedState: client.UnitStateStopping,
+			expectedMsg:   "Stopping",
+		},
+		{
+			name: "StatusStopped",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusStopped),
+			},
+			expectedState: client.UnitStateStopped,
+			expectedMsg:   "Stopped",
+		},
+		{
+			name: "Unknown status",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.Status(999)), // Simulate an unknown status
+			},
+			expectedState: client.UnitStateFailed,
+			expectedMsg:   "Unknown component status: StatusNone",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := otelStatusToUnitState(tt.status)
-			assert.Equal(t, tt.expected, result)
+			state, msg := StateWithMessage(tt.otelStatus)
+			assert.Equal(t, tt.expectedState, state)
+			assert.Equal(t, tt.expectedMsg, msg)
 		})
 	}
 }
@@ -780,7 +903,7 @@ func TestOutputStatus(t *testing.T) {
 						},
 						{UnitID: "filestream-default", UnitType: client.UnitTypeOutput}: {
 							State:   client.UnitStateDegraded,
-							Message: "DEGRADED",
+							Message: "Unknown recoverable error",
 						},
 					},
 				},

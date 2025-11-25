@@ -155,8 +155,6 @@ receivers:
                   paths:
                     - /var/log/*.log
                   type: filestream
-        output:
-            otelconsumer: {}
     metricbeatreceiver:
         metricbeat:
             modules:
@@ -166,8 +164,6 @@ receivers:
                   metricsets:
                     - cpu
                   module: system
-        output:
-            otelconsumer: {}
 exporters:
     elasticsearch/_agent-component/default:
         api_key: placeholder

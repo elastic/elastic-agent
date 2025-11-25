@@ -8,8 +8,6 @@ receivers:
             - /opt/journal/
           merge: true
 
-    output:
-      otelconsumer:
     logging:
       level: debug
       selectors:

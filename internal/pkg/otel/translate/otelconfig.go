@@ -271,10 +271,6 @@ func getReceiversConfigForComponent(
 	dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
 
 	receiverConfig := map[string]any{
-		// the output needs to be otelconsumer
-		"output": map[string]any{
-			"otelconsumer": map[string]any{},
-		},
 		// just like we do for beats processes, each receiver needs its own data path
 		"path": map[string]any{
 			"data": BeatDataPath(comp.ID),
