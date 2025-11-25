@@ -32,11 +32,13 @@ core_components:
   - hostmetricsreceiver
   - k8sclusterreceiver
   - k8sobjectsreceiver
+  - kafkareceiver
   - kubeletstatsreceiver
   - otlpreceiver
 
 # Exporters
   - elasticsearchexporter
+  - kafkaexporter
   - otlpexporter
   - otlphttpexporter
 
@@ -104,4 +106,14 @@ annotations:
 #  elasticsearchexporter:
 #    comment: |
 #      Some Elasticsearch modes, such as `raw`, are not covered by Elastic Support.
-
+  kafkareceiver:
+    comment: |
+      The following features and configuration options are **NOT** officially supported in the EDOT Collector with the Kafka receiver:
+      - Encoding options other than `otlp_proto` or `otlp_json`
+      - Using the Sarama client (i.e. opting out of the `exporter.kafkaexporter.UseFranzGo` feature gate is not supported)
+  kafkaexporter:
+    comment: |
+      The following features and configuration options are **NOT** officially supported in the EDOT Collector with the Kafka receiver:
+      - Encoding options other than `otlp_proto` or `otlp_json`
+      - Using the Sarama client (i.e. opting out of the `exporter.kafkaexporter.UseFranzGo` feature gate is not supported)
+      - Partitioning configuration (i.e. `partition_*` options).
