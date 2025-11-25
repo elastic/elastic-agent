@@ -1089,15 +1089,9 @@ func runAgent(ctx context.Context, env map[string]string) error {
 		}
 
 		// produce docker package
-<<<<<<< HEAD
 		packageAgent(ctx, []string{
 			"linux/amd64",
-		}, dependenciesVersion, nil, mg.F(devtools.UseElasticAgentDemoPackaging), mg.F(CrossBuild), devtools.SelectedPackageTypes)
-=======
-		packageAgent(ctx, devtools.BuildPlatformList{
-			devtools.BuildPlatform{Name: "linux/amd64"},
 		}, dependenciesVersion, nil, devtools.SelectedPackageTypes, mg.F(devtools.UseElasticAgentDemoPackaging), getAgentBuildTargets()...)
->>>>>>> 9f1c4649c (Add `OTEL_COMPONENT=true` to packaging to allow building a seperate OTEL EDOT binary (#11237))
 
 		dockerPackagePath := filepath.Join("build", "package", "elastic-agent", "elastic-agent-linux-amd64.docker", "docker-build")
 		if err := os.Chdir(dockerPackagePath); err != nil {
@@ -1144,11 +1138,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-<<<<<<< HEAD
-func packageAgent(ctx context.Context, platforms []string, dependenciesVersion string, manifestResponse *manifest.Build, agentPackaging, agentBinaryTarget mg.Fn, packageTypes []mage.PackageType) error {
-=======
-func packageAgent(ctx context.Context, platforms devtools.BuildPlatformList, dependenciesVersion string, manifestResponse *manifest.Build, packageTypes []mage.PackageType, agentPackaging mg.Fn, agentBinaryTargets ...interface{}) error {
->>>>>>> 9f1c4649c (Add `OTEL_COMPONENT=true` to packaging to allow building a seperate OTEL EDOT binary (#11237))
+func packageAgent(ctx context.Context, platforms []string, dependenciesVersion string, manifestResponse *manifest.Build, packageTypes []mage.PackageType, agentPackaging mg.Fn, agentBinaryTargets ...interface{}) error {
 	fmt.Println("--- Package Elastic-Agent")
 
 	if mg.Verbose() {
