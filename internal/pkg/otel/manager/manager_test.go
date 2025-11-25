@@ -1187,7 +1187,7 @@ func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
 					Component: testComp,
 					State: runtime.ComponentState{
 						State:   client.UnitStateHealthy,
-						Message: "HEALTHY",
+						Message: "Healthy",
 						Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
 							runtime.ComponentUnitKey{
 								UnitID:   "filestream-unit",
