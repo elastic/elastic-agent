@@ -575,7 +575,7 @@ func Package(ctx context.Context) error {
 	// add the snapshot suffix if needed
 	dependenciesVersion += devtools.SnapshotSuffix()
 
-	packageAgent(ctx, platforms, dependenciesVersion, manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(CrossBuild), devtools.SelectedPackageTypes)
+	packageAgent(ctx, platforms, dependenciesVersion, manifestResponse, devtools.SelectedPackageTypes, mg.F(devtools.UseElasticAgentPackaging), getAgentBuildTargets()...)
 	return nil
 }
 
@@ -796,7 +796,7 @@ func Update() {
 }
 
 func EnsureCrossBuildOutputDir() error {
-	repositoryRoot, err := findRepositoryRoot()
+	repositoryRoot, err := mage.ElasticBeatsDir()
 	if err != nil {
 		return fmt.Errorf("finding repository root: %w", err)
 	}
@@ -1115,7 +1115,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 		// produce docker package
 		packageAgent(ctx, devtools.BuildPlatformList{
 			devtools.BuildPlatform{Name: "linux/amd64"},
-		}, dependenciesVersion, nil, mg.F(devtools.UseElasticAgentDemoPackaging), mg.F(CrossBuild), devtools.SelectedPackageTypes)
+		}, dependenciesVersion, nil, devtools.SelectedPackageTypes, mg.F(devtools.UseElasticAgentDemoPackaging), getAgentBuildTargets()...)
 
 		dockerPackagePath := filepath.Join("build", "package", "elastic-agent", "elastic-agent-linux-amd64.docker", "docker-build")
 		if err := os.Chdir(dockerPackagePath); err != nil {
@@ -1162,7 +1162,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-func packageAgent(ctx context.Context, platforms devtools.BuildPlatformList, dependenciesVersion string, manifestResponse *manifest.Build, agentPackaging, agentBinaryTarget mg.Fn, packageTypes []mage.PackageType) error {
+func packageAgent(ctx context.Context, platforms devtools.BuildPlatformList, dependenciesVersion string, manifestResponse *manifest.Build, packageTypes []mage.PackageType, agentPackaging mg.Fn, agentBinaryTargets ...interface{}) error {
 	fmt.Println("--- Package Elastic-Agent")
 
 	if mg.Verbose() {
@@ -1207,7 +1207,7 @@ func packageAgent(ctx context.Context, platforms devtools.BuildPlatformList, dep
 	// package agent
 	log.Println("--- Running post packaging ")
 	mg.Deps(Update)
-	mg.Deps(agentBinaryTarget)
+	mg.Deps(agentBinaryTargets...)
 
 	// compile the elastic-agent.exe proxy binary for the windows archive
 	for _, p := range platforms {
@@ -1518,7 +1518,7 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 	}
 
 	// Create a dir with the buildID at <root>/build/dra/<buildID>
-	repositoryRoot, err := findRepositoryRoot()
+	repositoryRoot, err := mage.ElasticBeatsDir()
 	if err != nil {
 		return fmt.Errorf("finding repository root: %w", err)
 	}
@@ -1574,7 +1574,7 @@ func PackageUsingDRA(ctx context.Context) error {
 		return fmt.Errorf("setting agent commit hash %q: %w", agentCoreProject.CommitHash, err)
 	}
 
-	return packageAgent(ctx, platforms, parsedVersion.VersionWithPrerelease(), manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(useDRAAgentBinaryForPackage, devtools.ManifestURL, parsedVersion.VersionWithPrerelease()), devtools.SelectedPackageTypes)
+	return packageAgent(ctx, platforms, parsedVersion.VersionWithPrerelease(), manifestResponse, devtools.SelectedPackageTypes, mg.F(devtools.UseElasticAgentPackaging), mg.F(useDRAAgentBinaryForPackage, devtools.ManifestURL, parsedVersion.VersionWithPrerelease()))
 }
 
 func downloadManifestAndSetVersion(ctx context.Context, url string) (*manifest.Build, *version.ParsedSemVer, error) {
@@ -1597,10 +1597,6 @@ func downloadManifestAndSetVersion(ctx context.Context, url string) (*manifest.B
 	os.Setenv("BEAT_VERSION", parsedVersion.CoreVersion())
 
 	return &resp, parsedVersion, nil
-}
-
-func findRepositoryRoot() (string, error) {
-	return sh.Output(mg.GoCmd(), "list", "-f", "{{.Root}}")
 }
 
 func findLatestBuildForBranch(ctx context.Context, baseURL string, branch string) (*branchInfo, error) {
@@ -1760,7 +1756,7 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestURL string, versio
 		log.Printf("found elastic-agent-core component used: %v", elasticAgentCoreComponent)
 	}
 
-	repositoryRoot, err := findRepositoryRoot()
+	repositoryRoot, err := mage.ElasticBeatsDir()
 	if err != nil {
 		return fmt.Errorf("looking up for repository root: %w", err)
 	}
@@ -3634,6 +3630,29 @@ func hasCleanOnExit() bool {
 	return b
 }
 
+// GolangCrossBuild builds the elastic-otel-collector binary in the golang-crossbuild container.
+// Don't call directly; called from otel:crossBuild.
+func (Otel) GolangCrossBuild() error {
+	mg.Deps(EnsureCrossBuildOutputDir)
+
+	params := devtools.DefaultGolangCrossBuildArgs()
+	params.Name = "elastic-otel-collector-" + mage.Platform.GOOS + "-" + mage.Platform.Arch
+	params.OutputDir = "build/golang-crossbuild"
+	params.Package = "github.com/elastic/elastic-agent/internal/edot"
+	injectBuildVars(params.Vars)
+
+	if err := devtools.GolangCrossBuild(params); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CrossBuild builds the elastic-otel-collector binary in the golang-crossbuild container.
+func (Otel) CrossBuild() error {
+	return devtools.CrossBuild(devtools.WithName("elastic-otel-collector"), devtools.WithTarget("otel:golangCrossBuild"))
+}
+
 func (Otel) Readme() error {
 	fmt.Println(">> Building internal/pkg/otel/README.md")
 
@@ -4167,4 +4186,14 @@ func getMacOSMajorVersion() (int, error) {
 	}
 
 	return majorVer, nil
+}
+
+func getAgentBuildTargets() []interface{} {
+	// add otel:crossBuild as pre-build for packaging when OTEL_COMPONENT=true
+	buildTargets := make([]interface{}, 0, 2)
+	if mage.OTELComponentBuild {
+		buildTargets = append(buildTargets, Otel.CrossBuild)
+	}
+	buildTargets = append(buildTargets, CrossBuild)
+	return buildTargets
 }
