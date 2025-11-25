@@ -59,4 +59,5 @@ fleet.yml
 fleet.yml.lock
 fleet.yml.old
 pkg/component/fake/component/component
+pkg/core/process/testsignal/testsignal
 internal/pkg/agent/install/testblocking/testblocking
