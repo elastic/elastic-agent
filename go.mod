@@ -304,7 +304,7 @@ require (
 	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/lunes v0.1.0 // indirect
-	github.com/elastic/mito v1.23.0 // indirect
+	github.com/elastic/mito v1.24.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.20.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.20.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.22.0 // indirect
