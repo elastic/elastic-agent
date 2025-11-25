@@ -269,7 +269,7 @@ func cfgDecodeHookFunc() mapstructure.DecodeHookFunc {
 			}
 			return proxyURL, nil
 		case t == reflect.TypeOf(kerberos.AuthType(0)):
-			authType := kerberos.AuthType(0)
+			var authType kerberos.AuthType
 			if err := authType.Unpack(data.(string)); err != nil {
 				return nil, fmt.Errorf("failed parsing kerberos.auth_type: %w", err)
 			}
