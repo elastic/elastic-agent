@@ -2246,7 +2246,13 @@ func (Integration) Local(ctx context.Context, testName string) error {
 	// run the integration tests but only run test that can run locally
 	params := devtools.DefaultGoTestIntegrationArgs()
 	params.Tags = append(params.Tags, "local")
+<<<<<<< HEAD
 	params.Packages = []string{"github.com/elastic/elastic-agent/testing/integration"}
+=======
+	params.Packages = []string{
+		"github.com/elastic/elastic-agent/testing/integration/...",
+	}
+>>>>>>> 85241ff32 (Use unique index for TestOtelLogsIngestion (#11254))
 
 	var goTestFlags []string
 	rawTestFlags := os.Getenv("GOTEST_FLAGS")
