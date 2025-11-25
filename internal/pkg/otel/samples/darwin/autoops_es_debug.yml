@@ -27,8 +27,6 @@ receivers:
           fields:
             temp_resource_id: ${env:AUTOOPS_TEMP_RESOURCE_ID}
             token: ${env:AUTOOPS_TOKEN}
-    output:
-      otelconsumer:
     telemetry_types: ["logs"]
 
 exporters:
