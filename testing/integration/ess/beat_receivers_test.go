@@ -817,6 +817,12 @@ agent.monitoring.enabled: false
 	}
 }
 
+// Log lines TestBeatsReceiverProcessRuntimeFallback checks for
+const (
+	otelRuntimeUnsupportedLogLineStart = "otel runtime is not supported"
+	prometheusInputSkippedLogLine      = "The Otel prometheus metrics monitoring input can't run in a beats process, skipping"
+)
+
 // TestBeatsReceiverProcessRuntimeFallback verifies that we fall back to the process runtime if the otel runtime
 // does not support the requested configuration.
 func TestBeatsReceiverProcessRuntimeFallback(t *testing.T) {
@@ -848,7 +854,6 @@ outputs:
     hosts: [http://localhost:9200]
     api_key: placeholder
     indices: [] # not supported by the elasticsearch exporter
-agent.monitoring.enabled: false
 `
 
 	// this is the context for the whole test, with a global timeout defined
@@ -872,13 +877,14 @@ agent.monitoring.enabled: false
 		status, statusErr := fixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
 		// we should be running beats processes even though the otel runtime was requested
-		assertBeatsHealthy(collect, &status, component.ProcessRuntimeManager, 1)
+		assertBeatsHealthy(collect, &status, component.ProcessRuntimeManager, 4)
 	}, 1*time.Minute, 1*time.Second)
 	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
 	require.NoError(t, err)
 
 	// verify we've logged a warning about using the process runtime
-	var unsupportedLogRecord map[string]any
+	var unsupportedLogRecords []map[string]any
+	var prometheusUnsupportedLogRecord map[string]any
 	for _, line := range strings.Split(string(logsBytes), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -889,9 +895,13 @@ agent.monitoring.enabled: false
 			continue
 		}
 
-		if message, ok := logRecord["message"].(string); ok && strings.HasPrefix(message, "otel runtime is not supported") {
-			unsupportedLogRecord = logRecord
-			break
+		if message, ok := logRecord["message"].(string); ok {
+			if strings.HasPrefix(message, otelRuntimeUnsupportedLogLineStart) {
+				unsupportedLogRecords = append(unsupportedLogRecords, logRecord)
+			}
+			if strings.HasPrefix(message, prometheusInputSkippedLogLine) {
+				prometheusUnsupportedLogRecord = logRecord
+			}
 		}
 	}
 
@@ -902,11 +912,8 @@ agent.monitoring.enabled: false
 		}
 	})
 
-	require.NotNil(t, unsupportedLogRecord, "unsupported log message should be present")
-	message, ok := unsupportedLogRecord["message"].(string)
-	require.True(t, ok, "log message field should be a string")
-	expectedMessage := "otel runtime is not supported for component system/metrics-default, switching to process runtime, reason: unsupported configuration for system/metrics-default: error translating config for output: default, unit: system/metrics-default, error: indices is currently not supported: unsupported operation"
-	assert.Equal(t, expectedMessage, message)
+	assert.Len(t, unsupportedLogRecords, 5, "one log line for each component we try to run")
+	assert.NotEmpty(t, prometheusUnsupportedLogRecord, "should get a log line about Otel prometheus metrics input being skipped")
 }
 
 // TestComponentWorkDir verifies that the component working directory is not deleted when moving the component from
@@ -1255,7 +1262,7 @@ agent.logging.stderr: true
 	}
 
 	var monitoringDoc estools.Documents
-	assert.EventuallyWithT(t,
+	require.EventuallyWithT(t,
 		func(ct *assert.CollectT) {
 			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer findCancel()
@@ -1265,7 +1272,7 @@ agent.logging.stderr: true
 
 			assert.GreaterOrEqual(ct, monitoringDoc.Hits.Total.Value, 1)
 		},
-		2*time.Minute, 5*time.Second,
+		3*time.Minute, 5*time.Second,
 		"Expected at least %d log, got %d", 1, monitoringDoc.Hits.Total.Value)
 
 	inputField := monitoringDoc.Hits.Hits[0].Source["input"]

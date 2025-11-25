@@ -15,6 +15,7 @@ toc:
   - file: components.md
     children:
       - file: components/apmconfigextension.md
+      - file: components/elasticapmconnector.md
       - file: components/elasticapmintakereceiver.md
       - file: components/elasticapmprocessor.md
       - file: components/elasticsearchexporter.md
@@ -22,6 +23,7 @@ toc:
       - file: components/hostmetricsreceiver.md
       - file: components/k8sclusterreceiver.md
       - file: components/k8sobjectsreceiver.md
+      - file: components/kubeletstatsreceiver.md
   - file: customization.md
     children:
       - file: custom-collector.md

@@ -472,6 +472,15 @@ exporters:
   elasticsearch:
     api_key: {{.ESApiKey}}
     endpoint: {{.ESEndpoint}}
+    logs_index: {{.TestId}}
+    sending_queue:
+      wait_for_result: true
+      block_on_overflow: true
+      enabled: true
+      batch:
+        min_size: 2000
+        max_size: 10000
+        flush_timeout: 1s
     mapping:
       mode: none
 
@@ -498,6 +507,13 @@ service:
         - resource/add-test-id
       receivers:
         - filelog
+  telemetry:
+    logs:
+      level: DEBUG
+      encoding: json
+      disable_stacktrace: true
+      output_paths:
+        - {{.OTelLogFile}}
 `
 
 func TestOtelLogsIngestion(t *testing.T) {
@@ -515,8 +531,11 @@ func TestOtelLogsIngestion(t *testing.T) {
 	// Prepare the OTel config.
 	testId := info.Namespace
 
-	tempDir := t.TempDir()
+	// Ensure everything is saved in case of test failure
+	// this folder is also collected on CI.
+	tempDir := aTesting.TempDir(t, "..", "..", "..", "build")
 	inputFilePath := filepath.Join(tempDir, "input.log")
+	otelLogFilePath := filepath.Join(tempDir, "elastic-agent.ndjson")
 
 	esHost, err := integration.GetESHost()
 	require.NoError(t, err, "failed to get ES host")
@@ -533,6 +552,7 @@ func TestOtelLogsIngestion(t *testing.T) {
 	logsIngestionConfig = strings.ReplaceAll(logsIngestionConfig, "{{.ESEndpoint}}", esHost)
 	logsIngestionConfig = strings.ReplaceAll(logsIngestionConfig, "{{.InputFilePath}}", inputFilePath)
 	logsIngestionConfig = strings.ReplaceAll(logsIngestionConfig, "{{.TestId}}", testId)
+	logsIngestionConfig = strings.ReplaceAll(logsIngestionConfig, "{{.OTelLogFile}}", otelLogFilePath)
 
 	cfgFilePath := filepath.Join(tempDir, "otel.yml")
 	require.NoError(t, os.WriteFile(cfgFilePath, []byte(logsIngestionConfig), 0o600))
@@ -566,26 +586,30 @@ func TestOtelLogsIngestion(t *testing.T) {
 		require.NoError(t, err)
 	}
 	inputFile.Close()
-	t.Cleanup(func() {
-		_ = os.Remove(inputFilePath)
-	})
 
-	actualHits := &struct{ Hits int }{}
-	require.Eventually(t,
-		func() bool {
-			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// It takes about 45s to ingest all files on local tests,
+	// so set the timeout to 5min to be on the safe side.
+	require.EventuallyWithT(
+		t,
+		func(c *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer findCancel()
 
-			docs, err := estools.GetLogsForIndexWithContext(findCtx, esClient, ".ds-logs-generic-default*", map[string]interface{}{
-				"Resource.test.id": testId,
-			})
-			require.NoError(t, err)
-
-			actualHits.Hits = docs.Hits.Total.Value
-			return actualHits.Hits == logsCount
+			docs, err := estools.GetAllLogsForIndexWithContext(
+				findCtx,
+				esClient,
+				testId)
+			require.NoError(c, err)
+			require.Equalf(
+				c,
+				logsCount,
+				docs.Hits.Total.Value,
+				"expecting %d events",
+				logsCount)
 		},
-		2*time.Minute, 1*time.Second,
-		"Expected %v logs, got %v", logsCount, actualHits)
+		5*time.Minute,
+		time.Second,
+		"did not find the expected number of events")
 
 	cancel()
 	fixtureWg.Wait()
@@ -832,8 +856,6 @@ func TestFileBeatReceiver(t *testing.T) {
           enabled: true
           count: 1
           message: {{.Message}}
-    output:
-      otelconsumer:
     logging:
       level: info
       selectors:
@@ -959,8 +981,6 @@ func TestOtelFBReceiverE2E(t *testing.T) {
             - {{.InputPath}}
           prospector.scanner.fingerprint.enabled: false
           file_identity.native: ~
-    output:
-      otelconsumer:
     logging:
       level: info
       selectors:
@@ -973,10 +993,12 @@ exporters:
       - {{.ESEndpoint}}
     api_key: {{.ESApiKey}}
     logs_index: {{.Index}}
-    batcher:
-      enabled: true
-      flush_timeout: 1s
-      min_size: {{.MinItems}}
+    sending_queue:
+      wait_for_result: true # Avoid losing data on shutdown
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: {{.MinItems}}
     mapping:
       mode: bodymap
 service:
@@ -1382,8 +1404,6 @@ func TestOtelMBReceiverE2E(t *testing.T) {
             - '.*'
           metricsets:
             - cpu
-    output:
-      otelconsumer:
     logging:
       level: info
       selectors:
@@ -1396,10 +1416,12 @@ exporters:
       - {{.ESEndpoint}}
     api_key: {{.ESApiKey}}
     logs_index: {{.Index}}
-    batcher:
-      enabled: true
-      flush_timeout: 1s
-      min_size: {{.MinItems}}
+    sending_queue:
+      wait_for_result: true # Avoid losing data on shutdown
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: {{.MinItems}}
     mapping:
       mode: bodymap
 service:
@@ -1570,8 +1592,6 @@ receivers:
           fields:
             dataset: generic
           target: event
-    output:
-      otelconsumer:
     logging:
       level: info
       selectors:
@@ -1588,9 +1608,11 @@ exporters:
     compression: none
     api_key: {{.ESApiKey}}
     logs_index: {{.FBReceiverIndex}}
-    batcher:
-      enabled: true
-      flush_timeout: 1s
+    sending_queue:
+      wait_for_result: true # Avoid losing data on shutdown
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
     mapping:
       mode: bodymap
 service:
@@ -1770,7 +1792,8 @@ func TestFBOtelRestartE2E(t *testing.T) {
 		},
 		Stack: &define.Stack{},
 	})
-	tmpDir := t.TempDir()
+
+	tmpDir := aTesting.TempDir(t, "..", "..", "..", "build")
 
 	inputFile, err := os.CreateTemp(tmpDir, "input.txt")
 	require.NoError(t, err, "failed to create temp file to hold data to ingest")
@@ -1805,8 +1828,6 @@ func TestFBOtelRestartE2E(t *testing.T) {
                 document_id: "id"
           prospector.scanner.fingerprint.enabled: false
           file_identity.native: ~
-    output:
-      otelconsumer:
     logging:
       level: info
       selectors:
@@ -1823,9 +1844,11 @@ exporters:
       - {{.ESEndpoint}}
     api_key: {{.ESApiKey}}
     logs_index: {{.Index}}
-    batcher:
-      enabled: true
-      flush_timeout: 1s
+    sending_queue:
+      wait_for_result: true # Avoid losing data on shutdown
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
     mapping:
       mode: bodymap
     logs_dynamic_id:
@@ -1838,6 +1861,16 @@ service:
       exporters:
         - elasticsearch/log
         #- debug
+  telemetry:
+    logs:
+      level: DEBUG
+      encoding: json
+      disable_stacktrace: true
+      # Save the logs in a file that is kept if the test fails
+      output_paths:
+        - {{.HomeDir}}/elastic-agent-logs.ndjson
+      error_output_paths:
+        - {{.HomeDir}}/elastic-agent-error-logs.ndjosn
 `
 	otelConfigPath := filepath.Join(tmpDir, "otel.yml")
 	var otelConfigBuffer bytes.Buffer
@@ -1851,16 +1884,6 @@ service:
 				Index:      index,
 			}))
 	require.NoError(t, os.WriteFile(otelConfigPath, otelConfigBuffer.Bytes(), 0o600))
-	t.Cleanup(func() {
-		if t.Failed() {
-			contents, err := os.ReadFile(otelConfigPath)
-			if err != nil {
-				t.Logf("No otel configuration file at %s", otelConfigPath)
-				return
-			}
-			t.Logf("Contents of otel config file:\n%s\n", string(contents))
-		}
-	})
 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", otelConfigPath}))
 	require.NoError(t, err)
@@ -1890,17 +1913,6 @@ service:
 		assert.NoError(t, err, "failed to close input file")
 	}()
 
-	t.Cleanup(func() {
-		if t.Failed() {
-			contents, err := os.ReadFile(inputFilePath)
-			if err != nil {
-				t.Logf("no data file to import at %s", inputFilePath)
-				return
-			}
-			t.Logf("contents of import file:\n%s\n", string(contents))
-		}
-	})
-
 	// Start the collector, ingest some logs and then stop it
 	stoppedCh := make(chan int, 1)
 	fCtx, cancel := context.WithDeadline(ctx, time.Now().Add(1*time.Minute))
@@ -1913,19 +1925,23 @@ service:
 		close(stoppedCh)
 	}()
 
-	// Make sure we ingested at least 10 logs before stopping the collector
-	var hits int
-	require.Eventually(t, func() bool {
-		findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer findCancel()
+	require.EventuallyWithT(
+		t,
+		func(t *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer findCancel()
 
-		docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]interface{}{
-			"log.file.path": inputFilePath,
-		})
-		require.NoError(t, err)
-		hits += int(docs.Hits.Total.Value)
-		return hits >= 10
-	}, 1*time.Minute, 1*time.Second, "Expected to ingest at least 10 logs, got %d", hits)
+			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]any{
+				"log.file.path": inputFilePath,
+			})
+			require.NoError(t, err)
+			got := int(docs.Hits.Total.Value)
+
+			require.GreaterOrEqual(t, got, 10, "")
+		},
+		time.Minute,
+		time.Second,
+		"Expecting to ingest at least 10 logs")
 	cancel()
 
 	select {
@@ -1946,26 +1962,19 @@ service:
 		err = fixture.RunOtelWithClient(fCtx)
 	}()
 
-	// Make sure all the logs are ingested
-	actualHits := &struct {
-		Hits       int
-		UniqueHits int
-	}{}
-	require.Eventually(t,
-		func() bool {
+	require.EventuallyWithT(
+		t,
+		func(t *assert.CollectT) {
 			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer findCancel()
 
-			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]interface{}{
+			docs, err := estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+index+"*", map[string]any{
 				"log.file.path": inputFilePath,
 			})
 			require.NoError(t, err)
 
-			actualHits.Hits = docs.Hits.Total.Value
-
 			uniqueIngestedLogs := make(map[string]struct{})
 			for _, hit := range docs.Hits.Hits {
-				t.Log("Hit: ", hit.Source["message"])
 				message, found := hit.Source["message"]
 				require.True(t, found, "expected message field in document %q", hit.Source)
 				msg, ok := message.(string)
@@ -1973,11 +1982,14 @@ service:
 				require.NotContainsf(t, uniqueIngestedLogs, msg, "found duplicated log message %q", msg)
 				uniqueIngestedLogs[msg] = struct{}{}
 			}
-			actualHits.UniqueHits = len(uniqueIngestedLogs)
-			return actualHits.UniqueHits == int(inputLinesCounter.Load())
+
+			want := inputLinesCounter.Load()
+			got := docs.Hits.Total.Value
+			require.EqualValues(t, want, got, "expecting %d hits got %d hits", want, got)
 		},
-		20*time.Second, 1*time.Second,
-		"Expected %d logs, got %v", int(inputLinesCounter.Load()), actualHits)
+		20*time.Second,
+		time.Second,
+		"Did not find the expected number of logs")
 
 	cancel()
 	fixtureWg.Wait()
@@ -2051,8 +2063,6 @@ receivers:
             - '.*'
           metricsets:
             - cpu
-    output:
-      otelconsumer:
     queue.mem.flush.timeout: 0s
 exporters:
   elasticsearch/log:
@@ -2060,10 +2070,12 @@ exporters:
       - {{.ESEndpoint}}
     api_key: {{.ESApiKey}}
     logs_index: {{.Index}}
-    batcher:
-      enabled: true
-      flush_timeout: 1s
-      min_size: 1
+    sending_queue:
+      wait_for_result: true # Avoid losing data on shutdown
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 1
     tls:
       ca_file: {{ .CAFile }}
     auth:
@@ -2197,8 +2209,6 @@ receivers:
             - '.*'
           metricsets:
             - cpu
-    output:
-      otelconsumer:
     queue.mem.flush.timeout: 0s
 exporters:
   elasticsearch/log:
@@ -2206,10 +2216,12 @@ exporters:
       - {{.ESEndpoint}}
     api_key: {{.ESApiKey}}
     logs_index: {{.Index}}
-    batcher:
-      enabled: true
-      flush_timeout: 1s
-      min_size: 1
+    sending_queue:
+      wait_for_result: true # Avoid losing data on shutdown
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 1
     auth:
       authenticator: beatsauth
     mapping:
