@@ -676,8 +676,6 @@ func TestFleetGatewaySchedulerSwitch(t *testing.T) {
 		require.Equal(t, ms.Duration, defaultGatewaySettings.Duration)
 	}))
 }
-<<<<<<< HEAD
-=======
 
 func TestFastCheckinStateFetcher(t *testing.T) {
 	init := func(t *testing.T) *FastCheckinStateFetcher {
@@ -1003,4 +1001,3 @@ func TestConvertToCheckingComponents(t *testing.T) {
 		})
 	}
 }
->>>>>>> 1144501c4 (Set correct types for otel components in Fleet status (#11233))
