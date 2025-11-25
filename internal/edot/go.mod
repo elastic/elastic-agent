@@ -53,7 +53,7 @@ require (
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.139.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.139.0
 	go.opentelemetry.io/ebpf-profiler v0.0.202540
-	go.uber.org/zap v1.27.0
+	go.uber.org/zap v1.27.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -280,7 +280,7 @@ require (
 	github.com/elastic/elastic-agent-system-metrics v0.13.4 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.8.0 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
-	github.com/elastic/go-docappender/v2 v2.11.3 // indirect
+	github.com/elastic/go-docappender/v2 v2.12.0 // indirect
 	github.com/elastic/go-elasticsearch/v8 v8.19.0 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect
 	github.com/elastic/go-grok v0.3.1 // indirect
