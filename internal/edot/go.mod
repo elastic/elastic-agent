@@ -5,7 +5,7 @@ go 1.24.10
 replace github.com/elastic/elastic-agent => ../../
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251121190645-8580e1a4ad09
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251125165534-04732ce4ee33
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.26.2
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.20.0
@@ -430,7 +430,7 @@ require (
 	github.com/mdlayher/socket v0.4.1 // indirect
 	github.com/mdlayher/vsock v1.2.1 // indirect
 	github.com/meraki/dashboard-api-go/v3 v3.0.9 // indirect
-	github.com/microsoft/go-mssqldb v1.9.3 // indirect
+	github.com/microsoft/go-mssqldb v1.9.4 // indirect
 	github.com/microsoft/wmi v0.34.0 // indirect
 	github.com/miekg/dns v1.1.68 // indirect
 	github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8 // indirect
