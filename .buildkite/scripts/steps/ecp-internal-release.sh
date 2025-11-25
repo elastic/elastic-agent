@@ -37,10 +37,14 @@ BUILD_VERSION="$(jq -r '.version' .package-version)"
 DOCKER_TAG="git-${VERSION}"
 PRIVATE_REPO="docker.elastic.co/observability-ci/ecp-elastic-agent-service"
 PRIVATE_IMAGE="${PRIVATE_REPO}:${DOCKER_TAG}"
+PRIVATE_IMAGE_AMD64="${PRIVATE_IMAGE}-amd64"
+PRIVATE_IMAGE_ARM64="${PRIVATE_IMAGE}-arm64"
 
 echo "Build version: ${BUILD_VERSION}"
 echo "Docker tag: ${DOCKER_TAG}"
 echo "Target image: ${PRIVATE_IMAGE}"
+echo "AMD64 tag: ${PRIVATE_IMAGE_AMD64}"
+echo "ARM64 tag: ${PRIVATE_IMAGE_ARM64}"
 
 echo "--- :arrow_down: Downloading build artifacts"
 echo "Downloading AMD64 build artifacts..."
@@ -51,21 +55,21 @@ buildkite-agent artifact download "build/distributions/**" . --step "packaging-s
 echo "--- :docker: Processing AMD64 image"
 echo "Loading AMD64 image..."
 docker load -i ./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-amd64.docker.tar.gz
-echo "Tagging AMD64 image as ${PRIVATE_IMAGE}..."
-docker image tag "elastic-agent-service:$DOCKER_TAG" "$PRIVATE_IMAGE"
+echo "Tagging AMD64 image as ${PRIVATE_IMAGE_AMD64}..."
+docker image tag "elastic-agent-service:$DOCKER_TAG" "$PRIVATE_IMAGE_AMD64"
 echo "Pushing AMD64 image..."
-docker push "$PRIVATE_IMAGE"
-AMD64_DIGEST=$(docker image inspect --format "{{index .RepoDigests 0}}" "$PRIVATE_IMAGE")
+docker push "$PRIVATE_IMAGE_AMD64"
+AMD64_DIGEST=$(docker image inspect --format "{{index .RepoDigests 0}}" "$PRIVATE_IMAGE_AMD64")
 echo "AMD64 digest: ${AMD64_DIGEST}"
 
 echo "--- :docker: Processing ARM64 image"
 echo "Loading ARM64 image..."
 docker load -i ./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VERSION-linux-arm64.docker.tar.gz
-echo "Tagging ARM64 image as ${PRIVATE_IMAGE}..."
-docker image tag "elastic-agent-service:$DOCKER_TAG" "$PRIVATE_IMAGE"
+echo "Tagging ARM64 image as ${PRIVATE_IMAGE_ARM64}..."
+docker image tag "elastic-agent-service:$DOCKER_TAG" "$PRIVATE_IMAGE_ARM64"
 echo "Pushing ARM64 image..."
-docker push "$PRIVATE_IMAGE"
-ARM64_DIGEST=$(docker image inspect --format "{{index .RepoDigests 0}}" "$PRIVATE_IMAGE")
+docker push "$PRIVATE_IMAGE_ARM64"
+ARM64_DIGEST=$(docker image inspect --format "{{index .RepoDigests 0}}" "$PRIVATE_IMAGE_ARM64")
 echo "ARM64 digest: ${ARM64_DIGEST}"
 
 echo "--- :rocket: Creating multi-architecture manifest"
