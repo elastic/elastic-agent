@@ -1172,6 +1172,15 @@ func TestMonitoringConfigOtelOutputSupport(t *testing.T) {
 			monitoringRuntimeManager:   monitoringcfg.ProcessRuntimeManager,
 		},
 		{
+			name: "logstash output - should NOT have prometheus monitoring",
+			outputConfig: map[string]any{
+				"type":  "logstash",
+				"hosts": []string{"localhost:9092"},
+			},
+			expectPrometheusMonitoring: false,
+			monitoringRuntimeManager:   monitoringcfg.ProcessRuntimeManager,
+		},
+		{
 			name: "elasticsearch output - should have prometheus monitoring",
 			outputConfig: map[string]any{
 				"type":  "elasticsearch",

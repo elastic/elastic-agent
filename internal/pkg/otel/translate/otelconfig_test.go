@@ -1380,6 +1380,12 @@ func TestVerifyOutputIsOtelSupported(t *testing.T) {
 			expectedError: "unsupported output type: kafka",
 		},
 		{
+			name:          "unsupported output type - logstash",
+			outputType:    "logstash",
+			outputCfg:     map[string]any{},
+			expectedError: "unsupported output type: logstash",
+		},
+		{
 			name:       "unsupported configuration - indices field",
 			outputType: "elasticsearch",
 			outputCfg: map[string]any{
