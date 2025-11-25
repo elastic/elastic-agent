@@ -286,7 +286,7 @@ steps:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_2204_X86_64}"
     env:
-      - GH_VERSION=2.4.0
+      GH_VERSION: "2.4.0"
     if_changed:
       include:
         - deploy/kubernetes/*
