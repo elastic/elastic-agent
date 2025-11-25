@@ -17,7 +17,7 @@ products:
 
 The {{product.apm}} Config extension (`apmconfigextension`) enables central configuration for {{edot}} SDKs through the Open Agent Management Protocol (OpAMP). It connects the {{edot}} Collector to the Elastic configuration server ({{product.apm-server}} or {{fleet}} Server) so that configuration updates can be retrieved and applied dynamically.
 
-This component is a core part of the {{edot}} Collector distribution and is required for enabling the Central Configuration feature in {{product.observability}}.
+{applies_to}`stack: ga 9.1` This component is a core part of the {{edot}} Collector distribution and is required for enabling the [Central Configuration feature](docs-content://solutions/observability/apm/opentelemetry/edot-sdks-central-configuration.md) in {{product.observability}}.
 
 For full contrib details, refer to the [OpenTelemetry `apmconfigextension` documentation](https://github.com/elastic/opentelemetry-collector-components/tree/main/extension/apmconfigextension).
 
@@ -25,10 +25,10 @@ For full contrib details, refer to the [OpenTelemetry `apmconfigextension` docum
 
 The extension acts as an OpAMP client, establishing a control channel between the Collector and the Elastic configuration server. Through this channel:
 
-* The Collector requests configuration bundles for connected {{edot}} SDKs.
-* The configuration server sends updates based on user changes in the Applications UI.
-* Updated configuration is distributed to {{edot}} SDKs using OpAMP-supported mechanisms.
-* The Collector reports status and metadata back to the server.
+1. The Collector requests configuration bundles for connected {{edot}} SDKs.
+2. The configuration server sends updates based on user changes in the Applications UI.
+3. Updated configuration is distributed to {{edot}} SDKs using OpAMP-supported mechanisms.
+4. The Collector reports status and metadata back to the server.
 
 The extension does not modify telemetry or manage pipelines. Its sole purpose is configuration synchronization.
 
@@ -68,7 +68,7 @@ service:
 
 ### {{edot}} Collector managed by {{agent}}
 
-When using {{agent}}, the endpoint and authentication are provided automatically. A minimal configuration might look like:
+When using {{agent}}, the endpoint and authentication are provided automatically. A minimal configuration might look like this:
 
 ```yaml
 extensions:
@@ -80,7 +80,7 @@ service:
 
 ### Custom OpAMP settings
 
-Advanced users may configure timeouts or connection behavior:
+You can configure timeouts or connection behavior:
 
 ```yaml
 extensions:
@@ -102,19 +102,11 @@ The following are the most important settings when configuring the {{product.apm
 | `tls` | TLS options, including certificate verification behavior. |
 | `timeout` | Timeout for OpAMP communication. |
 
+:::{note}
+The endpoint must point to an OpAMP-enabled {{product.apm-server}} or {{fleet}} Server. Standard ingest or OTLP endpoints will not work.
+:::
+
 For the complete list of configuration options, refer to the [contrib `apmconfigextension` documentation](https://github.com/elastic/opentelemetry-collector-components/tree/main/extension/apmconfigextension).
-
-## Limitations
-
-Be aware of these constraints and behaviors when using the {{product.apm}} Config extension:
-
-* Central configuration for {{edot}} SDKs does not work without this extension.
-
-* The extension does not process telemetry data. It only handles configuration synchronization.
-
-* The endpoint must point to an OpAMP-enabled {{product.apm-server}} or {{fleet}} Server. Standard ingest or OTLP endpoints will not work.
-
-* Authentication errors stop configuration delivery. Incorrect keys or certificates prevent SDK updates.
 
 ## Resources
 
