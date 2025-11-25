@@ -99,7 +99,7 @@ steps:
       - label: ":package: arm64: OTEL_COMPONENT zip,tar.gz"
         key: packaging-arm64-otel-component
         env:
-          PLATFORMS: "windows/arm64,linux/arm64"
+          PLATFORMS: "linux/arm64"
           PACKAGES: "tar.gz,zip"
           OTEL_COMPONENT: "true"
         command: ".buildkite/scripts/steps/integration-package.sh"
