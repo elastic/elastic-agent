@@ -1376,6 +1376,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverrece
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver v0.139.0/go.mod h1:ZnoQNt1oRAWLngoYWLbFUdrr1m8UcXZxEDg/W6+JrOY=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver v0.139.0 h1:0M9E1AlRyUWXzRQIerGw0et3pdItIfZhaNFX6Y+EXzg=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver v0.139.0/go.mod h1:C2wYuBBlYaWuFQP+elufZGZrlj7GyeCdzroEZYlV5os=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver v0.139.0 h1:d3gfDFoyCGpLrOba4WezCr4mN0tFQuchP2lG0c5Iwp0=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver v0.139.0/go.mod h1:rzONCE55PRW+ogXOMavHrWi/H6uBzNAGGJzL1fRLs+I=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.139.0 h1:uq3xrmeDzIfwXHB5BCC/BAOO/ZIrexi+hDbRcd3DrNg=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.139.0/go.mod h1:C89wYTePUCuLie/te7LW8KYuN07EVf9HLxiJEzjcQgY=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
