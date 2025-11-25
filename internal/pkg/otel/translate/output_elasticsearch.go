@@ -36,18 +36,9 @@ type esToOTelOptions struct {
 
 var defaultOptions = esToOTelOptions{
 	ElasticsearchConfig: elasticsearch.DefaultConfig(),
-
-<<<<<<< HEAD
-	Index:    "", // Dynamic routing is disabled if index is set
-	Pipeline: "",
-	Preset:   "custom", // default is custom if not set
-	HostWorkerCfg: outputs.HostWorkerCfg{
-		Workers: 1,
-	},
-=======
-	Index:  "",       // Dynamic routing is disabled if index is set
-	Preset: "custom", // default is custom if not set
->>>>>>> 70ef801ad ([otel config translate] allow hosts to be string not just slice (#11394))
+	Index:               "", // Dynamic routing is disabled if index is set
+	Pipeline:            "",
+	Preset:              "custom", // default is custom if not set
 }
 
 // ToOTelConfig converts a Beat config into OTel elasticsearch exporter config
@@ -127,11 +118,7 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 		// where it could spin as many goroutines as it liked.
 		// Given that batcher implementation can change and it has a history of such changes,
 		// let's keep max_conns_per_host setting for now and remove it once exporterhelper is stable.
-<<<<<<< HEAD
-		"max_conns_per_host": escfg.NumWorkers(),
-=======
 		"max_conns_per_host": getTotalNumWorkers(output), // num_workers * len(hosts) if loadbalance is true
->>>>>>> 70ef801ad ([otel config translate] allow hosts to be string not just slice (#11394))
 
 		// Retry
 		"retry": map[string]any{
@@ -152,11 +139,7 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 			"queue_size":        getQueueSize(logger, output),
 			"block_on_overflow": true,
 			"wait_for_result":   true,
-<<<<<<< HEAD
-			"num_consumers":     escfg.NumWorkers(),
-=======
 			"num_consumers":     getTotalNumWorkers(output), // num_workers * len(hosts) if loadbalance is true
->>>>>>> 70ef801ad ([otel config translate] allow hosts to be string not just slice (#11394))
 		},
 
 		"mapping": map[string]any{
@@ -190,8 +173,6 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 	return otelYAMLCfg, nil
 }
 
-<<<<<<< HEAD
-=======
 // getTotalNumWorkers returns the number of hosts that beats would
 // have used taking into account hosts, loadbalance and worker
 func getTotalNumWorkers(cfg *config.C) int {
@@ -202,7 +183,6 @@ func getTotalNumWorkers(cfg *config.C) int {
 	return len(hostList)
 }
 
->>>>>>> 70ef801ad ([otel config translate] allow hosts to be string not just slice (#11394))
 // log warning for unsupported config
 func checkUnsupportedConfig(cfg *config.C, logger *logp.Logger) error {
 	if cfg.HasField("indices") {
