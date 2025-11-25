@@ -100,6 +100,19 @@ func TestRenderOutputs(t *testing.T) {
 				},
 			}, "var1"),
 		},
+		"optional single var": {
+			input: NewKey("outputs", NewDict([]Node{
+				NewKey("default", NewDict([]Node{
+					NewKey("key", NewStrVal("${var1.name|?}")),
+				})),
+			})),
+			expected: NewDict([]Node{}),
+			vars: mustMakeVars(map[string]interface{}{
+				"var1": map[string]interface{}{
+					"other": "value1",
+				},
+			}),
+		},
 	}
 
 	for name, test := range testcases {

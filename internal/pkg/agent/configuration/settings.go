@@ -23,6 +23,7 @@ type SettingsConfig struct {
 	EventLoggingConfig *logger.Config                  `yaml:"logging.event_data,omitempty" config:"logging.event_data,omitempty" json:"logging.event_data,omitempty"`
 	Upgrade            *UpgradeConfig                  `yaml:"upgrade" config:"upgrade" json:"upgrade"`
 	Collector          *CollectorConfig                `yaml:"collector" config:"collector" json:"collector"`
+	VariablesConfig    *VariablesConfig                `yaml:"variables,omitempty" config:"variables,omitempty" json:"variables,omitempty"`
 
 	// standalone config
 	Reload              *ReloadConfig `config:"reload" yaml:"reload" json:"reload"`

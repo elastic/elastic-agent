@@ -455,7 +455,8 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 			return nil, err
 		}
 
-		renderedInputs, err := transpiler.RenderInputs(inputs, varsArray)
+		// allow missing vars on uninstall (we don't want it to prevent the ability to uninstall)
+		renderedInputs, err := transpiler.RenderInputs(inputs, varsArray, true)
 		if err != nil {
 			return nil, err
 		}

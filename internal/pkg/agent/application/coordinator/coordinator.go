@@ -1905,7 +1905,11 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	// perform variable substitution for inputs
 	inputs, ok := transpiler.Lookup(ast, "inputs")
 	if ok {
-		renderedInputs, err := transpiler.RenderInputs(inputs, c.vars)
+		allowMissing := false
+		if c.cfg.Settings.VariablesConfig != nil && c.cfg.Settings.VariablesConfig.AllowMissing {
+			allowMissing = true
+		}
+		renderedInputs, err := transpiler.RenderInputs(inputs, c.vars, allowMissing)
 		if err != nil {
 			return fmt.Errorf("rendering inputs failed: %w", err)
 		}

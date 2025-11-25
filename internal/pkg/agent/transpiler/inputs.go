@@ -7,6 +7,8 @@ package transpiler
 import (
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/cespare/xxhash/v2"
 )
@@ -19,7 +21,7 @@ const (
 )
 
 // RenderInputs renders dynamic inputs section
-func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
+func RenderInputs(inputs Node, varsArray []*Vars, allowMissingVars bool) (Node, error) {
 	l, ok := inputs.Value().(*List)
 	if !ok {
 		return nil, fmt.Errorf("inputs must be an array")
@@ -27,8 +29,10 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 	var nodes []varIDMap
 	nodesMap := map[uint64]*Dict{}
 	hasher := xxhash.New()
+	inputApplied := make(map[int]bool)
+	inputNoMatchErr := make(map[int]*noMatchError)
 	for _, vars := range varsArray {
-		for _, node := range l.Value().([]Node) {
+		for inputIdx, node := range l.Value().([]Node) {
 			dict, ok := node.(*Dict)
 			if !ok {
 				continue
@@ -39,8 +43,22 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 			}
 			// Apply creates a new Node with a deep copy of all the values
 			n, err := dict.Apply(vars)
-			if errors.Is(err, ErrNoMatch) {
-				// has a variable that didn't exist, so we ignore it
+			if errors.Is(err, errNoMatchAllowed) {
+				// has an optional variable that didn't match, so we ignore it
+				continue
+			}
+			var noMatchErr *noMatchError
+			if errors.As(err, &noMatchErr) {
+				// if ignore missing vars is enabled, just continue
+				if allowMissingVars {
+					continue
+				}
+				// has a required variable that didn't exist
+				if _, exists := inputNoMatchErr[inputIdx]; !exists {
+					// store it; only if it never gets a match will it be an error
+					inputNoMatchErr[inputIdx] = noMatchErr
+				}
+				// try other vars
 				continue
 			}
 			if err != nil {
@@ -67,8 +85,27 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 				nodesMap[hash] = dict
 				nodes = append(nodes, varIDMap{vars.ID(), dict})
 			}
+			// input successfully applied
+			inputApplied[inputIdx] = true
 		}
 	}
+
+	// check if any inputs had NoMatchError but were never successfully applied
+	var errVars []string
+	for inputIdx, inputErr := range inputNoMatchErr {
+		if !inputApplied[inputIdx] {
+			// not applied
+			// only add unique errors that way the same variable is not repeated
+			// multiple times cause the error message to be un-readable.
+			if !slices.Contains(errVars, inputErr.Var()) {
+				errVars = append(errVars, inputErr.Var())
+			}
+		}
+	}
+	if len(errVars) > 0 {
+		return nil, fmt.Errorf("no matching vars: %s", strings.Join(errVars, ", "))
+	}
+
 	var nInputs []Node
 	for _, node := range nodes {
 		if node.id != "" {
