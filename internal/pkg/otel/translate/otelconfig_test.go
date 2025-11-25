@@ -407,9 +407,6 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 			},
-			"output": map[string]any{
-				"otelconsumer": map[string]any{},
-			},
 			"path": map[string]any{
 				"data": filepath.Join(paths.Run(), id),
 			},
@@ -743,9 +740,6 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
-						"output": map[string]any{
-							"otelconsumer": map[string]any{},
-						},
 						"path": map[string]any{
 							"data": filepath.Join(paths.Run(), "beat-metrics-monitoring"),
 						},
@@ -853,9 +847,6 @@ func TestGetOtelConfig(t *testing.T) {
 									"processors": defaultProcessors("test-1", "generic-1", "metrics"),
 								},
 							},
-						},
-						"output": map[string]any{
-							"otelconsumer": map[string]any{},
 						},
 						"path": map[string]any{
 							"data": filepath.Join(paths.Run(), "system-metrics"),
@@ -1106,7 +1097,6 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			assert.True(t, ok, "receiver config should be a map")
 
 			// Verify configuration section presence
-			assert.Contains(t, receiverConfig, "output", "output config should be present")
 			assert.Contains(t, receiverConfig, "path", "path config should be present")
 			assert.Contains(t, receiverConfig, "logging", "logging config should be present")
 			assert.Contains(t, receiverConfig, tt.expectedBeatName, fmt.Sprintf("%s config should be present", tt.expectedBeatName))

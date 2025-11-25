@@ -832,8 +832,6 @@ func TestFileBeatReceiver(t *testing.T) {
           enabled: true
           count: 1
           message: {{.Message}}
-    output:
-      otelconsumer:
     logging:
       level: info
       selectors:
@@ -959,8 +957,6 @@ func TestOtelFBReceiverE2E(t *testing.T) {
             - {{.InputPath}}
           prospector.scanner.fingerprint.enabled: false
           file_identity.native: ~
-    output:
-      otelconsumer:
     logging:
       level: info
       selectors:
@@ -1384,8 +1380,6 @@ func TestOtelMBReceiverE2E(t *testing.T) {
             - '.*'
           metricsets:
             - cpu
-    output:
-      otelconsumer:
     logging:
       level: info
       selectors:
@@ -1574,8 +1568,6 @@ receivers:
           fields:
             dataset: generic
           target: event
-    output:
-      otelconsumer:
     logging:
       level: info
       selectors:
@@ -1812,8 +1804,6 @@ func TestFBOtelRestartE2E(t *testing.T) {
                 document_id: "id"
           prospector.scanner.fingerprint.enabled: false
           file_identity.native: ~
-    output:
-      otelconsumer:
     logging:
       level: info
       selectors:
@@ -2049,8 +2039,6 @@ receivers:
             - '.*'
           metricsets:
             - cpu
-    output:
-      otelconsumer:
     queue.mem.flush.timeout: 0s
 exporters:
   elasticsearch/log:
@@ -2197,8 +2185,6 @@ receivers:
             - '.*'
           metricsets:
             - cpu
-    output:
-      otelconsumer:
     queue.mem.flush.timeout: 0s
 exporters:
   elasticsearch/log:
