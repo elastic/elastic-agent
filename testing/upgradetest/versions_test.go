@@ -245,7 +245,7 @@ func TestFetchUpgradableVersionsAfterFeatureFreeze(t *testing.T) {
 func TestGetUpgradableVersions(t *testing.T) {
 	versions, err := GetUpgradableVersions()
 	require.NoError(t, err)
-	assert.Truef(t, len(versions) > 1, "expected at least one version for testing, got %d.\n%v", len(versions), versions)
+	assert.Truef(t, len(versions) >= 1, "expected at least one version for testing, got %d.\n%v", len(versions), versions)
 }
 
 func TestPreviousMinor(t *testing.T) {
