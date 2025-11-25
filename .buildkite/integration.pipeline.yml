@@ -39,12 +39,15 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
 
-      - label: ":package: amd64: FIPS tar.gz"
-        key: "packaging-amd64-fips"
+      # Temporary build step to verify building the elastic-agent works.
+      # This will be removed once OTEL_COMPONENT is removed, because it
+      # became the default.
+      - label: ":package: amd64: OTEL_COMPONENT zip,tar.gz,rpm,deb "
+        key: packaging-amd64-otel-component
         env:
-          PACKAGES: "tar.gz"
-          PLATFORMS: "linux/amd64"
-          FIPS: "true"
+          PLATFORMS: "windows/amd64,linux/amd64"
+          PACKAGES: "zip,tar.gz,rpm,deb"
+          OTEL_COMPONENT: "true"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
@@ -53,15 +56,15 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n2-standard-4"
+          machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
 
-      - label: ":package: amd64: OTEL_COMPONENT tar.gz"
-        key: "packaging-amd64-otel-component"
+      - label: ":package: amd64: FIPS tar.gz"
+        key: "packaging-amd64-fips"
         env:
           PACKAGES: "tar.gz"
           PLATFORMS: "linux/amd64"
-          OTEL_COMPONENT: "true"
+          FIPS: "true"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
@@ -90,12 +93,15 @@ steps:
           instanceType: "c6g.2xlarge"
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
-      - label: ":package: arm64: FIPS tar.gz"
-        key: "packaging-arm64-fips"
+      # Temporary build step to verify building the elastic-agent works.
+      # This will be removed once OTEL_COMPONENT is removed, because it
+      # became the default.
+      - label: ":package: arm64: OTEL_COMPONENT zip,tar.gz"
+        key: packaging-arm64-otel-component
         env:
-          PACKAGES: "tar.gz"
-          PLATFORMS: "linux/arm64"
-          FIPS: "true"
+          PLATFORMS: "windows/arm64,linux/arm64"
+          PACKAGES: "tar.gz,zip"
+          OTEL_COMPONENT: "true"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
@@ -107,12 +113,12 @@ steps:
           instanceType: "c6g.2xlarge"
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
-      - label: ":package: arm64: OTEL_COMPONENT tar.gz"
-        key: "packaging-arm64-otel-component"
+      - label: ":package: arm64: FIPS tar.gz"
+        key: "packaging-arm64-fips"
         env:
           PACKAGES: "tar.gz"
           PLATFORMS: "linux/arm64"
-          OTEL_COMPONENT: "true"
+          FIPS: "true"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
@@ -200,7 +206,6 @@ steps:
           OTEL_COMPONENT: "true"
         command: |
           .buildkite/scripts/steps/integration-package.sh
-          .buildkite/scripts/steps/integration-cloud-image-push.sh
         artifact_paths:
           - build/distributions/**
         agents:
