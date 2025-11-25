@@ -566,8 +566,10 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 // this is done by parsing the `m.mergedCollectorCfg` and converting it into the best effort *status.AggregateStatus.
 func (m *OTelManager) reportStartupErr(ctx context.Context, err error) {
 	criticalErr := func(err error) error {
-		var otelStatus *status.AggregateStatus
-		// TODO: Create the mapping.
+		otelStatus, err := otelConfigToStatus(m.mergedCollectorCfg, err)
+		if err != nil {
+			return err
+		}
 		return m.reportOtelStatusUpdate(ctx, otelStatus)
 	}(err)
 	if criticalErr != nil {

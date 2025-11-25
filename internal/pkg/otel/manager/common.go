@@ -11,6 +11,8 @@ import (
 	"net"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+	"go.opentelemetry.io/collector/confmap"
+	"go.opentelemetry.io/collector/otelcol"
 )
 
 // for testing purposes
@@ -79,4 +81,17 @@ func findRandomTCPPorts(count int) (ports []int, err error) {
 	}
 
 	return ports, err
+}
+
+// otelConfigToStatus converts the `cfg` to `status.AggregateStatus` using the reported error.
+func otelConfigToStatus(cfg *confmap.Conf, err error) (*status.AggregateStatus, error) {
+	// marshall into config
+	var c otelcol.Config
+	if err := cfg.Marshal(&c); err != nil {
+		return nil, fmt.Errorf("could not marshal configuration: %w", err)
+	}
+
+	// TODO: Convert here.
+
+	return nil, nil
 }
