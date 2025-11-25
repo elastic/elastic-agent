@@ -1,0 +1,45 @@
+name: Validate docs generation structure
+
+on:
+  pull_request:
+    paths:
+      - 'internal/edot/**'
+      - 'internal/pkg/otel/**'
+
+jobs:
+  validate-structure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      
+      - name: Validate expected files for docs generation
+        run: |
+          echo "Validating files required by docs/scripts/update-docs/update-components-docs.py"
+          
+          MISSING=0
+          
+          for file in \
+            "go.mod" \
+            "internal/pkg/otel/components.yml" \
+            "internal/pkg/otel/samples/linux/gateway.yml"
+          do
+            if [[ ! -f "$file" ]]; then
+              echo "❌ Missing: $file"
+              MISSING=1
+            else
+              echo "✅ Found: $file"
+            fi
+          done
+          
+          if [[ $MISSING -eq 1 ]]; then
+            echo ""
+            echo "::error::One or more files required by the docs generation script are missing."
+            echo "If these files were intentionally moved, please update:"
+            echo "  - docs/scripts/update-docs/update-components-docs.py"
+            echo "  - .github/workflows/validate-docs-structure.yml"
+            exit 1
+          fi
+          
+          echo ""
+          echo "✅ All required files are present."
+
