@@ -29,10 +29,15 @@ func newValidateCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 		},
 	}
 
+<<<<<<< HEAD:internal/pkg/agent/cmd/validate.go
 	setupOtelFlags(cmd.Flags())
+=======
+	SetupOtelFlags(cmd.Flags())
+	origHelpFunc := cmd.HelpFunc()
+>>>>>>> 9f1c4649c (Add `OTEL_COMPONENT=true` to packaging to allow building a seperate OTEL EDOT binary (#11237)):internal/edot/cmd/validate.go
 	cmd.SetHelpFunc(func(c *cobra.Command, s []string) {
 		hideInheritedFlags(c)
-		c.Root().HelpFunc()(c, s)
+		origHelpFunc(c, s)
 	})
 
 	return cmd
