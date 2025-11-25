@@ -39,6 +39,26 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
 
+      # Temporary build step to verify building the elastic-agent works.
+      # This will be removed once OTEL_COMPONENT is removed, because it
+      # became the default.
+      - label: ":package: amd64: OTEL_COMPONENT zip,tar.gz,rpm,deb "
+        key: packaging-amd64-otel-component
+        env:
+          PLATFORMS: "windows/amd64,linux/amd64"
+          PACKAGES: "zip,tar.gz,rpm,deb"
+          OTEL_COMPONENT: "true"
+        command: ".buildkite/scripts/steps/integration-package.sh"
+        artifact_paths:
+          - build/distributions/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
+
       - label: ":package: amd64: FIPS tar.gz"
         key: "packaging-amd64-fips"
         env:
@@ -62,6 +82,26 @@ steps:
         env:
           PLATFORMS: "windows/arm64,linux/arm64"
           PACKAGES: "tar.gz,zip"
+        command: ".buildkite/scripts/steps/integration-package.sh"
+        artifact_paths:
+          - build/distributions/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "aws"
+          instanceType: "c6g.2xlarge"
+          image: "${IMAGE_UBUNTU_2204_ARM_64}"
+
+      # Temporary build step to verify building the elastic-agent works.
+      # This will be removed once OTEL_COMPONENT is removed, because it
+      # became the default.
+      - label: ":package: arm64: OTEL_COMPONENT zip,tar.gz"
+        key: packaging-arm64-otel-component
+        env:
+          PLATFORMS: "windows/arm64,linux/arm64"
+          PACKAGES: "tar.gz,zip"
+          OTEL_COMPONENT: "true"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
@@ -148,6 +188,40 @@ steps:
           PACKAGES: "docker"
           PLATFORMS: "linux/arm64"
           FIPS: "true"
+        command: |
+          .buildkite/scripts/steps/integration-package.sh
+        artifact_paths:
+          - build/distributions/**
+        agents:
+          provider: "aws"
+          instanceType: "c6g.2xlarge"
+          diskSizeGb: 200
+          image: "${IMAGE_UBUNTU_2204_ARM_64}"
+
+      - label: ":package: amd64: OTEL_COMPONENT Containers"
+        key: packaging-containers-amd64-otel-component
+        env:
+          PACKAGES: "docker"
+          PLATFORMS: "linux/amd64"
+          OTEL_COMPONENT: "true"
+        command: |
+          .buildkite/scripts/steps/integration-package.sh
+        artifact_paths:
+          - build/distributions/**
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          diskSizeGb: 200
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
+        plugins:
+          - *vault_docker_login
+
+      - label: ":package: arm64: OTEL_COMPONENT Containers"
+        key: packaging-containers-arm64-otel-component
+        env:
+          PACKAGES: "docker"
+          PLATFORMS: "linux/arm64"
+          OTEL_COMPONENT: "true"
         command: |
           .buildkite/scripts/steps/integration-package.sh
         artifact_paths:
