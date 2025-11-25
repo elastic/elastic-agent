@@ -54,7 +54,9 @@ steps:
           FIPS: "true"
           EC_ENDPOINT: "https://api.staging.elastic-gov.com"
           ESS_REGION: "us-gov-east-1"
+          TF_VAR_deployment_template_id: "aws-general-purpose"
           TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
+          TF_VAR_docker_images_name_suffix: "-fips"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64-fips'
@@ -86,7 +88,9 @@ steps:
           FIPS: "true"
           EC_ENDPOINT: "https://api.staging.elastic-gov.com"
           ESS_REGION: "us-gov-east-1"
+          TF_VAR_deployment_template_id: "aws-general-purpose"
           TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
+          TF_VAR_docker_images_name_suffix: "-fips"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download build/distributions/** . --step 'packaging-arm64-fips'
