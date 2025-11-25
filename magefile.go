@@ -796,7 +796,7 @@ func Update() {
 }
 
 func EnsureCrossBuildOutputDir() error {
-	repositoryRoot, err := findRepositoryRoot()
+	repositoryRoot, err := mage.ElasticBeatsDir()
 	if err != nil {
 		return fmt.Errorf("finding repository root: %w", err)
 	}
@@ -1518,7 +1518,7 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 	}
 
 	// Create a dir with the buildID at <root>/build/dra/<buildID>
-	repositoryRoot, err := findRepositoryRoot()
+	repositoryRoot, err := mage.ElasticBeatsDir()
 	if err != nil {
 		return fmt.Errorf("finding repository root: %w", err)
 	}
@@ -1597,10 +1597,6 @@ func downloadManifestAndSetVersion(ctx context.Context, url string) (*manifest.B
 	os.Setenv("BEAT_VERSION", parsedVersion.CoreVersion())
 
 	return &resp, parsedVersion, nil
-}
-
-func findRepositoryRoot() (string, error) {
-	return sh.Output(mg.GoCmd(), "list", "-f", "{{.Root}}")
 }
 
 func findLatestBuildForBranch(ctx context.Context, baseURL string, branch string) (*branchInfo, error) {
@@ -1760,7 +1756,7 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestURL string, versio
 		log.Printf("found elastic-agent-core component used: %v", elasticAgentCoreComponent)
 	}
 
-	repositoryRoot, err := findRepositoryRoot()
+	repositoryRoot, err := mage.ElasticBeatsDir()
 	if err != nil {
 		return fmt.Errorf("looking up for repository root: %w", err)
 	}
