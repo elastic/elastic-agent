@@ -299,9 +299,9 @@ steps:
       build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
     command: "buildkite-agent pipeline upload .buildkite/integration.pipeline.yml"
     env:
-      BUILDKITE_PULL_REQUEST=${BUILDKITE_PULL_REQUEST}
-      BUILDKITE_PULL_REQUEST_BASE_BRANCH=${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
-      GITHUB_PR_LABELS=${GITHUB_PR_LABELS}
+      BUILDKITE_PULL_REQUEST: ${BUILDKITE_PULL_REQUEST}
+      BUILDKITE_PULL_REQUEST_BASE_BRANCH: ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
+      GITHUB_PR_LABELS: ${GITHUB_PR_LABELS}
     if_changed:
       include:
         - internal/**
