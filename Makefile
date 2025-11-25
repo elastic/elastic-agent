@@ -68,3 +68,19 @@ check-no-changes:
 .PHONY: get-version
 get-version:
 	@mage dumpVariables | grep 'beat_version' | cut -d"=" -f 2 | tr -d " "
+
+## validate-docs-files : Validate files required by docs generation script
+REQUIRED_FILES := \
+	go.mod \
+	internal/pkg/otel/components.yml \
+	internal/pkg/otel/samples/linux/gateway.yml
+
+.PHONY: validate-docs-files
+validate-docs-files:
+	@echo "Validating files required by docs/scripts/update-docs/update-components-docs.py"
+	@$(foreach file,$(REQUIRED_FILES),\
+		$(if $(wildcard $(file)),\
+			echo "✅ Found: $(file)";,\
+			echo "❌ Missing: $(file)"; exit 1;))
+	@echo ""
+	@echo "✅ All required files are present."
