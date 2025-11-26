@@ -13,7 +13,6 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -50,7 +49,7 @@ func (tlsCache) MakeKey(keyPassPath, certPath, keyPath string) string {
 //	    "revision": 1,
 //	    "type": "endpoint"
 //	}
-func EndpointSignedComponentModifier() coordinator.ComponentsModifier {
+func EndpointSignedComponentModifier() component.ComponentsModifier {
 	return func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
 		const signedKey = "signed"
 
@@ -83,7 +82,7 @@ func EndpointSignedComponentModifier() coordinator.ComponentsModifier {
 // 'key_passphrase_path'.
 // It does so, ONLY for the client TLS configuration for mTLS used with
 // fleet-server.
-func EndpointTLSComponentModifier(log *logger.Logger) coordinator.ComponentsModifier {
+func EndpointTLSComponentModifier(log *logger.Logger) component.ComponentsModifier {
 	return newEndpointTLSComponentModifier(log, &tlsCache{mu: &sync.Mutex{}})
 }
 
