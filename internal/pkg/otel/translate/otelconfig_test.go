@@ -1343,6 +1343,7 @@ func TestGetBeatsAuthExtensionConfig(t *testing.T) {
 			name: "with kerberos is enabled",
 			outputCfg: map[string]any{
 				"kerberos": map[string]any{
+					"enabled":     true,
 					"auth_type":   "password",
 					"config_path": "temp/krb5.conf",
 					"username":    "beats",
@@ -1355,7 +1356,7 @@ func TestGetBeatsAuthExtensionConfig(t *testing.T) {
 				"idle_connection_timeout": "3s",
 				"timeout":                 "1m30s",
 				"kerberos": map[string]any{
-					"enabled":          nil,
+					"enabled":          true,
 					"auth_type":        "password",
 					"config_path":      "temp/krb5.conf",
 					"username":         "beats",
