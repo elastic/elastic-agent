@@ -13,6 +13,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: 'go.mod'
+      
+      - name: Install mage
+        uses: magefile/mage-action@6f50bbb8ea47d56e62dee92392788acbc8192d0b # v3.1.0
+        with:
+          install-only: true
+      
       - name: Validate expected files for docs generation
         run: make validate-docs-files
 
