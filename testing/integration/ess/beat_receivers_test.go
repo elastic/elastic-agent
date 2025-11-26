@@ -382,9 +382,6 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 			"data_stream.namespace",
 			"elastic_agent.id",
 			"event.ingested",
-
-			// only in receiver doc
-			"agent.otelcol",
 		}
 		switch tc.onlyCompareKeys {
 		case true:
@@ -593,10 +590,6 @@ outputs:
 
 			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
 			"agent.version",
-
-			// only in receiver doc
-			"agent.otelcol.component.id",
-			"agent.otelcol.component.kind",
 		}
 
 		stripNondeterminism := func(m mapstr.M, mset string) {
