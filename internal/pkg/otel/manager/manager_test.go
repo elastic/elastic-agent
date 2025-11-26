@@ -447,7 +447,7 @@ func TestOTelManager_Run(t *testing.T) {
 			},
 		},
 		{
-			name: "subprocess collector panics",
+			name: "subprocess collector panics restarts",
 			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
 				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
 			},
@@ -467,6 +467,36 @@ func TestOTelManager_Run(t *testing.T) {
 					seenRecoveredTimes = m.recoveryRetries.Load()
 					return seenRecoveredTimes > 2
 				}, time.Minute, time.Second, "expected recovered times to be at least 3, got %d", seenRecoveredTimes)
+
+				err = os.Unsetenv("TEST_SUPERVISED_COLLECTOR_PANIC")
+				require.NoError(t, err, "failed to unset TEST_SUPERVISED_COLLECTOR_PANIC env var")
+				updateTime := time.Now()
+				e.EnsureHealthy(t, updateTime)
+
+				// no configuration should stop the runner
+				updateTime = time.Now()
+				m.Update(nil, nil)
+				e.EnsureOffWithoutError(t, updateTime)
+				require.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
+				assert.GreaterOrEqual(t, uint32(3), seenRecoveredTimes, "recovery retries should be 3")
+			},
+		},
+		{
+			name: "subprocess collector panics reports fatal",
+			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
+			},
+			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
+				// panic instantly always
+				err := os.Setenv("TEST_SUPERVISED_COLLECTOR_PANIC", "0s")
+				require.NoError(t, err, "failed to set TEST_SUPERVISED_COLLECTOR_PANIC env var")
+				t.Cleanup(func() {
+					_ = os.Unsetenv("TEST_SUPERVISED_COLLECTOR_PANIC")
+				})
+
+				cfg := confmap.NewFromStringMap(testConfig)
+				m.Update(cfg, nil)
 
 				// ensure that it reports a generic fatal error for all components, a panic cannot be assigned to
 				// a specific component in the collector
@@ -490,18 +520,6 @@ func TestOTelManager_Run(t *testing.T) {
 					require.True(collectT, ok, "pipeline traces should be present")
 					assert.Equal(collectT, traces.Status(), componentstatus.StatusFatalError)
 				})
-
-				err = os.Unsetenv("TEST_SUPERVISED_COLLECTOR_PANIC")
-				require.NoError(t, err, "failed to unset TEST_SUPERVISED_COLLECTOR_PANIC env var")
-				updateTime := time.Now()
-				e.EnsureHealthy(t, updateTime)
-
-				// no configuration should stop the runner
-				updateTime = time.Now()
-				m.Update(nil, nil)
-				e.EnsureOffWithoutError(t, updateTime)
-				require.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
-				assert.GreaterOrEqual(t, uint32(3), seenRecoveredTimes, "recovery retries should be 3")
 			},
 		},
 		{

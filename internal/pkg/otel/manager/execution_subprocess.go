@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sync"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
@@ -358,6 +359,7 @@ type zapWriter interface {
 type zapLast struct {
 	wrapped zapWriter
 	last    zapcore.Entry
+	mx      sync.Mutex
 }
 
 func newZapLast(w zapWriter) *zapLast {
@@ -368,11 +370,15 @@ func newZapLast(w zapWriter) *zapLast {
 
 // Write stores the most recent log entry.
 func (z *zapLast) Write(entry zapcore.Entry, fields []zapcore.Field) error {
+	z.mx.Lock()
 	z.last = entry
+	z.mx.Unlock()
 	return z.wrapped.Write(entry, fields)
 }
 
 // Last returns the last log entry.
 func (z *zapLast) Last() zapcore.Entry {
+	z.mx.Lock()
+	defer z.mx.Unlock()
 	return z.last
 }
