@@ -5,6 +5,7 @@
 package composable
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -32,11 +33,11 @@ func (r *ProviderRegistry) AddContextProvider(name string, builder ContextProvid
 	defer r.lock.Unlock()
 
 	if name == "" {
-		return fmt.Errorf("provider name is required")
+		return errors.New("provider name is required")
 	}
 
 	if strings.ToLower(name) != name {
-		return fmt.Errorf("provider name must be lowercase")
+		return errors.New("provider name must be lowercase")
 	}
 
 	_, contextExists := r.contextProviders[name]

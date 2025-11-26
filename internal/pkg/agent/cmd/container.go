@@ -404,7 +404,7 @@ func ensureServiceToken(streams *cli.IOStreams, cfg *setupConfig) error {
 	}
 	// request new token
 	if cfg.Kibana.Fleet.Username == "" || cfg.Kibana.Fleet.Password == "" {
-		return fmt.Errorf("username/password must be provided to retrieve service token")
+		return errors.New("username/password must be provided to retrieve service token")
 	}
 
 	logInfo(streams, "Requesting service_token from Kibana.")

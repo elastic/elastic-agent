@@ -33,7 +33,7 @@ import (
 // This may occur if the user sends multiple diagnostics actions to an agent in a short duration
 // or if the agent goes offline and retrieves multiple diagnostics actions.
 // In either case the 1st action will succeed and the others will ack with an the error.
-var ErrRateLimit = fmt.Errorf("rate limit exceeded")
+var ErrRateLimit = errors.New("rate limit exceeded")
 
 // getCPUDiag is a wrapper around diagnostics.CreateCPUProfile so it can be replaced in unit-tests.
 var getCPUDiag = func(ctx context.Context, d time.Duration) ([]byte, error) {

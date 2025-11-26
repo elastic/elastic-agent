@@ -46,7 +46,7 @@ func TestBeatNameToDefaultDatastreamType(t *testing.T) {
 		},
 		{
 			beatName:      "cloudbeat",
-			expectedError: fmt.Errorf("input type not supported by Otel: "),
+			expectedError: errors.New("input type not supported by Otel: "),
 		},
 	}
 

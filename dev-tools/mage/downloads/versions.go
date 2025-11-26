@@ -213,7 +213,7 @@ func ExtractCommitHash(input string) (string, error) {
 	matches := re.FindStringSubmatch(input)
 
 	if len(matches) < 2 {
-		return "", fmt.Errorf("commit hash not found")
+		return "", errors.New("commit hash not found")
 	}
 
 	return matches[1], nil
@@ -310,7 +310,7 @@ func FetchProjectBinary(ctx context.Context, project string, artifactName string
 // to be downloaded will be defined by the snapshot produced by the Beats CI or Fleet CI for that commit.
 func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, project string, artifactName string, artifact string, version string, timeoutFactor int, xpack bool, downloadPath string, downloadSHAFile bool) (string, error) {
 	if BeatsLocalPath != "" {
-		return "", fmt.Errorf("⚠️ Beats local path usage is deprecated and not used to fetch the binaries. Please use the packaging job to generate the artifacts to be consumed by these tests")
+		return "", errors.New("⚠️ Beats local path usage is deprecated and not used to fetch the binaries. Please use the packaging job to generate the artifacts to be consumed by these tests")
 	}
 
 	if downloadPath == "" {
@@ -488,7 +488,7 @@ func getDownloadURLFromResolvers(resolvers []DownloadURLResolver) (string, strin
 		return url, shaURL, nil
 	}
 
-	return "", "", fmt.Errorf("the artifact was not found")
+	return "", "", errors.New("the artifact was not found")
 }
 
 // getObjectURLFromResolvers extracts the media URL for the desired artifact from the
@@ -511,7 +511,7 @@ func getObjectURLFromResolvers(resolvers []BucketURLResolver, maxtimeout time.Du
 		return downloadURL, nil
 	}
 
-	return "", fmt.Errorf("the artifact was not found")
+	return "", errors.New("the artifact was not found")
 }
 
 // getObjectURLFromBucket extracts the media URL for the desired artifact from the
