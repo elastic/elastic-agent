@@ -262,6 +262,19 @@ shared:
       - *comp-pf-elastic-symbolizer
       - *comp-pf-host-agent
 
+  # components for cloud/service variants (excludes cloud-defend)
+  - &elastic_agent_cloud_components
+    components:
+      - *comp-agentbeat
+      - *comp-apm_server
+      - *comp-cloudbeat
+      - *comp-connectors
+      - *comp-endpoint
+      - *comp-fleet-server
+      - *comp-pf-elastic-collector
+      - *comp-pf-elastic-symbolizer
+      - *comp-pf-host-agent
+
   # components included in FIPS-capable elastic-agent package specs
   - &elastic_agent_fips_components
     components:
@@ -446,6 +459,14 @@ shared:
       <<: *linux_otel_files
       <<: *agent_unpacked_components_files
 
+  - &agent_cloud_binary_base
+    <<: *common
+    <<: *elastic_agent_cloud_components
+    files:
+      <<: *agent_binary_files
+      <<: *linux_otel_files
+      <<: *agent_unpacked_components_files
+
   - &agent_binary_fips_spec
     <<: *common_fips
     <<: *elastic_agent_fips_components
@@ -525,6 +546,31 @@ shared:
   - &agent_docker_spec
     <<: *agent_binary_spec
     # Default docker image name is <spec name>-<docker variant>
+    extra_vars:
+      dockerfile: 'Dockerfile.elastic-agent.tmpl'
+      docker_entrypoint: 'docker-entrypoint.elastic-agent.tmpl'
+      user: '{{ .BeatName }}'
+      linux_capabilities: ''
+      beats_install_path: "install"
+    files:
+      'elastic-agent.yml':
+        source: 'elastic-agent.docker.yml'
+        mode: 0600
+        config: true
+      'otel.yml':
+        source: 'otel.yml'
+        mode: 0600
+        config: true
+      '.elastic-agent.active.commit':
+        content: >
+          {{ commit }}
+        mode: 0644
+      'hints.inputs.d':
+        source: '{{ repo.RootDir }}/deploy/kubernetes/elastic-agent-standalone/templates.d'
+        mode: 0755
+
+  - &agent_cloud_docker_base
+    <<: *agent_cloud_binary_base
     extra_vars:
       dockerfile: 'Dockerfile.elastic-agent.tmpl'
       docker_entrypoint: 'docker-entrypoint.elastic-agent.tmpl'
@@ -1468,7 +1514,7 @@ specs:
       arch: amd64
       types: [docker]
       spec:
-        <<: *agent_docker_spec
+        <<: *agent_cloud_docker_base
         # The cloud image is always based on Wolfi
         <<: *docker_wolfi_spec
         <<: *docker_builder_spec
@@ -1481,7 +1527,7 @@ specs:
       arch: arm64
       types: [docker]
       spec:
-        <<: *agent_docker_spec
+        <<: *agent_cloud_docker_base
         # The cloud image is always based on Wolfi
         <<: *docker_wolfi_arm_spec
         <<: *docker_builder_arm_spec
@@ -1495,7 +1541,7 @@ specs:
       arch: amd64
       types: [ docker ]
       spec:
-        <<: *agent_docker_spec
+        <<: *agent_cloud_docker_base
         # The service image is always based on Wolfi
         <<: *docker_wolfi_spec
         <<: *docker_builder_spec
@@ -1509,7 +1555,7 @@ specs:
       arch: arm64
       types: [ docker ]
       spec:
-        <<: *agent_docker_spec
+        <<: *agent_cloud_docker_base
         # The service image is always based on Wolfi
         <<: *docker_wolfi_arm_spec
         <<: *docker_builder_arm_spec
