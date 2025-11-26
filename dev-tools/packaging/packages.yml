@@ -103,7 +103,7 @@ components:
     fips: false
     platforms:
       - *linux-amd64
-    packageTypes: *all-package-types
+    packageTypes: *pkg-type-docker
   - &comp-connectors
     projectName: connectors
     packageName: connectors-{{.Version}}.zip
@@ -459,7 +459,7 @@ shared:
       <<: *linux_otel_files
       <<: *agent_unpacked_components_files
 
-  - &agent_cloud_binary_base
+  - &agent_cloud_binary_spec
     <<: *common
     <<: *elastic_agent_cloud_components
     files:
@@ -569,8 +569,8 @@ shared:
         source: '{{ repo.RootDir }}/deploy/kubernetes/elastic-agent-standalone/templates.d'
         mode: 0755
 
-  - &agent_cloud_docker_base
-    <<: *agent_cloud_binary_base
+  - &agent_cloud_docker_spec
+    <<: *agent_cloud_binary_spec
     extra_vars:
       dockerfile: 'Dockerfile.elastic-agent.tmpl'
       docker_entrypoint: 'docker-entrypoint.elastic-agent.tmpl'
@@ -1514,7 +1514,7 @@ specs:
       arch: amd64
       types: [docker]
       spec:
-        <<: *agent_cloud_docker_base
+        <<: *agent_cloud_docker_spec
         # The cloud image is always based on Wolfi
         <<: *docker_wolfi_spec
         <<: *docker_builder_spec
@@ -1527,7 +1527,7 @@ specs:
       arch: arm64
       types: [docker]
       spec:
-        <<: *agent_cloud_docker_base
+        <<: *agent_cloud_docker_spec
         # The cloud image is always based on Wolfi
         <<: *docker_wolfi_arm_spec
         <<: *docker_builder_arm_spec
@@ -1541,7 +1541,7 @@ specs:
       arch: amd64
       types: [ docker ]
       spec:
-        <<: *agent_cloud_docker_base
+        <<: *agent_cloud_docker_spec
         # The service image is always based on Wolfi
         <<: *docker_wolfi_spec
         <<: *docker_builder_spec
@@ -1555,7 +1555,7 @@ specs:
       arch: arm64
       types: [ docker ]
       spec:
-        <<: *agent_cloud_docker_base
+        <<: *agent_cloud_docker_spec
         # The service image is always based on Wolfi
         <<: *docker_wolfi_arm_spec
         <<: *docker_builder_arm_spec
