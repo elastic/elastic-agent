@@ -20,7 +20,6 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 
@@ -44,7 +43,7 @@ func TestEndpointComponentModifier(t *testing.T) {
 
 	tests := map[string][]struct {
 		name         string
-		compModifier coordinator.ComponentsModifier
+		compModifier component.ComponentsModifier
 		comps        []component.Component
 		cfg          map[string]interface{}
 		wantComps    []component.Component
