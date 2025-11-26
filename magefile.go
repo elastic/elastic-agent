@@ -465,13 +465,13 @@ func (Check) License() error {
 // DocsFiles validates that files required by the docs generation script exist.
 func (Check) DocsFiles() error {
 	fmt.Println("Validating files required by docs/scripts/update-docs/update-components-docs.py")
-	
+
 	requiredFiles := []string{
 		"go.mod",
 		"internal/pkg/otel/components.yml",
 		"internal/pkg/otel/samples/linux/gateway.yml",
 	}
-	
+
 	missing := false
 	for _, file := range requiredFiles {
 		if _, err := os.Stat(file); os.IsNotExist(err) {
@@ -481,7 +481,7 @@ func (Check) DocsFiles() error {
 			fmt.Printf("✅ Found: %s\n", file)
 		}
 	}
-	
+
 	if missing {
 		fmt.Println()
 		return fmt.Errorf("one or more files required by the docs generation script are missing.\n" +
@@ -490,7 +490,7 @@ func (Check) DocsFiles() error {
 			"  - magefile.go (Check.DocsFiles function)\n" +
 			"  - .github/workflows/validate-docs-structure.yml")
 	}
-	
+
 	fmt.Println()
 	fmt.Println("✅ All required files are present.")
 	return nil
