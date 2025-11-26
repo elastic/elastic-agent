@@ -103,7 +103,8 @@ components:
     fips: false
     platforms:
       - *linux-amd64
-    packageTypes: *pkg-type-docker
+    packageTypes:
+      - *pkg-type-docker
   - &comp-connectors
     projectName: connectors
     packageName: connectors-{{.Version}}.zip
