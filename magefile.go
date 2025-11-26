@@ -450,9 +450,9 @@ func (Build) TestBinaries() error {
 	return nil
 }
 
-// All run all the code checks.
+// All run all the code and docs checks.
 func (Check) All() {
-	mg.SerialDeps(Check.License, Integration.Check)
+	mg.SerialDeps(Check.License, Integration.Check, Check.DocsFiles)
 }
 
 // License makes sure that all the Golang files have the appropriate license header.
