@@ -230,6 +230,30 @@ func (e *EventListener) EnsureHealthy(t *testing.T, u time.Time) {
 	}, 60*time.Second, 1*time.Second, "otel collector never got healthy")
 }
 
+// EnsureFatal ensures that the OTelManager is fatal by checking the latest error and status.
+func (e *EventListener) EnsureFatal(t *testing.T, u time.Time, extraT ...func(collectT *assert.CollectT, latestErr *EventTime[error], latestStatus *EventTime[*status.AggregateStatus])) {
+	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+		e.mtx.Lock()
+		latestErr := e.err
+		latestStatus := e.collectorStatus
+		e.mtx.Unlock()
+
+		// we expect to have a reported error which is nil and a reported status which is StatusOK
+		require.NotNil(collect, latestErr)
+		assert.Nil(collect, latestErr.Value())
+		assert.False(collect, latestErr.Before(u))
+		require.NotNil(collect, latestStatus)
+		require.NotNil(collect, latestStatus.Value())
+		assert.False(collect, latestStatus.Before(u))
+		require.Equal(collect, componentstatus.StatusFatalError, latestStatus.Value().Status())
+
+		// extra checks
+		for _, et := range extraT {
+			et(collect, latestErr, latestStatus)
+		}
+	}, 60*time.Second, 1*time.Second, "otel collector never fatal")
+}
+
 // EnsureOffWithoutError ensures that the OTelManager is off without an error by checking the latest error and status.
 func (e *EventListener) EnsureOffWithoutError(t *testing.T, u time.Time) {
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -435,7 +459,6 @@ func TestOTelManager_Run(t *testing.T) {
 					_ = os.Unsetenv("TEST_SUPERVISED_COLLECTOR_PANIC")
 				})
 
-				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				m.Update(cfg, nil)
 
@@ -444,6 +467,29 @@ func TestOTelManager_Run(t *testing.T) {
 					seenRecoveredTimes = m.recoveryRetries.Load()
 					return seenRecoveredTimes > 2
 				}, time.Minute, time.Second, "expected recovered times to be at least 3, got %d", seenRecoveredTimes)
+
+				// ensure that it reports a generic fatal error for all components, a panic cannot be assigned to
+				// a specific component in the collector
+				e.EnsureFatal(t, time.Now().Add(time.Second), func(collectT *assert.CollectT, _ *EventTime[error], latestStatus *EventTime[*status.AggregateStatus]) {
+					status := latestStatus.Value()
+
+					// healthcheck auto added
+					extensions, ok := status.ComponentStatusMap["extensions"]
+					require.True(collectT, ok, "extensions should be present")
+					assert.Equal(collectT, extensions.Status(), componentstatus.StatusFatalError)
+
+					metrics, ok := status.ComponentStatusMap["pipeline:metrics"]
+					require.True(collectT, ok, "pipeline metrics should be present")
+					assert.Equal(collectT, metrics.Status(), componentstatus.StatusFatalError)
+
+					logs, ok := status.ComponentStatusMap["pipeline:logs"]
+					require.True(collectT, ok, "pipeline logs should be present")
+					assert.Equal(collectT, logs.Status(), componentstatus.StatusFatalError)
+
+					traces, ok := status.ComponentStatusMap["pipeline:traces"]
+					require.True(collectT, ok, "pipeline traces should be present")
+					assert.Equal(collectT, traces.Status(), componentstatus.StatusFatalError)
+				})
 
 				err = os.Unsetenv("TEST_SUPERVISED_COLLECTOR_PANIC")
 				require.NoError(t, err, "failed to unset TEST_SUPERVISED_COLLECTOR_PANIC env var")
@@ -600,7 +646,7 @@ func TestOTelManager_Run(t *testing.T) {
 			},
 		},
 		{
-			name: "subprocess collector invalid config",
+			name: "subprocess collector empty config",
 			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
 				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
 			},
@@ -610,7 +656,13 @@ func TestOTelManager_Run(t *testing.T) {
 				// Errors channel is non-blocking, should be able to send an Update that causes an error multiple
 				// times without it blocking on sending over the errCh.
 				for range 3 {
-					cfg := confmap.New() // invalid config
+					// empty config
+					//
+					// this is really validating a flow that is not possible with the elastic-agent
+					// if the OTEL configuration is determined to be empty then it will not be ran
+					//
+					// this does give a good test of a truly invalid configuration
+					cfg := confmap.New() // empty config
 					m.Update(cfg, nil)
 
 					// delay between updates to ensure the collector will have to fail
@@ -638,6 +690,235 @@ func TestOTelManager_Run(t *testing.T) {
 					}
 				}
 				assert.Error(t, err, "otel manager should have returned an error")
+			},
+		},
+		{
+			name: "subprocess collector invalid receivers/exporters",
+			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
+			},
+			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
+				// not valid receivers/exporters
+				//
+				// this needs to be reported as status errors
+				cfg := confmap.NewFromStringMap(map[string]interface{}{
+					"receivers": map[string]interface{}{
+						"invalid_receiver": map[string]interface{}{},
+					},
+					"exporters": map[string]interface{}{
+						"invalid_exporter": map[string]interface{}{},
+					},
+					"service": map[string]interface{}{
+						"pipelines": map[string]interface{}{
+							"traces": map[string]interface{}{
+								"receivers": []string{"invalid_receiver"},
+								"exporters": []string{"invalid_exporter"},
+							},
+						},
+					},
+				})
+				m.Update(cfg, nil)
+				e.EnsureFatal(t, time.Now().Add(time.Second), func(collectT *assert.CollectT, _ *EventTime[error], latestStatus *EventTime[*status.AggregateStatus]) {
+					status := latestStatus.Value()
+
+					// healthcheck auto added
+					_, ok := status.ComponentStatusMap["extensions"]
+					require.True(collectT, ok, "extensions should be present")
+
+					traces, ok := status.ComponentStatusMap["pipeline:traces"]
+					require.True(collectT, ok, "pipeline traces should be present")
+					assert.Equal(collectT, traces.Status(), componentstatus.StatusFatalError)
+
+					exporter, ok := traces.ComponentStatusMap["exporter:invalid_exporter"]
+					require.True(collectT, ok, "exporter should be present")
+					receiver, ok := traces.ComponentStatusMap["receiver:invalid_receiver"]
+					require.True(collectT, ok, "receiver should be present")
+
+					// don't want this test to rely on OTEL to report in a specific order, so it checks
+					// both ways either invalid_receiver or invalid_exporter is reported as failed
+					if exporter.Status() == componentstatus.StatusFatalError {
+						assert.Equal(collectT, exporter.Status(), componentstatus.StatusFatalError) // already true, just makes it clear
+						assert.Equal(collectT, receiver.Status(), componentstatus.StatusStarting)
+					} else {
+						assert.Equal(collectT, receiver.Status(), componentstatus.StatusFatalError)
+						assert.Equal(collectT, exporter.Status(), componentstatus.StatusStarting)
+					}
+				})
+			},
+		},
+		{
+			name: "subprocess collector failing to start receiver",
+			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
+			},
+			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
+				// unable to start receiver
+				//
+				// this needs to be reported as status errors
+				cfg := confmap.NewFromStringMap(map[string]interface{}{
+					"receivers": map[string]interface{}{
+						"otlp": map[string]interface{}{
+							"protocols": map[string]interface{}{
+								"grpc": map[string]interface{}{
+									"endpoint": "nonexistent.invalid:4317", // not valid domain
+								},
+							},
+						},
+					},
+					"exporters": map[string]interface{}{
+						"debug": map[string]interface{}{
+							"verbosity": "detailed",
+						},
+					},
+					"service": map[string]interface{}{
+						"pipelines": map[string]interface{}{
+							"traces": map[string]interface{}{
+								"receivers": []string{"otlp"},
+								"exporters": []string{"debug"},
+							},
+						},
+					},
+				})
+				m.Update(cfg, nil)
+				e.EnsureFatal(t, time.Now().Add(time.Second), func(collectT *assert.CollectT, _ *EventTime[error], latestStatus *EventTime[*status.AggregateStatus]) {
+					status := latestStatus.Value()
+
+					// healthcheck auto added
+					_, ok := status.ComponentStatusMap["extensions"]
+					require.True(collectT, ok, "extensions should be present")
+
+					traces, ok := status.ComponentStatusMap["pipeline:traces"]
+					require.True(collectT, ok, "pipeline traces should be present")
+					assert.Equal(collectT, traces.Status(), componentstatus.StatusFatalError)
+
+					exporter, ok := traces.ComponentStatusMap["exporter:debug"]
+					require.True(collectT, ok, "debug exporter should be present")
+					receiver, ok := traces.ComponentStatusMap["receiver:otlp"]
+					require.True(collectT, ok, "otlp receiver should be present")
+
+					assert.Equal(collectT, receiver.Status(), componentstatus.StatusFatalError)
+					assert.Equal(collectT, exporter.Status(), componentstatus.StatusStarting)
+				})
+			},
+		},
+		{
+			name: "subprocess collector failing complex",
+			execModeFn: func(collectorRunErr chan error) (collectorExecution, error) {
+				return newSubprocessExecution(logp.DebugLevel, testBinary, 0, 0)
+			},
+			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
+			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
+				// complex configuration that validates that otelConfigToStatus is able to compute a valid
+				// aggregated status model of the failure
+				//
+				// this needs to be reported as status errors
+				cfg := confmap.NewFromStringMap(map[string]interface{}{
+					"receivers": map[string]interface{}{
+						"otlp/1": map[string]interface{}{
+							"protocols": map[string]interface{}{
+								"grpc": map[string]interface{}{
+									"endpoint": "localhost:17777", // same as below (results in failure)
+								},
+							},
+						},
+						"otlp/2": map[string]interface{}{
+							"protocols": map[string]interface{}{
+								"grpc": map[string]interface{}{
+									"endpoint": "localhost:17777", // same as above (results in failure)
+								},
+							},
+						},
+					},
+					"processors": map[string]interface{}{
+						"batch/1": map[string]interface{}{},
+						"batch/2": map[string]interface{}{},
+						"batch/3": map[string]interface{}{},
+					},
+					"connectors": map[string]interface{}{
+						"forward": map[string]interface{}{},
+					},
+					"exporters": map[string]interface{}{
+						"debug/1": map[string]interface{}{
+							"verbosity": "detailed",
+						},
+						"debug/2": map[string]interface{}{
+							"verbosity": "detailed",
+						},
+						"debug/3": map[string]interface{}{
+							"verbosity": "detailed",
+						},
+					},
+					"service": map[string]interface{}{
+						"pipelines": map[string]interface{}{
+							"traces/1": map[string]interface{}{
+								"receivers":  []string{"otlp/1"},
+								"processors": []string{"batch/1"},
+								"exporters":  []string{"forward", "debug/1"},
+							},
+							"traces/2": map[string]interface{}{
+								"receivers":  []string{"otlp/2"},
+								"processors": []string{"batch/2"},
+								"exporters":  []string{"forward", "debug/2"},
+							},
+							"traces/3": map[string]interface{}{
+								"receivers":  []string{"forward"},
+								"processors": []string{"batch/3"},
+								"exporters":  []string{"debug/3"},
+							},
+						},
+					},
+				})
+				m.Update(cfg, nil)
+				e.EnsureFatal(t, time.Now().Add(time.Second), func(collectT *assert.CollectT, _ *EventTime[error], latestStatus *EventTime[*status.AggregateStatus]) {
+					status := latestStatus.Value()
+
+					// healthcheck auto added
+					_, ok := status.ComponentStatusMap["extensions"]
+					require.True(collectT, ok, "extensions should be present")
+
+					// all traces present
+					traces1, ok := status.ComponentStatusMap["pipeline:traces/1"]
+					require.True(collectT, ok, "pipeline traces/1 should be present")
+					traces2, ok := status.ComponentStatusMap["pipeline:traces/2"]
+					require.True(collectT, ok, "pipeline traces/2 should be present")
+					traces3, ok := status.ComponentStatusMap["pipeline:traces/3"]
+					require.True(collectT, ok, "pipeline traces/3 should be present")
+
+					// traces/3 should always be marked starting, it doesn't have a receiver that should fail
+					assert.Equal(collectT, traces3.Status(), componentstatus.StatusStarting)
+
+					// connector should be present
+					connector1, ok := traces1.ComponentStatusMap["connector:forward"]
+					require.True(collectT, ok, "connector:forward should be present in traces/1")
+					assert.Equal(collectT, connector1.Status(), componentstatus.StatusStarting)
+					connector2, ok := traces1.ComponentStatusMap["connector:forward"]
+					require.True(collectT, ok, "connector:forward should be present in traces/2")
+					assert.Equal(collectT, connector2.Status(), componentstatus.StatusStarting)
+					connector3, ok := traces1.ComponentStatusMap["connector:forward"]
+					require.True(collectT, ok, "connector:forward should be present in traces/3")
+					assert.Equal(collectT, connector3.Status(), componentstatus.StatusStarting)
+
+					// don't assume the order in which OTEL starts the components,
+					// the checks below ensure no specific order
+
+					if traces1.Status() == componentstatus.StatusStarting {
+						// traces2 should be failing then
+						assert.Equal(collectT, traces2.Status(), componentstatus.StatusFatalError)
+
+						receiver, ok := traces2.ComponentStatusMap["receiver:otlp/2"]
+						require.True(collectT, ok, "otlp/2 receiver should be present")
+						assert.Equal(collectT, receiver.Status(), componentstatus.StatusFatalError)
+					} else {
+						// traces1 should be failing then
+						assert.Equal(collectT, traces1.Status(), componentstatus.StatusFatalError)
+
+						receiver, ok := traces2.ComponentStatusMap["receiver:otlp/1"]
+						require.True(collectT, ok, "otlp/1 receiver should be present")
+						assert.Equal(collectT, receiver.Status(), componentstatus.StatusFatalError)
+					}
+				})
 			},
 		},
 	} {
@@ -1530,22 +1811,46 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		assert.Len(t, collectorStatus.ComponentStatusMap, 0)
 	})
 
-	t.Run("collector error is passed up to the component manager", func(t *testing.T) {
+	t.Run("collector execution error is passed as status not error", func(t *testing.T) {
 		collectorErr := errors.New("collector error")
+
+		var err error
+		var aggStatus *status.AggregateStatus
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case aggStatus = <-mgr.WatchCollector():
+				case <-mgr.WatchComponents():
+					// don't block (ignored for test)
+				case e := <-mgr.Errors():
+					err = e
+					if err != nil {
+						// only return if real error (nil is just clearing the error state)
+						return
+					}
+				case <-time.After(time.Second):
+					// didn't get an error (good!)
+					return
+				}
+			}
+		}()
 
 		select {
 		case <-ctx.Done():
 			t.Fatal("timeout waiting for collector status update")
 		case execution.errCh <- collectorErr:
 		}
+		wg.Wait()
 
-		// we should get an error
-		select {
-		case <-ctx.Done():
-			t.Fatal("timeout waiting for collector status update")
-		case err := <-mgr.Errors():
-			assert.Equal(t, collectorErr, err)
-		}
+		// should not come in as an error
+		require.Nil(t, err, "got unexpected error from the collector execution")
+
+		// should have a fatal error in status
+		require.NotNil(t, aggStatus)
+		assert.Equal(t, aggStatus.Status(), componentstatus.StatusFatalError)
 	})
 }
 

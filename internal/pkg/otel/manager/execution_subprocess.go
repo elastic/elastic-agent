@@ -110,9 +110,11 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 		return nil, fmt.Errorf("failed to marshal config to yaml: %w", err)
 	}
 
-	stdOut := runtimeLogger.NewLogWriterWithDefaults(baseLogger.Core(), zapcore.Level(r.logLevel))
+	stdOutLast := newZapLast(baseLogger.Core())
+	stdOut := runtimeLogger.NewLogWriterWithDefaults(stdOutLast, zapcore.Level(r.logLevel))
 	// info level for stdErr because by default collector writes to stderr
-	stdErr := runtimeLogger.NewLogWriterWithDefaults(baseLogger.Core(), zapcore.Level(r.logLevel))
+	stdErrLast := newZapLast(baseLogger.Core())
+	stdErr := runtimeLogger.NewLogWriterWithDefaults(stdErrLast, zapcore.Level(r.logLevel))
 
 	procCtx, procCtxCancel := context.WithCancel(ctx)
 	env := os.Environ()
@@ -220,7 +222,18 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 				// report nil error so that the caller can be notified that the process has exited without error
 				r.reportErrFn(ctx, processErrCh, nil)
 			} else {
-				r.reportErrFn(ctx, processErrCh, fmt.Errorf("supervised collector (pid: %d) exited with error: %s", procState.Pid(), procState.String()))
+				var procReportErr error
+				if stdErrLast.Last().Message != "" {
+					// use stderr message as the error
+					procReportErr = errors.New(stdErrLast.Last().Message)
+				} else if stdOutLast.Last().Message != "" {
+					// use last stdout message as the error
+					procReportErr = errors.New(stdOutLast.Last().Message)
+				} else {
+					// neither case use standard process error
+					procReportErr = fmt.Errorf("supervised collector (pid: %d) exited with error: %s", procState.Pid(), procState.String())
+				}
+				r.reportErrFn(ctx, processErrCh, procReportErr)
 			}
 			return
 		}
@@ -337,4 +350,29 @@ func (s *procHandle) Stop(waitTime time.Duration) {
 		s.log.Warnf("supervised collector subprocess didn't exit in time after killing it")
 	case <-s.processDoneCh:
 	}
+}
+
+type zapWriter interface {
+	Write(zapcore.Entry, []zapcore.Field) error
+}
+type zapLast struct {
+	wrapped zapWriter
+	last    zapcore.Entry
+}
+
+func newZapLast(w zapWriter) *zapLast {
+	return &zapLast{
+		wrapped: w,
+	}
+}
+
+// Write stores the most recent log entry.
+func (z *zapLast) Write(entry zapcore.Entry, fields []zapcore.Field) error {
+	z.last = entry
+	return z.wrapped.Write(entry, fields)
+}
+
+// Last returns the last log entry.
+func (z *zapLast) Last() zapcore.Entry {
+	return z.last
 }

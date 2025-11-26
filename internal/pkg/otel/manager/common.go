@@ -88,11 +88,20 @@ func findRandomTCPPorts(count int) (ports []int, err error) {
 }
 
 // otelConfigToStatus converts the `cfg` to `status.AggregateStatus` using the reported error.
+//
+// The flow of this function comes from https://github.com/open-telemetry/opentelemetry-collector/blob/main/service/internal/graph/graph.go
+// It's a much simpler version, but follows the same for loop ordering and building of connectors of the internal
+// graph system that OTEL uses to build its component graph.
 func otelConfigToStatus(cfg *confmap.Conf, err error) (*status.AggregateStatus, error) {
 	// marshall into config
 	var c otelcol.Config
-	if err := cfg.Marshal(&c); err != nil {
-		return nil, fmt.Errorf("could not marshal configuration: %w", err)
+	if unmarshalErr := cfg.Unmarshal(&c); unmarshalErr != nil {
+		return nil, fmt.Errorf("could not unmarshal config: %w", unmarshalErr)
+	}
+
+	// should at least define a single pipeline
+	if len(c.Service.Pipelines) == 0 {
+		return nil, fmt.Errorf("no pipelines defined")
 	}
 
 	// aggregators are used to create the overall status structure
@@ -179,8 +188,9 @@ func otelConfigToStatus(cfg *confmap.Conf, err error) (*status.AggregateStatus, 
 }
 
 func recordSpecificErr(agg *status.Aggregator, instanceID *componentstatus.InstanceID, err error, extraMatchStrs ...string) bool {
-	matcherStr := fmt.Sprintf("failed to start %q %s:", instanceID.ComponentID().String(), strings.ToLower(instanceID.Kind().String()))
-	if strings.Contains(err.Error(), matcherStr) {
+	forIDStr := fmt.Sprintf("for id: %q", instanceID.ComponentID().String())
+	failedMatchStr := fmt.Sprintf("failed to start %q %s:", instanceID.ComponentID().String(), strings.ToLower(instanceID.Kind().String()))
+	if strings.Contains(err.Error(), forIDStr) || strings.Contains(err.Error(), failedMatchStr) {
 		// specific so this instance gets the reported error
 		agg.RecordStatus(instanceID, componentstatus.NewFatalErrorEvent(err))
 		return true
