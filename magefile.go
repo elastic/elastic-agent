@@ -487,7 +487,8 @@ func (Check) DocsFiles() error {
 		return fmt.Errorf("one or more files required by the docs generation script are missing.\n" +
 			"If these files were intentionally moved, please update:\n" +
 			"  - docs/scripts/update-docs/update-components-docs.py\n" +
-			"  - magefile.go (Check.DocsFiles function)")
+			"  - magefile.go (Check.DocsFiles function)\n" +
+			"  - .github/workflows/validate-docs-structure.yml")
 	}
 	
 	fmt.Println()

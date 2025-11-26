@@ -68,8 +68,3 @@ check-no-changes:
 .PHONY: get-version
 get-version:
 	@mage dumpVariables | grep 'beat_version' | cut -d"=" -f 2 | tr -d " "
-
-## validate-docs-files : Validate files required by docs generation script
-.PHONY: validate-docs-files
-validate-docs-files:
-	@mage check:docsFiles
