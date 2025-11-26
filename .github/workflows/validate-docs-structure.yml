@@ -5,6 +5,7 @@ on:
     paths:
       - 'internal/edot/**'
       - 'internal/pkg/otel/**'
+      - '.github/workflows/validate-docs-structure.yml'
 
 jobs:
   validate-structure:
