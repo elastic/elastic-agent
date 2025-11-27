@@ -631,40 +631,7 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 		if err != nil {
 			return nil, err
 		}
-
-<<<<<<< HEAD
-		// inject headers configured during enroll
-		if t == elasticsearchType && headers != nil {
-			// can be nil when called from install/uninstall
-			if agentHeaders := headers.Headers(); len(agentHeaders) > 0 {
-				headers := make(map[string]interface{})
-				if existingHeadersRaw, found := output[headersKey]; found {
-					existingHeaders, ok := existingHeadersRaw.(map[string]interface{})
-					if !ok {
-						return nil, fmt.Errorf("invalid 'outputs.headers', expected a map not a %T", outputRaw)
-					}
-					headers = existingHeaders
-				}
-
-				for headerName, headerVal := range agentHeaders {
-					headers[headerName] = headerVal
-				}
-
-				output[headersKey] = headers
-			}
-		}
-
-		outputsMap[name] = outputI{
-			name:       name,
-			enabled:    enabled,
-			logLevel:   logLevel,
-			outputType: t,
-			config:     output,
-			inputs:     make(map[string][]inputI),
-		}
-=======
 		outputsMap[name] = *parsedOutput
->>>>>>> 2c4c615f1 (Ensure the self-monitoring configuration knows the actual component runtime (#11300))
 	}
 
 	// map the inputs to the outputs

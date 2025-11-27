@@ -393,7 +393,7 @@ func getComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath stri
 	}
 
 	// Compute the components from the computed configuration.
-	comps, err := specs.ToComponents(m, monitorFn, lvl, agentInfo, map[string]uint64{})
+	comps, err := specs.ToComponents(m, nil, monitorFn, lvl, agentInfo, map[string]uint64{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to render components: %w", err)
 	}
@@ -416,7 +416,7 @@ func getMonitoringFn(ctx context.Context, logger *logger.Logger, cfg map[string]
 	if err != nil {
 		return nil, fmt.Errorf("could not load agent info: %w", err)
 	}
-	monitor := componentmonitoring.New(agentCfg.Settings.V1MonitoringEnabled, agentCfg.Settings.DownloadConfig.OS(), agentCfg.Settings.MonitoringConfig, agentInfo)
+	monitor := componentmonitoring.New(agentCfg.Settings.V1MonitoringEnabled, agentCfg.Settings.DownloadConfig.OS(), agentCfg.Settings.MonitoringConfig, agentInfo, logger)
 	return monitor.MonitoringConfig, nil
 }
 

@@ -526,25 +526,12 @@ func (b *BeatsMonitor) injectLogsInput(
 	streams = append(streams, b.getServiceComponentFilestreamStreams(componentInfos)...)
 
 	input := map[string]interface{}{
-<<<<<<< HEAD
-		idKey:        fmt.Sprintf("%s-agent", monitoringFilesUnitsID),
-		"name":       fmt.Sprintf("%s-agent", monitoringFilesUnitsID),
-		"type":       "filestream",
-		useOutputKey: monitoringOutput,
-		"streams":    streams,
-	}
-
-	// Make sure we don't set anything until the configuration is stable if the otel manager isn't enabled
-	if b.config.C.RuntimeManager != monitoringCfg.DefaultRuntimeManager {
-		input["_runtime_experimental"] = b.config.C.RuntimeManager
-=======
 		idKey:                   fmt.Sprintf("%s-agent", monitoringFilesUnitsID),
 		"name":                  fmt.Sprintf("%s-agent", monitoringFilesUnitsID),
 		"type":                  "filestream",
 		useOutputKey:            monitoringOutput,
 		"streams":               streams,
 		"_runtime_experimental": string(monitoringRuntime),
->>>>>>> 2c4c615f1 (Ensure the self-monitoring configuration knows the actual component runtime (#11300))
 	}
 
 	inputs := []any{input}
@@ -644,19 +631,6 @@ func (b *BeatsMonitor) injectMetricsInput(
 		})
 	}
 
-<<<<<<< HEAD
-	// Make sure we don't set anything until the configuration is stable if the otel manager isn't enabled
-	if b.config.C.RuntimeManager != monitoringCfg.DefaultRuntimeManager {
-		for _, input := range inputs {
-			inputMap := input.(map[string]interface{})
-			if _, found := inputMap["_runtime_experimental"]; !found {
-				inputMap["_runtime_experimental"] = b.config.C.RuntimeManager
-			}
-		}
-	}
-
-=======
->>>>>>> 2c4c615f1 (Ensure the self-monitoring configuration knows the actual component runtime (#11300))
 	// add system/process metrics for services that can't be monitored via json/beats metrics
 	inputs = append(inputs, b.getServiceComponentProcessMetricInputs(
 		componentInfos, metricsCollectionIntervalString)...)
