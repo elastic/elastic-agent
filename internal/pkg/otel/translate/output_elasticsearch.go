@@ -10,12 +10,14 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
 
 	"github.com/elastic/beats/v7/libbeat/common"
+	"github.com/elastic/beats/v7/libbeat/common/transport/kerberos"
 	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
 	"github.com/elastic/beats/v7/libbeat/publisher/queue/memqueue"
@@ -27,7 +29,6 @@ import (
 
 type esToOTelOptions struct {
 	elasticsearch.ElasticsearchConfig `config:",inline"`
-	outputs.HostWorkerCfg             `config:",inline"`
 
 	Index  string `config:"index"`
 	Preset string `config:"preset"`
@@ -38,9 +39,6 @@ var defaultOptions = esToOTelOptions{
 
 	Index:  "",       // Dynamic routing is disabled if index is set
 	Preset: "custom", // default is custom if not set
-	HostWorkerCfg: outputs.HostWorkerCfg{
-		Workers: 1,
-	},
 }
 
 // ToOTelConfig converts a Beat config into OTel elasticsearch exporter config
@@ -97,13 +95,19 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 	}
 
 	// Create url using host name, protocol and path
+	outputHosts, err := outputs.ReadHostList(output)
+	if err != nil {
+		return nil, fmt.Errorf("error reading host list: %w", err)
+	}
 	hosts := []string{}
-	for _, h := range escfg.Hosts {
+	for _, h := range outputHosts {
 		esURL, err := common.MakeURL(escfg.Protocol, escfg.Path, h, 9200)
 		if err != nil {
 			return nil, fmt.Errorf("cannot generate ES URL from host %w", err)
 		}
-		hosts = append(hosts, esURL)
+		if !slices.Contains(hosts, esURL) {
+			hosts = append(hosts, esURL)
+		}
 	}
 
 	otelYAMLCfg := map[string]any{
@@ -114,7 +118,7 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 		// where it could spin as many goroutines as it liked.
 		// Given that batcher implementation can change and it has a history of such changes,
 		// let's keep max_conns_per_host setting for now and remove it once exporterhelper is stable.
-		"max_conns_per_host": getTotalNumWorkers(escfg), // num_workers * len(hosts) if loadbalance is true
+		"max_conns_per_host": getTotalNumWorkers(output), // num_workers * len(hosts) if loadbalance is true
 
 		// Retry
 		"retry": map[string]any{
@@ -135,7 +139,7 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 			"queue_size":        getQueueSize(logger, output),
 			"block_on_overflow": true,
 			"wait_for_result":   true,
-			"num_consumers":     getTotalNumWorkers(escfg), // num_workers * len(hosts) if loadbalance is true
+			"num_consumers":     getTotalNumWorkers(output), // num_workers * len(hosts) if loadbalance is true
 		},
 
 		"mapping": map[string]any{
@@ -171,13 +175,14 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 	return otelYAMLCfg, nil
 }
 
-func getTotalNumWorkers(escfg esToOTelOptions) int {
-	// calculate total workers
-	totalWorkers := escfg.NumWorkers()
-	if escfg.LoadBalance && len(escfg.Hosts) > 1 {
-		totalWorkers = (escfg.NumWorkers() * len(escfg.Hosts))
+// getTotalNumWorkers returns the number of hosts that beats would
+// have used taking into account hosts, loadbalance and worker
+func getTotalNumWorkers(cfg *config.C) int {
+	hostList, err := outputs.ReadHostList(cfg)
+	if err != nil {
+		return 1
 	}
-	return totalWorkers
+	return len(hostList)
 }
 
 // log warning for unsupported config
@@ -192,8 +197,6 @@ func checkUnsupportedConfig(cfg *config.C) error {
 		return fmt.Errorf("ladbalance:false is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("non_indexable_policy") {
 		return fmt.Errorf("non_indexable_policy is currently not supported: %w", errors.ErrUnsupported)
-	} else if cfg.HasField("kerberos") {
-		return fmt.Errorf("kerberos is currently not supported: %w", errors.ErrUnsupported)
 	}
 
 	return nil
@@ -269,6 +272,12 @@ func cfgDecodeHookFunc() mapstructure.DecodeHookFunc {
 				return nil, fmt.Errorf("failed parsing proxy_url: %w", err)
 			}
 			return proxyURL, nil
+		case t == reflect.TypeOf(kerberos.AuthType(0)):
+			var authType kerberos.AuthType
+			if err := authType.Unpack(data.(string)); err != nil {
+				return nil, fmt.Errorf("failed parsing kerberos.auth_type: %w", err)
+			}
+			return authType, nil
 		default:
 			return data, nil
 		}
