@@ -23,7 +23,7 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
-:::{dropdown} Elastic Agent becomes unhealthy with the error host parsing failed for prometheus-collector: error parsing URL: parse "http://localhost:EDOT_COLLECTOR_METRICS_PORT"
+:::{dropdown} Elastic Agent becomes unhealthy with the error `host parsing failed for prometheus-collector: error parsing URL: parse "http://localhost:EDOT_COLLECTOR_METRICS_PORT"`
 ***Applies to: {{agent}} 9.2.1**
 
 On November 13th 2025, a known issue was discovered that causes Elastic Agent to become unhealthy with the error 'host parsing failed for prometheus-collector: error parsing URL: parse "http://localhost:EDOT_COLLECTOR_METRICS_PORT": invalid port ":EDOT_COLLECTOR_METRICS_PORT" after host'.
