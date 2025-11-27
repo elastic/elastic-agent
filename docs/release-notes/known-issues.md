@@ -23,10 +23,33 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+:::{dropdown} Elastic Agent becomes unhealthy with the error host parsing failed for prometheus-collector: error parsing URL: parse "http://localhost:EDOT_COLLECTOR_METRICS_PORT"
+***Applies to: {{agent}} 9.2.1**
+
+On November 13th 2025, a known issue was discovered that causes Elastic Agent to become unhealthy with the error 'host parsing failed for prometheus-collector: error parsing URL: parse "http://localhost:EDOT_COLLECTOR_METRICS_PORT": invalid port ":EDOT_COLLECTOR_METRICS_PORT" after host'.
+
+This problem has no effect on the operation of Elastic Agent besides incorrectly marking it as unhealthy. The `prometheus/metrics` input that is
+affected is incorrectly created when certain output types (Logstash, Kafka) or output parameters (e.g. loadbalance) are used.
+
+For more information, check [#11169](https://github.com/elastic/elastic-agent/issues/11169.
+
+**Workaround**
+See https://github.com/elastic/elastic-agent/issues/11169#issuecomment-3553232394
+
+Affected users set the "Monitoring Runtime" advanced policy setting to the "process" runtime to work around this issue. This is the runtime
+mode that is already being used when this problem occurs. The same can be done in a standalone agent by setting `agent.monitoring._runtime_experimental: process` in their `elastic-agent.yaml` file.
+
+```yaml
+agent.monitoring:
+    _runtime_experimental: process
+```
+
+The fix will be included in version 9.2.2.
+:::
 
 :::{dropdown} Failed upgrades leave {{agent}} stuck until restart
 
-**Applies to: {{agent}} 8.18.7, 9.0.7** 
+**Applies to: {{agent}} 8.18.7, 9.0.7**
 
 On September 17, 2025, a known issue was discovered that can cause {{agent}} upgrades to get stuck if an upgrade attempt fails under specific conditions. This happens because the coordinator’s `overrideState` remains set, leaving the agent in a state that appears to be upgrading.
 
@@ -41,8 +64,8 @@ This issue is triggered if the upgrade fails during one of the early checks insi
 **Symptoms**
 
 - {{fleet}} shows the upgrade action in progress, even though the upgrade remains stuck
-- No further upgrade attempts succeed 
-- Elastic Agent status shows an override state indicating upgrade 
+- No further upgrade attempts succeed
+- Elastic Agent status shows an override state indicating upgrade
 
 **Workaround**
 
