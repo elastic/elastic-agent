@@ -13,10 +13,11 @@ import (
 	"os/exec"
 	"time"
 
+	mock "github.com/stretchr/testify/mock"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	mock "github.com/stretchr/testify/mock"
 )
 
 // NewMockWatcherHelper creates a new instance of MockWatcherHelper. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
