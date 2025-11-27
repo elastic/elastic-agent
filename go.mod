@@ -86,7 +86,7 @@ require (
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.135.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.135.0
 	go.opentelemetry.io/collector/service v0.135.0
-	go.uber.org/zap v1.27.0
+	go.uber.org/zap v1.27.1
 	go.yaml.in/yaml/v3 v3.0.4
 	golang.org/x/crypto v0.44.0
 	golang.org/x/exp v0.0.0-20250811191247-51f88131bc50
@@ -337,7 +337,7 @@ require (
 	github.com/edsrzf/mmap-go v1.2.0 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
-	github.com/elastic/go-docappender/v2 v2.11.0 // indirect
+	github.com/elastic/go-docappender/v2 v2.12.0 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect
 	github.com/elastic/go-grok v0.3.1 // indirect
 	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
@@ -468,7 +468,7 @@ require (
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
 	github.com/kamstrup/intmap v0.5.1 // indirect
 	github.com/klauspost/asmfmt v1.3.2 // indirect
-	github.com/klauspost/compress v1.18.0 // indirect
+	github.com/klauspost/compress v1.18.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/knadh/koanf/providers/confmap v1.0.0 // indirect
 	github.com/knadh/koanf/v2 v2.3.0 // indirect
