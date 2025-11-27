@@ -14,12 +14,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	koanfmaps "github.com/knadh/koanf/maps"
 
-<<<<<<< HEAD
-=======
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/monitoringhelpers"
-
->>>>>>> 99a477c21 ([beatreceivers] Add support for kerberos (#11163))
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
@@ -32,12 +27,8 @@ import (
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
 	"github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
-<<<<<<< HEAD
 	"github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-=======
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
->>>>>>> 99a477c21 ([beatreceivers] Add support for kerberos (#11163))
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
