@@ -1230,9 +1230,11 @@ exporters:
     compression: none
     api_key: {{.ESApiKey}}
     logs_index: {{.FBReceiverIndex}}
-    batcher:
-      enabled: true
-      flush_timeout: 1s
+    sending_queue:
+      wait_for_result: true # Avoid losing data on shutdown
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
     mapping:
       mode: bodymap
 service:
