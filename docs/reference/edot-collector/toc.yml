@@ -15,10 +15,9 @@ toc:
   - file: components.md
     children:
       - file: components/apmconfigextension.md
+      - file: components/attributesprocessor.md
       - file: components/elasticapmconnector.md
       - file: components/elasticapmintakereceiver.md
-      - file: components/k8sclusterreceiver.md
-      - file: components/attributesprocessor.md
       - file: components/elasticapmprocessor.md
       - file: components/elasticsearchexporter.md
       - file: components/filelogreceiver.md
