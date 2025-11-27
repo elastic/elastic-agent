@@ -820,6 +820,7 @@ func mapAtLeastOneTrue(mm map[string]bool) bool {
 	return false
 }
 
+<<<<<<< HEAD
 func TestFileBeatReceiver(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: integration.Default,
@@ -1077,6 +1078,8 @@ service:
 	require.True(t, err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded), "Retrieved unexpected error: %s", err.Error())
 }
 
+=======
+>>>>>>> 4664a0888 ((chore): remove duplicate integration tests (#11372))
 func TestOtelFilestreamInput(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: integration.Default,
@@ -1372,6 +1375,7 @@ agent.monitoring:
 	cmd.Wait()
 }
 
+<<<<<<< HEAD
 func TestOtelMBReceiverE2E(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: integration.Default,
@@ -1501,6 +1505,8 @@ service:
 	require.True(t, err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded), "Retrieved unexpected error: %s", err.Error())
 }
 
+=======
+>>>>>>> 4664a0888 ((chore): remove duplicate integration tests (#11372))
 func TestHybridAgentE2E(t *testing.T) {
 	// This test is a hybrid agent test that ingests a single log with
 	// filebeat and fbreceiver. It then compares the final documents in
@@ -1731,6 +1737,10 @@ service:
 		"elastic_agent.id",
 		"elastic_agent.snapshot",
 		"elastic_agent.version",
+
+		// only in fbreceiver doc
+		"agent.otelcol.component.id",
+		"agent.otelcol.component.kind",
 	}
 
 	AssertMapsEqual(t, doc1, doc2, ignoredFields, "expected documents to be equal")
