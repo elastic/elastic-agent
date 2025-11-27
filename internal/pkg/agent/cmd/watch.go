@@ -334,7 +334,8 @@ func rollback(log *logp.Logger, topDir string, client client.Client, installModi
 	// This is only a placeholder in case there is no versionedHome defined (which we always have)
 	hash := ""
 	if filepath.IsAbs(versionedHome) {
-		// if the versioned home is an absolute path we need
+		// if the versioned home is an absolute path we need to normalize it relative to the current topDir as the
+		// cleanup() will expect relative paths
 		versionedHome, err = filepath.Rel(topDir, versionedHome)
 		if err != nil {
 			return fmt.Errorf("extract from %q a path relative to %q: %w", versionedHome, topDir, err)
