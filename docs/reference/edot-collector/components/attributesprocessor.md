@@ -1,6 +1,6 @@
 ---
 navigation_title: Attributes processor
-description: The attributes processor is an OpenTelemetry Collector component that modifies resource and span, metric, or log attributes before they are exported.
+description: The attributes processor is an OpenTelemetry Collector component that modifies resource attributes and span, metric, or log attributes before they are exported.
 applies_to:
   stack:
   serverless:
@@ -52,7 +52,7 @@ The following are the most important settings when configuring the attributes pr
 
 | Option | Description |
 |--------|-------------|
-| `actions` | A list of attribute modifications to apply. Each action uses the upstream-supported action types: `insert`, `update`, `upsert`, `delete`, `hash`, `extract`, `convert`, `rename`. |
+| `actions` | A list of attribute modifications to apply. Each action uses the upstream-supported action types: `insert`, `update`, `upsert`, `delete`, `hash`, `extract`, `convert`, `rename`, `truncate`. |
 | `include` / `exclude` | Rules for matching telemetry based on service name, span name, resource attributes, log severity, or metric name. |
 | `match_type` | How attribute comparison is evaluated (`strict`, `regexp`, `expr`). |
 
@@ -89,7 +89,7 @@ service:
     traces:
       receivers: [otlp]
       processors: [attributes]
-      exporters: [elasticsearch]
+      exporters: [elastic]
 ```
 
 ### Remove or obfuscate sensitive information from logs
@@ -100,12 +100,12 @@ Remove sensitive data from log attributes before export to comply with privacy r
 processors:
   attributes:
     actions:
-      # Delete sensitive fields
+      # Delete sensitive fields - illustrative example (not real values)
       - key: user.password
         action: delete
       - key: credit_card.number
         action: delete
-      - key: ssn
+      - key: ssn 
         action: delete
       
       # Hash IP addresses for privacy
@@ -164,8 +164,9 @@ processors:
     # Add cluster ID to all telemetry from production namespace
     include:
       match_type: strict
-      resources:
-        - k8s.namespace.name: production
+      resource_attributes:
+        - key: k8s.namespace.name
+          value: production
     actions:
       - key: cluster.id
         action: insert
@@ -194,6 +195,10 @@ processors:
 ```
 
 This example removes an authorization header only from telemetry produced by the `checkout-service`.
+
+:::{note}
+Deleting keys like `http.request.header.authorization` only works if the key exists as a flattened attribute. Some SDKs store headers inside structured maps, which are not supported by the attributes processor.
+:::
 
 ## Best practices and caveats
 
