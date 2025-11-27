@@ -843,6 +843,7 @@ func TestBeatsReceiverProcessRuntimeFallback(t *testing.T) {
 
 	config := `agent.logging.to_stderr: true
 agent.logging.to_files: false
+agent.monitoring._runtime_experimental: otel
 inputs:
   - type: system/metrics
     id: unique-system-metrics-input
@@ -863,16 +864,13 @@ outputs:
     hosts: [http://localhost:9200]
     api_key: placeholder
     indices: [] # not supported by the elasticsearch exporter
-<<<<<<< HEAD
-agent.monitoring._runtime_experimental: otel
-=======
+
   supported:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
     status_reporting:
       enabled: false
->>>>>>> 2c4c615f1 (Ensure the self-monitoring configuration knows the actual component runtime (#11300))
 `
 
 	// this is the context for the whole test, with a global timeout defined
