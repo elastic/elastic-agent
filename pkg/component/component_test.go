@@ -2503,7 +2503,7 @@ func TestToComponents(t *testing.T) {
 			runtime, err := LoadRuntimeSpecs(filepath.Join("..", "..", "specs"), scenario.Platform, SkipBinaryCheck())
 			require.NoError(t, err)
 
-			result, err := runtime.ToComponents(scenario.Policy, nil, scenario.LogLevel, scenario.headers, map[string]uint64{})
+			result, err := runtime.ToComponents(scenario.Policy, nil, nil, scenario.LogLevel, scenario.headers, map[string]uint64{})
 			if scenario.Err != "" {
 				assert.Equal(t, scenario.Err, err.Error())
 			} else {
@@ -2979,7 +2979,7 @@ func TestFlattenedDataStream(t *testing.T) {
 		t.Fatalf("cannot load runtime specs: %s", err)
 	}
 
-	result, err := runtime.ToComponents(policy, nil, logp.DebugLevel, nil, map[string]uint64{})
+	result, err := runtime.ToComponents(policy, nil, nil, logp.DebugLevel, nil, map[string]uint64{})
 	if err != nil {
 		t.Fatalf("cannot convert policy to component: %s", err)
 	}
@@ -3080,7 +3080,7 @@ func TestFlattenedDataStreamIsolatedUnits(t *testing.T) {
 		t.Fatalf("cannot load runtime specs: %s", err)
 	}
 
-	result, err := runtime.ToComponents(policy, nil, logp.DebugLevel, nil, map[string]uint64{})
+	result, err := runtime.ToComponents(policy, nil, nil, logp.DebugLevel, nil, map[string]uint64{})
 	if err != nil {
 		t.Fatalf("cannot convert policy to component: %s", err)
 	}

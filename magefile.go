@@ -450,9 +450,9 @@ func (Build) TestBinaries() error {
 	return nil
 }
 
-// All run all the code checks.
+// All run all the code and docs checks.
 func (Check) All() {
-	mg.SerialDeps(Check.License, Integration.Check)
+	mg.SerialDeps(Check.License, Integration.Check, Check.DocsFiles)
 }
 
 // License makes sure that all the Golang files have the appropriate license header.
@@ -460,6 +460,40 @@ func (Check) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
 	// exclude copied files until we come up with a better option
 	return sh.RunV("go-licenser", "-d", "-license", "Elasticv2")
+}
+
+// DocsFiles validates that files required by the docs generation script exist.
+func (Check) DocsFiles() error {
+	fmt.Println("Validating files required by docs/scripts/update-docs/update-components-docs.py")
+
+	requiredFiles := []string{
+		"go.mod",
+		"internal/pkg/otel/components.yml",
+		"internal/pkg/otel/samples/linux/gateway.yml",
+	}
+
+	missing := false
+	for _, file := range requiredFiles {
+		if _, err := os.Stat(file); os.IsNotExist(err) {
+			fmt.Printf("❌ Missing: %s\n", file)
+			missing = true
+		} else {
+			fmt.Printf("✅ Found: %s\n", file)
+		}
+	}
+
+	if missing {
+		fmt.Println()
+		return fmt.Errorf("one or more files required by the docs generation script are missing.\n" +
+			"If these files were intentionally moved, please update:\n" +
+			"  - docs/scripts/update-docs/update-components-docs.py\n" +
+			"  - magefile.go (Check.DocsFiles function)\n" +
+			"  - .github/workflows/validate-docs-structure.yml")
+	}
+
+	fmt.Println()
+	fmt.Println("✅ All required files are present.")
+	return nil
 }
 
 // Changes run git status --porcelain and return an error if we have changes or uncommitted files.
