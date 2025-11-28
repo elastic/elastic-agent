@@ -495,6 +495,7 @@ func TestGlobalHooks(t *testing.T) {
 			assert.NoErrorf(t, err, "hook %q validation error: %v", err)
 		case "package version":
 			assert.Equal(t, testPkgVer, string(output), "hook package version does not match")
+		case "environment":
 		default:
 			ok, err = isPprof(output)
 			assert.Truef(t, ok, "hook %q returned incompatible data: %q", h.Name, hex.EncodeToString(output))
@@ -857,4 +858,52 @@ func TestRedactSSLKeyInInputs(t *testing.T) {
 	assert.Equal(t, REDACTED, sliceSSL["certificate"])
 	require.Contains(t, sliceSSL, "key")
 	assert.Equal(t, REDACTED, sliceSSL["key"])
+}
+
+func TestRedactEnv(t *testing.T) {
+	tests := []struct {
+		name   string
+		env    map[string]string
+		expect map[string]any
+	}{{
+		name: "No redactions",
+		env: map[string]string{
+			"TEST_LEVEL": "test-val",
+			"VAL1":       "a,b,c",
+		},
+		expect: map[string]any{
+			"TEST_LEVEL": "test-val",
+			"VAL1":       "a,b,c",
+		},
+	}, {
+		name: "Redacts value based on key",
+		env: map[string]string{
+			"TEST_LEVEL":    "test-val",
+			"VAL1":          "a,b,c",
+			"API_KEY":       "secret-value",
+			"SERVICE_TOKEN": "secret-token",
+		},
+		expect: map[string]any{
+			"TEST_LEVEL":    "test-val",
+			"VAL1":          "a,b,c",
+			"API_KEY":       REDACTED,
+			"SERVICE_TOKEN": REDACTED,
+		},
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+			redacted, err := redactEnv()
+			require.NoError(t, err)
+
+			// redacted includes full env vars, we want to check if the expected k:v's are present
+			for k, v := range tt.expect {
+				require.Contains(t, redacted, k)
+				require.Equal(t, v, redacted[k])
+			}
+		})
+	}
 }
