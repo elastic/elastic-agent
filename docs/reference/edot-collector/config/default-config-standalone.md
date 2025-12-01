@@ -294,7 +294,7 @@ To activate the central configuration feature, add the [`apmconfig`](https://git
 :::{include} ../_snippets/edot-collector-auth.md
 :::
 
-Create an API Key following [these instructions](docs-content://deploy-manage/api-keys/elasticsearch-api-keys.md). The API key must have `config_agent:read` permissions and resources set to `-`.
+Create an API Key following [these instructions](docs-content://deploy-manage/api-keys/elasticsearch-api-keys.md). The API key must have `config_agent:read` permissions and resources set to `*`.
 
 ## Secure connection
 
@@ -334,7 +334,7 @@ extensions:
         privileges:
           - "config_agent:read"
         resources:
-          - "-"
+          - "*"
   apmconfig:
     opamp:
       protocols:
