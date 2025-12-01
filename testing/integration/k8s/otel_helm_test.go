@@ -246,15 +246,11 @@ func k8sStepDeployApp(manifest string) func(t *testing.T, ctx context.Context, k
 // are created and documents being written
 func k8sStepCheckDatastreamsHits(info *define.Info, dsType, dataset, datastreamNamespace string) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		require.EventuallyWithT(t, func(t *assert.CollectT) {
+		require.Eventually(t, func() bool {
 			query := queryK8sNamespaceDataStream(dsType, dataset, datastreamNamespace, namespace)
-
 			docs, err := estools.PerformQueryForRawQuery(ctx, query, fmt.Sprintf(".ds-%s*", dsType), info.ESClient)
 			require.NoError(t, err, "failed to get %s datastream documents", fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace))
-			require.Greater(t, docs.Hits.Total.Value, 0,
-				fmt.Sprintf("at least one document should be available for %s datastream",
-					fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace)))
-		}, 5*time.Second, 10*time.Second, fmt.Sprintf("no documets found on datastream %s",
-			fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace)))
+			return docs.Hits.Total.Value > 0
+		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least one document should be available for %s datastream", fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace)))
 	}
 }
