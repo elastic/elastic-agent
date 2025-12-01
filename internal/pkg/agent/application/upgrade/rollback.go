@@ -177,14 +177,15 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 	log.Infof("versioned homes to keep: %v", versionedHomesToKeep)
 
 	var cumulativeError error
-	relativeHomePaths := make([]string, len(versionedHomesToKeep))
-	for i, h := range versionedHomesToKeep {
+	relativeHomePaths := make([]string, 0, len(versionedHomesToKeep))
+	for _, h := range versionedHomesToKeep {
 		relHomePath, err := filepath.Rel(dataDirPath, filepath.Join(topDirPath, h))
 		if err != nil {
 			cumulativeError = goerrors.Join(cumulativeError, fmt.Errorf("extracting elastic-agent path relative to data directory from %s: %w", h, err))
-			continue
+			// best effort: try to use the entry as-is, without calculating the path relative to `data`
+			relHomePath = h
 		}
-		relativeHomePaths[i] = relHomePath
+		relativeHomePaths = append(relativeHomePaths, relHomePath)
 	}
 
 	log.Infof("Starting cleanup of versioned homes. Keeping: %v", relativeHomePaths)
