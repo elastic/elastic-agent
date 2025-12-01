@@ -531,7 +531,7 @@ func TestContainerCMDAgentMonitoringRuntimeExperimental(t *testing.T) {
 			// Verify that components are using the expected runtime
 			require.EventuallyWithTf(t, func(ct *assert.CollectT) {
 				status, err := agentFixture.ExecStatus(ctx, atesting.WithCmdOptions(withEnv(env)))
-				require.NoErrorf(t, err, "error getting agent status")
+				require.NoErrorf(ct, err, "error getting agent status")
 
 				expectedComponentCount := 4 // process runtime
 				if tc.expectedRuntimeName == string(monitoringCfg.OtelRuntimeManager) {
@@ -552,13 +552,13 @@ func TestContainerCMDAgentMonitoringRuntimeExperimental(t *testing.T) {
 					switch comp.ID {
 					case "beat/metrics-monitoring", "filestream-monitoring", "prometheus/metrics-monitoring":
 						// Monitoring components should use the expected runtime
-						assert.Equalf(t, tc.expectedRuntimeName, compRuntime, "expected correct runtime name for monitoring component %s with id %s", comp.Name, comp.ID)
+						assert.Equalf(ct, tc.expectedRuntimeName, compRuntime, "expected correct runtime name for monitoring component %s with id %s", comp.Name, comp.ID)
 					case "http/metrics-monitoring":
 						// The comp.VersionInfo.Name for this component is empty at times.
 						// See https://github.com/elastic/elastic-agent/issues/11162.
 					default:
 						// Non-monitoring components should use the default runtime
-						assert.Equalf(t, string(component.DefaultRuntimeManager), compRuntime, "expected default runtime for non-monitoring component %s with id %s", comp.Name, comp.ID)
+						assert.Equalf(ct, string(component.DefaultRuntimeManager), compRuntime, "expected default runtime for non-monitoring component %s with id %s", comp.Name, comp.ID)
 					}
 				}
 			}, 1*time.Minute, 1*time.Second,
@@ -655,7 +655,7 @@ func TestContainerCMDAgentMonitoringRuntimeExperimentalPolicy(t *testing.T) {
 			// Verify that components are using the expected runtime
 			require.EventuallyWithTf(t, func(ct *assert.CollectT) {
 				status, err := agentFixture.ExecStatus(ctx, atesting.WithCmdOptions(withEnv(env)))
-				require.NoErrorf(t, err, "error getting agent status")
+				require.NoErrorf(ct, err, "error getting agent status")
 
 				expectedComponentCount := 4 // process runtime
 				if tc.expectedRuntimeName == string(monitoringCfg.OtelRuntimeManager) {
@@ -676,13 +676,13 @@ func TestContainerCMDAgentMonitoringRuntimeExperimentalPolicy(t *testing.T) {
 					switch comp.ID {
 					case "beat/metrics-monitoring", "filestream-monitoring", "prometheus/metrics-monitoring":
 						// Monitoring components should use the expected runtime
-						assert.Equalf(t, tc.expectedRuntimeName, compRuntime, "unexpected runtime name for monitoring component %s with id %s", comp.Name, comp.ID)
+						assert.Equalf(ct, tc.expectedRuntimeName, compRuntime, "unexpected runtime name for monitoring component %s with id %s", comp.Name, comp.ID)
 					case "http/metrics-monitoring":
 						// The comp.VersionInfo.Name for this component is empty at times.
 						// See https://github.com/elastic/elastic-agent/issues/11162.
 					default:
 						// Non-monitoring components should use the default runtime
-						assert.Equalf(t, string(component.DefaultRuntimeManager), compRuntime, "expected default runtime for non-monitoring component %s with id %s", comp.Name, comp.ID)
+						assert.Equalf(ct, string(component.DefaultRuntimeManager), compRuntime, "expected default runtime for non-monitoring component %s with id %s", comp.Name, comp.ID)
 					}
 				}
 			}, 1*time.Minute, 1*time.Second,
