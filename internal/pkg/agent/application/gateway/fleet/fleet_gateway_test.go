@@ -1140,7 +1140,7 @@ func TestAvailableRollbacks(t *testing.T) {
 			name: "valid available rollbacks - assert key and value",
 			setup: func(t *testing.T, rbSource *mockRollbacksSource, client *testingClient) {
 
-				validUntil := time.Now().Add(time.Minute)
+				validUntil := time.Now().UTC().Add(time.Minute)
 				// truncate to the second to avoid different precision due to marshal/unmarshal
 				validUntil = validUntil.Truncate(time.Second)
 
