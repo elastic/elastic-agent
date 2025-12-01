@@ -20,6 +20,8 @@ steps:
     agents:
       provider: "gcp"
 
+  - wait
+
   - label: ":pipeline::grey_question::seedling: Trigger service tests for ${ENVIRONMENT}"
     command: ".buildkite/scripts/steps/run-agentless-tests.sh"
     agents:
