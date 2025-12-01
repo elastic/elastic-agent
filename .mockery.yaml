@@ -19,7 +19,7 @@ packages:
       Agent: {}
   github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet:
     interfaces:
-      rollbacksSource: { }
+      rollbacksSource: {}
   github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade:
     interfaces:
       WatcherHelper: {}

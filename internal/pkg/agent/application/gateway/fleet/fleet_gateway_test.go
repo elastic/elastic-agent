@@ -22,10 +22,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/logp"
-
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
+
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -1105,6 +1106,121 @@ func TestConvertToCheckingComponents(t *testing.T) {
 				})
 			}
 			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestAvailableRollbacks(t *testing.T) {
+	testcases := []struct {
+		name                  string
+		setup                 func(t *testing.T, rbSource *mockRollbacksSource, client *testingClient)
+		wantErr               assert.ErrorAssertionFunc
+		assertCheckinResponse func(t *testing.T, resp *fleetapi.CheckinResponse)
+	}{
+		{
+			name: "no available rollbacks - normal checkin",
+			setup: func(t *testing.T, rbSource *mockRollbacksSource, client *testingClient) {
+				rbSource.EXPECT().Get().Return(nil, nil)
+				client.Answer(func(_ context.Context, _ http.Header, body io.Reader) (*http.Response, error) {
+					unmarshaled := map[string]interface{}{}
+					err := json.NewDecoder(body).Decode(&unmarshaled)
+					assert.NoError(t, err, "error decoding checkin body")
+					assert.NotContains(t, unmarshaled, "available_rollbacks")
+					return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       io.NopCloser(strings.NewReader("{}")),
+						},
+						nil
+				})
+			},
+			wantErr:               assert.NoError,
+			assertCheckinResponse: nil,
+		},
+		{
+			name: "valid available rollbacks - assert key and value",
+			setup: func(t *testing.T, rbSource *mockRollbacksSource, client *testingClient) {
+
+				validUntil := time.Now().Add(time.Minute)
+				// truncate to the second to avoid different precision due to marshal/unmarshal
+				validUntil = validUntil.Truncate(time.Second)
+
+				rbSource.EXPECT().Get().Return(map[string]ttl.TTLMarker{
+					"data/elastic-agent-1.2.3-abcdef": {
+						Version:    "1.2.3",
+						Hash:       "abcdef",
+						ValidUntil: validUntil,
+					},
+				}, nil)
+				client.Answer(func(_ context.Context, _ http.Header, body io.Reader) (*http.Response, error) {
+					unmarshaled := map[string]json.RawMessage{}
+					err := json.NewDecoder(body).Decode(&unmarshaled)
+					assert.NoError(t, err, "error decoding checkin body")
+					if assert.Contains(t, unmarshaled, "available_rollbacks") {
+						// verify that we got the correct data
+						var actual []fleetapi.CheckinRollback
+						err = json.Unmarshal(unmarshaled["available_rollbacks"], &actual)
+						require.NoError(t, err, "error decoding available rollbacks from checkin body")
+
+						expected := []fleetapi.CheckinRollback{{
+							Version:    "1.2.3",
+							ValidUntil: validUntil,
+						}}
+						assert.Equal(t, expected, actual)
+					}
+
+					return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       io.NopCloser(strings.NewReader("{}")),
+						},
+						nil
+				})
+			},
+			wantErr:               assert.NoError,
+			assertCheckinResponse: nil,
+		},
+		{
+			name: "Error getting rollbacks should not make the checkin error out, just omit available_rollbacks",
+			setup: func(t *testing.T, rbSource *mockRollbacksSource, client *testingClient) {
+				rbSource.EXPECT().Get().Return(nil, errors.New("some error getting rollbacks"))
+				client.Answer(func(_ context.Context, _ http.Header, body io.Reader) (*http.Response, error) {
+					unmarshaled := map[string]interface{}{}
+					err := json.NewDecoder(body).Decode(&unmarshaled)
+					assert.NoError(t, err, "error decoding checkin body")
+					assert.NotContains(t, unmarshaled, "available_rollbacks")
+
+					return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       io.NopCloser(strings.NewReader("{}")),
+						},
+						nil
+				})
+			},
+			wantErr:               assert.NoError,
+			assertCheckinResponse: nil,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			stepperScheduler := scheduler.NewStepper()
+			testClient := newTestingClient()
+			log, _ := logger.New("fleet_gateway", false)
+
+			stateStore := newStateStore(t, log)
+
+			mockRollbacksSrc := newMockRollbacksSource(t)
+
+			mockAgentInfo := new(testAgentInfo)
+
+			tc.setup(t, mockRollbacksSrc, testClient)
+
+			gateway, err := newFleetGatewayWithScheduler(log, defaultGatewaySettings, mockAgentInfo, testClient, stepperScheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
+			require.NoError(t, err, "error creating gateway")
+			checkinResponse, _, err := gateway.execute(t.Context())
+			tc.wantErr(t, err)
+			if tc.assertCheckinResponse != nil {
+				tc.assertCheckinResponse(t, checkinResponse)
+			}
 		})
 	}
 }
