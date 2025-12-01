@@ -30,6 +30,9 @@ setup_extract_sha() {
     else
         (cd serverless-gitops && git pull)
     fi
+
+    # Install yq for YAML parsing
+    go install github.com/mikefarah/yq/v4@v4.45.1
 }
 
 extract_sha() {
