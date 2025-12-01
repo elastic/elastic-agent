@@ -14,6 +14,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	koanfmaps "github.com/knadh/koanf/maps"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/monitoringhelpers"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -25,7 +26,7 @@ import (
 
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -292,7 +293,7 @@ func getReceiversConfigForComponent(
 	// Beat config inside a beat receiver is nested under an additional key. Not sure if this simple translation is
 	// always safe. We should either ensure this is always the case, or have an explicit mapping.
 	beatName := strings.TrimSuffix(receiverType.String(), "receiver")
-	binaryName := GetBeatNameForComponent(comp)
+	binaryName := comp.BeatName()
 	dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
 
 	receiverConfig := map[string]any{
@@ -381,19 +382,10 @@ func getExportersConfigForComponent(comp *component.Component, logger *logp.Logg
 	return exportersConfig, queueSettings, extensionConfig, nil
 }
 
-// GetBeatNameForComponent returns the beat binary name that would be used to run this component.
-func GetBeatNameForComponent(comp *component.Component) string {
-	// TODO: Add this information directly to the spec?
-	if comp.InputSpec == nil || comp.InputSpec.BinaryName != "agentbeat" {
-		return ""
-	}
-	return comp.InputSpec.Spec.Command.Args[0]
-}
-
 // getSignalForComponent returns the otel signal for the given component. Currently, this is always logs, even for
 // metricbeat.
 func getSignalForComponent(comp *component.Component) (pipeline.Signal, error) {
-	beatName := GetBeatNameForComponent(comp)
+	beatName := comp.BeatName()
 	switch beatName {
 	case "filebeat", "metricbeat":
 		return pipeline.SignalLogs, nil
@@ -404,7 +396,7 @@ func getSignalForComponent(comp *component.Component) (pipeline.Signal, error) {
 
 // getReceiverTypeForComponent returns the receiver type for the given component.
 func getReceiverTypeForComponent(comp *component.Component) (otelcomponent.Type, error) {
-	beatName := GetBeatNameForComponent(comp)
+	beatName := comp.BeatName()
 	switch beatName {
 	case "filebeat":
 		return otelcomponent.MustNewType("filebeatreceiver"), nil
@@ -557,7 +549,7 @@ func OutputConfigToExporterConfig(logger *logp.Logger, exporterType otelcomponen
 // getDefaultDatastreamTypeForComponent returns the default datastream type for a given component.
 // This is needed to translate from the agent policy config format to the beats config format.
 func getDefaultDatastreamTypeForComponent(comp *component.Component) (string, error) {
-	beatName := GetBeatNameForComponent(comp)
+	beatName := comp.BeatName()
 	switch beatName {
 	case "filebeat":
 		return "logs", nil
@@ -649,7 +641,10 @@ func BeatDataPath(componentId string) string {
 // getBeatsAuthExtensionConfig sets http transport settings on beatsauth
 // currently this is only supported for elasticsearch output
 func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
-	defaultTransportSettings := elasticsearch.ESDefaultTransportSettings()
+
+	authSettings := beatsauthextension.BeatsAuthConfig{
+		Transport: elasticsearch.ESDefaultTransportSettings(),
+	}
 
 	var resultMap map[string]any
 	if err := outputCfg.Unpack(&resultMap); err != nil {
@@ -657,7 +652,7 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 	}
 
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		Result:          &defaultTransportSettings,
+		Result:          &authSettings,
 		TagName:         "config",
 		SquashTagOption: "inline",
 		DecodeHook:      cfgDecodeHookFunc(),
@@ -670,17 +665,24 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 		return nil, err
 	}
 
-	newConfig, err := config.NewConfigFrom(defaultTransportSettings)
+	newConfig, err := config.NewConfigFrom(authSettings)
 	if err != nil {
 		return nil, err
 	}
 
 	// proxy_url on newConfig is of type url.URL. Beatsauth extension expects it to be of string type instead
 	// this logic here converts url.URL to string type similar to what a user would set on filebeat config
-	if defaultTransportSettings.Proxy.URL != nil {
-		err = newConfig.SetString("proxy_url", -1, defaultTransportSettings.Proxy.URL.String())
+	if authSettings.Transport.Proxy.URL != nil {
+		err = newConfig.SetString("proxy_url", -1, authSettings.Transport.Proxy.URL.String())
 		if err != nil {
 			return nil, fmt.Errorf("error settingg proxy url:%w ", err)
+		}
+	}
+
+	if authSettings.Kerberos != nil {
+		err = newConfig.SetString("kerberos.auth_type", -1, authSettings.Kerberos.AuthType.String())
+		if err != nil {
+			return nil, fmt.Errorf("error setting kerberos auth type url:%w ", err)
 		}
 	}
 

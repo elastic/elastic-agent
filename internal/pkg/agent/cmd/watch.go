@@ -102,6 +102,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 					fmt.Fprintf(streams.Err, "Rollback command failed: %v\n", err)
 					os.Exit(errorRollbackFailed)
 				}
+				return
 			}
 
 			if err = withAppLocker(log, func() error {
@@ -200,7 +201,19 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 		// hash is the same as hash of agent which initiated watcher.
 		versionedHomesToKeep := make([]string, 0, len(marker.RollbacksAvailable)+1)
 		// current version needs to be kept
-		versionedHomesToKeep = append(versionedHomesToKeep, paths.VersionedHome(topDir))
+		if marker.Details != nil && marker.Details.State == details.StateRollback {
+			// we need to keep the previous versioned home (we have rolled back)
+			versionedHomesToKeep = append(versionedHomesToKeep, marker.PrevVersionedHome)
+		} else {
+			// we need to keep the upgraded version, since it has not been rolled back
+			absCurrentVersionedHome := paths.VersionedHome(topDir)
+			currentVersionedHome, err := filepath.Rel(topDir, absCurrentVersionedHome)
+			if err != nil {
+				return fmt.Errorf("extracting current home path %q relative to %q: %w", absCurrentVersionedHome, topDir, err)
+			}
+			versionedHomesToKeep = append(versionedHomesToKeep, currentVersionedHome)
+		}
+
 		versionedHomesToKeep = appendAvailableRollbacks(log, marker, versionedHomesToKeep)
 		log.Infof("About to clean up upgrade. Keeping versioned homes: %v", versionedHomesToKeep)
 		if err := installModifier.Cleanup(log, paths.Top(), true, false, versionedHomesToKeep...); err != nil {
@@ -320,6 +333,14 @@ func rollback(log *logp.Logger, topDir string, client client.Client, installModi
 	// FIXME get the hash from the list of installs or the manifest or the versioned home
 	// This is only a placeholder in case there is no versionedHome defined (which we always have)
 	hash := ""
+	if filepath.IsAbs(versionedHome) {
+		// if the versioned home is an absolute path we need to normalize it relative to the current topDir as the
+		// cleanup() will expect relative paths
+		versionedHome, err = filepath.Rel(topDir, versionedHome)
+		if err != nil {
+			return fmt.Errorf("extract from %q a path relative to %q: %w", versionedHome, topDir, err)
+		}
+	}
 	err = installModifier.Rollback(context.Background(), log, client, topDir, versionedHome, hash, WithPreRestartHook(updateMarkerAndDetails))
 	if err != nil {
 		return fmt.Errorf("rolling back: %w", err)

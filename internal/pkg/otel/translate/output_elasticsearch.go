@@ -17,6 +17,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 
 	"github.com/elastic/beats/v7/libbeat/common"
+	"github.com/elastic/beats/v7/libbeat/common/transport/kerberos"
 	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
 	"github.com/elastic/beats/v7/libbeat/publisher/queue/memqueue"
@@ -196,8 +197,6 @@ func checkUnsupportedConfig(cfg *config.C) error {
 		return fmt.Errorf("ladbalance:false is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("non_indexable_policy") {
 		return fmt.Errorf("non_indexable_policy is currently not supported: %w", errors.ErrUnsupported)
-	} else if cfg.HasField("kerberos") {
-		return fmt.Errorf("kerberos is currently not supported: %w", errors.ErrUnsupported)
 	}
 
 	return nil
@@ -273,6 +272,12 @@ func cfgDecodeHookFunc() mapstructure.DecodeHookFunc {
 				return nil, fmt.Errorf("failed parsing proxy_url: %w", err)
 			}
 			return proxyURL, nil
+		case t == reflect.TypeOf(kerberos.AuthType(0)):
+			var authType kerberos.AuthType
+			if err := authType.Unpack(data.(string)); err != nil {
+				return nil, fmt.Errorf("failed parsing kerberos.auth_type: %w", err)
+			}
+			return authType, nil
 		default:
 			return data, nil
 		}
