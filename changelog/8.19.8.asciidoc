@@ -34,8 +34,8 @@ Review important information about the  8.19.8 release.
 
 
 
-* Fix filesource provider to work with kubernetes secret mounts. https://github.com/elastic/elastic-agent/pull/11184[#11184] https://github.com/elastic/elastic-agent/pull/11300[#11300] https://github.com/elastic/elastic-agent/pull/11429[#11429] https://github.com/elastic/elastic-agent/pull/11438[#11438] https://github.com/elastic/elastic-agent/issues/11083[#11083] https://github.com/elastic/elastic-agent/issues/11230[#11230]
-* Ensure the monitoring input for the Otel collector can only run inside the collector. https://github.com/elastic/elastic-agent/pull/11184[#11184] https://github.com/elastic/elastic-agent/pull/11300[#11300] https://github.com/elastic/elastic-agent/pull/11429[#11429] https://github.com/elastic/elastic-agent/pull/11438[#11438] https://github.com/elastic/elastic-agent/issues/11083[#11083] https://github.com/elastic/elastic-agent/issues/11230[#11230]
-* Fix a fatal startup error in Beats Receivers caused by truncation of long UTF-8 hostnames. https://github.com/elastic/elastic-agent/pull/11184[#11184] https://github.com/elastic/elastic-agent/pull/11300[#11300] https://github.com/elastic/elastic-agent/pull/11429[#11429] https://github.com/elastic/elastic-agent/pull/11438[#11438] https://github.com/elastic/elastic-agent/issues/11083[#11083] https://github.com/elastic/elastic-agent/issues/11230[#11230]
+* Fix filesource provider to work with kubernetes secret mounts. https://github.com/elastic/elastic-agent/pull/11050[#11050]
+* Ensure the monitoring input for the Otel collector can only run inside the collector. https://github.com/elastic/elastic-agent/pull/11204[#11204]
+* Fix a fatal startup error in Beats Receivers caused by truncation of long UTF-8 hostnames. https://github.com/elastic/elastic-agent/pull/11285[#11285]
 
 // end 8.19.8 relnotes
