@@ -1241,7 +1241,7 @@ func packageAgent(ctx context.Context, platforms devtools.BuildPlatformList, dep
 	// package agent
 	log.Println("--- Running post packaging ")
 	mg.Deps(Update)
-	mg.Deps(agentBinaryTargets...)
+	mg.SerialDeps(agentBinaryTargets...)
 
 	// compile the elastic-agent.exe proxy binary for the windows archive
 	for _, p := range platforms {
