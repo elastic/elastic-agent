@@ -15,6 +15,11 @@ env:
   TEAM_CHANNEL: "#agentless-alerts"
 
 steps:
+  - label: ":docker: Validate docker image is built for all architectures"
+    command: ".buildkite/scripts/steps/validate-agentless-docker-image.sh"
+    agents:
+      provider: "gcp"
+
   - label: ":pipeline::grey_question::seedling: Trigger service tests for ${ENVIRONMENT}"
     command: ".buildkite/scripts/steps/run-agentless-tests.sh"
     agents:
