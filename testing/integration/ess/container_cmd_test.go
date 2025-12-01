@@ -548,7 +548,7 @@ func TestContainerCMDAgentMonitoringRuntimeExperimental(t *testing.T) {
 					case "beat-v2-client":
 						compRuntime = string(component.ProcessRuntimeManager)
 					}
-					ct.Logf("Component ID: %s, version info: %s, runtime: %s", comp.ID, comp.VersionInfo.Name, compRuntime)
+					t.Logf("Component ID: %s, version info: %s, runtime: %s", comp.ID, comp.VersionInfo.Name, compRuntime)
 					switch comp.ID {
 					case "beat/metrics-monitoring", "filestream-monitoring", "prometheus/metrics-monitoring":
 						// Monitoring components should use the expected runtime
