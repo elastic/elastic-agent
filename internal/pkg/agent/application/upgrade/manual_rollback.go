@@ -17,6 +17,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -271,4 +272,62 @@ func getAvailableRollbacks(rollbackWindow time.Duration, now time.Time, currentV
 	}
 
 	return res
+}
+
+type RollbackCleanupFilter func(log *logger.Logger, now time.Time, versionedHome string, ttl ttl.TTLMarker) bool
+
+// CleanupAllRollbacks is a filter that will match all available rollbacks
+func CleanupAllRollbacks(_ *logger.Logger, _ time.Time, _ string, _ ttl.TTLMarker) bool {
+	return true
+}
+
+// CleanupExpiredRollbacks is a filter that will match all expired rollback targets
+func CleanupExpiredRollbacks(log *logger.Logger, now time.Time, versionedHome string, ttl ttl.TTLMarker) bool {
+	if now.After(ttl.ValidUntil) {
+		// the install directory exists but it's expired. Remove the files.
+		log.Infof("agent TTL marker %+v marks %q as expired, removing directory", ttl, versionedHome)
+		return true
+	}
+
+	return false
+}
+
+// CleanAvailableRollbacks will remove the extra agent installs that can be used as manual rollback target. Invoked before triggering
+// an update in order to free disk space for the new agent version or whenever a cleanup should happen.
+// This function has basic protection for the current home and it will remove any available rollback for which the filter function
+// returns true.
+// This function will return the leftover available rollbacks that will survive the cleanup, can be used to schedule another launch
+// of the cleanup in the future
+func CleanAvailableRollbacks(log *logger.Logger, source availableRollbacksSource, topDir string, currentHomeRelPath string, filter RollbackCleanupFilter) (map[string]ttl.TTLMarker, error) {
+	rollbacks, err := source.Get()
+	if err != nil {
+		return nil, fmt.Errorf("unable to get available rollbacks: %w", err)
+	}
+
+	// Clean the currentHomeRel path to normalize it
+	currentHomeRelPath = filepath.Clean(currentHomeRelPath)
+
+	log.Debugw("preparing to cleanup rollbacks", "rollbacks", rollbacks)
+	var aggregateErr error
+	now := time.Now().UTC()
+
+	leftoverRollbacks := map[string]ttl.TTLMarker{}
+
+	for versionedHome, ttlMarker := range rollbacks {
+
+		if currentHomeRelPath == filepath.Clean(versionedHome) {
+			log.Warnf("skipping cleanup of available rollback located in %q as it matches the current home", versionedHome)
+			continue
+		}
+
+		if filter(log, now, versionedHome, ttlMarker) {
+			versionedHomeAbsPath := filepath.Join(topDir, versionedHome)
+			if cleanupErr := install.RemoveBut(versionedHomeAbsPath, true); cleanupErr != nil {
+				aggregateErr = errors.Join(aggregateErr, fmt.Errorf("removing directory %q: %w", versionedHomeAbsPath, cleanupErr))
+			}
+		} else {
+			leftoverRollbacks[versionedHome] = ttlMarker
+		}
+	}
+	return leftoverRollbacks, aggregateErr
 }

@@ -338,6 +338,16 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		u.log.Errorw("Unable to clean downloads before update", "error.message", err, "downloads.path", paths.Downloads())
 	}
 
+	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
+	if err != nil {
+		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
+	}
+
+	_, err = CleanAvailableRollbacks(u.log, u.availableRollbacksSource, paths.Top(), currentVersionedHome, CleanupAllRollbacks)
+	if err != nil {
+		u.log.Warnw("Unable to clean all available rollbacks", "error.message", err)
+	}
+
 	det.SetState(details.StateDownloading)
 
 	sourceURI = u.sourceURI(sourceURI)
@@ -435,11 +445,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 
 	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
 	newPath := paths.BinaryPath(filepath.Join(paths.Top(), hashedDir), AgentName)
-
-	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
-	if err != nil {
-		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
-	}
 
 	if err := u.changeSymlink(u.log, paths.Top(), symlinkPath, newPath); err != nil {
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)
