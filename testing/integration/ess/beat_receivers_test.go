@@ -909,6 +909,9 @@ func TestSensitiveLogsESExporter(t *testing.T) {
 		},
 		Stack: &define.Stack{},
 	})
+
+	t.Skip("Flaky test, see https://github.com/elastic/elastic-agent/issues/11023#issuecomment-3596964850")
+
 	tmpDir := t.TempDir()
 	numEvents := 50
 	// Create the data file to ingest
