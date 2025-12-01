@@ -23,11 +23,11 @@ const (
 	OtelRuntimeManager    = "otel"
 	DefaultRuntimeManager = OtelRuntimeManager
 
-	// metricset execution period used for the monitoring metrics inputs
+	// DefaultMetricsCollectionInterval is the metricset execution period used for the monitoring metrics inputs
 	// we set this to 60s to reduce the load/data volume on the monitoring cluster
 	DefaultMetricsCollectionInterval = 60 * time.Second
 
-	// metricset stream failure threshold before the stream is marked as DEGRADED
+	// DefaultMetricsStreamFailureThreshold is the metricset stream failure threshold before the stream is marked as DEGRADED
 	// to avoid marking the agent degraded for transient errors, we set the default threshold to 5
 	DefaultMetricsStreamFailureThreshold = uint(5)
 )
