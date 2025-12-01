@@ -416,4 +416,6 @@ agent.logging.to_stderr: true
 #      - vars:
 #          my_var: key3
 
-
+# Advanced internal settings. No stability guarantees are provided. The options in this section may be removed at any
+# point without warning.
+# agent.internal:
