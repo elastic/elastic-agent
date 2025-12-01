@@ -393,7 +393,7 @@ func uninstallComponents(ctx context.Context, cfgFile string, uninstallToken str
 			continue
 		}
 		if err = uninstallServiceComponent(ctx, log, comp, uninstallToken, pt); err != nil {
-			os.Stderr.WriteString(fmt.Sprintf("failed to uninstall component %q: %s\n", comp.ID, err))
+			_, _ = fmt.Fprintf(os.Stderr, "failed to uninstall component %q: %s\n", comp.ID, err)
 			// The decision was made to change the behaviour and leave the Agent installed if Endpoint uninstall fails
 			// https://github.com/elastic/elastic-agent/pull/2708#issuecomment-1574251911
 			// Thus returning error here.
@@ -423,7 +423,7 @@ func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Confi
 	if err != nil {
 		return nil, aerrors.New("failed to create a map from config", err)
 	}
-	allComps, err := specs.ToComponents(mm, nil, logp.InfoLevel, nil, map[string]uint64{})
+	allComps, err := specs.ToComponents(mm, nil, nil, logp.InfoLevel, nil, map[string]uint64{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to render components: %w", err)
 	}
