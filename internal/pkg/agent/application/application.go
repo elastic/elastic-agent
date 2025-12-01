@@ -132,6 +132,7 @@ func New(
 		cfg.Settings.DownloadConfig.OS(),
 		cfg.Settings.MonitoringConfig,
 		agentInfo,
+		log,
 	)
 
 	runtime, err := runtime.NewManager(
@@ -148,7 +149,7 @@ func New(
 
 	var configMgr coordinator.ConfigManager
 	var managed *managedConfigManager
-	var compModifiers = []coordinator.ComponentsModifier{InjectAPMConfig}
+	var compModifiers = []component.ComponentsModifier{InjectAPMConfig}
 	var composableManaged bool
 	var isManaged bool
 	var actionAcker acker.Acker
