@@ -14,6 +14,14 @@ toc:
       - file: config/proxy.md
   - file: components.md
     children:
+<<<<<<< HEAD
+=======
+      - file: components/apmconfigextension.md
+      - file: components/attributesprocessor.md
+      - file: components/elasticapmconnector.md
+      - file: components/elasticapmintakereceiver.md
+      - file: components/elasticapmprocessor.md
+>>>>>>> 4d7a357d7 (Add documentation page for the EDOT Collector attributes processor (#11331))
       - file: components/elasticsearchexporter.md
       - file: components/elasticapmintakereceiver.md
       - file: components/k8sclusterreceiver.md
