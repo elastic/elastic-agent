@@ -17,6 +17,8 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
@@ -42,7 +44,10 @@ func TestMonitoringFull(t *testing.T) {
 			},
 		},
 		"outputs": map[string]any{
-			"default": map[string]any{},
+			"default": map[string]any{
+				"hosts": []string{"localhost:9200"},
+				"type":  "elasticsearch",
+			},
 		},
 	}
 
@@ -123,6 +128,7 @@ func TestMonitoringFull(t *testing.T) {
 					},
 				},
 				agentInfo: agentInfo,
+				logger:    logp.NewNopLogger(),
 			}
 
 			expectedConfigBytes, err := os.ReadFile(tc.ExpectedConfigPath)
@@ -173,6 +179,7 @@ func TestMonitoringWithEndpoint(t *testing.T) {
 			},
 		},
 		agentInfo: agentInfo,
+		logger:    logp.NewNopLogger(),
 	}
 
 	policy := map[string]any{
@@ -347,6 +354,7 @@ func TestMonitoringConfigMetricsInterval(t *testing.T) {
 				config:          tc.monitoringCfg,
 				operatingSystem: runtime.GOOS,
 				agentInfo:       agentInfo,
+				logger:          logp.NewNopLogger(),
 			}
 			got, err := b.MonitoringConfig(tc.policy, components, map[string]uint64{}) // put a componentID/binary mapping to have something in the beats monitoring input
 			assert.NoError(t, err)
@@ -580,6 +588,7 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 				config:          tc.monitoringCfg,
 				operatingSystem: runtime.GOOS,
 				agentInfo:       agentInfo,
+				logger:          logp.NewNopLogger(),
 			}
 			got, err := b.MonitoringConfig(tc.policy, components, map[string]uint64{}) // put a componentID/binary mapping to have something in the beats monitoring input
 			assert.NoError(t, err)
@@ -755,6 +764,7 @@ func TestErrorMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 				config:          tc.monitoringCfg,
 				operatingSystem: runtime.GOOS,
 				agentInfo:       agentInfo,
+				logger:          logp.NewNopLogger(),
 			}
 
 			_, err := b.MonitoringConfig(tc.policy, components, map[string]uint64{}) // put a componentID/binary mapping to have something in the beats monitoring input
@@ -794,6 +804,7 @@ func TestMonitoringConfigComponentFields(t *testing.T) {
 		enabled:   true,
 		config:    cfg,
 		agentInfo: agentInfo,
+		logger:    logp.NewNopLogger(),
 	}
 
 	components := []component.Component{
@@ -904,6 +915,7 @@ func TestMonitoringConfigForBeatsReceivers(t *testing.T) {
 		enabled:   true,
 		config:    cfg,
 		agentInfo: agentInfo,
+		logger:    logp.NewNopLogger(),
 	}
 
 	components := []component.Component{
@@ -991,7 +1003,10 @@ func TestMonitoringWithOtelRuntime(t *testing.T) {
 					},
 				},
 				"outputs": map[string]any{
-					"default": map[string]any{},
+					"default": map[string]any{
+						"hosts": []string{"localhost:9200"},
+						"type":  "elasticsearch",
+					},
 				},
 			}
 
@@ -999,6 +1014,7 @@ func TestMonitoringWithOtelRuntime(t *testing.T) {
 				enabled:   true,
 				config:    cfg,
 				agentInfo: agentInfo,
+				logger:    logp.NewNopLogger(),
 			}
 
 			components := []component.Component{
@@ -1084,6 +1100,7 @@ func TestEnrichArgs(t *testing.T) {
 			b := &BeatsMonitor{
 				enabled: test.enabled,
 				config:  &test.config,
+				logger:  logp.NewNopLogger(),
 			}
 			args := b.EnrichArgs(unitID, test.binaryName, nil)
 			// replace socket path with placeholder, it's annoying to do cross-platform tests on these
@@ -1117,7 +1134,7 @@ func TestMonitorReload(t *testing.T) {
 	monitorcfg.MonitorLogs = false
 	monitorcfg.MonitorMetrics = false
 
-	beatsMonitor := New(true, "", monitorcfg, nil)
+	beatsMonitor := New(true, "", monitorcfg, nil, logp.NewNopLogger())
 	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, false)
 	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, false)
 
@@ -1133,4 +1150,127 @@ agent.monitoring:
 
 	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, true)
 	assert.Equal(t, beatsMonitor.config.C.MonitorMetrics, true)
+}
+
+func TestMonitoringConfigOtelOutputSupport(t *testing.T) {
+	agentInfo, err := info.NewAgentInfo(context.Background(), false)
+	require.NoError(t, err, "Error creating agent info")
+
+	testCases := []struct {
+		name                       string
+		outputConfig               map[string]any
+		expectPrometheusMonitoring bool
+		monitoringRuntimeManager   string
+	}{
+		{
+			name: "kafka output - should NOT have prometheus monitoring",
+			outputConfig: map[string]any{
+				"type":  "kafka",
+				"hosts": []string{"localhost:9092"},
+			},
+			expectPrometheusMonitoring: false,
+			monitoringRuntimeManager:   monitoringcfg.ProcessRuntimeManager,
+		},
+		{
+			name: "logstash output - should NOT have prometheus monitoring",
+			outputConfig: map[string]any{
+				"type":  "logstash",
+				"hosts": []string{"localhost:9092"},
+			},
+			expectPrometheusMonitoring: false,
+			monitoringRuntimeManager:   monitoringcfg.ProcessRuntimeManager,
+		},
+		{
+			name: "elasticsearch output - should have prometheus monitoring",
+			outputConfig: map[string]any{
+				"type":  "elasticsearch",
+				"hosts": []string{"localhost:9200"},
+			},
+			expectPrometheusMonitoring: true,
+			monitoringRuntimeManager:   monitoringcfg.OtelRuntimeManager,
+		},
+		{
+			name: "elasticsearch with unsupported config - should NOT have prometheus monitoring",
+			outputConfig: map[string]any{
+				"type":    "elasticsearch",
+				"hosts":   []string{"localhost:9200"},
+				"indices": []any{},
+			},
+			expectPrometheusMonitoring: false,
+			monitoringRuntimeManager:   monitoringcfg.ProcessRuntimeManager,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testMon := BeatsMonitor{
+				enabled: true,
+				config: &monitoringConfig{
+					C: &monitoringcfg.MonitoringConfig{
+						Enabled:        true,
+						MonitorMetrics: true,
+						MonitorLogs:    false,
+						HTTP: &monitoringcfg.MonitoringHTTPConfig{
+							Enabled: false,
+						},
+						RuntimeManager: monitoringcfg.OtelRuntimeManager,
+					},
+				},
+				agentInfo: agentInfo,
+				logger:    logp.NewNopLogger(),
+			}
+
+			policy := map[string]any{
+				"agent": map[string]any{
+					"monitoring": map[string]any{
+						"metrics": true,
+						"http": map[string]any{
+							"enabled": false,
+						},
+					},
+				},
+				"outputs": map[string]any{
+					"default": tc.outputConfig,
+				},
+			}
+
+			// Add a component that uses the OTel runtime to trigger prometheus monitoring
+			components := []component.Component{
+				{
+					ID: "filestream-otel",
+					InputSpec: &component.InputRuntimeSpec{
+						BinaryName: "filebeat",
+						Spec: component.InputSpec{
+							Command: &component.CommandSpec{
+								Name: "filebeat",
+							},
+						},
+					},
+					RuntimeManager: component.OtelRuntimeManager,
+				},
+			}
+
+			outCfg, err := testMon.MonitoringConfig(policy, components, map[string]uint64{})
+			require.NoError(t, err)
+
+			// Check for prometheus/metrics input
+			inputs := outCfg["inputs"].([]any)
+			foundPrometheusInput := false
+			for _, input := range inputs {
+				var inputStruct struct {
+					ID      string `mapstructure:"id"`
+					Type    string `mapstructure:"type"`
+					Runtime string `mapstructure:"_runtime_experimental"`
+				}
+				require.NoError(t, mapstructure.Decode(input, &inputStruct))
+				foundPrometheusInput = foundPrometheusInput || inputStruct.Type == "prometheus/metrics"
+				assert.Equalf(t, tc.monitoringRuntimeManager, inputStruct.Runtime,
+					"expected monitoring runtime manager %s for input %s, got %s",
+					tc.monitoringRuntimeManager, inputStruct.ID, inputStruct.Runtime)
+			}
+
+			assert.Equal(t, tc.expectPrometheusMonitoring, foundPrometheusInput,
+				"Prometheus monitoring presence mismatch for output type")
+		})
+	}
 }

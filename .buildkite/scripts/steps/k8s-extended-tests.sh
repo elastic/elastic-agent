@@ -34,7 +34,7 @@ set -e
 outputXML="build/TEST-go-integration.xml"
 
 if [ -f "$outputXML" ]; then
-  go install github.com/alexec/junit2html@latest
+  go install github.com/kitproj/junit2html@latest
   junit2html < "$outputXML" > build/TEST-report.html
 else
     echo "Cannot generate HTML test report: $outputXML not found"

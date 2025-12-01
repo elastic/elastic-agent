@@ -37,7 +37,7 @@ import (
 	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/otiai10/copy"
+	filecopy "github.com/otiai10/copy"
 
 	"github.com/elastic/elastic-agent/dev-tools/devmachine"
 	"github.com/elastic/elastic-agent/dev-tools/mage"
@@ -261,11 +261,11 @@ func (Build) GenerateConfig() error {
 	return sh.Copy(filepath.Join(buildDir, configFile), filepath.Join(metaDir, configFile))
 }
 
-// WindowsArchiveRootBinary compiles a binary to be placed at the root of the windows elastic-agent archive. This binary
+// windowsArchiveRootBinaryForGoArch compiles a binary to be placed at the root of the windows elastic-agent archive. This binary
 // is a thin proxy to the actual elastic-agent binary that resides in the data/elastic-agent-{commit-short-sha}
 // directory of the archive.
-func (Build) WindowsArchiveRootBinary() error {
-	fmt.Println("--- Compiling root binary for windows archive")
+func (Build) windowsArchiveRootBinaryForGoArch(goarch string) error {
+	fmt.Printf("--- Compiling root binary for %s windows archive\n", goarch)
 	hashShort, err := devtools.CommitHashShort()
 	if err != nil {
 		return fmt.Errorf("error getting commit hash: %w", err)
@@ -279,7 +279,7 @@ func (Build) WindowsArchiveRootBinary() error {
 
 	args := devtools.BuildArgs{
 		Name:        outputName,
-		OutputDir:   filepath.Join(buildDir, "windows-archive-root-binary"),
+		OutputDir:   filepath.Join(buildDir, fmt.Sprintf("windows-%s-archive-root-binary", goarch)),
 		InputFiles:  []string{"wrapper/windows/archive-proxy/main.go"},
 		CGO:         false,
 		WinMetadata: true,
@@ -292,7 +292,7 @@ func (Build) WindowsArchiveRootBinary() error {
 		},
 		Env: map[string]string{
 			"GOOS":   "windows",
-			"GOARCH": devtools.GOARCH,
+			"GOARCH": goarch,
 		},
 		LDFlags: []string{
 			"-s", // Strip all debug symbols from binary (does not affect Go stack traces).
@@ -308,6 +308,13 @@ func (Build) WindowsArchiveRootBinary() error {
 	}
 
 	return devtools.Build(args)
+}
+
+// WindowsArchiveRootBinary compiles a binary to be placed at the root of the windows elastic-agent archive. This binary
+// is a thin proxy to the actual elastic-agent binary that resides in the data/elastic-agent-{commit-short-sha}
+// directory of the archive.
+func (Build) WindowsArchiveRootBinary() {
+	mg.Deps(mg.F(Build.windowsArchiveRootBinaryForGoArch, devtools.GOARCH))
 }
 
 // GolangCrossBuildOSS build the Beat binary inside of the golang-builder.
@@ -427,7 +434,11 @@ func (Build) TestBinaries() error {
 		}
 
 		outputName := filepath.Join(pkg, binary)
-		err := devtools.Run(nil, nil, os.Stderr, "go", pkg, "build", "-v", "-o", outputName, pkg)
+		finalArgs := make([]string, len(args))
+		copy(finalArgs, args)
+		finalArgs = append(finalArgs, "-o", outputName, filepath.Join(pkg))
+
+		err := RunGo(finalArgs...)
 		if err != nil {
 			return err
 		}
@@ -439,9 +450,9 @@ func (Build) TestBinaries() error {
 	return nil
 }
 
-// All run all the code checks.
+// All run all the code and docs checks.
 func (Check) All() {
-	mg.SerialDeps(Check.License, Integration.Check)
+	mg.SerialDeps(Check.License, Integration.Check, Check.DocsFiles)
 }
 
 // License makes sure that all the Golang files have the appropriate license header.
@@ -449,6 +460,40 @@ func (Check) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
 	// exclude copied files until we come up with a better option
 	return sh.RunV("go-licenser", "-d", "-license", "Elasticv2")
+}
+
+// DocsFiles validates that files required by the docs generation script exist.
+func (Check) DocsFiles() error {
+	fmt.Println("Validating files required by docs/scripts/update-docs/update-components-docs.py")
+
+	requiredFiles := []string{
+		"go.mod",
+		"internal/pkg/otel/components.yml",
+		"internal/pkg/otel/samples/linux/gateway.yml",
+	}
+
+	missing := false
+	for _, file := range requiredFiles {
+		if _, err := os.Stat(file); os.IsNotExist(err) {
+			fmt.Printf("❌ Missing: %s\n", file)
+			missing = true
+		} else {
+			fmt.Printf("✅ Found: %s\n", file)
+		}
+	}
+
+	if missing {
+		fmt.Println()
+		return fmt.Errorf("one or more files required by the docs generation script are missing.\n" +
+			"If these files were intentionally moved, please update:\n" +
+			"  - docs/scripts/update-docs/update-components-docs.py\n" +
+			"  - magefile.go (Check.DocsFiles function)\n" +
+			"  - .github/workflows/validate-docs-structure.yml")
+	}
+
+	fmt.Println()
+	fmt.Println("✅ All required files are present.")
+	return nil
 }
 
 // Changes run git status --porcelain and return an error if we have changes or uncommitted files.
@@ -537,7 +582,7 @@ func Package(ctx context.Context) error {
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
-	platforms := devtools.Platforms.Names()
+	platforms := devtools.Platforms
 	if len(platforms) == 0 {
 		panic("elastic-agent package is expected to build at least one platform package")
 	}
@@ -564,7 +609,7 @@ func Package(ctx context.Context) error {
 	// add the snapshot suffix if needed
 	dependenciesVersion += devtools.SnapshotSuffix()
 
-	packageAgent(ctx, platforms, dependenciesVersion, manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(CrossBuild), devtools.SelectedPackageTypes)
+	packageAgent(ctx, platforms, dependenciesVersion, manifestResponse, devtools.SelectedPackageTypes, mg.F(devtools.UseElasticAgentPackaging), getAgentBuildTargets()...)
 	return nil
 }
 
@@ -785,7 +830,7 @@ func Update() {
 }
 
 func EnsureCrossBuildOutputDir() error {
-	repositoryRoot, err := findRepositoryRoot()
+	repositoryRoot, err := mage.ElasticBeatsDir()
 	if err != nil {
 		return fmt.Errorf("finding repository root: %w", err)
 	}
@@ -1102,9 +1147,9 @@ func runAgent(ctx context.Context, env map[string]string) error {
 		}
 
 		// produce docker package
-		packageAgent(ctx, []string{
-			"linux/amd64",
-		}, dependenciesVersion, nil, mg.F(devtools.UseElasticAgentDemoPackaging), mg.F(CrossBuild), devtools.SelectedPackageTypes)
+		packageAgent(ctx, devtools.BuildPlatformList{
+			devtools.BuildPlatform{Name: "linux/amd64"},
+		}, dependenciesVersion, nil, devtools.SelectedPackageTypes, mg.F(devtools.UseElasticAgentDemoPackaging), getAgentBuildTargets()...)
 
 		dockerPackagePath := filepath.Join("build", "package", "elastic-agent", "elastic-agent-linux-amd64.docker", "docker-build")
 		if err := os.Chdir(dockerPackagePath); err != nil {
@@ -1151,7 +1196,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-func packageAgent(ctx context.Context, platforms []string, dependenciesVersion string, manifestResponse *manifest.Build, agentPackaging, agentBinaryTarget mg.Fn, packageTypes []mage.PackageType) error {
+func packageAgent(ctx context.Context, platforms devtools.BuildPlatformList, dependenciesVersion string, manifestResponse *manifest.Build, packageTypes []mage.PackageType, agentPackaging mg.Fn, agentBinaryTargets ...interface{}) error {
 	fmt.Println("--- Package Elastic-Agent")
 
 	if mg.Verbose() {
@@ -1173,7 +1218,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	keepArchive := os.Getenv("KEEP_ARCHIVE") != ""
 
 	// download/copy all the necessary dependencies for packaging elastic-agent
-	archivePath, dropPath, dependencies := collectPackageDependencies(platforms, dependenciesVersion, packageTypes, dependencies)
+	archivePath, dropPath, dependencies := collectPackageDependencies(platforms.Names(), dependenciesVersion, packageTypes, dependencies)
 
 	// cleanup after build
 	if !keepArchive {
@@ -1191,16 +1236,18 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	defer os.RemoveAll(flatPath)
 
 	// extract all dependencies from their archives into flat dir
-	flattenDependencies(platforms, dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse, dependencies)
+	flattenDependencies(platforms.Names(), dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse, dependencies)
 
 	// package agent
 	log.Println("--- Running post packaging ")
 	mg.Deps(Update)
-	mg.Deps(agentBinaryTarget)
+	mg.SerialDeps(agentBinaryTargets...)
 
 	// compile the elastic-agent.exe proxy binary for the windows archive
-	if slices.Contains(platforms, "windows/amd64") || slices.Contains(platforms, "windows/arm64") {
-		mg.Deps(Build.WindowsArchiveRootBinary)
+	for _, p := range platforms {
+		if p.GOOS() == "windows" {
+			mg.Deps(mg.F(Build.windowsArchiveRootBinaryForGoArch, p.GOARCH()))
+		}
 	}
 
 	mg.SerialDeps(devtools.Package, TestPackages)
@@ -1505,7 +1552,7 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 	}
 
 	// Create a dir with the buildID at <root>/build/dra/<buildID>
-	repositoryRoot, err := findRepositoryRoot()
+	repositoryRoot, err := mage.ElasticBeatsDir()
 	if err != nil {
 		return fmt.Errorf("finding repository root: %w", err)
 	}
@@ -1537,7 +1584,7 @@ func PackageUsingDRA(ctx context.Context) error {
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
-	platforms := devtools.Platforms.Names()
+	platforms := devtools.Platforms
 	if len(platforms) == 0 {
 		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")
 	}
@@ -1561,7 +1608,7 @@ func PackageUsingDRA(ctx context.Context) error {
 		return fmt.Errorf("setting agent commit hash %q: %w", agentCoreProject.CommitHash, err)
 	}
 
-	return packageAgent(ctx, platforms, parsedVersion.VersionWithPrerelease(), manifestResponse, mg.F(devtools.UseElasticAgentPackaging), mg.F(useDRAAgentBinaryForPackage, devtools.ManifestURL, parsedVersion.VersionWithPrerelease()), devtools.SelectedPackageTypes)
+	return packageAgent(ctx, platforms, parsedVersion.VersionWithPrerelease(), manifestResponse, devtools.SelectedPackageTypes, mg.F(devtools.UseElasticAgentPackaging), mg.F(useDRAAgentBinaryForPackage, devtools.ManifestURL, parsedVersion.VersionWithPrerelease()))
 }
 
 func downloadManifestAndSetVersion(ctx context.Context, url string) (*manifest.Build, *version.ParsedSemVer, error) {
@@ -1584,10 +1631,6 @@ func downloadManifestAndSetVersion(ctx context.Context, url string) (*manifest.B
 	os.Setenv("BEAT_VERSION", parsedVersion.CoreVersion())
 
 	return &resp, parsedVersion, nil
-}
-
-func findRepositoryRoot() (string, error) {
-	return sh.Output(mg.GoCmd(), "list", "-f", "{{.Root}}")
 }
 
 func findLatestBuildForBranch(ctx context.Context, baseURL string, branch string) (*branchInfo, error) {
@@ -1747,7 +1790,7 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestURL string, versio
 		log.Printf("found elastic-agent-core component used: %v", elasticAgentCoreComponent)
 	}
 
-	repositoryRoot, err := findRepositoryRoot()
+	repositoryRoot, err := mage.ElasticBeatsDir()
 	if err != nil {
 		return fmt.Errorf("looking up for repository root: %w", err)
 	}
@@ -1813,8 +1856,8 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestURL string, versio
 
 		log.Printf("copying %q to %q", srcBinaryPath, dstBinaryPath)
 
-		err = copy.Copy(srcBinaryPath, dstBinaryPath, copy.Options{
-			PermissionControl: copy.PerservePermission,
+		err = filecopy.Copy(srcBinaryPath, dstBinaryPath, filecopy.Options{
+			PermissionControl: filecopy.PerservePermission,
 		})
 		if err != nil {
 			return fmt.Errorf("copying %q to %q: %w", srcBinaryPath, dstBinaryPath, err)
@@ -2255,7 +2298,9 @@ func (Integration) Local(ctx context.Context, testName string) error {
 	// run the integration tests but only run test that can run locally
 	params := devtools.DefaultGoTestIntegrationArgs()
 	params.Tags = append(params.Tags, "local")
-	params.Packages = []string{"github.com/elastic/elastic-agent/testing/integration"}
+	params.Packages = []string{
+		"github.com/elastic/elastic-agent/testing/integration/...",
+	}
 
 	var goTestFlags []string
 	rawTestFlags := os.Getenv("GOTEST_FLAGS")
@@ -3621,6 +3666,29 @@ func hasCleanOnExit() bool {
 	return b
 }
 
+// GolangCrossBuild builds the elastic-otel-collector binary in the golang-crossbuild container.
+// Don't call directly; called from otel:crossBuild.
+func (Otel) GolangCrossBuild() error {
+	mg.Deps(EnsureCrossBuildOutputDir)
+
+	params := devtools.DefaultGolangCrossBuildArgs()
+	params.Name = "elastic-otel-collector-" + mage.Platform.GOOS + "-" + mage.Platform.Arch
+	params.OutputDir = "build/golang-crossbuild"
+	params.Package = "github.com/elastic/elastic-agent/internal/edot"
+	injectBuildVars(params.Vars)
+
+	if err := devtools.GolangCrossBuild(params); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CrossBuild builds the elastic-otel-collector binary in the golang-crossbuild container.
+func (Otel) CrossBuild() error {
+	return devtools.CrossBuild(devtools.WithName("elastic-otel-collector"), devtools.WithTarget("otel:golangCrossBuild"))
+}
+
 func (Otel) Readme() error {
 	fmt.Println(">> Building internal/pkg/otel/README.md")
 
@@ -4154,4 +4222,14 @@ func getMacOSMajorVersion() (int, error) {
 	}
 
 	return majorVer, nil
+}
+
+func getAgentBuildTargets() []interface{} {
+	// add otel:crossBuild as pre-build for packaging when OTEL_COMPONENT=true
+	buildTargets := make([]interface{}, 0, 2)
+	if mage.OTELComponentBuild {
+		buildTargets = append(buildTargets, Otel.CrossBuild)
+	}
+	buildTargets = append(buildTargets, CrossBuild)
+	return buildTargets
 }
