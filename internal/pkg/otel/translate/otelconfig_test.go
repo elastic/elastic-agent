@@ -1302,10 +1302,10 @@ func TestGetBeatsAuthExtensionConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "with ssl enabled and verification_mode full",
+			name: "with ssl enabled and verification_mode certificate",
 			outputCfg: map[string]any{
 				"ssl.enabled":           true,
-				"ssl.verification_mode": "full",
+				"ssl.verification_mode": "certificate",
 			},
 			expected: map[string]any{
 				"continue_on_error":       true,
@@ -1324,9 +1324,39 @@ func TestGetBeatsAuthExtensionConfig(t *testing.T) {
 					"key_passphrase_path":     "",
 					"renegotiation":           int64(0),
 					"supported_protocols":     []interface{}{},
-					"verification_mode":       uint64(0),
+					"verification_mode":       uint64(2),
 				},
 				"timeout": "1m30s",
+			},
+		},
+		{
+			name: "with kerberos is enabled",
+			outputCfg: map[string]any{
+				"kerberos": map[string]any{
+					"enabled":     true,
+					"auth_type":   "password",
+					"config_path": "temp/krb5.conf",
+					"username":    "beats",
+					"password":    "testing",
+					"realm":       "elastic",
+				},
+			},
+			expected: map[string]any{
+				"continue_on_error":       true,
+				"idle_connection_timeout": "3s",
+				"timeout":                 "1m30s",
+				"kerberos": map[string]any{
+					"enabled":          true,
+					"auth_type":        "password",
+					"config_path":      "temp/krb5.conf",
+					"username":         "beats",
+					"password":         "testing",
+					"realm":            "elastic",
+					"enable_krb5_fast": false,
+					"service_name":     "",
+					"keytab":           "",
+				},
+				"proxy_disable": false,
 			},
 		},
 	}
@@ -1343,6 +1373,58 @@ func TestGetBeatsAuthExtensionConfig(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, tt.expected, actual)
+			}
+		})
+	}
+}
+
+func TestVerifyOutputIsOtelSupported(t *testing.T) {
+	tests := []struct {
+		name          string
+		outputType    string
+		outputCfg     map[string]any
+		expectedError string
+	}{
+		{
+			name:       "supported output - elasticsearch",
+			outputType: "elasticsearch",
+			outputCfg: map[string]any{
+				"type":  "elasticsearch",
+				"hosts": []any{"localhost:9200"},
+			},
+		},
+		{
+			name:          "unsupported output type - kafka",
+			outputType:    "kafka",
+			outputCfg:     map[string]any{},
+			expectedError: "unsupported output type: kafka",
+		},
+		{
+			name:          "unsupported output type - logstash",
+			outputType:    "logstash",
+			outputCfg:     map[string]any{},
+			expectedError: "unsupported output type: logstash",
+		},
+		{
+			name:       "unsupported configuration - indices field",
+			outputType: "elasticsearch",
+			outputCfg: map[string]any{
+				"type":    "elasticsearch",
+				"hosts":   []any{"localhost:9200"},
+				"indices": []any{},
+			},
+			expectedError: "unsupported configuration for elasticsearch:",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := VerifyOutputIsOtelSupported(tt.outputType, tt.outputCfg)
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
 			}
 		})
 	}
