@@ -23,6 +23,34 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+:::{dropdown} Elastic Agent becomes unhealthy when an Elasticsearch output used for monitoring specifies the hosts parameter as a string instead of a list.
+**Applies to: {{agent}} 9.2.1**
+
+On November 12st 2025, a known issue was discovered that causes Elastic Agent to become unhealthy with the error:
+
+`Otel manager failed: failed to generate otel config: error translating config for output: monitoring, unit: http/metrics-monitoring, error: failed decoding config. decoding failed due to the following error(s): 'hosts' source data must be an array or slice, got string`
+
+This occurs when the `hosts` parameter of an Elasticsearch output that is set as the monitoring output is defined as a string instead of a list:
+
+```yaml
+output.elasticsearch:
+  hosts: "https://myEShost:9200" # string instead of list
+```
+
+For more information, check [#11352](https://github.com/elastic/elastic-agent/issues/11352).
+
+**Workaround**
+
+Affected users can change the `hosts` configuration from a string to list:
+
+```yaml
+output.elasticsearch:
+  hosts: ["https://myEShost:9200"] # list/array instead of string
+```
+
+The fix will be included in version 9.2.2 which will allow both the string and list formats as was previously the case.
+:::
+
 :::{dropdown} Elastic Agent becomes unhealthy with a host URL parsing error related to the Prometheus collector metricset
 **Applies to: {{agent}} 9.2.1**
 
