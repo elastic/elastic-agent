@@ -14,6 +14,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	koanfmaps "github.com/knadh/koanf/maps"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
@@ -27,7 +28,7 @@ import (
 	"github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
 	"github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
-	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -619,7 +620,10 @@ func BeatDataPath(componentId string) string {
 // getBeatsAuthExtensionConfig sets http transport settings on beatsauth
 // currently this is only supported for elasticsearch output
 func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
-	defaultTransportSettings := elasticsearch.ESDefaultTransportSettings()
+
+	authSettings := beatsauthextension.BeatsAuthConfig{
+		Transport: elasticsearch.ESDefaultTransportSettings(),
+	}
 
 	var resultMap map[string]any
 	if err := outputCfg.Unpack(&resultMap); err != nil {
@@ -627,7 +631,7 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 	}
 
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		Result:          &defaultTransportSettings,
+		Result:          &authSettings,
 		TagName:         "config",
 		SquashTagOption: "inline",
 		DecodeHook:      cfgDecodeHookFunc(),
@@ -640,17 +644,24 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 		return nil, err
 	}
 
-	newConfig, err := config.NewConfigFrom(defaultTransportSettings)
+	newConfig, err := config.NewConfigFrom(authSettings)
 	if err != nil {
 		return nil, err
 	}
 
 	// proxy_url on newConfig is of type url.URL. Beatsauth extension expects it to be of string type instead
 	// this logic here converts url.URL to string type similar to what a user would set on filebeat config
-	if defaultTransportSettings.Proxy.URL != nil {
-		err = newConfig.SetString("proxy_url", -1, defaultTransportSettings.Proxy.URL.String())
+	if authSettings.Transport.Proxy.URL != nil {
+		err = newConfig.SetString("proxy_url", -1, authSettings.Transport.Proxy.URL.String())
 		if err != nil {
 			return nil, fmt.Errorf("error settingg proxy url:%w ", err)
+		}
+	}
+
+	if authSettings.Kerberos != nil {
+		err = newConfig.SetString("kerberos.auth_type", -1, authSettings.Kerberos.AuthType.String())
+		if err != nil {
+			return nil, fmt.Errorf("error setting kerberos auth type url:%w ", err)
 		}
 	}
 
