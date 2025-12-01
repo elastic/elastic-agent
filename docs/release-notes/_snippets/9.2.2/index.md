@@ -10,8 +10,8 @@
 * Redact secrets in slices. [#11271](https://github.com/elastic/elastic-agent/pull/11271) 
 
   Redact secrets in conifg and component files found in the diagnostics archive that occur within slices.
-* Fix filesource provider to work with kubernetes secret mounts. [#11499](https://github.com/elastic/elastic-agent/pull/11499) [#11455](https://github.com/elastic/elastic-agent/pull/11455) 
-* Ensure the monitoring input for the Otel collector can only run inside the collector. [#11499](https://github.com/elastic/elastic-agent/pull/11499) [#11455](https://github.com/elastic/elastic-agent/pull/11455) 
-* Fix a fatal startup error in Beats Receivers caused by truncation of long UTF-8 hostnames. [#11499](https://github.com/elastic/elastic-agent/pull/11499) [#11455](https://github.com/elastic/elastic-agent/pull/11455) 
+* Fix filesource provider to work with kubernetes secret mounts. [#11050](https://github.com/elastic/elastic-agent/pull/11050)
+* Ensure the monitoring input for the Otel collector can only run inside the collector. [#11204](https://github.com/elastic/elastic-agent/pull/11204) 
+* Fix a fatal startup error in Beats Receivers caused by truncation of long UTF-8 hostnames. [#11285](https://github.com/elastic/elastic-agent/pull/11285)
 * Allow host to be a string for otel configuration translation. [#11394](https://github.com/elastic/elastic-agent/pull/11394) [#11352](https://github.com/elastic/elastic-agent/issues/11352)
 
