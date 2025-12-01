@@ -176,7 +176,7 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *windows_cache_settings
-              key-extra: "windows/amd64"
+              key-extra: "windows/amd64,integration"
 
       - label: "Windows:2025:amd64:sudo"
         depends_on:
@@ -201,7 +201,7 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *windows_cache_settings
-              key-extra: "windows/amd64"
+              key-extra: "windows/amd64,integration"
 
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-amd64
@@ -225,7 +225,7 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *linux_cache_settings
-              key-extra: "linux/amd64"
+              key-extra: "linux/amd64,integration"
 
   - group: "Stateful: Windows"
     key: integration-tests-win
@@ -258,7 +258,7 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *windows_cache_settings
-              key-extra: "windows/amd64"
+              key-extra: "windows/amd64,integration"
         matrix:
           - default
           - fleet
@@ -292,7 +292,7 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *windows_cache_settings
-              key-extra: "windows/amd64"
+              key-extra: "windows/amd64,integration"
         matrix:
           - default
 
@@ -319,7 +319,7 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *windows_cache_settings
-              key-extra: "windows/amd64"
+              key-extra: "windows/amd64,integration"
         matrix:
           - default
           - fleet
@@ -353,7 +353,7 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *windows_cache_settings
-              key-extra: "windows/amd64"
+              key-extra: "windows/amd64,integration"
         matrix:
           - default
 
@@ -387,7 +387,7 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *linux_cache_settings
-              key-extra: "linux/amd64"
+              key-extra: "linux/amd64,integration"
         matrix:
           - default
 
@@ -416,7 +416,7 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *linux_cache_settings
-              key-extra: "linux/amd64"
+              key-extra: "linux/amd64,integration"
         matrix:
           - default
           - upgrade
@@ -456,7 +456,7 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *linux_cache_settings
-              key-extra: "linux/arm64"
+              key-extra: "linux/arm64,integration"
         matrix:
           - default
           - upgrade
@@ -498,7 +498,7 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *linux_cache_settings
-              key-extra: "linux/arm64"
+              key-extra: "linux/arm64,integration"
         matrix:
           - default
 
@@ -532,7 +532,7 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *linux_cache_settings
-              key-extra: "linux/amd64"
+              key-extra: "linux/amd64,integration"
         matrix:
           setup:
             image:
@@ -566,7 +566,7 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *linux_cache_settings
-              key-extra: "linux/amd64"
+              key-extra: "linux/amd64,integration"
         matrix:
           setup:
             image:
@@ -616,7 +616,7 @@ steps:
           - *aws_oidc
           - cache#v1.8.0:
               <<: *linux_cache_settings
-              key-extra: "linux/amd64"
+              key-extra: "linux/amd64,integration"
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
