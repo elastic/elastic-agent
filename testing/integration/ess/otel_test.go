@@ -873,7 +873,6 @@ inputs:
   - type: filestream
     id: filestream-e2e
     use_output: default
-    _runtime_experimental: otel
     streams:
       - id: e2e
         data_stream:
@@ -900,6 +899,7 @@ agent:
     metrics: true
     logs: false
     use_output: monitoring
+agent.internal.runtime.filebeat.filestream: otel
 `
 	index := ".ds-logs-e2e-*"
 	var configBuffer bytes.Buffer
@@ -1018,7 +1018,6 @@ inputs:
   - type: http/metrics
     id: http-metrics-test
     use_output: default
-    _runtime_experimental: otel
     streams:
     - metricsets:
        - json
@@ -1041,6 +1040,8 @@ agent.monitoring:
   http:
     enabled: true
     port: 6790
+agent.internal.runtime.metricbeat:
+  http/metrics: otel
 `
 	index := ".ds-metrics-e2e-*"
 	var configBuffer bytes.Buffer
@@ -1935,7 +1936,6 @@ inputs:
   - type: system/metrics
     id: http-metrics-test
     use_output: default
-    _runtime_experimental: otel
     streams:
     - metricsets:
        - cpu
@@ -1961,6 +1961,8 @@ agent.monitoring:
     port: 6792
 agent.grpc:
     port: 6790
+agent.internal.runtime.metricbeat:
+  system/metrics: otel
 `
 
 	var configBuffer bytes.Buffer

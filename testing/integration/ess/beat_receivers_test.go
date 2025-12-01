@@ -439,6 +439,8 @@ func TestAgentMetricsInput(t *testing.T) {
     to_stderr: true
   monitoring:
     _runtime_experimental: {{.RuntimeExperimental}}
+  internal.runtime.metricbeat:
+    system/metrics: {{.RuntimeExperimental}}
 inputs:
   # Collecting system metrics
   - type: system/metrics
@@ -446,7 +448,6 @@ inputs:
     data_stream.namespace: {{.Namespace}}
     use_output: default
     {{if ne .RuntimeExperimental "" }}
-    _runtime_experimental: {{.RuntimeExperimental}}
     {{end}}
     streams:
       {{range $mset := .Metricsets}}
@@ -700,11 +701,12 @@ func TestBeatsReceiverLogs(t *testing.T) {
 	configTemplate := `agent.logging.level: info
 agent.logging.to_stderr: true
 agent.logging.to_files: false
+agent.internal.runtime.metricbeat:
+  system/metrics: {{.RuntimeExperimental}}
 inputs:
   # Collecting system metrics
   - type: system/metrics
     id: unique-system-metrics-input
-    _runtime_experimental: {{.RuntimeExperimental}}
     streams:
       - metricsets:
         - cpu
@@ -834,10 +836,11 @@ func TestBeatsReceiverProcessRuntimeFallback(t *testing.T) {
 
 	config := `agent.logging.to_stderr: true
 agent.logging.to_files: false
+agent.internal.runtime.metricbeat:
+  system/metrics: otel
 inputs:
   - type: system/metrics
     id: unique-system-metrics-input
-    _runtime_experimental: otel
     streams:
       - metricsets:
         - cpu
@@ -964,11 +967,12 @@ func TestComponentWorkDir(t *testing.T) {
 	configTemplate := `agent.logging.level: debug
 agent.logging.to_stderr: true
 agent.logging.to_files: false
+agent.internal.runtime.metricbeat:
+  system/metrics: {{.RuntimeExperimental}}
 inputs:
   # Collecting system metrics
   - type: system/metrics
     id: unique-system-metrics-input
-    _runtime_experimental: {{.RuntimeExperimental}}
     streams:
       - metricsets:
         - cpu
@@ -1198,11 +1202,11 @@ func TestSensitiveLogsESExporter(t *testing.T) {
 	require.NoError(t, err)
 
 	configTemplate := `
+agent.internal.runtime.filebeat.filestream: otel
 inputs:
   - type: filestream
     id: filestream-e2e
     use_output: default
-    _runtime_experimental: otel
     streams:
       - id: e2e
         data_stream:
@@ -1385,7 +1389,6 @@ inputs:
   - type: filestream
     id: filestream-e2e
     use_output: default
-    _runtime_experimental: otel
     streams:
       - id: e2e
         data_stream:
@@ -1406,6 +1409,7 @@ agent:
     metrics: false
     logs: true
     _runtime_experimental: otel
+agent.internal.runtime.filebeat.filestream: otel
 agent.logging.level: debug
 agent.logging.stderr: true
 `

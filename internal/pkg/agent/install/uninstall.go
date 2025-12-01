@@ -417,12 +417,17 @@ func uninstallServiceComponent(ctx context.Context, log *logp.Logger, comp compo
 	return nil
 }
 
-func serviceComponentsFromConfig(specs component.RuntimeSpecs, cfg *config.Config) ([]component.Component, error) {
-	mm, err := cfg.ToMapStr()
+func serviceComponentsFromConfig(specs component.RuntimeSpecs, rawCfg *config.Config) ([]component.Component, error) {
+	mm, err := rawCfg.ToMapStr()
 	if err != nil {
 		return nil, aerrors.New("failed to create a map from config", err)
 	}
-	allComps, err := specs.ToComponents(mm, nil, nil, logp.InfoLevel, nil, map[string]uint64{})
+	cfg, err := configuration.NewFromConfig(rawCfg)
+	if err != nil {
+		return nil, aerrors.New("failed to unpack config", err)
+	}
+	allComps, err := specs.ToComponents(
+		mm, cfg.Settings.Internal.Runtime, nil, nil, logp.InfoLevel, nil, map[string]uint64{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to render components: %w", err)
 	}
