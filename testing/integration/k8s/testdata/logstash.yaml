@@ -10,6 +10,7 @@ spec:
   selector:
     matchLabels:
       app: logstash-agent
+      app.kubernetes.io/name: logstash-agent
   strategy: {}
   template:
     metadata:
