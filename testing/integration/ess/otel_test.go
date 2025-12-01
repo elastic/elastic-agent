@@ -1243,6 +1243,138 @@ service:
   pipelines:
     logs:
       receivers:
+        - filebeatreceiver
+      exporters:
+        - elasticsearch/log
+        - debug
+`
+
+	beatsApiKey, err := getDecodedApiKey(esApiKey)
+	require.NoError(t, err, "error decoding api key")
+
+	var configBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			configOptions{
+				InputPath:       inputFilePath,
+				HomeDir:         tmpDir,
+				ESEndpoint:      esEndpoint,
+				ESApiKey:        esApiKey.Encoded,
+				BeatsESApiKey:   string(beatsApiKey),
+				FBReceiverIndex: fbReceiverIndex,
+			}))
+	configContents := configBuffer.Bytes()
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Logf("Contents of agent config file:\n%s\n", string(configContents))
+		}
+	})
+
+	// Now we can actually create the fixture and run it
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	err = fixture.Configure(ctx, configContents)
+	require.NoError(t, err)
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err)
+	cmd.WaitDelay = 1 * time.Second
+
+	var output strings.Builder
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	err = cmd.Start()
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 1*time.Minute, 1*time.Second)
+
+	var docs estools.Documents
+	actualHits := &struct {
+		Hits int
+	}{}
+	require.Eventually(t,
+		func() bool {
+			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer findCancel()
+
+			docs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, ".ds-"+fbIndex+"*", map[string]interface{}{
+				"log.file.path": inputFilePath,
+			})
+			require.NoError(t, err)
+
+			actualHits.Hits = docs.Hits.Total.Value
+
+			return actualHits.Hits == numEvents*2 // filebeat + fbreceiver
+		},
+		1*time.Minute, 1*time.Second,
+		"Expected %d logs in elasticsearch, got: %v", numEvents, actualHits)
+
+	doc1 := docs.Hits.Hits[0].Source
+	doc2 := docs.Hits.Hits[1].Source
+	ignoredFields := []string{
+		// Expected to change between filebeat and fbreceiver
+		"@timestamp",
+		"agent.ephemeral_id",
+		"agent.id",
+
+		// for short periods of time, the beats binary version can be out of sync with the beat receiver version
+		"agent.version",
+
+		// Missing from fbreceiver doc
+		"elastic_agent.id",
+		"elastic_agent.snapshot",
+		"elastic_agent.version",
+
+		// only in fbreceiver doc
+		"agent.otelcol.component.id",
+		"agent.otelcol.component.kind",
+	}
+
+	AssertMapsEqual(t, doc1, doc2, ignoredFields, "expected documents to be equal")
+	cancel()
+	cmd.Wait()
+}
+
+func AssertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg string) {
+	t.Helper()
+
+	flatM1 := m1.Flatten()
+	flatM2 := m2.Flatten()
+	for _, f := range ignoredFields {
+		// Checking ignored fields is disabled until we resolve an issue with event.ingested not being set
+		// in some cases.
+		// See https://github.com/elastic/elastic-agent/issues/8486 for details.
+		//hasKeyM1, _ := flatM1.HasKey(f)
+		//hasKeyM2, _ := flatM2.HasKey(f)
+		//
+		//if !hasKeyM1 && !hasKeyM2 {
+		//	assert.Failf(t, msg, "ignored field %q does not exist in either map, please remove it from the ignored fields", f)
+		//}
+		flatM1.Delete(f)
+		flatM2.Delete(f)
+	}
+	require.Zero(t, cmp.Diff(flatM1, flatM2), msg)
 }
 
 func AssertMapstrKeysEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg string) {
