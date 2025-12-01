@@ -1183,7 +1183,7 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 	// package agent
 	log.Println("--- Running post packaging ")
 	mg.Deps(Update)
-	mg.Deps(agentBinaryTargets...)
+	mg.SerialDeps(agentBinaryTargets...)
 
 	// compile the elastic-agent.exe proxy binary for the windows archive
 	if slices.Contains(platforms, "windows/amd64") {
