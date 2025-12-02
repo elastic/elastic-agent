@@ -97,7 +97,7 @@ func GlobalHooks() Hooks {
 		},
 		{
 			Name:        "environment",
-			Filename:    "environment.yml",
+			Filename:    "environment.yaml",
 			Description: "Environment variables",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {

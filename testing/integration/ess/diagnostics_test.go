@@ -46,7 +46,7 @@ var diagnosticsFiles = []string{
 	"components-actual.yaml",
 	"components-expected.yaml",
 	"computed-config.yaml",
-	"environment.yml",
+	"environment.yaml",
 	"goroutine.pprof.gz",
 	"heap.pprof.gz",
 	"local-config.yaml",
