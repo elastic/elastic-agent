@@ -64,7 +64,7 @@ targets:
     sourceid: opentelemetry-kube-stack-helm
     spec:
       file: "testing/integration/k8s/k8s.go"
-      matchpattern: '(KubeStackChartVersion\s*=\s)".*"'
+      matchpattern: '(KubeStackChartVersion\s*=\s*)".*"'
       replacepattern: '$1"{{ source "opentelemetry-kube-stack-helm" }}"'
 
   update-testdata:
