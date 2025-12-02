@@ -347,6 +347,8 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
+    status_reporting:
+      enabled: false
 agent.monitoring.enabled: false
 agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 `
@@ -400,7 +402,19 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 				"beat_metrics.json",
 				"input_metrics.json",
 			},
-			expectedAgentState: integrationtest.NewClientState(client.Degraded),
+			expectedComponentState: map[string]integrationtest.ComponentState{
+				"filestream-default": {
+					State: integrationtest.NewClientState(client.Healthy),
+					Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
+						integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "filestream-default"}: {
+							State: integrationtest.NewClientState(client.Healthy),
+						},
+						integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "filestream-default-filestream-filebeat"}: {
+							State: integrationtest.NewClientState(client.Healthy),
+						},
+					},
+				},
+			},
 		},
 	}
 
@@ -474,6 +488,8 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
+    status_reporting:
+      enabled: false
 agent.monitoring.enabled: false
 agent.internal.runtime.filebeat.filestream: otel
 `
