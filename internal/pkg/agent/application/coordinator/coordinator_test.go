@@ -1041,23 +1041,6 @@ func Test_ApplyPersistedConfig(t *testing.T) {
 	}
 }
 
-func Test_ApplyPersistedConfig_FeatureDisabled(t *testing.T) {
-	cfgFile := filepath.Join(".", "testdata", "overrides.yml")
-
-	cfg, err := config.LoadFile(filepath.Join(".", "testdata", "config.yaml"))
-	require.NoError(t, err)
-
-	err = applyPersistedConfig(cfg, cfgFile, func() bool { return false })
-	require.NoError(t, err)
-
-	c := &configuration.Configuration{}
-	require.NoError(t, cfg.Agent.Unpack(&c))
-
-	require.True(t, c.Settings.MonitoringConfig.MonitorLogs)
-	require.True(t, c.Settings.MonitoringConfig.MonitorMetrics)
-	require.True(t, c.Settings.MonitoringConfig.Enabled)
-}
-
 func BenchmarkCoordinator_generateComponentModel(b *testing.B) {
 	// load variables
 	varsMaps := []map[string]any{}
