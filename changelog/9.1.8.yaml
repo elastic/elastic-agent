@@ -1,0 +1,41 @@
+version: 9.1.8
+entries:
+    - kind: bug-fix
+      summary: fix filesource provider to work with kubernetes secret mounts
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11050
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1762438673
+      file:
+        name: 1762438673-fix-filesource-provider-to-work-with-kubernetes-secret-mounts.yaml
+        checksum: 58035340e8d1722d9846474f8795d559a68aaa65
+    - kind: security
+      summary: Redact secrets in slices
+      description: Redact secrets in conifg and component files found in the diagnostics archive that occur within slices.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11271
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1763589181
+      file:
+        name: 1763589181-Redact-secrets-in-slices.yaml
+        checksum: d9c041559d60973ff9ef8a52616f0e6d21068db7
+    - kind: bug-fix
+      summary: Fix a fatal startup error in Beats Receivers caused by truncation of long UTF-8 hostnames
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11285
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1763643582
+      file:
+        name: 1763643582-fix-fatal-startup-error-beats-receivers-utf8-hostname.yaml
+        checksum: b5fdea3654facbfbb5c2055494f10390a1309558
