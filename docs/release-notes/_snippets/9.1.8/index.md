@@ -1,9 +1,5 @@
 ## 9.1.8 [elastic-agent-release-notes-9.1.8]
 
-
-
-
-
 ### Fixes [elastic-agent-9.1.8-fixes]
 
 * Redact secrets in slices. [#11271](https://github.com/elastic/elastic-agent/pull/11271) 
