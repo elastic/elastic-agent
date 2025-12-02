@@ -1194,10 +1194,10 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			name: "unsupported input type",
 			component: &component.Component{
 				ID:         "unsupported-input",
-				InputType:  "log", // unsupported
+				InputType:  "stdin", // unsupported
 				OutputType: "elasticsearch",
 			},
-			expectedError: "unsupported input type: log",
+			expectedError: "unsupported input type: stdin",
 		},
 		{
 			name: "unsupported configuration",
@@ -1383,6 +1383,58 @@ func TestGetBeatsAuthExtensionConfig(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, tt.expected, actual)
+			}
+		})
+	}
+}
+
+func TestVerifyOutputIsOtelSupported(t *testing.T) {
+	tests := []struct {
+		name          string
+		outputType    string
+		outputCfg     map[string]any
+		expectedError string
+	}{
+		{
+			name:       "supported output - elasticsearch",
+			outputType: "elasticsearch",
+			outputCfg: map[string]any{
+				"type":  "elasticsearch",
+				"hosts": []any{"localhost:9200"},
+			},
+		},
+		{
+			name:          "unsupported output type - kafka",
+			outputType:    "kafka",
+			outputCfg:     map[string]any{},
+			expectedError: "unsupported output type: kafka",
+		},
+		{
+			name:          "unsupported output type - logstash",
+			outputType:    "logstash",
+			outputCfg:     map[string]any{},
+			expectedError: "unsupported output type: logstash",
+		},
+		{
+			name:       "unsupported configuration - indices field",
+			outputType: "elasticsearch",
+			outputCfg: map[string]any{
+				"type":    "elasticsearch",
+				"hosts":   []any{"localhost:9200"},
+				"indices": []any{},
+			},
+			expectedError: "unsupported configuration for elasticsearch:",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := VerifyOutputIsOtelSupported(tt.outputType, tt.outputCfg)
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
 			}
 		})
 	}
