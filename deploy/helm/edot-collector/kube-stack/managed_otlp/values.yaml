@@ -321,7 +321,18 @@ collectors:
               - "service.version"
       receivers:
         prometheus:
-          config: {}
+          config:
+            scrape_configs:
+              # Collect all metrics from pods on the daemon set's node with at least this annotation
+              # prometheus.io/scrape: 'true'
+              # This can be further customized by setting the following annotations:
+              # prometheus.io/scheme: 'https'
+              # prometheus.io/path: '/data/metrics'
+              # prometheus.io/port: '80'
+              - job_name: kubernetes-pods
+                scrape_interval: 30s
+                kubernetes_sd_configs:
+                  - role: pod
         # [OTLP Receiver](https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver)
         otlp:
           protocols:
