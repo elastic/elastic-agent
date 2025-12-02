@@ -8,10 +8,10 @@
 # - security: impacts on the security of a product or a user’s deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
-kind: bug-fix
+kind: feature
 
 # Change summary; a 80ish characters long description of the change.
-summary: Ensure the monitoring input for the Otel collector can only run inside the collector.
+summary: Allow setting component runtime per input type
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.

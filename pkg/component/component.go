@@ -19,7 +19,6 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -36,6 +35,82 @@ type HeadersProvider interface {
 }
 
 type RuntimeManager string
+
+type RuntimeConfig struct {
+	Default    string            `yaml:"default" config:"default" json:"default"`
+	Filebeat   BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
+	Metricbeat BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
+}
+
+type BeatRuntimeConfig struct {
+	Default   string            `yaml:"default" config:"default" json:"default"`
+	InputType map[string]string `yaml:",inline,omitempty" config:",inline,omitempty" json:",inline,omitempty"`
+}
+
+func DefaultRuntimeConfig() *RuntimeConfig {
+	return &RuntimeConfig{
+		Default: string(DefaultRuntimeManager),
+	}
+}
+
+func (r *RuntimeConfig) Validate() error {
+	validateRuntime := func(val string, allowEmpty bool) error {
+		if allowEmpty && val == "" {
+			return nil
+		}
+		switch RuntimeManager(val) {
+		case "", OtelRuntimeManager, ProcessRuntimeManager:
+			return nil
+		default:
+			return fmt.Errorf("invalid runtime manager: %s, must be either %s or %s",
+				val, OtelRuntimeManager, ProcessRuntimeManager)
+		}
+	}
+	if err := validateRuntime(r.Default, false); err != nil {
+		return err
+	}
+	for _, beatConfig := range []BeatRuntimeConfig{r.Filebeat, r.Metricbeat} {
+		if err := validateRuntime(beatConfig.Default, true); err != nil {
+			return err
+		}
+		for _, val := range beatConfig.InputType {
+			if err := validateRuntime(val, false); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (r *RuntimeConfig) BeatRuntimeConfig(beatName string) *BeatRuntimeConfig {
+	switch beatName {
+	case "filebeat":
+		return &r.Filebeat
+	case "metricbeat":
+		return &r.Metricbeat
+	default:
+		return nil
+	}
+}
+
+func (r *RuntimeConfig) RuntimeManagerForInputType(inputType string, beatName string) RuntimeManager {
+	beatRuntimeConfig := r.BeatRuntimeConfig(beatName)
+	if beatRuntimeConfig != nil {
+		// Check if there's a specific runtime manager for this input type
+		if manager, ok := beatRuntimeConfig.InputType[inputType]; ok {
+			return RuntimeManager(manager)
+		}
+		// Check if the beat has a default runtime manager
+		if beatRuntimeConfig.Default != "" {
+			return RuntimeManager(beatRuntimeConfig.Default)
+		}
+	}
+	// Fall back to global default
+	if r.Default != "" {
+		return RuntimeManager(r.Default)
+	}
+	return DefaultRuntimeManager
+}
 
 const (
 	// defaultUnitLogLevel is the default log level that a unit will get if one is not defined.
@@ -242,10 +317,15 @@ func (c *Component) Type() string {
 // command has a different name.
 func (c *Component) BinaryName() string {
 	if c.InputSpec != nil {
-		if c.InputSpec.Spec.Command != nil && c.InputSpec.Spec.Command.Name != "" {
-			return c.InputSpec.Spec.Command.Name
-		}
-		return c.InputSpec.BinaryName
+		return c.InputSpec.CommandName()
+	}
+	return ""
+}
+
+// BeatName returns the beat binary name that would be used to run this component.
+func (c *Component) BeatName() string {
+	if c.InputSpec != nil {
+		return c.InputSpec.BeatName()
 	}
 	return ""
 }
@@ -345,13 +425,14 @@ type Model struct {
 // the current runtime specification.
 func (r *RuntimeSpecs) ToComponents(
 	policy map[string]interface{},
+	runtimeCfg *RuntimeConfig,
 	modifiers []ComponentsModifier,
 	monitoringInjector GenerateMonitoringCfgFn,
 	ll logp.Level,
 	headers HeadersProvider,
 	currentServiceCompInts map[string]uint64,
 ) ([]Component, error) {
-	components, err := r.PolicyToComponents(policy, ll, headers)
+	components, err := r.PolicyToComponents(policy, runtimeCfg, ll, headers)
 	if err != nil {
 		return nil, err
 	}
@@ -372,7 +453,7 @@ func (r *RuntimeSpecs) ToComponents(
 
 		if monitoringCfg != nil {
 			// monitoring is enabled
-			monitoringComps, err := r.PolicyToComponents(monitoringCfg, ll, headers)
+			monitoringComps, err := r.PolicyToComponents(monitoringCfg, runtimeCfg, ll, headers)
 			if err != nil {
 				return nil, fmt.Errorf("failed to generate monitoring components: %w", err)
 			}
@@ -421,6 +502,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 	output outputI,
 	featureFlags *features.Flags,
 	componentConfig *ComponentConfig,
+	runtimeConfig *RuntimeConfig,
 ) []Component {
 	var components []Component
 	inputSpec, componentErr := r.GetInput(inputType)
@@ -437,6 +519,9 @@ func (r *RuntimeSpecs) componentsForInputType(
 		for _, input := range output.Inputs[inputType] {
 			if input.enabled {
 				unitID := fmt.Sprintf("%s-%s", componentID, input.id)
+				if input.runtimeManager == "" {
+					input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName())
+				}
 				unitsForRuntimeManager[input.runtimeManager] = append(
 					unitsForRuntimeManager[input.runtimeManager],
 					unitForInput(input, unitID),
@@ -475,6 +560,10 @@ func (r *RuntimeSpecs) componentsForInputType(
 				componentErr = ErrOutputNotSupported
 			}
 
+			if input.runtimeManager == "" {
+				input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName())
+			}
+
 			var units []Unit
 			if input.enabled {
 				unitID := fmt.Sprintf("%s-unit", componentID)
@@ -500,7 +589,12 @@ func (r *RuntimeSpecs) componentsForInputType(
 	return components
 }
 
-func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *features.Flags, componentConfig *ComponentConfig) []Component {
+func (r *RuntimeSpecs) componentsForOutput(
+	output outputI,
+	featureFlags *features.Flags,
+	componentConfig *ComponentConfig,
+	runtimeConfig *RuntimeConfig,
+) []Component {
 	var components []Component
 	for inputType := range output.Inputs {
 		// No need for error checking at this stage -- we are guaranteed
@@ -508,7 +602,7 @@ func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *feature
 		// from running then it will be in the Component's Err field and
 		// we will report it later. The only thing we skip is a component/s
 		// with no units.
-		typeComponents := r.componentsForInputType(inputType, output, featureFlags, componentConfig)
+		typeComponents := r.componentsForInputType(inputType, output, featureFlags, componentConfig, runtimeConfig)
 		for _, component := range typeComponents {
 			if len(component.Units) > 0 {
 				components = append(components, component)
@@ -521,6 +615,7 @@ func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *feature
 // PolicyToComponents takes the policy and generates a component model.
 func (r *RuntimeSpecs) PolicyToComponents(
 	policy map[string]interface{},
+	runtimeCfg *RuntimeConfig,
 	ll logp.Level,
 	headers HeadersProvider,
 ) ([]Component, error) {
@@ -561,7 +656,7 @@ func (r *RuntimeSpecs) PolicyToComponents(
 		output := outputsMap[outputName]
 		if output.Enabled {
 			components = append(components,
-				r.componentsForOutput(output, featureFlags, componentConfig)...)
+				r.componentsForOutput(output, featureFlags, componentConfig, runtimeCfg)...)
 		}
 	}
 
@@ -598,7 +693,12 @@ func injectInputPolicyID(fleetPolicy map[string]interface{}, inputConfig map[str
 
 // toIntermediate takes the policy and returns it into an intermediate representation that is easier to map into a set
 // of components.
-func toIntermediate(policy map[string]interface{}, aliasMapping map[string]string, ll logp.Level, headers HeadersProvider) (map[string]outputI, error) {
+func toIntermediate(
+	policy map[string]interface{},
+	aliasMapping map[string]string,
+	ll logp.Level,
+	headers HeadersProvider,
+) (map[string]outputI, error) {
 	const (
 		outputsKey        = "outputs"
 		enabledKey        = "enabled"
@@ -701,7 +801,7 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 			return nil, fmt.Errorf("invalid 'inputs.%d.log_level', %w", idx, err)
 		}
 
-		runtimeManager := DefaultRuntimeManager
+		var runtimeManager RuntimeManager
 		// determine the runtime manager for the input
 		if runtimeManagerRaw, ok := input[runtimeManagerKey]; ok {
 			runtimeManagerStr, ok := runtimeManagerRaw.(string)
