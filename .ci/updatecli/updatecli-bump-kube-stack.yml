@@ -43,7 +43,7 @@ sources:
       file: "testing/integration/k8s/k8s.go"
     transformers:
       - findsubmatch:
-          pattern: 'KubeStackChartVersion\s*=\s"(.*)"'
+          pattern: 'KubeStackChartVersion\s*=\s*"(.*)"'
           # This tells Updatecli to only keep the 1st capture group
           captureindex: 1
 
