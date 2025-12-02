@@ -19,6 +19,7 @@ sources:
     kind: golang/gomod
     name: Get current OTel Collector core beta version in go.mod
     spec:
+      file: internal/edot/go.mod
       module: go.opentelemetry.io/collector/receiver/otlpreceiver
   latest_core_beta:
     kind: golang/module
@@ -34,6 +35,7 @@ sources:
     kind: golang/gomod
     name: Get current OTel Collector contrib version in go.mod
     spec:
+      file: internal/edot/go.mod
       module: github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector
   latest_contrib:
     kind: golang/module
