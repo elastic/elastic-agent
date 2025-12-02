@@ -23,6 +23,11 @@ func allowFleetOverride(
 ) bool {
 	// first match wins
 	for _, cap := range fleetOverrideCaps {
+		if cap == nil {
+			// being defensive here, should not happen
+			continue
+		}
+
 		switch cap.rule {
 		case ruleTypeAllow:
 			log.Debugf("Fleet override allowed by capability")

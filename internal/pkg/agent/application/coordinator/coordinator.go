@@ -1612,8 +1612,10 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 
 	// override retrieved config from Fleet with persisted config from AgentConfig file
 
-	if err := applyPersistedConfig(cfg, paths.ConfigFile(), c.caps.AllowFleetOverride); err != nil {
-		return fmt.Errorf("could not apply persisted configuration: %w", err)
+	if c.caps != nil {
+		if err := applyPersistedConfig(cfg, paths.ConfigFile(), c.caps.AllowFleetOverride); err != nil {
+			return fmt.Errorf("could not apply persisted configuration: %w", err)
+		}
 	}
 
 	// perform and verify ast translation

@@ -4,3 +4,5 @@ agent:
     use_output: default
     logs: false
     metrics: true
+    http:
+      port: 6774
