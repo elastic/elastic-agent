@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -1609,6 +1610,12 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 		c.logger.Errorf("failed to add secret markers: %v", err)
 	}
 
+	// override retrieved config from Fleet with persisted config from AgentConfig file
+
+	if err := applyPersistedConfig(cfg, paths.ConfigFile(), c.caps.AllowFleetOverride); err != nil {
+		return fmt.Errorf("could not apply persisted configuration: %w", err)
+	}
+
 	// perform and verify ast translation
 	m, err := cfg.ToMapStr()
 	if err != nil {
@@ -1693,6 +1700,32 @@ func (c *Coordinator) generateAST(cfg *config.Config, m map[string]interface{}) 
 	}
 
 	c.ast = rawAst
+	return nil
+}
+
+func applyPersistedConfig(cfg *config.Config, configFile string, checkFn func() bool) error {
+	if !checkFn() {
+		// Feature is disabled, nothing to do
+		return nil
+	}
+
+	f, err := os.OpenFile(configFile, os.O_RDONLY, 0)
+	if err != nil && os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("opening config file: %w", err)
+	}
+	defer f.Close()
+
+	persisted, err := config.NewConfigFrom(f)
+	if err != nil {
+		return fmt.Errorf("parsing persisted config: %w", err)
+	}
+
+	err = cfg.Merge(persisted)
+	if err != nil {
+		return fmt.Errorf("merging persisted config: %w", err)
+	}
 	return nil
 }
 

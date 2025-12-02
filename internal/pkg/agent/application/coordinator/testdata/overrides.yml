@@ -1,0 +1,6 @@
+agent:
+  monitoring:
+    enabled: true
+    use_output: default
+    logs: false
+    metrics: true

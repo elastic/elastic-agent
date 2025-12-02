@@ -1011,6 +1011,53 @@ func TestCoordinator_UpgradeDetails(t *testing.T) {
 	require.Equal(t, expectedErr.Error(), coord.state.UpgradeDetails.Metadata.ErrorMsg)
 }
 
+func Test_ApplyPersistedConfig(t *testing.T) {
+	cfgFile := filepath.Join(".", "testdata", "overrides.yml")
+
+	testCases := []struct {
+		name          string
+		featureEnable bool
+		expectedLogs  bool
+	}{
+		{name: "enabled", featureEnable: true, expectedLogs: false},
+		{name: "disabled", featureEnable: false, expectedLogs: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, err := config.LoadFile(filepath.Join(".", "testdata", "config.yaml"))
+			require.NoError(t, err)
+
+			err = applyPersistedConfig(cfg, cfgFile, func() bool { return tc.featureEnable })
+			require.NoError(t, err)
+
+			c := &configuration.Configuration{}
+			require.NoError(t, cfg.Agent.Unpack(&c))
+
+			require.Equal(t, tc.expectedLogs, c.Settings.MonitoringConfig.MonitorLogs)
+			require.True(t, c.Settings.MonitoringConfig.MonitorMetrics)
+			require.True(t, c.Settings.MonitoringConfig.Enabled)
+		})
+	}
+}
+
+func Test_ApplyPersistedConfig_FeatureDisabled(t *testing.T) {
+	cfgFile := filepath.Join(".", "testdata", "overrides.yml")
+
+	cfg, err := config.LoadFile(filepath.Join(".", "testdata", "config.yaml"))
+	require.NoError(t, err)
+
+	err = applyPersistedConfig(cfg, cfgFile, func() bool { return false })
+	require.NoError(t, err)
+
+	c := &configuration.Configuration{}
+	require.NoError(t, cfg.Agent.Unpack(&c))
+
+	require.True(t, c.Settings.MonitoringConfig.MonitorLogs)
+	require.True(t, c.Settings.MonitoringConfig.MonitorMetrics)
+	require.True(t, c.Settings.MonitoringConfig.Enabled)
+}
+
 func BenchmarkCoordinator_generateComponentModel(b *testing.B) {
 	// load variables
 	varsMaps := []map[string]any{}
