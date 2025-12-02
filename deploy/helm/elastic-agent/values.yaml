@@ -338,13 +338,13 @@ extraIntegrations: {}
 agent:
   # -- elastic-agent version
   # @section -- 6 - Elastic-Agent Configuration
-  version: 9.1.8
+  version: 9.1.9
   # -- image configuration
   # @section -- 6 - Elastic-Agent Configuration
   image:
     repository: docker.elastic.co/elastic-agent/elastic-agent
     pullPolicy: IfNotPresent
-    tag: "9.1.8-SNAPSHOT"
+    tag: "9.1.9-SNAPSHOT"
   # -- image pull secrets
   # @section -- 6 - Elastic-Agent Configuration
   imagePullSecrets: []
