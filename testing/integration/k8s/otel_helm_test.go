@@ -189,14 +189,15 @@ func mergeValues(t *testing.T, namespace string, values values.Options) map[stri
 // k8sStepCheckRunningPods checks the status of the agent inside the pods returned by the selector
 func k8sStepCheckRunningPods(podLabelSelector string, expectedPodNumber int, containerName string) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		require.EventuallyWithTf(t, func(t *assert.CollectT) {
+		require.EventuallyWithTf(t, func(collectT *assert.CollectT) {
 			perNodePodList := &corev1.PodList{}
 			err := kCtx.client.Resources(namespace).List(ctx, perNodePodList, func(opt *metav1.ListOptions) {
 				opt.LabelSelector = podLabelSelector
 			})
-			require.NoError(t, err, "failed to list pods with selector ", perNodePodList)
+			require.NoError(collectT,
+				err, "failed to list pods with selector ", perNodePodList)
 
-			require.Greaterf(t, len(perNodePodList.Items), 0,
+			require.Greaterf(collectT, len(perNodePodList.Items), 0,
 				"no pod found for label selector %q", podLabelSelector)
 
 			checkedAgentContainers := 0
@@ -216,7 +217,8 @@ func k8sStepCheckRunningPods(podLabelSelector string, expectedPodNumber int, con
 				}
 			}
 
-			require.GreaterOrEqualf(t, checkedAgentContainers, expectedPodNumber,
+			require.GreaterOrEqualf(collectT,
+				checkedAgentContainers, expectedPodNumber,
 				"at least %d agent containers with name %q should be checked",
 				expectedPodNumber, containerName)
 		}, 5*time.Minute, 10*time.Second, fmt.Sprintf(

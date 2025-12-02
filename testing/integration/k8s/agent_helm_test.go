@@ -20,7 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
-func TestAgentKubeStackHelm(t *testing.T) {
+func TestKubernetesAgentHelmRotatedLogs(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Stack: &define.Stack{},
 		Local: false,
@@ -140,7 +140,7 @@ func k8sStepCheckLogFilesIngested(
 	expectedFiles ...expectedLogFile,
 ) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		require.EventuallyWithT(t, func(t *assert.CollectT) {
+		require.EventuallyWithT(t, func(collectT *assert.CollectT) {
 			query := map[string]any{
 				"size":    0,
 				"_source": []string{"message"},
@@ -183,7 +183,7 @@ func k8sStepCheckLogFilesIngested(
 
 			resp, err := PerformQuery(
 				ctx, query, fmt.Sprintf(".ds-%s*", dsType), info.ESClient)
-			require.NoError(t, err,
+			require.NoError(collectT, err,
 				"failed to query %s datastream",
 				fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace))
 
@@ -202,7 +202,7 @@ func k8sStepCheckLogFilesIngested(
 
 			// Assert all expected files were found
 			for i, expected := range expectedFiles {
-				assert.True(t, found[i],
+				assert.True(collectT, found[i],
 					"expected to find %s, found only: %v",
 					expected.description, files)
 			}
