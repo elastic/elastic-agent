@@ -292,6 +292,20 @@ func CleanupExpiredRollbacks(log *logger.Logger, now time.Time, versionedHome st
 	return false
 }
 
+// PreserveActiveUpgradeVersions is a decorator to a filter function that will preserve versions involved in an ongoing upgrade
+func PreserveActiveUpgradeVersions(marker *UpdateMarker, innerFilter RollbackCleanupFilter) RollbackCleanupFilter {
+	return func(log *logger.Logger, now time.Time, versionedHome string, ttl ttl.TTLMarker) bool {
+		if marker != nil && !IsTerminalState(marker) {
+			// we are in the middle of an active upgrade
+			if marker.PrevVersionedHome == versionedHome {
+				// if the versionedHome matches the old versioned home, skip that cleanup.
+				return false
+			}
+		}
+		return innerFilter(log, now, versionedHome, ttl)
+	}
+}
+
 // CleanAvailableRollbacks will remove the extra agent installs that can be used as manual rollback target. Invoked before triggering
 // an update in order to free disk space for the new agent version or whenever a cleanup should happen.
 // This function has basic protection for the current home and it will remove any available rollback for which the filter function
@@ -302,6 +316,11 @@ func CleanAvailableRollbacks(log *logger.Logger, source availableRollbacksSource
 	rollbacks, err := source.Get()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get available rollbacks: %w", err)
+	}
+
+	if len(rollbacks) == 0 {
+		log.Debugf("No available rollbacks returned, exiting cleanup")
+		return nil, nil
 	}
 
 	// Clean the currentHomeRel path to normalize it
@@ -320,14 +339,24 @@ func CleanAvailableRollbacks(log *logger.Logger, source availableRollbacksSource
 			continue
 		}
 
+		versionedHomeAbsPath := filepath.Join(topDir, versionedHome)
+		_, err = os.Stat(versionedHomeAbsPath)
+		if errors.Is(err, os.ErrNotExist) {
+			log.Warnf("Versioned home %s corresponding to agent TTL marker %+v  is not found on disk", versionedHomeAbsPath, ttlMarker)
+			continue
+		}
+
 		if filter(log, now, versionedHome, ttlMarker) {
-			versionedHomeAbsPath := filepath.Join(topDir, versionedHome)
 			if cleanupErr := install.RemoveBut(versionedHomeAbsPath, true); cleanupErr != nil {
 				aggregateErr = errors.Join(aggregateErr, fmt.Errorf("removing directory %q: %w", versionedHomeAbsPath, cleanupErr))
 			}
 		} else {
 			leftoverRollbacks[versionedHome] = ttlMarker
 		}
+	}
+	err = source.Set(leftoverRollbacks)
+	if err != nil {
+		aggregateErr = errors.Join(aggregateErr, fmt.Errorf("unable to update available rollbacks on source: %w", err))
 	}
 	return leftoverRollbacks, aggregateErr
 }
