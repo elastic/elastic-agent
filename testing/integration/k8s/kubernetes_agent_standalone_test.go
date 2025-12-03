@@ -1300,14 +1300,11 @@ func k8sStepLogstashCheckStatus(logstashPodLabelSelector string, logstashExpecte
 					continue
 				}
 
-				// Wait for Logstash to be fully ready and listening on port 5044
 				require.Eventually(t, func() bool {
 					stdout := &bytes.Buffer{}
 					stderr := &bytes.Buffer{}
-
-					// Check Logstash API health
 					err := kCtx.client.Resources().ExecInPod(ctx, namespace, pod.Name, "logstash",
-						[]string{"curl", "-s", "localhost:9600/_node/stats"}, stdout, stderr)
+						[]string{"curl", "-s", "localhost:9600/_node/health"}, stdout, stderr)
 					if err != nil {
 						return false
 					}
@@ -1316,33 +1313,12 @@ func k8sStepLogstashCheckStatus(logstashPodLabelSelector string, logstashExpecte
 					if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 						return false
 					}
-
-					// Check if the pipeline is running - try multiple paths as structure may vary
-					if pipelines, ok := result["pipelines"].(map[string]interface{}); ok {
-						// Check for "main" pipeline (default name)
-						if main, ok := pipelines["main"].(map[string]interface{}); ok {
-							if workers, ok := main["workers"].(float64); ok && workers > 0 {
-								return true
-							}
-						}
-						// If there are any pipelines with workers, that's good enough
-						for _, pipelineData := range pipelines {
-							if pipelineMap, ok := pipelineData.(map[string]interface{}); ok {
-								if workers, ok := pipelineMap["workers"].(float64); ok && workers > 0 {
-									return true
-								}
-							}
-						}
-					}
-
-					// Alternative check: just verify the API is responding and has valid structure
-					if _, hasJVM := result["jvm"]; hasJVM {
-						if _, hasPipelines := result["pipelines"]; hasPipelines {
-							t.Logf("Logstash API is responding with pipeline data")
+					if status, ok := result["status"].(string); ok {
+						if status == "green" {
+							t.Logf("Logstash API is responding and healthy")
 							return true
 						}
 					}
-
 					return false
 				}, 3*time.Minute, 5*time.Second, "Logstash pod %s did not become healthy in time", pod.Name)
 
