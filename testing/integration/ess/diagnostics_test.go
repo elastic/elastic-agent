@@ -46,6 +46,7 @@ var diagnosticsFiles = []string{
 	"components-actual.yaml",
 	"components-expected.yaml",
 	"computed-config.yaml",
+	"environment.yaml",
 	"goroutine.pprof.gz",
 	"heap.pprof.gz",
 	"local-config.yaml",
@@ -347,6 +348,8 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
+    status_reporting:
+      enabled: false
 agent.monitoring.enabled: false
 agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 `
@@ -359,13 +362,25 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
+	expectedComponentState := map[string]integrationtest.ComponentState{
+		"filestream-default": {
+			State: integrationtest.NewClientState(client.Healthy),
+			Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
+				integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "filestream-default"}: {
+					State: integrationtest.NewClientState(client.Healthy),
+				},
+				integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "filestream-default-filestream-filebeat"}: {
+					State: integrationtest.NewClientState(client.Healthy),
+				},
+			},
+		},
+	}
+	expectedAgentState := integrationtest.NewClientState(client.Healthy)
 
 	testCases := []struct {
 		name                         string
 		runtime                      string
 		expectedCompDiagnosticsFiles []string
-		expectedAgentState           *client.State
-		expectedComponentState       map[string]integrationtest.ComponentState
 	}{
 		{
 			name:    "filebeat process",
@@ -377,20 +392,6 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 				"beat-rendered-config.yml",
 				"global_processors.txt",
 			),
-			expectedAgentState: integrationtest.NewClientState(client.Healthy),
-			expectedComponentState: map[string]integrationtest.ComponentState{
-				"filestream-default": {
-					State: integrationtest.NewClientState(client.Healthy),
-					Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
-						integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "filestream-default"}: {
-							State: integrationtest.NewClientState(client.Healthy),
-						},
-						integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "filestream-default-filestream-filebeat"}: {
-							State: integrationtest.NewClientState(client.Healthy),
-						},
-					},
-				},
-			},
 		},
 		{
 			name:    "filebeat receiver",
@@ -400,7 +401,6 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 				"beat_metrics.json",
 				"input_metrics.json",
 			},
-			expectedAgentState: integrationtest.NewClientState(client.Degraded),
 		},
 	}
 
@@ -443,8 +443,8 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 			}
 			err = f.Run(ctx, integrationtest.State{
 				Configure:  configBuffer.String(),
-				AgentState: tc.expectedAgentState,
-				Components: tc.expectedComponentState,
+				AgentState: expectedAgentState,
+				Components: expectedComponentState,
 				After:      testDiagnosticsFactory(t, filebeatSetup, expDiagFiles, tc.expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
 			})
 			assert.NoError(t, err)
@@ -474,6 +474,8 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
+    status_reporting:
+      enabled: false
 agent.monitoring.enabled: false
 agent.internal.runtime.filebeat.filestream: otel
 `
