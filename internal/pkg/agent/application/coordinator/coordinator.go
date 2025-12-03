@@ -206,10 +206,6 @@ type VarsManager interface {
 	Watch() <-chan []*transpiler.Vars
 }
 
-// ComponentsModifier is a function that takes the computed components model and modifies it before
-// passing it into the components runtime manager.
-type ComponentsModifier func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error)
-
 // managerShutdownTimeout is how long the coordinator will wait during shutdown
 // to receive termination states from its managers.
 // Note: The current timeout (5s) is shorter than the default stop timeout for
@@ -231,7 +227,8 @@ type Coordinator struct {
 	agentInfo info.Agent
 	isManaged bool
 
-	cfg        *configuration.Configuration
+	initialCfg *configuration.Configuration
+	currentCfg *configuration.Configuration
 	specs      component.RuntimeSpecs
 	fleetAcker acker.Acker
 
@@ -249,7 +246,7 @@ type Coordinator struct {
 	otelCfg *confmap.Conf
 
 	caps      capabilities.Capabilities
-	modifiers []ComponentsModifier
+	modifiers []component.ComponentsModifier
 
 	// The current state of the Coordinator. This value and its subfields are
 	// safe to read directly from within the main Coordinator goroutine.
@@ -419,7 +416,7 @@ func New(
 	otelMgr OTelManager,
 	fleetAcker acker.Acker,
 	initialUpgradeDetails *details.Details,
-	modifiers ...ComponentsModifier,
+	modifiers ...component.ComponentsModifier,
 ) *Coordinator {
 	var fleetState cproto.State
 	var fleetMessage string
@@ -438,7 +435,8 @@ func New(
 	}
 	c := &Coordinator{
 		logger:     logger,
-		cfg:        cfg,
+		initialCfg: cfg,
+		currentCfg: cfg,
 		agentInfo:  agentInfo,
 		isManaged:  isManaged,
 		specs:      specs,
@@ -994,10 +992,10 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			Description: "current local configuration of the running Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
-				if c.cfg == nil {
+				if c.initialCfg == nil {
 					return []byte("error: failed no local configuration")
 				}
-				o, err := yaml.Marshal(c.cfg)
+				o, err := yaml.Marshal(c.initialCfg)
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
 				}
@@ -1463,6 +1461,12 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 
 	// c.setProtection(protectionConfig)
 
+	currentCfg, err := configuration.NewFromConfig(cfg)
+	if err != nil {
+		return fmt.Errorf("invalid configuration: %w", err)
+	}
+	c.currentCfg = currentCfg
+
 	if c.vars != nil {
 		return c.refreshComponentModel(ctx)
 	}
@@ -1656,17 +1660,10 @@ func (c *Coordinator) updateManagersWithConfig(model *component.Model) {
 func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtimeModel *component.Model, otelModel *component.Model) {
 	var otelComponents, runtimeComponents []component.Component
 	for _, comp := range model.Components {
-		c.maybeOverrideRuntimeForComponent(&comp)
 		switch comp.RuntimeManager {
 		case component.OtelRuntimeManager:
 			otelComponents = append(otelComponents, comp)
 		case component.ProcessRuntimeManager:
-			// Hack to fix https://github.com/elastic/elastic-agent/issues/11169
-			// TODO: Remove this after https://github.com/elastic/elastic-agent/issues/10220 is resolved
-			if comp.ID == "prometheus/metrics-monitoring" {
-				c.logger.Warnf("The Otel prometheus metrics monitoring input can't run in a beats process, skipping")
-				continue
-			}
 			runtimeComponents = append(runtimeComponents, comp)
 		default:
 			// this should be impossible if we parse the configuration correctly
@@ -1688,7 +1685,7 @@ func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtime
 // Normally, we use the runtime set in the component itself via the configuration, but
 // we may also fall back to the process runtime if the otel runtime is unsupported for
 // some reason. One example is the output using unsupported config options.
-func (c *Coordinator) maybeOverrideRuntimeForComponent(comp *component.Component) {
+func maybeOverrideRuntimeForComponent(logger *logger.Logger, comp *component.Component) {
 	if comp.RuntimeManager == component.ProcessRuntimeManager {
 		// do nothing, the process runtime can handle any component
 		return
@@ -1697,7 +1694,7 @@ func (c *Coordinator) maybeOverrideRuntimeForComponent(comp *component.Component
 		// check if the component is actually supported
 		err := translate.VerifyComponentIsOtelSupported(comp)
 		if err != nil {
-			c.logger.Warnf("otel runtime is not supported for component %s, switching to process runtime, reason: %v", comp.ID, err)
+			logger.Warnf("otel runtime is not supported for component %s, switching to process runtime, reason: %v", comp.ID, err)
 			comp.RuntimeManager = component.ProcessRuntimeManager
 		}
 	}
@@ -1756,8 +1753,16 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		existingCompState[comp.Component.ID] = comp.State.Pid
 	}
 
+	otelRuntimeModifier := func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
+		for i := range comps {
+			maybeOverrideRuntimeForComponent(c.logger, &comps[i])
+		}
+		return comps, nil
+	}
 	comps, err := c.specs.ToComponents(
 		cfg,
+		c.currentCfg.Settings.Internal.Runtime,
+		append(c.modifiers, otelRuntimeModifier),
 		configInjector,
 		c.state.LogLevel,
 		c.agentInfo,
@@ -1769,13 +1774,6 @@ func (c *Coordinator) generateComponentModel() (err error) {
 
 	// Filter any disallowed inputs/outputs from the components
 	comps = c.filterByCapabilities(comps)
-
-	for _, modifier := range c.modifiers {
-		comps, err = modifier(comps, cfg)
-		if err != nil {
-			return fmt.Errorf("failed to modify components: %w", err)
-		}
-	}
 
 	// If we made it this far, update our internal derived values and
 	// return with no error

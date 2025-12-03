@@ -342,13 +342,13 @@ inputs:
     prospector.scanner.fingerprint.enabled: false
     file_identity.native: ~
     use_output: default
-    _runtime_experimental: {{ .Runtime }}
 outputs:
   default:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
 agent.monitoring.enabled: false
+agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 `
 
 	var filebeatSetup = map[string]integrationtest.ComponentState{
@@ -467,7 +467,6 @@ inputs:
     prospector.scanner.fingerprint.enabled: false
     file_identity.native: ~
     use_output: default
-    _runtime_experimental: otel
 agent.grpc:
     port: 6790
 outputs:
@@ -476,6 +475,7 @@ outputs:
     hosts: [http://localhost:9200]
     api_key: placeholder
 agent.monitoring.enabled: false
+agent.internal.runtime.filebeat.filestream: otel
 `
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))

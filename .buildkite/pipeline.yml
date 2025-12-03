@@ -281,65 +281,50 @@ steps:
   # Runs only on main and if k8s files are changed
   - label: "Trigger k8s sync"
     branches: main
-    plugins:
-      - monorepo-diff#v1.2.0:
-          diff: "git diff --name-only HEAD~1"
-          interpolation: false
-          watch:
-            - path:
-                - deploy/kubernetes/*
-                - version/docs/version.asciidoc
-              config:
-                label: "Sync K8s"
-                command: ".buildkite/scripts/steps/sync-k8s.sh"
-                agents:
-                  provider: "gcp"
-                  image: "${IMAGE_UBUNTU_2204_X86_64}"
-                env:
-                  - GH_VERSION=2.4.0
+    command: ".buildkite/scripts/steps/sync-k8s.sh"
+    agents:
+      provider: "gcp"
+      image: "${IMAGE_UBUNTU_2204_X86_64}"
+    env:
+      GH_VERSION: "2.4.0"
+    if_changed:
+      include:
+        - deploy/kubernetes/*
+        - version/docs/version.asciidoc
 
   # Trigger for pull requests
   - label: "Trigger Extended tests for Pull request"
     if: |
       (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
       build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
-
-    plugins:
-      - monorepo-diff#v1.2.0:
-          diff: "git diff --name-only origin/${GITHUB_PR_TARGET_BRANCH}...HEAD"
-          interpolation: false
-          watch:
-            - path:
-                - internal/
-                - dev-tools/
-                - pkg/
-                - deploy/
-                - test_infra/
-                - testing/
-                - version/
-                - specs/
-                - .agent-versions.json
-                - .go-version
-                - .package-version
-                - go.mod
-                - go.sum
-                - magefile.go
-                - main.go
-
-                - .buildkite/integration.pipeline.yml
-                - .buildkite/bk.integration.pipeline.yml
-                - .buildkite/bk.integration-fips.pipeline.yml
-                - .buildkite/pipeline.yml
-                - .buildkite/scripts/
-                - .buildkite/hooks/
-
-              config:
-                label: ":pipeline: Upload extended testing Pipeline"
-                command: "buildkite-agent pipeline upload .buildkite/integration.pipeline.yml"
-                env:
-                  - BUILDKITE_PULL_REQUEST=${BUILDKITE_PULL_REQUEST}
-                  - BUILDKITE_PULL_REQUEST_BASE_BRANCH=${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
-                  - GITHUB_PR_LABELS=${GITHUB_PR_LABELS}
+    command: "buildkite-agent pipeline upload .buildkite/integration.pipeline.yml"
+    env:
+      BUILDKITE_PULL_REQUEST: ${BUILDKITE_PULL_REQUEST}
+      BUILDKITE_PULL_REQUEST_BASE_BRANCH: ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
+      GITHUB_PR_LABELS: ${GITHUB_PR_LABELS}
+    if_changed:
+      include:
+        - internal/**
+        - dev-tools/**
+        - pkg/**
+        - deploy/**
+        - test_infra/**
+        - testing/**
+        - version/**
+        - specs/**
+        - .agent-versions.json
+        - .go-version
+        - .package-version
+        - go.mod
+        - go.sum
+        - magefile.go
+        - main.go
+        - .buildkite/integration.pipeline.yml
+        - .buildkite/bk.integration.pipeline.yml
+        - .buildkite/bk.integration-fips.pipeline.yml
+        - .buildkite/pipeline.yml
+        - .buildkite/scripts/**
+        - .buildkite/hooks/**
 
   # Trigger for branches
   - label: "Triggering Extended tests for branches"
@@ -352,17 +337,12 @@ steps:
   # this should help detecting issues earlier in the development cycle
   - label: "Trigger Serverless Beats Tests"
     if: build.pull_request.id != null
-    plugins:
-      - monorepo-diff#v1.2.0:
-          diff: "git diff --name-only origin/${GITHUB_PR_TARGET_BRANCH}...HEAD"
-          interpolation: false
-          watch:
-            - path:
-                - .buildkite/serverless.beats.tests.yml
-                - .buildkite/scripts/steps/beats_tests.sh
-                - .buildkite/hooks/pre-command
-              config:
-                trigger: "beats-agent-serverless-tests"
-                build:
-                  commit: "${BUILDKITE_COMMIT}"
-                  branch: "${BUILDKITE_BRANCH}"
+    trigger: "beats-agent-serverless-tests"
+    build:
+      commit: "${BUILDKITE_COMMIT}"
+      branch: "${BUILDKITE_BRANCH}"
+    if_changed:
+      include:
+        - .buildkite/serverless.beats.tests.yml
+        - .buildkite/scripts/steps/beats_tests.sh
+        - .buildkite/hooks/pre-command
