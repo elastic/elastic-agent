@@ -311,6 +311,11 @@ func CleanAvailableRollbacks(log *logger.Logger, source availableRollbacksSource
 		return nil, fmt.Errorf("unable to get available rollbacks: %w", err)
 	}
 
+	if len(rollbacks) == 0 {
+		log.Debugf("No available rollbacks returned, exiting cleanup")
+		return nil, nil
+	}
+
 	// Clean the currentHomeRel path to normalize it
 	currentHomeRelPath = filepath.Clean(currentHomeRelPath)
 

@@ -326,7 +326,6 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 			setup: func(t *testing.T, topDir string) (*upgrade.UpdateMarker, rollbacksSource) {
 				mockRollbackSource := newMockRollbacksSource(t)
 				mockRollbackSource.EXPECT().Get().Return(nil, nil)
-				mockRollbackSource.EXPECT().Set(map[string]ttl.TTLMarker{}).Return(nil)
 				return nil, mockRollbackSource
 			},
 
