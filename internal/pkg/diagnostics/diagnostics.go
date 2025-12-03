@@ -369,11 +369,11 @@ func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, slice
 		if rootValue != nil {
 			switch cast := rootValue.(type) {
 			case map[string]interface{}:
-				rootValue = redactMap(errOut, cast, sliceElem)
+				rootValue = redactMap(errOut, cast, false)
 			case map[interface{}]interface{}:
-				rootValue = redactMap(errOut, cast, sliceElem)
+				rootValue = redactMap(errOut, cast, false)
 			case map[int]interface{}:
-				rootValue = redactMap(errOut, cast, sliceElem)
+				rootValue = redactMap(errOut, cast, false)
 			case []interface{}:
 				// Recursively process each element in the slice so that we also walk
 				// through lists (e.g. inputs[4].streams[0]). This is required to

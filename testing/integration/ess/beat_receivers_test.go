@@ -909,6 +909,9 @@ func TestSensitiveLogsESExporter(t *testing.T) {
 		},
 		Stack: &define.Stack{},
 	})
+
+	t.Skip("Flaky test, see https://github.com/elastic/elastic-agent/issues/11023#issuecomment-3596964850")
+
 	tmpDir := t.TempDir()
 	numEvents := 50
 	// Create the data file to ingest
@@ -1129,9 +1132,8 @@ func setStrictMapping(client *elasticsearch.Client, index string) error {
 	defer cancel()
 
 	// Build request
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut,
-		esEndpoint+"/_index_template/no-dynamic-template",
-		bytes.NewReader(jsonData))
+	url := fmt.Sprintf("%s/_index_template/%s", esEndpoint, index)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(jsonData))
 	if err != nil {
 		return fmt.Errorf("could not create http request to ES server: %v", err)
 	}
@@ -1143,8 +1145,15 @@ func setStrictMapping(client *elasticsearch.Client, index string) error {
 	if err != nil {
 		return fmt.Errorf("error performing request: %v", err)
 	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("incorrect response code: %v", err)
+		responseBody, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return fmt.Errorf("unexpected status code: %d, error reading response body: %w", resp.StatusCode, readErr)
+		}
+		return fmt.Errorf("unexpected status code: %d, response body: %s", resp.StatusCode, responseBody)
 	}
 	return nil
 }
