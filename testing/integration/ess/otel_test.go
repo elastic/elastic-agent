@@ -522,9 +522,8 @@ func TestOtelLogsIngestion(t *testing.T) {
 	// Prepare the OTel config.
 	testId := info.Namespace
 
-	// Ensure everything is saved in case of test failure
-	// this folder is also collected on CI.
-	tempDir := aTesting.TempDir(t, "..", "..", "..", "build")
+	// TODO(Tiago): use TempDir from https://github.com/elastic/elastic-agent-libs/pull/369 once it's merged
+	tempDir := t.TempDir()
 	inputFilePath := filepath.Join(tempDir, "input.log")
 	otelLogFilePath := filepath.Join(tempDir, "elastic-agent.ndjson")
 
