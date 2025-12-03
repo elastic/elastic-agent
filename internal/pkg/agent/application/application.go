@@ -209,7 +209,11 @@ func New(
 			log.Info("Parsed configuration and determined agent is in Fleet Server bootstrap mode")
 
 			compModifiers = append(compModifiers, FleetServerComponentModifier(cfg.Fleet.Server))
-			configMgr = coordinator.NewConfigPatchManager(newFleetServerBootstrapManager(log), PatchAPMConfig(log, rawConfig))
+			configMgr = coordinator.NewConfigPatchManager(
+				newFleetServerBootstrapManager(log),
+				PatchAPMConfig(log, rawConfig),
+				PatchFleetConfig(log, rawConfig, caps, isManaged),
+			)
 		} else {
 			log.Info("Parsed configuration and determined agent is managed by Fleet")
 
@@ -259,7 +263,12 @@ func New(
 			if err != nil {
 				return nil, nil, nil, err
 			}
-			configMgr = coordinator.NewConfigPatchManager(managed, injectOutputOverrides(log, rawConfig), PatchAPMConfig(log, rawConfig))
+			configMgr = coordinator.NewConfigPatchManager(
+				managed,
+				injectOutputOverrides(log, rawConfig),
+				PatchAPMConfig(log, rawConfig),
+				PatchFleetConfig(log, rawConfig, caps, isManaged),
+			)
 		}
 	}
 
