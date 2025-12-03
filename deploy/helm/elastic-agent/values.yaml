@@ -300,6 +300,17 @@ kubernetes:
       # -- system metric stream vars
       # @section -- 2 - Kubernetes integration
       vars: {}
+autoOps:
+  enabled: false
+  autoops_token: ""
+  autoops_otel_url: ""
+  autoops_temp_resource_id: ""
+  es_api_key: ""
+  es_username: ""
+  es_password: ""
+  elastic_cloud_connected_mode_api_key: ""
+  elastic_cloud_connected_mode_api_url: ""
+  autoops_es_url: ""
 system:
   # -- enable System integration.
   # @section -- 4 - System integration
@@ -530,6 +541,14 @@ agent:
         kubernetes:
           node: ${NODE_NAME}
           scope: node
+    autoOps:
+      mode: deployment
+      serviceAccount:
+        create: true
+      clusterRole:
+        create: false
+      nodeSelector:
+        kubernetes.io/os: linux
 kube-state-metrics:
   enabled: true
   fullnameOverride: "kube-state-metrics"

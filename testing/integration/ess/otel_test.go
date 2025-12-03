@@ -22,7 +22,6 @@ import (
 	"text/template"
 	"time"
 
-	libbeattesting "github.com/elastic/beats/v7/libbeat/tests/integration"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 
 	"github.com/google/go-cmp/cmp"
@@ -477,6 +476,11 @@ exporters:
     sending_queue:
       wait_for_result: true
       block_on_overflow: true
+      enabled: true
+      batch:
+        min_size: 2000
+        max_size: 10000
+        flush_timeout: 1s
     mapping:
       mode: none
 
@@ -529,10 +533,7 @@ func TestOtelLogsIngestion(t *testing.T) {
 
 	// Ensure everything is saved in case of test failure
 	// this folder is also collected on CI.
-	rootDir, err := filepath.Abs(filepath.Join("..", "..", "..", "build"))
-	require.NoError(t, err, "cannot get absolute path of rootDir")
-
-	tempDir := libbeattesting.CreateTempDir(t, rootDir)
+	tempDir := aTesting.TempDir(t, "..", "..", "..", "build")
 	inputFilePath := filepath.Join(tempDir, "input.log")
 	otelLogFilePath := filepath.Join(tempDir, "elastic-agent.ndjson")
 
@@ -583,10 +584,9 @@ func TestOtelLogsIngestion(t *testing.T) {
 		require.NoError(t, err)
 	}
 	inputFile.Close()
-	t.Cleanup(func() {
-		_ = os.Remove(inputFilePath)
-	})
 
+	// It takes about 45s to ingest all files on local tests,
+	// so set the timeout to 5min to be on the safe side.
 	require.EventuallyWithT(
 		t,
 		func(c *assert.CollectT) {
@@ -605,7 +605,7 @@ func TestOtelLogsIngestion(t *testing.T) {
 				"expecting %d events",
 				logsCount)
 		},
-		2*time.Minute,
+		5*time.Minute,
 		time.Second,
 		"did not find the expected number of events")
 
@@ -1136,7 +1136,6 @@ inputs:
   - type: filestream
     id: filestream-e2e
     use_output: default
-    _runtime_experimental: otel
     streams:
       - id: e2e
         data_stream:
@@ -1163,6 +1162,7 @@ agent:
     metrics: true
     logs: false
     use_output: monitoring
+agent.internal.runtime.filebeat.filestream: otel
 `
 	index := ".ds-logs-e2e-*"
 	var configBuffer bytes.Buffer
@@ -1279,7 +1279,6 @@ inputs:
   - type: http/metrics
     id: http-metrics-test
     use_output: default
-    _runtime_experimental: otel
     streams:
     - metricsets:
        - json
@@ -1302,6 +1301,8 @@ agent.monitoring:
   http:
     enabled: true
     port: 6790
+agent.internal.runtime.metricbeat:
+  http/metrics: otel
 `
 	index := ".ds-metrics-e2e-*"
 	var configBuffer bytes.Buffer
@@ -1836,8 +1837,6 @@ func TestFBOtelRestartE2E(t *testing.T) {
                 document_id: "id"
           prospector.scanner.fingerprint.enabled: false
           file_identity.native: ~
-    output:
-      otelconsumer:
     logging:
       level: info
       selectors:
@@ -2071,8 +2070,6 @@ receivers:
             - '.*'
           metricsets:
             - cpu
-    output:
-      otelconsumer:
     queue.mem.flush.timeout: 0s
 exporters:
   elasticsearch/log:
@@ -2217,8 +2214,6 @@ receivers:
             - '.*'
           metricsets:
             - cpu
-    output:
-      otelconsumer:
     queue.mem.flush.timeout: 0s
 exporters:
   elasticsearch/log:
@@ -2323,7 +2318,6 @@ inputs:
   - type: system/metrics
     id: http-metrics-test
     use_output: default
-    _runtime_experimental: otel
     streams:
     - metricsets:
        - cpu
@@ -2349,6 +2343,8 @@ agent.monitoring:
     port: 6792
 agent.grpc:
     port: 6790
+agent.internal.runtime.metricbeat:
+  system/metrics: otel
 `
 
 	var configBuffer bytes.Buffer

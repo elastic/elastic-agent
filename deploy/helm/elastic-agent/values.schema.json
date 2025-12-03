@@ -331,6 +331,88 @@
                 }
             }
         },
+        "autoOps": {
+            "type": "object",
+            "description": "Configuration for AutoOps integration.",
+            "additionalProperties": false,
+            "properties": {
+                "enabled": { "type": "boolean", "description": "Enable AutoOps integration." },
+
+                "autoops_token": { "type": "string", "description": "Token to register into AutoOps" },
+                "autoops_otel_url": { "type": "string", "description": "OTel server URL" },
+                "autoops_temp_resource_id": { "type": "string", "description": "Temporary resource ID" },
+
+                "es_api_key": { "type": "string", "description": "Monitored ES cluster API key" },
+                "es_username": { "type": "string", "description": "Monitored ES cluster username" },
+                "es_password": { "type": "string", "description": "Monitored ES cluster password" },
+                "autoops_es_url": { "type": "string", "description": "Monitored ES cluster URL" },
+
+
+                "elastic_cloud_connected_mode_api_key": { "type": "string", "description": "Cloud Connected Mode API key" },
+                "elastic_cloud_connected_mode_api_url": { "type": "string", "description": "Cloud Connected Mode API URL" }
+            },
+
+            "if": {
+                "properties": { "enabled": { "const": true } },
+                "required": ["enabled"]
+            },
+            "then": {
+                "required": ["autoops_token", "autoops_otel_url", "autoops_temp_resource_id"],
+                "allOf": [
+                    {
+                        "properties": {
+                            "autoops_token": { "type": "string", "minLength": 1 },
+                            "autoops_otel_url": { "type": "string", "minLength": 1 },
+                            "autoops_temp_resource_id": { "type": "string", "minLength": 1 },
+                            "autoops_es_url": { "type": "string", "description": "Monitored ES cluster URL" }
+                        }
+                    }
+                ],
+                "oneOf": [
+                    {
+                        "description": "Auth via API key only",
+                        "required": ["es_api_key"],
+                        "properties": {
+                            "es_api_key": { "type": "string", "minLength": 1 }
+                        },
+                        "allOf": [
+                            {
+                                "not": {
+                                    "anyOf": [
+                                        {
+                                            "required": ["es_username"],
+                                            "properties": { "es_username": { "type": "string", "minLength": 1 } }
+                                        },
+                                        {
+                                            "required": ["es_password"],
+                                            "properties": { "es_password": { "type": "string", "minLength": 1 } }
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "description": "Auth via username + password only",
+                        "required": ["es_username", "es_password"],
+                        "properties": {
+                            "es_username": { "type": "string", "minLength": 1 },
+                            "es_password": { "type": "string", "minLength": 1 }
+                        },
+                        "allOf": [
+                            {
+                                "not": {
+                                    "allOf": [
+                                        { "required": ["es_api_key"] },
+                                        { "properties": { "es_api_key": { "type": "string", "minLength": 1 } } }
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
         "extraIntegrations": {
             "type": "object",
             "description": "Configuration for extra integrations.",
