@@ -503,8 +503,8 @@ github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumpti
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic/go.mod h1:0vCBR1wgGwZeGmloJ+eCWIZF2S47grTXRzj2mftg2Nk=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
 github.com/elastic/bayeux v1.0.5/go.mod h1:CSI4iP7qeo5MMlkznGvYKftp8M7qqP/3nzmVZoXHY68=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251130155143-19eb3e615086 h1:/UwahTtqgICYIbQqRhg+1B4SVXfhIWUcobMmwxBf1Jc=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251130155143-19eb3e615086/go.mod h1:jFJMJMOG18CdEbvM3UKQnn3Ft66j2vgMfStZwLAcK+A=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251202130319-deec5c55e9b0 h1:NLqI2no2x3cSjcKH76C9ItRw0GiQVC7/uoJ/DLurEcE=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251202130319-deec5c55e9b0/go.mod h1:jFJMJMOG18CdEbvM3UKQnn3Ft66j2vgMfStZwLAcK+A=
 github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae h1:OiShmbWAyGU0MS0ADJWr1/QgeLIZliMk9xsrFicR3/s=
 github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae/go.mod h1:D2IckZVXARugvikE4fv1glvaJMohKSZRzrPsxCjo9O0=
 github.com/elastic/elastic-agent-autodiscover v0.10.0 h1:WJ4zl9uSfk1kHmn2B/0byQBLIL607Zt4LNfOgV7+XN0=
@@ -1374,6 +1374,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverrece
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver v0.139.0/go.mod h1:ZnoQNt1oRAWLngoYWLbFUdrr1m8UcXZxEDg/W6+JrOY=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver v0.139.0 h1:0M9E1AlRyUWXzRQIerGw0et3pdItIfZhaNFX6Y+EXzg=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver v0.139.0/go.mod h1:C2wYuBBlYaWuFQP+elufZGZrlj7GyeCdzroEZYlV5os=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver v0.139.0 h1:d3gfDFoyCGpLrOba4WezCr4mN0tFQuchP2lG0c5Iwp0=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver v0.139.0/go.mod h1:rzONCE55PRW+ogXOMavHrWi/H6uBzNAGGJzL1fRLs+I=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.139.0 h1:uq3xrmeDzIfwXHB5BCC/BAOO/ZIrexi+hDbRcd3DrNg=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.139.0/go.mod h1:C89wYTePUCuLie/te7LW8KYuN07EVf9HLxiJEzjcQgY=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=

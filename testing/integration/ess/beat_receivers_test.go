@@ -715,6 +715,8 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
+    status_reporting:
+      enabled: false
 agent.monitoring.enabled: false
 `
 
@@ -857,6 +859,8 @@ outputs:
     hosts: [http://localhost:9200]
     api_key: placeholder
     indices: [] # not supported by the elasticsearch exporter
+    status_reporting:
+      enabled: false
   supported:
     type: elasticsearch
     hosts: [http://localhost:9200]
@@ -981,6 +985,8 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
+    status_reporting:
+      enabled: false
 agent.monitoring.enabled: false
 `
 
@@ -1068,6 +1074,8 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
+    status_reporting:
+      enabled: false
 agent.monitoring.enabled: false
 `
 	err = fixture.Configure(ctx, []byte(configNoComponents))
@@ -1521,9 +1529,8 @@ func setStrictMapping(client *elasticsearch.Client, index string) error {
 	defer cancel()
 
 	// Build request
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut,
-		esEndpoint+"/_index_template/no-dynamic-template",
-		bytes.NewReader(jsonData))
+	url := fmt.Sprintf("%s/_index_template/%s", esEndpoint, index)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(jsonData))
 	if err != nil {
 		return fmt.Errorf("could not create http request to ES server: %v", err)
 	}
@@ -1535,8 +1542,15 @@ func setStrictMapping(client *elasticsearch.Client, index string) error {
 	if err != nil {
 		return fmt.Errorf("error performing request: %v", err)
 	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("incorrect response code: %v", err)
+		responseBody, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return fmt.Errorf("unexpected status code: %d, error reading response body: %w", resp.StatusCode, readErr)
+		}
+		return fmt.Errorf("unexpected status code: %d, response body: %s", resp.StatusCode, responseBody)
 	}
 	return nil
 }

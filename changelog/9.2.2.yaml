@@ -1,0 +1,68 @@
+version: 9.2.2
+entries:
+    - kind: bug-fix
+      summary: fix filesource provider to work with kubernetes secret mounts
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11050
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1762438673
+      file:
+        name: 1762438673-fix-filesource-provider-to-work-with-kubernetes-secret-mounts.yaml
+        checksum: 58035340e8d1722d9846474f8795d559a68aaa65
+    - kind: bug-fix
+      summary: Ensure the monitoring input for the Otel collector can only run inside the collector.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11204
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1763382303
+      file:
+        name: 1763382303-prometheus-otel-self-monitoring.yaml
+        checksum: f038289f8c342a4421f337e49f35b9c3a683a46a
+    - kind: security
+      summary: Redact secrets in slices
+      description: Redact secrets in conifg and component files found in the diagnostics archive that occur within slices.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11271
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1763589181
+      file:
+        name: 1763589181-Redact-secrets-in-slices.yaml
+        checksum: d9c041559d60973ff9ef8a52616f0e6d21068db7
+    - kind: bug-fix
+      summary: Fix a fatal startup error in Beats Receivers caused by truncation of long UTF-8 hostnames
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11285
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1763643582
+      file:
+        name: 1763643582-fix-fatal-startup-error-beats-receivers-utf8-hostname.yaml
+        checksum: b5fdea3654facbfbb5c2055494f10390a1309558
+    - kind: bug-fix
+      summary: Allow host to be a string for otel configuration translation
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11394
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/11352
+      impact: ""
+      action: ""
+      timestamp: 1764016303
+      file:
+        name: 1764016303-allow-host-to-be-a-string-for-otel-configuration-translation.yaml
+        checksum: 7f3f634b8c2bd92df76f55688508855306604eb7
