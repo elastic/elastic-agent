@@ -32,6 +32,12 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.139.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.139.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver v0.139.0
+<<<<<<< HEAD
+=======
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver v0.139.0
+>>>>>>> 097f2b381 ([edot] add windowsperfcounters receiver (#11418))
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.139.0
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/pflag v1.0.9

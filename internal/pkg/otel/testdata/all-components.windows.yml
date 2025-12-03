@@ -1,3 +1,28 @@
 exporters:
   file:
+<<<<<<< HEAD
     path: ${env:TMP}\file-exporter-output.json
+=======
+    path: ${env:TMP}\file-exporter-output.json
+receivers:
+  windowseventlog:
+    channel: "Application"
+  windowsperfcounters:
+    perfcounters:
+      - object: Memory
+        counters:
+          - name: Committed Bytes
+            metric: bytes.committed
+service:
+  pipelines:
+    logs/windows:
+      receivers:
+        - windowseventlog
+      exporters:
+        - nop
+    metrics/windows:
+      receivers:
+        - windowsperfcounters
+      exporters:
+        - nop
+>>>>>>> 097f2b381 ([edot] add windowsperfcounters receiver (#11418))

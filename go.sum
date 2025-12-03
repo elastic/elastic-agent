@@ -1330,6 +1330,15 @@ github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreat
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.139.0/go.mod h1:LQO4Ed9FFeKURlq1cLsTThd/526lJKRNvTbB8+HFAvg=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver v0.139.0 h1:xbh/KQO+Ed/absJfMnS0yr10Pv93D9OvvAPVljC7vfE=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver v0.139.0/go.mod h1:63xoHn0RIkxvX5mgwj/bgGiRuwgPOhLroN1c34ywvsk=
+<<<<<<< HEAD
+=======
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver v0.139.0 h1:KYZ4QXpoVLnCdey+7UjYcb3J5jmIVEjjwKW1MrQC7JM=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver v0.139.0/go.mod h1:ZnoQNt1oRAWLngoYWLbFUdrr1m8UcXZxEDg/W6+JrOY=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver v0.139.0 h1:0M9E1AlRyUWXzRQIerGw0et3pdItIfZhaNFX6Y+EXzg=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver v0.139.0/go.mod h1:C2wYuBBlYaWuFQP+elufZGZrlj7GyeCdzroEZYlV5os=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver v0.139.0 h1:d3gfDFoyCGpLrOba4WezCr4mN0tFQuchP2lG0c5Iwp0=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver v0.139.0/go.mod h1:rzONCE55PRW+ogXOMavHrWi/H6uBzNAGGJzL1fRLs+I=
+>>>>>>> 097f2b381 ([edot] add windowsperfcounters receiver (#11418))
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.139.0 h1:uq3xrmeDzIfwXHB5BCC/BAOO/ZIrexi+hDbRcd3DrNg=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.139.0/go.mod h1:C89wYTePUCuLie/te7LW8KYuN07EVf9HLxiJEzjcQgY=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=

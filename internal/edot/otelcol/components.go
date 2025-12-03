@@ -24,6 +24,12 @@ import (
 	nginxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver"
 	receivercreator "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator"
 	redisreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver"
+<<<<<<< HEAD
+=======
+	sqlserverreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver"
+	windowsperfcountersreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver"
+>>>>>>> 097f2b381 ([edot] add windowsperfcounters receiver (#11418))
 	zipkinreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver"
 	nopreceiver "go.opentelemetry.io/collector/receiver/nopreceiver"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
@@ -105,6 +111,17 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			mbreceiver.NewFactory(),
 			jmxreceiver.NewFactory(),
 			nopreceiver.NewFactory(),
+<<<<<<< HEAD
+=======
+			apachereceiver.NewFactory(),
+			iisreceiver.NewFactory(),
+			mysqlreceiver.NewFactory(),
+			postgresqlreceiver.NewFactory(),
+			sqlserverreceiver.NewFactory(),
+			windowseventlogreceiver.NewFactory(),
+			awss3receiver.NewFactory(),
+			windowsperfcountersreceiver.NewFactory(),
+>>>>>>> 097f2b381 ([edot] add windowsperfcounters receiver (#11418))
 		}
 		// some receivers should only be available when
 		// not in fips mode due to restrictions on crypto usage
