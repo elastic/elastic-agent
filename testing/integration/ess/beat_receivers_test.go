@@ -726,6 +726,8 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
+    status_reporting:
+      enabled: false
 agent.monitoring.enabled: false
 `
 
@@ -866,7 +868,12 @@ outputs:
     hosts: [http://localhost:9200]
     api_key: placeholder
     indices: [] # not supported by the elasticsearch exporter
+<<<<<<< HEAD
 
+=======
+    status_reporting:
+      enabled: false
+>>>>>>> b8a142f54 (Ensure we don't report output status in tests where it's irrelevant (#11539))
   supported:
     type: elasticsearch
     hosts: [http://localhost:9200]
@@ -991,6 +998,8 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
+    status_reporting:
+      enabled: false
 agent.monitoring.enabled: false
 `
 
@@ -1078,6 +1087,8 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
+    status_reporting:
+      enabled: false
 agent.monitoring.enabled: false
 `
 	err = fixture.Configure(ctx, []byte(configNoComponents))
