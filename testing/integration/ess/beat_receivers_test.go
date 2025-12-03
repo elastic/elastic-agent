@@ -874,7 +874,7 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
-	status_reporting:
+    status_reporting:
       enabled: false
 `
 
