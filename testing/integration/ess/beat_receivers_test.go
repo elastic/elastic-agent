@@ -870,6 +870,12 @@ outputs:
     indices: [] # not supported by the elasticsearch exporter
     status_reporting:
       enabled: false
+  supported:
+    type: elasticsearch
+    hosts: [http://localhost:9200]
+    api_key: placeholder
+	status_reporting:
+      enabled: false
 `
 
 	// this is the context for the whole test, with a global timeout defined
