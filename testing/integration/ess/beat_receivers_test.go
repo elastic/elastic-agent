@@ -725,6 +725,8 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
+    status_reporting:
+      enabled: false
 agent.monitoring.enabled: false
 `
 
@@ -822,6 +824,287 @@ agent.monitoring.enabled: false
 	}
 }
 
+<<<<<<< HEAD
+=======
+// Log lines TestBeatsReceiverProcessRuntimeFallback checks for
+const (
+	otelRuntimeUnsupportedLogLineStart                 = "otel runtime is not supported for component"
+	otelRuntimeMonitoringOutputUnsupportedLogLineStart = "otel runtime is not supported for monitoring output"
+	prometheusInputSkippedLogLine                      = "The Otel prometheus metrics monitoring input can't run in a beats process, skipping"
+)
+
+// TestBeatsReceiverProcessRuntimeFallback verifies that we fall back to the process runtime if the otel runtime
+// does not support the requested configuration.
+func TestBeatsReceiverProcessRuntimeFallback(t *testing.T) {
+	_ = define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: nil,
+	})
+
+	config := `agent.logging.to_stderr: true
+agent.logging.to_files: false
+agent.internal.runtime.metricbeat:
+  system/metrics: otel
+inputs:
+  - type: system/metrics
+    id: unique-system-metrics-input
+    streams:
+      - metricsets:
+        - cpu
+  - type: system/metrics
+    id: unique-system-metrics-input-2
+    use_output: supported
+    _runtime_experimental: otel
+    streams:
+      - metricsets:
+        - cpu
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [http://localhost:9200]
+    api_key: placeholder
+    indices: [] # not supported by the elasticsearch exporter
+    status_reporting:
+      enabled: false
+  supported:
+    type: elasticsearch
+    hosts: [http://localhost:9200]
+    api_key: placeholder
+    status_reporting:
+      enabled: false
+`
+
+	// this is the context for the whole test, with a global timeout defined
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	// set up a standalone agent
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	err = fixture.Configure(ctx, []byte(config))
+	require.NoError(t, err)
+
+	installOutput, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true})
+	require.NoError(t, err, "install failed, output: %s", string(installOutput))
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+		// we should be running beats processes for components with default output even though the otel runtime was requested
+		// agent should be healthy
+		assert.Equal(collect, int(cproto.State_HEALTHY), status.State)
+		assert.Equal(collect, 5, len(status.Components))
+
+		// all the components should be healthy, their units should be healthy, and they should identify
+		// themselves as running in the process runtime if they're using the default or monitoring outputs
+		for _, comp := range status.Components {
+			assert.Equal(collect, int(cproto.State_HEALTHY), comp.State)
+			expectedComponentVersionInfoName := componentVersionInfoNameForRuntime(component.OtelRuntimeManager)
+			if strings.HasSuffix(comp.ID, "default") || strings.HasSuffix(comp.ID, "monitoring") {
+				expectedComponentVersionInfoName = componentVersionInfoNameForRuntime(component.ProcessRuntimeManager)
+			}
+			assert.Equal(collect, expectedComponentVersionInfoName, comp.VersionInfo.Name)
+			for _, unit := range comp.Units {
+				assert.Equal(collect, int(cproto.State_HEALTHY), unit.State)
+			}
+		}
+	}, 1*time.Minute, 1*time.Second)
+	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
+	require.NoError(t, err)
+
+	// verify we've logged a warning about using the process runtime
+	var unsupportedLogRecords []map[string]any
+	var prometheusUnsupportedLogRecord map[string]any
+	var monitoringOutputUnsupportedLogRecord map[string]any
+	for _, line := range strings.Split(string(logsBytes), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var logRecord map[string]any
+		if unmarshalErr := json.Unmarshal([]byte(line), &logRecord); unmarshalErr != nil {
+			continue
+		}
+
+		if message, ok := logRecord["message"].(string); ok {
+			if strings.HasPrefix(message, otelRuntimeUnsupportedLogLineStart) {
+				unsupportedLogRecords = append(unsupportedLogRecords, logRecord)
+			}
+			if strings.HasPrefix(message, prometheusInputSkippedLogLine) {
+				prometheusUnsupportedLogRecord = logRecord
+			}
+			if strings.HasPrefix(message, otelRuntimeMonitoringOutputUnsupportedLogLineStart) {
+				monitoringOutputUnsupportedLogRecord = logRecord
+			}
+		}
+	}
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent logs seen by the test:")
+			t.Log(string(logsBytes))
+		}
+	})
+
+	assert.Len(t, unsupportedLogRecords, 1, "one log line for each component we try to run")
+	assert.NotEmpty(t, prometheusUnsupportedLogRecord, "should get a log line about Otel prometheus metrics input being skipped")
+	assert.NotEmpty(t, monitoringOutputUnsupportedLogRecord, "should get a log line about monitoring output not being supported")
+}
+
+// TestComponentWorkDir verifies that the component working directory is not deleted when moving the component from
+// the process runtime to the otel runtime.
+func TestComponentWorkDir(t *testing.T) {
+	_ = define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: nil,
+	})
+
+	type configOptions struct {
+		RuntimeExperimental string
+	}
+	configTemplate := `agent.logging.level: debug
+agent.logging.to_stderr: true
+agent.logging.to_files: false
+agent.internal.runtime.metricbeat:
+  system/metrics: {{.RuntimeExperimental}}
+inputs:
+  # Collecting system metrics
+  - type: system/metrics
+    id: unique-system-metrics-input
+    streams:
+      - metricsets:
+        - cpu
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [http://localhost:9200]
+    api_key: placeholder
+    status_reporting:
+      enabled: false
+agent.monitoring.enabled: false
+`
+
+	var configBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			configOptions{
+				RuntimeExperimental: string(component.ProcessRuntimeManager),
+			}))
+	processConfig := configBuffer.Bytes()
+	require.NoError(t,
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			configOptions{
+				RuntimeExperimental: string(component.OtelRuntimeManager),
+			}))
+	receiverConfig := configBuffer.Bytes()
+	// this is the context for the whole test, with a global timeout defined
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	// set up a standalone agent
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	err = fixture.Configure(ctx, processConfig)
+	require.NoError(t, err)
+
+	output, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true})
+	require.NoError(t, err, "failed to install agent: %s", output)
+
+	var componentID, componentWorkDir string
+	var workDirCreated time.Time
+
+	// wait for component to appear in status and be healthy
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		require.NoError(collect, statusErr)
+		require.Equal(collect, 1, len(status.Components))
+		componentStatus := status.Components[0]
+		assert.Equal(collect, cproto.State_HEALTHY, cproto.State(componentStatus.State))
+		componentID = componentStatus.ID
+	}, 2*time.Minute, 5*time.Second)
+
+	runDir, err := atesting.FindRunDir(fixture)
+	require.NoError(t, err)
+
+	componentWorkDir = filepath.Join(runDir, componentID)
+	stat, err := os.Stat(componentWorkDir)
+	require.NoError(t, err, "component working directory should exist")
+	assert.True(t, stat.IsDir(), "component working directory should exist")
+	workDirCreated = stat.ModTime()
+
+	// change configuration and wait until the beats receiver is present in status
+	err = fixture.Configure(ctx, receiverConfig)
+	require.NoError(t, err)
+
+	// wait for component to appear in status and be healthy or degraded
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		require.NoError(collect, statusErr)
+		require.Equal(collect, 1, len(status.Components))
+		componentStatus := status.Components[0]
+		require.Equal(collect, "beats-receiver", componentStatus.VersionInfo.Name)
+		componentState := cproto.State(componentStatus.State)
+		assert.Truef(collect, componentState == cproto.State_HEALTHY || componentState == cproto.State_DEGRADED,
+			"component state should be HEALTHY or DEGRADED, got %s", componentState.String())
+	}, 2*time.Minute, 5*time.Second)
+
+	// the component working directory should still exist
+	stat, err = os.Stat(componentWorkDir)
+	require.NoError(t, err, "component working directory should exist")
+	assert.True(t, stat.IsDir(), "component working directory should exist")
+	assert.Equal(t, workDirCreated, stat.ModTime(), "component working directory shouldn't have been modified")
+
+	configNoComponents := `agent.logging.level: info
+agent.logging.to_stderr: true
+agent.logging.to_files: false
+inputs: []
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [http://localhost:9200]
+    api_key: placeholder
+    status_reporting:
+      enabled: false
+agent.monitoring.enabled: false
+`
+	err = fixture.Configure(ctx, []byte(configNoComponents))
+	require.NoError(t, err)
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		require.NoError(collect, statusErr)
+		require.Equal(collect, 0, len(status.Components))
+	}, 2*time.Minute, 5*time.Second)
+
+	// the component working directory shouldn't exist anymore
+	require.NoDirExists(t, componentWorkDir)
+}
+
+>>>>>>> b8a142f54 (Ensure we don't report output status in tests where it's irrelevant (#11539))
 func assertCollectorComponentsHealthy(t *assert.CollectT, status *atesting.AgentStatusCollectorOutput) {
 	assert.Equal(t, int(cproto.CollectorComponentStatus_StatusOK), status.Status, "component status should be ok")
 	assert.Equal(t, "", status.Error, "component status should not have an error")
