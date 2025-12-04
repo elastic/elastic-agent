@@ -348,6 +348,19 @@ steps:
         - .buildkite/scripts/steps/beats_tests.sh
         - .buildkite/hooks/pre-command
 
+  # Trigger for pull requests - packaging
+  # this should help detecting issues earlier in the development cycle
+  - label: "Trigger Serverless Beats Tests"
+    if: build.pull_request.id != null
+    commands:
+      - .buildkite/scripts/steps/run-packaging-pipeline.sh
+      - .buildkite/scripts/steps/run-packaging-pipeline.sh | buildkite-agent pipeline upload
+    if_changed:
+      include:
+        - .buildkite/pipeline.elastic-agent-package.yml
+        - .buildkite/scripts/steps/package.sh
+        - .buildkite/scripts/steps/run-packaging-pipeline.sh
+
   # wait for CI to be done
   - wait: ~
 
