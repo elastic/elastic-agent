@@ -23,10 +23,10 @@ cat << EOF
       message: "${BUILDKITE_PULL_REQUEST} - Test packaging works as expected"
       commit: "${BUILDKITE_COMMIT}"
       branch: "${BUILDKITE_BRANCH}"
-      env:
-        DRA_VERSION: "${BEAT_VERSION}"
-        DRA_WORKFLOW: "snapshot"
-        DRA_DRY_RUN: "--dry-run"
-        MANIFEST_URL: "${MANIFEST_URL}"
-        ELASTIC_SLACK_NOTIFICATIONS_ENABLED: "false"
+    env:
+      DRA_VERSION: "${BEAT_VERSION}"
+      DRA_WORKFLOW: "snapshot"
+      DRA_DRY_RUN: "--dry-run"
+      MANIFEST_URL: "${MANIFEST_URL}"
+      ELASTIC_SLACK_NOTIFICATIONS_ENABLED: "false"
 EOF
