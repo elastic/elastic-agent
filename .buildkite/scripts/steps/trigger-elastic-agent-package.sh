@@ -6,6 +6,7 @@
 #  - BUILDKITE_PULL_REQUEST
 #  - BUILDKITE_COMMIT
 #  - BUILDKITE_BRANCH
+#  - BUILDKITE_PULL_REQUEST_BASE_BRANCH
 #
 
 if [ ! -f .package-version ]; then
@@ -20,13 +21,14 @@ cat << EOF
   - label: ":pipeline: Run elastic-agent-package"
     trigger: "elastic-agent-package"
     build:
-      message: "${BUILDKITE_PULL_REQUEST} - Test packaging works as expected"
+      message: "#${BUILDKITE_PULL_REQUEST} - Verify elastic-agent-package works"
       commit: "${BUILDKITE_COMMIT}"
       branch: "${BUILDKITE_BRANCH}"
-    env:
-      DRA_VERSION: "${BEAT_VERSION}"
-      DRA_WORKFLOW: "snapshot"
-      DRA_DRY_RUN: "--dry-run"
-      MANIFEST_URL: "${MANIFEST_URL}"
-      ELASTIC_SLACK_NOTIFICATIONS_ENABLED: "false"
+      env:
+        DRA_VERSION: "${BEAT_VERSION}"
+        DRA_WORKFLOW: "snapshot"
+        DRA_BRANCH: "${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
+        DRA_DRY_RUN: "--dry-run"
+        MANIFEST_URL: "${MANIFEST_URL}"
+        ELASTIC_SLACK_NOTIFICATIONS_ENABLED: "false"
 EOF
