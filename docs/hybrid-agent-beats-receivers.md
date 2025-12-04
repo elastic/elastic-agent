@@ -155,8 +155,12 @@ receivers:
                   paths:
                     - /var/log/*.log
                   type: filestream
+<<<<<<< HEAD
         output:
             otelconsumer: {}
+=======
+        queue.mem.flush.timeout: 0s
+>>>>>>> be1ae0059 (docs(otel): document delivery guarantees for OTel mode (#11560))
     metricbeatreceiver:
         metricbeat:
             modules:
@@ -166,8 +170,12 @@ receivers:
                   metricsets:
                     - cpu
                   module: system
+<<<<<<< HEAD
         output:
             otelconsumer: {}
+=======
+        queue.mem.flush.timeout: 0s
+>>>>>>> be1ae0059 (docs(otel): document delivery guarantees for OTel mode (#11560))
 exporters:
     elasticsearch/_agent-component/default:
         api_key: placeholder
@@ -180,6 +188,24 @@ exporters:
             enabled: true
         mapping:
             mode: bodymap
+
+        retry:
+            enabled: true
+            initial_interval: 1s
+            max_interval: 1m0s
+            max_retries: 3
+
+        sending_queue:
+            enabled: true
+            wait_for_result: true
+            block_on_overflow: true
+            num_consumers: 1
+            queue_size: 3200
+            batch:
+                max_size: 1600
+                min_size: 0
+                flush_timeout: 10s
+                sizer: items
 service:
     pipelines:
         logs:
@@ -189,3 +215,26 @@ service:
                 - filebeatreceiver
                 - metricbeatreceiver
 ```
+
+### Beats receivers delivery guarantees in OTel mode
+
+When Beat receivers are used in OTel mode, event delivery guarantees depend on the configuration of the OpenTelemetry Collector `sending_queue` and retry settings.  
+Unlike standalone Beats, the EDOT pipeline allows users to customize queue behavior through the Collector configuration.  
+This flexibility is useful, but it also means that not every option combination is compatible with reliable delivery.
+
+Elastic Agent in OTel mode provides an **at least once** delivery guarantee for Beat receivers **only when using the supported `sending_queue` settings described below**.  
+These settings mirror Beats pipeline behavior closely enough to preserve durability expectations.
+
+If users provide arbitrary `sending_queue` or Beat queue overrides, delivery semantics become **undefined** and **at least once delivery cannot be guaranteed**.  
+These combinations are not tested and may result in event loss during backpressure or shutdown.
+
+To achieve the intended delivery guarantee, the exporter that receives events from Beat receivers must define a `sending_queue` with the following characteristics:
+
+- `enabled: true`: The queue must be active.  
+- `wait_for_result: true`: The pipeline must wait for the exporter response before removing events.  
+- `block_on_overflow: true`: Prevents event drops when the queue is full.  
+- The `batch` configuration must include explicit `max_size`, `min_size`, and `flush_timeout` values to ensure events are grouped and flushed in predictable, controlled batches.
+
+Additionally, the retry settings must be enabled on the exporter, using a backoff policy that retries until the operation succeeds. By default, `max_retries` is set to 3, which is how most Beats behave. Standalone Filebeat, however, retries indefinitely. Beats receivers don't support unlimited retries yet, and this is being tracked at https://github.com/elastic/beats/issues/47892.
+
+Beat receivers also require the Beat-internal memory queue to run in synchronous mode for delivery guarantees. This is enabled by setting `queue.mem.flush.timeout: 0s` in each receiver configuration, as shown in the example above.
