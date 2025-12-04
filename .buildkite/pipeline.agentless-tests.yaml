@@ -20,7 +20,7 @@ steps:
     agents:
       image: "docker.elastic.co/ci-agent-images/observability/oci-image-tools-agent:latest@sha256:a4ababd1347111759babc05c9ad5a680f4af48892784951358488b7e7fc94af9"
     plugins:
-      - elastic/vault-docker-login#v0.6.2:
+      - elastic/vault-docker-login#v0.6.3:
           secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
 
   - wait
