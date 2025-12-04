@@ -348,9 +348,9 @@ steps:
         - .buildkite/scripts/steps/beats_tests.sh
         - .buildkite/hooks/pre-command
 
-  # Trigger for pull requests - packaging
-  # this should help detecting issues earlier in the development cycle
-  - label: "Trigger Serverless Beats Tests"
+  # NOTE: This should help detecting issues earlier in the development cycle
+  # See https://github.com/elastic/elastic-agent/issues/11604
+  - label: "Trigger Elastic Agent Package"
     if: build.pull_request.id != null
     commands:
       - .buildkite/scripts/steps/run-packaging-pipeline.sh
