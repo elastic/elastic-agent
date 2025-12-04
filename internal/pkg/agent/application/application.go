@@ -52,6 +52,7 @@ import (
 type rollbacksSource interface {
 	Set(map[string]ttl.TTLMarker) error
 	Get() (map[string]ttl.TTLMarker, error)
+	Remove(string) error
 }
 
 // CfgOverrider allows for application driven overrides of configuration read from disk.
@@ -335,7 +336,7 @@ func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, in
 		log.Warnf("Error calculating home path %q relative to top path %q: %s", absHomePath, topDir, err)
 		return
 	}
-	_, err = upgrade.CleanAvailableRollbacks(log, rollbackSource, topDir, relHomePath, upgrade.PreserveActiveUpgradeVersions(initialUpdateMarker, upgrade.CleanupExpiredRollbacks))
+	_, err = upgrade.CleanAvailableRollbacks(log, rollbackSource, topDir, relHomePath, now, upgrade.PreserveActiveUpgradeVersions(initialUpdateMarker, upgrade.CleanupExpiredRollbacks))
 	if err != nil {
 		log.Warnf("Error cleaning available rollbacks: %s", err)
 	}

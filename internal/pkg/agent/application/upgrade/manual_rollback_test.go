@@ -551,7 +551,8 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 						ValidUntil: oneHourFromNow, // still valid
 					},
 				}, nil)
-				rollbackSource.EXPECT().Set(map[string]ttl.TTLMarker{}).Return(nil)
+				rollbackSource.EXPECT().Remove(filepath.Join("data", "elastic-agent-1.2.3-expire")).Return(nil)
+				rollbackSource.EXPECT().Remove(filepath.Join("data", "elastic-agent-4.5.6-valid1")).Return(nil)
 
 				// setup the fake agent installations
 				setupAgents(t, log, topDir, setupAgentInstallations{
@@ -604,13 +605,7 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 					},
 				}, nil)
 
-				rollbackSource.EXPECT().Set(map[string]ttl.TTLMarker{
-					filepath.Join("data", "elastic-agent-4.5.6-valid1"): {
-						Version:    "4.5.6",
-						Hash:       "valid1",
-						ValidUntil: oneHourFromNow, // still valid
-					},
-				}).Return(nil)
+				rollbackSource.EXPECT().Remove(filepath.Join("data", "elastic-agent-1.2.3-expire")).Return(nil)
 
 				// setup the fake agent installations
 				setupAgents(t, log, topDir, setupAgentInstallations{
@@ -664,8 +659,6 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 					},
 				}, nil)
 
-				rollbackSource.EXPECT().Set(map[string]ttl.TTLMarker{}).Return(nil)
-
 				// setup the fake agent installations
 				setupAgents(t, log, topDir, setupAgentInstallations{
 					installedAgents: []testAgentInstall{
@@ -701,7 +694,6 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 						ValidUntil: oneHourAgo, // expired 1 hour ago
 					},
 				}, nil)
-				rollbackSource.EXPECT().Set(map[string]ttl.TTLMarker{}).Return(nil)
 
 				// setup the fake agent installations
 				setupAgents(t, log, topDir, setupAgentInstallations{
@@ -739,14 +731,6 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 						ValidUntil: oneHourAgo, // expired 1 hour ago
 					},
 				}, nil)
-
-				rollbackSource.EXPECT().Set(map[string]ttl.TTLMarker{
-					filepath.Join("data", "elastic-agent-1.2.3-oldver"): {
-						Version:    "1.2.3",
-						Hash:       "oldver",
-						ValidUntil: oneHourAgo, // expired 1 hour ago
-					},
-				}).Return(nil)
 
 				fromVersion := testAgentVersion{
 					version: "1.2.3",
@@ -812,11 +796,134 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 			mockRollbacksSource := newMockAvailableRollbacksSource(t)
 
 			tt.setup(t, log, topDir, mockRollbacksSource)
-			got, err := CleanAvailableRollbacks(log, mockRollbacksSource, topDir, tt.args.currentHomeRelPath, tt.args.filter)
+			got, err := CleanAvailableRollbacks(log, mockRollbacksSource, topDir, tt.args.currentHomeRelPath, time.Now(), tt.args.filter)
 			tt.wantErr(t, err)
 			assert.Equal(t, tt.want, got)
 			if tt.postCleanupAssertions != nil {
 				tt.postCleanupAssertions(t, topDir)
+			}
+		})
+	}
+}
+
+func TestPerformScheduledCleanup(t *testing.T) {
+
+	now := time.Now()
+
+	// Possible rollback version
+	v456Valid := testAgentVersion{
+		version: "4.5.6",
+		hash:    "valid1",
+	}
+
+	// Installed test agent version
+	v789Actual := testAgentVersion{
+		version: "7.8.9",
+		hash:    "actual",
+	}
+
+	// min and max duration for cleanup scheduling
+	minInterval := 10 * time.Minute
+	maxInterval := 2 * time.Hour
+
+	type args struct {
+		currentVersionedHome string
+		minInterval          time.Duration
+		maxInterval          time.Duration
+	}
+
+	tests := []struct {
+		name       string
+		setup      func(t *testing.T, log *logger.Logger, topDir string, source *mockAvailableRollbacksSource)
+		args       args
+		want       time.Time
+		assertions func(t *testing.T, topDir string, source *mockAvailableRollbacksSource)
+	}{
+		{
+			name: "No available rollbacks: keep checking every maxInterval",
+			setup: func(t *testing.T, log *logger.Logger, topDir string, source *mockAvailableRollbacksSource) {
+				source.EXPECT().Get().Return(nil, nil)
+				// setup the fake agent installations
+				setupAgents(t, log, topDir, setupAgentInstallations{
+					installedAgents: []testAgentInstall{
+						{
+							version:          v789Actual,
+							useVersionInPath: true,
+						},
+					},
+					upgradeFrom:  testAgentVersion{},
+					upgradeTo:    testAgentVersion{},
+					currentAgent: v789Actual,
+				},
+					false,
+				)
+			},
+			args: args{
+				currentVersionedHome: filepath.Join("data", "elastic-agent-7.8.9-actual"),
+				minInterval:          minInterval,
+				maxInterval:          maxInterval,
+			},
+			want: now.Add(maxInterval),
+			assertions: func(t *testing.T, topDir string, source *mockAvailableRollbacksSource) {
+				assert.DirExists(t, filepath.Join(topDir, "data", "elastic-agent-7.8.9-actual"))
+			},
+		},
+		{
+			name: "Available rollback expiring in the future: check again at expiration time",
+			setup: func(t *testing.T, log *logger.Logger, topDir string, source *mockAvailableRollbacksSource) {
+				// setup the fake agent installations
+				setupAgents(t, log, topDir, setupAgentInstallations{
+					installedAgents: []testAgentInstall{
+						{
+							version:          v456Valid,
+							useVersionInPath: true,
+						},
+						{
+							version:          v789Actual,
+							useVersionInPath: true,
+						},
+					},
+					upgradeFrom:  testAgentVersion{},
+					upgradeTo:    testAgentVersion{},
+					currentAgent: v789Actual,
+				},
+					false,
+				)
+
+				// return rollback expiring in the future
+				source.EXPECT().Get().Return(
+					map[string]ttl.TTLMarker{
+						filepath.Join("data", "elastic-agent-4.5.6-valid1"): {
+							Version:    "4.5.6",
+							Hash:       "valid1",
+							ValidUntil: now.Add(1 * time.Hour),
+						},
+					},
+					nil)
+			},
+			args: args{
+				currentVersionedHome: filepath.Join("data", "elastic-agent-7.8.9-actual"),
+				minInterval:          minInterval,
+				maxInterval:          maxInterval,
+			},
+			want: now.Add(1 * time.Hour),
+			assertions: func(t *testing.T, topDir string, source *mockAvailableRollbacksSource) {
+				assert.DirExists(t, filepath.Join(topDir, "data", "elastic-agent-7.8.9-actual"))
+				assert.DirExists(t, filepath.Join(topDir, "data", "elastic-agent-4.5.6-valid1"))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			topDir := t.TempDir()
+			log, _ := loggertest.New(t.Name())
+			source := newMockAvailableRollbacksSource(t)
+			tt.setup(t, log, topDir, source)
+			nextRunTime := performScheduledCleanup(log, topDir, tt.args.currentVersionedHome, source, now, tt.args.minInterval, tt.args.maxInterval)
+			assert.Equal(t, tt.want, nextRunTime)
+			if tt.assertions != nil {
+				tt.assertions(t, topDir, source)
 			}
 		})
 	}

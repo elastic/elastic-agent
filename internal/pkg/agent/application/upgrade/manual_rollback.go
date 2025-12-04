@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
@@ -312,7 +313,7 @@ func PreserveActiveUpgradeVersions(marker *UpdateMarker, innerFilter RollbackCle
 // returns true.
 // This function will return the leftover available rollbacks that will survive the cleanup, can be used to schedule another launch
 // of the cleanup in the future
-func CleanAvailableRollbacks(log *logger.Logger, source availableRollbacksSource, topDir string, currentHomeRelPath string, filter RollbackCleanupFilter) (map[string]ttl.TTLMarker, error) {
+func CleanAvailableRollbacks(log *logger.Logger, source availableRollbacksSource, topDir string, currentHomeRelPath string, now time.Time, filter RollbackCleanupFilter) (map[string]ttl.TTLMarker, error) {
 	rollbacks, err := source.Get()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get available rollbacks: %w", err)
@@ -328,7 +329,6 @@ func CleanAvailableRollbacks(log *logger.Logger, source availableRollbacksSource
 
 	log.Debugw("preparing to cleanup rollbacks", "rollbacks", rollbacks)
 	var aggregateErr error
-	now := time.Now().UTC()
 
 	leftoverRollbacks := map[string]ttl.TTLMarker{}
 
@@ -349,14 +349,55 @@ func CleanAvailableRollbacks(log *logger.Logger, source availableRollbacksSource
 		if filter(log, now, versionedHome, ttlMarker) {
 			if cleanupErr := install.RemoveBut(versionedHomeAbsPath, true); cleanupErr != nil {
 				aggregateErr = errors.Join(aggregateErr, fmt.Errorf("removing directory %q: %w", versionedHomeAbsPath, cleanupErr))
+			} else {
+				if removeErr := source.Remove(versionedHome); removeErr != nil {
+					aggregateErr = errors.Join(aggregateErr, fmt.Errorf("removing TTL for %s: %w", versionedHome, removeErr))
+				}
 			}
 		} else {
 			leftoverRollbacks[versionedHome] = ttlMarker
 		}
 	}
-	err = source.Set(leftoverRollbacks)
-	if err != nil {
-		aggregateErr = errors.Join(aggregateErr, fmt.Errorf("unable to update available rollbacks on source: %w", err))
-	}
+
 	return leftoverRollbacks, aggregateErr
+}
+
+func PeriodicallyCleanRollbacks(ctx context.Context, log *logger.Logger, wg *sync.WaitGroup, topDir, currentVersionedHome string, source availableRollbacksSource, minInterval, maxInterval time.Duration) func() {
+	return func() {
+		defer wg.Done()
+		log.Info("starting periodically cleaning rollbacks")
+		timer := time.NewTimer(minInterval)
+		for {
+			select {
+			case <-ctx.Done():
+				log.Info("context is done, stopping periodically cleaning rollbacks")
+				return
+			case now := <-timer.C:
+				nextRunTime := performScheduledCleanup(log, topDir, currentVersionedHome, source, now, minInterval, maxInterval)
+				log.Debugf("Running next rollbacks cleanup in %s", nextRunTime)
+				timer.Reset(time.Until(nextRunTime))
+			}
+		}
+	}
+}
+
+func performScheduledCleanup(log *logger.Logger, topDir, currentVersionedHome string, source availableRollbacksSource, now time.Time, minInterval, maxInterval time.Duration) time.Time {
+	rollbacksAfterCleanup, err := CleanAvailableRollbacks(log, source, topDir, currentVersionedHome, now, CleanupExpiredRollbacks)
+	if err != nil {
+		log.Errorf("error cleaning up rollbacks: %s, rescheduling cleanup in %s", err.Error(), minInterval)
+		return now.Add(minInterval)
+	}
+
+	var nextRunTime time.Time
+	for _, rollback := range rollbacksAfterCleanup {
+		if nextRunTime.IsZero() || nextRunTime.After(rollback.ValidUntil) {
+			nextRunTime = rollback.ValidUntil
+		}
+	}
+
+	if nextRunTime.IsZero() {
+		return now.Add(maxInterval)
+	}
+
+	return nextRunTime
 }
