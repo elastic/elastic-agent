@@ -229,6 +229,10 @@
                                     "type": "boolean",
                                     "description": "Enable containers logs stream."
                                 },
+                                "rotated_logs": {
+                                    "type": "boolean",
+                                    "description": "BETA: enable rotated logs ingestion. WARNING: enabling it might cause date re-ingestion on existing deployments. [ref](https://www.elastic.co/docs/reference/integrations/kubernetes/container-logs#ingesting-rotated-container-logs)."
+                                },
                                 "vars": {
                                     "type": "object",
                                     "description": "Stream variables.",
