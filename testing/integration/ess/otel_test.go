@@ -468,6 +468,7 @@ exporters:
       wait_for_result: true
       block_on_overflow: true
       enabled: true
+      queue_size: 10000
       batch:
         min_size: 2000
         max_size: 10000
