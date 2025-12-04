@@ -129,11 +129,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			postgresqlreceiver.NewFactory(),
 			sqlserverreceiver.NewFactory(),
 			windowseventlogreceiver.NewFactory(),
-<<<<<<< HEAD
-=======
-			awss3receiver.NewFactory(),
 			windowsperfcountersreceiver.NewFactory(),
->>>>>>> 097f2b381 ([edot] add windowsperfcounters receiver (#11418))
 		}
 
 		// some receivers are only available on certain OS.
