@@ -19,6 +19,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Fetch all history including tags
+          persist-credentials: false  # Avoid credential conflicts with create-pull-request
       
       - name: Add upstream remote and fetch tags
         run: |

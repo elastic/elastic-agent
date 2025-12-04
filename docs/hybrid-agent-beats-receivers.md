@@ -45,21 +45,32 @@ collector configuration used to run the Beat receivers.
 
 The capability to use Beat receivers is being enabled on per Beat and per input type basis. At the time of writing (August 2025),
 Filebeat and Metricbeat can run as receivers and both the `filestream` and `system/metrics` inputs work outside of
-monitoring use cases. An example showing how to set the feature flag to run the `filestream` and `system/metrics` inputs as Beat
-receivers follows below.
+monitoring use cases.
+
+With the changes in https://github.com/elastic/elastic-agent/pull/11186 a new `agent.internal.runtime` section allows controlling
+the default runtime where `otel` indicates the input should run as a receiver. The default can be controlled on a per Beat and per
+input basis. For example to run the `filestream` and `system/metrics` inputs as Beat receivers:
 
 ```yaml
+agent:
+  internal:
+    runtime:
+      default: process # Run all beats and inputs as sub-processes unless overridden below.
+      filebeat:
+        default: process # Run all Filebeat inputs as sub-processe unless overidden individually.
+        filestream: otel # Run the Filebeat filestream input as a beat receiver.
+      metricbeat:
+        default: process # Run all Metricbeat inputs as sub-processe unless overidden individually.
+        system/metrics: otel # Run the Metricbeat system/metrics input as a beat receiver.
 inputs:
   - id: system-metrics-receiver
     type: system/metrics
-    _runtime_experimental: otel
     streams:
       - metricsets:
         - cpu
         data_stream.dataset: system.cpu
   - id: filestream-receiver
     type: filestream
-    _runtime_experimental: otel
     data_stream.dataset: generic
     paths:
         - /var/log/*.log
@@ -68,6 +79,33 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
+```
+
+### Configuration Translation Overrides
+
+When an input is executed as a Beat receiver, it is injected into an OpenTelemetry collector pipeline that was
+generated based on the associated output. The `ssl`, `proxy*`, and other transport settings are added to a generated
+[beatsauth extension](https://github.com/elastic/beats/tree/da79b6ecce2fd9cc9403f8041aea10616ba93c57/x-pack/otel/extension/beatsauthextension)
+instance which allows the collector to use the Beat SSL settings and underlying HTTP transport to guarantee the behavior is the same as before.
+Similarly, when using the Elasticsearch output an [elasticsearch exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/elasticsearchexporter)
+instance is generated with a configuration equivalent to the previous Elasticsearch output in Beats using the `bodymap` mapping mode to
+continue to generate ECS documents.
+
+The changes in https://github.com/elastic/elastic-agent/pull/10992 added a way to override or extend the translated beatsauth extension and
+elasticsearch exporter parameters in case there is a problem or bug with the translation process. For example:
+
+```yaml
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [127.0.0.1:9200]
+    api_key: "example-key"
+    otel:
+      extensions:
+        beatsauth:
+          timeout: "60s" # Override the connection timeout from the translated value.
+      exporter:
+        include_source_on_error: false # Override the generated value of include_source_on_error.
 ```
 
 ## Hybrid Agent

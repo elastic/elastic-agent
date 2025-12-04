@@ -15,6 +15,7 @@ toc:
   - file: components.md
     children:
       - file: components/apmconfigextension.md
+      - file: components/attributesprocessor.md
       - file: components/elasticapmconnector.md
       - file: components/elasticapmintakereceiver.md
       - file: components/elasticapmprocessor.md
