@@ -32,6 +32,7 @@ import (
 	redisreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver"
 	sqlserverreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver"
+	windowsperfcountersreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver"
 	zipkinreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver"
 	nopreceiver "go.opentelemetry.io/collector/receiver/nopreceiver"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
@@ -128,6 +129,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			postgresqlreceiver.NewFactory(),
 			sqlserverreceiver.NewFactory(),
 			windowseventlogreceiver.NewFactory(),
+			windowsperfcountersreceiver.NewFactory(),
 		}
 
 		// some receivers are only available on certain OS.
