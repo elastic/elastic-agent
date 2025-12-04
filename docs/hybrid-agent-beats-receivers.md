@@ -155,12 +155,9 @@ receivers:
                   paths:
                     - /var/log/*.log
                   type: filestream
-<<<<<<< HEAD
         output:
             otelconsumer: {}
-=======
         queue.mem.flush.timeout: 0s
->>>>>>> be1ae0059 (docs(otel): document delivery guarantees for OTel mode (#11560))
     metricbeatreceiver:
         metricbeat:
             modules:
@@ -170,12 +167,9 @@ receivers:
                   metricsets:
                     - cpu
                   module: system
-<<<<<<< HEAD
         output:
             otelconsumer: {}
-=======
         queue.mem.flush.timeout: 0s
->>>>>>> be1ae0059 (docs(otel): document delivery guarantees for OTel mode (#11560))
 exporters:
     elasticsearch/_agent-component/default:
         api_key: placeholder
