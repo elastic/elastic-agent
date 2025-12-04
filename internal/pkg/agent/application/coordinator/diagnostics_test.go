@@ -95,6 +95,7 @@ agent:
   download: null
   grpc: null
   id: ""
+  internal: null
   path: ""
   process: null
   reload: null
@@ -132,7 +133,7 @@ fleet:
   protocol: "test-protocol"
 `
 
-	coord := &Coordinator{cfg: cfg}
+	coord := &Coordinator{initialCfg: cfg}
 	hook, ok := diagnosticHooksMap(coord)["local-config"]
 	require.True(t, ok, "diagnostic hooks should have an entry for local-config")
 

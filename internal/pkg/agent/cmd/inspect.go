@@ -142,11 +142,15 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 	if err != nil {
 		return fmt.Errorf("error checking for root/Administrator privileges: %w", err)
 	}
+	fullCfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true, !isAdmin)
+	if err != nil {
+		return fmt.Errorf("error loading agent config: %w", err)
+	}
+	agentCfg, err := configuration.NewFromConfig(fullCfg)
+	if err != nil {
+		return fmt.Errorf("error loading agent config: %w", err)
+	}
 	if !opts.variables && !opts.includeMonitoring {
-		fullCfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true, !isAdmin)
-		if err != nil {
-			return fmt.Errorf("error loading agent config: %w", err)
-		}
 		// Ensure secret markers are injected based on secret_paths before redaction.
 		if err := diagnostics.AddSecretMarkers(l, fullCfg); err != nil {
 			fmt.Fprintf(streams.Err, "failed to add secret markers: %v\n", err)
@@ -185,7 +189,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		if err != nil {
 			return fmt.Errorf("failed to get monitoring: %w", err)
 		}
-		components, err := specs.PolicyToComponents(cfg, lvl, agentInfo)
+		components, err := specs.PolicyToComponents(cfg, agentCfg.Settings.Internal.Runtime, lvl, agentInfo)
 		if err != nil {
 			return fmt.Errorf("failed to get binary mappings: %w", err)
 		}
@@ -382,6 +386,15 @@ func getComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath stri
 		return nil, err
 	}
 
+	rawCfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true, !isAdmin)
+	if err != nil {
+		return nil, err
+	}
+	cfg, err := configuration.NewFromConfig(rawCfg)
+	if err != nil {
+		return nil, err
+	}
+
 	monitorFn, err := getMonitoringFn(ctx, l, m, otel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get monitoring: %w", err)
@@ -393,7 +406,7 @@ func getComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath stri
 	}
 
 	// Compute the components from the computed configuration.
-	comps, err := specs.ToComponents(m, nil, monitorFn, lvl, agentInfo, map[string]uint64{})
+	comps, err := specs.ToComponents(m, cfg.Settings.Internal.Runtime, nil, monitorFn, lvl, agentInfo, map[string]uint64{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to render components: %w", err)
 	}
