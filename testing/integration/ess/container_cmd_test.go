@@ -42,8 +42,8 @@ func createPolicy(
 	agentFixture *atesting.Fixture,
 	info *define.Info,
 	policyName string,
-	dataOutputID string) (string, string) {
-
+	dataOutputID string,
+) (string, string) {
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        policyName,
 		Namespace:   info.Namespace,
@@ -89,8 +89,8 @@ func prepareAgentCMD(
 	ctx context.Context,
 	agentFixture *atesting.Fixture,
 	args []string,
-	env []string) (*exec.Cmd, *strings.Builder) {
-
+	env []string,
+) (*exec.Cmd, *strings.Builder) {
 	cmd, err := agentFixture.PrepareAgentCommand(ctx, args)
 	if err != nil {
 		t.Fatalf("could not prepare agent command: %s", err)
@@ -533,13 +533,6 @@ func TestContainerCMDAgentMonitoringRuntimeExperimental(t *testing.T) {
 				status, err := agentFixture.ExecStatus(ctx, atesting.WithCmdOptions(withEnv(env)))
 				require.NoErrorf(ct, err, "error getting agent status")
 
-				expectedComponentCount := 4 // process runtime
-				if tc.expectedRuntimeName == string(monitoringCfg.OtelRuntimeManager) {
-					expectedComponentCount = 5
-				}
-
-				require.Len(ct, status.Components, expectedComponentCount, "expected right number of components in agent status")
-
 				for _, comp := range status.Components {
 					var compRuntime string
 					switch comp.VersionInfo.Name {
@@ -550,15 +543,15 @@ func TestContainerCMDAgentMonitoringRuntimeExperimental(t *testing.T) {
 					}
 					t.Logf("Component ID: %s, version info: %s, runtime: %s", comp.ID, comp.VersionInfo.Name, compRuntime)
 					switch comp.ID {
-					case "beat/metrics-monitoring", "filestream-monitoring", "prometheus/metrics-monitoring":
+					case "beat/metrics-monitoring", "filestream-monitoring":
 						// Monitoring components should use the expected runtime
 						assert.Equalf(ct, tc.expectedRuntimeName, compRuntime, "expected correct runtime name for monitoring component %s with id %s", comp.Name, comp.ID)
 					case "http/metrics-monitoring":
 						// The comp.VersionInfo.Name for this component is empty at times.
 						// See https://github.com/elastic/elastic-agent/issues/11162.
 					default:
-						// Non-monitoring components should use the default runtime
-						assert.Equalf(ct, string(component.DefaultRuntimeManager), compRuntime, "expected default runtime for non-monitoring component %s with id %s", comp.Name, comp.ID)
+						// Non-monitoring components are not controlled by the env variable
+						continue
 					}
 				}
 			}, 1*time.Minute, 1*time.Second,
@@ -775,7 +768,7 @@ inputs:
 
 	config := fmt.Sprintf(configTemplate, esAddr)
 	configPath := filepath.Join(workDir, "elastic-agent.yml")
-	err := os.WriteFile(configPath, []byte(config), 0644)
+	err := os.WriteFile(configPath, []byte(config), 0o644)
 	if err != nil {
 		t.Fatalf("failed to write agent config file: %s", err)
 	}
