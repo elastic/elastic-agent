@@ -6,3 +6,10 @@ agent:
     metrics: true
     http:
       port: 6774
+outputs:
+  default:
+    type: kafka
+    hosts: localhost
+    api_key: ""
+    username: ""
+    password: ""

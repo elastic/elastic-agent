@@ -22,15 +22,16 @@ func Test_FleetPatcher(t *testing.T) {
 	configFile := filepath.Join(".", "coordinator", "testdata", "overrides.yml")
 
 	testCases := []struct {
-		name          string
-		isManaged     bool
-		featureEnable bool
-		expectedLogs  bool
+		name               string
+		isManaged          bool
+		featureEnable      bool
+		expectedLogs       bool
+		expectedOutputType string
 	}{
-		{name: "managed - enabled", isManaged: true, featureEnable: true, expectedLogs: false},
-		{name: "managed - disabled", isManaged: true, featureEnable: false, expectedLogs: true},
-		{name: "not managed - enabled", isManaged: false, featureEnable: true, expectedLogs: true},
-		{name: "not managed - disabled", isManaged: false, featureEnable: false, expectedLogs: true},
+		{name: "managed - enabled", isManaged: true, featureEnable: true, expectedLogs: false, expectedOutputType: "kafka"},
+		{name: "managed - disabled", isManaged: true, featureEnable: false, expectedLogs: true, expectedOutputType: "elasticsearch"},
+		{name: "not managed - enabled", isManaged: false, featureEnable: true, expectedLogs: true, expectedOutputType: "elasticsearch"},
+		{name: "not managed - disabled", isManaged: false, featureEnable: false, expectedLogs: true, expectedOutputType: "elasticsearch"},
 	}
 
 	overridesFile, err := os.OpenFile(configFile, os.O_RDONLY, 0)
@@ -62,6 +63,17 @@ func Test_FleetPatcher(t *testing.T) {
 			assert.Equal(t, tc.expectedLogs, c.Settings.MonitoringConfig.MonitorLogs)
 			require.True(t, c.Settings.MonitoringConfig.MonitorMetrics)
 			require.True(t, c.Settings.MonitoringConfig.Enabled)
+
+			// make sure output is not kafka
+			oc, err := cfg.Agent.Child("outputs", -1)
+			require.NoError(t, err)
+
+			do, err := oc.Child("default", -1)
+			require.NoError(t, err)
+
+			outputType, err := do.String("type", -1)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedOutputType, outputType, "output type should be %s, got %s", tc.expectedOutputType, outputType)
 		})
 	}
 }
