@@ -29,7 +29,7 @@ func CurrentFileOwner() (FileOwner, error) {
 
 // HasStrictExecPerms ensures that the path is executable by the owner, cannot be written by anyone other than the
 // owner of the file and that the owner of the file is the same as the UID or root.
-func HasStrictExecPerms(path string, uid int) error {
+func HasStrictExecPerms(path string, uid int, checkUID bool) error {
 	info, err := file.Stat(path)
 	if err != nil {
 		return err
@@ -49,7 +49,7 @@ func HasStrictExecPerms(path string, uid int) error {
 		return err
 	}
 
-	if fileUID != 0 && fileUID != uid {
+	if checkUID && fileUID != 0 && fileUID != uid {
 		return errors.New("file owner does not match expected UID or root")
 	}
 
