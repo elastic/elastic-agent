@@ -157,6 +157,8 @@ github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/cloudmock v0
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/cloudmock v0.51.0/go.mod h1:SZiPHWGOOk3bl8tkevxkoiwPgsIl6CwrWcbwjfHZpdM=
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.51.0 h1:6/0iUd0xrnX7qt+mLNRwg5c0PGv8wpE8K90ryANQwMI=
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.51.0/go.mod h1:otE2jQekW/PqXk1Awf5lmfokJx4uwuqcj1ab5SpGeW0=
+github.com/IBM/sarama v1.43.3 h1:Yj6L2IaNvb2mRBop39N7mmJAHBVY3dTPncr3qGVkxPA=
+github.com/IBM/sarama v1.43.3/go.mod h1:FVIRaLrhK3Cla/9FfRF5X9Zua2KpS3SYIXxhac1H+FQ=
 github.com/IBM/sarama v1.46.3 h1:njRsX6jNlnR+ClJ8XmkO+CM4unbrNr/2vB5KK6UA+IE=
 github.com/IBM/sarama v1.46.3/go.mod h1:GTUYiF9DMOZVe3FwyGT+dtSPceGFIgA+sPc5u6CBwko=
 github.com/Jeffail/gabs/v2 v2.6.0 h1:WdCnGaDhNa4LSRTMwhLZzJ7SRDXjABNP13SOKvCpL5w=
@@ -585,8 +587,6 @@ github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintaker
 github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.21.0/go.mod h1:N4WqsVYCLY61Hjky9Yj/mtwtwJRxByWvuEg5cXmM1D8=
 github.com/elastic/opentelemetry-lib v0.26.0 h1:651I/49XOqc3o+8nRz0kMXwcs2kyEclXEtWeOfe7iBk=
 github.com/elastic/opentelemetry-lib v0.26.0/go.mod h1:8TcWo+HmCf7fLE3qWLKqIqpYu+raxMhG0iMHXthDCrY=
-github.com/elastic/sarama v1.19.1-0.20250603175145-7672917f26b6 h1:2COw7kzXkIyS4hKNUl5qw0KolrwncrY4VVNpngVNo8I=
-github.com/elastic/sarama v1.19.1-0.20250603175145-7672917f26b6/go.mod h1:Ua/oXS4NS+U/pp/urxgzEGWd1MvocHA+yd4Bu4+Eb80=
 github.com/elazarl/goproxy v0.0.0-20240909085733-6741dbfc16a1 h1:g7YUigN4dW2+zpdusdTTghZ+5Py3BaUMAStvL8Nk+FY=
 github.com/elazarl/goproxy v0.0.0-20240909085733-6741dbfc16a1/go.mod h1:thX175TtLTzLj3p7N/Q9IiKZ7NF+p72cvL91emV0hzo=
 github.com/elazarl/goproxy/ext v0.0.0-20240909085733-6741dbfc16a1 h1:XgXwWTQglBILwCpfm8I9xUjPXKOi1EzRzuYzyczU5Z0=
