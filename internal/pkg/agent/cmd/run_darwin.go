@@ -8,6 +8,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"syscall"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -41,5 +42,10 @@ func dropRootPrivileges(l *logger.Logger, ownership utils.FileOwner) error {
 }
 
 func checkCapabilitiesPerms(agentCapabilitiesPath string, uid int) error {
-	return utils.HasStrictExecPerms(agentCapabilitiesPath, uid)
+	if err := utils.HasStrictExecPerms(agentCapabilitiesPath, uid); err != nil && !os.IsNotExist(err) {
+		// capabilities are corrupted, we should not proceed
+		return fmt.Errorf("invalid capabilities file permissions: %w", err)
+	}
+
+	return nil
 }
