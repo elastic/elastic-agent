@@ -817,13 +817,13 @@ func createBasicFleetPolicyData(t *testing.T, fleetHost string) (fleetservertest
 //  7. Upgrade the agent
 //  8. Ensure upgrade succeeds
 func TestFleetDownloadProxyURL(t *testing.T) {
-	ctx := t.Context()
 	info := define.Require(t, define.Requirements{
 		Group: integration.Fleet,
 		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  true,
 	})
+	ctx := t.Context()
 	kibClient := info.KibanaClient
 	fleetServerURL, err := fleettools.DefaultURL(ctx, kibClient)
 	require.NoError(t, err)

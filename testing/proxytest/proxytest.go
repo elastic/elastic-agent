@@ -208,10 +208,10 @@ func New(t *testing.T, optns ...Option) *Proxy {
 				requestID, w.statusCode, r.Method, r.URL, r.Proto, r.RemoteAddr))
 		}),
 	)
-	p.Server.Listener = l
+	p.Listener = l
 
 	if opts.serverTLSConfig != nil {
-		p.Server.TLS = opts.serverTLSConfig
+		p.TLS = opts.serverTLSConfig
 	}
 
 	u, err := url.Parse(p.URL)
