@@ -511,9 +511,9 @@ func TestOtelLogsIngestion(t *testing.T) {
 		Group: integration.Default,
 		Local: true,
 		OS: []define.OS{
-			// {Type: define.Windows},
+			{Type: define.Windows},
 			{Type: define.Linux},
-			// {Type: define.Darwin},
+			{Type: define.Darwin},
 		},
 		Stack: &define.Stack{},
 	})
