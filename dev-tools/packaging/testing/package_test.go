@@ -371,17 +371,8 @@ func checkNpcapNotices(pkg, file string, contents io.Reader) error {
 	return nil
 }
 
-<<<<<<< HEAD
 func checkDocker(t *testing.T, file string, fipsPackage bool) {
-	p, info, err := readDocker(file, true)
-=======
-func checkDocker(t *testing.T, file string, fipsPackage bool) (string, int64) {
-	if strings.Contains(file, "elastic-otel-collector") {
-		return checkEdotCollectorDocker(t, file)
-	}
-
 	p, info, err := readDocker(t, file, true)
->>>>>>> 57d2faae2 (Convert readDocker to testing helper. (#11605))
 	if err != nil {
 		t.Errorf("error reading file %v: %v", file, err)
 		return
@@ -404,62 +395,6 @@ func checkDocker(t *testing.T, file string, fipsPackage bool) (string, int64) {
 	if strings.Contains(file, "-complete") {
 		checkCompleteDocker(t, file)
 	}
-<<<<<<< HEAD
-=======
-
-	name, err := dockerName(file, info.Config.Labels)
-	if err != nil {
-		t.Errorf("error constructing docker name: %v", err)
-		return "", -1
-	}
-
-	return name, info.Size
-}
-
-func dockerName(file string, labels map[string]string) (string, error) {
-	version, found := labels["version"]
-	if !found {
-		return "", errors.New("version label not found")
-	}
-
-	parts := strings.Split(file, "/")
-	if len(parts) == 0 {
-		return "", errors.New("failed to get file name parts")
-	}
-
-	lastPart := parts[len(parts)-1]
-	versionIdx := strings.Index(lastPart, version)
-	if versionIdx < 0 {
-		return "", fmt.Errorf("version not found in nam %q", file)
-	}
-	return lastPart[:versionIdx-1], nil
-}
-
-func checkEdotCollectorDocker(t *testing.T, file string) (string, int64) {
-	p, info, err := readDocker(t, file, true)
-	if err != nil {
-		t.Errorf("error reading file %v: %v", file, err)
-		return "", -1
-	}
-
-	checkDockerEntryPoint(t, p, info)
-	checkDockerLabels(t, p, info, file)
-	checkDockerUser(t, p, info, *rootUserContainer)
-	checkFilePermissions(t, p, configFilePattern, os.FileMode(0644))
-	checkFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
-	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
-	checkModulesPresent(t, "", p)
-	checkModulesDPresent(t, "", p)
-	checkLicensesPresent(t, "licenses/", p)
-
-	name, err := dockerName(file, info.Config.Labels)
-	if err != nil {
-		t.Errorf("error constructing docker name: %v", err)
-		return "", -1
-	}
-
-	return name, info.Size
->>>>>>> 57d2faae2 (Convert readDocker to testing helper. (#11605))
 }
 
 func checkCompleteDocker(t *testing.T, file string) {
@@ -1055,13 +990,6 @@ func readDocker(t *testing.T, dockerFile string, filterWorkingDir bool) (*packag
 	defer file.Close()
 
 	var info *dockerInfo
-<<<<<<< HEAD
-=======
-
-	stat, err := file.Stat()
-	require.NoError(t, err)
-
->>>>>>> 57d2faae2 (Convert readDocker to testing helper. (#11605))
 	layers := make(map[string]*packageFile)
 
 	gzipReader, err := gzip.NewReader(file)
@@ -1115,15 +1043,7 @@ func readDocker(t *testing.T, dockerFile string, filterWorkingDir bool) (*packag
 		}
 	}
 
-<<<<<<< HEAD
-	if len(p.Contents) == 0 {
-		return nil, nil, fmt.Errorf("no files found in docker working directory (%s)", info.Config.WorkingDir)
-	}
-
-=======
 	require.NotZero(t, len(p.Contents), fmt.Sprintf("no files found in docker working directory (%s)", info.Config.WorkingDir))
-	info.Size = stat.Size()
->>>>>>> 57d2faae2 (Convert readDocker to testing helper. (#11605))
 	return p, info, nil
 }
 
