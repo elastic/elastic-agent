@@ -346,8 +346,6 @@ steps:
         - .buildkite/serverless.beats.tests.yml
         - .buildkite/scripts/steps/beats_tests.sh
         - .buildkite/hooks/pre-command
-<<<<<<< HEAD
-=======
 
   # NOTE: This should help detecting issues earlier in the development cycle
   # See https://github.com/elastic/elastic-agent/issues/11604
@@ -362,12 +360,3 @@ steps:
         - .buildkite/scripts/steps/package.sh
         - .buildkite/scripts/steps/trigger-elastic-agent-package.sh
 
-  # wait for CI to be done
-  - wait: ~
-
-  - label: "Publish to serverless"
-    branches: main
-    trigger: "agentless-serverless-release"
-    build:
-      commit: "${BUILDKITE_COMMIT}"
->>>>>>> cffc2cdff (ci(packaging): let's test the packaging pipeline on PRs too (#11612))
