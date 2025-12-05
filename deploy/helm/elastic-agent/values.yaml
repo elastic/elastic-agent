@@ -151,6 +151,8 @@ kubernetes:
       # -- enable containers logs stream [ref](https://www.elastic.co/docs/current/integrations/kubernetes/container-logs)
       # @section -- 2 - Kubernetes integration
       enabled: true
+      # -- BETA: enable rotated logs ingestion. WARNING: enabling it might cause date re-ingestion on existing deployments. [ref](https://www.elastic.co/docs/reference/integrations/kubernetes/container-logs#ingesting-rotated-container-logs)
+      rotated_logs: false
       # -- containers logs stream vars
       # @section -- 2 - Kubernetes integration
       vars: {}
