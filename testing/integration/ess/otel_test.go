@@ -26,6 +26,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/testing/fs"
+
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommontest"
@@ -463,6 +465,12 @@ exporters:
   elasticsearch:
     api_key: {{.ESApiKey}}
     endpoint: {{.ESEndpoint}}
+    logs_index: {{.TestId}}
+    sending_queue:
+      wait_for_result: true
+      block_on_overflow: true
+      enabled: true
+      queue_size: 10000
     mapping:
       mode: none
 
@@ -489,6 +497,13 @@ service:
         - resource/add-test-id
       receivers:
         - filelog
+  telemetry:
+    logs:
+      level: DEBUG
+      encoding: json
+      disable_stacktrace: true
+      output_paths:
+        - {{.OTelLogFile}}
 `
 
 func TestOtelLogsIngestion(t *testing.T) {
@@ -506,8 +521,9 @@ func TestOtelLogsIngestion(t *testing.T) {
 	// Prepare the OTel config.
 	testId := info.Namespace
 
-	tempDir := t.TempDir()
+	tempDir := fs.TempDir(t, "..", "..", "..", "build")
 	inputFilePath := filepath.Join(tempDir, "input.log")
+	otelLogFilePath := filepath.Join(tempDir, "elastic-agent.ndjson")
 
 	esHost, err := integration.GetESHost()
 	require.NoError(t, err, "failed to get ES host")
@@ -524,6 +540,7 @@ func TestOtelLogsIngestion(t *testing.T) {
 	logsIngestionConfig = strings.ReplaceAll(logsIngestionConfig, "{{.ESEndpoint}}", esHost)
 	logsIngestionConfig = strings.ReplaceAll(logsIngestionConfig, "{{.InputFilePath}}", inputFilePath)
 	logsIngestionConfig = strings.ReplaceAll(logsIngestionConfig, "{{.TestId}}", testId)
+	logsIngestionConfig = strings.ReplaceAll(logsIngestionConfig, "{{.OTelLogFile}}", otelLogFilePath)
 
 	cfgFilePath := filepath.Join(tempDir, "otel.yml")
 	require.NoError(t, os.WriteFile(cfgFilePath, []byte(logsIngestionConfig), 0o600))
@@ -557,26 +574,30 @@ func TestOtelLogsIngestion(t *testing.T) {
 		require.NoError(t, err)
 	}
 	inputFile.Close()
-	t.Cleanup(func() {
-		_ = os.Remove(inputFilePath)
-	})
 
-	actualHits := &struct{ Hits int }{}
-	require.Eventually(t,
-		func() bool {
-			findCtx, findCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// It takes about 45s to ingest all files on local tests,
+	// so set the timeout to 5min to be on the safe side.
+	require.EventuallyWithT(
+		t,
+		func(c *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer findCancel()
 
-			docs, err := estools.GetLogsForIndexWithContext(findCtx, esClient, ".ds-logs-generic-default*", map[string]interface{}{
-				"Resource.test.id": testId,
-			})
-			require.NoError(t, err)
-
-			actualHits.Hits = docs.Hits.Total.Value
-			return actualHits.Hits == logsCount
+			docs, err := estools.GetAllLogsForIndexWithContext(
+				findCtx,
+				esClient,
+				testId)
+			require.NoError(c, err)
+			require.Equalf(
+				c,
+				logsCount,
+				docs.Hits.Total.Value,
+				"expecting %d events",
+				logsCount)
 		},
-		2*time.Minute, 1*time.Second,
-		"Expected %v logs, got %v", logsCount, actualHits)
+		5*time.Minute,
+		time.Second,
+		"did not find the expected number of events")
 
 	cancel()
 	fixtureWg.Wait()
