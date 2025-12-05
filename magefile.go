@@ -39,6 +39,12 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	filecopy "github.com/otiai10/copy"
 
+	// beat specific targets for building elastic-otel-collector with
+	// all the beats bundled in
+	metricbeat "github.com/elastic/beats/v7/metricbeat/scripts/mage"
+	packetbeat "github.com/elastic/beats/v7/packetbeat/scripts/mage"
+	xpacketbeat "github.com/elastic/beats/v7/x-pack/packetbeat/scripts/mage"
+
 	"github.com/elastic/elastic-agent/dev-tools/devmachine"
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
@@ -1211,6 +1217,15 @@ func packageAgent(ctx context.Context, platforms devtools.BuildPlatformList, dep
 		return fmt.Errorf("failed extracting dependencies: %w", err)
 	}
 
+	// for OTEL_COMPONENT=true the agentbeat is built into the elastic-otel-collector and is not needed
+	// as a dependency. Once it becomes the only way then this can be removed and just remove agentbeat as
+	// an overall dependency.
+	if mage.OTELComponentBuild {
+		dependencies = slices.DeleteFunc(dependencies, func(dep packaging.BinarySpec) bool {
+			return dep.BinaryName == "agentbeat"
+		})
+	}
+
 	if mg.Verbose() {
 		log.Printf("dependencies extracted from package specs: %v", dependencies)
 	}
@@ -1335,6 +1350,14 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 			dependencies = packaging.FilterComponents(dependencies, packaging.WithBinaryName("agentbeat"))
 			if mg.Verbose() {
 				log.Printf("Packaging using a beats repository, reducing dependendencies to %v", dependencies)
+			}
+
+			// for OTEL_COMPONENT=true the agentbeat is built into the elastic-otel-collector and is not needed
+			// as a dependency. Once it becomes the only way then this can be removed and just remove agentbeat as
+			// an overall dependency.
+			if mage.OTELComponentBuild {
+				packedBeats = []string{}
+				dependencies = []packaging.BinarySpec{}
 			}
 
 			// build from local repo, will assume beats repo is located on the same root level
@@ -3666,6 +3689,14 @@ func hasCleanOnExit() bool {
 	return b
 }
 
+func findBeatsDir() (string, error) {
+	output, err := sh.Output("go", "list", "-m", "-f", "{{.Dir}}", "github.com/elastic/beats/v7")
+	if err != nil {
+		return "", fmt.Errorf("failed to find beat dir: %w", err)
+	}
+	return strings.TrimSpace(output), nil
+}
+
 // GolangCrossBuild builds the elastic-otel-collector binary in the golang-crossbuild container.
 // Don't call directly; called from otel:crossBuild.
 func (Otel) GolangCrossBuild() error {
@@ -3675,7 +3706,42 @@ func (Otel) GolangCrossBuild() error {
 	params.Name = "elastic-otel-collector-" + mage.Platform.GOOS + "-" + mage.Platform.Arch
 	params.OutputDir = "build/golang-crossbuild"
 	params.Package = "github.com/elastic/elastic-agent/internal/edot"
+	params.ExtraFlags = append(params.ExtraFlags, "-tags=agentbeat")
 	injectBuildVars(params.Vars)
+
+	// embedded packetbeat is only included in a non-FIPS build
+	if !mage.FIPSBuild {
+		// requires the NPCAP installer on Windows
+		beatsDir, err := findBeatsDir()
+		if err != nil {
+			return err
+		}
+		if err := xpacketbeat.CopyNPCAPInstaller(filepath.Join(beatsDir, "x-pack", "packetbeat", "npcap", "installer")); err != nil {
+			return err
+		}
+
+		// requires custom CGO_LDFLAGS and CGO_CFLAGS
+		packetBeatArgs := packetbeat.GolangCrossBuildArgs()
+		if params.Env == nil {
+			params.Env = map[string]string{}
+		}
+		cgoLdflags, ok := packetBeatArgs.Env["CGO_LDFLAGS"]
+		if ok {
+			_, exists := params.Env["CGO_LDFLAGS"]
+			if exists {
+				return fmt.Errorf("CGO_LDFLAGS already exists and packetbeat CGO_LDFLAGS will overwrite")
+			}
+			params.Env["CGO_LDFLAGS"] = cgoLdflags
+		}
+		cgoCflags, ok := packetBeatArgs.Env["CGO_CFLAGS"]
+		if ok {
+			_, exists := params.Env["CGO_CFLAGS"]
+			if exists {
+				return fmt.Errorf("CGO_CFLAGS already exists and packetbeat CGO_CFLAGS will overwrite")
+			}
+			params.Env["CGO_CFLAGS"] = cgoCflags
+		}
+	}
 
 	if err := devtools.GolangCrossBuild(params); err != nil {
 		return err
@@ -3686,7 +3752,21 @@ func (Otel) GolangCrossBuild() error {
 
 // CrossBuild builds the elastic-otel-collector binary in the golang-crossbuild container.
 func (Otel) CrossBuild() error {
-	return devtools.CrossBuild(devtools.WithName("elastic-otel-collector"), devtools.WithTarget("otel:golangCrossBuild"))
+	opts := []devtools.CrossBuildOption{devtools.WithName("elastic-otel-collector"), devtools.WithTarget("otel:golangCrossBuild")}
+
+	// embedded packetbeat is only included in a non-FIPS build
+	if !mage.FIPSBuild {
+		// download the NPCAP installer
+		beatsDir, err := findBeatsDir()
+		if err != nil {
+			return err
+		}
+		mg.SerialDeps(xpacketbeat.GetNpcapInstallerFn(filepath.Join(beatsDir, "x-pack", "packetbeat")))
+
+		opts = append(opts, devtools.ImageSelector(xpacketbeat.ImageSelector))
+	}
+
+	return devtools.CrossBuild(opts...)
 }
 
 func (Otel) Readme() error {

@@ -8,6 +8,7 @@ import (
 	"flag"
 	"os"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/spf13/cobra"
 
 	// import logp flags
@@ -53,6 +54,7 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	}
 
 	// path flags
+	paths.SetupFlags()
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.home"))
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.home.unversioned"))
 	// hidden used internally by container subcommand

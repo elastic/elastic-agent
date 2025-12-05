@@ -66,6 +66,7 @@ var (
 	diagnosticsExtensionSocket string
 	unversionedHome            bool
 	tmpCreator                 sync.Once
+	setupFlagsOnce             sync.Once
 )
 
 func init() {
@@ -81,20 +82,25 @@ func init() {
 	versionedHome := VersionedHome(topPath)
 	downloadsPath = filepath.Join(versionedHome, "downloads")
 	componentsPath = filepath.Join(versionedHome, "components")
+}
 
-	fs := flag.CommandLine
-	fs.StringVar(&topPath, "path.home", topPath, "Agent root path")
-	fs.BoolVar(&unversionedHome, "path.home.unversioned", unversionedHome, "Agent root path is not versioned based on build")
-	fs.StringVar(&configPath, "path.config", configPath, "Config path is the directory Agent looks for its config file")
-	fs.StringVar(&configFilePath, "config", DefaultConfigName, "Configuration file, relative to path.config")
-	fs.StringVar(&configFilePath, "c", DefaultConfigName, "Configuration file, relative to path.config")
-	fs.StringVar(&logsPath, "path.logs", logsPath, "Logs path contains Agent log output")
-	fs.StringVar(&controlSocketPath, "path.socket", controlSocketPath, "Control protocol socket path for the Agent")
+// SetupFlags sets up global flags for path adjustment.
+func SetupFlags() {
+	setupFlagsOnce.Do(func() {
+		fs := flag.CommandLine
+		fs.StringVar(&topPath, "path.home", topPath, "Agent root path")
+		fs.BoolVar(&unversionedHome, "path.home.unversioned", unversionedHome, "Agent root path is not versioned based on build")
+		fs.StringVar(&configPath, "path.config", configPath, "Config path is the directory Agent looks for its config file")
+		fs.StringVar(&configFilePath, "config", DefaultConfigName, "Configuration file, relative to path.config")
+		fs.StringVar(&configFilePath, "c", DefaultConfigName, "Configuration file, relative to path.config")
+		fs.StringVar(&logsPath, "path.logs", logsPath, "Logs path contains Agent log output")
+		fs.StringVar(&controlSocketPath, "path.socket", controlSocketPath, "Control protocol socket path for the Agent")
 
-	// enable user to download update artifacts to alternative place
-	// TODO: remove path.downloads support on next major (this can be configured using `agent.download.targetDirectory`)
-	// `path.download` serves just as init value for `agent.download.targetDirectory`
-	fs.StringVar(&downloadsPath, "path.downloads", downloadsPath, "Downloads path contains binaries Agent downloads")
+		// enable user to download update artifacts to alternative place
+		// TODO: remove path.downloads support on next major (this can be configured using `agent.download.targetDirectory`)
+		// `path.download` serves just as init value for `agent.download.targetDirectory`
+		fs.StringVar(&downloadsPath, "path.downloads", downloadsPath, "Downloads path contains binaries Agent downloads")
+	})
 }
 
 // Top returns the top directory for Elastic Agent, all the versioned
