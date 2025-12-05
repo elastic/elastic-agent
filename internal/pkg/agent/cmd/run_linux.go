@@ -43,8 +43,14 @@ func dropRootPrivileges(l *logger.Logger, ownership utils.FileOwner) error {
 
 }
 
-func checkCapabilitiesPerms(agentCapabilitiesPath string, uid int) error {
-	if err := utils.HasStrictExecPerms(agentCapabilitiesPath, uid); err != nil && !os.IsNotExist(err) {
+func checkCapabilitiesPerms(agentCapabilitiesPath string, userName string, uid int) error {
+	var capabilitiesUID int
+	if userName != "" {
+		capabilitiesUID = uid
+	} else {
+		capabilitiesUID = os.Getuid()
+	}
+	if err := utils.HasStrictExecPerms(agentCapabilitiesPath, capabilitiesUID); err != nil && !os.IsNotExist(err) {
 		// capabilities are corrupted, we should not proceed
 		return fmt.Errorf("invalid capabilities file permissions: %w", err)
 	}
