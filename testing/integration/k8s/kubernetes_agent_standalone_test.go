@@ -209,6 +209,7 @@ func TestKubernetesAgentOtel(t *testing.T) {
 
 func TestKubernetesAgentHelm(t *testing.T) {
 	info := define.Require(t, define.Requirements{
+		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  false,
 		OS: []define.OS{
