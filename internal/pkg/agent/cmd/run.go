@@ -286,6 +286,12 @@ func runElasticAgent(
 			ownership.GID = gid
 		}
 
+		// check capabilities permissions before fixing them
+		if err := utils.HasStrictExecPerms(paths.AgentCapabilitiesPath(), ownership.UID); err != nil {
+			// capabilities are corrupted, we should not proceed
+			return fmt.Errorf("invalid capabilities file permissions: %w", err)
+		}
+
 		topPath := paths.Top()
 		err = perms.FixPermissions(topPath, perms.WithOwnership(ownership))
 		if err != nil {
