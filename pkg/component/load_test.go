@@ -139,6 +139,191 @@ func TestLoadRuntimeSpecs(t *testing.T) {
 	}
 }
 
+func TestInputRuntimeSpec_CommandName(t *testing.T) {
+	tests := []struct {
+		name string
+		spec InputRuntimeSpec
+		want string
+	}{
+		{
+			name: "returns Command.Name when set",
+			spec: InputRuntimeSpec{
+				BinaryName: "mybinary",
+				Spec: InputSpec{
+					Command: &CommandSpec{
+						Name: "custom-command",
+					},
+				},
+			},
+			want: "custom-command",
+		},
+		{
+			name: "returns first arg when binary is agentbeat and no Command.Name",
+			spec: InputRuntimeSpec{
+				BinaryName: "agentbeat",
+				Spec: InputSpec{
+					Command: &CommandSpec{
+						Args: []string{"filebeat", "--some-flag"},
+					},
+				},
+			},
+			want: "filebeat",
+		},
+		{
+			name: "returns BinaryName when no Command",
+			spec: InputRuntimeSpec{
+				BinaryName: "mybinary",
+				Spec:       InputSpec{},
+			},
+			want: "mybinary",
+		},
+		{
+			name: "returns BinaryName when Command has no Name and not agentbeat",
+			spec: InputRuntimeSpec{
+				BinaryName: "mybinary",
+				Spec: InputSpec{
+					Command: &CommandSpec{
+						Args: []string{"some-arg"},
+					},
+				},
+			},
+			want: "mybinary",
+		},
+		{
+			name: "returns BinaryName when agentbeat but no args",
+			spec: InputRuntimeSpec{
+				BinaryName: "agentbeat",
+				Spec: InputSpec{
+					Command: &CommandSpec{
+						Args: []string{},
+					},
+				},
+			},
+			want: "agentbeat",
+		},
+		{
+			name: "prefers Command.Name over agentbeat first arg",
+			spec: InputRuntimeSpec{
+				BinaryName: "agentbeat",
+				Spec: InputSpec{
+					Command: &CommandSpec{
+						Name: "explicit-name",
+						Args: []string{"filebeat"},
+					},
+				},
+			},
+			want: "explicit-name",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.spec.CommandName()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestInputRuntimeSpec_BeatName(t *testing.T) {
+	tests := []struct {
+		name string
+		spec InputRuntimeSpec
+		want string
+	}{
+		{
+			name: "returns command name when it ends with beat",
+			spec: InputRuntimeSpec{
+				BinaryName: "mybinary",
+				Spec: InputSpec{
+					Command: &CommandSpec{
+						Name: "filebeat",
+					},
+				},
+			},
+			want: "filebeat",
+		},
+		{
+			name: "returns empty when command name does not end with beat",
+			spec: InputRuntimeSpec{
+				BinaryName: "mybinary",
+				Spec: InputSpec{
+					Command: &CommandSpec{
+						Name: "apm-server",
+					},
+				},
+			},
+			want: "",
+		},
+		{
+			name: "returns first arg when agentbeat and arg ends with beat",
+			spec: InputRuntimeSpec{
+				BinaryName: "agentbeat",
+				Spec: InputSpec{
+					Command: &CommandSpec{
+						Args: []string{"metricbeat", "--some-flag"},
+					},
+				},
+			},
+			want: "metricbeat",
+		},
+		{
+			name: "returns empty when agentbeat but first arg does not end with beat",
+			spec: InputRuntimeSpec{
+				BinaryName: "agentbeat",
+				Spec: InputSpec{
+					Command: &CommandSpec{
+						Args: []string{"osquerybeat", "--some-flag"},
+					},
+				},
+			},
+			want: "osquerybeat",
+		},
+		{
+			name: "returns BinaryName when it ends with beat and no Command",
+			spec: InputRuntimeSpec{
+				BinaryName: "testbeat",
+				Spec:       InputSpec{},
+			},
+			want: "testbeat",
+		},
+		{
+			name: "returns empty when BinaryName does not end with beat and no Command",
+			spec: InputRuntimeSpec{
+				BinaryName: "fleet-server",
+				Spec:       InputSpec{},
+			},
+			want: "",
+		},
+		{
+			name: "handles heartbeat correctly",
+			spec: InputRuntimeSpec{
+				BinaryName: "agentbeat",
+				Spec: InputSpec{
+					Command: &CommandSpec{
+						Args: []string{"heartbeat"},
+					},
+				},
+			},
+			want: "heartbeat",
+		},
+		{
+			name: "handles auditbeat correctly",
+			spec: InputRuntimeSpec{
+				BinaryName: "auditbeat",
+				Spec:       InputSpec{},
+			},
+			want: "auditbeat",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.spec.BeatName()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestLoadSpec_Components(t *testing.T) {
 	scenarios := []struct {
 		Name string

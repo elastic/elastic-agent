@@ -1117,9 +1117,10 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 	require.NoError(t, err)
 
 	monitoringMgr := newTestMonitoringMgr()
-	cfg := configuration.DefaultGRPCConfig()
-	cfg.Port = 0
-	rm, err := runtime.NewManager(l, l, ai, apmtest.DiscardTracer, monitoringMgr, cfg)
+	cfg := configuration.DefaultConfiguration()
+	grpcCfg := cfg.Settings.GRPC
+	grpcCfg.Port = 0
+	rm, err := runtime.NewManager(l, l, ai, apmtest.DiscardTracer, monitoringMgr, grpcCfg)
 	require.NoError(t, err)
 	otelMgr := &fakeOTelManager{}
 	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), l)
@@ -1137,8 +1138,7 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 	if acker == nil {
 		acker = &fakeActionAcker{}
 	}
-
-	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelMgr, acker, nil)
+	coord := New(l, cfg, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelMgr, acker, nil)
 	return coord, cfgMgr, varsMgr
 }
 

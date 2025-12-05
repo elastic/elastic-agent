@@ -10,7 +10,6 @@ import (
 	"golang.org/x/net/http/httpproxy"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
@@ -20,7 +19,7 @@ import (
 // The URL used is the HTTPS_PROXY env var. If that's not set the HTTP_PROXY env var is used.
 // If there are no env vars set, or the unit's config has `proxy_disable: true`, nothing is injected
 // If the output config has `proxy_url: ""`, it will not be overwritten.
-func InjectProxyEndpointModifier() coordinator.ComponentsModifier {
+func InjectProxyEndpointModifier() component.ComponentsModifier {
 	return func(comps []component.Component, _ map[string]interface{}) ([]component.Component, error) {
 		for i, comp := range comps {
 			if comp.InputSpec != nil && comp.InputSpec.InputType == endpoint {

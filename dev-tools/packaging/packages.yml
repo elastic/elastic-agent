@@ -369,6 +369,10 @@ shared:
     'data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}':
       source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
+    'data/{{.BeatName}}-{{ commit_short }}/elastic-otel-collector{{.BinaryExt}}':
+      source: build/golang-crossbuild/elastic-otel-collector-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+      mode: 0755
+      skip_on_missing: true
     'data/{{.BeatName}}-{{ commit_short }}/package.version':
       content: >
         {{ agent_package_version }}
@@ -390,6 +394,10 @@ shared:
     'data/{{.BeatName}}-{{ commit_short }}/elastic-agent.app/Contents/MacOS/{{.BeatName}}{{.BinaryExt}}':
       source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
+    'data/{{.BeatName}}-{{ commit_short }}/elastic-otel-collector{{.BinaryExt}}':
+      source: build/golang-crossbuild/elastic-otel-collector-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+      mode: 0755
+      skip_on_missing: true
     'data/{{.BeatName}}-{{ commit_short }}/package.version':
       content: >
         {{ agent_package_version }}

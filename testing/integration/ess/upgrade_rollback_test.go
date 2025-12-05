@@ -576,8 +576,14 @@ func managedRollbackRestartTest(ctx context.Context, t *testing.T, info *define.
 
 func standaloneRollbackRestartTest(ctx context.Context, t *testing.T, startFixture *atesting.Fixture, endFixture *atesting.Fixture) {
 	standaloneRollbackTest(ctx, t, startFixture, endFixture, reallyFastWatcherCfg, details.ReasonWatchFailed,
-		func(ctx context.Context, t *testing.T, _ client.Client, _ *atesting.Fixture, _ *atesting.Fixture) {
-			restartAgentNTimes(t, 3, 10*time.Second)
+		func(ctx context.Context, t *testing.T, _ client.Client, from *atesting.Fixture, to *atesting.Fixture) {
+			installedAgentClient := from.NewClient()
+			targetVersion, err := to.ExecVersion(ctx)
+			require.NoError(t, err, "failed to get target version")
+			restartContext, cancel := context.WithTimeout(t.Context(), 1*time.Minute)
+			defer cancel()
+			// restart the agent only if it matches the (upgraded) target version
+			restartAgentVersion(restartContext, t, installedAgentClient, targetVersion.Binary, 10*time.Second)
 		})
 }
 
