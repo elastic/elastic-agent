@@ -1,0 +1,5 @@
+agent.logging.level: debug
+agent.logging.to_files: true
+agent:
+  logging:
+    to_stderr: false
