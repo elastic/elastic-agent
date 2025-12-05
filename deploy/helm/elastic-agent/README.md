@@ -1,8 +1,3 @@
-<!--
-(NOTE: Do not edit README.md directly. It is a generated file!)
-(      To make changes, please modify README.md.gotmpl and run `helm-docs`)
--->
-
 # elastic-agent
 
 ![Version: 9.1.0-beta](https://img.shields.io/badge/Version-9.1.0--beta-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 9.1.0](https://img.shields.io/badge/AppVersion-9.1.0-informational?style=flat-square)
@@ -87,6 +82,7 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 | kubernetes.containers.state.enabled | bool | `true` | enable containers state stream (kube-state-metrics) [ref](https://www.elastic.co/guide/en/beats/metricbeat/8.11/metricbeat-metricset-kubernetes-state_container.html) |
 | kubernetes.containers.state.vars | object | `{}` | containers state stream vars |
 | kubernetes.containers.logs.enabled | bool | `true` | enable containers logs stream [ref](https://www.elastic.co/docs/current/integrations/kubernetes/container-logs) |
+| kubernetes.containers.logs.rotated_logs | bool | `false` | BETA: enable rotated logs ingestion. WARNING: enabling it might cause date re-ingestion on existing deployments. [ref](https://www.elastic.co/docs/reference/integrations/kubernetes/container-logs#ingesting-rotated-container-logs) |
 | kubernetes.containers.logs.vars | object | `{}` | containers logs stream vars |
 | kubernetes.containers.audit_logs.enabled | bool | `false` | enable containers audit logs stream [ref](https://www.elastic.co/docs/current/integrations/kubernetes/audit-logs) |
 | kubernetes.pods.metrics.enabled | bool | `true` | enable pods metric stream (kubelet) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kubelet#pod) |
