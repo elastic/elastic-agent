@@ -39,3 +39,7 @@ func dropRootPrivileges(l *logger.Logger, ownership utils.FileOwner) error {
 
 	return nil
 }
+
+func checkCapabilitiesPerms(agentCapabilitiesPath string, uid int) error {
+	return utils.HasStrictExecPerms(agentCapabilitiesPath, uid)
+}
