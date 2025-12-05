@@ -42,7 +42,6 @@ func dropRootPrivileges(l *logger.Logger, ownership utils.FileOwner) error {
 }
 
 func checkCapabilitiesPerms(agentCapabilitiesPath string, userName string, uid int) error {
-
 	var capabilitiesUID int
 	if userName != "" {
 		capabilitiesUID = uid
