@@ -371,8 +371,17 @@ func checkNpcapNotices(pkg, file string, contents io.Reader) error {
 	return nil
 }
 
+<<<<<<< HEAD
 func checkDocker(t *testing.T, file string, fipsPackage bool) {
 	p, info, err := readDocker(file, true)
+=======
+func checkDocker(t *testing.T, file string, fipsPackage bool) (string, int64) {
+	if strings.Contains(file, "elastic-otel-collector") {
+		return checkEdotCollectorDocker(t, file)
+	}
+
+	p, info, err := readDocker(t, file, true)
+>>>>>>> 57d2faae2 (Convert readDocker to testing helper. (#11605))
 	if err != nil {
 		t.Errorf("error reading file %v: %v", file, err)
 		return
@@ -395,10 +404,66 @@ func checkDocker(t *testing.T, file string, fipsPackage bool) {
 	if strings.Contains(file, "-complete") {
 		checkCompleteDocker(t, file)
 	}
+<<<<<<< HEAD
+=======
+
+	name, err := dockerName(file, info.Config.Labels)
+	if err != nil {
+		t.Errorf("error constructing docker name: %v", err)
+		return "", -1
+	}
+
+	return name, info.Size
+}
+
+func dockerName(file string, labels map[string]string) (string, error) {
+	version, found := labels["version"]
+	if !found {
+		return "", errors.New("version label not found")
+	}
+
+	parts := strings.Split(file, "/")
+	if len(parts) == 0 {
+		return "", errors.New("failed to get file name parts")
+	}
+
+	lastPart := parts[len(parts)-1]
+	versionIdx := strings.Index(lastPart, version)
+	if versionIdx < 0 {
+		return "", fmt.Errorf("version not found in nam %q", file)
+	}
+	return lastPart[:versionIdx-1], nil
+}
+
+func checkEdotCollectorDocker(t *testing.T, file string) (string, int64) {
+	p, info, err := readDocker(t, file, true)
+	if err != nil {
+		t.Errorf("error reading file %v: %v", file, err)
+		return "", -1
+	}
+
+	checkDockerEntryPoint(t, p, info)
+	checkDockerLabels(t, p, info, file)
+	checkDockerUser(t, p, info, *rootUserContainer)
+	checkFilePermissions(t, p, configFilePattern, os.FileMode(0644))
+	checkFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
+	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
+	checkModulesPresent(t, "", p)
+	checkModulesDPresent(t, "", p)
+	checkLicensesPresent(t, "licenses/", p)
+
+	name, err := dockerName(file, info.Config.Labels)
+	if err != nil {
+		t.Errorf("error constructing docker name: %v", err)
+		return "", -1
+	}
+
+	return name, info.Size
+>>>>>>> 57d2faae2 (Convert readDocker to testing helper. (#11605))
 }
 
 func checkCompleteDocker(t *testing.T, file string) {
-	p, _, err := readDocker(file, false)
+	p, _, err := readDocker(t, file, false)
 	if err != nil {
 		t.Errorf("error reading file %v: %v", file, err)
 	}
@@ -977,27 +1042,30 @@ func openZip(zipFile string) (*zip.ReadCloser, error) {
 	return r, nil
 }
 
-func readDocker(dockerFile string, filterWorkingDir bool) (*packageFile, *dockerInfo, error) {
+func readDocker(t *testing.T, dockerFile string, filterWorkingDir bool) (*packageFile, *dockerInfo, error) {
+	t.Helper()
+
 	// Read the manifest file first so that the config file and layer
 	// names are known in advance.
 	manifest, err := getDockerManifest(dockerFile)
-	if err != nil {
-		return nil, nil, err
-	}
+	require.NoError(t, err)
 
 	file, err := os.Open(dockerFile)
-	if err != nil {
-		return nil, nil, err
-	}
+	require.NoError(t, err)
 	defer file.Close()
 
 	var info *dockerInfo
+<<<<<<< HEAD
+=======
+
+	stat, err := file.Stat()
+	require.NoError(t, err)
+
+>>>>>>> 57d2faae2 (Convert readDocker to testing helper. (#11605))
 	layers := make(map[string]*packageFile)
 
 	gzipReader, err := gzip.NewReader(file)
-	if err != nil {
-		return nil, nil, err
-	}
+	require.NoError(t, err)
 	defer gzipReader.Close()
 
 	tarReader := tar.NewReader(gzipReader)
@@ -1007,28 +1075,21 @@ func readDocker(dockerFile string, filterWorkingDir bool) (*packageFile, *docker
 			if errors.Is(err, io.EOF) {
 				break
 			}
-			return nil, nil, err
+			require.NoError(t, err)
 		}
 
 		switch {
 		case header.Name == manifest.Config:
 			info, err = readDockerInfo(tarReader)
-			if err != nil {
-				return nil, nil, err
-			}
+			require.NoError(t, err)
 		case slices.Contains(manifest.Layers, header.Name):
 			layer, err := readTarContents(header.Name, tarReader)
-			if err != nil {
-				return nil, nil, err
-			}
+			require.NoError(t, err)
 			layers[header.Name] = layer
 		}
 	}
 
-	if len(info.Config.Entrypoint) == 0 {
-		return nil, nil, fmt.Errorf("no entrypoint")
-	}
-
+	require.NotZero(t, len(info.Config.Entrypoint), "no entrypoint")
 	workingDir := info.Config.WorkingDir
 	entrypoint := info.Config.Entrypoint[0]
 
@@ -1036,9 +1097,7 @@ func readDocker(dockerFile string, filterWorkingDir bool) (*packageFile, *docker
 	p := &packageFile{Name: filepath.Base(dockerFile), Contents: map[string]packageEntry{}}
 	for _, layer := range manifest.Layers {
 		layerFile, found := layers[layer]
-		if !found {
-			return nil, nil, fmt.Errorf("layer not found: %s", layer)
-		}
+		require.True(t, found, fmt.Sprintf("layer not found: %s", layer))
 		for name, entry := range layerFile.Contents {
 			if excludedPathsPattern.MatchString(name) {
 				continue
@@ -1056,10 +1115,15 @@ func readDocker(dockerFile string, filterWorkingDir bool) (*packageFile, *docker
 		}
 	}
 
+<<<<<<< HEAD
 	if len(p.Contents) == 0 {
 		return nil, nil, fmt.Errorf("no files found in docker working directory (%s)", info.Config.WorkingDir)
 	}
 
+=======
+	require.NotZero(t, len(p.Contents), fmt.Sprintf("no files found in docker working directory (%s)", info.Config.WorkingDir))
+	info.Size = stat.Size()
+>>>>>>> 57d2faae2 (Convert readDocker to testing helper. (#11605))
 	return p, info, nil
 }
 
