@@ -58,6 +58,8 @@ elastic-agent.yml.*
 fleet.yml
 fleet.yml.lock
 fleet.yml.old
+internal/pkg/agent/application/filelock/testlocker/testlocker
+internal/pkg/agent/install/testblocking/testblocking
+internal/pkg/otel/manager/testing/testing
 pkg/component/fake/component/component
 pkg/core/process/testsignal/testsignal
-internal/pkg/agent/install/testblocking/testblocking

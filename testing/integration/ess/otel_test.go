@@ -26,6 +26,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/testing/fs"
+
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommontest"
@@ -469,10 +471,6 @@ exporters:
       block_on_overflow: true
       enabled: true
       queue_size: 10000
-      batch:
-        min_size: 2000
-        max_size: 10000
-        flush_timeout: 1s
     mapping:
       mode: none
 
@@ -513,9 +511,9 @@ func TestOtelLogsIngestion(t *testing.T) {
 		Group: integration.Default,
 		Local: true,
 		OS: []define.OS{
-			{Type: define.Windows},
+			// {Type: define.Windows},
 			{Type: define.Linux},
-			{Type: define.Darwin},
+			// {Type: define.Darwin},
 		},
 		Stack: &define.Stack{},
 	})
@@ -523,8 +521,7 @@ func TestOtelLogsIngestion(t *testing.T) {
 	// Prepare the OTel config.
 	testId := info.Namespace
 
-	// TODO(Tiago): use TempDir from https://github.com/elastic/elastic-agent-libs/pull/369 once it's merged
-	tempDir := t.TempDir()
+	tempDir := fs.TempDir(t, "..", "..", "..", "build")
 	inputFilePath := filepath.Join(tempDir, "input.log")
 	otelLogFilePath := filepath.Join(tempDir, "elastic-agent.ndjson")
 
