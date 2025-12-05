@@ -21,10 +21,8 @@ const (
 	DefaultHost           = "localhost"
 	ProcessRuntimeManager = "process"
 	OtelRuntimeManager    = "otel"
-<<<<<<< HEAD
+
 	DefaultRuntimeManager = ProcessRuntimeManager
-=======
-	DefaultRuntimeManager = OtelRuntimeManager
 
 	// DefaultMetricsCollectionInterval is the metricset execution period used for the monitoring metrics inputs
 	// we set this to 60s to reduce the load/data volume on the monitoring cluster
@@ -33,7 +31,6 @@ const (
 	// DefaultMetricsStreamFailureThreshold is the metricset stream failure threshold before the stream is marked as DEGRADED
 	// to avoid marking the agent degraded for transient errors, we set the default threshold to 5
 	DefaultMetricsStreamFailureThreshold = uint(5)
->>>>>>> 786c3e5cd (Remove config parsing from monitoring manager (#11466))
 )
 
 // MonitoringConfig describes a configuration of a monitoring
