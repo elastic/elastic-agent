@@ -4,6 +4,9 @@ env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   ASDF_MAGE_VERSION: 1.14.0
 
+  # Make Docker builds less verbose
+  BUILDKIT_PROGRESS: plain
+
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
   IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1762801856"
