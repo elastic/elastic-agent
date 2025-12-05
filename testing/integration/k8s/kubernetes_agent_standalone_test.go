@@ -208,7 +208,6 @@ func TestKubernetesAgentOtel(t *testing.T) {
 
 func TestKubernetesAgentHelm(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  false,
 		OS: []define.OS{
@@ -240,149 +239,14 @@ func TestKubernetesAgentHelm(t *testing.T) {
 		{
 			// Configure the perNode and clusterWide agents to both use host networking. On the node that
 			// runs the clusterWide agent, this tests that two agents do not try to bind to the same
-			// gRPC control protocol port by default preventing one from starting.
-			name: "helm standalone agent default kubernetes privileged without host network port collision",
-			steps: []k8sTestStep{
-				k8sStepCreateNamespace(),
-				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
-					"kubernetes": map[string]any{
-						"enabled": true,
-					},
-					"agent": map[string]any{
-						"unprivileged": false,
-						"image": map[string]any{
-							"repository": kCtx.agentImageRepo,
-							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
-						},
-						"presets": map[string]any{
-							"clusterWide": map[string]any{
-								"hostNetwork": true,
-							},
-							"perNode": map[string]any{
-								"hostNetwork": true,
-							},
-						},
-					},
-					"outputs": map[string]any{
-						"default": map[string]any{
-							"type":    "ESPlainAuthAPI",
-							"url":     kCtx.esHost,
-							"api_key": kCtx.esAPIKey,
-						},
-					},
-				}),
-				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
-				k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
-				k8sStepCheckRestrictUpgrade("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
-				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
-				k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
-			},
-		},
-		{
-			name: "helm standalone agent default kubernetes unprivileged",
-			steps: []k8sTestStep{
-				k8sStepCreateNamespace(),
-				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
-					"kubernetes": map[string]any{
-						"enabled": true,
-						"state": map[string]any{
-							"agentAsSidecar": map[string]any{
-								"enabled": true,
-							},
-						},
-					},
-					"agent": map[string]any{
-						"unprivileged": true,
-						"image": map[string]any{
-							"repository": kCtx.agentImageRepo,
-							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
-						},
-					},
-					"outputs": map[string]any{
-						"default": map[string]any{
-							"type":    "ESPlainAuthAPI",
-							"url":     kCtx.esHost,
-							"api_key": kCtx.esAPIKey,
-						},
-					},
-				}),
-				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
-				k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
-				k8sStepCheckAgentStatus("app.kubernetes.io/name=kube-state-metrics", 1, "agent", nil),
-				k8sStepCheckRestrictUpgrade("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
-				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
-				k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
-				k8sStepRunInnerTests("app.kubernetes.io/name=kube-state-metrics", 1, "agent"),
-			},
-		},
-		{
-			name: "helm managed agent default kubernetes privileged",
-			steps: []k8sTestStep{
-				k8sStepCreateNamespace(),
-				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
-					"agent": map[string]any{
-						"unprivileged": false,
-						"image": map[string]any{
-							"repository": kCtx.agentImageRepo,
-							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
-						},
-						"fleet": map[string]any{
-							"enabled": true,
-							"url":     kCtx.enrollParams.FleetURL,
-							"token":   kCtx.enrollParams.EnrollmentToken,
-							"preset":  "perNode",
-						},
-					},
-				}),
-				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
-				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
-			},
-		},
-		{
-			name: "helm managed agent unenrolled with different enrollment token",
-			steps: []k8sTestStep{
-				k8sStepCreateNamespace(),
-				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
-					"agent": map[string]any{
-						"unprivileged": false,
-						"image": map[string]any{
-							"repository": kCtx.agentImageRepo,
-							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
-						},
-						"fleet": map[string]any{
-							"enabled": true,
-							"url":     kCtx.enrollParams.FleetURL,
-							"token":   kCtx.enrollParams.EnrollmentToken,
-							"preset":  "perNode",
-						},
-					},
-				}),
-				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
-				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
-				func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-					// unenroll all agents from fleet and keep track of their ids
-					unEnrolledIDs := map[string]struct{}{}
-					k8sStepForEachAgentID("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", func(ctx context.Context, id string) error {
-						unEnrolledIDs[id] = struct{}{}
-						_, err = info.KibanaClient.UnEnrollAgent(ctx, kibana.UnEnrollAgentRequest{
-							ID:     id,
-							Revoke: true,
-						})
-						return err
-					})(t, ctx, kCtx, namespace)
-					k8sStepHelmUninstall("helm-agent")(t, ctx, kCtx, namespace)
-
-					// generate a new enrollment token and re-deploy, the helm chart since it is
-					// under the same release name and same namespace will have the same state
-					// as the previous deployment
-					enrollParams, err := fleettools.NewEnrollParams(ctx, info.KibanaClient)
-					require.NoError(t, err, "failed to create fleet enroll params")
-					require.NotEqual(t, kCtx.enrollParams.EnrollmentToken, enrollParams.EnrollmentToken, "enrollment token did not change")
+				// gRPC control protocol port by default preventing one from starting.
+				name: "helm standalone agent default kubernetes privileged without host network port collision",
+				steps: []k8sTestStep{
+					k8sStepCreateNamespace(),
 					k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
+						"kubernetes": map[string]any{
+							"enabled": true,
+						},
 						"agent": map[string]any{
 							"unprivileged": false,
 							"image": map[string]any{
@@ -390,108 +254,72 @@ func TestKubernetesAgentHelm(t *testing.T) {
 								"tag":        kCtx.agentImageTag,
 								"pullPolicy": "Never",
 							},
-							"fleet": map[string]any{
-								"enabled": true,
-								"url":     enrollParams.FleetURL,
-								"token":   enrollParams.EnrollmentToken,
-								"preset":  "perNode",
+							"presets": map[string]any{
+								"clusterWide": map[string]any{
+									"hostNetwork": true,
+								},
+								"perNode": map[string]any{
+									"hostNetwork": true,
+								},
 							},
 						},
-					})(t, ctx, kCtx, namespace)
-					k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil)(t, ctx, kCtx, namespace)
-					k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent")(t, ctx, kCtx, namespace)
-					enrolledIDs := map[string]time.Time{}
-					k8sStepForEachAgentID("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", func(ctx context.Context, id string) error {
-						resp, err := kibanaGetAgent(ctx, info.KibanaClient, id)
-						if err != nil {
-							return err
-						}
-						// no ID should match the ones from the unenrolled ones
-						if _, exists := unEnrolledIDs[id]; exists {
-							return fmt.Errorf("agent with id %s found in unEnrolledIDs", id)
-						}
-						// keep track of the new enrolled ids and their enrollment time as reported by fleet
-						enrolledIDs[id] = resp.EnrolledAt
-						return nil
-					})(t, ctx, kCtx, namespace)
-
-					// uninstall and reinstall but this time check that the elastic-agent is not re-enrolling
-					k8sStepHelmUninstall("helm-agent")(t, ctx, kCtx, namespace)
-					k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
-						"agent": map[string]any{
-							"unprivileged": false,
-							"image": map[string]any{
-								"repository": kCtx.agentImageRepo,
-								"tag":        kCtx.agentImageTag,
-								"pullPolicy": "Never",
-							},
-							"fleet": map[string]any{
-								"enabled": true,
-								"url":     enrollParams.FleetURL,
-								"token":   enrollParams.EnrollmentToken,
-								"preset":  "perNode",
+						"outputs": map[string]any{
+							"default": map[string]any{
+								"type":    "ESPlainAuthAPI",
+								"url":     kCtx.esHost,
+								"api_key": kCtx.esAPIKey,
 							},
 						},
-					})(t, ctx, kCtx, namespace)
-					k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil)(t, ctx, kCtx, namespace)
-					k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent")(t, ctx, kCtx, namespace)
-					k8sStepForEachAgentID("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", func(ctx context.Context, id string) error {
-						resp, err := kibanaGetAgent(ctx, info.KibanaClient, id)
-						if err != nil {
-							return err
-						}
-						// no ID should match the ones from the unenrolled ones
-						enrolledAt, exists := enrolledIDs[id]
-						if !exists {
-							return fmt.Errorf("agent with id %s not found in enrolledIDs", id)
-						}
-
-						if !resp.EnrolledAt.Equal(enrolledAt) {
-							return fmt.Errorf("agent enrollment time is updated")
-						}
-						return nil
-					})(t, ctx, kCtx, namespace)
+					}),
+					k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+					k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
+					k8sStepCheckRestrictUpgrade("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+					k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+					k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
 				},
 			},
-		},
-		{
-			name: "helm managed agent unenrolled",
-			steps: []k8sTestStep{
-				k8sStepCreateNamespace(),
-				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
-					"agent": map[string]any{
-						"unprivileged": false,
-						"image": map[string]any{
-							"repository": kCtx.agentImageRepo,
-							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
-						},
-						"fleet": map[string]any{
+			{
+				name: "helm standalone agent default kubernetes unprivileged",
+				steps: []k8sTestStep{
+					k8sStepCreateNamespace(),
+					k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
+						"kubernetes": map[string]any{
 							"enabled": true,
-							"url":     kCtx.enrollParams.FleetURL,
-							"token":   kCtx.enrollParams.EnrollmentToken,
-							"preset":  "perNode",
+							"state": map[string]any{
+								"agentAsSidecar": map[string]any{
+									"enabled": true,
+								},
+							},
 						},
-					},
-				}),
-				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
-				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
-				func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-					// unenroll all agents from fleet and keep track of their ids
-					unEnrolledIDs := map[string]struct{}{}
-					k8sStepForEachAgentID("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", func(ctx context.Context, id string) error {
-						unEnrolledIDs[id] = struct{}{}
-						_, err = info.KibanaClient.UnEnrollAgent(ctx, kibana.UnEnrollAgentRequest{
-							ID:     id,
-							Revoke: true,
-						})
-						return err
-					})(t, ctx, kCtx, namespace)
-
-					// re-deploy with the same enrollment token, the helm chart since it is
-					// under the same release name and same namespace will have the same state
-					// as the previous deployment
-					k8sStepHelmUninstall("helm-agent")(t, ctx, kCtx, namespace)
+						"agent": map[string]any{
+							"unprivileged": true,
+							"image": map[string]any{
+								"repository": kCtx.agentImageRepo,
+								"tag":        kCtx.agentImageTag,
+								"pullPolicy": "Never",
+							},
+						},
+						"outputs": map[string]any{
+							"default": map[string]any{
+								"type":    "ESPlainAuthAPI",
+								"url":     kCtx.esHost,
+								"api_key": kCtx.esAPIKey,
+							},
+						},
+					}),
+					k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+					k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
+					k8sStepCheckAgentStatus("app.kubernetes.io/name=kube-state-metrics", 1, "agent", nil),
+					k8sStepCheckRestrictUpgrade("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+					k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+					k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
+					k8sStepRunInnerTests("app.kubernetes.io/name=kube-state-metrics", 1, "agent"),
+				},
+			},
+			{
+				name: "helm managed agent default kubernetes privileged",
+				steps: []k8sTestStep{
+					k8sStepCreateNamespace(),
 					k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
 						"agent": map[string]any{
 							"unprivileged": false,
@@ -507,26 +335,15 @@ func TestKubernetesAgentHelm(t *testing.T) {
 								"preset":  "perNode",
 							},
 						},
-					})(t, ctx, kCtx, namespace)
-					k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil)(t, ctx, kCtx, namespace)
-					k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent")(t, ctx, kCtx, namespace)
-					enrolledIDs := map[string]time.Time{}
-					k8sStepForEachAgentID("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", func(ctx context.Context, id string) error {
-						resp, err := kibanaGetAgent(ctx, info.KibanaClient, id)
-						if err != nil {
-							return err
-						}
-						// no ID should match the ones from the unenrolled ones
-						if _, exists := unEnrolledIDs[id]; exists {
-							return fmt.Errorf("agent with id %s found in unEnrolledIDs", id)
-						}
-						// keep track of the new enrolled ids and their enrollment time as reported by fleet
-						enrolledIDs[id] = resp.EnrolledAt
-						return nil
-					})(t, ctx, kCtx, namespace)
-
-					// uninstall and reinstall but this time check that the elastic-agent is not re-enrolling
-					k8sStepHelmUninstall("helm-agent")(t, ctx, kCtx, namespace)
+					}),
+					k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+					k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+				},
+			},
+			{
+				name: "helm managed agent unenrolled with different enrollment token",
+				steps: []k8sTestStep{
+					k8sStepCreateNamespace(),
 					k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
 						"agent": map[string]any{
 							"unprivileged": false,
@@ -542,61 +359,104 @@ func TestKubernetesAgentHelm(t *testing.T) {
 								"preset":  "perNode",
 							},
 						},
-					})(t, ctx, kCtx, namespace)
-					k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil)(t, ctx, kCtx, namespace)
-					k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent")(t, ctx, kCtx, namespace)
-					k8sStepForEachAgentID("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", func(ctx context.Context, id string) error {
-						resp, err := kibanaGetAgent(ctx, info.KibanaClient, id)
-						if err != nil {
+					}),
+					k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+					k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+					func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+						// unenroll all agents from fleet and keep track of their ids
+						unEnrolledIDs := map[string]struct{}{}
+						k8sStepForEachAgentID("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", func(ctx context.Context, id string) error {
+							unEnrolledIDs[id] = struct{}{}
+							_, err = info.KibanaClient.UnEnrollAgent(ctx, kibana.UnEnrollAgentRequest{
+								ID:     id,
+								Revoke: true,
+							})
 							return err
-						}
-						// no ID should match the ones from the unenrolled ones
-						enrolledAt, exists := enrolledIDs[id]
-						if !exists {
-							return fmt.Errorf("agent with id %s not found in enrolledIDs", id)
-						}
+						})(t, ctx, kCtx, namespace)
+						k8sStepHelmUninstall("helm-agent")(t, ctx, kCtx, namespace)
 
-						if !resp.EnrolledAt.Equal(enrolledAt) {
-							return fmt.Errorf("agent enrollment time is updated")
-						}
-						return nil
-					})(t, ctx, kCtx, namespace)
+						// generate a new enrollment token and re-deploy, the helm chart since it is
+						// under the same release name and same namespace will have the same state
+						// as the previous deployment
+						enrollParams, err := fleettools.NewEnrollParams(ctx, info.KibanaClient)
+						require.NoError(t, err, "failed to create fleet enroll params")
+						require.NotEqual(t, kCtx.enrollParams.EnrollmentToken, enrollParams.EnrollmentToken, "enrollment token did not change")
+						k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
+							"agent": map[string]any{
+								"unprivileged": false,
+								"image": map[string]any{
+									"repository": kCtx.agentImageRepo,
+									"tag":        kCtx.agentImageTag,
+									"pullPolicy": "Never",
+								},
+								"fleet": map[string]any{
+									"enabled": true,
+									"url":     enrollParams.FleetURL,
+									"token":   enrollParams.EnrollmentToken,
+									"preset":  "perNode",
+								},
+							},
+						})(t, ctx, kCtx, namespace)
+						k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil)(t, ctx, kCtx, namespace)
+						k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent")(t, ctx, kCtx, namespace)
+						enrolledIDs := map[string]time.Time{}
+						k8sStepForEachAgentID("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", func(ctx context.Context, id string) error {
+							resp, err := kibanaGetAgent(ctx, info.KibanaClient, id)
+							if err != nil {
+								return err
+							}
+							// no ID should match the ones from the unenrolled ones
+							if _, exists := unEnrolledIDs[id]; exists {
+								return fmt.Errorf("agent with id %s found in unEnrolledIDs", id)
+							}
+							// keep track of the new enrolled ids and their enrollment time as reported by fleet
+							enrolledIDs[id] = resp.EnrolledAt
+							return nil
+						})(t, ctx, kCtx, namespace)
+
+						// uninstall and reinstall but this time check that the elastic-agent is not re-enrolling
+						k8sStepHelmUninstall("helm-agent")(t, ctx, kCtx, namespace)
+						k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
+							"agent": map[string]any{
+								"unprivileged": false,
+								"image": map[string]any{
+									"repository": kCtx.agentImageRepo,
+									"tag":        kCtx.agentImageTag,
+									"pullPolicy": "Never",
+								},
+								"fleet": map[string]any{
+									"enabled": true,
+									"url":     enrollParams.FleetURL,
+									"token":   enrollParams.EnrollmentToken,
+									"preset":  "perNode",
+								},
+							},
+						})(t, ctx, kCtx, namespace)
+						k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil)(t, ctx, kCtx, namespace)
+						k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent")(t, ctx, kCtx, namespace)
+						k8sStepForEachAgentID("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", func(ctx context.Context, id string) error {
+							resp, err := kibanaGetAgent(ctx, info.KibanaClient, id)
+							if err != nil {
+								return err
+							}
+							// no ID should match the ones from the unenrolled ones
+							enrolledAt, exists := enrolledIDs[id]
+							if !exists {
+								return fmt.Errorf("agent with id %s not found in enrolledIDs", id)
+							}
+
+							if !resp.EnrolledAt.Equal(enrolledAt) {
+								return fmt.Errorf("agent enrollment time is updated")
+							}
+							return nil
+						})(t, ctx, kCtx, namespace)
+					},
 				},
 			},
-		},
-		{
-			name: "helm managed agent upgrade older version",
-			steps: []k8sTestStep{
-				k8sStepCreateNamespace(),
-				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
-					"agent": map[string]any{
-						"unprivileged": false,
-						"image": map[string]any{
-							"repository": "docker.elastic.co/elastic-agent/elastic-agent",
-							"tag":        "8.17.0",
-							"pullPolicy": "IfNotPresent",
-						},
-						"fleet": map[string]any{
-							"enabled": true,
-							"url":     kCtx.enrollParams.FleetURL,
-							"token":   kCtx.enrollParams.EnrollmentToken,
-							"preset":  "perNode",
-						},
-					},
-				}),
-				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
-				func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-					enrolledIDs := map[string]time.Time{}
-					k8sStepForEachAgentID("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", func(ctx context.Context, id string) error {
-						resp, err := kibanaGetAgent(ctx, info.KibanaClient, id)
-						if err != nil {
-							return err
-						}
-						// keep track of the new enrolled ids and their enrollment time as reported by fleet
-						enrolledIDs[id] = resp.EnrolledAt
-						return nil
-					})(t, ctx, kCtx, namespace)
-					k8sStepHelmUninstall("helm-agent")(t, ctx, kCtx, namespace)
+			{
+				name: "helm managed agent unenrolled",
+				steps: []k8sTestStep{
+					k8sStepCreateNamespace(),
 					k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
 						"agent": map[string]any{
 							"unprivileged": false,
@@ -612,138 +472,286 @@ func TestKubernetesAgentHelm(t *testing.T) {
 								"preset":  "perNode",
 							},
 						},
-					})(t, ctx, kCtx, namespace)
-					k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil)(t, ctx, kCtx, namespace)
-					k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent")(t, ctx, kCtx, namespace)
-					k8sStepForEachAgentID("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", func(ctx context.Context, id string) error {
-						resp, err := kibanaGetAgent(ctx, info.KibanaClient, id)
-						if err != nil {
+					}),
+					k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+					k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+					func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+						// unenroll all agents from fleet and keep track of their ids
+						unEnrolledIDs := map[string]struct{}{}
+						k8sStepForEachAgentID("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", func(ctx context.Context, id string) error {
+							unEnrolledIDs[id] = struct{}{}
+							_, err = info.KibanaClient.UnEnrollAgent(ctx, kibana.UnEnrollAgentRequest{
+								ID:     id,
+								Revoke: true,
+							})
 							return err
-						}
-						enrolledAt, exists := enrolledIDs[id]
-						if !exists {
-							return fmt.Errorf("agent with id %s not found in enrolledIDs", id)
-						}
-						if !resp.EnrolledAt.Equal(enrolledAt) {
-							return fmt.Errorf("agent enrollment time is updated")
-						}
-						return nil
-					})(t, ctx, kCtx, namespace)
+						})(t, ctx, kCtx, namespace)
+
+						// re-deploy with the same enrollment token, the helm chart since it is
+						// under the same release name and same namespace will have the same state
+						// as the previous deployment
+						k8sStepHelmUninstall("helm-agent")(t, ctx, kCtx, namespace)
+						k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
+							"agent": map[string]any{
+								"unprivileged": false,
+								"image": map[string]any{
+									"repository": kCtx.agentImageRepo,
+									"tag":        kCtx.agentImageTag,
+									"pullPolicy": "Never",
+								},
+								"fleet": map[string]any{
+									"enabled": true,
+									"url":     kCtx.enrollParams.FleetURL,
+									"token":   kCtx.enrollParams.EnrollmentToken,
+									"preset":  "perNode",
+								},
+							},
+						})(t, ctx, kCtx, namespace)
+						k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil)(t, ctx, kCtx, namespace)
+						k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent")(t, ctx, kCtx, namespace)
+						enrolledIDs := map[string]time.Time{}
+						k8sStepForEachAgentID("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", func(ctx context.Context, id string) error {
+							resp, err := kibanaGetAgent(ctx, info.KibanaClient, id)
+							if err != nil {
+								return err
+							}
+							// no ID should match the ones from the unenrolled ones
+							if _, exists := unEnrolledIDs[id]; exists {
+								return fmt.Errorf("agent with id %s found in unEnrolledIDs", id)
+							}
+							// keep track of the new enrolled ids and their enrollment time as reported by fleet
+							enrolledIDs[id] = resp.EnrolledAt
+							return nil
+						})(t, ctx, kCtx, namespace)
+
+						// uninstall and reinstall but this time check that the elastic-agent is not re-enrolling
+						k8sStepHelmUninstall("helm-agent")(t, ctx, kCtx, namespace)
+						k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
+							"agent": map[string]any{
+								"unprivileged": false,
+								"image": map[string]any{
+									"repository": kCtx.agentImageRepo,
+									"tag":        kCtx.agentImageTag,
+									"pullPolicy": "Never",
+								},
+								"fleet": map[string]any{
+									"enabled": true,
+									"url":     kCtx.enrollParams.FleetURL,
+									"token":   kCtx.enrollParams.EnrollmentToken,
+									"preset":  "perNode",
+								},
+							},
+						})(t, ctx, kCtx, namespace)
+						k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil)(t, ctx, kCtx, namespace)
+						k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent")(t, ctx, kCtx, namespace)
+						k8sStepForEachAgentID("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", func(ctx context.Context, id string) error {
+							resp, err := kibanaGetAgent(ctx, info.KibanaClient, id)
+							if err != nil {
+								return err
+							}
+							// no ID should match the ones from the unenrolled ones
+							enrolledAt, exists := enrolledIDs[id]
+							if !exists {
+								return fmt.Errorf("agent with id %s not found in enrolledIDs", id)
+							}
+
+							if !resp.EnrolledAt.Equal(enrolledAt) {
+								return fmt.Errorf("agent enrollment time is updated")
+							}
+							return nil
+						})(t, ctx, kCtx, namespace)
+					},
 				},
 			},
-		},
-		{
-			name: "helm managed agent default kubernetes unprivileged",
-			steps: []k8sTestStep{
-				k8sStepCreateNamespace(),
-				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
-					"agent": map[string]any{
-						"unprivileged": true,
-						"image": map[string]any{
-							"repository": kCtx.agentImageRepo,
-							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
-						},
-						"fleet": map[string]any{
-							"enabled": true,
-							"url":     kCtx.enrollParams.FleetURL,
-							"token":   kCtx.enrollParams.EnrollmentToken,
-							"preset":  "perNode",
-						},
-					},
-				}),
-				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
-				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
-			},
-		},
-		{
-			name: "helm standalone agent unprivileged kubernetes hints",
-			steps: []k8sTestStep{
-				k8sStepCreateNamespace(),
-				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
-					"agent": map[string]any{
-						"unprivileged": true,
-						"image": map[string]any{
-							"repository": kCtx.agentImageRepo,
-							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
-						},
-					},
-					"kubernetes": map[string]any{
-						"enabled": true,
-						"hints": map[string]any{
-							"enabled": true,
-						},
-						"state": map[string]any{
-							"agentAsSidecar": map[string]any{
+			{
+				name: "helm managed agent upgrade older version",
+				steps: []k8sTestStep{
+					k8sStepCreateNamespace(),
+					k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
+						"agent": map[string]any{
+							"unprivileged": false,
+							"image": map[string]any{
+								"repository": "docker.elastic.co/elastic-agent/elastic-agent",
+								"tag":        "8.17.0",
+								"pullPolicy": "IfNotPresent",
+							},
+							"fleet": map[string]any{
 								"enabled": true,
+								"url":     kCtx.enrollParams.FleetURL,
+								"token":   kCtx.enrollParams.EnrollmentToken,
+								"preset":  "perNode",
 							},
 						},
+					}),
+					k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+					func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+						enrolledIDs := map[string]time.Time{}
+						k8sStepForEachAgentID("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", func(ctx context.Context, id string) error {
+							resp, err := kibanaGetAgent(ctx, info.KibanaClient, id)
+							if err != nil {
+								return err
+							}
+							// keep track of the new enrolled ids and their enrollment time as reported by fleet
+							enrolledIDs[id] = resp.EnrolledAt
+							return nil
+						})(t, ctx, kCtx, namespace)
+						k8sStepHelmUninstall("helm-agent")(t, ctx, kCtx, namespace)
+						k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
+							"agent": map[string]any{
+								"unprivileged": false,
+								"image": map[string]any{
+									"repository": kCtx.agentImageRepo,
+									"tag":        kCtx.agentImageTag,
+									"pullPolicy": "Never",
+								},
+								"fleet": map[string]any{
+									"enabled": true,
+									"url":     kCtx.enrollParams.FleetURL,
+									"token":   kCtx.enrollParams.EnrollmentToken,
+									"preset":  "perNode",
+								},
+							},
+						})(t, ctx, kCtx, namespace)
+						k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil)(t, ctx, kCtx, namespace)
+						k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent")(t, ctx, kCtx, namespace)
+						k8sStepForEachAgentID("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", func(ctx context.Context, id string) error {
+							resp, err := kibanaGetAgent(ctx, info.KibanaClient, id)
+							if err != nil {
+								return err
+							}
+							enrolledAt, exists := enrolledIDs[id]
+							if !exists {
+								return fmt.Errorf("agent with id %s not found in enrolledIDs", id)
+							}
+							if !resp.EnrolledAt.Equal(enrolledAt) {
+								return fmt.Errorf("agent enrollment time is updated")
+							}
+							return nil
+						})(t, ctx, kCtx, namespace)
 					},
-					"outputs": map[string]any{
-						"default": map[string]any{
-							"type":    "ESPlainAuthAPI",
-							"url":     kCtx.esHost,
-							"api_key": kCtx.esAPIKey,
-						},
-					},
-				}),
-				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
-				k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
-				k8sStepCheckAgentStatus("app.kubernetes.io/name=kube-state-metrics", 1, "agent", nil),
-				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
-				k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
-				k8sStepRunInnerTests("app.kubernetes.io/name=kube-state-metrics", 1, "agent"),
-				k8sStepHintsRedisCreate(),
-				k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", true),
-				k8sStepHintsRedisDelete(),
-				k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", false),
+				},
 			},
-		},
-		{
-			name: "helm standalone agent unprivileged kubernetes hints pre-deployed",
-			steps: []k8sTestStep{
-				k8sStepCreateNamespace(),
-				k8sStepHintsRedisCreate(),
-				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
-					"agent": map[string]any{
-						"unprivileged": true,
-						"image": map[string]any{
-							"repository": kCtx.agentImageRepo,
-							"tag":        kCtx.agentImageTag,
-							"pullPolicy": "Never",
-						},
-					},
-					"kubernetes": map[string]any{
-						"enabled": true,
-						"hints": map[string]any{
-							"enabled": true,
-						},
-						"state": map[string]any{
-							"agentAsSidecar": map[string]any{
+			{
+				name: "helm managed agent default kubernetes unprivileged",
+				steps: []k8sTestStep{
+					k8sStepCreateNamespace(),
+					k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
+						"agent": map[string]any{
+							"unprivileged": true,
+							"image": map[string]any{
+								"repository": kCtx.agentImageRepo,
+								"tag":        kCtx.agentImageTag,
+								"pullPolicy": "Never",
+							},
+							"fleet": map[string]any{
 								"enabled": true,
+								"url":     kCtx.enrollParams.FleetURL,
+								"token":   kCtx.enrollParams.EnrollmentToken,
+								"preset":  "perNode",
 							},
 						},
-					},
-					"outputs": map[string]any{
-						"default": map[string]any{
-							"type":    "ESPlainAuthAPI",
-							"url":     kCtx.esHost,
-							"api_key": kCtx.esAPIKey,
-						},
-					},
-				}),
-				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
-				k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
-				k8sStepCheckAgentStatus("app.kubernetes.io/name=kube-state-metrics", 1, "agent", nil),
-				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
-				k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
-				k8sStepRunInnerTests("app.kubernetes.io/name=kube-state-metrics", 1, "agent"),
-				k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", true),
-				k8sStepHintsRedisDelete(),
-				k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", false),
+					}),
+					k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+					k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+				},
 			},
-		},
+			{
+				name: "helm standalone agent unprivileged kubernetes hints",
+				steps: []k8sTestStep{
+					k8sStepCreateNamespace(),
+					k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
+						"agent": map[string]any{
+							"unprivileged": true,
+							"image": map[string]any{
+								"repository": kCtx.agentImageRepo,
+								"tag":        kCtx.agentImageTag,
+								"pullPolicy": "Never",
+							},
+						},
+						"kubernetes": map[string]any{
+							"enabled": true,
+							"hints": map[string]any{
+								"enabled": true,
+							},
+							"state": map[string]any{
+								"agentAsSidecar": map[string]any{
+									"enabled": true,
+								},
+							},
+						},
+						"outputs": map[string]any{
+							"default": map[string]any{
+								"type":    "ESPlainAuthAPI",
+								"url":     kCtx.esHost,
+								"api_key": kCtx.esAPIKey,
+							},
+						},
+					}),
+					k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+					k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
+					k8sStepCheckAgentStatus("app.kubernetes.io/name=kube-state-metrics", 1, "agent", nil),
+					k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+					k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
+					k8sStepRunInnerTests("app.kubernetes.io/name=kube-state-metrics", 1, "agent"),
+					k8sStepHintsRedisCreate(),
+					k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", true),
+					k8sStepHintsRedisDelete(),
+					k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", false),
+				},
+			},
+			{
+				name: "helm standalone agent unprivileged kubernetes hints pre-deployed",
+				steps: []k8sTestStep{
+					k8sStepCreateNamespace(),
+					k8sStepHintsRedisCreate(),
+					k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
+						"agent": map[string]any{
+							"unprivileged": true,
+							"image": map[string]any{
+								"repository": kCtx.agentImageRepo,
+								"tag":        kCtx.agentImageTag,
+								"pullPolicy": "Never",
+							},
+						},
+						"kubernetes": map[string]any{
+							"enabled": true,
+							"hints": map[string]any{
+								"enabled": true,
+							},
+							"state": map[string]any{
+								"agentAsSidecar": map[string]any{
+									"enabled": true,
+								},
+							},
+						},
+						"outputs": map[string]any{
+							"default": map[string]any{
+								"type":    "ESPlainAuthAPI",
+								"url":     kCtx.esHost,
+								"api_key": kCtx.esAPIKey,
+							},
+						},
+					}),
+					k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+					k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
+					k8sStepCheckAgentStatus("app.kubernetes.io/name=kube-state-metrics", 1, "agent", nil),
+					k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+					k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
+					k8sStepRunInnerTests("app.kubernetes.io/name=kube-state-metrics", 1, "agent"),
+					k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", true),
+					k8sStepHintsRedisDelete(),
+					k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", false),
+				},
+			},
+		}...)
+	}
+
+	// Add Logstash test case - doesn't require Stack
+	testCases = append(testCases, []struct {
+		name       string
+		skipReason string
+		steps      []k8sTestStep
+	}{
 		{
 			name: "helm standalone agent default kubernetes unprivileged with logstash output",
 			steps: []k8sTestStep{
@@ -1304,7 +1312,7 @@ func k8sStepLogstashCheckStatus(logstashPodLabelSelector string, logstashExpecte
 					stdout := &bytes.Buffer{}
 					stderr := &bytes.Buffer{}
 					err := kCtx.client.Resources().ExecInPod(ctx, namespace, pod.Name, "logstash",
-						[]string{"curl", "-s", "localhost:9600/_node/health"}, stdout, stderr)
+						[]string{"curl", "-s", "localhost:9600/_health_report"}, stdout, stderr)
 					if err != nil {
 						return false
 					}
@@ -1313,6 +1321,7 @@ func k8sStepLogstashCheckStatus(logstashPodLabelSelector string, logstashExpecte
 					if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 						return false
 					}
+
 					if status, ok := result["status"].(string); ok {
 						if status == "green" {
 							t.Logf("Logstash API is responding and healthy")
