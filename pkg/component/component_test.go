@@ -3827,7 +3827,9 @@ func TestDefaultRuntimeConfig(t *testing.T) {
 	assert.Equal(t, "", config.Filebeat.Default)
 	assert.Nil(t, config.Filebeat.InputType)
 	assert.Equal(t, "", config.Metricbeat.Default)
-	assert.Nil(t, config.Metricbeat.InputType)
+	assert.Equal(t,
+		map[string]string{"system/metrics": string(OtelRuntimeManager)},
+		config.Metricbeat.InputType)
 }
 
 func TestToComponentsWithRuntimeConfig(t *testing.T) {
