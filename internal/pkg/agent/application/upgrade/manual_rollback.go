@@ -16,6 +16,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/reexec"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -44,12 +45,12 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 	if errors.Is(err, os.ErrNotExist) {
 		// there is no upgrade marker (the rollback was requested after the watcher grace period had elapsed), we need
 		// to extract available rollbacks from agent installs
-		watcherExecutable, versionedHomeToRollbackTo, err = rollbackUsingAgentInstalls(u.log, u.watcherHelper, u.availableRollbacksSource, topDir, now, version, u.markUpgrade)
+		watcherExecutable, versionedHomeToRollbackTo, err = rollbackUsingAgentInstalls(u.log, u.watcherHelper, u.availableRollbacksSource, topDir, now, version, u.markUpgrade, action)
 	} else {
 		// If upgrade marker is available, we need to gracefully stop any watcher process, read the available rollbacks from
 		// the upgrade marker and then proceed with rollback
 		updateMarkerExistsBeforeRollback = true
-		watcherExecutable, versionedHomeToRollbackTo, err = rollbackUsingUpgradeMarker(ctx, u.log, u.watcherHelper, topDir, now, version)
+		watcherExecutable, versionedHomeToRollbackTo, err = rollbackUsingUpgradeMarker(ctx, u.log, u.watcherHelper, topDir, now, version, action)
 	}
 
 	if err != nil {
@@ -80,7 +81,7 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 	return nil, nil
 }
 
-func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper, source availableRollbacksSource, topDir string, now time.Time, rollbackVersion string, markUpgrade markUpgradeFunc) (string, string, error) {
+func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper, source availableRollbacksSource, topDir string, now time.Time, rollbackVersion string, markUpgrade markUpgradeFunc, action *fleetapi.ActionUpgrade) (string, string, error) {
 	// read the available installs
 	availableRollbacks, err := source.Get()
 	if err != nil {
@@ -88,7 +89,7 @@ func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper,
 	}
 	// check for the version we want to rollback to
 	var targetInstall string
-	var targetTTLMarker TTLMarker
+	var targetTTLMarker ttl.TTLMarker
 	for versionedHome, ttlMarker := range availableRollbacks {
 		if ttlMarker.Version == rollbackVersion && now.Before(ttlMarker.ValidUntil) {
 			// found a valid target
@@ -134,8 +135,12 @@ func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper,
 		versionedHome: targetInstall,
 	}
 
-	upgradeDetails := details.NewDetails(release.VersionWithSnapshot(), details.StateRequested, "" /*action.ID*/)
-	err = markUpgrade(log, paths.DataFrom(topDir), now, curAgentInstall, prevAgentInstall, nil /*action*/, upgradeDetails, nil)
+	actionId := ""
+	if action != nil {
+		actionId = action.ActionID
+	}
+	upgradeDetails := details.NewDetails(release.VersionWithSnapshot(), details.StateRequested, actionId)
+	err = markUpgrade(log, paths.DataFrom(topDir), now, curAgentInstall, prevAgentInstall, action, upgradeDetails, nil)
 	if err != nil {
 		return "", "", fmt.Errorf("creating upgrade marker: %w", err)
 	}
@@ -145,7 +150,7 @@ func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper,
 	return watcherExecutable, targetInstall, nil
 }
 
-func rollbackUsingUpgradeMarker(ctx context.Context, log *logger.Logger, watcherHelper WatcherHelper, topDir string, now time.Time, version string) (string, string, error) {
+func rollbackUsingUpgradeMarker(ctx context.Context, log *logger.Logger, watcherHelper WatcherHelper, topDir string, now time.Time, version string, _ *fleetapi.ActionUpgrade) (string, string, error) {
 	// read the upgrade marker
 	updateMarker, err := LoadMarker(paths.DataFrom(topDir))
 	if err != nil {
@@ -245,7 +250,7 @@ func extractAgentInstallsFromMarker(updateMarker *UpdateMarker) (previous agentI
 	return previous, current, nil
 }
 
-func getAvailableRollbacks(rollbackWindow time.Duration, now time.Time, currentVersion string, parsedCurrentVersion *version.ParsedSemVer, currentVersionedHome string, currentHash string) map[string]TTLMarker {
+func getAvailableRollbacks(rollbackWindow time.Duration, now time.Time, currentVersion string, parsedCurrentVersion *version.ParsedSemVer, currentVersionedHome string, currentHash string) map[string]ttl.TTLMarker {
 	if rollbackWindow == disableRollbackWindow {
 		// if there's no rollback window it means that no rollback should survive the watcher cleanup at the end of the grace period.
 		return nil
@@ -258,8 +263,8 @@ func getAvailableRollbacks(rollbackWindow time.Duration, now time.Time, currentV
 
 	// when multiple rollbacks will be supported, read the existing descriptor
 	// at this stage we can get by with a single rollback
-	res := make(map[string]TTLMarker, 1)
-	res[currentVersionedHome] = TTLMarker{
+	res := make(map[string]ttl.TTLMarker, 1)
+	res[currentVersionedHome] = ttl.TTLMarker{
 		Version:    currentVersion,
 		Hash:       currentHash,
 		ValidUntil: now.Add(rollbackWindow),
