@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"time"
 
@@ -50,6 +51,7 @@ func main() {
 	exitCode := 0
 	err = cmd.RunCollector(ctx, nil, true, "debug", monitoringURL)
 	if err != nil && !errors.Is(err, context.Canceled) {
+		fmt.Fprintln(os.Stderr, err)
 		exitCode = 1
 	}
 
