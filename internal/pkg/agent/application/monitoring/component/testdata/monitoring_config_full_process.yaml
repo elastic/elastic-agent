@@ -1,8 +1,3 @@
-agent:
-  monitoring:
-    http:
-      enabled: false
-    metrics: true
 inputs:
 - _runtime_experimental: process
   id: filestream-monitoring-agent
