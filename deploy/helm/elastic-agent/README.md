@@ -22,28 +22,70 @@ The supported types of outputs are:
 - `ESSecretAuthBasic`: `elasticsearch` output with the connection details specified in a k8s secret
 - `ESSecretAuthAPI`: `elasticsearch` output with the connection details specified in a k8s secret
 - `ESECKRef`: `elasticsearch` output that references by name an Elasticsearch cluster managed by ECK operator
+- `Logstash`: `logstash` output with connection details (hosts, ssl, loadbalance, etc) specified inline in the yaml
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| outputs.{name}.type | string | `"ESPlainAuthBasic"` | type of the output [one of `ESPlainAuthBasic`, `ESPlainAuthAPI`, `ESSecretAuthBasic`, `ESSecretAuthAPI`, `ESECKRef`] |
+| outputs.{name}.type | string | `"ESPlainAuthBasic"` | type of the output [one of `ESPlainAuthBasic`, `ESPlainAuthAPI`, `ESSecretAuthBasic`, `ESSecretAuthAPI`, `ESECKRef`, `Logstash`] |
 | outputs.{name}.url | string | `""` | url of the output [required for types `ESPlainAuthBasic` and `ESPlainAuthAPI`] |
 | outputs.{name}.username | string | `""` | the username to use to authenticate with the output [required for type `ESPlainAuthBasic`] |
 | outputs.{name}.password | string | `""` | the password to use to authenticate with the output [required for type `ESPlainAuthBasic`] |
 | outputs.{name}.api_key | string | `""` | the API key use to authenticate with the output [required for type `ESPlainAuthAPI`] |
 | outputs.{name}.secretName | string | `""` | the k8s secret to mount output connection details [required for types `ESSecretAuthBasic` and `ESSecretAuthAPI`] |
 | outputs.{name}.name | string | `""` | name to reference an Elasticsearch cluster managed by ECK [required for type `ESECKRef`] |
-| outputs.{name}.namespace | string | `""` | namespace to reference an Elasticsearch cluster managed by ECK [optional for type `ESECKRef`] |
+
+
+The following fields are specific to Logstash. output type:
+| Key | Type | Default | Example | Description |
+|-----|------|---------|---------|-------------|
+| outputs.{name}.hosts | string array | `""` | `["myhost:5044", "myhost2:5044"]` | An array of Logstash hosts [required] |
+| outputs.{name}.enabled | boolean | `true` | `false` | Enables or disables the output. If set to false, the output is disabled. |
+| outputs.{name}.escape_html | boolean | `false` | `true` | Configures escaping of HTML in strings. Set to true to enable escaping. |
+| outputs.{name}.proxy_url | string | `""` | `"socks5://username:password@socks5host:2233"` |  The URL of the SOCKS5 proxy to use when connecting to the Logstash servers. The value must be a URL with a scheme of `socks5://`. |
+| outputs.{name}.enabled | boolean | `false` | `true` | Determines whether Logstash hostnames are resolved locally when using a proxy. If false and a proxy is used, name resolution occurs on the proxy server. |
+| outputs.{name}.loadbalance | boolean | `false` | `true` | Whether to loadbalance across the logstash hosts |
+| outputs.{name}.ttl | string | `"0"` | `"30s"` | Time to live for a connection to Logstash after which the connection will be reestablished.  |
+| outputs.{name}.slow_start | boolean | `false` | `true` | If true, only a subset of events in a batch of events is transferred per transaction. The number of events to be sent increases up to bulk_max_size if no error is encountered. On error, the number of events per transaction is reduced again.  |
+| outputs.{name}.pipelining | integer | 2 | `5` | The number of batches to send asynchronously to Logstash while waiting for an ACK from Logstash. The output becomes blocking after the specified number of batches are written. Specify 0 to turn off pipelining. |
+
+For `Logstash` extra fields can be specified inline the yaml following these guidelines:
+ - ["Performance tuning settings"](https://www.elastic.co/docs/reference/fleet/logstash-output#output-logstash-performance-tuning-settings)
+ - ["Memory queue settings"](https://www.elastic.co/docs/reference/fleet/logstash-output#output-logstash-memory-queue-settings)
+
+ For all outputs(except `ESECKRef`) these extra fields can be specified inline the yaml following these guidelines
+ - ["SSL/TLS Settings"](https://www.elastic.co/docs/reference/fleet/elastic-agent-ssl-configuration)
+  *NOTE* ssl.certificate_authorities is defined as ssl.certificateAuthorities
+  *NOTE* ssl.verification_mode is defined as ssl.verificationMode
+
+The following variables can be specified using valueFrom syntax:
+ * ssl.certificate
+ * ssl.key
+ * ssl.key_passphrase
+ * ssl.certificateAuthorities
+
+ The valueFrom syntax allows you to set a variable two different ways:
+```
+variable_name:
+    valueFromSecret:
+        name: <secret name>
+        key: <secret key>
+```
+
+or
+
+```
+variable_name:
+    value: "text"
+```
+
 Examples of Helm chart arguments to define an output with name `myOutput`:
 - `ESPlainAuthBasic`: `--set outputs.myOutput.url=https://elasticsearch:9200 --set outputs.myOutput.username=changeme --set outputs.myOutput.password=changeme`
 - `ESPlainAuthAPI`: `--set outputs.myOutput.url=https://elasticsearch:9200 --set outputs.myOutput.api_key=token`
 - `ESSecretAuthBasic`: `--set outputs.myOutput.type=ESSecretAuthBasic --set outputs.myOutput.secretName=k8s_secret_name` (required keys in the k8s secret are `url`, `username`, `password`)
 - `ESSecretAuthAPI`: `--set outputs.myOutput.type=ESSecretAuthAPI --set outputs.myOutput.secretName=k8s_secret_name` (required keys in the k8s secret are `url`, `api_key`)
 - `ESECKRef`: `--set outputs.myOutput.type=ESECKRef --set outputs.myOutput.name=eck_es_cluster_name`
+- `Logstash`: `--set outputs.myOutput.type=Logstash --set outputs.myOutput.hosts=["myHost:5044"] --set outputs.myOutput.ssl.enabled=true --set-file outputs.myOuput.ssl.certificateAuthorities[0].value=/path/to/ca.crt`
 
-For `ESPlainAuthBasic`, `ESPlainAuthAPI` `ESSecretAuthBasic`, `ESSecretAuthAPI` extra fields can be specified inline the yaml following these guidelines (`ESECKRef` doesn't support them):
- - ["Data parsing, filtering, and manipulation settings"](`https://www.elastic.co/guide/en/fleet/current/elasticsearch-output.html#output-elasticsearch-data-parsing-settings`)
- - ["Performance tuning settings"](https://www.elastic.co/guide/en/fleet/current/elasticsearch-output.html#output-elasticsearch-performance-tuning-settings)
- - ["Memory queue settings"](https://www.elastic.co/guide/en/fleet/current/elasticsearch-output.html#output-elasticsearch-memory-queue-settings)
 
 ### 2 - Kubernetes integration
 
