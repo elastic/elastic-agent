@@ -27,6 +27,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
@@ -90,7 +91,7 @@ type unpackHandler interface {
 type copyActionStoreFunc func(log *logger.Logger, newHome string) error
 type copyRunDirectoryFunc func(log *logger.Logger, oldRunPath, newRunPath string) error
 type fileDirCopyFunc func(from, to string, opts ...filecopy.Options) error
-type markUpgradeFunc func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]TTLMarker) error
+type markUpgradeFunc func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error
 type changeSymlinkFunc func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error
 type rollbackInstallFunc func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, rollbackSource availableRollbacksSource) error
 
@@ -117,8 +118,8 @@ type WatcherHelper interface {
 }
 
 type availableRollbacksSource interface {
-	Set(map[string]TTLMarker) error
-	Get() (map[string]TTLMarker, error)
+	Set(map[string]ttl.TTLMarker) error
+	Get() (map[string]ttl.TTLMarker, error)
 }
 
 // Upgrader performs an upgrade
@@ -337,6 +338,16 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		u.log.Errorw("Unable to clean downloads before update", "error.message", err, "downloads.path", paths.Downloads())
 	}
 
+	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
+	if err != nil {
+		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
+	}
+
+	_, err = CleanAvailableRollbacks(u.log, u.availableRollbacksSource, paths.Top(), currentVersionedHome, CleanupAllRollbacks)
+	if err != nil {
+		u.log.Warnw("Unable to clean all available rollbacks", "error.message", err)
+	}
+
 	det.SetState(details.StateDownloading)
 
 	sourceURI = u.sourceURI(sourceURI)
@@ -434,11 +445,6 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 
 	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
 	newPath := paths.BinaryPath(filepath.Join(paths.Top(), hashedDir), AgentName)
-
-	currentVersionedHome, err := filepath.Rel(paths.Top(), paths.Home())
-	if err != nil {
-		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
-	}
 
 	if err := u.changeSymlink(u.log, paths.Top(), symlinkPath, newPath); err != nil {
 		u.log.Errorw("Rolling back: changing symlink failed", "error.message", err)

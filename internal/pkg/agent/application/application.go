@@ -7,15 +7,13 @@ package application
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"time"
 
 	"go.elastic.co/apm/v2"
 
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
-
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/go-ucfg"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -52,8 +50,8 @@ import (
 )
 
 type rollbacksSource interface {
-	Set(map[string]upgrade.TTLMarker) error
-	Get() (map[string]upgrade.TTLMarker, error)
+	Set(map[string]ttl.TTLMarker) error
+	Get() (map[string]ttl.TTLMarker, error)
 }
 
 // CfgOverrider allows for application driven overrides of configuration read from disk.
@@ -135,7 +133,7 @@ func New(
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
 	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled
 
-	availableRollbacksSource := upgrade.NewTTLMarkerRegistry(log, paths.Top())
+	availableRollbacksSource := ttl.NewTTLMarkerRegistry(log, paths.Top())
 	if upgrade.IsUpgradeable() {
 		// If we are not running in a container, check and normalize the install descriptor before we start the agent
 		normalizeAgentInstalls(log, paths.Top(), time.Now(), initialUpdateMarker, availableRollbacksSource)
@@ -255,7 +253,7 @@ func New(
 			}
 
 			// TODO: stop using global state
-			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, paths.Top(), client, fleetAcker, actionAcker, retrier, stateStorage, actionQueue, upgrader)
+			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, paths.Top(), client, fleetAcker, actionAcker, retrier, stateStorage, actionQueue, availableRollbacksSource, upgrader)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -331,57 +329,15 @@ func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, in
 		}
 	}
 
-	// check if we need to cleanup old agent installs
-	rollbacks, err := rollbackSource.Get()
+	absHomePath := paths.Home()
+	relHomePath, err := filepath.Rel(topDir, absHomePath)
 	if err != nil {
-		log.Warnf("Error getting available rollbacks during startup check: %s", err)
+		log.Warnf("Error calculating home path %q relative to top path %q: %s", absHomePath, topDir, err)
 		return
 	}
-
-	var versionedHomesToCleanup []string
-	for versionedHome, ttlMarker := range rollbacks {
-
-		versionedHomeAbsPath := filepath.Join(topDir, versionedHome)
-
-		if versionedHomeAbsPath == paths.HomeFrom(topDir) {
-			// skip the current install
-			log.Warnf("Found a TTL marker for the currently running agent at %s. Skipping cleanup...", versionedHome)
-			continue
-		}
-
-		_, err = os.Stat(versionedHomeAbsPath)
-		if errors.Is(err, os.ErrNotExist) {
-			log.Warnf("Versioned home %s corresponding to agent TTL marker %+v  is not found on disk", versionedHomeAbsPath, ttlMarker)
-			versionedHomesToCleanup = append(versionedHomesToCleanup, versionedHome)
-			continue
-		}
-
-		if err != nil {
-			log.Warnf("error checking versioned home %s for agent install: %s", versionedHomeAbsPath, err.Error())
-			continue
-		}
-
-		if now.After(ttlMarker.ValidUntil) {
-			// the install directory exists but it's expired. Remove the files.
-			log.Infof("agent TTL marker %+v marks %q as expired, removing directory", ttlMarker, versionedHomeAbsPath)
-			if cleanupErr := install.RemoveBut(versionedHomeAbsPath, true); cleanupErr != nil {
-				log.Warnf("Error removing directory %q: %s", versionedHomeAbsPath, cleanupErr)
-			} else {
-				log.Infof("Directory %q was removed", versionedHomeAbsPath)
-				versionedHomesToCleanup = append(versionedHomesToCleanup, versionedHome)
-			}
-		}
-	}
-
-	if len(versionedHomesToCleanup) > 0 {
-		log.Infof("removing install descriptor(s) for %v", versionedHomesToCleanup)
-		for _, versionedHomeToCleanup := range versionedHomesToCleanup {
-			delete(rollbacks, versionedHomeToCleanup)
-		}
-		err = rollbackSource.Set(rollbacks)
-		if err != nil {
-			log.Warnf("Error removing install descriptor(s): %s", err)
-		}
+	_, err = upgrade.CleanAvailableRollbacks(log, rollbackSource, topDir, relHomePath, upgrade.PreserveActiveUpgradeVersions(initialUpdateMarker, upgrade.CleanupExpiredRollbacks))
+	if err != nil {
+		log.Warnf("Error cleaning available rollbacks: %s", err)
 	}
 }
 
