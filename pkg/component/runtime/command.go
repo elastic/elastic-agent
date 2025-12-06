@@ -369,7 +369,7 @@ func (c *commandRuntime) start(comm Communicator) error {
 	if err != nil {
 		return fmt.Errorf("failed to determine absolute path: %w", err)
 	}
-	err = utils.HasStrictExecPerms(path, uid)
+	err = utils.HasStrictExecPerms(path, uid, false)
 	if err != nil {
 		return fmt.Errorf("execution of component prevented: %w", err)
 	}

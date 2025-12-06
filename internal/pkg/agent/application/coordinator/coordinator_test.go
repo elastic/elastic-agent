@@ -1011,6 +1011,47 @@ func TestCoordinator_UpgradeDetails(t *testing.T) {
 	require.Equal(t, expectedErr.Error(), coord.state.UpgradeDetails.Metadata.ErrorMsg)
 }
 
+func Test_ApplyPersistedConfig(t *testing.T) {
+	cfgFile := filepath.Join(".", "testdata", "overrides.yml")
+
+	testCases := []struct {
+		name               string
+		featureEnable      bool
+		expectedLogs       bool
+		expectedOutputType string
+	}{
+		{name: "enabled", featureEnable: true, expectedLogs: false, expectedOutputType: "kafka"},
+		{name: "disabled", featureEnable: false, expectedLogs: true, expectedOutputType: "elasticsearch"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, err := config.LoadFile(filepath.Join(".", "testdata", "config.yaml"))
+			require.NoError(t, err)
+
+			err = applyPersistedConfig(cfg, cfgFile, func() bool { return tc.featureEnable })
+			require.NoError(t, err)
+
+			c := &configuration.Configuration{}
+			require.NoError(t, cfg.Agent.Unpack(&c))
+
+			require.Equal(t, tc.expectedLogs, c.Settings.MonitoringConfig.MonitorLogs)
+			require.True(t, c.Settings.MonitoringConfig.MonitorMetrics)
+			require.True(t, c.Settings.MonitoringConfig.Enabled)
+
+			// make sure output is not kafka
+			oc, err := cfg.Agent.Child("outputs", -1)
+			require.NoError(t, err)
+
+			do, err := oc.Child("default", -1)
+			require.NoError(t, err)
+			outputType, err := do.String("type", -1)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedOutputType, outputType, "output type should be %s, got %s", tc.expectedOutputType, outputType)
+		})
+	}
+}
+
 func BenchmarkCoordinator_generateComponentModel(b *testing.B) {
 	// load variables
 	varsMaps := []map[string]any{}
