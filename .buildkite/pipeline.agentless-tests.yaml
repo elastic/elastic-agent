@@ -15,6 +15,16 @@ env:
   TEAM_CHANNEL: "#agentless-alerts"
 
 steps:
+  - label: ":docker: Validate docker image is built for all architectures"
+    command: ".buildkite/scripts/steps/validate-agentless-docker-image.sh"
+    agents:
+      image: "docker.elastic.co/ci-agent-images/observability/oci-image-tools-agent:latest@sha256:a4ababd1347111759babc05c9ad5a680f4af48892784951358488b7e7fc94af9"
+    plugins:
+      - elastic/vault-docker-login#v0.6.3:
+          secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+
+  - wait
+
   - label: ":pipeline::grey_question::seedling: Trigger service tests for ${ENVIRONMENT}"
     command: ".buildkite/scripts/steps/run-agentless-tests.sh"
     agents:
