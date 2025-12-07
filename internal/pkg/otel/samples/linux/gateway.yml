@@ -35,11 +35,11 @@ service:
   pipelines:
     metrics:
       receivers: [otlp]
-      processors: [batch/metrics]
+      processors: [batch/metrics, elasticapm]
       exporters: [debug, elasticsearch/otel]
     logs:
       receivers: [otlp]
-      processors: [batch]
+      processors: [batch, elasticapm]
       exporters: [debug, elasticapm, elasticsearch/otel]
     traces:
       receivers: [otlp]
