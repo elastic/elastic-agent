@@ -90,6 +90,15 @@ func GetComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath stri
 		return nil, err
 	}
 
+	rawCfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true, !isAdmin)
+	if err != nil {
+		return nil, err
+	}
+	cfg, err := configuration.NewFromConfig(rawCfg)
+	if err != nil {
+		return nil, err
+	}
+
 	monitorFn, err := GetMonitoringFn(ctx, l, m, otel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get monitoring: %w", err)
@@ -101,7 +110,7 @@ func GetComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath stri
 	}
 
 	// Compute the components from the computed configuration.
-	comps, err := specs.ToComponents(m, nil, monitorFn, lvl, agentInfo, map[string]uint64{})
+	comps, err := specs.ToComponents(m, cfg.Settings.Internal.Runtime, nil, monitorFn, lvl, agentInfo, map[string]uint64{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to render components: %w", err)
 	}

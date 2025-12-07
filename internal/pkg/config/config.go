@@ -56,6 +56,7 @@ var DefaultOptions = []interface{}{
 	ucfg.IgnoreCommas,
 	ucfg.ResolveEnv,
 	ucfg.VarExp,
+	ucfg.FieldMergeValues("agent"),
 	VarSkipKeys("inputs", "outputs"),
 	OTelKeys("connectors", "receivers", "processors", "exporters", "extensions", "service"),
 }

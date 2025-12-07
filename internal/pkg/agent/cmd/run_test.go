@@ -5,12 +5,27 @@
 package cmd
 
 import (
+	_ "embed"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+)
+
+var (
+	//go:embed testdata/run/singlelogging.yaml
+	singleLoggingConfig []byte
+
+	//go:embed testdata/run/splitlogging.yaml
+	splitLoggingConfig []byte
 )
 
 func Test_initTracer(t *testing.T) {
@@ -90,6 +105,52 @@ func Test_initTracer(t *testing.T) {
 				return
 			}
 			tt.want(t, got, "initTracer(%v, %v, %v)", tt.args.agentName, tt.args.version, tt.args.mcfg)
+		})
+	}
+}
+
+func TestRunLoadConfig(t *testing.T) {
+	tests := []struct {
+		name   string
+		file   []byte
+		expect func() *configuration.Configuration
+	}{{
+		name: "single logging entry",
+		file: singleLoggingConfig,
+		expect: func() *configuration.Configuration {
+			cfg := configuration.DefaultConfiguration()
+			cfg.Settings.LoggingConfig.Level = logp.DebugLevel
+			cfg.Settings.LoggingConfig.ToFiles = true
+			cfg.Settings.LoggingConfig.ToStderr = false
+
+			return cfg
+		},
+	}, {
+		name: "split logging entries",
+		file: splitLoggingConfig,
+		expect: func() *configuration.Configuration {
+			cfg := configuration.DefaultConfiguration()
+			cfg.Settings.LoggingConfig.Level = logp.DebugLevel
+			cfg.Settings.LoggingConfig.ToFiles = true
+			cfg.Settings.LoggingConfig.ToStderr = false
+
+			return cfg
+		},
+	}}
+
+	origCfgDir := paths.Config()
+	t.Cleanup(func() { paths.SetConfig(origCfgDir) })
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			paths.SetConfig(dir)
+			err := os.WriteFile(filepath.Join(dir, paths.DefaultConfigName), tt.file, 0o644)
+			require.NoError(t, err)
+
+			cfg, err := loadConfig(t.Context(), nil)
+			require.NoError(t, err)
+			require.Equal(t, tt.expect(), cfg)
 		})
 	}
 }

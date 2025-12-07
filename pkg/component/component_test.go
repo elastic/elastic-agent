@@ -95,13 +95,14 @@ func TestToComponents(t *testing.T) {
 	}
 
 	scenarios := []struct {
-		Name     string
-		Platform PlatformDetail
-		Policy   map[string]interface{}
-		LogLevel logp.Level
-		Err      string
-		Result   []Component
-		headers  HeadersProvider
+		Name          string
+		Platform      PlatformDetail
+		Policy        map[string]interface{}
+		RuntimeConfig *RuntimeConfig
+		LogLevel      logp.Level
+		Err           string
+		Result        []Component
+		headers       HeadersProvider
 	}{
 		{
 			Name:     "Empty policy",
@@ -1027,6 +1028,326 @@ func TestToComponents(t *testing.T) {
 						},
 					},
 					RuntimeManager: ProcessRuntimeManager,
+				},
+			},
+		},
+		{
+			Name:     "RuntimeConfig: global default otel",
+			Platform: linuxAMD64Platform,
+			RuntimeConfig: &RuntimeConfig{
+				Default: string(OtelRuntimeManager),
+			},
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-0",
+					},
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-1",
+					},
+				},
+			},
+			Result: []Component{
+				{
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "filestream",
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "elasticsearch",
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-0",
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-1",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-1",
+							}),
+						},
+					},
+					RuntimeManager: OtelRuntimeManager,
+				},
+			},
+		},
+		{
+			Name:     "RuntimeConfig: global default process",
+			Platform: linuxAMD64Platform,
+			RuntimeConfig: &RuntimeConfig{
+				Default: string(ProcessRuntimeManager),
+			},
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type": "log",
+						"id":   "log-0",
+					},
+					map[string]interface{}{
+						"type": "log",
+						"id":   "log-1",
+					},
+				},
+			},
+			Result: []Component{
+				{
+					InputType:  "log",
+					OutputType: "elasticsearch",
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "log",
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "log-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "elasticsearch",
+							}),
+						},
+						{
+							ID:       "log-default-log-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "log",
+								"id":   "log-0",
+							}),
+						},
+						{
+							ID:       "log-default-log-1",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "log",
+								"id":   "log-1",
+							}),
+						},
+					},
+					RuntimeManager: ProcessRuntimeManager,
+				},
+			},
+		},
+		{
+			Name:     "RuntimeConfig: mixed with _runtime_experimental override",
+			Platform: linuxAMD64Platform,
+			RuntimeConfig: &RuntimeConfig{
+				Default: string(OtelRuntimeManager),
+			},
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-0",
+					},
+					map[string]interface{}{
+						"type":                  "filestream",
+						"id":                    "filestream-1",
+						"_runtime_experimental": "process",
+					},
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-2",
+					},
+				},
+			},
+			Result: []Component{
+				{
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "filestream",
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "elasticsearch",
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-0",
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-2",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-2",
+							}),
+						},
+					},
+					RuntimeManager: OtelRuntimeManager,
+				},
+				{
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "filestream",
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "elasticsearch",
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-1",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-1",
+							}),
+						},
+					},
+					RuntimeManager: ProcessRuntimeManager,
+				},
+			},
+		},
+		{
+			Name:     "RuntimeConfig: multiple input types with different defaults",
+			Platform: linuxAMD64Platform,
+			RuntimeConfig: &RuntimeConfig{
+				Default: string(OtelRuntimeManager),
+				Filebeat: BeatRuntimeConfig{
+					Default: string(ProcessRuntimeManager),
+					InputType: map[string]string{
+						"log": string(OtelRuntimeManager),
+					},
+				},
+			},
+			Policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-0",
+					},
+					map[string]interface{}{
+						"type": "log",
+						"id":   "log-0",
+					},
+				},
+			},
+			Result: []Component{
+				{
+					InputType:  "filestream",
+					OutputType: "elasticsearch",
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "filestream",
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "filestream-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "elasticsearch",
+							}),
+						},
+						{
+							ID:       "filestream-default-filestream-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "filestream",
+								"id":   "filestream-0",
+							}),
+						},
+					},
+					RuntimeManager: ProcessRuntimeManager,
+				},
+				{
+					InputType:  "log",
+					OutputType: "elasticsearch",
+					InputSpec: &InputRuntimeSpec{
+						InputType:  "log",
+						BinaryName: "testbeat",
+						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
+					},
+					Units: []Unit{
+						{
+							ID:       "log-default",
+							Type:     client.UnitTypeOutput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "elasticsearch",
+							}),
+						},
+						{
+							ID:       "log-default-log-0",
+							Type:     client.UnitTypeInput,
+							LogLevel: defaultUnitLogLevel,
+							Config: MustExpectedConfig(map[string]interface{}{
+								"type": "log",
+								"id":   "log-0",
+							}),
+						},
+					},
+					RuntimeManager: OtelRuntimeManager,
 				},
 			},
 		},
@@ -2500,10 +2821,17 @@ func TestToComponents(t *testing.T) {
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.Name, func(t *testing.T) {
-			runtime, err := LoadRuntimeSpecs(filepath.Join("..", "..", "specs"), scenario.Platform, SkipBinaryCheck())
+			specs, err := LoadRuntimeSpecs(filepath.Join("..", "..", "specs"), scenario.Platform, SkipBinaryCheck())
 			require.NoError(t, err)
 
-			result, err := runtime.ToComponents(scenario.Policy, nil, nil, scenario.LogLevel, scenario.headers, map[string]uint64{})
+			// Use provided RuntimeConfig or fall back to default
+			runtimeConfig := scenario.RuntimeConfig
+			if runtimeConfig == nil {
+				runtimeConfig = DefaultRuntimeConfig()
+			}
+
+			result, err := specs.ToComponents(
+				scenario.Policy, runtimeConfig, nil, nil, scenario.LogLevel, scenario.headers, map[string]uint64{})
 			if scenario.Err != "" {
 				assert.Equal(t, scenario.Err, err.Error())
 			} else {
@@ -2979,7 +3307,7 @@ func TestFlattenedDataStream(t *testing.T) {
 		t.Fatalf("cannot load runtime specs: %s", err)
 	}
 
-	result, err := runtime.ToComponents(policy, nil, nil, logp.DebugLevel, nil, map[string]uint64{})
+	result, err := runtime.ToComponents(policy, DefaultRuntimeConfig(), nil, nil, logp.DebugLevel, nil, map[string]uint64{})
 	if err != nil {
 		t.Fatalf("cannot convert policy to component: %s", err)
 	}
@@ -3080,7 +3408,7 @@ func TestFlattenedDataStreamIsolatedUnits(t *testing.T) {
 		t.Fatalf("cannot load runtime specs: %s", err)
 	}
 
-	result, err := runtime.ToComponents(policy, nil, nil, logp.DebugLevel, nil, map[string]uint64{})
+	result, err := runtime.ToComponents(policy, DefaultRuntimeConfig(), nil, nil, logp.DebugLevel, nil, map[string]uint64{})
 	if err != nil {
 		t.Fatalf("cannot convert policy to component: %s", err)
 	}
@@ -3182,4 +3510,540 @@ func TestComponent_WorkDir(t *testing.T) {
 		err = c.RemoveWorkDir(tempDir)
 		require.NoError(t, err)
 	})
+}
+
+func TestRuntimeConfigValidate(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  *RuntimeConfig
+		wantErr string
+	}{
+		{
+			name: "valid default process",
+			config: &RuntimeConfig{
+				Default: string(ProcessRuntimeManager),
+			},
+		},
+		{
+			name: "valid default otel",
+			config: &RuntimeConfig{
+				Default: string(OtelRuntimeManager),
+			},
+		},
+		{
+			name: "invalid default runtime",
+			config: &RuntimeConfig{
+				Default: "invalid",
+			},
+			wantErr: "invalid runtime manager: invalid, must be either otel or process",
+		},
+		{
+			name: "valid filebeat default",
+			config: &RuntimeConfig{
+				Default: string(ProcessRuntimeManager),
+				Filebeat: BeatRuntimeConfig{
+					Default: string(OtelRuntimeManager),
+				},
+			},
+		},
+		{
+			name: "invalid filebeat default",
+			config: &RuntimeConfig{
+				Default: string(ProcessRuntimeManager),
+				Filebeat: BeatRuntimeConfig{
+					Default: "invalid",
+				},
+			},
+			wantErr: "invalid runtime manager: invalid, must be either otel or process",
+		},
+		{
+			name: "valid metricbeat default",
+			config: &RuntimeConfig{
+				Default: string(ProcessRuntimeManager),
+				Metricbeat: BeatRuntimeConfig{
+					Default: string(OtelRuntimeManager),
+				},
+			},
+		},
+		{
+			name: "invalid metricbeat default",
+			config: &RuntimeConfig{
+				Default: string(ProcessRuntimeManager),
+				Metricbeat: BeatRuntimeConfig{
+					Default: "invalid",
+				},
+			},
+			wantErr: "invalid runtime manager: invalid, must be either otel or process",
+		},
+		{
+			name: "valid filebeat input type",
+			config: &RuntimeConfig{
+				Default: string(ProcessRuntimeManager),
+				Filebeat: BeatRuntimeConfig{
+					Default: string(ProcessRuntimeManager),
+					InputType: map[string]string{
+						"filestream": string(OtelRuntimeManager),
+						"log":        string(ProcessRuntimeManager),
+					},
+				},
+			},
+		},
+		{
+			name: "invalid filebeat input type",
+			config: &RuntimeConfig{
+				Default: string(ProcessRuntimeManager),
+				Filebeat: BeatRuntimeConfig{
+					Default: string(ProcessRuntimeManager),
+					InputType: map[string]string{
+						"filestream": "invalid",
+					},
+				},
+			},
+			wantErr: "invalid runtime manager: invalid, must be either otel or process",
+		},
+		{
+			name: "valid metricbeat input type",
+			config: &RuntimeConfig{
+				Default: string(ProcessRuntimeManager),
+				Metricbeat: BeatRuntimeConfig{
+					Default: string(ProcessRuntimeManager),
+					InputType: map[string]string{
+						"system/metrics": string(OtelRuntimeManager),
+					},
+				},
+			},
+		},
+		{
+			name: "invalid metricbeat input type",
+			config: &RuntimeConfig{
+				Default: string(ProcessRuntimeManager),
+				Metricbeat: BeatRuntimeConfig{
+					Default: string(ProcessRuntimeManager),
+					InputType: map[string]string{
+						"system/metrics": "invalid",
+					},
+				},
+			},
+			wantErr: "invalid runtime manager: invalid, must be either otel or process",
+		},
+		{
+			name: "empty default is allowed",
+			config: &RuntimeConfig{
+				Default: "",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestRuntimeConfigBeatRuntimeConfig(t *testing.T) {
+	config := &RuntimeConfig{
+		Default: string(ProcessRuntimeManager),
+		Filebeat: BeatRuntimeConfig{
+			Default: string(OtelRuntimeManager),
+			InputType: map[string]string{
+				"filestream": string(ProcessRuntimeManager),
+			},
+		},
+		Metricbeat: BeatRuntimeConfig{
+			Default: string(ProcessRuntimeManager),
+			InputType: map[string]string{
+				"system/metrics": string(OtelRuntimeManager),
+			},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		beatName string
+		want     *BeatRuntimeConfig
+	}{
+		{
+			name:     "filebeat",
+			beatName: "filebeat",
+			want:     &config.Filebeat,
+		},
+		{
+			name:     "metricbeat",
+			beatName: "metricbeat",
+			want:     &config.Metricbeat,
+		},
+		{
+			name:     "unknown beat",
+			beatName: "unknownbeat",
+			want:     nil,
+		},
+		{
+			name:     "empty beat name",
+			beatName: "",
+			want:     nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := config.BeatRuntimeConfig(tt.beatName)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestRuntimeConfigRuntimeManagerForInputType(t *testing.T) {
+	tests := []struct {
+		name      string
+		config    *RuntimeConfig
+		inputType string
+		beatName  string
+		want      RuntimeManager
+	}{
+		{
+			name: "uses input type specific config for filebeat",
+			config: &RuntimeConfig{
+				Default: string(ProcessRuntimeManager),
+				Filebeat: BeatRuntimeConfig{
+					Default: string(ProcessRuntimeManager),
+					InputType: map[string]string{
+						"filestream": string(OtelRuntimeManager),
+					},
+				},
+			},
+			inputType: "filestream",
+			beatName:  "filebeat",
+			want:      OtelRuntimeManager,
+		},
+		{
+			name: "uses beat default when input type not configured",
+			config: &RuntimeConfig{
+				Default: string(ProcessRuntimeManager),
+				Filebeat: BeatRuntimeConfig{
+					Default: string(OtelRuntimeManager),
+					InputType: map[string]string{
+						"filestream": string(ProcessRuntimeManager),
+					},
+				},
+			},
+			inputType: "log",
+			beatName:  "filebeat",
+			want:      OtelRuntimeManager,
+		},
+		{
+			name: "uses global default when beat not configured",
+			config: &RuntimeConfig{
+				Default: string(OtelRuntimeManager),
+			},
+			inputType: "filestream",
+			beatName:  "filebeat",
+			want:      OtelRuntimeManager,
+		},
+		{
+			name: "uses global default when beat name unknown",
+			config: &RuntimeConfig{
+				Default: string(OtelRuntimeManager),
+				Filebeat: BeatRuntimeConfig{
+					Default: string(ProcessRuntimeManager),
+				},
+			},
+			inputType: "some-input",
+			beatName:  "unknownbeat",
+			want:      OtelRuntimeManager,
+		},
+		{
+			name: "uses default runtime manager when default empty",
+			config: &RuntimeConfig{
+				Default: "",
+			},
+			inputType: "filestream",
+			beatName:  "filebeat",
+			want:      DefaultRuntimeManager,
+		},
+		{
+			name: "metricbeat input type specific config",
+			config: &RuntimeConfig{
+				Default: string(ProcessRuntimeManager),
+				Metricbeat: BeatRuntimeConfig{
+					Default: string(ProcessRuntimeManager),
+					InputType: map[string]string{
+						"system/metrics": string(OtelRuntimeManager),
+					},
+				},
+			},
+			inputType: "system/metrics",
+			beatName:  "metricbeat",
+			want:      OtelRuntimeManager,
+		},
+		{
+			name: "metricbeat uses beat default when input type not configured",
+			config: &RuntimeConfig{
+				Default: string(ProcessRuntimeManager),
+				Metricbeat: BeatRuntimeConfig{
+					Default: string(OtelRuntimeManager),
+				},
+			},
+			inputType: "system/metrics",
+			beatName:  "metricbeat",
+			want:      OtelRuntimeManager,
+		},
+		{
+			name: "priority order: input type > beat default > global default",
+			config: &RuntimeConfig{
+				Default: string(OtelRuntimeManager),
+				Filebeat: BeatRuntimeConfig{
+					Default: string(ProcessRuntimeManager),
+					InputType: map[string]string{
+						"filestream": string(OtelRuntimeManager),
+						"log":        string(ProcessRuntimeManager),
+					},
+				},
+			},
+			inputType: "filestream",
+			beatName:  "filebeat",
+			want:      OtelRuntimeManager,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.config.RuntimeManagerForInputType(tt.inputType, tt.beatName)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestDefaultRuntimeConfig(t *testing.T) {
+	config := DefaultRuntimeConfig()
+	require.NotNil(t, config)
+	assert.Equal(t, string(DefaultRuntimeManager), config.Default)
+	assert.Equal(t, "", config.Filebeat.Default)
+	assert.Nil(t, config.Filebeat.InputType)
+	assert.Equal(t, "", config.Metricbeat.Default)
+	assert.Nil(t, config.Metricbeat.InputType)
+}
+
+func TestToComponentsWithRuntimeConfig(t *testing.T) {
+	linuxAMD64Platform := PlatformDetail{
+		Platform: Platform{
+			OS:   Linux,
+			Arch: AMD64,
+			GOOS: Linux,
+		},
+	}
+
+	tests := []struct {
+		name          string
+		policy        map[string]interface{}
+		runtimeConfig *RuntimeConfig
+		wantCount     int
+		validate      func(t *testing.T, components []Component)
+	}{
+		{
+			name: "global default otel runtime",
+			policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-0",
+					},
+				},
+			},
+			runtimeConfig: &RuntimeConfig{
+				Default: string(OtelRuntimeManager),
+			},
+			wantCount: 1,
+			validate: func(t *testing.T, components []Component) {
+				assert.Equal(t, OtelRuntimeManager, components[0].RuntimeManager)
+			},
+		},
+		{
+			name: "global default applies to all inputs",
+			policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-0",
+					},
+					map[string]interface{}{
+						"type": "log",
+						"id":   "log-0",
+					},
+				},
+			},
+			runtimeConfig: &RuntimeConfig{
+				Default: string(ProcessRuntimeManager),
+			},
+			wantCount: 2,
+			validate: func(t *testing.T, components []Component) {
+				// All components should use process runtime since that's the global default
+				for _, comp := range components {
+					assert.Equal(t, ProcessRuntimeManager, comp.RuntimeManager,
+						"all components should use global default process runtime")
+				}
+			},
+		},
+		{
+			name: "beat-specific configs are ignored when beat name is empty",
+			policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-0",
+					},
+				},
+			},
+			runtimeConfig: &RuntimeConfig{
+				Default: string(ProcessRuntimeManager),
+				// These will be ignored because testbeat doesn't use agentbeat
+				Filebeat: BeatRuntimeConfig{
+					Default: string(OtelRuntimeManager),
+					InputType: map[string]string{
+						"filestream": string(OtelRuntimeManager),
+					},
+				},
+			},
+			wantCount: 1,
+			validate: func(t *testing.T, components []Component) {
+				// Should use global default, not filebeat config
+				assert.Equal(t, ProcessRuntimeManager, components[0].RuntimeManager,
+					"should use global default when beat name is empty")
+			},
+		},
+		{
+			name: "inputs with explicit _runtime_experimental split into separate components",
+			policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-0",
+					},
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-1",
+					},
+					map[string]interface{}{
+						"type":                  "filestream",
+						"id":                    "filestream-2",
+						"_runtime_experimental": "otel",
+					},
+				},
+			},
+			runtimeConfig: &RuntimeConfig{
+				Default: string(ProcessRuntimeManager),
+			},
+			wantCount: 2,
+			validate: func(t *testing.T, components []Component) {
+				// When inputs have different runtime managers, they are split into separate components
+				otelCount := 0
+				processCount := 0
+				for _, comp := range components {
+					switch comp.RuntimeManager {
+					case OtelRuntimeManager:
+						otelCount++
+						// Should have 1 input (filestream-2 with explicit _runtime_experimental)
+						inputUnits := 0
+						for _, unit := range comp.Units {
+							if unit.Type == client.UnitTypeInput {
+								inputUnits++
+							}
+						}
+						assert.Equal(t, 1, inputUnits, "otel component should have 1 input unit")
+					case ProcessRuntimeManager:
+						processCount++
+						// Should have 2 inputs (filestream-0 and filestream-1 using global default)
+						inputUnits := 0
+						for _, unit := range comp.Units {
+							if unit.Type == client.UnitTypeInput {
+								inputUnits++
+							}
+						}
+						assert.Equal(t, 2, inputUnits, "process component should have 2 input units")
+					}
+				}
+				assert.Equal(t, 1, otelCount, "should have 1 otel component")
+				assert.Equal(t, 1, processCount, "should have 1 process component")
+			},
+		},
+		{
+			name: "runtime config priority: _runtime_experimental overrides config",
+			policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type":                  "filestream",
+						"id":                    "filestream-0",
+						"_runtime_experimental": "process",
+					},
+				},
+			},
+			runtimeConfig: &RuntimeConfig{
+				Default: string(OtelRuntimeManager),
+				Filebeat: BeatRuntimeConfig{
+					Default: string(OtelRuntimeManager),
+					InputType: map[string]string{
+						"filestream": string(OtelRuntimeManager),
+					},
+				},
+			},
+			wantCount: 1,
+			validate: func(t *testing.T, components []Component) {
+				// _runtime_experimental should override all RuntimeConfig settings
+				assert.Equal(t, ProcessRuntimeManager, components[0].RuntimeManager,
+					"_runtime_experimental should override RuntimeConfig")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runtime, err := LoadRuntimeSpecs(filepath.Join("..", "..", "specs"), linuxAMD64Platform, SkipBinaryCheck())
+			require.NoError(t, err)
+
+			result, err := runtime.ToComponents(
+				tt.policy, tt.runtimeConfig, nil, nil, logp.InfoLevel, nil, map[string]uint64{})
+			require.NoError(t, err)
+			require.Len(t, result, tt.wantCount)
+
+			if tt.validate != nil {
+				tt.validate(t, result)
+			}
+		})
+	}
 }

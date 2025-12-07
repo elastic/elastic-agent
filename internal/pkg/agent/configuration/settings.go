@@ -23,6 +23,7 @@ type SettingsConfig struct {
 	EventLoggingConfig *logger.Config                  `yaml:"logging.event_data,omitempty" config:"logging.event_data,omitempty" json:"logging.event_data,omitempty"`
 	Upgrade            *UpgradeConfig                  `yaml:"upgrade" config:"upgrade" json:"upgrade"`
 	Collector          *CollectorConfig                `yaml:"collector" config:"collector" json:"collector"`
+	Internal           *InternalConfig                 `yaml:"internal" config:"internal" json:"internal"`
 
 	// standalone config
 	Reload              *ReloadConfig `config:"reload" yaml:"reload" json:"reload"`
@@ -41,6 +42,7 @@ func DefaultSettingsConfig() *SettingsConfig {
 		GRPC:                DefaultGRPCConfig(),
 		Upgrade:             DefaultUpgradeConfig(),
 		Collector:           DefaultCollectorConfig(),
+		Internal:            DefaultInternalConfig(),
 		Reload:              DefaultReloadConfig(),
 		V1MonitoringEnabled: true,
 	}
