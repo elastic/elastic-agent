@@ -9,6 +9,7 @@ package ess
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,8 +21,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	libbeattesting "github.com/elastic/beats/v7/libbeat/tests/integration"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
+	"github.com/elastic/elastic-agent-libs/testing/fs"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -119,14 +120,14 @@ service:
 	rootDir, err := filepath.Abs(filepath.Join("..", "..", "..", "build"))
 	require.NoError(t, err, "cannot get absolute path of rootDir")
 
-	tmpDir := libbeattesting.CreateTempDir(t, rootDir)
+	tmpDir := fs.TempDir(t, rootDir)
 	inputFilePath, err := filepath.Abs(filepath.Join(tmpDir, "log.log"))
 
 	// Generate a string we can use to search in the logs,
 	// without it tests on Windows will fail
 	inputFilePathStr := strings.ReplaceAll(inputFilePath, `\`, `\\`)
 
-	libbeattesting.WriteLogFile(t, inputFilePath, 50, false)
+	WriteLogFile(t, inputFilePath, 50, false)
 
 	esApiKey := createESApiKey(t, info.ESClient)
 	esHost, err := integration.GetESHost()
@@ -135,8 +136,7 @@ service:
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(2*time.Minute))
 	defer cancel()
 
-	agentLogFile := NewLogFile(t, tmpDir)
-	agentLogFile.KeepLogFileOnSuccess = true
+	agentLogFile := fs.NewLogFile(t, tmpDir, t.Name())
 
 	cfg := map[string]any{
 		"HomeDir":      tmpDir,
@@ -186,7 +186,7 @@ service:
 	)
 
 	// Add 50 events to the file, it now contains 100 events
-	libbeattesting.WriteLogFile(t, inputFilePath, 50, true)
+	WriteLogFile(t, inputFilePath, 50, true)
 
 	agentLogFile.WaitLogsContains(
 		t,
@@ -271,7 +271,7 @@ func StartElasticAgentOtel(
 	return cmd
 }
 
-func StopElasticAgentOtel(t *testing.T, cmd *exec.Cmd, f *LogFile) {
+func StopElasticAgentOtel(t *testing.T, cmd *exec.Cmd, f *fs.LogFile) {
 	require.NoError(
 		t,
 		process.Terminate(cmd.Process),
@@ -284,4 +284,56 @@ func StopElasticAgentOtel(t *testing.T, cmd *exec.Cmd, f *LogFile) {
 		"Shutdown complete.",
 		time.Second,
 		"Filebeat Receiver didn't shutdown")
+}
+
+// WriteLogFile writes count lines to path.
+// Each line contains the current time (RFC3339) and a counter.
+// Prefix is added instead of current time if it exists.
+// If no prefix is passed, each line is 50 bytes long
+func WriteLogFile(t *testing.T, path string, count int, append bool, prefix ...string) {
+	var file *os.File
+	var err error
+	if !append {
+		file, err = os.Create(path)
+		if err != nil {
+			t.Fatalf("could not create file '%s': %s", path, err)
+		}
+	} else {
+		file, err = os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+		if err != nil {
+			t.Fatalf("could not open or create file: '%s': %s", path, err)
+		}
+	}
+
+	defer func() {
+		if err := file.Close(); err != nil {
+			t.Fatalf("could not close file: %s", err)
+		}
+	}()
+	defer func() {
+		if err := file.Sync(); err != nil {
+			t.Fatalf("could not sync file: %s", err)
+		}
+	}()
+
+	var now string
+	if len(prefix) == 0 {
+		// If the length is different, e.g when there is no offset from UTC.
+		// add some padding so the length is predictable
+		now = time.Now().Format(time.RFC3339)
+		if len(now) != len(time.RFC3339) {
+			paddingNeeded := len(time.RFC3339) - len(now)
+			for range paddingNeeded {
+				now += "-"
+			}
+		}
+	} else {
+		now = strings.Join(prefix, "")
+	}
+
+	for i := range count {
+		if _, err := fmt.Fprintf(file, "%s           %13d\n", now, i); err != nil {
+			t.Fatalf("could not write line %d to file: %s", count+1, err)
+		}
+	}
 }
