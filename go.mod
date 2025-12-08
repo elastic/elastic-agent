@@ -308,18 +308,18 @@ require (
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/lunes v0.2.0 // indirect
 	github.com/elastic/mito v1.24.0 // indirect
-	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.20.0 // indirect
-	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.20.0 // indirect
-	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.22.0 // indirect
-	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.20.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.24.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.24.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.24.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.24.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20251113000200-a6f7cddc8520 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/testutil v0.0.0-20251113000200-a6f7cddc8520 // indirect
-	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.21.0 // indirect
-	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.20.0 // indirect
-	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.20.0 // indirect
-	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.20.0 // indirect
-	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.21.0 // indirect
-	github.com/elastic/opentelemetry-lib v0.26.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.24.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.24.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.24.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.24.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.24.0 // indirect
+	github.com/elastic/opentelemetry-lib v0.27.0 // indirect
 	github.com/elastic/sarama v1.19.1-0.20250603175145-7672917f26b6 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.35.0 // indirect
