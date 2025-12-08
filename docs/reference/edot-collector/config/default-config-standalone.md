@@ -168,8 +168,8 @@ The following example configuration files are available for the Gateway mode:
 % start:edot-gateway-9x-table
 | Version | Configuration  |
 |---------|----------------|
-| 9.2     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.1/internal/pkg/otel/samples/linux/gateway.yml) |
-| 9.1     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.1.7/internal/pkg/otel/samples/linux/gateway.yml) |
+| 9.2     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.2/internal/pkg/otel/samples/linux/gateway.yml) |
+| 9.1     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.1.8/internal/pkg/otel/samples/linux/gateway.yml) |
 | 9.0     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.0.8/internal/pkg/otel/samples/linux/gateway.yml) |
 % end:edot-gateway-9x-table
 ::::
@@ -178,7 +178,7 @@ The following example configuration files are available for the Gateway mode:
 % start:edot-gateway-8x-table
 | Version | Configuration  |
 |---------|----------------|
-| 8.19    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.19.7/internal/pkg/otel/samples/linux/gateway.yml) |
+| 8.19    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.19.8/internal/pkg/otel/samples/linux/gateway.yml) |
 | 8.18    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.18.8/internal/pkg/otel/samples/linux/gateway.yml) |
 | 8.17    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.17.10/internal/pkg/otel/samples/linux/gateway.yml) |
 % end:edot-gateway-8x-table
@@ -291,10 +291,32 @@ The EDOT Collector can be configured to use [APM Agent Central Configuration](do
 
 To activate the central configuration feature, add the [`apmconfig`](https://github.com/elastic/opentelemetry-collector-components/blob/main/extension/apmconfigextension/README.md). For example:
 
-:::{include} ../_snippets/edot-collector-auth.md
-:::
+```yaml
+extensions:
+  apikeyauth:
+    endpoint: "${ELASTIC_ENDPOINT}"
+    application_privileges:
+      - application: "apm"
+        privileges: ["config_agent:read"]
+        resources: ["*"]
 
-Create an API Key following [these instructions](docs-content://deploy-manage/api-keys/elasticsearch-api-keys.md). The API key must have `config_agent:read` permissions and resources set to `-`.
+  apmconfig:
+    opamp:
+      protocols:
+        http:
+          auth:
+            authenticator: apikeyauth
+```
+
+::::{note}
+The EDOT Collector doesn't store or embed the {{es}} API key.
+
+Each EDOT SDK sends its own API key in the `Authorization` header (for example: `Authorization: ApiKey <Base64(id:key)>`).
+
+The `apikeyauth` extension only validates incoming API keys against {{es}}, ensuring they include the `apm` to `config_agent:read` privilege and `resources: ["*"]`.
+::::
+
+Create an API Key following [these instructions](docs-content://deploy-manage/api-keys/elasticsearch-api-keys.md). The API key must include the application privilege `config_agent:read` with resources set to `"*"`.
 
 ## Secure connection
 
@@ -323,25 +345,23 @@ extensions:
 
 In addition to TLS, you can configure authentication to ensure that only authorized agents can communicate with the extension and retrieve their corresponding remote configurations.
 
-The `apmconfig` extension supports any configauth authenticator. Use the `apikeyauth` extension to authenticate with Elasticsearch API keys:
+The `apmconfig` extension supports any `configauth` authenticator. Use the `apikeyauth` extension to authenticate with {{es}} API keys:
 
 ```yaml
 extensions:
   apikeyauth:
-    endpoint: "<YOUR_ELASTICSEARCH_ENDPOINT>"
+    endpoint: "${ELASTIC_ENDPOINT}"
     application_privileges:
       - application: "apm"
-        privileges:
-          - "config_agent:read"
-        resources:
-          - "-"
+        privileges: ["config_agent:read"]
+        resources: ["*"]
+
   apmconfig:
     opamp:
       protocols:
         http:
           auth:
             authenticator: apikeyauth
-   ...
 ```
 
 Create an API key with the minimum required application permissions through {{kib}} under **Observability** → **Applications** → **Settings** → **Agent Keys**, or by using the Elasticsearch Security API:

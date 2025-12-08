@@ -84,6 +84,7 @@ func TestDiagnosticLocalConfig(t *testing.T) {
 						ServerCA:          "/path/to/server/ca",
 					},
 				},
+				MetricsPeriod: monitoringCfg.DefaultMetricsCollectionInterval,
 			},
 		},
 	}
@@ -95,6 +96,7 @@ agent:
   download: null
   grpc: null
   id: ""
+  internal: null
   path: ""
   process: null
   reload: null
@@ -105,11 +107,12 @@ agent:
     http: null
     logs: false
     metrics: false
-    metrics_period: ""
+    metrics_period: "1m0s"
     namespace: ""
     pprof: null
     failure_threshold: null
     traces: true
+    use_output: ""
     apm:
       hosts:
         - host1
@@ -132,7 +135,7 @@ fleet:
   protocol: "test-protocol"
 `
 
-	coord := &Coordinator{cfg: cfg}
+	coord := &Coordinator{initialCfg: cfg}
 	hook, ok := diagnosticHooksMap(coord)["local-config"]
 	require.True(t, ok, "diagnostic hooks should have an entry for local-config")
 
