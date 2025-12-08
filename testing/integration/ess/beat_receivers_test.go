@@ -953,7 +953,6 @@ func TestBeatsReceiverSubcomponentStatus(t *testing.T) {
 		},
 		Stack: nil,
 	})
-	t.Skip("Needs otel upstream changes, see https://github.com/elastic/ingest-dev/issues/5742")
 
 	// This configuration contains two system/metrics inputs, each with two identical metricsets:
 	// * one for cpu, always healthy
