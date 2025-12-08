@@ -224,12 +224,14 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 				r.reportErrFn(ctx, processErrCh, nil)
 			} else {
 				var procReportErr error
-				if stdErrLast.Last().Message != "" {
+				stderrMsg := stdErrLast.Last().Message
+				stdoutMsg := stdOutLast.Last().Message
+				if stderrMsg != "" {
 					// use stderr message as the error
-					procReportErr = errors.New(stdErrLast.Last().Message)
-				} else if stdOutLast.Last().Message != "" {
+					procReportErr = errors.New(stderrMsg)
+				} else if stdoutMsg != "" {
 					// use last stdout message as the error
-					procReportErr = errors.New(stdOutLast.Last().Message)
+					procReportErr = errors.New(stdoutMsg)
 				} else {
 					// neither case use standard process error
 					procReportErr = fmt.Errorf("supervised collector (pid: %d) exited with error: %s", procState.Pid(), procState.String())

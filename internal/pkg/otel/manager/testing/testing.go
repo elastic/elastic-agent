@@ -7,10 +7,10 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"time"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/edot/cmd"
 )
 
@@ -48,16 +48,12 @@ func main() {
 
 	monitoringURL := os.Getenv("TEST_SUPERVISED_COLLECTOR_MONITORING_URL")
 
-	exitCode := 0
 	err = cmd.RunCollector(ctx, nil, true, "debug", monitoringURL)
 	if err != nil && !errors.Is(err, context.Canceled) {
-		fmt.Fprintln(os.Stderr, err)
-		exitCode = 1
+		logp.NewLogger("").Fatal("collector server run finished with error: %v", err)
 	}
 
 	if shutdownDelay > 0 {
 		<-time.After(shutdownDelay)
 	}
-
-	os.Exit(exitCode)
 }

@@ -129,6 +129,9 @@ func otelConfigToStatus(cfg *confmap.Conf, err error) (*status.AggregateStatus, 
 	// pipelines
 	for pipelineID, pipelineCfg := range c.Service.Pipelines {
 		for _, recvID := range pipelineCfg.Receivers {
+			// upstream graph creates a single component instance for a set of pipelines, then status reporting
+			// copies the instance for each pipeline. creating a unique instance per-pipeline provides the same
+			// behavior.
 			instanceID := componentstatus.NewInstanceID(recvID, component.KindReceiver, pipelineID)
 			_, isConnector := c.Connectors[recvID]
 			if isConnector {
@@ -188,9 +191,13 @@ func otelConfigToStatus(cfg *confmap.Conf, err error) (*status.AggregateStatus, 
 }
 
 func recordSpecificErr(agg *status.Aggregator, instanceID *componentstatus.InstanceID, err error, extraMatchStrs ...string) bool {
+	// matches configuration errors for a specific component
 	forIDStr := fmt.Sprintf("for id: %q", instanceID.ComponentID().String())
+	// occurs when a specific component fails to start
 	failedMatchStr := fmt.Sprintf("failed to start %q %s:", instanceID.ComponentID().String(), strings.ToLower(instanceID.Kind().String()))
-	if strings.Contains(err.Error(), forIDStr) || strings.Contains(err.Error(), failedMatchStr) {
+	// occurs when a component factory is not available (unknown component type)
+	factoryNotAvailableStr := fmt.Sprintf("factory not available for: %q", instanceID.ComponentID().String())
+	if strings.Contains(err.Error(), forIDStr) || strings.Contains(err.Error(), failedMatchStr) || strings.Contains(err.Error(), factoryNotAvailableStr) {
 		// specific so this instance gets the reported error
 		agg.RecordStatus(instanceID, componentstatus.NewFatalErrorEvent(err))
 		return true
