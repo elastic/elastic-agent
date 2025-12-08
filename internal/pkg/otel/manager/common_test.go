@@ -769,12 +769,12 @@ func TestRecordSpecificErr(t *testing.T) {
 			expectMatch:   true,
 		},
 		{
-			name:        "extension with for id pattern",
-			componentID: "health_check",
+			name:          "extension with for id pattern",
+			componentID:   "health_check",
 			componentKind: component.KindExtension,
-			err:         errors.New(`error for id: "health_check"`),
-			expectMatch: true,
-			isExtension: true,
+			err:           errors.New(`error for id: "health_check"`),
+			expectMatch:   true,
+			isExtension:   true,
 		},
 		{
 			name:          "match on 'factory not available' pattern for receiver",
