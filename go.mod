@@ -350,4 +350,9 @@ replace (
 // Needed to prevent https://github.com/open-telemetry/opentelemetry-go/issues/7039
 replace go.opentelemetry.io/otel/exporters/prometheus => go.opentelemetry.io/otel/exporters/prometheus v0.58.0
 
+replace (
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/healthcheck => github.com/swiatekm/opentelemetry-collector-contrib/internal/healthcheck v0.0.0-20251215151250-0b5f133ca522
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status => github.com/swiatekm/opentelemetry-collector-contrib/pkg/status v0.0.0-20251215151250-0b5f133ca522
+)
+
 tool golang.org/x/tools/cmd/deadcode

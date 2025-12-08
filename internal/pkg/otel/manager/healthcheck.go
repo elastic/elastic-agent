@@ -77,8 +77,9 @@ func injectHealthCheckV2Extension(conf *confmap.Conf, healthCheckExtensionID str
 				"http": map[string]interface{}{
 					"endpoint": fmt.Sprintf("localhost:%d", httpHealthCheckPort),
 					"status": map[string]interface{}{
-						"enabled": healthCheckHealthStatusEnabled,
-						"path":    healthCheckHealthStatusPath,
+						"enabled":            healthCheckHealthStatusEnabled,
+						"path":               healthCheckHealthStatusPath,
+						"include_attributes": true,
 					},
 					"config": map[string]interface{}{
 						"enabled": healthCheckHealthConfigEnabled,
