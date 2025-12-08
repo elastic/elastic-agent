@@ -421,7 +421,7 @@ func checkDocker(t *testing.T, file string, fipsPackage bool) (string, int64) {
 		return checkEdotCollectorDocker(t, file)
 	}
 
-	p, info, err := readDocker(file, true)
+	p, info, err := readDocker(t, file, true)
 	if err != nil {
 		t.Errorf("error reading file %v: %v", file, err)
 		return "", -1
@@ -474,7 +474,7 @@ func dockerName(file string, labels map[string]string) (string, error) {
 }
 
 func checkEdotCollectorDocker(t *testing.T, file string) (string, int64) {
-	p, info, err := readDocker(file, true)
+	p, info, err := readDocker(t, file, true)
 	if err != nil {
 		t.Errorf("error reading file %v: %v", file, err)
 		return "", -1
@@ -500,7 +500,7 @@ func checkEdotCollectorDocker(t *testing.T, file string) (string, int64) {
 }
 
 func checkCompleteDocker(t *testing.T, file string) {
-	p, _, err := readDocker(file, false)
+	p, _, err := readDocker(t, file, false)
 	if err != nil {
 		t.Errorf("error reading file %v: %v", file, err)
 	}
@@ -844,7 +844,12 @@ func checkFIPS(t *testing.T, agentPackageRootDir string) {
 				case "-tags":
 					foundTags = true
 					require.Contains(t, setting.Value, "requirefips")
-					require.Contains(t, setting.Value, "ms_tls13kdf")
+
+					// Check if the ms_tls13kdf build tag is set only if the binary was built
+					// with go1.24.x (see https://github.com/microsoft/go/pull/1662).
+					if strings.HasPrefix(info.GoVersion, "go1.24") {
+						require.Contains(t, setting.Value, "ms_tls13kdf")
+					}
 					continue
 				case "GOEXPERIMENT":
 					foundExperiment = true
@@ -1074,33 +1079,27 @@ func openZip(zipFile string) (*zip.ReadCloser, error) {
 	return r, nil
 }
 
-func readDocker(dockerFile string, filterWorkingDir bool) (*packageFile, *dockerInfo, error) {
+func readDocker(t *testing.T, dockerFile string, filterWorkingDir bool) (*packageFile, *dockerInfo, error) {
+	t.Helper()
+
 	// Read the manifest file first so that the config file and layer
 	// names are known in advance.
 	manifest, err := getDockerManifest(dockerFile)
-	if err != nil {
-		return nil, nil, err
-	}
+	require.NoError(t, err)
 
 	file, err := os.Open(dockerFile)
-	if err != nil {
-		return nil, nil, err
-	}
+	require.NoError(t, err)
 	defer file.Close()
 
 	var info *dockerInfo
 
 	stat, err := file.Stat()
-	if err != nil {
-		return nil, nil, err
-	}
+	require.NoError(t, err)
 
 	layers := make(map[string]*packageFile)
 
 	gzipReader, err := gzip.NewReader(file)
-	if err != nil {
-		return nil, nil, err
-	}
+	require.NoError(t, err)
 	defer gzipReader.Close()
 
 	tarReader := tar.NewReader(gzipReader)
@@ -1110,28 +1109,21 @@ func readDocker(dockerFile string, filterWorkingDir bool) (*packageFile, *docker
 			if errors.Is(err, io.EOF) {
 				break
 			}
-			return nil, nil, err
+			require.NoError(t, err)
 		}
 
 		switch {
 		case header.Name == manifest.Config:
 			info, err = readDockerInfo(tarReader)
-			if err != nil {
-				return nil, nil, err
-			}
+			require.NoError(t, err)
 		case slices.Contains(manifest.Layers, header.Name):
 			layer, err := readTarContents(header.Name, tarReader)
-			if err != nil {
-				return nil, nil, err
-			}
+			require.NoError(t, err)
 			layers[header.Name] = layer
 		}
 	}
 
-	if len(info.Config.Entrypoint) == 0 {
-		return nil, nil, fmt.Errorf("no entrypoint")
-	}
-
+	require.NotZero(t, len(info.Config.Entrypoint), "no entrypoint")
 	workingDir := info.Config.WorkingDir
 	entrypoint := info.Config.Entrypoint[0]
 
@@ -1139,9 +1131,7 @@ func readDocker(dockerFile string, filterWorkingDir bool) (*packageFile, *docker
 	p := &packageFile{Name: filepath.Base(dockerFile), Contents: map[string]packageEntry{}}
 	for _, layer := range manifest.Layers {
 		layerFile, found := layers[layer]
-		if !found {
-			return nil, nil, fmt.Errorf("layer not found: %s", layer)
-		}
+		require.True(t, found, fmt.Sprintf("layer not found: %s", layer))
 		for name, entry := range layerFile.Contents {
 			if excludedPathsPattern.MatchString(name) {
 				continue
@@ -1159,10 +1149,7 @@ func readDocker(dockerFile string, filterWorkingDir bool) (*packageFile, *docker
 		}
 	}
 
-	if len(p.Contents) == 0 {
-		return nil, nil, fmt.Errorf("no files found in docker working directory (%s)", info.Config.WorkingDir)
-	}
-
+	require.NotZero(t, len(p.Contents), fmt.Sprintf("no files found in docker working directory (%s)", info.Config.WorkingDir))
 	info.Size = stat.Size()
 	return p, info, nil
 }

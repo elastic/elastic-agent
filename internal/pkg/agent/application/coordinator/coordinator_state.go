@@ -6,15 +6,19 @@ package coordinator
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/component"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/otelhelpers"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 )
@@ -176,6 +180,17 @@ func (c *Coordinator) applyComponentState(state runtime.ComponentComponentState)
 				break
 			}
 		}
+		// If the component was stopped and isn't listed among components the coordinator knows about, it's safe to
+		// remove its working directory. Otherwise, we may just be moving it between runtimes.
+		if !slices.ContainsFunc(c.componentModel, func(c component.Component) bool {
+			return state.Component.ID == c.ID
+		}) {
+			c.logger.Debugf("removing working directory for component '%s'", state.Component.ID)
+			err := state.Component.RemoveWorkDir(paths.Run())
+			if err != nil {
+				c.logger.Warnf("failed to remove workdir for component %s: %v", state.Component.ID, err)
+			}
+		}
 	}
 
 	c.stateNeedsRefresh = true
@@ -230,10 +245,10 @@ func (c *Coordinator) generateReportableState() (s State) {
 	} else if c.varsMgrErr != nil {
 		s.State = agentclient.Failed
 		s.Message = fmt.Sprintf("Vars manager: %s", c.varsMgrErr.Error())
-	} else if hasState(s.Components, client.UnitStateFailed) || otelhelpers.HasStatus(s.Collector, componentstatus.StatusFatalError) || otelhelpers.HasStatus(s.Collector, componentstatus.StatusPermanentError) {
+	} else if hasState(s.Components, client.UnitStateFailed) || translate.HasStatus(s.Collector, componentstatus.StatusFatalError) || translate.HasStatus(s.Collector, componentstatus.StatusPermanentError) {
 		s.State = agentclient.Degraded
 		s.Message = "1 or more components/units in a failed state"
-	} else if hasState(s.Components, client.UnitStateDegraded) || otelhelpers.HasStatus(s.Collector, componentstatus.StatusRecoverableError) {
+	} else if hasState(s.Components, client.UnitStateDegraded) || translate.HasStatus(s.Collector, componentstatus.StatusRecoverableError) {
 		s.State = agentclient.Degraded
 		s.Message = "1 or more components/units in a degraded state"
 	} else {

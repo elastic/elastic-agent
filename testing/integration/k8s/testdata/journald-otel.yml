@@ -5,9 +5,9 @@ receivers:
         - type: journald
           id: journald-input
           paths:
-            - /opt/journal/*/*
-    output:
-      otelconsumer:
+            - /opt/journal/
+          merge: true
+
     logging:
       level: debug
       selectors:
@@ -22,8 +22,11 @@ processors:
 
 exporters:
   elasticsearch:
+    logs_index: "${EA_POLICY_NAMESPACE}"
     endpoint: "${ES_HOST}"
     api_key: "${ES_API_KEY_ENCODED}"
+    mapping:
+      mode: none
 
 service:
   pipelines:
@@ -32,3 +35,8 @@ service:
       processors: [resource]
       exporters:
         - elasticsearch
+  telemetry:
+    logs:
+      level: DEBUG
+      encoding: json
+      disable_stacktrace: true

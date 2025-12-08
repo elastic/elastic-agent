@@ -5,6 +5,8 @@
 package configuration
 
 import (
+	"time"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 )
@@ -19,6 +21,7 @@ type FleetAgentConfig struct {
 	Client              remote.Config      `config:",inline" yaml:",inline"`
 	Info                *AgentInfo         `config:"agent" yaml:"agent"`
 	Server              *FleetServerConfig `config:"server" yaml:"server,omitempty"`
+	Checkin             *FleetCheckin      `config:"checkin" yaml:"checkin,omitempty"`
 }
 
 // Valid validates the required fields for accessing the API.
@@ -36,6 +39,10 @@ func (e *FleetAgentConfig) Valid() error {
 		if len(e.Client.Host) == 0 {
 			return errors.New("missing fleet host configuration", errors.TypeConfig)
 		}
+
+		if err := e.Checkin.Validate(); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -47,5 +54,44 @@ func DefaultFleetAgentConfig() *FleetAgentConfig {
 		Enabled: false,
 		Client:  remote.DefaultClientConfig(),
 		Info:    &AgentInfo{},
+		Checkin: nil,
 	}
 }
+
+type FleetCheckin struct {
+	Mode               string        `config:"mode" yaml:"mode,omitempty"` // `standard` or `on_state_change` (empty string is accepted as standard)
+	RequestBackoffInit time.Duration `config:"request_backoff_init" yaml:"request_backoff_init,omitempty"`
+	RequestBackoffMax  time.Duration `config:"request_backoff_max" yaml:"request_backoff_max,omitempty"`
+}
+
+func (f *FleetCheckin) IsModeOnStateChanged() bool {
+	return f != nil && f.Mode == fleetCheckinModeOnStateChanged
+}
+
+func (f *FleetCheckin) GetMode() string {
+	if f == nil || f.Mode == "" {
+		return fleetCheckinModeStandard
+	}
+
+	return f.Mode
+}
+
+func (f *FleetCheckin) Validate() error {
+	if f == nil {
+		return nil
+	}
+
+	if f.Mode != "" && f.Mode != fleetCheckinModeStandard && f.Mode != fleetCheckinModeOnStateChanged {
+		return errors.New("checkin.mode must be either 'standard' or 'on_state_change'")
+	}
+
+	if f.RequestBackoffMax < f.RequestBackoffInit {
+		return errors.New("checkin.request_backoff_max must be greater than or equal to checkin.request_backoff_init")
+	}
+	return nil
+}
+
+const (
+	fleetCheckinModeStandard       = "standard"
+	fleetCheckinModeOnStateChanged = "on_state_change"
+)

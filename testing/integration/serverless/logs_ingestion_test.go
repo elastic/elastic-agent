@@ -20,6 +20,5 @@ func TestLogIngestionFleetManaged(t *testing.T) {
 		Local: false,
 		Sudo:  true,
 	})
-
 	integration.LogIngestionFleetManaged(t, info)
 }

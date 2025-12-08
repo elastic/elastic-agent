@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"helm.sh/helm/v3/pkg/cli/values"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 
@@ -1175,6 +1176,41 @@ func k8sStepHelmDeploy(chartPath string, releaseName string, values map[string]a
 		installAction.WaitForJobs = true
 		_, err = installAction.Run(helmChart, values)
 		require.NoError(t, err, "failed to install helm chart")
+	}
+}
+
+// k8sStepHelmUpgrade upgrades a helm release with the given values and the release name
+func k8sStepHelmUpgrade(chartPath string, releaseName string, values values.Options) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		settings := cli.New()
+		settings.SetNamespace(namespace)
+		actionConfig := &action.Configuration{}
+
+		helmChart, err := loader.Load(chartPath)
+		require.NoError(t, err, "failed to load helm chart")
+
+		err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "",
+			func(format string, v ...interface{}) {})
+		require.NoError(t, err, "failed to init helm action config")
+
+		t.Cleanup(func() {
+			if t.Failed() {
+				k8sDumpPods(t, ctx, kCtx.client, t.Name(), namespace, kCtx.logsBasePath, kCtx.createdAt)
+			}
+
+			uninstallAction := action.NewUninstall(actionConfig)
+			uninstallAction.Wait = true
+			_, _ = uninstallAction.Run(releaseName)
+		})
+
+		upgradeAction := action.NewUpgrade(actionConfig)
+		upgradeAction.Namespace = namespace
+		upgradeAction.Timeout = 2 * time.Minute
+		upgradeAction.Wait = true
+		upgradeAction.WaitForJobs = true
+		_, err = upgradeAction.Run(
+			releaseName, helmChart, mergeValues(t, namespace, values))
+		require.NoError(t, err, "failed to upgrade helm chart")
 	}
 }
 

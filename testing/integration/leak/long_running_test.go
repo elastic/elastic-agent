@@ -306,7 +306,7 @@ func (gm *goroutinesMonitor) Init(ctx context.Context, t *testing.T, fixture *at
 				Transport: &http.Transport{
 					DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 						if runtime.GOOS != "windows" {
-							path := strings.Replace(socketPath, "unix://", "", -1)
+							path := strings.ReplaceAll(socketPath, "unix://", "")
 							return net.Dial("unix", path)
 						} else {
 							if strings.HasPrefix(socketPath, "npipe:///") {
@@ -382,6 +382,9 @@ func (handleMon *handleMonitor) Init(ctx context.Context, t *testing.T, fixture 
 
 	for _, comp := range status.Components {
 		pidStr := pidInStatusMessageRegex.FindString(comp.Message)
+		if pidStr == "" { // could be an otel receiver, not a process
+			continue
+		}
 		pid, err := strconv.ParseInt(pidStr, 10, 64)
 		require.NoError(t, err)
 

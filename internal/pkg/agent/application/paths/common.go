@@ -33,6 +33,9 @@ const (
 	// ControlSocketName is the control socket name.
 	ControlSocketName = "elastic-agent.sock"
 
+	// Our DiagnosticsExtension will use DiagnosticsExtensionSocketName to listen and serve diagnostic requests.
+	DiagnosticsExtensionSocketName = "edot-diagnostics-extension.sock"
+
 	// WindowsControlSocketInstalledPath is the control socket path used when installed on Windows.
 	WindowsControlSocketInstalledPath = `npipe:///elastic-agent-system`
 
@@ -52,16 +55,17 @@ const (
 var ExternalInputsPattern = filepath.Join("inputs.d", "*.yml")
 
 var (
-	topPath           string
-	configPath        string
-	configFilePath    string
-	logsPath          string
-	downloadsPath     string
-	componentsPath    string
-	installPath       string
-	controlSocketPath string
-	unversionedHome   bool
-	tmpCreator        sync.Once
+	topPath                    string
+	configPath                 string
+	configFilePath             string
+	logsPath                   string
+	downloadsPath              string
+	componentsPath             string
+	installPath                string
+	controlSocketPath          string
+	diagnosticsExtensionSocket string
+	unversionedHome            bool
+	tmpCreator                 sync.Once
 )
 
 func init() {
@@ -70,6 +74,7 @@ func init() {
 	configPath = topPath
 	logsPath = topPath
 	controlSocketPath = initialControlSocketPath(topPath)
+	diagnosticsExtensionSocket = SocketFromPath(runtime.GOOS, topPath, DiagnosticsExtensionSocketName)
 	unversionedHome = false // only versioned by container subcommand
 
 	// these should never change
@@ -339,8 +344,14 @@ func RunningInstalled() bool {
 // ControlSocketFromPath returns the control socket path for an Elastic Agent running
 // on the defined platform, and its executing directory.
 func ControlSocketFromPath(platform string, path string) string {
+	return SocketFromPath(platform, path, ControlSocketName)
+}
+
+// SocketFromPath returns the socket path for an Elastic Agent running
+// on the defined platform for a given socket, and its executing directory.
+func SocketFromPath(platform string, path string, socketName string) string {
 	// socket should be inside this directory
-	socketPath := filepath.Join(path, ControlSocketName)
+	socketPath := filepath.Join(path, socketName)
 	if platform == "windows" {
 		// on windows the control socket always uses the fallback
 		return utils.SocketURLWithFallback(socketPath, path)
@@ -353,6 +364,14 @@ func ControlSocketFromPath(platform string, path string) string {
 	// place in global /tmp to ensure that its small enough to fit; current path is way to long
 	// for it to be used, but needs to be unique per Agent (in the case that multiple are running)
 	return utils.SocketURLWithFallback(socketPath, path)
+}
+
+func DiagnosticsExtensionSocket() string {
+	return diagnosticsExtensionSocket
+}
+
+func SetDiagnosticsExtensionSocket(socket string) {
+	diagnosticsExtensionSocket = SocketFromPath(runtime.GOOS, topPath, socket)
 }
 
 func pathSplit(path string) []string {

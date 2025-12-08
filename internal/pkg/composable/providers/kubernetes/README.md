@@ -100,7 +100,7 @@ In order to enable hints based autodiscover, user needs to uncomment the followi
 **Note:** If hints are enabled, the [`default_container_logs`](https://github.com/elastic/elastic-agent/blob/4e983446837ff551a9f058fdc575a193d9afcbab/deploy/kubernetes/elastic-agent-standalone-kubernetes.yaml#L33C8-L33C42) option is set to `True` by default. This means that logs from all discovered pods will be collected automatically, without requiring any annotations. To disable this behavior, set the option to `False`. This will stop the automatic log collection from all discovered pods. In this case, you must explicitly annotate your pods with the annotation `co.elastic.hints/package: "container_logs"` to collect their logs.
 
 
-The init container will start before the elastic agent pod and will donwload all the templates of packages [supported](https://github.com/elastic/elastic-agent/tree/main/deploy/kubernetes/elastic-agent-standalone/templates.d). 
+The init container will start before the elastic agent pod and will download all the templates of packages [supported](https://github.com/elastic/elastic-agent/tree/main/deploy/kubernetes/elastic-agent-standalone/templates.d). 
 Elastic agent will then collect from the pods running (through the watchers mechanism) all the hints annotations and will try to match them with the correct package.
 In the redis example, it will use the [redis template](https://github.com/elastic/elastic-agent/blob/main/deploy/kubernetes/elastic-agent-standalone/templates.d/redis.yml) and substitute the template variables with the values specified in the annotations. Default values will be used for variables not provided.
 A new input will be then created for redis and redis-specific data will start being collected.

@@ -44,11 +44,11 @@ func changeSymlink(log *logger.Logger, topDirPath, symlinkPath, newTarget string
 }
 
 func prevSymlinkPath(topDirPath string) string {
-	agentPrevName := agentName + ".prev"
+	agentPrevName := AgentName + ".prev"
 
 	// handle windows suffixes
 	if runtime.GOOS == windowsOSName {
-		agentPrevName = agentName + ".exe.prev"
+		agentPrevName = AgentName + ".exe.prev"
 	}
 
 	return filepath.Join(topDirPath, agentPrevName)

@@ -33,6 +33,9 @@ var ErrConnRefused = errors.New("connection refused")
 // ErrTemporaryServerError is returned when the request caused a temporary server error
 var ErrTemporaryServerError = errors.New("temporary server error, please retry later")
 
+// ErrInvalidToken is returned when client is not authorized to perform enrollment.
+var ErrInvalidToken error = errors.New("invalid enrollment token")
+
 // temporaryServerErrorCodes defines status codes that allow clients to retry their request.
 var temporaryServerErrorCodes = map[int]string{
 	http.StatusBadGateway:         "BadGateway",
@@ -232,6 +235,10 @@ func (e *EnrollCmd) Execute(ctx context.Context, r *EnrollRequest) (*EnrollRespo
 
 	if resp.StatusCode == http.StatusTooManyRequests {
 		return nil, ErrTooManyRequests
+	}
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, ErrInvalidToken
 	}
 
 	if status, temporary := temporaryServerErrorCodes[resp.StatusCode]; temporary {

@@ -320,3 +320,28 @@ type SortableParsedVersions []*ParsedSemVer
 func (spv SortableParsedVersions) Len() int           { return len(spv) }
 func (spv SortableParsedVersions) Swap(i, j int)      { spv[i], spv[j] = spv[j], spv[i] }
 func (spv SortableParsedVersions) Less(i, j int) bool { return spv[i].Less(*spv[j]) }
+
+// CompareNillableParsedSemVer is a comparison function for sorting *ParsedSemVer in ascending order
+func CompareNillableParsedSemVer(a, b *ParsedSemVer) int {
+	// nils are always smaller
+	if a == nil {
+		return -1
+	}
+	if b == nil {
+		return 1
+	}
+	return CompareParsedSemVer(*a, *b)
+}
+
+// CompareParsedSemVer is a comparison function for sorting ParsedSemVer in ascending order
+func CompareParsedSemVer(a, b ParsedSemVer) int {
+	if a.Less(b) {
+		return -1
+	}
+
+	if b.Less(a) {
+		return 1
+	}
+
+	return 0
+}

@@ -7,11 +7,9 @@
 package install
 
 import (
-	"github.com/schollz/progressbar/v3"
-
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-func switchPlatformMode(pt *progressbar.ProgressBar, ownership utils.FileOwner) error {
+func switchPlatformMode(_ ProgressDescriber, _ utils.FileOwner) error {
 	return nil
 }

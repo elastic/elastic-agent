@@ -17,6 +17,8 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"gopkg.in/yaml.v3"
 
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
+
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
@@ -24,17 +26,21 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
+	"github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
 	runtimeLogger "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
 
 const (
-	OtelSetSupervisedFlagName          = "supervised"
-	OtelSupervisedLoggingLevelFlagName = "supervised.logging.level"
+	OtelSetSupervisedFlagName           = "supervised"
+	OtelSupervisedLoggingLevelFlagName  = "supervised.logging.level"
+	OtelSupervisedMonitoringURLFlagName = "supervised.monitoring.url"
 )
 
-func newSubprocessExecution(logLevel logp.Level, collectorPath string) (*subprocessExecution, error) {
+// newSubprocessExecution creates a new execution which runs the otel collector in a subprocess. A metricsPort or
+// healthCheckPort of 0 will result in a random port being used.
+func newSubprocessExecution(logLevel logp.Level, collectorPath string, metricsPort int, healthCheckPort int) (*subprocessExecution, error) {
 	nsUUID, err := uuid.NewV4()
 	if err != nil {
 		return nil, fmt.Errorf("cannot generate UUID: %w", err)
@@ -51,24 +57,29 @@ func newSubprocessExecution(logLevel logp.Level, collectorPath string) (*subproc
 			"otel",
 			fmt.Sprintf("--%s", OtelSetSupervisedFlagName),
 			fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, logLevel.String()),
+			fmt.Sprintf("--%s=%s", OtelSupervisedMonitoringURLFlagName, monitoring.EDOTMonitoringEndpoint()),
 		},
-		logLevel:               logLevel,
-		healthCheckExtensionID: healthCheckExtensionID,
-		reportErrFn:            reportErr,
+		logLevel:                 logLevel,
+		healthCheckExtensionID:   healthCheckExtensionID,
+		collectorMetricsPort:     metricsPort,
+		collectorHealthCheckPort: healthCheckPort,
+		reportErrFn:              reportErr,
 	}, nil
 }
 
 type subprocessExecution struct {
-	collectorPath          string
-	collectorArgs          []string
-	logLevel               logp.Level
-	healthCheckExtensionID string
-	reportErrFn            func(ctx context.Context, errCh chan error, err error) // required for testing
+	collectorPath            string
+	collectorArgs            []string
+	logLevel                 logp.Level
+	healthCheckExtensionID   string
+	collectorMetricsPort     int
+	collectorHealthCheckPort int
+	reportErrFn              func(ctx context.Context, errCh chan error, err error) // required for testing
 }
 
 // startCollector starts a supervised collector and monitors its health. Process exit errors are sent to the
 // processErrCh channel. Other run errors, such as not able to connect to the health endpoint, are sent to the runErrCh channel.
-func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger.Logger, cfg *confmap.Conf, processErrCh chan error, statusCh chan *status.AggregateStatus) (collectorHandle, error) {
+func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, processErrCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
 	if cfg == nil {
 		// configuration is required
 		return nil, errors.New("no configuration provided")
@@ -84,9 +95,9 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 		return nil, fmt.Errorf("cannot access collector path: %w", err)
 	}
 
-	httpHealthCheckPort, err := findRandomTCPPort()
+	httpHealthCheckPort, collectorMetricsPort, err := r.getCollectorPorts()
 	if err != nil {
-		return nil, fmt.Errorf("could not find port for http health check: %w", err)
+		return nil, fmt.Errorf("could not find port for collector: %w", err)
 	}
 
 	if err := injectHeathCheckV2Extension(cfg, r.healthCheckExtensionID, httpHealthCheckPort); err != nil {
@@ -99,14 +110,17 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 		return nil, fmt.Errorf("failed to marshal config to yaml: %w", err)
 	}
 
-	stdOut := runtimeLogger.NewLogWriterWithDefaults(logger.Core(), zapcore.Level(r.logLevel))
+	stdOut := runtimeLogger.NewLogWriterWithDefaults(baseLogger.Core(), zapcore.Level(r.logLevel))
 	// info level for stdErr because by default collector writes to stderr
-	stdErr := runtimeLogger.NewLogWriterWithDefaults(logger.Core(), zapcore.Level(r.logLevel))
+	stdErr := runtimeLogger.NewLogWriterWithDefaults(baseLogger.Core(), zapcore.Level(r.logLevel))
 
 	procCtx, procCtxCancel := context.WithCancel(ctx)
+	env := os.Environ()
+	// Set the environment variable for the collector metrics port. See comment at the constant definition for more information.
+	env = append(env, fmt.Sprintf("%s=%d", componentmonitoring.OtelCollectorMetricsPortEnvVarName, collectorMetricsPort))
 	processInfo, err := process.Start(r.collectorPath,
 		process.WithArgs(r.collectorArgs),
-		process.WithEnv(os.Environ()),
+		process.WithEnv(env),
 		process.WithCmdOptions(func(c *exec.Cmd) error {
 			c.Stdin = bytes.NewReader(confBytes)
 			c.Stdout = stdOut
@@ -138,7 +152,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 			close(healthCheckDone)
 		}()
 		currentStatus := aggregateStatus(componentstatus.StatusStarting, nil)
-		reportCollectorStatus(ctx, statusCh, currentStatus)
+		r.reportSubprocessCollectorStatus(ctx, statusCh, currentStatus)
 
 		// specify a max duration of not being able to get the status from the collector
 		const maxFailuresDuration = 130 * time.Second
@@ -154,22 +168,29 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 			if err != nil {
 				switch {
 				case errors.Is(err, context.Canceled):
-					reportCollectorStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStopped, nil))
+					// after the collector exits, we need to report a nil status
+					r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
 					return
+				default:
+					// if we face any other error (most likely, connection refused), log the error.
+					logger.Debugf("Received an unexpected error while fetching component status: %v", err)
 				}
 			} else {
 				maxFailuresTimer.Reset(maxFailuresDuration)
-
+				removeManagedHealthCheckExtensionStatus(statuses, r.healthCheckExtensionID)
 				if !compareStatuses(currentStatus, statuses) {
 					currentStatus = statuses
-					reportCollectorStatus(procCtx, statusCh, statuses)
+					r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
 				}
 			}
 
 			select {
 			case <-procCtx.Done():
-				reportCollectorStatus(ctx, statusCh, aggregateStatus(componentstatus.StatusStopped, nil))
+				// after the collector exits, we need to report a nil status
+				r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
 				return
+			case <-forceFetchStatusCh:
+				r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
 			case <-healthCheckPollTimer.C:
 				healthCheckPollTimer.Reset(healthCheckPollDuration)
 			case <-maxFailuresTimer.C:
@@ -179,7 +200,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 				)
 				if !compareStatuses(currentStatus, failedToConnectStatuses) {
 					currentStatus = statuses
-					reportCollectorStatus(procCtx, statusCh, statuses)
+					r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
 				}
 			}
 		}
@@ -187,6 +208,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 
 	go func() {
 		procState, procErr := processInfo.Process.Wait()
+		logger.Debugf("wait for pid %d returned", processInfo.PID)
 		procCtxCancel()
 		<-healthCheckDone
 		close(ctl.processDoneCh)
@@ -209,6 +231,74 @@ func (r *subprocessExecution) startCollector(ctx context.Context, logger *logger
 	return ctl, nil
 }
 
+// cloneCollectorStatus creates a deep copy of the provided AggregateStatus.
+func cloneCollectorStatus(aStatus *status.AggregateStatus) *status.AggregateStatus {
+	if aStatus == nil {
+		return nil
+	}
+
+	st := &status.AggregateStatus{
+		Event: aStatus.Event,
+	}
+
+	if len(aStatus.ComponentStatusMap) > 0 {
+		st.ComponentStatusMap = make(map[string]*status.AggregateStatus, len(aStatus.ComponentStatusMap))
+		for k, cs := range aStatus.ComponentStatusMap {
+			st.ComponentStatusMap[k] = cloneCollectorStatus(cs)
+		}
+	}
+
+	return st
+}
+
+func (r *subprocessExecution) reportSubprocessCollectorStatus(ctx context.Context, statusCh chan *status.AggregateStatus, collectorStatus *status.AggregateStatus) {
+	// we need to clone the status to prevent any mutation on the receiver side
+	// affecting the original ref
+	clonedStatus := cloneCollectorStatus(collectorStatus)
+	reportCollectorStatus(ctx, statusCh, clonedStatus)
+}
+
+// getCollectorPorts returns the ports used by the OTel collector. If the ports set in the execution struct are 0,
+// random ports are returned instead.
+func (r *subprocessExecution) getCollectorPorts() (healthCheckPort int, metricsPort int, err error) {
+	randomPorts := make([]*int, 0, 2)
+	// if the ports are defined (non-zero), use them
+	if r.collectorMetricsPort == 0 {
+		randomPorts = append(randomPorts, &metricsPort)
+	} else {
+		metricsPort = r.collectorMetricsPort
+	}
+	if r.collectorHealthCheckPort == 0 {
+		randomPorts = append(randomPorts, &healthCheckPort)
+	} else {
+		healthCheckPort = r.collectorHealthCheckPort
+	}
+
+	if len(randomPorts) == 0 {
+		return healthCheckPort, metricsPort, nil
+	}
+
+	// we need at least one random port, create it
+	ports, err := findRandomTCPPorts(len(randomPorts))
+	if err != nil {
+		return 0, 0, err
+	}
+	for i, port := range ports {
+		*randomPorts[i] = port
+	}
+	return healthCheckPort, metricsPort, nil
+}
+
+func removeManagedHealthCheckExtensionStatus(status *status.AggregateStatus, healthCheckExtensionID string) {
+	extensions, exists := status.ComponentStatusMap["extensions"]
+	if !exists {
+		return
+	}
+
+	extensionID := "extension:" + healthCheckExtensionID
+	delete(extensions.ComponentStatusMap, extensionID)
+}
+
 type procHandle struct {
 	processDoneCh chan struct{}
 	processInfo   *process.Info
@@ -225,19 +315,26 @@ func (s *procHandle) Stop(waitTime time.Duration) {
 	default:
 	}
 
+	s.log.Debugf("gracefully stopping pid %d", s.processInfo.PID)
 	if err := s.processInfo.Stop(); err != nil {
 		s.log.Warnf("failed to send stop signal to the supervised collector: %v", err)
 		// we failed to stop the process just kill it and return
-		_ = s.processInfo.Kill()
-		return
+	} else {
+		select {
+		case <-time.After(waitTime):
+			s.log.Warnf("timeout waiting (%s) for the supervised collector to stop, killing it", waitTime.String())
+		case <-s.processDoneCh:
+			// process has already exited
+			return
+		}
 	}
 
+	// since we are here this means that the process either got an error at stop or did not stop within the timeout,
+	// kill it and give one more mere second for the process wait to be called
+	_ = s.processInfo.Kill()
 	select {
-	case <-time.After(waitTime):
-		s.log.Warnf("timeout waiting (%s) for the supervised collector to stop, killing it", waitTime.String())
-		// our caller ctx is Done; kill the process just in case
-		_ = s.processInfo.Kill()
+	case <-time.After(1 * time.Second):
+		s.log.Warnf("supervised collector subprocess didn't exit in time after killing it")
 	case <-s.processDoneCh:
-		// process has already exited
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/elastic/elastic-agent/pkg/version"
 )
@@ -16,8 +17,8 @@ import (
 const (
 	// Every product on the version list has a unique product ID
 	// This product ID belongs to Elastic Agent excluding alpha/beta/RC versions.
-	elasticAgentProductID = "bltce270507523f4c56"
-	productVersionsAPIURL = "https://www.elastic.co/api"
+	elasticAgentProductPrefix = "Elastic Agent"
+	productVersionsAPIURL     = "https://www.elastic.co/api"
 )
 
 type item struct {
@@ -25,7 +26,7 @@ type item struct {
 	Version string `json:"version_number"`
 	// Product contains a list of product IDs.
 	// For the agent it should  be a single item that equals `elasticAgentProductID`
-	Product []string `json:"product"`
+	Product string `json:"title"`
 }
 
 type httpDoer interface {
@@ -101,10 +102,7 @@ func (pvc *ProductVersionsClient) FetchAgentVersions(ctx context.Context) (versi
 	var versionList version.SortableParsedVersions
 	for _, i := range versions {
 		for _, v := range i {
-			if len(v.Product) != 1 {
-				continue
-			}
-			if v.Product[0] != elasticAgentProductID {
+			if !strings.HasPrefix(v.Product, elasticAgentProductPrefix) {
 				continue
 			}
 			parsed, err := version.ParseVersion(v.Version)

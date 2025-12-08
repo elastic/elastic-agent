@@ -1,0 +1,326 @@
+version: 9.2.0
+entries:
+    - kind: breaking-change
+      summary: Remove the elasticinframetrics processor from Otel configurations.
+      description: Removes the elasticinframetrics processor along with the elasticsearch exporter in ECS mode configurations.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9112
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/8958
+      impact: ""
+      action: ""
+      timestamp: 1754644634
+      file:
+        name: 1754644634-remove_eimp.yaml
+        checksum: 32d912bdc2d39ff15ddc7c9d73540c8b874104f9
+    - kind: feature
+      summary: Add the tailsampling OpenTelemetry processor.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9621
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1756369623
+      file:
+        name: 1756369623-Add-the-tailsampling-OpenTelemetry-processor.yaml
+        checksum: 0043c060b06a55873776003c25e04f8da87de7c7
+    - kind: feature
+      summary: add_k8seventsreceiver
+      description: Adds k8seventsreceiver otel component.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9826
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/9791
+      impact: ""
+      action: ""
+      timestamp: 1757404149
+      file:
+        name: 1757404149-add_k8seventsreceiver.yaml
+        checksum: 83e2940ed0e2fbd755540d75a10694fd5c538893
+    - kind: feature
+      summary: edot-profilingmetrics
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9887
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1757594649
+      file:
+        name: 1757594649-edot-profilingmetrics.yaml
+        checksum: 307d556539a83101ff806852ec1c2742f4246c69
+    - kind: feature
+      summary: edot-profilingreceiver
+      description: Add profilingreceiver to EDOT.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9888
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1757595855
+      file:
+        name: 1757595855-edot-profilingreceiver.yaml
+        checksum: 3b695ab31d45709ae40538ac82e39c5945ae1da7
+    - kind: enhancement
+      summary: Add Headers Setter extension to EDOT Collector.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9903
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/9889
+      impact: ""
+      action: ""
+      timestamp: 1757668211
+      file:
+        name: 1757668211-add-headersetter-extension-to-EDOT.yaml
+        checksum: b932cfa08b5d1b969cecd5e877dbd769b2334e9d
+    - kind: feature
+      summary: Add agent_policy_id and policy_revision_idx to checkin requests.
+      description: |
+        Add agent_policy_id and policy_revision_idx attributes to checkin requests.
+        These attributes are used to inform fleet-server of the policy id and revision that the agent is currently running.
+        Add a feature flag to disable sending acks for POLICY_CHANGE actions on a future release.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9931
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/6446
+      impact: ""
+      action: ""
+      timestamp: 1757710842
+      file:
+        name: 1757710842-Add-agent_policy_id-and-policy_revision_idx-to-checkin-requests.yaml
+        checksum: 20f0d0a4bccbd7b83174246e575b508015034baa
+    - kind: feature
+      summary: (kube-stack) Add k8seventsreceiver in kube-stack configurations
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10086
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/9791
+      impact: ""
+      action: ""
+      timestamp: 1758543195
+      file:
+        name: 1758543195-add_k8seventsreceiver_kube_stack.yaml
+        checksum: 6f695d17d56338c833583b66573d1af591d3a482
+    - kind: feature
+      summary: Remove resource/k8s processor and use k8sattributes processor for mOTEL service attributes
+      description: |
+        This PR removes the `resource/k8s` processor in honour of the k8sattributes processor that
+        provides native support for the Service attributes:
+        https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.127.0/processor/k8sattributesprocessor#configuring-recommended-resource-attributes
+        This change is aligned with the respective Semantic Conventions' guidance:
+        https://opentelemetry.io/docs/specs/semconv/non-normative/k8s-attributes/#service-attributes
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10108
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1758622251
+      file:
+        name: 1758622251-remove_resource_k8s_processor.yaml
+        checksum: 4aeb7c8088b1deb18d27735a7fc791964f298f9e
+    - kind: upgrade
+      summary: Replacing the elastictrace processor with the elasticapm processor in EDOT
+      description: The `elastictrace` processor has been deprecated and replaced with the `elasticapm` processor in the Elastic Distribution of OpenTelemetry (EDOT). The `elasticapm` processor has all the functionality of the `elastictrace` processor, plus it also supports logs and metrics in addition to traces.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10116
+      issue: []
+      impact: Users who used the `elastictrace` processor in their configurations will need to update their configurations to use the `elasticapm` processor instead.
+      action: Replace usages of the `elastictrace` processor with the `elasticapm` processor in your configurations.
+      timestamp: 1758634479
+      file:
+        name: 1758634479-add-elasticapm-processor-to-EDOT.yaml
+        checksum: aca5e466933c5991a5bab9fe4ff7cbd151941bec
+    - kind: feature
+      summary: Add Logstash exporter to be used with Beats OTel receivers.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10137
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1758747376
+      file:
+        name: 1758747376-add-logstash-exporter.yaml
+        checksum: d03c0aea97656ca9e969500eb56157741c0a88c5
+    - kind: bug-fix
+      summary: Add special case handling for profiling in EDOT.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10143
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1758789248
+      file:
+        name: 1758789248-fix-edot-tooling.yaml
+        checksum: a63ebcc308ed149cb9012b6aacb52c0b1a6646f6
+    - kind: feature
+      summary: Add Windows Event Log receiver to EDOT Collector.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10196
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1759134678
+      file:
+        name: 1759134678-main.yaml
+        checksum: 53e10fab36bbb5d6552f9d2752dcc7ff745ef7ed
+    - kind: enhancement
+      summary: Include OTel Collector internal telemetry in Agent monitoring.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9928
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1759257958
+      file:
+        name: 1759257958-collector-telemetry-monitoring.yaml
+        checksum: ae32205aa4e143a02262e8c3f6c4dad37949d276
+    - kind: enhancement
+      summary: Add debug exporter to AutoOps OTel config sample.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10268
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1759359160
+      file:
+        name: 1759359160-autoops-debug-output.yaml
+        checksum: 0e4014fd4dff64c8afbf43cb340f29ababf17240
+    - kind: breaking-change
+      summary: Remove Elastic Trace processor from EDOT Collector
+      description: It is replaced with the Elastic APM processor.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10378
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1759842970
+      file:
+        name: 1759842970-replace-elastic-trace-processor-with-elastic-apm-processor.yaml
+        checksum: 9ff714b945a34ad5029b092011b7b8a803d58895
+    - kind: enhancement
+      summary: Update OTel Collector components to v0.137.0.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10391
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1759863922
+      file:
+        name: 1759863922-update-otel-to-v0.137.0.yaml
+        checksum: 5b014438363c0bcf09ef12fa9fab4ca6253d9935
+    - kind: bug-fix
+      summary: 'inspect: Handle components with slashes in their name'
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10442
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1759994876
+      file:
+        name: 1759994876-fix-10417-inspect-slash.yaml
+        checksum: e4e48c62243d23ce27d7a3c08d7e89e746b0c74c
+    - kind: bug-fix
+      summary: Improve OTel batching and queueing for AutoOps data shipping.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10492
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1760133531
+      file:
+        name: 1760133531-autoops-improve-batching.yaml
+        checksum: 44fb73e37e24c9594a90770ab507565f6fa8ff5c
+    - kind: feature
+      summary: add logs_metrics_traces.yml sample in EDOT for Windows.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10514
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1760341169
+      file:
+        name: 1760341169-add-logs_metrics_traces.yml-sample-in-EDOT-for-Windows.yaml
+        checksum: 9831c6e424ea5a829f424e185729229a6939d94e
+    - kind: other
+      summary: Upgrade Node version to LTS v22.20.0.
+      description: ""
+      component: heartbeat
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10541
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1760454869
+      file:
+        name: 1760454869-dependency-upgrade-node-to-LTS-v22.20.0.yaml
+        checksum: 251c74ed27df04b51294248d237d2ede1117009d
+    - kind: other
+      summary: Updating EDOT gateway collector batch configuration when ingesting to mOTLP endpoint.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10569
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1760515775
+      file:
+        name: 1760515775-batchingconfig.yaml
+        checksum: 811c606c6e5c7a411d5d9369241e6f885e533e4d
+    - kind: deprecation
+      summary: Adds a new version marked deprecated of the elastictraceprocessor
+      description: The elastictraceprocessor is back in the EDOT Collector, but marked as deprecated.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10588
+      issue: []
+      impact: The elastictraceprocessor will be removed in a future version.
+      action: Users are encouraged to migrate to the elasticapm processor.
+      timestamp: 1760538256
+      file:
+        name: 1760538256-add_back_elastictrace_processor.yaml
+        checksum: f2a3da8f2d939dd9787a106e34726285f52e4f44
+    - kind: other
+      summary: Bump Golang version to 1.24.9
+      description: ""
+      component: elastic-agent
+      pr: []
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1760594937
+      file:
+        name: 1760594937-bump-golang-to-1.24.9.yaml
+        checksum: 7fd1d4b3c093c1d7912b9dbadadafca6b42fc411

@@ -1,0 +1,25 @@
+receivers:
+  profiling:
+    samples_per_second: 19
+
+connectors:
+  profilingmetrics:
+    by_frametype: true
+    by_frame: true
+    by_classification: true
+
+exporters:
+  elasticsearch:
+    endpoints: [ "${env:ELASTIC_ENDPOINT}" ]
+    api_key: ${env:ELASTIC_API_KEY}
+    mapping:
+      mode: otel
+
+service:
+  pipelines:
+    profiles:
+      receivers: [ profiling ]
+      exporters: [ profilingmetrics ]
+    metrics:
+      receivers: [ profilingmetrics ]
+      exporters: [ elasticsearch ]

@@ -20,7 +20,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
-	clientmocks "github.com/elastic/elastic-agent/testing/mocks/pkg/control/v2/client"
 )
 
 func TestUpgradeCmd(t *testing.T) {
@@ -33,8 +32,8 @@ func TestUpgradeCmd(t *testing.T) {
 		defer s.Stop()
 
 		upgradeCh := make(chan struct{})
-		mock := &mockServer{upgradeStop: upgradeCh}
-		cproto.RegisterElasticAgentControlServer(s, mock)
+		mockSrv := &mockServer{upgradeStop: upgradeCh}
+		cproto.RegisterElasticAgentControlServer(s, mockSrv)
 		go func() {
 			err := s.Serve(tcpServer)
 			assert.NoError(t, err)
@@ -65,15 +64,15 @@ func TestUpgradeCmd(t *testing.T) {
 			err = upgradeCmdWithClient(commandInput)
 			assert.NoError(t, err)
 			// verify that we actually talked to the server
-			counter := atomic.LoadInt32(&mock.upgrades)
+			counter := atomic.LoadInt32(&mockSrv.upgrades)
 			assert.Equal(t, int32(1), counter, "server should have handled one upgrade")
 			// unblock the further test execution
 			close(clientCh)
 		}()
 
-		// we will know that the client reached the server watching the `mock.upgrades` counter
+		// we will know that the client reached the server watching the `mockSrv.upgrades` counter
 		require.Eventually(t, func() bool {
-			counter := atomic.LoadInt32(&mock.upgrades)
+			counter := atomic.LoadInt32(&mockSrv.upgrades)
 			return counter > 0
 		}, 30*time.Second, 100*time.Millisecond)
 
@@ -87,7 +86,7 @@ func TestUpgradeCmd(t *testing.T) {
 	})
 
 	t.Run("fail if fleet managed and unprivileged with --force flag", func(t *testing.T) {
-		mockClient := clientmocks.NewClient(t)
+		mockClient := client.NewMockClient(t)
 
 		args := []string{"8.13.0"} // Version argument
 		streams := cli.NewIOStreams()
@@ -117,7 +116,7 @@ func TestUpgradeCmd(t *testing.T) {
 	})
 
 	t.Run("fail if fleet managed privileged but no force flag", func(t *testing.T) {
-		mockClient := clientmocks.NewClient(t)
+		mockClient := client.NewMockClient(t)
 
 		args := []string{"8.13.0"} // Version argument
 		streams := cli.NewIOStreams()
@@ -141,7 +140,7 @@ func TestUpgradeCmd(t *testing.T) {
 	})
 
 	t.Run("proceed with upgrade if fleet managed, privileged, --force is set", func(t *testing.T) {
-		mockClient := clientmocks.NewClient(t)
+		mockClient := client.NewMockClient(t)
 		mockClient.EXPECT().State(mock.Anything).Return(&client.AgentState{State: cproto.State_HEALTHY}, nil)
 		mockClient.EXPECT().Upgrade(mock.Anything, mock.Anything, false, mock.Anything, mock.Anything, mock.Anything).Return("mockVersion", nil)
 
@@ -168,7 +167,7 @@ func TestUpgradeCmd(t *testing.T) {
 		assert.NoError(t, err)
 	})
 	t.Run("abort upgrade if the agent is fleet managed and skip-verify flag is set", func(t *testing.T) {
-		mockClient := clientmocks.NewClient(t)
+		mockClient := client.NewMockClient(t)
 
 		args := []string{"8.13.0"} // Version argument
 		streams := cli.NewIOStreams()
@@ -199,7 +198,7 @@ func TestUpgradeCmd(t *testing.T) {
 		assert.Contains(t, err.Error(), skipVerifyNotAllowedError.Error())
 	})
 	t.Run("abort upgrade if the agent is standalone, the user is unprivileged and skip-verify flag is set", func(t *testing.T) {
-		mockClient := clientmocks.NewClient(t)
+		mockClient := client.NewMockClient(t)
 
 		args := []string{"8.13.0"} // Version argument
 		streams := cli.NewIOStreams()
@@ -229,7 +228,7 @@ func TestUpgradeCmd(t *testing.T) {
 		assert.Contains(t, err.Error(), skipVerifyNotRootError.Error())
 	})
 	t.Run("proceed with upgrade if agent is standalone, user is privileged and skip-verify flag is set", func(t *testing.T) {
-		mockClient := clientmocks.NewClient(t)
+		mockClient := client.NewMockClient(t)
 		mockClient.EXPECT().State(mock.Anything).Return(&client.AgentState{State: cproto.State_HEALTHY}, nil)
 		mockClient.EXPECT().Upgrade(mock.Anything, mock.Anything, false, mock.Anything, mock.Anything, mock.Anything).Return("mockVersion", nil)
 

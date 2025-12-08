@@ -81,6 +81,11 @@ var GlobalPlatforms = Platforms{
 		Arch: AMD64,
 		GOOS: Windows,
 	},
+	{
+		OS:   Windows,
+		Arch: ARM64,
+		GOOS: Windows,
+	},
 }
 
 // String returns the platform string identifier.

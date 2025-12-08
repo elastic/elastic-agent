@@ -1,5 +1,5 @@
 ---
-navigation_title: Configure Metrics Collection
+navigation_title: Metrics collection
 description: Learn how to configure and customize metrics collection through the Elastic Distribution of OpenTelemetry Collector. 
 applies_to:
   stack:

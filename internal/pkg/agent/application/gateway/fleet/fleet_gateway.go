@@ -6,21 +6,26 @@ package fleet
 
 import (
 	"context"
+	stderrors "errors"
+	"sync"
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+
+	"github.com/elastic/elastic-agent-libs/logp"
 
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/otelhelpers"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -71,6 +76,7 @@ type stateStore interface {
 	AckToken() string
 	SetAckToken(ackToken string)
 	Save() error
+	Action() fleetapi.Action
 }
 
 type FleetGateway struct {
@@ -82,8 +88,8 @@ type FleetGateway struct {
 	acker              acker.Acker
 	unauthCounter      int
 	checkinFailCounter int
-	stateFetcher       func() coordinator.State
 	stateStore         stateStore
+	stateFetcher       StateFetcher
 	errCh              chan error
 	actionCh           chan []fleetapi.Action
 }
@@ -94,19 +100,22 @@ func New(
 	agentInfo agentInfo,
 	client client.Sender,
 	acker acker.Acker,
-	stateFetcher func() coordinator.State,
 	stateStore stateStore,
+	stateFetcher StateFetcher,
+	cfg *configuration.FleetCheckin,
 ) (*FleetGateway, error) {
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
+	st := defaultGatewaySettings
+	st.Backoff = getBackoffSettings(cfg)
 	return newFleetGatewayWithScheduler(
 		log,
-		defaultGatewaySettings,
+		st,
 		agentInfo,
 		client,
 		scheduler,
 		acker,
-		stateFetcher,
 		stateStore,
+		stateFetcher,
 	)
 }
 
@@ -117,8 +126,8 @@ func newFleetGatewayWithScheduler(
 	client client.Sender,
 	scheduler scheduler.Scheduler,
 	acker acker.Acker,
-	stateFetcher func() coordinator.State,
 	stateStore stateStore,
+	stateFetcher StateFetcher,
 ) (*FleetGateway, error) {
 	return &FleetGateway{
 		log:          log,
@@ -143,7 +152,6 @@ func (f *FleetGateway) Run(ctx context.Context) error {
 	if f.settings.Backoff == nil {
 		requestBackoff = RequestBackoff(ctx.Done())
 	} else {
-		// this is only used in tests
 		requestBackoff = backoff.NewEqualJitterBackoff(
 			ctx.Done(),
 			f.settings.Backoff.Init,
@@ -192,11 +200,20 @@ func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 		f.log.Debugf("Checking started")
 		resp, took, err := f.execute(ctx)
 		if err != nil {
-			f.checkinFailCounter++
+			becauseOfStateChanged := errors.Is(err, errComponentStateChanged)
 
+			// don't count that as failed attempt
+			if !becauseOfStateChanged {
+				f.checkinFailCounter++
+			}
+
+			warnMsg := "Possible transient error during checkin with fleet-server, retrying"
+			if becauseOfStateChanged {
+				warnMsg = "Check in cancelled because of state change, retrying"
+			}
 			// Report the first two failures at warn level as they may be recoverable with retries.
 			if f.checkinFailCounter <= 2 {
-				f.log.Warnw("Possible transient error during checkin with fleet-server, retrying",
+				f.log.Warnw(warnMsg,
 					"error.message", err, "request_duration_ns", took, "failed_checkins", f.checkinFailCounter,
 					"retry_after_ns", bo.NextWait())
 			} else {
@@ -248,8 +265,8 @@ func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 	return nil, ctx.Err()
 }
 
-func (f *FleetGateway) convertToCheckinComponents(components []runtime.ComponentComponentState, collector *status.AggregateStatus) []fleetapi.CheckinComponent {
-	if components == nil {
+func convertToCheckinComponents(logger *logp.Logger, components []runtime.ComponentComponentState, collector *status.AggregateStatus) []fleetapi.CheckinComponent {
+	if components == nil && (collector == nil || len(collector.ComponentStatusMap) == 0) {
 		return nil
 	}
 	stateString := func(s eaclient.UnitState) string {
@@ -262,6 +279,21 @@ func (f *FleetGateway) convertToCheckinComponents(components []runtime.Component
 	unitTypeString := func(t eaclient.UnitType) string {
 		if typ := t.String(); typ != "unknown" {
 			return typ
+		}
+		return ""
+	}
+
+	otelComponentTypeString := func(componentStatusId string) string {
+		kind, _, err := translate.ParseEntityStatusId(componentStatusId)
+		if err != nil {
+			logger.Warnf("failed to parse component status id '%s': %v", componentStatusId, err)
+			return ""
+		}
+		switch kind {
+		case "receiver":
+			return "input"
+		case "exporter":
+			return "output"
 		}
 		return ""
 	}
@@ -304,7 +336,7 @@ func (f *FleetGateway) convertToCheckinComponents(components []runtime.Component
 	// and each subcomponent is a unit.
 	if collector != nil {
 		for id, item := range collector.ComponentStatusMap {
-			state, msg := otelhelpers.StateWithMessage(item)
+			state, msg := translate.StateWithMessage(item)
 
 			checkinComponent := fleetapi.CheckinComponent{
 				ID:      id,
@@ -316,11 +348,12 @@ func (f *FleetGateway) convertToCheckinComponents(components []runtime.Component
 			if len(item.ComponentStatusMap) > 0 {
 				units := make([]fleetapi.CheckinUnit, 0, len(item.ComponentStatusMap))
 				for unitId, unitItem := range item.ComponentStatusMap {
-					unitState, unitMsg := otelhelpers.StateWithMessage(unitItem)
+					unitState, unitMsg := translate.StateWithMessage(unitItem)
 					units = append(units, fleetapi.CheckinUnit{
 						ID:      unitId,
 						Status:  stateString(unitState),
 						Message: unitMsg,
+						Type:    otelComponentTypeString(unitId),
 					})
 				}
 				checkinComponent.Units = units
@@ -347,27 +380,34 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// get current state
-	state := f.stateFetcher()
+	state, stateCtx := f.stateFetcher.FetchState(ctx)
 
 	// convert components into checkin components structure
-	components := f.convertToCheckinComponents(state.Components, state.Collector)
+	components := convertToCheckinComponents(f.log, state.Components, state.Collector)
 
 	f.log.Debugf("correcting agent loglevel from %s to %s using coordinator state", ecsMeta.Elastic.Agent.LogLevel, state.LogLevel.String())
 	// Fix loglevel with the current log level used by coordinator
 	ecsMeta.Elastic.Agent.LogLevel = state.LogLevel.String()
 
+	action := f.stateStore.Action()
+	agentPolicyID := getPolicyID(action)
+	policyRevisionIDX := getPolicyRevisionIDX(action)
+
 	// checkin
 	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client)
 	req := &fleetapi.CheckinRequest{
-		AckToken:       ackToken,
-		Metadata:       ecsMeta,
-		Status:         agentStateToString(state.State),
-		Message:        state.Message,
-		Components:     components,
-		UpgradeDetails: state.UpgradeDetails,
+		AckToken:          ackToken,
+		Metadata:          ecsMeta,
+		Status:            agentStateToString(state.State),
+		Message:           state.Message,
+		Components:        components,
+		UpgradeDetails:    state.UpgradeDetails,
+		AgentPolicyID:     agentPolicyID,
+		PolicyRevisionIDX: policyRevisionIDX,
 	}
 
-	resp, took, err := cmd.Execute(ctx, req)
+	resp, took, err := cmd.Execute(stateCtx, req)
+	f.stateFetcher.Done()
 	if isUnauth(err) {
 		f.unauthCounter++
 		if f.shouldUseLongSched() {
@@ -383,6 +423,9 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 
 	f.unauthCounter = 0
 	if err != nil {
+		if errors.Is(err, context.Canceled) && errors.Is(context.Cause(stateCtx), errComponentStateChanged) {
+			return nil, took, stderrors.Join(err, errComponentStateChanged)
+		}
 		return nil, took, err
 	}
 
@@ -446,4 +489,163 @@ func RequestBackoff(done <-chan struct{}) backoff.Backoff {
 		defaultFleetBackoffSettings.Init,
 		defaultFleetBackoffSettings.Max,
 	)
+}
+
+// getPolicyID will check that the passed action is a POLICY_CHANGE action and return the policy_id attribute of the policy as a string.
+func getPolicyID(action fleetapi.Action) string {
+	policyChange, ok := action.(*fleetapi.ActionPolicyChange)
+	if !ok {
+		return ""
+	}
+	v, ok := policyChange.Data.Policy["policy_id"]
+	if !ok {
+		return ""
+	}
+	vv, ok := v.(string)
+	if !ok {
+		return ""
+	}
+	return vv
+}
+
+// getPolicyRevisionIDX will check that the passed action is a POLICY_CHANGE action and return the policy_revision_idx attribute of the policy as an int64.
+// The function will attempt to convert the attribute to int64 if int or float64 is used in order to prevent issues from serialization.
+func getPolicyRevisionIDX(action fleetapi.Action) int64 {
+	policyChange, ok := action.(*fleetapi.ActionPolicyChange)
+	if !ok {
+		return 0
+	}
+	v, ok := policyChange.Data.Policy["policy_revision_idx"]
+	if !ok {
+		return 0
+	}
+	switch vv := v.(type) {
+	case int64:
+		return vv
+	case int:
+		return int64(vv)
+	case float64:
+		return int64(vv)
+	default:
+		return 0
+	}
+}
+
+var errComponentStateChanged = errors.New("error component state changed")
+
+type StateFetcher interface {
+	// FetchState returns the current state and a context that is valid as long as the returned state is valid to use.
+	FetchState(ctx context.Context) (coordinator.State, context.Context)
+	// Done should be called once the checkin call is complete.
+	Done()
+	StartStateWatch(ctx context.Context) error
+}
+
+type FastCheckinStateFetcher struct {
+	log       *logger.Logger
+	fetcher   func() coordinator.State
+	stateChan chan coordinator.State
+
+	cancel context.CancelCauseFunc
+	mutex  sync.Mutex
+}
+
+func NewFastCheckinStateFetcher(log *logger.Logger, fetcher func() coordinator.State, stateChan chan coordinator.State) *FastCheckinStateFetcher {
+	return &FastCheckinStateFetcher{
+		log:       log,
+		fetcher:   fetcher,
+		stateChan: stateChan,
+		cancel:    nil,
+		mutex:     sync.Mutex{},
+	}
+}
+
+// Fetch wraps the state fetching to send in the check-in request under the checkin state mutex.
+// After the state is fetched the checkin cancellation function has be initialized and the new context
+// is returned.
+func (s *FastCheckinStateFetcher) FetchState(ctx context.Context) (coordinator.State, context.Context) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.cancel != nil {
+		s.cancel(nil) // ensure ctx cleanup
+	}
+
+	ctx2, ctxCancel := context.WithCancelCause(ctx)
+	state := s.fetcher()
+	s.cancel = ctxCancel
+	return state, ctx2
+}
+
+func (s *FastCheckinStateFetcher) Done() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.cancel != nil {
+		s.cancel(nil) // ensure ctx cleanup
+		s.cancel = nil
+	}
+}
+
+func (s *FastCheckinStateFetcher) invalidateState() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.cancel != nil {
+		s.cancel(errComponentStateChanged)
+		s.cancel = nil
+	}
+}
+
+func (s *FastCheckinStateFetcher) StartStateWatch(ctx context.Context) error {
+	s.log.Info("FleetGateway state watching started")
+	for {
+		select {
+		case <-ctx.Done():
+			s.log.Info("FleetGateway state watching stopped")
+			return ctx.Err()
+		case _, isOpen := <-s.stateChan:
+			if !isOpen {
+				s.log.Info("FleetGateway state watching channel closed, stopping loop.")
+				return nil
+			}
+			// TODO: consider check for specific changes e.g. degraded?
+			s.invalidateState()
+		}
+	}
+}
+
+// CheckinStateFetcher implements the simple state fetching without any invalidation or fast checkin logic.
+type CheckinStateFetcher struct {
+	fetcher func() coordinator.State
+}
+
+func NewCheckinStateFetcher(fetcher func() coordinator.State) *CheckinStateFetcher {
+	return &CheckinStateFetcher{fetcher: fetcher}
+}
+
+// FetchState returns the current state and the given ctx because the current state is always valid to use.
+func (s *CheckinStateFetcher) FetchState(ctx context.Context) (coordinator.State, context.Context) {
+	state := s.fetcher()
+	return state, ctx
+}
+
+func (s *CheckinStateFetcher) Done()                                     {}
+func (s *CheckinStateFetcher) StartStateWatch(ctx context.Context) error { return nil }
+
+func getBackoffSettings(cfg *configuration.FleetCheckin) *backoffSettings {
+	bo := defaultFleetBackoffSettings
+
+	if cfg == nil {
+		return &defaultFleetBackoffSettings
+	}
+
+	if cfg.RequestBackoffInit > 0 {
+		bo.Init = cfg.RequestBackoffInit
+	}
+	if cfg.RequestBackoffMax > 0 {
+		bo.Max = cfg.RequestBackoffMax
+	}
+
+	return &bo
 }

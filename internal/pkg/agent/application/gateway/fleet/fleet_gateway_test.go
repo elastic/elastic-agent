@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -20,6 +22,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+	"go.opentelemetry.io/collector/component/componentstatus"
+
+	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -29,12 +37,14 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
+	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
-type clientCallbackFunc func(headers http.Header, body io.Reader) (*http.Response, error)
+type clientCallbackFunc func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error)
 
 type testingClient struct {
 	sync.Mutex
@@ -43,7 +53,7 @@ type testingClient struct {
 }
 
 func (t *testingClient) Send(
-	_ context.Context,
+	ctx context.Context,
 	_ string,
 	_ string,
 	_ url.Values,
@@ -53,7 +63,7 @@ func (t *testingClient) Send(
 	t.Lock()
 	defer t.Unlock()
 	defer func() { t.received <- struct{}{} }()
-	return t.callback(headers, body)
+	return t.callback(ctx, headers, body)
 }
 
 func (t *testingClient) URI() string {
@@ -89,8 +99,8 @@ func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGat
 			client,
 			scheduler,
 			noop.New(),
-			emptyStateFetcher,
 			stateStore,
+			NewCheckinStateFetcher(emptyStateFetcher),
 		)
 
 		require.NoError(t, err)
@@ -137,7 +147,7 @@ func TestFleetGateway(t *testing.T) {
 		defer cancel()
 
 		waitFn := ackSeq(
-			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
+			client.Answer(func(_ context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
 				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 				return resp, nil
 			}),
@@ -169,7 +179,7 @@ func TestFleetGateway(t *testing.T) {
 		defer cancel()
 
 		waitFn := ackSeq(
-			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
+			client.Answer(func(_ context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
 				// TODO: assert no events
 				resp := wrapStrToResp(http.StatusOK, `
 	{
@@ -228,13 +238,13 @@ func TestFleetGateway(t *testing.T) {
 			client,
 			scheduler,
 			noop.New(),
-			emptyStateFetcher,
 			stateStore,
+			NewCheckinStateFetcher(emptyStateFetcher),
 		)
 		require.NoError(t, err)
 
 		waitFn := ackSeq(
-			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
+			client.Answer(func(_ context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
 				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 				return resp, nil
 			}),
@@ -280,12 +290,12 @@ func TestFleetGateway(t *testing.T) {
 			client,
 			scheduler,
 			noop.New(),
-			emptyStateFetcher,
 			stateStore,
+			NewCheckinStateFetcher(emptyStateFetcher),
 		)
 		require.NoError(t, err)
 
-		ch2 := client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
+		ch2 := client.Answer(func(_ context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
 			resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 			return resp, nil
 		})
@@ -339,14 +349,14 @@ func TestFleetGateway(t *testing.T) {
 			client,
 			scheduler,
 			noop.New(),
-			stateFetcher,
 			stateStore,
+			NewCheckinStateFetcher(stateFetcher),
 		)
 
 		require.NoError(t, err)
 
 		waitFn := ackSeq(
-			client.Answer(func(headers http.Header, body io.Reader) (*http.Response, error) {
+			client.Answer(func(_ context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
 				data, err := io.ReadAll(body)
 				require.NoError(t, err)
 
@@ -377,6 +387,149 @@ func TestFleetGateway(t *testing.T) {
 		default:
 		}
 	})
+
+	t.Run("sends agent_policy_id and policy_revision_idx", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		scheduler := scheduler.NewStepper()
+		client := newTestingClient()
+
+		log, _ := loggertest.New("fleet_gateway")
+
+		stateStore := newStateStore(t, log)
+		stateStore.SetAction(&fleetapi.ActionPolicyChange{
+			ActionID:   "test-action-id",
+			ActionType: fleetapi.ActionTypePolicyChange,
+			Data: fleetapi.ActionPolicyChangeData{
+				Policy: map[string]interface{}{
+					"policy_id":           "test-policy-id",
+					"policy_revision_idx": 1,
+				},
+			},
+		})
+		err := stateStore.Save()
+		require.NoError(t, err)
+
+		gateway, err := newFleetGatewayWithScheduler(
+			log,
+			settings,
+			agentInfo,
+			client,
+			scheduler,
+			noop.New(),
+			stateStore,
+			NewCheckinStateFetcher(emptyStateFetcher),
+		)
+		require.NoError(t, err)
+
+		waitFn := ackSeq(
+			client.Answer(func(_ context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
+				data, err := io.ReadAll(body)
+				require.NoError(t, err)
+
+				var checkinRequest fleetapi.CheckinRequest
+				err = json.Unmarshal(data, &checkinRequest)
+				require.NoError(t, err)
+
+				require.Equal(t, "test-policy-id", checkinRequest.AgentPolicyID)
+				require.Equal(t, int64(1), checkinRequest.PolicyRevisionIDX)
+
+				resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
+				return resp, nil
+			}),
+		)
+
+		errCh := runFleetGateway(ctx, gateway)
+
+		// Synchronize scheduler and acking of calls from the worker go routine.
+		scheduler.Next()
+		waitFn()
+
+		cancel()
+		err = <-errCh
+		require.NoError(t, err)
+		select {
+		case actions := <-gateway.Actions():
+			t.Errorf("Expected no actions, got %v", actions)
+		default:
+		}
+	})
+
+	t.Run("Test cancel checkin on state update", func(t *testing.T) {
+		scheduler := scheduler.NewStepper()
+		client := newTestingClient()
+
+		ctx, cancel := context.WithCancel(context.Background())
+
+		log, _ := logger.New("tst", false)
+		stateStore := newStateStore(t, log)
+
+		stateChannel := make(chan coordinator.State, 10)
+
+		stateFetcher := NewFastCheckinStateFetcher(log, emptyStateFetcher, stateChannel)
+
+		gateway, err := newFleetGatewayWithScheduler(
+			log,
+			&fleetGatewaySettings{
+				Duration: 5 * time.Second,
+				Backoff:  &backoffSettings{Init: 10 * time.Millisecond, Max: 30 * time.Second},
+			},
+			agentInfo,
+			client,
+			scheduler,
+			noop.New(),
+			stateStore,
+			stateFetcher,
+		)
+		require.NoError(t, err)
+
+		requestSent := make(chan struct{}, 10)
+
+		// (emulate long poll) wait for the context to be cancelled
+		ch2 := client.Answer(func(ctx context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
+			requestSent <- struct{}{}
+			<-ctx.Done()
+			return nil, ctx.Err()
+		})
+
+		wg := sync.WaitGroup{}
+
+		// custom runFleetGateway
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := gateway.Run(ctx)
+			if err != nil && !errors.Is(err, context.Canceled) {
+				assert.NoError(t, err)
+			}
+		}()
+
+		// start state watcher
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := stateFetcher.StartStateWatch(ctx)
+			assert.ErrorIs(t, err, context.Canceled)
+		}()
+
+		// trigger cmd loop
+		scheduler.Next()
+		// ensure that checkin request was sent (and it is waiting) and then interrupt with state change.
+		<-requestSent
+		// State change arrives while waiting on fleet sever long poll
+		stateChannel <- coordinator.State{}
+
+		// wait for fleet ctx canceled error
+		<-ch2
+
+		// ensure that this specific error returned from f.execute
+		executeErr := <-gateway.errCh
+		assert.ErrorIs(t, executeErr, errComponentStateChanged)
+
+		cancel()
+		wg.Wait()
+	})
 }
 
 func TestRetriesOnFailures(t *testing.T) {
@@ -396,7 +549,7 @@ func TestRetriesOnFailures(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			fail := func(_ http.Header, _ io.Reader) (*http.Response, error) {
+			fail := func(_ context.Context, _ http.Header, _ io.Reader) (*http.Response, error) {
 				return wrapStrToResp(http.StatusInternalServerError, "something is bad"), nil
 			}
 			clientWaitFn := client.Answer(fail)
@@ -413,7 +566,7 @@ func TestRetriesOnFailures(t *testing.T) {
 
 			// API recover
 			waitFn := ackSeq(
-				client.Answer(func(_ http.Header, body io.Reader) (*http.Response, error) {
+				client.Answer(func(_ context.Context, _ http.Header, body io.Reader) (*http.Response, error) {
 					resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 					return resp, nil
 				}),
@@ -444,7 +597,7 @@ func TestRetriesOnFailures(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			fail := func(_ http.Header, _ io.Reader) (*http.Response, error) {
+			fail := func(_ context.Context, _ http.Header, _ io.Reader) (*http.Response, error) {
 				return wrapStrToResp(http.StatusInternalServerError, "something is bad"), nil
 			}
 			waitChan := client.Answer(fail)
@@ -606,7 +759,7 @@ func TestFleetGatewaySchedulerSwitch(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		unauth := func(_ http.Header, _ io.Reader) (*http.Response, error) {
+		unauth := func(_ context.Context, _ http.Header, _ io.Reader) (*http.Response, error) {
 			return nil, client.ErrInvalidAPIKey
 		}
 
@@ -641,7 +794,7 @@ func TestFleetGatewaySchedulerSwitch(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		unauth := func(_ http.Header, _ io.Reader) (*http.Response, error) {
+		unauth := func(_ context.Context, _ http.Header, _ io.Reader) (*http.Response, error) {
 			resp := wrapStrToResp(http.StatusOK, `{ "actions": [] }`)
 			return resp, nil
 		}
@@ -665,4 +818,329 @@ func TestFleetGatewaySchedulerSwitch(t *testing.T) {
 
 		require.Equal(t, ms.Duration, defaultGatewaySettings.Duration)
 	}))
+}
+
+func TestFastCheckinStateFetcher(t *testing.T) {
+	init := func(t *testing.T) *FastCheckinStateFetcher {
+		log, _ := logger.New("state_fetcher_"+t.Name(), false)
+		ch := make(chan coordinator.State, 10)
+		s := NewFastCheckinStateFetcher(log, emptyStateFetcher, ch)
+
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+
+		ctx, cnl := context.WithCancel(t.Context())
+		go func() {
+			defer wg.Done()
+			err := s.StartStateWatch(ctx)
+			assert.ErrorIs(t, err, context.Canceled, "error on StartStateWatch")
+		}()
+
+		t.Cleanup(func() {
+			cnl()
+			wg.Wait()
+		})
+
+		return s
+	}
+
+	t.Run("calling done with empty state should be noop", func(t *testing.T) {
+		s := init(t)
+		assert.Nil(t, s.cancel)
+		s.Done()
+		assert.Nil(t, s.cancel)
+	})
+
+	t.Run("fetch state and then done", func(t *testing.T) {
+		s := init(t)
+		assert.Nil(t, s.cancel)
+
+		_, ctx := s.FetchState(t.Context())
+		assert.NoError(t, ctx.Err())
+		assert.NotNil(t, s.cancel)
+
+		s.Done()
+		assert.Nil(t, s.cancel)
+		assert.NotErrorIs(t, context.Cause(ctx), errComponentStateChanged)
+		assert.ErrorIs(t, ctx.Err(), context.Canceled)
+	})
+
+	t.Run("state change should invalidate context", func(t *testing.T) {
+		s := init(t)
+		assert.Nil(t, s.cancel)
+
+		_, ctx := s.FetchState(t.Context())
+		assert.NoError(t, ctx.Err())
+		assert.NotNil(t, s.cancel)
+
+		s.stateChan <- coordinator.State{}
+
+		<-ctx.Done()
+		assert.ErrorIs(t, context.Cause(ctx), errComponentStateChanged)
+		assert.ErrorIs(t, ctx.Err(), context.Canceled)
+
+		s.mutex.Lock()
+		assert.Nil(t, s.cancel)
+		s.mutex.Unlock()
+	})
+}
+
+func TestConvertToCheckingComponents(t *testing.T) {
+	tests := []struct {
+		name       string
+		components []runtime.ComponentComponentState
+		collector  *status.AggregateStatus
+		expected   []fleetapi.CheckinComponent
+	}{
+		{
+			name:       "Nil inputs",
+			components: nil,
+			collector:  nil,
+			expected:   nil,
+		},
+		{
+			name:       "Empty inputs",
+			components: []runtime.ComponentComponentState{},
+			collector:  &status.AggregateStatus{},
+			expected:   []fleetapi.CheckinComponent{},
+		},
+		{
+			name: "Only agent components",
+			components: []runtime.ComponentComponentState{
+				{
+					Component: component.Component{ID: "comp-1", InputSpec: &component.InputRuntimeSpec{InputType: "log"}},
+					State: runtime.ComponentState{
+						State:   eaclient.UnitStateHealthy,
+						Message: "Component is healthy",
+					},
+				},
+				{
+					Component: component.Component{ID: "comp-2", InputSpec: &component.InputRuntimeSpec{InputType: "log"}},
+					State: runtime.ComponentState{
+						State:   eaclient.UnitStateDegraded,
+						Message: "Component is degraded",
+						Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+							{UnitID: "unit-1", UnitType: eaclient.UnitTypeInput}: {
+								State:   eaclient.UnitStateFailed,
+								Message: "Input unit failed",
+								Payload: map[string]interface{}{"error": "some error"},
+							},
+						},
+					},
+				},
+			},
+			collector: nil,
+			expected: []fleetapi.CheckinComponent{
+				{
+					ID:      "comp-1",
+					Type:    "log",
+					Status:  "HEALTHY",
+					Message: "Component is healthy",
+				},
+				{
+					ID:      "comp-2",
+					Type:    "log",
+					Status:  "DEGRADED",
+					Message: "Component is degraded",
+					Units: []fleetapi.CheckinUnit{
+						{
+							ID:      "unit-1",
+							Type:    "input",
+							Status:  "FAILED",
+							Message: "Input unit failed",
+							Payload: map[string]interface{}{"error": "some error"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:       "Only OTel components",
+			components: nil,
+			collector: &status.AggregateStatus{
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					"extensions": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							"extensions:healthcheck": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+						},
+					},
+					"pipeline:logs": {
+						Event: componentstatus.NewRecoverableErrorEvent(fmt.Errorf("pipeline error")),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							"receiver:filebeat": {
+								Event: componentstatus.NewEvent(componentstatus.StatusStarting),
+							},
+							"exporter:elasticsearch": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							"processor:batch": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+						},
+					},
+				},
+			},
+			expected: []fleetapi.CheckinComponent{
+				{
+					ID:      "extensions",
+					Type:    "otel",
+					Status:  "HEALTHY",
+					Message: "Healthy",
+					Units: []fleetapi.CheckinUnit{
+						{
+							ID:      "extensions:healthcheck",
+							Type:    "",
+							Status:  "HEALTHY",
+							Message: "Healthy",
+						},
+					},
+				},
+				{
+					ID:      "pipeline:logs",
+					Type:    "otel",
+					Status:  "DEGRADED",
+					Message: "Recoverable: pipeline error",
+					Units: []fleetapi.CheckinUnit{
+						{
+							ID:      "exporter:elasticsearch",
+							Type:    "output",
+							Status:  "HEALTHY",
+							Message: "Healthy",
+						},
+						{
+							ID:      "processor:batch",
+							Type:    "",
+							Status:  "HEALTHY",
+							Message: "Healthy",
+						},
+						{
+							ID:      "receiver:filebeat",
+							Type:    "input",
+							Status:  "STARTING",
+							Message: "Starting",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Both agent and OTel components",
+			components: []runtime.ComponentComponentState{
+				{
+					Component: component.Component{ID: "comp-1", InputSpec: &component.InputRuntimeSpec{InputType: "log"}},
+					State: runtime.ComponentState{
+						State:   eaclient.UnitStateHealthy,
+						Message: "Component is healthy",
+					},
+				},
+			},
+			collector: &status.AggregateStatus{
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					"pipeline:logs": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+				},
+			},
+			expected: []fleetapi.CheckinComponent{
+				{
+					ID:      "comp-1",
+					Type:    "log",
+					Status:  "HEALTHY",
+					Message: "Component is healthy",
+				},
+				{
+					ID:      "pipeline:logs",
+					Type:    "otel",
+					Status:  "HEALTHY",
+					Message: "Healthy",
+				},
+			},
+		},
+		{
+			name: "Unknown states and types",
+			components: []runtime.ComponentComponentState{
+				{
+					Component: component.Component{ID: "comp-1", InputSpec: &component.InputRuntimeSpec{InputType: "log"}},
+					State: runtime.ComponentState{
+						State:   eaclient.UnitState(99),
+						Message: "Unknown state",
+						Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+							{UnitID: "unit-1", UnitType: eaclient.UnitType(99)}: {
+								State:   eaclient.UnitState(99),
+								Message: "Unknown unit state",
+							},
+						},
+					},
+				},
+			},
+			collector: nil,
+			expected: []fleetapi.CheckinComponent{
+				{
+					ID:      "comp-1",
+					Type:    "log",
+					Status:  "",
+					Message: "Unknown state",
+					Units: []fleetapi.CheckinUnit{
+						{
+							ID:      "unit-1",
+							Type:    "",
+							Status:  "",
+							Message: "Unknown unit state",
+						},
+					},
+				},
+			},
+		},
+		{
+			name:       "OTel component with invalid ID",
+			components: []runtime.ComponentComponentState{},
+			collector: &status.AggregateStatus{
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					"invalid-id": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							"invalid-unit-id": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+						},
+					},
+				},
+			},
+			expected: []fleetapi.CheckinComponent{
+				{
+					ID:      "invalid-id",
+					Type:    "otel",
+					Status:  "HEALTHY",
+					Message: "Healthy",
+					Units: []fleetapi.CheckinUnit{
+						{
+							ID:      "invalid-unit-id",
+							Type:    "",
+							Status:  "HEALTHY",
+							Message: "Healthy",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := convertToCheckinComponents(logp.NewNopLogger(), tt.components, tt.collector)
+			// Testify diffs are nicer if we sort and compare directly vs using ElementsMathc
+			slices.SortFunc(result, func(a, b fleetapi.CheckinComponent) int {
+				return strings.Compare(a.ID, b.ID)
+			})
+			for _, c := range result {
+				slices.SortFunc(c.Units, func(a, b fleetapi.CheckinUnit) int {
+					return strings.Compare(a.ID, b.ID)
+				})
+			}
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }

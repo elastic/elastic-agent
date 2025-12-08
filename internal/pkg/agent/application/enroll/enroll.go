@@ -35,8 +35,9 @@ import (
 )
 
 const (
-	EnrollBackoffInit = time.Second * 5
-	EnrollBackoffMax  = time.Minute * 10
+	EnrollBackoffInit      = time.Second * 5
+	EnrollBackoffMax       = time.Minute * 10
+	EnrollInfiniteAttempts = -1
 
 	maxRetriesstoreAgentInfo       = 5
 	defaultFleetServerHost         = "0.0.0.0"
@@ -57,6 +58,7 @@ func EnrollWithBackoff(
 	options EnrollOptions,
 	configStore saver,
 	backoffFactory func(done <-chan struct{}) backoff.Backoff,
+	maxAttempts int,
 ) error {
 	if backoffFactory == nil {
 		backoffFactory = func(done <-chan struct{}) backoff.Backoff {
@@ -92,9 +94,20 @@ func EnrollWithBackoff(
 	signal := make(chan struct{})
 	defer close(signal)
 	backExp := backoffFactory(signal)
+	enrollFn := func() error {
+		return enroll(ctx, log, persistentConfig, client, options, configStore)
+	}
+	err = retryEnroll(err, maxAttempts, log, enrollFn, client.URI(), backExp)
+
+	return err
+}
+
+func retryEnroll(err error, maxAttempts int, log *logger.Logger, enrollFn func() error, clientURI string, backExp backoff.Backoff) error {
+	attemptNo := 1
 
 RETRYLOOP:
 	for {
+		attemptNo++
 		switch {
 		case errors.Is(err, fleetapi.ErrTooManyRequests):
 			log.Warn("Too many requests on the remote server, will retry in a moment.")
@@ -102,7 +115,7 @@ RETRYLOOP:
 			log.Warn("Remote server is not ready to accept connections(Connection Refused), will retry in a moment.")
 		case errors.Is(err, fleetapi.ErrTemporaryServerError):
 			log.Warnf("Remote server failed to handle the request(%s), will retry in a moment.", err.Error())
-		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded), err == nil:
+		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded), errors.Is(err, fleetapi.ErrInvalidToken), err == nil, (maxAttempts != EnrollInfiniteAttempts && attemptNo > maxAttempts):
 			break RETRYLOOP
 		case err != nil:
 			log.Warnf("Error detected: %s, will retry in a moment.", err.Error())
@@ -110,8 +123,8 @@ RETRYLOOP:
 		if !backExp.Wait() {
 			break RETRYLOOP
 		}
-		log.Infof("Retrying enrollment to URL: %s", client.URI())
-		err = enroll(ctx, log, persistentConfig, client, options, configStore)
+		log.Infof("Retrying enrollment to URL: %s", clientURI)
+		err = enrollFn()
 	}
 
 	return err

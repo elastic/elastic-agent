@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -34,8 +33,6 @@ const (
 	actionStop     = actionMode(0)
 	actionStart    = actionMode(1)
 
-	runDirMod = 0770
-
 	envAgentComponentID   = "AGENT_COMPONENT_ID"
 	envAgentComponentType = "AGENT_COMPONENT_TYPE"
 
@@ -44,8 +41,6 @@ const (
 
 func (m actionMode) String() string {
 	switch m {
-	case actionTeardown:
-		return "teardown"
 	case actionStop:
 		return "stop"
 	case actionStart:
@@ -337,9 +332,10 @@ func (c *commandRuntime) forceCompState(state client.UnitState, msg string) {
 // compState updates just the component state not all the units.
 func (c *commandRuntime) compState(state client.UnitState) {
 	msg := stateUnknownMessage
-	if state == client.UnitStateHealthy {
+	switch state {
+	case client.UnitStateHealthy:
 		msg = fmt.Sprintf("Healthy: communicating with pid '%d'", c.proc.PID)
-	} else if state == client.UnitStateDegraded {
+	case client.UnitStateDegraded:
 		if c.missedCheckins == 1 {
 			msg = fmt.Sprintf("Degraded: pid '%d' missed 1 check-in", c.proc.PID)
 		} else {
@@ -367,11 +363,8 @@ func (c *commandRuntime) start(comm Communicator) error {
 	}
 	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentID, c.current.ID))
 	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentType, c.getSpecType()))
-	uid, gid := os.Geteuid(), os.Getegid()
-	workDir, err := c.workDir(uid, gid)
-	if err != nil {
-		return err
-	}
+	uid := os.Geteuid()
+	workDir := c.current.WorkDirPath(paths.Run())
 	path, err := filepath.Abs(c.getSpecBinaryPath())
 	if err != nil {
 		return fmt.Errorf("failed to determine absolute path: %w", err)
@@ -382,14 +375,12 @@ func (c *commandRuntime) start(comm Communicator) error {
 	}
 
 	if err := c.monitor.Prepare(c.current.ID); err != nil {
-		return err
+		return fmt.Errorf("failed to prepare component monitoring resources: %w", err)
 	}
 	args := c.monitor.EnrichArgs(c.current.ID, c.getSpecBinaryName(), cmdSpec.Args)
 
 	// differentiate data paths
-	dataPath := filepath.Join(paths.Run(), c.current.ID)
-	_ = os.MkdirAll(dataPath, 0755)
-	args = append(args, "-E", "path.data="+dataPath)
+	args = append(args, "-E", "path.data="+workDir)
 
 	// reset checkin state before starting the process.
 	c.lastCheckin = time.Time{}
@@ -400,7 +391,7 @@ func (c *commandRuntime) start(comm Communicator) error {
 		process.WithEnv(env),
 		process.WithCmdOptions(attachOutErr(c.logStd, c.logErr), dirPath(workDir)))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to start process: %w", err)
 	}
 
 	c.proc = proc
@@ -433,17 +424,24 @@ func (c *commandRuntime) stop(ctx context.Context) error {
 			return
 		case <-t.C:
 			// kill no matter what (might already be stopped)
+			c.log.Debugf("timeout waiting for pid %d, killing it", c.proc.PID)
 			_ = info.Kill()
 		}
 	}(c.proc, cmdSpec.Timeouts.Stop)
-	return c.proc.Stop()
+
+	c.log.Debugf("gracefully stopping pid %d", c.proc.PID)
+
+	if stopErr := c.proc.Stop(); stopErr != nil {
+		return fmt.Errorf("failed to stop process %s: %w", c.proc.Cmd.String(), stopErr)
+	}
+	return nil
 }
 
 func (c *commandRuntime) startWatcher(info *process.Info, comm Communicator) {
 	go func() {
 		err := comm.WriteStartUpInfo(info.Stdin)
 		if err != nil {
-			_, _ = c.logErr.Write([]byte(fmt.Sprintf("Failed: failed to provide connection information to spawned pid '%d': %s", info.PID, err)))
+			_, _ = fmt.Fprintf(c.logErr, "Failed: failed to provide connection information to spawned pid '%d': %s", info.PID, err)
 			// kill instantly
 			_ = info.Kill()
 		} else {
@@ -452,6 +450,7 @@ func (c *commandRuntime) startWatcher(info *process.Info, comm Communicator) {
 
 		ch := info.Wait()
 		s := <-ch
+		c.log.Debugf("wait for pid %d returned", info.PID)
 		c.procCh <- procState{
 			proc:  info,
 			state: s,
@@ -473,38 +472,11 @@ func (c *commandRuntime) handleProc(state *os.ProcessState) bool {
 		return true
 	case actionStop, actionTeardown:
 		// stopping (should have exited)
-		if c.actionState == actionTeardown {
-			// teardown so the entire component has been removed (cleanup work directory)
-			_ = os.RemoveAll(c.workDirPath())
-		}
+		// Component workdir creation and deletion happens in the coordinator, nothing to do here.
 		stopMsg := fmt.Sprintf("Stopped: pid '%d' exited with code '%d'", state.Pid(), state.ExitCode())
 		c.forceCompState(client.UnitStateStopped, stopMsg)
 	}
 	return false
-}
-
-func (c *commandRuntime) workDirPath() string {
-	return filepath.Join(paths.Run(), c.current.ID)
-}
-
-func (c *commandRuntime) workDir(uid int, gid int) (string, error) {
-	path := c.workDirPath()
-	err := os.MkdirAll(path, runDirMod)
-	if err != nil {
-		return "", fmt.Errorf("failed to create path %q: %w", path, err)
-	}
-	if runtime.GOOS == component.Windows {
-		return path, nil
-	}
-	err = os.Chown(path, uid, gid)
-	if err != nil {
-		return "", fmt.Errorf("failed to chown %q: %w", path, err)
-	}
-	err = os.Chmod(path, runDirMod)
-	if err != nil {
-		return "", fmt.Errorf("failed to chmod %q: %w", path, err)
-	}
-	return path, nil
 }
 
 func (c *commandRuntime) getSpecType() string {

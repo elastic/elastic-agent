@@ -13,12 +13,11 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
-	mockhandlers "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/actions/handlers"
-	mockinfo "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/info"
-	mockfleetacker "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/fleetapi/acker"
 )
 
 func TestSettings_SetLogLevel(t *testing.T) {
@@ -37,7 +36,7 @@ func TestSettings_SetLogLevel(t *testing.T) {
 		name                 string
 		fields               fields
 		args                 args
-		setupMocks           func(*testing.T, *mockhandlers.LogLevelSetter, *mockinfo.Agent)
+		setupMocks           func(*testing.T, *mockLogLevelSetter, *info.MockAgent)
 		wantErr              assert.ErrorAssertionFunc
 		wantFallbackLogLevel *logp.Level
 	}{
@@ -47,7 +46,7 @@ func TestSettings_SetLogLevel(t *testing.T) {
 			args: args{
 				lvl: &testWarnLevel,
 			},
-			setupMocks: func(t *testing.T, setter *mockhandlers.LogLevelSetter, agent *mockinfo.Agent) {
+			setupMocks: func(t *testing.T, setter *mockLogLevelSetter, agent *info.MockAgent) {
 				agent.EXPECT().RawLogLevel().Return("").Once()
 				setter.EXPECT().SetLogLevel(mock.Anything, &testWarnLevel).Return(nil).Once()
 			},
@@ -60,7 +59,7 @@ func TestSettings_SetLogLevel(t *testing.T) {
 			args: args{
 				lvl: nil,
 			},
-			setupMocks: func(t *testing.T, setter *mockhandlers.LogLevelSetter, agent *mockinfo.Agent) {
+			setupMocks: func(t *testing.T, setter *mockLogLevelSetter, agent *info.MockAgent) {
 				agent.EXPECT().RawLogLevel().Return("").Once()
 				setter.EXPECT().SetLogLevel(mock.Anything, &defaultLogLevel).Return(nil).Once()
 			},
@@ -73,7 +72,7 @@ func TestSettings_SetLogLevel(t *testing.T) {
 			args: args{
 				lvl: &testWarnLevel,
 			},
-			setupMocks: func(t *testing.T, setter *mockhandlers.LogLevelSetter, agent *mockinfo.Agent) {
+			setupMocks: func(t *testing.T, setter *mockLogLevelSetter, agent *info.MockAgent) {
 				agent.EXPECT().RawLogLevel().Return("info").Once()
 			},
 			wantErr:              assert.NoError,
@@ -82,8 +81,8 @@ func TestSettings_SetLogLevel(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockAgentInfo := mockinfo.NewAgent(t)
-			mockLogLevelSetter := mockhandlers.NewLogLevelSetter(t)
+			mockAgentInfo := info.NewMockAgent(t)
+			mockLogLevelSetter := newMockLogLevelSetter(t)
 
 			if tt.setupMocks != nil {
 				tt.setupMocks(t, mockLogLevelSetter, mockAgentInfo)
@@ -121,7 +120,7 @@ func TestSettings_handleLogLevel(t *testing.T) {
 		name       string
 		fields     fields
 		args       args
-		setupMocks func(*testing.T, *mockinfo.Agent, *mockhandlers.LogLevelSetter, *mockfleetacker.Acker)
+		setupMocks func(*testing.T, *info.MockAgent, *mockLogLevelSetter, *acker.MockAcker)
 		wantErr    assert.ErrorAssertionFunc
 	}{
 		{
@@ -137,7 +136,7 @@ func TestSettings_handleLogLevel(t *testing.T) {
 					Data:       fleetapi.ActionSettingsData{LogLevel: "debug"},
 				},
 			},
-			setupMocks: func(t *testing.T, agent *mockinfo.Agent, setter *mockhandlers.LogLevelSetter, acker *mockfleetacker.Acker) {
+			setupMocks: func(t *testing.T, agent *info.MockAgent, setter *mockLogLevelSetter, acker *acker.MockAcker) {
 				agent.EXPECT().SetLogLevel(mock.Anything, "debug").Return(nil)
 				setter.EXPECT().SetLogLevel(mock.Anything, &testDebugLogLevel).Return(nil)
 				acker.EXPECT().Ack(mock.Anything, mock.Anything).Return(nil)
@@ -159,7 +158,7 @@ func TestSettings_handleLogLevel(t *testing.T) {
 						LogLevel: clearLogLevelValue},
 				},
 			},
-			setupMocks: func(t *testing.T, agent *mockinfo.Agent, setter *mockhandlers.LogLevelSetter, acker *mockfleetacker.Acker) {
+			setupMocks: func(t *testing.T, agent *info.MockAgent, setter *mockLogLevelSetter, acker *acker.MockAcker) {
 				agent.EXPECT().SetLogLevel(mock.Anything, "").Return(nil)
 				setter.EXPECT().SetLogLevel(mock.Anything, &testWarnLogLevel).Return(nil)
 				acker.EXPECT().Ack(mock.Anything, mock.Anything).Return(nil)
@@ -181,7 +180,7 @@ func TestSettings_handleLogLevel(t *testing.T) {
 						LogLevel: clearLogLevelValue},
 				},
 			},
-			setupMocks: func(t *testing.T, agent *mockinfo.Agent, setter *mockhandlers.LogLevelSetter, acker *mockfleetacker.Acker) {
+			setupMocks: func(t *testing.T, agent *info.MockAgent, setter *mockLogLevelSetter, acker *acker.MockAcker) {
 				agent.EXPECT().SetLogLevel(mock.Anything, "").Return(nil)
 				setter.EXPECT().SetLogLevel(mock.Anything, &testDefaultLogLevel).Return(nil)
 				acker.EXPECT().Ack(mock.Anything, mock.Anything).Return(nil)
@@ -193,9 +192,9 @@ func TestSettings_handleLogLevel(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			log, _ := loggertest.New(tt.name)
-			mockAgentInfo := mockinfo.NewAgent(t)
-			mockLogLevelSetter := mockhandlers.NewLogLevelSetter(t)
-			mockAcker := mockfleetacker.NewAcker(t)
+			mockAgentInfo := info.NewMockAgent(t)
+			mockLogLevelSetter := newMockLogLevelSetter(t)
+			mockAcker := acker.NewMockAcker(t)
 
 			if tt.setupMocks != nil {
 				tt.setupMocks(t, mockAgentInfo, mockLogLevelSetter, mockAcker)

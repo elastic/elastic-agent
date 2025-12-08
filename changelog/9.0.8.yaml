@@ -1,0 +1,97 @@
+version: 9.0.8
+entries:
+    - kind: enhancement
+      summary: Agent cleans up downloads directory and the new versioned home if upgrade fails.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9386
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/5235
+      impact: ""
+      action: ""
+      timestamp: 1755268130
+      file:
+        name: 1755268130-cleanup-downloads-directory-and-the-new-versioned-home-if-upgrade-fails.yaml
+        checksum: 5d9cdb7ac38cde4951de2c63368b504161601607
+    - kind: enhancement
+      summary: When there is a disk space error during an upgrade, agent responds with clean insufficient disk space error message.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9392
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/5235
+      impact: ""
+      action: ""
+      timestamp: 1757010848
+      file:
+        name: 1757010848-agent-responds-with-clean-insufficient-disk-space-error-message.yaml
+        checksum: f56341e6c991397a73bc108a1f7b3db04c6a3abc
+    - kind: bug-fix
+      summary: Include aggregated agent status in HTTP liveness checks.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9673
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/9576
+      impact: ""
+      action: ""
+      timestamp: 1757502748
+      file:
+        name: 1757502748-liveness-include-agent-aggregated-status.yaml
+        checksum: 7f059a7bc06c911463fcb96cfc0c077d3e1c7d62
+    - kind: bug-fix
+      summary: reduce-default-telemetry-frequency
+      description: Reduce the default telemetry frequency to 60 seconds. This change aims to lower infrastructure costs and reduce label churn in time-series storage. High-cardinality labels sampled too frequently inflate storage and index size, and increase query latency with limited added value. Environments that require higher resolution can change the `collection_interval` for `hostmetrics`, `kubeletstats` and `k8s_cluster` receivers to a lower value.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9987
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1758039757
+      file:
+        name: 1758039757-reduce-default-telemetry-frequency.yaml
+        checksum: b898653d4d803506feb56c9aac563e3615f46ffe
+    - kind: bug-fix
+      summary: Fix stuck upgrade state by clearing coordinator overridden state after failed upgrade.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/9992
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1758045690
+      file:
+        name: 1758045690-clear-coordinator-state.yaml
+        checksum: f91a0478a6a6a49b3e6e0bb974f3341ca1ce0677
+    - kind: bug-fix
+      summary: Include components units status in HTTP liveness checks.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10060
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/8047
+      impact: ""
+      action: ""
+      timestamp: 1758287649
+      file:
+        name: 1758287649-fix-liveness_units.yaml
+        checksum: 56d3167373e1447971495c4d8fc7aacf534b2ab0
+    - kind: bug-fix
+      summary: Add info about hostPID for Universal Profiling.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/10173
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1758890389
+      file:
+        name: 1758890389-k8s-daemonset-up.yaml
+        checksum: ad42b53c8827e46e717881741fd6a2dec54068ff

@@ -194,7 +194,12 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 	require.Lenf(t, splits, 2,
 		"expected split of beats output version to be split into 2, it was split into %q",
 		strings.Join(splits, "|"))
-	wantBuildHash := splits[0]
+	filebeatBuildHash := splits[0]
+
+	// get the elastic-agent build hash
+	agentVersion, err := f.ExecVersion(ctx)
+	require.NoError(t, err, "failed to get agent version")
+	agentCommit := agentVersion.Binary.Commit
 
 	diagZip, err := f.ExecDiagnostics(ctx)
 	require.NoError(t, err, "failed collecting diagnostics")
@@ -251,9 +256,20 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 	require.NoError(t, err, "could not parse state.yaml (%s)", stateYAML.Name())
 
 	for _, c := range state.Components {
-		assert.Equalf(t, wantBuildHash, c.State.VersionInfo.BuildHash,
+		var expectedCommit, expectedBuildHash string
+		switch c.State.VersionInfo.Name {
+		case "beats-receiver":
+			expectedBuildHash = agentCommit
+			expectedCommit = agentCommit
+		case "beat-v2-client":
+			expectedBuildHash = filebeatBuildHash
+			expectedCommit = filebeatBuildHash
+		default:
+			t.Errorf("got unknown value in version_info.name: %s", c.State.VersionInfo.Name)
+		}
+		assert.Equalf(t, expectedBuildHash, c.State.VersionInfo.BuildHash,
 			"component %s: VersionInfo.BuildHash mismatch", c.ID)
-		assert.Equalf(t, wantBuildHash, c.State.VersionInfo.Meta.Commit,
+		assert.Equalf(t, expectedCommit, c.State.VersionInfo.Meta.Commit,
 			"component %s: VersionInfo.Meta.Commit mismatch", c.ID)
 	}
 

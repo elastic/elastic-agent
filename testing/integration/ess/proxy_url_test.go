@@ -770,7 +770,7 @@ func createBasicFleetPolicyData(t *testing.T, fleetHost string) (fleetservertest
 		Key: "apiKeyKey",
 	}
 
-	agentID := strings.Replace(t.Name(), "/", "-", -1) + "-agent-id"
+	agentID := strings.ReplaceAll(t.Name(), "/", "-") + "-agent-id"
 	policyUUID, err := uuid.NewV4()
 	require.NoError(t, err, "error generating UUID for policy")
 

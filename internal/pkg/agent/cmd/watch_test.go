@@ -26,7 +26,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -123,11 +122,11 @@ func Test_watchCmd(t *testing.T) {
 					&upgrade.UpdateMarker{
 						Version:           "4.5.6",
 						Hash:              "newver",
-						VersionedHome:     "elastic-agent-4.5.6-newver",
+						VersionedHome:     filepath.Join("data", "elastic-agent-4.5.6-newver"),
 						UpdatedOn:         time.Now(),
 						PrevVersion:       "1.2.3",
 						PrevHash:          "prvver",
-						PrevVersionedHome: "elastic-agent-prvver",
+						PrevVersionedHome: filepath.Join("data", "elastic-agent-prvver"),
 						Acked:             false,
 						Action:            nil,
 						Details:           nil, //details.NewDetails("4.5.6", details.StateReplacing, ""),
@@ -144,7 +143,7 @@ func Test_watchCmd(t *testing.T) {
 				expectedRemoveMarkerFlag := runtime.GOOS != "windows"
 
 				installModifier.EXPECT().
-					Cleanup(mock.Anything, topDir, "elastic-agent-4.5.6-newver", "newver", expectedRemoveMarkerFlag, false).
+					Cleanup(mock.Anything, topDir, expectedRemoveMarkerFlag, false, filepath.Join("data", "elastic-agent-4.5.6-newver")).
 					Return(nil)
 			},
 			args: args{
@@ -153,21 +152,64 @@ func Test_watchCmd(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
-			name: "unhappy path: error watching, rollback to previous install",
+			name: "unhappy path: error watching, rollback to previous install, leaving the upgrade marker",
 			setupUpgradeMarker: func(t *testing.T, topDir string, watcher *mockAgentWatcher, installModifier *mockInstallationModifier) {
 				dataDirPath := paths.DataFrom(topDir)
 				err := os.MkdirAll(dataDirPath, 0755)
 				require.NoError(t, err)
+				previousVersionedHome := filepath.Join("data", "elastic-agent-9.2.0-prvver")
+				err = upgrade.SaveMarker(
+					dataDirPath,
+					&upgrade.UpdateMarker{
+						Version:           "9.3.0",
+						Hash:              "newver",
+						VersionedHome:     filepath.Join("data", "elastic-agent-9.3.0-newver"),
+						UpdatedOn:         time.Now(),
+						PrevVersion:       "9.2.0",
+						PrevHash:          "prvver",
+						PrevVersionedHome: previousVersionedHome,
+						Acked:             false,
+						Action:            nil,
+						Details:           nil,
+					},
+					true,
+				)
+				require.NoError(t, err)
+
+				watcher.EXPECT().
+					Watch(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(errors.New("some watch error due to agent misbehaving"))
+				installModifier.EXPECT().
+					Rollback(mock.Anything, mock.Anything, mock.Anything, paths.Top(), previousVersionedHome, "prvver", mock.MatchedBy(func(opt upgrade.RollbackOption) bool {
+						settings := upgrade.NewRollbackSettings()
+						opt(settings)
+
+						return !settings.RemoveMarker
+					})).
+					Return(nil)
+			},
+			args: args{
+				cfg: configuration.DefaultUpgradeConfig().Watcher,
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "unhappy path: error watching, rollback to previous install, removing upgrade marker if version is < 9.2.0-SNAPSHOT",
+			setupUpgradeMarker: func(t *testing.T, topDir string, watcher *mockAgentWatcher, installModifier *mockInstallationModifier) {
+				dataDirPath := paths.DataFrom(topDir)
+				err := os.MkdirAll(dataDirPath, 0755)
+				require.NoError(t, err)
+				previousVersionedHome := filepath.Join("data", "elastic-agent-1.2.3-prvver")
 				err = upgrade.SaveMarker(
 					dataDirPath,
 					&upgrade.UpdateMarker{
 						Version:           "4.5.6",
 						Hash:              "newver",
-						VersionedHome:     "elastic-agent-4.5.6-newver",
+						VersionedHome:     filepath.Join("data", "elastic-agent-4.5.6-newver"),
 						UpdatedOn:         time.Now(),
 						PrevVersion:       "1.2.3",
 						PrevHash:          "prvver",
-						PrevVersionedHome: "elastic-agent-prvver",
+						PrevVersionedHome: previousVersionedHome,
 						Acked:             false,
 						Action:            nil,
 						Details:           nil, //details.NewDetails("4.5.6", details.StateReplacing, ""),
@@ -180,8 +222,19 @@ func Test_watchCmd(t *testing.T) {
 					Watch(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(errors.New("some watch error due to agent misbehaving"))
 				installModifier.EXPECT().
-					Rollback(mock.Anything, mock.Anything, mock.Anything, paths.Top(), "elastic-agent-prvver", "prvver", mock.Anything).
-					Return(nil)
+					Rollback(
+						mock.Anything,
+						mock.Anything,
+						mock.Anything,
+						paths.Top(),
+						previousVersionedHome,
+						"prvver",
+						mock.MatchedBy(func(opt upgrade.RollbackOption) bool {
+							settings := upgrade.NewRollbackSettings()
+							opt(settings)
+
+							return settings.RemoveMarker
+						})).Return(nil)
 			},
 			args: args{
 				cfg: configuration.DefaultUpgradeConfig().Watcher,
@@ -194,16 +247,17 @@ func Test_watchCmd(t *testing.T) {
 				dataDirPath := paths.DataFrom(topDir)
 				err := os.MkdirAll(dataDirPath, 0755)
 				require.NoError(t, err)
+				previousVersionedHome := filepath.Join("data", "elastic-agent-prvver")
 				err = upgrade.SaveMarker(
 					dataDirPath,
 					&upgrade.UpdateMarker{
 						Version:           "4.5.6",
 						Hash:              "newver",
-						VersionedHome:     "elastic-agent-4.5.6-newver",
+						VersionedHome:     filepath.Join("data", "elastic-agent-4.5.6-newver"),
 						UpdatedOn:         time.Now(),
 						PrevVersion:       "1.2.3",
 						PrevHash:          "prvver",
-						PrevVersionedHome: "elastic-agent-prvver",
+						PrevVersionedHome: previousVersionedHome,
 						Acked:             false,
 						Action:            nil,
 						Details: &details.Details{
@@ -220,7 +274,7 @@ func Test_watchCmd(t *testing.T) {
 				// topdir, prevVersionedHome and prevHash are not taken from the upgrade marker, otherwise they would be
 				// <topDir, "topDir/data/elastic-agent-prvver", "prvver">
 				installModifier.EXPECT().
-					Cleanup(mock.Anything, paths.Top(), paths.VersionedHome(topDir), release.ShortCommit(), true, false).
+					Cleanup(mock.Anything, paths.Top(), true, false, previousVersionedHome).
 					Return(nil)
 			},
 			args: args{
@@ -240,11 +294,11 @@ func Test_watchCmd(t *testing.T) {
 					&upgrade.UpdateMarker{
 						Version:           "4.5.6",
 						Hash:              "newver",
-						VersionedHome:     "elastic-agent-4.5.6-newver",
+						VersionedHome:     filepath.Join("data", "elastic-agent-4.5.6-newver"),
 						UpdatedOn:         updatedOn,
 						PrevVersion:       "1.2.3",
 						PrevHash:          "prvver",
-						PrevVersionedHome: "elastic-agent-prvver",
+						PrevVersionedHome: filepath.Join("data", "elastic-agent-prvver"),
 						Acked:             false,
 						Action:            nil,
 						Details:           nil,
@@ -253,10 +307,10 @@ func Test_watchCmd(t *testing.T) {
 				)
 				require.NoError(t, err)
 
-				// topdir, prevVersionedHome and prevHash are not taken from the upgrade marker, otherwise they would be
-				// <topDir, "topDir/data/elastic-agent-prvver", "prvver">
+				// topdir, versionedHome and hash are not taken from the upgrade marker, otherwise they would be
+				// <topDir, "data/elastic-agent-4.5.6-newver">
 				installModifier.EXPECT().
-					Cleanup(mock.Anything, paths.Top(), paths.VersionedHome(topDir), release.ShortCommit(), true, false).
+					Cleanup(mock.Anything, paths.Top(), true, false, filepath.Join("data", "elastic-agent-unknow")).
 					Return(nil)
 			},
 			args: args{
@@ -270,7 +324,7 @@ func Test_watchCmd(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
-			name: "Desired outcome is rollback no upgrade details, no rollback and simple cleanup",
+			name: "Default config, no rollback and simple cleanup",
 			setupUpgradeMarker: func(t *testing.T, tmpDir string, watcher *mockAgentWatcher, installModifier *mockInstallationModifier) {
 				dataDirPath := paths.DataFrom(tmpDir)
 				err := os.MkdirAll(dataDirPath, 0755)
@@ -282,11 +336,11 @@ func Test_watchCmd(t *testing.T) {
 					&upgrade.UpdateMarker{
 						Version:           "4.5.6",
 						Hash:              "newver",
-						VersionedHome:     "elastic-agent-4.5.6-newver",
+						VersionedHome:     filepath.Join("data", "elastic-agent-4.5.6-newver"),
 						UpdatedOn:         updatedOn,
 						PrevVersion:       "1.2.3",
 						PrevHash:          "prvver",
-						PrevVersionedHome: "elastic-agent-prvver",
+						PrevVersionedHome: filepath.Join("data", "elastic-agent-prvver"),
 						Acked:             false,
 						Action: &fleetapi.ActionUpgrade{
 							ActionID:   "action-id",
@@ -300,7 +354,7 @@ func Test_watchCmd(t *testing.T) {
 				require.NoError(t, err)
 
 				installModifier.EXPECT().
-					Cleanup(mock.Anything, paths.Top(), paths.VersionedHome(tmpDir), release.ShortCommit(), true, false).
+					Cleanup(mock.Anything, paths.Top(), true, false, filepath.Join("data", "elastic-agent-unknow")).
 					Return(nil)
 			},
 			args: args{

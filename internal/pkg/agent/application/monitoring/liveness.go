@@ -13,7 +13,8 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
-	"github.com/elastic/elastic-agent/internal/pkg/otel/otelhelpers"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/monitoringhelpers"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 )
 
@@ -83,14 +84,9 @@ func livenessHandler(coord CoordinatorState) func(http.ResponseWriter, *http.Req
 			return nil
 		}
 
-		unhealthyComponent := false
-		for _, comp := range state.Components {
-			if (failConfig.Failed && comp.State.State == client.UnitStateFailed) || (failConfig.Degraded && comp.State.State == client.UnitStateDegraded) {
-				unhealthyComponent = true
-			}
-		}
-		if state.Collector != nil {
-			if (failConfig.Failed && (otelhelpers.HasStatus(state.Collector, componentstatus.StatusFatalError) || otelhelpers.HasStatus(state.Collector, componentstatus.StatusPermanentError))) || (failConfig.Degraded && otelhelpers.HasStatus(state.Collector, componentstatus.StatusRecoverableError)) {
+		unhealthyComponent := (failConfig.Failed && monitoringhelpers.HaveState(state.Components, client.UnitStateFailed)) || (failConfig.Degraded && monitoringhelpers.HaveState(state.Components, client.UnitStateDegraded))
+		if !unhealthyComponent && state.Collector != nil {
+			if (failConfig.Failed && (translate.HasStatus(state.Collector, componentstatus.StatusFatalError) || translate.HasStatus(state.Collector, componentstatus.StatusPermanentError))) || (failConfig.Degraded && translate.HasStatus(state.Collector, componentstatus.StatusRecoverableError)) {
 				unhealthyComponent = true
 			}
 		}

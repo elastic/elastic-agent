@@ -296,9 +296,9 @@ func osBatchToOGC(cacheDir string, batch common.OSBatch) Layout {
 		batch.OS.Arch,
 	}
 	if batch.OS.Type == define.Linux {
-		tags = append(tags, strings.ToLower(fmt.Sprintf("%s-%s", batch.OS.Distro, strings.Replace(batch.OS.Version, ".", "-", -1))))
+		tags = append(tags, strings.ToLower(fmt.Sprintf("%s-%s", batch.OS.Distro, strings.ReplaceAll(batch.OS.Version, ".", "-"))))
 	} else {
-		tags = append(tags, strings.ToLower(fmt.Sprintf("%s-%s", batch.OS.Type, strings.Replace(batch.OS.Version, ".", "-", -1))))
+		tags = append(tags, strings.ToLower(fmt.Sprintf("%s-%s", batch.OS.Type, strings.ReplaceAll(batch.OS.Version, ".", "-"))))
 	}
 	los, _ := findOSLayout(batch.OS.OS)
 	return Layout{

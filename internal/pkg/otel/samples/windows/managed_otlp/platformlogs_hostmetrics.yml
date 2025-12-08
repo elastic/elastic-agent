@@ -1,0 +1,90 @@
+receivers:
+  windowseventlog:
+    channel: application
+
+  # Receiver for CPU, Disk, Memory, and Filesystem metrics
+  hostmetrics/system:
+    collection_interval: 60s
+    scrapers:
+      filesystem:
+      memory:
+        metrics:
+          system.memory.utilization:
+            enabled: true
+      # process scraper is disabled for now: https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/39423
+      #process:
+      #  mute_process_exe_error: true
+      #  mute_process_io_error: true
+      #  mute_process_user_error: true
+      #  metrics:
+      #    process.threads:
+      #      enabled: true
+      #    process.open_file_descriptors:
+      #      enabled: true
+      #    process.memory.utilization:
+      #      enabled: true
+      #    process.disk.operations:
+      #      enabled: true
+      network:
+      processes:
+      load:
+
+processors:
+  resourcedetection:
+    detectors: ["system"]
+    system:
+      hostname_sources: ["os"]
+      resource_attributes:
+        host.name:
+          enabled: true
+        host.id:
+          enabled: false
+        host.arch:
+          enabled: true
+        host.ip:
+          enabled: true
+        host.mac:
+          enabled: true
+        host.cpu.vendor.id:
+          enabled: true
+        host.cpu.family:
+          enabled: true
+        host.cpu.model.id:
+          enabled: true
+        host.cpu.model.name:
+          enabled: true
+        host.cpu.stepping:
+          enabled: true
+        host.cpu.cache.l2.size:
+          enabled: true
+        os.description:
+          enabled: true
+        os.type:
+          enabled: true
+
+exporters:
+  # Exporter to send logs and metrics to Elasticsearch Managed OTLP Input
+  otlp/ingest:
+    endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
+    headers:
+      Authorization: ApiKey ${env:ELASTIC_API_KEY}
+    sending_queue:
+      enabled: true
+      sizer: bytes
+      queue_size: 50000000 # 50MB uncompressed
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 1_000_000 # 1MB uncompressed
+        max_size: 4_000_000 # 4MB uncompressed
+
+service:
+  pipelines:
+    metrics/hostmetrics:
+      receivers: [hostmetrics/system]
+      processors: [resourcedetection]
+      exporters: [otlp/ingest]
+    logs/platformlogs:
+      receivers: [windowseventlog]
+      processors: [resourcedetection]
+      exporters: [otlp/ingest]

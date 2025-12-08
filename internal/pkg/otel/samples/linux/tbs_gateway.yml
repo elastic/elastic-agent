@@ -19,7 +19,7 @@ processors:
   batch/metrics:
     send_batch_max_size: 0 # Explicitly set to 0 to avoid splitting metrics requests
     timeout: 1s
-  elastictrace: {} # Elastic Trace Processor
+  elasticapm: {} # Elastic APM Processor
   tail_sampling:
     decision_wait: 10s
     num_traces: 100
@@ -56,7 +56,7 @@ service:
       exporters: [ debug, elasticapm, elasticsearch/otel ]
     traces/1-process-elastic:
       receivers: [ otlp ]
-      processors: [ batch, elastictrace ]
+      processors: [ batch, elasticapm ]
       exporters: [ debug, elasticapm, forward ]
     traces/2-process-tbs:
       receivers: [ forward ]

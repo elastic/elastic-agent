@@ -25,8 +25,8 @@ func (a upgradeAgentWatcher) Watch(ctx context.Context, tilGrace, errorCheckInte
 
 type upgradeInstallationModifier struct{}
 
-func (a upgradeInstallationModifier) Cleanup(log *logger.Logger, topDirPath, currentVersionedHome, currentHash string, removeMarker, keepLogs bool) error {
-	return upgrade.Cleanup(log, topDirPath, currentVersionedHome, currentHash, removeMarker, keepLogs)
+func (a upgradeInstallationModifier) Cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool, versionedHomesToKeep ...string) error {
+	return upgrade.Cleanup(log, topDirPath, removeMarker, keepLogs, versionedHomesToKeep...)
 }
 
 func (a upgradeInstallationModifier) Rollback(ctx context.Context, log *logger.Logger, c client.Client, topDirPath, prevVersionedHome, prevHash string, opts ...upgrade.RollbackOption) error {

@@ -148,6 +148,10 @@ be used when the same credentials will be used across all the possible actions a
   KIBANA_CA - path to certificate authority to use with communicate with Kibana [$ELASTICSEARCH_CA]
   ELASTIC_AGENT_TAGS - user provided tags for the agent [linux,staging]
 
+* Beats Receivers
+  The following experimental environment variables can be set to enable using Beats Receivers.
+
+  AGENT_MONITORING_RUNTIME_EXPERIMENTAL - Set to either "process" or "otel" to use the respective runtime for the monitoring components.
 
 * Elastic-Agent event logging
   If EVENTS_TO_STDERR is set to true log entries containing event data or whole raw events will be logged to stderr alongside
@@ -170,7 +174,7 @@ occurs on every start of the container set FLEET_FORCE to 1.
 }
 
 func logError(streams *cli.IOStreams, err error) {
-	fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+	fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
 }
 
 func logInfo(streams *cli.IOStreams, a ...interface{}) {

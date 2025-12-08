@@ -32,7 +32,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
-	mockhandlers "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/agent/application/actions/handlers"
 )
 
 // Test Handler SSL_Passphrase tests encrypted private keys in the policy
@@ -117,7 +116,7 @@ func Test_Handler_SSL_Passphrase(t *testing.T) {
 		wantCAs                  []string
 		wantCertificateConfig    tlscommon.CertificateConfig
 		assertErr                func(t *testing.T, err error)
-		customLogLevelSetterMock func(t *testing.T) *mockhandlers.LogLevelSetter
+		customLogLevelSetterMock func(t *testing.T) *mockLogLevelSetter
 	}{{
 		name: "certificate and key with passphrase is applied when present",
 		originalCfg: &configuration.Configuration{
@@ -203,7 +202,7 @@ func Test_Handler_SSL_Passphrase(t *testing.T) {
 				setterCalledCount++
 			}}
 
-			var logLevelSetterMock *mockhandlers.LogLevelSetter
+			var logLevelSetterMock *mockLogLevelSetter
 			if tc.customLogLevelSetterMock != nil {
 				logLevelSetterMock = tc.customLogLevelSetterMock(t)
 			} else {

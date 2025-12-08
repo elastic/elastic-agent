@@ -50,7 +50,6 @@ import (
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	mockAcker "github.com/elastic/elastic-agent/testing/mocks/internal_/pkg/fleetapi/acker"
 )
 
 const (
@@ -551,7 +550,7 @@ func TestPreUpgradeCallback(t *testing.T) {
 		upgradeErr:  upgrade.ErrUpgradeSameVersion,
 	}
 
-	acker := mockAcker.NewAcker(t)
+	acker := acker.NewMockAcker(t)
 	coord, _, _ := createCoordinator(t, ctx,
 		ManagedCoordinator(true),
 		WithUpgradeManager(upgradeManager),
@@ -1118,9 +1117,10 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 	require.NoError(t, err)
 
 	monitoringMgr := newTestMonitoringMgr()
-	cfg := configuration.DefaultGRPCConfig()
-	cfg.Port = 0
-	rm, err := runtime.NewManager(l, l, ai, apmtest.DiscardTracer, monitoringMgr, cfg)
+	cfg := configuration.DefaultConfiguration()
+	grpcCfg := cfg.Settings.GRPC
+	grpcCfg.Port = 0
+	rm, err := runtime.NewManager(l, l, ai, apmtest.DiscardTracer, monitoringMgr, grpcCfg)
 	require.NoError(t, err)
 	otelMgr := &fakeOTelManager{}
 	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), l)
@@ -1138,8 +1138,7 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 	if acker == nil {
 		acker = &fakeActionAcker{}
 	}
-
-	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelMgr, acker, nil)
+	coord := New(l, cfg, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelMgr, acker, nil)
 	return coord, cfgMgr, varsMgr
 }
 

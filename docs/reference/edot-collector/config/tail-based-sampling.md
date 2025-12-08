@@ -46,7 +46,7 @@ service:
   pipelines:
     traces/1-process-elastic:
       receivers: [ otlp ]
-      processors: [ elastictrace ]
+      processors: [ elasticapm ]
       exporters: [ elasticapm, forward ]
     traces/2-process-tbs:
       receivers: [ forward ]
@@ -91,7 +91,7 @@ service:
   pipelines:
     traces/1-process-elastic:
       receivers: [ otlp ]
-      processors: [ elastictrace ]
+      processors: [ elasticapm ]
       exporters: [ elasticapm, forward ]
     traces/2-process-tbs:
       receivers: [ forward ]
