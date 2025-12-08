@@ -59,9 +59,9 @@ require (
 )
 
 require (
+	github.com/aws/aws-sdk-go-v2/service/signin v1.0.2 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.139.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.139.0 // indirect
-	github.com/peterbourgon/ff/v3 v3.4.0 // indirect
 	go.opentelemetry.io/collector/component/componentstatus v0.139.0 // indirect
 	go.opentelemetry.io/collector/component/componenttest v0.141.0 // indirect
 	go.opentelemetry.io/collector/config/confighttp v0.139.0 // indirect
@@ -402,7 +402,6 @@ require (
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
 	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/josharian/native v1.1.0 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
 	github.com/kamstrup/intmap v0.5.1 // indirect
@@ -525,7 +524,6 @@ require (
 	github.com/shirou/gopsutil/v4 v4.25.10 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/shurcooL/httpfs v0.0.0-20230704072500-f1e31cf0ba5c // indirect
-	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
 	github.com/stackitcloud/stackit-sdk-go/core v0.17.3 // indirect
@@ -556,7 +554,6 @@ require (
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	github.com/zeebo/errs v1.4.0 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.1 // indirect
