@@ -38,7 +38,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [apachereceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/apachereceiver/v0.141.0/receiver/apachereceiver/README.md) | v0.141.0 |
 | [awss3receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/awss3receiver/v0.141.0/receiver/awss3receiver/README.md) | v0.141.0 |
 | [dockerstatsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/dockerstatsreceiver/v0.141.0/receiver/dockerstatsreceiver/README.md) | v0.141.0 |
-| [elasticapmintakereceiver](https://github.com/elastic/opentelemetry-collector-components/blob/receiver/elasticapmintakereceiver/v0.21.0/receiver/elasticapmintakereceiver/README.md) | v0.21.0 |
+| [elasticapmintakereceiver](https://github.com/elastic/opentelemetry-collector-components/blob/receiver/elasticapmintakereceiver/v0.24.0/receiver/elasticapmintakereceiver/README.md) | v0.24.0 |
 | [filelogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/filelogreceiver/v0.141.0/receiver/filelogreceiver/README.md) | v0.141.0 |
 | [hostmetricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/hostmetricsreceiver/v0.141.0/receiver/hostmetricsreceiver/README.md) | v0.141.0 |
 | [httpcheckreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/httpcheckreceiver/v0.141.0/receiver/httpcheckreceiver/README.md) | v0.141.0 |
@@ -84,9 +84,9 @@ This section provides a summary of components included in the Elastic Distributi
 | [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.141.0/processor/attributesprocessor/README.md) | v0.141.0 |
 | [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.141.0/processor/batchprocessor/README.md) | v0.141.0 |
 | [cumulativetodeltaprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/cumulativetodeltaprocessor/v0.141.0/processor/cumulativetodeltaprocessor/README.md) | v0.141.0 |
-| [elasticapmprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticapmprocessor/v0.21.0/processor/elasticapmprocessor/README.md) | v0.21.0 |
-| [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.20.0/processor/elasticinframetricsprocessor/README.md) | v0.20.0 |
-| [elastictraceprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elastictraceprocessor/v0.20.0/processor/elastictraceprocessor/README.md) | v0.20.0 |
+| [elasticapmprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticapmprocessor/v0.24.0/processor/elasticapmprocessor/README.md) | v0.24.0 |
+| [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.24.0/processor/elasticinframetricsprocessor/README.md) | v0.24.0 |
+| [elastictraceprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elastictraceprocessor/v0.24.0/processor/elastictraceprocessor/README.md) | v0.24.0 |
 | [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.141.0/processor/filterprocessor/README.md) | v0.141.0 |
 | [geoipprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/geoipprocessor/v0.141.0/processor/geoipprocessor/README.md) | v0.141.0 |
 | [k8sattributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/k8sattributesprocessor/v0.141.0/processor/k8sattributesprocessor/README.md) | v0.141.0 |
@@ -100,8 +100,8 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| [apikeyauthextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apikeyauthextension/v0.22.0/extension/apikeyauthextension/README.md) | v0.22.0 |
-| [apmconfigextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apmconfigextension/v0.20.0/extension/apmconfigextension/README.md) | v0.20.0 |
+| [apikeyauthextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apikeyauthextension/v0.24.0/extension/apikeyauthextension/README.md) | v0.24.0 |
+| [apmconfigextension](https://github.com/elastic/opentelemetry-collector-components/blob/extension/apmconfigextension/v0.24.0/extension/apmconfigextension/README.md) | v0.24.0 |
 | [awslogsencodingextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/encoding/awslogsencodingextension/v0.141.0/extension/encoding/awslogsencodingextension/README.md) | v0.141.0 |
 | [bearertokenauthextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/bearertokenauthextension/v0.141.0/extension/bearertokenauthextension/README.md) | v0.141.0 |
 | [filestorage](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/storage/filestorage/v0.141.0/extension/storage/filestorage/README.md) | v0.141.0 |
@@ -117,9 +117,9 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| [elasticapmconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/elasticapmconnector/v0.20.0/connector/elasticapmconnector/README.md) | v0.20.0 |
+| [elasticapmconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/elasticapmconnector/v0.24.0/connector/elasticapmconnector/README.md) | v0.24.0 |
 | [forwardconnector](https://github.com/open-telemetry/opentelemetry-collector/blob/connector/forwardconnector/v0.141.0/connector/forwardconnector/README.md) | v0.141.0 |
-| [profilingmetricsconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/profilingmetricsconnector/v0.20.0/connector/profilingmetricsconnector/README.md) | v0.20.0 |
+| [profilingmetricsconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/profilingmetricsconnector/v0.24.0/connector/profilingmetricsconnector/README.md) | v0.24.0 |
 | [routingconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/routingconnector/v0.141.0/connector/routingconnector/README.md) | v0.141.0 |
 | [spanmetricsconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/spanmetricsconnector/v0.141.0/connector/spanmetricsconnector/README.md) | v0.141.0 |
 ## Persistence in OpenTelemetry Collector
