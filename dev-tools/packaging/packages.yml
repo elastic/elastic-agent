@@ -411,6 +411,8 @@ shared:
       mode: 0755
       config_mode: 0644
       skip_on_missing: true
+
+  - &agent_otel_component_files
     'data/{{.BeatName}}-{{ commit_short }}/components/elastic-otel-collector{{.BinaryExt}}':
       source: build/golang-crossbuild/elastic-otel-collector-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
@@ -434,6 +436,7 @@ shared:
       <<: *agent_binary_files
       <<: *linux_otel_files
       <<: *agent_unpacked_components_files
+      <<: *agent_otel_component_files
 
   - &agent_binary_fips_spec
     <<: *common_fips
@@ -441,6 +444,7 @@ shared:
     files:
       <<: *agent_binary_files
       <<: *agent_unpacked_components_files
+      <<: *agent_otel_component_files
       NOTICE.txt:
         source: '{{ repo.RootDir }}/NOTICE-fips.txt'
         mode: 0644
@@ -452,6 +456,7 @@ shared:
     files:
       <<: *agent_darwin_binary_files
       <<: *agent_unpacked_components_files
+      <<: *agent_otel_component_files
 
   # Binary package spec (zip for windows) for community beats.
   - &agent_windows_binary_spec
@@ -1667,6 +1672,7 @@ specs:
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+          <<: *agent_otel_component_files
 
     - os: darwin
       types: [tgz]
@@ -1678,6 +1684,7 @@ specs:
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+          <<: *agent_otel_component_files
 
     - os: linux
       types: [tgz]
@@ -1689,6 +1696,7 @@ specs:
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+          <<: *agent_otel_component_files
 
     - os: aix
       types: [tgz]
@@ -1700,6 +1708,7 @@ specs:
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+          <<: *agent_otel_component_files
 
     - os: linux
       types: [tgz]
@@ -1712,3 +1721,4 @@ specs:
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+          <<: *agent_otel_component_files

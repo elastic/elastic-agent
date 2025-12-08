@@ -39,9 +39,6 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	filecopy "github.com/otiai10/copy"
 
-	// beat specific targets for building elastic-otel-collector with
-	// all the beats bundled in
-	metricbeat "github.com/elastic/beats/v7/metricbeat/scripts/mage"
 	packetbeat "github.com/elastic/beats/v7/packetbeat/scripts/mage"
 	xpacketbeat "github.com/elastic/beats/v7/x-pack/packetbeat/scripts/mage"
 
@@ -323,14 +320,6 @@ func (Build) WindowsArchiveRootBinary() {
 	mg.Deps(mg.F(Build.windowsArchiveRootBinaryForGoArch, devtools.GOARCH))
 }
 
-// GolangCrossBuildOSS build the Beat binary inside of the golang-builder.
-// Do not use directly, use crossBuild instead.
-func GolangCrossBuildOSS() error {
-	params := devtools.DefaultGolangCrossBuildArgs()
-	injectBuildVars(params.Vars)
-	return devtools.GolangCrossBuild(params)
-}
-
 // GolangCrossBuild build the Beat binary inside of the golang-builder.
 // Do not use directly, use crossBuild instead.
 func GolangCrossBuild() error {
@@ -343,21 +332,7 @@ func GolangCrossBuild() error {
 		return err
 	}
 
-	// TODO: no OSS bits just yet
-	// return GolangCrossBuildOSS()
-
 	return nil
-}
-
-// BinaryOSS build the fleet artifact.
-func (Build) BinaryOSS() error {
-	mg.Deps(Prepare.Env)
-	buildArgs := devtools.DefaultBuildArgs()
-	buildArgs.Name = "elastic-agent-oss"
-	buildArgs.OutputDir = buildDir
-	injectBuildVars(buildArgs.Vars)
-
-	return devtools.Build(buildArgs)
 }
 
 // Binary build the fleet artifact.
@@ -552,32 +527,6 @@ func (Format) All() {
 func (Format) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
 	return sh.RunV("go-licenser", "-license", "Elastic")
-}
-
-// AssembleDarwinUniversal merges the darwin/amd64 and darwin/arm64 into a single
-// universal binary using `lipo`. It's automatically invoked by CrossBuild whenever
-// the darwin/amd64 and darwin/arm64 are present.
-func AssembleDarwinUniversal() error {
-	cmd := "lipo"
-
-	if _, err := exec.LookPath(cmd); err != nil {
-		return fmt.Errorf("%q is required to assemble the universal binary: %w",
-			cmd, err)
-	}
-
-	var lipoArgs []string
-	args := []string{
-		"build/golang-crossbuild/%s-darwin-universal",
-		"build/golang-crossbuild/%s-darwin-arm64",
-		"build/golang-crossbuild/%s-darwin-amd64",
-	}
-
-	for _, arg := range args {
-		lipoArgs = append(lipoArgs, fmt.Sprintf(arg, devtools.BeatName))
-	}
-
-	lipo := sh.RunCmd(cmd, "-create", "-output")
-	return lipo(lipoArgs...)
 }
 
 // Package packages the Beat for distribution.
@@ -855,6 +804,9 @@ func PackageAgentCore() {
 	start := time.Now()
 	defer func() { fmt.Println("packageAgentCore ran for", time.Since(start)) }()
 
+	if mage.OTELComponentBuild {
+		mg.Deps(Otel.CrossBuild)
+	}
 	mg.Deps(CrossBuild)
 
 	devtools.UseElasticAgentCorePackaging()
@@ -3750,8 +3702,27 @@ func (Otel) GolangCrossBuild() error {
 	return nil
 }
 
+// npcapImageSelector is a copy of xpacketbeat.ImageSelector. xpacketbeat.ImageSelector cannot be used
+// directly because it will use its own devtools that comes from the beats repository and will duplicate global
+// state that is not correct for the elastic-agent.
+func npcapImageSelector(platform string) (string, error) {
+	image, err := devtools.CrossBuildImage(platform)
+	if err != nil {
+		return "", err
+	}
+	if os.Getenv("CI") != "true" && os.Getenv("NPCAP_LOCAL") != "true" {
+		return image, nil
+	}
+	if platform == "windows/amd64" {
+		image = strings.ReplaceAll(image, "beats-dev", "observability-ci") // Temporarily work around naming of npcap image.
+		image = strings.ReplaceAll(image, "main", "npcap-"+xpacketbeat.NpcapVersion+"-debian9")
+	}
+	return image, nil
+}
+
 // CrossBuild builds the elastic-otel-collector binary in the golang-crossbuild container.
 func (Otel) CrossBuild() error {
+	mg.Deps(EnsureCrossBuildOutputDir)
 	opts := []devtools.CrossBuildOption{devtools.WithName("elastic-otel-collector"), devtools.WithTarget("otel:golangCrossBuild")}
 
 	// embedded packetbeat is only included in a non-FIPS build
@@ -3762,8 +3733,8 @@ func (Otel) CrossBuild() error {
 			return err
 		}
 		mg.SerialDeps(xpacketbeat.GetNpcapInstallerFn(filepath.Join(beatsDir, "x-pack", "packetbeat")))
-
-		opts = append(opts, devtools.ImageSelector(xpacketbeat.ImageSelector))
+		// use the npcap build image for windows
+		opts = append(opts, devtools.ImageSelector(npcapImageSelector))
 	}
 
 	return devtools.CrossBuild(opts...)
