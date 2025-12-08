@@ -225,7 +225,10 @@ func changeLaunchdServiceFile(serviceName string, plistPath string, username str
 	if err != nil {
 		return fmt.Errorf("failed to access service file for write at %q: %w", plistPath, err)
 	}
-	defer func() { _ = fileWriter.Close() }()
+	defer func() {
+		_ = fileWriter.Sync()
+		_ = fileWriter.Close()
+	}()
 
 	enc := plist.NewEncoder(fileWriter)
 	if err := enc.Encode(plistMap); err != nil {

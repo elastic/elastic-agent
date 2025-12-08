@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -138,6 +137,11 @@ func (suite *FakeInputSuite) TestManager_Features() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subscriptionCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -338,6 +342,11 @@ func (suite *FakeInputSuite) TestManager_APM() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subscriptionCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -610,6 +619,12 @@ func (suite *FakeInputSuite) TestManager_Limits() {
 		Units: []component.Unit{},
 	}
 
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
+
 	subscriptionCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
 	subscriptionErrCh := make(chan error)
@@ -774,6 +789,12 @@ func (suite *FakeInputSuite) TestManager_BadUnitToGood() {
 		},
 	}
 
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
+
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
 	subErrCh := make(chan error)
@@ -792,9 +813,10 @@ func (suite *FakeInputSuite) TestManager_BadUnitToGood() {
 				} else {
 					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-input"}]
 					if ok {
-						if unit.State == client.UnitStateFailed {
+						switch unit.State {
+						case client.UnitStateFailed:
 							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
-						} else if unit.State == client.UnitStateHealthy {
+						case client.UnitStateHealthy:
 							// update the bad unit to be good; so it will transition to healthy
 							updatedComp := comp
 							updatedComp.Units = make([]component.Unit, len(comp.Units))
@@ -816,9 +838,9 @@ func (suite *FakeInputSuite) TestManager_BadUnitToGood() {
 							if err != nil {
 								subErrCh <- err
 							}
-						} else if unit.State == client.UnitStateStopped || unit.State == client.UnitStateStarting {
+						case client.UnitStateStopped, client.UnitStateStarting:
 							// acceptable
-						} else {
+						default:
 							// unknown state that should not have occurred
 							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
 						}
@@ -832,24 +854,25 @@ func (suite *FakeInputSuite) TestManager_BadUnitToGood() {
 								subErrCh <- errors.New("bad-input unit should be failed")
 							}
 						} else {
-							if unit.State == client.UnitStateFailed {
+							switch unit.State {
+							case client.UnitStateFailed:
 								if unit.Message == "hard-error for config" {
 									// still hard-error; wait for it to go healthy
 								} else {
 									subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
 								}
-							} else if unit.State == client.UnitStateHealthy {
+							case client.UnitStateHealthy:
 								// bad unit is now healthy; stop the component
 								m.Update(component.Model{Components: []component.Component{}})
 								err := <-m.errCh
 								if err != nil {
 									subErrCh <- err
 								}
-							} else if unit.State == client.UnitStateStopped {
+							case client.UnitStateStopped:
 								subErrCh <- nil
-							} else if unit.State == client.UnitStateStarting {
+							case client.UnitStateStarting:
 								// acceptable
-							} else {
+							default:
 								// unknown state that should not have occurred
 								subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
 							}
@@ -948,6 +971,14 @@ func (suite *FakeInputSuite) TestManager_GoodUnitToBad() {
 		Err:  errors.New("hard-error for config"),
 	}
 	goodUnitKey := ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "good-input"}
+
+	runPath := paths.Run()
+	for _, comp := range []component.Component{healthyComp, unhealthyComp} {
+		require.NoError(t, comp.PrepareWorkDir(runPath))
+		t.Cleanup(func() {
+			assert.NoError(t, comp.RemoveWorkDir(runPath))
+		})
+	}
 
 	// Wait for Manager to start up
 	timedWaitForReady(t, m, 1*time.Second)
@@ -1067,6 +1098,7 @@ func noDeadlockTestComponent(t *testing.T, index int) component.Component {
 }
 
 func (suite *FakeInputSuite) TestManager_NoDeadlock() {
+	runPath := paths.Run()
 	t := suite.T()
 	// NOTE: This is a long-running test that spams the runtime managers `Update` function to try and
 	// trigger a deadlock. This test takes 2 minutes to run trying to re-produce issue:
@@ -1105,6 +1137,10 @@ func (suite *FakeInputSuite) TestManager_NoDeadlock() {
 		defer close(updateResultChan)
 		for i := 0; updateLoopCtx.Err() == nil; i++ {
 			comp := noDeadlockTestComponent(t, i)
+			require.NoError(t, comp.PrepareWorkDir(runPath))
+			t.Cleanup(func() {
+				assert.NoError(t, comp.RemoveWorkDir(runPath))
+			})
 			m.Update(component.Model{Components: []component.Component{comp}})
 			err := <-m.errCh
 			updateResultChan <- err
@@ -1193,6 +1229,11 @@ func (suite *FakeInputSuite) TestManager_Configure() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -1210,9 +1251,10 @@ func (suite *FakeInputSuite) TestManager_Configure() {
 				} else {
 					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-input"}]
 					if ok {
-						if unit.State == client.UnitStateFailed {
+						switch unit.State {
+						case client.UnitStateFailed:
 							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
-						} else if unit.State == client.UnitStateHealthy {
+						case client.UnitStateHealthy:
 							// update config to change the state to degraded
 							comp.Units[0].Config = component.MustExpectedConfig(map[string]interface{}{
 								"type":    "fake",
@@ -1224,11 +1266,11 @@ func (suite *FakeInputSuite) TestManager_Configure() {
 							if err != nil {
 								subErrCh <- err
 							}
-						} else if unit.State == client.UnitStateDegraded {
+						case client.UnitStateDegraded:
 							subErrCh <- nil
-						} else if unit.State == client.UnitStateStarting {
+						case client.UnitStateStarting:
 							// acceptable
-						} else {
+						default:
 							// unknown state that should not have occurred
 							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
 						}
@@ -1325,6 +1367,11 @@ func (suite *FakeInputSuite) TestManager_RemoveUnit() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -1344,11 +1391,12 @@ func (suite *FakeInputSuite) TestManager_RemoveUnit() {
 				} else {
 					unit0, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-input-0"}]
 					if ok {
-						if unit0.State == client.UnitStateFailed {
+						switch unit0.State {
+						case client.UnitStateFailed:
 							subErrCh <- fmt.Errorf("unit 0 failed: %s", unit0.Message)
-						} else if unit0.State == client.UnitStateStarting || unit0.State == client.UnitStateHealthy {
+						case client.UnitStateStarting, client.UnitStateHealthy:
 							// acceptable
-						} else {
+						default:
 							// unknown state that should not have occurred
 							subErrCh <- fmt.Errorf("unit 0 reported unexpected state: %v", unit0.State)
 						}
@@ -1357,9 +1405,10 @@ func (suite *FakeInputSuite) TestManager_RemoveUnit() {
 					}
 					unit1, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-input-1"}]
 					if ok {
-						if unit1.State == client.UnitStateFailed {
+						switch unit1.State {
+						case client.UnitStateFailed:
 							subErrCh <- fmt.Errorf("unit 1 failed: %s", unit1.Message)
-						} else if unit1.State == client.UnitStateHealthy {
+						case client.UnitStateHealthy:
 							// unit1 is healthy lets remove it from the component
 							comp.Units = comp.Units[0:1]
 							m.Update(component.Model{Components: []component.Component{comp}})
@@ -1367,12 +1416,12 @@ func (suite *FakeInputSuite) TestManager_RemoveUnit() {
 							if err != nil {
 								subErrCh <- err
 							}
-						} else if unit1.State == client.UnitStateStarting || unit1.State == client.UnitStateStopping {
+						case client.UnitStateStarting, client.UnitStateStopping:
 							// acceptable
-						} else if unit1.State == client.UnitStateStopped {
+						case client.UnitStateStopped:
 							// unit should have been reported stopped before being removed
 							unit1Stopped = true
-						} else {
+						default:
 							// unknown state that should not have occurred
 							subErrCh <- fmt.Errorf("unit 1 reported unexpected state: %v", unit1.State)
 						}
@@ -1470,6 +1519,11 @@ func (suite *FakeInputSuite) TestManager_ActionState() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -1487,9 +1541,10 @@ func (suite *FakeInputSuite) TestManager_ActionState() {
 				} else {
 					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-input"}]
 					if ok {
-						if unit.State == client.UnitStateFailed {
+						switch unit.State {
+						case client.UnitStateFailed:
 							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
-						} else if unit.State == client.UnitStateHealthy {
+						case client.UnitStateHealthy:
 							// must be called in a separate go routine because it cannot block receiving from the
 							// subscription channel
 							go func() {
@@ -1503,12 +1558,12 @@ func (suite *FakeInputSuite) TestManager_ActionState() {
 									subErrCh <- err
 								}
 							}()
-						} else if unit.State == client.UnitStateDegraded {
+						case client.UnitStateDegraded:
 							// action set it to degraded
 							subErrCh <- nil
-						} else if unit.State == client.UnitStateStarting {
+						case client.UnitStateStarting:
 							// acceptable
-						} else {
+						default:
 							// unknown state that should not have occurred
 							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
 						}
@@ -1595,6 +1650,11 @@ func (suite *FakeInputSuite) TestManager_Restarts() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -1616,11 +1676,12 @@ func (suite *FakeInputSuite) TestManager_Restarts() {
 				} else {
 					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-input"}]
 					if ok {
-						if unit.State == client.UnitStateFailed {
+						switch unit.State {
+						case client.UnitStateFailed:
 							if !killed {
 								subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
 							}
-						} else if unit.State == client.UnitStateHealthy {
+						case client.UnitStateHealthy:
 							// force the input to exit and it should be restarted
 							if !killed {
 								killed = true
@@ -1642,9 +1703,9 @@ func (suite *FakeInputSuite) TestManager_Restarts() {
 								// got back to healthy after kill
 								subErrCh <- nil
 							}
-						} else if unit.State == client.UnitStateStarting {
+						case client.UnitStateStarting:
 							// acceptable
-						} else {
+						default:
 							// unknown state that should not have occurred
 							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
 						}
@@ -1738,6 +1799,11 @@ func (suite *FakeInputSuite) TestManager_Restarts_ConfigKill() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -1759,11 +1825,12 @@ func (suite *FakeInputSuite) TestManager_Restarts_ConfigKill() {
 				} else {
 					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-input"}]
 					if ok {
-						if unit.State == client.UnitStateFailed {
+						switch unit.State {
+						case client.UnitStateFailed:
 							if !killed {
 								subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
 							}
-						} else if unit.State == client.UnitStateHealthy {
+						case client.UnitStateHealthy:
 							// force the input to exit and it should be restarted
 							if !killed {
 								killed = true
@@ -1786,9 +1853,9 @@ func (suite *FakeInputSuite) TestManager_Restarts_ConfigKill() {
 								// got back to healthy after kill
 								subErrCh <- nil
 							}
-						} else if unit.State == client.UnitStateStarting || unit.State == client.UnitStateStopped {
+						case client.UnitStateStarting, client.UnitStateStopped:
 							// acceptable
-						} else {
+						default:
 							// unknown state that should not have occurred
 							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
 						}
@@ -1883,6 +1950,11 @@ func (suite *FakeInputSuite) TestManager_KeepsRestarting() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -1904,10 +1976,11 @@ func (suite *FakeInputSuite) TestManager_KeepsRestarting() {
 				} else {
 					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-input"}]
 					if ok {
-						if unit.State == client.UnitStateFailed {
+						switch unit.State {
+						case client.UnitStateFailed:
 							// unit should not be failed because we allow restart per period
 							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
-						} else if unit.State == client.UnitStateHealthy {
+						case client.UnitStateHealthy:
 							if lastStoppedCount != stoppedCount {
 								lastStoppedCount = stoppedCount
 
@@ -1928,11 +2001,11 @@ func (suite *FakeInputSuite) TestManager_KeepsRestarting() {
 								// got stopped 3 times and got back to healthy
 								subErrCh <- nil
 							}
-						} else if unit.State == client.UnitStateStarting {
+						case client.UnitStateStarting:
 							// acceptable
-						} else if unit.State == client.UnitStateStopped {
+						case client.UnitStateStopped:
 							stoppedCount += 1
-						} else {
+						default:
 							// unknown state that should not have occurred
 							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
 						}
@@ -2028,6 +2101,11 @@ func (suite *FakeInputSuite) TestManager_RestartsOnMissedCheckins() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -2137,6 +2215,11 @@ func (suite *FakeInputSuite) TestManager_InvalidAction() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -2154,9 +2237,10 @@ func (suite *FakeInputSuite) TestManager_InvalidAction() {
 				} else {
 					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-input"}]
 					if ok {
-						if unit.State == client.UnitStateFailed {
+						switch unit.State {
+						case client.UnitStateFailed:
 							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
-						} else if unit.State == client.UnitStateHealthy {
+						case client.UnitStateHealthy:
 							actionCtx, actionCancel := context.WithTimeout(context.Background(), 5*time.Second)
 							_, err := m.PerformAction(actionCtx, comp, comp.Units[0], "invalid_missing_action", nil)
 							actionCancel()
@@ -2167,9 +2251,9 @@ func (suite *FakeInputSuite) TestManager_InvalidAction() {
 							} else {
 								subErrCh <- nil
 							}
-						} else if unit.State == client.UnitStateStarting {
+						case client.UnitStateStarting:
 							// acceptable
-						} else {
+						default:
 							// unknown state that should not have occurred
 							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
 						}
@@ -2349,6 +2433,13 @@ func (suite *FakeInputSuite) TestManager_MultiComponent() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	for _, c := range components {
+		require.NoError(t, c.PrepareWorkDir(runPath))
+		t.Cleanup(func() {
+			assert.NoError(t, c.RemoveWorkDir(runPath))
+		})
+	}
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -2476,6 +2567,11 @@ func (suite *FakeInputSuite) TestManager_LogLevel() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
 
 	subCtx, subCancel := context.WithCancel(context.Background())
 	defer subCancel()
@@ -2493,9 +2589,10 @@ func (suite *FakeInputSuite) TestManager_LogLevel() {
 				} else {
 					unit, ok := state.Units[ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "fake-input"}]
 					if ok {
-						if unit.State == client.UnitStateFailed {
+						switch unit.State {
+						case client.UnitStateFailed:
 							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
-						} else if unit.State == client.UnitStateHealthy {
+						case client.UnitStateHealthy:
 							updatedComp := comp
 							updatedComp.Units = make([]component.Unit, len(comp.Units))
 							copy(updatedComp.Units, comp.Units)
@@ -2520,9 +2617,9 @@ func (suite *FakeInputSuite) TestManager_LogLevel() {
 							} else {
 								subErrCh <- nil
 							}
-						} else if unit.State == client.UnitStateStarting {
+						case client.UnitStateStarting:
 							// acceptable
-						} else {
+						default:
 							// unknown state that should not have occurred
 							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
 						}
@@ -2677,6 +2774,19 @@ func (suite *FakeInputSuite) TestManager_StartStopComponent() {
 			},
 		},
 	}
+	runPath := paths.Run()
+	for _, c := range components {
+		require.NoError(t, c.PrepareWorkDir(runPath))
+		t.Cleanup(func() {
+			assert.NoError(t, c.RemoveWorkDir(runPath))
+		})
+	}
+	for _, c := range components2 {
+		require.NoError(t, c.PrepareWorkDir(runPath))
+		t.Cleanup(func() {
+			assert.NoError(t, c.RemoveWorkDir(runPath))
+		})
+	}
 
 	select {
 	case err := <-managerErrCh:
@@ -2824,6 +2934,12 @@ func (suite *FakeInputSuite) TestManager_Chunk() {
 		Units: units,
 	}
 
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	t.Cleanup(func() {
+		assert.NoError(t, comp.RemoveWorkDir(runPath))
+	})
+
 	waitCtx, waitCancel := context.WithTimeout(ctx, 1*time.Second)
 	defer waitCancel()
 	if err := waitForReady(waitCtx, m); err != nil {
@@ -2846,15 +2962,16 @@ func (suite *FakeInputSuite) TestManager_Chunk() {
 					healthyCount := 0
 					stoppedCount := 0
 					for _, unit := range state.Units {
-						if unit.State == client.UnitStateFailed {
+						switch unit.State {
+						case client.UnitStateFailed:
 							subErrCh <- fmt.Errorf("unit failed: %s", unit.Message)
-						} else if unit.State == client.UnitStateHealthy {
+						case client.UnitStateHealthy:
 							healthyCount += 1
-						} else if unit.State == client.UnitStateStopped {
+						case client.UnitStateStopped:
 							stoppedCount += 1
-						} else if unit.State == client.UnitStateStarting {
+						case client.UnitStateStarting:
 							// acceptable
-						} else {
+						default:
 							// unknown state that should not have occurred
 							subErrCh <- fmt.Errorf("unit reported unexpected state: %v", unit.State)
 						}
@@ -2901,10 +3018,6 @@ LOOP:
 
 	err = <-errCh
 	require.NoError(t, err)
-
-	workDir := filepath.Join(paths.Run(), comp.ID)
-	_, err = os.Stat(workDir)
-	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
 func signalState(subErrCh chan error, state *ComponentState, acceptableStates []client.UnitState) {

@@ -9,7 +9,6 @@ import (
 	_ "embed"
 	"fmt"
 	"maps"
-	"math"
 	"net"
 	"net/url"
 	"os"
@@ -18,10 +17,14 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 	"unicode"
 
 	koanfmaps "github.com/knadh/koanf/maps"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/monitoringhelpers"
+
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -54,15 +57,11 @@ const (
 	fileSchemePrefix = "file"
 	unixSchemePrefix = "unix"
 
-	defaultOutputName          = "default"
 	outputsKey                 = "outputs"
 	inputsKey                  = "inputs"
 	idKey                      = "id"
 	agentKey                   = "agent"
-	monitoringKey              = "monitoring"
-	serviceKey                 = "service"
 	useOutputKey               = "use_output"
-	monitoringMetricsPeriodKey = "metrics_period"
 	failureThresholdKey        = "failure_threshold"
 	monitoringOutput           = "monitoring"
 	defaultMonitoringNamespace = "default"
@@ -71,18 +70,11 @@ const (
 	fileBeatName               = "filebeat"
 	collectorName              = "collector"
 
-	monitoringMetricsUnitID = "metrics-monitoring"
-	monitoringFilesUnitsID  = "filestream-monitoring"
+	monitoringMetricsUnitID         = "metrics-monitoring"
+	monitoringFilesUnitsID          = "filestream-monitoring"
+	prometheusMonitoringComponentId = "prometheus/" + monitoringMetricsUnitID
 
 	windowsOS = "windows"
-
-	// metricset execution period used for the monitoring metrics inputs
-	// we set this to 60s to reduce the load/data volume on the monitoring cluster
-	defaultMetricsCollectionInterval = 60 * time.Second
-
-	// metricset stream failure threshold before the stream is marked as DEGRADED
-	// to avoid marking the agent degraded for transient errors, we set the default threshold to 5
-	defaultMetricsStreamFailureThreshold = uint(5)
 )
 
 var (
@@ -94,11 +86,11 @@ var (
 // BeatsMonitor provides config values for monitoring of agent clients (beats, endpoint, etc)
 // by injecting the monitoring config into an existing fleet config
 type BeatsMonitor struct {
-	enabled                 bool // feature flag disabling whole v1 monitoring story
-	config                  *monitoringConfig
-	operatingSystem         string
-	agentInfo               info.Agent
-	isOtelRuntimeSubprocess bool
+	enabled         bool // feature flag disabling whole v1 monitoring story
+	config          *monitoringConfig
+	operatingSystem string
+	agentInfo       info.Agent
+	logger          *logp.Logger
 }
 
 // componentInfo is the information necessary to generate monitoring configuration for a component. We don't just use
@@ -117,15 +109,21 @@ type monitoringConfig struct {
 }
 
 // New creates a new BeatsMonitor instance.
-func New(enabled bool, operatingSystem string, cfg *monitoringCfg.MonitoringConfig, agentInfo info.Agent, isOtelRuntimeSubprocess bool) *BeatsMonitor {
+func New(
+	enabled bool,
+	operatingSystem string,
+	cfg *monitoringCfg.MonitoringConfig,
+	agentInfo info.Agent,
+	logger *logp.Logger,
+) *BeatsMonitor {
 	return &BeatsMonitor{
 		enabled: enabled,
 		config: &monitoringConfig{
 			C: cfg,
 		},
-		operatingSystem:         operatingSystem,
-		agentInfo:               agentInfo,
-		isOtelRuntimeSubprocess: isOtelRuntimeSubprocess,
+		operatingSystem: operatingSystem,
+		agentInfo:       agentInfo,
+		logger:          logger,
 	}
 }
 
@@ -170,86 +168,39 @@ func (b *BeatsMonitor) MonitoringConfig(
 
 	cfg := make(map[string]interface{})
 
-	monitoringOutputName := defaultOutputName
-	metricsCollectionIntervalString := b.config.C.MetricsPeriod
-	failureThreshold := b.config.C.FailureThreshold
 	if agentCfg, found := policy[agentKey]; found {
 		// The agent section is required for feature flags
 		cfg[agentKey] = agentCfg
-
-		agentCfgMap, ok := agentCfg.(map[string]interface{})
-		if ok {
-			if monitoringCfg, found := agentCfgMap[monitoringKey]; found {
-				monitoringMap, ok := monitoringCfg.(map[string]interface{})
-				if ok {
-					if use, found := monitoringMap[useOutputKey]; found {
-						if useStr, ok := use.(string); ok {
-							monitoringOutputName = useStr
-						}
-					}
-
-					if metricsPeriod, found := monitoringMap[monitoringMetricsPeriodKey]; found {
-						if metricsPeriodStr, ok := metricsPeriod.(string); ok {
-							metricsCollectionIntervalString = metricsPeriodStr
-						}
-					}
-
-					if policyFailureThresholdRaw, found := monitoringMap[failureThresholdKey]; found {
-						switch policyValue := policyFailureThresholdRaw.(type) {
-						case uint:
-							failureThreshold = &policyValue
-						case int:
-							if policyValue < 0 {
-								return nil, fmt.Errorf("converting policy failure threshold int to uint, value must be non-negative: %v", policyValue)
-							}
-							unsignedValue := uint(policyValue)
-							failureThreshold = &unsignedValue
-						case float64:
-							if policyValue < 0 || policyValue > math.MaxUint {
-								return nil, fmt.Errorf("converting policy failure threshold float64 to uint, value out of range: %v", policyValue)
-							}
-							truncatedUnsignedValue := uint(policyValue)
-							failureThreshold = &truncatedUnsignedValue
-						case string:
-							parsedPolicyValue, err := strconv.ParseUint(policyValue, 10, 64)
-							if err != nil {
-								return nil, fmt.Errorf("converting policy failure threshold string to uint: %w", err)
-							}
-							if parsedPolicyValue > math.MaxUint {
-								// this is to catch possible overflow in 32-bit envs, should not happen that often
-								return nil, fmt.Errorf("converting policy failure threshold from string to uint, value out of range: %v", policyValue)
-							}
-							uintPolicyValue := uint(parsedPolicyValue)
-							failureThreshold = &uintPolicyValue
-						default:
-							return nil, fmt.Errorf("unsupported type for policy failure threshold: %T", policyFailureThresholdRaw)
-						}
-					}
-				}
-			}
-		}
 	}
 
-	componentInfos := b.getComponentInfos(components, componentIDPidMap)
-
-	if err := b.injectMonitoringOutput(policy, cfg, monitoringOutputName); err != nil && !errors.Is(err, errNoOutputPresent) {
+	outputCfg, err := b.injectMonitoringOutput(policy, cfg)
+	if err != nil && !errors.Is(err, errNoOutputPresent) {
 		return nil, errors.New(err, "failed to inject monitoring output")
 	} else if errors.Is(err, errNoOutputPresent) {
 		// nothing to inject, no monitoring output
 		return nil, nil
 	}
 
+	outputOtelSupportedErr := verifyOutputOtelSupported(outputCfg)
+	monitoringRuntime := component.RuntimeManager(b.config.C.RuntimeManager)
+	if outputOtelSupportedErr != nil {
+		b.logger.Warnf("otel runtime is not supported for monitoring output, switching to process runtime, reason: %v", outputOtelSupportedErr)
+		monitoringRuntime = monitoringCfg.ProcessRuntimeManager
+	}
+	outputOtelSupported := outputOtelSupportedErr == nil
+	componentInfos := b.getComponentInfos(components, monitoringRuntime, outputOtelSupported, componentIDPidMap)
+
 	// initializes inputs collection so injectors don't have to deal with it
 	b.initInputs(cfg)
 
 	if b.config.C.MonitorLogs {
-		if err := b.injectLogsInput(cfg, componentInfos, monitoringOutput); err != nil {
+		if err := b.injectLogsInput(cfg, componentInfos, monitoringOutput, monitoringRuntime); err != nil {
 			return nil, errors.New(err, "failed to inject monitoring output")
 		}
 	}
 
 	if b.config.C.MonitorMetrics {
-		if err := b.injectMetricsInput(cfg, componentInfos, metricsCollectionIntervalString, failureThreshold); err != nil {
+		if err := b.injectMetricsInput(cfg, componentInfos, monitoringRuntime); err != nil {
 			return nil, errors.New(err, "failed to inject monitoring output")
 		}
 	}
@@ -289,7 +240,7 @@ func (b *BeatsMonitor) ComponentMonitoringConfig(unitID, binary string) map[stri
 	}
 
 	configMap := make(map[string]any)
-	endpoint := BeatsMonitoringEndpoint(unitID)
+	endpoint := monitoringhelpers.BeatsMonitoringEndpoint(unitID)
 	if endpoint != "" {
 		httpConfigMap := map[string]any{
 			"enabled": true,
@@ -395,20 +346,28 @@ func (b *BeatsMonitor) initInputs(cfg map[string]interface{}) {
 	cfg[inputsKey] = inputsCollection
 }
 
-func (b *BeatsMonitor) injectMonitoringOutput(source, dest map[string]interface{}, monitoringOutputName string) error {
+// injectMonitoringOutput injects the monitoring output into the configuration. It takes an existing output named
+// `monitoringOutputName` and makes a copy of it named `monitoring`. It returns the output configuration.
+func (b *BeatsMonitor) injectMonitoringOutput(source, dest map[string]interface{}) (map[string]any, error) {
+	monitoringOutputName := b.config.C.UseOutput
 	outputsNode, found := source[outputsKey]
 	if !found {
-		return errNoOutputPresent
+		return nil, errNoOutputPresent
 	}
 
 	outputs, ok := outputsNode.(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("outputs not a map")
+		return nil, fmt.Errorf("outputs not a map")
 	}
 
 	outputNode, found := outputs[monitoringOutputName]
 	if !found {
-		return fmt.Errorf("output %q used for monitoring not found", monitoringOutputName)
+		return nil, fmt.Errorf("output %q used for monitoring not found", monitoringOutputName)
+	}
+
+	outputMap, ok := outputNode.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("output %q used for monitoring not a map", monitoringOutputName)
 	}
 
 	monitoringOutputs := map[string]interface{}{
@@ -417,13 +376,18 @@ func (b *BeatsMonitor) injectMonitoringOutput(source, dest map[string]interface{
 
 	dest[outputsKey] = monitoringOutputs
 
-	return nil
+	return outputMap, nil
 }
 
 // getComponentInfos returns a slice of componentInfo structs based on the provided components. This slice contains
 // all the information needed to generate the monitoring configuration for these components, as well as configuration
 // for new components which are going to be doing the monitoring.
-func (b *BeatsMonitor) getComponentInfos(components []component.Component, componentIDPidMap map[string]uint64) []componentInfo {
+func (b *BeatsMonitor) getComponentInfos(
+	components []component.Component,
+	monitoringRuntime component.RuntimeManager,
+	outputOtelSupported bool,
+	componentIDPidMap map[string]uint64,
+) []componentInfo {
 	componentInfos := make([]componentInfo, 0, len(components))
 	for _, comp := range components {
 		compInfo := componentInfo{
@@ -442,30 +406,35 @@ func (b *BeatsMonitor) getComponentInfos(components []component.Component, compo
 			componentInfo{
 				ID:             fmt.Sprintf("beat/%s", monitoringMetricsUnitID),
 				BinaryName:     metricBeatName,
-				RuntimeManager: component.RuntimeManager(b.config.C.RuntimeManager),
+				RuntimeManager: monitoringRuntime,
 			},
 			componentInfo{
 				ID:             fmt.Sprintf("http/%s", monitoringMetricsUnitID),
 				BinaryName:     metricBeatName,
-				RuntimeManager: component.RuntimeManager(b.config.C.RuntimeManager),
+				RuntimeManager: monitoringRuntime,
 			})
 	}
 	if b.config.C.MonitorLogs {
 		componentInfos = append(componentInfos, componentInfo{
 			ID:             monitoringFilesUnitsID,
 			BinaryName:     fileBeatName,
-			RuntimeManager: component.RuntimeManager(b.config.C.RuntimeManager),
+			RuntimeManager: monitoringRuntime,
 		})
 	}
-	// If any other component uses the Otel runtime, also add a component to monitor
-	// its telemetry.
+	// If any other component uses the Otel runtime, also add a component to monitor its telemetry.
+	// This component only works in the Otel runtime, so we can't add it if the output doesn't support it.
 	if b.config.C.MonitorMetrics && usingOtelRuntime(componentInfos) {
-		componentInfos = append(componentInfos,
-			componentInfo{
-				ID:             fmt.Sprintf("prometheus/%s", monitoringMetricsUnitID),
-				BinaryName:     metricBeatName,
-				RuntimeManager: component.RuntimeManager(b.config.C.RuntimeManager),
-			})
+		if outputOtelSupported {
+			componentInfos = append(componentInfos,
+				componentInfo{
+					ID:             prometheusMonitoringComponentId,
+					BinaryName:     metricBeatName,
+					RuntimeManager: component.OtelRuntimeManager,
+				})
+		} else {
+			b.logger.Warn("The Otel prometheus metrics monitoring input can't run in a beats process, skipping")
+		}
+
 	}
 	// sort the components to ensure a consistent order of inputs in the configuration
 	slices.SortFunc(componentInfos, func(a, b componentInfo) int {
@@ -475,7 +444,12 @@ func (b *BeatsMonitor) getComponentInfos(components []component.Component, compo
 }
 
 // injectLogsInput adds logging configs for component monitoring to the `cfg` map
-func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentInfos []componentInfo, monitoringOutput string) error {
+func (b *BeatsMonitor) injectLogsInput(
+	cfg map[string]interface{},
+	componentInfos []componentInfo,
+	monitoringOutput string,
+	monitoringRuntime component.RuntimeManager,
+) error {
 	logsDrop := filepath.Dir(loggingPath("unit", b.operatingSystem))
 
 	streams := []any{b.getAgentFilestreamStream(logsDrop)}
@@ -483,16 +457,12 @@ func (b *BeatsMonitor) injectLogsInput(cfg map[string]interface{}, componentInfo
 	streams = append(streams, b.getServiceComponentFilestreamStreams(componentInfos)...)
 
 	input := map[string]interface{}{
-		idKey:        fmt.Sprintf("%s-agent", monitoringFilesUnitsID),
-		"name":       fmt.Sprintf("%s-agent", monitoringFilesUnitsID),
-		"type":       "filestream",
-		useOutputKey: monitoringOutput,
-		"streams":    streams,
-	}
-
-	// Make sure we don't set anything until the configuration is stable if the otel manager isn't enabled
-	if b.config.C.RuntimeManager != monitoringCfg.DefaultRuntimeManager {
-		input["_runtime_experimental"] = b.config.C.RuntimeManager
+		idKey:                   fmt.Sprintf("%s-agent", monitoringFilesUnitsID),
+		"name":                  fmt.Sprintf("%s-agent", monitoringFilesUnitsID),
+		"type":                  "filestream",
+		useOutputKey:            monitoringOutput,
+		"streams":               streams,
+		"_runtime_experimental": string(monitoringRuntime),
 	}
 
 	inputs := []any{input}
@@ -528,21 +498,12 @@ func (b *BeatsMonitor) getCollectorTelemetryEndpoint() string {
 func (b *BeatsMonitor) injectMetricsInput(
 	cfg map[string]interface{},
 	componentInfos []componentInfo,
-	metricsCollectionIntervalString string,
-	failureThreshold *uint,
+	monitoringRuntime component.RuntimeManager,
 ) error {
-	if metricsCollectionIntervalString == "" {
-		metricsCollectionIntervalString = defaultMetricsCollectionInterval.String()
-	}
-
-	if failureThreshold == nil {
-		defaultValue := defaultMetricsStreamFailureThreshold
-		failureThreshold = &defaultValue
-	}
 	monitoringNamespace := b.monitoringNamespace()
 
-	beatsStreams := b.getBeatsStreams(componentInfos, failureThreshold, metricsCollectionIntervalString)
-	httpStreams := b.getHttpStreams(componentInfos, failureThreshold, metricsCollectionIntervalString)
+	beatsStreams := b.getBeatsStreams(componentInfos)
+	httpStreams := b.getHttpStreams(componentInfos)
 
 	inputs := []interface{}{
 		map[string]interface{}{
@@ -553,7 +514,8 @@ func (b *BeatsMonitor) injectMetricsInput(
 			"data_stream": map[string]interface{}{
 				"namespace": monitoringNamespace,
 			},
-			"streams": beatsStreams,
+			"streams":               beatsStreams,
+			"_runtime_experimental": string(monitoringRuntime),
 		},
 		map[string]interface{}{
 			idKey:        fmt.Sprintf("%s-agent", monitoringMetricsUnitID),
@@ -563,12 +525,18 @@ func (b *BeatsMonitor) injectMetricsInput(
 			"data_stream": map[string]interface{}{
 				"namespace": monitoringNamespace,
 			},
-			"streams": httpStreams,
+			"streams":               httpStreams,
+			"_runtime_experimental": string(monitoringRuntime),
 		},
 	}
 
-	if usingOtelRuntime(componentInfos) {
-		prometheusStream := b.getPrometheusStream(failureThreshold, metricsCollectionIntervalString)
+	// We only add this stream if the Otel manager is enabled and the respective component info exists. This is a
+	// special case where this input shouldn't exists if the output doesn't support otel, which we check while
+	// creating the component infos.
+	if usingOtelRuntime(componentInfos) && slices.ContainsFunc(componentInfos, func(ci componentInfo) bool {
+		return ci.ID == prometheusMonitoringComponentId
+	}) {
+		prometheusStream := b.getPrometheusStream()
 		inputs = append(inputs, map[string]interface{}{
 			idKey:        fmt.Sprintf("%s-collector", monitoringMetricsUnitID),
 			"name":       fmt.Sprintf("%s-collector", monitoringMetricsUnitID),
@@ -578,20 +546,15 @@ func (b *BeatsMonitor) injectMetricsInput(
 				"namespace": monitoringNamespace,
 			},
 			"streams": []any{prometheusStream},
+			// hardcode this to run in the otel runtime
+			// it won't work in a beat process because we don't set the required environment variable there
+			"_runtime_experimental": monitoringCfg.OtelRuntimeManager,
 		})
-	}
-
-	// Make sure we don't set anything until the configuration is stable if the otel manager isn't enabled
-	if b.config.C.RuntimeManager != monitoringCfg.DefaultRuntimeManager {
-		for _, input := range inputs {
-			inputMap := input.(map[string]interface{})
-			inputMap["_runtime_experimental"] = b.config.C.RuntimeManager
-		}
 	}
 
 	// add system/process metrics for services that can't be monitored via json/beats metrics
 	inputs = append(inputs, b.getServiceComponentProcessMetricInputs(
-		componentInfos, metricsCollectionIntervalString)...)
+		componentInfos)...)
 
 	inputsNode, found := cfg[inputsKey]
 	if !found {
@@ -691,13 +654,13 @@ func (b *BeatsMonitor) getServiceComponentFilestreamStreams(componentInfos []com
 // Note: The return type must be []any due to protobuf serialization quirks.
 func (b *BeatsMonitor) getHttpStreams(
 	componentInfos []componentInfo,
-	failureThreshold *uint,
-	metricsCollectionIntervalString string,
 ) []any {
 	monitoringNamespace := b.monitoringNamespace()
 	sanitizedAgentName := sanitizeName(agentName)
 	indexName := fmt.Sprintf("metrics-elastic_agent.%s-%s", sanitizedAgentName, monitoringNamespace)
 	dataset := fmt.Sprintf("elastic_agent.%s", sanitizedAgentName)
+	metricsCollectionIntervalString := b.config.C.MetricsPeriod.String()
+	failureThreshold := b.config.C.FailureThreshold
 	httpStreams := make([]any, 0, len(componentInfos))
 
 	agentStream := map[string]any{
@@ -720,7 +683,7 @@ func (b *BeatsMonitor) getHttpStreams(
 	}
 	httpStreams = append(httpStreams, agentStream)
 
-	if usingOtelRuntime(componentInfos) && b.isOtelRuntimeSubprocess {
+	if usingOtelRuntime(componentInfos) {
 		edotSubprocessStream := map[string]any{
 			idKey: fmt.Sprintf("%s-edot-collector", monitoringMetricsUnitID),
 			"data_stream": map[string]interface{}{
@@ -748,7 +711,7 @@ func (b *BeatsMonitor) getHttpStreams(
 			continue
 		}
 
-		endpoints := []interface{}{PrefixedEndpoint(BeatsMonitoringEndpoint(compInfo.ID))}
+		endpoints := []interface{}{PrefixedEndpoint(monitoringhelpers.BeatsMonitoringEndpoint(compInfo.ID))}
 		name := sanitizeName(binaryName)
 
 		// Do not create http streams if runtime-manager is otel and binary is of beat type
@@ -806,10 +769,7 @@ func (b *BeatsMonitor) getHttpStreams(
 
 // getPrometheusStream returns the stream definition for prometheus/metrics input.
 // Note: The return type must be []any due to protobuf serialization quirks.
-func (b *BeatsMonitor) getPrometheusStream(
-	failureThreshold *uint,
-	metricsCollectionIntervalString string,
-) any {
+func (b *BeatsMonitor) getPrometheusStream() any {
 	monitoringNamespace := b.monitoringNamespace()
 
 	// Send these metrics through the metricbeat monitoring datastream, since
@@ -833,12 +793,12 @@ func (b *BeatsMonitor) getPrometheusStream(
 		"metrics_path": "/metrics",
 		"hosts":        []interface{}{prometheusHost},
 		"namespace":    monitoringNamespace,
-		"period":       metricsCollectionIntervalString,
+		"period":       b.config.C.MetricsPeriod.String(),
 		"index":        indexName,
 		"processors":   processorsForCollectorPrometheusStream(monitoringNamespace, dataset, b.agentInfo),
 	}
-	if failureThreshold != nil {
-		otelStream[failureThresholdKey] = *failureThreshold
+	if b.config.C.FailureThreshold != nil {
+		otelStream[failureThresholdKey] = *b.config.C.FailureThreshold
 	}
 	return otelStream
 }
@@ -847,8 +807,6 @@ func (b *BeatsMonitor) getPrometheusStream(
 // Note: The return type must be []any due to protobuf serialization quirks.
 func (b *BeatsMonitor) getBeatsStreams(
 	componentInfos []componentInfo,
-	failureThreshold *uint,
-	metricsCollectionIntervalString string,
 ) []any {
 	monitoringNamespace := b.monitoringNamespace()
 	beatsStreams := make([]any, 0, len(componentInfos))
@@ -873,13 +831,13 @@ func (b *BeatsMonitor) getBeatsStreams(
 			},
 			"metricsets": []interface{}{"stats"},
 			"hosts":      endpoints,
-			"period":     metricsCollectionIntervalString,
+			"period":     b.config.C.MetricsPeriod.String(),
 			"index":      indexName,
 			"processors": processorsForBeatsStream(binaryName, compInfo.ID, monitoringNamespace, dataset, b.agentInfo, compInfo.RuntimeManager),
 		}
 
-		if failureThreshold != nil {
-			beatsStream[failureThresholdKey] = *failureThreshold
+		if b.config.C.FailureThreshold != nil {
+			beatsStream[failureThresholdKey] = *b.config.C.FailureThreshold
 		}
 
 		beatsStreams = append(beatsStreams, beatsStream)
@@ -893,7 +851,6 @@ func (b *BeatsMonitor) getBeatsStreams(
 // Note: The return type must be []any due to protobuf serialization quirks.
 func (b *BeatsMonitor) getServiceComponentProcessMetricInputs(
 	componentInfos []componentInfo,
-	metricsCollectionIntervalString string,
 ) []any {
 	monitoringNamespace := b.monitoringNamespace()
 	inputs := []any{}
@@ -921,7 +878,7 @@ func (b *BeatsMonitor) getServiceComponentProcessMetricInputs(
 						"namespace": monitoringNamespace,
 					},
 					"metricsets":              []interface{}{"process"},
-					"period":                  metricsCollectionIntervalString,
+					"period":                  b.config.C.MetricsPeriod.String(),
 					"index":                   fmt.Sprintf("metrics-elastic_agent.%s-%s", name, monitoringNamespace),
 					"process.pid":             compInfo.Pid,
 					"process.cgroups.enabled": false,
@@ -946,6 +903,8 @@ func processorsForAgentFilestream() []any {
 		dropPeriodicMetricsLogsProcessor(),
 		// drop event logs
 		dropEventLogs(),
+		// drop potential sensitive fields emitted by elasticsearch exporter logs
+		dropSensitiveFieldsFromElasticSearchExporterLogs(),
 	}
 	// if the event is from a component, use the component's dataset
 	processors = append(processors, useComponentDatasetProcessors()...)
@@ -1180,6 +1139,20 @@ func dropFieldsProcessor(fields []any, ignoreMissing bool) map[string]any {
 		"drop_fields": map[string]interface{}{
 			"fields":         fields,
 			"ignore_missing": ignoreMissing,
+		},
+	}
+}
+
+// dropElasticSearchExporterLogs returns a processor which drops fields from logs emitted by elasticsearch exporter,  that may contain sensitive data.
+func dropSensitiveFieldsFromElasticSearchExporterLogs() map[string]any {
+	return map[string]interface{}{
+		"drop_fields": map[string]interface{}{
+			"fields": []any{"error.reason"},
+			"when": map[string]interface{}{
+				"contains": map[string]interface{}{
+					"message": "failed to index document", // this message come from ES exporter
+				},
+			},
 		},
 	}
 }
@@ -1422,10 +1395,6 @@ func AgentMonitoringEndpoint(cfg *monitoringCfg.MonitoringConfig) string {
 	return fmt.Sprintf(`unix:///tmp/elastic-agent/%x.sock`, sha256.Sum256([]byte(path)))
 }
 
-func BeatsMonitoringEndpoint(componentID string) string {
-	return utils.SocketURLWithFallback(componentID, paths.TempDir())
-}
-
 func httpCopyRules() []interface{} {
 	fromToMap := []interface{}{
 		// I should be able to see the CPU Usage on the running machine. Am using too much CPU?
@@ -1484,6 +1453,15 @@ func isSupportedBeatsBinary(binaryName string) bool {
 		}
 	}
 	return false
+}
+
+func verifyOutputOtelSupported(outputCfg map[string]any) error {
+	parsed, err := component.ParseOutput(monitoringOutput, outputCfg, logp.InfoLevel, nil)
+	if err != nil {
+		return err
+	}
+
+	return translate.VerifyOutputIsOtelSupported(parsed.OutputType, outputCfg)
 }
 
 func monitoringDrop(path string) (drop string) {

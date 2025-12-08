@@ -11,11 +11,12 @@ updates:
       - Team:Elastic-Agent-Control-Plane
       - backport-active-all
     allow:
-      # Only update internal dependencies for now while we evaluate this workflow.
       - dependency-name: "github.com/elastic/*"
-      - dependency-name: "github.com/elastic/opentelemetry-collector-components/*"
+      - dependency-name: "helm.sh/helm/*"
     ignore:
       - dependency-name: "github.com/elastic/beats/*"
+      # Otel dependency updates are done in lock-step with Otel core framework updates
+      - dependency-name: "github.com/elastic/opentelemetry-collector-components/*"
     open-pull-requests-limit: 10
 
   - package-ecosystem: "github-actions"

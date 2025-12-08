@@ -510,14 +510,19 @@ collectors:
             http:
               endpoint: 0.0.0.0:4318
       processors:
+        resourcedetection/env:
+          detectors: [env, k8snode]
+          timeout: 2s
+          override: false
+        resource/hostname:
+          attributes:
+            - key: host.name
+              from_attribute: k8s.node.name
+              action: insert
         batch:
           send_batch_size: 1000
           timeout: 1s
           send_batch_max_size: 1500
-        resourcedetection/env:
-          detectors: [env]
-          timeout: 2s
-          override: false
       exporters:
         debug: {}
 
@@ -528,6 +533,7 @@ collectors:
               - otlp
             processors:
               - resourcedetection/env
+              - resource/hostname
               - batch
             exporters:
               - debug
@@ -536,6 +542,7 @@ collectors:
               - otlp
             processors:
               - resourcedetection/env
+              - resource/hostname
               - batch
             exporters:
               - debug
@@ -544,6 +551,7 @@ collectors:
               - otlp
             processors:
               - resourcedetection/env
+              - resource/hostname
               - batch
             exporters:
               - debug
@@ -1649,14 +1657,15 @@ nodeExporter:
 prometheus-node-exporter:
   namespaceOverride: ""
   podLabels:
-    ## Add the 'node-exporter' label to be used by serviceMonitor to match standard common usage in rules and grafana dashboards
-    ##
     jobLabel: node-exporter
   releaseLabel: true
   extraArgs:
     - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+|var/lib/kubelet/.+)($|/)
     - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$
   service:
+    ## Add the 'node-exporter' label to be used by serviceMonitor to match standard common usage in rules and grafana dashboards
+    labels:
+      jobLabel: node-exporter
     portName: http-metrics
   prometheus:
     monitor:

@@ -48,8 +48,10 @@ func NewManager(log *logger.Logger, exec string) ExecManager {
 
 func (m *manager) ReExec(shutdownCallback ShutdownCallbackFn, argOverrides ...string) {
 	go func() {
+		m.logger.Debug("Triggering manager shutdown")
 		close(m.trigger)
 		<-m.shutdown
+		m.logger.Debug("Manager shutdown complete")
 
 		if shutdownCallback != nil {
 			if err := shutdownCallback(); err != nil {

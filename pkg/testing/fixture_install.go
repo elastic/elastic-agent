@@ -278,6 +278,7 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 		socketPath = paths.ControlSocketFromPath(runtime.GOOS, f.workDir)
 	}
 	c := client.New(client.WithAddress(socketPath))
+	f.setSocketPath(socketPath)
 	f.setClient(c)
 
 	f.t.Cleanup(func() {
@@ -409,8 +410,23 @@ func mapProcess(p agentsystemprocess.ProcState) runningProcess {
 	return mappedProcess
 }
 
+// getElasticAgentProcesses returns the running elastic-agent control plane processes. Note that this does not mean
+// all processes running using the elastic-agent binary.
 func getElasticAgentProcesses(t *gotesting.T) []runningProcess {
-	return getProcesses(t, `.*elastic\-agent.*`)
+	agentProcesses := getProcesses(t, `.*elastic\-agent.*`)
+	// the otel collector might be running as a subprocess using the elastic-agent otel command
+	// we don't want to count these, so we drop all processes which are children of another process on the list
+	pids := make(map[int]struct{}, len(agentProcesses))
+	for _, p := range agentProcesses {
+		pids[p.Pid] = struct{}{}
+	}
+	agentControlPlaneProcesses := make([]runningProcess, 0, len(agentProcesses))
+	for _, p := range agentProcesses {
+		if _, ok := pids[p.Ppid]; !ok {
+			agentControlPlaneProcesses = append(agentControlPlaneProcesses, p)
+		}
+	}
+	return agentControlPlaneProcesses
 }
 
 // Includes both the main elastic-agent process and the agentbeat sub-processes for ensuring

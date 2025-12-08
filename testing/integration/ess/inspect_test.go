@@ -100,4 +100,13 @@ func TestInspect(t *testing.T) {
 	assert.Equalf(t, "<REDACTED>", yObj.Inputs[0].CustomAttr, "inspect output: %s", p)
 	assert.Equalf(t, "<REDACTED>", yObj.Agent.Protection.SigningKey, "`signing_key` is not redacted but it should be, because it contains `key`. inspect output: %s", p)
 	assert.Equalf(t, "<REDACTED>", yObj.Agent.Protection.UninstallTokenHash, "`uninstall_token_hash` is not redacted but it should be, because it contains `token`. inspect output: %s", p)
+
+	p, err = fixture.Exec(ctx, []string{"inspect", "components", "beat/metrics-monitoring"})
+	require.NoErrorf(t, err, "Error when running inspect components, output: %s", p)
+	var yamlComponent struct {
+		InputType string `yaml:"input_type"`
+	}
+	err = yaml.Unmarshal(p, &yamlComponent)
+	require.NoError(t, err)
+	assert.Equal(t, "beat/metrics", yamlComponent.InputType)
 }

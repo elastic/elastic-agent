@@ -21,7 +21,7 @@ type FleetAgentConfig struct {
 	Client              remote.Config      `config:",inline" yaml:",inline"`
 	Info                *AgentInfo         `config:"agent" yaml:"agent"`
 	Server              *FleetServerConfig `config:"server" yaml:"server,omitempty"`
-	Checkin             FleetCheckin       `config:"checkin" yaml:"checkin,omitempty"`
+	Checkin             *FleetCheckin      `config:"checkin" yaml:"checkin,omitempty"`
 }
 
 // Valid validates the required fields for accessing the API.
@@ -54,13 +54,7 @@ func DefaultFleetAgentConfig() *FleetAgentConfig {
 		Enabled: false,
 		Client:  remote.DefaultClientConfig(),
 		Info:    &AgentInfo{},
-		Checkin: DefaultFleetCheckin(),
-	}
-}
-
-func DefaultFleetCheckin() FleetCheckin {
-	return FleetCheckin{
-		Mode: fleetCheckinModeStandard,
+		Checkin: nil,
 	}
 }
 
@@ -71,10 +65,22 @@ type FleetCheckin struct {
 }
 
 func (f *FleetCheckin) IsModeOnStateChanged() bool {
-	return f.Mode == fleetCheckinModeOnStateChanged
+	return f != nil && f.Mode == fleetCheckinModeOnStateChanged
+}
+
+func (f *FleetCheckin) GetMode() string {
+	if f == nil || f.Mode == "" {
+		return fleetCheckinModeStandard
+	}
+
+	return f.Mode
 }
 
 func (f *FleetCheckin) Validate() error {
+	if f == nil {
+		return nil
+	}
+
 	if f.Mode != "" && f.Mode != fleetCheckinModeStandard && f.Mode != fleetCheckinModeOnStateChanged {
 		return errors.New("checkin.mode must be either 'standard' or 'on_state_change'")
 	}

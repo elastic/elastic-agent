@@ -7,10 +7,16 @@ package config
 import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 )
 
-const defaultExecMode = manager.SubprocessExecutionMode
+const (
+	defaultExecMode = SubprocessExecutionMode
+
+	SubprocessExecutionMode ExecutionMode = "subprocess"
+	EmbeddedExecutionMode   ExecutionMode = "embedded"
+)
+
+type ExecutionMode string
 
 type execModeConfig struct {
 	Agent struct {
@@ -23,7 +29,7 @@ type execModeConfig struct {
 }
 
 // GetExecutionModeFromConfig returns the execution mode of the OTel runtime based on the config.
-func GetExecutionModeFromConfig(log *logp.Logger, conf *config.Config) manager.ExecutionMode {
+func GetExecutionModeFromConfig(log *logp.Logger, conf *config.Config) ExecutionMode {
 	var c execModeConfig
 	if err := conf.UnpackTo(&c); err != nil {
 		log.Warnf("failed to unpack config when getting otel runtime execution mode: %v", err)
@@ -39,8 +45,8 @@ func GetExecutionModeFromConfig(log *logp.Logger, conf *config.Config) manager.E
 	}
 
 	if *c.Agent.Features.Otel.SubprocessExecution {
-		return manager.SubprocessExecutionMode
+		return SubprocessExecutionMode
 	} else {
-		return manager.EmbeddedExecutionMode
+		return EmbeddedExecutionMode
 	}
 }

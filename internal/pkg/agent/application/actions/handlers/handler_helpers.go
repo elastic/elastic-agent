@@ -15,8 +15,10 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 )
@@ -41,6 +43,18 @@ type dispatchableAction interface {
 type unitWithComponent struct {
 	unit      component.Unit
 	component component.Component
+}
+
+func stopComponents(ctx context.Context, ch chan coordinator.ConfigChange, a fleetapi.Action, acker acker.Acker, backupCallback func()) {
+	unenrollPolicy := newPolicyChange(ctx, config.New(), a, acker, true, false)
+	ch <- unenrollPolicy
+
+	backupCallback()
+
+	unenrollCtx, cancel := context.WithTimeout(ctx, unenrollTimeout)
+	defer cancel()
+
+	unenrollPolicy.WaitAck(unenrollCtx)
 }
 
 func findMatchingUnitsByActionType(state coordinator.State, typ string) []unitWithComponent {

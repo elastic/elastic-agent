@@ -1,0 +1,5 @@
+| Version | Configuration  |
+|---------|----------------|
+{%- for version in versions %}
+| {{ "%-7s"|format(version.version) }} | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/{{ version.tag }}/internal/pkg/otel/samples/linux/gateway.yml) |
+{%- endfor %}

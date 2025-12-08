@@ -224,12 +224,13 @@ type VarsManager interface {
 	Watch() <-chan []*transpiler.Vars
 }
 
-// ComponentsModifier is a function that takes the computed components model and modifies it before
-// passing it into the components runtime manager.
-type ComponentsModifier func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error)
-
 // managerShutdownTimeout is how long the coordinator will wait during shutdown
 // to receive termination states from its managers.
+// Note: The current timeout (5s) is shorter than the default stop timeout for
+// subprocess components (30s from process.DefaultConfig()). This means the
+// coordinator may not wait for the subprocesses to finish terminating, preventing
+// Wait() from being called on them. This will result in zombie processes
+// during restart on Unix systems.
 const managerShutdownTimeout = time.Second * 5
 
 type configReloader interface {
@@ -244,7 +245,8 @@ type Coordinator struct {
 	agentInfo info.Agent
 	isManaged bool
 
-	cfg        *configuration.Configuration
+	initialCfg *configuration.Configuration
+	currentCfg *configuration.Configuration
 	specs      component.RuntimeSpecs
 	fleetAcker acker.Acker
 
@@ -262,7 +264,7 @@ type Coordinator struct {
 	otelCfg *confmap.Conf
 
 	caps      capabilities.Capabilities
-	modifiers []ComponentsModifier
+	modifiers []component.ComponentsModifier
 
 	// The current state of the Coordinator. This value and its subfields are
 	// safe to read directly from within the main Coordinator goroutine.
@@ -434,7 +436,7 @@ func New(
 	otelMgr OTelManager,
 	fleetAcker acker.Acker,
 	initialUpgradeDetails *details.Details,
-	modifiers ...ComponentsModifier,
+	modifiers ...component.ComponentsModifier,
 ) *Coordinator {
 	var fleetState cproto.State
 	var fleetMessage string
@@ -453,7 +455,8 @@ func New(
 	}
 	c := &Coordinator{
 		logger:     logger,
-		cfg:        cfg,
+		initialCfg: cfg,
+		currentCfg: cfg,
 		agentInfo:  agentInfo,
 		isManaged:  isManaged,
 		specs:      specs,
@@ -677,6 +680,7 @@ func (c *Coordinator) Migrate(
 		options,
 		store,
 		backoffFactory,
+		3, // try enrollment for 3 times and fail
 	)
 	if err != nil {
 		restoreErr := RestoreConfig()
@@ -941,10 +945,15 @@ func (c *Coordinator) watchRuntimeComponents(
 	state := make(map[string]runtime.ComponentState)
 
 	for {
+		var componentStates []runtime.ComponentComponentState
 		select {
 		case <-ctx.Done():
 			return
 		case componentState := <-runtimeComponentStates:
+			componentStates = append(componentStates, componentState)
+		case componentStates = <-otelComponentStates:
+		}
+		for _, componentState := range componentStates {
 			logComponentStateChange(c.logger, state, &componentState)
 			// Forward the final changes back to Coordinator, unless our context
 			// has ended.
@@ -953,19 +962,21 @@ func (c *Coordinator) watchRuntimeComponents(
 			case <-ctx.Done():
 				return
 			}
-		case componentStates := <-otelComponentStates:
-			for _, componentState := range componentStates {
-				logComponentStateChange(c.logger, state, &componentState)
-				// Forward the final changes back to Coordinator, unless our context
-				// has ended.
-				select {
-				case c.managerChans.runtimeManagerUpdate <- componentState:
-				case <-ctx.Done():
-					return
-				}
-			}
 		}
 	}
+}
+
+// ensureComponentWorkDirs ensures the component working directories exist for current components. This method is
+// idempotent.
+func (c *Coordinator) ensureComponentWorkDirs() error {
+	for _, comp := range c.componentModel {
+		c.logger.Debugf("Ensuring a working directory exists for component: %s", comp.ID)
+		err := comp.PrepareWorkDir(paths.Run())
+		if err != nil {
+			return fmt.Errorf("preparing a working directory for component %s failed: %w", comp.ID, err)
+		}
+	}
+	return nil
 }
 
 // logComponentStateChange emits a log message based on the new component state.
@@ -1141,10 +1152,10 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			Description: "current local configuration of the running Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
-				if c.cfg == nil {
+				if c.initialCfg == nil {
 					return []byte("error: failed no local configuration")
 				}
-				o, err := yaml.Marshal(c.cfg)
+				o, err := yaml.Marshal(c.initialCfg)
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
 				}
@@ -1623,6 +1634,12 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 	}
 	c.setProtection(protectionConfig)
 
+	currentCfg, err := configuration.NewFromConfig(cfg)
+	if err != nil {
+		return fmt.Errorf("invalid configuration: %w", err)
+	}
+	c.currentCfg = currentCfg
+
 	if c.vars != nil {
 		return c.refreshComponentModel(ctx)
 	}
@@ -1750,6 +1767,12 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 		return fmt.Errorf("generating component model: %w", err)
 	}
 
+	// ensure all components have working directories
+	err = c.ensureComponentWorkDirs()
+	if err != nil {
+		return fmt.Errorf("ensuring component work dirs exists: %w", err)
+	}
+
 	signed, err := component.SignedFromPolicy(c.derivedConfig)
 	if err != nil {
 		if !errors.Is(err, component.ErrNotFound) {
@@ -1793,7 +1816,6 @@ func (c *Coordinator) updateManagersWithConfig(model *component.Model) {
 func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtimeModel *component.Model, otelModel *component.Model) {
 	var otelComponents, runtimeComponents []component.Component
 	for _, comp := range model.Components {
-		c.maybeOverrideRuntimeForComponent(&comp)
 		switch comp.RuntimeManager {
 		case component.OtelRuntimeManager:
 			otelComponents = append(otelComponents, comp)
@@ -1819,7 +1841,7 @@ func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtime
 // Normally, we use the runtime set in the component itself via the configuration, but
 // we may also fall back to the process runtime if the otel runtime is unsupported for
 // some reason. One example is the output using unsupported config options.
-func (c *Coordinator) maybeOverrideRuntimeForComponent(comp *component.Component) {
+func maybeOverrideRuntimeForComponent(logger *logger.Logger, comp *component.Component) {
 	if comp.RuntimeManager == component.ProcessRuntimeManager {
 		// do nothing, the process runtime can handle any component
 		return
@@ -1828,7 +1850,7 @@ func (c *Coordinator) maybeOverrideRuntimeForComponent(comp *component.Component
 		// check if the component is actually supported
 		err := translate.VerifyComponentIsOtelSupported(comp)
 		if err != nil {
-			c.logger.Warnf("otel runtime is not supported for component %s, switching to process runtime, reason: %v", comp.ID, err)
+			logger.Warnf("otel runtime is not supported for component %s, switching to process runtime, reason: %v", comp.ID, err)
 			comp.RuntimeManager = component.ProcessRuntimeManager
 		}
 	}
@@ -1918,8 +1940,16 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		existingCompState[comp.Component.ID] = comp.State.Pid
 	}
 
+	otelRuntimeModifier := func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
+		for i := range comps {
+			maybeOverrideRuntimeForComponent(c.logger, &comps[i])
+		}
+		return comps, nil
+	}
 	comps, err := c.specs.ToComponents(
 		cfg,
+		c.currentCfg.Settings.Internal.Runtime,
+		append(c.modifiers, otelRuntimeModifier),
 		configInjector,
 		c.state.LogLevel,
 		c.agentInfo,
@@ -1931,13 +1961,6 @@ func (c *Coordinator) generateComponentModel() (err error) {
 
 	// Filter any disallowed inputs/outputs from the components
 	comps = c.filterByCapabilities(comps)
-
-	for _, modifier := range c.modifiers {
-		comps, err = modifier(comps, cfg)
-		if err != nil {
-			return fmt.Errorf("failed to modify components: %w", err)
-		}
-	}
 
 	// If we made it this far, update our internal derived values and
 	// return with no error

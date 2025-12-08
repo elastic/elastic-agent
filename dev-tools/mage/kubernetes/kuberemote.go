@@ -70,7 +70,7 @@ func NewKubeRemote(kubeconfig string, namespace string, name string, workDir str
 	if err != nil {
 		return nil, err
 	}
-	name = strings.Replace(name, "_", "-", -1)
+	name = strings.ReplaceAll(name, "_", "-")
 	svcAccName := fmt.Sprintf("%s-sa", name)
 	secretName := fmt.Sprintf("%s-ssh-key", name)
 	privateKey, publicKey, err := generateSSHKeyPair()
@@ -338,7 +338,7 @@ func getFreePort() (uint16, error) {
 		return 0, err
 	}
 	defer l.Close()
-	return uint16(l.Addr().(*net.TCPAddr).Port), nil
+	return uint16(l.Addr().(*net.TCPAddr).Port), nil //nolint:gosec // G115 Conversion from int to uint16 is safe here.
 }
 
 // createSecretManifest creates the secret object to create in the cluster.

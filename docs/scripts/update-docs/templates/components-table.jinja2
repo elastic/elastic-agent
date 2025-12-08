@@ -7,41 +7,47 @@ These components are included in EDOT Collector version {{version.edot_collector
 {%if grouped_components['Receivers'] -%}
 |***Receivers***||||
 {% for comp in grouped_components['Receivers'] -%}
-| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}) | {{ comp['repo_link'] }} | {{ comp['support_status'] }} | {{ comp['version'] }} |
+| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}){% if comp.get('annotation_number') %}^{{ comp['annotation_number'] }}^{% endif %} | {{ comp['repo_link'] }} | {{ comp['support_status'] }} | {{ comp['version'] }} |
 {% endfor %}
 {%- endif -%}
 
 {%- if grouped_components['Exporters'] -%}
 |***Exporters***||||
 {% for comp in grouped_components['Exporters'] -%}
-| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}) | {{ comp['repo_link'] }} | {{ comp['support_status'] }} | {{ comp['version'] }} |
+| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}){% if comp.get('annotation_number') %}^{{ comp['annotation_number'] }}^{% endif %} | {{ comp['repo_link'] }} | {{ comp['support_status'] }} | {{ comp['version'] }} |
 {% endfor %}
 {%- endif -%}
 
 {%- if grouped_components['Processors'] -%}
 |***Processors***||||
 {% for comp in grouped_components['Processors'] -%}
-| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}) | {{ comp['repo_link'] }} | {{ comp['support_status'] }} | {{ comp['version'] }} |
+| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}){% if comp.get('annotation_number') %}^{{ comp['annotation_number'] }}^{% endif %} | {{ comp['repo_link'] }} | {{ comp['support_status'] }} | {{ comp['version'] }} |
 {% endfor %}
 {%- endif -%}
 
 {%- if grouped_components['Connectors'] -%}
 |***Connectors***||||
 {% for comp in grouped_components['Connectors'] -%}
-| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}) | {{ comp['repo_link'] }} | {{ comp['support_status'] }} | {{ comp['version'] }} |
+| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}){% if comp.get('annotation_number') %}^{{ comp['annotation_number'] }}^{% endif %} | {{ comp['repo_link'] }} | {{ comp['support_status'] }} | {{ comp['version'] }} |
 {% endfor %}
 {%- endif -%}
 
 {%- if grouped_components['Extensions'] -%}
 |***Extensions***||||
 {% for comp in grouped_components['Extensions'] -%}
-| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}) | {{ comp['repo_link'] }} | {{ comp['support_status'] }} | {{ comp['version'] }} |
+| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}){% if comp.get('annotation_number') %}^{{ comp['annotation_number'] }}^{% endif %} | {{ comp['repo_link'] }} | {{ comp['support_status'] }} | {{ comp['version'] }} |
 {% endfor %}
 {%- endif -%}
 
 {%- if grouped_components['Providers'] -%}
 |***Providers***||||
 {% for comp in grouped_components['Providers'] -%}
-| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}) | {{ comp['repo_link'] }} | {{ comp['support_status'] }} | {{ comp['version'] }} |
+| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}){% if comp.get('annotation_number') %}^{{ comp['annotation_number'] }}^{% endif %} | {{ comp['repo_link'] }} | {{ comp['support_status'] }} | {{ comp['version'] }} |
 {% endfor %}
+{% endif %}
+{%- if annotations -%}
+
+{%- for annotation in annotations -%}
+^{{ annotation['number'] }}^ `{{ annotation['component_name'] }}`: {{ annotation['text'] }}
+{%- endfor -%}
 {%- endif -%}

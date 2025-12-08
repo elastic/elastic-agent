@@ -323,6 +323,6 @@ func getTestNames(pt []define.BatchPackageTests) []string {
 }
 
 func getStackKey(s *define.Stack) string {
-	version := strings.Replace(s.Version, ".", "-", -1)
+	version := strings.ReplaceAll(s.Version, ".", "-")
 	return fmt.Sprintf("integration-stack-%s", version)
 }

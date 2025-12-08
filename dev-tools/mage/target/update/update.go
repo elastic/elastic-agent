@@ -6,10 +6,11 @@ package update
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/magefile/mage/mg"
-	"github.com/magefile/mage/sh"
 
+	"github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
 )
 
@@ -23,7 +24,15 @@ func Beats(targetVersion string) error {
 
 func BeatsModule(targetVersion string) error {
 	goArgs := []string{"get", fmt.Sprintf("%s@%s", BeatsModulePath, targetVersion)}
-	err := sh.RunV(mg.GoCmd(), goArgs...)
+
+	fmt.Println("Updating beats module in edot package")
+	err := mage.Run(nil, os.Stdout, os.Stderr, "go", "internal/edot", goArgs...)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Updating beats module in elastic-agent package")
+	err = mage.Run(nil, os.Stdout, os.Stderr, "go", "", goArgs...)
 	if err != nil {
 		return err
 	}

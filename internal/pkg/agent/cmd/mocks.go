@@ -144,16 +144,24 @@ func (_m *mockInstallationModifier) EXPECT() *mockInstallationModifier_Expecter 
 }
 
 // Cleanup provides a mock function for the type mockInstallationModifier
-func (_mock *mockInstallationModifier) Cleanup(log *logger.Logger, topDirPath string, currentVersionedHome string, currentHash string, removeMarker bool, keepLogs bool) error {
-	ret := _mock.Called(log, topDirPath, currentVersionedHome, currentHash, removeMarker, keepLogs)
+func (_mock *mockInstallationModifier) Cleanup(log *logger.Logger, topDirPath string, removeMarker bool, keepLogs bool, versionedHomesToKeep ...string) error {
+	// string
+	_va := make([]interface{}, len(versionedHomesToKeep))
+	for _i := range versionedHomesToKeep {
+		_va[_i] = versionedHomesToKeep[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, log, topDirPath, removeMarker, keepLogs)
+	_ca = append(_ca, _va...)
+	ret := _mock.Called(_ca...)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Cleanup")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*logger.Logger, string, string, string, bool, bool) error); ok {
-		r0 = returnFunc(log, topDirPath, currentVersionedHome, currentHash, removeMarker, keepLogs)
+	if returnFunc, ok := ret.Get(0).(func(*logger.Logger, string, bool, bool, ...string) error); ok {
+		r0 = returnFunc(log, topDirPath, removeMarker, keepLogs, versionedHomesToKeep...)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -168,15 +176,15 @@ type mockInstallationModifier_Cleanup_Call struct {
 // Cleanup is a helper method to define mock.On call
 //   - log *logger.Logger
 //   - topDirPath string
-//   - currentVersionedHome string
-//   - currentHash string
 //   - removeMarker bool
 //   - keepLogs bool
-func (_e *mockInstallationModifier_Expecter) Cleanup(log interface{}, topDirPath interface{}, currentVersionedHome interface{}, currentHash interface{}, removeMarker interface{}, keepLogs interface{}) *mockInstallationModifier_Cleanup_Call {
-	return &mockInstallationModifier_Cleanup_Call{Call: _e.mock.On("Cleanup", log, topDirPath, currentVersionedHome, currentHash, removeMarker, keepLogs)}
+//   - versionedHomesToKeep ...string
+func (_e *mockInstallationModifier_Expecter) Cleanup(log interface{}, topDirPath interface{}, removeMarker interface{}, keepLogs interface{}, versionedHomesToKeep ...interface{}) *mockInstallationModifier_Cleanup_Call {
+	return &mockInstallationModifier_Cleanup_Call{Call: _e.mock.On("Cleanup",
+		append([]interface{}{log, topDirPath, removeMarker, keepLogs}, versionedHomesToKeep...)...)}
 }
 
-func (_c *mockInstallationModifier_Cleanup_Call) Run(run func(log *logger.Logger, topDirPath string, currentVersionedHome string, currentHash string, removeMarker bool, keepLogs bool)) *mockInstallationModifier_Cleanup_Call {
+func (_c *mockInstallationModifier_Cleanup_Call) Run(run func(log *logger.Logger, topDirPath string, removeMarker bool, keepLogs bool, versionedHomesToKeep ...string)) *mockInstallationModifier_Cleanup_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 *logger.Logger
 		if args[0] != nil {
@@ -186,29 +194,28 @@ func (_c *mockInstallationModifier_Cleanup_Call) Run(run func(log *logger.Logger
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
-		var arg2 string
+		var arg2 bool
 		if args[2] != nil {
-			arg2 = args[2].(string)
+			arg2 = args[2].(bool)
 		}
-		var arg3 string
+		var arg3 bool
 		if args[3] != nil {
-			arg3 = args[3].(string)
+			arg3 = args[3].(bool)
 		}
-		var arg4 bool
-		if args[4] != nil {
-			arg4 = args[4].(bool)
+		var arg4 []string
+		variadicArgs := make([]string, len(args)-4)
+		for i, a := range args[4:] {
+			if a != nil {
+				variadicArgs[i] = a.(string)
+			}
 		}
-		var arg5 bool
-		if args[5] != nil {
-			arg5 = args[5].(bool)
-		}
+		arg4 = variadicArgs
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
-			arg4,
-			arg5,
+			arg4...,
 		)
 	})
 	return _c
@@ -219,7 +226,7 @@ func (_c *mockInstallationModifier_Cleanup_Call) Return(err error) *mockInstalla
 	return _c
 }
 
-func (_c *mockInstallationModifier_Cleanup_Call) RunAndReturn(run func(log *logger.Logger, topDirPath string, currentVersionedHome string, currentHash string, removeMarker bool, keepLogs bool) error) *mockInstallationModifier_Cleanup_Call {
+func (_c *mockInstallationModifier_Cleanup_Call) RunAndReturn(run func(log *logger.Logger, topDirPath string, removeMarker bool, keepLogs bool, versionedHomesToKeep ...string) error) *mockInstallationModifier_Cleanup_Call {
 	_c.Call.Return(run)
 	return _c
 }

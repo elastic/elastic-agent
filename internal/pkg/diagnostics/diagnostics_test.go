@@ -495,6 +495,7 @@ func TestGlobalHooks(t *testing.T) {
 			assert.NoErrorf(t, err, "hook %q validation error: %v", err)
 		case "package version":
 			assert.Equal(t, testPkgVer, string(output), "hook package version does not match")
+		case "environment":
 		default:
 			ok, err = isPprof(output)
 			assert.Truef(t, ok, "hook %q returned incompatible data: %q", h.Name, hex.EncodeToString(output))
@@ -788,6 +789,121 @@ func TestAddRedactionMarkers(t *testing.T) {
 			result, err := cfg.ToMapStr()
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expectedConfig, result)
+		})
+	}
+}
+
+func TestRedactSSLKeyInInputs(t *testing.T) {
+	inputYaml := []byte(`inputs:
+    - ssl:
+        certificate: cert1
+        key: key1
+      nested:
+        ssl:
+          certificate: cert2
+          key: key2
+      slice:
+        - ssl:
+            certificate: cert3
+            key: key3`)
+
+	var unmarshalled map[string]any
+	err := yaml.Unmarshal(inputYaml, &unmarshalled)
+	require.NoError(t, err)
+
+	var errOut bytes.Buffer
+	redacted := Redact(unmarshalled, &errOut)
+	assert.Equalf(t, 0, errOut.Len(), "Unexpected errors written when redacting secrets: %s", errOut.String())
+	require.NotNil(t, redacted)
+
+	require.Contains(t, redacted, "inputs")
+	inputs, ok := redacted["inputs"].([]any)
+	require.Truef(t, ok, "expected inputs to be slice, detected: %T", redacted["inputs"])
+	require.Len(t, inputs, 1)
+	input, ok := inputs[0].(map[string]any)
+	require.True(t, ok, "expected input to be object, detected: %T", inputs[0])
+
+	// check top level ssl
+	require.Contains(t, input, "ssl")
+	top, ok := input["ssl"].(map[string]any)
+	require.True(t, ok, "expected type to be object, detected: %T", input["ssl"])
+	require.Contains(t, top, "certificate")
+	assert.Equal(t, REDACTED, top["certificate"])
+	require.Contains(t, top, "key")
+	assert.Equal(t, REDACTED, top["key"])
+
+	// check nested object
+	require.Contains(t, input, "nested")
+	nested, ok := input["nested"].(map[string]any)
+	require.True(t, ok, "expected type to be object, detected: %T", input["nested"])
+	require.Contains(t, nested, "ssl")
+	nestedSSL, ok := nested["ssl"].(map[string]any)
+	require.True(t, ok, "expected type to be object, detected: %T", nested["ssl"])
+	require.Contains(t, nestedSSL, "certificate")
+	assert.Equal(t, REDACTED, nestedSSL["certificate"])
+	require.Contains(t, nestedSSL, "key")
+	assert.Equal(t, REDACTED, nestedSSL["key"])
+
+	// check nested slice
+	require.Contains(t, input, "slice")
+	slice, ok := input["slice"].([]any)
+	require.True(t, ok, "expected type to be slice, detected: %T", input["slice"])
+	require.Len(t, slice, 1)
+	elem, ok := slice[0].(map[string]any)
+	require.True(t, ok, "expected type to be object, detected: %T", slice[0])
+	require.Contains(t, elem, "ssl")
+	sliceSSL, ok := elem["ssl"].(map[string]any)
+	require.True(t, ok, "expected type to be object, detected: %T", elem["ssl"])
+	require.Contains(t, sliceSSL, "certificate")
+	assert.Equal(t, REDACTED, sliceSSL["certificate"])
+	require.Contains(t, sliceSSL, "key")
+	assert.Equal(t, REDACTED, sliceSSL["key"])
+}
+
+func TestRedactEnv(t *testing.T) {
+	tests := []struct {
+		name   string
+		env    map[string]string
+		expect map[string]any
+	}{{
+		name: "No redactions",
+		env: map[string]string{
+			"TEST_LEVEL": "test-val",
+			"VAL1":       "a,b,c",
+		},
+		expect: map[string]any{
+			"TEST_LEVEL": "test-val",
+			"VAL1":       "a,b,c",
+		},
+	}, {
+		name: "Redacts value based on key",
+		env: map[string]string{
+			"TEST_LEVEL":    "test-val",
+			"VAL1":          "a,b,c",
+			"API_KEY":       "secret-value",
+			"SERVICE_TOKEN": "secret-token",
+		},
+		expect: map[string]any{
+			"TEST_LEVEL":    "test-val",
+			"VAL1":          "a,b,c",
+			"API_KEY":       REDACTED,
+			"SERVICE_TOKEN": REDACTED,
+		},
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+			redacted, err := redactEnv()
+			require.NoError(t, err)
+
+			// redacted includes full env vars, we want to check if the expected k:v's are present
+			for k, v := range tt.expect {
+				require.Contains(t, redacted, k)
+				require.Equal(t, v, redacted[k])
+			}
 		})
 	}
 }

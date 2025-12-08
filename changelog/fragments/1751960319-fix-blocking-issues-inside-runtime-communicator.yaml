@@ -1,5 +1,0 @@
-kind: bug-fix
-summary: Resolve deadlocks in runtime checkin communication
-component: elastic-agent
-pr: https://github.com/elastic/elastic-agent/pull/8881
-issue: https://github.com/elastic/elastic-agent/issues/7944

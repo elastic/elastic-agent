@@ -96,6 +96,23 @@ func GlobalHooks() Hooks {
 			},
 		},
 		{
+			Name:        "environment",
+			Filename:    "environment.yaml",
+			Description: "Environment variables",
+			ContentType: "application/yaml",
+			Hook: func(_ context.Context) []byte {
+				redacted, err := redactEnv()
+				if err != nil {
+					return []byte(err.Error())
+				}
+				out, err := yaml.Marshal(redacted)
+				if err != nil {
+					return []byte(fmt.Sprintf("Unable to marshall env vars into yaml: %v", err))
+				}
+				return out
+			},
+		},
+		{
 			Name:        "goroutine",
 			Filename:    "goroutine.pprof.gz",
 			Description: "stack traces of all current goroutines",
@@ -369,11 +386,11 @@ func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, slice
 		if rootValue != nil {
 			switch cast := rootValue.(type) {
 			case map[string]interface{}:
-				rootValue = redactMap(errOut, cast, sliceElem)
+				rootValue = redactMap(errOut, cast, false)
 			case map[interface{}]interface{}:
-				rootValue = redactMap(errOut, cast, sliceElem)
+				rootValue = redactMap(errOut, cast, false)
 			case map[int]interface{}:
-				rootValue = redactMap(errOut, cast, sliceElem)
+				rootValue = redactMap(errOut, cast, false)
 			case []interface{}:
 				// Recursively process each element in the slice so that we also walk
 				// through lists (e.g. inputs[4].streams[0]). This is required to
@@ -701,4 +718,18 @@ func addSecretMarkers(cfg *config.Config, secretPaths []string) error {
 	}
 
 	return aggregateError
+}
+
+func redactEnv() (map[string]any, error) {
+	envMap := map[string]any{}
+	for _, e := range os.Environ() {
+		pair := strings.SplitN(e, "=", 2)
+		envMap[pair[0]] = pair[1]
+	}
+	var errOut bytes.Buffer
+	redacted := Redact(envMap, &errOut)
+	if errOut.Len() > 0 {
+		return nil, errors.New(errOut.String())
+	}
+	return redacted, nil
 }

@@ -70,6 +70,8 @@ steps:
               env:
                 SERVICE_COMMIT_HASH: $${COMMIT_HASH}
                 SERVICE: agentless
+                SYNTHETICS_PROJECT: "agentless"
+                SYNTHETICS_TAG: "agentless-ci"
       YAML
       fi
     agents:

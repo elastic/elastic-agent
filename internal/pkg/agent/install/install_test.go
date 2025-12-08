@@ -226,5 +226,6 @@ func TestSetupInstallPath(t *testing.T) {
 	require.NoError(t, err)
 	err = setupInstallPath(tmpdir, ownership)
 	require.NoError(t, err)
-	require.FileExists(t, filepath.Join(tmpdir, paths.MarkerFileName))
+	markerFilePath := filepath.Join(tmpdir, paths.MarkerFileName)
+	require.FileExists(t, markerFilePath)
 }

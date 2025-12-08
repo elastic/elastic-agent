@@ -34,7 +34,6 @@ path: /foo/bar
 username: elastic
 password: changeme
 index: "some-index"
-pipeline: "some-ingest-pipeline"
 backoff:
   init: 42s
   max: 420s
@@ -48,9 +47,10 @@ endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
 logs_index: some-index
-max_conns_per_host: 30
+logs_dynamic_pipeline:
+  enabled: true
+max_conns_per_host: 60
 password: changeme
-pipeline: some-ingest-pipeline
 retry:
   enabled: true
   initial_interval: 42s
@@ -64,7 +64,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 30
+  num_consumers: 60
   queue_size: 3200
   wait_for_result: true
 user: elastic
@@ -82,7 +82,6 @@ compression_params:
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
-
 	})
 
 	t.Run("test api key is encoded before mapping to es-exporter", func(t *testing.T) {
@@ -97,6 +96,8 @@ api_key: "TiNAGG4BaaMdaH1tRfuU:KnR6yE41RrSowb0kQ0HWoA"
 endpoints:
   - http://localhost:9200
 logs_index: some-index
+logs_dynamic_pipeline:
+  enabled: true
 retry:
   enabled: true
   initial_interval: 1s
@@ -126,7 +127,50 @@ compression_params:
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
+	})
 
+	t.Run("test hosts can be a string", func(t *testing.T) {
+		beatCfg := `
+hosts: "localhost:9200"
+index: "some-index"
+api_key: "TiNAGG4BaaMdaH1tRfuU:KnR6yE41RrSowb0kQ0HWoA"
+`
+
+		OTelCfg := `
+endpoints:
+  - http://localhost:9200
+logs_index: some-index
+logs_dynamic_pipeline:
+  enabled: true
+retry:
+  enabled: true
+  initial_interval: 1s
+  max_interval: 1m0s
+  max_retries: 3
+sending_queue:
+  batch:
+    flush_timeout: 10s
+    max_size: 1600
+    min_size: 0
+    sizer: items
+  block_on_overflow: true
+  enabled: true
+  num_consumers: 1
+  queue_size: 3200
+  wait_for_result: true
+mapping:
+  mode: bodymap
+max_conns_per_host: 1
+api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
+compression: gzip
+compression_params:
+  level: 1
+ `
+		cfg := config.MustNewConfigFrom(beatCfg)
+		got, err := ToOTelConfig(cfg, logger)
+		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
+		expOutput := newFromYamlString(t, OTelCfg)
+		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
 	})
 
 	// when preset is configured, we only test worker, bulk_max_size
@@ -143,6 +187,8 @@ preset: %s
 `
 
 		commonOTelCfg := `
+logs_dynamic_pipeline:
+  enabled: true    
 endpoints:
   - http://localhost:9200
 retry:
@@ -201,6 +247,8 @@ sending_queue:
 			{
 				presetName: "scale",
 				output: `
+logs_dynamic_pipeline:
+  enabled: true        
 endpoints:
   - http://localhost:9200
 retry:
@@ -275,9 +323,7 @@ sending_queue:
 				compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
 			})
 		}
-
 	})
-
 }
 
 func TestCompressionConfig(t *testing.T) {
@@ -293,6 +339,8 @@ index: "some-index"
 compression_level: %d`
 
 	otelConfig := `
+logs_dynamic_pipeline:
+  enabled: true 
 endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
@@ -303,7 +351,7 @@ retry:
   initial_interval: 1s
   max_interval: 1m0s
   max_retries: 3
-max_conns_per_host: 1
+max_conns_per_host: 2
 user: elastic
 sending_queue:
   batch:
@@ -313,7 +361,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
+  num_consumers: 2
   queue_size: 3200
   wait_for_result: true
 mapping:
@@ -337,7 +385,6 @@ compression: none
 			compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
 		})
 	}
-
 }
 
 func newFromYamlString(t *testing.T, input string) *confmap.Conf {

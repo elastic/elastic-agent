@@ -39,6 +39,8 @@ func GetAllComponentStates(otelStatus *status.AggregateStatus, components []comp
 				if compState, statusErr = getComponentState(pipelineStatus, comp); statusErr != nil {
 					return nil, statusErr
 				}
+			} else if otelStatus != nil && otelStatus.Event != nil && otelStatus.Status() == componentstatus.StatusStarting {
+				compState = getComponentStartingState(comp)
 			} else {
 				// If the component is not found in the OTel status, we return a stopped state.
 				compState = runtime.ComponentComponentState{
@@ -68,7 +70,7 @@ func DropComponentStateFromOtelStatus(otelStatus *status.AggregateStatus) (*stat
 			continue
 		}
 		pipelineId := &pipeline.ID{}
-		componentKind, pipelineIdStr, parseErr := parseEntityStatusId(pipelineStatusId)
+		componentKind, pipelineIdStr, parseErr := ParseEntityStatusId(pipelineStatusId)
 		if parseErr != nil {
 			return nil, parseErr
 		}
@@ -90,6 +92,160 @@ func DropComponentStateFromOtelStatus(otelStatus *status.AggregateStatus) (*stat
 	return newStatus, nil
 }
 
+// MaybeMuteExporterStatus modifies the given otel status by muting exporter statuses for muted components.
+// It also updates parent pipeline statuses based on child components.
+func MaybeMuteExporterStatus(
+	otelStatus *status.AggregateStatus,
+	components []component.Component,
+) (*status.AggregateStatus, error) {
+	if otelStatus == nil {
+		return nil, nil
+	}
+
+	newStatus := deepCopyStatus(otelStatus)
+
+	// Mute exporters
+	if err := muteExporters(newStatus, components); err != nil {
+		return nil, err
+	}
+
+	updateStatus(newStatus)
+
+	return newStatus, nil
+}
+
+// HasStatus returns true when the status contains that component status.
+func HasStatus(current *status.AggregateStatus, s componentstatus.Status) bool {
+	if current == nil {
+		return false
+	}
+	if current.Status() == s {
+		return true
+	}
+	for _, comp := range current.ComponentStatusMap {
+		return HasStatus(comp, s)
+	}
+	return false
+}
+
+// StateWithMessage returns a `client.UnitState` and message for the current status.
+func StateWithMessage(current *status.AggregateStatus) (client.UnitState, string) {
+	s := current.Status()
+	switch s {
+	case componentstatus.StatusNone:
+		// didn't report a status, we assume with no status
+		// that it is healthy
+		return client.UnitStateHealthy, "Healthy"
+	case componentstatus.StatusStarting:
+		return client.UnitStateStarting, "Starting"
+	case componentstatus.StatusOK:
+		return client.UnitStateHealthy, "Healthy"
+	case componentstatus.StatusRecoverableError:
+		if current.Err() != nil {
+			return client.UnitStateDegraded, fmt.Sprintf("Recoverable: %s", current.Err())
+		}
+		return client.UnitStateDegraded, "Unknown recoverable error"
+	case componentstatus.StatusPermanentError:
+		if current.Err() != nil {
+			return client.UnitStateFailed, fmt.Sprintf("Permanent: %s", current.Err())
+		}
+		return client.UnitStateFailed, "Unknown permanent error"
+	case componentstatus.StatusFatalError:
+		if current.Err() != nil {
+			return client.UnitStateFailed, fmt.Sprintf("Fatal: %s", current.Err())
+		}
+		return client.UnitStateFailed, "Unknown fatal error"
+	case componentstatus.StatusStopping:
+		return client.UnitStateStopping, "Stopping"
+	case componentstatus.StatusStopped:
+		return client.UnitStateStopped, "Stopped"
+	}
+	// if we hit this case, then a new status was added that we don't know about
+	return client.UnitStateFailed, fmt.Sprintf("Unknown component status: %s", s)
+}
+
+// updateStatus recursively updates each AggregateStatus.Event
+// based on the statuses of its child components.
+func updateStatus(status *status.AggregateStatus) {
+	if status == nil {
+		return
+	}
+
+	ok := true
+
+	for _, child := range status.ComponentStatusMap {
+		updateStatus(child)
+
+		if child.Status() != componentstatus.StatusOK {
+			ok = false
+		}
+	}
+
+	if len(status.ComponentStatusMap) > 0 {
+		if ok {
+			status.Event = componentstatus.NewEvent(componentstatus.StatusOK)
+		}
+	}
+}
+
+// muteExporters sets all exporter statuses to OK for muted pipelines/components.
+func muteExporters(agg *status.AggregateStatus, components []component.Component) error {
+	for pipelineStatusID, pipelineStatus := range agg.ComponentStatusMap {
+		if pipelineStatusID == "extensions" {
+			// we do not want to report extension status
+			continue
+		}
+		pipelineID, err := parsePipelineID(pipelineStatusID)
+		if err != nil {
+			return err
+		}
+
+		componentID, found := strings.CutPrefix(pipelineID.Name(), OtelNamePrefix)
+		if !found || !isOutputMuted(componentID, components) {
+			continue
+		}
+
+		// Mute exporters for the pipeline for this component
+		for compID, compStatus := range pipelineStatus.ComponentStatusMap {
+			kind, _, err := ParseEntityStatusId(compID)
+			if err != nil {
+				return err
+			}
+			if kind == "exporter" {
+				compStatus.Event = componentstatus.NewEvent(componentstatus.StatusOK)
+			}
+		}
+	}
+	return nil
+}
+
+// parsePipelineID extracts a *pipeline.ID from a status ID string.
+func parsePipelineID(statusID string) (*pipeline.ID, error) {
+	_, pipelineIDStr, err := ParseEntityStatusId(statusID)
+	if err != nil {
+		return nil, err
+	}
+	pID := &pipeline.ID{}
+	if err := pID.UnmarshalText([]byte(pipelineIDStr)); err != nil {
+		return nil, err
+	}
+	return pID, nil
+}
+
+// isOutputMuted checks whether output status reporting is disabled for the given componentID
+func isOutputMuted(componentID string, components []component.Component) bool {
+	for _, comp := range components {
+		if comp.ID != componentID {
+			continue
+		}
+		if comp.OutputStatusReporting == nil {
+			return false
+		}
+		return !comp.OutputStatusReporting.Enabled
+	}
+	return false
+}
+
 // getOtelRuntimePipelineStatuses finds otel pipeline statuses belonging to runtime components and returns them as a map
 // from component id to pipeline status.
 func getOtelRuntimePipelineStatuses(otelStatus *status.AggregateStatus) (map[string]*status.AggregateStatus, error) {
@@ -105,7 +261,7 @@ func getOtelRuntimePipelineStatuses(otelStatus *status.AggregateStatus) (map[str
 			continue
 		}
 		pipelineId := &pipeline.ID{}
-		componentKind, pipelineIdStr, parseErr := parseEntityStatusId(pipelineStatusId)
+		componentKind, pipelineIdStr, parseErr := ParseEntityStatusId(pipelineStatusId)
 		if parseErr != nil {
 			return nil, parseErr
 		}
@@ -129,9 +285,10 @@ func getOtelRuntimePipelineStatuses(otelStatus *status.AggregateStatus) (map[str
 
 // getComponentState extracts the full status of a component from its respective otel pipeline status.
 func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Component) (runtime.ComponentComponentState, error) {
+	pipelineState, pipelineMessage := StateWithMessage(pipelineStatus)
 	compState := runtime.ComponentState{
-		State:   otelStatusToUnitState(pipelineStatus.Status()),
-		Message: otelStatusToUnitState(pipelineStatus.Status()).String(),
+		State:   pipelineState,
+		Message: pipelineMessage,
 		Units:   make(map[runtime.ComponentUnitKey]runtime.ComponentUnitState),
 		VersionInfo: runtime.ComponentVersionInfo{
 			Name: OtelComponentName,
@@ -142,7 +299,7 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 			BuildHash: version.Commit(),
 		},
 	}
-	receiverStatuses, exporterStatuses, err := getUnitOtelStatuses(pipelineStatus)
+	receiverStatuses, exporterStatuses, err := getUnitOtelStatuses(pipelineStatus, comp)
 	if err != nil {
 		return runtime.ComponentComponentState{}, err
 	}
@@ -186,8 +343,40 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 	return compStatus, nil
 }
 
+// getComponentStartingState returns a ComponentComponentState with all units in the starting state,
+// including version info and initial status for each unit.
+func getComponentStartingState(comp component.Component) runtime.ComponentComponentState {
+	compState := runtime.ComponentState{
+		State:   client.UnitStateStarting,
+		Message: client.UnitStateStarting.String(),
+		Units:   make(map[runtime.ComponentUnitKey]runtime.ComponentUnitState),
+		VersionInfo: runtime.ComponentVersionInfo{
+			Name: OtelComponentName,
+			Meta: map[string]string{ // mimic what beats return over the control protocol
+				"build_time": version.BuildTime().String(),
+				"commit":     version.Commit(),
+			},
+			BuildHash: version.Commit(),
+		},
+	}
+	for _, unit := range comp.Units {
+		unitKey := runtime.ComponentUnitKey{
+			UnitID:   unit.ID,
+			UnitType: unit.Type,
+		}
+		compState.Units[unitKey] = getComponentUnitState(&status.AggregateStatus{
+			Event:              componentstatus.NewEvent(componentstatus.StatusStarting),
+			ComponentStatusMap: map[string]*status.AggregateStatus{},
+		}, unit)
+	}
+	return runtime.ComponentComponentState{
+		Component: comp,
+		State:     compState,
+	}
+}
+
 // getUnitOtelStatuses extracts the receiver and exporter status from otel pipeline status.
-func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus) (
+func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus, comp component.Component) (
 	receiverStatuses map[otelcomponent.ID]*status.AggregateStatus,
 	exporterStatuses map[otelcomponent.ID]*status.AggregateStatus,
 	err error) {
@@ -196,7 +385,7 @@ func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus) (
 
 	for otelCompStatusId, otelCompStatus := range pipelineStatus.ComponentStatusMap {
 		var otelComponentID otelcomponent.ID
-		componentKind, otelComponentIDStr, parseErr := parseEntityStatusId(otelCompStatusId)
+		componentKind, otelComponentIDStr, parseErr := ParseEntityStatusId(otelCompStatusId)
 		if parseErr != nil {
 			return nil, nil, parseErr
 		}
@@ -218,8 +407,7 @@ func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus) (
 
 // getComponentUnitState extracts component unit state from otel status.
 func getComponentUnitState(otelUnitStatus *status.AggregateStatus, unit component.Unit) runtime.ComponentUnitState {
-	unitStatus := otelStatusToUnitState(otelUnitStatus.Status())
-	unitMessage := unitMessageFromOtelStatus(otelUnitStatus)
+	unitStatus, unitMessage := StateWithMessage(otelUnitStatus)
 	var streamStatus map[string]map[string]string
 
 	if unit.Config != nil {
@@ -228,7 +416,7 @@ func getComponentUnitState(otelUnitStatus *status.AggregateStatus, unit componen
 			// For now, set the stream status to the same as the unit status.
 			var errorString string
 			if otelUnitStatus.Err() != nil {
-				errorString = otelUnitStatus.Err().Error()
+				errorString = unitMessage
 			}
 			streamStatus[stream.Id] = map[string]string{
 				"error":  errorString,
@@ -251,48 +439,11 @@ func getComponentUnitState(otelUnitStatus *status.AggregateStatus, unit componen
 	}
 }
 
-// unitMessageFromOtelStatus converts otel status to component unit message.
-// This is a partial reimplementation of part of the logic in
-// https://github.com/elastic/beats/blob/main/x-pack/libbeat/management/unit.go#L208
-func unitMessageFromOtelStatus(otelUnitStatus *status.AggregateStatus) string {
-	if otelUnitStatus.Err() != nil {
-		return otelUnitStatus.Err().Error()
-	}
-	unitStatus := otelStatusToUnitState(otelUnitStatus.Status())
-	if unitStatus == client.UnitStateHealthy {
-		return "Healthy"
-	}
-
-	return unitStatus.String()
-}
-
-// otelStatusToUnitState translates otel status to component unit state.
-func otelStatusToUnitState(status componentstatus.Status) client.UnitState {
-	statusMap := map[componentstatus.Status]client.UnitState{
-		componentstatus.StatusNone: client.UnitStateDegraded,
-		// StatusStarting indicates the component is starting.
-		componentstatus.StatusStarting: client.UnitStateStarting,
-		// StatusOK indicates the component is running without issues.
-		componentstatus.StatusOK: client.UnitStateHealthy,
-		// StatusRecoverableError indicates that the component has experienced a transient error and may recover.
-		componentstatus.StatusRecoverableError: client.UnitStateDegraded,
-		// StatusPermanentError indicates that the component has detected a condition at runtime that will need human intervention to fix. The collector will continue to run in a degraded mode.
-		componentstatus.StatusPermanentError: client.UnitStateFailed,
-		// StatusFatalError indicates that the collector has experienced a fatal runtime error and will shut down.
-		componentstatus.StatusFatalError: client.UnitStateFailed,
-		// StatusStopping indicates that the component is in the process of shutting down.
-		componentstatus.StatusStopping: client.UnitStateStopping,
-		// StatusStopped indicates that the component has completed shutdown.
-		componentstatus.StatusStopped: client.UnitStateStopped,
-	}
-	return statusMap[status]
-}
-
-// parseEntityStatusId parses an entity status ID into its kind and entity ID. An entity can be a pipeline or otel component.
+// ParseEntityStatusId parses an entity status ID into its kind and entity ID. An entity can be a pipeline or otel component.
 // The ID is expected to be in the format "kind:entityId", where kind is either "pipeline" or the otel component type (e.g., "receiver", "exporter").
 // The returned entityId may be empty - this is true for the top-level "extensions" key.
 // This format is used by the healthcheckv2 extension.
-func parseEntityStatusId(id string) (kind string, entityId string, err error) {
+func ParseEntityStatusId(id string) (kind string, entityId string, err error) {
 	if id == "extensions" {
 		return "extensions", "", nil
 	}

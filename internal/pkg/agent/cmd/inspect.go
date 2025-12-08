@@ -12,27 +12,22 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"go.opentelemetry.io/collector/confmap"
 	"gopkg.in/yaml.v2"
 
-	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/service"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/vars"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install/componentvalidation"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
-	otelconfig "github.com/elastic/elastic-agent/internal/pkg/otel/config"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -62,7 +57,7 @@ wait that amount of time before using the variables for the configuration.
 			ctx, cancel := context.WithCancel(context.Background())
 			service.HandleSignals(func() {}, cancel)
 			if err := inspectConfig(ctx, paths.ConfigFile(), opts, streams); err != nil {
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
 				os.Exit(1)
 			}
 		},
@@ -115,7 +110,7 @@ variables for the configuration.
 			service.HandleSignals(func() {}, cancel)
 
 			if err := inspectComponents(ctx, paths.ConfigFile(), opts, streams); err != nil {
-				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage())
+				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
 				os.Exit(1)
 			}
 		},
@@ -144,11 +139,15 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 	if err != nil {
 		return fmt.Errorf("error checking for root/Administrator privileges: %w", err)
 	}
+	fullCfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true, !isAdmin)
+	if err != nil {
+		return fmt.Errorf("error loading agent config: %w", err)
+	}
+	agentCfg, err := configuration.NewFromConfig(fullCfg)
+	if err != nil {
+		return fmt.Errorf("error loading agent config: %w", err)
+	}
 	if !opts.variables && !opts.includeMonitoring {
-		fullCfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true, !isAdmin)
-		if err != nil {
-			return fmt.Errorf("error loading agent config: %w", err)
-		}
 		// Ensure secret markers are injected based on secret_paths before redaction.
 		if err := diagnostics.AddSecretMarkers(l, fullCfg); err != nil {
 			fmt.Fprintf(streams.Err, "failed to add secret markers: %v\n", err)
@@ -161,7 +160,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		return nil
 	}
 
-	cfg, otel, lvl, err := getConfigWithVariables(ctx, l, cfgPath, opts.variablesWait, !isAdmin)
+	cfg, otel, lvl, err := componentvalidation.GetConfigWithVariables(ctx, l, cfgPath, opts.variablesWait, !isAdmin)
 	if err != nil {
 		return fmt.Errorf("error fetching config with variables: %w", err)
 	}
@@ -183,11 +182,11 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 			return fmt.Errorf("failed to detect inputs and outputs: %w", err)
 		}
 
-		monitorFn, err := getMonitoringFn(ctx, l, cfg, otel)
+		monitorFn, err := componentvalidation.GetMonitoringFn(ctx, l, cfg, otel)
 		if err != nil {
 			return fmt.Errorf("failed to get monitoring: %w", err)
 		}
-		components, err := specs.PolicyToComponents(cfg, lvl, agentInfo)
+		components, err := specs.PolicyToComponents(cfg, agentCfg.Settings.Internal.Runtime, lvl, agentInfo)
 		if err != nil {
 			return fmt.Errorf("failed to get binary mappings: %w", err)
 		}
@@ -291,7 +290,7 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 		return err
 	}
 
-	comps, err := getComponentsFromPolicy(ctx, l, cfgPath, opts.variablesWait)
+	comps, err := componentvalidation.GetComponentsFromPolicy(ctx, l, cfgPath, opts.variablesWait)
 	if err != nil {
 		// error already includes the context
 		return err
@@ -318,24 +317,30 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 
 	// ID provided.
 	if opts.id != "" {
-		splitID := strings.SplitN(opts.id, "/", 2)
-		compID := splitID[0]
-		unitID := ""
-		if len(splitID) > 1 {
-			unitID = splitID[1]
-		}
+		// Interpret the ID as either a component or component/unit.
+		// First try to find a component with the full ID.
+		compID := opts.id
 		comp, ok := findComponent(comps, compID)
 		if ok {
-			if unitID != "" {
-				unit, ok := findUnit(comp, unitID)
-				if ok {
-					return printUnit(unit, streams)
-				}
-				return fmt.Errorf("unable to find unit with ID: %s/%s", compID, unitID)
-			}
 			return printComponent(comp, streams)
 		}
-		return fmt.Errorf("unable to find component with ID: %s", compID)
+
+		// Next try to split the ID and find a unit inside a component.
+		splitID := strings.SplitN(opts.id, "/", 2)
+		if len(splitID) > 1 {
+			compID = splitID[0]
+			comp, ok = findComponent(comps, compID)
+		}
+		if !ok {
+			return fmt.Errorf("unable to find component with ID: %s", compID)
+		}
+
+		unitID := splitID[1]
+		unit, ok := findUnit(comp, unitID)
+		if !ok {
+			return fmt.Errorf("unable to find unit with ID: %s/%s", compID, unitID)
+		}
+		return printUnit(unit, streams)
 	}
 
 	// Separate any components that are blocked by capabilities config
@@ -354,126 +359,6 @@ func inspectComponents(ctx context.Context, cfgPath string, opts inspectComponen
 	}
 
 	return printComponents(allowed, blocked, streams)
-}
-
-func getComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath string, variablesWait time.Duration, platformModifiers ...component.PlatformModifier) ([]component.Component, error) {
-	// Load the requirements before trying to load the configuration. These should always load
-	// even if the configuration is wrong.
-	platform, err := component.LoadPlatformDetail(platformModifiers...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to gather system information: %w", err)
-	}
-	specs, err := component.LoadRuntimeSpecs(paths.Components(), platform)
-	if err != nil {
-		return nil, fmt.Errorf("failed to detect inputs and outputs: %w", err)
-	}
-
-	isAdmin, err := utils.HasRoot()
-	if err != nil {
-		return nil, fmt.Errorf("error checking for root/Administrator privileges: %w", err)
-	}
-
-	m, otel, lvl, err := getConfigWithVariables(ctx, l, cfgPath, variablesWait, !isAdmin)
-	if err != nil {
-		return nil, err
-	}
-
-	monitorFn, err := getMonitoringFn(ctx, l, m, otel)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get monitoring: %w", err)
-	}
-
-	agentInfo, err := info.NewAgentInfoWithLog(ctx, "error", false)
-	if err != nil {
-		return nil, fmt.Errorf("could not load agent info: %w", err)
-	}
-
-	// Compute the components from the computed configuration.
-	comps, err := specs.ToComponents(m, monitorFn, lvl, agentInfo, map[string]uint64{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to render components: %w", err)
-	}
-
-	return comps, nil
-}
-
-func getMonitoringFn(ctx context.Context, logger *logger.Logger, cfg map[string]interface{}, otelCfg *confmap.Conf) (component.GenerateMonitoringCfgFn, error) {
-	config, err := config.NewConfigFrom(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	agentCfg := configuration.DefaultConfiguration()
-	if err := config.UnpackTo(agentCfg); err != nil {
-		return nil, err
-	}
-
-	agentInfo, err := info.NewAgentInfoWithLog(ctx, "error", false)
-	if err != nil {
-		return nil, fmt.Errorf("could not load agent info: %w", err)
-	}
-	otelExecMode := otelconfig.GetExecutionModeFromConfig(logger, config)
-	isOtelExecModeSubprocess := otelExecMode == manager.SubprocessExecutionMode
-	monitor := componentmonitoring.New(agentCfg.Settings.V1MonitoringEnabled, agentCfg.Settings.DownloadConfig.OS(), agentCfg.Settings.MonitoringConfig, agentInfo, isOtelExecModeSubprocess)
-	return monitor.MonitoringConfig, nil
-}
-
-func getConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath string, timeout time.Duration, unprivileged bool) (map[string]interface{}, *confmap.Conf, logp.Level, error) {
-
-	cfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true, unprivileged)
-	if err != nil {
-		return nil, nil, logp.InfoLevel, err
-	}
-	lvl, err := getLogLevel(cfg, cfgPath)
-	if err != nil {
-		return nil, nil, logp.InfoLevel, err
-	}
-	m, err := cfg.ToMapStr()
-	if err != nil {
-		return nil, nil, lvl, err
-	}
-	ast, err := transpiler.NewAST(m)
-	if err != nil {
-		return nil, nil, lvl, fmt.Errorf("could not create the AST from the configuration: %w", err)
-	}
-
-	// Wait for the variables based on the timeout.
-	vars, err := vars.WaitForVariables(ctx, l, cfg, timeout)
-	if err != nil {
-		return nil, nil, lvl, fmt.Errorf("failed to gather variables: %w", err)
-	}
-
-	// Render the inputs using the discovered inputs.
-	inputs, ok := transpiler.Lookup(ast, "inputs")
-	if ok {
-		renderedInputs, err := transpiler.RenderInputs(inputs, vars)
-		if err != nil {
-			return nil, nil, lvl, fmt.Errorf("rendering inputs failed: %w", err)
-		}
-		err = transpiler.Insert(ast, renderedInputs, "inputs")
-		if err != nil {
-			return nil, nil, lvl, fmt.Errorf("inserting rendered inputs failed: %w", err)
-		}
-	}
-	m, err = ast.Map()
-	if err != nil {
-		return nil, nil, lvl, fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
-	}
-	return m, cfg.OTel, lvl, nil
-}
-
-func getLogLevel(rawCfg *config.Config, cfgPath string) (logp.Level, error) {
-	cfg, err := configuration.NewFromConfig(rawCfg)
-	if err != nil {
-		return logger.DefaultLogLevel, errors.New(err,
-			fmt.Sprintf("could not parse configuration file %s", cfgPath),
-			errors.TypeFilesystem,
-			errors.M(errors.MetaKeyPath, cfgPath))
-	}
-	if cfg.Settings.LoggingConfig != nil {
-		return cfg.Settings.LoggingConfig.Level, nil
-	}
-	return logger.DefaultLogLevel, nil
 }
 
 func printComponents(

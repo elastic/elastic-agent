@@ -20,6 +20,8 @@ if [ -z "$TEST_SUDO" ]; then
   exit 1
 fi
 
+ESS_REGION=${ESS_REGION:-""}
+
 # Override the stack version from `.package-version` contents
 # There is a time when the current snapshot is not available on cloud yet, so we cannot use the latest version automatically
 # This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
@@ -31,16 +33,13 @@ if [[ "${FIPS:-false}" == "true" ]]; then
   STACK_BUILD_ID=""
 fi
 
-echo "~~~ Building test binaries"
-mage build:testBinaries
-
 # If the step is retried, we start the stack again.
 # BUILDKITE_RETRY_COUNT == "0" for the first run
 # BUILDKITE_RETRY_COUNT > 0 for the retries
 if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 || "${FORCE_ESS_CREATE:-false}" == "true" ]]; then
   echo "~~~ The steps is retried, starting the ESS stack again"
-  trap 'ess_down' EXIT
-  ess_up "$STACK_VERSION" "$STACK_BUILD_ID" || (echo -e "^^^ +++\nFailed to start ESS stack")
+  trap 'ess_down "$ESS_REGION"' EXIT
+  ess_up "$STACK_VERSION" "$STACK_BUILD_ID" "$ESS_REGION"
 else
   # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data
   echo "~~~ Receiving ESS stack metadata"
@@ -66,6 +65,10 @@ if [[ "${GROUP_NAME}" == "kubernetes" ]]; then
   source .buildkite/scripts/install-kubectl.sh
   .buildkite/scripts/buildkite-k8s-integration-tests.sh $@
 else
+  # test binaries are needed only when running integration tests outside of k8s
+  echo "~~~ Building test binaries"
+  mage build:testBinaries
+  
   if [ "$TEST_SUDO" == "true" ]; then
     sudo -E .buildkite/scripts/buildkite-integration-tests.sh $@
   else

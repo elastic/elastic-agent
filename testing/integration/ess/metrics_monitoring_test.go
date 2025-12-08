@@ -13,12 +13,16 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httputil"
+	"runtime"
 	"testing"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/elastic/elastic-agent-system-metrics/metric/system/process"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
@@ -172,8 +176,7 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 			query = genESQuery(agentStatus.Info.ID,
 				[][]string{
 					{"match", "component.id", cid},
-					{"exists", "field", "system.process.cpu.total.value"},
-					{"exists", "field", "system.process.memory.size"},
+					{"match", "agent.type", "metricbeat"},
 				})
 			now = time.Now()
 			res, err := estools.PerformQueryForRawQuery(ctx, query, "metrics-elastic_agent*", runner.info.ESClient)
@@ -208,7 +211,40 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 			return false
 		}
 		return true
-	}, time.Minute*10, time.Second*10, "could not fetch metrics for all known components in default install: %v", componentIds)
+	}, time.Minute*10, time.Second*10, "could not fetch metrics for edot collector")
+
+	if runtime.GOOS == "windows" {
+		return
+	}
+
+	// restart the agent to validate that this does not result in any agent-spawned subprocess
+	// becoming defunct
+	err = runner.agentFixture.ExecRestart(ctx)
+	require.NoError(t, err, "could not restart agent")
+
+	require.Eventually(t, func() bool {
+		err = runner.agentFixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 1*time.Minute, 1*time.Second)
+
+	procStats := process.Stats{
+		// filtering with '.*elastic-agent' or '^.*elastic-agent$' doesn't
+		// seem to work as expected
+		Procs: []string{".*"},
+	}
+	err = procStats.Init()
+	require.NoError(t, err, "could not initialize process.Stats")
+
+	pidMap, _, err := procStats.FetchPids()
+	require.NoError(t, err, "could not fetch pids")
+
+	for _, state := range pidMap {
+		assert.NotEqualValuesf(t, process.Zombie, state.State, "process %d is in zombie state", state.Pid.ValueOr(0))
+	}
 }
 
 func genESQuery(agentID string, requiredFields [][]string) map[string]interface{} {

@@ -7,8 +7,10 @@
 package ess
 
 import (
+	"archive/tar"
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -44,6 +46,7 @@ var diagnosticsFiles = []string{
 	"components-actual.yaml",
 	"components-expected.yaml",
 	"computed-config.yaml",
+	"environment.yaml",
 	"goroutine.pprof.gz",
 	"heap.pprof.gz",
 	"local-config.yaml",
@@ -340,13 +343,15 @@ inputs:
     prospector.scanner.fingerprint.enabled: false
     file_identity.native: ~
     use_output: default
-    _runtime_experimental: {{ .Runtime }}
 outputs:
   default:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
+    status_reporting:
+      enabled: false
 agent.monitoring.enabled: false
+agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 `
 
 	var filebeatSetup = map[string]integrationtest.ComponentState{
@@ -357,13 +362,25 @@ agent.monitoring.enabled: false
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
+	expectedComponentState := map[string]integrationtest.ComponentState{
+		"filestream-default": {
+			State: integrationtest.NewClientState(client.Healthy),
+			Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
+				integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "filestream-default"}: {
+					State: integrationtest.NewClientState(client.Healthy),
+				},
+				integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "filestream-default-filestream-filebeat"}: {
+					State: integrationtest.NewClientState(client.Healthy),
+				},
+			},
+		},
+	}
+	expectedAgentState := integrationtest.NewClientState(client.Healthy)
 
 	testCases := []struct {
 		name                         string
 		runtime                      string
 		expectedCompDiagnosticsFiles []string
-		expectedAgentState           *client.State
-		expectedComponentState       map[string]integrationtest.ComponentState
 	}{
 		{
 			name:    "filebeat process",
@@ -375,20 +392,6 @@ agent.monitoring.enabled: false
 				"beat-rendered-config.yml",
 				"global_processors.txt",
 			),
-			expectedAgentState: integrationtest.NewClientState(client.Healthy),
-			expectedComponentState: map[string]integrationtest.ComponentState{
-				"filestream-default": {
-					State: integrationtest.NewClientState(client.Healthy),
-					Units: map[integrationtest.ComponentUnitKey]integrationtest.ComponentUnitState{
-						integrationtest.ComponentUnitKey{UnitType: client.UnitTypeOutput, UnitID: "filestream-default"}: {
-							State: integrationtest.NewClientState(client.Healthy),
-						},
-						integrationtest.ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: "filestream-default-filestream-filebeat"}: {
-							State: integrationtest.NewClientState(client.Healthy),
-						},
-					},
-				},
-			},
 		},
 		{
 			name:    "filebeat receiver",
@@ -398,7 +401,6 @@ agent.monitoring.enabled: false
 				"beat_metrics.json",
 				"input_metrics.json",
 			},
-			expectedAgentState: integrationtest.NewClientState(client.Degraded),
 		},
 	}
 
@@ -441,8 +443,8 @@ agent.monitoring.enabled: false
 			}
 			err = f.Run(ctx, integrationtest.State{
 				Configure:  configBuffer.String(),
-				AgentState: tc.expectedAgentState,
-				Components: tc.expectedComponentState,
+				AgentState: expectedAgentState,
+				Components: expectedComponentState,
 				After:      testDiagnosticsFactory(t, filebeatSetup, expDiagFiles, tc.expectedCompDiagnosticsFiles, f, []string{"diagnostics", "collect"}),
 			})
 			assert.NoError(t, err)
@@ -465,7 +467,6 @@ inputs:
     prospector.scanner.fingerprint.enabled: false
     file_identity.native: ~
     use_output: default
-    _runtime_experimental: otel
 agent.grpc:
     port: 6790
 outputs:
@@ -473,7 +474,10 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
+    status_reporting:
+      enabled: false
 agent.monitoring.enabled: false
+agent.internal.runtime.filebeat.filestream: otel
 `
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
@@ -547,6 +551,7 @@ agent.monitoring.enabled: false
 		require.NoErrorf(t, err, "stat file %q failed", path)
 		require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", path)
 	}
+	verifyFilebeatRegistry(t, filepath.Join(extractionDir, "components/filestream-default/registry.tar.gz"))
 }
 
 func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string) func(ctx context.Context) error {
@@ -730,4 +735,24 @@ func extractKeysFromMap[K comparable, V any](src map[K]V) []K {
 type filePattern struct {
 	pattern  string
 	optional bool
+}
+
+func verifyFilebeatRegistry(t *testing.T, path string) {
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	gzReader, err := gzip.NewReader(bytes.NewReader(data))
+	require.NoError(t, err)
+	tarReader := tar.NewReader(gzReader)
+	hdr, err := tarReader.Next()
+	require.NoError(t, err)
+	assert.Equal(t, "registry", hdr.Name)
+	hdr, err = tarReader.Next()
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join("registry", "filebeat"), hdr.Name)
+	hdr, err = tarReader.Next()
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join("registry", "filebeat", "log.json"), hdr.Name)
+	hdr, err = tarReader.Next()
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join("registry", "filebeat", "meta.json"), hdr.Name)
 }

@@ -1,5 +1,0 @@
-kind: bug-fix
-summary: Ensure standalone Elastic Agent uses log level from configuration instead of persisted state
-component: elastic-agent
-pr: https://github.com/elastic/elastic-agent/pull/8784
-issue: https://github.com/elastic/elastic-agent/issues/8137

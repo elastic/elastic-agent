@@ -26,6 +26,12 @@ The following `values.yaml` files are used depending on the ingest scenario:
 * [Direct ingestion into Elasticsearch](https://github.com/elastic/elastic-agent/blob/main/deploy/helm/edot-collector/kube-stack/values.yaml)
 * [Managed OTLP Endpoint](https://github.com/elastic/elastic-agent/blob/main/deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml)
 
+::::{important}
+**Configuration compatibility with {{product.elastic-stack}} versions**
+
+If you're running EDOT Collector 9.x with {{product.elastic-stack}} 8.18 or 8.19, use the Helm `values.yaml` files and configuration aligned with your Stack version to ensure proper functionality with {{product.kibana}} Observability UIs. For more details, refer to [Configuration compatibility with Elastic Stack versions](/reference/edot-collector/config/default-config-standalone.md#configuration-compatibility-with-elastic-stack-versions).
+::::
+
 The following sections describe the default pipelines for the different roles of EDOT collectors in a Kubernetes setup.
 
 ## Cluster Collector pipeline

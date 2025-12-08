@@ -63,6 +63,10 @@ spec:
             # The Elasticsearch host to communicate with
             - name: ES_HOST
               value: ""
+            # The fingerprint of a root CA certificate used to sign
+            # Elasticsearch's TLS certificate
+            - name: CA_TRUSTED
+              value: ""
             - name: NODE_NAME
               valueFrom:
                 fieldRef:

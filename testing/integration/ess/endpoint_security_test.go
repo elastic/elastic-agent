@@ -188,7 +188,7 @@ func addEndpointCleanup(t *testing.T, uninstallToken string) {
 		uninstallContext, uninstallCancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer uninstallCancel()
 
-		t.Logf("Uninstalling endpoint with the following uinstall token: %s", uninstallToken)
+		t.Logf("Uninstalling endpoint with the following uninstall token: %s", uninstallToken)
 		_, err = exec.CommandContext(uninstallContext, "/opt/Elastic/Endpoint/elastic-endpoint", "uninstall", "--uninstall-token", uninstallToken).CombinedOutput()
 		if err != nil {
 			t.Fatalf("error when cleaning up elastic-endpoint: uninstall token %s", uninstallToken)
@@ -320,7 +320,7 @@ func testUnprotectedInstallUpgrade(
 	t.Logf("Comparing start version %s to upgraded version %s", startEndpointVersion.String(), parsedUpgradedVersion.String())
 	require.True(t, startEndpointVersion.Less(*parsedUpgradedVersion))
 
-	t.Log("trying to uinstall without token, not expecting error")
+	t.Log("trying to uninstall without token, not expecting error")
 	out, err = exec.Command("sudo", "elastic-agent", "uninstall", "-f").CombinedOutput()
 	t.Log(string(out))
 	require.NoError(t, err)
@@ -714,10 +714,11 @@ func testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T, i
 	// Verify that the Endpoint directory was correctly removed.
 	// Regression test for https://github.com/elastic/elastic-agent/issues/3077
 	agentInstallPath := fixture.WorkDir()
-	files, err := os.ReadDir(filepath.Clean(filepath.Join(agentInstallPath, "..")))
+	elasticInstallPath := filepath.Clean(filepath.Join(agentInstallPath, ".."))
+	files, err := os.ReadDir(elasticInstallPath)
 	require.NoError(t, err)
 
-	t.Logf("Checking directories at install path %s", agentInstallPath)
+	t.Logf("Checking directories at install path %s", elasticInstallPath)
 	for _, f := range files {
 		if !f.IsDir() {
 			continue
