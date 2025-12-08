@@ -432,14 +432,14 @@ github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumpti
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic/go.mod h1:0vCBR1wgGwZeGmloJ+eCWIZF2S47grTXRzj2mftg2Nk=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
 github.com/elastic/bayeux v1.0.5/go.mod h1:CSI4iP7qeo5MMlkznGvYKftp8M7qqP/3nzmVZoXHY68=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251203173126-96dc1b39c163 h1:U/zcMEPIsEhzXJ8PjEFyn5bgy4GJKIFuTQ/MVr9Zry4=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251203173126-96dc1b39c163/go.mod h1:jFJMJMOG18CdEbvM3UKQnn3Ft66j2vgMfStZwLAcK+A=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251207162230-1c8215c08c9c h1:SQYQ+L6YHm4bUueK6/z0xp8uRMx9EIdcOTE9poQWcJA=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251207162230-1c8215c08c9c/go.mod h1:y9CnW61pzAjYU4CIQbx+enCK29wHR1jV5A7yhicCa/Q=
 github.com/elastic/elastic-agent-autodiscover v0.10.0 h1:WJ4zl9uSfk1kHmn2B/0byQBLIL607Zt4LNfOgV7+XN0=
 github.com/elastic/elastic-agent-autodiscover v0.10.0/go.mod h1:Nf3zh9FcJ9nTTswTwDTUAqXmvQllOrNliM6xmORSxwE=
 github.com/elastic/elastic-agent-client/v7 v7.17.2 h1:Cl2TeABqWZgW40t5fchGWT/sRk4MDDLWA0d8iHHOxLA=
 github.com/elastic/elastic-agent-client/v7 v7.17.2/go.mod h1:5irRFqp6HLqtu1S+OeY0jg8x7K6PLL+DW+PwVk1vJnk=
-github.com/elastic/elastic-agent-libs v0.26.2 h1:zwytPWmTWSJG80oa9/5FJ6zue47ysI23eMo15LfeWy0=
-github.com/elastic/elastic-agent-libs v0.26.2/go.mod h1:fc2noLqosmQorIGbatJfVeh4CL77yiP8ot16/5umeoM=
+github.com/elastic/elastic-agent-libs v0.28.0 h1:UDL9aSxgjqC9TrHAEHgI8gtuhRYPM/1gSfh7ztHWWLw=
+github.com/elastic/elastic-agent-libs v0.28.0/go.mod h1:0xUg7alsNE/WhY9DZRIdTYW75nqSHC1octIAg//j/PQ=
 github.com/elastic/elastic-agent-system-metrics v0.13.4 h1:gX8VdlQyakPcPKFpD7uHv2QLRDyguuKfZgu0LE27V7c=
 github.com/elastic/elastic-agent-system-metrics v0.13.4/go.mod h1:lB8veYWYBlA9eF6TahmPN87G1IEgWlbep7QSqLSW90U=
 github.com/elastic/elastic-transport-go/v8 v8.8.0 h1:7k1Ua+qluFr6p1jfJjGDl97ssJS/P7cHNInzfxgBQAo=
@@ -1224,6 +1224,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverrece
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver v0.139.0/go.mod h1:ZnoQNt1oRAWLngoYWLbFUdrr1m8UcXZxEDg/W6+JrOY=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver v0.139.0 h1:0M9E1AlRyUWXzRQIerGw0et3pdItIfZhaNFX6Y+EXzg=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver v0.139.0/go.mod h1:C2wYuBBlYaWuFQP+elufZGZrlj7GyeCdzroEZYlV5os=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver v0.139.0 h1:d3gfDFoyCGpLrOba4WezCr4mN0tFQuchP2lG0c5Iwp0=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver v0.139.0/go.mod h1:rzONCE55PRW+ogXOMavHrWi/H6uBzNAGGJzL1fRLs+I=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.139.0 h1:uq3xrmeDzIfwXHB5BCC/BAOO/ZIrexi+hDbRcd3DrNg=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.139.0/go.mod h1:C89wYTePUCuLie/te7LW8KYuN07EVf9HLxiJEzjcQgY=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
