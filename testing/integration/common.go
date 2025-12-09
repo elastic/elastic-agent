@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/testing/estools"
@@ -33,21 +34,17 @@ func GetESHost() (string, error) {
 // FindESDocs runs `findFn` until at least one document is returned and there is no error
 func FindESDocs(t *testing.T, findFn func() (estools.Documents, error)) estools.Documents {
 	var docs estools.Documents
-	require.Eventually(
+	require.EventuallyWithT(
 		t,
-		func() bool {
+		func(c *assert.CollectT) {
 			var err error
 			docs, err = findFn()
-			if err != nil {
-				t.Logf("got an error querying ES, retrying. Error: %s", err)
-				return false
-			}
-
-			return docs.Hits.Total.Value != 0
+			require.NoErrorf(c, err, "got an error querying ES, retrying. Error: %s", err)
+			require.NotEqualValues(c, 0, docs.Hits.Total.Value, "expecting at least one document returned by 'findFn'")
 		},
 		3*time.Minute,
 		15*time.Second,
-	)
+		"did not find the expected documents on ES")
 
 	return docs
 }

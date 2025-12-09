@@ -368,6 +368,10 @@ agent.logging.to_stderr: true
   # file. Defaults to false.
   # rotateonstartup: false
 
+# Advanced internal settings. No stability guarantees are provided. The options in this section may be removed at any
+# point without warning.
+# agent.internal:
+
 # Providers
 
 # Providers supply the key/values pairs that are used for variable substitution

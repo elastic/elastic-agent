@@ -30,9 +30,10 @@ func newValidateCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 	}
 
 	SetupOtelFlags(cmd.Flags())
+	origHelpFunc := cmd.HelpFunc()
 	cmd.SetHelpFunc(func(c *cobra.Command, s []string) {
 		hideInheritedFlags(c)
-		c.Root().HelpFunc()(c, s)
+		origHelpFunc(c, s)
 	})
 
 	return cmd

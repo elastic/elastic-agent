@@ -27,11 +27,11 @@ Authentication in the EDOT Collector is handled through extensions that implemen
 
 The EDOT Collector supports the following authentication extensions:
 
-### Elastic API Key Authentication (`apikeyauth`)
+### Elastic API key authentication (`apikeyauth`)
 
 The `apikeyauth` extension is an Elastic-specific authentication method that validates Elasticsearch API keys against your {{es}} cluster. This extension is ideal for authenticating requests from EDOT SDKs and other Collectors that use Elasticsearch API keys.
 
-### Bearer Token Authentication (`bearertokenauth`)
+### Bearer token authentication (`bearertokenauth`)
 
 The `bearertokenauth` extension is an contrib OpenTelemetry authentication method that supports static bearer tokens. This extension is useful for token-based authentication scenarios.
 
@@ -70,6 +70,44 @@ receivers:
 service:
   extensions: [apikeyauth]
 ```
+
+#### Using `apikeyauth` with EDOT SDKs and central configuration
+
+The `apikeyauth` authenticator is also used by the `apmconfig` extension when EDOT SDKs retrieve central configuration from the EDOT Collector.
+
+EDOT SDKs send their own {{es}} API key to the Collector in the `Authorization` header (for example: `Authorization: ApiKey <Base64(id:key)>`).
+
+The Collector does not store or embed the API key. Instead, the `apikeyauth` extension validates the incoming key by calling {{es}} and checking that it has:
+
+* `application: "apm"`
+
+* privilege: `config_agent:read`
+
+* `resources: ["*"]`
+
+A minimal configuration for this use case looks like:
+
+```yaml
+extensions:
+  apikeyauth:
+    endpoint: "${ELASTIC_ENDPOINT}"
+    application_privileges:
+      - application: "apm"
+        privileges: ["config_agent:read"]
+        resources: ["*"]
+
+  apmconfig:
+    opamp:
+      protocols:
+        http:
+          auth:
+            authenticator: apikeyauth
+
+service:
+  extensions: [apikeyauth]
+```
+
+Use `resources: ["*"]` to grant read access for all APM services. A literal dash (`"-"`) is not valid.
 
 #### Configuration options
 
@@ -147,7 +185,9 @@ These use cases show how to configure the `apikeyauth` and `bearertokenauth` ext
 
 ### Authenticating EDOT SDKs
 
-When using EDOT SDKs, configure the `apikeyauth` extension to validate API keys:
+When EDOT SDKs retrieve central configuration from the Collector, they authenticate using an {{es}} API key. The Collector validates this key using the `apikeyauth` extension.
+
+For example:
 
 ```yaml subs=true
 extensions:
@@ -172,6 +212,18 @@ service:
   extensions: [apikeyauth]
 ```
 
+::::{note}
+EDOT SDKs authenticate by sending their API key in the `Authorization` header. The EDOT Collector doesn't store the API key, it only validates it.
+
+Ensure the API key has:
+
+* `application: "apm"`
+* `privileges: ["config_agent:read"]`
+* `resources: ["*"]`
+
+These privileges allow SDKs to read their central configuration through the Collector.
+::::
+
 ### Securing collector-to-collector communication
 
 Use bearer token authentication for secure communication between collectors:
@@ -195,7 +247,7 @@ service:
 
 ### Multi-tenant authentication
 
-For multi-tenant environments, use the `apikeyauth` extension with tenant-specific headers:
+For multi-tenant environments, use the `apikeyauth` extension with additional cache key headers to ensure privileges are validated for each tenant:
 
 ```yaml subs=true
 extensions:

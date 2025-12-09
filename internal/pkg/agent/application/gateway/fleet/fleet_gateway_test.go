@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -20,6 +22,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+	"go.opentelemetry.io/collector/component/componentstatus"
+
+	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -29,6 +37,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
+	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -873,4 +883,264 @@ func TestFastCheckinStateFetcher(t *testing.T) {
 		assert.Nil(t, s.cancel)
 		s.mutex.Unlock()
 	})
+}
+
+func TestConvertToCheckingComponents(t *testing.T) {
+	tests := []struct {
+		name       string
+		components []runtime.ComponentComponentState
+		collector  *status.AggregateStatus
+		expected   []fleetapi.CheckinComponent
+	}{
+		{
+			name:       "Nil inputs",
+			components: nil,
+			collector:  nil,
+			expected:   nil,
+		},
+		{
+			name:       "Empty inputs",
+			components: []runtime.ComponentComponentState{},
+			collector:  &status.AggregateStatus{},
+			expected:   []fleetapi.CheckinComponent{},
+		},
+		{
+			name: "Only agent components",
+			components: []runtime.ComponentComponentState{
+				{
+					Component: component.Component{ID: "comp-1", InputSpec: &component.InputRuntimeSpec{InputType: "log"}},
+					State: runtime.ComponentState{
+						State:   eaclient.UnitStateHealthy,
+						Message: "Component is healthy",
+					},
+				},
+				{
+					Component: component.Component{ID: "comp-2", InputSpec: &component.InputRuntimeSpec{InputType: "log"}},
+					State: runtime.ComponentState{
+						State:   eaclient.UnitStateDegraded,
+						Message: "Component is degraded",
+						Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+							{UnitID: "unit-1", UnitType: eaclient.UnitTypeInput}: {
+								State:   eaclient.UnitStateFailed,
+								Message: "Input unit failed",
+								Payload: map[string]interface{}{"error": "some error"},
+							},
+						},
+					},
+				},
+			},
+			collector: nil,
+			expected: []fleetapi.CheckinComponent{
+				{
+					ID:      "comp-1",
+					Type:    "log",
+					Status:  "HEALTHY",
+					Message: "Component is healthy",
+				},
+				{
+					ID:      "comp-2",
+					Type:    "log",
+					Status:  "DEGRADED",
+					Message: "Component is degraded",
+					Units: []fleetapi.CheckinUnit{
+						{
+							ID:      "unit-1",
+							Type:    "input",
+							Status:  "FAILED",
+							Message: "Input unit failed",
+							Payload: map[string]interface{}{"error": "some error"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:       "Only OTel components",
+			components: nil,
+			collector: &status.AggregateStatus{
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					"extensions": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							"extensions:healthcheck": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+						},
+					},
+					"pipeline:logs": {
+						Event: componentstatus.NewRecoverableErrorEvent(fmt.Errorf("pipeline error")),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							"receiver:filebeat": {
+								Event: componentstatus.NewEvent(componentstatus.StatusStarting),
+							},
+							"exporter:elasticsearch": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							"processor:batch": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+						},
+					},
+				},
+			},
+			expected: []fleetapi.CheckinComponent{
+				{
+					ID:      "extensions",
+					Type:    "otel",
+					Status:  "HEALTHY",
+					Message: "Healthy",
+					Units: []fleetapi.CheckinUnit{
+						{
+							ID:      "extensions:healthcheck",
+							Type:    "",
+							Status:  "HEALTHY",
+							Message: "Healthy",
+						},
+					},
+				},
+				{
+					ID:      "pipeline:logs",
+					Type:    "otel",
+					Status:  "DEGRADED",
+					Message: "Recoverable: pipeline error",
+					Units: []fleetapi.CheckinUnit{
+						{
+							ID:      "exporter:elasticsearch",
+							Type:    "output",
+							Status:  "HEALTHY",
+							Message: "Healthy",
+						},
+						{
+							ID:      "processor:batch",
+							Type:    "",
+							Status:  "HEALTHY",
+							Message: "Healthy",
+						},
+						{
+							ID:      "receiver:filebeat",
+							Type:    "input",
+							Status:  "STARTING",
+							Message: "Starting",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Both agent and OTel components",
+			components: []runtime.ComponentComponentState{
+				{
+					Component: component.Component{ID: "comp-1", InputSpec: &component.InputRuntimeSpec{InputType: "log"}},
+					State: runtime.ComponentState{
+						State:   eaclient.UnitStateHealthy,
+						Message: "Component is healthy",
+					},
+				},
+			},
+			collector: &status.AggregateStatus{
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					"pipeline:logs": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+				},
+			},
+			expected: []fleetapi.CheckinComponent{
+				{
+					ID:      "comp-1",
+					Type:    "log",
+					Status:  "HEALTHY",
+					Message: "Component is healthy",
+				},
+				{
+					ID:      "pipeline:logs",
+					Type:    "otel",
+					Status:  "HEALTHY",
+					Message: "Healthy",
+				},
+			},
+		},
+		{
+			name: "Unknown states and types",
+			components: []runtime.ComponentComponentState{
+				{
+					Component: component.Component{ID: "comp-1", InputSpec: &component.InputRuntimeSpec{InputType: "log"}},
+					State: runtime.ComponentState{
+						State:   eaclient.UnitState(99),
+						Message: "Unknown state",
+						Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+							{UnitID: "unit-1", UnitType: eaclient.UnitType(99)}: {
+								State:   eaclient.UnitState(99),
+								Message: "Unknown unit state",
+							},
+						},
+					},
+				},
+			},
+			collector: nil,
+			expected: []fleetapi.CheckinComponent{
+				{
+					ID:      "comp-1",
+					Type:    "log",
+					Status:  "",
+					Message: "Unknown state",
+					Units: []fleetapi.CheckinUnit{
+						{
+							ID:      "unit-1",
+							Type:    "",
+							Status:  "",
+							Message: "Unknown unit state",
+						},
+					},
+				},
+			},
+		},
+		{
+			name:       "OTel component with invalid ID",
+			components: []runtime.ComponentComponentState{},
+			collector: &status.AggregateStatus{
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					"invalid-id": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							"invalid-unit-id": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+						},
+					},
+				},
+			},
+			expected: []fleetapi.CheckinComponent{
+				{
+					ID:      "invalid-id",
+					Type:    "otel",
+					Status:  "HEALTHY",
+					Message: "Healthy",
+					Units: []fleetapi.CheckinUnit{
+						{
+							ID:      "invalid-unit-id",
+							Type:    "",
+							Status:  "HEALTHY",
+							Message: "Healthy",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := convertToCheckinComponents(logp.NewNopLogger(), tt.components, tt.collector)
+			// Testify diffs are nicer if we sort and compare directly vs using ElementsMathc
+			slices.SortFunc(result, func(a, b fleetapi.CheckinComponent) int {
+				return strings.Compare(a.ID, b.ID)
+			})
+			for _, c := range result {
+				slices.SortFunc(c.Units, func(a, b fleetapi.CheckinUnit) int {
+					return strings.Compare(a.ID, b.ID)
+				})
+			}
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }
