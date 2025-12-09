@@ -1,6 +1,6 @@
 ---
 navigation_title: Custom data stream routing
-description: Customize data stream routing in EDOT. Learn scenarios, patterns, and risks when modifying `data_stream.namespace` or `data_stream.dataset`.
+description: Customize data stream routing in EDOT. Learn scenarios, patterns, and risks when modifying data_stream.namespace or data_stream.dataset.
 applies_to:
   stack:
   serverless:
@@ -19,7 +19,7 @@ products:
 
 While most use cases rely on these defaults, EDOT also supports advanced dynamic routing.
 
-:::{important}
+:::{warning}
 We strongly recommend not changing the default data stream names. Customizing data stream routing diverges from the standard ingestion model and there's no guarantee it will be valid for future versions.
 :::
 
@@ -47,8 +47,9 @@ Changing the `dataset` value can cause:
 - Loss of compatibility with built-in correlations and cross-linking
 - Inconsistent field mappings
 - Proliferation of data streams and increased shard counts
+- Incompatibility with OpenTelemetry content packs, which are required to visualize OpenTelemetry data stored natively as OpenTelemetry semantic conventions
 
-Only modify `dataset` if it's absolutely necessary and you're aware of the trade-offs.
+Only modify `dataset` if it's absolutely necessary and you're aware of the tradeoffs.
 
 ## Configuration example
 
@@ -106,6 +107,7 @@ This configuration diverges from the standard ingestion model. Be aware of the f
 - Future EDOT versions may not support this configuration or may introduce breaking changes.
 - Changes might lead to an increase in data streams and shard counts.
 - Dashboards and UIs may not recognize non-standard datasets.
+- OpenTelemetry content packs may not work with custom datasets. These content packs are required to visualize OpenTelemetry data stored natively as OpenTelemetry semantic conventions. Install content packs from the {{kib}} Integrations UI by searching for `otel`.
 - Some data streams might fail to be created if there are non-allowed characters in the values set for `data_stream.namespace` or `data_stream.dataset`.
 
 Use this feature only when necessary and validate in non-production environments first.
