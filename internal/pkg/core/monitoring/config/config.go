@@ -13,14 +13,23 @@ import (
 )
 
 const (
-	defaultPort      = 6791
-	defaultNamespace = "default"
+	defaultPort       = 6791
+	defaultNamespace  = "default"
+	DefaultOutputName = "default"
 
 	// DefaultHost is used when host is not defined or empty
 	DefaultHost           = "localhost"
 	ProcessRuntimeManager = "process"
 	OtelRuntimeManager    = "otel"
 	DefaultRuntimeManager = OtelRuntimeManager
+
+	// DefaultMetricsCollectionInterval is the metricset execution period used for the monitoring metrics inputs
+	// we set this to 60s to reduce the load/data volume on the monitoring cluster
+	DefaultMetricsCollectionInterval = 60 * time.Second
+
+	// DefaultMetricsStreamFailureThreshold is the metricset stream failure threshold before the stream is marked as DEGRADED
+	// to avoid marking the agent degraded for transient errors, we set the default threshold to 5
+	DefaultMetricsStreamFailureThreshold = uint(5)
 )
 
 // MonitoringConfig describes a configuration of a monitoring
@@ -28,7 +37,8 @@ type MonitoringConfig struct {
 	Enabled          bool                  `yaml:"enabled" config:"enabled"`
 	MonitorLogs      bool                  `yaml:"logs" config:"logs"`
 	MonitorMetrics   bool                  `yaml:"metrics" config:"metrics"`
-	MetricsPeriod    string                `yaml:"metrics_period" config:"metrics_period"`
+	UseOutput        string                `yaml:"use_output" config:"use_output"`
+	MetricsPeriod    time.Duration         `yaml:"metrics_period" config:"metrics_period"`
 	FailureThreshold *uint                 `yaml:"failure_threshold" config:"failure_threshold"`
 	LogMetrics       bool                  `yaml:"-" config:"-"`
 	HTTP             *MonitoringHTTPConfig `yaml:"http" config:"http"`
@@ -119,6 +129,8 @@ func DefaultConfig() *MonitoringConfig {
 		monRuntimeManager = monRuntimeEnv
 	}
 
+	defaultFailureThreshold := DefaultMetricsStreamFailureThreshold
+
 	return &MonitoringConfig{
 		Enabled:        true,
 		MonitorLogs:    true,
@@ -130,10 +142,13 @@ func DefaultConfig() *MonitoringConfig {
 			Host:    DefaultHost,
 			Port:    defaultPort,
 		},
-		Namespace:      defaultNamespace,
-		APM:            defaultAPMConfig(),
-		Diagnostics:    defaultDiagnostics(),
-		RuntimeManager: monRuntimeManager,
+		Namespace:        defaultNamespace,
+		APM:              defaultAPMConfig(),
+		Diagnostics:      defaultDiagnostics(),
+		RuntimeManager:   monRuntimeManager,
+		UseOutput:        DefaultOutputName,
+		MetricsPeriod:    DefaultMetricsCollectionInterval,
+		FailureThreshold: &defaultFailureThreshold,
 	}
 }
 
