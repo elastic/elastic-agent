@@ -59,6 +59,8 @@ func TestLimitsLog(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
+	rollbackSrc := newMockRollbacksSource(t)
+
 	_, _, _, err := New(
 		ctx,
 		log,
@@ -72,6 +74,7 @@ func TestLimitsLog(t *testing.T) {
 		true,              // disable monitoring
 		nil,               // no configuration overrides
 		nil,
+		rollbackSrc,
 	)
 	require.NoError(t, err)
 

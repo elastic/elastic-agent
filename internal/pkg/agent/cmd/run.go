@@ -14,11 +14,13 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 
 	"go.elastic.co/apm/v2"
@@ -391,8 +393,12 @@ func runElasticAgent(
 	}
 
 	isBootstrap := configuration.IsFleetServerBootstrap(cfg.Fleet)
+
+	// create an availableRollbackSource
+	availableRollbacksSource := ttl.NewTTLMarkerRegistry(l, paths.Top())
+
 	coord, configMgr, _, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode,
-		fleetInitTimeout, isBootstrap, override, initialUpgradeMarker, modifiers...)
+		fleetInitTimeout, isBootstrap, override, initialUpgradeMarker, availableRollbacksSource, modifiers...)
 	if err != nil {
 		return err
 	}
@@ -462,6 +468,13 @@ func runElasticAgent(
 		appErr <- err
 	}()
 
+	// Spawn the rollbacks cleanup goroutine
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		upgrade.PeriodicallyCleanRollbacks(ctx, l, appDone, paths.Top(), "", availableRollbacksSource, 10*time.Minute, 2*time.Hour)
+	}()
 	// listen for signals
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
@@ -499,7 +512,8 @@ LOOP:
 	}
 	cancel()
 	err = <-appErr
-
+	// wait for goroutines to shut down
+	wg.Wait()
 	if logShutdown {
 		l.Info("Shutting down completed.")
 	}

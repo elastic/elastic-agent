@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
@@ -362,21 +361,21 @@ func CleanAvailableRollbacks(log *logger.Logger, source availableRollbacksSource
 	return leftoverRollbacks, aggregateErr
 }
 
-func PeriodicallyCleanRollbacks(ctx context.Context, log *logger.Logger, wg *sync.WaitGroup, topDir, currentVersionedHome string, source availableRollbacksSource, minInterval, maxInterval time.Duration) func() {
-	return func() {
-		defer wg.Done()
-		log.Info("starting periodically cleaning rollbacks")
-		timer := time.NewTimer(minInterval)
-		for {
-			select {
-			case <-ctx.Done():
-				log.Info("context is done, stopping periodically cleaning rollbacks")
-				return
-			case now := <-timer.C:
-				nextRunTime := performScheduledCleanup(log, topDir, currentVersionedHome, source, now, minInterval, maxInterval)
-				log.Debugf("Running next rollbacks cleanup in %s", nextRunTime)
-				timer.Reset(time.Until(nextRunTime))
-			}
+func PeriodicallyCleanRollbacks(ctx context.Context, log *logger.Logger, appDone <-chan bool, topDir, currentVersionedHome string, source availableRollbacksSource, minInterval, maxInterval time.Duration) {
+	log.Info("starting periodically cleaning rollbacks")
+	timer := time.NewTimer(minInterval)
+	for {
+		select {
+		case <-ctx.Done():
+			log.Info("context is done, stopping periodically cleaning rollbacks")
+			return
+		case <-appDone:
+			log.Info("appDone channel read, stopping periodically cleaning rollbacks")
+			return
+		case now := <-timer.C:
+			nextRunTime := performScheduledCleanup(log, topDir, currentVersionedHome, source, now, minInterval, maxInterval)
+			log.Debugf("Running next rollbacks cleanup in %s", nextRunTime)
+			timer.Reset(time.Until(nextRunTime))
 		}
 	}
 }

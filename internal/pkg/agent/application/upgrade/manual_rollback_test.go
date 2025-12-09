@@ -5,11 +5,13 @@
 package upgrade
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -925,6 +927,77 @@ func TestPerformScheduledCleanup(t *testing.T) {
 			if tt.assertions != nil {
 				tt.assertions(t, topDir, source)
 			}
+		})
+	}
+}
+
+func TestPeriodicallyCleanRollbacks(t *testing.T) {
+
+	// min and max duration for cleanup scheduling
+	minInterval := time.Millisecond
+	maxInterval := 1 * time.Minute
+
+	tests := []struct {
+		name            string
+		setup           func(t *testing.T, log *logger.Logger, topDir string, source *mockAvailableRollbacksSource)
+		handleGoroutine func(t *testing.T, cancel context.CancelFunc, appDone chan bool)
+	}{
+		{
+			name: "Goroutine stops when context expires",
+			setup: func(t *testing.T, log *logger.Logger, topDir string, source *mockAvailableRollbacksSource) {
+				source.EXPECT().Get().Return(nil, nil).Maybe()
+			},
+			handleGoroutine: func(t *testing.T, cancel context.CancelFunc, appDone chan bool) {
+				// give some time to get the goroutine running
+				<-time.After(5 * minInterval)
+				cancel()
+			},
+		},
+		{
+			name: "Goroutine stops when appDone is closed",
+			setup: func(t *testing.T, log *logger.Logger, topDir string, source *mockAvailableRollbacksSource) {
+				source.EXPECT().Get().Return(nil, nil).Maybe()
+			},
+			handleGoroutine: func(t *testing.T, cancel context.CancelFunc, appDone chan bool) {
+				// give some time to get the goroutine running
+				<-time.After(5 * minInterval)
+				close(appDone)
+			},
+		},
+		{
+			name: "Goroutine stops when both context is canceled and appDone is closed",
+			setup: func(t *testing.T, log *logger.Logger, topDir string, source *mockAvailableRollbacksSource) {
+				source.EXPECT().Get().Return(nil, nil).Maybe()
+			},
+			handleGoroutine: func(t *testing.T, cancel context.CancelFunc, appDone chan bool) {
+				// give some time to get the goroutine running
+				<-time.After(5 * minInterval)
+				cancel()
+				close(appDone)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			topDir := t.TempDir()
+			log, _ := loggertest.New(t.Name())
+			source := newMockAvailableRollbacksSource(t)
+			tt.setup(t, log, topDir, source)
+			wg := new(sync.WaitGroup)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			appDone := make(chan bool, 1)
+			// launch goroutine
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				PeriodicallyCleanRollbacks(ctx, log, appDone, topDir, "notreallyimportant", source, minInterval, maxInterval)
+			}()
+
+			tt.handleGoroutine(t, cancel, appDone)
+			wg.Wait()
 		})
 	}
 }

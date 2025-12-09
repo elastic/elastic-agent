@@ -72,6 +72,7 @@ func New(
 	disableMonitoring bool,
 	override CfgOverrider,
 	initialUpdateMarker *upgrade.UpdateMarker,
+	availableRollbacksSource rollbacksSource,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
@@ -134,7 +135,6 @@ func New(
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
 	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled
 
-	availableRollbacksSource := ttl.NewTTLMarkerRegistry(log, paths.Top())
 	if upgrade.IsUpgradeable() {
 		// If we are not running in a container, check and normalize the install descriptor before we start the agent
 		normalizeAgentInstalls(log, paths.Top(), time.Now(), initialUpdateMarker, availableRollbacksSource)
