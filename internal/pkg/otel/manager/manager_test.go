@@ -1506,13 +1506,11 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 
 	// Create manager with test dependencies
 	mgr := OTelManager{
-		logger:            testLogger,
-		baseLogger:        testLogger,
-		errCh:             make(chan error, 1), // holds at most one error
-		updateCh:          make(chan configUpdate, 1),
-		collectorStatusCh: make(chan *status.AggregateStatus, 1),
-		// componentStateCh uses a buffer channel to ensure that no state transitions are missed and to prevent
-		// any possible case of deadlock, 5 is used just to give a small buffer.
+		logger:                     testLogger,
+		baseLogger:                 testLogger,
+		errCh:                      make(chan error, 1), // holds at most one error
+		updateCh:                   make(chan configUpdate, 1),
+		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
 		componentStateCh:           make(chan []runtime.ComponentComponentState, 5),
 		doneChan:                   make(chan struct{}),
 		recoveryTimer:              newRestarterNoop(),

@@ -182,13 +182,15 @@ func NewOTelManager(
 		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
 		errCh:                      make(chan error, 1), // holds at most one error
 		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
-		componentStateCh:           make(chan []runtime.ComponentComponentState),
-		updateCh:                   make(chan configUpdate, 1),
-		doneChan:                   make(chan struct{}),
-		execution:                  exec,
-		recoveryTimer:              recoveryTimer,
-		collectorRunErr:            make(chan error),
-		stopTimeout:                stopTimeout,
+		// componentStateCh uses a buffer channel to ensure that no state transitions are missed and to prevent
+		// any possible case of deadlock, 5 is used just to give a small buffer.
+		componentStateCh: make(chan []runtime.ComponentComponentState, 5),
+		updateCh:         make(chan configUpdate, 1),
+		doneChan:         make(chan struct{}),
+		execution:        exec,
+		recoveryTimer:    recoveryTimer,
+		collectorRunErr:  make(chan error),
+		stopTimeout:      stopTimeout,
 	}, nil
 }
 
