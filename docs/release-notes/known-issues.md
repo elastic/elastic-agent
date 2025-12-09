@@ -24,7 +24,7 @@ Known issues are significant defects or limitations that may impact your impleme
 % :::
 
 :::{dropdown} Elastic Agent becomes unhealthy when an Elasticsearch output used for monitoring specifies any list parameter as a string
-**Applies to: {{agent}} 9.2.1**
+**Applies to: {{agent}} 9.2.1, 9.2.2**
 
 On November 21st 2025, a known issue was discovered that causes Elastic Agent to become unhealthy when a list parameter is specified as a string. Examples for the `hosts` and `ssl.certificate_authorities` parameters follow:
 
