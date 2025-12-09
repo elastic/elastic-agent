@@ -76,7 +76,7 @@ receivers:
   dockerstatsreceiver:
     gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver v0.139.0
   elasticapmintakereceiver:
-    gomod: github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.24.0
+    gomod: github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.21.0
   filelogreceiver:
     gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.139.0
   hostmetricsreceiver:
@@ -130,11 +130,11 @@ processors:
   cumulativetodeltaprocessor:
     gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/cumulativetodeltaprocessor v0.139.0
   elasticapmprocessor:
-    gomod: github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.24.0
+    gomod: github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.21.0
   elasticinframetricsprocessor:
-    gomod: github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.24.0
+    gomod: github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.20.0
   elastictraceprocessor:
-    gomod: github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.24.0
+    gomod: github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.20.0
   filterprocessor:
     gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.139.0
   geoipprocessor:
@@ -172,11 +172,11 @@ exporters:
 
 connectors:
   elasticapmconnector:
-    gomod: github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.24.0
+    gomod: github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.20.0
   forwardconnector:
     gomod: go.opentelemetry.io/collector/connector/forwardconnector v0.139.0
   profilingmetricsconnector:
-    gomod: github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.24.0
+    gomod: github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.20.0
   routingconnector:
     gomod: github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.139.0
   spanmetricsconnector:
@@ -184,9 +184,9 @@ connectors:
 
 extensions:
   apikeyauthextension:
-    gomod: github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.24.0
+    gomod: github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.22.0
   apmconfigextension:
-    gomod: github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.24.0
+    gomod: github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.20.0
   bearertokenauthextension:
     gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.139.0
   filestorage:
@@ -227,3 +227,4 @@ Build your custom Collector using the `ocb` tool and the configuration file by r
 The command generates a new Collector in the specified output path, `otelcol-dev`. The generated Collector includes the components you specified in the configuration file.
 
 For general information on building a custom Collector, refer to the [OpenTelemetry documentation](https://opentelemetry.io/docs/collector/custom-collector/#step-1---install-the-builder).
+
