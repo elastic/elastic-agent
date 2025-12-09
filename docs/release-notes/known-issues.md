@@ -54,7 +54,7 @@ output.elasticsearch:
 
 The fix for the `hosts` parameter was included in version 9.2.2, which restores support for both the string and list formats of the `hosts` parameter.
 
-A general fix for the remaining parameters will be included in an upcoming patch release. See https://github.com/elastic/elastic-agent/issues/11352.
+A general fix for the remaining parameters will be included in an upcoming patch release. See [Issue #11352](https://github.com/elastic/elastic-agent/issues/11352).
 :::
 
 :::{dropdown} Elastic Agent becomes unhealthy with a host URL parsing error related to the Prometheus collector metricset
