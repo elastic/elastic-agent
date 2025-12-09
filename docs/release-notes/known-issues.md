@@ -40,7 +40,6 @@ output.elasticsearch:
   ssl.certificate_authorities: "/tmp/ca.pem" # string instead of list
 ```
 
-For more information, check [#11352](https://github.com/elastic/elastic-agent/issues/11352).
 
 **Workaround**
 
