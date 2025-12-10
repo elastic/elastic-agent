@@ -221,11 +221,11 @@ func (e *EventListener) EnsureHealthy(t *testing.T, u time.Time) {
 
 		// we expect to have a reported error which is nil and a reported status which is StatusOK
 		require.NotNil(collect, latestErr)
-		require.Nil(collect, latestErr.Value())
-		require.False(collect, latestErr.Before(u))
+		assert.Nil(collect, latestErr.Value())
+		assert.False(collect, latestErr.Before(u))
 		require.NotNil(collect, latestStatus)
 		require.NotNil(collect, latestStatus.Value())
-		require.False(collect, latestStatus.Before(u))
+		assert.False(collect, latestStatus.Before(u))
 		require.Equal(collect, componentstatus.StatusOK, latestStatus.Value().Status())
 	}, 60*time.Second, 1*time.Second, "otel collector never got healthy")
 }
