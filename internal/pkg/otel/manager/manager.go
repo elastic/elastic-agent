@@ -25,7 +25,11 @@ type OTelManager struct {
 	// baseLogger is the base logger for the otel collector, and doesn't include any agent-specific fields.
 	baseLogger *logger.Logger
 	logger     *logger.Logger
-	errCh      chan error
+
+	// errCh should only be used to send critical errors that will mark the entire elastic-agent as failed
+	// if it's an issue with starting or running the collector those should not be critical errors, instead
+	// they should be reported as failed components to the elastic-agent
+	errCh chan error
 
 	// The current configuration that the OTel collector is using. In the case that
 	// the cfg is nil then the collector is not running.
@@ -46,6 +50,7 @@ type OTelManager struct {
 // NewOTelManager returns a OTelManager.
 func NewOTelManager(logger, baseLogger *logger.Logger) *OTelManager {
 	return &OTelManager{
+<<<<<<< HEAD
 		logger:     logger,
 		baseLogger: baseLogger,
 		errCh:      make(chan error, 1), // holds at most one error
@@ -53,6 +58,24 @@ func NewOTelManager(logger, baseLogger *logger.Logger) *OTelManager {
 		statusCh:   make(chan *status.AggregateStatus),
 		doneChan:   make(chan struct{}),
 	}
+=======
+		logger:                     logger,
+		baseLogger:                 baseLogger,
+		agentInfo:                  agentInfo,
+		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
+		errCh:                      make(chan error, 1), // holds at most one error
+		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
+		// componentStateCh uses a buffer channel to ensure that no state transitions are missed and to prevent
+		// any possible case of deadlock, 5 is used just to give a small buffer.
+		componentStateCh: make(chan []runtime.ComponentComponentState, 5),
+		updateCh:         make(chan configUpdate, 1),
+		doneChan:         make(chan struct{}),
+		execution:        exec,
+		recoveryTimer:    recoveryTimer,
+		collectorRunErr:  make(chan error),
+		stopTimeout:      stopTimeout,
+	}, nil
+>>>>>>> 3182df59d (Report crashing OTEL process cleanly with proper status reporting (#11448))
 }
 
 // Run runs the lifecycle of the manager.
@@ -73,15 +96,62 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				<-runErrCh // wait for collector to be stopped
 			}
 			return ctx.Err()
+<<<<<<< HEAD
 		case err = <-runErrCh:
 			if err == nil {
 				// err is nil but there is a configuration
 				//
+=======
+		case <-m.recoveryTimer.C():
+			m.recoveryTimer.Stop()
+
+			if m.mergedCollectorCfg == nil || m.proc != nil || ctx.Err() != nil {
+				// no configuration, or the collector is already running, or the context
+				// is cancelled.
+				continue
+			}
+
+			// at this point no critical errors are occurring
+			// any issues starting the collector are reporting in the status
+			reportErr(ctx, m.errCh, nil)
+
+			newRetries := m.recoveryRetries.Add(1)
+			m.logger.Infof("collector recovery restarting, total retries: %d", newRetries)
+			m.proc, err = m.execution.startCollector(ctx, m.baseLogger, m.logger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+			if err != nil {
+				// report a startup error (this gets reported as status)
+				m.reportStartupErr(ctx, err)
+				// reset the restart timer to the next backoff
+				recoveryDelay := m.recoveryTimer.ResetNext()
+				m.logger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
+			}
+		case err = <-m.collectorRunErr:
+			m.recoveryTimer.Stop()
+			if err == nil {
+				// err is nil means that the collector has exited cleanly without an error
+				if m.proc != nil {
+					m.proc.Stop(m.stopTimeout)
+					m.proc = nil
+				}
+
+				// no critical error from this point forward
+				reportErr(ctx, m.errCh, nil)
+
+				if m.mergedCollectorCfg == nil {
+					// no configuration then the collector should not be
+					// running.
+					continue
+				}
+
+				m.logger.Warnf("collector exited without an error but a configuration was provided")
+
+>>>>>>> 3182df59d (Report crashing OTEL process cleanly with proper status reporting (#11448))
 				// in this rare case the collector stopped running but a configuration was
 				// provided and the collector stopped with a clean exit
 				cancel()
 				cancel, provider, err = m.startCollector(m.cfg, runErrCh)
 				if err != nil {
+<<<<<<< HEAD
 					// failed to create the collector (this is different then
 					// it's failing to run). we do not retry creation on failure
 					// as it will always fail. A new configuration is required for
@@ -90,6 +160,13 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				} else {
 					// all good at the moment (possible that it will fail)
 					m.reportErr(ctx, nil)
+=======
+					// report a startup error (this gets reported as status)
+					m.reportStartupErr(ctx, err)
+					// reset the restart timer to the next backoff
+					recoveryDelay := m.recoveryTimer.ResetNext()
+					m.logger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
+>>>>>>> 3182df59d (Report crashing OTEL process cleanly with proper status reporting (#11448))
 				}
 			} else {
 				// error occurred while running the collector, this occurs in the
@@ -111,6 +188,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				}
 				// pass the error to the errCh so the coordinator, unless it's a cancel error
 				if !errors.Is(err, context.Canceled) {
+<<<<<<< HEAD
 					m.logger.Errorf("Failed to start the collector: %s", err)
 					m.reportErr(ctx, err)
 				}
@@ -137,6 +215,49 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				// ensure that the coordinator knows that there is no error
 				// as the collector is not running anymore
 				m.reportErr(ctx, nil)
+=======
+					// report a startup error (this gets reported as status)
+					m.reportStartupErr(ctx, err)
+					// reset the restart timer to the next backoff
+					recoveryDelay := m.recoveryTimer.ResetNext()
+					m.logger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
+				}
+			}
+
+		case cfgUpdate := <-m.updateCh:
+			// we received a new configuration, thus stop the recovery timer
+			// and reset the retry count
+			m.recoveryTimer.Stop()
+			m.recoveryRetries.Store(0)
+			mergedCfg, err := buildMergedConfig(cfgUpdate, m.agentInfo, m.beatMonitoringConfigGetter, m.baseLogger)
+			if err != nil {
+				// critical error, merging the configuration should always work
+				reportErr(ctx, m.errCh, err)
+				continue
+			}
+
+			// this is the only place where we mutate the internal config attributes, take a write lock for the duration
+			m.mx.Lock()
+			previousConfigHash := m.mergedCollectorCfgHash
+			configChanged, configUpdateErr := m.maybeUpdateMergedConfig(mergedCfg)
+			m.collectorCfg = cfgUpdate.collectorCfg
+			m.components = cfgUpdate.components
+			m.mx.Unlock()
+
+			if configUpdateErr != nil {
+				m.logger.Warn("failed to calculate hash of merged config, proceeding with update", zap.Error(configUpdateErr))
+			}
+
+			if configChanged {
+				m.logger.Debugf(
+					"new config hash (%d) is different than the old config hash (%d), applying update",
+					m.mergedCollectorCfgHash, previousConfigHash)
+				applyErr := m.applyMergedConfig(ctx, collectorStatusCh, m.collectorRunErr, forceFetchStatusCh)
+				// only report the error if we actually apply the update
+				// otherwise, we could override an actual error with a nil in the channel when the collector
+				// state doesn't actually change
+				reportErr(ctx, m.errCh, applyErr)
+>>>>>>> 3182df59d (Report crashing OTEL process cleanly with proper status reporting (#11448))
 			} else {
 				// either a new configuration or the first configuration
 				// that results in the collector being started
@@ -159,6 +280,21 @@ func (m *OTelManager) Run(ctx context.Context) error {
 					// needs to be updated in the collector
 					provider.Update(m.cfg)
 				}
+<<<<<<< HEAD
+=======
+				forceFetchStatusCh <- struct{}{}
+			}
+
+		case otelStatus := <-collectorStatusCh:
+			err = m.reportOtelStatusUpdate(ctx, otelStatus)
+			if err != nil {
+				// critical error and not handling the status update correctly
+				// can't properly report status if this fails, so we report it as critical
+				reportErr(ctx, m.errCh, err)
+			} else {
+				// status update was able to be reporting clear any critical error
+				reportErr(ctx, m.errCh, nil)
+>>>>>>> 3182df59d (Report crashing OTEL process cleanly with proper status reporting (#11448))
 			}
 		}
 	}
@@ -226,7 +362,166 @@ func (m *OTelManager) reportErr(ctx context.Context, err error) {
 	default:
 	}
 	select {
+<<<<<<< HEAD
 	case m.errCh <- err:
+=======
+	case m.updateCh <- cfgUpdate:
+	case <-m.doneChan:
+		// Manager is shutting down, ignore the update
+	}
+}
+
+// WatchCollector returns a read-only channel that provides collector status updates.
+func (m *OTelManager) WatchCollector() <-chan *status.AggregateStatus {
+	return m.collectorStatusCh
+}
+
+// WatchComponents returns a read-only channel that provides component state updates.
+func (m *OTelManager) WatchComponents() <-chan []runtime.ComponentComponentState {
+	return m.componentStateCh
+}
+
+func (m *OTelManager) MergedOtelConfig() *confmap.Conf {
+	m.mx.RLock()
+	defer m.mx.RUnlock()
+	return m.mergedCollectorCfg
+}
+
+// handleOtelStatusUpdate processes status updates from the underlying OTelManager.
+// This method extracts component states from the aggregate status, updates internal state tracking,
+// and prepares component state updates for distribution to watchers.
+// Returns component state updates and any error encountered during processing.
+func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus) ([]runtime.ComponentComponentState, error) {
+	// Remove agent managed extensions from the status report
+	if otelStatus != nil {
+		if extensionsMap, exists := otelStatus.ComponentStatusMap["extensions"]; exists {
+			for extensionKey := range extensionsMap.ComponentStatusMap {
+				switch {
+				case strings.HasPrefix(extensionKey, "extension:beatsauth"):
+					delete(extensionsMap.ComponentStatusMap, extensionKey)
+				case strings.HasPrefix(extensionKey, "extension:elastic_diagnostics"):
+					delete(extensionsMap.ComponentStatusMap, extensionKey)
+				}
+			}
+
+			if len(extensionsMap.ComponentStatusMap) == 0 {
+				delete(otelStatus.ComponentStatusMap, "extensions")
+			}
+		}
+	}
+
+	otelStatus, err := translate.MaybeMuteExporterStatus(otelStatus, m.components)
+	if err != nil {
+		return nil, fmt.Errorf("failed to mute exporter states from otel status: %w", err)
+	}
+
+	// Extract component states from otel status
+	componentStates, err := translate.GetAllComponentStates(otelStatus, m.components)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract component states: %w", err)
+	}
+
+	// Drop component state information from otel status
+	finalStatus, err := translate.DropComponentStateFromOtelStatus(otelStatus)
+	if err != nil {
+		return nil, fmt.Errorf("failed to drop component state from otel status: %w", err)
+	}
+
+	// Update the current collector status to the cleaned status (after dropping component states)
+	m.currentCollectorStatus = finalStatus
+
+	// Handle component state updates
+	return m.processComponentStates(componentStates), nil
+}
+
+// reportStartupErr maps this error to the *status.AggregateStatus.
+// this is done by parsing the `m.mergedCollectorCfg` and converting it into the best effort *status.AggregateStatus.
+func (m *OTelManager) reportStartupErr(ctx context.Context, err error) {
+	criticalErr := func(err error) error {
+		otelStatus, err := otelConfigToStatus(m.mergedCollectorCfg, err)
+		if err != nil {
+			return err
+		}
+		return m.reportOtelStatusUpdate(ctx, otelStatus)
+	}(err)
+	if criticalErr != nil {
+		// critical error occurred
+		reportErr(ctx, m.errCh, fmt.Errorf("failed to report statup error: %w", criticalErr))
+	} else {
+		// no error reporting (clear critical)
+		reportErr(ctx, m.errCh, nil)
+	}
+}
+
+// reportOtelStatusUpdate processes status updates from the underlying otel collector and reports separate collector
+// and component state updates to the external watch channels.
+func (m *OTelManager) reportOtelStatusUpdate(ctx context.Context, otelStatus *status.AggregateStatus) error {
+	componentUpdates, err := m.handleOtelStatusUpdate(otelStatus)
+	if err != nil {
+		return err
+	}
+	reportCollectorStatus(ctx, m.collectorStatusCh, m.currentCollectorStatus)
+	m.reportComponentStateUpdates(ctx, componentUpdates)
+	return nil
+}
+
+// processComponentStates updates the internal component state tracking and handles cleanup
+// of components that are no longer in the configuration. This method ensures that removed
+// components are properly marked as STOPPED even if no explicit stop event was received.
+func (m *OTelManager) processComponentStates(componentStates []runtime.ComponentComponentState) []runtime.ComponentComponentState {
+	// Drop component states which don't exist in the configuration anymore
+	// we need to do this because we aren't guaranteed to receive a STOPPED state when the component is removed
+	componentIds := make(map[string]bool)
+	for _, componentState := range componentStates {
+		componentIds[componentState.Component.ID] = true
+	}
+	for id := range m.currentComponentStates {
+		if _, ok := componentIds[id]; !ok {
+			// this component is not in the configuration anymore, emit a fake STOPPED state
+			componentStates = append(componentStates, runtime.ComponentComponentState{
+				Component: component.Component{
+					ID: id,
+				},
+				State: runtime.ComponentState{
+					State: client.UnitStateStopped,
+				},
+			})
+		}
+	}
+
+	// update the current state
+	m.currentComponentStates = make(map[string]runtime.ComponentComponentState)
+	for _, componentState := range componentStates {
+		if componentState.State.State == client.UnitStateStopped {
+			delete(m.currentComponentStates, componentState.Component.ID)
+		} else {
+			m.currentComponentStates[componentState.Component.ID] = componentState
+		}
+	}
+
+	return componentStates
+}
+
+// maybeUpdateMergedConfig updates the merged config if it's different from the current value. It checks this by
+// calculating a hash and comparing. It returns a value indicating if the configuration was updated.
+// If an error is encountered when calculating the hash, this will always be true.
+func (m *OTelManager) maybeUpdateMergedConfig(mergedCfg *confmap.Conf) (updated bool, err error) {
+	// if we get an error here, we just proceed with the update, worst that can happen is that we reload unnecessarily
+	mergedCfgHash, err := calculateConfmapHash(mergedCfg)
+	previousConfigHash := m.mergedCollectorCfgHash
+
+	m.mergedCollectorCfg = mergedCfg
+	m.mergedCollectorCfgHash = mergedCfgHash
+	return !bytes.Equal(mergedCfgHash, previousConfigHash) || err != nil, err
+}
+
+// reportComponentStateUpdates sends component state updates to the component watch channel. It is synchronous and
+// blocking - the update must be received before this function returns. We are not allowed to drop older updates
+// in favor of newer ones here, as the coordinator expected incremental updates.
+func (m *OTelManager) reportComponentStateUpdates(ctx context.Context, componentUpdates []runtime.ComponentComponentState) {
+	select {
+	case m.componentStateCh <- componentUpdates:
+>>>>>>> 3182df59d (Report crashing OTEL process cleanly with proper status reporting (#11448))
 	case <-ctx.Done():
 	}
 }
