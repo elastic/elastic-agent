@@ -1404,6 +1404,21 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 	} else {
 		archivePath = movePackagesToArchive(dropPath, platforms, packageVersion, dependencies)
 	}
+
+	// Only include components that support at least one of the selected package types
+	supportsSelectedPackageTypesFilter := func(dep packaging.BinarySpec) bool {
+		for _, platform := range platforms {
+			if supportsAtLeastOnePackageType(platform, dep, packageTypes) {
+				return true
+			}
+		}
+		if mg.Verbose() {
+			log.Printf(">>> Filtering out component %s as it doesn't support any selected package types %v", dep.BinaryName, packageTypes)
+		}
+		return false
+	}
+	dependencies = packaging.FilterComponents(dependencies, supportsSelectedPackageTypesFilter)
+
 	return archivePath, dropPath, dependencies
 }
 
