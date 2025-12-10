@@ -291,6 +291,9 @@ func (t *EventTime[T]) Time() time.Time {
 }
 
 func countHealthCheckExtensionStatuses(status *status.AggregateStatus) uint {
+	if status == nil {
+		return 0
+	}
 	extensions, ok := status.ComponentStatusMap["extensions"]
 	if !ok {
 		return 0
