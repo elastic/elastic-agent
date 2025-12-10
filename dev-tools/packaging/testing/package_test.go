@@ -1066,6 +1066,11 @@ func getExpectedComponents(variant, os, arch string) []string {
 			continue
 		}
 
+		// fleet-server is not available on windows arm64
+		if comp == "fleet-server" && os == "windows" && arch == "arm64" {
+			continue
+		}
+
 		// cloud-defend is not available on arm64 (it's also linux-only, handled above)
 		if comp == "cloud-defend" && arch == "arm64" {
 			continue
