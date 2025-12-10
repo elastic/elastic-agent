@@ -188,6 +188,17 @@ type Unit struct {
 	Err error `yaml:"error,omitempty"`
 }
 
+func (u *Unit) GetInputID(componentID string) string {
+	if u.Type == client.UnitTypeOutput {
+		return ""
+	}
+	inputID, found := strings.CutPrefix(fmt.Sprintf("%s-", componentID), u.ID)
+	if !found {
+		return ""
+	}
+	return inputID
+}
+
 // Signed Strongly typed configuration for the signed data
 type Signed struct {
 	Data      string `yaml:"data"`      // Signed base64 encoded json bytes
@@ -546,7 +557,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 		unitsForRuntimeManager := make(map[RuntimeManager][]Unit)
 		for _, input := range output.Inputs[inputType] {
 			if input.enabled {
-				unitID := fmt.Sprintf("%s-%s", componentID, input.id)
+				unitID := GetInputUnitId(componentID, input.id)
 				if input.runtimeManager == "" {
 					input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName())
 				}
@@ -594,7 +605,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 
 			var units []Unit
 			if input.enabled {
-				unitID := fmt.Sprintf("%s-unit", componentID)
+				unitID := GetOutputUnitId(componentID)
 				units = append(units, unitForInput(input, unitID))
 
 				// each component gets its own output, because of unit isolation
@@ -1084,4 +1095,12 @@ func extractStatusReporting(cfg map[string]interface{}) *StatusReporting {
 	return &StatusReporting{
 		Enabled: enabled,
 	}
+}
+
+func GetInputUnitId(componentID string, inputID string) string {
+	return fmt.Sprintf("%s-%s", componentID, inputID)
+}
+
+func GetOutputUnitId(componentID string) string {
+	return fmt.Sprintf("%s-unit", componentID)
 }

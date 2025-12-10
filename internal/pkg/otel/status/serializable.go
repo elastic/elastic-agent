@@ -24,7 +24,7 @@ type SerializableStatus struct {
 // SerializableEvent is exported for json.Unmarshal
 type SerializableEvent struct {
 	Healthy      bool           `json:"healthy"`
-	StatusString string         `json:"status"`
+	StatusString string         `json:"status" mapstructure:"status"`
 	Error        string         `json:"error,omitempty"`
 	Timestamp    time.Time      `json:"status_time"`
 	Attributes   map[string]any `json:"attributes"`
