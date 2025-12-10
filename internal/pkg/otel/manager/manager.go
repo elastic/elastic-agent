@@ -18,25 +18,22 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-
-	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
-
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-libs/logp"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
-
-	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
-	"go.opentelemetry.io/collector/confmap"
-
-	"github.com/elastic/elastic-agent-libs/logp"
-
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -79,8 +76,9 @@ type OTelManager struct {
 	agentInfo                  info.Agent
 	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter
 
-	collectorCfg *confmap.Conf
-	components   []component.Component
+	healthCheckExtID string
+	collectorCfg     *confmap.Conf
+	components       []component.Component
 
 	// The current configuration that the OTel collector is using. In the case that
 	// the mergedCollectorCfg is nil then the collector is not running.
@@ -139,6 +137,12 @@ func NewOTelManager(
 	var recoveryTimer collectorRecoveryTimer
 	var err error
 
+	hcUUID, err := uuid.NewV4()
+	if err != nil {
+		return nil, fmt.Errorf("cannot generate UUID: %w", err)
+	}
+	hcUUIDStr := hcUUID.String()
+
 	// determine the otel collector ports
 	collectorMetricsPort, collectorHealthCheckPort := 0, 0
 	if agentCollectorConfig != nil {
@@ -165,7 +169,7 @@ func NewOTelManager(
 			return nil, fmt.Errorf("failed to get the path to the collector executable: %w", err)
 		}
 		recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
-		exec, err = newSubprocessExecution(logLevel, executable, collectorMetricsPort, collectorHealthCheckPort)
+		exec, err = newSubprocessExecution(logLevel, executable, hcUUIDStr, collectorMetricsPort, collectorHealthCheckPort)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create subprocess execution: %w", err)
 		}
@@ -180,6 +184,7 @@ func NewOTelManager(
 		baseLogger:                 baseLogger,
 		agentInfo:                  agentInfo,
 		beatMonitoringConfigGetter: beatMonitoringConfigGetter,
+		healthCheckExtID:           fmt.Sprintf("extension:healthcheckv2/%s", hcUUIDStr),
 		errCh:                      make(chan error, 1), // holds at most one error
 		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
 		// componentStateCh uses a buffer channel to ensure that no state transitions are missed and to prevent
@@ -531,7 +536,7 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				case strings.HasPrefix(extensionKey, "extension:elastic_diagnostics"):
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
-				case strings.HasPrefix(extensionKey, "extension:healthcheckv2"):
+				case extensionKey == m.healthCheckExtID:
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				}
 			}
