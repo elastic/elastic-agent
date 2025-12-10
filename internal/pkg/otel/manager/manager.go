@@ -267,16 +267,8 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				// provided and the collector stopped with a clean exit
 				m.proc, err = m.execution.startCollector(ctx, m.baseLogger, m.logger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh, forceFetchStatusCh)
 				if err != nil {
-<<<<<<< HEAD
-					// failed to create the collector (this is different then
-					// it's failing to run). we do not retry creation on failure
-					// as it will always fail a new configuration is required for
-					// it not to fail (a new configuration will result in the retry)
-					reportErr(ctx, m.errCh, err)
-=======
 					// report a startup error (this gets reported as status)
 					m.reportStartupErr(ctx, err)
->>>>>>> 3182df59d (Report crashing OTEL process cleanly with proper status reporting (#11448))
 					// reset the restart timer to the next backoff
 					recoveryDelay := m.recoveryTimer.ResetNext()
 					m.logger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
