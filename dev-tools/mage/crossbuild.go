@@ -373,7 +373,6 @@ func (b GolangCrossBuilder) Build() error {
 		"--env", fmt.Sprintf("DEV=%v", DevBuild),
 		"--env", fmt.Sprintf("EXTERNAL=%v", ExternalBuild),
 		"--env", fmt.Sprintf("FIPS=%v", FIPSBuild),
-		"--env", fmt.Sprintf("OTEL_COMPONENT=%v", OTELComponentBuild),
 		"-v", repoInfo.RootDir+":"+mountPoint,
 		"-w", workDir,
 		image,

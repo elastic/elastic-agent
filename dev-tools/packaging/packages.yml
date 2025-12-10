@@ -416,11 +416,9 @@ shared:
     'data/{{.BeatName}}-{{ commit_short }}/components/elastic-otel-collector{{.BinaryExt}}':
       source: build/golang-crossbuild/elastic-otel-collector-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
       mode: 0755
-      skip_on_missing: true
     'data/{{.BeatName}}-{{ commit_short }}/components/elastic-otel-collector.spec.yml':
       source: '{{ repo.RootDir }}/internal/edot/spec.yml'
       mode: 0755
-      skip_on_missing: true
 
   # Binary package spec (tar.gz for linux) for community beats.
   - &agent_binary_spec_no_component_files

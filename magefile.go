@@ -564,7 +564,7 @@ func Package(ctx context.Context) error {
 	// add the snapshot suffix if needed
 	dependenciesVersion += devtools.SnapshotSuffix()
 
-	packageAgent(ctx, platforms, dependenciesVersion, manifestResponse, devtools.SelectedPackageTypes, mg.F(devtools.UseElasticAgentPackaging), getAgentBuildTargets()...)
+	packageAgent(ctx, platforms, dependenciesVersion, manifestResponse, devtools.SelectedPackageTypes, mg.F(devtools.UseElasticAgentPackaging), Otel.CrossBuild, CrossBuild)
 	return nil
 }
 
@@ -804,10 +804,7 @@ func PackageAgentCore() {
 	start := time.Now()
 	defer func() { fmt.Println("packageAgentCore ran for", time.Since(start)) }()
 
-	if mage.OTELComponentBuild {
-		mg.Deps(Otel.CrossBuild)
-	}
-	mg.Deps(CrossBuild)
+	mg.SerialDeps(Otel.CrossBuild, CrossBuild)
 
 	devtools.UseElasticAgentCorePackaging()
 
@@ -1107,7 +1104,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 		// produce docker package
 		packageAgent(ctx, devtools.BuildPlatformList{
 			devtools.BuildPlatform{Name: "linux/amd64"},
-		}, dependenciesVersion, nil, devtools.SelectedPackageTypes, mg.F(devtools.UseElasticAgentDemoPackaging), getAgentBuildTargets()...)
+		}, dependenciesVersion, nil, devtools.SelectedPackageTypes, mg.F(devtools.UseElasticAgentDemoPackaging), Otel.CrossBuild, CrossBuild)
 
 		dockerPackagePath := filepath.Join("build", "package", "elastic-agent", "elastic-agent-linux-amd64.docker", "docker-build")
 		if err := os.Chdir(dockerPackagePath); err != nil {
@@ -1167,15 +1164,6 @@ func packageAgent(ctx context.Context, platforms devtools.BuildPlatformList, dep
 	dependencies, err := ExtractComponentsFromSelectedPkgSpecs(devtools.Packages)
 	if err != nil {
 		return fmt.Errorf("failed extracting dependencies: %w", err)
-	}
-
-	// for OTEL_COMPONENT=true the agentbeat is built into the elastic-otel-collector and is not needed
-	// as a dependency. Once it becomes the only way then this can be removed and just remove agentbeat as
-	// an overall dependency.
-	if mage.OTELComponentBuild {
-		dependencies = slices.DeleteFunc(dependencies, func(dep packaging.BinarySpec) bool {
-			return dep.BinaryName == "agentbeat"
-		})
 	}
 
 	if mg.Verbose() {
@@ -1302,14 +1290,6 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 			dependencies = packaging.FilterComponents(dependencies, packaging.WithBinaryName("agentbeat"))
 			if mg.Verbose() {
 				log.Printf("Packaging using a beats repository, reducing dependendencies to %v", dependencies)
-			}
-
-			// for OTEL_COMPONENT=true the agentbeat is built into the elastic-otel-collector and is not needed
-			// as a dependency. Once it becomes the only way then this can be removed and just remove agentbeat as
-			// an overall dependency.
-			if mage.OTELComponentBuild {
-				packedBeats = []string{}
-				dependencies = []packaging.BinarySpec{}
 			}
 
 			// build from local repo, will assume beats repo is located on the same root level
@@ -4273,14 +4253,4 @@ func getMacOSMajorVersion() (int, error) {
 	}
 
 	return majorVer, nil
-}
-
-func getAgentBuildTargets() []interface{} {
-	// add otel:crossBuild as pre-build for packaging when OTEL_COMPONENT=true
-	buildTargets := make([]interface{}, 0, 2)
-	if mage.OTELComponentBuild {
-		buildTargets = append(buildTargets, Otel.CrossBuild)
-	}
-	buildTargets = append(buildTargets, CrossBuild)
-	return buildTargets
 }

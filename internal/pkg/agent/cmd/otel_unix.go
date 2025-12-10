@@ -2,25 +2,24 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build otelexternal && windows
+//go:build !windows
 
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/sys/unix"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
 
 // binaryName is the name of the executable to run
-const binaryName = "elastic-otel-collector.exe"
+const binaryName = "elastic-otel-collector"
 
 func newOtelCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 	return &cobra.Command{
@@ -28,23 +27,13 @@ func newOtelCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 		DisableFlagParsing: true,
 		RunE: func(_ *cobra.Command, cmdArgs []string) error {
 			executable := filepath.Join(paths.Components(), binaryName)
-			cmd := exec.Command(executable, cmdArgs...)
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			cmd.Stdin = os.Stdin
-			err := cmd.Start()
+			args := []string{binaryName}
+			args = append(args, cmdArgs...)
+			err := unix.Exec(executable, args, os.Environ())
 			if err != nil {
-				return fmt.Errorf("failed to start %s: %w", executable, err)
+				return fmt.Errorf("failed to exec %s: %w", executable, err)
 			}
-			err = cmd.Wait()
-			if err == nil {
-				return nil
-			}
-			var exitErr *exec.ExitError
-			if errors.As(err, &exitErr) {
-				os.Exit(exitErr.ExitCode())
-			}
-			return fmt.Errorf("%s failed: %w", executable, err)
+			return nil
 		},
 	}
 }
