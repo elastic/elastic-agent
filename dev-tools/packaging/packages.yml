@@ -255,6 +255,19 @@ shared:
       - *comp-agentbeat
       - *comp-apm_server
       - *comp-cloudbeat
+      - *comp-connectors
+      - *comp-endpoint
+      - *comp-fleet-server
+      - *comp-pf-elastic-collector
+      - *comp-pf-elastic-symbolizer
+      - *comp-pf-host-agent
+
+  # components included in elastic-agent docker images (includes cloud-defend)
+  - &elastic_agent_docker_components
+    components:
+      - *comp-agentbeat
+      - *comp-apm_server
+      - *comp-cloudbeat
       - *comp-cloud-defend
       - *comp-connectors
       - *comp-endpoint
@@ -545,7 +558,8 @@ shared:
       repository: 'docker.elastic.co/elastic-agent'
 
   - &agent_docker_spec
-    <<: *agent_binary_spec
+    <<: *common
+    <<: *elastic_agent_docker_components
     # Default docker image name is <spec name>-<docker variant>
     extra_vars:
       dockerfile: 'Dockerfile.elastic-agent.tmpl'
@@ -554,6 +568,9 @@ shared:
       linux_capabilities: ''
       beats_install_path: "install"
     files:
+      <<: *agent_binary_files
+      <<: *linux_otel_files
+      <<: *agent_unpacked_components_files
       'elastic-agent.yml':
         source: 'elastic-agent.docker.yml'
         mode: 0600
