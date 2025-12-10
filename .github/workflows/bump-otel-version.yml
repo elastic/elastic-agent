@@ -2,8 +2,9 @@ name: bump-otel-version
 
 on:
   workflow_dispatch:
-  schedule:
-  - cron: '24 5 * * 1-5'
+  # Disabled because we do the updates manually, due to upstream dependencies like beats and elastic components
+  #schedule:
+  #- cron: '24 5 * * 1-5'
 
 permissions:
   contents: read
