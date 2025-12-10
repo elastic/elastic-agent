@@ -213,7 +213,7 @@ func (e *EventListener) getCollectorStatus() *status.AggregateStatus {
 
 // EnsureHealthy ensures that the OTelManager is healthy by checking the latest error and status.
 func (e *EventListener) EnsureHealthy(t *testing.T, u time.Time) {
-	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		e.mtx.Lock()
 		latestErr := e.err
 		latestStatus := e.collectorStatus
