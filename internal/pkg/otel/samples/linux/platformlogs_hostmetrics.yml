@@ -7,6 +7,11 @@ receivers:
     start_at: end
     storage: file_storage
 #   start_at: beginning
+  # Uncomment the following lines only for Linux systems and OTel collector running with
+  # --feature-gates=service.profilesSupport and elevated privileges like CAP_SYS_ADMIN or using sudo.
+  # For more details check out https://www.elastic.co/docs/reference/edot-collector/config/configure-profiles-collection
+#  profiling:
+#    SamplesPerSecond: 19
 
   # Receiver for CPU, Disk, Memory, and Filesystem metrics
   hostmetrics/system:
@@ -41,6 +46,13 @@ receivers:
       network:
       processes:
       load:
+
+# Uncomment the following lines only if the profiling receiver is configured.
+#connectors:
+#  profilingmetrics:
+#    by_frame: true
+#    by_frametype: true
+#    by_classification: true
 
 extensions:
   file_storage:
@@ -98,3 +110,11 @@ service:
       receivers: [filelog/platformlogs]
       processors: [resourcedetection]
       exporters: [elasticsearch/otel]
+    # Uncomment the following lines only if the profiling receiver and
+    # profilingmetrics connector is configured.
+#    profiles:
+#      receivers: [ profiling ]
+#      exporters: [ profilingmetrics ]
+#    metrics/profiling:
+#      receivers: [ profilingmetrics ]
+#      exporters: [ elasticsearch/otel ]

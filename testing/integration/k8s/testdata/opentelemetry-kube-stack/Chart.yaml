@@ -34,4 +34,4 @@ name: opentelemetry-kube-stack
 sources:
 - https://github.com/open-telemetry/opentelemetry-operator
 type: application
-version: 0.12.4
+version: 0.12.6
