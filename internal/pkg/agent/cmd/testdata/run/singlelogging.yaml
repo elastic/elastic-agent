@@ -1,0 +1,5 @@
+agent:
+  logging:
+    level: debug
+    to_files: true
+    to_stderr: false
