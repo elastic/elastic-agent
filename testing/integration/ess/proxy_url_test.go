@@ -859,7 +859,6 @@ func TestFleetDownloadProxyURL(t *testing.T) {
 	require.NoError(t, err, "Unable to create download source")
 
 	// Get and process start and end fixtures
-	// TODO: Do we need FIPS aware tests?
 	startFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 	err = startFixture.Prepare(ctx)
@@ -910,6 +909,9 @@ func TestFleetDownloadProxyURL(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	err = upgradetest.ConfigureFastWatcher(ctx, startFixture)
+	require.NoError(t, err, "unable to write fast watcher config")
+
 	t.Log("Installing Elastic Agent...")
 	installOpts := atesting.InstallOpts{
 		Force: true,
@@ -921,8 +923,6 @@ func TestFleetDownloadProxyURL(t *testing.T) {
 	output, err := startFixture.Install(ctx, &installOpts)
 	t.Logf("Install agent output:\n%s", string(output))
 	require.NoError(t, err)
-
-	// TODO fast watcher config?
 
 	t.Log("Waiting for Agent to be correct version and healthy...")
 	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
