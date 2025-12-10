@@ -173,6 +173,51 @@ compression_params:
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
 	})
 
+	t.Run("ssl.certificate_authorities can be a string", func(t *testing.T) {
+		beatCfg := `
+hosts: "localhost:9200"
+index: "some-index"
+api_key: "TiNAGG4BaaMdaH1tRfuU:KnR6yE41RrSowb0kQ0HWoA"
+ssl.certificate_authorities: "/not/a/real/path/ca.pem"
+`
+
+		OTelCfg := `
+endpoints:
+  - http://localhost:9200
+logs_index: some-index
+logs_dynamic_pipeline:
+  enabled: true
+retry:
+  enabled: true
+  initial_interval: 1s
+  max_interval: 1m0s
+  max_retries: 3
+sending_queue:
+  batch:
+    flush_timeout: 10s
+    max_size: 1600
+    min_size: 0
+    sizer: items
+  block_on_overflow: true
+  enabled: true
+  num_consumers: 1
+  queue_size: 3200
+  wait_for_result: true
+mapping:
+  mode: bodymap
+max_conns_per_host: 1
+api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
+compression: gzip
+compression_params:
+  level: 1
+ `
+		cfg := config.MustNewConfigFrom(beatCfg)
+		got, err := ToOTelConfig(cfg, logger)
+		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
+		expOutput := newFromYamlString(t, OTelCfg)
+		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
+	})
+
 	// when preset is configured, we only test worker, bulk_max_size
 	// idle_connection_timeout should be correctly configured on beatsauthextension
 	// es-exporter sets compression level to 1 by default

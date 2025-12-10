@@ -76,10 +76,11 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 	}
 
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		Result:          &escfg,
-		TagName:         "config",
-		SquashTagOption: "inline",
-		DecodeHook:      cfgDecodeHookFunc(),
+		Result:           &escfg,
+		TagName:          "config",
+		SquashTagOption:  "inline",
+		DecodeHook:       cfgDecodeHookFunc(),
+		WeaklyTypedInput: true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed creating decoder. %w", err)
