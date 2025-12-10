@@ -196,7 +196,7 @@ func checkRPM(t *testing.T, file string) {
 	variant, os, arch := detectPackageVariant(file)
 	if variant != "fips" {
 		expectedComps := getExpectedComponents(variant, os, arch)
-		checkExpectedComponents(t, p, expectedComps, variant, arch)
+		checkExpectedComponents(t, p, expectedComps, variant, os, arch)
 	}
 }
 
@@ -223,7 +223,7 @@ func checkDeb(t *testing.T, file string, buf *bytes.Buffer) {
 	variant, os, arch := detectPackageVariant(file)
 	if variant != "fips" {
 		expectedComps := getExpectedComponents(variant, os, arch)
-		checkExpectedComponents(t, p, expectedComps, variant, arch)
+		checkExpectedComponents(t, p, expectedComps, variant, os, arch)
 	}
 }
 
@@ -261,7 +261,7 @@ func checkTar(t *testing.T, file string, fipsCheck bool) {
 		// Component validation (only for non-FIPS package)
 		variant, os, arch := detectPackageVariant(file)
 		expectedComps := getExpectedComponents(variant, os, arch)
-		checkExpectedComponents(t, p, expectedComps, variant, arch)
+		checkExpectedComponents(t, p, expectedComps, variant, os, arch)
 	}
 }
 
@@ -292,7 +292,7 @@ func checkZip(t *testing.T, file string) {
 	variant, os, arch := detectPackageVariant(file)
 	if variant != "fips" {
 		expectedComps := getExpectedComponents(variant, os, arch)
-		checkExpectedComponents(t, p, expectedComps, variant, arch)
+		checkExpectedComponents(t, p, expectedComps, variant, os, arch)
 	}
 }
 
@@ -461,7 +461,7 @@ func checkDocker(t *testing.T, file string, fipsPackage bool) (string, int64) {
 		// Validate components present in image (only for non-FIPS images)
 		variant, os, arch := detectPackageVariant(file)
 		expectedComps := getExpectedComponents(variant, os, arch)
-		checkExpectedComponents(t, p, expectedComps, variant, arch)
+		checkExpectedComponents(t, p, expectedComps, variant, os, arch)
 	}
 	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
 	checkModulesPresent(t, "", p)
