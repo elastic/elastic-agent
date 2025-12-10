@@ -192,6 +192,12 @@ func checkRPM(t *testing.T, file string) {
 	checkLicensesPresent(t, "/usr/share", p)
 	checkSystemdUnitPermissions(t, p)
 	ensureNoBuildIDLinks(t, p)
+
+	variant, arch := detectPackageVariant(file)
+	if variant != "fips" {
+		expectedComps := getExpectedComponents(variant, arch)
+		checkExpectedComponents(t, p, expectedComps, variant, arch)
+	}
 }
 
 func checkDeb(t *testing.T, file string, buf *bytes.Buffer) {
@@ -213,6 +219,12 @@ func checkDeb(t *testing.T, file string, buf *bytes.Buffer) {
 	checkModulesOwner(t, p, true)
 	checkModulesPermissions(t, p)
 	checkSystemdUnitPermissions(t, p)
+
+	variant, arch := detectPackageVariant(file)
+	if variant != "fips" {
+		expectedComps := getExpectedComponents(variant, arch)
+		checkExpectedComponents(t, p, expectedComps, variant, arch)
+	}
 }
 
 func checkTar(t *testing.T, file string, fipsCheck bool) {
@@ -245,6 +257,11 @@ func checkTar(t *testing.T, file string, fipsCheck bool) {
 		t.Run("FIPS check", func(t *testing.T) {
 			checkFIPS(t, tempExtractionPath)
 		})
+	} else {
+		// Component validation (only for non-FIPS package)
+		variant, arch := detectPackageVariant(file)
+		expectedComps := getExpectedComponents(variant, arch)
+		checkExpectedComponents(t, p, expectedComps, variant, arch)
 	}
 }
 
@@ -271,6 +288,12 @@ func checkZip(t *testing.T, file string) {
 	t.Run("check_notice_file", testNoticeFile(tempExtractionPath, false))
 
 	checkSha512PackageHash(t, file)
+
+	variant, arch := detectPackageVariant(file)
+	if variant != "fips" {
+		expectedComps := getExpectedComponents(variant, arch)
+		checkExpectedComponents(t, p, expectedComps, variant, arch)
+	}
 }
 
 func testManifestFile(agentPackageRootDir string, checkFips bool) func(t *testing.T) {
@@ -434,6 +457,11 @@ func checkDocker(t *testing.T, file string, fipsPackage bool) (string, int64) {
 	if !fipsPackage {
 		// FIPS docker image do not contain an otelcol script, run this check only on non FIPS-capable images
 		checkFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
+
+		// Validate components present in image (only for non-FIPS images)
+		variant, arch := detectPackageVariant(file)
+		expectedComps := getExpectedComponents(variant, arch)
+		checkExpectedComponents(t, p, expectedComps, variant, arch)
 	}
 	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
 	checkModulesPresent(t, "", p)
@@ -907,6 +935,168 @@ type packageEntry struct {
 	UID  int
 	GID  int
 	Mode os.FileMode
+}
+
+// detectPackageVariant extracts the variant and architecture from a package filename
+func detectPackageVariant(filename string) (variant string, arch string) {
+	base := filepath.Base(filename)
+
+	// Normalize architecture names
+	archMap := map[string]string{
+		"x86_64":  "amd64",
+		"amd64":   "amd64",
+		"arm64":   "arm64",
+		"aarch64": "arm64",
+	}
+
+	// Detect architecture
+	for pattern, normalized := range archMap {
+		if strings.Contains(base, pattern) {
+			arch = normalized
+			break
+		}
+	}
+
+	// Detect variant (order matters - first type in switch statement is used for variants with combined types)
+	// fips goes first, we want to skip checkExpectedComponents validation for all fips packages
+	switch {
+	case strings.Contains(base, "fips"):
+		variant = "fips"
+	case strings.Contains(base, "elastic-otel-collector"):
+		variant = "elastic-otel-collector"
+	case strings.Contains(base, "complete"):
+		variant = "complete"
+	case strings.Contains(base, "slim"):
+		variant = "slim"
+	case strings.Contains(base, "cloud"):
+		variant = "cloud"
+	case strings.Contains(base, "service"):
+		variant = "service"
+	default:
+		variant = "regular"
+	}
+
+	return variant, arch
+}
+
+// getExpectedComponents returns the list of expected component names for a given variant and architecture
+func getExpectedComponents(variant string, arch string) []string {
+	// Keep this up-to-date with the component lists defined in packages.yml
+	allComponents := []string{
+		"agentbeat",
+		"apm-server",
+		"cloudbeat",
+		"cloud-defend",
+		"connectors",
+		"endpoint-security",
+		"fleet-server",
+		"pf-elastic-collector",
+		"pf-elastic-symbolizer",
+		"pf-host-agent",
+	}
+
+	cloudComponents := []string{
+		"agentbeat",
+		"apm-server",
+		"cloudbeat",
+		"connectors",
+		"endpoint-security",
+		"fleet-server",
+		"pf-elastic-collector",
+		"pf-elastic-symbolizer",
+		"pf-host-agent",
+	}
+
+	slimComponents := []string{
+		"agentbeat",
+		"pf-host-agent",
+	}
+
+	edotComponents := []string{
+		"agentbeat",
+	}
+
+	// Map variants to their component lists
+	var components []string
+	switch variant {
+	case "regular", "complete":
+		components = allComponents
+	case "cloud", "service":
+		components = cloudComponents
+	case "slim":
+		components = slimComponents
+	case "elastic-otel-collector":
+		components = edotComponents
+	default:
+		// Unknown variant, return empty list
+		return []string{}
+	}
+
+	// Filter components by architecture
+	// cloud-defend is only available on amd64
+	if arch != "amd64" {
+		filtered := make([]string, 0, len(components))
+		for _, comp := range components {
+			if comp == "cloud-defend" {
+				continue
+			}
+			filtered = append(filtered, comp)
+		}
+		return filtered
+	}
+
+	return components
+}
+
+// checkExpectedComponents validates that the package contains the expected components
+func checkExpectedComponents(t *testing.T, p *packageFile, expectedComponents []string, variant string, arch string) {
+	t.Run(fmt.Sprintf("%s component validation (%s, %s)", p.Name, variant, arch), func(t *testing.T) {
+
+		// Build expected set
+		expectedSet := make(map[string]bool, len(expectedComponents))
+		for _, comp := range expectedComponents {
+			expectedSet[comp] = true
+		}
+
+		// Scan for components based on .spec.yml files
+		foundComponents := make(map[string]bool)
+		for path := range p.Contents {
+			if strings.Contains(path, "components/") && strings.HasSuffix(path, ".spec.yml") {
+				componentName := strings.TrimSuffix(filepath.Base(path), ".spec.yml")
+				foundComponents[componentName] = true
+			}
+		}
+
+		// Check for missing and unexpected components
+		var missing, unexpected []string
+		for _, expected := range expectedComponents {
+			if !foundComponents[expected] {
+				missing = append(missing, expected)
+			}
+		}
+		for comp := range foundComponents {
+			if !expectedSet[comp] {
+				unexpected = append(unexpected, comp)
+			}
+		}
+
+		// Log found components
+		if len(foundComponents) > 0 {
+			found := slices.Collect(maps.Keys(foundComponents))
+			sort.Strings(found)
+			t.Logf("Found components: %v", found)
+		}
+
+		// Report errors
+		if len(missing) > 0 {
+			sort.Strings(missing)
+			t.Errorf("Missing expected components: %v", missing)
+		}
+		if len(unexpected) > 0 {
+			sort.Strings(unexpected)
+			t.Errorf("Found unexpected components: %v", unexpected)
+		}
+	})
 }
 
 func getFiles(t *testing.T, pattern *regexp.Regexp) []string {
