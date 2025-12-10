@@ -1289,6 +1289,9 @@ func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
 							"extension:elastic_diagnostics/test": {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
+							"extension:healthcheckv2/test": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
 						},
 					},
 				},

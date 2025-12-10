@@ -531,6 +531,8 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				case strings.HasPrefix(extensionKey, "extension:elastic_diagnostics"):
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
+				case strings.HasPrefix(extensionKey, "extension:healthcheckv2"):
+					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				}
 			}
 
