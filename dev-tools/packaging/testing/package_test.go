@@ -937,7 +937,7 @@ type packageEntry struct {
 	Mode os.FileMode
 }
 
-// detectPackageVariant extracts the variant and architecture from a package filename
+// detectPackageVariant extracts the variant, OS and architecture from a package filename
 func detectPackageVariant(filename string) (variant, os, arch string) {
 	base := filepath.Base(filename)
 
