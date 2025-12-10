@@ -193,9 +193,9 @@ func checkRPM(t *testing.T, file string) {
 	checkSystemdUnitPermissions(t, p)
 	ensureNoBuildIDLinks(t, p)
 
-	variant, arch := detectPackageVariant(file)
+	variant, os, arch := detectPackageVariant(file)
 	if variant != "fips" {
-		expectedComps := getExpectedComponents(variant, arch)
+		expectedComps := getExpectedComponents(variant, os, arch)
 		checkExpectedComponents(t, p, expectedComps, variant, arch)
 	}
 }
@@ -220,9 +220,9 @@ func checkDeb(t *testing.T, file string, buf *bytes.Buffer) {
 	checkModulesPermissions(t, p)
 	checkSystemdUnitPermissions(t, p)
 
-	variant, arch := detectPackageVariant(file)
+	variant, os, arch := detectPackageVariant(file)
 	if variant != "fips" {
-		expectedComps := getExpectedComponents(variant, arch)
+		expectedComps := getExpectedComponents(variant, os, arch)
 		checkExpectedComponents(t, p, expectedComps, variant, arch)
 	}
 }
@@ -259,8 +259,8 @@ func checkTar(t *testing.T, file string, fipsCheck bool) {
 		})
 	} else {
 		// Component validation (only for non-FIPS package)
-		variant, arch := detectPackageVariant(file)
-		expectedComps := getExpectedComponents(variant, arch)
+		variant, os, arch := detectPackageVariant(file)
+		expectedComps := getExpectedComponents(variant, os, arch)
 		checkExpectedComponents(t, p, expectedComps, variant, arch)
 	}
 }
@@ -289,9 +289,9 @@ func checkZip(t *testing.T, file string) {
 
 	checkSha512PackageHash(t, file)
 
-	variant, arch := detectPackageVariant(file)
+	variant, os, arch := detectPackageVariant(file)
 	if variant != "fips" {
-		expectedComps := getExpectedComponents(variant, arch)
+		expectedComps := getExpectedComponents(variant, os, arch)
 		checkExpectedComponents(t, p, expectedComps, variant, arch)
 	}
 }
@@ -459,8 +459,8 @@ func checkDocker(t *testing.T, file string, fipsPackage bool) (string, int64) {
 		checkFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
 
 		// Validate components present in image (only for non-FIPS images)
-		variant, arch := detectPackageVariant(file)
-		expectedComps := getExpectedComponents(variant, arch)
+		variant, os, arch := detectPackageVariant(file)
+		expectedComps := getExpectedComponents(variant, os, arch)
 		checkExpectedComponents(t, p, expectedComps, variant, arch)
 	}
 	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
@@ -938,7 +938,7 @@ type packageEntry struct {
 }
 
 // detectPackageVariant extracts the variant and architecture from a package filename
-func detectPackageVariant(filename string) (variant string, arch string) {
+func detectPackageVariant(filename string) (variant, os, arch string) {
 	base := filepath.Base(filename)
 
 	// Normalize architecture names
@@ -947,14 +947,6 @@ func detectPackageVariant(filename string) (variant string, arch string) {
 		"amd64":   "amd64",
 		"arm64":   "arm64",
 		"aarch64": "arm64",
-	}
-
-	// Detect architecture
-	for pattern, normalized := range archMap {
-		if strings.Contains(base, pattern) {
-			arch = normalized
-			break
-		}
 	}
 
 	// Detect variant (order matters - first type in switch statement is used for variants with combined types)
@@ -976,11 +968,31 @@ func detectPackageVariant(filename string) (variant string, arch string) {
 		variant = "regular"
 	}
 
-	return variant, arch
+	// Detect OS
+	switch {
+	case strings.Contains(base, "windows"):
+		os = "windows"
+	case strings.Contains(base, "linux") || strings.Contains(base, ".docker.tar.gz"):
+		os = "linux" // All container images are linux-based
+	case strings.Contains(base, "darwin"):
+		os = "darwin"
+	default:
+		os = "unknown"
+	}
+
+	// Detect architecture
+	for pattern, normalized := range archMap {
+		if strings.Contains(base, pattern) {
+			arch = normalized
+			break
+		}
+	}
+
+	return variant, os, arch
 }
 
 // getExpectedComponents returns the list of expected component names for a given variant and architecture
-func getExpectedComponents(variant string, arch string) []string {
+func getExpectedComponents(variant, os, arch string) []string {
 	// Keep this up-to-date with the component lists defined in packages.yml
 	allComponents := []string{
 		"agentbeat",
@@ -1032,25 +1044,42 @@ func getExpectedComponents(variant string, arch string) []string {
 		return []string{}
 	}
 
-	// Filter components by architecture
-	// cloud-defend is only available on amd64
-	if arch != "amd64" {
-		filtered := make([]string, 0, len(components))
-		for _, comp := range components {
-			if comp == "cloud-defend" {
-				continue
-			}
-			filtered = append(filtered, comp)
-		}
-		return filtered
+	linuxOnlyComponents := map[string]bool{
+		"cloudbeat":             true,
+		"cloud-defend":          true,
+		"connectors":            true,
+		"pf-elastic-collector":  true,
+		"pf-elastic-symbolizer": true,
+		"pf-host-agent":         true,
 	}
 
-	return components
+	// Filter components by OS and architecture
+	filtered := make([]string, 0, len(components))
+	for _, comp := range components {
+		// Skip linux-only components on non-linux platforms
+		if os != "linux" && linuxOnlyComponents[comp] {
+			continue
+		}
+
+		// apm-server is not available on windows or darwin arm64
+		if comp == "apm-server" && (os == "windows" || os == "darwin") && arch == "arm64" {
+			continue
+		}
+
+		// cloud-defend is not available on arm64 (it's also linux-only, handled above)
+		if comp == "cloud-defend" && arch == "arm64" {
+			continue
+		}
+
+		filtered = append(filtered, comp)
+	}
+
+	return filtered
 }
 
 // checkExpectedComponents validates that the package contains the expected components
-func checkExpectedComponents(t *testing.T, p *packageFile, expectedComponents []string, variant string, arch string) {
-	t.Run(fmt.Sprintf("%s component validation (%s, %s)", p.Name, variant, arch), func(t *testing.T) {
+func checkExpectedComponents(t *testing.T, p *packageFile, expectedComponents []string, variant string, os string, arch string) {
+	t.Run(fmt.Sprintf("%s component validation (%s, %s, %s)", p.Name, variant, os, arch), func(t *testing.T) {
 
 		// Build expected set
 		expectedSet := make(map[string]bool, len(expectedComponents))
