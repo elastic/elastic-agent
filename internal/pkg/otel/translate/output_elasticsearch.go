@@ -76,11 +76,10 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 	}
 
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		Result:           &escfg,
-		TagName:          "config",
-		SquashTagOption:  "inline",
-		DecodeHook:       cfgDecodeHookFunc(),
-		WeaklyTypedInput: true,
+		Result:          &escfg,
+		TagName:         "config",
+		SquashTagOption: "inline",
+		DecodeHook:      cfgDecodeHookFunc(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed creating decoder. %w", err)
@@ -279,6 +278,9 @@ func cfgDecodeHookFunc() mapstructure.DecodeHookFunc {
 				return nil, fmt.Errorf("failed parsing kerberos.auth_type: %w", err)
 			}
 			return authType, nil
+		case t == reflect.TypeOf([]string{}):
+			return []string{data.(string)}, nil
+
 		default:
 			return data, nil
 		}
