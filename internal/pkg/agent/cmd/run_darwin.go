@@ -48,7 +48,7 @@ func checkCapabilitiesPerms(agentCapabilitiesPath string, userName string, uid i
 	} else {
 		capabilitiesUID = os.Getuid()
 	}
-	if err := utils.HasStrictExecPerms(agentCapabilitiesPath, capabilitiesUID, true); err != nil && !os.IsNotExist(err) {
+	if err := utils.HasStrictExecPermsAndOwnership(agentCapabilitiesPath, capabilitiesUID); err != nil && !os.IsNotExist(err) {
 		// capabilities are corrupted, we should not proceed
 		return fmt.Errorf("invalid capabilities file permissions: %w", err)
 	}
