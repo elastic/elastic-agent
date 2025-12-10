@@ -473,6 +473,14 @@ shared:
       <<: *linux_otel_files
       <<: *agent_unpacked_components_files
 
+  - &agent_docker_binary_spec
+    <<: *common
+    <<: *elastic_agent_docker_components
+    files:
+      <<: *agent_binary_files
+      <<: *linux_otel_files
+      <<: *agent_unpacked_components_files
+
   - &agent_cloud_binary_spec
     <<: *common
     <<: *elastic_agent_cloud_components
@@ -558,8 +566,7 @@ shared:
       repository: 'docker.elastic.co/elastic-agent'
 
   - &agent_docker_spec
-    <<: *common
-    <<: *elastic_agent_docker_components
+    <<: *agent_docker_binary_spec
     # Default docker image name is <spec name>-<docker variant>
     extra_vars:
       dockerfile: 'Dockerfile.elastic-agent.tmpl'
@@ -568,9 +575,6 @@ shared:
       linux_capabilities: ''
       beats_install_path: "install"
     files:
-      <<: *agent_binary_files
-      <<: *linux_otel_files
-      <<: *agent_unpacked_components_files
       'elastic-agent.yml':
         source: 'elastic-agent.docker.yml'
         mode: 0600
