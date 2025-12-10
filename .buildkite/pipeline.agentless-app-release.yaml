@@ -57,6 +57,8 @@ steps:
 
   - label: ":docker: Validate docker image is built for all architectures"
     command: ".buildkite/scripts/steps/validate-agentless-docker-image.sh"
+    env:
+      SERVICE_VERSION: "${VERSION}"
     agents:
       image: "docker.elastic.co/ci-agent-images/observability/oci-image-tools-agent:latest@sha256:a4ababd1347111759babc05c9ad5a680f4af48892784951358488b7e7fc94af9"
     plugins:
