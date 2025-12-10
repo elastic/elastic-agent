@@ -615,7 +615,7 @@ func (c *Coordinator) Migrate(
 	backoffFactory func(done <-chan struct{}) backoff.Backoff,
 	notifyFn func(context.Context, *fleetapi.ActionMigrate) error,
 ) error {
-	if c.specs.Platform().OS == component.Container {
+	if c.isContainerizedEnvironment() {
 		return ErrContainerNotSupported
 	}
 	if !c.isManaged {
@@ -1613,7 +1613,7 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 	// override retrieved config from Fleet with persisted config from AgentConfig file
 
 	if c.caps != nil {
-		if err := applyPersistedConfig(cfg, paths.ConfigFile(), c.caps.AllowFleetOverride); err != nil {
+		if err := applyPersistedConfig(cfg, paths.ConfigFile(), c.isContainerizedEnvironment, c.caps.AllowFleetOverride); err != nil {
 			return fmt.Errorf("could not apply persisted configuration: %w", err)
 		}
 	}
@@ -1705,10 +1705,12 @@ func (c *Coordinator) generateAST(cfg *config.Config, m map[string]interface{}) 
 	return nil
 }
 
-func applyPersistedConfig(cfg *config.Config, configFile string, checkFn func() bool) error {
-	if !checkFn() {
-		// Feature is disabled, nothing to do
-		return nil
+func applyPersistedConfig(cfg *config.Config, configFile string, checkFns ...func() bool) error {
+	for _, checkFn := range checkFns {
+		if !checkFn() {
+			// Feature is disabled, nothing to do
+			return nil
+		}
 	}
 
 	f, err := os.OpenFile(configFile, os.O_RDONLY, 0)
@@ -2396,4 +2398,8 @@ func computeEnrollOptions(ctx context.Context, cfgPath string, cfgFleetPath stri
 
 	options = enroll.FromFleetConfig(cfg.Fleet)
 	return options, nil
+}
+
+func (c *Coordinator) isContainerizedEnvironment() bool {
+	return c.specs.Platform().OS == component.Container
 }
