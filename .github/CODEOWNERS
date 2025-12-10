@@ -11,6 +11,8 @@ changelog/fragments/
 
 # Sub-directories/files ownership. Remember that order matters; the last matching pattern takes the most precedence.
 /.buildkite @elastic/elastic-agent-control-plane @elastic/observablt-ci
+/.buildkite/pipeline.agentless-tests.yaml @elastic/ingest-managed-jobs
+/.buildkite/scripts/steps/validate-agentless-docker-image.sh @elastic/ingest-managed-jobs
 /.ci @elastic/elastic-agent-control-plane @elastic/observablt-ci
 /.ci/scripts/ecp-internal-release.sh @elastic/elastic-agent-control-plane
 /.ci/scripts/update-integration-testdata.sh @elastic/elastic-agent-control-plane
