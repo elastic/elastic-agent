@@ -239,39 +239,7 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 			name: "upgrade to a repackaged agent built from the same commit",
 			fixturesSetup: func(t *testing.T) (from *atesting.Fixture, to *atesting.Fixture) {
 				// Upgrade from the current build to the same build as Independent Agent Release.
-
-				// Start from the build under test.
-				fromFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-				require.NoError(t, err)
-
-				// Create a new package with a different version (IAR-style)
-				// modify the version with the "+buildYYYYMMDDHHMMSS"
-				currentVersion, err := version.ParseVersion(define.Version())
-				require.NoErrorf(t, err, "define.Version() %q is not parsable.", define.Version())
-
-				newVersionBuildMetadata := "build" + time.Now().Format("20060102150405")
-				parsedNewVersion := version.NewParsedSemVer(currentVersion.Major(), currentVersion.Minor(), currentVersion.Patch(), "", newVersionBuildMetadata)
-
-				err = fromFixture.EnsurePrepared(t.Context())
-				require.NoErrorf(t, err, "fixture should be prepared")
-
-				// retrieve the compressed package file location
-				srcPackage, err := fromFixture.SrcPackage(t.Context())
-				require.NoErrorf(t, err, "error retrieving start fixture source package")
-
-				versionForFixture, repackagedArchiveFile, err := repackageArchive(t, srcPackage, newVersionBuildMetadata, currentVersion, parsedNewVersion)
-				require.NoError(t, err, "error repackaging the archive built from the same commit")
-
-				// I wish I could just pass the location of the package on disk to the whole upgrade tests/fixture/fetcher code
-				// but I would have to break too much code for that, when in Rome... add more code on top of inflexible code
-				repackagedLocalFetcher := atesting.LocalFetcher(filepath.Dir(repackagedArchiveFile))
-				toFixture, err := atesting.NewFixture(
-					t,
-					versionForFixture.String(),
-					atesting.WithFetcher(repackagedLocalFetcher),
-				)
-				require.NoError(t, err)
-
+				fromFixture, toFixture := prepareCommitAndRepackagedFixtures(t)
 				return fromFixture, toFixture
 			},
 		},
@@ -365,36 +333,7 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 			agentConfig: fastWatcherCfgWithRollbackWindow,
 			fixturesSetup: func(t *testing.T) (from *atesting.Fixture, to *atesting.Fixture) {
 				// Upgrade from the current build to the same build as Independent Agent Release.
-
-				// Start from the build under test.
-				fromFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-				require.NoError(t, err)
-
-				// Create a new package with a different version (IAR-style)
-				// modify the version with the "+buildYYYYMMDDHHMMSS"
-				currentVersion, err := version.ParseVersion(define.Version())
-				require.NoErrorf(t, err, "define.Version() %q is not parsable.", define.Version())
-
-				newVersionBuildMetadata := "build" + time.Now().Format("20060102150405")
-				parsedNewVersion := version.NewParsedSemVer(currentVersion.Major(), currentVersion.Minor(), currentVersion.Patch(), "", newVersionBuildMetadata)
-
-				err = fromFixture.EnsurePrepared(t.Context())
-				require.NoErrorf(t, err, "fixture should be prepared")
-
-				// retrieve the compressed package file location
-				srcPackage, err := fromFixture.SrcPackage(t.Context())
-				require.NoErrorf(t, err, "error retrieving start fixture source package")
-
-				versionForFixture, repackagedArchiveFile, err := repackageArchive(t, srcPackage, newVersionBuildMetadata, currentVersion, parsedNewVersion)
-				require.NoError(t, err, "error repackaging the archive built from the same commit")
-
-				repackagedLocalFetcher := atesting.LocalFetcher(filepath.Dir(repackagedArchiveFile))
-				toFixture, err := atesting.NewFixture(
-					t,
-					versionForFixture.String(),
-					atesting.WithFetcher(repackagedLocalFetcher),
-				)
-				require.NoError(t, err)
+				fromFixture, toFixture := prepareCommitAndRepackagedFixtures(t)
 
 				return fromFixture, toFixture
 			},
@@ -410,37 +349,7 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 			agentConfig: fastWatcherCfgWithRollbackWindow,
 			fixturesSetup: func(t *testing.T) (from *atesting.Fixture, to *atesting.Fixture) {
 				// Upgrade from the current build to the same build as Independent Agent Release.
-
-				// Start from the build under test.
-				fromFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
-				require.NoError(t, err)
-
-				// Create a new package with a different version (IAR-style)
-				// modify the version with the "+buildYYYYMMDDHHMMSS"
-				currentVersion, err := version.ParseVersion(define.Version())
-				require.NoErrorf(t, err, "define.Version() %q is not parsable.", define.Version())
-
-				newVersionBuildMetadata := "build" + time.Now().Format("20060102150405")
-				parsedNewVersion := version.NewParsedSemVer(currentVersion.Major(), currentVersion.Minor(), currentVersion.Patch(), "", newVersionBuildMetadata)
-
-				err = fromFixture.EnsurePrepared(t.Context())
-				require.NoErrorf(t, err, "fixture should be prepared")
-
-				// retrieve the compressed package file location
-				srcPackage, err := fromFixture.SrcPackage(t.Context())
-				require.NoErrorf(t, err, "error retrieving start fixture source package")
-
-				versionForFixture, repackagedArchiveFile, err := repackageArchive(t, srcPackage, newVersionBuildMetadata, currentVersion, parsedNewVersion)
-				require.NoError(t, err, "error repackaging the archive built from the same commit")
-
-				repackagedLocalFetcher := atesting.LocalFetcher(filepath.Dir(repackagedArchiveFile))
-				toFixture, err := atesting.NewFixture(
-					t,
-					versionForFixture.String(),
-					atesting.WithFetcher(repackagedLocalFetcher),
-				)
-				require.NoError(t, err)
-
+				fromFixture, toFixture := prepareCommitAndRepackagedFixtures(t)
 				return fromFixture, toFixture
 			},
 			rollbackTrigger: func(ctx context.Context, t *testing.T, client client.Client, startFixture, endFixture *atesting.Fixture) {
@@ -760,4 +669,37 @@ func versionMatch(ctx context.Context, t *testing.T, c client.Client, targetVers
 		return false
 	}
 	return true
+}
+
+func prepareCommitAndRepackagedFixtures(t *testing.T) (*atesting.Fixture, *atesting.Fixture) {
+	// Start from the build under test.
+	fromFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	// Create a new package with a different version (IAR-style)
+	// modify the version with the "+buildYYYYMMDDHHMMSS"
+	currentVersion, err := version.ParseVersion(define.Version())
+	require.NoErrorf(t, err, "define.Version() %q is not parsable.", define.Version())
+
+	newVersionBuildMetadata := "build" + time.Now().Format("20060102150405")
+	parsedNewVersion := version.NewParsedSemVer(currentVersion.Major(), currentVersion.Minor(), currentVersion.Patch(), "", newVersionBuildMetadata)
+
+	err = fromFixture.EnsurePrepared(t.Context())
+	require.NoErrorf(t, err, "fixture should be prepared")
+
+	// retrieve the compressed package file location
+	srcPackage, err := fromFixture.SrcPackage(t.Context())
+	require.NoErrorf(t, err, "error retrieving start fixture source package")
+
+	versionForFixture, repackagedArchiveFile, err := repackageArchive(t, srcPackage, newVersionBuildMetadata, currentVersion, parsedNewVersion)
+	require.NoError(t, err, "error repackaging the archive built from the same commit")
+
+	repackagedLocalFetcher := atesting.LocalFetcher(filepath.Dir(repackagedArchiveFile))
+	toFixture, err := atesting.NewFixture(
+		t,
+		versionForFixture.String(),
+		atesting.WithFetcher(repackagedLocalFetcher),
+	)
+	require.NoError(t, err)
+	return fromFixture, toFixture
 }
