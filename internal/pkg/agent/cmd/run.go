@@ -468,13 +468,19 @@ func runElasticAgent(
 		appErr <- err
 	}()
 
-	// Spawn the rollbacks cleanup goroutine
 	wg := new(sync.WaitGroup)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		upgrade.PeriodicallyCleanRollbacks(ctx, l, paths.Top(), "", availableRollbacksSource, 10*time.Minute, 2*time.Hour)
-	}()
+	// Spawn the rollbacks cleanup goroutine
+	relativeHomePath, homePathErr := filepath.Rel(paths.Top(), paths.Home())
+	if homePathErr != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			upgrade.PeriodicallyCleanRollbacks(ctx, l, paths.Top(), relativeHomePath, availableRollbacksSource, 10*time.Minute, 2*time.Hour)
+		}()
+	} else {
+		l.Warnw("Error calculating relative path for versioned home. Rollback cleanup will not be scheduled ", "topPath", paths.Top(), "homePath", paths.Home(), "error", homePathErr)
+	}
+
 	// listen for signals
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
