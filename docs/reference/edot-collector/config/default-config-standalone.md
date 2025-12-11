@@ -525,7 +525,7 @@ For {{ecloud}} and {{serverless-full}} deployments, mTLS is not required. TLS an
 
 ## Configuration compatibility with Elastic Stack versions
 
-While EDOT Collector 9.x is compatible with {{product.elastic-stack}} 8.18 and 8.19, users running these Stack versions should use the EDOT Collector configuration aligned with their Stack version to ensure the end-to-end experience works properly with {{product.kibana}} Observability UIs.
+While EDOT Collector 9.x is compatible with {{product.elastic-stack}} 8.18 and 8.19, users running these Stack versions should use the EDOT Collector configuration aligned with their Stack version to ensure the end-to-end experience works properly with {{product.kibana}} Observability UIs. Refer to [Migrate components](/reference/edot-collector/components/migrate-components.md) to migrate your configuration to the new components.
 
 ::::{important}
 If you're upgrading EDOT Collector to 9.x but keeping your {{product.elastic-stack}} on 8.18 or 8.19:

@@ -38,65 +38,51 @@ import (
 const dispatchFlushInterval = time.Minute * 5
 
 type managedConfigManager struct {
-	log                  *logger.Logger
-	agentInfo            info.Agent
-	cfg                  *configuration.Configuration
-	client               *remote.Client
-	store                storage.Store
-	stateStore           *store.StateStore
-	actionQueue          *queue.ActionQueue
-	dispatcher           *dispatcher.ActionDispatcher
-	runtime              *runtime.Manager
-	coord                *coordinator.Coordinator
-	fleetInitTimeout     time.Duration
-	initialClientSetters []actions.ClientSetter
-	fleetAcker           *fleet.Acker
-	actionAcker          acker.Acker
-	retrier              *retrier.Retrier
+	log                      *logger.Logger
+	agentInfo                info.Agent
+	cfg                      *configuration.Configuration
+	client                   *remote.Client
+	store                    storage.Store
+	stateStore               *store.StateStore
+	actionQueue              *queue.ActionQueue
+	dispatcher               *dispatcher.ActionDispatcher
+	runtime                  *runtime.Manager
+	coord                    *coordinator.Coordinator
+	fleetInitTimeout         time.Duration
+	initialClientSetters     []actions.ClientSetter
+	fleetAcker               *fleet.Acker
+	actionAcker              acker.Acker
+	retrier                  *retrier.Retrier
+	availableRollbacksSource rollbacksSource
 
 	ch    chan coordinator.ConfigChange
 	errCh chan error
 }
 
-func newManagedConfigManager(
-	ctx context.Context,
-	log *logger.Logger,
-	agentInfo info.Agent,
-	cfg *configuration.Configuration,
-	storeSaver storage.Store,
-	runtime *runtime.Manager,
-	fleetInitTimeout time.Duration,
-	topPath string,
-	client *remote.Client,
-	fleetAcker *fleet.Acker,
-	actionAcker acker.Acker,
-	retrier *retrier.Retrier,
-	stateStore *store.StateStore,
-	actionQueue *queue.ActionQueue,
-	clientSetters ...actions.ClientSetter,
-) (*managedConfigManager, error) {
+func newManagedConfigManager(ctx context.Context, log *logger.Logger, agentInfo info.Agent, cfg *configuration.Configuration, storeSaver storage.Store, runtime *runtime.Manager, fleetInitTimeout time.Duration, topPath string, client *remote.Client, fleetAcker *fleet.Acker, actionAcker acker.Acker, retrier *retrier.Retrier, stateStore *store.StateStore, actionQueue *queue.ActionQueue, source rollbacksSource, clientSetters ...actions.ClientSetter) (*managedConfigManager, error) {
 	actionDispatcher, err := dispatcher.New(log, topPath, handlers.NewDefault(log), actionQueue)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize action dispatcher: %w", err)
 	}
 
 	return &managedConfigManager{
-		log:                  log,
-		agentInfo:            agentInfo,
-		cfg:                  cfg,
-		client:               client,
-		store:                storeSaver,
-		stateStore:           stateStore,
-		actionQueue:          actionQueue,
-		dispatcher:           actionDispatcher,
-		runtime:              runtime,
-		fleetInitTimeout:     fleetInitTimeout,
-		ch:                   make(chan coordinator.ConfigChange),
-		errCh:                make(chan error),
-		initialClientSetters: clientSetters,
-		fleetAcker:           fleetAcker,
-		actionAcker:          actionAcker,
-		retrier:              retrier,
+		log:                      log,
+		agentInfo:                agentInfo,
+		cfg:                      cfg,
+		client:                   client,
+		store:                    storeSaver,
+		stateStore:               stateStore,
+		actionQueue:              actionQueue,
+		dispatcher:               actionDispatcher,
+		runtime:                  runtime,
+		fleetInitTimeout:         fleetInitTimeout,
+		ch:                       make(chan coordinator.ConfigChange),
+		errCh:                    make(chan error),
+		initialClientSetters:     clientSetters,
+		fleetAcker:               fleetAcker,
+		actionAcker:              actionAcker,
+		retrier:                  retrier,
+		availableRollbacksSource: source,
 	}, nil
 }
 
@@ -185,6 +171,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		m.stateStore,
 		stateFetcher,
 		m.cfg.Fleet.Checkin,
+		m.availableRollbacksSource,
 	)
 	if err != nil {
 		return err
