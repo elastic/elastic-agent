@@ -369,8 +369,9 @@ steps:
       include:
         - .buildkite/pipeline.yml
         - .buildkite/pipeline.agentless-app-release.yaml
-        - .buildkite/scripts/steps/validate-agentless-docker-image.sh
+        - .buildkite/scripts/steps/ecp-internal-release.sh
         - .buildkite/scripts/steps/integration-package.sh
+        - .buildkite/scripts/steps/validate-agentless-docker-image.sh
     trigger: "agentless-serverless-release"
     build:
       commit: "${BUILDKITE_COMMIT}"
