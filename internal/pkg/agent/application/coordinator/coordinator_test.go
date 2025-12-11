@@ -225,6 +225,29 @@ func TestComponentUpdateDiff(t *testing.T) {
 			},
 		},
 		{
+			name: "just-change-output-service-component",
+			old: []component.Component{
+				{
+					ID:         "endpoint-elasticsearch",
+					OutputType: "elasticsearch",
+					InputSpec:  &component.InputRuntimeSpec{Spec: component.InputSpec{Service: &component.ServiceSpec{}}},
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "endpoint-logstash",
+					OutputType: "logstash",
+					InputSpec:  &component.InputRuntimeSpec{Spec: component.InputSpec{Service: &component.ServiceSpec{}}},
+				},
+			},
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Equal(t, []string{"elasticsearch"}, logs.Outputs.Removed)
+				require.Equal(t, []string{"logstash"}, logs.Outputs.Added)
+				require.Len(t, logs.Components.Removed, 0)
+				require.Len(t, logs.Components.Added, 0)
+			},
+		},
+		{
 			name: "config-update",
 			old: []component.Component{
 				{
