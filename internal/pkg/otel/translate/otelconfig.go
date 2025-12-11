@@ -59,7 +59,34 @@ var (
 		"winlog",
 	}
 
-	OtelSupportedInputTypes          = OtelSupportedFilebeatInputTypes
+	OtelSupportedMetricbeatInputTypes = []string{
+		"activemq/metrics",      // activemq
+		"apache/metrics",        // apache
+		"beat/metrics",          // monitoring
+		"containerd/metrics",    // containerd
+		"docker/metrics",        // docker
+		"elasticsearch/metrics", // elasticsearch
+		"etcd/metrics",          // etcd
+		"http/metrics",          // monitoring, couchbase, couchdb, hadoop, kibana
+		"jolokia/metrics",       // apache_spark, casandra, kafka, spring_boot
+		"kafka/metrics",         // kafka
+		"kibana/metrics",        // kibana
+		"linux/metrics",         // linux
+		"logstash/metrics",      // logstash
+		"memcached/metrics",     // memcached
+		"mongodb/metrics",       // mongodb
+		"mysql/metrics",         // mysql
+		"nats/metrics",          // nats
+		"nginx/metrics",         // nginx
+		"prometheus/metrics",    // monitoring, apache_tomcat, cockroachdb, couchbase, elastic_package_registry, etcd, hashicorp_vault, ibmmq, influxdb, istio, prometheus, websphere_application_server
+		"rabbitmq/metrics",      // rabbitmq
+		"sql/metrics",           // microsoft_sqlserver, mysql
+		"stan/metrics",          // stan
+		"statsd/metrics",        // airflow, envoyproxy
+		"system/metrics",        // monitoring, linux
+		"vsphere/metrics",       // vsphere
+	}
+	OtelSupportedInputTypes          = slices.Concat(OtelSupportedFilebeatInputTypes, OtelSupportedMetricbeatInputTypes)
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
 		otelcomponent.MustNewType("elasticsearch"): translateEsOutputToExporter,
 	}
@@ -127,7 +154,7 @@ func VerifyComponentIsOtelSupported(comp *component.Component) error {
 
 	// check if given input is supported in OTel runtime
 	// this includes all metricbeat inputs and some filebeat inputs for now
-	if !slices.Contains(OtelSupportedInputTypes, comp.InputType) && !strings.HasSuffix(comp.InputType, "/metrics") {
+	if !slices.Contains(OtelSupportedInputTypes, comp.InputType) {
 		return fmt.Errorf("unsupported input type: %s", comp.InputType)
 	}
 
