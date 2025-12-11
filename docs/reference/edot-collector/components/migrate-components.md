@@ -25,6 +25,8 @@ This guide explains how to migrate from deprecated EDOT Collector components to 
 
 ## Migrate your configuration
 
+Follow these steps to migrate your existing EDOT Collector configuration.
+
 :::::{stepper}
 
 ::::{step} Download the latest default configuration
@@ -69,5 +71,3 @@ If you're upgrading EDOT Collector to 9.x but keeping your {{product.elastic-sta
 
 - [Default configuration (standalone)](/reference/edot-collector/config/default-config-standalone.md)
 - [Components included in the EDOT Collector](/reference/edot-collector/components.md)
-- [elasticapmprocessor](/reference/edot-collector/components/elasticapmprocessor.md)
-- [elasticapmconnector](/reference/edot-collector/components/elasticapmconnector.md)
