@@ -2057,30 +2057,29 @@ func (c *Coordinator) checkAndLogUpdate(lastComponentModel []component.Component
 	// currentCompMap is a map of component IDs -> components that will exist in the current/new component model.
 	currentCompMap := convertComponentListToMap(c.componentModel)
 
-	// Every component must use one of two types of component runtimes: Command or Service.
-	// - For Command Runtime components, if the component is present in both lastCompMap and currentCompMap,
-	//   it means the component's configuration is being updated. We do this by removing the component from the component
-	//   model (causing it to stop) and then added back (causing it to start).
-	// - For Service Runtime components, if the component is present in both lastCompMap and currentCompMap,
-	//   it means the component's configuration is being updated. However, unlike Command Runtime components, Service
-	//   Runtime components should not be stopped and restarted; they are intended to run as a service and should. therefore,
-	//   be left running when their configuration is being updated. As such, they should not be removed from the component
-	//   model and then added back.  We find such components and keep track of their IDs so we can discard them later.
+	// Every component must use one of two types of component runtimes: Command or Service. If a component is present in
+	// both lastCompMap and currentCompMap, it means the component's configuration is being updated.
+	// - For Command Runtime components we remove the component from the component model, causing it to stop, and then
+	//  add it back, causing it to start.
+	// - Service Runtime components are intended to run as a service. They should not be stopped and started when
+	//   their configuration is being updated. In other words, we do not want to remove them from the component model
+	//   and then add them back. Instead, we find such components and keep track of their IDs so we can exclude the
+	//   components from the diff later.
 	serviceRuntimeCompInputTypeToIdMap := map[string]string{}
 	for _, comp := range lastCompMap {
 		if comp.UsesServiceRuntime() {
 			serviceRuntimeCompInputTypeToIdMap[comp.InputType] = comp.ID
 		}
 	}
-	compIDsToDiscard := map[string]struct{}{}
+	compIDsToExclude := map[string]struct{}{}
 	for currentCompID, comp := range currentCompMap {
 		if comp.UsesServiceRuntime() {
 			if lastCompID, exists := serviceRuntimeCompInputTypeToIdMap[comp.InputType]; exists {
 				// The service component is present in both lastCompMap and currentCompMap.
 				// Record the IDs of this component from each map for so we can discard them later, to prevent
 				// removing the service component from the component model and then adding it back.
-				compIDsToDiscard[lastCompID] = struct{}{}
-				compIDsToDiscard[currentCompID] = struct{}{}
+				compIDsToExclude[lastCompID] = struct{}{}
+				compIDsToExclude[currentCompID] = struct{}{}
 			}
 		}
 	}
@@ -2144,11 +2143,11 @@ func (c *Coordinator) checkAndLogUpdate(lastComponentModel []component.Component
 
 	// take our diff map and format everything for output
 	for id, diff := range compDiffMap {
-		_, shouldDiscardID := compIDsToDiscard[id]
-		if diff.inLast && !diff.inCurrent && !shouldDiscardID {
+		_, shouldExclude := compIDsToExclude[id]
+		if diff.inLast && !diff.inCurrent && !shouldExclude {
 			removedList = append(removedList, id)
 		}
-		if !diff.inLast && diff.inCurrent && !shouldDiscardID {
+		if !diff.inLast && diff.inCurrent && !shouldExclude {
 			addedList = append(addedList, id)
 		}
 		// format a user-readable list of diffs
