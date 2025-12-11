@@ -19,6 +19,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 
 	"go.elastic.co/apm/v2"
@@ -391,8 +392,11 @@ func runElasticAgent(
 	}
 
 	isBootstrap := configuration.IsFleetServerBootstrap(cfg.Fleet)
+
+	availableRollbacksSource := ttl.NewTTLMarkerRegistry(l, paths.Top())
+
 	coord, configMgr, _, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode,
-		fleetInitTimeout, isBootstrap, override, initialUpgradeMarker, modifiers...)
+		fleetInitTimeout, isBootstrap, override, initialUpgradeMarker, availableRollbacksSource, modifiers...)
 	if err != nil {
 		return err
 	}
@@ -411,7 +415,7 @@ func runElasticAgent(
 	diagHooks := diagnostics.GlobalHooks()
 	diagHooks = append(diagHooks, coord.DiagnosticHooks()...)
 	controlLog := l.Named("control")
-	control := server.New(controlLog, agentInfo, coord, tracer, diagHooks, cfg.Settings.GRPC)
+	control := server.New(controlLog, agentInfo, coord, tracer, diagHooks, cfg.Settings.GRPC, availableRollbacksSource)
 
 	// if the configMgr implements the TestModeConfigSetter in means that Elastic Agent is in testing mode and
 	// the configuration will come in over the control protocol, so we set the config setting on the control protocol

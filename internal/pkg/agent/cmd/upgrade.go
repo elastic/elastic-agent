@@ -6,6 +6,8 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
+	goerrors "errors"
 	"fmt"
 	"os"
 	"strings"
@@ -43,7 +45,7 @@ var (
 	skipVerifyNotRootError          = errors.New(fmt.Sprintf("user needs to be root to use \"%s\" flag when upgrading standalone agents", flagSkipVerify))
 )
 
-func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
+func newUpgradeCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade <version>",
 		Short: "Upgrade the currently installed Elastic Agent to the specified version",
@@ -72,7 +74,55 @@ func newUpgradeCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 		os.Exit(1)
 	}
 
+	listRollbacksCmd := newListRollbacksCmd(args, streams)
+	cmd.AddCommand(listRollbacksCmd)
+
 	return cmd
+}
+
+func newListRollbacksCmd(_ []string, streams *cli.IOStreams) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list-rollbacks <version>",
+		Short: "Lists the available rollbacks present on disk",
+		Long:  "This command lists the details about other agent installs present on disk, displaying versions that can be used with 'elastic-agent upgrade --rollback'.",
+		Args:  cobra.NoArgs,
+		Run: func(c *cobra.Command, args []string) {
+			c.SetContext(context.Background())
+			if err := listRollbacks(streams, c, args); err != nil {
+				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
+				os.Exit(1)
+			}
+		},
+	}
+
+	return cmd
+}
+
+func listRollbacks(streams *cli.IOStreams, cmd *cobra.Command, args []string) error {
+	c := client.New()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	err := c.Connect(ctx)
+	if err != nil {
+		return errors.New(err, "failed communicating to running daemon", errors.TypeNetwork, errors.M("socket", control.Address()))
+	}
+	defer c.Disconnect()
+
+	rollbacks, err := c.AvailableRollbacks(ctx)
+
+	marshalledRollbacks, marshalErr := json.Marshal(rollbacks)
+	if err != nil {
+		err = goerrors.Join(err, fmt.Errorf("failed marshalling rollbacks: %v", marshalErr))
+		return err
+	}
+
+	_, writeErr := streams.Out.Write(marshalledRollbacks)
+	if writeErr != nil {
+		err = goerrors.Join(err, fmt.Errorf("failed writing to stdout: %v", writeErr))
+	}
+
+	return err
 }
 
 type upgradeInput struct {
