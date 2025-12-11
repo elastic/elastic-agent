@@ -6,7 +6,7 @@
 // github.com/vektra/mockery
 // template: testify
 
-package application
+package fleet
 
 import (
 	mock "github.com/stretchr/testify/mock"
@@ -92,57 +92,6 @@ func (_c *mockRollbacksSource_Get_Call) Return(stringToTTLMarker map[string]ttl.
 }
 
 func (_c *mockRollbacksSource_Get_Call) RunAndReturn(run func() (map[string]ttl.TTLMarker, error)) *mockRollbacksSource_Get_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// Set provides a mock function for the type mockRollbacksSource
-func (_mock *mockRollbacksSource) Set(stringToTTLMarker map[string]ttl.TTLMarker) error {
-	ret := _mock.Called(stringToTTLMarker)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Set")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(map[string]ttl.TTLMarker) error); ok {
-		r0 = returnFunc(stringToTTLMarker)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// mockRollbacksSource_Set_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Set'
-type mockRollbacksSource_Set_Call struct {
-	*mock.Call
-}
-
-// Set is a helper method to define mock.On call
-//   - stringToTTLMarker map[string]ttl.TTLMarker
-func (_e *mockRollbacksSource_Expecter) Set(stringToTTLMarker interface{}) *mockRollbacksSource_Set_Call {
-	return &mockRollbacksSource_Set_Call{Call: _e.mock.On("Set", stringToTTLMarker)}
-}
-
-func (_c *mockRollbacksSource_Set_Call) Run(run func(stringToTTLMarker map[string]ttl.TTLMarker)) *mockRollbacksSource_Set_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 map[string]ttl.TTLMarker
-		if args[0] != nil {
-			arg0 = args[0].(map[string]ttl.TTLMarker)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *mockRollbacksSource_Set_Call) Return(err error) *mockRollbacksSource_Set_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *mockRollbacksSource_Set_Call) RunAndReturn(run func(stringToTTLMarker map[string]ttl.TTLMarker) error) *mockRollbacksSource_Set_Call {
 	_c.Call.Return(run)
 	return _c
 }
