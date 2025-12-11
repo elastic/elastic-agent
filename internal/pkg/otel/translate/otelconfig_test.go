@@ -411,6 +411,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"otelconsumer": map[string]any{},
 			},
 			"path": map[string]any{
+				"home": paths.Components(),
 				"data": filepath.Join(paths.Run(), id),
 			},
 			"queue": map[string]any{
@@ -747,6 +748,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"otelconsumer": map[string]any{},
 						},
 						"path": map[string]any{
+							"home": paths.Components(),
 							"data": filepath.Join(paths.Run(), "beat-metrics-monitoring"),
 						},
 						"queue": map[string]any{
@@ -858,6 +860,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"otelconsumer": map[string]any{},
 						},
 						"path": map[string]any{
+							"home": paths.Components(),
 							"data": filepath.Join(paths.Run(), "system-metrics"),
 						},
 						"queue": map[string]any{
