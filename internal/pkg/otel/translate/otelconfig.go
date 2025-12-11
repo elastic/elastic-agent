@@ -299,6 +299,7 @@ func getReceiversConfigForComponent(
 	receiverConfig := map[string]any{
 		// just like we do for beats processes, each receiver needs its own data path
 		"path": map[string]any{
+			"home": paths.Components(),
 			"data": BeatDataPath(comp.ID),
 		},
 		// adds additional context on logs emitted by beatreceivers to uniquely identify per component logs
@@ -641,7 +642,6 @@ func BeatDataPath(componentId string) string {
 // getBeatsAuthExtensionConfig sets http transport settings on beatsauth
 // currently this is only supported for elasticsearch output
 func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
-
 	authSettings := beatsauthextension.BeatsAuthConfig{
 		Transport: elasticsearch.ESDefaultTransportSettings(),
 	}
