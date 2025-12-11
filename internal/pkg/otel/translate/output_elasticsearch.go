@@ -5,6 +5,7 @@
 package translate
 
 import (
+	"crypto/tls"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -280,7 +281,18 @@ func cfgDecodeHookFunc() mapstructure.DecodeHookFunc {
 			return authType, nil
 		case t == reflect.TypeOf([]string{}):
 			return []string{data.(string)}, nil
-
+		case t == reflect.TypeOf([]tlscommon.CipherSuite{tlscommon.CipherSuite(tls.TLS_AES_128_GCM_SHA256)}):
+			cipherSuite := tlscommon.CipherSuite(tls.TLS_AES_128_GCM_SHA256)
+			if err := cipherSuite.Unpack(data); err != nil {
+				return nil, fmt.Errorf("failed parsing ssl cipher_suites: %w", err)
+			}
+			return []tlscommon.CipherSuite{cipherSuite}, nil
+		case t == reflect.TypeOf([]tlscommon.TLSVersion{tlscommon.TLSVersion(tlscommon.TLSVersion13)}):
+			tlsVersion := tlscommon.TLSVersion(tlscommon.TLSVersion13)
+			if err := tlsVersion.Unpack(data); err != nil {
+				return nil, fmt.Errorf("failed parsing ssl supported_protocols: %w", err)
+			}
+			return []tlscommon.TLSVersion{tlsVersion}, nil
 		default:
 			return data, nil
 		}

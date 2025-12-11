@@ -173,12 +173,15 @@ compression_params:
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
 	})
 
-	t.Run("ssl.certificate_authorities can be a string", func(t *testing.T) {
+	t.Run("ssl setting of type []string can be a string", func(t *testing.T) {
 		beatCfg := `
 hosts: "localhost:9200"
 index: "some-index"
 api_key: "TiNAGG4BaaMdaH1tRfuU:KnR6yE41RrSowb0kQ0HWoA"
 ssl.certificate_authorities: "/not/a/real/path/ca.pem"
+ssl.supported_protocols: "TLSv1.3"
+ssl.cipher_suites: "ECDHE-ECDSA-AES-256-CBC-SHA"
+
 `
 
 		OTelCfg := `
