@@ -953,29 +953,6 @@ func TestPeriodicallyCleanRollbacks(t *testing.T) {
 				cancel()
 			},
 		},
-		{
-			name: "Goroutine stops when appDone is closed",
-			setup: func(t *testing.T, log *logger.Logger, topDir string, source *mockAvailableRollbacksSource) {
-				source.EXPECT().Get().Return(nil, nil).Maybe()
-			},
-			handleGoroutine: func(t *testing.T, cancel context.CancelFunc, appDone chan bool) {
-				// give some time to get the goroutine running
-				<-time.After(5 * minInterval)
-				close(appDone)
-			},
-		},
-		{
-			name: "Goroutine stops when both context is canceled and appDone is closed",
-			setup: func(t *testing.T, log *logger.Logger, topDir string, source *mockAvailableRollbacksSource) {
-				source.EXPECT().Get().Return(nil, nil).Maybe()
-			},
-			handleGoroutine: func(t *testing.T, cancel context.CancelFunc, appDone chan bool) {
-				// give some time to get the goroutine running
-				<-time.After(5 * minInterval)
-				cancel()
-				close(appDone)
-			},
-		},
 	}
 
 	for _, tt := range tests {
@@ -993,7 +970,7 @@ func TestPeriodicallyCleanRollbacks(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				PeriodicallyCleanRollbacks(ctx, log, appDone, topDir, "notreallyimportant", source, minInterval, maxInterval)
+				PeriodicallyCleanRollbacks(ctx, log, topDir, "notreallyimportant", source, minInterval, maxInterval)
 			}()
 
 			tt.handleGoroutine(t, cancel, appDone)

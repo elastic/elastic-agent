@@ -361,16 +361,13 @@ func CleanAvailableRollbacks(log *logger.Logger, source availableRollbacksSource
 	return leftoverRollbacks, aggregateErr
 }
 
-func PeriodicallyCleanRollbacks(ctx context.Context, log *logger.Logger, appDone <-chan bool, topDir, currentVersionedHome string, source availableRollbacksSource, minInterval, maxInterval time.Duration) {
+func PeriodicallyCleanRollbacks(ctx context.Context, log *logger.Logger, topDir, currentVersionedHome string, source availableRollbacksSource, minInterval, maxInterval time.Duration) {
 	log.Info("starting periodically cleaning rollbacks")
 	timer := time.NewTimer(minInterval)
 	for {
 		select {
 		case <-ctx.Done():
 			log.Info("context is done, stopping periodically cleaning rollbacks")
-			return
-		case <-appDone:
-			log.Info("appDone channel read, stopping periodically cleaning rollbacks")
 			return
 		case now := <-timer.C:
 			nextRunTime := performScheduledCleanup(log, topDir, currentVersionedHome, source, now, minInterval, maxInterval)

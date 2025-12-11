@@ -473,7 +473,7 @@ func runElasticAgent(
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		upgrade.PeriodicallyCleanRollbacks(ctx, l, appDone, paths.Top(), "", availableRollbacksSource, 10*time.Minute, 2*time.Hour)
+		upgrade.PeriodicallyCleanRollbacks(ctx, l, paths.Top(), "", availableRollbacksSource, 10*time.Minute, 2*time.Hour)
 	}()
 	// listen for signals
 	signals := make(chan os.Signal, 1)
