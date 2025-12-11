@@ -33,6 +33,7 @@ const (
 	ElasticAgentControl_DiagnosticUnits_FullMethodName      = "/cproto.ElasticAgentControl/DiagnosticUnits"
 	ElasticAgentControl_DiagnosticComponents_FullMethodName = "/cproto.ElasticAgentControl/DiagnosticComponents"
 	ElasticAgentControl_Configure_FullMethodName            = "/cproto.ElasticAgentControl/Configure"
+	ElasticAgentControl_AvailableRollbacks_FullMethodName   = "/cproto.ElasticAgentControl/AvailableRollbacks"
 )
 
 // ElasticAgentControlClient is the client API for ElasticAgentControl service.
@@ -65,6 +66,8 @@ type ElasticAgentControlClient interface {
 	// on any Elastic Agent that is not in TESTING_MODE will result in an error being
 	// returned and nothing occurring.
 	Configure(ctx context.Context, in *ConfigureRequest, opts ...grpc.CallOption) (*Empty, error)
+	// AvailableRollbacks returns any existing agent installs than can be used as target for a manual rollback operation
+	AvailableRollbacks(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*AvailableRollbacksResponse, error)
 }
 
 type elasticAgentControlClient struct {
@@ -192,6 +195,16 @@ func (c *elasticAgentControlClient) Configure(ctx context.Context, in *Configure
 	return out, nil
 }
 
+func (c *elasticAgentControlClient) AvailableRollbacks(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*AvailableRollbacksResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AvailableRollbacksResponse)
+	err := c.cc.Invoke(ctx, ElasticAgentControl_AvailableRollbacks_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ElasticAgentControlServer is the server API for ElasticAgentControl service.
 // All implementations must embed UnimplementedElasticAgentControlServer
 // for forward compatibility.
@@ -222,6 +235,8 @@ type ElasticAgentControlServer interface {
 	// on any Elastic Agent that is not in TESTING_MODE will result in an error being
 	// returned and nothing occurring.
 	Configure(context.Context, *ConfigureRequest) (*Empty, error)
+	// AvailableRollbacks returns any existing agent installs than can be used as target for a manual rollback operation
+	AvailableRollbacks(context.Context, *Empty) (*AvailableRollbacksResponse, error)
 	mustEmbedUnimplementedElasticAgentControlServer()
 }
 
@@ -258,6 +273,9 @@ func (UnimplementedElasticAgentControlServer) DiagnosticComponents(*DiagnosticCo
 }
 func (UnimplementedElasticAgentControlServer) Configure(context.Context, *ConfigureRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Configure not implemented")
+}
+func (UnimplementedElasticAgentControlServer) AvailableRollbacks(context.Context, *Empty) (*AvailableRollbacksResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AvailableRollbacks not implemented")
 }
 func (UnimplementedElasticAgentControlServer) mustEmbedUnimplementedElasticAgentControlServer() {}
 func (UnimplementedElasticAgentControlServer) testEmbeddedByValue()                             {}
@@ -421,6 +439,24 @@ func _ElasticAgentControl_Configure_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ElasticAgentControl_AvailableRollbacks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ElasticAgentControlServer).AvailableRollbacks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ElasticAgentControl_AvailableRollbacks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ElasticAgentControlServer).AvailableRollbacks(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ElasticAgentControl_ServiceDesc is the grpc.ServiceDesc for ElasticAgentControl service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -451,6 +487,10 @@ var ElasticAgentControl_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Configure",
 			Handler:    _ElasticAgentControl_Configure_Handler,
+		},
+		{
+			MethodName: "AvailableRollbacks",
+			Handler:    _ElasticAgentControl_AvailableRollbacks_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

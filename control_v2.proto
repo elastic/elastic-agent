@@ -371,6 +371,20 @@ message ConfigureRequest {
   string config = 1;
 }
 
+// AvailableRollback contains the location, version and expiration time of existing elastic-agent installation
+// that the agent can be rolled back to
+message AvailableRollback {
+  string versioned_home = 1;
+  string version  = 2;
+  string valid_until = 3;
+}
+
+// AvailableRollbacks response contains the sets of available rollbacks or any error that occurred while serving the request
+message AvailableRollbacksResponse {
+  repeated AvailableRollback rollbacks = 1;
+  string error = 2;
+}
+
 service ElasticAgentControl {
   // Fetches the currently running version of the Elastic Agent.
   rpc Version(Empty) returns (VersionResponse);
@@ -406,4 +420,7 @@ service ElasticAgentControl {
   // on any Elastic Agent that is not in TESTING_MODE will result in an error being
   // returned and nothing occurring.
   rpc Configure(ConfigureRequest) returns (Empty);
+
+  // AvailableRollbacks returns any existing agent installs than can be used as target for a manual rollback operation
+  rpc AvailableRollbacks(Empty) returns (AvailableRollbacksResponse);
 }
