@@ -50,6 +50,7 @@ import (
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 const (
@@ -1029,8 +1030,21 @@ func Test_ApplyPersistedConfig(t *testing.T) {
 			cfg, err := config.LoadFile(filepath.Join(".", "testdata", "config.yaml"))
 			require.NoError(t, err)
 
-			err = applyPersistedConfig(cfg, cfgFile, func() bool { return tc.featureEnable })
+			testLogger, observedLogs := loggertest.New("")
+			err = applyPersistedConfig(testLogger, cfg, cfgFile, func() bool { return tc.featureEnable })
 			require.NoError(t, err)
+
+			found := false
+			// check that a log message was emitted about disabling kafka output
+			logs := observedLogs.All()
+			for _, logEntry := range logs {
+				if strings.Contains(logEntry.Message, "is disabled") {
+					found = true
+					break
+				}
+			}
+
+			require.NotEqualf(t, tc.featureEnable, found, "expected log message")
 
 			c := &configuration.Configuration{}
 			require.NoError(t, cfg.Agent.Unpack(&c))

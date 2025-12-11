@@ -1637,7 +1637,7 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 	// override retrieved config from Fleet with persisted config from AgentConfig file
 
 	if c.caps != nil {
-		if err := applyPersistedConfig(cfg, paths.ConfigFile(), c.isContainerizedEnvironment, c.caps.AllowFleetOverride); err != nil {
+		if err := applyPersistedConfig(c.logger, cfg, paths.ConfigFile(), c.isContainerizedEnvironment, c.caps.AllowFleetOverride); err != nil {
 			return fmt.Errorf("could not apply persisted configuration: %w", err)
 		}
 	}
@@ -1729,10 +1729,11 @@ func (c *Coordinator) generateAST(cfg *config.Config, m map[string]interface{}) 
 	return nil
 }
 
-func applyPersistedConfig(cfg *config.Config, configFile string, checkFns ...func() bool) error {
-	for _, checkFn := range checkFns {
+func applyPersistedConfig(logger *logger.Logger, cfg *config.Config, configFile string, checkFns ...func() bool) error {
+	for checkNo, checkFn := range checkFns {
 		if !checkFn() {
 			// Feature is disabled, nothing to do
+			logger.Infof("Applying persisted configuration is disabled by check with idx %d.", checkNo)
 			return nil
 		}
 	}
