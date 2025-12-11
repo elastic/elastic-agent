@@ -49,6 +49,17 @@ agent.upgrade:
     rollback:
         window: 10m
 `
+const fastWatcherCfgWithShortRollbackWindow = `
+agent:
+  logging.level: debug
+  upgrade:
+    watcher:
+      grace_period: 30s
+      error_check.interval: 5s
+    rollback:
+      window: 1m
+      cleanup_interval: 10s
+`
 
 // TestStandaloneUpgradeRollback tests the scenario where upgrading to a new version
 // of Agent fails due to the new Agent binary reporting an unhealthy status. It checks
@@ -239,7 +250,7 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 			name: "upgrade to a repackaged agent built from the same commit",
 			fixturesSetup: func(t *testing.T) (from *atesting.Fixture, to *atesting.Fixture) {
 				// Upgrade from the current build to the same build as Independent Agent Release.
-				fromFixture, toFixture := prepareCommitAndRepackagedFixtures(t)
+				fromFixture, toFixture := prepareCommitAndRepackagedFixtures(t, time.Now())
 				return fromFixture, toFixture
 			},
 		},
@@ -333,7 +344,7 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 			agentConfig: fastWatcherCfgWithRollbackWindow,
 			fixturesSetup: func(t *testing.T) (from *atesting.Fixture, to *atesting.Fixture) {
 				// Upgrade from the current build to the same build as Independent Agent Release.
-				fromFixture, toFixture := prepareCommitAndRepackagedFixtures(t)
+				fromFixture, toFixture := prepareCommitAndRepackagedFixtures(t, time.Now())
 
 				return fromFixture, toFixture
 			},
@@ -349,7 +360,7 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 			agentConfig: fastWatcherCfgWithRollbackWindow,
 			fixturesSetup: func(t *testing.T) (from *atesting.Fixture, to *atesting.Fixture) {
 				// Upgrade from the current build to the same build as Independent Agent Release.
-				fromFixture, toFixture := prepareCommitAndRepackagedFixtures(t)
+				fromFixture, toFixture := prepareCommitAndRepackagedFixtures(t, time.Now())
 				return fromFixture, toFixture
 			},
 			rollbackTrigger: func(ctx context.Context, t *testing.T, client client.Client, startFixture, endFixture *atesting.Fixture) {
@@ -397,6 +408,73 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 			standaloneRollbackTest(
 				ctx, t, from, to, fastWatcherCfgWithRollbackWindow, fmt.Sprintf(details.ReasonManualRollbackPattern, from.Version()),
 				tc.rollbackTrigger)
+		})
+	}
+
+}
+
+func TestCleanupRollbacks(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Upgrade,
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+	})
+
+	now := time.Now()
+
+	type upgradeOperation struct {
+		from *atesting.Fixture
+		to   *atesting.Fixture
+		opts []upgradetest.UpgradeOpt
+	}
+	type fixturesSetupFunc func(t *testing.T) []upgradeOperation
+
+	testcases := []struct {
+		name               string
+		fixturesSetup      fixturesSetupFunc
+		agentConfig        string
+		assertAfterUpgrade func(t *testing.T, errUpgrade error, installedFixture *atesting.Fixture, op upgradeOperation)
+	}{
+		{
+			name: "agent should clear expired rollback after upgrading to a repackaged version",
+			fixturesSetup: func(t *testing.T) []upgradeOperation {
+				from, to := prepareCommitAndRepackagedFixtures(t, now)
+				return []upgradeOperation{{
+					from: from,
+					to:   to,
+					opts: []upgradetest.UpgradeOpt{
+						upgradetest.WithCustomWatcherConfig(fastWatcherCfgWithShortRollbackWindow),
+						upgradetest.WithDisableHashCheck(true),
+					},
+				}}
+			},
+			agentConfig: fastWatcherCfgWithShortRollbackWindow,
+			assertAfterUpgrade: func(t *testing.T, err error, installedFixture *atesting.Fixture, op upgradeOperation) {
+				require.NoError(t, err, "upgrade should not fail")
+				oldAgentVersionedHome := filepath.Join(installedFixture.WorkDir(), "data", fmt.Sprintf("elastic-agent-%s-%s", op.from.Version(), op.from.ShortHash()))
+				require.EventuallyWithT(t, func(collect *assert.CollectT) {
+					t.Logf("checking if the rollback directory %q has been cleaned...", oldAgentVersionedHome)
+					assert.NoDirExists(collect, oldAgentVersionedHome, "old rollback should have been cleaned up after expiration")
+				}, 1*time.Minute, 10*time.Second)
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			upgradeOperations := tc.fixturesSetup(t)
+			require.Greater(t, len(upgradeOperations), 0, "testcase should specify at least one upgradeOperation")
+
+			// initial install and upgrade
+			initialUpgrade := upgradeOperations[0]
+			err := upgradetest.PerformUpgrade(
+				t.Context(), initialUpgrade.from, initialUpgrade.to, t, initialUpgrade.opts...)
+			tc.assertAfterUpgrade(t, err, initialUpgrade.from, initialUpgrade)
+
+			// follow-up upgrades (to test upgrades in a chain)
+			//for _, op := range upgradeOperations[1:] {
+			//	// TODO keep upgrading the same agent passing in the original fixture of the installed agent
+			//}
 		})
 	}
 
@@ -671,7 +749,7 @@ func versionMatch(ctx context.Context, t *testing.T, c client.Client, targetVers
 	return true
 }
 
-func prepareCommitAndRepackagedFixtures(t *testing.T) (*atesting.Fixture, *atesting.Fixture) {
+func prepareCommitAndRepackagedFixtures(t *testing.T, now time.Time) (*atesting.Fixture, *atesting.Fixture) {
 	// Start from the build under test.
 	fromFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
@@ -681,10 +759,15 @@ func prepareCommitAndRepackagedFixtures(t *testing.T) (*atesting.Fixture, *atest
 	currentVersion, err := version.ParseVersion(define.Version())
 	require.NoErrorf(t, err, "define.Version() %q is not parsable.", define.Version())
 
-	newVersionBuildMetadata := "build" + time.Now().Format("20060102150405")
+	toFixture := createRepackagedFixture(t, currentVersion, fromFixture, now)
+	return fromFixture, toFixture
+}
+
+func createRepackagedFixture(t *testing.T, currentVersion *version.ParsedSemVer, fromFixture *atesting.Fixture, buildTimeStamp time.Time) *atesting.Fixture {
+	newVersionBuildMetadata := "build" + buildTimeStamp.Format("20060102150405")
 	parsedNewVersion := version.NewParsedSemVer(currentVersion.Major(), currentVersion.Minor(), currentVersion.Patch(), "", newVersionBuildMetadata)
 
-	err = fromFixture.EnsurePrepared(t.Context())
+	err := fromFixture.EnsurePrepared(t.Context())
 	require.NoErrorf(t, err, "fixture should be prepared")
 
 	// retrieve the compressed package file location
@@ -701,5 +784,5 @@ func prepareCommitAndRepackagedFixtures(t *testing.T) (*atesting.Fixture, *atest
 		atesting.WithFetcher(repackagedLocalFetcher),
 	)
 	require.NoError(t, err)
-	return fromFixture, toFixture
+	return toFixture
 }
