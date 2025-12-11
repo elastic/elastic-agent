@@ -364,7 +364,7 @@ steps:
   # NOTE: This should help detecting issues earlier in the development cycle
   # See https://github.com/elastic/elastic-agent/pull/11725
   - label: "DRY RUN publish to serverless"
-    if: build.pull_request.id != null
+    if: build.pull_request.id != null && build.env("BUILDKITE_PULL_REQUEST_BASE_BRANCH") == "main"
     if_changed:
       include:
         - .buildkite/pipeline.yml
