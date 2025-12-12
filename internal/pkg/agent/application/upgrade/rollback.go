@@ -174,16 +174,22 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 
 	dirPrefix := fmt.Sprintf("%s-", AgentName)
 
-	relativeHomePaths := make([]string, len(versionedHomesToKeep))
-	for i, h := range versionedHomesToKeep {
-		relHomePath, err := filepath.Rel("data", h)
+	log.Infof("versioned homes to keep: %v", versionedHomesToKeep)
+
+	var cumulativeError error
+	relativeHomePaths := make([]string, 0, len(versionedHomesToKeep))
+	for _, h := range versionedHomesToKeep {
+		relHomePath, err := filepath.Rel(dataDirPath, filepath.Join(topDirPath, h))
 		if err != nil {
-			return fmt.Errorf("extracting elastic-agent path relative to data directory from %s: %w", h, err)
+			cumulativeError = goerrors.Join(cumulativeError, fmt.Errorf("extracting elastic-agent path relative to data directory from %s: %w", h, err))
+			// best effort: try to use the entry as-is, without calculating the path relative to `data`
+			relHomePath = h
 		}
-		relativeHomePaths[i] = relHomePath
+		relativeHomePaths = append(relativeHomePaths, relHomePath)
 	}
 
-	var errs []error
+	log.Infof("Starting cleanup of versioned homes. Keeping: %v", relativeHomePaths)
+
 	for _, dir := range subdirs {
 		if slices.Contains(relativeHomePaths, dir) {
 			continue
@@ -200,11 +206,11 @@ func cleanup(log *logger.Logger, topDirPath string, removeMarker, keepLogs bool,
 			ignoredDirs = append(ignoredDirs, "logs")
 		}
 		if cleanupErr := install.RemoveBut(hashedDir, true, ignoredDirs...); cleanupErr != nil {
-			errs = append(errs, cleanupErr)
+			cumulativeError = goerrors.Join(cumulativeError, cleanupErr)
 		}
 	}
 
-	return goerrors.Join(errs...)
+	return cumulativeError
 }
 
 // InvokeWatcher invokes an agent instance using watcher argument for watching behavior of

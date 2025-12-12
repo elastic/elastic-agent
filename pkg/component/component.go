@@ -50,6 +50,11 @@ type BeatRuntimeConfig struct {
 func DefaultRuntimeConfig() *RuntimeConfig {
 	return &RuntimeConfig{
 		Default: string(DefaultRuntimeManager),
+		Metricbeat: BeatRuntimeConfig{
+			InputType: map[string]string{
+				"system/metrics": string(OtelRuntimeManager),
+			},
+		},
 	}
 }
 
@@ -117,7 +122,7 @@ const (
 	defaultUnitLogLevel                  = client.UnitLogLevelInfo
 	headersKey                           = "headers"
 	elasticsearchType                    = "elasticsearch"
-	workDirPathMod                       = 0770
+	workDirPathMod                       = 0o770
 	ProcessRuntimeManager                = RuntimeManager("process")
 	OtelRuntimeManager                   = RuntimeManager("otel")
 	DefaultRuntimeManager RuntimeManager = ProcessRuntimeManager

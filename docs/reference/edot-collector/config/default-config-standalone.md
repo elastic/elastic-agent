@@ -168,8 +168,8 @@ The following example configuration files are available for the Gateway mode:
 % start:edot-gateway-9x-table
 | Version | Configuration  |
 |---------|----------------|
-| 9.2     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.1/internal/pkg/otel/samples/linux/gateway.yml) |
-| 9.1     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.1.7/internal/pkg/otel/samples/linux/gateway.yml) |
+| 9.2     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.2/internal/pkg/otel/samples/linux/gateway.yml) |
+| 9.1     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.1.8/internal/pkg/otel/samples/linux/gateway.yml) |
 | 9.0     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.0.8/internal/pkg/otel/samples/linux/gateway.yml) |
 % end:edot-gateway-9x-table
 ::::
@@ -178,7 +178,7 @@ The following example configuration files are available for the Gateway mode:
 % start:edot-gateway-8x-table
 | Version | Configuration  |
 |---------|----------------|
-| 8.19    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.19.7/internal/pkg/otel/samples/linux/gateway.yml) |
+| 8.19    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.19.8/internal/pkg/otel/samples/linux/gateway.yml) |
 | 8.18    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.18.8/internal/pkg/otel/samples/linux/gateway.yml) |
 | 8.17    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.17.10/internal/pkg/otel/samples/linux/gateway.yml) |
 % end:edot-gateway-8x-table
@@ -525,7 +525,7 @@ For {{ecloud}} and {{serverless-full}} deployments, mTLS is not required. TLS an
 
 ## Configuration compatibility with Elastic Stack versions
 
-While EDOT Collector 9.x is compatible with {{product.elastic-stack}} 8.18 and 8.19, users running these Stack versions should use the EDOT Collector configuration aligned with their Stack version to ensure the end-to-end experience works properly with {{product.kibana}} Observability UIs.
+While EDOT Collector 9.x is compatible with {{product.elastic-stack}} 8.18 and 8.19, users running these Stack versions should use the EDOT Collector configuration aligned with their Stack version to ensure the end-to-end experience works properly with {{product.kibana}} Observability UIs. Refer to [Migrate components](/reference/edot-collector/components/migrate-components.md) to migrate your configuration to the new components.
 
 ::::{important}
 If you're upgrading EDOT Collector to 9.x but keeping your {{product.elastic-stack}} on 8.18 or 8.19:

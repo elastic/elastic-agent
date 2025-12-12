@@ -1,13 +1,13 @@
 module github.com/elastic/elastic-agent/internal/edot
 
-go 1.24.10
+go 1.24.11
 
 replace github.com/elastic/elastic-agent => ../../
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251130155143-19eb3e615086
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251211195827-462751c83c26
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-	github.com/elastic/elastic-agent-libs v0.26.2
+	github.com/elastic/elastic-agent-libs v0.28.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.20.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.20.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.22.0
@@ -45,9 +45,10 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver v0.139.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver v0.139.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver v0.139.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver v0.139.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.139.0
 	github.com/spf13/cobra v1.10.1
-	github.com/spf13/pflag v1.0.9
+	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/collector/connector/forwardconnector v0.139.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.139.0
@@ -58,6 +59,7 @@ require (
 )
 
 require (
+	github.com/alexbrainman/sspi v0.0.0-20210105120005-909beea2cc74 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.139.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.139.0 // indirect
 	go.opentelemetry.io/collector/component/componentstatus v0.139.0 // indirect
@@ -271,7 +273,7 @@ require (
 	github.com/eapache/go-xerial-snappy v0.0.0-20230731223053-c322873962e3 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
 	github.com/ebitengine/purego v0.9.1 // indirect
-	github.com/eclipse/paho.mqtt.golang v1.3.5 // indirect
+	github.com/eclipse/paho.mqtt.golang v1.5.1 // indirect
 	github.com/edsrzf/mmap-go v1.2.0 // indirect
 	github.com/elastic/apm-data v1.19.5 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
@@ -354,7 +356,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/gomodule/redigo v1.9.2 // indirect
-	github.com/google/cel-go v0.25.0 // indirect
+	github.com/google/cel-go v0.26.0 // indirect
 	github.com/google/flatbuffers v25.2.10+incompatible // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
