@@ -1015,7 +1015,6 @@ func getExpectedComponents(variant, os, arch, pkgType string) []string {
 		"apm-server",
 		"cloudbeat",
 		"cloud-defend",
-		"connectors",
 		"endpoint-security",
 		"fleet-server",
 		"pf-elastic-collector",
@@ -1072,9 +1071,11 @@ func getExpectedComponents(variant, os, arch, pkgType string) []string {
 		"pf-host-agent":         true,
 	}
 
-	// Filter components by OS, architecture and package type, to remove them from packages to which they don't apply
+	// Filter components by OS, architecture and package type
 	filtered := make([]string, 0, len(components))
 	for _, comp := range components {
+		// `continue` for each case which should be excluded
+
 		// Exclude linux-only components on non-linux platforms
 		if os != "linux" && linuxOnlyComponents[comp] {
 			continue
@@ -1090,13 +1091,18 @@ func getExpectedComponents(variant, os, arch, pkgType string) []string {
 			continue
 		}
 
-		// connectors and cloud-defend are only in container images
-		if (comp == "connectors" || comp == "cloud-defend") && pkgType == "docker" {
+		// cloud-defend is not available on non-amd64 arch
+		if comp == "cloud-defend" && arch != "amd64" {
 			continue
 		}
 
-		// cloud-defend is only available on amd64
-		if comp == "cloud-defend" && arch != "amd64" {
+		// connectors is not available in non-docker package types
+		if comp == "connectors" && pkgType != "docker" {
+			continue
+		}
+
+		// cloud-defend is not available in non-docker package types
+		if comp == "cloud-defend" && pkgType != "docker" {
 			continue
 		}
 
