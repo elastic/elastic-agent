@@ -825,8 +825,7 @@ func TestPerformScheduledCleanup(t *testing.T) {
 	}
 
 	// min and max duration for cleanup scheduling
-	minInterval := 10 * time.Minute
-	maxInterval := 2 * time.Hour
+	cleanupInterval := 10 * time.Minute
 
 	type args struct {
 		currentVersionedHome string
@@ -842,7 +841,7 @@ func TestPerformScheduledCleanup(t *testing.T) {
 		assertions func(t *testing.T, topDir string, source *mockAvailableRollbacksSource)
 	}{
 		{
-			name: "No available rollbacks: keep checking every maxInterval",
+			name: "No available rollbacks: keep checking every cleanupInterval",
 			setup: func(t *testing.T, log *logger.Logger, topDir string, source *mockAvailableRollbacksSource) {
 				source.EXPECT().Get().Return(nil, nil)
 				// setup the fake agent installations
@@ -862,10 +861,9 @@ func TestPerformScheduledCleanup(t *testing.T) {
 			},
 			args: args{
 				currentVersionedHome: filepath.Join("data", "elastic-agent-7.8.9-actual"),
-				minInterval:          minInterval,
-				maxInterval:          maxInterval,
+				minInterval:          cleanupInterval,
 			},
-			want: now.Add(maxInterval),
+			want: now.Add(cleanupInterval),
 			assertions: func(t *testing.T, topDir string, source *mockAvailableRollbacksSource) {
 				assert.DirExists(t, filepath.Join(topDir, "data", "elastic-agent-7.8.9-actual"))
 			},
@@ -905,8 +903,7 @@ func TestPerformScheduledCleanup(t *testing.T) {
 			},
 			args: args{
 				currentVersionedHome: filepath.Join("data", "elastic-agent-7.8.9-actual"),
-				minInterval:          minInterval,
-				maxInterval:          maxInterval,
+				minInterval:          cleanupInterval,
 			},
 			want: now.Add(1 * time.Hour),
 			assertions: func(t *testing.T, topDir string, source *mockAvailableRollbacksSource) {
@@ -922,7 +919,7 @@ func TestPerformScheduledCleanup(t *testing.T) {
 			log, _ := loggertest.New(t.Name())
 			source := newMockAvailableRollbacksSource(t)
 			tt.setup(t, log, topDir, source)
-			nextRunTime := performScheduledCleanup(log, topDir, tt.args.currentVersionedHome, source, now, tt.args.minInterval, tt.args.maxInterval)
+			nextRunTime := performScheduledCleanup(log, topDir, tt.args.currentVersionedHome, source, now, tt.args.minInterval)
 			assert.Equal(t, tt.want, nextRunTime)
 			if tt.assertions != nil {
 				tt.assertions(t, topDir, source)
@@ -935,7 +932,6 @@ func TestPeriodicallyCleanRollbacks(t *testing.T) {
 
 	// min and max duration for cleanup scheduling
 	minInterval := time.Millisecond
-	maxInterval := 1 * time.Minute
 
 	tests := []struct {
 		name            string
@@ -970,7 +966,7 @@ func TestPeriodicallyCleanRollbacks(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				PeriodicallyCleanRollbacks(ctx, log, topDir, "notreallyimportant", source, minInterval, maxInterval)
+				PeriodicallyCleanRollbacks(ctx, log, topDir, "notreallyimportant", source, minInterval)
 			}()
 
 			tt.handleGoroutine(t, cancel, appDone)

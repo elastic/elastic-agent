@@ -346,6 +346,7 @@ func CleanAvailableRollbacks(log *logger.Logger, source availableRollbacksSource
 		}
 
 		if filter(log, now, versionedHome, ttlMarker) {
+			log.Debugf("cleaning up rollback in %q", versionedHome)
 			if cleanupErr := install.RemoveBut(versionedHomeAbsPath, true); cleanupErr != nil {
 				aggregateErr = errors.Join(aggregateErr, fmt.Errorf("removing directory %q: %w", versionedHomeAbsPath, cleanupErr))
 			} else {
@@ -354,6 +355,7 @@ func CleanAvailableRollbacks(log *logger.Logger, source availableRollbacksSource
 				}
 			}
 		} else {
+			log.Debugf("leaving rollback in %q intact as it's not been selected by the filter function", versionedHome)
 			leftoverRollbacks[versionedHome] = ttlMarker
 		}
 	}
@@ -361,7 +363,7 @@ func CleanAvailableRollbacks(log *logger.Logger, source availableRollbacksSource
 	return leftoverRollbacks, aggregateErr
 }
 
-func PeriodicallyCleanRollbacks(ctx context.Context, log *logger.Logger, topDir, currentVersionedHome string, source availableRollbacksSource, minInterval, maxInterval time.Duration) {
+func PeriodicallyCleanRollbacks(ctx context.Context, log *logger.Logger, topDir, currentVersionedHome string, source availableRollbacksSource, minInterval time.Duration) {
 	log.Info("starting periodically cleaning rollbacks")
 	timer := time.NewTimer(minInterval)
 	for {
@@ -370,14 +372,18 @@ func PeriodicallyCleanRollbacks(ctx context.Context, log *logger.Logger, topDir,
 			log.Info("context is done, stopping periodically cleaning rollbacks")
 			return
 		case now := <-timer.C:
-			nextRunTime := performScheduledCleanup(log, topDir, currentVersionedHome, source, now, minInterval, maxInterval)
+			nextRunTime := performScheduledCleanup(log, topDir, currentVersionedHome, source, now, minInterval)
+			nextTimerDuration := time.Until(nextRunTime)
+			if nextTimerDuration < minInterval {
+				nextTimerDuration = minInterval
+			}
 			log.Debugf("Running next rollbacks cleanup in %s", nextRunTime)
-			timer.Reset(time.Until(nextRunTime))
+			timer.Reset(nextTimerDuration)
 		}
 	}
 }
 
-func performScheduledCleanup(log *logger.Logger, topDir, currentVersionedHome string, source availableRollbacksSource, now time.Time, minInterval, maxInterval time.Duration) time.Time {
+func performScheduledCleanup(log *logger.Logger, topDir, currentVersionedHome string, source availableRollbacksSource, now time.Time, minInterval time.Duration) time.Time {
 	rollbacksAfterCleanup, err := CleanAvailableRollbacks(log, source, topDir, currentVersionedHome, now, CleanupExpiredRollbacks)
 	if err != nil {
 		log.Errorf("error cleaning up rollbacks: %s, rescheduling cleanup in %s", err.Error(), minInterval)
@@ -392,7 +398,7 @@ func performScheduledCleanup(log *logger.Logger, topDir, currentVersionedHome st
 	}
 
 	if nextRunTime.IsZero() {
-		return now.Add(maxInterval)
+		return now.Add(minInterval)
 	}
 
 	return nextRunTime
