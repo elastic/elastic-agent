@@ -96,12 +96,19 @@ import (
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
 	elasticapmconnector "github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector"
 	profilingmetricsconnector "github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector"
+
+	// Telemetry
+	elasticmonitoringreceiver "github.com/elastic/elastic-agent/internal/edot/otelcol/monitoring/elasticmonitoringreceiver"
+	internaltelemetry "github.com/elastic/elastic-agent/internal/edot/otelcol/monitoring/internaltelemetry"
 )
 
 func components(extensionFactories ...extension.Factory) func() (otelcol.Factories, error) {
 	return func() (otelcol.Factories, error) {
 		var err error
 		factories := otelcol.Factories{}
+
+		// Internal telemetry monitoring
+		factories.Telemetry = internaltelemetry.NewFactory()
 
 		// Receivers
 		receivers := []receiver.Factory{
@@ -120,6 +127,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			nginxreceiver.NewFactory(),
 			jaegerreceiver.NewFactory(),
 			zipkinreceiver.NewFactory(),
+			elasticmonitoringreceiver.NewFactory(),
 			fbreceiver.NewFactory(),
 			mbreceiver.NewFactory(),
 			jmxreceiver.NewFactory(),
