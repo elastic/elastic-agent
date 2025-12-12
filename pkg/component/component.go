@@ -547,7 +547,14 @@ func (r *RuntimeSpecs) componentsForInputType(
 
 	// Treat as non isolated units component on error of reading the input spec
 	if componentErr != nil || !inputSpec.Spec.IsolateUnits {
+		// Components are generally identified by their input type and output name. However, for
+		// Service Runtime components, there can only ever be a single instance of the component running,
+		// as a service. So we identify these only by their input type.
 		componentID := fmt.Sprintf("%s-%s", inputType, output.Name)
+		if inputSpec.Spec.Service != nil {
+			componentID = inputType
+		}
+
 		if componentErr == nil && !containsStr(inputSpec.Spec.Outputs, output.OutputType) {
 			// This output is unsupported.
 			componentErr = ErrOutputNotSupported
@@ -592,7 +599,14 @@ func (r *RuntimeSpecs) componentsForInputType(
 	} else {
 		for _, input := range output.Inputs[inputType] {
 			// Units are being mapped to components, so we need a unique ID for each.
+			// Components are generally identified by their input type, output name, and input ID. However, for
+			// Service Runtime components, there can only ever be a single instance of the component running,
+			// as a service. So we identify these only by their input type and input ID.
 			componentID := fmt.Sprintf("%s-%s-%s", inputType, output.Name, input.id)
+			if inputSpec.Spec.Service != nil {
+				componentID = fmt.Sprintf("%s-%s", inputType, input.id)
+			}
+
 			if componentErr == nil && !containsStr(inputSpec.Spec.Outputs, output.OutputType) {
 				// This output is unsupported.
 				componentErr = ErrOutputNotSupported
