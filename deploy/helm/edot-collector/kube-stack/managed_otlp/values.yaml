@@ -129,6 +129,11 @@ collectors:
                 key: app.kubernetes.io/version
                 from: pod
       receivers:
+<<<<<<< HEAD
+=======
+        # [K8s Events Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8seventsreceiver)
+        k8s_events: {}
+>>>>>>> 6a7cd38f5 (fix: spec invalid rendered values "null" (#11481))
         # [K8s Objects Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sobjectsreceiver)
         k8sobjects:
           objects:
@@ -582,7 +587,7 @@ collectors:
               endpoint: ${env:MY_POD_IP}:4317
             http:
               endpoint: ${env:MY_POD_IP}:4318
-      processors:
+      processors: {}
       exporters:
         debug:
         otlp/ingest_logs:
