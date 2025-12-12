@@ -109,11 +109,6 @@ collectors:
               - "service.name"
               - "service.version"
       receivers:
-<<<<<<< HEAD
-=======
-        # [K8s Events Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8seventsreceiver)
-        k8s_events: {}
->>>>>>> 6a7cd38f5 (fix: spec invalid rendered values "null" (#11481))
         # [K8s Objects Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sobjectsreceiver)
         k8sobjects:
           objects:
