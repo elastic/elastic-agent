@@ -3566,7 +3566,8 @@ func (Otel) GolangCrossBuild() error {
 	params := devtools.DefaultGolangCrossBuildArgs()
 	params.Name = "elastic-otel-collector-" + mage.Platform.GOOS + "-" + mage.Platform.Arch
 	params.OutputDir = "build/golang-crossbuild"
-	params.Package = "github.com/elastic/elastic-agent/internal/edot"
+	params.WorkDir = "internal/edot"
+	params.Package = "."
 	params.ExtraFlags = append(params.ExtraFlags, "-tags=agentbeat")
 	injectBuildVars(params.Vars)
 
