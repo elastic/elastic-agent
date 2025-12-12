@@ -432,8 +432,7 @@ func TestCleanupRollbacks(t *testing.T) {
 	testcases := []struct {
 		name               string
 		fixturesSetup      fixturesSetupFunc
-		agentConfig        string
-		assertAfterUpgrade func(t *testing.T, errUpgrade error, installedFixture *atesting.Fixture, op upgradeOperation)
+		assertAfterUpgrade func(t *testing.T, errUpgrade error, installedFixture *atesting.Fixture, upgradeIndex int, upgrades []upgradeOperation)
 	}{
 		{
 			name: "agent should clear expired rollback after upgrading to a repackaged version",
@@ -448,14 +447,52 @@ func TestCleanupRollbacks(t *testing.T) {
 					},
 				}}
 			},
-			agentConfig: fastWatcherCfgWithShortRollbackWindow,
-			assertAfterUpgrade: func(t *testing.T, err error, installedFixture *atesting.Fixture, op upgradeOperation) {
+			assertAfterUpgrade: func(t *testing.T, err error, installedFixture *atesting.Fixture, upgradeIndex int, upgrades []upgradeOperation) {
 				require.NoError(t, err, "upgrade should not fail")
-				oldAgentVersionedHome := filepath.Join(installedFixture.WorkDir(), "data", fmt.Sprintf("elastic-agent-%s-%s", op.from.Version(), op.from.ShortHash()))
+				oldAgentVersionedHome := filepath.Join(installedFixture.WorkDir(), "data", fmt.Sprintf("elastic-agent-%s-%s", upgrades[upgradeIndex].from.Version(), upgrades[upgradeIndex].from.ShortHash()))
 				require.EventuallyWithT(t, func(collect *assert.CollectT) {
 					t.Logf("checking if the rollback directory %q has been cleaned...", oldAgentVersionedHome)
 					assert.NoDirExists(collect, oldAgentVersionedHome, "old rollback should have been cleaned up after expiration")
 				}, 1*time.Minute, 10*time.Second)
+			},
+		},
+		{
+			name: "agent should clear rollbacks upon initiating a new upgrade",
+			fixturesSetup: func(t *testing.T) []upgradeOperation {
+				baseFixture, firstRepackagedFixture := prepareCommitAndRepackagedFixtures(t, now)
+				currentVersion, err := version.ParseVersion(define.Version())
+				require.NoErrorf(t, err, "define.Version() %q is not parsable.", define.Version())
+				secondRepackagedFixture := createRepackagedFixture(t, currentVersion, baseFixture, now.Add(24*time.Hour))
+				return []upgradeOperation{
+					{
+						from: baseFixture,
+						to:   firstRepackagedFixture,
+						opts: []upgradetest.UpgradeOpt{
+							upgradetest.WithCustomWatcherConfig(fastWatcherCfgWithRollbackWindow),
+							upgradetest.WithDisableHashCheck(true),
+						},
+					},
+					{
+						from: firstRepackagedFixture,
+						to:   secondRepackagedFixture,
+						opts: []upgradetest.UpgradeOpt{
+							upgradetest.WithoutInstall(),
+							upgradetest.WithCustomWatcherConfig(fastWatcherCfgWithRollbackWindow),
+							upgradetest.WithDisableHashCheck(true),
+						},
+					},
+				}
+			},
+			assertAfterUpgrade: func(t *testing.T, err error, installedFixture *atesting.Fixture, upgradeIndex int, upgrades []upgradeOperation) {
+				require.NoError(t, err, "upgrade should not fail")
+				if upgradeIndex > 0 {
+					// we are interested to check only after the first upgrade
+					// verify that the previous rollback is gone
+					oldAgentVersionedHome := filepath.Join(installedFixture.WorkDir(), "data", fmt.Sprintf("elastic-agent-%s-%s", upgrades[upgradeIndex-1].from.Version(), upgrades[upgradeIndex-1].from.ShortHash()))
+					t.Logf("checking if the rollback directory %q has been cleaned...", oldAgentVersionedHome)
+					assert.NoDirExists(t, oldAgentVersionedHome, "old rollback should have been cleaned up after expiration")
+				}
+
 			},
 		},
 	}
@@ -466,15 +503,22 @@ func TestCleanupRollbacks(t *testing.T) {
 			require.Greater(t, len(upgradeOperations), 0, "testcase should specify at least one upgradeOperation")
 
 			// initial install and upgrade
-			initialUpgrade := upgradeOperations[0]
-			err := upgradetest.PerformUpgrade(
-				t.Context(), initialUpgrade.from, initialUpgrade.to, t, initialUpgrade.opts...)
-			tc.assertAfterUpgrade(t, err, initialUpgrade.from, initialUpgrade)
+			var initialUpgrade upgradeOperation
 
 			// follow-up upgrades (to test upgrades in a chain)
-			//for _, op := range upgradeOperations[1:] {
-			//	// TODO keep upgrading the same agent passing in the original fixture of the installed agent
-			//}
+			for i, op := range upgradeOperations {
+				if i == 0 {
+					initialUpgrade = op
+					t.Logf("Performing initial install of version %q and first upgrade to version %q", initialUpgrade.from.Version(), initialUpgrade.to.Version())
+				} else {
+					t.Logf("Performing new upgrade to version %q", op.to.Version())
+				}
+
+				err := upgradetest.PerformUpgrade(
+					t.Context(), initialUpgrade.from, op.to, t, op.opts...)
+				// this is the i-th upgrade
+				tc.assertAfterUpgrade(t, err, initialUpgrade.from, i, upgradeOperations)
+			}
 		})
 	}
 
