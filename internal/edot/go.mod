@@ -5,9 +5,6 @@ go 1.24.11
 // use in-repo directory
 replace github.com/elastic/elastic-agent => ../../
 
-// use in-repo git submodule
-replace github.com/elastic/beats/v7 => ../../beats
-
 require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251211195827-462751c83c26
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
@@ -63,6 +60,7 @@ require (
 )
 
 require (
+	github.com/alexbrainman/sspi v0.0.0-20210105120005-909beea2cc74 // indirect
 	github.com/bluekeyes/go-gitdiff v0.7.1 // indirect
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
 	github.com/elastic/ebpfevents v0.8.0 // indirect

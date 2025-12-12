@@ -437,6 +437,8 @@ github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumpti
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic/go.mod h1:0vCBR1wgGwZeGmloJ+eCWIZF2S47grTXRzj2mftg2Nk=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
 github.com/elastic/bayeux v1.0.5/go.mod h1:CSI4iP7qeo5MMlkznGvYKftp8M7qqP/3nzmVZoXHY68=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251211195827-462751c83c26 h1:QpWu1VIP8oXTDwpdQgaBIglakhcRvuUISEdR3RLFh68=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251211195827-462751c83c26/go.mod h1:2qC0udDg/AUBtgb1dRKrxbCR1M18VjICVV93m2RMsUc=
 github.com/elastic/dhcp v0.0.0-20200227161230-57ec251c7eb3 h1:lnDkqiRFKm0rxdljqrj3lotWinO9+jFmeDXIC4gvIQs=
 github.com/elastic/dhcp v0.0.0-20200227161230-57ec251c7eb3/go.mod h1:aPqzac6AYkipvp4hufTyMj5PDIphF3+At8zr7r51xjY=
 github.com/elastic/ebpfevents v0.8.0 h1:rIrhj3SSsrwSOIv/MderZd0ZpbCLT4pudBtfnAbj3Oo=
