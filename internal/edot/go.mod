@@ -9,7 +9,7 @@ require (
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.28.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.24.0
-	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.24.0
+	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.25.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.24.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.24.0
 	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.24.0
@@ -617,7 +617,7 @@ require (
 	go.opentelemetry.io/collector/scraper v0.141.0 // indirect
 	go.opentelemetry.io/collector/scraper/scraperhelper v0.141.0 // indirect
 	go.opentelemetry.io/collector/semconv v0.128.1-0.20250610090210-188191247685 // indirect
-	go.opentelemetry.io/collector/service v0.141.0 // indirect
+	go.opentelemetry.io/collector/service v0.141.0
 	go.opentelemetry.io/collector/service/hostcapabilities v0.141.0 // indirect
 	go.opentelemetry.io/contrib/bridges/otelzap v0.13.0 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.38.0 // indirect

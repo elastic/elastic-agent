@@ -490,8 +490,8 @@ github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6 h1:JVNuBrmOoqLJgp9
 github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6/go.mod h1:cXqWcLnmu5y4QveTb2hjk7rgzkHMuZsqeXtbJpNAcu0=
 github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.24.0 h1:CTwf+2Rq+C0WXObv9EphlnOkFsgfTWGW+OXXXSz0+hc=
 github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.24.0/go.mod h1:RUnWIadE802WSVQ4/ziTQjkCDSIXCWBIL2tdbsFwmaY=
-github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.24.0 h1:kk2M3nFB2tlKco8lQPYZ1p+eRoainxfTB4OlMs9BfCk=
-github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.24.0/go.mod h1:peUUpAGDxj1+yZajz1GcfAvmjuDkyP4peJi+Bq/u3tI=
+github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.25.0 h1:sA2lxB0//lvGiPU+AovowwaZSLNJZkjeUE6vCyHYEmQ=
+github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.25.0/go.mod h1:2Nwf1zAL/LLGRT7aAUSmMdsLtVS80bPRVtOdwbnEjaE=
 github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.24.0 h1:QsyBpGP9OlfJjWXhJExnWoxfPtkaPODmgx3AP66U3L8=
 github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.24.0/go.mod h1:MdU8DUPS+7SEs72DByZ2IQaAjIJ6WtDu94wmFPjLeqs=
 github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.24.0 h1:j5mCQbRGFkoo83psu3v5UxlmQhqNGEsVXscKKgkDLHQ=

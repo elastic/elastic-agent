@@ -305,7 +305,7 @@ require (
 	github.com/elastic/lunes v0.2.0 // indirect
 	github.com/elastic/mito v1.24.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.24.0 // indirect
-	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.24.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.25.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.24.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.24.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20251113000200-a6f7cddc8520 // indirect
