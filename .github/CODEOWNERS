@@ -11,6 +11,8 @@ changelog/fragments/
 
 # Sub-directories/files ownership. Remember that order matters; the last matching pattern takes the most precedence.
 /.buildkite @elastic/elastic-agent-control-plane @elastic/observablt-ci
+/.buildkite/pipeline.agentless-tests.yaml @elastic/ingest-managed-jobs
+/.buildkite/scripts/steps/validate-agentless-docker-image.sh @elastic/ingest-managed-jobs
 /.ci @elastic/elastic-agent-control-plane @elastic/observablt-ci
 /.ci/scripts/ecp-internal-release.sh @elastic/elastic-agent-control-plane
 /.ci/scripts/update-integration-testdata.sh @elastic/elastic-agent-control-plane
@@ -30,6 +32,8 @@ changelog/fragments/
 /internal/pkg/otel/samples @elastic/ingest-otel-data @elastic/ingest-docs
 /internal/pkg/otel/components.yml @elastic/ingest-otel-leads
 /internal/pkg/composable/providers/kubernetes @elastic/elastic-agent-control-plane
-/internal/pkg/otel/samples/darwin/autoops_es*.yml @elastic/opex
-/internal/pkg/otel/samples/linux/autoops_es*.yml @elastic/opex
-/internal/pkg/otel/samples/windows/autoops_es*.yml @elastic/opex
+/internal/pkg/otel/samples/darwin/autoops_es.yml @elastic/opex
+/internal/pkg/otel/samples/linux/autoops_es.yml @elastic/opex
+/internal/pkg/otel/samples/windows/autoops_es.yml @elastic/opex
+/deploy/helm/elastic-agent/templates/integrations/_auto_ops @elastic.opex
+

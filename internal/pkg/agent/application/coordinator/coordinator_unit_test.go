@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 
@@ -468,7 +469,7 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 	}()
 
 	tmpDir := t.TempDir()
-	upgradeMgr, err := upgrade.NewUpgrader(log, &artifact.Config{}, nil, &info.AgentInfo{}, new(upgrade.AgentWatcherHelper), upgrade.NewTTLMarkerRegistry(nil, tmpDir))
+	upgradeMgr, err := upgrade.NewUpgrader(log, &artifact.Config{}, nil, &info.AgentInfo{}, new(upgrade.AgentWatcherHelper), ttl.NewTTLMarkerRegistry(nil, tmpDir))
 	require.NoError(t, err, "errored when creating a new upgrader")
 
 	// Channels have buffer length 1, so we don't have to run on multiple
@@ -496,6 +497,7 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 		otelMgr:    &fakeOTelManager{},
 
 		// Set valid but empty initial values for ast and vars
+		currentCfg:         configuration.DefaultConfiguration(),
 		vars:               emptyVars(t),
 		ast:                emptyAST(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
@@ -1041,6 +1043,7 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 	t.Run("mixed policy", func(t *testing.T) {
 		// Create a policy with one input and one output (no otel configuration)
 		cfg := config.MustNewConfigFrom(`
+agent.internal.runtime.filebeat.filestream: otel
 outputs:
   default:
     type: elasticsearch
@@ -1050,7 +1053,6 @@ inputs:
   - id: test-input
     type: filestream
     use_output: default
-    _runtime_experimental: otel
   - id: test-other-input
     type: system/metrics
     use_output: default
@@ -1105,6 +1107,7 @@ service:
 	t.Run("unsupported otel output option", func(t *testing.T) {
 		// Create a policy with one input and one output (no otel configuration)
 		cfg := config.MustNewConfigFrom(`
+agent.internal.runtime.filebeat.filestream: otel
 outputs:
   default:
     type: elasticsearch
@@ -1115,7 +1118,6 @@ inputs:
   - id: test-input
     type: filestream
     use_output: default
-    _runtime_experimental: otel
   - id: test-other-input
     type: system/metrics
     use_output: default
@@ -1223,6 +1225,7 @@ func TestCoordinatorManagesComponentWorkDirs(t *testing.T) {
 	t.Run("run in process manager", func(t *testing.T) {
 		// Create a policy with one input and one output (no otel configuration)
 		cfg := config.MustNewConfigFrom(`
+agent.internal.runtime.filebeat.filestream: process
 outputs:
   default:
     type: elasticsearch
@@ -1232,7 +1235,6 @@ inputs:
   - id: test-input
     type: filestream
     use_output: default
-    _runtime_experimental: process
 `)
 
 		// Send the policy change and make sure it was acknowledged.
@@ -1252,6 +1254,7 @@ inputs:
 	t.Run("run in otel manager", func(t *testing.T) {
 		// Create a policy with one input and one output (no otel configuration)
 		cfg := config.MustNewConfigFrom(`
+agent.internal.runtime.filebeat.filestream: otel
 outputs:
   default:
     type: elasticsearch
@@ -1261,7 +1264,6 @@ inputs:
   - id: test-input
     type: filestream
     use_output: default
-    _runtime_experimental: otel
 `)
 
 		// Send the policy change and make sure it was acknowledged.
@@ -1349,9 +1351,8 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 			// manager, so it receives the update result.
 			runtimeManagerError: updateErrChan,
 		},
-		runtimeMgr: runtimeManager,
-		otelMgr:    &fakeOTelManager{},
-
+		runtimeMgr:         runtimeManager,
+		otelMgr:            &fakeOTelManager{},
 		vars:               emptyVars(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 		secretMarkerFunc:   testSecretMarkerFunc,

@@ -1174,6 +1174,8 @@ spec:
                 default: 30s
                 format: duration
                 type: string
+              dnsPolicy:
+                type: string
               env:
                 items:
                   properties:
@@ -2244,6 +2246,8 @@ spec:
                       type: string
                     hostPort:
                       format: int32
+                      maximum: 65535
+                      minimum: 0
                       type: integer
                     name:
                       type: string

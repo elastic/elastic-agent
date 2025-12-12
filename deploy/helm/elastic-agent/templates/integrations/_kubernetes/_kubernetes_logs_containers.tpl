@@ -17,12 +17,19 @@ Config input for container logs
     namespace: {{ .Values.kubernetes.namespace }}
   use_output: {{ .Values.kubernetes.output }}
   streams:
+  {{- if $.Values.kubernetes.containers.logs.rotated_logs }}
+  - id: kubernetes-container-logs-${kubernetes.pod.uid}-${kubernetes.container.name}
+    gzip_experimental: true
+    paths:
+      - '/var/log/pods/${kubernetes.namespace}_${kubernetes.pod.name}_${kubernetes.pod.uid}/${kubernetes.container.name}/*.log*'
+  {{ else }}
   - id: kubernetes-container-logs-${kubernetes.pod.name}-${kubernetes.container.id}
+    paths:
+      - '/var/log/containers/*${kubernetes.container.id}.log'
+  {{ end }}
     data_stream:
       dataset: kubernetes.container_logs
       type: logs
-    paths:
-      - '/var/log/containers/*${kubernetes.container.id}.log'
     prospector.scanner.symlinks: {{ dig "vars" "symlinks" true .Values.kubernetes.containers.logs }}
     parsers:
       - container:

@@ -39,11 +39,13 @@ RUN true && \
     chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/*beat && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/osquery* || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/apm-server || true) && \
+    (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/cloud-defend || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/endpoint-security || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/fleet-server || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-elastic-collector || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-elastic-symbolizer || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-host-agent || true) && \
+    (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/elastic-otel-collector || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/otelcol || true) && \
     (chmod 0755 {{ $beatHome }}/otelcol || true) && \
     find {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components -name "*.yml*" -type f -exec chmod 0644 {} \; && \

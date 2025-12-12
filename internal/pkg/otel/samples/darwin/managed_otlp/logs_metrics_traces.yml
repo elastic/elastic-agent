@@ -12,7 +12,14 @@ receivers:
   hostmetrics/system:
     collection_interval: 60s
     scrapers:
+      disk:
       filesystem:
+      cpu:
+        metrics:
+          system.cpu.utilization:
+            enabled: true
+          system.cpu.logical.count:
+            enabled: true
       memory:
         metrics:
           system.memory.utilization:

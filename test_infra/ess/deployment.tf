@@ -113,6 +113,9 @@ resource "ec_deployment" "integration-testing" {
     }
     config = {
       docker_image = local.elasticsearch_docker_image
+      user_settings_json = jsonencode({
+        "cluster.max_shards_per_node" = 2000
+      })
     }
   }
   kibana = {

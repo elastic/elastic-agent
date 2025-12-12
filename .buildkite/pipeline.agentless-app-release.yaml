@@ -55,7 +55,22 @@ steps:
   # wait for metadata to be set
   - wait: ~
 
+  - label: ":docker: Validate docker image is built for all architectures"
+    command: ".buildkite/scripts/steps/validate-agentless-docker-image.sh"
+    env:
+      SERVICE_VERSION: "${VERSION}"
+    agents:
+      image: "docker.elastic.co/ci-agent-images/observability/oci-image-tools-agent:latest@sha256:a4ababd1347111759babc05c9ad5a680f4af48892784951358488b7e7fc94af9"
+    plugins:
+      - elastic/vault-docker-login#v0.6.3:
+          secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+
+  # wait for image architecture validation
+  - wait: ~
+
   - label: ":grey_question: Promote agentless app release if validation passes"
+    # DRY_RUN will help to skip this step when set to true
+    if: build.env("DRY_RUN") == null || build.env("DRY_RUN") == "false"
     depends_on: "mirror-elastic-agent"
     command: |
       export COMMIT_HASH=$$(buildkite-agent meta-data get git-short-commit)
