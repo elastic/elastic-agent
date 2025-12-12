@@ -55,7 +55,7 @@ stack: ga 8.12
 The exporter uses the `otel` mapping mode by default. In this mode, the {{es}} Exporter stores documents in Elastic's preferred OTel-native schema. Documents use the original attribute names and closely follow the event structure from the OTLP events.
 
 :::{note}
-The exporter supports other mapping modes (`ecs`, `bodymap`, `none`, `raw`) through the `mapping::mode` setting, but configuring these modes explicitly is not officially supported by the EDOT Collector. In a future release, the configuration option will be removed in favor of automatic mode selection.
+The exporter supports other mapping modes (`ecs`, `bodymap`, `none`, `raw`) through the `mapping::mode` setting, but configuring these modes is not officially supported by the EDOT Collector. In a future release, the configuration option will be removed in favor of automatic mode selection.
 :::
 
 ## Document routing
