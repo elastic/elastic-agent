@@ -1605,13 +1605,13 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 			kibana.MonitoringEnabledLogs,
 			kibana.MonitoringEnabledMetrics,
 		},
+		AdvancedSettings: map[string]any{
+			"agent_logging_level": "debug",
+		},
 		Overrides: map[string]any{
 			"agent": map[string]any{
 				"monitoring": map[string]any{
 					"_runtime_experimental": "process",
-				},
-				"logging": map[string]any{
-					"level": "debug",
 				},
 			},
 		},
@@ -1699,9 +1699,6 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 			"agent": map[string]any{
 				"monitoring": map[string]any{
 					"_runtime_experimental": "otel",
-				},
-				"logging": map[string]any{
-					"level": "debug",
 				},
 			},
 		},
