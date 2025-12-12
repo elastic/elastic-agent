@@ -64,10 +64,10 @@ func newComponentRuntime(
 		return newFailedRuntime(comp)
 	}
 	if comp.InputSpec != nil {
-		if comp.UsesCommandRuntime() {
+		if comp.InputSpec.Spec.Command != nil {
 			return newCommandRuntime(comp, logger, monitor)
 		}
-		if comp.UsesServiceRuntime() {
+		if comp.InputSpec.Spec.Service != nil {
 			return newServiceRuntime(comp, logger, isLocal)
 		}
 		return nil, errors.New("unknown component runtime")

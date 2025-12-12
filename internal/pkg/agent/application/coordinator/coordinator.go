@@ -2052,9 +2052,7 @@ func (c *Coordinator) checkAndLogUpdate(lastComponentModel []component.Component
 		diffUnits map[string]diffCheck
 	}
 
-	// lastCompMap is a map of component IDs -> components that exist in the last/previous component model.
 	lastCompMap := convertComponentListToMap(lastComponentModel)
-	// currentCompMap is a map of component IDs -> components that will exist in the current/new component model.
 	currentCompMap := convertComponentListToMap(c.componentModel)
 
 	compDiffMap := map[string]compCheck{}
