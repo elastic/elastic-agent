@@ -1,0 +1,44 @@
+// begin 8.19.9 relnotes
+
+[[release-notes-8.19.9]]
+==  8.19.9
+
+Review important information about the  8.19.9 release.
+
+
+
+
+
+
+
+
+
+[discrete]
+[[new-features-8.19.9]]
+=== New features
+
+The 8.19.9 release adds the following new and notable features.
+
+
+
+
+* Allow setting component runtime per input type. https://github.com/elastic/elastic-agent/pull/11671[#11671] https://github.com/elastic/elastic-agent/pull/11749[#11749] https://github.com/elastic/elastic-agent/pull/11752[#11752] https://github.com/elastic/elastic-agent/pull/11729[#11729] https://github.com/elastic/elastic-agent/pull/11719[#11719] 
+
+
+
+
+
+
+[discrete]
+[[bug-fixes-8.19.9]]
+=== Bug fixes
+
+
+
+
+* Ensure the self-monitoring configuration accounts for the runtime components actually run in. https://github.com/elastic/elastic-agent/pull/11671[#11671] https://github.com/elastic/elastic-agent/pull/11749[#11749] https://github.com/elastic/elastic-agent/pull/11752[#11752] https://github.com/elastic/elastic-agent/pull/11729[#11729] https://github.com/elastic/elastic-agent/pull/11719[#11719] 
+* Allow host to be a string for otel configuration translation. https://github.com/elastic/elastic-agent/pull/11394[#11394] https://github.com/elastic/elastic-agent/issues/11352[#11352]
+* Add environment.yaml file to diagnostics. https://github.com/elastic/elastic-agent/pull/11671[#11671] https://github.com/elastic/elastic-agent/pull/11749[#11749] https://github.com/elastic/elastic-agent/pull/11752[#11752] https://github.com/elastic/elastic-agent/pull/11729[#11729] https://github.com/elastic/elastic-agent/pull/11719[#11719] https://github.com/elastic/elastic-agent/issues/10966[#10966]
+* Merge multiple agent keys when loading config. https://github.com/elastic/elastic-agent/pull/11671[#11671] https://github.com/elastic/elastic-agent/pull/11749[#11749] https://github.com/elastic/elastic-agent/pull/11752[#11752] https://github.com/elastic/elastic-agent/pull/11729[#11729] https://github.com/elastic/elastic-agent/pull/11719[#11719] https://github.com/elastic/elastic-agent/issues/3717[#3717]
+
+// end 8.19.9 relnotes
