@@ -114,7 +114,7 @@ collectors:
               - "service.version"
       receivers:
         # [K8s Events Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8seventsreceiver)
-        k8s_events:
+        k8s_events: {}
         # [K8s Objects Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sobjectsreceiver)
         # NOTE: The k8sobjects receiver for K8s Events collection is being replaced by the k8s_events receiver, it might be removed in future versions of this configuration
         k8sobjects:
@@ -590,7 +590,7 @@ collectors:
           metrics/aggregated-otel-metrics:
             receivers:
               - elasticapm
-            processors:
+            processors: []
             exporters:
               - debug
               - elasticsearch/otel
@@ -599,6 +599,7 @@ collectors:
 instrumentation:
   name: elastic-instrumentation
   enabled: true # Enable/disable auto-instrumentation.
+  env: []
   exporter:
     endpoint: http://opentelemetry-kube-stack-daemon-collector.opentelemetry-operator-system.svc.cluster.local:4318 # The daemonset OpenTelemetry Collector endpoint where telemetry data will be exported.
   propagators:
