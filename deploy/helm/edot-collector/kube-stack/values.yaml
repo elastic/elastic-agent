@@ -109,6 +109,11 @@ collectors:
               - "service.name"
               - "service.version"
       receivers:
+<<<<<<< HEAD
+=======
+        # [K8s Events Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8seventsreceiver)
+        k8s_events: {}
+>>>>>>> 6a7cd38f5 (fix: spec invalid rendered values "null" (#11481))
         # [K8s Objects Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sobjectsreceiver)
         k8sobjects:
           objects:
@@ -625,7 +630,7 @@ collectors:
           metrics/aggregated-otel-metrics:
             receivers:
               - elasticapm
-            processors:
+            processors: []
             exporters:
               - debug
               - elasticsearch/otel
@@ -634,6 +639,7 @@ collectors:
 instrumentation:
   name: elastic-instrumentation
   enabled: true # Enable/disable auto-instrumentation.
+  env: []
   exporter:
     endpoint: http://opentelemetry-kube-stack-daemon-collector.opentelemetry-operator-system.svc.cluster.local:4318 # The daemonset OpenTelemetry Collector endpoint where telemetry data will be exported.
   propagators:
