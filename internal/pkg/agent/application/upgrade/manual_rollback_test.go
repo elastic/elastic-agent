@@ -830,7 +830,6 @@ func TestPerformScheduledCleanup(t *testing.T) {
 	type args struct {
 		currentVersionedHome string
 		minInterval          time.Duration
-		maxInterval          time.Duration
 	}
 
 	tests := []struct {
