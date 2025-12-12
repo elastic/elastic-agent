@@ -49,10 +49,6 @@ require (
 	github.com/sajari/regression v1.0.1
 	github.com/schollz/progressbar/v3 v3.13.1
 	github.com/spf13/cobra v1.10.1
-<<<<<<< HEAD
-=======
-	github.com/spf13/pflag v1.0.10
->>>>>>> c7313c8b9 (build(deps): bump helm.sh/helm/v3 from 3.15.4 to 3.19.3 (#11733))
 	github.com/stretchr/testify v1.11.1
 	github.com/winlabs/gowin32 v0.0.0-20240930213947-f504d7e14639
 	go.elastic.co/apm/module/apmgorilla/v2 v2.6.0
@@ -81,14 +77,8 @@ require (
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
-<<<<<<< HEAD
 	gotest.tools/gotestsum v1.12.2
-	helm.sh/helm/v3 v3.15.4
-=======
-	gotest.tools/gotestsum v1.13.0
 	helm.sh/helm/v3 v3.19.3
-	howett.net/plist v1.0.1
->>>>>>> c7313c8b9 (build(deps): bump helm.sh/helm/v3 from 3.15.4 to 3.19.3 (#11733))
 	k8s.io/api v0.34.1
 	k8s.io/apimachinery v0.34.1
 	k8s.io/cli-runtime v0.34.0
@@ -264,12 +254,7 @@ require (
 	github.com/containerd/platforms v0.2.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.6.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
-<<<<<<< HEAD
-	github.com/creack/pty v1.1.20 // indirect
-	github.com/cyphar/filepath-securejoin v0.3.6 // indirect
-=======
 	github.com/cyphar/filepath-securejoin v0.6.0 // indirect
->>>>>>> c7313c8b9 (build(deps): bump helm.sh/helm/v3 from 3.15.4 to 3.19.3 (#11733))
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dennwc/varint v1.0.0 // indirect
 	github.com/devigned/tab v0.1.2-0.20190607222403-0c15cf42f9a2 // indirect
@@ -601,7 +586,7 @@ require (
 	github.com/shurcooL/httpfs v0.0.0-20230704072500-f1e31cf0ba5c // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
-	github.com/spf13/pflag v1.0.9 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
 	github.com/stackitcloud/stackit-sdk-go/core v0.17.3 // indirect
 	github.com/stoewer/go-strcase v1.3.1 // indirect
@@ -629,7 +614,6 @@ require (
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
-	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
@@ -754,16 +738,10 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
-<<<<<<< HEAD
 	howett.net/plist v1.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.32.2 // indirect
-	k8s.io/apiserver v0.32.3 // indirect
-	k8s.io/component-base v0.32.3 // indirect
-=======
 	k8s.io/apiextensions-apiserver v0.34.0 // indirect
 	k8s.io/apiserver v0.34.0 // indirect
 	k8s.io/component-base v0.34.0 // indirect
->>>>>>> c7313c8b9 (build(deps): bump helm.sh/helm/v3 from 3.15.4 to 3.19.3 (#11733))
 	k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b // indirect
 	k8s.io/kubectl v0.34.0 // indirect
 	k8s.io/kubelet v0.32.3 // indirect
