@@ -270,12 +270,17 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	}
 	f.extractDir = finalDir
 	f.workDir = finalDir
-	// collect the hash: it's done by reading the `.build_hash.txt` (the same information can be gathered by the manifest but that involves YAML unmarshalling)
-	hashBytes, err := os.ReadFile(filepath.Join(finalDir, ".build_hash.txt"))
-	if err != nil {
-		return fmt.Errorf("reading .build_hash.txt from the extracted archive: %w", err)
+
+	// not done for certain types of packages
+	if f.packageFormat != "deb" && f.packageFormat != "rpm" {
+		// collect the hash: it's done by reading the `.build_hash.txt` (the same information can be gathered by the manifest but that involves YAML unmarshalling)
+
+		hashBytes, err := os.ReadFile(filepath.Join(finalDir, ".build_hash.txt"))
+		if err != nil {
+			return fmt.Errorf("reading .build_hash.txt from the extracted archive: %w", err)
+		}
+		f.hash = string(hashBytes)
 	}
-	f.hash = string(hashBytes)
 
 	return nil
 }
