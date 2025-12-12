@@ -213,7 +213,7 @@ func (e *EventListener) getCollectorStatus() *status.AggregateStatus {
 
 // EnsureHealthy ensures that the OTelManager is healthy by checking the latest error and status.
 func (e *EventListener) EnsureHealthy(t *testing.T, u time.Time) {
-	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		e.mtx.Lock()
 		latestErr := e.err
 		latestStatus := e.collectorStatus
@@ -315,6 +315,9 @@ func (t *EventTime[T]) Time() time.Time {
 }
 
 func countHealthCheckExtensionStatuses(status *status.AggregateStatus) uint {
+	if status == nil {
+		return 0
+	}
 	extensions, ok := status.ComponentStatusMap["extensions"]
 	if !ok {
 		return 0
@@ -401,7 +404,7 @@ func TestOTelManager_Run(t *testing.T) {
 				require.NotNil(t, execHandle, "execModeFn handle should not be nil")
 				execHandle.Stop(waitTimeForStop)
 				e.EnsureHealthy(t, updateTime)
-				assert.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 0")
+				require.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 0")
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
@@ -427,7 +430,7 @@ func TestOTelManager_Run(t *testing.T) {
 				updateTime := time.Now()
 				m.Update(cfg, nil)
 				e.EnsureHealthy(t, updateTime)
-				assert.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 0")
+				require.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 0")
 
 				var oldPHandle *procHandle
 				// repeatedly kill the collector
@@ -445,7 +448,7 @@ func TestOTelManager_Run(t *testing.T) {
 					// the collector should restart and report healthy
 					updateTime = time.Now()
 					e.EnsureHealthy(t, updateTime)
-					assert.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 0")
+					require.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 0")
 				}
 
 				seenRecoveredTimes := m.recoveryRetries.Load()
@@ -692,7 +695,7 @@ func TestOTelManager_Run(t *testing.T) {
 				m.Update(cfg, nil)
 				e.EnsureHealthy(t, updateTime)
 
-				assert.EqualValues(t, 1, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 1")
+				require.EqualValues(t, 1, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 1")
 			},
 		},
 		{
