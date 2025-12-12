@@ -124,7 +124,7 @@ func readTTLMarker(filePath string) (TTLMarker, error) {
 }
 
 func writeTTLMarker(filePath string, marker TTLMarker) error {
-	file, err := os.Create(filePath)
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0660)
 	if err != nil {
 		return fmt.Errorf("failed to open %q: %w", filePath, err)
 	}
