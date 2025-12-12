@@ -15,9 +15,7 @@ products:
 
 # Custom data stream routing with EDOT
 
-{{edot}} (EDOT) uses opinionated defaults for data stream naming to ensure compatibility with Elastic dashboards, {{product.apm}} visualizations, and curated UIs.
-
-While most use cases rely on these defaults, EDOT also supports advanced dynamic routing.
+{{edot}} (EDOT) uses opinionated defaults for data stream naming to ensure compatibility with Elastic dashboards, {{product.apm}} visualizations, and curated UIs. While most use cases rely on these defaults, EDOT also supports advanced dynamic routing.
 
 :::{warning}
 We strongly recommend not changing the default data stream names. Customizing data stream routing diverges from the standard ingestion model and there's no guarantee it will be valid for future versions.
@@ -27,37 +25,37 @@ We strongly recommend not changing the default data stream names. Customizing da
 
 The only recommended use case for customizing data stream routing is to separate data by environment (for example: dev, staging, and prod).
 
-In this case, we recommend changing only `data_stream.namespace`, not `data_stream.dataset`.
-
-## Modifying `namespace`
-
 A data stream name follows this structure:
 
 ```
 <type>-<dataset>-<namespace>
 ```
 
+We recommend changing only `data_stream.namespace`, not `data_stream.dataset`.
+
+### The `namespace` field
+
 The `namespace` is intended as the configurable part of the name. Elastic dashboards, detectors, and UIs support multiple namespaces automatically.
 
-## Why not modify `dataset`?
+### The `dataset` field
 
-Changing the `dataset` value can cause:
+Only modify `dataset` if it's absolutely necessary and you're aware of the tradeoffs. Changing the `dataset` value can cause:
 
 - Dashboards and {{product.apm}} views to fail to load
+- Any other content pack that you end up installing to fail
 - Loss of compatibility with built-in correlations and cross-linking
 - Inconsistent field mappings
 - Proliferation of data streams and increased shard counts
 - Incompatibility with OpenTelemetry content packs, which are required to visualize OpenTelemetry data stored natively as OpenTelemetry semantic conventions
 
-Only modify `dataset` if it's absolutely necessary and you're aware of the tradeoffs.
-
 ## Configuration example
 
 To enable dynamic data stream routing:
 
-1. Set `mapping.mode: otel` in the {{es}} exporter. When using `otel` mapping mode, the exporter appends `.otel` to the `data_stream.dataset` value automatically.
-2. Use a `resource` processor to set the desired `namespace` or `dataset` from resource attributes.
-3. Add the processor to your pipeline.
+1. Use a `resource` processor to set the desired `namespace` or `dataset` from resource attributes.
+2. Add the processor to your pipeline.
+
+When using the default `otel` mapping mode, the exporter appends `.otel` to the `data_stream.dataset` value automatically.
 
 :::{note}
 The example is purely illustrative, with no guarantee of it being production ready.
@@ -68,11 +66,9 @@ exporters:
   elasticsearch/otel:
     api_key: ${env:ELASTIC_API_KEY}
     endpoints: [${env:ELASTIC_ENDPOINT}]
-    mapping:
-      mode: otel
 
 processors:
-  resource/env-namespace: # <-- make sure you are using `resource` and not `attributes`
+  resource/env-namespace:
     attributes:
       - key: data_stream.namespace
         from_attribute: k8s.namespace.name
@@ -83,12 +79,12 @@ service:
     metrics/otel:
       processors:
         - batch
-        - resource/env-namespace # <-- add the processor to the pipeline
+        - resource/env-namespace
       exporters:
         - elasticsearch/otel
 ```
 
-## Valid data stream names
+### Valid data stream names
 
 Any dynamic value used in `data_stream.namespace` or `data_stream.dataset` must comply with {{es}} index naming rules:
 
@@ -100,7 +96,7 @@ Any dynamic value used in `data_stream.namespace` or `data_stream.dataset` must 
 
 Invalid names prevent data stream creation.
 
-## Risks and limitations
+### Risks and limitations
 
 This configuration diverges from the standard ingestion model. Be aware of the following:
 
