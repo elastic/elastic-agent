@@ -114,7 +114,7 @@ collectors:
               - "service.version"
       receivers:
         # [K8s Events Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8seventsreceiver)
-        k8s_events:
+        k8s_events: {}
         # [K8s Objects Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sobjectsreceiver)
         # NOTE: The k8sobjects receiver for K8s Events collection is being replaced by the k8s_events receiver, it might be removed in future versions of this configuration
         k8sobjects:
@@ -544,7 +544,7 @@ collectors:
               endpoint: ${env:MY_POD_IP}:4317
             http:
               endpoint: ${env:MY_POD_IP}:4318
-      processors:
+      processors: {}
       exporters:
         debug:
         otlp/ingest_logs:
