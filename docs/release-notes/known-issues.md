@@ -23,32 +23,37 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
-:::{dropdown} Elastic Agent becomes unhealthy when an Elasticsearch output used for monitoring specifies the hosts parameter as a string
-**Applies to: {{agent}} 9.2.1**
+:::{dropdown} Elastic Agent becomes unhealthy when an Elasticsearch output used for monitoring specifies any list parameter as a string
+**Applies to: {{agent}} 9.2.1, 9.2.2**
 
-On November 21st 2025, a known issue was discovered that causes Elastic Agent to become unhealthy with the error:
+On November 21st 2025, a known issue was discovered that causes Elastic Agent to become unhealthy when a list parameter is specified as a string. Examples for the `hosts` and `ssl.certificate_authorities` parameters follow:
 
 `Otel manager failed: failed to generate otel config: error translating config for output: monitoring, unit: http/metrics-monitoring, error: failed decoding config. decoding failed due to the following error(s): 'hosts' source data must be an array or slice, got string`
 
-This occurs when the `hosts` parameter of an Elasticsearch output that is set as the monitoring output is defined as a string instead of a list:
+`OTel manager failed: failed to generate otel config: error translating config for output: monitoring, unit: filestream-monitoring, error: failed decoding config. decoding failed due to the following error(s): 'ssl.certificate_authorities' source data must be an array or slice, got string`
+
+This occurs when the parameter of an Elasticsearch output that is set as the monitoring output is defined as a string instead of a list:
 
 ```yaml callouts=false
 output.elasticsearch:
   hosts: "https://myEShost:9200" # string instead of list
+  ssl.certificate_authorities: "/tmp/ca.pem" # string instead of list
 ```
 
-For more information, check [#11352](https://github.com/elastic/elastic-agent/issues/11352).
 
 **Workaround**
 
-Affected users can change the `hosts` configuration from a string to a list:
+Affected users can change the affected parameter from a string to a list:
 
 ```yaml callouts=false
 output.elasticsearch:
   hosts: ["https://myEShost:9200"] # list/array instead of string
+  ssl.certificate_authorities: ["/tmp/ca.pem"] # list/array instead of string
 ```
 
-The fix will be included in version 9.2.2, which restores support for both the string and list formats of the `hosts` parameter.
+The fix for the `hosts` parameter was included in version 9.2.2, which restores support for both the string and list formats of the `hosts` parameter.
+
+A general fix for the remaining parameters will be included in an upcoming patch release. See [Issue #11352](https://github.com/elastic/elastic-agent/issues/11352).
 :::
 
 :::{dropdown} Elastic Agent becomes unhealthy with a host URL parsing error related to the Prometheus collector metricset
