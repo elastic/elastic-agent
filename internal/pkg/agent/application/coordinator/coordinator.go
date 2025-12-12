@@ -2025,10 +2025,6 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	// Filter any disallowed inputs/outputs from the components
 	comps = c.filterByCapabilities(comps)
 
-	// Detect if the same service components are in the last and current component
-	// models and, if so, preserve their IDs to prevent unnecessary restarts.
-	c.checkForSameServiceComponents(comps)
-
 	// If we made it this far, update our internal derived values and
 	// return with no error
 	c.derivedConfig = cfg
@@ -2039,30 +2035,6 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	c.checkAndLogUpdate(lastComponentModel)
 
 	return nil
-}
-
-// checkForSameServiceComponents compares service components in the last component model (c.componentModel) with those in
-// the current component model (comps).  If it finds that the same service component exists in both, it preserves that
-// component's ID. This ensures that the component will not be unnecessarily restarted, while still letting it receive
-// a configuration change (e.g.. change of output).
-func (c *Coordinator) checkForSameServiceComponents(comps []component.Component) {
-	serviceRuntimeCompInputTypeToIdMap := map[string]string{}
-	for _, comp := range c.componentModel {
-		if comp.UsesServiceRuntime() {
-			serviceRuntimeCompInputTypeToIdMap[comp.InputType] = comp.ID
-		}
-	}
-	for id, comp := range comps {
-		if comp.UsesServiceRuntime() {
-			if lastCompID, exists := serviceRuntimeCompInputTypeToIdMap[comp.InputType]; exists {
-				// The service component is present in both, the last component model (c.componentModel) and the
-				// current component model (comps).  Ensure we use the new component definition but with the old
-				// component ID. This will ensure the component is not unnecessarily restarted, while still letting
-				// it receive a configuration change (e.g.. change of output).
-				comps[id].ID = lastCompID
-			}
-		}
-	}
 }
 
 // compares the last component model with an updated model,
