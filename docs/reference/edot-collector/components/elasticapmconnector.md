@@ -136,6 +136,57 @@ Be aware of these constraints and behaviors when using the Elastic {{product.apm
 * **Minimal configuration options**: Unlike some connectors, the Elastic {{product.apm}} connector operates with mostly fixed behavior and offers few configuration parameters. While this simplifies setup, it also means you have limited ability to customize the aggregation logic.
 
 
+## Troubleshooting
+
+Read the following sections to troubleshoot issues with the Elastic {{product.apm}} connector.
+
+:::{dropdown} Storage spikes from high-cardinality data
+If you detect unexpected spikes in storage usage for {{product.apm}} metrics, high-cardinality data is often the cause. The connector aggregates metrics across multiple time intervals, and the volume of aggregated metrics is directly proportional to the cardinality of your data. The more unique combinations of service names, transaction names, and other dimensions, the more metric documents are produced.
+
+High cardinality in aggregations often points to an instrumentation issue, such as a field with many unique values that shouldn't vary. For example, including user IDs or request IDs in transaction names.
+
+#### Solution
+
+To limit the cardinality of aggregations and reduce storage usage, you can configure limits lower than the defaults. The connector supports four cardinality limits:
+
+| Limit | Description | Default |
+|-------|-------------|---------|
+| `resource` | Maximum cardinality of resources | 8000 |
+| `scope` | Maximum cardinality of scopes within a resource | 4000 |
+| `metric` | Maximum cardinality of metrics within a scope | 4000 |
+| `datapoint` | Maximum cardinality of datapoints within a metric | 4000 |
+
+Here's an example configuration that halves all the default cardinality limits:
+
+```yaml
+connectors:
+  elasticapm:
+    aggregation:
+      limits:
+        resource:
+          max_cardinality: 4000
+        scope:
+          max_cardinality: 2000
+        metric:
+          max_cardinality: 2000
+        datapoint:
+          max_cardinality: 2000
+```
+
+When configured limits are reached, additional metrics are placed into a separate overflow bucket. This bounds the resources consumed, but if overflow occurs frequently, it usually indicates an instrumentation problem that should be addressed at the source.
+
+#### Detecting overflow
+
+To check if overflow is occurring, look for overflow-related log messages from the connector. Frequent overflow events suggest that your cardinality limits are being exceeded regularly, which might affect the completeness of your {{product.apm}} metrics.
+
+If overflow is happening consistently, consider:
+
+1. Investigating the source of high-cardinality data and fixing the instrumentation.
+2. Lowering the `max_cardinality` settings as a temporary measure to bound resource usage.
+
+Lowering cardinality limits should be a last resort after confirming that high cardinality is expected for your use case and cannot be reduced through better instrumentation practices.
+:::
+
 ## Resources
 
 * [Contrib component: elasticapmconnector](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector)

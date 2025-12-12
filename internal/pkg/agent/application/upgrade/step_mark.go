@@ -14,6 +14,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -21,13 +22,6 @@ import (
 )
 
 const markerFilename = ".update-marker"
-
-// TTLMarker marks an elastic-agent install available for rollback
-type TTLMarker struct {
-	Version    string    `json:"version" yaml:"version"`
-	Hash       string    `json:"hash" yaml:"hash"`
-	ValidUntil time.Time `json:"valid_until" yaml:"valid_until"`
-}
 
 // UpdateMarker is a marker holding necessary information about ongoing upgrade.
 type UpdateMarker struct {
@@ -54,7 +48,7 @@ type UpdateMarker struct {
 
 	Details *details.Details `json:"details,omitempty" yaml:"details,omitempty"`
 
-	RollbacksAvailable map[string]TTLMarker `json:"rollbacks_available,omitempty" yaml:"rollbacks_available,omitempty"`
+	RollbacksAvailable map[string]ttl.TTLMarker `json:"rollbacks_available,omitempty" yaml:"rollbacks_available,omitempty"`
 }
 
 // GetActionID returns the Fleet Action ID associated with the
@@ -101,17 +95,17 @@ func convertToActionUpgrade(a *MarkerActionUpgrade) *fleetapi.ActionUpgrade {
 }
 
 type updateMarkerSerializer struct {
-	Version            string               `yaml:"version"`
-	Hash               string               `yaml:"hash"`
-	VersionedHome      string               `yaml:"versioned_home"`
-	UpdatedOn          time.Time            `yaml:"updated_on"`
-	PrevVersion        string               `yaml:"prev_version"`
-	PrevHash           string               `yaml:"prev_hash"`
-	PrevVersionedHome  string               `yaml:"prev_versioned_home"`
-	Acked              bool                 `yaml:"acked"`
-	Action             *MarkerActionUpgrade `yaml:"action"`
-	Details            *details.Details     `yaml:"details"`
-	RollbacksAvailable map[string]TTLMarker `yaml:"rollbacks_available,omitempty"`
+	Version            string                   `yaml:"version"`
+	Hash               string                   `yaml:"hash"`
+	VersionedHome      string                   `yaml:"versioned_home"`
+	UpdatedOn          time.Time                `yaml:"updated_on"`
+	PrevVersion        string                   `yaml:"prev_version"`
+	PrevHash           string                   `yaml:"prev_hash"`
+	PrevVersionedHome  string                   `yaml:"prev_versioned_home"`
+	Acked              bool                     `yaml:"acked"`
+	Action             *MarkerActionUpgrade     `yaml:"action"`
+	Details            *details.Details         `yaml:"details"`
+	RollbacksAvailable map[string]ttl.TTLMarker `yaml:"rollbacks_available,omitempty"`
 }
 
 func newMarkerSerializer(m *UpdateMarker) *updateMarkerSerializer {
@@ -141,7 +135,7 @@ type updateActiveCommitFunc func(log *logger.Logger, topDirPath, hash string, wr
 
 // markUpgrade marks update happened so we can handle grace period
 func markUpgradeProvider(updateActiveCommit updateActiveCommitFunc, writeFile writeFileFunc) markUpgradeFunc {
-	return func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]TTLMarker) error {
+	return func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error {
 
 		if len(previousAgent.hash) > HashLen {
 			previousAgent.hash = previousAgent.hash[:HashLen]
