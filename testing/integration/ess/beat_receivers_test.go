@@ -1610,6 +1610,9 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 				"monitoring": map[string]any{
 					"_runtime_experimental": "process",
 				},
+				"logging": map[string]any{
+					"level": "debug",
+				},
 			},
 		},
 	}
@@ -1696,6 +1699,9 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 			"agent": map[string]any{
 				"monitoring": map[string]any{
 					"_runtime_experimental": "otel",
+				},
+				"logging": map[string]any{
+					"level": "debug",
 				},
 			},
 		},
