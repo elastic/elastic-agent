@@ -396,16 +396,6 @@ func (c *Component) RemoveWorkDir(parentDirPath string) error {
 	return os.RemoveAll(c.WorkDirPath(parentDirPath))
 }
 
-// UsesCommandRuntime returns true if the component uses the command runtime
-func (c *Component) UsesCommandRuntime() bool {
-	return c.InputSpec != nil && c.InputSpec.Spec.Command != nil
-}
-
-// UsesServiceRuntime returns true if the component uses the service runtime
-func (c *Component) UsesServiceRuntime() bool {
-	return c.InputSpec != nil && c.InputSpec.Spec.Service != nil
-}
-
 // ComponentsModifier is a function that takes the computed components model and modifies it before
 // passing it into the components runtime manager.
 type ComponentsModifier func(comps []Component, cfg map[string]interface{}) ([]Component, error)
