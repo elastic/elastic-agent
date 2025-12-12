@@ -47,12 +47,10 @@ description: >-
     - "system/metrics"
     - "vsphere/metrics"
 
-  This may result in a reduction of resources since fewer agentbeat
+  This will result in a memory reduction since fewer agentbeat
   processes are started, because the otel runtime runs within the
   collector process.  If the policy is not compatible with the otel
-  runtime, it will fall back to the process runtime.  This behavior
-  can be overridden with the `agent.internal.runtime.metricbeat`
-  policy option.
+  runtime, it will fall back to the process runtime.
 
 
 # REQUIRED for breaking-change, deprecation, known-issue
