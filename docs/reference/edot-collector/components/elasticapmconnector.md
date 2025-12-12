@@ -147,7 +147,7 @@ High cardinality in aggregations often points to an instrumentation issue, such 
 
 #### Solution
 
-To limit the cardinality of aggregations and reduce storage usage, you can configure lower limits than the defaults. The connector supports four cardinality limits:
+To limit the cardinality of aggregations and reduce storage usage, you can configure limits lower than the defaults. The connector supports four cardinality limits:
 
 | Limit | Description | Default |
 |-------|-------------|---------|
