@@ -549,7 +549,10 @@ func (r *RuntimeSpecs) componentsForInputType(
 	if componentErr != nil || !inputSpec.Spec.IsolateUnits {
 		// Components are generally identified by their input type and output name. However, for
 		// Service Runtime components, there can only ever be a single instance of the component running,
-		// as a service. So we identify these only by their input type.
+		// as a service. So we identify these only by their input type. This way, if the output for a service
+		// component were to change, it would not result in a different ID for that component. By keeping the same
+		// ID, we prevent the component from being identified as a new one and the corresponding service from being
+		// unnecessarily stopped and started.
 		componentID := fmt.Sprintf("%s-%s", inputType, output.Name)
 		if inputSpec.Spec.Service != nil {
 			componentID = inputType
@@ -599,9 +602,12 @@ func (r *RuntimeSpecs) componentsForInputType(
 	} else {
 		for _, input := range output.Inputs[inputType] {
 			// Units are being mapped to components, so we need a unique ID for each.
-			// Components are generally identified by their input type, output name, and input ID. However, for
+			// Components are generally identified by their input type and output name. However, for
 			// Service Runtime components, there can only ever be a single instance of the component running,
-			// as a service. So we identify these only by their input type and input ID.
+			// as a service. So we identify these only by their input type. This way, if the output for a service
+			// component were to change, it would not result in a different ID for that component. By keeping the same
+			// ID, we prevent the component from being identified as a new one and the corresponding service from being
+			// unnecessarily stopped and started.
 			componentID := fmt.Sprintf("%s-%s-%s", inputType, output.Name, input.id)
 			if inputSpec.Spec.Service != nil {
 				componentID = fmt.Sprintf("%s-%s", inputType, input.id)
