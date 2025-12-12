@@ -267,7 +267,8 @@ type ActionUpgradeData struct {
 	Version   string `json:"version" yaml:"version,omitempty" mapstructure:"-"`
 	SourceURI string `json:"source_uri,omitempty" yaml:"source_uri,omitempty" mapstructure:"-"`
 	// TODO: update fleet open api schema
-	Retry int `json:"retry_attempt,omitempty" yaml:"retry_attempt,omitempty" mapstructure:"-"`
+	Retry    int  `json:"retry_attempt,omitempty" yaml:"retry_attempt,omitempty" mapstructure:"-"`
+	Rollback bool `json:"rollback,omitempty" yaml:"rollback,omitempty" mapstructure:"-"`
 }
 
 func (a *ActionUpgrade) String() string {
