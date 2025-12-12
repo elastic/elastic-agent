@@ -102,7 +102,7 @@ require (
 	go.opentelemetry.io/collector/exporter v1.45.0 // indirect
 	go.opentelemetry.io/collector/extension v1.45.0
 	go.opentelemetry.io/collector/featuregate v1.45.0 // indirect
-	go.opentelemetry.io/collector/otelcol v0.139.0 // indirect
+	go.opentelemetry.io/collector/otelcol v0.139.0
 	go.opentelemetry.io/collector/processor v1.45.0 // indirect
 	go.opentelemetry.io/collector/receiver v1.45.0 // indirect
 )
