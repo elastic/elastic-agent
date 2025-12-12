@@ -469,13 +469,15 @@ func runElasticAgent(
 	}()
 
 	wg := new(sync.WaitGroup)
+	additionalGoroutinesContext, cancelAdditionalGoroutines := context.WithCancel(ctx)
+	defer cancelAdditionalGoroutines()
 	// Spawn the rollbacks cleanup goroutine
 	relativeHomePath, homePathErr := filepath.Rel(paths.Top(), paths.Home())
 	if homePathErr == nil {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			upgrade.PeriodicallyCleanRollbacks(ctx, l, paths.Top(), relativeHomePath, availableRollbacksSource, cfg.Settings.Upgrade.Rollback.CleanupInterval)
+			upgrade.PeriodicallyCleanRollbacks(additionalGoroutinesContext, l, paths.Top(), relativeHomePath, availableRollbacksSource, cfg.Settings.Upgrade.Rollback.CleanupInterval)
 		}()
 	} else {
 		l.Warnw("Error calculating relative path for versioned home. Rollback cleanup will not be scheduled ", "topPath", paths.Top(), "homePath", paths.Home(), "error", homePathErr)
@@ -491,15 +493,18 @@ LOOP:
 		select {
 		case <-stop:
 			l.Info("service.ProcessWindowsControlEvents invoked stop function. Shutting down")
+			cancelAdditionalGoroutines()
 			break LOOP
 		case <-appDone:
 			l.Info("application done, coordinator exited")
 			logShutdown = false
+			cancelAdditionalGoroutines()
 			break LOOP
 		case <-rex.ShutdownChan():
 			l.Info("reexec shutdown channel triggered")
 			isRex = true
 			logShutdown = false
+			cancelAdditionalGoroutines()
 			break LOOP
 		case sig := <-signals:
 			l.Infof("signal %q received", sig)
@@ -508,6 +513,7 @@ LOOP:
 				isRex = true
 				rex.ReExec(nil)
 			} else {
+				cancelAdditionalGoroutines()
 				break LOOP
 			}
 		}
