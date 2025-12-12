@@ -60,31 +60,31 @@ var (
 	}
 
 	OtelSupportedMetricbeatInputTypes = []string{
-		"activemq/metrics",      // activemq
-		"apache/metrics",        // apache
-		"beat/metrics",          // monitoring
-		"containerd/metrics",    // containerd
-		"docker/metrics",        // docker
-		"elasticsearch/metrics", // elasticsearch
-		"etcd/metrics",          // etcd
-		"http/metrics",          // monitoring, couchbase, couchdb, hadoop, kibana
-		"jolokia/metrics",       // apache_spark, casandra, kafka, spring_boot
-		"kafka/metrics",         // kafka
-		"kibana/metrics",        // kibana
-		"linux/metrics",         // linux
-		"logstash/metrics",      // logstash
-		"memcached/metrics",     // memcached
-		"mongodb/metrics",       // mongodb
-		"mysql/metrics",         // mysql
-		"nats/metrics",          // nats
-		"nginx/metrics",         // nginx
-		"prometheus/metrics",    // monitoring, apache_tomcat, cockroachdb, couchbase, elastic_package_registry, etcd, hashicorp_vault, ibmmq, influxdb, istio, prometheus, websphere_application_server
-		"rabbitmq/metrics",      // rabbitmq
-		"sql/metrics",           // microsoft_sqlserver, mysql
-		"stan/metrics",          // stan
-		"statsd/metrics",        // airflow, envoyproxy
-		"system/metrics",        // monitoring, linux
-		"vsphere/metrics",       // vsphere
+		"activemq/metrics",
+		"apache/metrics",
+		"beat/metrics",
+		"containerd/metrics",
+		"docker/metrics",
+		"elasticsearch/metrics",
+		"etcd/metrics",
+		"http/metrics",
+		"jolokia/metrics",
+		"kafka/metrics",
+		"kibana/metrics",
+		"linux/metrics",
+		"logstash/metrics",
+		"memcached/metrics",
+		"mongodb/metrics",
+		"mysql/metrics",
+		"nats/metrics",
+		"nginx/metrics",
+		"prometheus/metrics",
+		"rabbitmq/metrics",
+		"sql/metrics",
+		"stan/metrics",
+		"statsd/metrics",
+		"system/metrics",
+		"vsphere/metrics",
 	}
 	OtelSupportedInputTypes          = slices.Concat(OtelSupportedFilebeatInputTypes, OtelSupportedMetricbeatInputTypes)
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
