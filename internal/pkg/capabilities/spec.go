@@ -13,9 +13,10 @@ import (
 // capabilitiesList deserializes a YAML list of capabilities into organized
 // arrays based on their type, for easy use by capabilitiesManager.
 type capabilitiesList struct {
-	inputChecks   []*stringMatcher
-	outputChecks  []*stringMatcher
-	upgradeChecks []*upgradeCapability
+	inputChecks         []*stringMatcher
+	outputChecks        []*stringMatcher
+	upgradeChecks       []*upgradeCapability
+	fleetOverrideChecks []*fleetOverrideCapability
 }
 
 // a type for capability values that must equal "allow" or "deny", enforced
@@ -81,6 +82,15 @@ func (r *capabilitiesList) UnmarshalYAML(unmarshal func(interface{}) error) erro
 				return err
 			}
 			r.upgradeChecks = append(r.upgradeChecks, cap)
+		} else if _, found = mm["fleet_override"]; found {
+			spec := struct {
+				Type allowOrDeny `yaml:"rule"`
+			}{}
+			if err := yaml.Unmarshal(partialYaml, &spec); err != nil {
+				return err
+			}
+			cap := newFleetOverrideCapability(spec.Type)
+			r.fleetOverrideChecks = append(r.fleetOverrideChecks, cap)
 		} else {
 			return fmt.Errorf("unexpected capability type for definition number '%d'", i)
 		}
