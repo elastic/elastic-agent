@@ -775,9 +775,14 @@
                         "ESPlainAuthAPI",
                         "ESSecretAuthBasic",
                         "ESSecretAuthAPI",
-                        "ESECKRef"
+                        "ESECKRef",
+                        "Logstash"
                     ],
                     "description": "Type of the output."
+                },
+                "hosts": {
+                    "type": "array",
+                    "description": "hosts of the output (required for Logstash type)."
                 },
                 "url": {
                     "type": "string",
@@ -812,6 +817,101 @@
                 },
                 "ssl": {
                     "$ref": "#/definitions/SSLConfigClient"
+                },
+                "loadbalance": {
+                    "type": "boolean",
+                    "description": "If true and multiple Logstash hosts are configured, the output plugin load balances published events onto all Logstash hosts. If false, the output plugin sends all events to one host (determined at random) and switches to another host if the selected one becomes unresponsive.",
+                    "examples": [ true, false ]
+                },
+                "ttl": {
+                    "type": "string",
+                    "description": "Time to live for a connection to Logstash after which the connection will be reestablished. This setting is useful when Logstash hosts represent load balancers. Because connections to Logstash hosts are sticky, operating behind load balancers can lead to uneven load distribution across instances. Specify a TTL on the connection to achieve equal connection distribution across instances.",
+                    "examples": [ "30s" ]
+                },
+                "slow_start": {
+                    "type": "boolean",
+                    "description": "If true, only a subset of events in a batch of events is transferred per transaction. The number of events to be sent increases up to bulk_max_size if no error is encountered. On error, the number of events per transaction is reduced again.",
+                    "examples": [ false, true ]
+                },
+                "pipelining": {
+                    "type": "integer",
+                    "description": "The number of batches to send asynchronously to Logstash while waiting for an ACK from Logstash. The output becomes blocking after the specified number of batches are written. Specify 0 to turn off pipelining.",
+                    "examples": [ 0, 2 ]
+                },               
+                "workers": {
+                    "type": "integer",
+                    "description": "Workers used to publish events. If using Elasticsearch the Custom preset must be set to use this",
+                    "examples": [ 1, 2 ]
+                },
+                "timeout": {
+                    "type": "string",
+                    "description": "The HTTP request timeout in seconds for the output request. If using Elasticsearch the Custom preset must be set to use this",
+                    "examples": [ "90s", "30s" ]
+                },
+                "queue": {
+                    "type": "object",
+                    "properties": {
+                        "mem": {
+                            "type": "object",
+                            "properties": {
+                                "flush": {
+                                    "type": "object",
+                                    "properties": {
+                                        "timeout": {
+                                            "type": "string",
+                                            "description": "The maximum wait time for queue.mem.flush.min_events to be fulfilled. If set to 0s, events are available to the output immediately. If using Elasticsearch the Custom preset must be set to use this",
+                                            "examples": [ "10s", "30s" ]
+                                        },
+                                        "min_events": {
+                                            "type": "integer",
+                                            "description": "flush.min_events is a legacy parameter, and new configurations should prefer to control batch size with bulk_max_size. As of 8.13, there is never a performance advantage to limiting batch size with flush.min_events instead of bulk_max_size. If using Elasticsearch the Custom preset must be set to use this",
+                                            "examples": [ 3200, 1600 ]   
+                                        }
+                                    }
+                                },
+                                "events": {
+                                    "type": "integer",
+                                    "description": "The number of events the queue can store. This value should be evenly divisible by the smaller of queue.mem.flush.min_events or bulk_max_size to avoid sending partial batches to the output. If using Elasticsearch the Custom preset must be set to use this",
+                                    "examples": [ 3200, 1600 ]  
+                                }
+                            }
+                        }
+                    }
+                },
+                "max_retries": {
+                    "type": "integer",
+                    "description": " The number of times to retry publishing an event after a publishing failure. After the specified number of retries, the events are typically dropped. Set max_retries to a value less than 0 to retry until all events are published. If using Elasticsearch the Custom preset must be set to use this",
+                    "examples": [ 3, 5 ]
+                },
+                "compression_level": {
+                    "type": "integer",
+                    "description": " The gzip compression level. Set this value to 0 to disable compression. The compression level must be in the range of 1 (best speed) to 9 (best compression). Increasing the compression level reduces network usage but increases CPU usage. If using Elasticsearch the Custom preset must be set to use this",
+                    "examples": [ 3, 5 ]
+                },
+                "bulk_max_size": {
+                    "type": "integer",
+                    "description": "The maximum number of events to bulk in a single Elasticsearch bulk API index request. Events can be collected into batches. Elastic Agent will split batches larger than bulk_max_size into multiple batches. Specifying a larger batch size can improve performance by lowering the overhead of sending events. However big batch sizes can also increase processing times, which might result in API errors, killed connections, timed-out publishing requests, and, ultimately, lower throughput. Setting bulk_max_size to values less than or equal to 0 turns off the splitting of batches. When splitting is disabled, the queue decides on the number of events to be contained in a batch. If using Elasticsearch the Custom preset must be set to use this",
+                    "examples": [ 3200, 1600 ]
+                },
+                "backoff": {
+                    "type": "object",
+                    "properties": {
+                        "max": {
+                            "type": "string",
+                            "description": "The maximum number of seconds to wait before attempting to connect to Elasticsearch after a network error. If using Elasticsearch the Custom preset must be set to use this",
+                            "examples": [ "30s", "60s" ]
+                        },
+                        "init": {
+                            "type": "string",
+                            "description": "The number of seconds to wait before trying to reconnect to Elasticsearch after a network error. After waiting backoff.init seconds, Elastic Agent tries to reconnect. If the attempt fails, the backoff timer is increased exponentially up to backoff.max. After a successful connection, the backoff timer is reset. If using Elasticsearch the Custom preset must be set to use this",
+                            "examples": [ "1s", "5s" ]                           
+                        }
+                    }
+                },
+                "allow_older_versions": {
+                    "type": "boolean",
+                    "description": "Allow Elastic Agent to connect and send output to an Elasticsearch instance that is running an earlier version than the agent version. Note that this setting does not affect Elastic Agent's ability to connect to Fleet Server. Fleet Server will not accept a connection from an agent at a later major or minor version. It will accept a connection from an agent at a later patch version. For example, an Elastic Agent at version 8.14.3 can connect to a Fleet Server on version 8.14.0, but an agent at version 8.15.0 or later is not able to connect. If using Elasticsearch the Custom preset must be set to use this",
+                    "examples": [ true, false ]
                 }
             },
             "required": [
@@ -935,18 +1035,173 @@
                             "name"
                         ]
                     }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "Logstash"
+                            }
+                        }
+                    },
+                    "then": {
+                        "properties": {
+                            "enabled": {
+                                "type": "boolean",
+                                "description": "Enabled or disables the output. If set to false the output is disabled"
+                            },
+                            "hosts": {
+                                "type": "array"
+                            },
+                            "escape_html": {
+                                "type": "boolean",
+                                "description": "Configures escaping of HTML in strings. Set to true to enable escaping."
+                            },
+                            "proxy_url": {
+                                "type": "string",
+                                "description": "The URL of the SOCKS5 proxy to use when connecting to the Logstash servers. The value must be a URL with a scheme of socks5://",
+                                "examples": [
+                                    "socks5://user:password@socks5-proxy:2233",
+                                    "socks5://socks5-proxy:2233"
+                                ]
+                            },
+                            "proxy_use_local_resolver": {
+                                "type": "boolean",
+                                "description": "Determines whether Logstash hostnames are resolved locally when using a proxy. If false and a proxy is used, name resolution occurs on the proxy server."
+                            },
+                            "loadbalance": {
+                                "type": "boolean",
+                                "description": "If true and multiple Logstash hosts are configured, the output plugin load balances published events onto all Logstash hosts. If false, the output plugin sends all events to one host (determined at random) and switches to another host if the selected one becomes unresponsive.",
+                                "examples": [
+                                    true,
+                                    false
+                                ]
+                            },
+                            "ttl": {
+                                "type": "string",
+                                "description": "Time to live for a connection to Logstash after which the connection will be reestablished. This setting is useful when Logstash hosts represent load balancers. Because connections to Logstash hosts are sticky, operating behind load balancers can lead to uneven load distribution across instances. Specify a TTL on the connection to achieve equal connection distribution across instances.",
+                                "examples": [
+                                    "30s"
+                                ]
+                            },
+                            "slow_start": {
+                                "type": "boolean",
+                                "description": "If true, only a subset of events in a batch of events is transferred per transaction. The number of events to be sent increases up to bulk_max_size if no error is encountered. On error, the number of events per transaction is reduced again.",
+                                "examples": [
+                                    false,
+                                    true
+                                ]
+                            },
+                            "pipelining": {
+                                "type": "integer",
+                                "description": "The number of batches to send asynchronously to Logstash while waiting for an ACK from Logstash. The output becomes blocking after the specified number of batches are written. Specify 0 to turn off pipelining.",
+                                "examples": [
+                                    0,
+                                    2
+                                ]
+                            },
+                            "workers": {
+                                "type": "integer"
+                            },
+                            "timeout": {
+                                "type": "string"
+                            },
+                            "queue": {
+                                "type": "object",
+                                "properties": {
+                                    "mem": {
+                                        "type": "object",
+                                        "properties": {
+                                            "flush": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "timeout": {
+                                                        "type": "string"
+                                                    },
+                                                    "min_events": {
+                                                        "type": "integer"
+                                                    }
+                                                }
+                                            },
+                                            "events": {
+                                                "type": "integer"
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "max_retries": {
+                                "type": "integer"
+                            },
+                            "compression_level": {
+                                "type": "integer"
+                            },
+                            "bulk_max_size": {
+                                "type": "integer"
+                            },
+                            "backoff": {
+                                "type": "object",
+                                "properties": {
+                                    "max": {
+                                        "type": "string"
+                                    },
+                                    "init": {
+                                        "type": "string"                      
+                                    }
+                                }
+                            },
+                            "allow_older_versions": {
+                                "type": "boolean"
+                            },
+                            "ssl": {
+                                "$ref": "#/definitions/SSLConfigClient"
+                            }
+                        },
+                        "required": [
+                            "hosts"
+                        ]
+                    }
                 }
             ]
         },
         "SSLConfigClient": {
             "type": "object",
             "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Enables or disables the SSL configuration.",
+                    "examples": [true, false]
+                },
                 "certificateAuthorities": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/ValueFrom"
                     },
                     "description": "The list of root certificates for verifications (required). If certificate_authorities is empty or not set, the system keystore is used. If certificate_authorities is self-signed, the host system needs to trust that CA cert as well."
+                },
+                "certificate": {
+                    "type": "object",
+                    "$ref": "#/definitions/ValueFrom",
+                    "description": "The certificates for mtls verifications(Logstash Only)."
+                },
+                "key": {
+                    "type": "object",
+                    "$ref": "#/definitions/ValueFrom",
+                    "description": "The key for mtls verifications(Logstash Only)."
+                },
+                "key_passphrase": {
+                    "type": "object",
+                    "$ref": "#/definitions/ValueFrom",
+                    "description": "The key passphrase for mtls verifications(Logstash Only)."
+                },
+                "renegotiation": {
+                    "type": "string",
+                    "description": "Configures the type of TLS renegotiation to support.",
+                    "enum": [
+                      "never",
+                      "once",
+                      "freely"
+                  ]
                 },
                 "verificationMode": {
                     "type": "string",
@@ -958,6 +1213,34 @@
                       "certificate",
                       "none"
                   ]
+                },
+                "client_authentication": {
+                    "type": "string",
+                    "description": "Configures client authentication.",
+                    "enum": [
+                      "none",
+                      "optional",
+                      "required"
+                  ]
+                },
+                "cipher_suites": {
+                    "type": "array",
+                    "description": "The list of cipher suites to use. The first entry has the highest priority. If this option is omitted, the Go crypto library’s default suites are used (recommended). Note that TLS 1.3 cipher suites are not individually configurable in Go, so they are not included in this list.",
+                    "examples": [["ECDHE-ECDSA-AES-128-CBC-SHA", "ECDHE-ECDSA-AES-256-CBC-SHA"]]
+                },
+                "curve_types": {
+                    "type": "array",
+                    "description": "The list of curve types for ECDHE (Elliptic Curve Diffie-Hellman ephemeral key exchange).",
+                    "examples": [["P-256", "P-384"]]
+                },
+                "supported_protocols": {
+                    "type": "array",
+                    "description": "List of allowed SSL/TLS versions. If the SSL/TLS server supports none of the specified versions, the connection will be dropped during or after the handshake. The list of allowed protocol versions include: TLSv1.1, TLSv1.2, and TLSv1.3.",
+                    "examples": [["TLSv1.2", "TLSv1.3"]]
+                },
+                "ca_sha256": {
+                    "type": "string",
+                    "description": "This configures a certificate pin that you can use to ensure that a specific certificate is part of the verified chain."
                 },
                 "caTrustedFingerprint": {
                     "type": "string",
