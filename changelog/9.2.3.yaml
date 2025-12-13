@@ -1,0 +1,66 @@
+version: 9.2.3
+entries:
+    - kind: feature
+      summary: Add windowseventlogreceiver to EDOT
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11418
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1764082001
+      file:
+        name: 1764082001-add-winperf.yaml
+        checksum: 0cf5a4ba0e0834b4fd63cc5637f3d3a34f430a0a
+    - kind: feature
+      summary: Enable cpu and disk hostmetrics scrapers for Darwin configurations
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11718
+        - https://github.com/elastic/elastic-agent/pull/11757
+        - https://github.com/elastic/elastic-agent/pull/11758
+        - https://github.com/elastic/elastic-agent/pull/11719
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/11714
+      impact: ""
+      action: ""
+      timestamp: 1764087321
+      file:
+        name: 1764087321-enable_darwin_cpu_disk_scrapers.yaml
+        checksum: 97a8e7536d0275d4fbe7993c47e868354f42b4e1
+    - kind: bug-fix
+      summary: Add environment.yaml file to diagnostics
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11718
+        - https://github.com/elastic/elastic-agent/pull/11757
+        - https://github.com/elastic/elastic-agent/pull/11758
+        - https://github.com/elastic/elastic-agent/pull/11719
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/10966
+      impact: ""
+      action: ""
+      timestamp: 1764357992
+      file:
+        name: 1764357992-Add-environment.yml-file-to-diagnostics.yaml
+        checksum: 32d02808ffe0d86635f1fae1998146da5518e734
+    - kind: bug-fix
+      summary: Merge multiple agent keys when loading config
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11718
+        - https://github.com/elastic/elastic-agent/pull/11757
+        - https://github.com/elastic/elastic-agent/pull/11758
+        - https://github.com/elastic/elastic-agent/pull/11719
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3717
+      impact: ""
+      action: ""
+      timestamp: 1764873750
+      file:
+        name: 1764873750-Merge-multiple-agent-keys-when-loading-config.yaml
+        checksum: bd5fdb1aff142e76b888cafd9b3fe171fe7657a2
