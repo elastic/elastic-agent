@@ -1,0 +1,74 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+env:
+  VERSION: ${BUILDKITE_COMMIT:0:12}
+steps:
+  - agents:
+      diskSizeGb: 400
+      machineType: c2-standard-16
+      provider: gcp
+    artifact_paths:
+      - build/distributions/elastic-agent-service-git-*.docker.tar.gz
+    command: .buildkite/scripts/steps/integration-package.sh
+    env:
+      DOCKER_VARIANTS: service
+      PACKAGES: docker
+      PLATFORMS: linux/amd64
+    key: packaging-service-container-amd64
+    label: "Packaging: Service Container linux/amd64"
+  - agents:
+      diskSizeGb: 400
+      imagePrefix: core-ubuntu-2204-aarch64
+      instanceType: t4g.2xlarge
+      provider: aws
+    artifact_paths:
+      - build/distributions/elastic-agent-service-git-*.docker.tar.gz
+    command: .buildkite/scripts/steps/integration-package.sh
+    env:
+      DOCKER_VARIANTS: service
+      PACKAGES: docker
+      PLATFORMS: linux/arm64
+    key: packaging-service-container-arm64
+    label: "Packaging: Service Container linux/arm64"
+  - wait: ""
+  - agents:
+      machineType: c2-standard-16
+      provider: gcp
+    command: .buildkite/scripts/steps/ecp-internal-release.sh
+    key: mirror-elastic-agent
+    label: Publish to internal registry
+    plugins:
+      - elastic/vault-docker-login#v0.5.2:
+          secret_path: kv/ci-shared/platform-ingest/elastic_docker_registry
+  - wait: ""
+  - agents:
+      image: docker.elastic.co/ci-agent-images/observability/oci-image-tools-agent:latest@sha256:a4ababd1347111759babc05c9ad5a680f4af48892784951358488b7e7fc94af9
+    command: .buildkite/scripts/steps/validate-agentless-docker-image.sh
+    env:
+      SERVICE_VERSION: ${VERSION}
+    label: ":docker: Validate docker image is built for all architectures"
+    plugins:
+      - elastic/vault-docker-login#v0.6.3:
+          secret_path: kv/ci-shared/platform-ingest/elastic_docker_registry
+  - wait: ""
+  - agents:
+      image: docker.elastic.co/ci-agent-images/serverless-helm-builder:0.0.2@sha256:d00e8a7a0ab3618cfaacb0a7b1e1b06ee29728eb2b44de602374bd8f6b9b92ac
+    command: |-
+      export COMMIT_HASH=$$(buildkite-agent meta-data get git-short-commit)
+      if [ $$(buildkite-agent step get "outcome" --step "mirror-elastic-agent") == "passed" ]; then
+          cat <<- YAML | buildkite-agent pipeline upload
+          steps:
+          - label: ":serverless::argo: Run synthetics tests and update agentless to $${COMMIT_HASH} in serverless-gitops"
+            async: true
+            branches: main
+            trigger: gpctl-promote-after-serverless-devenv-synthetics
+            build:
+              env:
+                SERVICE_COMMIT_HASH: $${COMMIT_HASH}
+                SERVICE: agentless
+                SYNTHETICS_PROJECT: "agentless"
+                SYNTHETICS_TAG: "agentless-ci"
+      YAML
+      fi
+    depends_on: mirror-elastic-agent
+    if: build.env("DRY_RUN") == null || build.env("DRY_RUN") == "false"
+    label: ":grey_question: Promote agentless app release if validation passes"

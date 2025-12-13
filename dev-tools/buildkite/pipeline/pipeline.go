@@ -8,9 +8,11 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 
 	"github.com/buildkite/buildkite-sdk/sdk/go/sdk/buildkite"
+	"gopkg.in/yaml.v3"
 )
 
 // Pipeline wraps the buildkite.Pipeline with additional helper methods.
@@ -183,4 +185,170 @@ func computeDiff(generated, expected string) string {
 	}
 
 	return diff.String()
+}
+
+// SemanticCompareResult contains the result of semantic comparison.
+type SemanticCompareResult struct {
+	Equal       bool
+	Differences []string
+	ParseError  error
+}
+
+// SemanticCompareWithFile compares a generated pipeline with an existing YAML file semantically.
+// This handles differences in comments, field ordering, and YAML anchor expansion.
+func SemanticCompareWithFile(p *Pipeline, path string) (*SemanticCompareResult, error) {
+	generated, err := p.MarshalYAML()
+	if err != nil {
+		return nil, fmt.Errorf("marshaling generated pipeline: %w", err)
+	}
+
+	expected, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading expected file %s: %w", path, err)
+	}
+
+	return SemanticCompare(generated, expected)
+}
+
+// SemanticCompare compares two YAML representations semantically by parsing them
+// into maps and comparing the data structures. This ignores comments, field ordering,
+// and handles YAML anchor expansion.
+func SemanticCompare(generated, expected []byte) (*SemanticCompareResult, error) {
+	result := &SemanticCompareResult{}
+
+	var genData, expData map[string]any
+	if err := yaml.Unmarshal(generated, &genData); err != nil {
+		result.ParseError = fmt.Errorf("parsing generated YAML: %w", err)
+		return result, nil
+	}
+	if err := yaml.Unmarshal(expected, &expData); err != nil {
+		result.ParseError = fmt.Errorf("parsing expected YAML: %w", err)
+		return result, nil
+	}
+
+	// Remove the 'common' key used for YAML anchors (not part of actual pipeline)
+	delete(expData, "common")
+
+	result.Differences = compareValues("", genData, expData)
+	result.Equal = len(result.Differences) == 0
+
+	return result, nil
+}
+
+// compareValues recursively compares two values and returns differences.
+func compareValues(path string, generated, expected any) []string {
+	var diffs []string
+
+	if generated == nil && expected == nil {
+		return nil
+	}
+
+	// Handle wait step equivalence: wait: ~ (null) == wait: "" (empty string)
+	if path == "wait" || strings.HasSuffix(path, ".wait") {
+		genStr, genIsStr := generated.(string)
+		if expected == nil && genIsStr && genStr == "" {
+			return nil
+		}
+		expStr, expIsStr := expected.(string)
+		if generated == nil && expIsStr && expStr == "" {
+			return nil
+		}
+	}
+
+	if generated == nil {
+		return []string{fmt.Sprintf("%s: missing in generated (expected: %v)", path, expected)}
+	}
+	if expected == nil {
+		return []string{fmt.Sprintf("%s: extra in generated (value: %v)", path, generated)}
+	}
+
+	// Normalize types for comparison
+	generated = normalizeValue(generated)
+	expected = normalizeValue(expected)
+
+	switch exp := expected.(type) {
+	case map[string]any:
+		gen, ok := generated.(map[string]any)
+		if !ok {
+			return []string{fmt.Sprintf("%s: type mismatch (generated: %T, expected: map)", path, generated)}
+		}
+		// Check all expected keys
+		for k, v := range exp {
+			newPath := k
+			if path != "" {
+				newPath = path + "." + k
+			}
+			diffs = append(diffs, compareValues(newPath, gen[k], v)...)
+		}
+		// Check for extra keys in generated
+		for k, v := range gen {
+			if _, exists := exp[k]; !exists {
+				newPath := k
+				if path != "" {
+					newPath = path + "." + k
+				}
+				diffs = append(diffs, fmt.Sprintf("%s: extra in generated (value: %v)", newPath, v))
+			}
+		}
+
+	case []any:
+		gen, ok := generated.([]any)
+		if !ok {
+			return []string{fmt.Sprintf("%s: type mismatch (generated: %T, expected: array)", path, generated)}
+		}
+		if len(gen) != len(exp) {
+			return []string{fmt.Sprintf("%s: array length mismatch (generated: %d, expected: %d)", path, len(gen), len(exp))}
+		}
+		for i := range exp {
+			newPath := fmt.Sprintf("%s[%d]", path, i)
+			diffs = append(diffs, compareValues(newPath, gen[i], exp[i])...)
+		}
+
+	default:
+		if !reflect.DeepEqual(generated, expected) {
+			return []string{fmt.Sprintf("%s: value mismatch (generated: %v, expected: %v)", path, generated, expected)}
+		}
+	}
+
+	return diffs
+}
+
+// normalizeValue normalizes values for comparison (e.g., int to int64, trim trailing newlines).
+func normalizeValue(v any) any {
+	switch val := v.(type) {
+	case string:
+		// Normalize trailing newlines (YAML block scalars add trailing newline)
+		return strings.TrimRight(val, "\n")
+	case int:
+		return int64(val)
+	case int32:
+		return int64(val)
+	case float64:
+		// YAML often parses integers as float64
+		if val == float64(int64(val)) {
+			return int64(val)
+		}
+		return val
+	case map[any]any:
+		// Convert map[any]any to map[string]any
+		result := make(map[string]any)
+		for k, v := range val {
+			result[fmt.Sprintf("%v", k)] = normalizeValue(v)
+		}
+		return result
+	case map[string]any:
+		result := make(map[string]any)
+		for k, v := range val {
+			result[k] = normalizeValue(v)
+		}
+		return result
+	case []any:
+		result := make([]any, len(val))
+		for i, v := range val {
+			result[i] = normalizeValue(v)
+		}
+		return result
+	default:
+		return v
+	}
 }
