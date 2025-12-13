@@ -10,92 +10,100 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/golden"
 
 	"github.com/elastic/elastic-agent/dev-tools/buildkite/pipeline"
 )
+
+// pipelineTestCase defines a test case for pipeline generation.
+type pipelineTestCase struct {
+	name       string
+	generator  func() *pipeline.Pipeline
+	goldenFile string
+	actualFile string
+}
+
+var pipelineTestCases = []pipelineTestCase{
+	{
+		name:       "GCECleanup",
+		generator:  GCECleanup,
+		goldenFile: "pipeline.elastic-agent-gce-cleanup.yml",
+		actualFile: "pipeline.elastic-agent-gce-cleanup.yml",
+	},
+	{
+		name:       "AgentlessAppRelease",
+		generator:  AgentlessAppRelease,
+		goldenFile: "pipeline.agentless-app-release.yaml",
+		actualFile: "pipeline.agentless-app-release.yaml",
+	},
+	{
+		name:       "Pipeline",
+		generator:  Pipeline,
+		goldenFile: "pipeline.yml",
+		actualFile: "pipeline.yml",
+	},
+	{
+		name:       "IntegrationPipeline",
+		generator:  IntegrationPipeline,
+		goldenFile: "integration.pipeline.yml",
+		actualFile: "integration.pipeline.yml",
+	},
+	{
+		name:       "ElasticAgentPackage",
+		generator:  ElasticAgentPackage,
+		goldenFile: "pipeline.elastic-agent-package.yml",
+		actualFile: "pipeline.elastic-agent-package.yml",
+	},
+}
 
 // findRepoRoot finds the repository root by looking for go.mod.
 func findRepoRoot(t *testing.T) string {
 	t.Helper()
 
 	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("failed to get working directory: %v", err)
-	}
+	require.NoError(t, err, "failed to get working directory")
 
 	for {
 		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
 			return dir
 		}
 		parent := filepath.Dir(dir)
-		if parent == dir {
-			t.Fatal("could not find repository root (go.mod)")
-		}
+		require.NotEqual(t, parent, dir, "could not find repository root (go.mod)")
 		dir = parent
 	}
 }
 
-func TestGCECleanup(t *testing.T) {
-	p := GCECleanup()
+func TestPipelines(t *testing.T) {
+	for _, tc := range pipelineTestCases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := tc.generator()
 
-	yaml, err := p.MarshalYAML()
-	if err != nil {
-		t.Fatalf("failed to marshal pipeline: %v", err)
+			yaml, err := p.MarshalYAML()
+			require.NoError(t, err, "failed to marshal pipeline")
+
+			// Golden file test - update with: go test -update
+			golden.AssertBytes(t, yaml, tc.goldenFile)
+		})
 	}
-
-	// Golden file test - update with: go test -update
-	golden.AssertBytes(t, yaml, "pipeline.elastic-agent-gce-cleanup.yml")
 }
 
-func TestGCECleanupMatchesActual(t *testing.T) {
+func TestPipelinesMatchActual(t *testing.T) {
 	repoRoot := findRepoRoot(t)
-	actualPath := filepath.Join(repoRoot, ".buildkite", "pipeline.elastic-agent-gce-cleanup.yml")
 
-	p := GCECleanup()
-	result, err := pipeline.SemanticCompareWithFile(p, actualPath)
-	if err != nil {
-		t.Fatalf("failed to compare: %v", err)
-	}
+	for _, tc := range pipelineTestCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actualPath := filepath.Join(repoRoot, ".buildkite", tc.actualFile)
 
-	if result.ParseError != nil {
-		t.Fatalf("failed to parse YAML: %v", result.ParseError)
-	}
+			p := tc.generator()
+			result, err := pipeline.SemanticCompareWithFile(p, actualPath)
+			require.NoError(t, err, "failed to compare")
+			require.NoError(t, result.ParseError, "failed to parse YAML")
 
-	if !result.Equal {
-		t.Errorf("Generated pipeline does not match %s:\n%s",
-			actualPath, strings.Join(result.Differences, "\n"))
-	}
-}
-
-func TestAgentlessAppRelease(t *testing.T) {
-	p := AgentlessAppRelease()
-
-	yaml, err := p.MarshalYAML()
-	if err != nil {
-		t.Fatalf("failed to marshal pipeline: %v", err)
-	}
-
-	// Golden file test - update with: go test -update
-	golden.AssertBytes(t, yaml, "pipeline.agentless-app-release.yaml")
-}
-
-func TestAgentlessAppReleaseMatchesActual(t *testing.T) {
-	repoRoot := findRepoRoot(t)
-	actualPath := filepath.Join(repoRoot, ".buildkite", "pipeline.agentless-app-release.yaml")
-
-	p := AgentlessAppRelease()
-	result, err := pipeline.SemanticCompareWithFile(p, actualPath)
-	if err != nil {
-		t.Fatalf("failed to compare: %v", err)
-	}
-
-	if result.ParseError != nil {
-		t.Fatalf("failed to parse YAML: %v", result.ParseError)
-	}
-
-	if !result.Equal {
-		t.Errorf("Generated pipeline does not match %s:\n%s",
-			actualPath, strings.Join(result.Differences, "\n"))
+			assert.True(t, result.Equal,
+				"Generated pipeline does not match %s:\n%s",
+				actualPath, strings.Join(result.Differences, "\n"))
+		})
 	}
 }

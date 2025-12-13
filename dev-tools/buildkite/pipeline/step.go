@@ -479,3 +479,66 @@ func SetInputIf(input *buildkite.InputStep, condition string) *buildkite.InputSt
 	input.If = Ptr(condition)
 	return input
 }
+
+// SetIfChanged sets if_changed patterns on a command step.
+func SetIfChanged(step *buildkite.CommandStep, include ...string) *buildkite.CommandStep {
+	step.IfChanged = &buildkite.IfChanged{
+		IfChanged: &buildkite.IfChangedObject{
+			Include: &buildkite.IfChangedObjectInclude{
+				StringArray: include,
+			},
+		},
+	}
+	return step
+}
+
+// SetTriggerIfChanged sets if_changed patterns on a trigger step.
+func SetTriggerIfChanged(trigger *buildkite.TriggerStep, include ...string) *buildkite.TriggerStep {
+	trigger.IfChanged = &buildkite.IfChanged{
+		IfChanged: &buildkite.IfChangedObject{
+			Include: &buildkite.IfChangedObjectInclude{
+				StringArray: include,
+			},
+		},
+	}
+	return trigger
+}
+
+// SetTriggerBuildWithMessage sets build configuration with message on a trigger step.
+func SetTriggerBuildWithMessage(trigger *buildkite.TriggerStep, commit, branch, message string, env map[string]string) *buildkite.TriggerStep {
+	build := &buildkite.TriggerStepBuild{}
+	if commit != "" {
+		build.Commit = Ptr(commit)
+	}
+	if branch != "" {
+		build.Branch = Ptr(branch)
+	}
+	if message != "" {
+		build.Message = Ptr(message)
+	}
+	if len(env) > 0 {
+		envMap := make(buildkite.Env, len(env))
+		for k, v := range env {
+			envMap[k] = v
+		}
+		build.Env = &envMap
+	}
+	trigger.Build = build
+	return trigger
+}
+
+// SetCommands sets multiple commands on a command step using the 'commands' field.
+func SetCommands(step *buildkite.CommandStep, commands ...string) *buildkite.CommandStep {
+	step.Commands = &buildkite.CommandStepCommand{
+		StringArray: commands,
+	}
+	return step
+}
+
+// WaitIf creates a conditional wait step.
+func WaitIf(condition string) *buildkite.WaitStep {
+	return &buildkite.WaitStep{
+		Wait: Ptr(""),
+		If:   Ptr(condition),
+	}
+}

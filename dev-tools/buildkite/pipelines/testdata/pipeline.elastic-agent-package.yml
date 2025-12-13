@@ -1,0 +1,200 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+env:
+  BEAT_NAME: elastic-agent
+  BEAT_URL: https://www.elastic.co/elastic-agent
+  IMAGE_UBUNTU_2404_ARM_64: platform-ingest-elastic-agent-ubuntu-2404-aarch64-1762801856
+  IMAGE_UBUNTU_2404_X86_64: platform-ingest-elastic-agent-ubuntu-2404-1762801856
+steps:
+  - fields:
+      - default: ""
+        hint: Link to the build manifest URL.
+        key: MANIFEST_URL
+        required: true
+        text: MANIFEST_URL
+      - hint: Increase verbosity of the mage commands, defaults to 0
+        key: MAGEFILE_VERBOSE
+        options:
+          - label: "True"
+            value: "1"
+          - label: "False"
+            value: "0"
+        required: false
+        select: Mage verbose
+      - hint: What workflow of the DRA release process this build is going to be triggered for
+        key: DRA_WORKFLOW
+        options:
+          - label: snapshot
+            value: snapshot
+          - label: staging
+            value: staging
+        required: true
+        select: DRA Workflow
+      - default: ""
+        hint: The packaging version to use
+        key: DRA_VERSION
+        required: true
+        text: DRA Version
+      - hint: If the DRA release manager script would actually publish anything or just print
+        key: DRA_DRY_RUN
+        options:
+          - label: "True"
+            value: --dry-run
+          - label: "False"
+            value: ""
+        required: false
+        select: DRA DRY-RUN
+    if: build.env("MANIFEST_URL") == null
+    input: Build parameters
+  - if: build.env("MANIFEST_URL") == null
+    wait: ""
+  - group: :Packaging Artefacts
+    key: package
+    steps:
+      - agents:
+          diskSizeGb: 400
+          image: ${IMAGE_UBUNTU_2404_X86_64}
+          machineType: c2-standard-16
+          provider: gcp
+        artifact_paths:
+          - build/distributions/**/*
+        command: |-
+          if [[ -z "$${MANIFEST_URL}" ]]; then
+            export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
+            if [[ -z "$${MANIFEST_URL}" ]]; then
+              echo ":broken_heart: Missing MANIFEST_URL variable or empty string provided"
+              exit 1
+            fi
+          fi
+          if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
+            export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
+          fi
+          .buildkite/scripts/steps/package.sh
+        env:
+          FIPS: "{{matrix.fips}}"
+          PLATFORMS: linux/amd64 windows/amd64 darwin/amd64
+        key: package_elastic-agent
+        label: ":package: FIPS={{matrix.fips}} Cross Building and package elastic-agent"
+        matrix:
+          setup:
+            fips:
+              - "false"
+              - "true"
+        plugins:
+          - elastic/vault-docker-login#v0.5.2:
+              secret_path: kv/ci-shared/platform-ingest/elastic_docker_registry
+      - agents:
+          diskSizeGb: 400
+          image: ${IMAGE_UBUNTU_2404_ARM_64}
+          instanceType: t4g.2xlarge
+          provider: aws
+        artifact_paths:
+          - build/distributions/**/*
+        command: |-
+          echo "Add support for multiarch"
+          docker run --privileged --rm tonistiigi/binfmt:master --install all
+
+          if [[ -z "$${MANIFEST_URL}" ]]; then
+            export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
+            if [[ -z "$${MANIFEST_URL}" ]]; then
+              echo ":broken_heart: Missing MANIFEST_URL variable or empty string provided"
+              exit 1
+            fi
+          fi
+          if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
+            export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
+          fi
+          .buildkite/scripts/steps/package.sh
+          ls -lahR build/
+        env:
+          FIPS: "{{matrix.fips}}"
+          PACKAGES: docker,tar.gz,deb,rpm,zip
+          PLATFORMS: linux/arm64 darwin/arm64 windows/arm64
+        key: package_elastic-agent-arm
+        label: ":package: FIPS={{matrix.fips}} Package ARM elastic-agent"
+        matrix:
+          setup:
+            fips:
+              - "false"
+              - "true"
+  - agents:
+      image: ${IMAGE_UBUNTU_2404_X86_64}
+      provider: gcp
+    command: |-
+      echo "+++ Restoring Artifacts"
+      buildkite-agent artifact download "build/**/*" .
+
+      echo "+++ Changing permissions for the release manager"
+      sudo chmod -R a+r build/distributions/
+      sudo chown -R :1000 build/distributions/
+      ls -lahR build/
+
+      echo "+++ Running DRA publish step"
+      if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
+        export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
+      fi
+      if [[ -z "$${DRA_DRY_RUN}" ]]; then
+        DRA_DRY_RUN=$(buildkite-agent meta-data get DRA_DRY_RUN --default "")
+        export DRA_DRY_RUN
+      fi
+      if [[ -z "$${DRA_VERSION}" ]]; then
+        DRA_VERSION=$(buildkite-agent meta-data get DRA_VERSION --default "")
+        export DRA_VERSION
+      fi
+      if [[ -z "$${DRA_WORKFLOW}" ]]; then
+        DRA_WORKFLOW=$(buildkite-agent meta-data get DRA_WORKFLOW --default "")
+        export DRA_WORKFLOW
+      fi
+      .buildkite/scripts/steps/dra-publish.sh
+    depends_on: package
+    env:
+      DRA_PROJECT_ARTIFACT_ID: agent-package
+      DRA_PROJECT_ID: elastic-agent-package
+    if: build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == null || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") != "independent-agent-release-staging"
+    key: dra-publish
+    label: ":elastic-stack: Publishing to DRA"
+  - agents:
+      diskSizeGb: 400
+      image: ${IMAGE_UBUNTU_2404_X86_64}
+      machineType: n2-standard-8
+      provider: gcp
+    artifact_paths:
+      - build/distributions/**/*
+    command: |-
+      echo "+++ Restoring Artifacts"
+      buildkite-agent artifact download "build/**/*" .
+      echo "+++ Changing permissions for the BK API commands"
+      sudo chown -R :1000 build/distributions/
+      echo "--- File listing"
+      ls -alR build
+      echo "--- Copy workaround for ironbank container filename"
+      .buildkite/scripts/steps/ironbank-cp-workaround.sh
+      echo "--- File listing after workaround"
+      ls -alR build
+      echo "+++ Checking artifact validity with release-manager collect dry run"
+      DRA_DRY_RUN="--dry-run"
+      export DRA_DRY_RUN
+      .buildkite/scripts/steps/dra-publish.sh
+      # Artifacts will be uploaded via the artifact_paths entry above
+      echo "+++ Set job metadata if TRIGGER_JOB_ID is properly set"
+      if [[ -z "$${TRIGGER_JOB_ID}" ]]; then
+        echo "TRIGGER_JOB_ID is not set, so not setting metadata"
+      else
+        # If a pipeline that triggered this build passes in a "TRIGGER_JOB_ID" env var, that
+        # is an indicator that it will want us to set some metadata in that calling build
+        # so that it can reference this specific build ID in order to easily download
+        # artifacts saved off in this build.
+        #
+        # This is a much easier way to pull back artifacts from a triggered build than using
+        # a Buildkite token that we then have to manage via vault, etc.
+        # See: https://forum.buildkite.community/t/how-to-download-artifacts-back-from-triggered-pipeline/3480/2
+        echo "Setting metadata for job that trigger this one"
+        buildkite-agent meta-data set "triggered_build_id" "$BUILDKITE_BUILD_ID" --job $TRIGGER_JOB_ID
+        buildkite-agent meta-data set "triggered_commit_hash" "$BUILDKITE_COMMIT" --job $TRIGGER_JOB_ID
+      fi
+    depends_on: package
+    env:
+      DRA_PROJECT_ARTIFACT_ID: agent-package
+      DRA_PROJECT_ID: elastic-agent-package
+    if: build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "independent-agent-release-staging"
+    key: bk-api-publish-independent-agent
+    label: Publishing via BK API for Independent Agent Release

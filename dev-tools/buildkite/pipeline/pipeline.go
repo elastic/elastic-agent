@@ -318,7 +318,15 @@ func normalizeValue(v any) any {
 	switch val := v.(type) {
 	case string:
 		// Normalize trailing newlines (YAML block scalars add trailing newline)
-		return strings.TrimRight(val, "\n")
+		trimmed := strings.TrimRight(val, "\n")
+		// Normalize boolean strings to actual booleans
+		if trimmed == "true" {
+			return true
+		}
+		if trimmed == "false" {
+			return false
+		}
+		return trimmed
 	case int:
 		return int64(val)
 	case int32:
