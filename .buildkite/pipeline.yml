@@ -359,4 +359,6 @@ steps:
         - .buildkite/pipeline.elastic-agent-package.yml
         - .buildkite/scripts/steps/package.sh
         - .buildkite/scripts/steps/trigger-elastic-agent-package.sh
+        - magefile.go
+        - dev-tools/**/*
 
