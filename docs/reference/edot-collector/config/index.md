@@ -24,5 +24,6 @@ The following pages provide insights into the default configurations of the EDOT
 * [Configure profiles collection](/reference/edot-collector/config/configure-profiles-collection.md)
 * [Authentication methods](/reference/edot-collector/config/authentication-methods.md)
 * [Tail-based sampling](/reference/edot-collector/config/tail-based-sampling.md)
+* [Custom data stream routing](/reference/edot-collector/config/custom-data-streams.md)
 
 
