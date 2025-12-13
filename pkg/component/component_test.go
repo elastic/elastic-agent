@@ -3828,7 +3828,32 @@ func TestDefaultRuntimeConfig(t *testing.T) {
 	assert.Nil(t, config.Filebeat.InputType)
 	assert.Equal(t, "", config.Metricbeat.Default)
 	assert.Equal(t,
-		map[string]string{"system/metrics": string(OtelRuntimeManager)},
+		map[string]string{
+			"activemq/metrics":      string(OtelRuntimeManager),
+			"apache/metrics":        string(OtelRuntimeManager),
+			"beat/metrics":          string(OtelRuntimeManager),
+			"containerd/metrics":    string(OtelRuntimeManager),
+			"docker/metrics":        string(OtelRuntimeManager),
+			"elasticsearch/metrics": string(OtelRuntimeManager),
+			"etcd/metrics":          string(OtelRuntimeManager),
+			"http/metrics":          string(OtelRuntimeManager),
+			"jolokia/metrics":       string(OtelRuntimeManager),
+			"kafka/metrics":         string(OtelRuntimeManager),
+			"kibana/metrics":        string(OtelRuntimeManager),
+			"linux/metrics":         string(OtelRuntimeManager),
+			"logstash/metrics":      string(OtelRuntimeManager),
+			"memcached/metrics":     string(OtelRuntimeManager),
+			"mongodb/metrics":       string(OtelRuntimeManager),
+			"mysql/metrics":         string(OtelRuntimeManager),
+			"nats/metrics":          string(OtelRuntimeManager),
+			"nginx/metrics":         string(OtelRuntimeManager),
+			"rabbitmq/metrics":      string(OtelRuntimeManager),
+			"sql/metrics":           string(OtelRuntimeManager),
+			"stan/metrics":          string(OtelRuntimeManager),
+			"statsd/metrics":        string(OtelRuntimeManager),
+			"system/metrics":        string(OtelRuntimeManager),
+			"vsphere/metrics":       string(OtelRuntimeManager),
+		},
 		config.Metricbeat.InputType)
 }
 
