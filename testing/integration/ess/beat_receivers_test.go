@@ -1605,6 +1605,9 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 			kibana.MonitoringEnabledLogs,
 			kibana.MonitoringEnabledMetrics,
 		},
+		AdvancedSettings: map[string]any{
+			"agent_logging_level": "debug",
+		},
 		Overrides: map[string]any{
 			"agent": map[string]any{
 				"monitoring": map[string]any{
