@@ -1,0 +1,181 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+env:
+  IMAGE_UBUNTU_2204_ARM_64: platform-ingest-elastic-agent-ubuntu-2204-aarch64-1762801856
+  IMAGE_UBUNTU_2204_X86_64: platform-ingest-elastic-agent-ubuntu-2204-1762801856
+  IMAGE_WIN_2022: platform-ingest-elastic-agent-windows-2022-1762801856
+  VAULT_PATH: kv/ci-shared/observability-ingest/cloud/gcp
+steps:
+  - agents:
+      image: ${IMAGE_UBUNTU_2204_X86_64}
+      provider: gcp
+    command: .buildkite/scripts/steps/check-ci.sh
+    key: check-ci
+    label: check-ci
+    retry:
+      manual:
+        allowed: true
+  - group: Unit tests
+    key: unit-tests
+    steps:
+      - agents:
+          image: ${IMAGE_UBUNTU_2204_X86_64}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/TEST-*.html
+          - build/TEST-*.xml
+          - build/diagnostics/*
+          - coverage-*.out
+        command: .buildkite/scripts/steps/unit-tests.sh
+        key: unit-tests-2204
+        label: Unit tests - Ubuntu 22.04
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+      - agents:
+          image: ${IMAGE_UBUNTU_2204_X86_64}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/TEST-*.html
+          - build/TEST-*.xml
+          - build/diagnostics/*
+          - coverage-*.out
+        command: .buildkite/scripts/steps/unit-tests.sh
+        env:
+          FIPS: "true"
+        key: unit-tests-2204-fips-tag
+        label: Unit tests - Ubuntu 22.04 with requirefips build tag
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+      - agents:
+          diskSizeGb: 200
+          image: ${IMAGE_UBUNTU_2204_ARM_64}
+          instanceType: m6g.xlarge
+          provider: aws
+        artifact_paths:
+          - build/TEST-*.html
+          - build/TEST-*.xml
+          - build/diagnostics/*
+          - coverage-*.out
+        command: .buildkite/scripts/steps/unit-tests.sh
+        key: unit-tests-2204-arm64
+        label: Unit tests - Ubuntu 22.04 ARM64
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+      - agents:
+          disk_size: 200
+          disk_type: pd-ssd
+          image: ${IMAGE_WIN_2022}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/TEST-*.html
+          - build/TEST-*.xml
+          - build/diagnostics/*
+          - coverage-*.out
+        command: .buildkite/scripts/steps/unit-tests.ps1
+        key: unit-tests-win2022
+        label: Unit tests - Windows 2022
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+  - group: macOS tests
+    key: macos-unit-tests
+    steps:
+      - agents:
+          imagePrefix: generic-base-15-arm-002
+          provider: orka
+        artifact_paths:
+          - build/TEST-*.html
+          - build/TEST-*.xml
+          - build/diagnostics/*
+          - coverage-*.out
+        command: .buildkite/scripts/steps/unit-tests.sh
+        label: Unit tests - macOS 15 ARM
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+      - agents:
+          imagePrefix: generic-13-ventura-x64
+          provider: orka
+        artifact_paths:
+          - build/TEST-*.html
+          - build/TEST-*.xml
+          - build/diagnostics/*
+          - coverage-*.out
+        branches: main 8.* 9.*
+        command: .buildkite/scripts/steps/unit-tests.sh
+        label: Unit tests - macOS 13
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+  - agents:
+      image: docker.elastic.co/ci-agent-images/buildkite-junit-annotate:1.0
+    command: ""
+    depends_on:
+      - allow_failure: true
+        step: unit-tests-2204
+      - allow_failure: true
+        step: unit-tests-2204-fips-tag
+      - allow_failure: true
+        step: unit-tests-2204-arm64
+      - allow_failure: true
+        step: unit-tests-win2022
+      - allow_failure: true
+        step: macos-unit-tests
+    label: ":junit: Junit annotate"
+    plugins:
+      - junit-annotate#v2.7.0:
+          always-annotate: true
+          artifacts: "**TEST-*.xml"
+          run-in-docker: false
+  - group: K8s tests
+    key: k8s-tests
+    steps:
+      - agents:
+          image: ${IMAGE_UBUNTU_2204_X86_64}
+          provider: gcp
+        command: .buildkite/scripts/steps/k8s-tests.sh
+        env:
+          K8S_VERSION: v{{matrix.k8s_version}}
+          KIND_VERSION: v0.27.0
+        label: "K8s tests: {{matrix.k8s_version}}"
+        matrix:
+          setup:
+            k8s_version:
+              - 1.33.0
+              - 1.32.0
+              - 1.31.0
+              - 1.30.0
+              - 1.29.4
+              - 1.28.9
+        retry:
+          manual:
+            allowed: true
+  - build:
+      branch: ${BUILDKITE_BRANCH}
+      commit: ${BUILDKITE_COMMIT}
+    if: build.pull_request.id == null
+    label: Triggering Extended tests for branches
+    trigger: elastic-agent-extended-testing
+  - wait: ""
+  - branches: main
+    build:
+      commit: ${BUILDKITE_COMMIT}
+    label: Publish to serverless
+    trigger: agentless-serverless-release
