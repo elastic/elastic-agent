@@ -6,6 +6,8 @@ git rm --quiet --cached -r .
 git reset --quiet --hard
 
 $env:GOTMPDIR = "$env:BUILDKITE_BUILD_CHECKOUT_PATH"
+$env:GOPROXY = "https://${ARTIFACTORY_USER}:${ARTIFACTORY_API_KEY}@artifactory.elastic.dev/artifactory/api/go/go"
+$env:GONOPROXY = "gopkg.in/natefinch/lumberjack.v2,gopkg.in/yaml*,github.com/rs/zerolog,gotest.tools/gotestsum"
 
 Write-Host "--- Build"
 mage build
