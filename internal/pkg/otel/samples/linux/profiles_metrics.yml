@@ -4,9 +4,6 @@ receivers:
 
 connectors:
   profilingmetrics:
-    by_frametype: true
-    by_frame: true
-    by_classification: true
 
 exporters:
   elasticsearch:
