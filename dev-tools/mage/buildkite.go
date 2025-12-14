@@ -33,7 +33,7 @@ var BuildkitePipelines = []PipelineDefinition{
 	{"GCECleanup", pipelines.GCECleanup, goldenFileDir + "/pipeline.elastic-agent-gce-cleanup.yml", true},
 	{"AgentlessAppRelease", pipelines.AgentlessAppRelease, goldenFileDir + "/pipeline.agentless-app-release.yaml", false},
 	{"Pipeline", pipelines.Pipeline, goldenFileDir + "/pipeline.yml", false},
-	{"IntegrationPipeline", pipelines.IntegrationPipeline, goldenFileDir + "/integration.pipeline.yml", false},
+	{"IntegrationPipeline", pipelines.IntegrationPipeline, goldenFileDir + "/integration.pipeline.yml", true},
 	{"ElasticAgentPackage", pipelines.ElasticAgentPackage, goldenFileDir + "/pipeline.elastic-agent-package.yml", false},
 	{"BKIntegrationPipeline", pipelines.BKIntegrationPipeline, goldenFileDir + "/bk.integration.pipeline.yml", false},
 	{"BKIntegrationFIPSPipeline", pipelines.BKIntegrationFIPSPipeline, goldenFileDir + "/bk.integration-fips.pipeline.yml", false},

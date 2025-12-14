@@ -193,10 +193,15 @@ func TestPipelineDefinitionFields(t *testing.T) {
 }
 
 func TestDynamicPipelines(t *testing.T) {
-	// Verify that GCECleanup is marked as dynamic
+	// Verify that migrated pipelines are marked as dynamic
+	dynamicPipelines := map[string]bool{
+		"GCECleanup":          true,
+		"IntegrationPipeline": true,
+	}
+
 	for _, p := range BuildkitePipelines {
-		if p.Name == "GCECleanup" {
-			assert.True(t, p.Dynamic, "GCECleanup should be marked as dynamic")
+		if dynamicPipelines[p.Name] {
+			assert.True(t, p.Dynamic, "%s should be marked as dynamic", p.Name)
 		}
 	}
 }
