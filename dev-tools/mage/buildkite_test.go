@@ -7,6 +7,7 @@ package mage
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -50,11 +51,11 @@ func TestBuildkitePipelinesRegistered(t *testing.T) {
 	assert.Equal(t, expectedPipelines, actualNames, "pipeline registry mismatch")
 }
 
-func TestBuildkitePipelineYAMLFiles(t *testing.T) {
-	// Verify that all pipeline YAML files are in the .buildkite directory
+func TestBuildkitePipelineGoldenFiles(t *testing.T) {
+	// Verify that all pipeline golden files are in the testdata directory
 	for _, p := range BuildkitePipelines {
-		assert.True(t, filepath.HasPrefix(p.YAMLFile, ".buildkite/"),
-			"pipeline %s YAML file %q should start with .buildkite/", p.Name, p.YAMLFile)
+		assert.True(t, strings.HasPrefix(p.GoldenFile, "dev-tools/buildkite/pipelines/testdata/"),
+			"pipeline %s golden file %q should be in testdata/", p.Name, p.GoldenFile)
 	}
 }
 
@@ -120,7 +121,7 @@ func TestBuildkiteValidatePipeline(t *testing.T) {
 	require.NoError(t, err, "GCECleanup validation should succeed")
 	assert.True(t, result.Valid, "GCECleanup should be valid")
 	assert.Equal(t, "GCECleanup", result.Name)
-	assert.Equal(t, ".buildkite/pipeline.elastic-agent-gce-cleanup.yml", result.YAMLFile)
+	assert.Equal(t, "dev-tools/buildkite/pipelines/testdata/pipeline.elastic-agent-gce-cleanup.yml", result.GoldenFile)
 }
 
 func TestBuildkiteValidatePipelineNotFound(t *testing.T) {
@@ -186,7 +187,16 @@ func TestPipelineDefinitionFields(t *testing.T) {
 		t.Run(p.Name, func(t *testing.T) {
 			assert.NotEmpty(t, p.Name, "pipeline should have a name")
 			assert.NotNil(t, p.Generator, "pipeline should have a generator")
-			assert.NotEmpty(t, p.YAMLFile, "pipeline should have a YAML file path")
+			assert.NotEmpty(t, p.GoldenFile, "pipeline should have a golden file path")
 		})
+	}
+}
+
+func TestDynamicPipelines(t *testing.T) {
+	// Verify that GCECleanup is marked as dynamic
+	for _, p := range BuildkitePipelines {
+		if p.Name == "GCECleanup" {
+			assert.True(t, p.Dynamic, "GCECleanup should be marked as dynamic")
+		}
 	}
 }

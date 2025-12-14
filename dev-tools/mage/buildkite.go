@@ -16,20 +16,27 @@ import (
 type PipelineDefinition struct {
 	Name      string
 	Generator func() *pipeline.Pipeline
-	// YAMLFile is the path to the existing YAML file for validation/comparison.
-	YAMLFile string
+	// GoldenFile is the path to the golden file for validation/comparison.
+	// This is used to verify the generated pipeline matches expected output.
+	GoldenFile string
+	// Dynamic indicates whether this pipeline has been migrated to dynamic upload.
+	// Dynamic pipelines use a stub in .buildkite/ that calls mage to generate the pipeline.
+	Dynamic bool
 }
 
+// goldenFileDir is the directory containing golden files for pipeline validation.
+const goldenFileDir = "dev-tools/buildkite/pipelines/testdata"
+
 // BuildkitePipelines is the list of all pipelines that can be generated.
-// The YAMLFile field points to the existing static YAML file for validation.
+// The GoldenFile field points to the golden file for validation.
 var BuildkitePipelines = []PipelineDefinition{
-	{"GCECleanup", pipelines.GCECleanup, ".buildkite/pipeline.elastic-agent-gce-cleanup.yml"},
-	{"AgentlessAppRelease", pipelines.AgentlessAppRelease, ".buildkite/pipeline.agentless-app-release.yaml"},
-	{"Pipeline", pipelines.Pipeline, ".buildkite/pipeline.yml"},
-	{"IntegrationPipeline", pipelines.IntegrationPipeline, ".buildkite/integration.pipeline.yml"},
-	{"ElasticAgentPackage", pipelines.ElasticAgentPackage, ".buildkite/pipeline.elastic-agent-package.yml"},
-	{"BKIntegrationPipeline", pipelines.BKIntegrationPipeline, ".buildkite/bk.integration.pipeline.yml"},
-	{"BKIntegrationFIPSPipeline", pipelines.BKIntegrationFIPSPipeline, ".buildkite/bk.integration-fips.pipeline.yml"},
+	{"GCECleanup", pipelines.GCECleanup, goldenFileDir + "/pipeline.elastic-agent-gce-cleanup.yml", true},
+	{"AgentlessAppRelease", pipelines.AgentlessAppRelease, goldenFileDir + "/pipeline.agentless-app-release.yaml", false},
+	{"Pipeline", pipelines.Pipeline, goldenFileDir + "/pipeline.yml", false},
+	{"IntegrationPipeline", pipelines.IntegrationPipeline, goldenFileDir + "/integration.pipeline.yml", false},
+	{"ElasticAgentPackage", pipelines.ElasticAgentPackage, goldenFileDir + "/pipeline.elastic-agent-package.yml", false},
+	{"BKIntegrationPipeline", pipelines.BKIntegrationPipeline, goldenFileDir + "/bk.integration.pipeline.yml", false},
+	{"BKIntegrationFIPSPipeline", pipelines.BKIntegrationFIPSPipeline, goldenFileDir + "/bk.integration-fips.pipeline.yml", false},
 }
 
 // BuildkiteGeneratePipeline generates a pipeline by name and outputs YAML to stdout.
@@ -90,28 +97,28 @@ func BuildkiteGCECleanup() error {
 // BuildkiteValidateResult contains the result of validating a single pipeline.
 type BuildkiteValidateResult struct {
 	Name        string
-	YAMLFile    string
+	GoldenFile  string
 	Valid       bool
 	Error       error
 	Differences []string
 }
 
-// BuildkiteValidate validates that generated pipelines match the existing YAML files.
+// BuildkiteValidate validates that generated pipelines match the golden files.
 // Returns the validation results and an error if any pipeline doesn't match.
 func BuildkiteValidate() ([]BuildkiteValidateResult, error) {
-	fmt.Println(">> buildkite:validate - Validating Buildkite pipelines against YAML files...")
+	fmt.Println(">> buildkite:validate - Validating Buildkite pipelines against golden files...")
 
 	var results []BuildkiteValidateResult
 	var errs []string
 
 	for _, p := range BuildkitePipelines {
 		result := BuildkiteValidateResult{
-			Name:     p.Name,
-			YAMLFile: p.YAMLFile,
+			Name:       p.Name,
+			GoldenFile: p.GoldenFile,
 		}
 
 		pl := p.Generator()
-		compareResult, err := pipeline.SemanticCompareWithFile(pl, p.YAMLFile)
+		compareResult, err := pipeline.SemanticCompareWithFile(pl, p.GoldenFile)
 		if err != nil {
 			result.Error = err
 			errs = append(errs, fmt.Sprintf("%s: %v", p.Name, err))
@@ -127,10 +134,10 @@ func BuildkiteValidate() ([]BuildkiteValidateResult, error) {
 		if !compareResult.Equal {
 			result.Differences = compareResult.Differences
 			errs = append(errs, fmt.Sprintf("%s: generated pipeline does not match %s:\n%s",
-				p.Name, p.YAMLFile, strings.Join(compareResult.Differences, "\n")))
+				p.Name, p.GoldenFile, strings.Join(compareResult.Differences, "\n")))
 		} else {
 			result.Valid = true
-			fmt.Printf("  ✓ %s matches %s\n", p.Name, p.YAMLFile)
+			fmt.Printf("  ✓ %s matches %s\n", p.Name, p.GoldenFile)
 		}
 		results = append(results, result)
 	}
@@ -153,12 +160,12 @@ func BuildkiteValidatePipeline(name string) (*BuildkiteValidateResult, error) {
 	for _, p := range BuildkitePipelines {
 		if p.Name == name {
 			result := &BuildkiteValidateResult{
-				Name:     p.Name,
-				YAMLFile: p.YAMLFile,
+				Name:       p.Name,
+				GoldenFile: p.GoldenFile,
 			}
 
 			pl := p.Generator()
-			compareResult, err := pipeline.SemanticCompareWithFile(pl, p.YAMLFile)
+			compareResult, err := pipeline.SemanticCompareWithFile(pl, p.GoldenFile)
 			if err != nil {
 				result.Error = err
 				return result, err
@@ -169,7 +176,7 @@ func BuildkiteValidatePipeline(name string) (*BuildkiteValidateResult, error) {
 			}
 			if !compareResult.Equal {
 				result.Differences = compareResult.Differences
-				return result, fmt.Errorf("generated pipeline does not match %s", p.YAMLFile)
+				return result, fmt.Errorf("generated pipeline does not match %s", p.GoldenFile)
 			}
 			result.Valid = true
 			return result, nil
@@ -180,29 +187,29 @@ func BuildkiteValidatePipeline(name string) (*BuildkiteValidateResult, error) {
 
 // BuildkiteDiffResult contains the diff result for a single pipeline.
 type BuildkiteDiffResult struct {
-	Name     string
-	YAMLFile string
-	Equal    bool
-	Diff     string
-	Error    error
+	Name       string
+	GoldenFile string
+	Equal      bool
+	Diff       string
+	Error      error
 }
 
-// BuildkiteDiff compares generated pipelines with existing YAML files.
+// BuildkiteDiff compares generated pipelines with golden files.
 // Returns the diff results for each pipeline.
 func BuildkiteDiff() []BuildkiteDiffResult {
-	fmt.Println(">> buildkite:diff - Comparing generated pipelines with YAML files...")
+	fmt.Println(">> buildkite:diff - Comparing generated pipelines with golden files...")
 
 	var results []BuildkiteDiffResult
 	anyDiff := false
 
 	for _, p := range BuildkitePipelines {
 		result := BuildkiteDiffResult{
-			Name:     p.Name,
-			YAMLFile: p.YAMLFile,
+			Name:       p.Name,
+			GoldenFile: p.GoldenFile,
 		}
 
 		pl := p.Generator()
-		compareResult, err := pipeline.CompareWithFile(pl, p.YAMLFile)
+		compareResult, err := pipeline.CompareWithFile(pl, p.GoldenFile)
 		if err != nil {
 			result.Error = err
 			fmt.Printf("\n--- %s ---\nError: %v\n", p.Name, err)
@@ -215,7 +222,7 @@ func BuildkiteDiff() []BuildkiteDiffResult {
 		if !compareResult.Equal {
 			result.Diff = compareResult.Diff
 			anyDiff = true
-			fmt.Printf("\n--- %s (%s) ---\n", p.Name, p.YAMLFile)
+			fmt.Printf("\n--- %s (%s) ---\n", p.Name, p.GoldenFile)
 			fmt.Println(compareResult.Diff)
 		}
 		results = append(results, result)
