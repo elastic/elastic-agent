@@ -56,6 +56,18 @@ var pipelineTestCases = []pipelineTestCase{
 		goldenFile: "pipeline.elastic-agent-package.yml",
 		actualFile: "pipeline.elastic-agent-package.yml",
 	},
+	{
+		name:       "BKIntegrationPipeline",
+		generator:  BKIntegrationPipeline,
+		goldenFile: "bk.integration.pipeline.yml",
+		actualFile: "bk.integration.pipeline.yml",
+	},
+	{
+		name:       "BKIntegrationFIPSPipeline",
+		generator:  BKIntegrationFIPSPipeline,
+		goldenFile: "bk.integration-fips.pipeline.yml",
+		actualFile: "bk.integration-fips.pipeline.yml",
+	},
 }
 
 // findRepoRoot finds the repository root by looking for go.mod.

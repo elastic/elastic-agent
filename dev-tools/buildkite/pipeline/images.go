@@ -30,6 +30,10 @@ const (
 	// Debian images
 	ImageDebian11 = "platform-ingest-elastic-agent-debian-11-1762801856"
 	ImageDebian13 = "platform-ingest-elastic-agent-debian-13-1762801856"
+
+	// FIPS images
+	ImageUbuntuX86FIPS   = "platform-ingest-elastic-agent-ubuntu-2204-fips-1762801856"
+	ImageUbuntuARM64FIPS = "platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1762801856"
 )
 
 // ImageEnvVars returns a map of environment variable names to image values.
@@ -79,7 +83,9 @@ const (
 
 // Common vault paths.
 const (
-	VaultPathGCP            = "kv/ci-shared/observability-ingest/cloud/gcp"
-	VaultPathDockerRegistry = "kv/ci-shared/platform-ingest/elastic_docker_registry"
-	VaultPathECKeyProd      = "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+	VaultPathGCP                = "kv/ci-shared/observability-ingest/cloud/gcp"
+	VaultPathDockerRegistry     = "kv/ci-shared/platform-ingest/elastic_docker_registry"
+	VaultPathECKeyProd          = "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
+	VaultPathECKeyStagingGov    = "kv/ci-shared/platform-ingest/platform-ingest-ec-staging-gov"
+	VaultPathBuildkiteAnalytics = "kv/ci-shared/platform-ingest/buildkite_analytics_token"
 )

@@ -69,6 +69,7 @@ steps:
                 SYNTHETICS_TAG: "agentless-ci"
       YAML
       fi
-    depends_on: mirror-elastic-agent
+    depends_on:
+      - mirror-elastic-agent
     if: build.env("DRY_RUN") == null || build.env("DRY_RUN") == "false"
     label: ":grey_question: Promote agentless app release if validation passes"

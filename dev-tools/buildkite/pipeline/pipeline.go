@@ -255,6 +255,30 @@ func compareValues(path string, generated, expected any) []string {
 		}
 	}
 
+	// Handle depends_on equivalence: "key" == ["key"]
+	if path == "depends_on" || strings.HasSuffix(path, ".depends_on") {
+		// Case 1: generated is array, expected is string
+		if genArr, genIsArr := generated.([]any); genIsArr {
+			if expStr, expIsStr := expected.(string); expIsStr {
+				if len(genArr) == 1 {
+					if genStr, ok := genArr[0].(string); ok && genStr == expStr {
+						return nil
+					}
+				}
+			}
+		}
+		// Case 2: generated is string, expected is array
+		if genStr, genIsStr := generated.(string); genIsStr {
+			if expArr, expIsArr := expected.([]any); expIsArr {
+				if len(expArr) == 1 {
+					if expStrVal, ok := expArr[0].(string); ok && expStrVal == genStr {
+						return nil
+					}
+				}
+			}
+		}
+	}
+
 	if generated == nil {
 		return []string{fmt.Sprintf("%s: missing in generated (expected: %v)", path, expected)}
 	}

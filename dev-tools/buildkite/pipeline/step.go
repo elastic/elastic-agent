@@ -213,21 +213,16 @@ func SetIf(step *buildkite.CommandStep, condition string) *buildkite.CommandStep
 }
 
 // SetDependsOn sets step dependencies on a command step.
+// Always uses array format for consistency with YAML files.
 func SetDependsOn(step *buildkite.CommandStep, keys ...string) *buildkite.CommandStep {
-	if len(keys) == 1 {
-		step.DependsOn = &buildkite.DependsOn{
-			String: Ptr(keys[0]),
+	items := make(buildkite.DependsOnList, len(keys))
+	for i, k := range keys {
+		items[i] = buildkite.DependsOnListItem{
+			String: Ptr(k),
 		}
-	} else {
-		items := make(buildkite.DependsOnList, len(keys))
-		for i, k := range keys {
-			items[i] = buildkite.DependsOnListItem{
-				String: Ptr(k),
-			}
-		}
-		step.DependsOn = &buildkite.DependsOn{
-			DependsOnList: &items,
-		}
+	}
+	step.DependsOn = &buildkite.DependsOn{
+		DependsOnList: &items,
 	}
 	return step
 }
@@ -338,21 +333,16 @@ func AddGroupStep(group *buildkite.GroupStep, step *buildkite.CommandStep) *buil
 }
 
 // SetGroupDependsOn sets dependencies on a group step.
+// Always uses array format for consistency with YAML files.
 func SetGroupDependsOn(group *buildkite.GroupStep, keys ...string) *buildkite.GroupStep {
-	if len(keys) == 1 {
-		group.DependsOn = &buildkite.DependsOn{
-			String: Ptr(keys[0]),
+	items := make(buildkite.DependsOnList, len(keys))
+	for i, k := range keys {
+		items[i] = buildkite.DependsOnListItem{
+			String: Ptr(k),
 		}
-	} else {
-		items := make(buildkite.DependsOnList, len(keys))
-		for i, k := range keys {
-			items[i] = buildkite.DependsOnListItem{
-				String: Ptr(k),
-			}
-		}
-		group.DependsOn = &buildkite.DependsOn{
-			DependsOnList: &items,
-		}
+	}
+	group.DependsOn = &buildkite.DependsOn{
+		DependsOnList: &items,
 	}
 	return group
 }
@@ -541,4 +531,56 @@ func WaitIf(condition string) *buildkite.WaitStep {
 		Wait: Ptr(""),
 		If:   Ptr(condition),
 	}
+}
+
+// SetAllowDependencyFailure sets allow_dependency_failure on a command step.
+func SetAllowDependencyFailure(step *buildkite.CommandStep, allow bool) *buildkite.CommandStep {
+	step.AllowDependencyFailure = &buildkite.AllowDependencyFailure{
+		Bool: Ptr(allow),
+	}
+	return step
+}
+
+// SetSoftFailExitStatus sets soft_fail with exit status pattern on a command step.
+func SetSoftFailExitStatus(step *buildkite.CommandStep, exitStatus string) *buildkite.CommandStep {
+	enumVal := buildkite.SoftFailObjectExitStatusEnum(exitStatus)
+	list := buildkite.SoftFailList{
+		buildkite.SoftFailObject{
+			ExitStatus: &buildkite.SoftFailObjectExitStatus{
+				SoftFailObjectExitStatusEnum: &enumVal,
+			},
+		},
+	}
+	step.SoftFail = &buildkite.SoftFail{
+		SoftFailList: &list,
+	}
+	return step
+}
+
+// SetSkipWithMessage marks a command step as skipped with a reason.
+func SetSkipWithMessage(step *buildkite.CommandStep, message string) *buildkite.CommandStep {
+	step.Skip = &buildkite.Skip{
+		String: Ptr(message),
+	}
+	return step
+}
+
+// SetGroupAllowDependencyFailure sets allow_dependency_failure on a group step.
+func SetGroupAllowDependencyFailure(group *buildkite.GroupStep, allow bool) *buildkite.GroupStep {
+	group.AllowDependencyFailure = &buildkite.AllowDependencyFailure{
+		Bool: Ptr(allow),
+	}
+	return group
+}
+
+// SetGroupIf sets a conditional expression on a group step.
+func SetGroupIf(group *buildkite.GroupStep, condition string) *buildkite.GroupStep {
+	group.If = Ptr(condition)
+	return group
+}
+
+// SetKey sets the key on a command step.
+func SetKey(step *buildkite.CommandStep, key string) *buildkite.CommandStep {
+	step.Key = Ptr(key)
+	return step
 }

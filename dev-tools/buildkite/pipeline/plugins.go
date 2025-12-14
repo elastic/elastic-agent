@@ -44,6 +44,16 @@ func PluginVaultECKeyProd() (string, map[string]any) {
 	return PluginVaultSecrets(VaultPathECKeyProd, "apiKey", "EC_API_KEY")
 }
 
+// PluginVaultECKeyStagingGov returns the vault-secrets plugin for EC staging gov API key.
+func PluginVaultECKeyStagingGov() (string, map[string]any) {
+	return PluginVaultSecrets(VaultPathECKeyStagingGov, "apiKey", "EC_API_KEY")
+}
+
+// PluginVaultBuildkiteAnalytics returns the vault-secrets plugin for Buildkite analytics token.
+func PluginVaultBuildkiteAnalytics() (string, map[string]any) {
+	return PluginVaultSecrets(VaultPathBuildkiteAnalytics, "token", "BUILDKITE_ANALYTICS_TOKEN")
+}
+
 // PluginGCPSecretManager returns the gcp-secret-manager plugin source and config.
 func PluginGCPSecretManager(envSecrets map[string]string) (string, map[string]any) {
 	return "elastic/gcp-secret-manager#" + PluginVersionGCPSecretManager, map[string]any{
@@ -105,6 +115,18 @@ func WithVaultDockerLogin(step *buildkite.CommandStep) *buildkite.CommandStep {
 // WithVaultECKeyProd adds the vault EC key prod plugin to a step.
 func WithVaultECKeyProd(step *buildkite.CommandStep) *buildkite.CommandStep {
 	source, config := PluginVaultECKeyProd()
+	return AddPlugin(step, source, config)
+}
+
+// WithVaultECKeyStagingGov adds the vault EC key staging gov plugin to a step.
+func WithVaultECKeyStagingGov(step *buildkite.CommandStep) *buildkite.CommandStep {
+	source, config := PluginVaultECKeyStagingGov()
+	return AddPlugin(step, source, config)
+}
+
+// WithVaultBuildkiteAnalytics adds the vault Buildkite analytics token plugin to a step.
+func WithVaultBuildkiteAnalytics(step *buildkite.CommandStep) *buildkite.CommandStep {
+	source, config := PluginVaultBuildkiteAnalytics()
 	return AddPlugin(step, source, config)
 }
 

@@ -145,7 +145,8 @@ steps:
         export DRA_WORKFLOW
       fi
       .buildkite/scripts/steps/dra-publish.sh
-    depends_on: package
+    depends_on:
+      - package
     env:
       DRA_PROJECT_ARTIFACT_ID: agent-package
       DRA_PROJECT_ID: elastic-agent-package
@@ -191,7 +192,8 @@ steps:
         buildkite-agent meta-data set "triggered_build_id" "$BUILDKITE_BUILD_ID" --job $TRIGGER_JOB_ID
         buildkite-agent meta-data set "triggered_commit_hash" "$BUILDKITE_COMMIT" --job $TRIGGER_JOB_ID
       fi
-    depends_on: package
+    depends_on:
+      - package
     env:
       DRA_PROJECT_ARTIFACT_ID: agent-package
       DRA_PROJECT_ID: elastic-agent-package

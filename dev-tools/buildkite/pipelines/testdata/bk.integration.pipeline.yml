@@ -1,0 +1,746 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+env:
+  ASDF_MAGE_VERSION: 1.14.0
+  ASDF_TERRAFORM_VERSION: 1.9.2
+  IMAGE_DEBIAN_11: platform-ingest-elastic-agent-debian-11-1762801856
+  IMAGE_DEBIAN_13: platform-ingest-elastic-agent-debian-13-1762801856
+  IMAGE_RHEL_10: platform-ingest-elastic-agent-rhel-10-1762801856
+  IMAGE_RHEL_8: platform-ingest-elastic-agent-rhel-8-1762801856
+  IMAGE_UBUNTU_2404_ARM_64: platform-ingest-elastic-agent-ubuntu-2404-aarch64-1762801856
+  IMAGE_UBUNTU_2404_X86_64: platform-ingest-elastic-agent-ubuntu-2404-1762801856
+  IMAGE_WIN_2022: platform-ingest-elastic-agent-windows-2022-1762801856
+  IMAGE_WIN_2025: platform-ingest-elastic-agent-windows-2025-1762801856
+  VAULT_PATH: kv/ci-shared/observability-ingest/cloud/gcp
+steps:
+  - agents:
+      image: ${IMAGE_UBUNTU_2404_X86_64}
+      machineType: n2-standard-8
+      provider: gcp
+    artifact_paths:
+      - build/*
+      - build/diagnostics/**
+    command: |-
+      #!/usr/bin/env bash
+      buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-amd64'
+      .buildkite/scripts/steps/integration_tests_tf.sh ech true
+    depends_on:
+      - packaging-containers-amd64
+      - packaging-containers-arm64
+    env:
+      FORCE_ESS_CREATE: "true"
+      TEST_PACKAGE: github.com/elastic/elastic-agent/testing/integration/ess
+      TF_VAR_integration_server_docker_image: docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}
+    key: integration-tests-ech
+    label: Custom ECH Testing
+    plugins:
+      - elastic/vault-secrets#v0.1.0:
+          env_var: EC_API_KEY
+          field: apiKey
+          path: kv/ci-shared/platform-ingest/platform-ingest-ec-prod
+    retry:
+      automatic:
+        limit: 1
+  - agents:
+      image: docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5
+      useCustomGlobalHooks: true
+    artifact_paths:
+      - test_infra/ess/*.tfstate
+      - test_infra/ess/*.lock.hcl
+    command: .buildkite/scripts/steps/ess_start.sh
+    key: integration-ess
+    label: Start ESS stack for integration tests
+    notify:
+      - github_commit_status:
+          context: buildkite/elastic-agent-extended-testing - ESS stack provision
+    plugins:
+      - elastic/vault-secrets#v0.1.0:
+          env_var: EC_API_KEY
+          field: apiKey
+          path: kv/ci-shared/platform-ingest/platform-ingest-ec-prod
+    retry:
+      automatic:
+        limit: 1
+  - depends_on:
+      - integration-ess
+    group: Extended runtime leak tests
+    key: extended-integration-tests
+    notify:
+      - github_commit_status:
+          context: buildkite/elastic-agent-extended-testing - Runtime leak tests
+    steps:
+      - agents:
+          image: ${IMAGE_WIN_2022}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        command: |-
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64*  . --step 'packaging-amd64'
+          .buildkite/scripts/steps/integration_tests_tf.ps1 fleet true
+        depends_on:
+          - packaging-amd64
+        env:
+          TEST_PACKAGE: github.com/elastic/elastic-agent/testing/integration/leak
+        label: Windows:2022:amd64:sudo
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              env_var: EC_API_KEY
+              field: apiKey
+              path: kv/ci-shared/platform-ingest/platform-ingest-ec-prod
+        retry:
+          automatic:
+            limit: 1
+      - agents:
+          image: ${IMAGE_WIN_2025}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        command: |-
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
+          .buildkite/scripts/steps/integration_tests_tf.ps1 fleet true
+        depends_on:
+          - packaging-amd64
+        env:
+          TEST_PACKAGE: github.com/elastic/elastic-agent/testing/integration/leak
+        label: Windows:2025:amd64:sudo
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              env_var: EC_API_KEY
+              field: apiKey
+              path: kv/ci-shared/platform-ingest/platform-ingest-ec-prod
+        retry:
+          automatic:
+            limit: 1
+      - agents:
+          image: ${IMAGE_UBUNTU_2404_X86_64}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        command: |-
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-amd64'
+          .buildkite/scripts/steps/integration_tests_tf.sh fleet true
+        depends_on:
+          - packaging-amd64
+        env:
+          TEST_PACKAGE: github.com/elastic/elastic-agent/testing/integration/leak
+        label: Ubuntu:2404:amd64:sudo
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              env_var: EC_API_KEY
+              field: apiKey
+              path: kv/ci-shared/platform-ingest/platform-ingest-ec-prod
+        retry:
+          automatic:
+            limit: 1
+  - depends_on:
+      - integration-ess
+    group: "Stateful: Windows"
+    key: integration-tests-win
+    notify:
+      - github_commit_status:
+          context: buildkite/elastic-agent-extended-testing - Windows
+    steps:
+      - agents:
+          image: ${IMAGE_WIN_2022}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        command: |-
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
+        depends_on:
+          - packaging-amd64
+        env:
+          TEST_PACKAGE: github.com/elastic/elastic-agent/testing/integration/ess
+        label: Win2022:sudo:{{matrix}}
+        matrix:
+          - default
+          - fleet
+          - fleet-endpoint-security
+          - fleet-privileged
+          - standalone-upgrade
+          - upgrade
+          - upgrade-flavor
+          - install-uninstall
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              env_var: EC_API_KEY
+              field: apiKey
+              path: kv/ci-shared/platform-ingest/platform-ingest-ec-prod
+        retry:
+          automatic:
+            limit: 1
+      - agents:
+          image: ${IMAGE_WIN_2022}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        command: |-
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
+        depends_on:
+          - packaging-amd64
+        env:
+          TEST_PACKAGE: github.com/elastic/elastic-agent/testing/integration/ess
+        label: Win2022:non-sudo:{{matrix}}
+        matrix:
+          - default
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              env_var: EC_API_KEY
+              field: apiKey
+              path: kv/ci-shared/platform-ingest/platform-ingest-ec-prod
+        retry:
+          automatic:
+            limit: 1
+      - agents:
+          image: ${IMAGE_WIN_2025}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        command: |-
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} true
+        depends_on:
+          - packaging-amd64
+        env:
+          TEST_PACKAGE: github.com/elastic/elastic-agent/testing/integration/ess
+        label: Win2025:sudo:{{matrix}}
+        matrix:
+          - default
+          - fleet
+          - fleet-endpoint-security
+          - fleet-privileged
+          - standalone-upgrade
+          - upgrade
+          - upgrade-flavor
+          - install-uninstall
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              env_var: EC_API_KEY
+              field: apiKey
+              path: kv/ci-shared/platform-ingest/platform-ingest-ec-prod
+        retry:
+          automatic:
+            limit: 1
+      - agents:
+          image: ${IMAGE_WIN_2025}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        command: |-
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
+          .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix}} false
+        depends_on:
+          - packaging-amd64
+        env:
+          TEST_PACKAGE: github.com/elastic/elastic-agent/testing/integration/ess
+        label: Win2025:non-sudo:{{matrix}}
+        matrix:
+          - default
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              env_var: EC_API_KEY
+              field: apiKey
+              path: kv/ci-shared/platform-ingest/platform-ingest-ec-prod
+        retry:
+          automatic:
+            limit: 1
+  - depends_on:
+      - integration-ess
+    group: Stateful:Ubuntu
+    key: integration-tests-ubuntu
+    notify:
+      - github_commit_status:
+          context: buildkite/elastic-agent-extended-testing - Ubuntu
+    steps:
+      - agents:
+          image: ${IMAGE_UBUNTU_2404_X86_64}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        command: |-
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-amd64'
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
+        depends_on:
+          - packaging-amd64
+        env:
+          TEST_PACKAGE: github.com/elastic/elastic-agent/testing/integration/ess
+        label: "x86_64:non-sudo: {{matrix}}"
+        matrix:
+          - default
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              env_var: EC_API_KEY
+              field: apiKey
+              path: kv/ci-shared/platform-ingest/platform-ingest-ec-prod
+        retry:
+          automatic:
+            limit: 1
+      - agents:
+          image: ${IMAGE_UBUNTU_2404_X86_64}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        command: |-
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-amd64
+          buildkite-agent artifact download build/distributions/elastic-agent-*-amd64.deb* . --step packaging-amd64
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
+        depends_on:
+          - packaging-amd64
+        env:
+          TEST_PACKAGE: github.com/elastic/elastic-agent/testing/integration/ess
+        label: "x86_64:sudo: {{matrix}}"
+        matrix:
+          - default
+          - upgrade
+          - upgrade-flavor
+          - standalone-upgrade
+          - fleet
+          - fleet-endpoint-security
+          - fleet-airgapped
+          - fleet-airgapped-privileged
+          - fleet-privileged
+          - fleet-upgrade-to-pr-build
+          - install-uninstall
+          - fqdn
+          - deb
+          - container
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              env_var: EC_API_KEY
+              field: apiKey
+              path: kv/ci-shared/platform-ingest/platform-ingest-ec-prod
+        retry:
+          automatic:
+            limit: 1
+      - agents:
+          image: ${IMAGE_UBUNTU_2404_ARM_64}
+          instanceType: m6g.2xlarge
+          provider: aws
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        command: |-
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-arm64* . --step 'packaging-arm64'
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} true
+        depends_on:
+          - packaging-arm64
+        env:
+          TEST_PACKAGE: github.com/elastic/elastic-agent/testing/integration/ess
+        label: "arm:sudo: {{matrix}}"
+        matrix:
+          - default
+          - upgrade
+          - upgrade-flavor
+          - standalone-upgrade
+          - fleet
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              env_var: EC_API_KEY
+              field: apiKey
+              path: kv/ci-shared/platform-ingest/platform-ingest-ec-prod
+        retry:
+          automatic:
+            limit: 1
+      - agents:
+          image: ${IMAGE_UBUNTU_2404_ARM_64}
+          instanceType: m6g.xlarge
+          provider: aws
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        command: |-
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-arm64* . --step 'packaging-arm64'
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix}} false
+        depends_on:
+          - packaging-arm64
+        env:
+          TEST_PACKAGE: github.com/elastic/elastic-agent/testing/integration/ess
+        label: "arm:non-sudo: {{matrix}}"
+        matrix:
+          - default
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              env_var: EC_API_KEY
+              field: apiKey
+              path: kv/ci-shared/platform-ingest/platform-ingest-ec-prod
+        retry:
+          automatic:
+            limit: 1
+        skip: true
+  - depends_on:
+      - integration-ess
+    group: Stateful:Debian
+    key: integration-tests-debian
+    notify:
+      - github_commit_status:
+          context: buildkite/elastic-agent-extended-testing - Debian
+    steps:
+      - agents:
+          image: "{{matrix.image}}"
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        command: |-
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-amd64'
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.group}} false
+        depends_on:
+          - packaging-amd64
+        env:
+          TEST_PACKAGE: github.com/elastic/elastic-agent/testing/integration/ess
+        label: "x86_64:non-sudo: {{matrix.group}} - {{matrix.image}}"
+        matrix:
+          setup:
+            group:
+              - default
+            image:
+              - ${IMAGE_DEBIAN_11}
+              - ${IMAGE_DEBIAN_13}
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              env_var: EC_API_KEY
+              field: apiKey
+              path: kv/ci-shared/platform-ingest/platform-ingest-ec-prod
+        retry:
+          automatic:
+            limit: 1
+      - agents:
+          image: "{{matrix.image}}"
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        command: |-
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-amd64
+          buildkite-agent artifact download build/distributions/elastic-agent-*-amd64.deb* . --step packaging-amd64
+          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.group}} true
+        depends_on:
+          - packaging-amd64
+        env:
+          TEST_PACKAGE: github.com/elastic/elastic-agent/testing/integration/ess
+        label: "x86_64:sudo: {{matrix.group}} - {{matrix.image}}"
+        matrix:
+          setup:
+            group:
+              - default
+              - upgrade
+              - upgrade-flavor
+              - standalone-upgrade
+              - fleet
+              - fleet-endpoint-security
+              - fleet-airgapped
+              - fleet-airgapped-privileged
+              - fleet-privileged
+              - fleet-upgrade-to-pr-build
+              - install-uninstall
+              - deb
+              - container
+            image:
+              - ${IMAGE_DEBIAN_11}
+              - ${IMAGE_DEBIAN_13}
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              env_var: EC_API_KEY
+              field: apiKey
+              path: kv/ci-shared/platform-ingest/platform-ingest-ec-prod
+        retry:
+          automatic:
+            limit: 1
+  - depends_on:
+      - integration-ess
+    group: Stateful:RHEL
+    key: integration-tests-rhel
+    notify:
+      - github_commit_status:
+          context: buildkite/elastic-agent-extended-testing - RHEL
+    steps:
+      - agents:
+          image: "{{matrix.image}}"
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        command: |-
+          buildkite-agent artifact download build/distributions/elastic-agent-*-x86_64.rpm* . --step packaging-amd64
+          .buildkite/scripts/steps/integration_tests_tf.sh rpm true
+        depends_on:
+          - packaging-amd64
+        env:
+          TEST_PACKAGE: github.com/elastic/elastic-agent/testing/integration/ess
+        label: x86_64:sudo:rpm - {{matrix.image}}
+        matrix:
+          setup:
+            image:
+              - ${IMAGE_RHEL_8}
+              - ${IMAGE_RHEL_10}
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              env_var: EC_API_KEY
+              field: apiKey
+              path: kv/ci-shared/platform-ingest/platform-ingest-ec-prod
+        retry:
+          automatic:
+            limit: 1
+  - depends_on:
+      - integration-ess
+      - packaging-containers-amd64
+    group: ":kubernetes: Kubernetes"
+    key: integration-tests-kubernetes
+    notify:
+      - github_commit_status:
+          context: buildkite/elastic-agent-extended-testing - Kubernetes
+    steps:
+      - agents:
+          diskSizeGb: 80
+          image: ${IMAGE_UBUNTU_2404_X86_64}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+          - build/*.pod_logs_dump/*
+        command: |-
+          buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
+          .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
+        env:
+          ASDF_KIND_VERSION: 0.27.0
+          DOCKER_VARIANTS: "{{matrix.variants}}"
+          K8S_VERSION: "{{matrix.version}}"
+          TARGET_ARCH: amd64
+        if: build.pull_request.id == null
+        label: ":git: :kubernetes: {{matrix.version}}:amd64:{{matrix.variants}}"
+        matrix:
+          setup:
+            variants:
+              - basic,slim,complete,service,elastic-otel-collector
+              - wolfi,slim-wolfi,complete-wolfi,elastic-otel-collector-wolfi
+            version:
+              - v1.27.16
+              - v1.28.15
+              - v1.29.14
+              - v1.30.0
+              - v1.31.0
+              - v1.32.0
+              - v1.33.0
+              - v1.34.0
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              env_var: EC_API_KEY
+              field: apiKey
+              path: kv/ci-shared/platform-ingest/platform-ingest-ec-prod
+        retry:
+          automatic:
+            limit: 1
+      - agents:
+          diskSizeGb: 80
+          image: ${IMAGE_UBUNTU_2404_X86_64}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+          - build/*.pod_logs_dump/*
+        command: |-
+          buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
+          .buildkite/scripts/steps/integration_tests_tf.sh kubernetes false
+        env:
+          ASDF_KIND_VERSION: 0.27.0
+          DOCKER_VARIANTS: "{{matrix.variants}}"
+          K8S_VERSION: "{{matrix.version}}"
+          TARGET_ARCH: amd64
+        if: build.pull_request.id != null
+        label: ":open-pull-request: :kubernetes: {{matrix.version}}:amd64:{{matrix.variants}}"
+        matrix:
+          setup:
+            variants:
+              - basic
+              - slim
+              - complete
+              - service
+              - elastic-otel-collector
+              - wolfi
+              - slim-wolfi
+              - complete-wolfi
+              - elastic-otel-collector-wolfi
+            version:
+              - v1.27.16
+              - v1.34.0
+        plugins:
+          - elastic/vault-secrets#v0.1.0:
+              env_var: EC_API_KEY
+              field: apiKey
+              path: kv/ci-shared/platform-ingest/platform-ingest-ec-prod
+        retry:
+          automatic:
+            limit: 1
+  - group: Serverless integration test
+    key: integration-tests-serverless
+    notify:
+      - github_commit_status:
+          context: buildkite/elastic-agent-extended-testing - Serverless integration test
+    steps:
+      - agents:
+          image: ${IMAGE_WIN_2022}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        command: |-
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
+          .buildkite/scripts/buildkite-integration-tests.ps1 fleet true
+        depends_on:
+          - packaging-amd64
+        env:
+          TEST_PACKAGE: github.com/elastic/elastic-agent/testing/integration/serverless
+        label: Windows:2022:amd64:sudo
+        plugins:
+          - elastic/oblt-google-auth#v1.3.0:
+              lifetime: 10800
+              project-id: elastic-observability-ci
+              project-number: "911195782929"
+          - elastic/gcp-secret-manager#v1.3.0-elastic:
+              env:
+                ELASTICSEARCH_HOST: ea-serverless-it-elasticsearch-hostname
+                ELASTICSEARCH_PASSWORD: ea-serverless-it-elasticsearch-password
+                ELASTICSEARCH_USERNAME: ea-serverless-it-elasticsearch-username
+                KIBANA_HOST: ea-serverless-it-kibana-hostname
+                KIBANA_PASSWORD: ea-serverless-it-kibana-password
+                KIBANA_USERNAME: ea-serverless-it-kibana-username
+        retry:
+          automatic:
+            limit: 1
+      - agents:
+          image: ${IMAGE_WIN_2025}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        command: |-
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
+          .buildkite/scripts/buildkite-integration-tests.ps1 fleet true
+        depends_on:
+          - packaging-amd64
+        env:
+          TEST_PACKAGE: github.com/elastic/elastic-agent/testing/integration/serverless
+        label: Windows:2025:amd64:sudo
+        plugins:
+          - elastic/oblt-google-auth#v1.3.0:
+              lifetime: 10800
+              project-id: elastic-observability-ci
+              project-number: "911195782929"
+          - elastic/gcp-secret-manager#v1.3.0-elastic:
+              env:
+                ELASTICSEARCH_HOST: ea-serverless-it-elasticsearch-hostname
+                ELASTICSEARCH_PASSWORD: ea-serverless-it-elasticsearch-password
+                ELASTICSEARCH_USERNAME: ea-serverless-it-elasticsearch-username
+                KIBANA_HOST: ea-serverless-it-kibana-hostname
+                KIBANA_PASSWORD: ea-serverless-it-kibana-password
+                KIBANA_USERNAME: ea-serverless-it-kibana-username
+        retry:
+          automatic:
+            limit: 1
+      - agents:
+          image: ${IMAGE_UBUNTU_2404_X86_64}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        command: |-
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-amd64'
+          sudo -E .buildkite/scripts/buildkite-integration-tests.sh fleet true
+        depends_on:
+          - packaging-amd64
+        env:
+          TEST_PACKAGE: github.com/elastic/elastic-agent/testing/integration/serverless
+        label: Ubuntu:2404:amd64:sudo
+        plugins:
+          - elastic/oblt-google-auth#v1.3.0:
+              lifetime: 10800
+              project-id: elastic-observability-ci
+              project-number: "911195782929"
+          - elastic/gcp-secret-manager#v1.3.0-elastic:
+              env:
+                ELASTICSEARCH_HOST: ea-serverless-it-elasticsearch-hostname
+                ELASTICSEARCH_PASSWORD: ea-serverless-it-elasticsearch-password
+                ELASTICSEARCH_USERNAME: ea-serverless-it-elasticsearch-username
+                KIBANA_HOST: ea-serverless-it-kibana-hostname
+                KIBANA_PASSWORD: ea-serverless-it-kibana-password
+                KIBANA_USERNAME: ea-serverless-it-kibana-username
+        retry:
+          automatic:
+            limit: 1
+  - agents:
+      image: docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5
+      useCustomGlobalHooks: true
+    allow_dependency_failure: true
+    command: |-
+      buildkite-agent artifact download "test_infra/ess/**" . --step "integration-ess"
+      ls -lah test_infra/ess
+      .buildkite/scripts/steps/ess_down.sh
+    depends_on:
+      - integration-tests-ubuntu
+      - integration-tests-win
+      - integration-tests-rhel
+      - integration-tests-kubernetes
+      - extended-integration-tests
+      - integration-tests-debian
+    label: ESS stack cleanup
+    plugins:
+      - elastic/vault-secrets#v0.1.0:
+          env_var: EC_API_KEY
+          field: apiKey
+          path: kv/ci-shared/platform-ingest/platform-ingest-ec-prod
+  - agents:
+      image: docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5
+      useCustomGlobalHooks: true
+    allow_dependency_failure: true
+    command: |-
+      buildkite-agent artifact download "build/*.xml" .
+      buildkite-agent artifact download "build\*.xml" .
+    depends_on:
+      - integration-tests-ech
+      - integration-tests-ubuntu
+      - integration-tests-win
+      - integration-tests-rhel
+      - integration-tests-kubernetes
+      - integration-tests-serverless
+      - integration-tests-debian
+    key: aggregate-reports
+    label: Aggregate test reports
+    plugins:
+      - elastic/vault-secrets#v0.1.0:
+          env_var: BUILDKITE_ANALYTICS_TOKEN
+          field: token
+          path: kv/ci-shared/platform-ingest/buildkite_analytics_token
+      - test-collector#v1.11.0:
+          branches: main
+          debug: true
+          files: build/*.xml
+          format: junit
+    soft_fail:
+      - exit_status: "*"
