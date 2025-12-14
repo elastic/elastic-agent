@@ -129,38 +129,6 @@ func (mr *monitoringReceiver) updateMetrics(ctx context.Context) {
 	mr.consumer.ConsumeLogs(ctx, pLogs)
 }
 
-func (mr *monitoringReceiver) eventFields() mapstr.M {
-	// beat.stats.libbeat.pipeline.queue.filled.pct
-	m := mapstr.M{
-		"data_stream": mapstr.M{
-			"dataset":   "elastic_agent.elastic_agent",
-			"namespace": "default",
-			"type":      "metrics",
-		},
-		"event": mapstr.M{
-			"dataset": "elastic_agent.elastic_agent",
-		},
-		"elastic_agent": mapstr.M{
-			"id":       "70c129a6-0075-47f4-9777-b88577afa393",
-			"process":  "elastic-agent",
-			"snapshot": false,
-			"version":  "9.3.0",
-		},
-		"agent": mapstr.M{
-			"id": "70c129a6-0075-47f4-9777-b88577afa393",
-		},
-		"component": mapstr.M{
-			"binary": "elastic-agent",
-			"id":     "elastic-agent/collector",
-		},
-		"metricset": mapstr.M{
-			"name": "stats",
-		},
-	}
-	m.Put("beat.stats.libbeat.pipeline.queue.filled.pct", 0.5)
-	return m
-}
-
 func NewFactory() receiver.Factory {
 	return receiver.NewFactory(
 		component.MustNewType(Name),
