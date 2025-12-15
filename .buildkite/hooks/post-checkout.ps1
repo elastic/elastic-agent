@@ -1,6 +1,9 @@
 # Set error handling
 $ErrorActionPreference = "Stop"
 
+# Fix CRLF before any git operations to prevent line ending conflicts
+git config core.autocrlf true
+
 # Define a function to checkout and merge
 function Checkout-Merge {
     param (
@@ -49,9 +52,6 @@ if ($pullRequest -ne "false") {
     Write-Host "Commit information"
     git --no-pager log --format=%B -n 1
 }
-
-Write-Host "Fixing CRLF in git checkout --"
-git config core.autocrlf true
 
 # Initialize submodules if they exist
 if (Test-Path ".gitmodules") {
