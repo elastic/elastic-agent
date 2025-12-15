@@ -430,15 +430,17 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	// checkin
 	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client)
 	req := &fleetapi.CheckinRequest{
-		AckToken:           ackToken,
-		Metadata:           ecsMeta,
-		Status:             agentStateToString(state.State),
-		Message:            state.Message,
-		Components:         components,
-		UpgradeDetails:     state.UpgradeDetails,
-		AgentPolicyID:      agentPolicyID,
-		PolicyRevisionIDX:  policyRevisionIDX,
-		AvailableRollbacks: validRollbacks,
+		AckToken:          ackToken,
+		Metadata:          ecsMeta,
+		Status:            agentStateToString(state.State),
+		Message:           state.Message,
+		Components:        components,
+		UpgradeDetails:    state.UpgradeDetails,
+		AgentPolicyID:     agentPolicyID,
+		PolicyRevisionIDX: policyRevisionIDX,
+	}
+	if len(validRollbacks) > 0 {
+		req.Upgrade.Rollbacks = validRollbacks
 	}
 
 	resp, took, err := cmd.Execute(stateCtx, req)
