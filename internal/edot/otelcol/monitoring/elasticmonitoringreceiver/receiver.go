@@ -6,7 +6,6 @@ package elasticmonitoringreceiver
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/elastic/beats/v7/libbeat/otelbeat/otelmap"
@@ -15,24 +14,44 @@ import (
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/plog"
+	"go.opentelemetry.io/collector/receiver"
 )
 
 type monitoringReceiver struct {
 	config   *Config
 	consumer consumer.Logs
 
-	ctx    context.Context
+	runCtx context.Context
 	cancel context.CancelFunc
-	host   component.Host
-	wg     sync.WaitGroup
+
+	// done is closed to signal that the receiver is finished shutting down.
+	// We use a channel rather than a wait group so the wait duration can
+	// be controlled by a provided context.
+	done chan struct{}
 }
 
-func (mr *monitoringReceiver) Start(ctx context.Context, host component.Host) error {
-	mr.ctx, mr.cancel = context.WithCancel(ctx)
-	mr.host = host
-	mr.wg.Add(1)
+func createReceiver(
+	ctx context.Context,
+	set receiver.Settings,
+	baseCfg component.Config,
+	consumer consumer.Logs,
+) (receiver.Logs, error) {
+	cfg := baseCfg.(*Config)
+
+	runCtx, cancel := context.WithCancel(context.Background())
+
+	return &monitoringReceiver{
+		config:   cfg,
+		consumer: consumer,
+		runCtx:   runCtx,
+		cancel:   cancel,
+		done:     make(chan struct{}),
+	}, nil
+}
+
+func (mr *monitoringReceiver) Start(ctx context.Context, _ component.Host) error {
 	go func() {
-		defer mr.wg.Done()
+		defer close(mr.done)
 		mr.run()
 	}()
 	return nil
@@ -40,14 +59,20 @@ func (mr *monitoringReceiver) Start(ctx context.Context, host component.Host) er
 
 func (mr *monitoringReceiver) Shutdown(ctx context.Context) error {
 	mr.cancel()
-	mr.wg.Wait()
+	// Wait for the run loop to stop, but return immediately if the context
+	// is cancelled.
+	select {
+	case <-mr.done:
+	case <-ctx.Done():
+	}
 	return nil
 }
 
 func (mr *monitoringReceiver) run() {
-	for mr.ctx.Err() == nil {
+	mr.updateMetrics()
+	for mr.runCtx.Err() == nil {
 		select {
-		case <-mr.ctx.Done():
+		case <-mr.runCtx.Done():
 		case <-time.After(mr.config.interval):
 			mr.updateMetrics()
 		}
@@ -65,7 +90,7 @@ func (mr *monitoringReceiver) updateMetrics() {
 	beatEvent := mapstr.M(mr.config.EventTemplate.Fields).Clone()
 
 	// Add internal telemetry data
-	addMetricsFields(mr.ctx, &beatEvent)
+	addMetricsFields(mr.runCtx, &beatEvent)
 
 	// Set timestamp
 	now := time.Now()
@@ -94,5 +119,5 @@ func (mr *monitoringReceiver) updateMetrics() {
 		//out.log.Errorf("received an error while converting map to plog.Log, some fields might be missing: %v", err)
 	}
 
-	mr.consumer.ConsumeLogs(mr.ctx, pLogs)
+	mr.consumer.ConsumeLogs(mr.runCtx, pLogs)
 }
