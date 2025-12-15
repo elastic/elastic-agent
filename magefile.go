@@ -81,6 +81,8 @@ import (
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	"golang.org/x/sync/errgroup"
+	"gopkg.in/yaml.v3"
+
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/chartutil"
@@ -381,14 +383,18 @@ func getTestBinariesPath() ([]string, error) {
 		filepath.Join(wd, "pkg", "component", "fake", "component"),
 		filepath.Join(wd, "internal", "pkg", "agent", "install", "testblocking"),
 		filepath.Join(wd, "pkg", "core", "process", "testsignal"),
-		filepath.Join(wd, "internal", "pkg", "otel", "manager", "testing"),
 		filepath.Join(wd, "internal", "pkg", "agent", "application", "filelock", "testlocker"),
+		filepath.Join(wd, "internal", "edot", "testing"),
 	}
 	return testBinaryPkgs, nil
 }
 
 // TestBinaries build the required binaries for the test suite.
 func (Build) TestBinaries() error {
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("could not get working directory: %w", err)
+	}
 	testBinaryPkgs, err := getTestBinariesPath()
 	if err != nil {
 		fmt.Errorf("cannot build test binaries: %w", err)
@@ -417,9 +423,32 @@ func (Build) TestBinaries() error {
 		outputName := filepath.Join(pkg, binary)
 		finalArgs := make([]string, len(args))
 		copy(finalArgs, args)
-		finalArgs = append(finalArgs, "-o", outputName, filepath.Join(pkg))
+		finalArgs = append(finalArgs, "-o", outputName)
 
-		err := RunGo(finalArgs...)
+		// test binaries under internal/edot must be built from the root of internal/edot so it uses
+		// the go.mod of that directory and not the go.mod of the top-level directory
+		edotRoot := filepath.Join(wd, "internal", "edot")
+		if strings.HasPrefix(pkg, edotRoot) {
+			// change to internal/edot directory so Go uses its go.mod
+			if err := os.Chdir(edotRoot); err != nil {
+				return fmt.Errorf("could not change to edot directory: %w", err)
+			}
+			// calculate the relative path from internal/edot to the package
+			relPath, err := filepath.Rel(edotRoot, pkg)
+			if err != nil {
+				os.Chdir(wd) // restore before returning
+				return fmt.Errorf("could not determine relative path for %s: %w", pkg, err)
+			}
+			finalArgs = append(finalArgs, "./"+relPath)
+		} else {
+			finalArgs = append(finalArgs, pkg)
+		}
+
+		err = RunGo(finalArgs...)
+		if strings.HasPrefix(pkg, edotRoot) {
+			// restore the work directory (if it was changed)
+			os.Chdir(wd)
+		}
 		if err != nil {
 			return err
 		}
