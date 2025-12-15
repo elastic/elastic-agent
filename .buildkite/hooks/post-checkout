@@ -49,7 +49,7 @@ fi
 # Initialize submodules if they exist
 if [[ -f ".gitmodules" ]]; then
     echo "Initializing submodules"
-    git submodule update --init
+    git submodule update --init --progress
 fi
 
 # Ensure buildkite groups are rendered

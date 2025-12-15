@@ -56,7 +56,7 @@ git config core.autocrlf true
 # Initialize submodules if they exist
 if (Test-Path ".gitmodules") {
     Write-Host "Initializing submodules"
-    git submodule update --init
+    git submodule update --init --progress
 }
 
 # Ensure Buildkite groups are rendered
