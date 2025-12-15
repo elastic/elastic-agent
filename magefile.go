@@ -397,10 +397,10 @@ func (Build) TestBinaries() error {
 	}
 	testBinaryPkgs, err := getTestBinariesPath()
 	if err != nil {
-		fmt.Errorf("cannot build test binaries: %w", err)
+		return fmt.Errorf("cannot build test binaries: %w", err)
 	}
 
-	args := []string{"build", "-v"}
+	buildArgs := []string{"build", "-v"}
 	if runtime.GOOS == "darwin" {
 		osMajorVer, err := getMacOSMajorVersion()
 		if err != nil {
@@ -410,10 +410,11 @@ func (Build) TestBinaries() error {
 		if osMajorVer > 13 {
 			// Workaround for https://github.com/golang/go/issues/67854 until it
 			// is resolved.
-			args = append(args, "-ldflags", "-extldflags='-ld_classic'")
+			buildArgs = append(buildArgs, "-ldflags", "-extldflags='-ld_classic'")
 		}
 	}
 
+	edotRoot := filepath.Join(wd, "internal", "edot")
 	for _, pkg := range testBinaryPkgs {
 		binary := filepath.Base(pkg)
 		if runtime.GOOS == "windows" {
@@ -421,39 +422,29 @@ func (Build) TestBinaries() error {
 		}
 
 		outputName := filepath.Join(pkg, binary)
-		finalArgs := make([]string, len(args))
-		copy(finalArgs, args)
-		finalArgs = append(finalArgs, "-o", outputName)
+		finalArgs := make([]string, 0, len(buildArgs)+4)
 
-		// test binaries under internal/edot must be built from the root of internal/edot so it uses
-		// the go.mod of that directory and not the go.mod of the top-level directory
-		edotRoot := filepath.Join(wd, "internal", "edot")
+		// test binaries under internal/edot must be built using internal/edot's go.mod
 		if strings.HasPrefix(pkg, edotRoot) {
-			// change to internal/edot directory so Go uses its go.mod
-			if err := os.Chdir(edotRoot); err != nil {
-				return fmt.Errorf("could not change to edot directory: %w", err)
-			}
+			// use -C to run go from internal/edot directory so it uses that go.mod
+			finalArgs = append(finalArgs, "-C", "internal/edot")
+			finalArgs = append(finalArgs, buildArgs...)
+			finalArgs = append(finalArgs, "-o", outputName)
 			// calculate the relative path from internal/edot to the package
 			relPath, err := filepath.Rel(edotRoot, pkg)
 			if err != nil {
-				os.Chdir(wd) // restore before returning
 				return fmt.Errorf("could not determine relative path for %s: %w", pkg, err)
 			}
 			finalArgs = append(finalArgs, "./"+relPath)
 		} else {
-			finalArgs = append(finalArgs, pkg)
+			finalArgs = append(finalArgs, buildArgs...)
+			finalArgs = append(finalArgs, "-o", outputName, pkg)
 		}
 
-		err = RunGo(finalArgs...)
-		if strings.HasPrefix(pkg, edotRoot) {
-			// restore the work directory (if it was changed)
-			os.Chdir(wd)
-		}
-		if err != nil {
+		if err = RunGo(finalArgs...); err != nil {
 			return err
 		}
-		err = os.Chmod(outputName, 0o755)
-		if err != nil {
+		if err = os.Chmod(outputName, 0o755); err != nil {
 			return err
 		}
 	}
