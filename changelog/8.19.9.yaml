@@ -5,11 +5,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/11671
-        - https://github.com/elastic/elastic-agent/pull/11749
-        - https://github.com/elastic/elastic-agent/pull/11752
-        - https://github.com/elastic/elastic-agent/pull/11729
-        - https://github.com/elastic/elastic-agent/pull/11719
+        - https://github.com/elastic/elastic-agent/pull/11300
       issue: []
       impact: ""
       action: ""
@@ -18,7 +14,7 @@ entries:
         name: 1763650536-self-monitoring-runtime.yaml
         checksum: 710e318433ce207e6651d5d55cdaa140b961dd35
     - kind: bug-fix
-      summary: allow host to be a string for otel configuration translation
+      summary: Allow host to be a string for OTel configuration translation.
       description: ""
       component: elastic-agent
       pr:
@@ -32,15 +28,11 @@ entries:
         name: 1764016303-allow-host-to-be-a-string-for-otel-configuration-translation.yaml
         checksum: 7f3f634b8c2bd92df76f55688508855306604eb7
     - kind: feature
-      summary: Allow setting component runtime per input type
+      summary: Allow setting component runtime per input type.
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/11671
-        - https://github.com/elastic/elastic-agent/pull/11749
-        - https://github.com/elastic/elastic-agent/pull/11752
-        - https://github.com/elastic/elastic-agent/pull/11729
-        - https://github.com/elastic/elastic-agent/pull/11719
+        - https://github.com/elastic/elastic-agent/pull/11186
       issue: []
       impact: ""
       action: ""
@@ -49,15 +41,11 @@ entries:
         name: 1764270813-runtime-per-input-type.yaml
         checksum: 11766aee53f12560f7dce5a62663eadc793106ef
     - kind: bug-fix
-      summary: Add environment.yaml file to diagnostics
+      summary: Add environment.yaml file to diagnostics.
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/11671
-        - https://github.com/elastic/elastic-agent/pull/11749
-        - https://github.com/elastic/elastic-agent/pull/11752
-        - https://github.com/elastic/elastic-agent/pull/11729
-        - https://github.com/elastic/elastic-agent/pull/11719
+        - https://github.com/elastic/elastic-agent/pull/11484
       issue:
         - https://github.com/elastic/elastic-agent/issues/10966
       impact: ""
@@ -67,15 +55,11 @@ entries:
         name: 1764357992-Add-environment.yml-file-to-diagnostics.yaml
         checksum: 32d02808ffe0d86635f1fae1998146da5518e734
     - kind: bug-fix
-      summary: Merge multiple agent keys when loading config
+      summary: Merge multiple agent keys when loading config.
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/11671
-        - https://github.com/elastic/elastic-agent/pull/11749
-        - https://github.com/elastic/elastic-agent/pull/11752
-        - https://github.com/elastic/elastic-agent/pull/11729
-        - https://github.com/elastic/elastic-agent/pull/11719
+        - https://github.com/elastic/elastic-agent/pull/11619
       issue:
         - https://github.com/elastic/elastic-agent/issues/3717
       impact: ""

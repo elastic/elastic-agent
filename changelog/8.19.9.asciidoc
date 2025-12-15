@@ -22,7 +22,7 @@ The 8.19.9 release adds the following new and notable features.
 
 
 
-* Allow setting component runtime per input type. https://github.com/elastic/elastic-agent/pull/11671[#11671] https://github.com/elastic/elastic-agent/pull/11749[#11749] https://github.com/elastic/elastic-agent/pull/11752[#11752] https://github.com/elastic/elastic-agent/pull/11729[#11729] https://github.com/elastic/elastic-agent/pull/11719[#11719] 
+* Allow setting component runtime per input type. https://github.com/elastic/elastic-agent/pull/11186[#11186]
 
 
 
@@ -36,9 +36,9 @@ The 8.19.9 release adds the following new and notable features.
 
 
 
-* Ensure the self-monitoring configuration accounts for the runtime components actually run in. https://github.com/elastic/elastic-agent/pull/11671[#11671] https://github.com/elastic/elastic-agent/pull/11749[#11749] https://github.com/elastic/elastic-agent/pull/11752[#11752] https://github.com/elastic/elastic-agent/pull/11729[#11729] https://github.com/elastic/elastic-agent/pull/11719[#11719] 
-* Allow host to be a string for otel configuration translation. https://github.com/elastic/elastic-agent/pull/11394[#11394] https://github.com/elastic/elastic-agent/issues/11352[#11352]
-* Add environment.yaml file to diagnostics. https://github.com/elastic/elastic-agent/pull/11671[#11671] https://github.com/elastic/elastic-agent/pull/11749[#11749] https://github.com/elastic/elastic-agent/pull/11752[#11752] https://github.com/elastic/elastic-agent/pull/11729[#11729] https://github.com/elastic/elastic-agent/pull/11719[#11719] https://github.com/elastic/elastic-agent/issues/10966[#10966]
-* Merge multiple agent keys when loading config. https://github.com/elastic/elastic-agent/pull/11671[#11671] https://github.com/elastic/elastic-agent/pull/11749[#11749] https://github.com/elastic/elastic-agent/pull/11752[#11752] https://github.com/elastic/elastic-agent/pull/11729[#11729] https://github.com/elastic/elastic-agent/pull/11719[#11719] https://github.com/elastic/elastic-agent/issues/3717[#3717]
+* Ensure the self-monitoring configuration accounts for the runtime components actually run in. https://github.com/elastic/elastic-agent/pull/11300[#11300]
+* Allow host to be a string for OTel configuration translation. https://github.com/elastic/elastic-agent/pull/11394[#11394] https://github.com/elastic/elastic-agent/issues/11352[#11352]
+* Add environment.yaml file to diagnostics. https://github.com/elastic/elastic-agent/pull/11484[#11484] https://github.com/elastic/elastic-agent/issues/10966[#10966]
+* Merge multiple agent keys when loading config. https://github.com/elastic/elastic-agent/pull/11619[#11619] https://github.com/elastic/elastic-agent/issues/3717[#3717]
 
 // end 8.19.9 relnotes
