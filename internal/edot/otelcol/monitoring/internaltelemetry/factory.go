@@ -7,11 +7,8 @@ package internaltelemetry
 import (
 	"context"
 	"errors"
-	"fmt"
-	"os"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config/configtelemetry"
@@ -50,14 +47,6 @@ var globalFactory atomic.Pointer[wrappedFactory]
 var newFactoryOnce sync.Once
 
 func NewFactory() telemetry.Factory {
-	// DEBUG LOOP REMOVE BEFORE MERGE
-	pid := os.Getpid()
-	for i := range 20 {
-		fmt.Printf("============= [%d] PID: %d =================================\n", i, pid)
-		time.Sleep(time.Second)
-	}
-	// END DEBUG LOOP
-
 	newFactoryOnce.Do(func() {
 		// Initialize a wrapped telemetry factory with the collector's
 		// default behavior.
