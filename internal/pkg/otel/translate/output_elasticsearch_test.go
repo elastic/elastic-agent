@@ -8,6 +8,7 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"strings"
 	"testing"
 	"text/template"
 
@@ -324,6 +325,125 @@ sending_queue:
 			})
 		}
 	})
+
+	t.Run("test max_retries positive", func(t *testing.T) {
+		beatCfg := `
+hosts:
+  - localhost:9200
+  - localhost:9300
+protocol: http
+max_retries: 5
+path: /foo/bar
+username: elastic
+password: changeme
+index: "some-index"
+backoff:
+  init: 42s
+  max: 420s
+workers: 30
+headers:
+  X-Header-1: foo
+  X-Bar-Header: bar`
+
+		OTelCfg := `
+endpoints:
+  - http://localhost:9200/foo/bar
+  - http://localhost:9300/foo/bar
+logs_index: some-index
+logs_dynamic_pipeline:
+  enabled: true
+max_conns_per_host: 60
+password: changeme
+retry:
+  enabled: true
+  initial_interval: 42s
+  max_interval: 7m0s
+  max_retries: 5
+sending_queue:
+  batch:
+    flush_timeout: 10s
+    max_size: 1600
+    min_size: 0
+    sizer: items
+  block_on_overflow: true
+  enabled: true
+  num_consumers: 60
+  queue_size: 3200
+  wait_for_result: true
+user: elastic
+headers:
+  X-Header-1: foo
+  X-Bar-Header: bar
+mapping:
+  mode: bodymap
+compression: gzip
+compression_params:
+  level: 1
+ `
+		cfg := config.MustNewConfigFrom(beatCfg)
+		got, err := ToOTelConfig(cfg, logger)
+		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
+		expOutput := newFromYamlString(t, OTelCfg)
+		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
+	})
+
+	t.Run("test max_retries zero", func(t *testing.T) {
+		beatCfg := `
+hosts:
+  - localhost:9200
+  - localhost:9300
+protocol: http
+max_retries: 0
+path: /foo/bar
+username: elastic
+password: changeme
+index: "some-index"
+backoff:
+  init: 42s
+  max: 420s
+workers: 30
+headers:
+  X-Header-1: foo
+  X-Bar-Header: bar`
+
+		OTelCfg := `
+endpoints:
+  - http://localhost:9200/foo/bar
+  - http://localhost:9300/foo/bar
+logs_index: some-index
+logs_dynamic_pipeline:
+  enabled: true
+max_conns_per_host: 60
+password: changeme
+retry:
+  enabled: false
+sending_queue:
+  batch:
+    flush_timeout: 10s
+    max_size: 1600
+    min_size: 0
+    sizer: items
+  block_on_overflow: true
+  enabled: true
+  num_consumers: 60
+  queue_size: 3200
+  wait_for_result: true
+user: elastic
+headers:
+  X-Header-1: foo
+  X-Bar-Header: bar
+mapping:
+  mode: bodymap
+compression: gzip
+compression_params:
+  level: 1
+ `
+		cfg := config.MustNewConfigFrom(beatCfg)
+		got, err := ToOTelConfig(cfg, logger)
+		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
+		expOutput := newFromYamlString(t, OTelCfg)
+		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
+	})
 }
 
 func TestCompressionConfig(t *testing.T) {
@@ -383,6 +503,40 @@ compression: none
 			require.NoError(t, template.Must(template.New("config").Parse(otelConfig)).Execute(&otelBuffer, level))
 			expOutput := newFromYamlString(t, otelBuffer.String())
 			compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
+		})
+	}
+}
+
+func TestToOTelConfig_CheckUnsupported(t *testing.T) {
+	logger := logptest.NewTestingLogger(t, "")
+
+	cases := []struct {
+		name            string
+		cfg             map[string]any
+		wantErrContains string
+	}{
+		{"indices", map[string]any{"indices": []any{"i"}}, "indices is currently not supported"},
+		{"parameters", map[string]any{"parameters": map[string]any{"x": "y"}}, "parameters is currently not supported"},
+		{"allow_older_versions_false", map[string]any{"allow_older_versions": false}, "allow_older_versions:false is currently not supported"},
+		{"loadbalance_false", map[string]any{"loadbalance": false}, "ladbalance:false is currently not supported"},
+		{"non_indexable_policy", map[string]any{"non_indexable_policy": "x"}, "non_indexable_policy is currently not supported"},
+		{"max_retries_negative", map[string]any{"max_retries": -5}, "max_retries should be non-negative"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			cfg, err := config.NewConfigFrom(c.cfg)
+			if err != nil {
+				t.Fatalf("failed creating config for case %s: %v", c.name, err)
+			}
+
+			_, err = ToOTelConfig(cfg, logger)
+			if err == nil {
+				t.Fatalf("expected error for case %s but got nil", c.name)
+			}
+			if !strings.Contains(err.Error(), c.wantErrContains) {
+				t.Fatalf("error mismatch for case %s:\n got: %v\nwant contains: %s", c.name, err, c.wantErrContains)
+			}
 		})
 	}
 }
