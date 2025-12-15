@@ -1434,6 +1434,10 @@ func supportsAtLeastOnePackageType(platform string, spec packaging.BinarySpec, p
 // supportsSelectedPackageTypesFilter returns a filter which will exclude components that do not support at least one of the selected package types
 func supportsSelectedPackageTypesFilter(platforms []string, packageTypes []devtools.PackageType) packaging.ComponentFilter {
 	return func(dep packaging.BinarySpec) bool {
+		// If there are no package types set, return true to include all components by default
+		if len(packageTypes) == 0 {
+			return true
+		}
 		for _, platform := range platforms {
 			if supportsAtLeastOnePackageType(platform, dep, packageTypes) {
 				return true
