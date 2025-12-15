@@ -643,6 +643,9 @@ func DownloadManifest(ctx context.Context) error {
 		return fmt.Errorf("failed extracting dependencies: %w", err)
 	}
 
+	// Only include components that support at least one of the selected package types
+	dependencies = packaging.FilterComponents(dependencies, supportsSelectedPackageTypesFilter(platforms, devtools.SelectedPackageTypes))
+
 	if e := manifest.DownloadComponents(ctx, dependencies, devtools.ManifestURL, platforms, dropPath); e != nil {
 		return fmt.Errorf("failed to download the manifest file, %w", e)
 	}
@@ -1404,6 +1407,10 @@ func collectPackageDependencies(platforms []string, packageVersion string, packa
 	} else {
 		archivePath = movePackagesToArchive(dropPath, platforms, packageVersion, dependencies)
 	}
+
+	// Only include components that support at least one of the selected package types
+	dependencies = packaging.FilterComponents(dependencies, supportsSelectedPackageTypesFilter(platforms, packageTypes))
+
 	return archivePath, dropPath, dependencies
 }
 
@@ -1422,6 +1429,25 @@ func supportsAtLeastOnePackageType(platform string, spec packaging.BinarySpec, p
 	}
 	log.Printf(">>> Component %s/%s not supported for any of the selected package types %v. Skipping...", spec.BinaryName, platform, packageTypes)
 	return false
+}
+
+// supportsSelectedPackageTypesFilter returns a filter which will exclude components that do not support at least one of the selected package types
+func supportsSelectedPackageTypesFilter(platforms []string, packageTypes []devtools.PackageType) packaging.ComponentFilter {
+	return func(dep packaging.BinarySpec) bool {
+		// If there are no package types set, return true to include all components by default
+		if len(packageTypes) == 0 {
+			return true
+		}
+		for _, platform := range platforms {
+			if supportsAtLeastOnePackageType(platform, dep, packageTypes) {
+				return true
+			}
+		}
+		if mg.Verbose() {
+			log.Printf(">>> Filtering out component %s as it doesn't support any selected package types %v", dep.BinaryName, packageTypes)
+		}
+		return false
+	}
 }
 
 func removePythonWheels(matches []string, version string, dependencies []packaging.BinarySpec) []string {
