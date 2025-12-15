@@ -64,6 +64,25 @@ components:
   #      - <platform, use anchors for platforms above>
   #    pythonWheel: true # true if it's a package that is not platform specific
   #    packageTypes: *all-package-types # package types it should be included in
+  # Elastic Agent core component, defined here because it's a dependency when packaging using elastic-agent DRA
+  - &comp-elastic-agent-core
+    projectName: elastic-agent-core
+    packageName: elastic-agent-core-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: elastic-agent-core-{{.Version}}-{{.Platform}}
+    binaryName: elastic-agent
+    fips: false
+    platforms: *all-platforms
+    packageTypes: *all-package-types
+  - &comp-agentbeat-fips
+    projectName: beats
+    packageName: agentbeat-fips-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: agentbeat-{{.Version}}-{{.Platform}}
+    binaryName: agentbeat
+    fips: true
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
   - &comp-apm_server
     projectName: apm-server
     packageName: apm-server-{{.Version}}-{{.Platform}}.{{.Ext}}
