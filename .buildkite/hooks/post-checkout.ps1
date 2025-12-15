@@ -38,23 +38,26 @@ function Checkout-Merge {
 
 $pullRequest = $env:BUILDKITE_PULL_REQUEST
 
-if ($pullRequest -eq "false") {
-    Write-Host "Not a pull request, skipping"
-    exit 0
+if ($pullRequest -ne "false") {
+    $targetBranch = $env:BUILDKITE_PULL_REQUEST_BASE_BRANCH
+    $prCommit = $env:BUILDKITE_COMMIT
+    $prId = $env:BUILDKITE_PULL_REQUEST
+    $mergeBranch = "pr_merge_$prId"
+
+    Checkout-Merge $targetBranch $prCommit $mergeBranch
+
+    Write-Host "Commit information"
+    git --no-pager log --format=%B -n 1
 }
-
-$targetBranch = $env:BUILDKITE_PULL_REQUEST_BASE_BRANCH
-$prCommit = $env:BUILDKITE_COMMIT
-$prId = $env:BUILDKITE_PULL_REQUEST
-$mergeBranch = "pr_merge_$prId"
-
-Checkout-Merge $targetBranch $prCommit $mergeBranch
-
-Write-Host "Commit information"
-git --no-pager log --format=%B -n 1
 
 Write-Host "Fixing CRLF in git checkout --"
 git config core.autocrlf true
+
+# Initialize submodules if they exist
+if (Test-Path ".gitmodules") {
+    Write-Host "Initializing submodules"
+    git submodule update --init
+}
 
 # Ensure Buildkite groups are rendered
 Write-Host ""
