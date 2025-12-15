@@ -10,6 +10,8 @@ import (
 
 	"github.com/elastic/beats/v7/libbeat/otelbeat/otelmap"
 	"github.com/elastic/elastic-agent-libs/mapstr"
+	"go.uber.org/zap"
+
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/pdata/pcommon"
@@ -18,6 +20,7 @@ import (
 )
 
 type monitoringReceiver struct {
+	logger   *zap.Logger
 	config   *Config
 	consumer consumer.Logs
 
@@ -41,6 +44,7 @@ func createReceiver(
 	runCtx, cancel := context.WithCancel(context.Background())
 
 	return &monitoringReceiver{
+		logger:   set.Logger,
 		config:   cfg,
 		consumer: consumer,
 		runCtx:   runCtx,
@@ -116,8 +120,8 @@ func (mr *monitoringReceiver) updateMetrics() {
 
 	// Set log record body to computed fields
 	if err := logRecord.Body().SetEmptyMap().FromRaw(map[string]any(beatEvent)); err != nil {
-		//out.log.Errorf("received an error while converting map to plog.Log, some fields might be missing: %v", err)
+		mr.logger.Error("couldn't convert map to plog.Log, some fields might be missing", zap.Error(err))
 	}
 
-	mr.consumer.ConsumeLogs(mr.runCtx, pLogs)
+	_ = mr.consumer.ConsumeLogs(mr.runCtx, pLogs)
 }
