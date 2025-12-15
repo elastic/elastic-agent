@@ -81,8 +81,6 @@ import (
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	"golang.org/x/sync/errgroup"
-	"gopkg.in/yaml.v3"
-
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/chartutil"
@@ -451,8 +449,8 @@ func (Check) DocsFiles() error {
 
 	requiredFiles := []string{
 		"go.mod",
-		"internal/pkg/otel/components.yml",
-		"internal/pkg/otel/samples/linux/gateway.yml",
+		"internal/edot/components.yml",
+		"internal/edot/samples/linux/gateway.yml",
 	}
 
 	missing := false
@@ -3639,10 +3637,10 @@ func (Otel) CrossBuild() error {
 }
 
 func (Otel) Readme() error {
-	fmt.Println(">> Building internal/pkg/otel/README.md")
+	fmt.Println(">> Building internal/edot/README.md")
 
-	readmeTmpl := filepath.Join("internal", "pkg", "otel", "templates", "README.md.tmpl")
-	readmeOut := filepath.Join("internal", "pkg", "otel", "README.md")
+	readmeTmpl := filepath.Join("internal", "edot", "templates", "README.md.tmpl")
+	readmeOut := filepath.Join("internal", "edot", "README.md")
 
 	// read README template
 	tmpl, err := template.ParseFiles(readmeTmpl)
