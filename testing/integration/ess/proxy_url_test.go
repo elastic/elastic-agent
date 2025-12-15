@@ -10,7 +10,9 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -24,14 +26,19 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
+	"github.com/elastic/elastic-agent/pkg/version"
 	"github.com/elastic/elastic-agent/testing/fleetservertest"
 	"github.com/elastic/elastic-agent/testing/integration"
 	"github.com/elastic/elastic-agent/testing/proxytest"
+	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
 func TestProxyURL(t *testing.T) {
@@ -791,4 +798,234 @@ func createBasicFleetPolicyData(t *testing.T, fleetHost string) (fleetservertest
 			Type:   "elasticsearch"},
 	}
 	return apiKey, policyData
+}
+
+// TestFleetDownloadProxyURL will test that the download proxy is used correctly for an agent upgrade.
+//
+// Test will target a download source that requires a proxy to be used.
+//
+//	elastic-agent -> proxy -> artifacts-proxy -> upstream
+//
+// If a proxy is not used, the artifacts-proxy returns a status error code.
+// This test will do the following:
+//  1. Create special artifacts-proxy that requires a proxy header in order to serve artifacts
+//  2. Create a policy with no proxies - that has the artifacts-proxy as the download url
+//  3. Enroll an agent
+//  4. Upgrade the agent
+//  5. Ensure upgrade fails
+//  6. Update policy to use a download proxy
+//  7. Upgrade the agent
+//  8. Ensure upgrade succeeds
+func TestFleetDownloadProxyURL(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Fleet,
+		Stack: &define.Stack{},
+		Local: false,
+		Sudo:  true,
+	})
+	ctx := t.Context()
+	kibClient := info.KibanaClient
+	fleetServerURL, err := fleettools.DefaultURL(ctx, kibClient)
+	require.NoError(t, err)
+	testUUID, err := uuid.NewV4()
+	require.NoError(t, err, "error generating UUID for test")
+
+	artifactsProxy := proxytest.New(t,
+		proxytest.WithVerifyRequest(func(r *http.Request) error { // ensure we have proxy header
+			h := r.Header.Get("Forwarded")
+			if h == "" {
+				h = r.Header.Get("X-Forwarded-For")
+				if h == "" {
+					return errors.New("missing proxy header")
+				}
+			}
+			return nil
+		}),
+		proxytest.WithRewriteFn(func(u *url.URL) { // Send requests to real upstream source
+			u.Scheme = "https"
+			u.Host = "snapshots.elastic.co"
+		}),
+		proxytest.WithRequestLog("artifacts", t.Logf),
+		proxytest.WithVerboseLog())
+	err = artifactsProxy.Start()
+	require.NoError(t, err, "Error starting artifacts proxy")
+	t.Cleanup(artifactsProxy.Close)
+
+	downloadSource := kibana.DownloadSource{
+		Name: "LocalArtifactsProxy-" + testUUID.String(),
+		Host: artifactsProxy.LocalhostURL + "/downloads/",
+	}
+	sourceResp, err := kibClient.CreateDownloadSource(ctx, downloadSource)
+	require.NoError(t, err, "Unable to create download source")
+
+	// Get and process start and end fixtures
+	startFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+	err = startFixture.Prepare(ctx)
+	require.NoError(t, err)
+	startVersionInfo, err := startFixture.ExecVersion(ctx)
+	require.NoError(t, err)
+	startParsedVersion, err := version.ParseVersion(startVersionInfo.Binary.String())
+	require.NoError(t, err)
+
+	endFixture, err := atesting.NewFixture(
+		t,
+		upgradetest.EnsureSnapshot(define.Version()),
+		atesting.WithFetcher(atesting.ArtifactFetcher()),
+	)
+	require.NoError(t, err)
+	err = endFixture.Prepare(ctx)
+	require.NoError(t, err)
+	endVersionInfo, err := endFixture.ExecVersion(ctx)
+	require.NoError(t, err)
+
+	if startVersionInfo.Binary.String() == endVersionInfo.Binary.String() &&
+		startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
+		t.Skipf("Build under test is the same as the build from the artifacts repository (version: %s) [commit: %s]",
+			startVersionInfo.Binary.String(), startVersionInfo.Binary.Commit)
+	}
+	if startVersionInfo.Binary.Commit == endVersionInfo.Binary.Commit {
+		t.Skipf("Target version has the same commit hash %q", endVersionInfo.Binary.Commit)
+	}
+
+	t.Log("Creating Agent policy...")
+	policy := kibana.AgentPolicy{
+		Name:        "test-policy-" + testUUID.String(),
+		Namespace:   "default",
+		Description: "Test policy " + testUUID.String(),
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
+		},
+		DownloadSourceID: sourceResp.Item.ID, // Use artifacts-proxy as download source
+		AdvancedSettings: map[string]interface{}{
+			"agent_download_timeout": "1m", // Force a fast initial failure timeout
+		},
+	}
+	policyResp, err := kibClient.CreatePolicy(ctx, policy)
+	require.NoError(t, err)
+	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(ctx, kibana.CreateEnrollmentAPIKeyRequest{
+		PolicyID: policyResp.ID,
+	})
+	require.NoError(t, err)
+
+	err = upgradetest.ConfigureFastWatcher(ctx, startFixture)
+	require.NoError(t, err, "unable to write fast watcher config")
+
+	t.Log("Installing Elastic Agent...")
+	installOpts := atesting.InstallOpts{
+		Force: true,
+		EnrollOpts: atesting.EnrollOpts{
+			URL:             fleetServerURL,
+			EnrollmentToken: enrollmentToken.APIKey,
+		},
+	}
+	output, err := startFixture.Install(ctx, &installOpts)
+	t.Logf("Install agent output:\n%s", string(output))
+	require.NoError(t, err)
+
+	t.Log("Waiting for Agent to be correct version and healthy...")
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	require.NoError(t, err)
+
+	agentID, err := startFixture.AgentID(ctx)
+	require.NoError(t, err)
+	t.Logf("Agent ID: %q", agentID)
+
+	t.Log("Waiting for enrolled Agent status to be online...")
+	require.Eventually(t, func() bool {
+		return check.FleetAgentStatus(ctx, t, kibClient, agentID, "online")()
+	}, time.Minute*2, time.Second, "Agent did not come online")
+
+	t.Logf("Upgrading from version \"%s-%s\" to version \"%s-%s\", without proxy...",
+		startParsedVersion, startVersionInfo.Binary.Commit,
+		endVersionInfo.Binary.String(), endVersionInfo.Binary.Commit)
+	err = fleettools.UpgradeAgent(ctx, kibClient, agentID, endVersionInfo.Binary.String(), true)
+	require.NoError(t, err)
+
+	t.Log("Ensure upgrade has failed")
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		agent, err := kibClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
+		require.NoError(c, err)
+		require.NotNil(c, agent.UpgradeDetails)
+		require.Equal(c, "UPG_FAILED", agent.UpgradeDetails.State)
+	}, time.Minute*5, time.Second, "Unable to verify that upgrade has failed.")
+
+	proxy := proxytest.New(t,
+		proxytest.WithRequestLog("proxy", t.Logf),
+		proxytest.WithVerboseLog())
+	err = proxy.Start()
+	require.NoError(t, err, "error starting download proxy")
+	t.Cleanup(proxy.Close)
+
+	fleetProxyResp, err := kibClient.CreateFleetProxy(ctx, kibana.ProxiesRequest{
+		Name: "fleet-upgrade-test-proxy-" + testUUID.String(),
+		URL:  proxy.LocalhostURL,
+	})
+	require.NoError(t, err)
+
+	// Update download source to include download proxy
+	downloadSource.ProxyID = fleetProxyResp.Item.ID
+	_, err = kibClient.UpdateDownloadSource(ctx, sourceResp.Item.ID, downloadSource)
+	require.NoError(t, err, "Unable to update policy with download source proxy")
+	// Update policy to increase download timeout to 60m (default 120m)
+	updatedPolicy, err := kibClient.UpdatePolicy(ctx, policyResp.ID, kibana.AgentPolicyUpdateRequest{
+		Name:      policy.Name,
+		Namespace: policy.Namespace,
+		AdvancedSettings: map[string]interface{}{
+			"agent_download_timeout": "60m",
+		},
+	})
+	require.NoError(t, err, "Unable to update policy with new download timeout")
+
+	t.Logf("Verify agent is online and has updated to revision %d", updatedPolicy.Revision)
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		agentResp, err := kibClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
+		require.NoError(c, err)
+		require.Equal(c, "online", agentResp.Status)
+		require.Equal(c, updatedPolicy.Revision, agentResp.PolicyRevision)
+	}, time.Minute, time.Second, "Expected agent to be online and policy has updated")
+
+	t.Logf("Upgrading from version \"%s-%s\" to version \"%s-%s\", with proxy...",
+		startParsedVersion, startVersionInfo.Binary.Commit,
+		endVersionInfo.Binary.String(), endVersionInfo.Binary.Commit)
+	err = fleettools.UpgradeAgent(ctx, kibClient, agentID, endVersionInfo.Binary.String(), true)
+	require.NoError(t, err)
+
+	t.Log("Ensure upgrade starts")
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		agent, err := kibClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
+		require.NoError(c, err)
+		require.NotNil(c, agent.UpgradeDetails)
+	}, time.Minute*5, time.Second, "Unable to verify that upgrade details appear.")
+
+	t.Log("Waiting for upgrade watcher to start...")
+	err = upgradetest.WaitForWatcher(ctx, 5*time.Minute, 10*time.Second)
+	require.NoError(t, err)
+	t.Log("Upgrade watcher started")
+
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	require.NoError(t, err)
+
+	t.Log("Waiting for upgraded Agent status to be online...")
+	require.Eventually(t, func() bool {
+		return check.FleetAgentStatus(ctx, t, kibClient, agentID, "online")()
+	}, time.Minute*10, time.Second*10, "Agent did not come online")
+
+	t.Log("Check agent version")
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		ver, err := fleettools.GetAgentVersion(ctx, kibClient, agentID)
+		require.NoError(c, err)
+		require.Equal(c, endVersionInfo.Binary.Version, ver)
+	}, time.Minute*5, time.Second)
+
+	t.Log("Waiting for upgrade watcher to finish...")
+	err = upgradetest.WaitForNoWatcher(ctx, 2*time.Minute, 10*time.Second, 1*time.Minute+15*time.Second)
+	require.NoError(t, err)
+
+	err = upgradetest.CheckHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary)
+	require.NoError(t, err, "Post watcher check has failed, agent may have rolled back")
+
+	require.NotEmpty(t, artifactsProxy.ProxiedRequests(), "artifactsProxy does not have any requests")
+	require.NotEmpty(t, proxy.ProxiedRequests(), "proxy does not have any requests")
 }
