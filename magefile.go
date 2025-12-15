@@ -469,7 +469,7 @@ func (Check) All() {
 func (Check) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
 	// exclude copied files until we come up with a better option
-	return sh.RunV("go-licenser", "-d", "-license", "Elasticv2")
+	return sh.RunV("go-licenser", "-d", "-license", "Elasticv2", "-exclude", "beats")
 }
 
 // DocsFiles validates that files required by the docs generation script exist.
@@ -555,7 +555,7 @@ func (Format) All() {
 // License applies the right license header.
 func (Format) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
-	return sh.RunV("go-licenser", "-license", "Elastic")
+	return sh.RunV("go-licenser", "-license", "Elastic", "-exclude", "beats")
 }
 
 // Package packages the Beat for distribution.
