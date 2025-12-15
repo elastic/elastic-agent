@@ -80,7 +80,6 @@ func addMetricsFields(ctx context.Context, event *mapstr.M) {
 					exporter_queue_size = &total
 				}
 			}
-
 		}
 	}
 

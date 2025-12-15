@@ -484,7 +484,6 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 		"metricset": mapstr.M{
 			"name": "stats",
 		},
-		"flag_field": "testing",
 	}
 }
 
@@ -498,12 +497,10 @@ func injectMonitoringReceiver(
 	receiverID := receiverType + "/" + translate.OtelNamePrefix + receiverName
 	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
 	exporterID := "elasticsearch/" + translate.OtelNamePrefix + "monitoring"
-	eventTemplate := mapstr.M(monitoringEventTemplate(monitoring, agentInfo))
-	eventTemplate.Put("beat.stats.libbeat.pipeline.queue.filled.pct", 0.9)
 	receiverCfg := map[string]any{
 		"receivers": map[string]any{
 			receiverID: map[string]any{
-				"event_template": eventTemplate,
+				"event_template": monitoringEventTemplate(monitoring, agentInfo),
 				"interval":       monitoring.MetricsPeriod,
 			},
 		},
