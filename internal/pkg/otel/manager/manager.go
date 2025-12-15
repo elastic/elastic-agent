@@ -400,16 +400,17 @@ func buildMergedConfig(
 			return nil, fmt.Errorf("failed to merge component otel config: %w", err)
 		}
 
-		if cfgUpdate.monitoringCfg != nil && cfgUpdate.monitoringCfg.Enabled {
-			injectMonitoringReceiver(mergedOtelCfg, cfgUpdate.monitoringCfg, agentInfo)
-			/*
-				// Monitoring is enabled, inject a receiver for the collector's internal telemetry
-				monitoringReceiverCfg :=
-				err := mergedOtelCfg.Merge(monitoringReceiverCfg)
+		if mCfg := cfgUpdate.monitoringCfg; mCfg != nil {
+			if mCfg.Enabled && mCfg.MonitorMetrics {
+				// Metrics monitoring is enabled, inject a receiver for the
+				// collector's internal telemetry.
+				err := injectMonitoringReceiver(mergedOtelCfg, mCfg, agentInfo)
 				if err != nil {
-					return nil, fmt.Errorf("failed to merge otel monitoring receiver config: %w", err)
-				}*/
-
+					return nil, fmt.Errorf("merging internal telemetry config: %w", err)
+				}
+			}
+		}
+		if cfgUpdate.monitoringCfg != nil && cfgUpdate.monitoringCfg.Enabled {
 		}
 	}
 
@@ -487,7 +488,11 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 	}
 }
 
-func injectMonitoringReceiver(config *confmap.Conf, monitoring *monitoringCfg.MonitoringConfig, agentInfo info.Agent) error {
+func injectMonitoringReceiver(
+	config *confmap.Conf,
+	monitoring *monitoringCfg.MonitoringConfig,
+	agentInfo info.Agent,
+) error {
 	receiverType := elasticmonitoringreceiver.Name
 	receiverName := "collector/internal-telemetry-monitoring"
 	receiverID := receiverType + "/" + translate.OtelNamePrefix + receiverName
@@ -498,7 +503,8 @@ func injectMonitoringReceiver(config *confmap.Conf, monitoring *monitoringCfg.Mo
 	receiverCfg := map[string]any{
 		"receivers": map[string]any{
 			receiverID: map[string]any{
-				"event_template": monitoringEventTemplate(monitoring, agentInfo),
+				"event_template": eventTemplate,
+				"interval":       monitoring.MetricsPeriod,
 			},
 		},
 		"service": map[string]any{

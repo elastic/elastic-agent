@@ -6,7 +6,6 @@ package elasticmonitoringreceiver
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/elastic/beats/v7/libbeat/otelbeat/otelmap"
@@ -25,9 +24,15 @@ const (
 )
 
 type Config struct {
+	// EventTemplate provides the static fields that will be included in every
+	// generated event. If data_stream.* is present, these fields will be set
+	// as attributes on the resulting log record, so the elasticsearch
+	// exporter will route it to the correct datastream.
 	EventTemplate struct {
 		Fields map[string]interface{} `mapstructure:",remain"`
 	} `mapstructure:"event_template"`
+
+	interval time.Duration `mapstructure:"interval"`
 }
 
 type monitoringReceiver struct {
@@ -40,7 +45,6 @@ func (mr *monitoringReceiver) Start(ctx context.Context, host component.Host) er
 	mr.host = host
 	go mr.run(ctx)
 	return nil
-	//return errors.New("hi fae")
 }
 
 func (mr *monitoringReceiver) Shutdown(ctx context.Context) error {
@@ -82,37 +86,35 @@ func addMetricsFields(ctx context.Context, event *mapstr.M) {
 
 	if exporter_queue_size != nil {
 		event.Put("beat.stats.libbeat.pipeline.queue.filled.events", *exporter_queue_size)
-		fmt.Printf("HI FAE HI FAE HI FAE I JUST ADDED AN EXPORTER QUEUE SIZE")
 	}
 }
 
 func (mr *monitoringReceiver) updateMetrics(ctx context.Context) {
-
 	pLogs := plog.NewLogs()
 	resourceLogs := pLogs.ResourceLogs().AppendEmpty()
 	sourceLogs := resourceLogs.ScopeLogs().AppendEmpty()
 	logRecords := sourceLogs.LogRecords()
 	logRecord := logRecords.AppendEmpty()
 
-	//beatEvent := mr.eventFields() //mapstr.M{}
+	// Initialize to the configured event template
 	beatEvent := mapstr.M(mr.config.EventTemplate.Fields).Clone()
 
+	// Add internal telemetry data
 	addMetricsFields(ctx, &beatEvent)
 
+	// Set timestamp
 	now := time.Now()
-	timestamp := pcommon.NewTimestampFromTime(now)
 	beatEvent["@timestamp"] = now
-
+	timestamp := pcommon.NewTimestampFromTime(now)
 	logRecord.SetTimestamp(timestamp)
 	logRecord.SetObservedTimestamp(timestamp)
+
+	// Convert fields to OTel-primitive types, if needed
 	otelmap.ConvertNonPrimitive(beatEvent)
 
+	// Add data_stream metadata to the log record attributes
 	if val, _ := beatEvent.GetValue("data_stream"); val != nil {
-		// If the below sub fields do not exist, it will return empty string.
-		subFields := []string{"dataset", "namespace", "type"}
-
-		for _, subField := range subFields {
-			// value, ok := data.Map().Get(subField)
+		for _, subField := range []string{"dataset", "namespace", "type"} {
 			value, err := beatEvent.GetValue("data_stream." + subField)
 			if vStr, ok := value.(string); ok && err == nil {
 				// set log record attribute only if value is non empty
@@ -122,6 +124,7 @@ func (mr *monitoringReceiver) updateMetrics(ctx context.Context) {
 
 	}
 
+	// Set log record body to computed fields
 	if err := logRecord.Body().SetEmptyMap().FromRaw(map[string]any(beatEvent)); err != nil {
 		//out.log.Errorf("received an error while converting map to plog.Log, some fields might be missing: %v", err)
 	}
@@ -137,7 +140,9 @@ func NewFactory() receiver.Factory {
 }
 
 func createDefaultConfig() component.Config {
-	return &Config{}
+	return &Config{
+		interval: 10 * time.Second,
+	}
 }
 
 func createReceiver(
