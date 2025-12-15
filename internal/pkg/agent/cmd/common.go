@@ -8,12 +8,12 @@ import (
 	"flag"
 	"os"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/spf13/cobra"
 
 	// import logp flags
 	_ "github.com/elastic/elastic-agent-libs/logp/configure"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/basecmd"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/version"
