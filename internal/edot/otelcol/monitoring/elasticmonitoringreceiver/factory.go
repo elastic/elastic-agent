@@ -24,7 +24,7 @@ type Config struct {
 		Fields map[string]interface{} `mapstructure:",remain"`
 	} `mapstructure:"event_template"`
 
-	interval time.Duration `mapstructure:"interval"`
+	Interval time.Duration `mapstructure:"interval"`
 }
 
 func NewFactory() receiver.Factory {
@@ -36,6 +36,6 @@ func NewFactory() receiver.Factory {
 
 func createDefaultConfig() component.Config {
 	return &Config{
-		interval: 10 * time.Second,
+		Interval: 10 * time.Second,
 	}
 }

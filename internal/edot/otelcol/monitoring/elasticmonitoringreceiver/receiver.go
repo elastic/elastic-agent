@@ -73,7 +73,7 @@ func (mr *monitoringReceiver) run() {
 	for mr.runCtx.Err() == nil {
 		select {
 		case <-mr.runCtx.Done():
-		case <-time.After(mr.config.interval):
+		case <-time.After(mr.config.Interval):
 			mr.updateMetrics()
 		}
 	}
