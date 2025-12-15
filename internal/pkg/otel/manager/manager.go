@@ -410,8 +410,6 @@ func buildMergedConfig(
 				}
 			}
 		}
-		if cfgUpdate.monitoringCfg != nil && cfgUpdate.monitoringCfg.Enabled {
-		}
 	}
 
 	// Merge with base collector config if it exists
