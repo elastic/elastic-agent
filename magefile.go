@@ -81,8 +81,6 @@ import (
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	"golang.org/x/sync/errgroup"
-	"gopkg.in/yaml.v3"
-
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/chartutil"
@@ -3736,7 +3734,61 @@ func (Otel) OsquerybeatFetchOsqueryDistros() {
 	mg.Deps(osquerybeat.FetchOsqueryDistros)
 }
 
+// PrepareBeats converts the beats submodule's .git file to a real .git directory.
+// Git submodules by default have a .git file that points to the parent repo's .git/modules/<submodule> directory.
+// When running  crossbuild in Docker, only the submodule directory is mounted, so the reference to the parent's
+// .git/modules breaks. This function copies the actual git directory into the submodule so it works standalone
+// in Docker.
+func (Otel) PrepareBeats() error {
+	beatsGitPath := filepath.Join("beats", ".git")
+
+	// check if .git is a file (submodule) or directory (already converted)
+	info, err := os.Lstat(beatsGitPath)
+	if err != nil {
+		return fmt.Errorf("failed to stat beats/.git: %w", err)
+	}
+	if info.IsDir() {
+		// already a directory
+		return nil
+	}
+
+	// read the .git file to get the gitdir path
+	content, err := os.ReadFile(beatsGitPath)
+	if err != nil {
+		return fmt.Errorf("failed to read beats/.git file: %w", err)
+	}
+	gitdirLine := strings.TrimSpace(string(content))
+	if !strings.HasPrefix(gitdirLine, "gitdir: ") {
+		return fmt.Errorf("unexpected beats/.git content: %s", gitdirLine)
+	}
+	gitdirRelPath := strings.TrimPrefix(gitdirLine, "gitdir: ")
+
+	// verify the source git directory exists
+	gitdirAbsPath := filepath.Join("beats", gitdirRelPath)
+	if _, err := os.Stat(gitdirAbsPath); err != nil {
+		return fmt.Errorf("git modules directory not found at %s: %w", gitdirAbsPath, err)
+	}
+
+	fmt.Printf(">> Converting beats submodule .git file to directory (source: %s)\n", gitdirAbsPath)
+
+	// remove the .git file and copy the directory
+	if err := os.Remove(beatsGitPath); err != nil {
+		return fmt.Errorf("failed to remove beats/.git file: %w", err)
+	}
+	if err := filecopy.Copy(gitdirAbsPath, beatsGitPath); err != nil {
+		return fmt.Errorf("failed to copy git directory: %w", err)
+	}
+
+	// remove the core.worktree config as it's no longer needed
+	// (it pointed to the submodule path from the parent's perspective)
+	_ = sh.Run("git", "-C", "beats", "config", "--unset", "core.worktree")
+
+	fmt.Println(">> Successfully converted beats/.git to a directory")
+	return nil
+}
+
 func (Otel) OsquerybeatCrossBuildExt() error {
+	mg.Deps(Otel.PrepareBeats)
 	fmt.Println("--- CrossBuild osquery-extension")
 	osquerybeatDir := filepath.Join("beats", "x-pack", "osquerybeat")
 	err := sh.RunV("mage", "-d", osquerybeatDir, "crossBuildExt")
