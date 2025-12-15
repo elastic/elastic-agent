@@ -61,6 +61,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/component"
+	pkgcomponent "github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -895,7 +896,7 @@ inputs:
 	component := components[0]
 	assert.Equal(t, "filestream-default", component.ID)
 	require.NotNil(t, component.Err, "Input with no spec should produce a component error")
-	assert.Equal(t, "input not supported", component.Err.Error(), "Input with no spec should report 'input not supported'")
+	assert.EqualError(t, pkgcomponent.ErrInputNotSupported, component.Err.Error(), "Input with no spec should report 'input not supported'")
 	require.Equal(t, 2, len(component.Units))
 
 	units := component.Units
@@ -1088,7 +1089,7 @@ service:
 		runtimeComponent := components[0]
 		assert.Equal(t, "system/metrics-default", runtimeComponent.ID)
 		require.NotNil(t, runtimeComponent.Err, "Input with no spec should produce a component error")
-		assert.Equal(t, "input not supported", runtimeComponent.Err.Error(), "Input with no spec should report 'input not supported'")
+		assert.EqualError(t, pkgcomponent.ErrInputNotSupported, runtimeComponent.Err.Error(), "Input with no spec should report 'input not supported'")
 		require.Equal(t, 2, len(runtimeComponent.Units))
 
 		units := runtimeComponent.Units
