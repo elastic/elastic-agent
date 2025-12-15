@@ -451,12 +451,12 @@ shared:
   - &metricbeat_lightweight_module
     'data/{{.BeatName}}-{{ commit_short }}/components/module':
       source: '{{ repo.RootDir }}/build/package/module'
-      mode: 0755
+      preserve_mode: true
 
   - &metricbeat_lightweight_module_core
     'components/module':
       source: '{{ repo.RootDir }}/build/package/module'
-      mode: 0755
+      preserve_mode: true
 
   - &osquerybeat_osquery_certs
     'data/{{.BeatName}}-{{ commit_short }}/components/certs/certs.pem':
@@ -471,12 +471,12 @@ shared:
   - &osquerybeat_osquery_lenses
     'data/{{.BeatName}}-{{ commit_short }}/components/lenses':
       source: '{{ repo.RootDir }}/build/data/install/{{.GOOS}}/{{.Platform.Arch}}/lenses'
-      mode: 0755
+      preserve_mode: true
 
   - &osquerybeat_osquery_lenses_core
     'components/lenses':
       source: '{{ repo.RootDir }}/build/data/install/{{.GOOS}}/{{.Platform.Arch}}/lenses'
-      mode: 0755
+      preserve_mode: true
 
   - &osquerybeat_osqueryd
     'data/{{.BeatName}}-{{ commit_short }}/components/osqueryd{{.BinaryExt}}':
