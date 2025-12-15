@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+# Merges the target branch INTO the current PR branch instead of the other way around.
+# This avoids issues where git cannot replace files during checkout (e.g., Windows file locking).
 checkout_merge() {
     local target_branch=$1
     local pr_commit=$2
@@ -12,11 +14,7 @@ checkout_merge() {
         exit 1
     fi
 
-    git fetch -v origin "${target_branch}"
-    git checkout FETCH_HEAD
-    echo "Current branch: $(git rev-parse --abbrev-ref HEAD)"
-
-    # create temporal branch to merge the PR with the target branch
+    # Create a merge branch from the current PR commit
     git checkout -b ${merge_branch}
     echo "New branch created: $(git rev-parse --abbrev-ref HEAD)"
 
@@ -24,7 +22,9 @@ checkout_merge() {
     git config user.name "github-merged-pr-post-checkout"
     git config user.email "auto-merge@buildkite"
 
-    git merge --no-edit "${BUILDKITE_COMMIT}" || {
+    # Fetch and merge the target branch into the PR branch
+    git fetch -v origin "${target_branch}"
+    git merge --no-edit FETCH_HEAD || {
         local merge_result=$?
         echo "Merge failed: ${merge_result}"
         git merge --abort

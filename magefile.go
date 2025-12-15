@@ -3773,6 +3773,17 @@ func (Otel) PrepareBeats() error {
 
 	fmt.Printf(">> Converting beats submodule .git file to directory (source: %s)\n", gitdirAbsPath)
 
+	// remove the core.worktree config from the source before copying.
+	// use git config -f to edit the file directly without needing a valid worktree.
+	// otherwise it would error with "fatal: cannot chdir to '../../../beats': No such file or directory"
+	sourceConfigPath := filepath.Join(gitdirAbsPath, "config")
+	if err := sh.Run("git", "config", "-f", sourceConfigPath, "--unset", "core.worktree"); err != nil {
+		// exit code 5 means the key was not found, which is fine
+		if sh.ExitStatus(err) != 5 {
+			return fmt.Errorf("failed to unset core.worktree in git config: %w", err)
+		}
+	}
+
 	// remove the .git file and copy the directory
 	if err := os.Remove(beatsGitPath); err != nil {
 		return fmt.Errorf("failed to remove beats/.git file: %w", err)
@@ -3780,10 +3791,6 @@ func (Otel) PrepareBeats() error {
 	if err := filecopy.Copy(gitdirAbsPath, beatsGitPath); err != nil {
 		return fmt.Errorf("failed to copy git directory: %w", err)
 	}
-
-	// remove the core.worktree config as it's no longer needed
-	// (it pointed to the submodule path from the parent's perspective)
-	_ = sh.Run("git", "-C", "beats", "config", "--unset", "core.worktree")
 
 	fmt.Println(">> Successfully converted beats/.git to a directory")
 	return nil
