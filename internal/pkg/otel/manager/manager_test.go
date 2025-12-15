@@ -337,7 +337,7 @@ func TestOTelManager_Run(t *testing.T) {
 	wd, erWd := os.Getwd()
 	require.NoError(t, erWd, "cannot get working directory")
 
-	testBinary := filepath.Join(wd, "testing", "testing")
+	testBinary := filepath.Join(wd, "..", "..", "..", "..", "internal", "edot", "testing", "testing")
 	require.FileExists(t, testBinary, "testing binary not found")
 
 	const waitTimeForStop = 30 * time.Second
@@ -873,7 +873,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	wd, erWd := os.Getwd()
 	require.NoError(t, erWd, "cannot get working directory")
 
-	testBinary := filepath.Join(wd, "testing", "testing")
+	testBinary := filepath.Join(wd, "..", "..", "..", "..", "internal", "edot", "testing", "testing")
 	require.FileExists(t, testBinary, "testing binary not found")
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -954,7 +954,7 @@ func TestOTelManager_Ports(t *testing.T) {
 	wd, erWd := os.Getwd()
 	require.NoError(t, erWd, "cannot get working directory")
 
-	testBinary := filepath.Join(wd, "testing", "testing")
+	testBinary := filepath.Join(wd, "..", "..", "..", "..", "internal", "edot", "testing", "testing")
 	require.FileExists(t, testBinary, "testing binary not found")
 
 	const waitTimeForStop = 30 * time.Second
@@ -1095,7 +1095,7 @@ func TestOTelManager_PortConflict(t *testing.T) {
 	wd, erWd := os.Getwd()
 	require.NoError(t, erWd, "cannot get working directory")
 
-	testBinary := filepath.Join(wd, "testing", "testing")
+	testBinary := filepath.Join(wd, "..", "..", "..", "..", "internal", "edot", "testing", "testing")
 	require.FileExists(t, testBinary, "testing binary not found")
 
 	const waitTimeForStop = 30 * time.Second
