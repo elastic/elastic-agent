@@ -11,6 +11,7 @@ toc:
       - file: config/tail-based-sampling.md
       - file: config/authentication-methods.md
       - file: config/configure-profiles-collection.md
+      - file: components/migrate-components.md
       - file: config/proxy.md
   - file: components.md
     children:
