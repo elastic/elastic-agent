@@ -967,26 +967,6 @@ func detectPackageDetails(filename string) (variant, os, arch, pkgType string) {
 		variant = "regular"
 	}
 
-	// Detect OS
-	switch {
-	case strings.Contains(base, "darwin"):
-		os = "darwin"
-	case strings.Contains(base, "linux") || strings.Contains(base, ".docker.tar.gz"):
-		os = "linux" // All container images are linux-based
-	case strings.Contains(base, "windows"):
-		os = "windows"
-	default:
-		os = "unknown"
-	}
-
-	// Detect architecture
-	for pattern, normalized := range archMap {
-		if strings.Contains(base, pattern) {
-			arch = normalized
-			break
-		}
-	}
-
 	// Detect package type
 	switch {
 	case strings.HasSuffix(base, ".docker.tar.gz"):
@@ -1003,6 +983,25 @@ func detectPackageDetails(filename string) (variant, os, arch, pkgType string) {
 		pkgType = "unknown"
 	}
 
+	// Detect OS
+	switch {
+	case strings.Contains(base, "darwin"):
+		os = "darwin"
+	case strings.Contains(base, "linux") || pkgType == "docker" || pkgType == "deb" || pkgType == "rpm":
+		os = "linux" // These package types are always linux
+	case strings.Contains(base, "windows"):
+		os = "windows"
+	default:
+		os = "unknown"
+	}
+
+	// Detect architecture
+	for pattern, normalized := range archMap {
+		if strings.Contains(base, pattern) {
+			arch = normalized
+			break
+		}
+	}
 	return variant, os, arch, pkgType
 }
 
@@ -1022,8 +1021,20 @@ func getExpectedComponents(variant, os, arch, pkgType string) []string {
 		"pf-host-agent",
 	}
 
-	// Components for cloud/service variants
+	// Components for cloud variant
 	cloudComponents := []string{
+		"agentbeat",
+		"apm-server",
+		"cloudbeat",
+		"endpoint-security",
+		"fleet-server",
+		"pf-elastic-collector",
+		"pf-elastic-symbolizer",
+		"pf-host-agent",
+	}
+
+	// Components for service variant
+	serviceComponents := []string{
 		"agentbeat",
 		"apm-server",
 		"cloudbeat",
@@ -1051,8 +1062,10 @@ func getExpectedComponents(variant, os, arch, pkgType string) []string {
 	switch variant {
 	case "regular", "complete":
 		components = allComponents
-	case "cloud", "service":
+	case "cloud":
 		components = cloudComponents
+	case "service":
+		components = serviceComponents
 	case "slim":
 		components = slimComponents
 	case "elastic-otel-collector":
