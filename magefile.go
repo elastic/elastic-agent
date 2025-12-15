@@ -39,7 +39,9 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	filecopy "github.com/otiai10/copy"
 
+	metricbeat "github.com/elastic/beats/v7/metricbeat/scripts/mage"
 	packetbeat "github.com/elastic/beats/v7/packetbeat/scripts/mage"
+	osquerybeat "github.com/elastic/beats/v7/x-pack/osquerybeat/scripts/mage"
 	xpacketbeat "github.com/elastic/beats/v7/x-pack/packetbeat/scripts/mage"
 
 	"github.com/elastic/elastic-agent/dev-tools/devmachine"
@@ -564,7 +566,7 @@ func Package(ctx context.Context) error {
 	// add the snapshot suffix if needed
 	dependenciesVersion += devtools.SnapshotSuffix()
 
-	packageAgent(ctx, platforms, dependenciesVersion, manifestResponse, devtools.SelectedPackageTypes, mg.F(devtools.UseElasticAgentPackaging), Otel.CrossBuild, CrossBuild)
+	packageAgent(ctx, platforms, dependenciesVersion, manifestResponse, devtools.SelectedPackageTypes, mg.F(devtools.UseElasticAgentPackaging), Otel.Prepare, Otel.CrossBuild, CrossBuild)
 	return nil
 }
 
@@ -804,7 +806,7 @@ func PackageAgentCore() {
 	start := time.Now()
 	defer func() { fmt.Println("packageAgentCore ran for", time.Since(start)) }()
 
-	mg.SerialDeps(Otel.CrossBuild, CrossBuild)
+	mg.SerialDeps(Otel.Prepare, Otel.CrossBuild, CrossBuild)
 
 	devtools.UseElasticAgentCorePackaging()
 
@@ -1104,7 +1106,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 		// produce docker package
 		packageAgent(ctx, devtools.BuildPlatformList{
 			devtools.BuildPlatform{Name: "linux/amd64"},
-		}, dependenciesVersion, nil, devtools.SelectedPackageTypes, mg.F(devtools.UseElasticAgentDemoPackaging), Otel.CrossBuild, CrossBuild)
+		}, dependenciesVersion, nil, devtools.SelectedPackageTypes, mg.F(devtools.UseElasticAgentDemoPackaging), Otel.Prepare, Otel.CrossBuild, CrossBuild)
 
 		dockerPackagePath := filepath.Join("build", "package", "elastic-agent", "elastic-agent-linux-amd64.docker", "docker-build")
 		if err := os.Chdir(dockerPackagePath); err != nil {
@@ -3550,14 +3552,6 @@ func hasCleanOnExit() bool {
 	return b
 }
 
-func findBeatsDir() (string, error) {
-	output, err := sh.Output("go", "list", "-m", "-f", "{{.Dir}}", "github.com/elastic/beats/v7")
-	if err != nil {
-		return "", fmt.Errorf("failed to find beat dir: %w", err)
-	}
-	return strings.TrimSpace(output), nil
-}
-
 // GolangCrossBuild builds the elastic-otel-collector binary in the golang-crossbuild container.
 // Don't call directly; called from otel:crossBuild.
 func (Otel) GolangCrossBuild() error {
@@ -3574,11 +3568,7 @@ func (Otel) GolangCrossBuild() error {
 	// embedded packetbeat is only included in a non-FIPS build
 	if !mage.FIPSBuild {
 		// requires the NPCAP installer on Windows
-		beatsDir, err := findBeatsDir()
-		if err != nil {
-			return err
-		}
-		if err := xpacketbeat.CopyNPCAPInstaller(filepath.Join(beatsDir, "x-pack", "packetbeat", "npcap", "installer")); err != nil {
+		if err := xpacketbeat.CopyNPCAPInstaller(filepath.Join("beats", "x-pack", "packetbeat", "npcap", "installer")); err != nil {
 			return err
 		}
 
@@ -3638,11 +3628,7 @@ func (Otel) CrossBuild() error {
 	// embedded packetbeat is only included in a non-FIPS build
 	if !mage.FIPSBuild {
 		// download the NPCAP installer
-		beatsDir, err := findBeatsDir()
-		if err != nil {
-			return err
-		}
-		mg.SerialDeps(xpacketbeat.GetNpcapInstallerFn(filepath.Join(beatsDir, "x-pack", "packetbeat")))
+		mg.SerialDeps(xpacketbeat.GetNpcapInstallerFn(filepath.Join("beats", "x-pack", "packetbeat")))
 		// use the npcap build image for windows
 		opts = append(opts, devtools.ImageSelector(npcapImageSelector))
 	}
@@ -3682,6 +3668,36 @@ func (Otel) Readme() error {
 	// check that links are live
 	mg.Deps(devtools.CheckLinksInFileAreLive(readmeOut))
 	return nil
+}
+
+func (Otel) MetricbeatPrepareLightModules() error {
+	return metricbeat.PrepareLightModulesPackaging(
+		filepath.Join("beats", "x-pack", "metricbeat", "module"), // x-pack/metricbeat
+		filepath.Join("beats", "metricbeat", "module"),           // metricbeat (oss)
+	)
+}
+
+func (Otel) OsquerybeatFetchOsqueryDistros() {
+	mg.Deps(osquerybeat.FetchOsqueryDistros)
+}
+
+func (Otel) OsquerybeatCrossBuildExt() error {
+	fmt.Println("--- CrossBuild osquery-extension")
+	osquerybeatDir := filepath.Join("beats", "x-pack", "osquerybeat")
+	err := sh.RunV("mage", "-d", osquerybeatDir, "crossBuildExt")
+	if err != nil {
+		return fmt.Errorf("failed to run mage -d %s crossBuildExt: %w", err)
+	}
+	return nil
+}
+
+func (Otel) Prepare() {
+	deps := []interface{}{Otel.MetricbeatPrepareLightModules}
+	if !mage.FIPSBuild {
+		// fips build doesn't embed osquerybeat
+		deps = append(deps, Otel.OsquerybeatFetchOsqueryDistros, Otel.OsquerybeatCrossBuildExt)
+	}
+	mg.Deps(deps...)
 }
 
 type Helm mg.Namespace

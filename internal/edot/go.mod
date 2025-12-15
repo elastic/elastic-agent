@@ -5,6 +5,8 @@ go 1.24.11
 // use in-repo directory
 replace github.com/elastic/elastic-agent => ../../
 
+replace github.com/elastic/beats/v7 => ../../beats
+
 require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251211195827-462751c83c26
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
