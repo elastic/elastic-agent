@@ -226,7 +226,6 @@ shared:
   # components for cloud/service variants (excludes cloud-defend)
   - &elastic_agent_cloud_components
     components:
-      - *comp-agentbeat
       - *comp-apm_server
       - *comp-cloudbeat
       - *comp-connectors
