@@ -9,12 +9,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/beats/v7/libbeat/otelbeat/otelmap"
-	"github.com/elastic/elastic-agent-libs/mapstr"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/plog"
+
+	"github.com/elastic/beats/v7/libbeat/otelbeat/otelmap"
+	"github.com/elastic/elastic-agent-libs/mapstr"
 )
 
 type monitoringReceiver struct {
