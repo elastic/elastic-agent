@@ -421,21 +421,6 @@ func (b *BeatsMonitor) getComponentInfos(
 			RuntimeManager: monitoringRuntime,
 		})
 	}
-	// If any other component uses the Otel runtime, also add a component to monitor its telemetry.
-	// This component only works in the Otel runtime, so we can't add it if the output doesn't support it.
-	if b.config.C.MonitorMetrics && usingOtelRuntime(componentInfos) {
-		if outputOtelSupported {
-			componentInfos = append(componentInfos,
-				componentInfo{
-					ID:             prometheusMonitoringComponentId,
-					BinaryName:     metricBeatName,
-					RuntimeManager: component.OtelRuntimeManager,
-				})
-		} else {
-			b.logger.Warn("The Otel prometheus metrics monitoring input can't run in a beats process, skipping")
-		}
-
-	}
 	// sort the components to ensure a consistent order of inputs in the configuration
 	slices.SortFunc(componentInfos, func(a, b componentInfo) int {
 		return strings.Compare(a.ID, b.ID)
