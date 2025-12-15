@@ -17,6 +17,10 @@ function Checkout-Merge {
         exit 1
     }
 
+    # Skip worktree for the currently running script to avoid Windows file locking issues
+    # (Windows cannot modify/delete a file that is currently being executed)
+    git update-index --skip-worktree .buildkite/hooks/post-checkout.ps1
+
     git fetch -v origin $targetBranch
     git checkout FETCH_HEAD
     Write-Host "Current branch: $(git rev-parse --abbrev-ref HEAD)"
@@ -35,8 +39,12 @@ function Checkout-Merge {
         $mergeResult = $LASTEXITCODE
         Write-Host "Merge failed: $mergeResult"
         git merge --abort
+        git update-index --no-skip-worktree .buildkite/hooks/post-checkout.ps1
         exit $mergeResult
     }
+
+    # Re-enable worktree tracking after successful merge
+    git update-index --no-skip-worktree .buildkite/hooks/post-checkout.ps1
 }
 
 $pullRequest = $env:BUILDKITE_PULL_REQUEST
