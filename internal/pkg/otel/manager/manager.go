@@ -27,6 +27,8 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 
+	otelcomponent "go.opentelemetry.io/collector/component"
+
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -490,11 +492,14 @@ func injectMonitoringReceiver(
 	monitoring *monitoringCfg.MonitoringConfig,
 	agentInfo info.Agent,
 ) error {
-	receiverType := elasticmonitoringreceiver.Name
+	receiverType := otelcomponent.MustNewType(elasticmonitoringreceiver.Name)
 	receiverName := "collector/internal-telemetry-monitoring"
-	receiverID := receiverType + "/" + translate.OtelNamePrefix + receiverName
+
+	receiverID := translate.GetReceiverID(receiverType, receiverName).String()
 	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
-	exporterID := "elasticsearch/" + translate.OtelNamePrefix + "monitoring"
+
+	exporterType := otelcomponent.MustNewType("elasticsearch")
+	exporterID := translate.GetExporterID(exporterType, componentmonitoring.MonitoringOutput).String()
 	receiverCfg := map[string]any{
 		"receivers": map[string]any{
 			receiverID: map[string]any{
