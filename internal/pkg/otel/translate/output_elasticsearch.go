@@ -276,6 +276,29 @@ func cfgDecodeHookFunc() mapstructure.DecodeHookFunc {
 				return nil, fmt.Errorf("failed parsing proxy_url: %w", err)
 			}
 			return proxyURL, nil
+<<<<<<< HEAD
+=======
+		case t == reflect.TypeOf(kerberos.AuthType(0)):
+			var authType kerberos.AuthType
+			if err := authType.Unpack(data.(string)); err != nil {
+				return nil, fmt.Errorf("failed parsing kerberos.auth_type: %w", err)
+			}
+			return authType, nil
+		case t == reflect.TypeOf([]string{}):
+			return []string{data.(string)}, nil
+		case t == reflect.TypeOf([]tlscommon.CipherSuite{tlscommon.CipherSuite(0)}):
+			cipherSuite := tlscommon.CipherSuite(0)
+			if err := cipherSuite.Unpack(data); err != nil {
+				return nil, fmt.Errorf("failed parsing ssl cipher_suites: %w", err)
+			}
+			return []tlscommon.CipherSuite{cipherSuite}, nil
+		case t == reflect.TypeOf([]tlscommon.TLSVersion{tlscommon.TLSVersion(0)}):
+			tlsVersion := tlscommon.TLSVersion(0)
+			if err := tlsVersion.Unpack(data); err != nil {
+				return nil, fmt.Errorf("failed parsing ssl supported_protocols: %w", err)
+			}
+			return []tlscommon.TLSVersion{tlsVersion}, nil
+>>>>>>> 196790921 (change elasticsearch configuration DecodeHook function to handle string to []string (#11732))
 		default:
 			return data, nil
 		}
