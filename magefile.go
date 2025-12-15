@@ -3569,7 +3569,9 @@ func (Otel) GolangCrossBuild() error {
 	if !mage.FIPSBuild {
 		// requires the NPCAP installer on Windows
 		if err := xpacketbeat.CopyNPCAPInstaller(filepath.Join("beats", "x-pack", "packetbeat", "npcap", "installer")); err != nil {
-			return err
+			// to allow local builds for Windows, this is allowed to fail
+			fmt.Printf("WARNING: Running packetbeat on Windows will fail, as no npcap installer will be embedded\n")
+			fmt.Printf("WARNING: Failed to copy npcap installer for Windows: %s\n", err)
 		}
 
 		// requires custom CGO_LDFLAGS and CGO_CFLAGS
@@ -3615,7 +3617,7 @@ func npcapImageSelector(platform string) (string, error) {
 	}
 	if platform == "windows/amd64" {
 		image = strings.ReplaceAll(image, "beats-dev", "observability-ci") // Temporarily work around naming of npcap image.
-		image = strings.ReplaceAll(image, "main", "npcap-"+xpacketbeat.NpcapVersion+"-debian9")
+		image = strings.ReplaceAll(image, "main", "npcap-"+xpacketbeat.NpcapVersion+"-debian11")
 	}
 	return image, nil
 }
