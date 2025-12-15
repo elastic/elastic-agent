@@ -8,7 +8,6 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"strings"
 	"testing"
 	"text/template"
 
@@ -526,17 +525,10 @@ func TestToOTelConfig_CheckUnsupported(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			cfg, err := config.NewConfigFrom(c.cfg)
-			if err != nil {
-				t.Fatalf("failed creating config for case %s: %v", c.name, err)
-			}
+			require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 
 			_, err = ToOTelConfig(cfg, logger)
-			if err == nil {
-				t.Fatalf("expected error for case %s but got nil", c.name)
-			}
-			if !strings.Contains(err.Error(), c.wantErrContains) {
-				t.Fatalf("error mismatch for case %s:\n got: %v\nwant contains: %s", c.name, err, c.wantErrContains)
-			}
+			require.ErrorContains(t, err, c.wantErrContains)
 		})
 	}
 }
