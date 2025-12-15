@@ -5,11 +5,9 @@
 package elasticmonitoringreceiver
 
 import (
-	"context"
 	"time"
 
 	"go.opentelemetry.io/collector/component"
-	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/receiver"
 )
 
@@ -40,18 +38,4 @@ func createDefaultConfig() component.Config {
 	return &Config{
 		interval: 10 * time.Second,
 	}
-}
-
-func createReceiver(
-	ctx context.Context,
-	set receiver.Settings,
-	baseCfg component.Config,
-	consumer consumer.Logs,
-) (receiver.Logs, error) {
-	cfg := baseCfg.(*Config)
-
-	return &monitoringReceiver{
-		config:   cfg,
-		consumer: consumer,
-	}, nil
 }

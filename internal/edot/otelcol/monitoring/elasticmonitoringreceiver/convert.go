@@ -7,9 +7,10 @@ package elasticmonitoringreceiver
 import (
 	"context"
 
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/edot/otelcol/monitoring/internaltelemetry"
-	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 )
 
 func addMetricsFields(ctx context.Context, event *mapstr.M) {
