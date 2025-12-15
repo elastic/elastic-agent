@@ -32,6 +32,7 @@ func TestKubernetesAgentHelmRotatedLogs(t *testing.T) {
 		},
 		Group: define.Kubernetes,
 	})
+	t.Skip("skipping until https://github.com/elastic/beats/pull/47893 and https://github.com/elastic/elastic-agent/pull/11783 are merged and make to the SNAPSHOT build")
 
 	containerRegex, err := regexp.Compile(`^/var/log/containers/.*flog.*\.log$`)
 	require.NoError(t, err, "failed to compile container log regex")

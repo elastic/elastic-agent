@@ -5,7 +5,7 @@ go 1.24.11
 replace github.com/elastic/elastic-agent => ../../
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251211195827-462751c83c26
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251212233918-72314a046f86
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.28.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.24.0
@@ -284,7 +284,7 @@ require (
 	github.com/elastic/elastic-transport-go/v8 v8.8.0 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
 	github.com/elastic/go-docappender/v2 v2.12.0 // indirect
-	github.com/elastic/go-elasticsearch/v8 v8.19.0 // indirect
+	github.com/elastic/go-elasticsearch/v8 v8.19.1 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect
 	github.com/elastic/go-grok v0.3.1 // indirect
 	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
