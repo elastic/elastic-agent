@@ -3678,6 +3678,18 @@ func npcapImageSelector(platform string) (string, error) {
 // CrossBuild builds the elastic-otel-collector binary in the golang-crossbuild container.
 func (Otel) CrossBuild() error {
 	mg.Deps(EnsureCrossBuildOutputDir)
+
+	// Download modules from internal/edot before crossbuilding.
+	// The crossbuild process mounts the host's module cache read-only into the container,
+	// so all dependencies must be downloaded before the build starts.
+	// internal/edot has its own go.mod with different dependencies than the main module.
+	if mage.CrossBuildMountModcache {
+		fmt.Println(">> Downloading modules for internal/edot")
+		if err := sh.Run("go", "-C", "internal/edot", "mod", "download"); err != nil {
+			return fmt.Errorf("failed to download modules for internal/edot: %w", err)
+		}
+	}
+
 	opts := []devtools.CrossBuildOption{devtools.WithName("elastic-otel-collector"), devtools.WithTarget("otel:golangCrossBuild")}
 
 	// embedded packetbeat is only included in a non-FIPS build
