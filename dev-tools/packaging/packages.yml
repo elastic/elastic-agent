@@ -707,10 +707,10 @@ shared:
       repository: 'docker.elastic.co/beats-ci'
     files:
       'data/cloud_downloads/filebeat.sh':
-        source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/filebeat.sh'
+        template: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/filebeat.sh.tmpl'
         mode: 0755
       'data/cloud_downloads/metricbeat.sh':
-        source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/metricbeat.sh'
+        template: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/metricbeat.sh.tmpl'
         mode: 0755
 
   # service build is based on previous cloud variant
