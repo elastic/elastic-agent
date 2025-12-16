@@ -411,8 +411,13 @@ github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6N
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/creack/pty v1.1.20 h1:VIPb/a2s17qNeQgDnkfZC35RScx+blkKF8GV68n80J4=
 github.com/creack/pty v1.1.20/go.mod h1:MOBLtS5ELjhRRrroQr9kyvTxUAFNvYEK993ew/Vr4O4=
+<<<<<<< HEAD
 github.com/cyphar/filepath-securejoin v0.3.6 h1:4d9N5ykBnSp5Xn2JkhocYDkOpURL/18CYMpo6xB9uWM=
 github.com/cyphar/filepath-securejoin v0.3.6/go.mod h1:Sdj7gXlvMcPZsbhwhQ33GguGLDGQL7h7bg04C/+u9jI=
+=======
+github.com/cyphar/filepath-securejoin v0.6.1 h1:5CeZ1jPXEiYt3+Z6zqprSAgSWiggmpVyciv8syjIpVE=
+github.com/cyphar/filepath-securejoin v0.6.1/go.mod h1:A8hd4EnAeyujCJRrICiOWqjS1AX0a9kM5XL+NwKoYSc=
+>>>>>>> d84d1b281 (build(deps): bump helm.sh/helm/v3 from 3.19.3 to 3.19.4 (#11824))
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
@@ -709,10 +714,17 @@ github.com/godror/godror v0.49.0 h1:oXAzPOm7bAGdFGkTaePCRXv3dfyr6Agni++4XhaRcC8=
 github.com/godror/godror v0.49.0/go.mod h1:D4gKled+sJVcagT1HWibkBsO9PcLn2Nu96FCr1RtnzI=
 github.com/godror/knownpb v0.3.0 h1:+caUdy8hTtl7X05aPl3tdL540TvCcaQA6woZQroLZMw=
 github.com/godror/knownpb v0.3.0/go.mod h1:PpTyfJwiOEAzQl7NtVCM8kdPCnp3uhxsZYIzZ5PV4zU=
+<<<<<<< HEAD
 github.com/gofrs/flock v0.12.1 h1:MTLVXXHf8ekldpJk3AKicLij9MdwOWkZ+a/jHHZby9E=
 github.com/gofrs/flock v0.12.1/go.mod h1:9zxTsyu5xtJ9DK+1tFZyibEV7y3uwDxPPfbxeeHCoD0=
 github.com/gofrs/uuid/v5 v5.3.2 h1:2jfO8j3XgSwlz/wHqemAEugfnTlikAYHhnqQ8Xh4fE0=
 github.com/gofrs/uuid/v5 v5.3.2/go.mod h1:CDOjlDMVAtN56jqyRUZh58JT31Tiw7/oQyEXZV+9bD8=
+=======
+github.com/gofrs/flock v0.13.0 h1:95JolYOvGMqeH31+FC7D2+uULf6mG61mEZ/A8dRYMzw=
+github.com/gofrs/flock v0.13.0/go.mod h1:jxeyy9R1auM5S6JYDBhDt+E2TCo7DkratH4Pgi8P+Z0=
+github.com/gofrs/uuid/v5 v5.4.0 h1:EfbpCTjqMuGyq5ZJwxqzn3Cbr2d0rUZU7v5ycAk/e/0=
+github.com/gofrs/uuid/v5 v5.4.0/go.mod h1:CDOjlDMVAtN56jqyRUZh58JT31Tiw7/oQyEXZV+9bD8=
+>>>>>>> d84d1b281 (build(deps): bump helm.sh/helm/v3 from 3.19.3 to 3.19.4 (#11824))
 github.com/gogo/googleapis v1.4.1 h1:1Yx4Myt7BxzvUr5ldGSbwYiZG6t9wGBZ+8/fX3Wvtq0=
 github.com/gogo/googleapis v1.4.1/go.mod h1:2lpHqI5OcWCtVElxXnPt+s8oJvMpySlOyM6xDCrzib4=
 github.com/gogo/protobuf v1.1.1/go.mod h1:r8qH/GZQm5c6nD/R0oafs1akxWv10x8SbQlK7atdtwQ=
@@ -2159,12 +2171,18 @@ gotest.tools/gotestsum v1.13.0/go.mod h1:7f0NS5hFb0dWr4NtcsAsF0y1kzjEFfAil0HiBQJ
 gotest.tools/v3 v3.0.2/go.mod h1:3SzNCllyD9/Y+b5r9JIKQ474KzkZyqLqEfYqMsX94Bk=
 gotest.tools/v3 v3.5.2 h1:7koQfIKdy+I8UTetycgUqXWSDwpgv193Ka+qRsmBY8Q=
 gotest.tools/v3 v3.5.2/go.mod h1:LtdLGcnqToBH83WByAAi/wiwSFCArdFIUV/xxN4pcjA=
+<<<<<<< HEAD
 helm.sh/helm/v3 v3.15.4 h1:UFHd6oZ1IN3FsUZ7XNhOQDyQ2QYknBNWRHH57e9cbHY=
 helm.sh/helm/v3 v3.15.4/go.mod h1:phOwlxqGSgppCY/ysWBNRhG3MtnpsttOzxaTK+Mt40E=
+=======
+helm.sh/helm/v3 v3.19.4 h1:E2yFBejmZBczWr5LblhjZbvAOAwVumfBO1AtN3nqI30=
+helm.sh/helm/v3 v3.19.4/go.mod h1:PC1rk7PqacpkV4acUFMLStOOis7QM9Jq3DveHBInu4s=
+>>>>>>> d84d1b281 (build(deps): bump helm.sh/helm/v3 from 3.19.3 to 3.19.4 (#11824))
 honnef.co/go/tools v0.0.0-20190102054323-c2f93a96b099/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
 honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
 howett.net/plist v1.0.1 h1:37GdZ8tP09Q35o9ych3ehygcsL+HqKSwzctveSlarvM=
 howett.net/plist v1.0.1/go.mod h1:lqaXoTrLY4hg8tnEzNru53gicrbv7rrk+2xJA/7hw9g=
+<<<<<<< HEAD
 k8s.io/api v0.32.3 h1:Hw7KqxRusq+6QSplE3NYG4MBxZw1BZnq4aP4cJVINls=
 k8s.io/api v0.32.3/go.mod h1:2wEDTXADtm/HA7CCMD8D8bK4yuBUptzaRhYcYEEYA3k=
 k8s.io/apiextensions-apiserver v0.32.2 h1:2YMk285jWMk2188V2AERy5yDwBYrjgWYggscghPCvV4=
@@ -2189,6 +2207,32 @@ k8s.io/kubelet v0.32.3 h1:B9HzW4yB67flx8tN2FYuDwZvxnmK3v5EjxxFvOYjmc8=
 k8s.io/kubelet v0.32.3/go.mod h1:yyAQSCKC+tjSlaFw4HQG7Jein+vo+GeKBGdXdQGvL1U=
 k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 h1:M3sRQVHv7vB20Xc2ybTt7ODCeFj6JSWYFzOFnYeS6Ro=
 k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
+=======
+k8s.io/api v0.34.2 h1:fsSUNZhV+bnL6Aqrp6O7lMTy6o5x2C4XLjnh//8SLYY=
+k8s.io/api v0.34.2/go.mod h1:MMBPaWlED2a8w4RSeanD76f7opUoypY8TFYkSM+3XHw=
+k8s.io/apiextensions-apiserver v0.34.2 h1:WStKftnGeoKP4AZRz/BaAAEJvYp4mlZGN0UCv+uvsqo=
+k8s.io/apiextensions-apiserver v0.34.2/go.mod h1:398CJrsgXF1wytdaanynDpJ67zG4Xq7yj91GrmYN2SE=
+k8s.io/apimachinery v0.34.2 h1:zQ12Uk3eMHPxrsbUJgNF8bTauTVR2WgqJsTmwTE/NW4=
+k8s.io/apimachinery v0.34.2/go.mod h1:/GwIlEcWuTX9zKIg2mbw0LRFIsXwrfoVxn+ef0X13lw=
+k8s.io/apiserver v0.34.2 h1:2/yu8suwkmES7IzwlehAovo8dDE07cFRC7KMDb1+MAE=
+k8s.io/apiserver v0.34.2/go.mod h1:gqJQy2yDOB50R3JUReHSFr+cwJnL8G1dzTA0YLEqAPI=
+k8s.io/cli-runtime v0.34.2 h1:cct1GEuWc3IyVT8MSCoIWzRGw9HJ/C5rgP32H60H6aE=
+k8s.io/cli-runtime v0.34.2/go.mod h1:X13tsrYexYUCIq8MarCBy8lrm0k0weFPTpcaNo7lms4=
+k8s.io/client-go v0.34.2 h1:Co6XiknN+uUZqiddlfAjT68184/37PS4QAzYvQvDR8M=
+k8s.io/client-go v0.34.2/go.mod h1:2VYDl1XXJsdcAxw7BenFslRQX28Dxz91U9MWKjX97fE=
+k8s.io/component-base v0.34.2 h1:HQRqK9x2sSAsd8+R4xxRirlTjowsg6fWCPwWYeSvogQ=
+k8s.io/component-base v0.34.2/go.mod h1:9xw2FHJavUHBFpiGkZoKuYZ5pdtLKe97DEByaA+hHbM=
+k8s.io/klog/v2 v2.130.1 h1:n9Xl7H1Xvksem4KFG4PYbdQCQxqc/tTUyrgXaOhHSzk=
+k8s.io/klog/v2 v2.130.1/go.mod h1:3Jpz1GvMt720eyJH1ckRHK1EDfpxISzJ7I9OYgaDtPE=
+k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b h1:MloQ9/bdJyIu9lb1PzujOPolHyvO06MXG5TUIj2mNAA=
+k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b/go.mod h1:UZ2yyWbFTpuhSbFhv24aGNOdoRdJZgsIObGBUaYVsts=
+k8s.io/kubectl v0.34.2 h1:+fWGrVlDONMUmmQLDaGkQ9i91oszjjRAa94cr37hzqA=
+k8s.io/kubectl v0.34.2/go.mod h1:X2KTOdtZZNrTWmUD4oHApJ836pevSl+zvC5sI6oO2YQ=
+k8s.io/kubelet v0.34.2 h1:Dl+1uh7xwJr70r+SHKyIpvu6XvzuoPu0uDIC4cqgJUs=
+k8s.io/kubelet v0.34.2/go.mod h1:RfwR03iuKeVV7Z1qD9XKH98c3tlPImJpQ3qHIW40htM=
+k8s.io/utils v0.0.0-20250604170112-4c0f3b243397 h1:hwvWFiBzdWw1FhfY1FooPn3kzWuJ8tmbZBHi4zVsl1Y=
+k8s.io/utils v0.0.0-20250604170112-4c0f3b243397/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
+>>>>>>> d84d1b281 (build(deps): bump helm.sh/helm/v3 from 3.19.3 to 3.19.4 (#11824))
 kernel.org/pub/linux/libs/security/libcap/cap v1.2.70 h1:QnLPkuDWWbD5C+3DUA2IUXai5TK6w2zff+MAGccqdsw=
 kernel.org/pub/linux/libs/security/libcap/cap v1.2.70/go.mod h1:/iBwcj9nbLejQitYvUm9caurITQ6WyNHibJk6Q9fiS4=
 kernel.org/pub/linux/libs/security/libcap/psx v1.2.70 h1:HsB2G/rEQiYyo1bGoQqHZ/Bvd6x1rERQTNdPr1FyWjI=
