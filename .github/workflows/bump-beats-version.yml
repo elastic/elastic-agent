@@ -13,7 +13,7 @@ env:
 
 jobs:
   filter:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 1
     outputs:
       matrix: ${{ steps.generator.outputs.matrix }}
