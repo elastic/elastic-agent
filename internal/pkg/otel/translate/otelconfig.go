@@ -59,7 +59,34 @@ var (
 		"winlog",
 	}
 
-	OtelSupportedInputTypes          = OtelSupportedFilebeatInputTypes
+	OtelSupportedMetricbeatInputTypes = []string{
+		"activemq/metrics",
+		"apache/metrics",
+		"beat/metrics",
+		"containerd/metrics",
+		"docker/metrics",
+		"elasticsearch/metrics",
+		"etcd/metrics",
+		"http/metrics",
+		"jolokia/metrics",
+		"kafka/metrics",
+		"kibana/metrics",
+		"linux/metrics",
+		"logstash/metrics",
+		"memcached/metrics",
+		"mongodb/metrics",
+		"mysql/metrics",
+		"nats/metrics",
+		"nginx/metrics",
+		"prometheus/metrics",
+		"rabbitmq/metrics",
+		"sql/metrics",
+		"stan/metrics",
+		"statsd/metrics",
+		"system/metrics",
+		"vsphere/metrics",
+	}
+	OtelSupportedInputTypes          = slices.Concat(OtelSupportedFilebeatInputTypes, OtelSupportedMetricbeatInputTypes)
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
 		otelcomponent.MustNewType("elasticsearch"): translateEsOutputToExporter,
 	}
@@ -127,7 +154,7 @@ func VerifyComponentIsOtelSupported(comp *component.Component) error {
 
 	// check if given input is supported in OTel runtime
 	// this includes all metricbeat inputs and some filebeat inputs for now
-	if !slices.Contains(OtelSupportedInputTypes, comp.InputType) && !strings.HasSuffix(comp.InputType, "/metrics") {
+	if !slices.Contains(OtelSupportedInputTypes, comp.InputType) {
 		return fmt.Errorf("unsupported input type: %s", comp.InputType)
 	}
 
@@ -299,6 +326,7 @@ func getReceiversConfigForComponent(
 	receiverConfig := map[string]any{
 		// just like we do for beats processes, each receiver needs its own data path
 		"path": map[string]any{
+			"home": paths.Components(),
 			"data": BeatDataPath(comp.ID),
 		},
 		// adds additional context on logs emitted by beatreceivers to uniquely identify per component logs
@@ -641,7 +669,6 @@ func BeatDataPath(componentId string) string {
 // getBeatsAuthExtensionConfig sets http transport settings on beatsauth
 // currently this is only supported for elasticsearch output
 func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
-
 	authSettings := beatsauthextension.BeatsAuthConfig{
 		Transport: elasticsearch.ESDefaultTransportSettings(),
 	}

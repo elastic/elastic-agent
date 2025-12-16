@@ -50,6 +50,34 @@ type BeatRuntimeConfig struct {
 func DefaultRuntimeConfig() *RuntimeConfig {
 	return &RuntimeConfig{
 		Default: string(DefaultRuntimeManager),
+		Metricbeat: BeatRuntimeConfig{
+			InputType: map[string]string{
+				"activemq/metrics":      string(OtelRuntimeManager),
+				"apache/metrics":        string(OtelRuntimeManager),
+				"beat/metrics":          string(OtelRuntimeManager),
+				"containerd/metrics":    string(OtelRuntimeManager),
+				"docker/metrics":        string(OtelRuntimeManager),
+				"elasticsearch/metrics": string(OtelRuntimeManager),
+				"etcd/metrics":          string(OtelRuntimeManager),
+				"http/metrics":          string(OtelRuntimeManager),
+				"jolokia/metrics":       string(OtelRuntimeManager),
+				"kafka/metrics":         string(OtelRuntimeManager),
+				"kibana/metrics":        string(OtelRuntimeManager),
+				"linux/metrics":         string(OtelRuntimeManager),
+				"logstash/metrics":      string(OtelRuntimeManager),
+				"memcached/metrics":     string(OtelRuntimeManager),
+				"mongodb/metrics":       string(OtelRuntimeManager),
+				"mysql/metrics":         string(OtelRuntimeManager),
+				"nats/metrics":          string(OtelRuntimeManager),
+				"nginx/metrics":         string(OtelRuntimeManager),
+				"rabbitmq/metrics":      string(OtelRuntimeManager),
+				"sql/metrics":           string(OtelRuntimeManager),
+				"stan/metrics":          string(OtelRuntimeManager),
+				"statsd/metrics":        string(OtelRuntimeManager),
+				"system/metrics":        string(OtelRuntimeManager),
+				"vsphere/metrics":       string(OtelRuntimeManager),
+			},
+		},
 	}
 }
 
@@ -117,7 +145,7 @@ const (
 	defaultUnitLogLevel                  = client.UnitLogLevelInfo
 	headersKey                           = "headers"
 	elasticsearchType                    = "elasticsearch"
-	workDirPathMod                       = 0770
+	workDirPathMod                       = 0o770
 	ProcessRuntimeManager                = RuntimeManager("process")
 	OtelRuntimeManager                   = RuntimeManager("otel")
 	DefaultRuntimeManager RuntimeManager = ProcessRuntimeManager

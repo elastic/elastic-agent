@@ -9,8 +9,8 @@ env:
   IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1762801856"
   IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1762801856"
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1762801856"
-  IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-1762801856"
-  IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1762801856"
+  IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-1764775167"
+  IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-1764775167"
 
 steps:
   - label: "check-ci"
@@ -360,6 +360,27 @@ steps:
         - .buildkite/pipeline.elastic-agent-package.yml
         - .buildkite/scripts/steps/package.sh
         - .buildkite/scripts/steps/trigger-elastic-agent-package.sh
+        - magefile.go
+        - dev-tools/**/*
+
+  # NOTE: This should help detecting issues earlier in the development cycle
+  # See https://github.com/elastic/elastic-agent/pull/11725
+  - label: "DRY RUN publish to serverless"
+    if: build.pull_request.id != null && build.env("BUILDKITE_PULL_REQUEST_BASE_BRANCH") == "main"
+    if_changed:
+      include:
+        - .buildkite/pipeline.yml
+        - .buildkite/pipeline.agentless-app-release.yaml
+        - .buildkite/scripts/steps/ecp-internal-release.sh
+        - .buildkite/scripts/steps/integration-package.sh
+        - .buildkite/scripts/steps/validate-agentless-docker-image.sh
+    trigger: "agentless-serverless-release"
+    build:
+      commit: "${BUILDKITE_COMMIT}"
+      branch: "${BUILDKITE_BRANCH}"
+      message: "publish to serverless (dry-run) #${BUILDKITE_PULL_REQUEST}"
+      env:
+        DRY_RUN: "true"
 
   # wait for CI to be done
   - wait: ~
