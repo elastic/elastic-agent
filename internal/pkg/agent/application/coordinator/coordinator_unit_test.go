@@ -1000,7 +1000,7 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 	// we need the filestream spec to be able to convert to Otel config
 	componentSpec := component.InputRuntimeSpec{
 		InputType:  "filestream",
-		BinaryName: "agentbeat",
+		BinaryName: "elastic-otel-collector",
 		Spec: component.InputSpec{
 			Name: "filestream",
 			Command: &component.CommandSpec{
@@ -1178,7 +1178,7 @@ func TestCoordinatorManagesComponentWorkDirs(t *testing.T) {
 	// we need the filestream spec to be able to convert to Otel config
 	componentSpec := component.InputRuntimeSpec{
 		InputType:  "filestream",
-		BinaryName: "agentbeat",
+		BinaryName: "elastic-otel-collector",
 		Spec: component.InputSpec{
 			Name: "filestream",
 			Command: &component.CommandSpec{
@@ -1608,7 +1608,7 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 		OutputType:     "elasticsearch",
 		RuntimeManager: component.OtelRuntimeManager,
 		InputSpec: &component.InputRuntimeSpec{
-			BinaryName: "agentbeat",
+			BinaryName: "elastic-otel-collector",
 			Spec: component.InputSpec{
 				Command: &component.CommandSpec{
 					Args: []string{"filebeat"},

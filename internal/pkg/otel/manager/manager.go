@@ -11,7 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
-	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -30,7 +30,6 @@ import (
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -127,7 +126,6 @@ func NewOTelManager(
 	logger *logger.Logger,
 	logLevel logp.Level,
 	baseLogger *logger.Logger,
-	mode config.ExecutionMode,
 	agentInfo info.Agent,
 	agentCollectorConfig *configuration.CollectorConfig,
 	beatMonitoringConfigGetter translate.BeatMonitoringConfigGetter,
@@ -160,24 +158,12 @@ func NewOTelManager(
 		}
 	}
 
-	switch mode {
-	case config.SubprocessExecutionMode:
-		// NOTE: if we stop embedding the collector binary in elastic-agent, we need to
-		// change this
-		executable, err := os.Executable()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get the path to the collector executable: %w", err)
-		}
-		recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
-		exec, err = newSubprocessExecution(logLevel, executable, hcUUIDStr, collectorMetricsPort, collectorHealthCheckPort)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create subprocess execution: %w", err)
-		}
-	default:
-		return nil, fmt.Errorf("unknown otel collector execution mode: %q", mode)
+	executable := filepath.Join(paths.Components(), collectorBinaryName)
+	recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
+	exec, err = newSubprocessExecution(logLevel, executable, hcUUIDStr, collectorMetricsPort, collectorHealthCheckPort)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create subprocess execution: %w", err)
 	}
-
-	logger.Debugf("Using collector execution mode: %s", mode)
 
 	return &OTelManager{
 		logger:                     logger,
