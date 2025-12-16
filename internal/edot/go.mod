@@ -366,7 +366,7 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/godror/godror v0.49.3 // indirect
 	github.com/godror/knownpb v0.3.0 // indirect
-	github.com/gofrs/flock v0.12.1 // indirect
+	github.com/gofrs/flock v0.13.0 // indirect
 	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/gohugoio/hashstructure v0.6.0 // indirect
@@ -704,9 +704,9 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gotest.tools/v3 v3.5.2 // indirect
 	howett.net/plist v1.0.1 // indirect
-	k8s.io/api v0.34.1 // indirect
-	k8s.io/apimachinery v0.34.1 // indirect
-	k8s.io/client-go v0.34.1 // indirect
+	k8s.io/api v0.34.2 // indirect
+	k8s.io/apimachinery v0.34.2 // indirect
+	k8s.io/client-go v0.34.2 // indirect
 	k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b // indirect
 	k8s.io/kubelet v0.32.3 // indirect
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397 // indirect

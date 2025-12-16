@@ -2195,13 +2195,13 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/gofrs/flock
-Version: v0.12.1
+Version: v0.13.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/gofrs/flock@v0.12.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/gofrs/flock@v0.13.0/LICENSE:
 
-Copyright (c) 2018-2024, The Gofrs
+Copyright (c) 2018-2025, The Gofrs
 Copyright (c) 2015-2020, Tim Heckman
 All rights reserved.
 
@@ -7278,11 +7278,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/api
-Version: v0.34.1
+Version: v0.34.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/k8s.io/api@v0.34.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/k8s.io/api@v0.34.2/LICENSE:
 
 
                                  Apache License
@@ -7490,11 +7490,11 @@ Contents of probable licence file $GOMODCACHE/k8s.io/api@v0.34.1/LICENSE:
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/apimachinery
-Version: v0.34.1
+Version: v0.34.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/k8s.io/apimachinery@v0.34.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/k8s.io/apimachinery@v0.34.2/LICENSE:
 
 
                                  Apache License
@@ -7702,11 +7702,11 @@ Contents of probable licence file $GOMODCACHE/k8s.io/apimachinery@v0.34.1/LICENS
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/client-go
-Version: v0.34.1
+Version: v0.34.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/k8s.io/client-go@v0.34.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/k8s.io/client-go@v0.34.2/LICENSE:
 
 
                                  Apache License
