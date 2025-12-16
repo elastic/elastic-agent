@@ -301,16 +301,27 @@ func isInsideData(exeDir string) bool {
 	return strings.HasSuffix(exeDir, expectedDirLegacy) || strings.HasSuffix(exeDir, expectedDirWithVersion)
 }
 
+// isInsideComponents returns true when the exeDir is inside of the current Agent's components directory.
+func isInsideComponents(exeDir string) bool {
+	expectedDirLegacy := filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit()), "components")
+	expectedDirWithVersion := filepath.Join("data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit()), "components")
+	return strings.HasSuffix(exeDir, expectedDirLegacy) || strings.HasSuffix(exeDir, expectedDirWithVersion)
+}
+
 // ExecDir returns the "executable" directory which is:
 // 1. The same if the execDir is not inside of the data path
 // 2. Two levels up if the execDir inside of the data path on non-macOS platforms
 // 3. Five levels up if the execDir inside of the dataPath on macOS platform
+// 4. Three levels up if the execDir is inside the components directory
 func ExecDir(execDir string) string {
 	if isInsideData(execDir) {
 		execDir = filepath.Dir(filepath.Dir(execDir))
 		if runtime.GOOS == darwin {
 			execDir = filepath.Dir(filepath.Dir(filepath.Dir(execDir)))
 		}
+	} else if isInsideComponents(execDir) {
+		// components -> elastic-agent-{hash} -> data -> top
+		execDir = filepath.Dir(filepath.Dir(filepath.Dir(execDir)))
 	}
 	return execDir
 }
