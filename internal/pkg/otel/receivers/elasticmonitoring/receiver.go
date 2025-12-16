@@ -8,9 +8,10 @@ import (
 	"context"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/elastic/beats/v7/libbeat/otelbeat/otelmap"
 	"github.com/elastic/elastic-agent-libs/mapstr"
-	"go.uber.org/zap"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
@@ -135,5 +136,8 @@ func (mr *monitoringReceiver) sendMetricsEvent(exporter string, metrics exporter
 		mr.logger.Error("couldn't convert map to plog.Log, some fields might be missing", zap.Error(err))
 	}
 
-	_ = mr.consumer.ConsumeLogs(mr.runCtx, pLogs)
+	err := mr.consumer.ConsumeLogs(mr.runCtx, pLogs)
+	if err != nil {
+		mr.logger.Error("consuming metrics log record", zap.String("exporter", exporter), zap.Error(err))
+	}
 }
