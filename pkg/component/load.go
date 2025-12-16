@@ -24,7 +24,7 @@ const (
 
 var (
 	// ErrInputNotSupported is returned when the input is not supported on any platform
-	ErrInputNotSupported = newError("input not supported")
+	ErrInputNotSupported = newError("input not supported - ensure you have installed the correct flavor: https://www.elastic.co/docs/reference/fleet/install-elastic-agents#elastic-agent-installation-flavors")
 	// ErrInputNotSupportedOnPlatform is returned when the input is supported but not on this platform
 	ErrInputNotSupportedOnPlatform = newError("input not supported on this platform")
 	// ErrOutputNotSupported is returned when the output is not supported on any platform
