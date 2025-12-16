@@ -568,14 +568,16 @@ func TestOtelLogsIngestion(t *testing.T) {
 	// remove elastic-agent.yml, otel should be independent
 	require.NoError(t, os.Remove(filepath.Join(fixture.WorkDir(), "elastic-agent.yml")))
 
+	// validate that the configuration is valid
+	validateCommandIsWorking(t, ctx, fixture, tempDir)
+
+	// start the collector
 	var fixtureWg sync.WaitGroup
 	fixtureWg.Add(1)
 	go func() {
 		defer fixtureWg.Done()
 		err = fixture.RunOtelWithClient(ctx)
 	}()
-
-	validateCommandIsWorking(t, ctx, fixture, tempDir)
 
 	// Write logs to input file.
 	logsCount := 10_000
