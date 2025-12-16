@@ -43,7 +43,13 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+<<<<<<< HEAD
 	"github.com/elastic/elastic-agent/pkg/component"
+=======
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
+	pkgcomponent "github.com/elastic/elastic-agent/pkg/component"
+>>>>>>> 612bfcd1e (Improve input not supported error to mention installation flavors. (#11825))
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -133,7 +139,7 @@ func TestCoordinatorReportsUnhealthyComponents(t *testing.T) {
 	}
 
 	unhealthyComponent := runtime.ComponentComponentState{
-		Component: component.Component{ID: "test-component-1"},
+		Component: pkgcomponent.Component{ID: "test-component-1"},
 		State: runtime.ComponentState{
 			State:   client.UnitStateDegraded,
 			Message: "test message",
@@ -298,14 +304,14 @@ func TestCoordinatorComponentStatesAreSeparate(t *testing.T) {
 	}
 
 	comp1 := runtime.ComponentComponentState{
-		Component: component.Component{ID: "test-component-1"},
+		Component: pkgcomponent.Component{ID: "test-component-1"},
 		State: runtime.ComponentState{
 			State:   client.UnitStateStarting,
 			Message: "test message",
 		},
 	}
 	comp2 := runtime.ComponentComponentState{
-		Component: component.Component{ID: "test-component-2"},
+		Component: pkgcomponent.Component{ID: "test-component-2"},
 		State: runtime.ComponentState{
 			State:   client.UnitStateStarting,
 			Message: "test message",
@@ -376,7 +382,7 @@ func TestCoordinatorReportsUnhealthyUnits(t *testing.T) {
 		UnitType: client.UnitTypeOutput,
 		UnitID:   "output-unit-1"}
 	comp := runtime.ComponentComponentState{
-		Component: component.Component{ID: "test-component-1"},
+		Component: pkgcomponent.Component{ID: "test-component-1"},
 		State: runtime.ComponentState{
 			State:   client.UnitStateHealthy,
 			Message: "everything is fine",
@@ -678,7 +684,7 @@ func TestCoordinatorPolicyChangeUpdatesMonitorReloader(t *testing.T) {
 
 	// Create a mocked runtime manager that will report the update call
 	runtimeManager := &fakeRuntimeManager{
-		updateCallback: func(comp []component.Component) error {
+		updateCallback: func(comp []pkgcomponent.Component) error {
 			return nil
 		},
 	}
@@ -818,10 +824,10 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManager(t *testing.T) {
 	configChan := make(chan ConfigChange, 1)
 
 	// Create a mocked runtime manager that will report the update call
-	var updated bool                     // Set by runtime manager callback
-	var components []component.Component // Set by runtime manager callback
+	var updated bool                        // Set by runtime manager callback
+	var components []pkgcomponent.Component // Set by runtime manager callback
 	runtimeManager := &fakeRuntimeManager{
-		updateCallback: func(comp []component.Component) error {
+		updateCallback: func(comp []pkgcomponent.Component) error {
 			updated = true
 			components = comp
 			return nil
@@ -880,7 +886,7 @@ inputs:
 	component := components[0]
 	assert.Equal(t, "filestream-default", component.ID)
 	require.NotNil(t, component.Err, "Input with no spec should produce a component error")
-	assert.Equal(t, "input not supported", component.Err.Error(), "Input with no spec should report 'input not supported'")
+	assert.EqualError(t, pkgcomponent.ErrInputNotSupported, component.Err.Error(), "Input with no spec should report 'input not supported'")
 	require.Equal(t, 2, len(component.Units))
 
 	units := component.Units
@@ -962,10 +968,10 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 	configChan := make(chan ConfigChange, 1)
 
 	// Create a mocked runtime manager that will report the update call
-	var updated bool                     // Set by runtime manager callback
-	var components []component.Component // Set by runtime manager callback
+	var updated bool                        // Set by runtime manager callback
+	var components []pkgcomponent.Component // Set by runtime manager callback
 	runtimeManager := &fakeRuntimeManager{
-		updateCallback: func(comp []component.Component) error {
+		updateCallback: func(comp []pkgcomponent.Component) error {
 			updated = true
 			components = comp
 			return nil
@@ -982,12 +988,12 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 	}
 
 	// we need the filestream spec to be able to convert to Otel config
-	componentSpec := component.InputRuntimeSpec{
+	componentSpec := pkgcomponent.InputRuntimeSpec{
 		InputType:  "filestream",
 		BinaryName: "agentbeat",
-		Spec: component.InputSpec{
+		Spec: pkgcomponent.InputSpec{
 			Name: "filestream",
-			Command: &component.CommandSpec{
+			Command: &pkgcomponent.CommandSpec{
 				Args: []string{"filebeat"},
 			},
 			Platforms: []string{
@@ -1002,9 +1008,9 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 		},
 	}
 
-	platform, err := component.LoadPlatformDetail()
+	platform, err := pkgcomponent.LoadPlatformDetail()
 	require.NoError(t, err)
-	specs, err := component.NewRuntimeSpecs(platform, []component.InputRuntimeSpec{componentSpec})
+	specs, err := pkgcomponent.NewRuntimeSpecs(platform, []pkgcomponent.InputRuntimeSpec{componentSpec})
 	require.NoError(t, err)
 
 	monitoringMgr := newTestMonitoringMgr()
@@ -1067,6 +1073,7 @@ service:
 	assert.True(t, otelUpdated, "OTel manager should be updated after a policy change")
 	require.NotNil(t, otelConfig, "OTel manager should have config")
 
+<<<<<<< HEAD
 	runtimeComponent := components[0]
 	assert.Equal(t, "system/metrics-default", runtimeComponent.ID)
 	require.NotNil(t, runtimeComponent.Err, "Input with no spec should produce a component error")
@@ -1079,6 +1086,242 @@ service:
 	assert.Equal(t, client.UnitTypeInput, units[0].Type)
 	assert.Equal(t, "test-other-input", units[0].Config.Id)
 	assert.Equal(t, "system/metrics", units[0].Config.Type)
+=======
+		runtimeComponent := components[0]
+		assert.Equal(t, "system/metrics-default", runtimeComponent.ID)
+		require.NotNil(t, runtimeComponent.Err, "Input with no spec should produce a component error")
+		assert.EqualError(t, pkgcomponent.ErrInputNotSupported, runtimeComponent.Err.Error(), "Input with no spec should report 'input not supported'")
+		require.Equal(t, 2, len(runtimeComponent.Units))
+
+		units := runtimeComponent.Units
+		// Verify the input unit
+		assert.Equal(t, "system/metrics-default-test-other-input", units[0].ID)
+		assert.Equal(t, client.UnitTypeInput, units[0].Type)
+		assert.Equal(t, "test-other-input", units[0].Config.Id)
+		assert.Equal(t, "system/metrics", units[0].Config.Type)
+
+		// Verify the output unit
+		assert.Equal(t, "system/metrics-default", units[1].ID)
+		assert.Equal(t, client.UnitTypeOutput, units[1].Type)
+		assert.Equal(t, "elasticsearch", units[1].Config.Type)
+	})
+
+	t.Run("unsupported otel output option", func(t *testing.T) {
+		// Create a policy with one input and one output (no otel configuration)
+		cfg := config.MustNewConfigFrom(`
+agent.internal.runtime.filebeat.filestream: otel
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - localhost:9200
+    indices: [] # not supported by the elasticsearch exporter
+inputs:
+  - id: test-input
+    type: filestream
+    use_output: default
+  - id: test-other-input
+    type: system/metrics
+    use_output: default
+receivers:
+  nop:
+exporters:
+  nop:
+service:
+  pipelines:
+    traces:
+      receivers:
+        - nop
+      exporters:
+        - nop
+`)
+
+		// Send the policy change and make sure it was acknowledged.
+		cfgChange := &configChange{cfg: cfg}
+		configChan <- cfgChange
+		coord.runLoopIteration(ctx)
+		assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+		assert.NoError(t, cfgChange.err, "config processing shouldn't report an error")
+
+		// Make sure the runtime manager received the expected component update.
+		// An assert.Equal on the full component model doesn't play nice with
+		// the embedded proto structs, so instead we verify the important fields
+		// manually (sorry).
+		assert.True(t, updated, "Runtime manager should be updated after a policy change")
+		assert.True(t, otelUpdated, "OTel manager should be updated after a policy change")
+		require.NotNil(t, otelConfig, "OTel manager should have config")
+
+		assert.Len(t, components, 2, "both components should be assigned to the runtime manager")
+	})
+
+}
+
+func TestCoordinatorManagesComponentWorkDirs(t *testing.T) {
+	// Send a test policy to the Coordinator as a Config Manager update,
+	// verify it creates a working directory for the component, keeps that working directory as the component
+	// moves to a different runtime, then deletes it after the component is stopped.
+	top := paths.Top()
+	paths.SetTop(t.TempDir())
+	t.Cleanup(func() {
+		paths.SetTop(top)
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	logger := logp.NewLogger("testing")
+
+	configChan := make(chan ConfigChange, 1)
+	updateChan := make(chan runtime.ComponentComponentState, 1)
+
+	// Create a mocked runtime manager that will report the update call
+	runtimeManager := &fakeRuntimeManager{}
+	otelManager := &fakeOTelManager{}
+
+	// we need the filestream spec to be able to convert to Otel config
+	componentSpec := pkgcomponent.InputRuntimeSpec{
+		InputType:  "filestream",
+		BinaryName: "agentbeat",
+		Spec: pkgcomponent.InputSpec{
+			Name: "filestream",
+			Command: &pkgcomponent.CommandSpec{
+				Args: []string{"filebeat"},
+			},
+			Platforms: []string{
+				"linux/amd64",
+				"linux/arm64",
+				"darwin/amd64",
+				"darwin/arm64",
+				"windows/amd64",
+				"container/amd64",
+				"container/arm64",
+			},
+		},
+	}
+
+	platform, err := pkgcomponent.LoadPlatformDetail()
+	require.NoError(t, err)
+	specs, err := pkgcomponent.NewRuntimeSpecs(platform, []pkgcomponent.InputRuntimeSpec{componentSpec})
+	require.NoError(t, err)
+
+	monitoringMgr := newTestMonitoringMgr()
+	coord := &Coordinator{
+		logger:           logger,
+		agentInfo:        &info.AgentInfo{},
+		stateBroadcaster: broadcaster.New(State{}, 0, 0),
+		managerChans: managerChans{
+			configManagerUpdate:  configChan,
+			runtimeManagerUpdate: updateChan,
+		},
+		monitorMgr:         monitoringMgr,
+		runtimeMgr:         runtimeManager,
+		otelMgr:            otelManager,
+		specs:              specs,
+		vars:               emptyVars(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
+	}
+
+	var workDirPath string
+	var workDirCreated time.Time
+
+	t.Run("run in process manager", func(t *testing.T) {
+		// Create a policy with one input and one output (no otel configuration)
+		cfg := config.MustNewConfigFrom(`
+agent.internal.runtime.filebeat.filestream: process
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - localhost:9200
+inputs:
+  - id: test-input
+    type: filestream
+    use_output: default
+`)
+
+		// Send the policy change and make sure it was acknowledged.
+		cfgChange := &configChange{cfg: cfg}
+		configChan <- cfgChange
+		coord.runLoopIteration(ctx)
+		assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+		assert.NoError(t, cfgChange.err, "config processing shouldn't report an error")
+		require.Len(t, coord.componentModel, 1, "there should be one component")
+		workDirPath = coord.componentModel[0].WorkDirPath(paths.Run())
+		stat, err := os.Stat(workDirPath)
+		require.NoError(t, err, "component working directory should exist")
+		assert.True(t, stat.IsDir(), "component working directory should exist")
+		workDirCreated = stat.ModTime()
+	})
+
+	t.Run("run in otel manager", func(t *testing.T) {
+		// Create a policy with one input and one output (no otel configuration)
+		cfg := config.MustNewConfigFrom(`
+agent.internal.runtime.filebeat.filestream: otel
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - localhost:9200
+inputs:
+  - id: test-input
+    type: filestream
+    use_output: default
+`)
+
+		// Send the policy change and make sure it was acknowledged.
+		cfgChange := &configChange{cfg: cfg}
+		configChan <- cfgChange
+		coord.runLoopIteration(ctx)
+		assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+		assert.NoError(t, cfgChange.err, "config processing shouldn't report an error")
+		require.Len(t, coord.componentModel, 1, "there should be one component")
+		compState := runtime.ComponentComponentState{
+			Component: pkgcomponent.Component{
+				ID: "filestream-default",
+			},
+			State: runtime.ComponentState{
+				State: client.UnitStateStopped,
+			},
+		}
+		updateChan <- compState
+		coord.runLoopIteration(ctx)
+		stat, err := os.Stat(workDirPath)
+		require.NoError(t, err, "component working directory should exist")
+		assert.True(t, stat.IsDir(), "component working directory should exist")
+		assert.Equal(t, workDirCreated, stat.ModTime(), "component working directory shouldn't have been modified")
+	})
+	t.Run("remove component", func(t *testing.T) {
+		// Create a policy with one input and one output (no otel configuration)
+		cfg := config.MustNewConfigFrom(`
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - localhost:9200
+inputs: []
+`)
+
+		// Send the policy change and make sure it was acknowledged.
+		cfgChange := &configChange{cfg: cfg}
+		configChan <- cfgChange
+		coord.runLoopIteration(ctx)
+		assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+		assert.NoError(t, cfgChange.err, "config processing shouldn't report an error")
+		require.Len(t, coord.componentModel, 0, "there should be one component")
+
+		compState := runtime.ComponentComponentState{
+			Component: pkgcomponent.Component{
+				ID: "filestream-default",
+			},
+			State: runtime.ComponentState{
+				State: client.UnitStateStopped,
+			},
+		}
+		updateChan <- compState
+		coord.runLoopIteration(ctx)
+		assert.NoDirExists(t, workDirPath, "component working directory shouldn't exist anymore")
+	})
+>>>>>>> 612bfcd1e (Improve input not supported error to mention installation flavors. (#11825))
 
 	// Verify the output unit
 	assert.Equal(t, "system/metrics-default", units[1].ID)
@@ -1099,7 +1342,7 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 	const errorStr = "update failed for testing reasons"
 	// Create a mocked runtime manager that always reports an error
 	runtimeManager := &fakeRuntimeManager{
-		updateCallback: func(comp []component.Component) error {
+		updateCallback: func(comp []pkgcomponent.Component) error {
 			return errors.New(errorStr)
 		},
 		errChan: updateErrChan,
@@ -1225,10 +1468,10 @@ func TestCoordinatorAppliesVarsToPolicy(t *testing.T) {
 	varsChan := make(chan []*transpiler.Vars, 1)
 
 	// Create a mocked runtime manager that will report the update call
-	var updated bool                     // Set by runtime manager callback
-	var components []component.Component // Set by runtime manager callback
+	var updated bool                        // Set by runtime manager callback
+	var components []pkgcomponent.Component // Set by runtime manager callback
 	runtimeManager := &fakeRuntimeManager{
-		updateCallback: func(comp []component.Component) error {
+		updateCallback: func(comp []pkgcomponent.Component) error {
 			updated = true
 			components = comp
 			return nil
@@ -1368,20 +1611,20 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 
 	runtimeStateChan := make(chan runtime.ComponentComponentState)
 
-	otelComponent := component.Component{
+	otelComponent := pkgcomponent.Component{
 		ID:             "filestream-default",
 		InputType:      "filestream",
 		OutputType:     "elasticsearch",
-		RuntimeManager: component.OtelRuntimeManager,
-		InputSpec: &component.InputRuntimeSpec{
+		RuntimeManager: pkgcomponent.OtelRuntimeManager,
+		InputSpec: &pkgcomponent.InputRuntimeSpec{
 			BinaryName: "agentbeat",
-			Spec: component.InputSpec{
-				Command: &component.CommandSpec{
+			Spec: pkgcomponent.InputSpec{
+				Command: &pkgcomponent.CommandSpec{
 					Args: []string{"filebeat"},
 				},
 			},
 		},
-		Units: []component.Unit{
+		Units: []pkgcomponent.Unit{
 			{
 				ID:   "filestream-unit",
 				Type: client.UnitTypeInput,
@@ -1399,7 +1642,7 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 		},
 	}
 	processComponent := otelComponent
-	processComponent.RuntimeManager = component.ProcessRuntimeManager
+	processComponent.RuntimeManager = pkgcomponent.ProcessRuntimeManager
 	processComponent.ID = "filestream-process"
 
 	otelStatus := &status.AggregateStatus{
@@ -1615,6 +1858,467 @@ func TestCoordinatorInitiatesUpgrade(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
+=======
+func TestCoordinator_UnmanagedAgent_SkipsMigrate(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	// overrideStateChan has buffer 2 so we can run on a single goroutine,
+	// since a successful upgrade sets the override state twice.
+	overrideStateChan := make(chan *coordinatorOverrideState, 2)
+
+	// similarly, upgradeDetailsChan is a buffered channel as well.
+	upgradeDetailsChan := make(chan *details.Details, 2)
+
+	// Create a manager that will allow upgrade attempts but return a failure
+	// from Upgrade itself (success requires testing ReExec and we aren't
+	// quite ready to do that yet).
+	upgradeMgr := &fakeUpgradeManager{
+		upgradeable: true,
+		upgradeErr:  errors.New("failed upgrade"),
+	}
+
+	coord := &Coordinator{
+		stateBroadcaster:   broadcaster.New(State{}, 0, 0),
+		overrideStateChan:  overrideStateChan,
+		upgradeDetailsChan: upgradeDetailsChan,
+		upgradeMgr:         upgradeMgr,
+		logger:             logp.NewLogger("testing"),
+		isManaged:          false,
+	}
+
+	action := &fleetapi.ActionMigrate{}
+
+	backoffFactory := func(done <-chan struct{}) backoff.Backoff {
+		return backoff.NewExpBackoff(done, 30*time.Millisecond, 2*time.Second)
+	}
+
+	err := coord.Migrate(ctx, action, backoffFactory, nil)
+	require.ErrorIs(t, err, ErrNotManaged)
+}
+
+func TestCoordinator_ContainerAgent_SkipsMigrate(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	// overrideStateChan has buffer 2 so we can run on a single goroutine,
+	// since a successful upgrade sets the override state twice.
+	overrideStateChan := make(chan *coordinatorOverrideState, 2)
+
+	// similarly, upgradeDetailsChan is a buffered channel as well.
+	upgradeDetailsChan := make(chan *details.Details, 2)
+
+	// Create a manager that will allow upgrade attempts but return a failure
+	// from Upgrade itself (success requires testing ReExec and we aren't
+	// quite ready to do that yet).
+	upgradeMgr := &fakeUpgradeManager{
+		upgradeable: true,
+		upgradeErr:  errors.New("failed upgrade"),
+	}
+
+	platformSpecs, _ := pkgcomponent.NewRuntimeSpecs(pkgcomponent.PlatformDetail{
+		Platform:                     pkgcomponent.Platform{OS: pkgcomponent.Container},
+		NativeArch:                   "",
+		Family:                       "",
+		Major:                        0,
+		Minor:                        0,
+		IsInstalledViaExternalPkgMgr: false,
+		User:                         pkgcomponent.UserDetail{},
+	}, nil)
+	coord := &Coordinator{
+		stateBroadcaster:   broadcaster.New(State{}, 0, 0),
+		overrideStateChan:  overrideStateChan,
+		upgradeDetailsChan: upgradeDetailsChan,
+		upgradeMgr:         upgradeMgr,
+		logger:             logp.NewLogger("testing"),
+		isManaged:          false,
+		specs:              platformSpecs,
+	}
+
+	action := &fleetapi.ActionMigrate{}
+
+	backoffFactory := func(done <-chan struct{}) backoff.Backoff {
+		return backoff.NewExpBackoff(done, 30*time.Millisecond, 2*time.Second)
+	}
+
+	err := coord.Migrate(ctx, action, backoffFactory, nil)
+	require.ErrorIs(t, err, ErrContainerNotSupported)
+}
+
+func TestCoordinator_FleetServer_SkipsMigration(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	// overrideStateChan has buffer 2 so we can run on a single goroutine,
+	// since a successful upgrade sets the override state twice.
+	overrideStateChan := make(chan *coordinatorOverrideState, 2)
+
+	// similarly, upgradeDetailsChan is a buffered channel as well.
+	upgradeDetailsChan := make(chan *details.Details, 2)
+
+	// Create a manager that will allow upgrade attempts but return a failure
+	// from Upgrade itself (success requires testing ReExec and we aren't
+	// quite ready to do that yet).
+	upgradeMgr := &fakeUpgradeManager{
+		upgradeable: true,
+		upgradeErr:  errors.New("failed upgrade"),
+	}
+
+	coord := &Coordinator{
+		stateBroadcaster:   broadcaster.New(State{}, 0, 0),
+		overrideStateChan:  overrideStateChan,
+		upgradeDetailsChan: upgradeDetailsChan,
+		upgradeMgr:         upgradeMgr,
+		logger:             logp.NewLogger("testing"),
+		// is managed so we proceed with migration
+		isManaged: true,
+	}
+
+	// is fleet server
+	coord.state.Components = append(coord.state.Components, runtime.ComponentComponentState{
+		Component: pkgcomponent.Component{
+			InputType: fleetServer,
+		},
+	})
+
+	action := &fleetapi.ActionMigrate{}
+
+	backoffFactory := func(done <-chan struct{}) backoff.Backoff {
+		return backoff.NewExpBackoff(done, 30*time.Millisecond, 2*time.Second)
+	}
+
+	err := coord.Migrate(ctx, action, backoffFactory, nil)
+	require.ErrorIs(t, err, ErrFleetServer)
+}
+
+func TestCoordinator_InitiatesMigration(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "vault does not use NewGCMWithRandomNonce.")
+	cfgPath := paths.Config()
+	defer paths.SetConfig(cfgPath)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	tmpConfig := t.TempDir()
+	paths.SetConfig(tmpConfig)
+	agentConfigFile := paths.ConfigFile()
+
+	var unenrollCalled bool
+	oldFleetServer := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			if strings.Contains(r.URL.Path, "unenroll") {
+				unenrollCalled = true
+			}
+
+			_, err := w.Write(nil)
+			require.NoError(t, err)
+
+		}))
+	defer oldFleetServer.Close()
+
+	fleetConfig := configuration.DefaultFleetAgentConfig()
+	fleetConfig.Enabled = true
+	fleetConfig.AccessAPIKey = "access-api-key"
+	fleetConfig.Info.ID = "agent.id"
+	fleetConfig.Client.Host = oldFleetServer.URL
+	fleetConfig.Client.Hosts = []string{oldFleetServer.URL}
+
+	agentConfig := &configuration.Configuration{
+		Fleet: fleetConfig,
+		Settings: &configuration.SettingsConfig{
+			ID: "agent.id",
+		},
+	}
+
+	rawAgentConfig := &configuration.Configuration{
+		Fleet: &configuration.FleetAgentConfig{
+			Enabled: true,
+		},
+		Settings: &configuration.SettingsConfig{
+			ID: "agent.id",
+		},
+	}
+
+	rawAgentConfigData, err := yaml.Marshal(rawAgentConfig)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(agentConfigFile, rawAgentConfigData, 0644))
+
+	// setup secret normally previously created by enroll
+	err = secret.CreateAgentSecret(ctx,
+		vault.WithUnprivileged(true),
+		vault.WithVaultPath(paths.AgentVaultPath()),
+	)
+	require.NoError(t, err)
+
+	store, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile(),
+		storage.WithUnprivileged(true),
+		storage.WithVaultPath(paths.AgentVaultPath()),
+	)
+	require.NoError(t, err)
+
+	fleetAgentConfigData, err := yaml.Marshal(agentConfig)
+	require.NoError(t, err)
+	require.NoError(t, store.Save(bytes.NewReader(fleetAgentConfigData)))
+
+	// overrideStateChan has buffer 2 so we can run on a single goroutine,
+	// since a successful upgrade sets the override state twice.
+	overrideStateChan := make(chan *coordinatorOverrideState, 2)
+
+	// similarly, upgradeDetailsChan is a buffered channel as well.
+	upgradeDetailsChan := make(chan *details.Details, 2)
+
+	// Create a manager that will allow upgrade attempts but return a failure
+	// from Upgrade itself (success requires testing ReExec and we aren't
+	// quite ready to do that yet).
+	upgradeMgr := &fakeUpgradeManager{
+		upgradeable: true,
+		upgradeErr:  errors.New("failed upgrade"),
+	}
+
+	acker := &fakeActionAcker{}
+
+	acker.On("Ack", mock.Anything, mock.Anything).Return(nil)
+	acker.On("Commit", mock.Anything).Return(nil)
+
+	agentInfo, err := info.NewAgentInfo(ctx, false)
+	require.NoError(t, err)
+	coord := &Coordinator{
+		stateBroadcaster:   broadcaster.New(State{}, 0, 0),
+		overrideStateChan:  overrideStateChan,
+		upgradeDetailsChan: upgradeDetailsChan,
+		upgradeMgr:         upgradeMgr,
+		logger:             logp.NewLogger("testing"),
+		// is managed so we proceed with migration
+		isManaged:  true,
+		fleetAcker: acker,
+		agentInfo:  agentInfo,
+	}
+
+	coord.state.Components = append(coord.state.Components, runtime.ComponentComponentState{
+		Component: pkgcomponent.Component{
+			InputType: "not-a-fleet-server",
+		},
+	})
+
+	newFleetServer := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			if strings.Contains(r.URL.Path, "status") {
+				_, err := w.Write(nil)
+				require.NoError(t, err)
+				return
+			}
+
+			body := []byte(`{
+	  "action": "created",
+	  "item": {
+	    "id": "a4937110-e53e-11e9-934f-47a8e38a522c",
+	    "active": true,
+	    "policy_id": "default",
+	    "type": "PERMANENT",
+	    "enrolled_at": "2019-10-02T18:01:22.337Z",
+	    "user_provided_metadata": {},
+	    "local_metadata": {},
+	    "actions": [],
+	    "access_api_key": "API_KEY"
+	  }
+	}`)
+			_, err := w.Write(body)
+			require.NoError(t, err)
+
+		}))
+	defer newFleetServer.Close()
+
+	action := &fleetapi.ActionMigrate{
+		Data: fleetapi.ActionMigrateData{
+			TargetURI:       newFleetServer.URL,
+			EnrollmentToken: "token",
+			Settings:        json.RawMessage(`{"insecure":true}`),
+		},
+		ActionID:   "migrate-id",
+		ActionType: "MIGRATE",
+	}
+
+	backoffFactory := func(done <-chan struct{}) backoff.Backoff {
+		return backoff.NewExpBackoff(done, 30*time.Millisecond, 2*time.Second)
+	}
+
+	err = coord.Migrate(ctx, action, backoffFactory, nil)
+	require.NoError(t, err)
+
+	acker.AssertCalled(t, "Ack", mock.Anything, action)
+	acker.AssertCalled(t, "Commit", mock.Anything)
+	require.True(t, unenrollCalled)
+}
+
+func TestCoordinator_InvalidComponentRevertsMigration(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "vault does not use NewGCMWithRandomNonce.")
+	cfgPath := paths.Config()
+	defer paths.SetConfig(cfgPath)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	tmpConfig := t.TempDir()
+	paths.SetConfig(tmpConfig)
+	agentConfigFile := paths.ConfigFile()
+
+	var unenrollCalled bool
+	oldFleetServer := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			if strings.Contains(r.URL.Path, "unenroll") {
+				unenrollCalled = true
+			}
+
+			_, err := w.Write(nil)
+			require.NoError(t, err)
+
+		}))
+	defer oldFleetServer.Close()
+
+	fleetConfig := configuration.DefaultFleetAgentConfig()
+	fleetConfig.Enabled = true
+	fleetConfig.AccessAPIKey = "access-api-key"
+	fleetConfig.Info.ID = "agent.id"
+	fleetConfig.Client.Host = oldFleetServer.URL
+	fleetConfig.Client.Hosts = []string{oldFleetServer.URL}
+
+	agentConfig := &configuration.Configuration{
+		Fleet: fleetConfig,
+		Settings: &configuration.SettingsConfig{
+			ID: "agent.id",
+		},
+	}
+
+	rawAgentConfig := &configuration.Configuration{
+		Fleet: &configuration.FleetAgentConfig{
+			Enabled: true,
+		},
+		Settings: &configuration.SettingsConfig{
+			ID: "agent.id",
+		},
+	}
+
+	rawAgentConfigData, err := yaml.Marshal(rawAgentConfig)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(agentConfigFile, rawAgentConfigData, 0644))
+
+	// setup secret normally previously created by enroll
+	err = secret.CreateAgentSecret(ctx,
+		vault.WithUnprivileged(true),
+		vault.WithVaultPath(paths.AgentVaultPath()),
+	)
+	require.NoError(t, err)
+
+	store, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile(),
+		storage.WithUnprivileged(true),
+		storage.WithVaultPath(paths.AgentVaultPath()),
+	)
+	require.NoError(t, err)
+
+	fleetAgentConfigData, err := yaml.Marshal(agentConfig)
+	require.NoError(t, err)
+	require.NoError(t, store.Save(bytes.NewReader(fleetAgentConfigData)))
+
+	// overrideStateChan has buffer 2 so we can run on a single goroutine,
+	// since a successful upgrade sets the override state twice.
+	overrideStateChan := make(chan *coordinatorOverrideState, 2)
+
+	// similarly, upgradeDetailsChan is a buffered channel as well.
+	upgradeDetailsChan := make(chan *details.Details, 2)
+
+	// Create a manager that will allow upgrade attempts but return a failure
+	// from Upgrade itself (success requires testing ReExec and we aren't
+	// quite ready to do that yet).
+	upgradeMgr := &fakeUpgradeManager{
+		upgradeable: true,
+		upgradeErr:  errors.New("failed upgrade"),
+	}
+
+	acker := &fakeActionAcker{}
+
+	acker.On("Ack", mock.Anything, mock.Anything).Return(nil)
+	acker.On("Commit", mock.Anything).Return(nil)
+
+	agentInfo, err := info.NewAgentInfo(ctx, false)
+	require.NoError(t, err)
+	coord := &Coordinator{
+		stateBroadcaster:   broadcaster.New(State{}, 0, 0),
+		overrideStateChan:  overrideStateChan,
+		upgradeDetailsChan: upgradeDetailsChan,
+		upgradeMgr:         upgradeMgr,
+		logger:             logp.NewLogger("testing"),
+		// is managed so we proceed with migration
+		isManaged:  true,
+		fleetAcker: acker,
+		agentInfo:  agentInfo,
+	}
+
+	coord.state.Components = append(coord.state.Components, runtime.ComponentComponentState{
+		Component: pkgcomponent.Component{
+			InputType: "not-a-fleet-server",
+		},
+	})
+
+	newFleetServer := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			if strings.Contains(r.URL.Path, "status") {
+				_, err := w.Write(nil)
+				require.NoError(t, err)
+				return
+			}
+
+			body := []byte(`{
+	  "action": "created",
+	  "item": {
+	    "id": "a4937110-e53e-11e9-934f-47a8e38a522c",
+	    "active": true,
+	    "policy_id": "default",
+	    "type": "PERMANENT",
+	    "enrolled_at": "2019-10-02T18:01:22.337Z",
+	    "user_provided_metadata": {},
+	    "local_metadata": {},
+	    "actions": [],
+	    "access_api_key": "API_KEY"
+	  }
+	}`)
+			_, err := w.Write(body)
+			require.NoError(t, err)
+
+		}))
+	defer newFleetServer.Close()
+
+	action := &fleetapi.ActionMigrate{
+		Data: fleetapi.ActionMigrateData{
+			TargetURI:       newFleetServer.URL,
+			EnrollmentToken: "token",
+			Settings:        json.RawMessage(`{"insecure":true}`),
+		},
+		ActionID:   "migrate-id",
+		ActionType: "MIGRATE",
+	}
+
+	backoffFactory := func(done <-chan struct{}) backoff.Backoff {
+		return backoff.NewExpBackoff(done, 30*time.Millisecond, 2*time.Second)
+	}
+
+	failingComponentNotify := func(_ context.Context, _ *fleetapi.ActionMigrate) error {
+		return fmt.Errorf("failed to notify")
+	}
+
+	err = coord.Migrate(ctx, action, backoffFactory, failingComponentNotify)
+	require.Error(t, err)
+
+	acker.AssertNumberOfCalls(t, "Ack", 0)
+	acker.AssertNotCalled(t, "Commit", 0)
+	require.False(t, unenrollCalled)
+}
+
+>>>>>>> 612bfcd1e (Improve input not supported error to mention installation flavors. (#11825))
 // Returns an empty but non-nil set of transpiler variables for testing
 // (Coordinator will only regenerate its component model when it has non-nil
 // vars).
@@ -1656,6 +2360,158 @@ func (fs *fakeMonitoringServer) Addr() net.Addr {
 	return nil
 }
 
+<<<<<<< HEAD
+=======
+func TestMergeFleetConfig(t *testing.T) {
+	testutils.InitStorage(t)
+
+	cfg := map[string]interface{}{
+		"fleet": map[string]interface{}{
+			"enabled":        true,
+			"kibana":         map[string]interface{}{"host": "demo"},
+			"access_api_key": "123",
+		},
+		"agent": map[string]interface{}{
+			"grpc": map[string]interface{}{
+				"port": uint16(6790),
+			},
+		},
+	}
+
+	path := paths.AgentConfigFile()
+	store, err := storage.NewEncryptedDiskStore(t.Context(), path)
+	require.NoError(t, err)
+
+	rawConfig := config.MustNewConfigFrom(cfg)
+	conf, err := mergeFleetConfig(t.Context(), rawConfig, store)
+	require.NoError(t, err)
+	assert.NotNil(t, conf)
+	assert.Equal(t, conf.Fleet.Enabled, cfg["fleet"].(map[string]interface{})["enabled"])
+	assert.Equal(t, conf.Fleet.AccessAPIKey, cfg["fleet"].(map[string]interface{})["access_api_key"])
+	assert.Equal(t, conf.Settings.GRPC.Port, cfg["agent"].(map[string]interface{})["grpc"].(map[string]interface{})["port"].(uint16))
+}
+
+func TestComputeEnrollOptions(t *testing.T) {
+	testutils.InitStorage(t)
+	tmp := t.TempDir()
+
+	storePath := filepath.Join(tmp, "fleet.enc")
+	cfgPath := filepath.Join(tmp, "elastic-agent.yml")
+
+	cfg := map[string]interface{}{
+		"fleet": map[string]interface{}{
+			"enabled":        true,
+			"access_api_key": "123",
+		},
+		"agent": map[string]interface{}{
+			"grpc": map[string]interface{}{
+				"port": uint16(6790),
+			},
+		},
+	}
+
+	rawAgentConfigData, err := yaml.Marshal(cfg)
+	require.NoError(t, err)
+
+	require.NoError(t, os.WriteFile(cfgPath, rawAgentConfigData, 0644))
+
+	store, err := storage.NewEncryptedDiskStore(t.Context(), storePath)
+	require.NoError(t, err)
+
+	fleetConfig := `fleet:
+  hosts: [localhost:1234]
+  ssl:
+    ca_sha256: ["sha1", "sha2"]
+    verification_mode: none
+  proxy_url: http://proxy.example.com:8080
+  proxy_disable: false
+  proxy_headers:
+    Proxy-Authorization: "Bearer token"
+    Custom-Header: "custom-value"
+  enrollment_token: enrollment-token-123
+  force: true
+  insecure: true
+  agent:
+    id: test-agent-id
+`
+	require.NoError(t, store.Save(bytes.NewReader([]byte(fleetConfig))))
+
+	options, err := computeEnrollOptions(t.Context(), cfgPath, storePath)
+	require.NoError(t, err)
+
+	require.NoError(t, err)
+	assert.NotNil(t, options)
+
+	assert.Equal(t, "123", options.EnrollAPIKey, "EnrollAPIKey mismatch")
+	assert.Equal(t, "http://localhost:1234", options.URL, "URL mismatch")
+
+	assert.Equal(t, []string{"sha1", "sha2"}, options.CASha256, "CASha256 mismatch")
+	assert.Equal(t, true, options.Insecure, "Insecure mismatch")
+	assert.Equal(t, "test-agent-id", options.ID, "ID mismatch")
+	assert.Equal(t, "http://proxy.example.com:8080", options.ProxyURL, "ProxyURL mismatch")
+	assert.Equal(t, false, options.ProxyDisabled, "ProxyDisabled mismatch")
+	expectedProxyHeaders := map[string]string{
+		"Proxy-Authorization": "Bearer token",
+		"Custom-Header":       "custom-value",
+	}
+	assert.Equal(t, expectedProxyHeaders, options.ProxyHeaders, "ProxyHeaders mismatch")
+}
+
+func TestHasEndpoint(t *testing.T) {
+	testCases := []struct {
+		name     string
+		state    State
+		expected bool
+	}{
+		{
+			"endpoint",
+			State{
+				Components: []runtime.ComponentComponentState{
+					{
+						Component: pkgcomponent.Component{
+							InputType: endpoint,
+						},
+					},
+				},
+			},
+			true,
+		},
+		{
+			"no endpoint",
+			State{
+				Components: []runtime.ComponentComponentState{
+					{
+						Component: pkgcomponent.Component{
+							InputType: "not endpoint",
+						},
+					},
+				},
+			},
+			false,
+		},
+
+		{
+			"no component",
+			State{
+				Components: []runtime.ComponentComponentState{},
+			},
+			false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Coordinator{
+				state: tc.state,
+			}
+
+			result := c.HasEndpoint()
+			assert.Equal(t, tc.expected, result, "HasEndpoint result mismatch")
+		})
+	}
+}
+
+>>>>>>> 612bfcd1e (Improve input not supported error to mention installation flavors. (#11825))
 type mockUpgradeManager struct {
 	upgradeErr error
 }
