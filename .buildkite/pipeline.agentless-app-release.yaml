@@ -41,7 +41,7 @@ steps:
       diskSizeGb: 400
 
   # wait for packaging to be done
-  - wait: ~
+  - wait
 
   - label: "Publish to internal registry"
     key: "mirror-elastic-agent"
@@ -53,7 +53,7 @@ steps:
       - *docker_login_plugin
 
   # wait for metadata to be set
-  - wait: ~
+  - wait
 
   - label: ":docker: Validate docker image is built for all architectures"
     command: ".buildkite/scripts/steps/validate-agentless-docker-image.sh"
@@ -66,7 +66,7 @@ steps:
           secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
 
   # wait for image architecture validation
-  - wait: ~
+  - wait
 
   - label: ":grey_question: Promote agentless app release if validation passes"
     # DRY_RUN will help to skip this step when set to true

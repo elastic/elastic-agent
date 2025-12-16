@@ -23,6 +23,10 @@ type pipelineTestCase struct {
 	generator  func() *pipeline.Pipeline
 	goldenFile string
 	actualFile string
+	// dynamic indicates the pipeline has been migrated to dynamic upload.
+	// Dynamic pipelines have a stub in .buildkite/ that calls mage, so we
+	// skip the actual file comparison for them.
+	dynamic bool
 }
 
 var pipelineTestCases = []pipelineTestCase{
@@ -31,6 +35,7 @@ var pipelineTestCases = []pipelineTestCase{
 		generator:  GCECleanup,
 		goldenFile: "pipeline.elastic-agent-gce-cleanup.yml",
 		actualFile: "pipeline.elastic-agent-gce-cleanup.yml",
+		dynamic:    true,
 	},
 	{
 		name:       "AgentlessAppRelease",
@@ -43,12 +48,14 @@ var pipelineTestCases = []pipelineTestCase{
 		generator:  Pipeline,
 		goldenFile: "pipeline.yml",
 		actualFile: "pipeline.yml",
+		dynamic:    true,
 	},
 	{
 		name:       "IntegrationPipeline",
 		generator:  IntegrationPipeline,
 		goldenFile: "integration.pipeline.yml",
 		actualFile: "integration.pipeline.yml",
+		dynamic:    true,
 	},
 	{
 		name:       "ElasticAgentPackage",
@@ -106,6 +113,10 @@ func TestPipelinesMatchActual(t *testing.T) {
 
 	for _, tc := range pipelineTestCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.dynamic {
+				t.Skip("Skipping actual file comparison for dynamic pipeline (uses mage for upload)")
+			}
+
 			actualPath := filepath.Join(repoRoot, ".buildkite", tc.actualFile)
 
 			p := tc.generator()

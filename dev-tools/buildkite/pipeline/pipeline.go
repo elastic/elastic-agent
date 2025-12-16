@@ -73,9 +73,8 @@ func (p *Pipeline) Add(step any) *Pipeline {
 
 // Wait adds a wait step to the pipeline.
 func (p *Pipeline) Wait() *Pipeline {
-	p.AddStep(&buildkite.WaitStep{
-		Wait: Ptr(""),
-	})
+	wait := buildkite.StringWaitStep("wait")
+	p.AddStep(wait)
 	return p
 }
 

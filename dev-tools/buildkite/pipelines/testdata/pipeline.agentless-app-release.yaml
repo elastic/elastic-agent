@@ -29,7 +29,7 @@ steps:
       PLATFORMS: linux/arm64
     key: packaging-service-container-arm64
     label: "Packaging: Service Container linux/arm64"
-  - wait: ""
+  - wait
   - agents:
       machineType: c2-standard-16
       provider: gcp
@@ -39,7 +39,7 @@ steps:
     plugins:
       - elastic/vault-docker-login#v0.5.2:
           secret_path: kv/ci-shared/platform-ingest/elastic_docker_registry
-  - wait: ""
+  - wait
   - agents:
       image: docker.elastic.co/ci-agent-images/observability/oci-image-tools-agent:latest@sha256:a4ababd1347111759babc05c9ad5a680f4af48892784951358488b7e7fc94af9
     command: .buildkite/scripts/steps/validate-agentless-docker-image.sh
@@ -49,7 +49,7 @@ steps:
     plugins:
       - elastic/vault-docker-login#v0.6.3:
           secret_path: kv/ci-shared/platform-ingest/elastic_docker_registry
-  - wait: ""
+  - wait
   - agents:
       image: docker.elastic.co/ci-agent-images/serverless-helm-builder:0.0.2@sha256:d00e8a7a0ab3618cfaacb0a7b1e1b06ee29728eb2b44de602374bd8f6b9b92ac
     command: |-

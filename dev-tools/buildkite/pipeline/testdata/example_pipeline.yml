@@ -173,7 +173,7 @@ steps:
     if: build.pull_request.id == null
     label: Triggering Extended tests for branches
     trigger: elastic-agent-extended-testing
-  - wait: ""
+  - wait
   - branches: main
     build:
       commit: ${BUILDKITE_COMMIT}

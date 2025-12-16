@@ -343,7 +343,7 @@ steps:
         - .buildkite/scripts/steps/validate-agentless-docker-image.sh
     label: DRY RUN publish to serverless
     trigger: agentless-serverless-release
-  - wait: ""
+  - wait
   - branches: main
     build:
       commit: ${BUILDKITE_COMMIT}
