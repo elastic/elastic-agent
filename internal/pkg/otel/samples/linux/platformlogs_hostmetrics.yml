@@ -11,7 +11,6 @@ receivers:
   # --feature-gates=service.profilesSupport and elevated privileges like CAP_SYS_ADMIN or using sudo.
   # For more details check out https://www.elastic.co/docs/reference/edot-collector/config/configure-profiles-collection
 #  profiling:
-#    SamplesPerSecond: 19
 
   # Receiver for CPU, Disk, Memory, and Filesystem metrics
   hostmetrics/system:
@@ -50,9 +49,6 @@ receivers:
 # Uncomment the following lines only if the profiling receiver is configured.
 #connectors:
 #  profilingmetrics:
-#    by_frame: true
-#    by_frametype: true
-#    by_classification: true
 
 extensions:
   file_storage:
