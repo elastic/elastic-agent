@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -244,8 +245,7 @@ func TestContextProvider_KubernetesSymlinks(t *testing.T) {
 	provider, err := builder(log, c, true)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	comm := ctesting.NewContextComm(ctx)
 	setChan := make(chan map[string]interface{})
 	comm.CallOnSet(func(value map[string]interface{}) {
@@ -253,9 +253,15 @@ func TestContextProvider_KubernetesSymlinks(t *testing.T) {
 		setChan <- value
 	})
 
+	// the provider can write to the comm, which logs to the test context
+	// because of this, we need to wait for it to exit before the test concludes
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
 		_ = provider.Run(ctx, comm)
+		wg.Done()
 	}()
+	t.Cleanup(func() { wg.Wait() })
 
 	// Wait for initial values
 	var current map[string]interface{}
