@@ -84,6 +84,19 @@ func (mr *monitoringReceiver) run() {
 }
 
 func (mr *monitoringReceiver) updateMetrics() {
+	exporterMetrics, err := collectMetrics(mr.runCtx)
+	if err != nil {
+		// This isn't inherently an error state, internal telemetry could
+		// be manually disabled, but it's not the expected path.
+		mr.logger.Info("couldn't collect metrics", zap.Error(err))
+		return
+	}
+	for exporter, metrics := range exporterMetrics {
+		mr.sendMetricsEvent(exporter, metrics)
+	}
+}
+
+func (mr *monitoringReceiver) sendMetricsEvent(exporter string, metrics exporterMetrics) {
 	pLogs := plog.NewLogs()
 	resourceLogs := pLogs.ResourceLogs().AppendEmpty()
 	sourceLogs := resourceLogs.ScopeLogs().AppendEmpty()
@@ -92,9 +105,8 @@ func (mr *monitoringReceiver) updateMetrics() {
 
 	// Initialize to the configured event template
 	beatEvent := mapstr.M(mr.config.EventTemplate.Fields).Clone()
-
-	// Add internal telemetry data
-	addMetricsFields(mr.runCtx, &beatEvent)
+	metrics.addToEventFields(&beatEvent)
+	beatEvent.Put("component.id", exporter)
 
 	// Set timestamp
 	now := time.Now()
