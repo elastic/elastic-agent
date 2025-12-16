@@ -571,7 +571,7 @@ func Package(ctx context.Context) error {
 		}
 		// we need that dependency to essentially download
 		// the components from the given manifest
-		mg.Deps(DownloadManifest)
+		mg.SerialDeps(devtools.UseElasticAgentPackaging, downloadManifest)
 	}
 
 	var dependenciesVersion string
@@ -590,6 +590,14 @@ func Package(ctx context.Context) error {
 
 // DownloadManifest downloads the provided manifest file into the predefined folder and downloads all components in the manifest.
 func DownloadManifest(ctx context.Context) error {
+	// Enforce that we use the correct elastic-agent packaging, to correctly load component dependencies
+	// Use mg.Deps() to ensure that the function will be called only once per mage invocation.
+	// devtools.Use*Packaging functions are not idempotent as they append in devtools.Packages
+	mg.Deps(devtools.UseElasticAgentCoreSourcePackaging)
+	return downloadManifest(ctx)
+}
+
+func downloadManifest(ctx context.Context) error {
 	fmt.Println("--- Downloading manifest")
 	start := time.Now()
 	defer func() { fmt.Println("Downloading manifest took", time.Since(start)) }()
@@ -609,10 +617,6 @@ func DownloadManifest(ctx context.Context) error {
 		return errAtLeastOnePlatform
 	}
 
-	// Enforce that we use the correct elastic-agent packaging, to correctly load component dependencies
-	// Use mg.Deps() to ensure that the function will be called only once per mage invocation.
-	// devtools.Use*Packaging functions are not idempotent as they append in devtools.Packages
-	mg.Deps(devtools.UseElasticAgentCoreSourcePackaging)
 	dependencies, err := ExtractComponentsFromSelectedPkgSpecs(devtools.Packages)
 	if err != nil {
 		return fmt.Errorf("failed extracting dependencies: %w", err)
