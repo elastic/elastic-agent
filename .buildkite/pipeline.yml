@@ -10,7 +10,7 @@ steps:
   - label: ":pipeline: Upload pipeline"
     command: |
       source .buildkite/scripts/common.sh
-      mage buildkite:pipeline | buildkite-agent pipeline upload
+      mage buildkite:pipeline | buildkite-agent pipeline upload --debug
     agents:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_2204_X86_64}"
