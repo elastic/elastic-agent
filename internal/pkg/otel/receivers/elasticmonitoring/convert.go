@@ -76,14 +76,14 @@ func (em *exporterMetrics) add(m exporterMetrics) {
 
 func (em *exporterMetrics) addToEventFields(event *mapstr.M) {
 	if em.queue_size != nil {
-		event.Put("beat.stats.libbeat.pipeline.queue.filled.events", *em.queue_size)
+		_, _ = event.Put("beat.stats.libbeat.pipeline.queue.filled.events", *em.queue_size)
 	}
 	if em.queue_capacity != nil {
-		event.Put("beat.stats.libbeat.pipeline.queue.max_events", *em.queue_capacity)
+		_, _ = event.Put("beat.stats.libbeat.pipeline.queue.max_events", *em.queue_capacity)
 	}
 	if em.queue_size != nil && em.queue_capacity != nil {
 		filled := float64(*em.queue_size) / float64(*em.queue_capacity)
-		event.Put("beat.stats.libbeat.pipeline.queue.filled.pct", filled)
+		_, _ = event.Put("beat.stats.libbeat.pipeline.queue.filled.pct", filled)
 	}
 	var sent_total int64
 	if em.sent_log_records != nil {
@@ -95,7 +95,7 @@ func (em *exporterMetrics) addToEventFields(event *mapstr.M) {
 	if em.sent_metric_points != nil {
 		sent_total += *em.sent_spans
 	}
-	event.Put("beat.stats.libbeat.output.events.acked", sent_total)
+	_, _ = event.Put("beat.stats.libbeat.output.events.acked", sent_total)
 
 	var failed_total int64
 	if em.send_failed_log_records != nil {
@@ -107,19 +107,19 @@ func (em *exporterMetrics) addToEventFields(event *mapstr.M) {
 	if em.send_failed_metric_points != nil {
 		failed_total += *em.send_failed_metric_points
 	}
-	event.Put("beat.stats.libbeat.output.events.dropped", failed_total)
+	_, _ = event.Put("beat.stats.libbeat.output.events.dropped", failed_total)
 
 	if em.docs_processed != nil {
-		event.Put("beat.stats.libbeat.output.events.total", *em.docs_processed)
+		_, _ = event.Put("beat.stats.libbeat.output.events.total", *em.docs_processed)
 	}
 	if em.docs_retried != nil {
-		event.Put("beat.stats.libbeat.output.events.failed", *em.docs_retried)
+		_, _ = event.Put("beat.stats.libbeat.output.events.failed", *em.docs_retried)
 	}
 	if em.bulk_request_count != nil {
-		event.Put("beat.stats.libbeat.output.events.batches", *em.bulk_request_count)
+		_, _ = event.Put("beat.stats.libbeat.output.events.batches", *em.bulk_request_count)
 	}
 	if em.flushed_bytes != nil {
-		event.Put("beat.stats.libbeat.output.write.bytes", *em.flushed_bytes)
+		_, _ = event.Put("beat.stats.libbeat.output.write.bytes", *em.flushed_bytes)
 	}
 }
 

@@ -106,7 +106,7 @@ func (mr *monitoringReceiver) sendMetricsEvent(exporter string, metrics exporter
 	// Initialize to the configured event template
 	beatEvent := mapstr.M(mr.config.EventTemplate.Fields).Clone()
 	metrics.addToEventFields(&beatEvent)
-	beatEvent.Put("component.id", exporter)
+	_, _ = beatEvent.Put("component.id", exporter)
 
 	// Set timestamp
 	now := time.Now()
