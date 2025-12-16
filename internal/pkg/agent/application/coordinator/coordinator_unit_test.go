@@ -60,7 +60,7 @@ import (
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
-	"github.com/elastic/elastic-agent/pkg/component"
+	pkgcomponent "github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -150,7 +150,7 @@ func TestCoordinatorReportsUnhealthyComponents(t *testing.T) {
 	}
 
 	unhealthyComponent := runtime.ComponentComponentState{
-		Component: component.Component{ID: "test-component-1"},
+		Component: pkgcomponent.Component{ID: "test-component-1"},
 		State: runtime.ComponentState{
 			State:   client.UnitStateDegraded,
 			Message: "test message",
@@ -315,14 +315,14 @@ func TestCoordinatorComponentStatesAreSeparate(t *testing.T) {
 	}
 
 	comp1 := runtime.ComponentComponentState{
-		Component: component.Component{ID: "test-component-1"},
+		Component: pkgcomponent.Component{ID: "test-component-1"},
 		State: runtime.ComponentState{
 			State:   client.UnitStateStarting,
 			Message: "test message",
 		},
 	}
 	comp2 := runtime.ComponentComponentState{
-		Component: component.Component{ID: "test-component-2"},
+		Component: pkgcomponent.Component{ID: "test-component-2"},
 		State: runtime.ComponentState{
 			State:   client.UnitStateStarting,
 			Message: "test message",
@@ -393,7 +393,7 @@ func TestCoordinatorReportsUnhealthyUnits(t *testing.T) {
 		UnitType: client.UnitTypeOutput,
 		UnitID:   "output-unit-1"}
 	comp := runtime.ComponentComponentState{
-		Component: component.Component{ID: "test-component-1"},
+		Component: pkgcomponent.Component{ID: "test-component-1"},
 		State: runtime.ComponentState{
 			State:   client.UnitStateHealthy,
 			Message: "everything is fine",
@@ -693,7 +693,7 @@ func TestCoordinatorPolicyChangeUpdatesMonitorReloader(t *testing.T) {
 
 	// Create a mocked runtime manager that will report the update call
 	runtimeManager := &fakeRuntimeManager{
-		updateCallback: func(comp []component.Component) error {
+		updateCallback: func(comp []pkgcomponent.Component) error {
 			return nil
 		},
 	}
@@ -833,10 +833,10 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManager(t *testing.T) {
 	configChan := make(chan ConfigChange, 1)
 
 	// Create a mocked runtime manager that will report the update call
-	var updated bool                     // Set by runtime manager callback
-	var components []component.Component // Set by runtime manager callback
+	var updated bool                        // Set by runtime manager callback
+	var components []pkgcomponent.Component // Set by runtime manager callback
 	runtimeManager := &fakeRuntimeManager{
-		updateCallback: func(comp []component.Component) error {
+		updateCallback: func(comp []pkgcomponent.Component) error {
 			updated = true
 			components = comp
 			return nil
@@ -895,7 +895,7 @@ inputs:
 	component := components[0]
 	assert.Equal(t, "filestream-default", component.ID)
 	require.NotNil(t, component.Err, "Input with no spec should produce a component error")
-	assert.Equal(t, "input not supported", component.Err.Error(), "Input with no spec should report 'input not supported'")
+	assert.EqualError(t, pkgcomponent.ErrInputNotSupported, component.Err.Error(), "Input with no spec should report 'input not supported'")
 	require.Equal(t, 2, len(component.Units))
 
 	units := component.Units
@@ -978,10 +978,10 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 	configChan := make(chan ConfigChange, 1)
 
 	// Create a mocked runtime manager that will report the update call
-	var updated bool                     // Set by runtime manager callback
-	var components []component.Component // Set by runtime manager callback
+	var updated bool                        // Set by runtime manager callback
+	var components []pkgcomponent.Component // Set by runtime manager callback
 	runtimeManager := &fakeRuntimeManager{
-		updateCallback: func(comp []component.Component) error {
+		updateCallback: func(comp []pkgcomponent.Component) error {
 			updated = true
 			components = comp
 			return nil
@@ -998,12 +998,12 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 	}
 
 	// we need the filestream spec to be able to convert to Otel config
-	componentSpec := component.InputRuntimeSpec{
+	componentSpec := pkgcomponent.InputRuntimeSpec{
 		InputType:  "filestream",
 		BinaryName: "agentbeat",
-		Spec: component.InputSpec{
+		Spec: pkgcomponent.InputSpec{
 			Name: "filestream",
-			Command: &component.CommandSpec{
+			Command: &pkgcomponent.CommandSpec{
 				Args: []string{"filebeat"},
 			},
 			Platforms: []string{
@@ -1018,9 +1018,9 @@ func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t
 		},
 	}
 
-	platform, err := component.LoadPlatformDetail()
+	platform, err := pkgcomponent.LoadPlatformDetail()
 	require.NoError(t, err)
-	specs, err := component.NewRuntimeSpecs(platform, []component.InputRuntimeSpec{componentSpec})
+	specs, err := pkgcomponent.NewRuntimeSpecs(platform, []pkgcomponent.InputRuntimeSpec{componentSpec})
 	require.NoError(t, err)
 
 	monitoringMgr := newTestMonitoringMgr()
@@ -1088,7 +1088,7 @@ service:
 		runtimeComponent := components[0]
 		assert.Equal(t, "system/metrics-default", runtimeComponent.ID)
 		require.NotNil(t, runtimeComponent.Err, "Input with no spec should produce a component error")
-		assert.Equal(t, "input not supported", runtimeComponent.Err.Error(), "Input with no spec should report 'input not supported'")
+		assert.EqualError(t, pkgcomponent.ErrInputNotSupported, runtimeComponent.Err.Error(), "Input with no spec should report 'input not supported'")
 		require.Equal(t, 2, len(runtimeComponent.Units))
 
 		units := runtimeComponent.Units
@@ -1176,12 +1176,12 @@ func TestCoordinatorManagesComponentWorkDirs(t *testing.T) {
 	otelManager := &fakeOTelManager{}
 
 	// we need the filestream spec to be able to convert to Otel config
-	componentSpec := component.InputRuntimeSpec{
+	componentSpec := pkgcomponent.InputRuntimeSpec{
 		InputType:  "filestream",
 		BinaryName: "agentbeat",
-		Spec: component.InputSpec{
+		Spec: pkgcomponent.InputSpec{
 			Name: "filestream",
-			Command: &component.CommandSpec{
+			Command: &pkgcomponent.CommandSpec{
 				Args: []string{"filebeat"},
 			},
 			Platforms: []string{
@@ -1196,9 +1196,9 @@ func TestCoordinatorManagesComponentWorkDirs(t *testing.T) {
 		},
 	}
 
-	platform, err := component.LoadPlatformDetail()
+	platform, err := pkgcomponent.LoadPlatformDetail()
 	require.NoError(t, err)
-	specs, err := component.NewRuntimeSpecs(platform, []component.InputRuntimeSpec{componentSpec})
+	specs, err := pkgcomponent.NewRuntimeSpecs(platform, []pkgcomponent.InputRuntimeSpec{componentSpec})
 	require.NoError(t, err)
 
 	monitoringMgr := newTestMonitoringMgr()
@@ -1274,7 +1274,7 @@ inputs:
 		assert.NoError(t, cfgChange.err, "config processing shouldn't report an error")
 		require.Len(t, coord.componentModel, 1, "there should be one component")
 		compState := runtime.ComponentComponentState{
-			Component: component.Component{
+			Component: pkgcomponent.Component{
 				ID: "filestream-default",
 			},
 			State: runtime.ComponentState{
@@ -1308,7 +1308,7 @@ inputs: []
 		require.Len(t, coord.componentModel, 0, "there should be one component")
 
 		compState := runtime.ComponentComponentState{
-			Component: component.Component{
+			Component: pkgcomponent.Component{
 				ID: "filestream-default",
 			},
 			State: runtime.ComponentState{
@@ -1335,7 +1335,7 @@ func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
 	const errorStr = "update failed for testing reasons"
 	// Create a mocked runtime manager that always reports an error
 	runtimeManager := &fakeRuntimeManager{
-		updateCallback: func(comp []component.Component) error {
+		updateCallback: func(comp []pkgcomponent.Component) error {
 			return errors.New(errorStr)
 		},
 		errChan: updateErrChan,
@@ -1460,10 +1460,10 @@ func TestCoordinatorAppliesVarsToPolicy(t *testing.T) {
 	varsChan := make(chan []*transpiler.Vars, 1)
 
 	// Create a mocked runtime manager that will report the update call
-	var updated bool                     // Set by runtime manager callback
-	var components []component.Component // Set by runtime manager callback
+	var updated bool                        // Set by runtime manager callback
+	var components []pkgcomponent.Component // Set by runtime manager callback
 	runtimeManager := &fakeRuntimeManager{
-		updateCallback: func(comp []component.Component) error {
+		updateCallback: func(comp []pkgcomponent.Component) error {
 			updated = true
 			components = comp
 			return nil
@@ -1602,20 +1602,20 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 	runtimeStateChan := make(chan runtime.ComponentComponentState)
 	componentUpdateChan := make(chan []runtime.ComponentComponentState)
 
-	otelComponent := component.Component{
+	otelComponent := pkgcomponent.Component{
 		ID:             "filestream-default",
 		InputType:      "filestream",
 		OutputType:     "elasticsearch",
-		RuntimeManager: component.OtelRuntimeManager,
-		InputSpec: &component.InputRuntimeSpec{
+		RuntimeManager: pkgcomponent.OtelRuntimeManager,
+		InputSpec: &pkgcomponent.InputRuntimeSpec{
 			BinaryName: "agentbeat",
-			Spec: component.InputSpec{
-				Command: &component.CommandSpec{
+			Spec: pkgcomponent.InputSpec{
+				Command: &pkgcomponent.CommandSpec{
 					Args: []string{"filebeat"},
 				},
 			},
 		},
-		Units: []component.Unit{
+		Units: []pkgcomponent.Unit{
 			{
 				ID:   "filestream-unit",
 				Type: client.UnitTypeInput,
@@ -1634,7 +1634,7 @@ func TestCoordinatorTranslatesOtelStatusToComponentState(t *testing.T) {
 	}
 
 	processComponent := otelComponent
-	processComponent.RuntimeManager = component.ProcessRuntimeManager
+	processComponent.RuntimeManager = pkgcomponent.ProcessRuntimeManager
 	processComponent.ID = "filestream-process"
 
 	compState := runtime.ComponentComponentState{
@@ -1828,14 +1828,14 @@ func TestCoordinator_ContainerAgent_SkipsMigrate(t *testing.T) {
 		upgradeErr:  errors.New("failed upgrade"),
 	}
 
-	platformSpecs, _ := component.NewRuntimeSpecs(component.PlatformDetail{
-		Platform:                     component.Platform{OS: component.Container},
+	platformSpecs, _ := pkgcomponent.NewRuntimeSpecs(pkgcomponent.PlatformDetail{
+		Platform:                     pkgcomponent.Platform{OS: pkgcomponent.Container},
 		NativeArch:                   "",
 		Family:                       "",
 		Major:                        0,
 		Minor:                        0,
 		IsInstalledViaExternalPkgMgr: false,
-		User:                         component.UserDetail{},
+		User:                         pkgcomponent.UserDetail{},
 	}, nil)
 	coord := &Coordinator{
 		stateBroadcaster:   broadcaster.New(State{}, 0, 0),
@@ -1888,7 +1888,7 @@ func TestCoordinator_FleetServer_SkipsMigration(t *testing.T) {
 
 	// is fleet server
 	coord.state.Components = append(coord.state.Components, runtime.ComponentComponentState{
-		Component: component.Component{
+		Component: pkgcomponent.Component{
 			InputType: fleetServer,
 		},
 	})
@@ -2008,7 +2008,7 @@ func TestCoordinator_InitiatesMigration(t *testing.T) {
 	}
 
 	coord.state.Components = append(coord.state.Components, runtime.ComponentComponentState{
-		Component: component.Component{
+		Component: pkgcomponent.Component{
 			InputType: "not-a-fleet-server",
 		},
 	})
@@ -2169,7 +2169,7 @@ func TestCoordinator_InvalidComponentRevertsMigration(t *testing.T) {
 	}
 
 	coord.state.Components = append(coord.state.Components, runtime.ComponentComponentState{
-		Component: component.Component{
+		Component: pkgcomponent.Component{
 			InputType: "not-a-fleet-server",
 		},
 	})
@@ -2376,7 +2376,7 @@ func TestHasEndpoint(t *testing.T) {
 			State{
 				Components: []runtime.ComponentComponentState{
 					{
-						Component: component.Component{
+						Component: pkgcomponent.Component{
 							InputType: endpoint,
 						},
 					},
@@ -2389,7 +2389,7 @@ func TestHasEndpoint(t *testing.T) {
 			State{
 				Components: []runtime.ComponentComponentState{
 					{
-						Component: component.Component{
+						Component: pkgcomponent.Component{
 							InputType: "not endpoint",
 						},
 					},
