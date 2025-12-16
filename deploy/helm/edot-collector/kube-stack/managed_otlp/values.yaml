@@ -112,6 +112,7 @@ collectors:
               # Service attributes added based on https://opentelemetry.io/docs/specs/semconv/non-normative/k8s-attributes/#service-attributes
               - "service.name"
               - "service.version"
+              - "service.instance.id"
       receivers:
         # [K8s Events Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8seventsreceiver)
         k8s_events: {}
@@ -315,6 +316,7 @@ collectors:
               # Service attributes added based on https://opentelemetry.io/docs/specs/semconv/non-normative/k8s-attributes/#service-attributes
               - "service.name"
               - "service.version"
+              - "service.instance.id"
       receivers:
         # [OTLP Receiver](https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver)
         otlp:
