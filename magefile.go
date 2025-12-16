@@ -3649,15 +3649,15 @@ func (Otel) GolangCrossBuild() error {
 	return nil
 }
 
-// npcapImageSelector is a copy of xpacketbeat.ImageSelector. xpacketbeat.ImageSelector cannot be used
-// directly because it will use its own devtools that comes from the beats repository and will duplicate global
-// state that is not correct for the elastic-agent.
+// npcapImageSelector is similar to xpacketbeat.ImageSelector, using a single variable to enable it. Sadly
+// xpacketbeat.ImageSelector cannot be used directly because it will use its own devtools that comes from the beats
+// repository and will duplicate global state that is not correct for the elastic-agent.
 func npcapImageSelector(platform string) (string, error) {
 	image, err := devtools.CrossBuildImage(platform)
 	if err != nil {
 		return "", err
 	}
-	if os.Getenv("CI") != "true" && os.Getenv("NPCAP_LOCAL") != "true" {
+	if os.Getenv("WINDOWS_NPCAP") != "true" {
 		return image, nil
 	}
 	if platform == "windows/amd64" {
