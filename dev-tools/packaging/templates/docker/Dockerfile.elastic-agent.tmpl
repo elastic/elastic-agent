@@ -36,7 +36,7 @@ RUN true && \
     rm {{ $beatBinary }} && \
     ln -s {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/elastic-agent {{ $beatBinary }} && \
     chmod 0755 {{ $beatHome }}/data/elastic-agent-*/elastic-agent && \
-    chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/*beat && \
+    chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/elastic-otel-collector && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/osquery* || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/apm-server || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/cloud-defend || true) && \
@@ -45,7 +45,6 @@ RUN true && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-elastic-collector || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-elastic-symbolizer || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-host-agent || true) && \
-    (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/elastic-otel-collector || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/otelcol || true) && \
     (chmod 0755 {{ $beatHome }}/otelcol || true) && \
     find {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/components -name "*.yml*" -type f -exec chmod 0644 {} \; && \
@@ -55,12 +54,11 @@ RUN true && \
 {{- end }}
 
 {{- if eq .Variant "cloud" }}
-    mkdir -p /opt/agentbeat /opt/filebeat /opt/metricbeat && \
+    mkdir -p /opt/filebeat /opt/metricbeat && \
     cp -f {{ $beatHome }}/data/cloud_downloads/filebeat.sh /opt/filebeat/filebeat && \
     chmod +x /opt/filebeat/filebeat && \
     cp -f {{ $beatHome }}/data/cloud_downloads/metricbeat.sh /opt/metricbeat/metricbeat && \
     chmod +x /opt/metricbeat/metricbeat && \
-    tar xf {{ $beatHome }}/data/cloud_downloads/agentbeat-*.tar.gz -C /opt/agentbeat --strip-components=1 && \
     rm -rf {{ $beatHome }}/data/cloud_downloads && \
 {{- end }}
     true

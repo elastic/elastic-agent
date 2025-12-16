@@ -73,16 +73,6 @@ components:
     fips: false
     platforms: *all-platforms
     packageTypes: *all-package-types
-  - &comp-agentbeat-fips
-    projectName: beats
-    packageName: agentbeat-fips-{{.Version}}-{{.Platform}}.{{.Ext}}
-    rootDir: agentbeat-{{.Version}}-{{.Platform}}
-    binaryName: agentbeat
-    fips: true
-    platforms:
-      - *linux-amd64
-      - *linux-arm64
-    packageTypes: *all-package-types
   - &comp-apm_server
     projectName: apm-server
     packageName: apm-server-{{.Version}}-{{.Platform}}.{{.Ext}}
@@ -524,6 +514,7 @@ shared:
     files:
       <<: *agent_binary_files
       <<: *linux_otel_files
+      <<: *agent_otel_collector_binary_spec
 
   - &agent_binary_spec
     <<: *common
@@ -546,6 +537,8 @@ shared:
       <<: *agent_binary_files
       <<: *linux_otel_files
       <<: *agent_unpacked_components_files
+      <<: *agent_otel_collector_binary_spec
+      <<: *metricbeat_lightweight_module
 
   - &agent_binary_fips_spec
     <<: *common_fips
@@ -702,13 +695,10 @@ shared:
       repository: 'docker.elastic.co/beats-ci'
     files:
       'data/cloud_downloads/filebeat.sh':
-        source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/filebeat.sh'
+        template: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/filebeat.sh.tmpl'
         mode: 0755
       'data/cloud_downloads/metricbeat.sh':
-        source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/metricbeat.sh'
-        mode: 0755
-      'data/cloud_downloads/agentbeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz':
-        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/agentbeat-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
+        template: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/metricbeat.sh.tmpl'
         mode: 0755
 
   - &agent_docker_cloud_fips_spec
@@ -721,9 +711,6 @@ shared:
         mode: 0755
       'data/cloud_downloads/metricbeat.sh':
         source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/metricbeat.sh'
-        mode: 0755
-      'data/cloud_downloads/agentbeat-fips-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz':
-        source: '{{.AgentDropPath}}/archives/{{.GOOS}}-{{.AgentArchName}}.tar.gz/agentbeat-fips-{{ beat_version }}{{if .Snapshot}}-SNAPSHOT{{end}}-{{.GOOS}}-{{.AgentArchName}}.tar.gz'
         mode: 0755
 
   # service build is based on previous cloud variant
@@ -761,13 +748,6 @@ shared:
         source: 'otel.yml'
         mode: 0600
         config: true
-      '.elastic-agent.active.commit':
-        content: >
-          {{ commit }}
-        mode: 0644
-      'data/{{.BeatName}}-{{ commit_short }}/components/agentbeat.spec.yml':
-        source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/agentbeat.spec.yml'
-        expand_spec: true
 
   - &agent_docker_edot_wolfi_spec
     <<: *agent_docker_edot_spec
@@ -799,9 +779,6 @@ shared:
       'hints.inputs.d':
         source: '{{ repo.RootDir }}/deploy/kubernetes/elastic-agent-standalone/templates.d'
         mode: 0755
-      'data/{{.BeatName}}-{{ commit_short }}/components/agentbeat.spec.yml':
-        source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/agentbeat.spec.yml'
-        expand_spec: true
       'data/{{.BeatName}}-{{ commit_short }}/components/pf-host-agent.spec.yml':
         source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/pf-host-agent.spec.yml'
         expand_spec: true
@@ -899,6 +876,7 @@ specs:
             mode: 0755
 
     ######## Docker images #########
+
     #### UBI-minimal-based images ####
     # Complete image gets a 'complete' variant for synthetics and other large
     # packages too big to fit in the main image
@@ -911,9 +889,7 @@ specs:
         <<: *agent_docker_complete_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     - os: linux
       arch: amd64
       types: [docker]
@@ -923,9 +899,7 @@ specs:
         <<: *agent_docker_wolfi_complete_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     - os: linux
       arch: arm64
       types: [docker]
@@ -935,9 +909,7 @@ specs:
         <<: *agent_docker_complete_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     - os: linux
       arch: arm64
       types: [docker]
@@ -947,9 +919,7 @@ specs:
         <<: *agent_docker_wolfi_complete_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     - os: linux
       arch: amd64
       types: [docker]
@@ -960,9 +930,7 @@ specs:
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
         docker_variant: 'ubi'
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     - os: linux
       arch: arm64
       types: [docker]
@@ -973,9 +941,7 @@ specs:
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
         docker_variant: 'ubi'
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     - os: linux
       arch: amd64
       types: [docker]
@@ -985,9 +951,7 @@ specs:
         <<: *agent_docker_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     - os: linux
       arch: arm64
       types: [docker]
@@ -997,9 +961,7 @@ specs:
         <<: *agent_docker_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     #### wolfi-based ####
     #### Slim docker images ####
     - os: linux
@@ -1011,9 +973,7 @@ specs:
         <<: *agent_docker_slim_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     - os: linux
       arch: arm64
       types: [ docker ]
@@ -1023,9 +983,7 @@ specs:
         <<: *agent_docker_slim_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     - os: linux
       arch: amd64
       types: [ docker ]
@@ -1035,9 +993,7 @@ specs:
         <<: *agent_docker_slim_wolfi_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     - os: linux
       arch: arm64
       types: [ docker ]
@@ -1047,9 +1003,7 @@ specs:
         <<: *agent_docker_slim_wolfi_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     #### EDOT collector docker images ####
     - os: linux
       arch: amd64
@@ -1060,9 +1014,7 @@ specs:
         <<: *agent_docker_edot_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     - os: linux
       arch: arm64
       types: [ docker ]
@@ -1072,9 +1024,7 @@ specs:
         <<: *agent_docker_edot_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     - os: linux
       arch: amd64
       types: [ docker ]
@@ -1084,9 +1034,7 @@ specs:
         <<: *agent_docker_edot_wolfi_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     - os: linux
       arch: arm64
       types: [ docker ]
@@ -1096,9 +1044,7 @@ specs:
         <<: *agent_docker_edot_wolfi_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     #### Cloud specific docker images ####
     - os: linux
       arch: amd64
@@ -1110,9 +1056,7 @@ specs:
         <<: *docker_builder_spec
         <<: *agent_docker_cloud_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     - os: linux
       arch: arm64
       types: [docker]
@@ -1123,9 +1067,8 @@ specs:
         <<: *docker_builder_arm_spec
         <<: *agent_docker_cloud_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+    #### End Cloud specific docker images ####
+
     #### Service specific docker images ####
     - os: linux
       arch: amd64
@@ -1138,9 +1081,7 @@ specs:
         <<: *agent_docker_cloud_spec
         <<: *agent_docker_service_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     - os: linux
       arch: arm64
       types: [ docker ]
@@ -1152,9 +1093,8 @@ specs:
         <<: *agent_docker_cloud_spec
         <<: *agent_docker_service_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+    #### End Service specific docker images ####
+
     - os: linux
       arch: amd64
       types: [docker]
@@ -1164,9 +1104,7 @@ specs:
         <<: *agent_docker_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     - os: linux
       arch: arm64
       types: [docker]
@@ -1176,9 +1114,7 @@ specs:
         <<: *agent_docker_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     ######## End Docker images ########
 
     ######## Start FIPS Specs ########
@@ -1192,6 +1128,7 @@ specs:
             source: data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}
             symlink: true
             mode: 0755
+
     - os: linux
       arch: amd64
       types: [ docker ]
@@ -1201,9 +1138,6 @@ specs:
         <<: *agent_docker_fips_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
 
     - os: linux
       arch: arm64
@@ -1214,9 +1148,6 @@ specs:
         <<: *agent_docker_fips_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
 
     - os: linux
       arch: amd64
@@ -1230,9 +1161,6 @@ specs:
         <<: *elastic_license_for_binaries
         name: "elastic-agent-cloud-fips"
         docker_image_name_template: "{{.BeatName}}-cloud-fips"
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
 
     - os: linux
       arch: arm64
@@ -1246,9 +1174,7 @@ specs:
         <<: *elastic_license_for_binaries
         name: "elastic-agent-cloud-fips"
         docker_image_name_template: "{{.BeatName}}-cloud-fips"
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+
     ######## End FIPS Specs ########
 
   # Elastic Beat with Elastic License and binary taken from the x-pack dir.
