@@ -1,0 +1,207 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+env:
+  ASDF_MAGE_VERSION: 1.14.0
+  BUILDKIT_PROGRESS: plain
+  IMAGE_UBUNTU_2204_ARM_64: platform-ingest-elastic-agent-ubuntu-2204-aarch64-1762801856
+  IMAGE_UBUNTU_2204_X86_64: platform-ingest-elastic-agent-ubuntu-2204-1762801856
+  VAULT_PATH: kv/ci-shared/observability-ingest/cloud/gcp
+steps:
+  - group: "Integration tests: packaging"
+    key: int-packaging
+    notify:
+      - github_commit_status:
+          context: buildkite/elastic-agent - Packaging
+    steps:
+      - agents:
+          image: ${IMAGE_UBUNTU_2204_X86_64}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/distributions/**
+        command: .buildkite/scripts/steps/integration-package.sh
+        env:
+          PACKAGES: zip,tar.gz,rpm,deb
+          PLATFORMS: windows/amd64,linux/amd64
+        key: packaging-amd64
+        label: ":package: amd64: zip,tar.gz,rpm,deb "
+        retry:
+          automatic:
+            limit: 1
+      - agents:
+          image: ${IMAGE_UBUNTU_2204_X86_64}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/distributions/**
+        command: .buildkite/scripts/steps/integration-package.sh
+        env:
+          OTEL_COMPONENT: "true"
+          PACKAGES: zip,tar.gz,rpm,deb
+          PLATFORMS: windows/amd64,linux/amd64
+        key: packaging-amd64-otel-component
+        label: ":package: amd64: OTEL_COMPONENT zip,tar.gz,rpm,deb "
+        retry:
+          automatic:
+            limit: 1
+      - agents:
+          image: ${IMAGE_UBUNTU_2204_X86_64}
+          machineType: n2-standard-4
+          provider: gcp
+        artifact_paths:
+          - build/distributions/**
+        command: .buildkite/scripts/steps/integration-package.sh
+        env:
+          FIPS: "true"
+          PACKAGES: tar.gz
+          PLATFORMS: linux/amd64
+        key: packaging-amd64-fips
+        label: ":package: amd64: FIPS tar.gz"
+        retry:
+          automatic:
+            limit: 1
+      - agents:
+          image: ${IMAGE_UBUNTU_2204_ARM_64}
+          instanceType: c6g.2xlarge
+          provider: aws
+        artifact_paths:
+          - build/distributions/**
+        command: .buildkite/scripts/steps/integration-package.sh
+        env:
+          PACKAGES: tar.gz,zip
+          PLATFORMS: windows/arm64,linux/arm64
+        key: packaging-arm64
+        label: ":package: arm64: zip,tar.gz"
+        retry:
+          automatic:
+            limit: 1
+      - agents:
+          image: ${IMAGE_UBUNTU_2204_ARM_64}
+          instanceType: c6g.2xlarge
+          provider: aws
+        artifact_paths:
+          - build/distributions/**
+        command: .buildkite/scripts/steps/integration-package.sh
+        env:
+          OTEL_COMPONENT: "true"
+          PACKAGES: tar.gz,zip
+          PLATFORMS: windows/arm64,linux/arm64
+        key: packaging-arm64-otel-component
+        label: ":package: arm64: OTEL_COMPONENT zip,tar.gz"
+        retry:
+          automatic:
+            limit: 1
+      - agents:
+          image: ${IMAGE_UBUNTU_2204_ARM_64}
+          instanceType: c6g.2xlarge
+          provider: aws
+        artifact_paths:
+          - build/distributions/**
+        command: .buildkite/scripts/steps/integration-package.sh
+        env:
+          FIPS: "true"
+          PACKAGES: tar.gz
+          PLATFORMS: linux/arm64
+        key: packaging-arm64-fips
+        label: ":package: arm64: FIPS tar.gz"
+        retry:
+          automatic:
+            limit: 1
+      - agents:
+          diskSizeGb: 200
+          image: ${IMAGE_UBUNTU_2204_X86_64}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/distributions/**
+        command: |-
+          .buildkite/scripts/steps/integration-package.sh
+          .buildkite/scripts/steps/integration-cloud-image-push.sh
+        env:
+          PACKAGES: docker
+          PLATFORMS: linux/amd64
+        key: packaging-containers-amd64
+        label: ":package: amd64: Containers"
+        plugins:
+          - elastic/vault-docker-login#v0.5.2:
+              secret_path: kv/ci-shared/platform-ingest/elastic_docker_registry
+      - agents:
+          diskSizeGb: 200
+          image: ${IMAGE_UBUNTU_2204_ARM_64}
+          instanceType: c6g.4xlarge
+          provider: aws
+        artifact_paths:
+          - build/distributions/**
+        command: .buildkite/scripts/steps/integration-package.sh
+        env:
+          PACKAGES: docker
+          PLATFORMS: linux/arm64
+        key: packaging-containers-arm64
+        label: ":package: arm64: Containers"
+      - agents:
+          diskSizeGb: 200
+          image: ${IMAGE_UBUNTU_2204_X86_64}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/distributions/**
+        command: |-
+          .buildkite/scripts/steps/integration-package.sh
+          .buildkite/scripts/steps/integration-cloud-image-push.sh
+        env:
+          FIPS: "true"
+          PACKAGES: docker
+          PLATFORMS: linux/amd64
+        key: packaging-containers-amd64-fips
+        label: ":package: amd64: FIPS Containers"
+        plugins:
+          - elastic/vault-docker-login#v0.5.2:
+              secret_path: kv/ci-shared/platform-ingest/elastic_docker_registry
+      - agents:
+          diskSizeGb: 200
+          image: ${IMAGE_UBUNTU_2204_ARM_64}
+          instanceType: c6g.2xlarge
+          provider: aws
+        artifact_paths:
+          - build/distributions/**
+        command: .buildkite/scripts/steps/integration-package.sh
+        env:
+          FIPS: "true"
+          PACKAGES: docker
+          PLATFORMS: linux/arm64
+        key: packaging-containers-arm64-fips
+        label: ":package: arm64: FIPS Containers"
+      - agents:
+          diskSizeGb: 200
+          image: ${IMAGE_UBUNTU_2204_X86_64}
+          machineType: n2-standard-8
+          provider: gcp
+        artifact_paths:
+          - build/distributions/**
+        command: .buildkite/scripts/steps/integration-package.sh
+        env:
+          OTEL_COMPONENT: "true"
+          PACKAGES: docker
+          PLATFORMS: linux/amd64
+        key: packaging-containers-amd64-otel-component
+        label: ":package: amd64: OTEL_COMPONENT Containers"
+        plugins:
+          - elastic/vault-docker-login#v0.5.2:
+              secret_path: kv/ci-shared/platform-ingest/elastic_docker_registry
+      - agents:
+          diskSizeGb: 200
+          image: ${IMAGE_UBUNTU_2204_ARM_64}
+          instanceType: c6g.2xlarge
+          provider: aws
+        artifact_paths:
+          - build/distributions/**
+        command: .buildkite/scripts/steps/integration-package.sh
+        env:
+          OTEL_COMPONENT: "true"
+          PACKAGES: docker
+          PLATFORMS: linux/arm64
+        key: packaging-containers-arm64-otel-component
+        label: ":package: arm64: OTEL_COMPONENT Containers"
+  - command: buildkite-agent pipeline upload .buildkite/bk.integration.pipeline.yml
+    label: Triggering Integration tests
+  - command: buildkite-agent pipeline upload .buildkite/bk.integration-fips.pipeline.yml
+    label: Triggering custom FIPS integration tests

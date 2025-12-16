@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+env:
+  VAULT_PATH: kv/ci-shared/observability-ingest/cloud/gcp
+steps:
+  - agents:
+      provider: gcp
+    command: .buildkite/scripts/steps/gce-cleanup.sh
+    key: gce-cleanup
+    label: GCE Cleanup

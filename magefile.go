@@ -179,6 +179,9 @@ type Otel mg.Namespace
 // Devmachine namespace contains tasks related to remote development machines.
 type Devmachine mg.Namespace
 
+// Buildkite namespace contains tasks for managing Buildkite pipeline YAML generation.
+type Buildkite mg.Namespace
+
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
 	err := sh.RunV("go", "mod", "tidy", "-v")
@@ -3847,6 +3850,60 @@ func (h Helm) RenderExamples() error {
 		}
 	}
 
+	return nil
+}
+
+// Pipeline outputs the main pipeline YAML to stdout.
+// Usage: mage buildkite:pipeline | buildkite-agent pipeline upload
+func (Buildkite) Pipeline() error {
+	return devtools.BuildkitePipeline()
+}
+
+// Integration outputs the integration pipeline YAML to stdout.
+// Usage: mage buildkite:integration | buildkite-agent pipeline upload
+func (Buildkite) Integration() error {
+	return devtools.BuildkiteIntegration()
+}
+
+// IntegrationFull outputs the full integration tests pipeline YAML to stdout.
+// Usage: mage buildkite:integrationFull | buildkite-agent pipeline upload
+func (Buildkite) IntegrationFull() error {
+	return devtools.BuildkiteIntegrationFull()
+}
+
+// IntegrationFIPS outputs the FIPS integration tests pipeline YAML to stdout.
+// Usage: mage buildkite:integrationFIPS | buildkite-agent pipeline upload
+func (Buildkite) IntegrationFIPS() error {
+	return devtools.BuildkiteIntegrationFIPS()
+}
+
+// Package outputs the Elastic Agent package pipeline YAML to stdout.
+// Usage: mage buildkite:package | buildkite-agent pipeline upload
+func (Buildkite) Package() error {
+	return devtools.BuildkitePackage()
+}
+
+// AgentlessRelease outputs the agentless app release pipeline YAML to stdout.
+// Usage: mage buildkite:agentlessRelease | buildkite-agent pipeline upload
+func (Buildkite) AgentlessRelease() error {
+	return devtools.BuildkiteAgentlessRelease()
+}
+
+// GceCleanup outputs the GCE cleanup pipeline YAML to stdout.
+// Usage: mage buildkite:gceCleanup | buildkite-agent pipeline upload
+func (Buildkite) GceCleanup() error {
+	return devtools.BuildkiteGCECleanup()
+}
+
+// Validate validates that generated pipelines match the existing YAML files.
+func (Buildkite) Validate() error {
+	_, err := devtools.BuildkiteValidate()
+	return err
+}
+
+// Diff shows the diff between generated pipelines and existing YAML files.
+func (Buildkite) Diff() error {
+	devtools.BuildkiteDiff()
 	return nil
 }
 
