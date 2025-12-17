@@ -484,8 +484,8 @@ github.com/elastic/elastic-agent-client/v7 v7.17.2 h1:Cl2TeABqWZgW40t5fchGWT/sRk
 github.com/elastic/elastic-agent-client/v7 v7.17.2/go.mod h1:5irRFqp6HLqtu1S+OeY0jg8x7K6PLL+DW+PwVk1vJnk=
 github.com/elastic/elastic-agent-libs v0.28.0 h1:UDL9aSxgjqC9TrHAEHgI8gtuhRYPM/1gSfh7ztHWWLw=
 github.com/elastic/elastic-agent-libs v0.28.0/go.mod h1:0xUg7alsNE/WhY9DZRIdTYW75nqSHC1octIAg//j/PQ=
-github.com/elastic/elastic-agent-system-metrics v0.13.4 h1:gX8VdlQyakPcPKFpD7uHv2QLRDyguuKfZgu0LE27V7c=
-github.com/elastic/elastic-agent-system-metrics v0.13.4/go.mod h1:lB8veYWYBlA9eF6TahmPN87G1IEgWlbep7QSqLSW90U=
+github.com/elastic/elastic-agent-system-metrics v0.13.5 h1:VPTkk3C0ixsgqhAS2S++0/BKe+X6tYn+GzHbBLVuiO4=
+github.com/elastic/elastic-agent-system-metrics v0.13.5/go.mod h1:JNfnZrC0viAjlJRUzQKKuMpDlXgjXBn4WdWEXQF7jcA=
 github.com/elastic/elastic-transport-go/v8 v8.8.0 h1:7k1Ua+qluFr6p1jfJjGDl97ssJS/P7cHNInzfxgBQAo=
 github.com/elastic/elastic-transport-go/v8 v8.8.0/go.mod h1:YLHer5cj0csTzNFXoNQ8qhtGY1GTvSqPnKWKaqQE3Hk=
 github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3 h1:UyNbxdkQiSfyipwsOCWAlO+ju3xXC61Z4prx/HBTtFk=
@@ -494,8 +494,8 @@ github.com/elastic/go-concert v0.3.1 h1:dqtq2+xA8w7BZunI7j3Hs43CjWod7/nNRD8ByPx4
 github.com/elastic/go-concert v0.3.1/go.mod h1:bQ/sGkdR0I8IdzLuxDcrczc+caloItvAqw23jISl9sQ=
 github.com/elastic/go-docappender/v2 v2.12.0 h1:4H5Ale36xmlSzJ8B4fpjNkvDcihEO22NnOFpJxoR/L0=
 github.com/elastic/go-docappender/v2 v2.12.0/go.mod h1:TH6zt+utuXQ8wm+tor0zcrKlZFuLUzXo8UMaSvOhvis=
-github.com/elastic/go-elasticsearch/v8 v8.19.0 h1:VmfBLNRORY7RZL+9hTxBD97ehl9H8Nxf2QigDh6HuMU=
-github.com/elastic/go-elasticsearch/v8 v8.19.0/go.mod h1:F3j9e+BubmKvzvLjNui/1++nJuJxbkhHefbaT0kFKGY=
+github.com/elastic/go-elasticsearch/v8 v8.19.1 h1:0iEGt5/Ds9MNVxEp3hqLsXdbe6SjleaVHONg/FuR09Q=
+github.com/elastic/go-elasticsearch/v8 v8.19.1/go.mod h1:tHJQdInFa6abmDbDCEH2LJja07l/SIpaGpJcm13nt7s=
 github.com/elastic/go-freelru v0.16.0 h1:gG2HJ1WXN2tNl5/p40JS/l59HjvjRhjyAa+oFTRArYs=
 github.com/elastic/go-freelru v0.16.0/go.mod h1:bSdWT4M0lW79K8QbX6XY2heQYSCqD7THoYf82pT/H3I=
 github.com/elastic/go-grok v0.3.1 h1:WEhUxe2KrwycMnlvMimJXvzRa7DoByJB4PVUIE1ZD/U=
