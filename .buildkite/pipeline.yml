@@ -367,3 +367,19 @@ steps:
                 build:
                   commit: "${BUILDKITE_COMMIT}"
                   branch: "${BUILDKITE_BRANCH}"
+
+  # NOTE: This should help detecting issues earlier in the development cycle
+  # See https://github.com/elastic/elastic-agent/issues/11604
+  - label: "Trigger Elastic Agent Package"
+    if: build.pull_request.id != null
+    commands:
+      - .buildkite/scripts/steps/trigger-elastic-agent-package.sh
+      - .buildkite/scripts/steps/trigger-elastic-agent-package.sh | buildkite-agent pipeline upload
+    if_changed:
+      include:
+        - .buildkite/pipeline.elastic-agent-package.yml
+        - .buildkite/scripts/steps/package.sh
+        - .buildkite/scripts/steps/trigger-elastic-agent-package.sh
+        - magefile.go
+        - dev-tools/**/*
+
