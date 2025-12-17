@@ -373,6 +373,27 @@ func (Build) Clean() error {
 	return nil
 }
 
+// TestBinaries build the required binaries for the test suite.
+func (Build) TestBinaries() error {
+	testBinaryPkgs, err := getTestBinariesPath()
+	if err != nil {
+		return fmt.Errorf("cannot build test binaries: %w", err)
+	}
+	return buildTestBinaries(testBinaryPkgs)
+}
+
+// TestFakeComponent build just the test fake component.
+func (Build) TestFakeComponent() error {
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("could not get working directory: %w", err)
+	}
+	testBinaryPkgs := []string{
+		filepath.Join(wd, "pkg", "component", "fake", "component"),
+	}
+	return buildTestBinaries(testBinaryPkgs)
+}
+
 func getTestBinariesPath() ([]string, error) {
 	wd, err := os.Getwd()
 	if err != nil {
@@ -389,15 +410,10 @@ func getTestBinariesPath() ([]string, error) {
 	return testBinaryPkgs, nil
 }
 
-// TestBinaries build the required binaries for the test suite.
-func (Build) TestBinaries() error {
+func buildTestBinaries(testBinaryPkgs []string) error {
 	wd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("could not get working directory: %w", err)
-	}
-	testBinaryPkgs, err := getTestBinariesPath()
-	if err != nil {
-		return fmt.Errorf("cannot build test binaries: %w", err)
 	}
 
 	buildArgs := []string{"build", "-v"}
@@ -2221,7 +2237,7 @@ func (Integration) Local(ctx context.Context, testName string) error {
 		devtools.Platforms = devtools.Platforms.Select(fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH))
 		mg.Deps(Package)
 	}
-	mg.Deps(Build.TestBinaries)
+	mg.Deps(Build.TestFakeComponent)
 
 	// clean the .agent-testing/local so this run will use the latest build
 	_ = os.RemoveAll(".agent-testing/local")
@@ -2871,7 +2887,7 @@ func (i Integration) testForResourceLeaks(ctx context.Context, matrix bool, test
 
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
 func (Integration) TestOnRemote(ctx context.Context) error {
-	mg.Deps(Build.TestBinaries)
+	mg.Deps(Build.TestFakeComponent)
 	version := os.Getenv("AGENT_VERSION")
 	if version == "" {
 		return errors.New("AGENT_VERSION environment variable must be set")
@@ -3613,7 +3629,8 @@ func (Otel) GolangCrossBuild() error {
 	// embedded packetbeat is only included in a non-FIPS build
 	if !mage.FIPSBuild {
 		// requires the NPCAP installer on Windows
-		if err := xpacketbeat.CopyNPCAPInstaller(filepath.Join("beats", "x-pack", "packetbeat", "npcap", "installer")); err != nil {
+		// ending '/' is required or the installer will not be copied to the correct location
+		if err := xpacketbeat.CopyNPCAPInstaller("beats/x-pack/packetbeat/npcap/installer/"); err != nil {
 			// to allow local builds for Windows, this is allowed to fail
 			fmt.Printf("WARNING: Running packetbeat on Windows will fail, as no npcap installer will be embedded\n")
 			fmt.Printf("WARNING: Failed to copy npcap installer for Windows: %s\n", err)
