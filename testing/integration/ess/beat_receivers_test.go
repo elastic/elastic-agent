@@ -1712,7 +1712,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 	healthCheck(ctx,
 		"Everything is ready. Begin running and processing data.",
 		component.OtelRuntimeManager,
-		4,
+		3,
 		otelTimestamp)
 
 	// restart 3 times, checks path definition is stable
@@ -1727,7 +1727,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 		healthCheck(ctx,
 			"Everything is ready. Begin running and processing data.",
 			component.OtelRuntimeManager,
-			4,
+			3,
 			restartTimestamp)
 	}
 
