@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -94,7 +95,7 @@ func TestMarkUpgrade(t *testing.T) {
 		previousAgent      agentInstall
 		action             *fleetapi.ActionUpgrade
 		details            *details.Details
-		availableRollbacks map[string]TTLMarker
+		availableRollbacks map[string]ttl.TTLMarker
 	}
 	type workingDirHook func(t *testing.T, dataDir string)
 
@@ -200,7 +201,7 @@ func TestMarkUpgrade(t *testing.T) {
 				},
 				action:  nil,
 				details: details.NewDetails("9.2.0-SNAPSHOT", details.StateReplacing, ""),
-				availableRollbacks: map[string]TTLMarker{
+				availableRollbacks: map[string]ttl.TTLMarker{
 					filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"): {
 						Version:    "1.2.3-SNAPSHOT",
 						ValidUntil: twentyFourHoursFromNow,
@@ -228,7 +229,7 @@ func TestMarkUpgrade(t *testing.T) {
 						ActionID:      "",
 						Metadata:      details.Metadata{},
 					},
-					RollbacksAvailable: map[string]TTLMarker{
+					RollbacksAvailable: map[string]ttl.TTLMarker{
 						filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-prvagt"): {
 							Version:    "1.2.3-SNAPSHOT",
 							ValidUntil: twentyFourHoursFromNow,

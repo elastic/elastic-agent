@@ -22,10 +22,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/logp"
-
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
+
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -92,16 +93,10 @@ func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGat
 
 		stateStore := newStateStore(t, log)
 
-		gateway, err := newFleetGatewayWithScheduler(
-			log,
-			settings,
-			agentInfo,
-			client,
-			scheduler,
-			noop.New(),
-			stateStore,
-			NewCheckinStateFetcher(emptyStateFetcher),
-		)
+		mockRollbacksSrc := newMockRollbacksSource(t)
+		mockRollbacksSrc.EXPECT().Get().Return(nil, nil)
+
+		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
 
 		require.NoError(t, err)
 
@@ -231,16 +226,10 @@ func TestFleetGateway(t *testing.T) {
 		log, _ := logger.New("tst", false)
 		stateStore := newStateStore(t, log)
 
-		gateway, err := newFleetGatewayWithScheduler(
-			log,
-			settings,
-			agentInfo,
-			client,
-			scheduler,
-			noop.New(),
-			stateStore,
-			NewCheckinStateFetcher(emptyStateFetcher),
-		)
+		mockRollbacksSrc := newMockRollbacksSource(t)
+		mockRollbacksSrc.EXPECT().Get().Return(nil, nil)
+
+		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
 		require.NoError(t, err)
 
 		waitFn := ackSeq(
@@ -280,19 +269,13 @@ func TestFleetGateway(t *testing.T) {
 		log, _ := logger.New("tst", false)
 		stateStore := newStateStore(t, log)
 
-		gateway, err := newFleetGatewayWithScheduler(
-			log,
-			&fleetGatewaySettings{
-				Duration: d,
-				Backoff:  &backoffSettings{Init: 1 * time.Second, Max: 30 * time.Second},
-			},
-			agentInfo,
-			client,
-			scheduler,
-			noop.New(),
-			stateStore,
-			NewCheckinStateFetcher(emptyStateFetcher),
-		)
+		mockRollbacksSrc := newMockRollbacksSource(t)
+		mockRollbacksSrc.EXPECT().Get().Return(nil, nil)
+
+		gateway, err := newFleetGatewayWithScheduler(log, &fleetGatewaySettings{
+			Duration: d,
+			Backoff:  &backoffSettings{Init: 1 * time.Second, Max: 30 * time.Second},
+		}, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
 		require.NoError(t, err)
 
 		ch2 := client.Answer(func(_ context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
@@ -342,16 +325,10 @@ func TestFleetGateway(t *testing.T) {
 			}
 		}
 
-		gateway, err := newFleetGatewayWithScheduler(
-			log,
-			settings,
-			agentInfo,
-			client,
-			scheduler,
-			noop.New(),
-			stateStore,
-			NewCheckinStateFetcher(stateFetcher),
-		)
+		mockRollbacksSrc := newMockRollbacksSource(t)
+		mockRollbacksSrc.EXPECT().Get().Return(nil, nil)
+
+		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(stateFetcher), mockRollbacksSrc)
 
 		require.NoError(t, err)
 
@@ -411,16 +388,10 @@ func TestFleetGateway(t *testing.T) {
 		err := stateStore.Save()
 		require.NoError(t, err)
 
-		gateway, err := newFleetGatewayWithScheduler(
-			log,
-			settings,
-			agentInfo,
-			client,
-			scheduler,
-			noop.New(),
-			stateStore,
-			NewCheckinStateFetcher(emptyStateFetcher),
-		)
+		mockRollbacksSrc := newMockRollbacksSource(t)
+		mockRollbacksSrc.EXPECT().Get().Return(nil, nil)
+
+		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
 		require.NoError(t, err)
 
 		waitFn := ackSeq(
@@ -469,19 +440,13 @@ func TestFleetGateway(t *testing.T) {
 
 		stateFetcher := NewFastCheckinStateFetcher(log, emptyStateFetcher, stateChannel)
 
-		gateway, err := newFleetGatewayWithScheduler(
-			log,
-			&fleetGatewaySettings{
-				Duration: 5 * time.Second,
-				Backoff:  &backoffSettings{Init: 10 * time.Millisecond, Max: 30 * time.Second},
-			},
-			agentInfo,
-			client,
-			scheduler,
-			noop.New(),
-			stateStore,
-			stateFetcher,
-		)
+		mockRollbacksSrc := newMockRollbacksSource(t)
+		mockRollbacksSrc.EXPECT().Get().Return(nil, nil)
+
+		gateway, err := newFleetGatewayWithScheduler(log, &fleetGatewaySettings{
+			Duration: 5 * time.Second,
+			Backoff:  &backoffSettings{Init: 10 * time.Millisecond, Max: 30 * time.Second},
+		}, agentInfo, client, scheduler, noop.New(), stateStore, stateFetcher, mockRollbacksSrc)
 		require.NoError(t, err)
 
 		requestSent := make(chan struct{}, 10)
@@ -1141,6 +1106,121 @@ func TestConvertToCheckingComponents(t *testing.T) {
 				})
 			}
 			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestAvailableRollbacks(t *testing.T) {
+	testcases := []struct {
+		name                  string
+		setup                 func(t *testing.T, rbSource *mockRollbacksSource, client *testingClient)
+		wantErr               assert.ErrorAssertionFunc
+		assertCheckinResponse func(t *testing.T, resp *fleetapi.CheckinResponse)
+	}{
+		{
+			name: "no available rollbacks - normal checkin",
+			setup: func(t *testing.T, rbSource *mockRollbacksSource, client *testingClient) {
+				rbSource.EXPECT().Get().Return(nil, nil)
+				client.Answer(func(_ context.Context, _ http.Header, body io.Reader) (*http.Response, error) {
+					unmarshaled := map[string]interface{}{}
+					err := json.NewDecoder(body).Decode(&unmarshaled)
+					assert.NoError(t, err, "error decoding checkin body")
+					assert.NotContains(t, unmarshaled, "available_rollbacks")
+					return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       io.NopCloser(strings.NewReader("{}")),
+						},
+						nil
+				})
+			},
+			wantErr:               assert.NoError,
+			assertCheckinResponse: nil,
+		},
+		{
+			name: "valid available rollbacks - assert key and value",
+			setup: func(t *testing.T, rbSource *mockRollbacksSource, client *testingClient) {
+
+				validUntil := time.Now().UTC().Add(time.Minute)
+				// truncate to the second to avoid different precision due to marshal/unmarshal
+				validUntil = validUntil.Truncate(time.Second)
+
+				rbSource.EXPECT().Get().Return(map[string]ttl.TTLMarker{
+					"data/elastic-agent-1.2.3-abcdef": {
+						Version:    "1.2.3",
+						Hash:       "abcdef",
+						ValidUntil: validUntil,
+					},
+				}, nil)
+				client.Answer(func(_ context.Context, _ http.Header, body io.Reader) (*http.Response, error) {
+					unmarshaled := map[string]json.RawMessage{}
+					err := json.NewDecoder(body).Decode(&unmarshaled)
+					assert.NoError(t, err, "error decoding checkin body")
+					if assert.Contains(t, unmarshaled, "upgrade") {
+						// verify that we got the correct data
+						var actualUpgrade fleetapi.CheckinUpgrade
+						err = json.Unmarshal(unmarshaled["upgrade"], &actualUpgrade)
+						require.NoError(t, err, "error decoding upgrade info from checkin body")
+
+						expected := []fleetapi.CheckinRollback{{
+							Version:    "1.2.3",
+							ValidUntil: validUntil,
+						}}
+						assert.Equal(t, expected, actualUpgrade.Rollbacks)
+					}
+
+					return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       io.NopCloser(strings.NewReader("{}")),
+						},
+						nil
+				})
+			},
+			wantErr:               assert.NoError,
+			assertCheckinResponse: nil,
+		},
+		{
+			name: "Error getting rollbacks should not make the checkin error out, just omit available_rollbacks",
+			setup: func(t *testing.T, rbSource *mockRollbacksSource, client *testingClient) {
+				rbSource.EXPECT().Get().Return(nil, errors.New("some error getting rollbacks"))
+				client.Answer(func(_ context.Context, _ http.Header, body io.Reader) (*http.Response, error) {
+					unmarshaled := map[string]interface{}{}
+					err := json.NewDecoder(body).Decode(&unmarshaled)
+					assert.NoError(t, err, "error decoding checkin body")
+					assert.NotContains(t, unmarshaled, "available_rollbacks")
+
+					return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       io.NopCloser(strings.NewReader("{}")),
+						},
+						nil
+				})
+			},
+			wantErr:               assert.NoError,
+			assertCheckinResponse: nil,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			stepperScheduler := scheduler.NewStepper()
+			testClient := newTestingClient()
+			log, _ := logger.New("fleet_gateway", false)
+
+			stateStore := newStateStore(t, log)
+
+			mockRollbacksSrc := newMockRollbacksSource(t)
+
+			mockAgentInfo := new(testAgentInfo)
+
+			tc.setup(t, mockRollbacksSrc, testClient)
+
+			gateway, err := newFleetGatewayWithScheduler(log, defaultGatewaySettings, mockAgentInfo, testClient, stepperScheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
+			require.NoError(t, err, "error creating gateway")
+			checkinResponse, _, err := gateway.execute(t.Context())
+			tc.wantErr(t, err)
+			if tc.assertCheckinResponse != nil {
+				tc.assertCheckinResponse(t, checkinResponse)
+			}
 		})
 	}
 }
