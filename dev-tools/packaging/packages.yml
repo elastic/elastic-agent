@@ -1439,7 +1439,6 @@ specs:
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
           <<: *agent_otel_collector_binary_spec_core
           <<: *metricbeat_lightweight_module_core
-          <<: *osquerybeat_extension_core
     ######## End FIPS Specs ########
 
   elastic_agent_core_source:

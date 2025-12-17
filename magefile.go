@@ -849,6 +849,13 @@ func PackageAgentCore() {
 
 	mg.SerialDeps(Otel.Prepare, Otel.CrossBuild, CrossBuild)
 
+	// compile the elastic-agent.exe proxy binary for the windows archive
+	for _, p := range devtools.Platforms {
+		if p.GOOS() == "windows" {
+			mg.Deps(mg.F(Build.windowsArchiveRootBinaryForGoArch, p.GOARCH()))
+		}
+	}
+
 	devtools.UseElasticAgentCorePackaging()
 
 	mg.Deps(devtools.Package)
