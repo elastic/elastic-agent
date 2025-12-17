@@ -1,4 +1,12 @@
+connectors:
+  # Generates OTel metrics from selected OTel profiling data.
+  # For more details check out https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/profilingmetricsconnector
+  profilingmetrics:
+
 receivers:
+  # --feature-gates=service.profilesSupport and elevated privileges like CAP_SYS_ADMIN or using sudo.
+  # For more details check out https://www.elastic.co/docs/reference/edot-collector/config/configure-profiles-collection
+  profiling:
   # Receiver for platform specific log files
   filelog/platformlogs:
     include: [/var/log/*.log]
@@ -98,8 +106,11 @@ exporters:
 service:
   extensions: [file_storage]
   pipelines:
+    profiles/host:
+      receivers: [profiling]
+      exporters: [profilingmetrics]
     metrics/hostmetrics:
-      receivers: [hostmetrics/system]
+      receivers: [hostmetrics/system, profilingmetrics]
       processors: [resourcedetection]
       exporters: [otlp/ingest]
     logs/platformlogs:
