@@ -1613,6 +1613,9 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 				"monitoring": map[string]any{
 					"_runtime_experimental": "process",
 				},
+				"logging": map[string]any{
+					"level": "debug",
+				},
 			},
 		},
 	}
@@ -1693,12 +1696,18 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 
 	// Switch to otel monitoring
 	otelMonUpdateReq := kibana.AgentPolicyUpdateRequest{
+		AdvancedSettings: map[string]any{
+			"agent_logging_level": "debug",
+		},
 		Name:      policyName,
 		Namespace: info.Namespace,
 		Overrides: map[string]any{
 			"agent": map[string]any{
 				"monitoring": map[string]any{
 					"_runtime_experimental": "otel",
+				},
+				"logging": map[string]any{
+					"level": "debug",
 				},
 			},
 		},
@@ -1745,12 +1754,18 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 
 	// Switch back to process monitoring
 	processMonUpdateReq := kibana.AgentPolicyUpdateRequest{
+		AdvancedSettings: map[string]any{
+			"agent_logging_level": "debug",
+		},
 		Name:      policyName,
 		Namespace: info.Namespace,
 		Overrides: map[string]any{
 			"agent": map[string]any{
 				"monitoring": map[string]any{
 					"_runtime_experimental": "process",
+				},
+				"logging": map[string]any{
+					"level": "debug",
 				},
 			},
 		},
