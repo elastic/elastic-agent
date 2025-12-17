@@ -194,8 +194,8 @@ func aggregateStatus(sts componentstatus.Status, err error) *status.AggregateSta
 	}
 }
 
-// injectHeathCheckV2Extension injects the healthcheckv2 extension into the provided configuration.
-func injectHeathCheckV2Extension(conf *confmap.Conf, healthCheckExtensionID string, httpHealthCheckPort int) error {
+// injectHealthCheckV2Extension injects the healthcheckv2 extension into the provided configuration.
+func injectHealthCheckV2Extension(conf *confmap.Conf, healthCheckExtensionID string, httpHealthCheckPort int) error {
 	err := conf.Merge(confmap.NewFromStringMap(map[string]interface{}{
 		"extensions": map[string]interface{}{
 			healthCheckExtensionID: map[string]interface{}{

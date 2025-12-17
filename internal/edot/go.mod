@@ -5,7 +5,7 @@ go 1.24.11
 replace github.com/elastic/elastic-agent => ../../
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251204233532-339fa3f887a1
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251207204415-4e3987b256f7
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.28.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.20.0
@@ -34,7 +34,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver v0.139.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.139.0
 	github.com/spf13/cobra v1.10.1
-	github.com/spf13/pflag v1.0.9
+	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/collector/connector/forwardconnector v0.139.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.139.0
@@ -259,11 +259,11 @@ require (
 	github.com/elastic/bayeux v1.0.5 // indirect
 	github.com/elastic/elastic-agent-autodiscover v0.10.0 // indirect
 	github.com/elastic/elastic-agent-client/v7 v7.17.2 // indirect
-	github.com/elastic/elastic-agent-system-metrics v0.13.4 // indirect
+	github.com/elastic/elastic-agent-system-metrics v0.13.5 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.8.0 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
 	github.com/elastic/go-docappender/v2 v2.12.0 // indirect
-	github.com/elastic/go-elasticsearch/v8 v8.19.0 // indirect
+	github.com/elastic/go-elasticsearch/v8 v8.19.1 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect
 	github.com/elastic/go-grok v0.3.1 // indirect
 	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
@@ -336,7 +336,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/gomodule/redigo v1.9.2 // indirect
-	github.com/google/cel-go v0.25.0 // indirect
+	github.com/google/cel-go v0.26.0 // indirect
 	github.com/google/flatbuffers v25.2.10+incompatible // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
