@@ -13,6 +13,7 @@ import (
 	// import logp flags
 	_ "github.com/elastic/elastic-agent-libs/logp/configure"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/basecmd"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/version"
@@ -53,6 +54,7 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	}
 
 	// path flags
+	paths.SetupFlags()
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.home"))
 	cmd.PersistentFlags().AddGoFlag(flag.CommandLine.Lookup("path.home.unversioned"))
 	// hidden used internally by container subcommand

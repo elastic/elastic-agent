@@ -24,6 +24,8 @@ jobs:
         branch: ["main", "8.19"]
     steps:
     - uses: actions/checkout@v6
+      with:
+        submodules: true
 
     - name: Set up Go
       uses: actions/setup-go@v6
