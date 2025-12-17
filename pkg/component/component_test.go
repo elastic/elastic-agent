@@ -3947,7 +3947,7 @@ func TestToComponentsWithRuntimeConfig(t *testing.T) {
 			},
 			runtimeConfig: &RuntimeConfig{
 				Default: string(ProcessRuntimeManager),
-				// These will be ignored because testbeat doesn't use agentbeat
+				// These will be ignored because testbeat doesn't use elastic-otel-collector
 				Filebeat: BeatRuntimeConfig{
 					Default: string(OtelRuntimeManager),
 					InputType: map[string]string{

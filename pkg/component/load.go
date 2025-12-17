@@ -58,7 +58,7 @@ func (s *InputRuntimeSpec) CommandName() string {
 		if s.Spec.Command.Name != "" {
 			return s.Spec.Command.Name
 		}
-		if s.BinaryName == "agentbeat" && len(s.Spec.Command.Args) > 0 {
+		if s.BinaryName == "elastic-otel-collector" && len(s.Spec.Command.Args) > 0 {
 			return s.Spec.Command.Args[0]
 		}
 	}

@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - 'internal/edot/**'
-      - 'internal/pkg/otel/**'
       - '.github/workflows/validate-docs-structure.yml'
 
 jobs:
@@ -12,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          submodules: true
       
       - name: Set up Go
         uses: actions/setup-go@v6

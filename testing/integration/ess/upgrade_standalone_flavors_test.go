@@ -51,7 +51,7 @@ func TestStandaloneUpgrade_Flavor_Basic(t *testing.T) {
 	checkFn := func(t *testing.T, fixture *atesting.Fixture) {
 		testComponentsPresence(context.Background(), fixture,
 			[]componentPresenceDefinition{
-				{"agentbeat", []string{"windows", "linux", "darwin"}},
+				{"elastic-otel-collector", []string{"windows", "linux", "darwin"}},
 				{"endpoint-security", []string{"windows", "linux", "darwin"}},
 				{"pf-host-agent", []string{"linux"}},
 			},
@@ -118,7 +118,7 @@ func TestStandaloneUpgrade_Flavor_Servers(t *testing.T) {
 	checkFn := func(t *testing.T, fixture *atesting.Fixture) {
 		testComponentsPresence(context.Background(), fixture,
 			[]componentPresenceDefinition{
-				{"agentbeat", []string{"windows", "linux", "darwin"}},
+				{"elastic-otel-collector", []string{"windows", "linux", "darwin"}},
 				{"endpoint-security", []string{"windows", "linux", "darwin"}},
 				{"pf-host-agent", []string{"linux"}},
 				{"cloudbeat", []string{"linux"}},
@@ -184,7 +184,7 @@ func TestStandaloneUpgrade_Flavor_UpgradeFromUnflavored(t *testing.T) {
 	checkFn := func(t *testing.T, fixture *atesting.Fixture) {
 		testComponentsPresence(context.Background(), fixture,
 			[]componentPresenceDefinition{
-				{"agentbeat", []string{"windows", "linux", "darwin"}},
+				{"elastic-otel-collector", []string{"windows", "linux", "darwin"}},
 				{"endpoint-security", []string{"windows", "linux", "darwin"}},
 				{"pf-host-agent", []string{"linux"}},
 				{"cloudbeat", []string{"linux"}},

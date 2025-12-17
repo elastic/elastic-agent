@@ -34,7 +34,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -337,7 +336,7 @@ func TestOTelManager_Run(t *testing.T) {
 	wd, erWd := os.Getwd()
 	require.NoError(t, erWd, "cannot get working directory")
 
-	testBinary := filepath.Join(wd, "testing", "testing")
+	testBinary := filepath.Join(wd, "..", "..", "..", "..", "internal", "edot", "testing", "testing")
 	require.FileExists(t, testBinary, "testing binary not found")
 
 	const waitTimeForStop = 30 * time.Second
@@ -873,7 +872,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	wd, erWd := os.Getwd()
 	require.NoError(t, erWd, "cannot get working directory")
 
-	testBinary := filepath.Join(wd, "testing", "testing")
+	testBinary := filepath.Join(wd, "..", "..", "..", "..", "internal", "edot", "testing", "testing")
 	require.FileExists(t, testBinary, "testing binary not found")
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -900,7 +899,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// the execution mode passed here is overridden below so it is irrelevant
-			m, err := NewOTelManager(l, logp.DebugLevel, base, config.SubprocessExecutionMode, nil, nil, nil, waitTimeForStop)
+			m, err := NewOTelManager(l, logp.DebugLevel, base, nil, nil, nil, waitTimeForStop)
 			require.NoError(t, err, "could not create otel manager")
 
 			executionMode, err := tc.execModeFn(m.collectorRunErr)
@@ -954,7 +953,7 @@ func TestOTelManager_Ports(t *testing.T) {
 	wd, erWd := os.Getwd()
 	require.NoError(t, erWd, "cannot get working directory")
 
-	testBinary := filepath.Join(wd, "testing", "testing")
+	testBinary := filepath.Join(wd, "..", "..", "..", "..", "internal", "edot", "testing", "testing")
 	require.FileExists(t, testBinary, "testing binary not found")
 
 	const waitTimeForStop = 30 * time.Second
@@ -993,7 +992,7 @@ func TestOTelManager_Ports(t *testing.T) {
 			m, err := NewOTelManager(
 				l,
 				logp.DebugLevel,
-				base, config.SubprocessExecutionMode,
+				base,
 				nil,
 				&agentCollectorConfig,
 				nil,
@@ -1095,7 +1094,7 @@ func TestOTelManager_PortConflict(t *testing.T) {
 	wd, erWd := os.Getwd()
 	require.NoError(t, erWd, "cannot get working directory")
 
-	testBinary := filepath.Join(wd, "testing", "testing")
+	testBinary := filepath.Join(wd, "..", "..", "..", "..", "internal", "edot", "testing", "testing")
 	require.FileExists(t, testBinary, "testing binary not found")
 
 	const waitTimeForStop = 30 * time.Second
@@ -1116,7 +1115,7 @@ func TestOTelManager_PortConflict(t *testing.T) {
 	m, err := NewOTelManager(
 		l,
 		logp.DebugLevel,
-		base, config.SubprocessExecutionMode,
+		base,
 		nil,
 		nil,
 		nil,
@@ -1765,7 +1764,6 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 		testLogger,
 		logp.DebugLevel,
 		testLogger,
-		config.SubprocessExecutionMode, // irrelevant, we'll override it
 		agentInfo,
 		nil,
 		beatMonitoringConfigGetter,
@@ -1862,7 +1860,6 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 		testLogger,
 		logp.DebugLevel,
 		testLogger,
-		config.SubprocessExecutionMode, // irrelevant, we'll override it
 		agentInfo,
 		nil,
 		beatMonitoringConfigGetter,
