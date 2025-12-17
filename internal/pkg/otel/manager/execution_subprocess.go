@@ -141,16 +141,13 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 	}
 
 	ctl := &procHandle{
-		processDoneCh: make(chan struct{}),
-		processInfo:   processInfo,
-		log:           logger,
+		processDoneCh:     make(chan struct{}),
+		healthcheckDoneCh: make(chan struct{}),
+		processInfo:       processInfo,
+		log:               logger,
 	}
 
-	healthCheckDone := make(chan struct{})
 	go func() {
-		defer func() {
-			close(healthCheckDone)
-		}()
 		currentStatus := aggregateStatus(componentstatus.StatusStarting, nil)
 		r.reportSubprocessCollectorStatus(ctx, statusCh, currentStatus)
 
@@ -207,8 +204,12 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 	}()
 
 	go func() {
+		<-ctl.healthcheckDoneCh
 		procCtxCancel()
-		<-healthCheckDone
+		logger.Debugf("health check done for pid %d", processInfo.PID)
+	}()
+
+	go func() {
 		procState, procErr := processInfo.Process.Wait()
 		logger.Debugf("wait for pid %d returned", processInfo.PID)
 		close(ctl.processDoneCh)
@@ -300,9 +301,10 @@ func removeManagedHealthCheckExtensionStatus(status *status.AggregateStatus, hea
 }
 
 type procHandle struct {
-	processDoneCh chan struct{}
-	processInfo   *process.Info
-	log           *logger.Logger
+	processDoneCh     chan struct{}
+	healthcheckDoneCh chan struct{}
+	processInfo       *process.Info
+	log               *logger.Logger
 }
 
 // Stop stops the process. If the process is already stopped, it does nothing. If the process does not stop within
@@ -314,7 +316,7 @@ func (s *procHandle) Stop(waitTime time.Duration) {
 		return
 	default:
 	}
-
+	close(s.healthcheckDoneCh)
 	s.log.Debugf("gracefully stopping pid %d", s.processInfo.PID)
 	if err := s.processInfo.Stop(); err != nil {
 		s.log.Warnf("failed to send stop signal to the supervised collector: %v", err)
