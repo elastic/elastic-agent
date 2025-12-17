@@ -207,10 +207,10 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 	}()
 
 	go func() {
-		procState, procErr := processInfo.Process.Wait()
-		logger.Debugf("wait for pid %d returned", processInfo.PID)
 		procCtxCancel()
 		<-healthCheckDone
+		procState, procErr := processInfo.Process.Wait()
+		logger.Debugf("wait for pid %d returned", processInfo.PID)
 		close(ctl.processDoneCh)
 		// using ctx instead of procCtx in the reportErr functions below is intentional. This allows us to report
 		// errors to the caller through processErrCh and essentially discard any other errors that occurred because
