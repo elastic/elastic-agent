@@ -2,8 +2,6 @@
 
 set -euo pipefail
 
-# Merges the target branch INTO the current PR branch instead of the other way around.
-# This avoids issues where git cannot replace files during checkout (e.g., Windows file locking).
 checkout_merge() {
     local target_branch=$1
     local pr_commit=$2
@@ -14,7 +12,11 @@ checkout_merge() {
         exit 1
     fi
 
-    # Create a merge branch from the current PR commit
+    git fetch -v origin "${target_branch}"
+    git checkout FETCH_HEAD
+    echo "Current branch: $(git rev-parse --abbrev-ref HEAD)"
+
+    # create temporal branch to merge the PR with the target branch
     git checkout -b ${merge_branch}
     echo "New branch created: $(git rev-parse --abbrev-ref HEAD)"
 
@@ -22,9 +24,7 @@ checkout_merge() {
     git config user.name "github-merged-pr-post-checkout"
     git config user.email "auto-merge@buildkite"
 
-    # Fetch and merge the target branch into the PR branch
-    git fetch -v origin "${target_branch}"
-    git merge --no-edit FETCH_HEAD || {
+    git merge --no-edit "${BUILDKITE_COMMIT}" || {
         local merge_result=$?
         echo "Merge failed: ${merge_result}"
         git merge --abort
@@ -34,23 +34,20 @@ checkout_merge() {
 
 pull_request="${BUILDKITE_PULL_REQUEST:-false}"
 
-if [[ "${pull_request}" != "false" ]]; then
-    TARGET_BRANCH="${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-master}"
-    PR_COMMIT="${BUILDKITE_COMMIT}"
-    PR_ID=${BUILDKITE_PULL_REQUEST}
-    MERGE_BRANCH="pr_merge_${PR_ID}"
-
-    checkout_merge "${TARGET_BRANCH}" "${PR_COMMIT}" "${MERGE_BRANCH}"
-
-    echo "Commit information"
-    git --no-pager log --format=%B -n 1
+if [[ "${pull_request}" == "false" ]]; then
+    echo "Not a pull request, skipping"
+    exit 0
 fi
 
-# Initialize submodules if they exist
-if [[ -f ".gitmodules" ]]; then
-    echo "Initializing submodules"
-    git submodule update --init --progress
-fi
+TARGET_BRANCH="${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-master}"
+PR_COMMIT="${BUILDKITE_COMMIT}"
+PR_ID=${BUILDKITE_PULL_REQUEST}
+MERGE_BRANCH="pr_merge_${PR_ID}"
+
+checkout_merge "${TARGET_BRANCH}" "${PR_COMMIT}" "${MERGE_BRANCH}"
+
+echo "Commit information"
+git --no-pager log --format=%B -n 1
 
 # Ensure buildkite groups are rendered
 echo ""
