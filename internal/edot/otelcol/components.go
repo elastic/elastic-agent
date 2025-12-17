@@ -100,7 +100,7 @@ import (
 	profilingmetricsconnector "github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector"
 
 	// Telemetry
-	internaltelemetry "github.com/elastic/elastic-agent/internal/edot/otelcol/monitoring/internaltelemetry"
+	internaltelemetry "github.com/elastic/elastic-agent/internal/pkg/otel/internaltelemetry"
 	elasticmonitoringreceiver "github.com/elastic/elastic-agent/internal/pkg/otel/receivers/elasticmonitoring"
 )
 

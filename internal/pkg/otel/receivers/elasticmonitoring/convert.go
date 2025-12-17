@@ -13,7 +13,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
-	"github.com/elastic/elastic-agent/internal/edot/otelcol/monitoring/internaltelemetry"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/internaltelemetry"
 )
 
 // A summary of current metrics values for a particular exporter
