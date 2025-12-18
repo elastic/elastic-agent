@@ -5,8 +5,19 @@ set -euo pipefail
 _SELF=$(dirname $0)
 source "${_SELF}/../common.sh"
 
-if test -z "${MANIFEST_URL=:""}"; then
+mage clean
+
+if test -z "${MANIFEST_URL:-}"; then
   echo "No MANIFEST_URL building core packages"
+
+  # Repo manifest is always SNAPSHOT components, force
+  # building in SNAPSHOT mode.
+  export SNAPSHOT=true
+
+  # FIPS only supports linux
+  if [ "${FIPS:-}" = "true" ]; then
+    export PLATFORMS="linux/amd64,linux/arm64"
+  fi
 
   # No manifest URL build the the core packages.
   mage packageAgentCore
@@ -23,10 +34,10 @@ fi
 export AGENT_DROP_PATH=build/elastic-agent-drop
 mkdir -p $AGENT_DROP_PATH
 
-mage clean downloadManifest
+mage downloadManifest
 
 if [ "${_UNSET_MANIFEST_URL:-}" = "true" ]; then
-  # unset before calling packageUsingDRA this will have the target
+  # Unset before calling packageUsingDRA this will have the target
   # use the built agent core packages from above
   unset MANIFEST_URL
 fi
@@ -42,6 +53,10 @@ MAGE_TARGETS+=("fixDRADockerArtifacts")
 mage "${MAGE_TARGETS[@]}"
 
 echo  "+++ Generate dependencies report"
+if test -z "${MANIFEST_URL:-}"; then
+  # Ensure MANIFEST_URL is set. Would become unset above.
+  MANIFEST_URL=$(jq -r .manifest_url .package-version)
+fi
 BEAT_VERSION_FULL=$(curl -s -XGET "${MANIFEST_URL}" |jq '.version' -r )
 bash "${_SELF}/../../../dev-tools/dependencies-report"
 mkdir -p build/distributions/reports

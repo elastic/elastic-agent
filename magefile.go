@@ -1787,7 +1787,7 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestResponse *manifest
 	extractDir := filepath.Join(downloadDir, extractionSubdir)
 	_ = os.RemoveAll(extractDir) // ignore error
 
-	// place the artifacts where the package.yml expects them (in build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}})
+	// place the artifacts where the package.yml expects them (in 'build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}')
 	for _, platform := range devtools.Platforms.Names() {
 		if !elasticAgentCoreComponent.SupportsPlatform(platform) {
 			continue
@@ -1811,7 +1811,7 @@ func useDRAAgentBinaryForPackage(ctx context.Context, manifestResponse *manifest
 		log.Printf("renaming %q to %q", srcDir, dstDir)
 		err := os.Rename(srcDir, dstDir)
 		if err != nil {
-			fmt.Errorf("failed renaming %q to %q: %w", srcDir, dstDir, err)
+			return fmt.Errorf("failed renaming %q to %q: %w", srcDir, dstDir, err)
 		}
 	}
 
