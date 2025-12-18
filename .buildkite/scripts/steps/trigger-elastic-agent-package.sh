@@ -14,8 +14,7 @@ if [ ! -f .package-version ]; then
   exit 1
 fi
 
-# No need for the snapshot but the three digits version is required
-BEAT_VERSION=$(jq -r .core_version .package-version)
+BEAT_VERSION="$(jq -r .core_version .package-version)-SNAPSHOT"
 
 cat << EOF
   - label: ":pipeline: Run elastic-agent-package"
