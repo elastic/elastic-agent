@@ -14,9 +14,7 @@ if [ ! -f .package-version ]; then
   exit 1
 fi
 
-# No need for the snapshot but the three digits version is required
-BEAT_VERSION=$(jq -r .version .core_version)
-MANIFEST_URL=$(jq -r .manifest_url .package-version)
+BEAT_VERSION="$(jq -r .core_version .package-version)"
 
 cat << EOF
   - label: ":pipeline: Run elastic-agent-package"
@@ -30,6 +28,5 @@ cat << EOF
         DRA_WORKFLOW: "snapshot"
         DRA_BRANCH: "${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
         DRA_DRY_RUN: "--dry-run"
-        MANIFEST_URL: "${MANIFEST_URL}"
         ELASTIC_SLACK_NOTIFICATIONS_ENABLED: "false"
 EOF
