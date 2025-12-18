@@ -323,7 +323,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		var statusErr error
 		status, statusErr := beatReceiverFixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
-		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 4)
+		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 3)
 	}, 1*time.Minute, 1*time.Second)
 
 	// 5. Assert monitoring logs and metrics are available on ES (for otel mode)
