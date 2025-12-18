@@ -4,6 +4,7 @@ products:
 exclude:
   - "*.md"
   - "manifests/kustomize-autosharding/README.md"
+  - "scripts/update-docs/README.md"
 cross_links:
   - docs-content
   - beats
