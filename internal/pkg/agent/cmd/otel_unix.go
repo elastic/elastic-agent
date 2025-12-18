@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build otelexternal && !windows
+//go:build !windows
 
 package cmd
 
@@ -26,7 +26,7 @@ func newOtelCommandWithArgs(_ []string, _ *cli.IOStreams) *cobra.Command {
 		Use:                "otel",
 		DisableFlagParsing: true,
 		RunE: func(_ *cobra.Command, cmdArgs []string) error {
-			executable := filepath.Join(filepath.Dir(paths.Components()), binaryName)
+			executable := filepath.Join(paths.Components(), binaryName)
 			args := []string{binaryName}
 			args = append(args, cmdArgs...)
 			err := unix.Exec(executable, args, os.Environ())

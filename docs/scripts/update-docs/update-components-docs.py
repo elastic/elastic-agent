@@ -31,15 +31,10 @@ TEMPLATE_COLLECTOR_OCB_FILE = 'templates/ocb.jinja2'
 TEMPLATE_GATEWAY_TABLE = 'templates/gateway-table.jinja2'
 COMPONENT_DOCS_YAML = '../../../docs/reference/edot-collector/component-docs.yml'
 DEFAULT_CONFIG_FILE = '../../../docs/reference/edot-collector/config/default-config-standalone.md'
-COMPONENTS_YAML = '../../../internal/pkg/otel/components.yml'
-
-# Path migration: EDOT code moved from internal/pkg/otel to internal/edot
-# in PR #10922 (merged Nov 7, 2025, backported to 8.19, 9.1, 9.2)
-# - go.mod with OTEL components moved to internal/edot/go.mod
-# - components.yml remains at internal/pkg/otel/components.yml
+COMPONENTS_YAML = '../../../internal/edot/components.yml'
 GOMOD_NEW_PATH = 'internal/edot/go.mod'
 GOMOD_OLD_PATH = 'go.mod'
-COMPONENTS_YAML_PATH = 'internal/pkg/otel/components.yml'
+COMPONENTS_YAML_PATH = 'internal/edot/components.yml'
 
 
 def check_file_exists_at_tag(file_path, tag):
@@ -471,7 +466,7 @@ def get_gateway_versions(major_version, min_minor):
     versions = get_minor_versions_above(major_version, min_minor)
     
     # Filter to only versions where gateway.yml exists
-    gateway_file = 'internal/pkg/otel/samples/linux/gateway.yml'
+    gateway_file = 'internal/edot/samples/linux/gateway.yml'
     valid_versions = []
     
     for version_info in versions:

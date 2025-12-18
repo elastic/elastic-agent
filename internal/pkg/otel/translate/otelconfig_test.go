@@ -54,7 +54,7 @@ func TestBeatNameToDefaultDatastreamType(t *testing.T) {
 		t.Run(fmt.Sprintf("%v", tt.beatName), func(t *testing.T) {
 			comp := component.Component{
 				InputSpec: &component.InputRuntimeSpec{
-					BinaryName: "agentbeat",
+					BinaryName: "elastic-otel-collector",
 					Spec: component.InputSpec{
 						Command: &component.CommandSpec{
 							Args: []string{tt.beatName},
@@ -88,7 +88,7 @@ func TestGetSignalForComponent(t *testing.T) {
 			expectedError: fmt.Errorf("unknown otel signal for input type: %s", "test"),
 		},
 		{
-			name: "not agentbeat",
+			name: "not elastic-otel-collector",
 			component: component.Component{
 				InputType: "test",
 				InputSpec: &component.InputRuntimeSpec{
@@ -102,7 +102,7 @@ func TestGetSignalForComponent(t *testing.T) {
 			component: component.Component{
 				InputType: "filestream",
 				InputSpec: &component.InputRuntimeSpec{
-					BinaryName: "agentbeat",
+					BinaryName: "elastic-otel-collector",
 					Spec: component.InputSpec{
 						Command: &component.CommandSpec{
 							Args: []string{"filebeat"},
@@ -117,7 +117,7 @@ func TestGetSignalForComponent(t *testing.T) {
 			component: component.Component{
 				InputType: "filestream",
 				InputSpec: &component.InputRuntimeSpec{
-					BinaryName: "agentbeat",
+					BinaryName: "elastic-otel-collector",
 					Spec: component.InputSpec{
 						Command: &component.CommandSpec{
 							Args: []string{"metricbeat"},
@@ -478,7 +478,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "filestream",
 						OutputType: "elasticsearch",
 						InputSpec: &component.InputRuntimeSpec{
-							BinaryName: "agentbeat",
+							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
 								Command: &component.CommandSpec{
 									Args: []string{"filebeat"},
@@ -530,7 +530,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "filestream",
 						OutputType: "elasticsearch",
 						InputSpec: &component.InputRuntimeSpec{
-							BinaryName: "agentbeat",
+							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
 								Command: &component.CommandSpec{
 									Args: []string{"filebeat"},
@@ -555,7 +555,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "filestream",
 						OutputType: "elasticsearch",
 						InputSpec: &component.InputRuntimeSpec{
-							BinaryName: "agentbeat",
+							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
 								Command: &component.CommandSpec{
 									Args: []string{"filebeat"},
@@ -614,7 +614,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "filestream",
 						OutputType: "elasticsearch",
 						InputSpec: &component.InputRuntimeSpec{
-							BinaryName: "agentbeat",
+							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
 								Command: &component.CommandSpec{
 									Args: []string{"filebeat"},
@@ -639,7 +639,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "filestream",
 						OutputType: "elasticsearch",
 						InputSpec: &component.InputRuntimeSpec{
-							BinaryName: "agentbeat",
+							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
 								Command: &component.CommandSpec{
 									Args: []string{"filebeat"},
@@ -696,7 +696,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "beat/metrics",
 						OutputType: "elasticsearch",
 						InputSpec: &component.InputRuntimeSpec{
-							BinaryName: "agentbeat",
+							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
 								Command: &component.CommandSpec{
 									Args: []string{"metricbeat"},
@@ -794,7 +794,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "system/metrics",
 						OutputType: "elasticsearch",
 						InputSpec: &component.InputRuntimeSpec{
-							BinaryName: "agentbeat",
+							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
 								Command: &component.CommandSpec{
 									Args: []string{"metricbeat"},
@@ -935,7 +935,7 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 		ID:        "filebeat-test-id",
 		InputType: "filestream",
 		InputSpec: &component.InputRuntimeSpec{
-			BinaryName: "agentbeat",
+			BinaryName: "elastic-otel-collector",
 			Spec: component.InputSpec{
 				Name: "filestream",
 				Command: &component.CommandSpec{
@@ -970,7 +970,7 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 		ID:        "metricbeat-test-id",
 		InputType: "system/metrics",
 		InputSpec: &component.InputRuntimeSpec{
-			BinaryName: "agentbeat",
+			BinaryName: "elastic-otel-collector",
 			Spec: component.InputSpec{
 				Name: "system/metrics",
 				Command: &component.CommandSpec{
@@ -1038,7 +1038,7 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 				ID:        "no-inputs-test-id",
 				InputType: "filestream",
 				InputSpec: &component.InputRuntimeSpec{
-					BinaryName: "agentbeat",
+					BinaryName: "elastic-otel-collector",
 					Spec: component.InputSpec{
 						Name: "filestream",
 						Command: &component.CommandSpec{
@@ -1135,7 +1135,7 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 				InputType:  "filestream",
 				OutputType: "elasticsearch",
 				InputSpec: &component.InputRuntimeSpec{
-					BinaryName: "agentbeat",
+					BinaryName: "elastic-otel-collector",
 					Spec: component.InputSpec{
 						Command: &component.CommandSpec{
 							Args: []string{"filebeat"},
@@ -1199,7 +1199,7 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 				InputType:  "filestream",
 				OutputType: "elasticsearch",
 				InputSpec: &component.InputRuntimeSpec{
-					BinaryName: "agentbeat",
+					BinaryName: "elastic-otel-collector",
 					Spec: component.InputSpec{
 						Command: &component.CommandSpec{
 							Args: []string{"filebeat"},

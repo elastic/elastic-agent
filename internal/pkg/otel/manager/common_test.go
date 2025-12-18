@@ -87,7 +87,7 @@ func testComponent(componentId string) agentcomponent.Component {
 		InputType:      "filestream",
 		OutputType:     "elasticsearch",
 		InputSpec: &agentcomponent.InputRuntimeSpec{
-			BinaryName: "agentbeat",
+			BinaryName: "elastic-otel-collector",
 			Spec: agentcomponent.InputSpec{
 				Command: &agentcomponent.CommandSpec{
 					Args: []string{"filebeat"},
