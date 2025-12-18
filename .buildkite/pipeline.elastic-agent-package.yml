@@ -81,7 +81,7 @@ steps:
               secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
 
       - label: ":package: FIPS=true Cross Building and package elastic-agent"
-        key: package_elastic-agent
+        key: package_elastic-agent_fips
         agents:
           provider: "gcp"
           machineType: "c2-standard-16"
@@ -105,7 +105,7 @@ steps:
               secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
 
       - label: ":package: FIPS=false Package ARM elastic-agent"
-        key: package_elastic-agent-arm
+        key: package_elastic-agent_arm
         agents:
           provider: "aws"
           instanceType: "t4g.2xlarge"
@@ -130,7 +130,7 @@ steps:
           - "build/distributions/**/*"
 
       - label: ":package: FIPS=true Package ARM elastic-agent"
-        key: package_elastic-agent-arm
+        key: package_elastic-agent_arm_fips
         agents:
           provider: "aws"
           instanceType: "t4g.2xlarge"
