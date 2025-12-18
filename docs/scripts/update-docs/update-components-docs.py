@@ -34,18 +34,103 @@ TEMPLATE_SAMPLES_LINKS = 'templates/samples-links.jinja2'
 COMPONENT_DOCS_YAML = '../../../docs/reference/edot-collector/component-docs.yml'
 DEFAULT_CONFIG_FILE = '../../../docs/reference/edot-collector/config/default-config-standalone.md'
 COMPONENTS_YAML = '../../../internal/edot/components.yml'
-GOMOD_NEW_PATH = 'internal/edot/go.mod'
-GOMOD_OLD_PATH = 'go.mod'
-COMPONENTS_YAML_NEW_PATH = 'internal/edot/components.yml'
-COMPONENTS_YAML_OLD_PATH = 'internal/pkg/otel/components.yml'
-GATEWAY_SAMPLES_NEW_PATH = 'internal/edot/samples/linux/gateway.yml'
-GATEWAY_SAMPLES_OLD_PATH = 'internal/pkg/otel/samples/linux/gateway.yml'
-SAMPLES_BASE_NEW_PATH = 'internal/edot/samples'
-SAMPLES_BASE_OLD_PATH = 'internal/pkg/otel/samples'
+# Path migration configuration
+# Each entry defines: new_path, old_path, and the version where the change occurred
+PATH_MIGRATIONS = {
+    'gomod': {
+        'new': 'internal/edot/go.mod',
+        'old': 'go.mod',
+        'since': (9, 0, 0),  # EDOT go.mod exists from 9.0.0+
+    },
+    'components_yml': {
+        'new': 'internal/edot/components.yml',
+        'old': 'internal/pkg/otel/components.yml',
+        'since': (9, 3, 0),  # Moved in PR #11821
+        'exists_since': (9, 2, 1),  # File was added in v9.2.1 via PR #11040
+    },
+    'samples': {
+        'new': 'internal/edot/samples',
+        'old': 'internal/pkg/otel/samples',
+        'since': (9, 3, 0),  # Moved in PR #11821
+    },
+    'gateway': {
+        'new': 'internal/edot/samples/linux/gateway.yml',
+        'old': 'internal/pkg/otel/samples/linux/gateway.yml',
+        'since': (9, 3, 0),  # Moved in PR #11821
+    },
+}
+
+
+def parse_version_tag(tag):
+    """Parse a version tag into a tuple of (major, minor, patch).
+    
+    Args:
+        tag: Git tag string (e.g., 'v9.2.2', '9.2.2', 'v9.3.0-test')
+        
+    Returns:
+        Tuple of (major, minor, patch) integers, or None if parsing fails
+    """
+    # Remove 'v' prefix if present
+    version_str = tag.lstrip('v')
+    
+    # Match semantic version pattern (allows suffixes like -test, -rc1, etc.)
+    match = re.match(r'^(\d+)\.(\d+)\.(\d+)', version_str)
+    if match:
+        return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    return None
+
+
+def resolve_path_for_tag(tag, path_type, fallback_to_file_check=True):
+    """Resolve the correct file path for a given tag using semantic versioning.
+    
+    This is the consolidated path resolution function that handles all path
+    migrations based on version comparison rather than file existence checks.
+    
+    Args:
+        tag: Git tag to resolve path for (e.g., 'v9.2.2')
+        path_type: Key from PATH_MIGRATIONS ('gomod', 'components_yml', 'samples', 'gateway')
+        fallback_to_file_check: If True and version parsing fails, fall back to file existence check
+        
+    Returns:
+        The correct path string for the tag, or None if the file doesn't exist
+    """
+    if path_type not in PATH_MIGRATIONS:
+        raise ValueError(f"Unknown path type: {path_type}. Valid types: {list(PATH_MIGRATIONS.keys())}")
+    
+    config = PATH_MIGRATIONS[path_type]
+    new_path = config['new']
+    old_path = config['old']
+    since_version = config['since']
+    exists_since = config.get('exists_since')  # Optional: when file was first added
+    
+    version = parse_version_tag(tag)
+    
+    if version is not None:
+        # Use semantic version comparison (fast, no subprocess)
+        if version >= since_version:
+            return new_path
+        else:
+            # Check if file exists at this version (for files added after initial release)
+            if exists_since and version < exists_since:
+                return None
+            return old_path
+    elif fallback_to_file_check:
+        # Fallback to file existence check for non-standard tags
+        if check_file_exists_at_tag(new_path, tag):
+            return new_path
+        elif check_file_exists_at_tag(old_path, tag):
+            return old_path
+        return None
+    else:
+        return None
 
 
 def check_file_exists_at_tag(file_path, tag):
-    """Check if a file exists at a specific Git tag"""
+    """Check if a file exists at a specific Git tag.
+    
+    Note: This is slower than version-based resolution. Use resolve_path_for_tag()
+    when possible, which uses semantic versioning for faster lookups.
+    """
     try:
         subprocess.run(
             ['git', 'cat-file', '-e', f'{tag}:{file_path}'],
@@ -57,91 +142,29 @@ def check_file_exists_at_tag(file_path, tag):
         return False
 
 
+# Convenience functions that use the consolidated resolver
 def get_gomod_path_for_tag(tag):
-    """Determine the correct path for go.mod with OTEL components based on the tag.
-    
-    The EDOT go.mod file was created at internal/edot/go.mod in PR #10922.
-    Prior to that, OTEL components were in the root go.mod.
-    
-    Args:
-        tag: Git tag to check
-        
-    Returns:
-        The correct path string for go.mod at that tag
-    """
-    # Try new path first (for newer versions)
-    if check_file_exists_at_tag(GOMOD_NEW_PATH, tag):
-        return GOMOD_NEW_PATH
-    # Fall back to old path
-    else:
-        return GOMOD_OLD_PATH
+    """Get the correct go.mod path for a tag."""
+    path = resolve_path_for_tag(tag, 'gomod')
+    # go.mod always exists, fall back to root if new path doesn't exist
+    return path if path else 'go.mod'
 
 
 def get_components_yaml_path_for_tag(tag):
-    """Determine the correct path for components.yml based on the tag.
-    
-    The components.yml file was moved from internal/pkg/otel/ to internal/edot/
-    in PR #11821 (v9.3.0+). Prior to that, it was at internal/pkg/otel/components.yml
-    (added in v9.2.1 via PR #11040).
-    
-    Args:
-        tag: Git tag to check
-        
-    Returns:
-        The correct path string for components.yml at that tag, or None if not found
-    """
-    # Try new path first (for v9.3.0+)
-    if check_file_exists_at_tag(COMPONENTS_YAML_NEW_PATH, tag):
-        return COMPONENTS_YAML_NEW_PATH
-    # Fall back to old path (for v9.2.x)
-    elif check_file_exists_at_tag(COMPONENTS_YAML_OLD_PATH, tag):
-        return COMPONENTS_YAML_OLD_PATH
-    # File doesn't exist at this tag (v9.0.x, v9.1.x, v9.2.0)
-    else:
-        return None
+    """Get the correct components.yml path for a tag, or None if it doesn't exist."""
+    return resolve_path_for_tag(tag, 'components_yml')
 
 
 def get_gateway_samples_path_for_tag(tag):
-    """Determine the correct path for gateway.yml samples based on the tag.
-    
-    The samples were moved from internal/pkg/otel/samples/ to internal/edot/samples/
-    in PR #11821 (v9.3.0+).
-    
-    Args:
-        tag: Git tag to check
-        
-    Returns:
-        The correct path string for gateway.yml at that tag, or None if not found
-    """
-    # Try new path first (for v9.3.0+)
-    if check_file_exists_at_tag(GATEWAY_SAMPLES_NEW_PATH, tag):
-        return GATEWAY_SAMPLES_NEW_PATH
-    # Fall back to old path
-    elif check_file_exists_at_tag(GATEWAY_SAMPLES_OLD_PATH, tag):
-        return GATEWAY_SAMPLES_OLD_PATH
-    # File doesn't exist at this tag
-    else:
-        return None
+    """Get the correct gateway.yml path for a tag, or None if it doesn't exist."""
+    return resolve_path_for_tag(tag, 'gateway')
 
 
 def get_samples_base_path_for_tag(tag):
-    """Determine the correct base path for samples based on the tag.
-    
-    The samples were moved from internal/pkg/otel/samples/ to internal/edot/samples/
-    in PR #11821 (v9.3.0+).
-    
-    Args:
-        tag: Git tag to check
-        
-    Returns:
-        The correct base path string for samples at that tag
-    """
-    # Check if the new path exists (using a known file as indicator)
-    if check_file_exists_at_tag(f"{SAMPLES_BASE_NEW_PATH}/linux/platformlogs.yml", tag):
-        return SAMPLES_BASE_NEW_PATH
-    # Fall back to old path
-    else:
-        return SAMPLES_BASE_OLD_PATH
+    """Get the correct samples base path for a tag."""
+    path = resolve_path_for_tag(tag, 'samples')
+    # Samples always exist in one location or another
+    return path if path else PATH_MIGRATIONS['samples']['old']
 
 
 def read_file_from_git_tag(file_path, tag):
