@@ -31,6 +31,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
+	"github.com/elastic/elastic-agent/internal/pkg/acl"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
@@ -829,7 +830,8 @@ func TestFleetUpgradeCommandToPRBuildWithSource(t *testing.T) {
 			t.Logf("Temporary directory %q preserved for investigation/debugging.", sourcePath)
 		}
 	})
-	err = os.Chmod(sourcePath, os.ModePerm)
+	// Use acl instead of os here so Windows permissions are set correctly
+	err = acl.Chmod(sourcePath, os.ModePerm)
 	require.NoError(t, err, "unable to set temp dir permissions")
 	t.Logf("Using temp dir %q with %o", sourcePath, os.ModePerm)
 	t.Logf("Downloading version %s to %s", endFixture.Version(), sourcePath)
