@@ -15,7 +15,6 @@ env:
 
 steps:
   - input: "Build parameters"
-    if: build.env("MANIFEST_URL") == null
     fields:
       - text: "MANIFEST_URL"
         key: "MANIFEST_URL"
@@ -55,13 +54,10 @@ steps:
             value: ""
         hint: "If the DRA release manager script would actually publish anything or just print"
 
-  - wait: ~
-    if: build.env("MANIFEST_URL") == null
-
   - group: ":Packaging Artifacts"
     key: "package"
     steps:
-      - label: ":package: FIPS={{matrix.fips}} Cross Building and package elastic-agent"
+      - label: ":package: FIPS=false Cross Building and package elastic-agent"
         key: package_elastic-agent
         agents:
           provider: "gcp"
@@ -70,7 +66,6 @@ steps:
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         env:
           PLATFORMS: "linux/amd64 windows/amd64 darwin/amd64"
-          FIPS: "{{matrix.fips}}"
         command: |
           if [[ -z "$${MANIFEST_URL}" ]]; then
             export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
@@ -90,7 +85,36 @@ steps:
           - elastic/vault-docker-login#v0.5.2:
               secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
 
-      - label: ":package: FIPS={{matrix.fips}} Package ARM elastic-agent"
+      - label: ":package: FIPS=true Cross Building and package elastic-agent"
+        key: package_elastic-agent
+        agents:
+          provider: "gcp"
+          machineType: "c2-standard-16"
+          diskSizeGb: 400
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
+        env:
+          PLATFORMS: "linux/amd64"
+          FIPS: "true"
+        command: |
+          if [[ -z "$${MANIFEST_URL}" ]]; then
+            export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
+          fi
+          if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
+            export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
+          fi
+          .buildkite/scripts/steps/package.sh
+        artifact_paths:
+          - "build/distributions/**/*"
+        matrix:
+          setup:
+            fips:
+              - false
+              - true
+        plugins:
+          - elastic/vault-docker-login#v0.5.2:
+              secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+
+      - label: ":package: FIPS=false Package ARM elastic-agent"
         key: package_elastic-agent-arm
         agents:
           provider: "aws"
@@ -100,7 +124,37 @@ steps:
         env:
           PLATFORMS: "linux/arm64 darwin/arm64 windows/arm64"
           PACKAGES: "docker,tar.gz,deb,rpm,zip"
-          FIPS: "{{matrix.fips}}"
+        command: |
+          echo "Add support for multiarch"
+          docker run --privileged --rm tonistiigi/binfmt:master --install all
+
+          if [[ -z "$${MANIFEST_URL}" ]]; then
+            export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
+          fi
+          if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
+            export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
+          fi
+          .buildkite/scripts/steps/package.sh
+          ls -lahR build/
+        artifact_paths:
+          - "build/distributions/**/*"
+        matrix:
+          setup:
+            fips:
+              - false
+              - true
+
+      - label: ":package: FIPS=true Package ARM elastic-agent"
+        key: package_elastic-agent-arm
+        agents:
+          provider: "aws"
+          instanceType: "t4g.2xlarge"
+          image: "${IMAGE_UBUNTU_2404_ARM_64}"
+          diskSizeGb: 400
+        env:
+          PLATFORMS: "linux/arm64"
+          PACKAGES: "docker,tar.gz,deb,rpm"
+          FIPS: "true"
         command: |
           echo "Add support for multiarch"
           docker run --privileged --rm tonistiigi/binfmt:master --install all

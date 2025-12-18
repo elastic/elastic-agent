@@ -14,11 +14,6 @@ if test -z "${MANIFEST_URL:-}"; then
   # building in SNAPSHOT mode.
   export SNAPSHOT=true
 
-  # FIPS only supports linux
-  if [ "${FIPS:-}" = "true" ]; then
-    export PLATFORMS="linux/amd64,linux/arm64"
-  fi
-
   # No manifest URL build the the core packages.
   mage packageAgentCore
 
