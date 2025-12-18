@@ -14,6 +14,10 @@ VERSION_QUALIFIER="${VERSION_QUALIFIER:=""}"
 if [[ "${BUILDKITE_PULL_REQUEST:="false"}" != "false" ]]; then
     BRANCH=main
     DRY_RUN="--dry-run"
+    # PR always force ending with -SNAPSHOT
+    if [[ "${PACKAGE_VERSION}" != *-SNAPSHOT ]]; then
+        PACKAGE_VERSION="${PACKAGE_VERSION}-SNAPSHOT"
+    fi
     echo "+++ Running in PR and setting branch main and --dry-run"
 fi
 
