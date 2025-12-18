@@ -5,8 +5,12 @@ set -euo pipefail
 _SELF=$(dirname $0)
 source "${_SELF}/../common.sh"
 
-if test -z "${MANIFEST_URL=:""}"; then
+if test -z "${MANIFEST_URL:=""}"; then
   echo "No MANIFEST_URL building core packages"
+
+  # This is always going to be a snapshot build. Since we later call packageUsingDRA without
+  # the manifest url, we need to ensure it knows this.
+  export SNAPSHOT=true
 
   # No manifest URL build the the core packages.
   mage packageAgentCore
@@ -23,7 +27,7 @@ fi
 export AGENT_DROP_PATH=build/elastic-agent-drop
 mkdir -p $AGENT_DROP_PATH
 
-mage clean downloadManifest
+mage downloadManifest
 
 if [ "${_UNSET_MANIFEST_URL:-}" = "true" ]; then
   # unset before calling packageUsingDRA this will have the target
@@ -42,6 +46,7 @@ MAGE_TARGETS+=("fixDRADockerArtifacts")
 mage "${MAGE_TARGETS[@]}"
 
 echo  "+++ Generate dependencies report"
+MANIFEST_URL=$(jq -r .manifest_url .package-version)
 BEAT_VERSION_FULL=$(curl -s -XGET "${MANIFEST_URL}" |jq '.version' -r )
 bash "${_SELF}/../../../dev-tools/dependencies-report"
 mkdir -p build/distributions/reports
