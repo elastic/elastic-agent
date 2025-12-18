@@ -732,7 +732,7 @@ spec:
             configMapKeyRef:
               key: ca_trusted
               name: elastic-agent-configs-k799f79hhb
-        image: docker.elastic.co/elastic-agent/elastic-agent:9.3.0
+        image: docker.elastic.co/elastic-agent/elastic-agent:9.4.0
         name: elastic-agent-standalone
         resources:
           limits:

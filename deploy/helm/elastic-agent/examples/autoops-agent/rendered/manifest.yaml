@@ -6,10 +6,10 @@ metadata:
   name: agent-autoops-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.3.0-beta
+    helm.sh/chart: elastic-agent-9.4.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.3.0
+    app.kubernetes.io/version: 9.4.0
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -18,10 +18,10 @@ metadata:
   name: agent-autoops-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.3.0-beta
+    helm.sh/chart: elastic-agent-9.4.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.3.0
+    app.kubernetes.io/version: 9.4.0
 stringData:
 
   agent.yml: |-
@@ -79,10 +79,10 @@ metadata:
   name: agent-autoops-example-autoops
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.3.0-beta
+    helm.sh/chart: elastic-agent-9.4.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.3.0
+    app.kubernetes.io/version: 9.4.0
 stringData:
   autoops-token: "REPLACE_ME_TOKEN"
   autoops-es-url: "https://ccm-test-eu-west-1.es.us-east-2.aws.elastic-cloud.com"
@@ -99,10 +99,10 @@ metadata:
   name: agent-autoops-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.3.0-beta
+    helm.sh/chart: elastic-agent-9.4.0-beta
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.3.0
+    app.kubernetes.io/version: 9.4.0
 spec:
   selector:
     matchLabels:
@@ -169,7 +169,7 @@ spec:
               key: cloud-connected-mode-api-url
               name: agent-autoops-example-autoops
               optional: true
-        image: docker.elastic.co/elastic-agent/elastic-agent:9.3.0-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:9.4.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         securityContext:
