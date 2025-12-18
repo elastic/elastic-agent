@@ -166,7 +166,6 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 				switch {
 				case errors.Is(err, context.Canceled):
 					// after the collector exits, we need to report a nil status
-					r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
 					return
 				default:
 					// if we face any other error (most likely, connection refused), log the error.
@@ -183,8 +182,6 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 
 			select {
 			case <-procCtx.Done():
-				// after the collector exits, we need to report a nil status
-				r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
 				return
 			case <-forceFetchStatusCh:
 				r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
@@ -206,6 +203,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 	go func() {
 		<-ctl.healthcheckDoneCh
 		procCtxCancel()
+		r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
 		logger.Debugf("health check done for pid %d", processInfo.PID)
 	}()
 

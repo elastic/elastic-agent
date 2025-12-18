@@ -1619,10 +1619,12 @@ agent:
     metrics: true
     logs: true
     _runtime_experimental: {{ .Runtime }}
+    use_output: default
+    namespace: {{ .Namespace }}
 
 agent.logging.level: debug
-agent.logging.stderr: true
 agent.reload.period: 1s
+agent.logging.stderr: true
 
 outputs:
   default:
@@ -1649,8 +1651,10 @@ outputs:
 	require.NoError(t, fut.Prepare(ctx))
 	require.NoError(t, fut.Configure(ctx, renderConfig("process")))
 
+	// store timestamp to filter duplicate docs with timestamp greater than this value
 	installTimestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
+	// make sure running and logs are making it to ES
 	healthCheck := func(ctx context.Context, message string, runtime component.RuntimeManager, componentCount int, timestamp string) {
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
 			var statusErr error
@@ -1693,7 +1697,6 @@ outputs:
 		Develop:    true,
 	})
 	require.NoError(t, err)
-	fmt.Println("Installed", installTimestamp)
 
 	healthCheck(ctx,
 		"control checkin v2 protocol has chunking enabled",
@@ -1701,8 +1704,18 @@ outputs:
 		3,
 		installTimestamp)
 
-	require.NoError(t, fut.Configure(ctx, renderConfig("otel")))
 	otelTimestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	combinedOutput, err := fut.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+	require.NoErrorf(t, err, "error uninstalling beat receiver agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
+
+	// Switch to otel monitoring
+	require.NoError(t, fut.Configure(ctx, renderConfig("otel")))
+	_, err = fut.Install(ctx, &atesting.InstallOpts{
+		Privileged: true,
+		Force:      true,
+		Develop:    true,
+	})
+	require.NoError(t, err)
 
 	// make sure running and logs are making it to ES
 	healthCheck(ctx,
@@ -1727,9 +1740,18 @@ outputs:
 			restartTimestamp)
 	}
 
+	combinedOutput, err = fut.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+	require.NoErrorf(t, err, "error uninstalling beat receiver agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
+
 	// Switch back to process monitoring
-	require.NoError(t, fut.Configure(ctx, renderConfig("process")))
 	processTimestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	require.NoError(t, fut.Configure(ctx, renderConfig("process")))
+	_, err = fut.Install(ctx, &atesting.InstallOpts{
+		Privileged: true,
+		Force:      true,
+		Develop:    true,
+	})
+	require.NoError(t, err)
 
 	// make sure running and logs are making it to ES
 	healthCheck(ctx,
@@ -1772,7 +1794,8 @@ outputs:
 		},
 	}
 	var buf bytes.Buffer
-	require.NoError(t, json.NewEncoder(&buf).Encode(rawQuery))
+	err = json.NewEncoder(&buf).Encode(rawQuery)
+	require.NoError(t, err)
 
 	es := esapi.New(info.ESClient)
 	res, err := es.Search(
@@ -1806,7 +1829,7 @@ outputs:
 	require.Equalf(t, 0, len(buckets), "len(buckets): %d, hits.total.value: %d, result was %s", len(buckets), value, string(resultBuf))
 
 	// Uninstall
-	combinedOutput, err := fut.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+	combinedOutput, err = fut.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 	require.NoErrorf(t, err, "error uninstalling beat receiver agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
 }
 
