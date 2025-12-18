@@ -24,11 +24,13 @@ TABLE_TAG = 'edot-collector-components-table'
 DEPS_TAG = 'edot-collector-components-ocb'
 GATEWAY_9X_TAG = 'edot-gateway-9x-table'
 GATEWAY_8X_TAG = 'edot-gateway-8x-table'
+SAMPLES_LINKS_TAG = 'edot-samples-links'
 
 EDOT_COLLECTOR_DIR = '../../../docs/reference/edot-collector'
 TEMPLATE_COLLECTOR_COMPONENTS_TABLE = 'templates/components-table.jinja2'
 TEMPLATE_COLLECTOR_OCB_FILE = 'templates/ocb.jinja2'
 TEMPLATE_GATEWAY_TABLE = 'templates/gateway-table.jinja2'
+TEMPLATE_SAMPLES_LINKS = 'templates/samples-links.jinja2'
 COMPONENT_DOCS_YAML = '../../../docs/reference/edot-collector/component-docs.yml'
 DEFAULT_CONFIG_FILE = '../../../docs/reference/edot-collector/config/default-config-standalone.md'
 COMPONENTS_YAML = '../../../internal/edot/components.yml'
@@ -38,6 +40,8 @@ COMPONENTS_YAML_NEW_PATH = 'internal/edot/components.yml'
 COMPONENTS_YAML_OLD_PATH = 'internal/pkg/otel/components.yml'
 GATEWAY_SAMPLES_NEW_PATH = 'internal/edot/samples/linux/gateway.yml'
 GATEWAY_SAMPLES_OLD_PATH = 'internal/pkg/otel/samples/linux/gateway.yml'
+SAMPLES_BASE_NEW_PATH = 'internal/edot/samples'
+SAMPLES_BASE_OLD_PATH = 'internal/pkg/otel/samples'
 
 
 def check_file_exists_at_tag(file_path, tag):
@@ -118,6 +122,26 @@ def get_gateway_samples_path_for_tag(tag):
     # File doesn't exist at this tag
     else:
         return None
+
+
+def get_samples_base_path_for_tag(tag):
+    """Determine the correct base path for samples based on the tag.
+    
+    The samples were moved from internal/pkg/otel/samples/ to internal/edot/samples/
+    in PR #11821 (v9.3.0+).
+    
+    Args:
+        tag: Git tag to check
+        
+    Returns:
+        The correct base path string for samples at that tag
+    """
+    # Check if the new path exists (using a known file as indicator)
+    if check_file_exists_at_tag(f"{SAMPLES_BASE_NEW_PATH}/linux/platformlogs.yml", tag):
+        return SAMPLES_BASE_NEW_PATH
+    # Fall back to old path
+    else:
+        return SAMPLES_BASE_OLD_PATH
 
 
 def read_file_from_git_tag(file_path, tag):
@@ -602,6 +626,23 @@ def generate_markdown():
     }
     render_components_into_file(EDOT_COLLECTOR_DIR, data, TEMPLATE_COLLECTOR_COMPONENTS_TABLE, TABLE_TAG)
     render_components_into_file(EDOT_COLLECTOR_DIR, data, TEMPLATE_COLLECTOR_OCB_FILE, DEPS_TAG)
+    
+    # Update sample configuration links
+    print("\nUpdating sample configuration links...")
+    version_tag = f"v{col_version}"
+    samples_base_path = get_samples_base_path_for_tag(version_tag)
+    print(f"  Version {col_version} → {samples_base_path}")
+    samples_data = {
+        'version': col_version,
+        'samples_path': samples_base_path
+    }
+    render_components_into_file(
+        os.path.dirname(DEFAULT_CONFIG_FILE),
+        samples_data,
+        TEMPLATE_SAMPLES_LINKS,
+        SAMPLES_LINKS_TAG
+    )
+    print("Sample configuration links updated successfully!")
     
     # Update gateway configuration tables
     print("\nUpdating gateway configuration tables...")
