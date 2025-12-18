@@ -825,6 +825,13 @@ func PackageAgentCore() error {
 	start := time.Now()
 	defer func() { fmt.Println("packageAgentCore ran for", time.Since(start)) }()
 
+	forcedTar := false
+	if devtools.IsPackageTypeSelected(devtools.Docker) && !devtools.IsPackageTypeSelected(devtools.TarGz) {
+		// targz is required in the core package for docker images
+		forcedTar = true
+		devtools.SelectedPackageTypes = append(devtools.SelectedPackageTypes, devtools.TarGz)
+	}
+
 	fmt.Println("--- Build elastic-agent-core")
 	mg.SerialDeps(Update, Otel.Prepare, Otel.CrossBuild, CrossBuild, Build.WindowsArchiveRootBinary)
 
@@ -832,7 +839,16 @@ func PackageAgentCore() error {
 	devtools.UseElasticAgentCorePackaging()
 
 	// ran directly as we don't want mage to cache that it already called devtools.Package
-	return devtools.Package()
+	err := devtools.Package()
+	if err != nil {
+		return err
+	}
+
+	// remove targz, so its not built in a following step (if there is one)
+	if forcedTar {
+		devtools.SelectedPackageTypes = slices.DeleteFunc(devtools.SelectedPackageTypes, func(pt devtools.PackageType) bool { return pt == devtools.TarGz })
+	}
+	return nil
 }
 
 // Config generates both the short/reference/docker.
