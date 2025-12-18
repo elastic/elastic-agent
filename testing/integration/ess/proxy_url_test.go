@@ -824,8 +824,6 @@ func TestFleetDownloadProxyURL(t *testing.T) {
 		Sudo:  true,
 	})
 
-	t.Skip("Flaky test, see https://github.com/elastic/elastic-agent/issues/11796#issuecomment-3667342065")
-
 	ctx := t.Context()
 	kibClient := info.KibanaClient
 	fleetServerURL, err := fleettools.DefaultURL(ctx, kibClient)
