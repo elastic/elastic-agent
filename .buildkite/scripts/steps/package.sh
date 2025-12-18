@@ -6,6 +6,8 @@ _SELF=$(dirname $0)
 source "${_SELF}/../common.sh"
 
 if test -z "${MANIFEST_URL=:""}"; then
+  echo "No MANIFEST_URL building core packages"
+
   # No manifest URL build the the core packages.
   mage packageAgentCore
 
@@ -14,6 +16,8 @@ if test -z "${MANIFEST_URL=:""}"; then
   # calling packageUsingDRA, so it uses the core built packages.
   export MANIFEST_URL=$(jq -r .manifest_url .package-version)
   _UNSET_MANIFEST_URL=true
+
+  echo "Using MANIFEST_URL from .package-version"
 fi
 
 export AGENT_DROP_PATH=build/elastic-agent-drop
