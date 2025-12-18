@@ -14,7 +14,7 @@ if [ ! -f .package-version ]; then
   exit 1
 fi
 
-BEAT_VERSION="$(jq -r .core_version .package-version)-SNAPSHOT"
+BEAT_VERSION="$(jq -r .core_version .package-version)"
 
 cat << EOF
   - label: ":pipeline: Run elastic-agent-package"
