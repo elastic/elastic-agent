@@ -484,6 +484,19 @@ func injectMonitoringReceiver(
 	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
 	exporterType := otelcomponent.MustNewType("elasticsearch")
 	exporterID := translate.GetExporterID(exporterType, componentmonitoring.MonitoringOutput).String()
+	monitoringExporterFound := false
+	if config.IsSet("exporters") {
+		// Search the defined exporters for one with the expected id for monitoring
+		for exporter := range config.Get("exporters").(map[string]any) {
+			if exporter == exporterID {
+				monitoringExporterFound = true
+			}
+		}
+	}
+	if !monitoringExporterFound {
+		// We can't monitor OTel metrics without OTel-based monitoring
+		return nil
+	}
 	receiverCfg := map[string]any{
 		"receivers": map[string]any{
 			receiverID: map[string]any{
