@@ -73,6 +73,16 @@ components:
     fips: false
     platforms: *all-platforms
     packageTypes: *all-package-types
+  - &comp-elastic-agent-core-fips
+    projectName: elastic-agent-core
+    packageName: elastic-agent-core-fips-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: elastic-agent-core-fips-{{.Version}}-{{.Platform}}
+    binaryName: elastic-agent
+    fips: true
+    platforms:
+      - *linux-amd64
+      - *linux-arm64
+    packageTypes: *all-package-types
   - &comp-apm_server
     projectName: apm-server
     packageName: apm-server-{{.Version}}-{{.Platform}}.{{.Ext}}

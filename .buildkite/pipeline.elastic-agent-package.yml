@@ -66,6 +66,7 @@ steps:
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         env:
           PLATFORMS: "linux/amd64 windows/amd64 darwin/amd64"
+          FIPS: "false"
         command: |
           if [[ -z "$${MANIFEST_URL}" ]]; then
             export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
@@ -114,6 +115,7 @@ steps:
         env:
           PLATFORMS: "linux/arm64 darwin/arm64 windows/arm64"
           PACKAGES: "docker,tar.gz,deb,rpm,zip"
+          FIPS: "false"
         command: |
           echo "Add support for multiarch"
           docker run --privileged --rm tonistiigi/binfmt:master --install all
