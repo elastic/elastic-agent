@@ -4,7 +4,9 @@
 
 package control
 
+import "time"
+
 // TimeFormat returns the time format shared between the protocol.
 func TimeFormat() string {
-	return "2006-01-02 15:04:05 -0700 MST"
+	return time.RFC3339Nano
 }
