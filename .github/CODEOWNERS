@@ -30,6 +30,7 @@ changelog/fragments/
 /docs/release-notes @elastic/ingest-docs
 /docs/docset.yml @elastic/ingest-docs
 /.github/workflows/update-docs.yml @elastic/ingest-docs
+/.github/workflows/validate-docs-structure.yml @elastic/ingest-docs
 /docs/reference/edot-collector @elastic/ingest-docs
 /docs/scripts/update-docs @elastic/ingest-docs
 /internal/edot/samples @elastic/ingest-otel-data @elastic/ingest-docs
