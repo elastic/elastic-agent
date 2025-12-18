@@ -34,7 +34,10 @@ DEFAULT_CONFIG_FILE = '../../../docs/reference/edot-collector/config/default-con
 COMPONENTS_YAML = '../../../internal/edot/components.yml'
 GOMOD_NEW_PATH = 'internal/edot/go.mod'
 GOMOD_OLD_PATH = 'go.mod'
-COMPONENTS_YAML_PATH = 'internal/edot/components.yml'
+COMPONENTS_YAML_NEW_PATH = 'internal/edot/components.yml'
+COMPONENTS_YAML_OLD_PATH = 'internal/pkg/otel/components.yml'
+GATEWAY_SAMPLES_NEW_PATH = 'internal/edot/samples/linux/gateway.yml'
+GATEWAY_SAMPLES_OLD_PATH = 'internal/pkg/otel/samples/linux/gateway.yml'
 
 
 def check_file_exists_at_tag(file_path, tag):
@@ -68,6 +71,53 @@ def get_gomod_path_for_tag(tag):
     # Fall back to old path
     else:
         return GOMOD_OLD_PATH
+
+
+def get_components_yaml_path_for_tag(tag):
+    """Determine the correct path for components.yml based on the tag.
+    
+    The components.yml file was moved from internal/pkg/otel/ to internal/edot/
+    in PR #11821 (v9.3.0+). Prior to that, it was at internal/pkg/otel/components.yml
+    (added in v9.2.1 via PR #11040).
+    
+    Args:
+        tag: Git tag to check
+        
+    Returns:
+        The correct path string for components.yml at that tag, or None if not found
+    """
+    # Try new path first (for v9.3.0+)
+    if check_file_exists_at_tag(COMPONENTS_YAML_NEW_PATH, tag):
+        return COMPONENTS_YAML_NEW_PATH
+    # Fall back to old path (for v9.2.x)
+    elif check_file_exists_at_tag(COMPONENTS_YAML_OLD_PATH, tag):
+        return COMPONENTS_YAML_OLD_PATH
+    # File doesn't exist at this tag (v9.0.x, v9.1.x, v9.2.0)
+    else:
+        return None
+
+
+def get_gateway_samples_path_for_tag(tag):
+    """Determine the correct path for gateway.yml samples based on the tag.
+    
+    The samples were moved from internal/pkg/otel/samples/ to internal/edot/samples/
+    in PR #11821 (v9.3.0+).
+    
+    Args:
+        tag: Git tag to check
+        
+    Returns:
+        The correct path string for gateway.yml at that tag, or None if not found
+    """
+    # Try new path first (for v9.3.0+)
+    if check_file_exists_at_tag(GATEWAY_SAMPLES_NEW_PATH, tag):
+        return GATEWAY_SAMPLES_NEW_PATH
+    # Fall back to old path
+    elif check_file_exists_at_tag(GATEWAY_SAMPLES_OLD_PATH, tag):
+        return GATEWAY_SAMPLES_OLD_PATH
+    # File doesn't exist at this tag
+    else:
+        return None
 
 
 def read_file_from_git_tag(file_path, tag):
@@ -114,8 +164,12 @@ def get_core_components(version='main'):
     latest_version = get_latest_version()
     version_tag = f"v{latest_version}"
     
-    # components.yml path hasn't changed
-    components_path = COMPONENTS_YAML_PATH
+    # Determine correct components.yml path for this version (handles path migration)
+    components_path = get_components_yaml_path_for_tag(version_tag)
+    if components_path is None:
+        print(f"Warning: components.yml not found at tag {version_tag}. Assuming no core components defined.")
+        return []
+    
     print(f"Reading core components from tag {version_tag}: {components_path}")
     content = read_file_from_git_tag(components_path, version_tag)
     if content is None:
@@ -132,8 +186,12 @@ def get_deprecated_components(version='main'):
     latest_version = get_latest_version()
     version_tag = f"v{latest_version}"
     
-    # components.yml path hasn't changed
-    components_path = COMPONENTS_YAML_PATH
+    # Determine correct components.yml path for this version (handles path migration)
+    components_path = get_components_yaml_path_for_tag(version_tag)
+    if components_path is None:
+        print(f"Warning: components.yml not found at tag {version_tag}. Assuming no deprecated components.")
+        return []
+    
     print(f"Reading deprecated components from tag {version_tag}: {components_path}")
     content = read_file_from_git_tag(components_path, version_tag)
     if content is None:
@@ -154,8 +212,12 @@ def get_component_annotations(version='main'):
     latest_version = get_latest_version()
     version_tag = f"v{latest_version}"
     
-    # components.yml path hasn't changed
-    components_path = COMPONENTS_YAML_PATH
+    # Determine correct components.yml path for this version (handles path migration)
+    components_path = get_components_yaml_path_for_tag(version_tag)
+    if components_path is None:
+        print(f"Warning: components.yml not found at tag {version_tag}. Assuming no annotations.")
+        return {}
+    
     print(f"Reading component annotations from tag {version_tag}: {components_path}")
     content = read_file_from_git_tag(components_path, version_tag)
     if content is None:
@@ -465,20 +527,21 @@ def get_gateway_versions(major_version, min_minor):
     # Get all minor versions >= min_minor with their latest patches
     versions = get_minor_versions_above(major_version, min_minor)
     
-    # Filter to only versions where gateway.yml exists
-    gateway_file = 'internal/edot/samples/linux/gateway.yml'
     valid_versions = []
     
     for version_info in versions:
         version_str = f"{major_version}.{version_info['minor']}"
         tag_name = version_info['tag']
         
-        if check_file_exists_at_tag(gateway_file, tag_name):
+        # Determine correct gateway.yml path for this version (handles path migration)
+        gateway_path = get_gateway_samples_path_for_tag(tag_name)
+        if gateway_path is not None:
             valid_versions.append({
                 'version': version_str,
-                'tag': tag_name
+                'tag': tag_name,
+                'gateway_path': gateway_path
             })
-            print(f"  {version_str} → {tag_name}")
+            print(f"  {version_str} → {tag_name} ({gateway_path})")
         else:
             print(f"  Skipping {version_str}: gateway.yml not found at {tag_name}")
     
