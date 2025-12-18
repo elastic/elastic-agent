@@ -20,7 +20,7 @@ steps:
       - text: "MANIFEST_URL"
         key: "MANIFEST_URL"
         default: ""
-        required: true
+        required: false
         hint: "Link to the build manifest URL."
       - select: "Mage verbose"
         key: "MAGEFILE_VERBOSE"
@@ -58,7 +58,7 @@ steps:
   - wait: ~
     if: build.env("MANIFEST_URL") == null
 
-  - group: ":Packaging Artefacts"
+  - group: ":Packaging Artifacts"
     key: "package"
     steps:
       - label: ":package: FIPS={{matrix.fips}} Cross Building and package elastic-agent"

@@ -6,21 +6,35 @@ _SELF=$(dirname $0)
 source "${_SELF}/../common.sh"
 
 if test -z "${MANIFEST_URL=:""}"; then
-  echo "Missing variable MANIFEST_URL, export it before use."
-  exit 2
+  # No manifest URL build the the core packages.
+  mage packageAgentCore
+
+  # Set manifest to version in repo so downloadManifest target
+  # can download the needed components. This gets unset before
+  # calling packageUsingDRA, so it uses the core built packages.
+  export MANIFEST_URL=$(jq -r .manifest_url .package-version)
+  _UNSET_MANIFEST_URL=true
 fi
 
 export AGENT_DROP_PATH=build/elastic-agent-drop
 mkdir -p $AGENT_DROP_PATH
 
-MAGE_TARGETS=(clean downloadManifest packageUsingDRA)
+mage clean downloadManifest
+
+if [ "${_UNSET_MANIFEST_URL:-}" = "true" ]; then
+  # unset before calling packageUsingDRA this will have the target
+  # use the built agent core packages from above
+  unset MANIFEST_URL
+fi
+
+MAGE_TARGETS=("packageUsingDRA")
 if [ "$FIPS" != "true" ]; then
   # Build ironbank only on non-FIPS builds
   MAGE_TARGETS+=("ironbank")
 fi
 MAGE_TARGETS+=("fixDRADockerArtifacts")
 
-# Download the components from the MANIFEST_URL and then package those downloaded into the $AGENT_DROP_PATH
+# Package and fix the DRA artifacts
 mage "${MAGE_TARGETS[@]}"
 
 echo  "+++ Generate dependencies report"

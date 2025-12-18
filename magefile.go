@@ -1546,18 +1546,23 @@ func PackageUsingDRA(ctx context.Context) error {
 		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")
 	}
 
-	// When AGENT_COMMIT_HASH_OVERRIDE is provided in the environment it means that this is going to build
-	// with elastic-agent-core packages that have been built on this host. This allows the testing of the
-	// packaging of the elastic-agent-core and the resulting final elastic-agent package.
+	// When MANIFEST_URL is not provided in the environment elastic-agent-core packages from build/distributions
+	// will be used instead of pulling from the manifest.
 	var err error
 	var manifestResponse *manifest.Build
 	var dependenciesVersion string
-	hash := os.Getenv(mage.AgentCommitHashEnvVar)
-	if hash == "" {
-		if !devtools.PackagingFromManifest {
-			return fmt.Errorf("elastic-agent PackageUsingDRA is expected to build from a manifest. Check that %s is set to a manifest URL", devtools.ManifestUrlEnvVar)
-		}
+	manifestURL := os.Getenv(mage.ManifestUrlEnvVar)
+	if manifestURL == "" {
+		fmt.Println("NOTICE: No MANIFEST_URL was provided, using elastic-agent-core packages from build/distributions.")
 
+		if beatVersion, found := os.LookupEnv("BEAT_VERSION"); !found {
+			dependenciesVersion = bversion.GetDefaultVersion()
+		} else {
+			dependenciesVersion = beatVersion
+		}
+		// add the snapshot suffix if needed
+		dependenciesVersion += devtools.SnapshotSuffix()
+	} else {
 		var parsedVersion *version.ParsedSemVer
 		manifestResponse, parsedVersion, err = downloadManifestAndSetVersion(ctx, devtools.ManifestURL)
 		if err != nil {
@@ -1574,14 +1579,6 @@ func PackageUsingDRA(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("setting agent commit hash %q: %w", agentCoreProject.CommitHash, err)
 		}
-	} else {
-		if beatVersion, found := os.LookupEnv("BEAT_VERSION"); !found {
-			dependenciesVersion = bversion.GetDefaultVersion()
-		} else {
-			dependenciesVersion = beatVersion
-		}
-		// add the snapshot suffix if needed
-		dependenciesVersion += devtools.SnapshotSuffix()
 	}
 
 	useDRA := func(ctx context.Context) error {
