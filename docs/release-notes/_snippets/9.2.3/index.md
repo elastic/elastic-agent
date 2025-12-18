@@ -7,7 +7,7 @@
 
 * Enable cpu and disk hostmetrics scrapers for Darwin configurations. [#11423](https://github.com/elastic/elastic-agent/pull/11423) 
 
-* Add windowseventlogreceiver to EDOT. [#11418](https://github.com/elastic/elastic-agent/pull/11418) 
+* Add Windows Event Log Receiver to EDOT. [#11418](https://github.com/elastic/elastic-agent/pull/11418) 
 * Improve input not supported error message to reference installation flavors. [#11825](https://github.com/elastic/elastic-agent/pull/11825) 
 
 
