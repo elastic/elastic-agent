@@ -15,7 +15,7 @@ products:
 
 # EDOT Collector customization
 
-The EDOT Collector comes with a [curated list](/reference/edot-collector/components.md) of OTel Collector components and some opinionated [configuration samples](https://github.com/elastic/elastic-agent/tree/main/internal/pkg/otel/samples).
+The EDOT Collector comes with a [curated list](/reference/edot-collector/components.md) of OTel Collector components and some opinionated [configuration samples](https://github.com/elastic/elastic-agent/tree/main/internal/edot/samples).
 
 If your use case requires additional components, you have two options:
 

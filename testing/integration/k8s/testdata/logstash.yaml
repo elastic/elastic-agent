@@ -1,0 +1,252 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: logstash-agent
+    app.kubernetes.io/name: logstash-agent # don't change this as integration tests depend on it
+  name: logstash-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: logstash-agent
+      app.kubernetes.io/name: logstash-agent
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: logstash-agent
+        app.kubernetes.io/name: logstash-agent # don't change this as integration tests depend on it
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - image: docker.elastic.co/logstash/logstash:9.2.1
+        ports:
+        - containerPort: 5044
+        name: logstash
+        env:
+        - name: LOG_FORMAT
+          value: "json"
+        - name: XPACK_MONITORING_ENABLED
+          value: "false"
+        resources:
+          requests:
+            cpu: "1000m"
+            memory: 2Gi
+          limits:
+            cpu: "1000m"
+            memory: 4Gi
+        securityContext:
+          readOnlyRootFilesystem: false
+        volumeMounts:
+        - name: logstash-certs
+          mountPath: "/opt/logstash/ssl"
+          readOnly: true
+        - name: logstash-pipeline-volume
+          mountPath: /usr/share/logstash/pipeline
+      volumes:
+      - name: logstash-pipeline-volume
+        configMap:
+          name: logstash-agent-configmap
+          defaultMode: 0777
+          optional: true
+          items:
+            - key: logstash.conf
+              path: logstash.conf
+      - name: logstash-certs
+        secret:
+          secretName: logstash-certs
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-agent-configmap
+data:
+  logstash.conf: |
+    input {
+      elastic_agent {
+        port => 5044
+        ssl_enabled => true
+        ssl_certificate_authorities => ["/opt/logstash/ssl/ca.crt"]
+        ssl_certificate => "/opt/logstash/ssl/logstash.crt"
+        ssl_key => "/opt/logstash/ssl/logstash.pkcs8.key"
+        ssl_client_authentication => "required"
+      }
+    }
+    output {
+        stdout { codec => rubydebug
+        }
+    }
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: logstash-certs
+type: Opaque
+stringData:
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIDWTCCAkGgAwIBAgIUHFOfZUl77OqM8h+XLyzvT9WYu8owDQYJKoZIhvcNAQEL
+    BQAwNDEyMDAGA1UEAxMpRWxhc3RpYyBDZXJ0aWZpY2F0ZSBUb29sIEF1dG9nZW5l
+    cmF0ZWQgQ0EwHhcNMjUxMDE2MTgxMTA3WhcNMjgxMDE1MTgxMTA3WjA0MTIwMAYD
+    VQQDEylFbGFzdGljIENlcnRpZmljYXRlIFRvb2wgQXV0b2dlbmVyYXRlZCBDQTCC
+    ASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMDQ8Uv8zPIONmy3/MbsNJVJ
+    0yOmY15R+Lk2IcoEsh5VNlq45f9i5PfYqCXRQEckhdziK4I2JXuuTNKXDEi6w64D
+    0rOjQ+JCvBsddPjPr6Cem3Iks+uPhizmYGcj5qR9gPBunmDRXzq1zvZcE/zIj+xk
+    gz4S5F4b6n7O3JQwSZADd/pq8WfuE6+slr5is5fmzibT38S4y3oLAlLpqcggZnzv
+    YQtPKg8HsCJUJAD885VRpf1i2z8fa1hmoekbRBn95GSx9jo6k7glFTlkdtEq407V
+    YRthaoUggFE2JCO02EmCbww2TOZdGaUqO+Gvz1iHNvNWMjb7fhk6muITivoY07sC
+    AwEAAaNjMGEwHQYDVR0OBBYEFOggvbkdlF+6ivHxuMZUN/IBSWMNMB8GA1UdIwQY
+    MBaAFOggvbkdlF+6ivHxuMZUN/IBSWMNMA8GA1UdEwEB/wQFMAMBAf8wDgYDVR0P
+    AQH/BAQDAgEGMA0GCSqGSIb3DQEBCwUAA4IBAQBikGz4+Z5EC1YUI4+VDMuTZ4LK
+    r6fr1p+6xiOIUaWMHpvilv29JyWLWUwbnEjE1HYE8oYTHv7RK9wK2vHqIxjGF31+
+    M2z4gF7G0IZIxR8kTI/hdgcHjBiWxE/aSEmAUQ+2PhSA474C6pcOMIyz7ek/kDPL
+    2R7WuQPSKW3qoXQVKjDp+t1muIZ7SKzMA1M6jegt4WhqRpAj1TTxdbNyVkRIySpS
+    p0xJ9bY2ErKxJZw71Rayx/KJTCjTKRAmijq04+200u+EazpQhlT4Sl/J5PBzh88c
+    wOhiVchtLdnvunYrmgIylYHoX7SzlQwwXnW8uuztlXtggyS3NLNzh+Lk5q+U
+    -----END CERTIFICATE-----
+  logstash.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIDWjCCAkKgAwIBAgIVAPUwnogJ94tbbTESr4PtJfOnodbLMA0GCSqGSIb3DQEB
+    CwUAMDQxMjAwBgNVBAMTKUVsYXN0aWMgQ2VydGlmaWNhdGUgVG9vbCBBdXRvZ2Vu
+    ZXJhdGVkIENBMB4XDTI1MTAxNjE4MTUwMFoXDTI4MTAxNTE4MTUwMFowEzERMA8G
+    A1UEAxMIbG9nc3Rhc2gwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCk
+    FuGdaAnjmXxiuVEytY40ACWAx38mP9v0fdI2xQNNTFj+UCYycdBaD8saCtrg7zPp
+    oUXAoBLK/lwaKrreSu5syel2iSxuBb/g0rOpgU/v5xSa1xdpNG19cZNUJDUoJz4t
+    dCp/zoB69/4THt4RIW/vNh+nDb/rA/Tb2ySzzFGeeP4+ViBxMmIONUUFy2NDKSj/
+    skGSRM7gmyJU8ocY0DTyMboaO0NyfFid93XG0yiixZVEyQuaenZ3qDm/fZPnUgLP
+    MeB14mlZh5a4a25zMM8iBzvDrsNXtfxMhaThUw3XbZRNT27JwzfjpfuZLko/MZVL
+    et3V8QIY1DecHhWosYC3AgMBAAGjgYMwgYAwHQYDVR0OBBYEFPbF8PqzLpM8Mj1w
+    TjV7HMBVur/8MB8GA1UdIwQYMBaAFOggvbkdlF+6ivHxuMZUN/IBSWMNMDMGA1Ud
+    EQQsMCqCKGxvZ3N0YXNoLWFnZW50LmRlZmF1bHQuc3ZjLmNsdXN0ZXIubG9jYWww
+    CQYDVR0TBAIwADANBgkqhkiG9w0BAQsFAAOCAQEAD3GSNP3L3pAVv35N3D5gChk0
+    gIl3yY6sDCSqbEHKmpaOY5KfGjVjH79ZwNVSx+JXgapJkceCKedGbulQ3L0KVPl/
+    N9oMQVi83JrLQk1weoTx2MGoUvVddMqRucFqQVMzxYEn4e1BzLLWWtlQwYzfQZVA
+    qsNaQ3Id2z0ymrDTS/+4YpRMfwSHZ4tyPQ2SRjaQUkOSzlK4Ia8P/tj0T/0Xl17j
+    2J0TZWF4kvh89aeot77V317ZNDCk1memJ5tQHW5ZlmHhqS+ffAL2wA+hxIEDXBjW
+    NNa1eCPQytogVB7KTu1FTxrRaklAt3qTsTTr2HTwEGDv36CViIhUWLh/anY7mg==
+    -----END CERTIFICATE-----
+  logstash.pkcs8.key: |
+    -----BEGIN PRIVATE KEY-----
+    MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCkFuGdaAnjmXxi
+    uVEytY40ACWAx38mP9v0fdI2xQNNTFj+UCYycdBaD8saCtrg7zPpoUXAoBLK/lwa
+    KrreSu5syel2iSxuBb/g0rOpgU/v5xSa1xdpNG19cZNUJDUoJz4tdCp/zoB69/4T
+    Ht4RIW/vNh+nDb/rA/Tb2ySzzFGeeP4+ViBxMmIONUUFy2NDKSj/skGSRM7gmyJU
+    8ocY0DTyMboaO0NyfFid93XG0yiixZVEyQuaenZ3qDm/fZPnUgLPMeB14mlZh5a4
+    a25zMM8iBzvDrsNXtfxMhaThUw3XbZRNT27JwzfjpfuZLko/MZVLet3V8QIY1Dec
+    HhWosYC3AgMBAAECggEABzbwVYzo/mZVtzuBq/KanYOyIm7jEsn1AFN15i2UXxYv
+    xYK9ozMo34TZP7xhckliJXAPUpBXMzCq2QWu8K4nvIXGK42NdArxrE9nUdkbLCej
+    WsmBQIFrHPxc53KuGaVcEQCOC8+HC6ESvUF6rxMiykg9bQloOkuSvQXuH6+omQiT
+    t9tOMHCgqqdmCxj8GdxoRvTrMWIKC2De8PIcYQi+8LDTytVC81jVmJSUDA7kAvLW
+    v9K14aoAHWhP+Ye5rXKi9smQ2X1KupvXM1hrM41lIcIUA8jp9TsRlk8AeTY2uDMb
+    VlPAvaaTyMSsilqu0+Iq0Wav2FBCMys5D1ezDI1JiQKBgQDkiYV/8RLWoQZ4yJ0p
+    hObljAbVpvbMvjHtrmbzp1Qe6DmuEKThGxd9a8OVbQ2AOAEsaWG3/3U0Kkj4Tu6J
+    8ToDaYUG5xXdm154CvwISoOYAJQsMJdN0i8l40dA0Gyz4c8YGU8ffMaLqbHAX9sD
+    ZJ64lZE8yzF+H6lpV5dK+HyRqQKBgQC3zsFAy5Ee1feFKkyMM+4eBEm5zq1BCtSt
+    RU1m1NgVu87etqXoCjV2uQF9xIWj/TzRdHBIETET+p8k2KoeEZtnWYunqvMVi+n4
+    PIzNQ2jhB0+h/9dhySIx7g42j0MFNhb/NRqOhVRSYDRZKVBULJ7LKHmIQT5tDvDF
+    bAnYICm7XwKBgQDEefKa/w/aE8/zkU2Ef2zelhbeIc/2T+Gu3IxIF2g7thy4qDiI
+    CvmT60zXr0y3Ge7wVp0bSfViZqQbTgjH8OqWOmaSe6MRxVxfSdpJ6n3d9UluAExk
+    LDo6kX4Vm9qIf67CoiejA2vScI6PvBkXfq7yNCwMHwiqzN+h4BsC6kR2GQKBgGCI
+    aoBQKRgrwYIjc+5SO6VyFRJLlDxLpuSVOBBgilfnub7H6BwUeH2wrjLSKmm0zuMm
+    Ju4CcWcPwdMFI1sFXjuKEMlvA5l2UNu5WS1YUNWWFGF9Ty2hB593aemHleg/vxYr
+    WpYtOdrFgdit1O1QPdlumV1Q/qsiJJtaoVTrl187AoGAfQoQ3tEavm+wFMOOsuwA
+    SalMPHCiJffu9oDIcOfGFtyYbctMOTcFeD/dygYWGqovRRPQdImzL1jhXxvI4ee/
+    xn8kIvigVnn9kqjInznSNUVkk8iz3M606nMnIOMe2LyY99srnRlZTJ5y0UzJe+S3
+    iV6QW0UsVo5LfvYXPFmSFvs=
+    -----END PRIVATE KEY-----
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: logstash-agent
+  name: logstash-agent
+spec:
+  ports:
+  - name: 5044-5044
+    port: 5044
+    protocol: TCP
+    targetPort: 5044
+  selector:
+    app: logstash-agent
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: agent-certs
+type: Opaque
+stringData:
+  tls.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIDIDCCAgigAwIBAgIUM4Re4KVzUvXarVxKyzl4OPQmH9UwDQYJKoZIhvcNAQEL
+    BQAwNDEyMDAGA1UEAxMpRWxhc3RpYyBDZXJ0aWZpY2F0ZSBUb29sIEF1dG9nZW5l
+    cmF0ZWQgQ0EwHhcNMjUxMDE2MTgxMjI4WhcNMjgxMDE1MTgxMjI4WjARMQ8wDQYD
+    VQQDEwZjbGllbnQwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCht7j1
+    xNaM1rBepqdmbHmiOptdAwqZt5Za4MEBsqGUV9+J73af5BYPMkajNxq1R7WZbuRO
+    MKNWsvAmw3b/Awo8jH2wgEt0Ez1yyyVohuIASa/PreRjVN1GEPy/CYbDkIzPBqTF
+    0Gzh3fj87JSQlufITanaAmaqU9qZeqQ5UJnKVrcO7aq0s3vKBssSBn91MUZWsKux
+    GWiyW3Dj0AG6InnMcRjQ5E9zPY80+/pcLNibKNx8ymBJRjvgYURevcqr2pNY5CKz
+    EMngBbD/rZZd5F7YeL039lZMab0tOJFhk/hS/pp/bo+jud/9lps5RbCjtsNUfKda
+    avVGARDGEUyt94z3AgMBAAGjTTBLMB0GA1UdDgQWBBTi50+uIor1Os70qd9qQOr7
+    YJXh9DAfBgNVHSMEGDAWgBToIL25HZRfuorx8bjGVDfyAUljDTAJBgNVHRMEAjAA
+    MA0GCSqGSIb3DQEBCwUAA4IBAQA+MwVUZNdIP721T/j2jJfqX6H8XhGE/3vUycRP
+    DMk9zZmn9utGs2ivn4yRQMusst9FSmd9BdfyjRT5CW/hcPVb+aakl4MXQhQvBaUK
+    5lStJo4KIfUbsBBPRElbYb1WGho2DeZkzJtNyg0puXl7L3QhIRxhK2ujK7HuOpNq
+    zUiwUIDLpMrVz3Yw5QKxJOfk/pFP/nQGRFR9cUF+k0z4KMC5lAVT7hpXN+zMiOsf
+    kZ5W96slq+KtlmFf/iTEnSKS1THkwiL+f3k4fMObsTXpeo6kicc3bHtVrjy+EA1k
+    nq7wxpMRZuVrC7F5zou7qHoeNkKQlRn8pZxQaIzQzsGzolwh
+    -----END CERTIFICATE-----
+  tls.key: |
+    -----BEGIN RSA PRIVATE KEY-----
+    MIIEpQIBAAKCAQEAobe49cTWjNawXqanZmx5ojqbXQMKmbeWWuDBAbKhlFffie92
+    n+QWDzJGozcatUe1mW7kTjCjVrLwJsN2/wMKPIx9sIBLdBM9csslaIbiAEmvz63k
+    Y1TdRhD8vwmGw5CMzwakxdBs4d34/OyUkJbnyE2p2gJmqlPamXqkOVCZyla3Du2q
+    tLN7ygbLEgZ/dTFGVrCrsRlosltw49ABuiJ5zHEY0ORPcz2PNPv6XCzYmyjcfMpg
+    SUY74GFEXr3Kq9qTWOQisxDJ4AWw/62WXeRe2Hi9N/ZWTGm9LTiRYZP4Uv6af26P
+    o7nf/ZabOUWwo7bDVHynWmr1RgEQxhFMrfeM9wIDAQABAoIBAAMB30nGvFe+OFHN
+    W/dYmcKcXY0JcKJyxuVb+XcsbLrg1DndZmjos27uhupLGSfH75Ci/qDkOTJM+LfF
+    XGMtt1UOEwGtEHok7P1XKHaB4rOlXGIKgE0zgXashaiQk0mRWKAS9NLHhPbVPKKw
+    YA2B+1058bwCQESU1e1EWe87sQ6bX347ck8MKRmy3iLcjw8SRwH0/u1eyRWTt90k
+    kN+UDGTs8wBO/is78lgfdU99gU8gwsmu3XxPjrTZZuE+c5chv/7FbPuUfpqzpHn8
+    EEpOwRCL0JFOOavaERbBec34gtONXAViUoPSyRIXz7MoE0oHrhccON3fHFNvPncQ
+    9Rj20fECgYEAzL2YwbXKF4hsS64pBjXBMzWAZvY8YAtYqTT2+Fz83lrNGr1SMFtL
+    fAzdH+LtjArA/i6oNRlZVjR7hCF5n4gX7BhWSx0+ngu34kY8NQJ8En3K0Z4dU6Au
+    b5THRR6Jmxqm8LOgt2pRkzgxL9dNhHoPveUy/uigqxRvgMKcKBMrmXECgYEAyjSp
+    8Pqk8oh+3JT6GSDoxE1GacSgbSsMI84SYttyULG1MzTdndibJOyOEz1U4UE5hUMM
+    mkkItalKF76yAVyY9o86YYZ3sBUDd6FLWeUUrtbMa0GvNuVCi9lsuokdw5vBlH0y
+    HlHOv3yGIGAuxhxP9e04+Ljj7nqpNvttWkxVmOcCgYEAjmQR+C7BJUq43o16dJow
+    Crhb27/Gz5k0iUGPvb2WE+KcoMsofP8RaW3c389IHExiWqUCUSOXETAg8w0A9CWH
+    Vai7YzQsl2hY8+Ka/tcCiS25P72ycbWGdg3H5NdPJnMLxX13+ffUUgoTk00u2UK2
+    7f+YTtZk33av8aHnTqu+d9ECgYEAsdTRJIr6qAZdM9edgJ4NuB6R75Eq2ffC7HZe
+    eyyuA8PWLVuwEBMglr+oT8lfrd80HDwUiFf03fctn2ZpnIL4T9c1K/IbrvM8Imjr
+    IPs0TnPAQg/5bZkBBodIdWEDmTWRcOsOOdYOsx9rwmt0l2zs8ccYlL3eT6z2xtEm
+    ogSCPz8CgYEAyb4zJjxwiCBYpXyNP2EwMkd2/HIx/qwKqwNEbJb39chWcPMYV/6q
+    1QdQD8REf7I8NO9s+wbyPnAsGg8bK3OJUA89RHZkpXFAZYbBLtSUPRAfvxd4eoYO
+    Kb4EtXcF/Gg7Dmeb/jtQMSSkRzQJ/4W+UP9GFcrp95kIdw+HNxdL73g=
+    -----END RSA PRIVATE KEY-----
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIDWTCCAkGgAwIBAgIUHFOfZUl77OqM8h+XLyzvT9WYu8owDQYJKoZIhvcNAQEL
+    BQAwNDEyMDAGA1UEAxMpRWxhc3RpYyBDZXJ0aWZpY2F0ZSBUb29sIEF1dG9nZW5l
+    cmF0ZWQgQ0EwHhcNMjUxMDE2MTgxMTA3WhcNMjgxMDE1MTgxMTA3WjA0MTIwMAYD
+    VQQDEylFbGFzdGljIENlcnRpZmljYXRlIFRvb2wgQXV0b2dlbmVyYXRlZCBDQTCC
+    ASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMDQ8Uv8zPIONmy3/MbsNJVJ
+    0yOmY15R+Lk2IcoEsh5VNlq45f9i5PfYqCXRQEckhdziK4I2JXuuTNKXDEi6w64D
+    0rOjQ+JCvBsddPjPr6Cem3Iks+uPhizmYGcj5qR9gPBunmDRXzq1zvZcE/zIj+xk
+    gz4S5F4b6n7O3JQwSZADd/pq8WfuE6+slr5is5fmzibT38S4y3oLAlLpqcggZnzv
+    YQtPKg8HsCJUJAD885VRpf1i2z8fa1hmoekbRBn95GSx9jo6k7glFTlkdtEq407V
+    YRthaoUggFE2JCO02EmCbww2TOZdGaUqO+Gvz1iHNvNWMjb7fhk6muITivoY07sC
+    AwEAAaNjMGEwHQYDVR0OBBYEFOggvbkdlF+6ivHxuMZUN/IBSWMNMB8GA1UdIwQY
+    MBaAFOggvbkdlF+6ivHxuMZUN/IBSWMNMA8GA1UdEwEB/wQFMAMBAf8wDgYDVR0P
+    AQH/BAQDAgEGMA0GCSqGSIb3DQEBCwUAA4IBAQBikGz4+Z5EC1YUI4+VDMuTZ4LK
+    r6fr1p+6xiOIUaWMHpvilv29JyWLWUwbnEjE1HYE8oYTHv7RK9wK2vHqIxjGF31+
+    M2z4gF7G0IZIxR8kTI/hdgcHjBiWxE/aSEmAUQ+2PhSA474C6pcOMIyz7ek/kDPL
+    2R7WuQPSKW3qoXQVKjDp+t1muIZ7SKzMA1M6jegt4WhqRpAj1TTxdbNyVkRIySpS
+    p0xJ9bY2ErKxJZw71Rayx/KJTCjTKRAmijq04+200u+EazpQhlT4Sl/J5PBzh88c
+    wOhiVchtLdnvunYrmgIylYHoX7SzlQwwXnW8uuztlXtggyS3NLNzh+Lk5q+U
+    -----END CERTIFICATE-----

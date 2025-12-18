@@ -18,6 +18,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
+          submodules: true
           fetch-depth: 0  # Fetch all history including tags
           persist-credentials: false  # Avoid credential conflicts with create-pull-request
       
@@ -83,7 +84,7 @@ jobs:
             
             ## References
             - **Source go.mod**: https://github.com/elastic/elastic-agent/blob/${{ steps.get_version.outputs.version }}/go.mod
-            - **Source core-components.yaml**: https://github.com/elastic/elastic-agent/blob/${{ steps.get_version.outputs.version }}/internal/pkg/otel/core-components.yaml
+            - **Source components.yaml**: https://github.com/elastic/elastic-agent/blob/${{ steps.get_version.outputs.version }}/internal/edot/components.yaml
             - **Release tag**: https://github.com/elastic/elastic-agent/tree/${{ steps.get_version.outputs.version }}
             
             This is an automated PR created by the documentation update workflow.
