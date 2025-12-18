@@ -76,11 +76,6 @@ steps:
           .buildkite/scripts/steps/package.sh
         artifact_paths:
           - "build/distributions/**/*"
-        matrix:
-          setup:
-            fips:
-              - false
-              - true
         plugins:
           - elastic/vault-docker-login#v0.5.2:
               secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
@@ -105,11 +100,6 @@ steps:
           .buildkite/scripts/steps/package.sh
         artifact_paths:
           - "build/distributions/**/*"
-        matrix:
-          setup:
-            fips:
-              - false
-              - true
         plugins:
           - elastic/vault-docker-login#v0.5.2:
               secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
@@ -138,11 +128,6 @@ steps:
           ls -lahR build/
         artifact_paths:
           - "build/distributions/**/*"
-        matrix:
-          setup:
-            fips:
-              - false
-              - true
 
       - label: ":package: FIPS=true Package ARM elastic-agent"
         key: package_elastic-agent-arm
@@ -169,11 +154,6 @@ steps:
           ls -lahR build/
         artifact_paths:
           - "build/distributions/**/*"
-        matrix:
-          setup:
-            fips:
-              - false
-              - true
 
   - label: ":elastic-stack: Publishing to DRA"
     if: build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == null || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") != "independent-agent-release-staging"
