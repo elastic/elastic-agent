@@ -329,6 +329,85 @@ shared:
         content: >
           {{ manifest .fips }}
 
+  # Deb/RPM spec.
+  - &deb_rpm_agent_spec_core_source
+    <<: *common
+    pre_install_script: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/preinstall.sh.tmpl'
+    post_install_script: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/postinstall.sh.tmpl'
+    post_rm_script: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/postrm.sh.tmpl'
+    files:
+      /usr/share/{{.BeatName}}/LICENSE.txt:
+        source: '{{ repo.RootDir }}/LICENSE.txt'
+        mode: 0644
+      /usr/share/{{.BeatName}}/NOTICE.txt:
+        source: '{{ repo.RootDir }}/NOTICE.txt'
+        mode: 0644
+      /usr/share/{{.BeatName}}/README.md:
+        template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/common/README.md.tmpl'
+        mode: 0644
+      /usr/share/{{.BeatName}}/.build_hash.txt:
+        content: >
+          {{ commit }}
+        mode: 0644
+      /etc/{{.BeatName}}/elastic-agent.reference.yml:
+        source: 'elastic-agent.reference.yml'
+        mode: 0644
+      /etc/{{.BeatName}}/elastic-agent.yml:
+        source: 'elastic-agent.yml'
+        mode: 0600
+        config: true
+      /etc/{{.BeatName}}/otel.yml:
+        source: 'otel.yml'
+        mode: 0600
+        config: true
+      /etc/{{.BeatName}}/.elastic-agent.active.commit:
+        content: >
+          {{ commit }}
+        mode: 0644
+      /usr/bin/{{.BeatName}}:
+        template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/elastic-agent.sh.tmpl'
+        mode: 0755
+      /lib/systemd/system/{{.BeatServiceName}}.service:
+        template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/elastic-agent.unit.tmpl'
+        mode: 0644
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}:
+        source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+        mode: 0755
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/package.version:
+        content: >
+          {{ agent_package_version }}
+        mode: 0644
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components:
+        source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/'
+        mode: 0755
+        config_mode: 0644
+        skip_on_missing: true
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/elastic-otel-collector:
+        source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector{{.BinaryExt}}'
+        mode: 0755
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/elastic-otel-collector.spec.yml:
+        source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector.spec.yml'
+        mode: 0755
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/module:
+        source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/module'
+        preserve_mode: true
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/certs/certs.pem:
+        source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/certs/certs.pem'
+        mode: 0640
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/lenses:
+        source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/lenses'
+        preserve_mode: true
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/osqueryd:
+        source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osqueryd'
+        mode: 0755
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/osquery-extension.ext:
+        source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery-extension.ext'
+        mode: 0755
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/manifest.yaml:
+        mode: 0644
+        content: >
+          {{ manifest .fips }}
+
   - &linux_otel_files
     'otelcol':
       source: '{{ repo.RootDir }}/dev-tools/packaging/files/linux/otelcol.sh'
@@ -1489,7 +1568,7 @@ specs:
     - os: linux
       types: [ deb, rpm ]
       spec:
-        <<: *deb_rpm_agent_spec
+        <<: *deb_rpm_agent_spec_core_source
         <<: *elastic_license_for_deb_rpm
 
     - os: aix
