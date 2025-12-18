@@ -945,10 +945,12 @@ func TestFleetDownloadProxyURL(t *testing.T) {
 
 	t.Log("Ensure upgrade has failed")
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		agent, err := kibClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
+		status, err := startFixture.ExecStatusRaw(ctx)
 		require.NoError(c, err)
-		require.NotNil(c, agent.UpgradeDetails)
-		require.Equal(c, "UPG_FAILED", agent.UpgradeDetails.State)
+		require.NotNil(c, status["upgrade_details"], "Agent status does not contain upgrade_details.")
+		upgradeDetails, ok := status["upgrade_details"].(map[string]any)
+		require.True(t, ok, "expected upgrade_details to be an object, got type: %T", status["upgrade_details"])
+		require.Equal(c, "UPG_FAILED", upgradeDetails["state"])
 	}, time.Minute*5, time.Second, "Unable to verify that upgrade has failed.")
 
 	proxy := proxytest.New(t,
@@ -994,9 +996,9 @@ func TestFleetDownloadProxyURL(t *testing.T) {
 
 	t.Log("Ensure upgrade starts")
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		agent, err := kibClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
+		status, err := startFixture.ExecStatusRaw(ctx)
 		require.NoError(c, err)
-		require.NotNil(c, agent.UpgradeDetails)
+		require.NotNil(c, status["upgrade_details"], "Agent status does not contain upgrade_details.")
 	}, time.Minute*5, time.Second, "Unable to verify that upgrade details appear.")
 
 	t.Log("Waiting for upgrade watcher to start...")

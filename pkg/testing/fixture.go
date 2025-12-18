@@ -860,6 +860,63 @@ func (f *Fixture) ExecStatus(ctx context.Context, opts ...statusOpt) (AgentStatu
 	}
 }
 
+// ExecStatusRaw executes `elastic-agent status --output=json`.
+//
+// Returns the output parsed as map[string]any and the error from the execution. Keep in mind the agent exits with status 1 if it's
+// unhealthy, but it still outputs the status successfully. This call does require that the Elastic Agent is running
+// and communication over the control protocol is working.
+//
+// By default, retry logic is applied. Use WithNoRetry to disable this behavior. WithRetryTimeout and WithRetryInterval
+// can be used to adjust the retry logic timing. The default retry timeout is one minute and the default retry
+// interval is one second.
+//
+// An empty AgentStatusOutput and non nil error means the output could not be parsed. As long as we get some output,
+// we don't return any error. It should work with any 8.6+ agent
+func (f *Fixture) ExecStatusRaw(ctx context.Context, opts ...statusOpt) (map[string]any, error) {
+	var opt statusOpts
+	opt.retryTimeout = 1 * time.Minute
+	opt.retryInterval = 1 * time.Second
+	for _, o := range opts {
+		o(&opt)
+	}
+
+	var cancel context.CancelFunc
+	if opt.noRetry || opt.retryTimeout == 0 {
+		ctx, cancel = context.WithCancel(ctx)
+	} else {
+		ctx, cancel = context.WithTimeout(ctx, opt.retryTimeout)
+	}
+	defer cancel()
+
+	var lastErr error
+	for {
+		if ctx.Err() != nil {
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) && lastErr != nil {
+				// return the last observed error
+				return nil, fmt.Errorf("agent status returned an error: %w", lastErr)
+			}
+			return nil, fmt.Errorf("agent status failed: %w", ctx.Err())
+		}
+		out, err := f.Exec(ctx, []string{"status", "--output", "json"}, opt.cmdOptions...)
+		status := map[string]any{}
+		if uerr := json.Unmarshal(out, &status); uerr != nil {
+			// unmarshal error means that json was not outputted due to a communication error
+			lastErr = fmt.Errorf("could not unmarshal agent status output: %w:\n%s", errors.Join(uerr, err), out)
+		} else if len(status) == 0 {
+			// still not correct try again for a successful status
+			lastErr = fmt.Errorf("agent status output is empty: %w", err)
+		} else {
+			return status, nil
+		}
+
+		if opt.noRetry {
+			return status, lastErr
+		}
+
+		sleepFor(ctx, opt.retryInterval)
+	}
+}
+
 // ExecInspect executes to inspect subcommand on the prepared Elastic Agent binary.
 // It returns the parsed output and the error from the execution or an empty
 // AgentInspectOutput and the unmarshalling error if it cannot unmarshal the
