@@ -27,6 +27,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
@@ -90,7 +91,7 @@ type unpackHandler interface {
 type copyActionStoreFunc func(log *logger.Logger, newHome string) error
 type copyRunDirectoryFunc func(log *logger.Logger, oldRunPath, newRunPath string) error
 type fileDirCopyFunc func(from, to string, opts ...filecopy.Options) error
-type markUpgradeFunc func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]TTLMarker) error
+type markUpgradeFunc func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error
 type changeSymlinkFunc func(log *logger.Logger, topDirPath, symlinkPath, newTarget string) error
 type rollbackInstallFunc func(ctx context.Context, log *logger.Logger, topDirPath, versionedHome, oldVersionedHome string, rollbackSource availableRollbacksSource) error
 
@@ -117,8 +118,8 @@ type WatcherHelper interface {
 }
 
 type availableRollbacksSource interface {
-	Set(map[string]TTLMarker) error
-	Get() (map[string]TTLMarker, error)
+	Set(map[string]ttl.TTLMarker) error
+	Get() (map[string]ttl.TTLMarker, error)
 }
 
 // Upgrader performs an upgrade

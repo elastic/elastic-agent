@@ -130,6 +130,7 @@ type PackageFile struct {
 	Template      string                  `yaml:"template,omitempty"` // Input template file.
 	Target        string                  `yaml:"target,omitempty"`   // Target location in package. Relative paths are added to a package specific directory (e.g. metricbeat-7.0.0-linux-x86_64).
 	Mode          os.FileMode             `yaml:"mode,omitempty"`     // Target mode for file. Does not apply when source is a directory.
+	PreserveMode  bool                    `yaml:"preserve_mode"`      // Preserve the original Mode of the file, useful when adding directories and need to preserve the original file permissions
 	ConfigMode    os.FileMode             `yaml:"config_mode,omitempty"`
 	Config        bool                    `yaml:"config"`                    // Mark file as config in the package (deb and rpm only).
 	Modules       bool                    `yaml:"modules"`                   // Mark directory as directory with modules.
@@ -909,6 +910,8 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 		}
 
 		switch {
+		case pkgFile.PreserveMode:
+			header.SetMode(info.Mode())
 		case componentConfigFilePattern.MatchString(info.Name()):
 			header.SetMode(componentConfigMode & os.ModePerm)
 		case pkgFile.ConfigMode > 0 && configFilePattern.MatchString(info.Name()):
@@ -995,6 +998,8 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile) error {
 		header.Uid, header.Gid = 0, 0
 
 		switch {
+		case pkgFile.PreserveMode:
+			header.Mode = int64(info.Mode())
 		case componentConfigFilePattern.MatchString(info.Name()):
 			header.Mode = int64(componentConfigMode & os.ModePerm)
 		case pkgFile.ConfigMode > 0 && configFilePattern.MatchString(info.Name()):

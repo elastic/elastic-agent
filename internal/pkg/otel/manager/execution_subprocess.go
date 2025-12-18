@@ -14,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gofrs/uuid/v5"
 	"go.opentelemetry.io/collector/component"
 	"gopkg.in/yaml.v3"
 
@@ -41,21 +40,16 @@ const (
 
 // newSubprocessExecution creates a new execution which runs the otel collector in a subprocess. A metricsPort or
 // healthCheckPort of 0 will result in a random port being used.
-func newSubprocessExecution(logLevel logp.Level, collectorPath string, metricsPort int, healthCheckPort int) (*subprocessExecution, error) {
-	nsUUID, err := uuid.NewV4()
-	if err != nil {
-		return nil, fmt.Errorf("cannot generate UUID: %w", err)
-	}
+func newSubprocessExecution(logLevel logp.Level, collectorPath string, uuid string, metricsPort int, healthCheckPort int) (*subprocessExecution, error) {
 	componentType, err := component.NewType(healthCheckExtensionName)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create component type: %w", err)
 	}
-	healthCheckExtensionID := component.NewIDWithName(componentType, nsUUID.String()).String()
+	healthCheckExtensionID := component.NewIDWithName(componentType, uuid).String()
 
 	return &subprocessExecution{
 		collectorPath: collectorPath,
 		collectorArgs: []string{
-			"otel",
 			fmt.Sprintf("--%s", OtelSetSupervisedFlagName),
 			fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, logLevel.String()),
 			fmt.Sprintf("--%s=%s", OtelSupervisedMonitoringURLFlagName, monitoring.EDOTMonitoringEndpoint()),
@@ -101,7 +95,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 		return nil, fmt.Errorf("could not find port for collector: %w", err)
 	}
 
-	if err := injectHeathCheckV2Extension(cfg, r.healthCheckExtensionID, httpHealthCheckPort); err != nil {
+	if err := injectHealthCheckV2Extension(cfg, r.healthCheckExtensionID, httpHealthCheckPort); err != nil {
 		return nil, fmt.Errorf("failed to inject health check extension: %w", err)
 	}
 

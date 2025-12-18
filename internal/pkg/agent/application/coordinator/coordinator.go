@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 
 	"go.opentelemetry.io/collector/component/componentstatus"
 
@@ -614,7 +616,7 @@ func (c *Coordinator) Migrate(
 	backoffFactory func(done <-chan struct{}) backoff.Backoff,
 	notifyFn func(context.Context, *fleetapi.ActionMigrate) error,
 ) error {
-	if c.specs.Platform().OS == component.Container {
+	if c.isContainerizedEnvironment() {
 		return ErrContainerNotSupported
 	}
 	if !c.isManaged {
@@ -852,6 +854,22 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 			return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
 		}
 
+		if errors.Is(err, upgrade.ErrNoRollbacksAvailable) && action != nil && release.VersionWithSnapshot() == action.Data.Version {
+			// when manually rolling back the action store is not copied back, so it's likely that the rolled back agent
+			// will receive (again) the rollback action because it's using an ackToken from before the rollback action
+			// was received by the "upgraded" elastic-agent.
+			// This block here is to avoid setting an error state because the rollback requested no longer exist after
+			// having performed the rollback once.
+			// A better test would be to compare actionIDs but there's no way to persist the actionID of the rollback action
+			// from the upgraded agent to the rolled back agent (upgrade details is reset when the upgrade marker is deleted)
+			c.logger.Infow(
+				"Received a rollback action with the same version as current and no rollbacks available, ignoring the likely replayed action",
+				"action_id", action.ID())
+			c.ClearOverrideState()
+			det.SetState(details.StateRollback)
+			return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
+		}
+
 		c.logger.Errorw("upgrade failed", "error", logp.Error(err))
 		// If ErrInsufficientDiskSpace is in the error chain, we want to set the
 		// the error to ErrInsufficientDiskSpace so that the error message is
@@ -863,10 +881,17 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		det.Fail(err)
 		return err
 	}
+
 	if cb != nil {
 		det.SetState(details.StateRestarting)
 		c.ReExec(cb)
 	}
+
+	if uOpts.rollback {
+		// Ack the rollback action, since there's no restart callback returned, this is still run
+		return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
+	}
+
 	return nil
 }
 
@@ -1609,6 +1634,14 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 		c.logger.Errorf("failed to add secret markers: %v", err)
 	}
 
+	// override retrieved config from Fleet with persisted config from AgentConfig file
+
+	if c.caps != nil {
+		if err := applyPersistedConfig(c.logger, cfg, paths.ConfigFile(), c.isContainerizedEnvironment, c.caps.AllowFleetOverride); err != nil {
+			return fmt.Errorf("could not apply persisted configuration: %w", err)
+		}
+	}
+
 	// perform and verify ast translation
 	m, err := cfg.ToMapStr()
 	if err != nil {
@@ -1693,6 +1726,35 @@ func (c *Coordinator) generateAST(cfg *config.Config, m map[string]interface{}) 
 	}
 
 	c.ast = rawAst
+	return nil
+}
+
+func applyPersistedConfig(logger *logger.Logger, cfg *config.Config, configFile string, checkFns ...func() bool) error {
+	for checkNo, checkFn := range checkFns {
+		if !checkFn() {
+			// Feature is disabled, nothing to do
+			logger.Infof("Applying persisted configuration is disabled by check with idx %d.", checkNo)
+			return nil
+		}
+	}
+
+	f, err := os.OpenFile(configFile, os.O_RDONLY, 0)
+	if err != nil && os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("opening config file: %w", err)
+	}
+	defer f.Close()
+
+	persisted, err := config.NewConfigFrom(f)
+	if err != nil {
+		return fmt.Errorf("parsing persisted config: %w", err)
+	}
+
+	err = cfg.Merge(persisted)
+	if err != nil {
+		return fmt.Errorf("merging persisted config: %w", err)
+	}
 	return nil
 }
 
@@ -2361,4 +2423,8 @@ func computeEnrollOptions(ctx context.Context, cfgPath string, cfgFleetPath stri
 
 	options = enroll.FromFleetConfig(cfg.Fleet)
 	return options, nil
+}
+
+func (c *Coordinator) isContainerizedEnvironment() bool {
+	return c.specs.Platform().OS == component.Container
 }
