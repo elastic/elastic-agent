@@ -350,14 +350,16 @@ steps:
 
   # NOTE: This should help detecting issues earlier in the development cycle
   # See https://github.com/elastic/elastic-agent/issues/11604
-  - label: "Verify DRA Packaging Process"
+  - label: "Trigger Elastic Agent Package"
     if: build.pull_request.id != null
     commands:
-      - .buildkite/scripts/steps/package-dra-test.sh
+      - .buildkite/scripts/steps/trigger-elastic-agent-package.sh
       - .buildkite/scripts/steps/trigger-elastic-agent-package.sh | buildkite-agent pipeline upload
     if_changed:
       include:
-        - .buildkite/scripts/steps/package-dra-test.sh
+        - .buildkite/pipeline.elastic-agent-package.yml
+        - .buildkite/scripts/steps/package.sh
+        - .buildkite/scripts/steps/trigger-elastic-agent-package.sh
         - magefile.go
         - dev-tools/**/*
 
