@@ -49,7 +49,9 @@ func stopComponents(ctx context.Context, ch chan coordinator.ConfigChange, a fle
 	unenrollPolicy := newPolicyChange(ctx, config.New(), a, acker, true, false)
 	ch <- unenrollPolicy
 
-	backupCallback()
+	if backupCallback != nil {
+		backupCallback()
+	}
 
 	unenrollCtx, cancel := context.WithTimeout(ctx, unenrollTimeout)
 	defer cancel()
