@@ -1155,17 +1155,17 @@ func TestAvailableRollbacks(t *testing.T) {
 					unmarshaled := map[string]json.RawMessage{}
 					err := json.NewDecoder(body).Decode(&unmarshaled)
 					assert.NoError(t, err, "error decoding checkin body")
-					if assert.Contains(t, unmarshaled, "available_rollbacks") {
+					if assert.Contains(t, unmarshaled, "upgrade") {
 						// verify that we got the correct data
-						var actual []fleetapi.CheckinRollback
-						err = json.Unmarshal(unmarshaled["available_rollbacks"], &actual)
-						require.NoError(t, err, "error decoding available rollbacks from checkin body")
+						var actualUpgrade fleetapi.CheckinUpgrade
+						err = json.Unmarshal(unmarshaled["upgrade"], &actualUpgrade)
+						require.NoError(t, err, "error decoding upgrade info from checkin body")
 
 						expected := []fleetapi.CheckinRollback{{
 							Version:    "1.2.3",
 							ValidUntil: validUntil,
 						}}
-						assert.Equal(t, expected, actual)
+						assert.Equal(t, expected, actualUpgrade.Rollbacks)
 					}
 
 					return &http.Response{

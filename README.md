@@ -87,6 +87,7 @@ pr: https://github.com/elastic/elastic-agent/pull/823
 ### Packaging
 
 Prerequisites:
+- Running `git submodule update --init` once after cloning or pulling the beats submodule for the first time.
 - installed [mage](https://github.com/magefile/mage)
 - [Docker](https://docs.docker.com/get-docker/)
 - [beats](https://github.com/elastic/beats) to pre-exist in the parent folder of the local Git repository checkout if, and only if, packaging with `EXTERNAL=false` to package the beats as well
@@ -100,18 +101,12 @@ To build a local version of the agent for development, run the command below. Th
 * windows/amd64
 
 ```sh
-# DEV=true disable signature verification to allow replacing binaries in the components sub-directory of the package.
-# EXTERNAL=true downloads the matching version of the binaries that are packaged with agent (Beats for example).
+# EXTERNAL=true downloads the matching version of the binaries that are packaged with agent, not necessary if only using Beats.
 # SNAPSHOT=true indicates that this is a snapshot version and not a release version.
-# PLATFORMS=linux/amd64 builds an agent that will run on 64 bit Linux systems.
+# PLATFORMS=linux/amd64 builds an agent that will run on 64 bit X86 Linux systems.
 # PACKAGES=tar.gz produces a tar.gz package
-DEV=true EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=tar.gz mage -v package
+EXTERNAL=true SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=tar.gz mage -v package
 ```
-
-If you build the same agent package often (when running integration tests, for example),
-you can also set KEEP_ARCHIVE=true in your environment. The packaging step will then
-avoid deleting the binary archive after the package is generated, removing the need to
-re-download binaries on every invocation.
 
 The resulting package will be produced in the build/distributions directory. The version is controlled by the value in [version.go](version/version.go).
 To install the agent extract the package and run the install command:

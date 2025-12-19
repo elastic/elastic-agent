@@ -166,16 +166,16 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		t.Logf("test failed: last status output: %#v", status)
 	}()
 
-	agentbeat := "agentbeat"
+	collectorPath := "elastic-otel-collector"
 	if runtime.GOOS == "windows" {
-		agentbeat += ".exe"
+		collectorPath += ".exe"
 	}
 	wd := f.WorkDir()
-	glob := filepath.Join(wd, "data", "elastic-agent-*", "components", agentbeat)
+	glob := filepath.Join(wd, "data", "elastic-agent-*", "components", collectorPath)
 	compPaths, err := filepath.Glob(glob)
-	require.NoErrorf(t, err, "failed to glob agentbeat path pattern %q", glob)
+	require.NoErrorf(t, err, "failed to glob elastic-otel-collector path pattern %q", glob)
 	require.Lenf(t, compPaths, 1,
-		"glob pattern \"%s\": found %d paths to agentbeat, can only have 1",
+		"glob pattern \"%s\": found %d paths to elastic-otel-collector, can only have 1",
 		glob, len(compPaths))
 
 	cmdVer := exec.Command(compPaths[0], "filebeat", "version")

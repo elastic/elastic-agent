@@ -108,10 +108,6 @@ func DefaultBuildArgs() BuildArgs {
 		}
 	}
 
-	if OTELComponentBuild {
-		args.ExtraFlags = append(args.ExtraFlags, "-tags=otelexternal")
-	}
-
 	if DevBuild {
 		// Disable optimizations (-N) and inlining (-l) for debugging.
 		args.ExtraFlags = append(args.ExtraFlags, `-gcflags=all=-N -l`)

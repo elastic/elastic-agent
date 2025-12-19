@@ -363,13 +363,12 @@ func (c *commandRuntime) start(comm Communicator) error {
 	}
 	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentID, c.current.ID))
 	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentType, c.getSpecType()))
-	uid := os.Geteuid()
 	workDir := c.current.WorkDirPath(paths.Run())
 	path, err := filepath.Abs(c.getSpecBinaryPath())
 	if err != nil {
 		return fmt.Errorf("failed to determine absolute path: %w", err)
 	}
-	err = utils.HasStrictExecPerms(path, uid)
+	err = utils.HasStrictExecPerms(path)
 	if err != nil {
 		return fmt.Errorf("execution of component prevented: %w", err)
 	}

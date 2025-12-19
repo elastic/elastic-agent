@@ -82,5 +82,5 @@ func AddLicenseHeaders() error {
 	}
 
 	licenser := gotool.Licenser
-	return licenser(licenser.License(license))
+	return licenser(licenser.License(license), licenser.Exclude("beats"))
 }

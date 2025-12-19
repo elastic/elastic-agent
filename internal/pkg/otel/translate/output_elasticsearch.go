@@ -120,14 +120,6 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 		// let's keep max_conns_per_host setting for now and remove it once exporterhelper is stable.
 		"max_conns_per_host": getTotalNumWorkers(output), // num_workers * len(hosts) if loadbalance is true
 
-		// Retry
-		"retry": map[string]any{
-			"enabled":          true,
-			"initial_interval": escfg.Backoff.Init, // backoff.init
-			"max_interval":     escfg.Backoff.Max,  // backoff.max
-			"max_retries":      escfg.MaxRetries,   // max_retries
-		},
-
 		"sending_queue": map[string]any{
 			"batch": map[string]any{
 				"flush_timeout": "10s",
@@ -149,6 +141,20 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 			"enabled": true,
 		},
 	}
+	// Retries
+	retryCfg := map[string]any{
+		"enabled":          true,
+		"max_retries":      escfg.MaxRetries,
+		"initial_interval": escfg.Backoff.Init, // backoff.init
+		"max_interval":     escfg.Backoff.Max,  // backoff.max
+	}
+	if escfg.MaxRetries == 0 {
+		// Disable retries
+		retryCfg = map[string]any{
+			"enabled": false,
+		}
+	}
+	otelYAMLCfg["retry"] = retryCfg
 
 	// Compression
 	otelYAMLCfg["compression"] = "none"
@@ -197,6 +203,8 @@ func checkUnsupportedConfig(cfg *config.C) error {
 		return fmt.Errorf("ladbalance:false is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("non_indexable_policy") {
 		return fmt.Errorf("non_indexable_policy is currently not supported: %w", errors.ErrUnsupported)
+	} else if val, err := cfg.Int("max_retries", -1); err == nil && val < 0 {
+		return fmt.Errorf("max_retries should be non-negative: %w", errors.ErrUnsupported)
 	}
 
 	return nil
@@ -278,6 +286,20 @@ func cfgDecodeHookFunc() mapstructure.DecodeHookFunc {
 				return nil, fmt.Errorf("failed parsing kerberos.auth_type: %w", err)
 			}
 			return authType, nil
+		case t == reflect.TypeOf([]string{}):
+			return []string{data.(string)}, nil
+		case t == reflect.TypeOf([]tlscommon.CipherSuite{tlscommon.CipherSuite(0)}):
+			cipherSuite := tlscommon.CipherSuite(0)
+			if err := cipherSuite.Unpack(data); err != nil {
+				return nil, fmt.Errorf("failed parsing ssl cipher_suites: %w", err)
+			}
+			return []tlscommon.CipherSuite{cipherSuite}, nil
+		case t == reflect.TypeOf([]tlscommon.TLSVersion{tlscommon.TLSVersion(0)}):
+			tlsVersion := tlscommon.TLSVersion(0)
+			if err := tlsVersion.Unpack(data); err != nil {
+				return nil, fmt.Errorf("failed parsing ssl supported_protocols: %w", err)
+			}
+			return []tlscommon.TLSVersion{tlsVersion}, nil
 		default:
 			return data, nil
 		}

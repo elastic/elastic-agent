@@ -101,10 +101,12 @@ func TestTar(t *testing.T) {
 	tarFiles := getFiles(t, regexp.MustCompile(`-\w+\.tar\.gz$`))
 	for _, tarFile := range tarFiles {
 		t.Run(filepath.Base(tarFile), func(t *testing.T) {
+			if strings.Contains(tarFile, "-core-") {
+				t.Skip("core package is not checked")
+			}
 			fipsPackage := strings.Contains(tarFile, "-fips-")
 			checkTar(t, tarFile, fipsPackage)
 		})
-
 	}
 }
 
@@ -112,6 +114,9 @@ func TestZip(t *testing.T) {
 	zips := getFiles(t, regexp.MustCompile(`^\w+\S+.zip$`))
 	for _, zip := range zips {
 		t.Run(filepath.Base(zip), func(t *testing.T) {
+			if strings.Contains(zip, "-core-") {
+				t.Skip("core package is not checked")
+			}
 			checkZip(t, zip)
 		})
 	}

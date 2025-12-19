@@ -89,11 +89,10 @@ var (
 
 	BeatProjectType ProjectType
 
-	Snapshot           bool
-	DevBuild           bool
-	ExternalBuild      bool
-	FIPSBuild          bool
-	OTELComponentBuild bool
+	Snapshot      bool
+	DevBuild      bool
+	ExternalBuild bool
+	FIPSBuild     bool
 
 	versionQualified bool
 	versionQualifier string
@@ -165,11 +164,6 @@ func initGlobals() {
 		panic(fmt.Errorf("failed to parse FIPS env value: %w", err))
 	}
 
-	OTELComponentBuild, err = strconv.ParseBool(EnvOr("OTEL_COMPONENT", "false"))
-	if err != nil {
-		panic(fmt.Errorf("failed to parse OTEL_COMPONENT env value: %w", err))
-	}
-
 	versionQualifier, versionQualified = os.LookupEnv("VERSION_QUALIFIER")
 
 	// order matters: this will override some of the values. Those values can be used
@@ -236,7 +230,6 @@ func varMap(args ...map[string]interface{}) map[string]interface{} {
 		"DEV":             DevBuild,
 		"EXTERNAL":        ExternalBuild,
 		"FIPS":            FIPSBuild,
-		"OTEL_COMPONENT":  OTELComponentBuild,
 		"Qualifier":       versionQualifier,
 		"CI":              CI,
 	}

@@ -19,13 +19,15 @@ type Capabilities interface {
 	AllowUpgrade(version string, sourceURI string) bool
 	AllowInput(name string) bool
 	AllowOutput(name string) bool
+	AllowFleetOverride() bool
 }
 
 type capabilitiesManager struct {
-	log          *logger.Logger
-	inputChecks  []*stringMatcher
-	outputChecks []*stringMatcher
-	upgradeCaps  []*upgradeCapability
+	log               *logger.Logger
+	inputChecks       []*stringMatcher
+	outputChecks      []*stringMatcher
+	upgradeCaps       []*upgradeCapability
+	fleetOverrideCaps []*fleetOverrideCapability
 }
 
 func (cm *capabilitiesManager) AllowInput(inputType string) bool {
@@ -38,6 +40,10 @@ func (cm *capabilitiesManager) AllowOutput(outputType string) bool {
 
 func (cm *capabilitiesManager) AllowUpgrade(version string, uri string) bool {
 	return allowUpgrade(cm.log, version, uri, cm.upgradeCaps)
+}
+
+func (cm *capabilitiesManager) AllowFleetOverride() bool {
+	return allowFleetOverride(cm.log, cm.fleetOverrideCaps)
 }
 
 func LoadFile(capsFile string, log *logger.Logger) (Capabilities, error) {
@@ -68,8 +74,10 @@ func Load(capsReader io.Reader, log *logger.Logger) (Capabilities, error) {
 	caps := spec.Capabilities
 
 	return &capabilitiesManager{
-		inputChecks:  caps.inputChecks,
-		outputChecks: caps.outputChecks,
-		upgradeCaps:  caps.upgradeChecks,
+		log:               log,
+		inputChecks:       caps.inputChecks,
+		outputChecks:      caps.outputChecks,
+		upgradeCaps:       caps.upgradeChecks,
+		fleetOverrideCaps: caps.fleetOverrideChecks,
 	}, nil
 }

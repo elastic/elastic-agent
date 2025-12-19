@@ -172,7 +172,7 @@ func TestInstallWithBasePath(t *testing.T) {
 	t.Run("check components set",
 		testComponentsPresence(ctx, fixture,
 			[]componentPresenceDefinition{
-				{"agentbeat", []string{"windows", "linux", "darwin"}},
+				{"elastic-otel-collector", []string{"windows", "linux", "darwin"}},
 				{"endpoint-security", []string{"windows", "linux", "darwin"}},
 				{"pf-host-agent", []string{"linux"}},
 			},
@@ -266,7 +266,7 @@ func TestInstallServersWithBasePath(t *testing.T) {
 	t.Run("check components set",
 		testComponentsPresence(ctx, fixture,
 			[]componentPresenceDefinition{
-				{"agentbeat", []string{"windows", "linux", "darwin"}},
+				{"elastic-otel-collector", []string{"windows", "linux", "darwin"}},
 				{"endpoint-security", []string{"windows", "linux", "darwin"}},
 				{"pf-host-agent", []string{"linux"}},
 				{"cloudbeat", []string{"linux"}},

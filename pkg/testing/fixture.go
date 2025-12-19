@@ -576,12 +576,16 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 	stdOut := newLogWatcher(logProxy)
 	stdErr := newLogWatcher(logProxy)
 
-	args := []string{command, "-e"}
-	if disableEncryptedStore {
-		args = append(args, "--disable-encrypted-store")
-	}
-	if enableTestingMode {
-		args = append(args, "--testing-mode")
+	args := []string{command}
+	if command != "otel" {
+		// otel command doesn't share these arguments with elastic-agent
+		args = append(args, "-e")
+		if disableEncryptedStore {
+			args = append(args, "--disable-encrypted-store")
+		}
+		if enableTestingMode {
+			args = append(args, "--testing-mode")
+		}
 	}
 
 	args = append(args, f.additionalArgs...)

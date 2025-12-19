@@ -15,22 +15,22 @@ products:
 
 # Elasticsearch exporter
 
-The Elasticsearch exporter is an OpenTelemetry Collector component that sends logs, metrics, and traces to {{es}}. The exporter supports multiple mapping modes and provides flexible configuration options for data routing, authentication, and performance tuning.
+The {{es}} exporter is an OpenTelemetry Collector component that sends logs, metrics, and traces to {{es}}. The exporter supports multiple mapping modes and provides flexible configuration options for data routing, authentication, and performance tuning.
 
 ## Get started
 
-To use the Elasticsearch exporter, include it in the exporter definitions of the [Collector configuration](/reference/edot-collector/config/index.md). The exporter is already included in the [default configuration](/reference/edot-collector/config/default-config-standalone.md).
+To use the {{es}} exporter, include it in the exporter definitions of the [Collector configuration](/reference/edot-collector/config/index.md). The exporter is already included in the [default configuration](/reference/edot-collector/config/default-config-standalone.md).
 
 ## Configuration
 
-The Elasticsearch exporter supports various configuration options for connecting to Elasticsearch, mapping data, and optimizing performance.
+The {{es}} exporter supports various configuration options for connecting to {{es}}, mapping data, and optimizing performance.
 
 ### Connection settings
 
 You must specify exactly one of the following connection methods:
 
-- `endpoint`: A single Elasticsearch URL. For example, `https://elasticsearch:9200`.
-- `endpoints`: A list of Elasticsearch URLs for round-robin load balancing.
+- `endpoint`: A single {{es}} URL. For example, `https://elasticsearch:9200`.
+- `endpoints`: A list of {{es}} URLs for round-robin load balancing.
 - `cloudid`: An [Elastic Cloud ID](docs-content://deploy-manage/deploy/elastic-cloud/find-cloud-id.md) for connecting to {{ecloud}}.
 
 If none of the previous settings are specified, the exporter relies on the `ELASTICSEARCH_URL` environment variable.
@@ -40,7 +40,7 @@ If none of the previous settings are specified, the exporter relies on the `ELAS
 The exporter supports standard OpenTelemetry [authentication configuration](https://github.com/open-telemetry/opentelemetry-collector/blob/main/config/configauth/README.md#authentication-configuration). You can also use these simplified authentication options:
 
 - `user` and `password`: For HTTP Basic Authentication
-- `api_key`: For [Elasticsearch API key authentication](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-security-create-api-key)
+- `api_key`: For [{{es}} API key authentication](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-security-create-api-key)
 
 ### TLS and security settings
 
@@ -48,39 +48,15 @@ The exporter supports standard OpenTelemetry TLS configuration for secure connec
 
 ## Mapping modes
 
-The exporter supports several mapping modes that determine how your telemetry data is preprocessed and stored in Elastic. You can configure the mapping mode through the `mapping` setting:
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `mapping::mode` | `otel` | The default mapping mode. Valid modes are: `none`, `ecs`, `otel`, `raw`, `bodymap`. |
-| `mapping::allowed_modes` | All mapping modes | A list of allowed mapping modes that can be requested through client metadata or scope attributes. |
-
-### OTel mapping mode
-
 ```{applies_to}
 stack: ga 8.12
 ```
 
-The default mapping mode is `otel`. In the `otel` mapping mode, the Elasticsearch Exporter stores documents in Elastic's preferred OTel-native schema. In this mapping mode, documents use the original attribute names and closely follow the event structure from the OTLP events.
+The exporter uses the `otel` mapping mode by default. In this mode, the {{es}} Exporter stores documents in Elastic's preferred OTel-native schema. Documents use the original attribute names and closely follow the event structure from the OTLP events.
 
-### ECS mapping mode
-
-In `ecs` mapping mode, the Elasticsearch Exporter maps fields from OpenTelemetry Semantic Conventions (SemConv) to Elastic Common Schema (ECS) where possible. This mode can be used for compatibility with existing dashboards that work with ECS. Refer to [ECS & OpenTelemetry](ecs://reference/ecs-opentelemetry.md) for more details.
-
-### Bodymap mapping mode
-
-In `bodymap` mapping mode, the Elasticsearch Exporter supports only logs and takes the body of a log record as the exact content of the Elasticsearch document without any transformation. Use this mapping mode when you want to have complete control over the Elasticsearch document structure.
-
-### None mapping mode
-
-In the `none` mapping mode the Elasticsearch Exporter produces documents with the original field names from the OTLP data structures.
-
-### Raw mapping mode
-
-The `raw` mapping mode is identical to `none`, except for two differences:
-
- - In `none` mode attributes are mapped with an `Attributes.` prefix, while in `raw` mode they are not.
- - In `none` mode span events are mapped with an `Events.` prefix, while in `raw` mode they are not.
+:::{note}
+The exporter supports other mapping modes (`ecs`, `bodymap`, `none`, `raw`) through the `mapping::mode` setting, but configuring these modes is not officially supported by the EDOT Collector. In a future release, the configuration option will be removed in favor of automatic mode selection.
+:::
 
 ## Document routing
 
@@ -117,7 +93,7 @@ These settings allow you to customize document routing:
 | `logstash_format::enabled` | `false` | Turns on or off Logstash format compatibility. When active, the index name is composed using the dynamic routing rules as prefix and the date as suffix. For example, `logs-generic-default-YYYY.MM.DD`. |
 | `logstash_format::prefix_separator` | `-` | Set a separator between logstash prefix and date. |
 | `logstash_format::date_format` | `%Y.%m.%d` | Time format based on strftime to generate the second part of the index name. |
-| `logs_dynamic_id::enabled` | `false` | Turns on or off dynamic ID for log records. If `elasticsearch.document_id` exists and isn't empty in log record attributes, it's used as the document ID. Otherwise, Elasticsearch generates the ID. The attribute is removed from the final document when using `otel` mapping mode. |
+| `logs_dynamic_id::enabled` | `false` | Turns on or off dynamic ID for log records. If `elasticsearch.document_id` exists and isn't empty in log record attributes, it's used as the document ID. Otherwise, {{es}} generates the ID. The attribute is removed from the final document when using `otel` mapping mode. |
 
 ### Document routing exceptions
 
@@ -178,8 +154,8 @@ Batching can be enabled and configured with the `batcher` section, using [common
 - `batcher`:
   - `enabled` (default=unset): Enable batching of requests into 1 or more bulk requests. On a batcher flush, it is possible for a batched request to be translated to more than 1 bulk request due to `flush::bytes`.
   - `sizer` (default=items): Unit of `min_size` and `max_size`. Currently supports only "items", in the future will also support "bytes".
-  - `min_size` (default=5000): Minimum batch size to be exported to Elasticsearch, measured in units according to `batcher::sizer`.
-  - `max_size` (default=0): Maximum batch size to be exported to Elasticsearch, measured in units according to `batcher::sizer`. To limit bulk request size, configure `flush::bytes` instead. :warning: It is recommended to keep `max_size` as 0 as a non-zero value may lead to broken metrics grouping and indexing rejections.
+  - `min_size` (default=5000): Minimum batch size to be exported to {{es}}, measured in units according to `batcher::sizer`.
+  - `max_size` (default=0): Maximum batch size to be exported to {{es}}, measured in units according to `batcher::sizer`. To limit bulk request size, configure `flush::bytes` instead. :warning: It is recommended to keep `max_size` as 0 as a non-zero value may lead to broken metrics grouping and indexing rejections.
   - `flush_timeout` (default=10s): Maximum time of the oldest item spent inside the batcher buffer, aka "max age of batcher buffer". A batcher flush will happen regardless of the size of content in batcher buffer.
 
 For example:
@@ -199,7 +175,7 @@ exporters:
 
 ## Bulk indexing
 
-The Elasticsearch exporter uses the [Elasticsearch Bulk API](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk) for indexing documents. Configure the behavior of bulk indexing with the following settings:
+The {{es}} exporter uses the [{{es}} Bulk API](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk) for indexing documents. Configure the behavior of bulk indexing with the following settings:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -217,12 +193,12 @@ The Elasticsearch exporter uses the [Elasticsearch Bulk API](https://www.elastic
 The `flush::interval` config is ignored when `batcher::enabled` config is explicitly set to true or false.
 :::
 
-Starting from Elasticsearch 8.18 and higher, the [`include_source_on_error`](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk#operation-bulk-include_source_on_error) query parameter allows users to receive the source document in the error response if there were parsing errors in the bulk request. In the exporter, the equivalent configuration is also named `include_source_on_error`.
+Starting from {{es}} 8.18 and higher, the [`include_source_on_error`](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk#operation-bulk-include_source_on_error) query parameter allows users to receive the source document in the error response if there were parsing errors in the bulk request. In the exporter, the equivalent configuration is also named `include_source_on_error`.
 
 - `include_source_on_error`:
   - `true`: Turns on bulk index responses to include source document on error. {applies_to}`stack: ga 8.18`
   - `false`: Turns off including source document on bulk index error responses. {applies_to}`stack: ga 8.18`
-  - `null` (default): Backward-compatible option for older Elasticsearch versions. By default, the error reason is discarded from bulk index responses entirely. Only the error type is returned.
+  - `null` (default): Backward-compatible option for older {{es}} versions. By default, the error reason is discarded from bulk index responses entirely. Only the error type is returned.
 
 :::{warning}
 The exporter might log error responses containing request payload, causing potential sensitive data to be exposed in logs.
@@ -230,12 +206,12 @@ The exporter might log error responses containing request payload, causing poten
 
 ## Ingest pipeline support
 
-Documents can be passed through an [Elasticsearch Ingest pipeline] before indexing. Use these settings to configure the ingest pipeline:
+Documents can be passed through an [{{es}} Ingest pipeline] before indexing. Use these settings to configure the ingest pipeline:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `pipeline` | - | ID of an Elasticsearch Ingest pipeline used for processing documents published by the exporter. |
-| `logs_dynamic_pipeline::enabled` | `false` | Turn on or off the dynamic pipeline. If `elasticsearch.ingest_pipeline` attribute exists in log record attributes and isn't empty, it's used as the Elasticsearch ingest pipeline. This currently only applies to the log signal. The attribute is removed from the final document when using `otel` mapping mode. |
+| `pipeline` | - | ID of an {{es}} Ingest pipeline used for processing documents published by the exporter. |
+| `logs_dynamic_pipeline::enabled` | `false` | Turn on or off the dynamic pipeline. If `elasticsearch.ingest_pipeline` attribute exists in log record attributes and isn't empty, it's used as the {{es}} ingest pipeline. This currently only applies to the log signal. The attribute is removed from the final document when using `otel` mapping mode. |
 
 For example:
 
@@ -246,22 +222,22 @@ exporters:
     pipeline: "my-custom-pipeline"
 ```
 
-## Elasticsearch node discovery
+## {{es}} node discovery
 
-The Elasticsearch Exporter regularly checks Elasticsearch for available nodes. Newly discovered nodes are automatically used for load balancing. 
+The {{es}} Exporter regularly checks {{es}} for available nodes. Newly discovered nodes are automatically used for load balancing. 
 
 The following settings are related to node discovery:
 
 - `discover`:
-  - `on_start` (optional): If enabled the exporter queries Elasticsearch
+  - `on_start` (optional): If enabled the exporter queries {{es}}
     for all known nodes in the cluster on startup.
-  - `interval` (optional): Interval to update the list of Elasticsearch nodes.
+  - `interval` (optional): Interval to update the list of {{es}} nodes.
 
 To turn off node discovery, set `discover.interval` to `0`.
 
 ## Known limitations
 
-The following are some known limitations of the Elasticsearch exporter:
+The following are some known limitations of the {{es}} exporter:
 
 - Metrics support is currently in development and might have limitations.
 - Profile support requires Universal Profiling to be installed in {{es}}.
@@ -271,17 +247,17 @@ The following are some known limitations of the Elasticsearch exporter:
 
 ## Known issues
 
-The following are the main known issues with the Elasticsearch exporter:
+The following are the main known issues with the {{es}} exporter:
 
 | Issue | Cause | Solution |
 |-------|-------|----------|
-| **version_conflict_engine_exception** | TSDB data streams require unique documents per timestamp. Occurs with OTel mapping mode on Elasticsearch 8.16+ or ECS mode with system integration streams. | Update to Elasticsearch version 8.17.6 or higher and the Elasticsearch exporter version 0.121.0 or higher, or install a custom component template. Remove batch processors to prevent metric splitting. |
-| **flush failed (400) illegal_argument_exception** | OTel mapping mode, which is default from version 0.122.0, requires Elasticsearch 8.12 or higher. | Upgrade Elasticsearch to 8.12 or higher or use alternative mapping modes. |
+| **version_conflict_engine_exception** | TSDB data streams require unique documents per timestamp. Occurs with OTel mapping mode on {{es}} 8.16+ or ECS mode with system integration streams. | Update to {{es}} version 8.17.6 or higher and the {{es}} exporter version 0.121.0 or higher, or install a custom component template. Remove batch processors to prevent metric splitting. |
+| **flush failed (400) illegal_argument_exception** | OTel mapping mode, which is default from version 0.122.0, requires {{es}} 8.12 or higher. | Upgrade {{es}} to 8.12 or higher or use alternative mapping modes. |
 
 ## Troubleshooting
 
-When you encounter issues with the Elasticsearch exporter, you can try the following:
+When you encounter issues with the {{es}} exporter, you can try the following:
 
-- Make sure your Elasticsearch version is compatible with your chosen mapping mode.
+- Make sure your {{es}} version is compatible with your chosen mapping mode.
 - Verify your API keys or credentials are valid and have appropriate permissions.
-- Check that your Elasticsearch cluster supports the required features for your mapping mode.
+- Check that your {{es}} cluster supports the required features for your mapping mode.

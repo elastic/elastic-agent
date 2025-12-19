@@ -11,6 +11,7 @@ import (
 	"go.opentelemetry.io/collector/otelcol"
 	"go.opentelemetry.io/collector/processor"
 	"go.opentelemetry.io/collector/receiver"
+	"go.opentelemetry.io/collector/service/telemetry/otelconftelemetry"
 
 	// Receivers:
 	apachereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver"
@@ -102,7 +103,9 @@ import (
 func components(extensionFactories ...extension.Factory) func() (otelcol.Factories, error) {
 	return func() (otelcol.Factories, error) {
 		var err error
-		factories := otelcol.Factories{}
+		factories := otelcol.Factories{
+			Telemetry: otelconftelemetry.NewFactory(),
+		}
 
 		// Receivers
 		receivers := []receiver.Factory{

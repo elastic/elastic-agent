@@ -63,5 +63,5 @@ fleet.yml.old
 pkg/component/fake/component/component
 pkg/core/process/testsignal/testsignal
 internal/pkg/agent/install/testblocking/testblocking
-internal/pkg/otel/manager/testing/testing
+internal/edot/testing/testing
 pkg/core/process/testsignal/testsignal

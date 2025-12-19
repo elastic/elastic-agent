@@ -1,0 +1,50 @@
+// begin 8.19.9 relnotes
+
+[[release-notes-8.19.9]]
+==  8.19.9
+
+Review important information about the  8.19.9 release.
+
+
+
+
+
+
+
+
+
+[discrete]
+[[new-features-8.19.9]]
+=== New features
+
+The 8.19.9 release adds the following new and notable features.
+
+
+
+
+* Allow setting component runtime per input type. https://github.com/elastic/elastic-agent/pull/11186[#11186] 
+
+
+
+
+
+
+[discrete]
+[[bug-fixes-8.19.9]]
+=== Bug fixes
+
+
+
+
+* Report crashing otel process cleanly with proper status reporting. https://github.com/elastic/elastic-agent/pull/11448[#11448] 
+* Fix kube-stack null template evaluation for Helm v4. https://github.com/elastic/elastic-agent/pull/11481[#11481] 
+
+
+* Ensure the self-monitoring configuration accounts for the runtime components actually run in. https://github.com/elastic/elastic-agent/pull/11300[#11300] 
+* Allow host to be a string for otel configuration translation. https://github.com/elastic/elastic-agent/pull/11394[#11394] https://github.com/elastic/elastic-agent/issues/11352[#11352]
+* Add environment.yaml file to diagnostics. https://github.com/elastic/elastic-agent/pull/11484[#11484] https://github.com/elastic/elastic-agent/issues/10966[#10966]
+* Merge multiple agent keys when loading config. https://github.com/elastic/elastic-agent/pull/11619[#11619] https://github.com/elastic/elastic-agent/issues/3717[#3717]
+* Hide healthcheckv2 from status output. https://github.com/elastic/elastic-agent/pull/11718[#11718] 
+* Handle string to []string conversion for elasticsearch config translation. https://github.com/elastic/elastic-agent/pull/11732[#11732] https://github.com/elastic/elastic-agent/issues/11352[#11352]
+* Set path.home for Beat Receivers to components directory. https://github.com/elastic/elastic-agent/pull/11726[#11726] https://github.com/elastic/beats/issues/48010[#48010]
+// end 8.19.9 relnotes

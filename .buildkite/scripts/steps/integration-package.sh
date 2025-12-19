@@ -12,5 +12,6 @@ source .buildkite/scripts/common.sh
 export SNAPSHOT="true"
 export EXTERNAL="true"
 export USE_PACKAGE_VERSION="true"
+export WINDOWS_NPCAP="true" # build Windows/amd64 with npcap bundled
 
 mage package

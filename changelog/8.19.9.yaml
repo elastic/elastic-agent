@@ -1,0 +1,137 @@
+version: 8.19.9
+entries:
+    - kind: bug-fix
+      summary: Ensure the self-monitoring configuration accounts for the runtime components actually run in.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11300
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1763650536
+      file:
+        name: 1763650536-self-monitoring-runtime.yaml
+        checksum: 710e318433ce207e6651d5d55cdaa140b961dd35
+    - kind: bug-fix
+      summary: Allow host to be a string for otel configuration translation.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11394
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/11352
+      impact: ""
+      action: ""
+      timestamp: 1764016303
+      file:
+        name: 1764016303-allow-host-to-be-a-string-for-otel-configuration-translation.yaml
+        checksum: 7f3f634b8c2bd92df76f55688508855306604eb7
+    - kind: bug-fix
+      summary: Report crashing OTel process cleanly with proper status reporting.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11448
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1764175228
+      file:
+        name: 1764175228-report-crashing-otel-process-cleanly-with-proper-status-reporting.yaml
+        checksum: 62a746ba3ea8715cff49004b6d91667c0448294b
+    - kind: feature
+      summary: Allow setting component runtime per input type.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11186
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1764270813
+      file:
+        name: 1764270813-runtime-per-input-type.yaml
+        checksum: 11766aee53f12560f7dce5a62663eadc793106ef
+    - kind: bug-fix
+      summary: Fix kube-stack null template evaluation for Helm v4.
+      description: ""
+      component: ""
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11481
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1764348725
+      file:
+        name: 1764348725-fix_templates_for_helm_4.yaml
+        checksum: b7f752f5de0d910907416ff4b7ac501f83e59ae9
+    - kind: bug-fix
+      summary: Add environment.yaml file to diagnostics.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11484
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/10966
+      impact: ""
+      action: ""
+      timestamp: 1764357992
+      file:
+        name: 1764357992-Add-environment.yml-file-to-diagnostics.yaml
+        checksum: 32d02808ffe0d86635f1fae1998146da5518e734
+    - kind: bug-fix
+      summary: Merge multiple agent keys when loading config.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11619
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/3717
+      impact: ""
+      action: ""
+      timestamp: 1764873750
+      file:
+        name: 1764873750-Merge-multiple-agent-keys-when-loading-config.yaml
+        checksum: bd5fdb1aff142e76b888cafd9b3fe171fe7657a2
+    - kind: bug-fix
+      summary: Hide healthcheckv2 from status output.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11718
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1765377327
+      file:
+        name: 1765377327-hide-healthcheckv2-from-status-output.yaml
+        checksum: 9ab8a8e02d947e3e39163df15488b471f9db53ae
+    - kind: bug-fix
+      summary: Set path.home for Beat Receivers to components directory.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11726
+      issue:
+        - https://github.com/elastic/beats/issues/48010
+      impact: ""
+      action: ""
+      timestamp: 1765388410
+      file:
+        name: 1765388410-set-path.home-for-beat-receivers.yaml
+        checksum: 37a1e6233d9b62927c18967be5019fc09aee1dd2
+    - kind: bug-fix
+      summary: Handle string to []string conversion for elasticsearch config translation.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11732
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/11352
+      impact: ""
+      action: ""
+      timestamp: 1765388410
+      file:
+        name: 1765388410-set-path.home-for-beat-receivers.yaml
+        checksum: 37a1e6233d9b62927c18967be5019fc09aee1dd2

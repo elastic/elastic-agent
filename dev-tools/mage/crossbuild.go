@@ -355,14 +355,6 @@ func (b GolangCrossBuilder) Build() error {
 		args = append(args, "-v", "/opt/git-mirrors:/opt/git-mirrors:ro")
 	}
 
-	if !ExternalBuild {
-		beatsPath, err := filepath.Abs(filepath.Join("../beats"))
-		if err != nil {
-			return fmt.Errorf("error while reading local beats: %w", err)
-		}
-		args = append(args, "-v", fmt.Sprintf("%s:%s", beatsPath, beatsPath))
-	}
-
 	args = append(args,
 		"--rm",
 		"--env", "GOFLAGS=-mod=readonly",
@@ -371,9 +363,7 @@ func (b GolangCrossBuilder) Build() error {
 		"--env", "MAGEFILE_TIMEOUT="+EnvOr("MAGEFILE_TIMEOUT", ""),
 		"--env", fmt.Sprintf("SNAPSHOT=%v", Snapshot),
 		"--env", fmt.Sprintf("DEV=%v", DevBuild),
-		"--env", fmt.Sprintf("EXTERNAL=%v", ExternalBuild),
 		"--env", fmt.Sprintf("FIPS=%v", FIPSBuild),
-		"--env", fmt.Sprintf("OTEL_COMPONENT=%v", OTELComponentBuild),
 		"-v", repoInfo.RootDir+":"+mountPoint,
 		"-w", workDir,
 		image,
