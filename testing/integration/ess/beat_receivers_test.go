@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/go-elasticsearch/v8"
 
 	"github.com/gofrs/uuid/v5"
@@ -1587,55 +1586,66 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 		time.Now().Add(5*time.Minute))
 	t.Cleanup(cancel)
 
-	policyName := fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String())
-	createPolicyReq := kibana.AgentPolicy{
-		Name:        policyName,
-		Namespace:   info.Namespace,
-		Description: fmt.Sprintf("%s policy", t.Name()),
-		MonitoringEnabled: []kibana.MonitoringEnabledOption{
-			kibana.MonitoringEnabledLogs,
-			kibana.MonitoringEnabledMetrics,
-		},
-		Overrides: map[string]any{
-			"agent": map[string]any{
-				"monitoring": map[string]any{
-					"_runtime_experimental": "process",
-				},
-			},
-		},
-	}
-	policyResponse, err := info.KibanaClient.CreatePolicy(ctx, createPolicyReq)
-	require.NoError(t, err, "error creating policy")
-
-	enrollmentToken, err := info.KibanaClient.CreateEnrollmentAPIKey(ctx,
-		kibana.CreateEnrollmentAPIKeyRequest{
-			PolicyID: policyResponse.ID,
-		})
-
 	fut, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	err = fut.Prepare(ctx)
+	esEndpoint, err := integration.GetESHost()
+	require.NoError(t, err)
+	esApiKey, err := createESApiKey(info.ESClient)
+	require.NoError(t, err)
+	decodedApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err)
 
-	fleetServerURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
-	require.NoError(t, err, "failed getting Fleet Server URL")
-
-	installOpts := atesting.InstallOpts{
-		NonInteractive: true,
-		Privileged:     true,
-		Force:          true,
-		EnrollOpts: atesting.EnrollOpts{
-			URL:             fleetServerURL,
-			EnrollmentToken: enrollmentToken.APIKey,
-		},
+	type cfgOpts struct {
+		Runtime    string
+		Namespace  string
+		ESEndpoint string
+		ESApiKey   string
 	}
-	combinedOutput, err := fut.Install(ctx, &installOpts)
-	require.NoErrorf(t, err, "error install with enroll: %s\ncombinedoutput:\n%s", err, string(combinedOutput))
+
+	const configTemplate = `
+agent:
+  monitoring:
+    enabled: true
+    metrics: true
+    logs: true
+    _runtime_experimental: {{ .Runtime }}
+    use_output: default
+    namespace: {{ .Namespace }}
+
+agent.logging.level: debug
+agent.reload.period: 1s
+agent.logging.stderr: true
+
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [{{ .ESEndpoint }}]
+    api_key: "{{ .ESApiKey }}"
+`
+
+	renderConfig := func(runtime string) []byte {
+		var buf bytes.Buffer
+		require.NoError(t,
+			template.Must(template.New("cfg").Parse(configTemplate)).Execute(&buf,
+				cfgOpts{
+					Runtime:    runtime,
+					Namespace:  info.Namespace,
+					ESEndpoint: esEndpoint,
+					ESApiKey:   decodedApiKey,
+				},
+			),
+		)
+		return buf.Bytes()
+	}
+
+	require.NoError(t, fut.Prepare(ctx))
+	require.NoError(t, fut.Configure(ctx, renderConfig("process")))
 
 	// store timestamp to filter duplicate docs with timestamp greater than this value
 	installTimestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
+	// make sure running and logs are making it to ES
 	healthCheck := func(ctx context.Context, message string, runtime component.RuntimeManager, componentCount int, timestamp string) {
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
 			var statusErr error
@@ -1672,41 +1682,31 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 			"health check failed: timestamp: %s", timestamp)
 	}
 
-	// make sure running and logs are making it to ES
+	_, err = fut.Install(ctx, &atesting.InstallOpts{
+		Privileged: true,
+		Force:      true,
+		Develop:    true,
+	})
+	require.NoError(t, err)
+
 	healthCheck(ctx,
 		"control checkin v2 protocol has chunking enabled",
 		component.ProcessRuntimeManager,
 		3,
 		installTimestamp)
 
-	// Switch to otel monitoring
-	otelMonUpdateReq := kibana.AgentPolicyUpdateRequest{
-		Name:      policyName,
-		Namespace: info.Namespace,
-		Overrides: map[string]any{
-			"agent": map[string]any{
-				"monitoring": map[string]any{
-					"_runtime_experimental": "otel",
-				},
-			},
-		},
-	}
-
-	otelMonResp, err := info.KibanaClient.UpdatePolicy(ctx,
-		policyResponse.ID, otelMonUpdateReq)
-	require.NoError(t, err)
-
 	otelTimestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	combinedOutput, err := fut.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+	require.NoErrorf(t, err, "error uninstalling beat receiver agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
 
-	// wait until policy is applied
-	policyCheck := func(expectedRevision int) {
-		require.Eventually(t, func() bool {
-			inspectOutput, err := fut.ExecInspect(ctx)
-			require.NoError(t, err)
-			return expectedRevision == inspectOutput.Revision
-		}, 3*time.Minute, 1*time.Second)
-	}
-	policyCheck(otelMonResp.Revision)
+	// Switch to otel monitoring
+	require.NoError(t, fut.Configure(ctx, renderConfig("otel")))
+	_, err = fut.Install(ctx, &atesting.InstallOpts{
+		Privileged: true,
+		Force:      true,
+		Develop:    true,
+	})
+	require.NoError(t, err)
 
 	// make sure running and logs are making it to ES
 	healthCheck(ctx,
@@ -1731,27 +1731,18 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 			restartTimestamp)
 	}
 
+	combinedOutput, err = fut.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+	require.NoErrorf(t, err, "error uninstalling beat receiver agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
+
 	// Switch back to process monitoring
-	processMonUpdateReq := kibana.AgentPolicyUpdateRequest{
-		Name:      policyName,
-		Namespace: info.Namespace,
-		Overrides: map[string]any{
-			"agent": map[string]any{
-				"monitoring": map[string]any{
-					"_runtime_experimental": "process",
-				},
-			},
-		},
-	}
-
-	processMonResp, err := info.KibanaClient.UpdatePolicy(ctx,
-		policyResponse.ID, processMonUpdateReq)
-	require.NoError(t, err)
-
 	processTimestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
-
-	// wait until policy is applied
-	policyCheck(processMonResp.Revision)
+	require.NoError(t, fut.Configure(ctx, renderConfig("process")))
+	_, err = fut.Install(ctx, &atesting.InstallOpts{
+		Privileged: true,
+		Force:      true,
+		Develop:    true,
+	})
+	require.NoError(t, err)
 
 	// make sure running and logs are making it to ES
 	healthCheck(ctx,
