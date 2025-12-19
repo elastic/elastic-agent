@@ -23,7 +23,7 @@ jobs:
     - id: generator
       uses: elastic/oblt-actions/elastic/active-branches@v1
       with:
-        exclude-branches: "7.17,8.17,8.18,9.0"
+        exclude-branches: "7.17,8.17,8.18,8.19,9.0,9.1,9.2,9.3"
         filter-branches: true
 
   update-beats:
@@ -56,7 +56,7 @@ jobs:
     - name: Run Updatecli in Apply mode
       uses: elastic/oblt-actions/updatecli/run@v1
       with:
-        command: apply --config .ci/updatecli/update-beats.yml --values .ci/updatecli/values.d/scm.yml
+        command: apply --config .ci/updatecli/update-beats.yml --values .ci/updatecli/values.d/scm.yml --debug
         version-file: .updatecli-version
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
