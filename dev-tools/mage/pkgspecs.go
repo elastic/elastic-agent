@@ -26,12 +26,6 @@ func UseElasticAgentCorePackaging() {
 	MustUsePackaging("elastic_agent_core", packageSpecFile)
 }
 
-// UseElasticAgentCoreSourcePackaging configures the package target to build binary packages
-// for an Elastic Agent.
-func UseElasticAgentCoreSourcePackaging() {
-	MustUsePackaging("elastic_agent_core_source", packageSpecFile)
-}
-
 // UseElasticAgentPackaging configures the package target to build packages for
 // an Elastic Agent.
 func UseElasticAgentPackaging() {
@@ -90,7 +84,7 @@ func LoadNamedSpec(name string, files ...string) error {
 	}
 
 	log.Printf("%v package spec loaded from %v", name, files)
-	Packages = append(Packages, packages...)
+	Packages = packages
 	return nil
 }
 
