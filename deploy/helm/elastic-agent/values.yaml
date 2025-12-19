@@ -7,7 +7,7 @@
 outputs:
   # name of the output
   default:
-    # -- type of the output [one of `ESPlainAuthBasic`, `ESPlainAuthAPI`, `ESSecretAuthBasic`, `ESSecretAuthAPI`, `ESECKRef`]
+    # -- type of the output [one of `ESPlainAuthBasic`, `ESPlainAuthAPI`, `ESSecretAuthBasic`, `ESSecretAuthAPI`, `ESECKRef`, `Logstash`]
     # @section -- 1.1 - Output Object
     # @sectionDescriptionTemplate -- OutputObject
     # @key -- outputs.{name}.type
@@ -43,6 +43,51 @@ outputs:
     # @section -- 1.1 - Output Object
     # @key -- outputs.{name}.namespace
     namespace: ""
+    # -- hosts of the output [required for type `Logstash`]
+    # @section -- 1.1 - Output Object
+    # @default -- `[]`
+    # @key -- outputs.{name}.hosts
+    #hosts: ["logstash:5044"]
+    # -- SSL/TLS configuration for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl
+    #ssl:
+    # -- enable SSL/TLS for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.enabled
+    #  enabled: false
+    # -- path to the CA certificate for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.certificateAuthorities
+    #  certificateAuthorities: ""
+    # verification mode for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.verification_mode
+    #  verification_mode: certificate
+    # -- path to the client certificate for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.certificate
+    #  certificate:
+    # -- contents to the client certificate for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.certificate.value
+    #  value: ""      
+    # -- path to the client private key for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.key
+    #  key: 
+    # -- path to the client private key for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.key.valueFromSecret
+    #    valueFromSecret:
+    # -- Secret name for the client private key for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.key.valueFromSecret.name
+    #     name: ""
+    # -- Key in the secret for the client private key for the output
+    # @section -- 1.1 - Output Object
+    # @key -- outputs.{name}.ssl.key.valueFromSecret.key
+    #      key: ""
 kubernetes:
   # -- enable Kubernetes integration.
   # @section -- 2 - Kubernetes integration
@@ -351,13 +396,13 @@ extraIntegrations: {}
 agent:
   # -- elastic-agent version
   # @section -- 6 - Elastic-Agent Configuration
-  version: 9.3.0
+  version: 9.4.0
   # -- image configuration
   # @section -- 6 - Elastic-Agent Configuration
   image:
     repository: docker.elastic.co/elastic-agent/elastic-agent
     pullPolicy: IfNotPresent
-    tag: "9.3.0-SNAPSHOT"
+    tag: "9.4.0-SNAPSHOT"
   # -- image pull secrets
   # @section -- 6 - Elastic-Agent Configuration
   imagePullSecrets: []

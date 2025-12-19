@@ -15,12 +15,11 @@ env:
 
 steps:
   - input: "Build parameters"
-    if: build.env("MANIFEST_URL") == null
     fields:
       - text: "MANIFEST_URL"
         key: "MANIFEST_URL"
         default: ""
-        required: true
+        required: false
         hint: "Link to the build manifest URL."
       - select: "Mage verbose"
         key: "MAGEFILE_VERBOSE"
@@ -55,13 +54,10 @@ steps:
             value: ""
         hint: "If the DRA release manager script would actually publish anything or just print"
 
-  - wait: ~
-    if: build.env("MANIFEST_URL") == null
-
-  - group: ":Packaging Artefacts"
+  - group: ":Packaging Artifacts"
     key: "package"
     steps:
-      - label: ":package: FIPS={{matrix.fips}} Cross Building and package elastic-agent"
+      - label: ":package: FIPS=false Cross Building and package elastic-agent"
         key: package_elastic-agent
         agents:
           provider: "gcp"
@@ -70,14 +66,10 @@ steps:
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         env:
           PLATFORMS: "linux/amd64 windows/amd64 darwin/amd64"
-          FIPS: "{{matrix.fips}}"
+          FIPS: "false"
         command: |
           if [[ -z "$${MANIFEST_URL}" ]]; then
             export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
-            if [[ -z "$${MANIFEST_URL}" ]]; then
-              echo ":broken_heart: Missing MANIFEST_URL variable or empty string provided"
-              exit 1
-            fi
           fi
           if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
             export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
@@ -85,17 +77,36 @@ steps:
           .buildkite/scripts/steps/package.sh
         artifact_paths:
           - "build/distributions/**/*"
-        matrix:
-          setup:
-            fips:
-              - false
-              - true
         plugins:
           - elastic/vault-docker-login#v0.5.2:
               secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
 
-      - label: ":package: FIPS={{matrix.fips}} Package ARM elastic-agent"
-        key: package_elastic-agent-arm
+      - label: ":package: FIPS=true Cross Building and package elastic-agent"
+        key: package_elastic-agent_fips
+        agents:
+          provider: "gcp"
+          machineType: "c2-standard-16"
+          diskSizeGb: 400
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
+        env:
+          PLATFORMS: "linux/amd64"
+          FIPS: "true"
+        command: |
+          if [[ -z "$${MANIFEST_URL}" ]]; then
+            export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
+          fi
+          if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
+            export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
+          fi
+          .buildkite/scripts/steps/package.sh
+        artifact_paths:
+          - "build/distributions/**/*"
+        plugins:
+          - elastic/vault-docker-login#v0.5.2:
+              secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+
+      - label: ":package: FIPS=false Package ARM elastic-agent"
+        key: package_elastic-agent_arm
         agents:
           provider: "aws"
           instanceType: "t4g.2xlarge"
@@ -104,17 +115,13 @@ steps:
         env:
           PLATFORMS: "linux/arm64 darwin/arm64 windows/arm64"
           PACKAGES: "docker,tar.gz,deb,rpm,zip"
-          FIPS: "{{matrix.fips}}"
+          FIPS: "false"
         command: |
           echo "Add support for multiarch"
           docker run --privileged --rm tonistiigi/binfmt:master --install all
 
           if [[ -z "$${MANIFEST_URL}" ]]; then
             export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
-            if [[ -z "$${MANIFEST_URL}" ]]; then
-              echo ":broken_heart: Missing MANIFEST_URL variable or empty string provided"
-              exit 1
-            fi
           fi
           if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
             export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
@@ -123,11 +130,32 @@ steps:
           ls -lahR build/
         artifact_paths:
           - "build/distributions/**/*"
-        matrix:
-          setup:
-            fips:
-              - false
-              - true
+
+      - label: ":package: FIPS=true Package ARM elastic-agent"
+        key: package_elastic-agent_arm_fips
+        agents:
+          provider: "aws"
+          instanceType: "t4g.2xlarge"
+          image: "${IMAGE_UBUNTU_2404_ARM_64}"
+          diskSizeGb: 400
+        env:
+          PLATFORMS: "linux/arm64"
+          PACKAGES: "docker,tar.gz,deb,rpm"
+          FIPS: "true"
+        command: |
+          echo "Add support for multiarch"
+          docker run --privileged --rm tonistiigi/binfmt:master --install all
+
+          if [[ -z "$${MANIFEST_URL}" ]]; then
+            export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
+          fi
+          if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
+            export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
+          fi
+          .buildkite/scripts/steps/package.sh
+          ls -lahR build/
+        artifact_paths:
+          - "build/distributions/**/*"
 
   - label: ":elastic-stack: Publishing to DRA"
     if: build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == null || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") != "independent-agent-release-staging"
@@ -149,6 +177,9 @@ steps:
       ls -lahR build/
 
       echo "+++ Running DRA publish step"
+      if [[ -z "$${MANIFEST_URL}" ]]; then
+        export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
+      fi
       if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
         export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
       fi
@@ -163,6 +194,13 @@ steps:
       if [[ -z "$${DRA_WORKFLOW}" ]]; then
         DRA_WORKFLOW=$(buildkite-agent meta-data get DRA_WORKFLOW --default "")
         export DRA_WORKFLOW
+      fi
+      if [[ -z "$${MANIFEST_URL}" ]]; then
+        # Triggered from a PR with no manifest URL. The build in that case is always a snapshot build.
+        # Ensure that the BEAT_VERSION that is passed to the DRA publish script is a SNAPSHOT version.
+        if [[ "${BEAT_VERSION}" != *-SNAPSHOT ]]; then
+          BEAT_VERSION="${BEAT_VERSION}-SNAPSHOT"
+        fi
       fi
       .buildkite/scripts/steps/dra-publish.sh
 
