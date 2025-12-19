@@ -52,7 +52,7 @@ Only modify `dataset` if it's absolutely necessary and you're aware of the trade
 
 To enable dynamic data stream routing:
 
-1. Use a `resource` processor to set the desired `namespace` or `dataset` from resource attributes.
+1. Use a `transform` processor with OTTL (OpenTelemetry Transformation Language) to set the desired `namespace` or `dataset` from resource attributes. The transform processor allows routing at the scope or signal level, not just at the resource level, and is becoming the default for data manipulation and enrichment.
 2. Add the processor to your pipeline.
 
 When using the default `otel` mapping mode, the exporter appends `.otel` to the `data_stream.dataset` value automatically.
@@ -68,18 +68,19 @@ exporters:
     endpoints: [${env:ELASTIC_ENDPOINT}]
 
 processors:
-  resource/env-namespace:
-    attributes:
-      - key: data_stream.namespace
-        from_attribute: k8s.namespace.name
-        action: upsert
+  transform/env-namespace:
+    error_mode: ignore
+    metric_statements:
+      - context: resource
+        statements:
+          - set(attributes["data_stream.namespace"], attributes["k8s.namespace.name"])
 
 service:
   pipelines:
     metrics/otel:
       processors:
         - batch
-        - resource/env-namespace
+        - transform/env-namespace
       exporters:
         - elasticsearch/otel
 ```
