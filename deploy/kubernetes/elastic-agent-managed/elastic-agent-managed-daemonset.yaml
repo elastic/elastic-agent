@@ -79,7 +79,6 @@ spec:
             #    - BPF # (since Linux 5.8) allows loading of BPF programs, create most map types, load BTF, iterate programs and maps.
             #    - PERFMON # (since Linux 5.8) allows attaching of BPF programs used for performance metrics and observability operations.
             #    - SYS_RESOURCE # Allow use of special resources or raising of resource limits. Used by 'Defend for Containers' to modify 'rlimit_memlock'
-            #    - SYS_ADMIN
             ########################################################################################
             # The following capabilities are needed for Universal Profiling.
             # More fine graded capabilities are only available for newer Linux kernels.
