@@ -17,6 +17,12 @@ if test -z "${MANIFEST_URL:-}"; then
   # No manifest URL build the the core packages.
   mage packageAgentCore
 
+  # Remove everything in the build/ directory except for build/distributions/.
+  # The DRA process only pulls already built elastic-agent-core packages any binaries
+  # or files that have been placed in build/ during the running of packageAgentCore
+  # will not be present. This ensures the same environment for PR's as the DRA path.
+  find build/ -mindepth 1 -maxdepth 1 ! -name 'distributions' -exec rm -rf {} +
+
   # Set manifest to version in repo so downloadManifest target
   # can download the needed components. This gets unset before
   # calling packageUsingDRA, so it uses the core built packages.
