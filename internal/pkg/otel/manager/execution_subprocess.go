@@ -141,13 +141,16 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 	}
 
 	ctl := &procHandle{
-		processDoneCh:     make(chan struct{}),
-		healthcheckDoneCh: make(chan struct{}),
-		processInfo:       processInfo,
-		log:               logger,
+		processDoneCh: make(chan struct{}),
+		processInfo:   processInfo,
+		log:           logger,
 	}
 
+	healthCheckDone := make(chan struct{})
 	go func() {
+		defer func() {
+			close(healthCheckDone)
+		}()
 		currentStatus := aggregateStatus(componentstatus.StatusStarting, nil)
 		r.reportSubprocessCollectorStatus(ctx, statusCh, currentStatus)
 
@@ -166,6 +169,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 				switch {
 				case errors.Is(err, context.Canceled):
 					// after the collector exits, we need to report a nil status
+					r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
 					return
 				default:
 					// if we face any other error (most likely, connection refused), log the error.
@@ -182,6 +186,8 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 
 			select {
 			case <-procCtx.Done():
+				// after the collector exits, we need to report a nil status
+				r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
 				return
 			case <-forceFetchStatusCh:
 				r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
@@ -201,15 +207,10 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 	}()
 
 	go func() {
-		<-ctl.healthcheckDoneCh
-		procCtxCancel()
-		r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
-		logger.Debugf("health check done for pid %d", processInfo.PID)
-	}()
-
-	go func() {
 		procState, procErr := processInfo.Process.Wait()
 		logger.Debugf("wait for pid %d returned", processInfo.PID)
+		procCtxCancel()
+		<-healthCheckDone
 		close(ctl.processDoneCh)
 		// using ctx instead of procCtx in the reportErr functions below is intentional. This allows us to report
 		// errors to the caller through processErrCh and essentially discard any other errors that occurred because
@@ -299,10 +300,9 @@ func removeManagedHealthCheckExtensionStatus(status *status.AggregateStatus, hea
 }
 
 type procHandle struct {
-	processDoneCh     chan struct{}
-	healthcheckDoneCh chan struct{}
-	processInfo       *process.Info
-	log               *logger.Logger
+	processDoneCh chan struct{}
+	processInfo   *process.Info
+	log           *logger.Logger
 }
 
 // Stop stops the process. If the process is already stopped, it does nothing. If the process does not stop within
@@ -314,7 +314,7 @@ func (s *procHandle) Stop(waitTime time.Duration) {
 		return
 	default:
 	}
-	close(s.healthcheckDoneCh)
+
 	s.log.Debugf("gracefully stopping pid %d", s.processInfo.PID)
 	if err := s.processInfo.Stop(); err != nil {
 		s.log.Warnf("failed to send stop signal to the supervised collector: %v", err)
