@@ -50,7 +50,6 @@ func newSubprocessExecution(logLevel logp.Level, collectorPath string, uuid stri
 	return &subprocessExecution{
 		collectorPath: collectorPath,
 		collectorArgs: []string{
-			"otel",
 			fmt.Sprintf("--%s", OtelSetSupervisedFlagName),
 			fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, logLevel.String()),
 			fmt.Sprintf("--%s=%s", OtelSupervisedMonitoringURLFlagName, monitoring.EDOTMonitoringEndpoint()),
@@ -96,7 +95,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 		return nil, fmt.Errorf("could not find port for collector: %w", err)
 	}
 
-	if err := injectHeathCheckV2Extension(cfg, r.healthCheckExtensionID, httpHealthCheckPort); err != nil {
+	if err := injectHealthCheckV2Extension(cfg, r.healthCheckExtensionID, httpHealthCheckPort); err != nil {
 		return nil, fmt.Errorf("failed to inject health check extension: %w", err)
 	}
 

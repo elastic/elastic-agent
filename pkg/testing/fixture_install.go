@@ -201,7 +201,7 @@ func (f *Fixture) installFunc(ctx context.Context, installOpts *InstallOpts, sho
 
 	// check for running agents before installing, but only if not installed into a namespace whose point is allowing two agents at once.
 	if installOpts != nil && !installOpts.Develop && installOpts.Namespace == "" {
-		assert.Empty(f.t, getElasticAgentAndAgentbeatProcesses(f.t), "there should be no running agent at beginning of Install()")
+		assert.Empty(f.t, getElasticAgentAndOtelProcesses(f.t), "there should be no running agent at beginning of Install()")
 	}
 
 	switch f.packageFormat {
@@ -303,8 +303,8 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 			return
 		}
 
-		// If not using an installation namespace, there should be no elastic-agent or agentbeat processes left running.
-		processes := getElasticAgentAndAgentbeatProcesses(f.t)
+		// If not using an installation namespace, there should be no elastic-agent or elastic-otel-collector processes left running.
+		processes := getElasticAgentAndOtelProcesses(f.t)
 		assert.Empty(f.t, processes, "there should be no running agent at the end of the test")
 	})
 
@@ -429,11 +429,11 @@ func getElasticAgentProcesses(t *gotesting.T) []runningProcess {
 	return agentControlPlaneProcesses
 }
 
-// Includes both the main elastic-agent process and the agentbeat sub-processes for ensuring
+// Includes both the main elastic-agent process and the elastic-otel-collector sub-processes for ensuring
 // that no sub-processes are orphaned from their parent process and left running. This
 // primarily tests that Windows Job Object assignment works.
-func getElasticAgentAndAgentbeatProcesses(t *gotesting.T) []runningProcess {
-	return getProcesses(t, `.*(elastic\-agent|agentbeat).*`)
+func getElasticAgentAndOtelProcesses(t *gotesting.T) []runningProcess {
+	return getProcesses(t, `.*(elastic\-agent|elastic\-otel\-collector).*`)
 }
 
 func getProcesses(t *gotesting.T, regex string) []runningProcess {

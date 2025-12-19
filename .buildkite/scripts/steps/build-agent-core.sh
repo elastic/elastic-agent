@@ -18,7 +18,7 @@ if [[ "$DRA_WORKFLOW" == "staging" ]] && [[ -n "$VERSION_QUALIFIER" ]]; then
     BEAT_VERSION_FULL="${BEAT_VERSION_FULL}-${VERSION_QUALIFIER}"
 fi
 
-SNAPSHOT=$SNAPSHOT mage packageAgentCore
+SNAPSHOT=$SNAPSHOT WINDOWS_NPCAP="true" mage packageAgentCore
 chmod -R 777 build/distributions
 
 echo  "+++ Generate dependencies report"

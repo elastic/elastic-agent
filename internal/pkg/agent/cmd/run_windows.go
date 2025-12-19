@@ -26,3 +26,8 @@ func logExternal(msg string) {
 }
 
 func dropRootPrivileges(_ *logger.Logger, _ utils.FileOwner) error { return nil }
+
+func checkCapabilitiesPerms(_ string, _ string, _ string) error {
+	// not implemented on Windows
+	return nil
+}

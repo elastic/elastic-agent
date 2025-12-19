@@ -86,12 +86,9 @@ DEV=true SNAPSHOT=true EXTERNAL=true PACKAGES="tar.gz,deb,rpm" PLATFORMS=linux/a
 The packaging process has many leavers that need to be correctly set:
 
  - `DEV=true|false`: Build with debug symbols
- - `EXTERNAL=true|false`: If `false` it will look for the `beats`
-   folder at the same level as `elastic-agent` and build
-   `x-pack/agentbeat` from there. Be aware that if you change Beats
-   code and there is already an Agentbeat artifact built, it will not
-   be re-build. You need to manually clean the Agentbeat build
-   folder. If `true` it will download the latest snapshot.
+ - `EXTERNAL=true|false`: If `false` it will not download any components
+   and only include the `elastic-otel-collector` which has `beats` bundled in
+   the resulting package.
  - `SNAPSHOT=true|false`: When downloading dependencies (like Beats)
    use snapshot versions. That is required to package from the `main`
    branch with `EXTERNAL=true`.
