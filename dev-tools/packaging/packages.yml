@@ -302,7 +302,7 @@ shared:
         template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/elastic-agent.unit.tmpl'
         mode: 0644
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}:
-        source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
         mode: 0755
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/package.version:
         content: >
@@ -314,104 +314,25 @@ shared:
         config_mode: 0644
         skip_on_missing: true
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/elastic-otel-collector:
-        source: '{{ repo.RootDir }}/build/golang-crossbuild/elastic-otel-collector-{{.GOOS}}-{{.Platform.Arch}}'
+        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector{{.BinaryExt}}'
         mode: 0755
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/elastic-otel-collector.spec.yml:
-        source: '{{ repo.RootDir }}/internal/edot/spec.yml'
+        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector.spec.yml'
         mode: 0755
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/module:
-        source: '{{ repo.RootDir }}/build/package/module'
+        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/module'
         preserve_mode: true
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/certs/certs.pem:
-        source: '{{ repo.RootDir }}/build/data/install/{{.GOOS}}/{{.Platform.Arch}}/certs/certs.pem'
+        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/certs/certs.pem'
         mode: 0640
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/lenses:
-        source: '{{ repo.RootDir }}/build/data/install/{{.GOOS}}/{{.Platform.Arch}}/lenses'
+        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/lenses'
         preserve_mode: true
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/osqueryd:
-        source: '{{ repo.RootDir }}/build/data/install/{{.GOOS}}/{{.Platform.Arch}}/osqueryd'
+        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osqueryd'
         mode: 0755
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/osquery-extension.ext:
-        source: '{{ repo.RootDir }}/beats/x-pack/osquerybeat/ext/osquery-extension/build/golang-crossbuild/osquery-extension-{{.GOOS}}-{{.Platform.Arch}}'
-        mode: 0755
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/manifest.yaml:
-        mode: 0644
-        content: >
-          {{ manifest .fips }}
-
-  # Deb/RPM spec.
-  - &deb_rpm_agent_spec_core_source
-    <<: *common
-    pre_install_script: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/preinstall.sh.tmpl'
-    post_install_script: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/postinstall.sh.tmpl'
-    post_rm_script: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/postrm.sh.tmpl'
-    files:
-      /usr/share/{{.BeatName}}/LICENSE.txt:
-        source: '{{ repo.RootDir }}/LICENSE.txt'
-        mode: 0644
-      /usr/share/{{.BeatName}}/NOTICE.txt:
-        source: '{{ repo.RootDir }}/NOTICE.txt'
-        mode: 0644
-      /usr/share/{{.BeatName}}/README.md:
-        template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/common/README.md.tmpl'
-        mode: 0644
-      /usr/share/{{.BeatName}}/.build_hash.txt:
-        content: >
-          {{ commit }}
-        mode: 0644
-      /etc/{{.BeatName}}/elastic-agent.reference.yml:
-        source: 'elastic-agent.reference.yml'
-        mode: 0644
-      /etc/{{.BeatName}}/elastic-agent.yml:
-        source: 'elastic-agent.yml'
-        mode: 0600
-        config: true
-      /etc/{{.BeatName}}/otel.yml:
-        source: 'otel.yml'
-        mode: 0600
-        config: true
-      /etc/{{.BeatName}}/.elastic-agent.active.commit:
-        content: >
-          {{ commit }}
-        mode: 0644
-      /usr/bin/{{.BeatName}}:
-        template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/elastic-agent.sh.tmpl'
-        mode: 0755
-      /lib/systemd/system/{{.BeatServiceName}}.service:
-        template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/elastic-agent.unit.tmpl'
-        mode: 0644
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}:
-        source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
-        mode: 0755
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/package.version:
-        content: >
-          {{ agent_package_version }}
-        mode: 0644
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components:
-        source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/'
-        mode: 0755
-        config_mode: 0644
-        skip_on_missing: true
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/elastic-otel-collector:
-        source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector{{.BinaryExt}}'
-        mode: 0755
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/elastic-otel-collector.spec.yml:
-        source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector.spec.yml'
-        mode: 0755
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/module:
-        source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/module'
-        preserve_mode: true
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/certs/certs.pem:
-        source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/certs/certs.pem'
-        mode: 0640
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/lenses:
-        source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/lenses'
-        preserve_mode: true
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/osqueryd:
-        source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osqueryd'
-        mode: 0755
-      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/components/osquery-extension.ext:
-        source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery-extension.ext'
+        source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery-extension.ext'
         mode: 0755
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{agent_package_version}}{{snapshot_suffix}}-{{ commit_short }}/manifest.yaml:
         mode: 0644
@@ -465,23 +386,10 @@ shared:
 
   - &agent_binary_files
     '{{.BeatName}}{{.BinaryExt}}':
-      source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
       mode: 0755
     'data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}':
-      source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
-      mode: 0755
-    'data/{{.BeatName}}-{{ commit_short }}/package.version':
-      content: >
-        {{ agent_package_version }}
-      mode: 0644
-    <<: *agent_binary_common_files
-
-  - &agent_binary_files_core_source
-    '{{.BeatName}}{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
-      mode: 0755
-    'data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
       mode: 0755
     'data/{{.BeatName}}-{{ commit_short }}/package.version':
       content: >
@@ -513,19 +421,10 @@ shared:
 
   - &agent_darwin_binary_files
     '{{.BeatName}}{{.BinaryExt}}':
-      source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
       mode: 0755
     'data/{{.BeatName}}-{{ commit_short }}/elastic-agent.app/Contents/MacOS/{{.BeatName}}{{.BinaryExt}}':
-      source: build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
-      mode: 0755
-    <<: *agent_darwin_binary_common_files
-
-  - &agent_darwin_binary_files_core_source
-    '{{.BeatName}}{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
-      mode: 0755
-    'data/{{.BeatName}}-{{ commit_short }}/elastic-agent.app/Contents/MacOS/{{.BeatName}}{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
       mode: 0755
     <<: *agent_darwin_binary_common_files
 
@@ -556,18 +455,10 @@ shared:
 
   - &agent_otel_collector_binary_spec
     'data/{{.BeatName}}-{{ commit_short }}/components/elastic-otel-collector{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/golang-crossbuild/elastic-otel-collector-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}'
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector{{.BinaryExt}}'
       mode: 0755
     'data/{{.BeatName}}-{{ commit_short }}/components/elastic-otel-collector.spec.yml':
-      source: '{{ repo.RootDir }}/internal/edot/spec.yml'
-      mode: 0755
-
-  - &agent_otel_collector_binary_spec_core_source
-    'data/{{.BeatName}}-{{ commit_short }}/components/elastic-otel-collector{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector{{.BinaryExt}}'
-      mode: 0755
-    'data/{{.BeatName}}-{{ commit_short }}/components/elastic-otel-collector.spec.yml':
-      source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector.spec.yml'
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector.spec.yml'
       mode: 0755
 
   - &agent_otel_collector_binary_spec_core
@@ -580,12 +471,7 @@ shared:
 
   - &metricbeat_lightweight_module
     'data/{{.BeatName}}-{{ commit_short }}/components/module':
-      source: '{{ repo.RootDir }}/build/package/module'
-      preserve_mode: true
-
-  - &metricbeat_lightweight_module_core_source
-    'data/{{.BeatName}}-{{ commit_short }}/components/module':
-      source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/module'
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/module'
       preserve_mode: true
 
   - &metricbeat_lightweight_module_core
@@ -595,12 +481,7 @@ shared:
 
   - &osquerybeat_osquery_certs
     'data/{{.BeatName}}-{{ commit_short }}/components/certs/certs.pem':
-      source: '{{ repo.RootDir }}/build/data/install/{{.GOOS}}/{{.Platform.Arch}}/certs/certs.pem'
-      mode: 0640
-
-  - &osquerybeat_osquery_certs_core_source
-    'data/{{.BeatName}}-{{ commit_short }}/components/certs/certs.pem':
-      source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/certs/certs.pem'
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/certs/certs.pem'
       mode: 0640
 
   - &osquerybeat_osquery_certs_core
@@ -610,12 +491,7 @@ shared:
 
   - &osquerybeat_osquery_lenses
     'data/{{.BeatName}}-{{ commit_short }}/components/lenses':
-      source: '{{ repo.RootDir }}/build/data/install/{{.GOOS}}/{{.Platform.Arch}}/lenses'
-      preserve_mode: true
-
-  - &osquerybeat_osquery_lenses_core_source
-    'data/{{.BeatName}}-{{ commit_short }}/components/lenses':
-      source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/lenses'
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/lenses'
       preserve_mode: true
 
   - &osquerybeat_osquery_lenses_core
@@ -625,12 +501,7 @@ shared:
 
   - &osquerybeat_osqueryd
     'data/{{.BeatName}}-{{ commit_short }}/components/osqueryd{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/data/install/{{.GOOS}}/{{.Platform.Arch}}/osqueryd{{.BinaryExt}}'
-      mode: 0755
-
-  - &osquerybeat_osqueryd_core_source
-    'data/{{.BeatName}}-{{ commit_short }}/components/osqueryd{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osqueryd{{.BinaryExt}}'
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osqueryd{{.BinaryExt}}'
       mode: 0755
 
   - &osquerybeat_osqueryd_core
@@ -640,12 +511,7 @@ shared:
 
   - &osquerybeat_osqueryapp
     'data/{{.BeatName}}-{{ commit_short }}/components/osquery.app':
-      source: '{{ repo.RootDir }}/build/data/install/{{.GOOS}}/{{.Platform.Arch}}/osquery.app'
-      preserve_mode: true
-
-  - &osquerybeat_osqueryapp_core_source
-    'data/{{.BeatName}}-{{ commit_short }}/components/osquery.app':
-      source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery.app'
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery.app'
       preserve_mode: true
 
   - &osquerybeat_osqueryapp_core
@@ -655,12 +521,7 @@ shared:
 
   - &osquerybeat_extension
     'data/{{.BeatName}}-{{ commit_short }}/components/osquery-extension.ext':
-      source: '{{ repo.RootDir }}/beats/x-pack/osquerybeat/ext/osquery-extension/build/golang-crossbuild/osquery-extension-{{.GOOS}}-{{.Platform.Arch}}'
-      mode: 0755
-
-  - &osquerybeat_extension_core_source
-    'data/{{.BeatName}}-{{ commit_short }}/components/osquery-extension.ext':
-      source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery-extension.ext'
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery-extension.ext'
       mode: 0755
 
   - &osquerybeat_extension_core
@@ -670,12 +531,7 @@ shared:
 
   - &osquerybeat_extension_windows
     'data/{{.BeatName}}-{{ commit_short }}/components/osquery-extension{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/beats/x-pack/osquerybeat/ext/osquery-extension/build/golang-crossbuild/osquery-extension-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}'
-      mode: 0755
-
-  - &osquerybeat_extension_windows_core_source
-    'data/{{.BeatName}}-{{ commit_short }}/components/osquery-extension{{.BinaryExt}}':
-      source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery-extension{{.BinaryExt}}'
+      source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery-extension{{.BinaryExt}}'
       mode: 0755
 
   - &osquerybeat_extension_windows_core
@@ -705,20 +561,6 @@ shared:
       <<: *osquerybeat_osqueryd
       <<: *osquerybeat_extension
 
-  - &agent_binary_core_source_spec
-    <<: *common
-    <<: *elastic_agent_components
-    files:
-      <<: *agent_binary_files_core_source
-      <<: *linux_otel_files
-      <<: *agent_unpacked_components_files
-      <<: *agent_otel_collector_binary_spec_core_source
-      <<: *metricbeat_lightweight_module_core_source
-      <<: *osquerybeat_osquery_certs_core_source
-      <<: *osquerybeat_osquery_lenses_core_source
-      <<: *osquerybeat_osqueryd_core_source
-      <<: *osquerybeat_extension_core_source
-
   - &agent_cloud_binary_spec
     <<: *common
     <<: *elastic_agent_cloud_components
@@ -741,18 +583,6 @@ shared:
         source: '{{ repo.RootDir }}/NOTICE-fips.txt'
         mode: 0644
 
-  - &agent_binary_fips_core_source_spec
-    <<: *common_fips
-    <<: *elastic_agent_fips_components
-    files:
-      <<: *agent_binary_files_core_source
-      <<: *agent_unpacked_components_files
-      <<: *agent_otel_collector_binary_spec_core_source
-      <<: *metricbeat_lightweight_module_core_source
-      NOTICE.txt:
-        source: '{{ repo.RootDir }}/NOTICE-fips.txt'
-        mode: 0644
-
   - &agent_darwin_binary_spec
     <<: *common
     <<: *elastic_agent_components
@@ -766,19 +596,6 @@ shared:
       <<: *osquerybeat_osqueryapp
       <<: *osquerybeat_extension
 
-  - &agent_darwin_binary_core_source_spec
-    <<: *common
-    <<: *elastic_agent_components
-    files:
-      <<: *agent_darwin_binary_files_core_source
-      <<: *agent_unpacked_components_files
-      <<: *agent_otel_collector_binary_spec_core_source
-      <<: *metricbeat_lightweight_module_core_source
-      <<: *osquerybeat_osquery_certs_core_source
-      <<: *osquerybeat_osquery_lenses_core_source
-      <<: *osquerybeat_osqueryapp_core_source
-      <<: *osquerybeat_extension_core_source
-
   # Binary package spec (zip for windows).
   - &agent_windows_binary_spec
     <<: *common
@@ -791,19 +608,6 @@ shared:
       <<: *osquerybeat_osquery_certs
       <<: *osquerybeat_osqueryd
       <<: *osquerybeat_extension_windows
-      <<: *agent_windows_otel_scripts_samples
-
-  - &agent_windows_binary_core_source_spec
-    <<: *common
-    <<: *elastic_agent_components
-    files:
-      <<: *agent_binary_files_core_source
-      <<: *agent_unpacked_windows_components_files
-      <<: *agent_otel_collector_binary_spec_core_source
-      <<: *metricbeat_lightweight_module_core_source
-      <<: *osquerybeat_osquery_certs_core_source
-      <<: *osquerybeat_osqueryd_core_source
-      <<: *osquerybeat_extension_windows_core_source
       <<: *agent_windows_otel_scripts_samples
 
   # This image is used only for preparing the file tree before actually building the image
@@ -1529,65 +1333,3 @@ specs:
           <<: *agent_otel_collector_binary_spec_core
           <<: *metricbeat_lightweight_module_core
     ######## End FIPS Specs ########
-
-  elastic_agent_core_source:
-    ###
-    # Elastic Agent Core Source Packages
-    #
-    # Builds the elastic-agent packages using the elastic-agent-core packages. Combined with the pulled components
-    # to make a final elastic-agent package.
-    ###
-    - os: windows
-      types: [ zip ]
-      spec:
-        <<: *agent_windows_binary_core_source_spec
-        <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: '{{ repo.RootDir }}/build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}/elastic-agent-archive-root.exe'
-          'package.version':
-            content: >
-              {{ agent_package_version }}
-            mode: 0644
-
-    - os: darwin
-      types: [ tgz ]
-      spec:
-        <<: *agent_darwin_binary_core_source_spec
-        <<: *elastic_license_for_binaries
-        files:
-          'data/{{.BeatName}}-{{ commit_short }}/elastic-agent':
-            template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/darwin/elastic-agent.tmpl'
-            mode: 0755
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: data/{{.BeatName}}-{{ commit_short }}/elastic-agent.app/Contents/MacOS/{{.BeatName}}{{.BinaryExt}}
-            symlink: true
-            mode: 0755
-
-    - os: linux
-      types: [ tgz ]
-      spec:
-        <<: *agent_binary_core_source_spec
-        <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}
-            symlink: true
-            mode: 0755
-
-    - os: linux
-      types: [ deb, rpm ]
-      spec:
-        <<: *deb_rpm_agent_spec_core_source
-        <<: *elastic_license_for_deb_rpm
-
-    - os: aix
-      types: [ tgz ]
-      spec:
-        <<: *agent_binary_core_source_spec
-        <<: *elastic_license_for_binaries
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: data/{{.BeatName}}-{{ commit_short }}/{{.BeatName}}{{.BinaryExt}}
-            symlink: true
-            mode: 0755
