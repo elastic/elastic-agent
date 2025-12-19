@@ -16,14 +16,14 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"helm.sh/helm/v3/pkg/cli/values"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
-
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +35,7 @@ import (
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
 
+	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	testK8s "github.com/elastic/elastic-agent/pkg/testing/kubernetes"
@@ -744,6 +745,70 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				k8sStepHintsRedisCheckAgentStatus("name=agent-pernode-helm-agent", false),
 			},
 		},
+		{
+			name: "helm standalone agent default kubernetes unprivileged with logstash output",
+			steps: []k8sTestStep{
+				k8sStepCreateNamespace(),
+				k8sStepLogstashCreate(),
+				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
+					"kubernetes": map[string]any{
+						"enabled": true,
+						"state": map[string]any{
+							"agentAsSidecar": map[string]any{
+								"enabled": true,
+							},
+						},
+					},
+					"agent": map[string]any{
+						"unprivileged": true,
+						"image": map[string]any{
+							"repository": kCtx.agentImageRepo,
+							"tag":        kCtx.agentImageTag,
+							"pullPolicy": "Never",
+						},
+					},
+					"outputs": map[string]any{
+						"default": map[string]any{
+							"type":  "Logstash",
+							"hosts": []any{"logstash-agent:5044"},
+							"ssl": map[string]any{
+								"certificateAuthorities": []any{
+									map[string]any{
+										"valueFromSecret": map[string]any{
+											"name": "agent-certs",
+											"key":  "ca.crt",
+										},
+									}},
+								"certificate": map[string]any{
+									"valueFromSecret": map[string]any{
+										"name": "agent-certs",
+										"key":  "tls.crt",
+									},
+								},
+								"key": map[string]any{
+									"valueFromSecret": map[string]any{
+										"name": "agent-certs",
+										"key":  "tls.key",
+									},
+								},
+								"verificationMode": "certificate",
+							},
+						},
+					},
+				}),
+				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+				k8sStepCheckAgentStatus("name=agent-clusterwide-helm-agent", 1, "agent", nil),
+				k8sStepCheckAgentStatus("app.kubernetes.io/name=kube-state-metrics", 1, "agent", nil),
+				k8sStepLogstashCheckStatus("app.kubernetes.io/name=logstash-agent", true),
+				k8sStepVerifyAgentLogstashConnection(),
+				k8sStepCheckRestrictUpgrade("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+				k8sStepRunInnerTests("name=agent-pernode-helm-agent", schedulableNodeCount, "agent"),
+				k8sStepRunInnerTests("name=agent-clusterwide-helm-agent", 1, "agent"),
+				k8sStepRunInnerTests("app.kubernetes.io/name=kube-state-metrics", 1, "agent"),
+				k8sStepLogstashDelete(),
+				k8sStepLogstashCheckStatus("app.kubernetes.io/name=logstash-agent", false),
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -1176,6 +1241,141 @@ func k8sStepHelmDeploy(chartPath string, releaseName string, values map[string]a
 		installAction.WaitForJobs = true
 		_, err = installAction.Run(helmChart, values)
 		require.NoError(t, err, "failed to install helm chart")
+	}
+}
+
+func k8sStepLogstashCreate() k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		r, err := os.Open("testdata/logstash.yaml")
+		require.NoError(t, err, "failed to open logstash k8s test data")
+
+		logstashObjs, err := testK8s.LoadFromYAML(bufio.NewReader(r))
+		require.NoError(t, err, "failed to convert logstash yaml to k8s objects")
+		t.Cleanup(func() {
+			err = k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, logstashObjs...)
+			require.NoError(t, err, "failed to delete logstash k8s objects")
+		})
+
+		err = k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true, waitTimeout: 120 * time.Second, namespace: namespace}, logstashObjs...)
+		require.NoError(t, err, "failed to create logstash k8s objects")
+	}
+}
+
+func k8sStepLogstashDelete() k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		logstashDeployment := &appsv1.Deployment{}
+		err := kCtx.client.Resources(namespace).Get(ctx, "logstash-agent", namespace, logstashDeployment)
+		require.NoError(t, err, "failed to get logstash deployment")
+
+		err = k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, logstashDeployment)
+		require.NoError(t, err, "failed to delete logstash k8s objects")
+
+		// Wait for the pod to be actually deleted with a timeout
+		require.Eventually(t, func() bool {
+			logstashPodList := &corev1.PodList{}
+			err := kCtx.client.Resources(namespace).List(ctx, logstashPodList, func(opt *metav1.ListOptions) {
+				opt.LabelSelector = "app.kubernetes.io/name=logstash-agent"
+			})
+			if err != nil {
+				t.Logf("error listing logstash pods: %v", err)
+				return false
+			}
+			return len(logstashPodList.Items) == 0
+		}, 2*time.Minute, 1*time.Second, "logstash pod was not deleted within timeout")
+	}
+}
+
+func k8sStepLogstashCheckStatus(logstashPodLabelSelector string, logstashExpected bool) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		logstashPodList := &corev1.PodList{}
+		err := kCtx.client.Resources(namespace).List(ctx, logstashPodList, func(opt *metav1.ListOptions) {
+			opt.LabelSelector = logstashPodLabelSelector
+		})
+		require.NoError(t, err, "failed to list logstash pods with selector ", logstashPodLabelSelector)
+		if logstashExpected {
+			require.NotEmpty(t, logstashPodList.Items, "no logstash pods found with selector ", logstashPodLabelSelector)
+		}
+		for _, pod := range logstashPodList.Items {
+			if logstashExpected {
+				if pod.Status.Phase != corev1.PodRunning {
+					t.Errorf("logstash pod %s is not running (phase: %s)", pod.Name, pod.Status.Phase)
+					continue
+				}
+
+				require.Eventually(t, func() bool {
+					stdout := &bytes.Buffer{}
+					stderr := &bytes.Buffer{}
+					err := kCtx.client.Resources().ExecInPod(ctx, namespace, pod.Name, "logstash",
+						[]string{"curl", "-s", "localhost:9600/_health_report"}, stdout, stderr)
+					if err != nil {
+						return false
+					}
+
+					var result map[string]interface{}
+					if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+						return false
+					}
+
+					if status, ok := result["status"].(string); ok {
+						if status == "green" {
+							t.Logf("Logstash API is responding and healthy")
+							return true
+						}
+					}
+					return false
+				}, 3*time.Minute, 5*time.Second, "Logstash pod %s did not become healthy in time", pod.Name)
+
+				t.Logf("Logstash pod %s is healthy and ready", pod.Name)
+			} else {
+				if pod.Status.Phase == corev1.PodRunning {
+					t.Errorf("logstash pod %s is running but it should not", pod.Name)
+				}
+			}
+		}
+	}
+}
+
+func k8sStepVerifyAgentLogstashConnection() k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		// Get one of the agent pods
+		agentPodList := &corev1.PodList{}
+		err := kCtx.client.Resources(namespace).List(ctx, agentPodList, func(opt *metav1.ListOptions) {
+			opt.LabelSelector = "name=agent-pernode-helm-agent"
+		})
+		require.NoError(t, err, "failed to list agent pods")
+		require.NotEmpty(t, agentPodList.Items, "no agent pods found")
+
+		agentPod := agentPodList.Items[0]
+
+		// Check agent logs for successful connection to Logstash
+		require.Eventually(t, func() bool {
+			// Get recent logs from the agent container (only last 2 minutes to avoid old errors)
+			logOpts := &corev1.PodLogOptions{
+				Container:  "agent",
+				Timestamps: true,
+				SinceTime:  &metav1.Time{Time: time.Now().Add(-2 * time.Minute)},
+			}
+
+			req := kCtx.clientSet.CoreV1().Pods(namespace).GetLogs(agentPod.Name, logOpts)
+			logs, err := req.Stream(ctx)
+			if err != nil {
+				return false
+			}
+			defer logs.Close()
+
+			logBytes, err := io.ReadAll(logs)
+			if err != nil {
+				return false
+			}
+
+			logContent := string(logBytes)
+
+			// Look for successful connection indicators
+			// Successful patterns: "Connection to backoff(...logstash-agent...) established"
+			return strings.Contains(logContent, "Connection to") &&
+				strings.Contains(logContent, "logstash-agent") &&
+				strings.Contains(logContent, "established")
+		}, 3*time.Minute, 5*time.Second, "Agent did not establish connection to Logstash within timeout")
 	}
 }
 

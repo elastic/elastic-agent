@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -615,7 +616,7 @@ func (c *Coordinator) Migrate(
 	backoffFactory func(done <-chan struct{}) backoff.Backoff,
 	notifyFn func(context.Context, *fleetapi.ActionMigrate) error,
 ) error {
-	if c.specs.Platform().OS == component.Container {
+	if c.isContainerizedEnvironment() {
 		return ErrContainerNotSupported
 	}
 	if !c.isManaged {
@@ -1633,6 +1634,14 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 		c.logger.Errorf("failed to add secret markers: %v", err)
 	}
 
+	// override retrieved config from Fleet with persisted config from AgentConfig file
+
+	if c.caps != nil {
+		if err := applyPersistedConfig(c.logger, cfg, paths.ConfigFile(), c.isContainerizedEnvironment, c.caps.AllowFleetOverride); err != nil {
+			return fmt.Errorf("could not apply persisted configuration: %w", err)
+		}
+	}
+
 	// perform and verify ast translation
 	m, err := cfg.ToMapStr()
 	if err != nil {
@@ -1717,6 +1726,35 @@ func (c *Coordinator) generateAST(cfg *config.Config, m map[string]interface{}) 
 	}
 
 	c.ast = rawAst
+	return nil
+}
+
+func applyPersistedConfig(logger *logger.Logger, cfg *config.Config, configFile string, checkFns ...func() bool) error {
+	for checkNo, checkFn := range checkFns {
+		if !checkFn() {
+			// Feature is disabled, nothing to do
+			logger.Infof("Applying persisted configuration is disabled by check with idx %d.", checkNo)
+			return nil
+		}
+	}
+
+	f, err := os.OpenFile(configFile, os.O_RDONLY, 0)
+	if err != nil && os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("opening config file: %w", err)
+	}
+	defer f.Close()
+
+	persisted, err := config.NewConfigFrom(f)
+	if err != nil {
+		return fmt.Errorf("parsing persisted config: %w", err)
+	}
+
+	err = cfg.Merge(persisted)
+	if err != nil {
+		return fmt.Errorf("merging persisted config: %w", err)
+	}
 	return nil
 }
 
@@ -2385,4 +2423,8 @@ func computeEnrollOptions(ctx context.Context, cfgPath string, cfgFleetPath stri
 
 	options = enroll.FromFleetConfig(cfg.Fleet)
 	return options, nil
+}
+
+func (c *Coordinator) isContainerizedEnvironment() bool {
+	return c.specs.Platform().OS == component.Container
 }

@@ -26,17 +26,11 @@ func UseElasticAgentCorePackaging() {
 	MustUsePackaging("elastic_agent_core", packageSpecFile)
 }
 
-// UseCommunityBeatPackaging configures the package target to build packages for
-// a community Beat.
-func UseCommunityBeatPackaging() {
-	MustUsePackaging("community_beat", packageSpecFile)
-}
-
 // UseElasticAgentPackaging configures the package target to build packages for
 // an Elastic Agent.
 func UseElasticAgentPackaging() {
 	// Prepare binaries so they can be packed into agent
-	MustUsePackaging("elastic_beat_agent_binaries", packageSpecFile)
+	MustUsePackaging("elastic_agent_packaging", packageSpecFile)
 }
 
 // UseElasticAgentDemoPackaging configures the package target to build packages for
@@ -44,46 +38,6 @@ func UseElasticAgentPackaging() {
 func UseElasticAgentDemoPackaging() {
 	// Prepare binaries so they can be packed into agent
 	MustUsePackaging("elastic_beat_agent_demo_binaries", packageSpecFile)
-}
-
-// UseElasticBeatPackaging configures the package target to build packages for
-// an Elastic Beat. This means it will generate two sets of packages -- one
-// that is purely OSS under Apache 2.0 and one that is licensed under the
-// Elastic License and may contain additional X-Pack features.
-func UseElasticBeatPackaging() {
-	UseElasticBeatOSSPackaging()
-	MustUsePackaging("elastic_beat_xpack_separate_binaries", packageSpecFile)
-}
-
-// UseElasticBeatOSSPackaging configures the package target to build OSS
-// packages.
-func UseElasticBeatOSSPackaging() {
-	MustUsePackaging("elastic_beat_oss", packageSpecFile)
-}
-
-// UseElasticBeatXPackPackaging configures the package target to build Elastic
-// licensed (X-Pack) packages.
-func UseElasticBeatXPackPackaging() {
-	MustUsePackaging("elastic_beat_xpack", packageSpecFile)
-}
-
-// UseElasticBeatXPackReducedPackaging configures the package target to build Elastic
-// licensed (X-Pack) packages for agent use.
-func UseElasticBeatXPackReducedPackaging() {
-	MustUsePackaging("elastic_beat_xpack_reduced", packageSpecFile)
-}
-
-// UseElasticBeatWithoutXPackPackaging configures the package target to build
-// packages for an Elastic Beat. This means it will generate two sets of
-// packages -- one that is purely OSS under Apache 2.0 and one that is licensed
-// under the Elastic License and may contain additional X-Pack features.
-//
-// NOTE: This method doesn't use binaries produced in the x-pack folder, this is
-// a temporary packaging target for projects that depends on beat but do have
-// concrete x-pack binaries.
-func UseElasticBeatWithoutXPackPackaging() {
-	UseElasticBeatOSSPackaging()
-	UseElasticBeatXPackPackaging()
 }
 
 // MustUsePackaging will load a named spec from a named file, if any errors
@@ -130,7 +84,7 @@ func LoadNamedSpec(name string, files ...string) error {
 	}
 
 	log.Printf("%v package spec loaded from %v", name, files)
-	Packages = append(Packages, packages...)
+	Packages = packages
 	return nil
 }
 
