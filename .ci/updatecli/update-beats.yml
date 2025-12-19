@@ -67,7 +67,7 @@ conditions:
     failwhen: false
 
 targets:
-  beats:
+  updatebeats:
     name: 'Update to elastic/beats@{{ source "beatscommit" }}'
     sourceid: beatscommit
     scmid: default
