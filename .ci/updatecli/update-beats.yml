@@ -18,7 +18,7 @@ scms:
 
 actions:
   default:
-    title: '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Update elastic/beats to {{ source "beats" }}'
+    title: '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Update elastic/beats to {{ source "beatscommit" }}'
     kind: github/pullrequest
     scmid: default
     spec:
@@ -32,7 +32,7 @@ actions:
         Update `elastic/beats` to the latest version on branch `{{ requiredEnv "BRANCH_NAME" }}`.
 
         *Changeset*
-        * https://github.com/elastic/beats/compare/{{ source "gomod" }}...{{ source "beats" }}
+        * https://github.com/elastic/beats/compare/{{ source "gomod" }}...{{ source "beatscommit" }}
 
 sources:
   beatscommit:
