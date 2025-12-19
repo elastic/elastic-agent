@@ -30,7 +30,7 @@ func TestGetAllComponentState(t *testing.T) {
 		OutputType:     "elasticsearch",
 		RuntimeManager: component.OtelRuntimeManager,
 		InputSpec: &component.InputRuntimeSpec{
-			BinaryName: "agentbeat",
+			BinaryName: "elastic-otel-collector",
 			Spec: component.InputSpec{
 				Command: &component.CommandSpec{
 					Args: []string{"filebeat"},
@@ -764,7 +764,7 @@ func TestOutputStatus(t *testing.T) {
 		OutputType:     "elasticsearch",
 		RuntimeManager: component.OtelRuntimeManager,
 		InputSpec: &component.InputRuntimeSpec{
-			BinaryName: "agentbeat",
+			BinaryName: "elastic-otel-collector",
 			Spec: component.InputSpec{
 				Command: &component.CommandSpec{
 					Args: []string{"filebeat"},

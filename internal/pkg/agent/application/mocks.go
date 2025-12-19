@@ -11,7 +11,7 @@ package application
 import (
 	mock "github.com/stretchr/testify/mock"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 )
 
 // newMockRollbacksSource creates a new instance of mockRollbacksSource. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
@@ -42,23 +42,23 @@ func (_m *mockRollbacksSource) EXPECT() *mockRollbacksSource_Expecter {
 }
 
 // Get provides a mock function for the type mockRollbacksSource
-func (_mock *mockRollbacksSource) Get() (map[string]upgrade.TTLMarker, error) {
+func (_mock *mockRollbacksSource) Get() (map[string]ttl.TTLMarker, error) {
 	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Get")
 	}
 
-	var r0 map[string]upgrade.TTLMarker
+	var r0 map[string]ttl.TTLMarker
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (map[string]upgrade.TTLMarker, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func() (map[string]ttl.TTLMarker, error)); ok {
 		return returnFunc()
 	}
-	if returnFunc, ok := ret.Get(0).(func() map[string]upgrade.TTLMarker); ok {
+	if returnFunc, ok := ret.Get(0).(func() map[string]ttl.TTLMarker); ok {
 		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[string]upgrade.TTLMarker)
+			r0 = ret.Get(0).(map[string]ttl.TTLMarker)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func() error); ok {
@@ -86,18 +86,18 @@ func (_c *mockRollbacksSource_Get_Call) Run(run func()) *mockRollbacksSource_Get
 	return _c
 }
 
-func (_c *mockRollbacksSource_Get_Call) Return(stringToTTLMarker map[string]upgrade.TTLMarker, err error) *mockRollbacksSource_Get_Call {
+func (_c *mockRollbacksSource_Get_Call) Return(stringToTTLMarker map[string]ttl.TTLMarker, err error) *mockRollbacksSource_Get_Call {
 	_c.Call.Return(stringToTTLMarker, err)
 	return _c
 }
 
-func (_c *mockRollbacksSource_Get_Call) RunAndReturn(run func() (map[string]upgrade.TTLMarker, error)) *mockRollbacksSource_Get_Call {
+func (_c *mockRollbacksSource_Get_Call) RunAndReturn(run func() (map[string]ttl.TTLMarker, error)) *mockRollbacksSource_Get_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // Set provides a mock function for the type mockRollbacksSource
-func (_mock *mockRollbacksSource) Set(stringToTTLMarker map[string]upgrade.TTLMarker) error {
+func (_mock *mockRollbacksSource) Set(stringToTTLMarker map[string]ttl.TTLMarker) error {
 	ret := _mock.Called(stringToTTLMarker)
 
 	if len(ret) == 0 {
@@ -105,7 +105,7 @@ func (_mock *mockRollbacksSource) Set(stringToTTLMarker map[string]upgrade.TTLMa
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(map[string]upgrade.TTLMarker) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(map[string]ttl.TTLMarker) error); ok {
 		r0 = returnFunc(stringToTTLMarker)
 	} else {
 		r0 = ret.Error(0)
@@ -119,16 +119,16 @@ type mockRollbacksSource_Set_Call struct {
 }
 
 // Set is a helper method to define mock.On call
-//   - stringToTTLMarker map[string]upgrade.TTLMarker
+//   - stringToTTLMarker map[string]ttl.TTLMarker
 func (_e *mockRollbacksSource_Expecter) Set(stringToTTLMarker interface{}) *mockRollbacksSource_Set_Call {
 	return &mockRollbacksSource_Set_Call{Call: _e.mock.On("Set", stringToTTLMarker)}
 }
 
-func (_c *mockRollbacksSource_Set_Call) Run(run func(stringToTTLMarker map[string]upgrade.TTLMarker)) *mockRollbacksSource_Set_Call {
+func (_c *mockRollbacksSource_Set_Call) Run(run func(stringToTTLMarker map[string]ttl.TTLMarker)) *mockRollbacksSource_Set_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 map[string]upgrade.TTLMarker
+		var arg0 map[string]ttl.TTLMarker
 		if args[0] != nil {
-			arg0 = args[0].(map[string]upgrade.TTLMarker)
+			arg0 = args[0].(map[string]ttl.TTLMarker)
 		}
 		run(
 			arg0,
@@ -142,7 +142,7 @@ func (_c *mockRollbacksSource_Set_Call) Return(err error) *mockRollbacksSource_S
 	return _c
 }
 
-func (_c *mockRollbacksSource_Set_Call) RunAndReturn(run func(stringToTTLMarker map[string]upgrade.TTLMarker) error) *mockRollbacksSource_Set_Call {
+func (_c *mockRollbacksSource_Set_Call) RunAndReturn(run func(stringToTTLMarker map[string]ttl.TTLMarker) error) *mockRollbacksSource_Set_Call {
 	_c.Call.Return(run)
 	return _c
 }

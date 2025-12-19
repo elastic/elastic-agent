@@ -3827,7 +3827,34 @@ func TestDefaultRuntimeConfig(t *testing.T) {
 	assert.Equal(t, "", config.Filebeat.Default)
 	assert.Nil(t, config.Filebeat.InputType)
 	assert.Equal(t, "", config.Metricbeat.Default)
-	assert.Nil(t, config.Metricbeat.InputType)
+	assert.Equal(t,
+		map[string]string{
+			"activemq/metrics":      string(OtelRuntimeManager),
+			"apache/metrics":        string(OtelRuntimeManager),
+			"beat/metrics":          string(OtelRuntimeManager),
+			"containerd/metrics":    string(OtelRuntimeManager),
+			"docker/metrics":        string(OtelRuntimeManager),
+			"elasticsearch/metrics": string(OtelRuntimeManager),
+			"etcd/metrics":          string(OtelRuntimeManager),
+			"http/metrics":          string(OtelRuntimeManager),
+			"jolokia/metrics":       string(OtelRuntimeManager),
+			"kafka/metrics":         string(OtelRuntimeManager),
+			"kibana/metrics":        string(OtelRuntimeManager),
+			"linux/metrics":         string(OtelRuntimeManager),
+			"logstash/metrics":      string(OtelRuntimeManager),
+			"memcached/metrics":     string(OtelRuntimeManager),
+			"mongodb/metrics":       string(OtelRuntimeManager),
+			"mysql/metrics":         string(OtelRuntimeManager),
+			"nats/metrics":          string(OtelRuntimeManager),
+			"nginx/metrics":         string(OtelRuntimeManager),
+			"rabbitmq/metrics":      string(OtelRuntimeManager),
+			"sql/metrics":           string(OtelRuntimeManager),
+			"stan/metrics":          string(OtelRuntimeManager),
+			"statsd/metrics":        string(OtelRuntimeManager),
+			"system/metrics":        string(OtelRuntimeManager),
+			"vsphere/metrics":       string(OtelRuntimeManager),
+		},
+		config.Metricbeat.InputType)
 }
 
 func TestToComponentsWithRuntimeConfig(t *testing.T) {
@@ -3920,7 +3947,7 @@ func TestToComponentsWithRuntimeConfig(t *testing.T) {
 			},
 			runtimeConfig: &RuntimeConfig{
 				Default: string(ProcessRuntimeManager),
-				// These will be ignored because testbeat doesn't use agentbeat
+				// These will be ignored because testbeat doesn't use elastic-otel-collector
 				Filebeat: BeatRuntimeConfig{
 					Default: string(OtelRuntimeManager),
 					InputType: map[string]string{

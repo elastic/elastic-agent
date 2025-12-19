@@ -21,7 +21,7 @@ The {{edot}} (EDOT) Collector includes embedded Collector components from the [O
 The components included in the EDOT Collector are categorized into **[Core]** and **[Extended]** components. The following table describes the current components included in the EDOT Collector, their source, and support status.
 
 ::::{note}
-Components marked as "Deprecated" in the table are retained in EDOT Collector 9.x to maintain backwards compatibility during the official deprecation window. If you're running EDOT Collector 9.x with {{product.elastic-stack}} 8.18 or 8.19, continue using these deprecated components as specified in the configuration for your Stack version. For more details, refer to [Configuration compatibility with {{product.elastic-stack}} versions](/reference/edot-collector/config/default-config-standalone.md#configuration-compatibility-with-elastic-stack-versions).
+Components marked as "Deprecated" in the table are retained in EDOT Collector 9.x to maintain backwards compatibility during the official deprecation window. If you're running EDOT Collector 9.x with {{product.elastic-stack}} 8.18 or 8.19, continue using these deprecated components as specified in the configuration for your Stack version. For more details, refer to [Configuration compatibility with {{product.elastic-stack}} versions](/reference/edot-collector/config/default-config-standalone.md#configuration-compatibility-with-elastic-stack-versions). To migrate your configuration to the new components, refer to [Migrate components](/reference/edot-collector/components/migrate-components.md).
 ::::
 
 % The following table is automatically generated from the EDOT Collector source code.
@@ -32,7 +32,7 @@ Components marked as "Deprecated" in the table are retained in EDOT Collector 9.
 % start:edot-collector-components-table
 ## List of components
 
-These components are included in EDOT Collector version 9.2.2.
+These components are included in EDOT Collector version 9.2.3.
 
 | Component | GitHub Repo | Support status | Version |
 |:---|:---|:---|:---|
@@ -61,6 +61,7 @@ These components are included in EDOT Collector version 9.2.2.
 | [redisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/redisreceiver) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.139.0 |
 | [sqlserverreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/sqlserverreceiver) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.139.0 |
 | [windowseventlogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/windowseventlogreceiver) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.139.0 |
+| [windowsperfcountersreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/windowsperfcountersreceiver) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.139.0 |
 | [zipkinreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/zipkinreceiver) | [OTel Contrib Repo](https://github.com/open-telemetry/opentelemetry-collector-contrib) | [Extended] | v0.139.0 |
 |***Exporters***||||
 | [debugexporter](https://github.com/open-telemetry/opentelemetry-collector/tree/main/exporter/debugexporter) | [OTel Core Repo](https://github.com/open-telemetry/opentelemetry-collector) | [Extended] | v0.139.0 |

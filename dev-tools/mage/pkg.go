@@ -28,7 +28,7 @@ func Package() error {
 
 	if len(Packages) == 0 {
 		return fmt.Errorf("no package specs are registered. Call " +
-			"UseCommunityBeatPackaging, UseElasticBeatPackaging or USeElasticBeatWithoutXPackPackaging first")
+			"UseElasticAgentPackaging or UseElasticAgentCorePackaging first")
 	}
 
 	// platforms := updateWithDarwinUniversal(Platforms)

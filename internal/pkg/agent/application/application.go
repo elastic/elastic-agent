@@ -14,6 +14,7 @@ import (
 	"go.elastic.co/apm/v2"
 
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 
 	"github.com/elastic/go-ucfg"
@@ -39,7 +40,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
-	otelconfig "github.com/elastic/elastic-agent/internal/pkg/otel/config"
 	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/queue"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -52,8 +52,8 @@ import (
 )
 
 type rollbacksSource interface {
-	Set(map[string]upgrade.TTLMarker) error
-	Get() (map[string]upgrade.TTLMarker, error)
+	Set(map[string]ttl.TTLMarker) error
+	Get() (map[string]ttl.TTLMarker, error)
 }
 
 // CfgOverrider allows for application driven overrides of configuration read from disk.
@@ -135,7 +135,7 @@ func New(
 	// monitoring is not supported in bootstrap mode https://github.com/elastic/elastic-agent/issues/1761
 	isMonitoringSupported := !disableMonitoring && cfg.Settings.V1MonitoringEnabled
 
-	availableRollbacksSource := upgrade.NewTTLMarkerRegistry(log, paths.Top())
+	availableRollbacksSource := ttl.NewTTLMarkerRegistry(log, paths.Top())
 	if upgrade.IsUpgradeable() {
 		// If we are not running in a container, check and normalize the install descriptor before we start the agent
 		normalizeAgentInstalls(log, paths.Top(), time.Now(), initialUpdateMarker, availableRollbacksSource)
@@ -255,7 +255,7 @@ func New(
 			}
 
 			// TODO: stop using global state
-			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, paths.Top(), client, fleetAcker, actionAcker, retrier, stateStorage, actionQueue, upgrader)
+			managed, err = newManagedConfigManager(ctx, log, agentInfo, cfg, store, runtime, fleetInitTimeout, paths.Top(), client, fleetAcker, actionAcker, retrier, stateStorage, actionQueue, availableRollbacksSource, upgrader)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -271,7 +271,6 @@ func New(
 	otelManager, err := otelmanager.NewOTelManager(
 		log.Named("otel_manager"),
 		logLevel, baseLogger,
-		otelconfig.SubprocessExecutionMode,
 		agentInfo,
 		cfg.Settings.Collector,
 		monitor.ComponentMonitoringConfig,

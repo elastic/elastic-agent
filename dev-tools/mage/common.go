@@ -658,6 +658,11 @@ func FindFilesRecursive(match func(path string, d fs.FileInfo) bool) ([]string, 
 			return filepath.SkipDir
 		}
 
+		// Don't look for files in beats submodule
+		if d.IsDir() && filepath.Base(path) == "beats" {
+			return filepath.SkipDir
+		}
+
 		if !d.Type().IsRegular() {
 			// continue
 			return nil
