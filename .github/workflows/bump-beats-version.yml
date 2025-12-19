@@ -62,6 +62,20 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         BRANCH_NAME: ${{ matrix.branch }}
 
+    - name: Create pull request
+      uses: peter-evans/create-pull-request@98357b18bf14b5342f975ff684046ec3b2a07725 #v8.0.0
+      with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          title: "[${{ matrix.branch }}][Automation] Update elastic/beats to ${{ env.UPDATECLI_BEATS_COMMIT }}"
+          commit-message: "[${{ matrix.branch }}][Automation] Update elastic/beats to ${{ env.UPDATECLI_BEATS_COMMIT }}"
+          body: |-
+            ### What
+            Update `elastic/beats` to ${{ env.UPDATECLI_BEATS_COMMIT }} on branch ${{ matrix.branch }}
+          branch: update-beats-${{ matrix.branch }}
+          base: ${{ matrix.branch }}
+          labels: automation,skip-changelog,"Team:Elastic-Agent-Control-Plane"
+          draft: false
+
     - if: ${{ failure()  }}
       uses: elastic/oblt-actions/slack/send@v1
       with:

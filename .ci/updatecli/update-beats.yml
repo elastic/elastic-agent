@@ -17,21 +17,10 @@ scms:
 
 actions:
   default:
-    title: '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Update elastic/beats to {{ source "beats" }}'
-    kind: github/pullrequest
+    kind: shell
     scmid: default
     spec:
-      automerge: false
-      labels:
-      - automation
-      - skip-changelog
-      - "Team:Elastic-Agent-Control-Plane"
-      description: |-
-        ### What
-        Update `elastic/beats` to the latest version on branch `{{ requiredEnv "BRANCH_NAME" }}`.
-
-        *Changeset*
-        * https://github.com/elastic/beats/compare/{{ source "gomod" }}...{{ source "beats" }}
+      command: 'UPDATECLI_BEATS_COMMIT={{ source "beats" }} >> $GITHUB_ENV'
 
 sources:
   beats:
