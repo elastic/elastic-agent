@@ -14,6 +14,7 @@ scms:
       branch: '{{ requiredEnv "BRANCH_NAME" }}'
       commitusingapi: true
       force: false
+      submodules: true
 
 actions:
   default:
@@ -42,7 +43,6 @@ sources:
     - findsubmatch:
         pattern: .*(.{12})$
         captureindex: 1
-
 
 conditions:
   is-already-updated:
