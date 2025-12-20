@@ -13,7 +13,6 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -58,35 +57,47 @@ const (
 )
 
 // Common settings with defaults derived from files, CWD, and environment.
+// These global variables are populated from the Config struct during initialization.
+// New code should prefer using GetConfig() to access configuration values.
 var (
-	GOOS         = build.Default.GOOS
-	GOARCH       = build.Default.GOARCH
-	GOARM        = EnvOr("GOARM", "")
-	Platform     = MakePlatformAttributes(GOOS, GOARCH, GOARM)
-	BinaryExt    = ""
-	XPackDir     = "../x-pack"
-	RaceDetector = false
-	TestCoverage = false
-	PLATFORMS    = EnvOr("PLATFORMS", "")
-	PACKAGES     = EnvOr("PACKAGES", "")
-	CI           = EnvOr("CI", "")
+	GOOS      string
+	GOARCH    string
+	GOARM     string
+	Platform  PlatformAttributes
+	BinaryExt = ""
+	XPackDir  = "../x-pack"
+
+	// RaceDetector enables the Go race detector in tests (from RACE_DETECTOR env var)
+	RaceDetector bool
+
+	// TestCoverage enables code coverage profiling (from TEST_COVERAGE env var)
+	TestCoverage bool
+
+	// PLATFORMS is the comma-separated list of target platforms (from PLATFORMS env var)
+	PLATFORMS string
+
+	// PACKAGES is the comma-separated list of package types (from PACKAGES env var)
+	PACKAGES string
+
+	// CI indicates we're running in a CI environment (from CI env var)
+	CI string
 
 	// CrossBuildMountModcache mounts $GOPATH/pkg/mod into
-	// the crossbuild images at /go/pkg/mod, read-only,  when set to true.
-	CrossBuildMountModcache = EnvOr("CROSSBUILD_MOUNT_MODCACHE", "true") == "true"
+	// the crossbuild images at /go/pkg/mod, read-only, when set to true.
+	CrossBuildMountModcache bool
 
 	// CrossBuildMountBuildCache mounts the Go build cache into golang-crossbuild containers
-	CrossBuildMountBuildCache      = EnvOr("CROSSBUILD_MOUNT_GOCACHE", "true") == "true"
-	CrossBuildBuildCacheVolumeName = "elastic-agent-crossbuild-build-cache"
+	CrossBuildMountBuildCache      bool
+	CrossBuildBuildCacheVolumeName string
 
-	BeatName        = EnvOr("BEAT_NAME", defaultName)
-	BeatServiceName = EnvOr("BEAT_SERVICE_NAME", BeatName)
-	BeatIndexPrefix = EnvOr("BEAT_INDEX_PREFIX", BeatName)
-	BeatDescription = EnvOr("BEAT_DESCRIPTION", "")
-	BeatVendor      = EnvOr("BEAT_VENDOR", "Elastic")
-	BeatLicense     = EnvOr("BEAT_LICENSE", "Elastic License 2.0")
-	BeatURL         = EnvOr("BEAT_URL", "https://www.elastic.co/beats/"+BeatName)
-	BeatUser        = EnvOr("BEAT_USER", "root")
+	BeatName        string
+	BeatServiceName string
+	BeatIndexPrefix string
+	BeatDescription string
+	BeatVendor      string
+	BeatLicense     string
+	BeatURL         string
+	BeatUser        string
 
 	BeatProjectType ProjectType
 
@@ -98,12 +109,13 @@ var (
 	versionQualified bool
 	versionQualifier string
 
-	// Env var to set the agent package version
+	// agentPackageVersion is set from AGENT_PACKAGE_VERSION env var
 	agentPackageVersion string
 
-	// PackagingFromManifest This value is set to tru when we have defined a ManifestURL variable
+	// PackagingFromManifest is set to true when ManifestURL is defined
 	PackagingFromManifest bool
-	// ManifestURL Location of the manifest file to package
+
+	// ManifestURL is the location of the manifest file to package
 	ManifestURL string
 
 	FuncMap = map[string]interface{}{
@@ -130,42 +142,14 @@ func init() {
 }
 
 func initGlobals() {
-	if GOOS == "windows" {
-		BinaryExt = ".exe"
-	}
-
-	var err error
-	RaceDetector, err = strconv.ParseBool(EnvOr("RACE_DETECTOR", "false"))
+	// Load configuration from the centralized Config struct
+	cfg, err := GetConfig()
 	if err != nil {
-		panic(fmt.Errorf("failed to parse RACE_DETECTOR env value: %w", err))
+		panic(fmt.Errorf("failed to load config: %w", err))
 	}
 
-	TestCoverage, err = strconv.ParseBool(EnvOr("TEST_COVERAGE", "false"))
-	if err != nil {
-		panic(fmt.Errorf("failed to parse TEST_COVERAGE env value: %w", err))
-	}
-
-	Snapshot, err = strconv.ParseBool(EnvOr("SNAPSHOT", "false"))
-	if err != nil {
-		panic(fmt.Errorf("failed to parse SNAPSHOT env value: %w", err))
-	}
-
-	DevBuild, err = strconv.ParseBool(EnvOr("DEV", "false"))
-	if err != nil {
-		panic(fmt.Errorf("failed to parse DEV env value: %w", err))
-	}
-
-	ExternalBuild, err = strconv.ParseBool(EnvOr("EXTERNAL", "false"))
-	if err != nil {
-		panic(fmt.Errorf("failed to parse EXTERNAL env value: %w", err))
-	}
-
-	FIPSBuild, err = strconv.ParseBool(EnvOr("FIPS", "false"))
-	if err != nil {
-		panic(fmt.Errorf("failed to parse FIPS env value: %w", err))
-	}
-
-	versionQualifier, versionQualified = os.LookupEnv("VERSION_QUALIFIER")
+	// Initialize globals from Config
+	initGlobalsFromConfig(cfg)
 
 	// order matters: this will override some of the values. Those values can be used
 	// as fallback for the variables below (mainly agentPackageVersion and ManifestURL)
@@ -174,11 +158,54 @@ func initGlobals() {
 		panic(fmt.Errorf("failed to init package version: %w", err))
 	}
 
+	// Apply overrides that may have been set by initPackageVersion
 	agentPackageVersion = EnvOr(agentPackageVersionEnvVar, agentPackageVersion)
-
 	ManifestURL = EnvOr(ManifestUrlEnvVar, ManifestURL)
 	PackagingFromManifest = ManifestURL != ""
+}
 
+// initGlobalsFromConfig populates global variables from the EnvConfig struct.
+// This maintains backward compatibility with code that uses the global variables.
+func initGlobalsFromConfig(cfg *EnvConfig) {
+	// Build configuration
+	GOOS = cfg.Build.GOOS
+	GOARCH = cfg.Build.GOARCH
+	GOARM = cfg.Build.GOARM
+	Platform = cfg.Platform()
+	BinaryExt = cfg.BinaryExt()
+	Snapshot = cfg.Build.Snapshot
+	DevBuild = cfg.Build.DevBuild
+	ExternalBuild = cfg.Build.ExternalBuild
+	FIPSBuild = cfg.Build.FIPSBuild
+	versionQualifier = cfg.Build.VersionQualifier
+	versionQualified = cfg.Build.VersionQualified
+	CI = cfg.Build.CI
+
+	// Beat configuration
+	BeatName = cfg.Beat.Name
+	BeatServiceName = cfg.Beat.ServiceName
+	BeatIndexPrefix = cfg.Beat.IndexPrefix
+	BeatDescription = cfg.Beat.Description
+	BeatVendor = cfg.Beat.Vendor
+	BeatLicense = cfg.Beat.License
+	BeatURL = cfg.Beat.URL
+	BeatUser = cfg.Beat.User
+
+	// Test configuration
+	RaceDetector = cfg.Test.RaceDetector
+	TestCoverage = cfg.Test.Coverage
+
+	// CrossBuild configuration
+	PLATFORMS = cfg.CrossBuild.Platforms
+	PACKAGES = cfg.CrossBuild.Packages
+	CrossBuildMountModcache = cfg.CrossBuild.MountModcache
+	CrossBuildMountBuildCache = cfg.CrossBuild.MountBuildCache
+	CrossBuildBuildCacheVolumeName = cfg.CrossBuild.BuildCacheVolumeName
+
+	// Packaging configuration
+	agentPackageVersion = cfg.Packaging.AgentPackageVersion
+	ManifestURL = cfg.Packaging.ManifestURL
+	PackagingFromManifest = cfg.Packaging.PackagingFromManifest
 }
 
 // ProjectType specifies the type of project (OSS vs X-Pack).

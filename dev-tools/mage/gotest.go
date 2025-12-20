@@ -83,12 +83,10 @@ func makeGoTestArgsForModule(name, module string) GoTestArgs {
 
 // testTagsFromEnv gets a list of comma-separated tags from the TEST_TAGS
 // environment variables, e.g: TEST_TAGS=aws,azure.
+// It uses the Config struct to get the test tags and adds FIPS-related tags if needed.
 func testTagsFromEnv() []string {
-	tags := strings.Split(strings.Trim(os.Getenv("TEST_TAGS"), ", "), ",")
-	if FIPSBuild {
-		tags = append(tags, "requirefips", "ms_tls13kdf")
-	}
-	return tags
+	cfg := MustGetConfig()
+	return cfg.TestTagsWithFIPS()
 }
 
 // DefaultGoTestUnitArgs returns a default set of arguments for running
