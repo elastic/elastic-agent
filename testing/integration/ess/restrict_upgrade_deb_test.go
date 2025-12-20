@@ -57,10 +57,11 @@ func TestRestrictUpgradeDeb(t *testing.T) {
 			return err == nil
 		}, 5*time.Minute, time.Second, "Elastic-Agent did not report healthy.")
 		if err != nil {
+			t.Logf("Agent status error: \"%v\"", err)
+
 			status, err := fixture.ExecStatus(ctx)
 			require.NoError(t, err, "must get Agent status")
 
-			t.Logf("Agent status error: \"%v\"", err)
 			require.FailNow(t, "Agent status:", status)
 		}
 
