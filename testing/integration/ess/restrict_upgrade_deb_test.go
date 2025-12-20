@@ -50,9 +50,6 @@ func TestRestrictUpgradeDeb(t *testing.T) {
 		_, err = fixture.InstallWithoutEnroll(ctx, &installOpts)
 		require.NoError(t, err)
 
-		_, err = fixture.InstallWithoutEnroll(ctx, &installOpts)
-		require.NoError(t, err)
-
 		assert.Eventuallyf(t, func() bool {
 			// Note that this updates err in the parent function
 			err = fixture.IsHealthy(ctx)
