@@ -535,19 +535,28 @@ func parallelJobs() chan int {
 }
 
 func numParallel() int {
-	if maxParallel := os.Getenv("MAX_PARALLEL"); maxParallel != "" {
-		if num, err := strconv.Atoi(maxParallel); err == nil && num > 0 {
-			return num
+	cfg := MustGetConfig()
+
+	// Use the configured max parallel from Config if set
+	if cfg.Build.MaxParallel > 0 {
+		maxParallel := cfg.Build.MaxParallel
+
+		// To be conservative use the minimum of the configured value
+		// and the Docker host CPUs.
+		info, err := GetDockerInfo()
+		// Check that info.NCPU != 0 since docker info doesn't return with an
+		// error status if communication with the daemon failed.
+		if err == nil && info.NCPU != 0 && info.NCPU < maxParallel {
+			maxParallel = info.NCPU
 		}
+
+		return maxParallel
 	}
 
-	// To be conservative use the minimum of the number of CPUs between the host
-	// and the Docker host.
+	// Fallback to runtime.NumCPU() if not configured
 	maxParallel := runtime.NumCPU()
 
 	info, err := GetDockerInfo()
-	// Check that info.NCPU != 0 since docker info doesn't return with an
-	// error status if communcation with the daemon failed.
 	if err == nil && info.NCPU != 0 && info.NCPU < maxParallel {
 		maxParallel = info.NCPU
 	}
