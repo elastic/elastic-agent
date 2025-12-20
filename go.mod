@@ -16,11 +16,7 @@ require (
 	github.com/docker/docker v28.5.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-<<<<<<< HEAD
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251218221037-2d1581840dc7
-=======
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251216185413-044579ba343a
->>>>>>> 08a5f42c2 ([8.19] Unblock 8.19 CI and bump beats (#11869))
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.10.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
@@ -144,20 +140,6 @@ require (
 	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ebitengine/purego v0.9.1 // indirect
-<<<<<<< HEAD
-=======
-	github.com/eclipse/paho.mqtt.golang v1.5.1 // indirect
-	github.com/edsrzf/mmap-go v1.2.0 // indirect
-	github.com/elastic/bayeux v1.0.5 // indirect
-	github.com/elastic/go-concert v0.3.1 // indirect
-	github.com/elastic/go-docappender/v2 v2.12.0 // indirect
-	github.com/elastic/go-freelru v0.16.0 // indirect
-	github.com/elastic/go-grok v0.3.1 // indirect
-	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
-	github.com/elastic/go-perf v0.0.0-20241029065020-30bec95324b8 // indirect
-	github.com/elastic/go-seccomp-bpf v1.6.0 // indirect
-	github.com/elastic/go-sfdc v0.0.0-20241010131323-8e176480d727 // indirect
->>>>>>> 08a5f42c2 ([8.19] Unblock 8.19 CI and bump beats (#11869))
 	github.com/elastic/go-structform v0.0.12 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect

@@ -8,11 +8,7 @@ replace github.com/elastic/elastic-agent => ../../
 replace github.com/elastic/beats/v7 => ../../beats
 
 require (
-<<<<<<< HEAD
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251218221037-2d1581840dc7
-=======
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251216185413-044579ba343a
->>>>>>> 08a5f42c2 ([8.19] Unblock 8.19 CI and bump beats (#11869))
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.29.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.24.0

@@ -439,15 +439,10 @@ github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumpti
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic/go.mod h1:0vCBR1wgGwZeGmloJ+eCWIZF2S47grTXRzj2mftg2Nk=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
 github.com/elastic/bayeux v1.0.5/go.mod h1:CSI4iP7qeo5MMlkznGvYKftp8M7qqP/3nzmVZoXHY68=
-<<<<<<< HEAD
 github.com/elastic/dhcp v0.0.0-20200227161230-57ec251c7eb3 h1:lnDkqiRFKm0rxdljqrj3lotWinO9+jFmeDXIC4gvIQs=
 github.com/elastic/dhcp v0.0.0-20200227161230-57ec251c7eb3/go.mod h1:aPqzac6AYkipvp4hufTyMj5PDIphF3+At8zr7r51xjY=
 github.com/elastic/ebpfevents v0.8.0 h1:rIrhj3SSsrwSOIv/MderZd0ZpbCLT4pudBtfnAbj3Oo=
 github.com/elastic/ebpfevents v0.8.0/go.mod h1:b6nLyQ8SA1RolRkP/nyGN6VAKqIObSJj8c2mhDGoNmg=
-=======
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251216185413-044579ba343a h1:Wcs9RHTiGoncecTk25D9SX6cHgZ0uFMZ3fSMXul8NLM=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251216185413-044579ba343a/go.mod h1:pMSzmcfJ8zwwltqZH9VDW8++TRkGU2S0KtR5Dw7T85s=
->>>>>>> 08a5f42c2 ([8.19] Unblock 8.19 CI and bump beats (#11869))
 github.com/elastic/elastic-agent-autodiscover v0.10.0 h1:WJ4zl9uSfk1kHmn2B/0byQBLIL607Zt4LNfOgV7+XN0=
 github.com/elastic/elastic-agent-autodiscover v0.10.0/go.mod h1:Nf3zh9FcJ9nTTswTwDTUAqXmvQllOrNliM6xmORSxwE=
 github.com/elastic/elastic-agent-client/v7 v7.17.2 h1:Cl2TeABqWZgW40t5fchGWT/sRk4MDDLWA0d8iHHOxLA=
