@@ -38,13 +38,20 @@ var SelectedPackageTypes []PackageType
 var SelectedDockerVariants []DockerVariant
 
 func init() {
+	initCrossBuildFromConfig()
+}
+
+// initCrossBuildFromConfig initializes crossbuild globals from the Config struct.
+func initCrossBuildFromConfig() {
+	cfg := MustGetConfig()
+
 	// Allow overriding via PLATFORMS.
-	if expression := os.Getenv("PLATFORMS"); len(expression) > 0 {
+	if expression := cfg.CrossBuild.Platforms; len(expression) > 0 {
 		Platforms = NewPlatformList(expression)
 	}
 
 	// Allow overriding via PACKAGES.
-	if packageTypes := os.Getenv("PACKAGES"); len(packageTypes) > 0 {
+	if packageTypes := cfg.CrossBuild.Packages; len(packageTypes) > 0 {
 		for _, pkgtype := range strings.Split(packageTypes, ",") {
 			var p PackageType
 			err := p.UnmarshalText([]byte(pkgtype))
@@ -56,7 +63,7 @@ func init() {
 	}
 
 	// Allow overriding via DOCKER_VARIANTS.
-	if dockerVariants := os.Getenv("DOCKER_VARIANTS"); len(dockerVariants) > 0 {
+	if dockerVariants := cfg.CrossBuild.DockerVariants; len(dockerVariants) > 0 {
 		for _, docvariant := range strings.Split(dockerVariants, ",") {
 			var v DockerVariant
 			err := v.UnmarshalText([]byte(docvariant))

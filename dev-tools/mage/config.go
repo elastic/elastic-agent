@@ -106,9 +106,10 @@ func makeConfigTemplate(destination string, mode os.FileMode, confParams ConfigF
 	// Rather than adding more "ExcludeX"/"UseX" options consider overwriting
 	// one of the libbeat templates in your project by adding a file with the
 	// same name to your _meta/config directory.
+	cfg := MustGetConfig()
 	params := map[string]interface{}{
-		"GOOS":                           EnvOr("DEV_OS", "linux"),
-		"GOARCH":                         EnvOr("DEV_ARCH", "amd64"),
+		"GOOS":                           cfg.CrossBuild.DevOS,
+		"GOARCH":                         cfg.CrossBuild.DevArch,
 		"BeatLicense":                    BeatLicense,
 		"Reference":                      false,
 		"Docker":                         false,

@@ -25,7 +25,9 @@ type packageVersion struct {
 }
 
 func initPackageVersion() error {
-	if os.Getenv("USE_PACKAGE_VERSION") != "true" {
+	cfg := MustGetConfig()
+
+	if !cfg.Packaging.UsePackageVersion {
 		return nil
 	}
 
