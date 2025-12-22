@@ -258,36 +258,35 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 
 	// 2. Assert monitoring logs and metrics are available on ES
 	for _, tc := range tests {
-		require.Eventuallyf(t,
-			func() bool {
-				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
-				defer findCancel()
-				mustClauses := []map[string]any{
-					{"match": map[string]any{"data_stream.type": tc.dsType}},
-					{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
-					{"match": map[string]any{"data_stream.namespace": processNamespace}},
-				}
-				mustClauses = append(mustClauses, tc.query...)
-				rawQuery := map[string]any{
-					"query": map[string]any{
-						"bool": map[string]any{
-							"must":   mustClauses,
-							"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestamp}}},
-						},
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+			defer findCancel()
+			mustClauses := []map[string]any{
+				{"match": map[string]any{"data_stream.type": tc.dsType}},
+				{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
+				{"match": map[string]any{"data_stream.namespace": processNamespace}},
+			}
+			mustClauses = append(mustClauses, tc.query...)
+			rawQuery := map[string]any{
+				"query": map[string]any{
+					"bool": map[string]any{
+						"must":   mustClauses,
+						"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestamp}}},
 					},
-					"sort": []map[string]any{
-						{"@timestamp": map[string]any{"order": "asc"}},
-					},
-				}
+				},
+				"sort": []map[string]any{
+					{"@timestamp": map[string]any{"order": "asc"}},
+				},
+			}
 
-				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
-				require.NoError(t, err)
-				if docs.Hits.Total.Value != 0 {
-					key := tc.dsType + "-" + tc.dsDataset + "-" + processNamespace
-					agentDocs[key] = docs
-				}
-				return docs.Hits.Total.Value > 0
-			},
+			docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
+			require.NoError(collect, err)
+			if docs.Hits.Total.Value != 0 {
+				key := tc.dsType + "-" + tc.dsDataset + "-" + processNamespace
+				agentDocs[key] = docs
+			}
+			require.Greater(collect, docs.Hits.Total.Value, 0)
+		},
 			2*time.Minute, 5*time.Second,
 			"agent monitoring classic no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestamp, tc.dsType, tc.dsDataset, processNamespace, tc.query)
 	}
@@ -328,37 +327,36 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 
 	// 5. Assert monitoring logs and metrics are available on ES (for otel mode)
 	for _, tc := range tests {
-		require.Eventuallyf(t,
-			func() bool {
-				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
-				defer findCancel()
-				mustClauses := []map[string]any{
-					{"match": map[string]any{"data_stream.type": tc.dsType}},
-					{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
-					{"match": map[string]any{"data_stream.namespace": receiverNamespace}},
-				}
-				mustClauses = append(mustClauses, tc.query...)
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+			defer findCancel()
+			mustClauses := []map[string]any{
+				{"match": map[string]any{"data_stream.type": tc.dsType}},
+				{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
+				{"match": map[string]any{"data_stream.namespace": receiverNamespace}},
+			}
+			mustClauses = append(mustClauses, tc.query...)
 
-				rawQuery := map[string]any{
-					"query": map[string]any{
-						"bool": map[string]any{
-							"must":   mustClauses,
-							"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestampBeatReceiver}}},
-						},
+			rawQuery := map[string]any{
+				"query": map[string]any{
+					"bool": map[string]any{
+						"must":   mustClauses,
+						"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestampBeatReceiver}}},
 					},
-					"sort": []map[string]any{
-						{"@timestamp": map[string]any{"order": "asc"}},
-					},
-				}
+				},
+				"sort": []map[string]any{
+					{"@timestamp": map[string]any{"order": "asc"}},
+				},
+			}
 
-				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
-				require.NoError(t, err)
-				if docs.Hits.Total.Value != 0 {
-					key := tc.dsType + "-" + tc.dsDataset + "-" + receiverNamespace
-					otelDocs[key] = docs
-				}
-				return docs.Hits.Total.Value > 0
-			},
+			docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
+			require.NoError(collect, err)
+			if docs.Hits.Total.Value != 0 {
+				key := tc.dsType + "-" + tc.dsDataset + "-" + receiverNamespace
+				otelDocs[key] = docs
+			}
+			require.Greater(collect, docs.Hits.Total.Value, 0)
+		},
 			4*time.Minute, 5*time.Second,
 			"agent monitoring beats receivers no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestampBeatReceiver, tc.dsType, tc.dsDataset, receiverNamespace, tc.query)
 	}
