@@ -208,7 +208,9 @@ func runOrSkip(t *testing.T, req Requirements, local bool) *Info {
 	}
 
 	t.Cleanup(func() {
-		_ = os.RemoveAll("/tmp/elastic-agent") // clean up any leftover data from tests
+		if runtime.GOOS != "windows" {
+			_ = os.RemoveAll("/tmp/elastic-agent") // clean up any leftover data from tests
+		}
 	})
 
 	namespace, err := getNamespace(t, local)
