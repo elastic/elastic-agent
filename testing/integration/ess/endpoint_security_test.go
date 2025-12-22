@@ -1820,6 +1820,11 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
+	fixture, err = define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
 	t.Log("Creating the first policy and enrollment token")
 	firstPolicy := createBasicPolicy()
 	policyResp, enrollKeyResp := createPolicyAndEnrollmentToken(ctx, t, info.KibanaClient, firstPolicy)
