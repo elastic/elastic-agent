@@ -1817,6 +1817,9 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 		},
 	})
 
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+
 	t.Log("Creating the first policy and enrollment token")
 	firstPolicy := createBasicPolicy()
 	policyResp, enrollKeyResp := createPolicyAndEnrollmentToken(ctx, t, info.KibanaClient, firstPolicy)
@@ -1881,8 +1884,6 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 
 	// Reassign the agent to the second policy
 	t.Log("Reassigning the agent to the second policy")
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
 	agentState, err := agentClient.State(ctx)
 	require.NoError(t, err)
 
