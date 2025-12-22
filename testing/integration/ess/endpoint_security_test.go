@@ -1817,10 +1817,10 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 		},
 	})
 
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	fixture, err = define.NewFixtureFromLocalBuild(t, define.Version())
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
@@ -1895,14 +1895,10 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 	policyReassignReq := kibana.AgentPolicyReassignRequest{
 		PolicyID: policyResp.ID,
 	}
-	err := info.KibanaClient.ReassignAgentToPolicy(ctx, agentState.Info.ID, policyReassignReq)
+	err = info.KibanaClient.ReassignAgentToPolicy(ctx, agentState.Info.ID, policyReassignReq)
 	require.NoError(t, err, "failed to reassign the agent to the second policy")
 
 	t.Log("Ensuring Elastic Agent and Endpoint are healthy after policy reassignment")
-	agentClient := fixture.Client()
-	err = agentClient.Connect(ctx)
-	require.NoError(t, err, "could not connect to the initial agent")
-
 	require.Eventually(t,
 		func() bool { return agentAndEndpointAreHealthy(t, ctx, agentClient) },
 		endpointHealthPollingTimeout,
@@ -1911,7 +1907,7 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 	)
 
 	// Assert that Endpoint is running the second policy
-	endpointPolicyID := getEndpointPolicyID(t)
+	endpointPolicyID = getEndpointPolicyID(t)
 	require.Equal(t, policyResp.ID, endpointPolicyID)
 
 	// Get Endpoint process ID after policy reassignment
@@ -1924,10 +1920,7 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 
 func getEndpointPID(t *testing.T) int {
 	entries, err := os.ReadDir("/proc")
-	require.NoError(t)
-	if err != nil {
-		return nil, err
-	}
+	require.NoError(t, err)
 
 	for _, entry := range entries {
 		if !entry.IsDir() {
