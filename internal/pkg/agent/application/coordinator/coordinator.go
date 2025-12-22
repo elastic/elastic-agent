@@ -15,11 +15,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.opentelemetry.io/collector/component/componentstatus"
+
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
+	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
-
-	"go.opentelemetry.io/collector/component/componentstatus"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 
@@ -161,7 +162,7 @@ type OTelManager interface {
 	Runner
 
 	// Update updates the current plain configuration for the otel collector and components.
-	Update(*confmap.Conf, []component.Component)
+	Update(*confmap.Conf, *monitoringCfg.MonitoringConfig, []component.Component)
 
 	// WatchCollector returns a channel to watch for collector status updates.
 	WatchCollector() <-chan *status.AggregateStatus
@@ -1871,7 +1872,7 @@ func (c *Coordinator) updateManagersWithConfig(model *component.Model) {
 		}
 		c.logger.With("component_ids", componentIDs).Info("Using OpenTelemetry collector runtime.")
 	}
-	c.otelMgr.Update(c.otelCfg, otelModel.Components)
+	c.otelMgr.Update(c.otelCfg, c.currentCfg.Settings.MonitoringConfig, otelModel.Components)
 }
 
 // splitModelBetweenManager splits the model components between the runtime manager and the otel manager.
