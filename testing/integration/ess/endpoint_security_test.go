@@ -12,6 +12,7 @@ import (
 	"crypto"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"net"
@@ -21,6 +22,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -1798,4 +1800,168 @@ type certificatePaths struct {
 	clientCertKeyPath     string
 	clientCertKeyEncPath  string
 	clientCertKeyPassPath string
+}
+
+// TestPolicyReassignWithTamperProtectedEndpoint creates a policy with Elastic Defend (i.e. Endpoint)
+// in it, making sure it has tamper protection enabled, and enrolls an Agent to this policy.  A second
+// policy, also with Elastic Defend and tamper protection enabled is created, and the Agent is reassigned
+// to this policy. Endpoint should not be uninstalled and reinstalled as a result of this policy reassignment.
+func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.FleetEndpointSecurity,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+	})
+
+	t.Log("Creating the first policy and enrollment token")
+	firstPolicy := createBasicPolicy()
+	policyResp, enrollKeyResp := createPolicyAndEnrollmentToken(ctx, t, info.KibanaClient, firstPolicy)
+
+	t.Log("Install Elastic Defend")
+	pkgPolicyResp, err := installElasticDefendPackage(t, info, policyResp.ID)
+	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
+
+	t.Log("Updating the first policy add tamper protection")
+	isProtected := true
+	updateReq := kibana.AgentPolicyUpdateRequest{
+		Name:        firstPolicy.Name,
+		Namespace:   firstPolicy.Namespace,
+		IsProtected: &isProtected,
+	}
+	_, err = info.KibanaClient.UpdatePolicy(ctx, policyResp.ID, updateReq)
+	require.NoError(t, err)
+
+	t.Log("Install and enroll Elastic Agent with the first policy")
+	opts := atesting.InstallOpts{}
+	_, err = tools.InstallAgentForPolicyWithToken(ctx, t, opts, fixture, info.KibanaClient, enrollKeyResp)
+	require.NoError(t, err, "failed to install Elastic Agent with the first policy")
+
+	t.Log("Ensuring Elastic Agent and Endpoint are healthy")
+	agentClient := fixture.Client()
+	err = agentClient.Connect(ctx)
+	require.NoError(t, err, "could not connect to the initial agent")
+
+	require.Eventually(t,
+		func() bool { return agentAndEndpointAreHealthy(t, ctx, agentClient) },
+		endpointHealthPollingTimeout,
+		time.Second,
+		"Endpoint component or units are not healthy prior to policy reassignment",
+	)
+
+	// Assert that Endpoint is running the first policy
+	endpointPolicyID := getEndpointPolicyID(t)
+	require.Equal(t, policyResp.ID, endpointPolicyID)
+
+	// Get Endpoint process ID before policy reassignment
+	firstPID := getEndpointPID(t)
+	require.NotZero(t, firstPID)
+
+	t.Log("Creating the second policy")
+	secondPolicy := createBasicPolicy()
+	policyResp, _ = createPolicyAndEnrollmentToken(ctx, t, info.KibanaClient, secondPolicy)
+
+	t.Log("Updating the second policy add tamper protection")
+	updateReq = kibana.AgentPolicyUpdateRequest{
+		Name:        secondPolicy.Name,
+		Namespace:   secondPolicy.Namespace,
+		IsProtected: &isProtected,
+	}
+	_, err = info.KibanaClient.UpdatePolicy(ctx, policyResp.ID, updateReq)
+	require.NoError(t, err)
+
+	t.Log("Get the second policy's uninstall token")
+	uninstallToken, err := tools.GetUninstallToken(ctx, info.KibanaClient, policyResp.ID)
+	require.NoError(t, err, "failed to get uninstall token for the second policy")
+
+	addEndpointCleanup(t, uninstallToken)
+
+	// Reassign the agent to the second policy
+	t.Log("Reassigning the agent to the second policy")
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	agentState, err := agentClient.State(ctx)
+	require.NoError(t, err)
+
+	policyReassignReq := kibana.AgentPolicyReassignRequest{
+		PolicyID: policyResp.ID,
+	}
+	err := info.KibanaClient.ReassignAgentToPolicy(ctx, agentState.Info.ID, policyReassignReq)
+	require.NoError(t, err, "failed to reassign the agent to the second policy")
+
+	t.Log("Ensuring Elastic Agent and Endpoint are healthy after policy reassignment")
+	agentClient := fixture.Client()
+	err = agentClient.Connect(ctx)
+	require.NoError(t, err, "could not connect to the initial agent")
+
+	require.Eventually(t,
+		func() bool { return agentAndEndpointAreHealthy(t, ctx, agentClient) },
+		endpointHealthPollingTimeout,
+		time.Second,
+		"Endpoint component or units are not healthy after policy reassignment",
+	)
+
+	// Assert that Endpoint is running the second policy
+	endpointPolicyID := getEndpointPolicyID(t)
+	require.Equal(t, policyResp.ID, endpointPolicyID)
+
+	// Get Endpoint process ID after policy reassignment
+	secondPID := getEndpointPID(t)
+	require.NotZero(t, secondPID)
+
+	// Assert that endpoint process IDs haven't changed across policy reassignment
+	require.Equal(t, firstPID, secondPID)
+}
+
+func getEndpointPID(t *testing.T) int {
+	entries, err := os.ReadDir("/proc")
+	require.NoError(t)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		currPID, err := strconv.Atoi(entry.Name())
+		if err != nil {
+			continue // not a PID directory
+		}
+
+		exePath := filepath.Join("/proc", entry.Name(), "exe")
+		resolvedExePath, err := os.Readlink(exePath)
+		if err != nil {
+			continue // permission denied or process exited
+		}
+
+		if resolvedExePath == "/opt/Elastic/Endpoint/elastic-endpoint" {
+			return currPID
+		}
+	}
+
+	return 0
+}
+
+func getEndpointPolicyID(t *testing.T) string {
+	// /opt/Elastic/Endpoint/elastic-endpoint status --output json
+	cmd := exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "status", "--output=json")
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err)
+
+	var status struct {
+		ElasticEndpoint struct {
+			Policy struct {
+				ID string `json:"id"`
+			}
+		} `json:"elastic-endpoint"`
+	}
+	err = json.Unmarshal(output, &status)
+	require.NoError(t, err)
+
+	return status.ElasticEndpoint.Policy.ID
 }

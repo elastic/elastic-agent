@@ -351,3 +351,5 @@ replace (
 replace go.opentelemetry.io/otel/exporters/prometheus => go.opentelemetry.io/otel/exporters/prometheus v0.58.0
 
 tool golang.org/x/tools/cmd/deadcode
+
+replace github.com/elastic/elastic-agent-libs => ../elastic-agent-libs
