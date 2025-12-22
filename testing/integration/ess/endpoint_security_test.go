@@ -1844,7 +1844,11 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Install and enroll Elastic Agent with the first policy")
-	opts := atesting.InstallOpts{}
+	opts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+		Privileged:     true,
+	}
 	_, err = tools.InstallAgentForPolicyWithToken(ctx, t, opts, fixture, info.KibanaClient, enrollKeyResp)
 	require.NoError(t, err, "failed to install Elastic Agent with the first policy")
 
