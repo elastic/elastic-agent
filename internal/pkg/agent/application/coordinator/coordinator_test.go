@@ -209,6 +209,33 @@ func TestComponentUpdateDiff(t *testing.T) {
 			},
 		},
 		{
+			name: "test-updated-component-input-id",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{ID: "input-one"},
+					},
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{ID: "input-two"},
+					},
+				},
+			},
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Len(t, logs.Components.Added, 0)
+				require.Len(t, logs.Components.Removed, 0)
+				require.Len(t, logs.Components.Updated, 1)
+				require.Contains(t, logs.Components.Updated[0], "input-two: added")
+				require.Contains(t, logs.Components.Updated[0], "input-one: removed")
+			},
+		}, {
 			name: "just-change-output",
 			old: []component.Component{
 				{
