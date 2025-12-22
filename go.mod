@@ -352,4 +352,4 @@ replace go.opentelemetry.io/otel/exporters/prometheus => go.opentelemetry.io/ote
 
 tool golang.org/x/tools/cmd/deadcode
 
-replace github.com/elastic/elastic-agent-libs => ../elastic-agent-libs
+replace github.com/elastic/elastic-agent-libs v0.29.0 => github.com/ycombinator/elastic-agent-libs v0.0.0-20251222070506-f939c145ec34
