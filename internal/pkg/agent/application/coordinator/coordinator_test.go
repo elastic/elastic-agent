@@ -200,6 +200,9 @@ func TestComponentUpdateDiff(t *testing.T) {
 				},
 			},
 			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Len(t, logs.Components.Added, 0)
+				require.Len(t, logs.Components.Removed, 0)
+				require.Len(t, logs.Components.Updated, 1)
 				require.Contains(t, logs.Components.Updated[0], "unit-three: added")
 				require.Contains(t, logs.Components.Updated[0], "unit-x: removed")
 			},
@@ -219,6 +222,9 @@ func TestComponentUpdateDiff(t *testing.T) {
 				},
 			},
 			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Len(t, logs.Components.Added, 0)
+				require.Len(t, logs.Components.Removed, 0)
+				require.Len(t, logs.Components.Updated, 0)
 				require.Equal(t, []string{"elasticsearch"}, logs.Outputs.Removed)
 				require.Equal(t, []string{"logstash"}, logs.Outputs.Added)
 			},
