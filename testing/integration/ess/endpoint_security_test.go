@@ -1965,9 +1965,9 @@ func getEndpointPID(t *testing.T) int {
 	return 0
 }
 
-func getEndpointPolicyID(t *testing.T) string {
+func getEndpointPolicyID(t *testing.T, ctx context.Context) string {
 	// /opt/Elastic/Endpoint/elastic-endpoint status --output json
-	cmd := exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "status", "--output=json")
+	cmd := exec.CommandContext(ctx, "/opt/Elastic/Endpoint/elastic-endpoint", "status", "--output", "json")
 	output, err := cmd.CombinedOutput()
 	require.NoError(t, err)
 
