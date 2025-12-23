@@ -37,6 +37,7 @@ RUN true && \
     ln -s {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/elastic-agent {{ $beatBinary }} && \
     chmod 0755 {{ $beatHome }}/data/elastic-agent-*/elastic-agent && \
     chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/elastic-otel-collector && \
+    (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/cloudbeat || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/osquery* || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/apm-server || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/cloud-defend || true) && \
