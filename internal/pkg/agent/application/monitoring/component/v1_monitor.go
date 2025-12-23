@@ -63,7 +63,7 @@ const (
 	agentKey                   = "agent"
 	useOutputKey               = "use_output"
 	failureThresholdKey        = "failure_threshold"
-	monitoringOutput           = "monitoring"
+	MonitoringOutput           = "monitoring"
 	defaultMonitoringNamespace = "default"
 	agentName                  = "elastic-agent"
 	metricBeatName             = "metricbeat"
@@ -194,7 +194,7 @@ func (b *BeatsMonitor) MonitoringConfig(
 	b.initInputs(cfg)
 
 	if b.config.C.MonitorLogs {
-		if err := b.injectLogsInput(cfg, componentInfos, monitoringOutput, monitoringRuntime); err != nil {
+		if err := b.injectLogsInput(cfg, componentInfos, MonitoringOutput, monitoringRuntime); err != nil {
 			return nil, errors.New(err, "failed to inject monitoring output")
 		}
 	}
@@ -371,7 +371,7 @@ func (b *BeatsMonitor) injectMonitoringOutput(source, dest map[string]interface{
 	}
 
 	monitoringOutputs := map[string]interface{}{
-		monitoringOutput: outputNode,
+		MonitoringOutput: outputNode,
 	}
 
 	dest[outputsKey] = monitoringOutputs
@@ -420,21 +420,6 @@ func (b *BeatsMonitor) getComponentInfos(
 			BinaryName:     fileBeatName,
 			RuntimeManager: monitoringRuntime,
 		})
-	}
-	// If any other component uses the Otel runtime, also add a component to monitor its telemetry.
-	// This component only works in the Otel runtime, so we can't add it if the output doesn't support it.
-	if b.config.C.MonitorMetrics && usingOtelRuntime(componentInfos) {
-		if outputOtelSupported {
-			componentInfos = append(componentInfos,
-				componentInfo{
-					ID:             prometheusMonitoringComponentId,
-					BinaryName:     metricBeatName,
-					RuntimeManager: component.OtelRuntimeManager,
-				})
-		} else {
-			b.logger.Warn("The Otel prometheus metrics monitoring input can't run in a beats process, skipping")
-		}
-
 	}
 	// sort the components to ensure a consistent order of inputs in the configuration
 	slices.SortFunc(componentInfos, func(a, b componentInfo) int {
@@ -510,7 +495,7 @@ func (b *BeatsMonitor) injectMetricsInput(
 			idKey:        fmt.Sprintf("%s-beats", monitoringMetricsUnitID),
 			"name":       fmt.Sprintf("%s-beats", monitoringMetricsUnitID),
 			"type":       "beat/metrics",
-			useOutputKey: monitoringOutput,
+			useOutputKey: MonitoringOutput,
 			"data_stream": map[string]interface{}{
 				"namespace": monitoringNamespace,
 			},
@@ -521,7 +506,7 @@ func (b *BeatsMonitor) injectMetricsInput(
 			idKey:        fmt.Sprintf("%s-agent", monitoringMetricsUnitID),
 			"name":       fmt.Sprintf("%s-agent", monitoringMetricsUnitID),
 			"type":       "http/metrics",
-			useOutputKey: monitoringOutput,
+			useOutputKey: MonitoringOutput,
 			"data_stream": map[string]interface{}{
 				"namespace": monitoringNamespace,
 			},
@@ -541,7 +526,7 @@ func (b *BeatsMonitor) injectMetricsInput(
 			idKey:        fmt.Sprintf("%s-collector", monitoringMetricsUnitID),
 			"name":       fmt.Sprintf("%s-collector", monitoringMetricsUnitID),
 			"type":       "prometheus/metrics",
-			useOutputKey: monitoringOutput,
+			useOutputKey: MonitoringOutput,
 			"data_stream": map[string]interface{}{
 				"namespace": monitoringNamespace,
 			},
@@ -865,7 +850,7 @@ func (b *BeatsMonitor) getServiceComponentProcessMetricInputs(
 			idKey:        fmt.Sprintf("%s-%s", monitoringMetricsUnitID, name),
 			"name":       fmt.Sprintf("%s-%s", monitoringMetricsUnitID, name),
 			"type":       "system/metrics",
-			useOutputKey: monitoringOutput,
+			useOutputKey: MonitoringOutput,
 			"data_stream": map[string]interface{}{
 				"namespace": monitoringNamespace,
 			},
@@ -1456,7 +1441,7 @@ func isSupportedBeatsBinary(binaryName string) bool {
 }
 
 func verifyOutputOtelSupported(outputCfg map[string]any) error {
-	parsed, err := component.ParseOutput(monitoringOutput, outputCfg, logp.InfoLevel, nil)
+	parsed, err := component.ParseOutput(MonitoringOutput, outputCfg, logp.InfoLevel, nil)
 	if err != nil {
 		return err
 	}
