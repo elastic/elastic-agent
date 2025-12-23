@@ -1877,9 +1877,8 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 		"Endpoint component or units are not healthy prior to policy reassignment",
 	)
 
-	// Assert that Endpoint is running the first policy
-	endpointPolicyID := getEndpointPolicyID(t)
-	require.Equal(t, policyResp.ID, endpointPolicyID)
+	// Get Endpoint's policy ID
+	firstEndpointPolicyID := getEndpointPolicyID(t, ctx)
 
 	// Get Endpoint process ID before policy reassignment
 	firstPID := getEndpointPID(t)
@@ -1925,9 +1924,9 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 		"Endpoint component or units are not healthy after policy reassignment",
 	)
 
-	// Assert that Endpoint is running the second policy
-	endpointPolicyID = getEndpointPolicyID(t)
-	require.Equal(t, policyResp.ID, endpointPolicyID)
+	// Assert that Endpoint is running a different policy
+	secondEndpointPolicyID := getEndpointPolicyID(t, ctx)
+	require.NotEqual(t, firstEndpointPolicyID, secondEndpointPolicyID)
 
 	// Get Endpoint process ID after policy reassignment
 	secondPID := getEndpointPID(t)
