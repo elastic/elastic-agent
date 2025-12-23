@@ -1905,8 +1905,6 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 	uninstallToken, err = tools.GetUninstallToken(ctx, info.KibanaClient, policyResp.ID)
 	require.NoError(t, err, "failed to get uninstall token for the second policy")
 
-	addEndpointCleanup(t, uninstallToken)
-
 	// Reassign the agent to the second policy
 	t.Log("Reassigning the agent to the second policy")
 	policyReassignReq := kibana.AgentPolicyReassignRequest{
@@ -1916,7 +1914,8 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 	err = info.KibanaClient.ReassignAgentToPolicy(ctx, agentID, policyReassignReq)
 	require.NoError(t, err, "failed to reassign the agent to the second policy")
 
-	isReassigned = true // Prevents cleaning up Endpoint using first policy's uninstall token'
+	isReassigned = true // Prevents cleaning up Endpoint using first policy's uninstall token
+	addEndpointCleanup(t, uninstallToken)
 
 	t.Log("Ensuring Elastic Agent and Endpoint are healthy after policy reassignment")
 	require.Eventually(t,
