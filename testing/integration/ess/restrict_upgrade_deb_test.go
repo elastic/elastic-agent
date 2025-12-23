@@ -41,6 +41,42 @@ func TestRestrictUpgradeDeb(t *testing.T) {
 
 		fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("deb"))
 		require.NoError(t, err)
+
+		cfg := []byte(`
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [http://localhost:9200]
+    api_key: "placeholder"
+    preset: balanced
+    status_reporting:
+      enabled: false
+
+inputs:
+  - type: system/metrics
+    id: unique-system-metrics-input
+    data_stream.namespace: default
+    use_output: default
+    streams:
+      - metricsets:
+        - cpu
+        data_stream.dataset: system.cpu
+      - metricsets:
+        - memory
+        data_stream.dataset: system.memory
+      - metricsets:
+        - network
+        data_stream.dataset: system.network
+      - metricsets:
+        - filesystem
+        data_stream.dataset: system.filesystem
+agent.monitoring.enabled: false
+`)
+		err = fixture.Prepare(ctx)
+		require.NoError(t, err)
+		err = fixture.Configure(ctx, cfg)
+		require.NoError(t, err)
+
 		installOpts := atesting.InstallOpts{
 			NonInteractive: true,
 			Privileged:     true,
