@@ -10,3 +10,8 @@ import "time"
 func TimeFormat() string {
 	return time.RFC3339Nano
 }
+
+// OldTimeFormat returns the old time format shared between the protocol.
+func OldTimeFormat() string {
+	return "2006-01-02 15:04:05 -0700 MST"
+}
