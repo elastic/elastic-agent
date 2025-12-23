@@ -1927,6 +1927,7 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 
 	// Assert that Endpoint is running a different policy.  We use a require.Eventually here because
 	// the policy reassignment can take a few seconds to propagate to Endpoint.
+	t.Log("Ensuring that Endpoint is running a different policy")
 	require.Eventually(t,
 		func() bool {
 			secondEndpointPolicyID := getEndpointPolicyID(t, ctx)
@@ -1942,6 +1943,7 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 	require.NotZero(t, secondPID)
 
 	// Assert that endpoint process IDs haven't changed across policy reassignment
+	t.Log("Ensuring that Endpoint has not restarted")
 	require.Equal(t, firstPID, secondPID)
 }
 
