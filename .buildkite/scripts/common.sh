@@ -31,8 +31,6 @@ EOF
   sudo systemctl restart docker
 }
 
-docker_disable_containerd_snapshotter
-
 getOSOptions() {
   case $(uname | tr '[:upper:]' '[:lower:]') in
     linux*)

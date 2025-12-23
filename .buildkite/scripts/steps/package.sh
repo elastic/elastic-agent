@@ -5,6 +5,8 @@ set -euo pipefail
 _SELF=$(dirname $0)
 source "${_SELF}/../common.sh"
 
+docker_disable_containerd_snapshotter
+
 mage clean
 
 if test -z "${MANIFEST_URL:-}"; then

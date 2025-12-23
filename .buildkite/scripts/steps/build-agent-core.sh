@@ -4,6 +4,8 @@ set -euo pipefail
 
 source .buildkite/scripts/common.sh
 
+docker_disable_containerd_snapshotter
+
 echo "+++ Build Agent artifacts"
 SNAPSHOT=""
 VERSION_QUALIFIER="${VERSION_QUALIFIER:=""}"

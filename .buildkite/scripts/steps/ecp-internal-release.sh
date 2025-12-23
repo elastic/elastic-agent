@@ -20,6 +20,8 @@ set -eu
 _SELF=$(dirname $0)
 source "${_SELF}/../common.sh"
 
+docker_disable_containerd_snapshotter
+
 # annotate create temp markdown file if not exists
 # this file will be later used to annotate the build
 # it appends to the file the message passed as argument
