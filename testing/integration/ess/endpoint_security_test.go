@@ -1833,7 +1833,7 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 	pkgPolicyResp, err := installElasticDefendPackage(t, info, policyResp.ID)
 	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
 
-	t.Log("Updating the first policy add tamper protection")
+	t.Log("Updating the first policy to add tamper protection")
 	isProtected := true
 	updateReq := kibana.AgentPolicyUpdateRequest{
 		Name:        firstPolicy.Name,
@@ -1892,7 +1892,7 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 	pkgPolicyResp, err = installElasticDefendPackage(t, info, policyResp.ID)
 	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
 
-	t.Log("Updating the second policy add tamper protection")
+	t.Log("Updating the second policy to add tamper protection")
 	updateReq = kibana.AgentPolicyUpdateRequest{
 		Name:        secondPolicy.Name,
 		Namespace:   secondPolicy.Namespace,
