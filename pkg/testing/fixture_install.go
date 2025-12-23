@@ -128,7 +128,7 @@ type InstallOpts struct {
 	EnrollOpts
 	FleetBootstrapOpts
 
-	Config string // Agent config to use for installation
+	Config string // Agent config to use for installation. Currently, this field is only used for DEB.
 }
 
 func (i *InstallOpts) ToCmdArgs() []string {
