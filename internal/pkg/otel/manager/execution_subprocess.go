@@ -62,6 +62,7 @@ func newSubprocessExecution(logLevel logp.Level, collectorPath string, uuid stri
 	}, nil
 }
 
+// subprocessExecution implements collectorExecution by running the collector in a subprocess.
 type subprocessExecution struct {
 	collectorPath            string
 	collectorArgs            []string
@@ -74,7 +75,20 @@ type subprocessExecution struct {
 
 // startCollector starts a supervised collector and monitors its health. Process exit errors are sent to the
 // processErrCh channel. Other run errors, such as not able to connect to the health endpoint, are sent to the runErrCh channel.
-func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, processErrCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
+func (r *subprocessExecution) startCollector(
+	ctx context.Context,
+	logLevel string,
+	baseLogger *logger.Logger,
+	logger *logger.Logger,
+	cfg *confmap.Conf,
+	processErrCh chan error,
+	statusCh chan *status.AggregateStatus,
+	forceFetchStatusCh chan struct{},
+) (collectorHandle, error) {
+	if err := r.setLogLevelFromString(logLevel); err != nil {
+		return nil, fmt.Errorf("failed to set log level for otel collector: %w", err)
+	}
+
 	if cfg == nil {
 		// configuration is required
 		return nil, errors.New("no configuration provided")
@@ -115,8 +129,12 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 	env := os.Environ()
 	// Set the environment variable for the collector metrics port. See comment at the constant definition for more information.
 	env = append(env, fmt.Sprintf("%s=%d", componentmonitoring.OtelCollectorMetricsPortEnvVarName, collectorMetricsPort))
+
+	// set collector args
+	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, r.logLevel.String()))
+
 	processInfo, err := process.Start(r.collectorPath,
-		process.WithArgs(r.collectorArgs),
+		process.WithArgs(collectorArgs),
 		process.WithEnv(env),
 		process.WithCmdOptions(func(c *exec.Cmd) error {
 			c.Stdin = bytes.NewReader(confBytes)
@@ -239,6 +257,18 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 	}()
 
 	return ctl, nil
+}
+
+func (r *subprocessExecution) setLogLevelFromString(logLevel string) error {
+	var lvl logp.Level
+	err := lvl.Unpack(logLevel)
+	if err != nil {
+		return fmt.Errorf("invalid log level '%s': %w", logLevel, err)
+	}
+	if r.logLevel != lvl {
+		r.logLevel = lvl
+	}
+	return nil
 }
 
 // cloneCollectorStatus creates a deep copy of the provided AggregateStatus.

@@ -1673,6 +1673,19 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 	}
 	c.currentCfg = currentCfg
 
+	// check if log level has changed in standalone agent config
+	ll := currentCfg.Settings.LoggingConfig.Level
+	if ll != c.state.LogLevel {
+		// set log level for the coordinator
+		c.setLogLevel(ll)
+		// set global log level
+		logger.SetLevel(logp.Level(ll))
+		// set agent log level.
+		// this is used by other parts of the agent to report the log level eg. otel manager
+		c.agentInfo.SetLogLevel(ctx, ll.String())
+		c.logger.Infof("log level changed to %s", ll.String())
+	}
+
 	if c.vars != nil {
 		return c.refreshComponentModel(ctx)
 	}
@@ -1801,10 +1814,13 @@ func (c *Coordinator) processVars(ctx context.Context, vars []*transpiler.Vars) 
 
 // Called on the main Coordinator goroutine.
 func (c *Coordinator) processLogLevel(ctx context.Context, ll logp.Level) {
-	c.setLogLevel(ll)
-	err := c.refreshComponentModel(ctx)
-	if err != nil {
-		c.logger.Errorf("updating log level: %s", err.Error())
+	// do not refresh component model if log level did not change
+	if c.state.LogLevel != ll {
+		c.setLogLevel(ll)
+		err := c.refreshComponentModel(ctx)
+		if err != nil {
+			c.logger.Errorf("updating log level: %s", err.Error())
+		}
 	}
 }
 
