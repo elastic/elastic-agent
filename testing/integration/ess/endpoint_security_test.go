@@ -1865,7 +1865,7 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 		}
 	}()
 
-	t.Log("Ensuring Elastic Agent and Endpoint are healthy")
+	t.Log("Ensuring Elastic Agent and Endpoint are healthy before policy reassignment")
 	agentClient := fixture.Client()
 	err = agentClient.Connect(ctx)
 	require.NoError(t, err, "could not connect to the initial agent")
