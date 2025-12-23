@@ -42,7 +42,7 @@ func TestRestrictUpgradeDeb(t *testing.T) {
 		fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), atesting.WithPackageFormat("deb"))
 		require.NoError(t, err)
 
-		cfg := []byte(`
+		cfg := `
 outputs:
   default:
     type: elasticsearch
@@ -71,16 +71,13 @@ inputs:
         - filesystem
         data_stream.dataset: system.filesystem
 agent.monitoring.enabled: false
-`)
-		err = fixture.Prepare(ctx)
-		require.NoError(t, err)
-		err = fixture.Configure(ctx, cfg)
-		require.NoError(t, err)
+`
 
 		installOpts := atesting.InstallOpts{
 			NonInteractive: true,
 			Privileged:     true,
 			Force:          true,
+			Config:         cfg,
 		}
 
 		_, err = fixture.InstallWithoutEnroll(ctx, &installOpts)

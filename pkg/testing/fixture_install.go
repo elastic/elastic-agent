@@ -127,6 +127,8 @@ type InstallOpts struct {
 
 	EnrollOpts
 	FleetBootstrapOpts
+
+	Config string // Agent config to use for installation
 }
 
 func (i *InstallOpts) ToCmdArgs() []string {
@@ -526,6 +528,9 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, shou
 		}
 	})
 
+	if installOpts.Config != "" {
+		require.NoError(f.t, os.WriteFile("/etc/elastic-agent/elastic-agent.yml", []byte(installOpts.Config), 0600))
+	}
 	// start elastic-agent
 	out, err = exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
 	if err != nil {
