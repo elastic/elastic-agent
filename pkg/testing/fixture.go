@@ -952,8 +952,50 @@ func (f *Fixture) IsHealthy(ctx context.Context, opts ...statusOpt) error {
 	}
 
 	if status.State != int(cproto.State_HEALTHY) {
-		return fmt.Errorf("agent isn't healthy, current status: %s",
-			client.State(status.State)) //nolint:gosec // value will never be over 32-bit
+		return fmt.Errorf("agent isn't healthy, current state: %s, full status: %+v",
+			client.State(status.State), status) //nolint:gosec // value will never be over 32-bit
+	}
+
+	return nil
+}
+
+// IsHealthyOrDegradedFromOutput works like IsHealthy, but accepts a Degraded status if the reason is an output in that state.
+// This is useful for tests where we have an ES output, but no actual ES, and we don't care about sending data
+// anywhere.
+func (f *Fixture) IsHealthyOrDegradedFromOutput(ctx context.Context, opts ...statusOpt) error {
+	status, err := f.ExecStatus(ctx, opts...)
+	if err != nil {
+		return fmt.Errorf("agent status returned an error: %w", err)
+	}
+
+	invalidStateErr := fmt.Errorf("agent isn't healthy, current state: %s, full status: %+v",
+		client.State(status.State), status) //nolint:gosec // value will never be over 32-bit
+	switch cproto.State(status.State) {
+	case cproto.State_HEALTHY:
+		return nil
+	case cproto.State_DEGRADED:
+		// handled below
+	default:
+		return invalidStateErr
+	}
+
+	for _, compState := range status.Components {
+		switch cproto.State(compState.State) {
+		case cproto.State_HEALTHY, cproto.State_DEGRADED:
+		default:
+			return invalidStateErr
+		}
+		for _, unitState := range compState.Units {
+			switch cproto.State(unitState.State) {
+			case cproto.State_HEALTHY:
+			case cproto.State_DEGRADED:
+				if cproto.UnitType(unitState.UnitType) != cproto.UnitType_OUTPUT {
+					return invalidStateErr
+				}
+			default:
+				return invalidStateErr
+			}
+		}
 	}
 
 	return nil
