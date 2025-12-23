@@ -2,8 +2,18 @@
 source .buildkite/scripts/common.sh
 set +euo pipefail
 
+# function resources() {
+#     while [ true ]; do
+#         echo "--- System resources"
+#         uname -a
+#         top -l 1 | head -10
+#         df -h
+#         sleep 10
+#     done
+# }
+# resources &
 echo "--- Unit tests"
-RACE_DETECTOR=true TEST_COVERAGE=true mage unitTest
+RACE_DETECTOR=true TEST_COVERAGE=true GOMEMLIMIT=4200MiB mage unitTest
 TESTS_EXIT_STATUS=$?
 echo "--- Prepare artifacts"
 # Copy coverage file to build directory so it can be downloaded as an artifact

@@ -25,6 +25,7 @@ steps:
 
   - group: "Unit tests"
     key: "unit-tests"
+    skip: "Testing infrastructure issues being investigated"
     steps:
       - label: "Unit tests - Ubuntu 22.04"
         key: "unit-tests-2204"
@@ -148,7 +149,7 @@ steps:
 
   - group: "macOS tests"
     key: "macos-unit-tests"
-    skip: "MacOS agents are being lost during test execution"
+    # skip: "MacOS agents are being lost during test execution"
     steps:
       - label: "Unit tests - macOS 15 ARM"
         command: ".buildkite/scripts/steps/unit-tests.sh"
@@ -186,6 +187,7 @@ steps:
 
   - group: "Desktop Windows tests"
     key: "extended-windows"
+    skip: "Testing infrastructure issues being investigated"
     steps:
       - label: "Unit tests - Windows 10"
         key: "unit-tests-win10"
@@ -226,6 +228,7 @@ steps:
             allowed: true
 
   - label: ":junit: Junit annotate"
+    skip: "Testing infrastructure issues being investigated"
     agents:
       # requires at least "bash", "curl" and "git"
       image: "docker.elastic.co/ci-agent-images/buildkite-junit-annotate:1.0"
@@ -256,6 +259,7 @@ steps:
 
   - group: "K8s tests"
     key: "k8s-tests"
+    skip: "Testing infrastructure issues being investigated"
     steps:
       - label: "K8s tests: {{matrix.k8s_version}}"
         env:
@@ -281,6 +285,7 @@ steps:
   # Triggers a dynamic step: Sync K8s
   # Runs only on main and if k8s files are changed
   - label: "Trigger k8s sync"
+    skip: "Testing infrastructure issues being investigated"
     branches: main
     command: ".buildkite/scripts/steps/sync-k8s.sh"
     agents:
@@ -295,6 +300,7 @@ steps:
 
   # Trigger for pull requests
   - label: "Trigger Extended tests for Pull request"
+    skip: "Testing infrastructure issues being investigated"
     if: |
       (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
       build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
@@ -329,6 +335,7 @@ steps:
 
   # Trigger for branches
   - label: "Triggering Extended tests for branches"
+    skip: "Testing infrastructure issues being investigated"
     if: build.pull_request.id == null
     trigger: "elastic-agent-extended-testing"
     build:
@@ -338,6 +345,7 @@ steps:
   # Trigger for pull requests - Serverless Beats Tests
   # this should help detecting issues earlier in the development cycle
   - label: "Trigger Serverless Beats Tests"
+    skip: "Testing infrastructure issues being investigated"
     if: build.pull_request.id != null
     trigger: "beats-agent-serverless-tests"
     build:
@@ -352,6 +360,7 @@ steps:
   # NOTE: This should help detecting issues earlier in the development cycle
   # See https://github.com/elastic/elastic-agent/issues/11604
   - label: "Trigger Elastic Agent Package"
+    skip: "Testing infrastructure issues being investigated"
     if: build.pull_request.id != null
     commands:
       - .buildkite/scripts/steps/trigger-elastic-agent-package.sh
@@ -367,6 +376,7 @@ steps:
   # NOTE: This should help detecting issues earlier in the development cycle
   # See https://github.com/elastic/elastic-agent/pull/11725
   - label: "DRY RUN publish to serverless"
+    skip: "Testing infrastructure issues being investigated"
     if: build.pull_request.id != null && build.env("BUILDKITE_PULL_REQUEST_BASE_BRANCH") == "main"
     if_changed:
       include:
@@ -387,6 +397,7 @@ steps:
   - wait: ~
 
   - label: "Publish to serverless"
+    skip: "Testing infrastructure issues being investigated"
     branches: main
     trigger: "agentless-serverless-release"
     build:
