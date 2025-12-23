@@ -51,7 +51,6 @@ func newSubprocessExecution(logLevel logp.Level, collectorPath string, uuid stri
 		collectorPath: collectorPath,
 		collectorArgs: []string{
 			fmt.Sprintf("--%s", OtelSetSupervisedFlagName),
-			fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, logLevel.String()),
 			fmt.Sprintf("--%s=%s", OtelSupervisedMonitoringURLFlagName, monitoring.EDOTMonitoringEndpoint()),
 		},
 		logLevel:                 logLevel,
