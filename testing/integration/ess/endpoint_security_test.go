@@ -1888,6 +1888,10 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 	secondPolicy := createBasicPolicy()
 	policyResp, _ = createPolicyAndEnrollmentToken(ctx, t, info.KibanaClient, secondPolicy)
 
+	t.Log("Install Elastic Defend")
+	pkgPolicyResp, err = installElasticDefendPackage(t, info, policyResp.ID)
+	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
+
 	t.Log("Updating the second policy add tamper protection")
 	updateReq = kibana.AgentPolicyUpdateRequest{
 		Name:        secondPolicy.Name,
