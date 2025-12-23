@@ -8213,11 +8213,11 @@ limitations under the License.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/crypto
-Version: v0.46.0
+Version: v0.45.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/crypto@v0.46.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/crypto@v0.45.0/LICENSE:
 
 Copyright 2009 The Go Authors.
 
@@ -8287,11 +8287,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/net
-Version: v0.48.0
+Version: v0.47.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/net@v0.48.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/net@v0.47.0/LICENSE:
 
 Copyright 2009 The Go Authors.
 
@@ -8324,11 +8324,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/sync
-Version: v0.19.0
+Version: v0.18.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/sync@v0.19.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/sync@v0.18.0/LICENSE:
 
 Copyright 2009 The Go Authors.
 
@@ -8361,11 +8361,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/sys
-Version: v0.39.0
+Version: v0.38.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/sys@v0.39.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/sys@v0.38.0/LICENSE:
 
 Copyright 2009 The Go Authors.
 
@@ -8398,11 +8398,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/term
-Version: v0.38.0
+Version: v0.37.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/term@v0.38.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/term@v0.37.0/LICENSE:
 
 Copyright 2009 The Go Authors.
 
@@ -8435,11 +8435,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/text
-Version: v0.32.0
+Version: v0.31.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/text@v0.32.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/text@v0.31.0/LICENSE:
 
 Copyright 2009 The Go Authors.
 
@@ -14372,13 +14372,13 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
 
 --------------------------------------------------------------------------------
 Dependency : github.com/hashicorp/go-version
-Version: v1.8.0
+Version: v1.7.0
 Licence type (autodetected): MPL-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/hashicorp/go-version@v1.8.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/hashicorp/go-version@v1.7.0/LICENSE:
 
-Copyright IBM Corp. 2014, 2025
+Copyright (c) 2014 HashiCorp, Inc.
 
 Mozilla Public License, version 2.0
 
