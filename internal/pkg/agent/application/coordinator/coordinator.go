@@ -1679,10 +1679,13 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 		// set log level for the coordinator
 		c.setLogLevel(ll)
 		// set global log level
-		logger.SetLevel(logp.Level(ll))
+		logger.SetLevel(ll)
 		// set agent log level.
 		// this is used by other parts of the agent to report the log level eg. otel manager
-		c.agentInfo.SetLogLevel(ctx, ll.String())
+		err = c.agentInfo.SetLogLevel(ctx, ll.String())
+		if err != nil {
+			c.logger.Errorf("failed to set agent log level: %v", err)
+		}
 		c.logger.Infof("log level changed to %s", ll.String())
 	}
 
