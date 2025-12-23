@@ -158,9 +158,9 @@ func TestInputRuntimeSpec_CommandName(t *testing.T) {
 			want: "custom-command",
 		},
 		{
-			name: "returns first arg when binary is agentbeat and no Command.Name",
+			name: "returns first arg when binary is elastic-otel-collector and no Command.Name",
 			spec: InputRuntimeSpec{
-				BinaryName: "agentbeat",
+				BinaryName: "elastic-otel-collector",
 				Spec: InputSpec{
 					Command: &CommandSpec{
 						Args: []string{"filebeat", "--some-flag"},
@@ -178,7 +178,7 @@ func TestInputRuntimeSpec_CommandName(t *testing.T) {
 			want: "mybinary",
 		},
 		{
-			name: "returns BinaryName when Command has no Name and not agentbeat",
+			name: "returns BinaryName when Command has no Name and not elastic-otel-collector",
 			spec: InputRuntimeSpec{
 				BinaryName: "mybinary",
 				Spec: InputSpec{
@@ -190,21 +190,21 @@ func TestInputRuntimeSpec_CommandName(t *testing.T) {
 			want: "mybinary",
 		},
 		{
-			name: "returns BinaryName when agentbeat but no args",
+			name: "returns BinaryName when elastic-otel-collector but no args",
 			spec: InputRuntimeSpec{
-				BinaryName: "agentbeat",
+				BinaryName: "elastic-otel-collector",
 				Spec: InputSpec{
 					Command: &CommandSpec{
 						Args: []string{},
 					},
 				},
 			},
-			want: "agentbeat",
+			want: "elastic-otel-collector",
 		},
 		{
-			name: "prefers Command.Name over agentbeat first arg",
+			name: "prefers Command.Name over elastic-otel-collector first arg",
 			spec: InputRuntimeSpec{
-				BinaryName: "agentbeat",
+				BinaryName: "elastic-otel-collector",
 				Spec: InputSpec{
 					Command: &CommandSpec{
 						Name: "explicit-name",
@@ -255,9 +255,9 @@ func TestInputRuntimeSpec_BeatName(t *testing.T) {
 			want: "",
 		},
 		{
-			name: "returns first arg when agentbeat and arg ends with beat",
+			name: "returns first arg when elastic-otel-collector and arg ends with beat",
 			spec: InputRuntimeSpec{
-				BinaryName: "agentbeat",
+				BinaryName: "elastic-otel-collector",
 				Spec: InputSpec{
 					Command: &CommandSpec{
 						Args: []string{"metricbeat", "--some-flag"},
@@ -267,9 +267,9 @@ func TestInputRuntimeSpec_BeatName(t *testing.T) {
 			want: "metricbeat",
 		},
 		{
-			name: "returns empty when agentbeat but first arg does not end with beat",
+			name: "returns empty when elastic-otel-collector but first arg does not end with beat",
 			spec: InputRuntimeSpec{
-				BinaryName: "agentbeat",
+				BinaryName: "elastic-otel-collector",
 				Spec: InputSpec{
 					Command: &CommandSpec{
 						Args: []string{"osquerybeat", "--some-flag"},
@@ -297,7 +297,7 @@ func TestInputRuntimeSpec_BeatName(t *testing.T) {
 		{
 			name: "handles heartbeat correctly",
 			spec: InputRuntimeSpec{
-				BinaryName: "agentbeat",
+				BinaryName: "elastic-otel-collector",
 				Spec: InputSpec{
 					Command: &CommandSpec{
 						Args: []string{"heartbeat"},

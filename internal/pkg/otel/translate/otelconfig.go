@@ -59,7 +59,34 @@ var (
 		"winlog",
 	}
 
-	OtelSupportedInputTypes          = OtelSupportedFilebeatInputTypes
+	OtelSupportedMetricbeatInputTypes = []string{
+		"activemq/metrics",
+		"apache/metrics",
+		"beat/metrics",
+		"containerd/metrics",
+		"docker/metrics",
+		"elasticsearch/metrics",
+		"etcd/metrics",
+		"http/metrics",
+		"jolokia/metrics",
+		"kafka/metrics",
+		"kibana/metrics",
+		"linux/metrics",
+		"logstash/metrics",
+		"memcached/metrics",
+		"mongodb/metrics",
+		"mysql/metrics",
+		"nats/metrics",
+		"nginx/metrics",
+		"prometheus/metrics",
+		"rabbitmq/metrics",
+		"sql/metrics",
+		"stan/metrics",
+		"statsd/metrics",
+		"system/metrics",
+		"vsphere/metrics",
+	}
+	OtelSupportedInputTypes          = slices.Concat(OtelSupportedFilebeatInputTypes, OtelSupportedMetricbeatInputTypes)
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
 		otelcomponent.MustNewType("elasticsearch"): translateEsOutputToExporter,
 	}
@@ -127,7 +154,7 @@ func VerifyComponentIsOtelSupported(comp *component.Component) error {
 
 	// check if given input is supported in OTel runtime
 	// this includes all metricbeat inputs and some filebeat inputs for now
-	if !slices.Contains(OtelSupportedInputTypes, comp.InputType) && !strings.HasSuffix(comp.InputType, "/metrics") {
+	if !slices.Contains(OtelSupportedInputTypes, comp.InputType) {
 		return fmt.Errorf("unsupported input type: %s", comp.InputType)
 	}
 
@@ -192,14 +219,14 @@ func getPipelineID(comp *component.Component) (pipeline.ID, error) {
 	return pipeline.NewIDWithName(signal, pipelineName), nil
 }
 
-// getReceiverID returns the receiver id for the given unit and exporter type.
-func getReceiverID(receiverType otelcomponent.Type, unitID string) otelcomponent.ID {
+// GetReceiverID returns the receiver id for the given unit and exporter type.
+func GetReceiverID(receiverType otelcomponent.Type, unitID string) otelcomponent.ID {
 	receiverName := fmt.Sprintf("%s%s", OtelNamePrefix, unitID)
 	return otelcomponent.NewIDWithName(receiverType, receiverName)
 }
 
-// getExporterID returns the exporter id for the given exporter type and output name.
-func getExporterID(exporterType otelcomponent.Type, outputName string) otelcomponent.ID {
+// GetExporterID returns the exporter id for the given exporter type and output name.
+func GetExporterID(exporterType otelcomponent.Type, outputName string) otelcomponent.ID {
 	exporterName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
 	return otelcomponent.NewIDWithName(exporterType, exporterName)
 }
@@ -289,7 +316,7 @@ func getReceiversConfigForComponent(
 		}
 	}
 
-	receiverId := getReceiverID(receiverType, comp.ID)
+	receiverId := GetReceiverID(receiverType, comp.ID)
 	// Beat config inside a beat receiver is nested under an additional key. Not sure if this simple translation is
 	// always safe. We should either ensure this is always the case, or have an explicit mapping.
 	beatName := strings.TrimSuffix(receiverType.String(), "receiver")
@@ -427,7 +454,7 @@ func unitToExporterConfig(unit component.Unit, exporterType otelcomponent.Type, 
 	// we'd like to use the same exporter for all outputs with the same name, so we parse out the name for the unit id
 	// these will be deduplicated by the configuration merging process at the end
 	outputName := strings.TrimPrefix(unit.ID, inputType+"-") // TODO: Use a more structured approach here
-	exporterId := getExporterID(exporterType, outputName)
+	exporterId := GetExporterID(exporterType, outputName)
 
 	// translate the configuration
 	unitConfigMap := unit.Config.GetSource().AsMap() // this is what beats do in libbeat/management/generate.go

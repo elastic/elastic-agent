@@ -43,6 +43,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -50,6 +51,7 @@ import (
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 const (
@@ -1011,6 +1013,60 @@ func TestCoordinator_UpgradeDetails(t *testing.T) {
 	require.Equal(t, expectedErr.Error(), coord.state.UpgradeDetails.Metadata.ErrorMsg)
 }
 
+func Test_ApplyPersistedConfig(t *testing.T) {
+	cfgFile := filepath.Join(".", "testdata", "overrides.yml")
+
+	testCases := []struct {
+		name               string
+		featureEnable      bool
+		expectedLogs       bool
+		expectedOutputType string
+	}{
+		{name: "enabled", featureEnable: true, expectedLogs: false, expectedOutputType: "kafka"},
+		{name: "disabled", featureEnable: false, expectedLogs: true, expectedOutputType: "elasticsearch"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, err := config.LoadFile(filepath.Join(".", "testdata", "config.yaml"))
+			require.NoError(t, err)
+
+			testLogger, observedLogs := loggertest.New("")
+			err = applyPersistedConfig(testLogger, cfg, cfgFile, func() bool { return tc.featureEnable })
+			require.NoError(t, err)
+
+			found := false
+			// check that a log message was emitted about disabling kafka output
+			logs := observedLogs.All()
+			for _, logEntry := range logs {
+				if strings.Contains(logEntry.Message, "is disabled") {
+					found = true
+					break
+				}
+			}
+
+			require.NotEqualf(t, tc.featureEnable, found, "expected log message")
+
+			c := &configuration.Configuration{}
+			require.NoError(t, cfg.Agent.Unpack(&c))
+
+			require.Equal(t, tc.expectedLogs, c.Settings.MonitoringConfig.MonitorLogs)
+			require.True(t, c.Settings.MonitoringConfig.MonitorMetrics)
+			require.True(t, c.Settings.MonitoringConfig.Enabled)
+
+			// make sure output is not kafka
+			oc, err := cfg.Agent.Child("outputs", -1)
+			require.NoError(t, err)
+
+			do, err := oc.Child("default", -1)
+			require.NoError(t, err)
+			outputType, err := do.String("type", -1)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedOutputType, outputType, "output type should be %s, got %s", tc.expectedOutputType, outputType)
+		})
+	}
+}
+
 func BenchmarkCoordinator_generateComponentModel(b *testing.B) {
 	// load variables
 	varsMaps := []map[string]any{}
@@ -1401,7 +1457,7 @@ func (f *fakeOTelManager) Errors() <-chan error {
 	return f.errChan
 }
 
-func (f *fakeOTelManager) Update(cfg *confmap.Conf, components []component.Component) {
+func (f *fakeOTelManager) Update(cfg *confmap.Conf, monitoring *monitoringCfg.MonitoringConfig, components []component.Component) {
 	var collectorResult, componentResult error
 	if f.updateCollectorCallback != nil {
 		collectorResult = f.updateCollectorCallback(cfg)

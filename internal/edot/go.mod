@@ -2,12 +2,15 @@ module github.com/elastic/elastic-agent/internal/edot
 
 go 1.24.11
 
+// use in-repo directory
 replace github.com/elastic/elastic-agent => ../../
 
+replace github.com/elastic/beats/v7 => ../../beats
+
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251211195827-462751c83c26
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251218221037-2d1581840dc7
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-	github.com/elastic/elastic-agent-libs v0.28.0
+	github.com/elastic/elastic-agent-libs v0.29.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.24.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.25.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.24.0
@@ -63,13 +66,33 @@ require (
 	github.com/alexbrainman/sspi v0.0.0-20210105120005-909beea2cc74 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.67.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.1 // indirect
+	github.com/bluekeyes/go-gitdiff v0.7.1 // indirect
+	github.com/coder/websocket v1.8.14 // indirect
+	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
+	github.com/elastic/ebpfevents v0.8.0 // indirect
+	github.com/elastic/go-libaudit/v2 v2.6.2 // indirect
+	github.com/elastic/go-licenser v0.4.2 // indirect
+	github.com/elastic/go-quark v0.3.0 // indirect
+	github.com/elastic/tk-btf v0.2.0 // indirect
+	github.com/elastic/toutoumomoma v0.0.0-20240626215117-76e39db18dfb // indirect
+	github.com/fsnotify/fsevents v0.1.1 // indirect
+	github.com/google/gopacket v1.1.19 // indirect
+	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75 // indirect
+	github.com/insomniacslk/dhcp v0.0.0-20220119180841-3c283ff8b7dd // indirect
+	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.141.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.141.0 // indirect
+	github.com/osquery/osquery-go v0.0.0-20231108163517-e3cde127e724 // indirect
+	github.com/pkg/xattr v0.4.9 // indirect
 	github.com/prometheus/client_golang/exp v0.0.0-20250914183048-a974e0d45e0a // indirect
+	github.com/samuel/go-parser v0.0.0-20130731160455-ca8abbf65d0e // indirect
+	github.com/samuel/go-thrift v0.0.0-20140522043831-2187045faa54 // indirect
+	github.com/teambition/rrule-go v1.8.2 // indirect
 	go.opentelemetry.io/collector/component/componentstatus v0.141.0 // indirect
 	go.opentelemetry.io/collector/component/componenttest v0.141.0 // indirect
 	go.opentelemetry.io/collector/config/confighttp v0.141.0 // indirect
 	go.opentelemetry.io/collector/processor/processorhelper v0.141.0 // indirect
+	mvdan.cc/garble v0.12.1 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 )
@@ -99,7 +122,7 @@ require (
 	go.opentelemetry.io/collector/confmap/provider/envprovider v1.47.0
 	go.opentelemetry.io/collector/confmap/provider/fileprovider v1.47.0
 	go.opentelemetry.io/collector/confmap/provider/httpprovider v1.47.0
-	go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.45.0
+	go.opentelemetry.io/collector/confmap/provider/httpsprovider v1.47.0
 	go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.47.0
 	go.opentelemetry.io/collector/connector v0.141.0
 	go.opentelemetry.io/collector/exporter v1.47.0
@@ -155,7 +178,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.0 // indirect
 	github.com/Azure/azure-storage-blob-go v0.15.0 // indirect
-	github.com/Azure/go-amqp v1.3.0 // indirect
+	github.com/Azure/go-amqp v1.4.0 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.29 // indirect
 	github.com/Azure/go-autorest/autorest/adal v0.9.24 // indirect
@@ -283,11 +306,11 @@ require (
 	github.com/elastic/bayeux v1.0.5 // indirect
 	github.com/elastic/elastic-agent-autodiscover v0.10.0 // indirect
 	github.com/elastic/elastic-agent-client/v7 v7.17.2 // indirect
-	github.com/elastic/elastic-agent-system-metrics v0.13.4 // indirect
+	github.com/elastic/elastic-agent-system-metrics v0.13.5 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.8.0 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
 	github.com/elastic/go-docappender/v2 v2.12.0 // indirect
-	github.com/elastic/go-elasticsearch/v8 v8.19.0 // indirect
+	github.com/elastic/go-elasticsearch/v8 v8.19.1 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect
 	github.com/elastic/go-grok v0.3.1 // indirect
 	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
@@ -348,7 +371,7 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/godror/godror v0.49.3 // indirect
 	github.com/godror/knownpb v0.3.0 // indirect
-	github.com/gofrs/flock v0.12.1 // indirect
+	github.com/gofrs/flock v0.13.0 // indirect
 	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/gohugoio/hashstructure v0.6.0 // indirect

@@ -17,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          submodules: true
 
       - uses: actions/setup-go@v6
         with:
@@ -76,7 +78,7 @@ jobs:
       - name: check for modified otel README.md
         id: otel-readme-check
         run: |
-          if git diff --quiet HEAD -- internal/pkg/otel/README.md; then
+          if git diff --quiet HEAD -- internal/edot/README.md; then
             echo "modified=false" >> $GITHUB_OUTPUT
           else
             echo "modified=true" >> $GITHUB_OUTPUT
@@ -85,7 +87,7 @@ jobs:
       - name: commit otel README.md
         if: steps.otel-readme-check.outputs.modified == 'true'
         run: |
-          git add internal/pkg/otel/README.md
+          git add internal/edot/README.md
           git commit -m "Update otel README.md"
 
       - name: Push added commits

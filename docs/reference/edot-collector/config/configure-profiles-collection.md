@@ -2,7 +2,7 @@
 navigation_title: Profiles collection
 description: Learn how to configure and customize profiles collection through the Elastic Distribution of OpenTelemetry Collector.
 applies_to:
-  stack: preview 9.2
+  stack: preview 9.3
   serverless:
     observability:
   product:
@@ -47,13 +47,9 @@ The following example generates profiling metrics by frame, frame type, and clas
 ```yaml
 connectors:
   profilingmetrics:
-    by_frame: true
-    by_frametype: true
-    by_classification: true
 
 receivers:
   profiling:
-    SamplesPerSecond: 19
 
 service:
   pipelines:
