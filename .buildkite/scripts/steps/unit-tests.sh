@@ -3,6 +3,12 @@ source .buildkite/scripts/common.sh
 set +euo pipefail
 
 echo "--- Unit tests"
+
+if command -v sw_vers &> /dev/null; then
+  echo "macOS version:"
+  sw_vers
+fi
+
 RACE_DETECTOR=true TEST_COVERAGE=true mage unitTest
 TESTS_EXIT_STATUS=$?
 echo "--- Prepare artifacts"
