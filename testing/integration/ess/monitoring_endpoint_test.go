@@ -51,7 +51,7 @@ func TestEndpointAgentServiceMonitoring(t *testing.T) {
 	runner := &EndpointMetricsMonRunner{
 		info:       info,
 		fixture:    fixture,
-		endpointID: "endpoint-default",
+		endpointID: "endpoint",
 	}
 
 	suite.Run(t, runner)
