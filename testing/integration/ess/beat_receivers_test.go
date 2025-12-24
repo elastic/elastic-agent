@@ -1012,7 +1012,13 @@ agent.monitoring.enabled: false
 
 	// wait for component to appear in status and be healthy
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		assert.NoError(collect, fixture.IsHealthyOrDegradedFromOutput(ctx))
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		require.NoError(collect, statusErr)
+		require.Equal(collect, 1, len(status.Components))
+		componentStatus := status.Components[0]
+		assert.Equal(collect, cproto.State_HEALTHY, cproto.State(componentStatus.State))
+		componentID = componentStatus.ID
 	}, 2*time.Minute, 5*time.Second)
 
 	runDir, err := atesting.FindRunDir(fixture)
