@@ -1134,8 +1134,6 @@ github.com/open-telemetry/opentelemetry-collector-contrib/internal/filter v0.141
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/filter v0.141.0/go.mod h1:QTceC+e3mAclBVDvBUuWvOvzRcIBikDr7jPJ4d/OgHs=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/gopsutilenv v0.141.0 h1:oogTgVI6xpteIjklDRV4qhKu8uhgrBCpdLq+SLgDavw=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/gopsutilenv v0.141.0/go.mod h1:zqz+PDW3woK1SJGzkozF6/158Du5p0VlxGlGHe677QA=
-github.com/open-telemetry/opentelemetry-collector-contrib/internal/healthcheck v0.141.0 h1:Ib8U2EOQq54eRDf33sAK8e2M7aA5UVWfnC5DSEdebk8=
-github.com/open-telemetry/opentelemetry-collector-contrib/internal/healthcheck v0.141.0/go.mod h1:SSQbMNwi8G+rrCMAQxan7lk6nyqLRZ4F7+9sIDXxyDc=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig v0.141.0 h1:23XwDn4lYAIGTKuL5Ex94+KpdLodUdf1sXB02ZUrCQE=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig v0.141.0/go.mod h1:MNTSHMl1wybxq7SMUy/Ew7JYr2cf70+JVCySwA2zBRI=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/kafka v0.141.0 h1:sYXJ024Y/JNUJ6K5LMF/cAYgW580RicjwYvVIJJteFs=
@@ -1174,8 +1172,6 @@ github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.141.0 
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.141.0/go.mod h1:3S0jKFJOdukRxfVUdtR+ymXqB7Rr8kjXLkWK7ESOKqE=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.141.0 h1:VX10o0qIXQiUTkvHtGrpdr6UWJ9yNjgSkL/cVLmdTFY=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.141.0/go.mod h1:KBnG3v77MKoruqf+/o97jyKmZTjKXOb/HIQjVTiaQIc=
-github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.141.0 h1:bsAO48ojRBMA0dk/RR7LIurkoYZfKTFxnrCQofiFNbI=
-github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.141.0/go.mod h1:eVHnGSqQGxwjlF9svzO1LRRgmMWKLWVKXSCHKRzHfRM=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/azure v0.141.0 h1:s87GaaCxBAUZRNsuzEc1ytgZENlmO0tCHllRmOqwMgk=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/azure v0.141.0/go.mod h1:yz4PL34ed39URi4DBUtvoBAtOZHWI95eMuxW+0/bRIk=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/jaeger v0.141.0 h1:G7LQ0plv/NYpPu0Cvym+nwtuiNP6F2vljZEMeUbs6Kk=
@@ -1428,6 +1424,10 @@ github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXl
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
+github.com/swiatekm/opentelemetry-collector-contrib/internal/healthcheck v0.0.0-20251215151250-0b5f133ca522 h1:IoVj2Y8BqXetRzhlEqqrtiMMQTpNkMg+dtR1/ieXnoc=
+github.com/swiatekm/opentelemetry-collector-contrib/internal/healthcheck v0.0.0-20251215151250-0b5f133ca522/go.mod h1:tF9H8+S/AmPwrkXpa8Qr3QmUDisnukldx3VYisUMWF8=
+github.com/swiatekm/opentelemetry-collector-contrib/pkg/status v0.0.0-20251215151250-0b5f133ca522 h1:m5Zq4qBlseHTI65Yus6V23OEo7PFd9Ngg9f0TEMLFuY=
+github.com/swiatekm/opentelemetry-collector-contrib/pkg/status v0.0.0-20251215151250-0b5f133ca522/go.mod h1:umNY2+bbiGqUGKdsRMvxRT2e+jJE37EP/C5g/WAKsb8=
 github.com/teambition/rrule-go v1.8.2 h1:lIjpjvWTj9fFUZCmuoVDrKVOtdiyzbzc93qTmRVe/J8=
 github.com/teambition/rrule-go v1.8.2/go.mod h1:Ieq5AbrKGciP1V//Wq8ktsTXwSwJHDD5mD/wLBGl3p4=
 github.com/testcontainers/testcontainers-go v0.40.0 h1:pSdJYLOVgLE8YdUY2FHQ1Fxu+aMnb6JfVz1mxk7OeMU=
