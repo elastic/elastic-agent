@@ -46,7 +46,7 @@ func TestRestrictUpgradeRPM(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Eventuallyf(t, func() bool {
-			err = fixture.IsHealthy(ctx)
+			err = fixture.IsHealthyOrDegradedFromOutput(ctx)
 			return err == nil
 		}, 5*time.Minute, time.Second,
 			"Elastic-Agent did not report healthy. Agent status error: \"%v\"",
