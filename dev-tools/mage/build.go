@@ -77,8 +77,14 @@ func (b BuildArgs) ParseBuildTags() []string {
 
 // DefaultBuildArgs returns the default BuildArgs for use in builds.
 func DefaultBuildArgs() BuildArgs {
+	cfg := MustGetConfig()
+	return DefaultBuildArgsWithConfig(cfg)
+}
+
+// DefaultBuildArgsWithConfig returns the default BuildArgs for use in builds.
+func DefaultBuildArgsWithConfig(cfg *EnvConfig) BuildArgs {
 	args := BuildArgs{
-		Name: BeatName,
+		Name: cfg.Beat.Name,
 		CGO:  build.Default.CgoEnabled,
 		Env:  map[string]string{},
 		Vars: map[string]string{
@@ -87,16 +93,15 @@ func DefaultBuildArgs() BuildArgs {
 		},
 		WinMetadata: true,
 	}
-	if versionQualified {
+	if cfg.Build.VersionQualified {
 		args.Vars[elasticAgentModulePath+"/version.qualifier"] = "{{ .Qualifier }}"
 	}
 
-	if positionIndependentCodeSupported() {
+	if positionIndependentCodeSupportedWithConfig(cfg) {
 		args.ExtraFlags = append(args.ExtraFlags, "-buildmode", "pie")
 	}
 
-	if FIPSBuild {
-
+	if cfg.Build.FIPSBuild {
 		fipsConfig := packaging.Settings().FIPS
 
 		for _, tag := range fipsConfig.Compile.Tags {
@@ -108,7 +113,7 @@ func DefaultBuildArgs() BuildArgs {
 		}
 	}
 
-	if DevBuild {
+	if cfg.Build.DevBuild {
 		// Disable optimizations (-N) and inlining (-l) for debugging.
 		args.ExtraFlags = append(args.ExtraFlags, `-gcflags=all=-N -l`)
 	} else {
@@ -126,14 +131,20 @@ func DefaultBuildArgs() BuildArgs {
 // The list of supported platforms is compiled based on the Go release notes: https://golang.org/doc/devel/release.html
 // The list has been updated according to the Go version: 1.16
 func positionIndependentCodeSupported() bool {
-	return oneOf(Platform.GOOS, "darwin") ||
-		(Platform.GOOS == "linux" && oneOf(Platform.GOARCH, "riscv64", "amd64", "arm", "arm64", "ppc64le", "386")) ||
-		(Platform.GOOS == "aix" && Platform.GOARCH == "ppc64") ||
+	cfg := MustGetConfig()
+	return positionIndependentCodeSupportedWithConfig(cfg)
+}
+
+func positionIndependentCodeSupportedWithConfig(cfg *EnvConfig) bool {
+	platform := cfg.Platform()
+	return oneOf(platform.GOOS, "darwin") ||
+		(platform.GOOS == "linux" && oneOf(platform.GOARCH, "riscv64", "amd64", "arm", "arm64", "ppc64le", "386")) ||
+		(platform.GOOS == "aix" && platform.GOARCH == "ppc64") ||
 
 		// Windows 32bit supports ASLR, but Windows Server 2003 and earlier do not.
 		// According to the support matrix (https://www.elastic.co/support/matrix), these old versions
 		// are not supported.
-		(Platform.GOOS == "windows")
+		(platform.GOOS == "windows")
 }
 
 func oneOf(value string, lst ...string) bool {
@@ -148,15 +159,23 @@ func oneOf(value string, lst ...string) bool {
 // DefaultGolangCrossBuildArgs returns the default BuildArgs for use in
 // cross-builds.
 func DefaultGolangCrossBuildArgs() BuildArgs {
-	args := DefaultBuildArgs()
-	args.Name += "-" + Platform.GOOS + "-" + Platform.Arch
+	cfg := MustGetConfig()
+	return DefaultGolangCrossBuildArgsWithConfig(cfg)
+}
+
+// DefaultGolangCrossBuildArgsWithConfig returns the default BuildArgs for use in
+// cross-builds.
+func DefaultGolangCrossBuildArgsWithConfig(cfg *EnvConfig) BuildArgs {
+	args := DefaultBuildArgsWithConfig(cfg)
+	platform := cfg.Platform()
+	args.Name += "-" + platform.GOOS + "-" + platform.Arch
 	args.OutputDir = filepath.Join("build", "golang-crossbuild")
-	if bp, found := BuildPlatforms.Get(Platform.Name); found {
+	if bp, found := BuildPlatforms.Get(platform.Name); found {
 		args.CGO = bp.Flags.SupportsCGO()
 	}
 
 	// Enable DEP (data execution protection) for Windows binaries.
-	if Platform.GOOS == "windows" {
+	if platform.GOOS == "windows" {
 		args.LDFlags = append(args.LDFlags, "-extldflags=-Wl,--nxcompat")
 	}
 
@@ -166,12 +185,13 @@ func DefaultGolangCrossBuildArgs() BuildArgs {
 // GolangCrossBuild invokes "go build" inside of the golang-crossbuild Docker
 // environment.
 func GolangCrossBuild(params BuildArgs) error {
+	cfg := MustGetConfig()
 	if os.Getenv("GOLANG_CROSSBUILD") != "1" {
 		return errors.New("Use the crossBuild target. golangCrossBuild can " +
 			"only be executed within the golang-crossbuild docker environment")
 	}
 
-	defer DockerChown(filepath.Join(params.OutputDir, params.Name+binaryExtension(GOOS)))
+	defer DockerChown(filepath.Join(params.OutputDir, params.Name+binaryExtension(cfg.Build.GOOS)))
 	defer DockerChown(filepath.Join(params.OutputDir))
 
 	mountPoint, err := ElasticBeatsDir()
@@ -187,9 +207,10 @@ func GolangCrossBuild(params BuildArgs) error {
 
 // Build invokes "go build" to produce a binary.
 func Build(params BuildArgs) error {
+	cfg := MustGetConfig()
 	fmt.Println(">> build: Building", params.Name)
 
-	binaryName := params.Name + binaryExtension(GOOS)
+	binaryName := params.Name + binaryExtension(cfg.Build.GOOS)
 
 	if params.OutputDir != "" {
 		if err := os.MkdirAll(params.OutputDir, 0755); err != nil {
@@ -238,7 +259,7 @@ func Build(params BuildArgs) error {
 		args = append(args, params.InputFiles...)
 	}
 
-	if GOOS == "windows" && params.WinMetadata {
+	if cfg.Build.GOOS == "windows" && params.WinMetadata {
 		log.Println("Generating a .syso containing Windows file metadata.")
 		syso, err := MakeWindowsSysoFile()
 		if err != nil {
@@ -300,6 +321,7 @@ func Run(env map[string]string, stdout, stderr io.Writer, cmd string, workingDir
 // allows users to view metadata about the exe in the Details tab of the file
 // properties viewer.
 func MakeWindowsSysoFile() (string, error) {
+	cfg := MustGetConfig()
 	version, err := BeatQualifiedVersion()
 	if err != nil {
 		return "", err
@@ -323,21 +345,21 @@ func MakeWindowsSysoFile() (string, error) {
 			FileType:       "01", // Application
 		},
 		StringFileInfo: goversioninfo.StringFileInfo{
-			CompanyName:      BeatVendor,
-			ProductName:      cases.Title(language.Und, cases.NoLower).String(BeatName),
+			CompanyName:      cfg.Beat.Vendor,
+			ProductName:      cases.Title(language.Und, cases.NoLower).String(cfg.Beat.Name),
 			ProductVersion:   version,
 			FileVersion:      version,
-			FileDescription:  BeatDescription,
-			OriginalFilename: BeatName + ".exe",
-			LegalCopyright:   "Copyright " + BeatVendor + ", License " + BeatLicense,
+			FileDescription:  cfg.Beat.Description,
+			OriginalFilename: cfg.Beat.Name + ".exe",
+			LegalCopyright:   "Copyright " + cfg.Beat.Vendor + ", License " + cfg.Beat.License,
 			Comments:         "commit=" + commit,
 		},
 	}
 
 	vi.Build()
 	vi.Walk()
-	sysoFile := BeatName + "_windows_" + GOARCH + ".syso"
-	if err = vi.WriteSyso(sysoFile, GOARCH); err != nil {
+	sysoFile := cfg.Beat.Name + "_windows_" + cfg.Build.GOARCH + ".syso"
+	if err = vi.WriteSyso(sysoFile, cfg.Build.GOARCH); err != nil {
 		return "", fmt.Errorf("failed to generate syso file with Windows metadata: %w", err)
 	}
 	return sysoFile, nil

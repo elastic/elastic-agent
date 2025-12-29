@@ -54,9 +54,10 @@ type ConfigParams struct {
 // Config generates config files. Set DEV_OS and DEV_ARCH to change the target
 // host for the generated configs. Defaults to linux/amd64.
 func Config(types ConfigFileType, args ConfigFileParams, targetDir string) error {
+	cfg := MustGetConfig()
 	// Short
 	if types.IsShort() {
-		file := filepath.Join(targetDir, BeatName+".yml")
+		file := filepath.Join(targetDir, cfg.Beat.Name+".yml")
 		if err := makeConfigTemplate(file, 0600, args, ShortConfigType); err != nil {
 			return fmt.Errorf("failed making short config: %w", err)
 		}
@@ -64,7 +65,7 @@ func Config(types ConfigFileType, args ConfigFileParams, targetDir string) error
 
 	// Reference
 	if types.IsReference() {
-		file := filepath.Join(targetDir, BeatName+".reference.yml")
+		file := filepath.Join(targetDir, cfg.Beat.Name+".reference.yml")
 		if err := makeConfigTemplate(file, 0644, args, ReferenceConfigType); err != nil {
 			return fmt.Errorf("failed making reference config: %w", err)
 		}
@@ -72,7 +73,7 @@ func Config(types ConfigFileType, args ConfigFileParams, targetDir string) error
 
 	// Docker
 	if types.IsDocker() {
-		file := filepath.Join(targetDir, BeatName+".docker.yml")
+		file := filepath.Join(targetDir, cfg.Beat.Name+".docker.yml")
 		if err := makeConfigTemplate(file, 0600, args, DockerConfigType); err != nil {
 			return fmt.Errorf("failed making docker config: %w", err)
 		}
@@ -110,7 +111,7 @@ func makeConfigTemplate(destination string, mode os.FileMode, confParams ConfigF
 	params := map[string]interface{}{
 		"GOOS":                           cfg.CrossBuild.DevOS,
 		"GOARCH":                         cfg.CrossBuild.DevArch,
-		"BeatLicense":                    BeatLicense,
+		"BeatLicense":                    cfg.Beat.License,
 		"Reference":                      false,
 		"Docker":                         false,
 		"ExcludeConsole":                 false,
@@ -125,7 +126,7 @@ func makeConfigTemplate(destination string, mode os.FileMode, confParams ConfigF
 	}
 	params = joinMaps(params, confParams.ExtraVars, tmplParams)
 	tmpl := template.New("config").Option("missingkey=error")
-	funcs := joinMaps(FuncMap, template.FuncMap{
+	funcs := joinMaps(FuncMap(), template.FuncMap{
 		"header":    header,
 		"subheader": subheader,
 		"indent":    indent,
