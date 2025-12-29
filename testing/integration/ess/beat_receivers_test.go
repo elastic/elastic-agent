@@ -322,7 +322,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		var statusErr error
 		status, statusErr := beatReceiverFixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
-		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 4)
+		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 3)
 	}, 1*time.Minute, 1*time.Second)
 
 	// 5. Assert monitoring logs and metrics are available on ES (for otel mode)
@@ -814,7 +814,6 @@ agent.monitoring.enabled: false
 const (
 	otelRuntimeUnsupportedLogLineStart                 = "otel runtime is not supported for component"
 	otelRuntimeMonitoringOutputUnsupportedLogLineStart = "otel runtime is not supported for monitoring output"
-	prometheusInputSkippedLogLine                      = "The Otel prometheus metrics monitoring input can't run in a beats process, skipping"
 )
 
 // TestBeatsReceiverProcessRuntimeFallback verifies that we fall back to the process runtime if the otel runtime
@@ -909,7 +908,6 @@ outputs:
 
 	// verify we've logged a warning about using the process runtime
 	var unsupportedLogRecords []map[string]any
-	var prometheusUnsupportedLogRecord map[string]any
 	var monitoringOutputUnsupportedLogRecord map[string]any
 	for _, line := range strings.Split(string(logsBytes), "\n") {
 		line = strings.TrimSpace(line)
@@ -925,9 +923,6 @@ outputs:
 			if strings.HasPrefix(message, otelRuntimeUnsupportedLogLineStart) {
 				unsupportedLogRecords = append(unsupportedLogRecords, logRecord)
 			}
-			if strings.HasPrefix(message, prometheusInputSkippedLogLine) {
-				prometheusUnsupportedLogRecord = logRecord
-			}
 			if strings.HasPrefix(message, otelRuntimeMonitoringOutputUnsupportedLogLineStart) {
 				monitoringOutputUnsupportedLogRecord = logRecord
 			}
@@ -942,7 +937,6 @@ outputs:
 	})
 
 	assert.Len(t, unsupportedLogRecords, 1, "one log line for each component we try to run")
-	assert.NotEmpty(t, prometheusUnsupportedLogRecord, "should get a log line about Otel prometheus metrics input being skipped")
 	assert.NotEmpty(t, monitoringOutputUnsupportedLogRecord, "should get a log line about monitoring output not being supported")
 }
 
@@ -1704,7 +1698,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 	healthCheck(ctx,
 		"Everything is ready. Begin running and processing data.",
 		component.OtelRuntimeManager,
-		4,
+		3,
 		otelTimestamp)
 
 	// restart 3 times, checks path definition is stable
@@ -1719,7 +1713,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 		healthCheck(ctx,
 			"Everything is ready. Begin running and processing data.",
 			component.OtelRuntimeManager,
-			4,
+			3,
 			restartTimestamp)
 	}
 

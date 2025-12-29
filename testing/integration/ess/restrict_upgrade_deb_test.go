@@ -55,13 +55,19 @@ func TestRestrictUpgradeDeb(t *testing.T) {
 			err = fixture.IsHealthyOrDegradedFromOutput(ctx)
 
 			return err == nil
-		}, 5*time.Minute, time.Second,
-			"Elastic-Agent did not report healthy. Agent status error: \"%v\"",
-			err,
-		)
+		}, 5*time.Minute, time.Second, "Elastic-Agent did not report healthy.")
+		if err != nil {
+			t.Logf("Agent status error: \"%v\"", err)
+
+			status, err := fixture.ExecStatus(ctx)
+			require.NoError(t, err, "must get Agent status")
+
+			require.FailNow(t, "Agent status:", status)
+		}
 
 		out, err := fixture.Exec(ctx, []string{"upgrade", "1.0.0"})
 		require.Error(t, err)
 		require.Contains(t, string(out), coordinator.ErrNotUpgradable.Error())
+
 	})
 }
