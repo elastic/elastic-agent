@@ -22,9 +22,6 @@ jobs:
     steps:
     - id: generator
       uses: elastic/oblt-actions/elastic/active-branches@v1
-      with:
-        exclude-branches: "7.17,8.17,8.18,9.0"
-        filter-branches: true
 
   update-beats:
     permissions:
@@ -53,16 +50,42 @@ jobs:
         version: v1.14.0
         install-only: true
 
+    # Note: We can't use updatecli to create the PR because it doesn't handle submodule updates correctly.
+    # See https://github.com/go-git/go-git/issues/872
     - name: Run Updatecli in Apply mode
       uses: elastic/oblt-actions/updatecli/run@v1
       with:
-        command: apply --config .ci/updatecli/update-beats.yml --values .ci/updatecli/values.d/scm.yml
+        command: apply --config .ci/updatecli/update-beats.yml --commit=false
         version-file: .updatecli-version
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         BRANCH_NAME: ${{ matrix.branch }}
 
-    - if: ${{ failure()  }}
+    - name: Export beats versions to environment variables
+      run: |
+        echo BEATS_PREVIOUS_VERSION=$(cat /tmp/.beats-previous-version) >> "$GITHUB_ENV"
+        echo BEATS_NEW_VERSION=$(cat /tmp/.beats-new-version) >> "$GITHUB_ENV"
+
+    - name: Create Pull Request
+      uses: peter-evans/create-pull-request@98357b18bf14b5342f975ff684046ec3b2a07725 # v8.0.0
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: "[${{ matrix.branch }}][Automation] Update elastic/beats to ${{ env.BEATS_NEW_VERSION }}"
+        title: "[${{ matrix.branch }}][Automation] Update elastic/beats to ${{ env.BEATS_NEW_VERSION }}"
+        body: |
+          ### What
+          Update `elastic/beats` to the latest version on branch `${{ matrix.branch }}`.
+
+          *Changeset*
+          * https://github.com/elastic/beats/compare/${{ env.BEATS_PREVIOUS_VERSION }}...${{ env.BEATS_NEW_VERSION }}
+        branch: update-beats-${{ matrix.branch }}
+        base: ${{ matrix.branch }}
+        delete-branch: true
+        labels: |
+          automation
+          skip-changelog
+          Team:Elastic-Agent-Control-Plane
+
+    - if: ${{ failure() }}
       uses: elastic/oblt-actions/slack/send@v1
       with:
         bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
