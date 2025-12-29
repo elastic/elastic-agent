@@ -46,57 +46,73 @@ type TestBinaryArgs struct {
 }
 
 func makeGoTestArgs(name string) GoTestArgs {
+	cfg := MustGetConfig()
+	return makeGoTestArgsWithConfig(cfg, name)
+}
+
+func makeGoTestArgsWithConfig(cfg *EnvConfig, name string) GoTestArgs {
 	fileName := fmt.Sprintf("build/TEST-go-%s", strings.ReplaceAll(strings.ToLower(name), " ", "_"))
 	params := GoTestArgs{
 		LogName:         name,
-		Race:            RaceDetector,
+		Race:            cfg.Test.RaceDetector,
 		Packages:        []string{"./..."},
 		OutputFile:      fileName + ".out",
 		JUnitReportFile: fileName + ".xml",
-		Tags:            testTagsFromEnv(),
+		Tags:            cfg.TestTagsWithFIPS(),
 		Env:             make(map[string]string),
 	}
-	if TestCoverage {
+	if cfg.Test.Coverage {
 		params.CoverageProfileFile = fileName + ".cov"
 	}
 	return params
 }
 
 func makeGoTestArgsForModule(name, module string) GoTestArgs {
+	cfg := MustGetConfig()
+	return makeGoTestArgsForModuleWithConfig(cfg, name, module)
+}
+
+func makeGoTestArgsForModuleWithConfig(cfg *EnvConfig, name, module string) GoTestArgs {
 	fileName := fmt.Sprintf("build/TEST-go-%s-%s",
 		strings.ReplaceAll(strings.ToLower(name), " ", "_"),
 		strings.ReplaceAll(strings.ToLower(module), " ", "_"),
 	)
 	params := GoTestArgs{
 		LogName:         fmt.Sprintf("%s-%s", name, module),
-		Race:            RaceDetector,
+		Race:            cfg.Test.RaceDetector,
 		Packages:        []string{fmt.Sprintf("./module/%s/...", module)},
 		OutputFile:      fileName + ".out",
 		JUnitReportFile: fileName + ".xml",
-		Tags:            testTagsFromEnv(),
+		Tags:            cfg.TestTagsWithFIPS(),
 	}
-	if TestCoverage {
+	if cfg.Test.Coverage {
 		params.CoverageProfileFile = fileName + ".cov"
 	}
 	return params
-}
-
-// testTagsFromEnv gets a list of comma-separated tags from the TEST_TAGS
-// environment variables, e.g: TEST_TAGS=aws,azure.
-// It uses the Config struct to get the test tags and adds FIPS-related tags if needed.
-func testTagsFromEnv() []string {
-	cfg := MustGetConfig()
-	return cfg.TestTagsWithFIPS()
 }
 
 // DefaultGoTestUnitArgs returns a default set of arguments for running
 // all unit tests. We tag unit test files with '!integration'.
 func DefaultGoTestUnitArgs() GoTestArgs { return makeGoTestArgs("Unit") }
 
+// DefaultGoTestUnitArgsWithConfig returns a default set of arguments for running
+// all unit tests, using the provided config.
+func DefaultGoTestUnitArgsWithConfig(cfg *EnvConfig) GoTestArgs {
+	return makeGoTestArgsWithConfig(cfg, "Unit")
+}
+
 // DefaultGoTestIntegrationArgs returns a default set of arguments for running
 // all integration tests. We tag integration test files with 'integration'.
 func DefaultGoTestIntegrationArgs() GoTestArgs {
 	args := makeGoTestArgs("Integration")
+	args.Tags = append(args.Tags, "integration")
+	return args
+}
+
+// DefaultGoTestIntegrationArgsWithConfig returns a default set of arguments for running
+// all integration tests, using the provided config.
+func DefaultGoTestIntegrationArgsWithConfig(cfg *EnvConfig) GoTestArgs {
+	args := makeGoTestArgsWithConfig(cfg, "Integration")
 	args.Tags = append(args.Tags, "integration")
 	return args
 }
@@ -109,11 +125,26 @@ func GoTestIntegrationArgsForModule(module string) GoTestArgs {
 	return args
 }
 
+// GoTestIntegrationArgsForModuleWithConfig returns a default set of arguments for running
+// module integration tests, using the provided config.
+func GoTestIntegrationArgsForModuleWithConfig(cfg *EnvConfig, module string) GoTestArgs {
+	args := makeGoTestArgsForModuleWithConfig(cfg, "Integration", module)
+	args.Tags = append(args.Tags, "integration")
+	return args
+}
+
 // DefaultTestBinaryArgs returns the default arguments for building
 // a binary for testing.
 func DefaultTestBinaryArgs() TestBinaryArgs {
+	cfg := MustGetConfig()
+	return DefaultTestBinaryArgsWithConfig(cfg)
+}
+
+// DefaultTestBinaryArgsWithConfig returns the default arguments for building
+// a binary for testing, using the provided config.
+func DefaultTestBinaryArgsWithConfig(cfg *EnvConfig) TestBinaryArgs {
 	return TestBinaryArgs{
-		Name: BeatName,
+		Name: cfg.Beat.Name,
 	}
 }
 
@@ -380,11 +411,19 @@ func BuildSystemTestBinary() error {
 // testing and measuring code coverage. The binary is only instrumented for
 // coverage when TEST_COVERAGE=true (default is false).
 func BuildSystemTestGoBinary(binArgs TestBinaryArgs) error {
+	cfg := MustGetConfig()
+	return BuildSystemTestGoBinaryWithConfig(cfg, binArgs)
+}
+
+// BuildSystemTestGoBinaryWithConfig builds a binary for testing that is instrumented for
+// testing and measuring code coverage. The binary is only instrumented for
+// coverage when TEST_COVERAGE=true (default is false).
+func BuildSystemTestGoBinaryWithConfig(cfg *EnvConfig, binArgs TestBinaryArgs) error {
 	args := []string{
 		"test", "-c",
 		"-o", binArgs.Name + ".test",
 	}
-	if TestCoverage {
+	if cfg.Test.Coverage {
 		args = append(args, "-coverpkg", "./...")
 	}
 	if len(binArgs.InputFiles) > 0 {

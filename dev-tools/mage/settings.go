@@ -56,69 +56,15 @@ const (
 	SnapshotSuffix                   = "-SNAPSHOT"
 )
 
-// Common settings with defaults derived from files, CWD, and environment.
-// These global variables are populated from the Config struct during initialization.
-// New code should prefer using GetConfig() to access configuration values.
-var (
-	GOOS      string
-	GOARCH    string
-	GOARM     string
-	Platform  PlatformAttributes
-	BinaryExt = ""
-	XPackDir  = "../x-pack"
+// XPackDir is the directory containing x-pack code (relative path constant).
+const XPackDir = "../x-pack"
 
-	// RaceDetector enables the Go race detector in tests (from RACE_DETECTOR env var)
-	RaceDetector bool
+// BeatProjectType specifies the type of project (OSS vs X-Pack).
+var BeatProjectType ProjectType
 
-	// TestCoverage enables code coverage profiling (from TEST_COVERAGE env var)
-	TestCoverage bool
-
-	// PLATFORMS is the comma-separated list of target platforms (from PLATFORMS env var)
-	PLATFORMS string
-
-	// PACKAGES is the comma-separated list of package types (from PACKAGES env var)
-	PACKAGES string
-
-	// CI indicates we're running in a CI environment (from CI env var)
-	CI string
-
-	// CrossBuildMountModcache mounts $GOPATH/pkg/mod into
-	// the crossbuild images at /go/pkg/mod, read-only, when set to true.
-	CrossBuildMountModcache bool
-
-	// CrossBuildMountBuildCache mounts the Go build cache into golang-crossbuild containers
-	CrossBuildMountBuildCache      bool
-	CrossBuildBuildCacheVolumeName string
-
-	BeatName        string
-	BeatServiceName string
-	BeatIndexPrefix string
-	BeatDescription string
-	BeatVendor      string
-	BeatLicense     string
-	BeatURL         string
-	BeatUser        string
-
-	BeatProjectType ProjectType
-
-	Snapshot      bool
-	DevBuild      bool
-	ExternalBuild bool
-	FIPSBuild     bool
-
-	versionQualified bool
-	versionQualifier string
-
-	// agentPackageVersion is set from AGENT_PACKAGE_VERSION env var
-	agentPackageVersion string
-
-	// PackagingFromManifest is set to true when ManifestURL is defined
-	PackagingFromManifest bool
-
-	// ManifestURL is the location of the manifest file to package
-	ManifestURL string
-
-	FuncMap = map[string]interface{}{
+// FuncMap returns template functions that use the config.
+func FuncMap() map[string]interface{} {
+	return map[string]interface{}{
 		"beat_doc_branch":                BeatDocBranch,
 		"beat_version":                   BeatQualifiedVersion,
 		"commit":                         CommitHash,
@@ -135,77 +81,6 @@ var (
 		agentManifestGeneratorMappedFunc: PackageManifest,
 		snapshotSuffix:                   MaybeSnapshotSuffix,
 	}
-)
-
-func init() {
-	initGlobals()
-}
-
-func initGlobals() {
-	// Load configuration from the centralized Config struct
-	cfg, err := GetConfig()
-	if err != nil {
-		panic(fmt.Errorf("failed to load config: %w", err))
-	}
-
-	// Initialize globals from Config
-	initGlobalsFromConfig(cfg)
-
-	// order matters: this will override some of the values. Those values can be used
-	// as fallback for the variables below (mainly agentPackageVersion and ManifestURL)
-	err = initPackageVersion()
-	if err != nil {
-		panic(fmt.Errorf("failed to init package version: %w", err))
-	}
-
-	// Apply overrides that may have been set by initPackageVersion
-	agentPackageVersion = EnvOr(agentPackageVersionEnvVar, agentPackageVersion)
-	ManifestURL = EnvOr(ManifestUrlEnvVar, ManifestURL)
-	PackagingFromManifest = ManifestURL != ""
-}
-
-// initGlobalsFromConfig populates global variables from the EnvConfig struct.
-// This maintains backward compatibility with code that uses the global variables.
-func initGlobalsFromConfig(cfg *EnvConfig) {
-	// Build configuration
-	GOOS = cfg.Build.GOOS
-	GOARCH = cfg.Build.GOARCH
-	GOARM = cfg.Build.GOARM
-	Platform = cfg.Platform()
-	BinaryExt = cfg.BinaryExt()
-	Snapshot = cfg.Build.Snapshot
-	DevBuild = cfg.Build.DevBuild
-	ExternalBuild = cfg.Build.ExternalBuild
-	FIPSBuild = cfg.Build.FIPSBuild
-	versionQualifier = cfg.Build.VersionQualifier
-	versionQualified = cfg.Build.VersionQualified
-	CI = cfg.Build.CI
-
-	// Beat configuration
-	BeatName = cfg.Beat.Name
-	BeatServiceName = cfg.Beat.ServiceName
-	BeatIndexPrefix = cfg.Beat.IndexPrefix
-	BeatDescription = cfg.Beat.Description
-	BeatVendor = cfg.Beat.Vendor
-	BeatLicense = cfg.Beat.License
-	BeatURL = cfg.Beat.URL
-	BeatUser = cfg.Beat.User
-
-	// Test configuration
-	RaceDetector = cfg.Test.RaceDetector
-	TestCoverage = cfg.Test.Coverage
-
-	// CrossBuild configuration
-	PLATFORMS = cfg.CrossBuild.Platforms
-	PACKAGES = cfg.CrossBuild.Packages
-	CrossBuildMountModcache = cfg.CrossBuild.MountModcache
-	CrossBuildMountBuildCache = cfg.CrossBuild.MountBuildCache
-	CrossBuildBuildCacheVolumeName = cfg.CrossBuild.BuildCacheVolumeName
-
-	// Packaging configuration
-	agentPackageVersion = cfg.Packaging.AgentPackageVersion
-	ManifestURL = cfg.Packaging.ManifestURL
-	PackagingFromManifest = cfg.Packaging.PackagingFromManifest
 }
 
 // ProjectType specifies the type of project (OSS vs X-Pack).
@@ -237,29 +112,34 @@ func EnvMap(args ...map[string]interface{}) map[string]interface{} {
 }
 
 func varMap(args ...map[string]interface{}) map[string]interface{} {
+	cfg := MustGetConfig()
+	return varMapWithConfig(cfg, args...)
+}
+
+func varMapWithConfig(cfg *EnvConfig, args ...map[string]interface{}) map[string]interface{} {
 	data := map[string]interface{}{
-		"GOOS":            GOOS,
-		"GOARCH":          GOARCH,
-		"GOARM":           GOARM,
-		"Platform":        Platform,
-		"PLATFORMS":       PLATFORMS,
-		"PACKAGES":        PACKAGES,
-		"BinaryExt":       BinaryExt,
+		"GOOS":            cfg.Build.GOOS,
+		"GOARCH":          cfg.Build.GOARCH,
+		"GOARM":           cfg.Build.GOARM,
+		"Platform":        cfg.Platform(),
+		"PLATFORMS":       cfg.CrossBuild.Platforms,
+		"PACKAGES":        cfg.CrossBuild.Packages,
+		"BinaryExt":       cfg.BinaryExt(),
 		"XPackDir":        XPackDir,
-		"BeatName":        BeatName,
-		"BeatServiceName": BeatServiceName,
-		"BeatIndexPrefix": BeatIndexPrefix,
-		"BeatDescription": BeatDescription,
-		"BeatVendor":      BeatVendor,
-		"BeatLicense":     BeatLicense,
-		"BeatURL":         BeatURL,
-		"BeatUser":        BeatUser,
-		"Snapshot":        Snapshot,
-		"DEV":             DevBuild,
-		"EXTERNAL":        ExternalBuild,
-		"FIPS":            FIPSBuild,
-		"Qualifier":       versionQualifier,
-		"CI":              CI,
+		"BeatName":        cfg.Beat.Name,
+		"BeatServiceName": cfg.Beat.ServiceName,
+		"BeatIndexPrefix": cfg.Beat.IndexPrefix,
+		"BeatDescription": cfg.Beat.Description,
+		"BeatVendor":      cfg.Beat.Vendor,
+		"BeatLicense":     cfg.Beat.License,
+		"BeatURL":         cfg.Beat.URL,
+		"BeatUser":        cfg.Beat.User,
+		"Snapshot":        cfg.Build.Snapshot,
+		"DEV":             cfg.Build.DevBuild,
+		"EXTERNAL":        cfg.Build.ExternalBuild,
+		"FIPS":            cfg.Build.FIPSBuild,
+		"Qualifier":       cfg.Build.VersionQualifier,
+		"CI":              cfg.Build.CI,
 	}
 
 	// Add the extra args to the map.
@@ -331,11 +211,13 @@ var (
 )
 
 // CommitHash returns the full length git commit hash.
+// It checks the global config's AgentCommitHashOverride first, then falls back to git.
 func CommitHash() (string, error) {
 	var err error
 	commitHashOnce.Do(func() {
-		// Check commit hash override first
-		commitHash = EnvOr(AgentCommitHashEnvVar, "")
+		// Check commit hash override from config first
+		cfg := MustGetConfig()
+		commitHash = cfg.Build.AgentCommitHashOverride
 		if commitHash == "" {
 			// no override found, get the hash from HEAD
 			commitHash, err = sh.Output("git", "rev-parse", "HEAD")
@@ -344,9 +226,30 @@ func CommitHash() (string, error) {
 	return commitHash, err
 }
 
+// CommitHashWithConfig returns the full length git commit hash using the provided config.
+// This variant does not use caching, making it suitable for contexts where
+// different configs may be passed.
+func CommitHashWithConfig(cfg *EnvConfig) (string, error) {
+	// Check commit hash override from config first
+	if cfg.Build.AgentCommitHashOverride != "" {
+		return cfg.Build.AgentCommitHashOverride, nil
+	}
+	// no override found, get the hash from HEAD
+	return sh.Output("git", "rev-parse", "HEAD")
+}
+
 // CommitHashShort returns the short length git commit hash.
 func CommitHashShort() (string, error) {
 	shortHash, err := CommitHash()
+	if len(shortHash) > 6 {
+		shortHash = shortHash[:6]
+	}
+	return shortHash, err
+}
+
+// CommitHashShortWithConfig returns the short length git commit hash using the provided config.
+func CommitHashShortWithConfig(cfg *EnvConfig) (string, error) {
+	shortHash, err := CommitHashWithConfig(cfg)
 	if len(shortHash) > 6 {
 		shortHash = shortHash[:6]
 	}
@@ -369,15 +272,16 @@ func TagContainsCommit() (bool, error) {
 }
 
 func AgentPackageVersion() (string, error) {
-
-	if agentPackageVersion != "" {
-		return agentPackageVersion, nil
+	cfg := MustGetConfig()
+	if cfg.Packaging.AgentPackageVersion != "" {
+		return cfg.Packaging.AgentPackageVersion, nil
 	}
 
 	return BeatQualifiedVersion()
 }
 
 func PackageManifest(fips bool) (string, error) {
+	cfg := MustGetConfig()
 
 	packageVersion, err := AgentPackageVersion()
 	if err != nil {
@@ -399,7 +303,7 @@ func PackageManifest(fips bool) (string, error) {
 		return "", fmt.Errorf("retrieving agent flavors: %w", err)
 	}
 
-	return GeneratePackageManifest(BeatName, packageVersion, Snapshot, hash, commitHashShort, fips, registry)
+	return GeneratePackageManifest(cfg.Beat.Name, packageVersion, cfg.Build.Snapshot, hash, commitHashShort, fips, registry)
 }
 
 func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, fullHash, shortHash string, fips bool, flavorsRegistry map[string][]string) (string, error) {
@@ -425,8 +329,8 @@ func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, ful
 
 // MaybeSnapshotSuffix returns the snapshot suffix for the artifact version, or an empty string if the build isn't a
 // snapshot.
-func MaybeSnapshotSuffix() string {
-	return GenerateSnapshotSuffix(Snapshot)
+func MaybeSnapshotSuffix(cfg *EnvConfig) string {
+	return GenerateSnapshotSuffix(cfg.Build.Snapshot)
 }
 
 func Substring(s string, start, length int) string {
@@ -538,23 +442,33 @@ var (
 // BeatQualifiedVersion returns the Beat's qualified version.  The value can be overwritten by
 // setting VERSION_QUALIFIER in the environment.
 func BeatQualifiedVersion() (string, error) {
-	version, err := beatVersion()
+	cfg := MustGetConfig()
+	return BeatQualifiedVersionWithConfig(cfg)
+}
+
+// BeatQualifiedVersionWithConfig returns the Beat's qualified version using the provided config.
+// This variant does not use caching, making it suitable for contexts where
+// different configs may be passed.
+func BeatQualifiedVersionWithConfig(cfg *EnvConfig) (string, error) {
+	version, err := BeatVersionWithConfig(cfg)
 	if err != nil {
 		return "", err
 	}
 	// version qualifier can intentionally be set to "" to override build time var
-	if !versionQualified || versionQualifier == "" {
+	if !cfg.Build.VersionQualified || cfg.Build.VersionQualifier == "" {
 		return version, nil
 	}
-	return version + "-" + versionQualifier, nil
+	return version + "-" + cfg.Build.VersionQualifier, nil
 }
 
 // BeatVersion returns the Beat's version. The value can be overridden by
-// setting BEAT_VERSION in the environment.
+// setting BEAT_VERSION in the environment or through the config.
 func beatVersion() (string, error) {
 	beatVersionOnce.Do(func() {
-		beatVersionValue = os.Getenv("BEAT_VERSION")
-		if beatVersionValue != "" {
+		// Check config first for BeatVersion override
+		cfg := MustGetConfig()
+		if cfg.Build.BeatVersionSet {
+			beatVersionValue = cfg.Build.BeatVersion
 			return
 		}
 
@@ -562,6 +476,17 @@ func beatVersion() (string, error) {
 	})
 
 	return beatVersionValue, beatVersionErr
+}
+
+// BeatVersionWithConfig returns the Beat's version using the provided config.
+// This variant does not use caching, making it suitable for contexts where
+// different configs may be passed.
+func BeatVersionWithConfig(cfg *EnvConfig) (string, error) {
+	// Check config first for BeatVersion override
+	if cfg.Build.BeatVersionSet {
+		return cfg.Build.BeatVersion, nil
+	}
+	return getBuildVariableSources().GetBeatVersion()
 }
 
 func loadFlavorsRegistry() (map[string][]string, error) {
