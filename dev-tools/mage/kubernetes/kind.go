@@ -13,6 +13,8 @@ import (
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
+
+	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 )
 
 // KindIntegrationTestStep setups a kind environment.
@@ -73,6 +75,7 @@ func (m *KindIntegrationTestStep) Setup(env map[string]string) error {
 		return err
 	}
 
+	cfg := devtools.MustGetConfig()
 	args := []string{
 		"create",
 		"cluster",
@@ -81,7 +84,7 @@ func (m *KindIntegrationTestStep) Setup(env map[string]string) error {
 		"--wait",
 		"300s",
 	}
-	kubeVersion := os.Getenv("K8S_VERSION")
+	kubeVersion := cfg.Kubernetes.K8sVersion
 	if kubeVersion != "" {
 		args = append(args, "--image", fmt.Sprintf("kindest/node:%s", kubeVersion))
 	}
@@ -110,9 +113,9 @@ func (m *KindIntegrationTestStep) Teardown(env map[string]string) error {
 		stdErr = os.Stderr
 	}
 
+	cfg := devtools.MustGetConfig()
 	name, created := env["KIND_CLUSTER"]
-	_, keepUp := os.LookupEnv("KIND_SKIP_DELETE")
-	if created && !keepUp {
+	if created && !cfg.Kubernetes.KindSkipDelete {
 		_, err := sh.Exec(
 			env,
 			stdOut,
