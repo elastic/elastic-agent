@@ -48,7 +48,7 @@ const (
 
 // Expand expands the given Go text/template string.
 func Expand(in string, args ...map[string]interface{}) (string, error) {
-	return expandTemplate(inlineTemplate, in, FuncMap, EnvMap(args...))
+	return expandTemplate(inlineTemplate, in, FuncMap(), EnvMap(args...))
 }
 
 // MustExpand expands the given Go text/template string. It panics if there is
@@ -123,12 +123,12 @@ func expandFile(src, dst string, args ...map[string]interface{}) error {
 		return fmt.Errorf("failed reading from template %v, %w", src, err)
 	}
 
-	output, err := expandTemplate(src, string(tmplData), FuncMap, args...)
+	output, err := expandTemplate(src, string(tmplData), FuncMap(), args...)
 	if err != nil {
 		return err
 	}
 
-	dst, err = expandTemplate(inlineTemplate, dst, FuncMap, args...)
+	dst, err = expandTemplate(inlineTemplate, dst, FuncMap(), args...)
 	if err != nil {
 		return err
 	}
@@ -837,12 +837,13 @@ func IsUpToDate(dst string, sources ...string) bool {
 // OSSBeatDir returns the OSS beat directory. You can pass paths and they will
 // be joined and appended to the OSS beat dir.
 func OSSBeatDir(path ...string) string {
+	cfg := MustGetConfig()
 	ossDir := CWD()
 
 	// Check if we need to correct ossDir because it's in x-pack.
 	if parentDir := filepath.Base(filepath.Dir(ossDir)); parentDir == xpackDirName {
 		// If the OSS version of the beat exists.
-		tmp := filepath.Join(ossDir, "../..", BeatName)
+		tmp := filepath.Join(ossDir, "../..", cfg.Beat.Name)
 		if _, err := os.Stat(tmp); !os.IsNotExist(err) {
 			ossDir = tmp
 		}
@@ -854,15 +855,16 @@ func OSSBeatDir(path ...string) string {
 // XPackBeatDir returns the X-Pack beat directory. You can pass paths and they
 // will be joined and appended to the X-Pack beat dir.
 func XPackBeatDir(path ...string) string {
+	cfg := MustGetConfig()
 	// Check if we have an X-Pack only beats
 	cur := CWD()
 
 	if parentDir := filepath.Base(filepath.Dir(cur)); parentDir == xpackDirName {
-		tmp := filepath.Join(filepath.Dir(cur), BeatName)
+		tmp := filepath.Join(filepath.Dir(cur), cfg.Beat.Name)
 		return filepath.Join(append([]string{tmp}, path...)...)
 	}
 
-	return OSSBeatDir(append([]string{XPackDir, BeatName}, path...)...)
+	return OSSBeatDir(append([]string{XPackDir, cfg.Beat.Name}, path...)...)
 }
 
 // createDir creates the parent directory for the given file.

@@ -5,6 +5,7 @@
 package mage
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -18,9 +19,18 @@ import (
 
 // Package packages the Beat for distribution. It generates packages based on
 // the set of target platforms and registered packaging specifications.
+// This is a convenience wrapper around PackageWithContext that uses the global config.
 func Package() error {
+	return PackageWithContext(context.Background())
+}
+
+// PackageWithContext packages the Beat for distribution using config from context.
+// It generates packages based on the set of target platforms and registered packaging specifications.
+func PackageWithContext(ctx context.Context) error {
+	cfg := ConfigFromContext(ctx)
 	fmt.Println("--- Package artifact")
-	if len(Platforms) == 0 {
+	platforms := cfg.GetPlatforms()
+	if len(platforms) == 0 {
 		fmt.Println(">> package: Skipping because the platform list is empty")
 		return nil
 	}
@@ -29,9 +39,6 @@ func Package() error {
 		return fmt.Errorf("no package specs are registered. Call " +
 			"UseElasticAgentPackaging or UseElasticAgentCorePackaging first")
 	}
-
-	// platforms := updateWithDarwinUniversal(Platforms)
-	platforms := Platforms
 
 	if mg.Verbose() {
 		debugSelectedPackageSpecsWithPlatform := make([]string, 0, len(Packages))
@@ -50,18 +57,18 @@ func Package() error {
 			}
 
 			// Checks if this package is compatible with the FIPS settings
-			if pkg.Spec.FIPS != FIPSBuild {
-				log.Printf("Skipping %s/%s package type because FIPS flag doesn't match [pkg=%v, build=%v]", pkg.Spec.Name, pkg.OS, pkg.Spec.FIPS, FIPSBuild)
+			if pkg.Spec.FIPS != cfg.Build.FIPSBuild {
+				log.Printf("Skipping %s/%s package type because FIPS flag doesn't match [pkg=%v, build=%v]", pkg.Spec.Name, pkg.OS, pkg.Spec.FIPS, cfg.Build.FIPSBuild)
 				continue
 			}
 
 			for _, pkgType := range pkg.Types {
-				if !IsPackageTypeSelected(pkgType) {
+				if !cfg.IsPackageTypeSelected(pkgType) {
 					log.Printf("Skipping %s package type because it is not selected", pkgType)
 					continue
 				}
 
-				if pkgType == Docker && !IsDockerVariantSelected(pkg.Spec.DockerVariant) {
+				if pkgType == Docker && !cfg.IsDockerVariantSelected(pkg.Spec.DockerVariant) {
 					log.Printf("Skipping %s docker variant type because it is not selected", pkg.Spec.DockerVariant)
 					continue
 				}
@@ -83,12 +90,12 @@ func Package() error {
 					continue
 				}
 
-				agentPackageDrop, _ := os.LookupEnv("AGENT_DROP_PATH")
+				agentPackageDrop := cfg.Packaging.AgentDropPath
 
 				spec := pkg.Spec.Clone()
 				spec.OS = target.GOOS()
 				spec.Arch = packageArch
-				spec.Snapshot = Snapshot
+				spec.Snapshot = cfg.Build.Snapshot
 				spec.evalContext = map[string]interface{}{
 					"GOOS":          target.GOOS(),
 					"GOARCH":        target.GOARCH(),
@@ -127,11 +134,13 @@ func Package() error {
 // IsPackageTypeSelected returns true if SelectedPackageTypes is empty or if
 // pkgType is present on SelectedPackageTypes. It returns false otherwise.
 func IsPackageTypeSelected(pkgType PackageType) bool {
-	if len(SelectedPackageTypes) == 0 {
+	cfg := MustGetConfig()
+	selectedTypes := cfg.GetPackageTypes()
+	if len(selectedTypes) == 0 {
 		return true
 	}
 
-	for _, t := range SelectedPackageTypes {
+	for _, t := range selectedTypes {
 		if t == pkgType {
 			return true
 		}
@@ -142,11 +151,13 @@ func IsPackageTypeSelected(pkgType PackageType) bool {
 // IsDockerVariantSelected returns true if SelectedDockerVariants is empty or if
 // docVariant is present on SelectedDockerVariants. It returns false otherwise.
 func IsDockerVariantSelected(docVariant DockerVariant) bool {
-	if len(SelectedDockerVariants) == 0 {
+	cfg := MustGetConfig()
+	selectedVariants := cfg.GetDockerVariants()
+	if len(selectedVariants) == 0 {
 		return true
 	}
 
-	for _, v := range SelectedDockerVariants {
+	for _, v := range selectedVariants {
 		if v == docVariant {
 			return true
 		}
@@ -220,6 +231,7 @@ func WithRootUserContainer() func(params *testPackagesParams) {
 // TestPackages executes the package tests on the produced binaries. These tests
 // inspect things like file ownership and mode.
 func TestPackages(options ...TestPackagesOption) error {
+	cfg := MustGetConfig()
 	fmt.Println("--- TestPackages")
 	params := testPackagesParams{}
 	for _, opt := range options {
@@ -257,7 +269,7 @@ func TestPackages(options ...TestPackagesOption) error {
 		args = append(args, "--root-user-container")
 	}
 
-	if BeatUser == "root" {
+	if cfg.Beat.User == "root" {
 		args = append(args, "-root-owner")
 	}
 
@@ -278,9 +290,11 @@ func TestPackages(options ...TestPackagesOption) error {
 // linux/386 binaries to ensure they meet the requirements for RHEL 6 which has
 // glibc 2.12.
 func TestLinuxForCentosGLIBC() error {
-	switch Platform.Name {
+	cfg := MustGetConfig()
+	platform := cfg.Platform()
+	switch platform.Name {
 	case "linux/amd64", "linux/386":
-		return TestBinaryGLIBCVersion(filepath.Join("build/golang-crossbuild", BeatName+"-linux-"+Platform.GOARCH), "2.12")
+		return TestBinaryGLIBCVersion(filepath.Join("build/golang-crossbuild", cfg.Beat.Name+"-linux-"+platform.GOARCH), "2.12")
 	default:
 		return nil
 	}

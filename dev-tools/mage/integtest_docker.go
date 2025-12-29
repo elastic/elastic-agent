@@ -68,6 +68,7 @@ func (d *DockerIntegrationTester) StepRequirements() IntegrationTestSteps {
 
 // Test performs the tests with docker-compose.
 func (d *DockerIntegrationTester) Test(dir string, mageTarget string, env map[string]string) error {
+	cfg := MustGetConfig()
 	var err error
 	d.buildImagesOnce.Do(func() { err = dockerComposeBuildImages() })
 	if err != nil {
@@ -81,7 +82,7 @@ func (d *DockerIntegrationTester) Test(dir string, mageTarget string, env map[st
 	}
 	dockerRepoRoot := filepath.Join("/go/src", repo.CanonicalRootImportPath)
 	dockerGoCache := filepath.Join(dockerRepoRoot, "build/docker-gocache")
-	magePath := filepath.Join("/go/src", repo.CanonicalRootImportPath, repo.SubDir, "build/mage-linux-"+GOARCH)
+	magePath := filepath.Join("/go/src", repo.CanonicalRootImportPath, repo.SubDir, "build/mage-linux-"+cfg.Build.GOARCH)
 	goPkgCache := filepath.Join(filepath.SplitList(build.Default.GOPATH)[0], "pkg/mod/cache/download")
 	dockerGoPkgCache := "/gocache"
 
@@ -248,6 +249,7 @@ func dockerComposeProjectName() string {
 
 // dockerComposeBuildImages builds all images in the docker-compose.yml file.
 func dockerComposeBuildImages() error {
+	cfg := MustGetConfig()
 	fmt.Println(">> Building docker images")
 
 	composeEnv, err := integTestDockerComposeEnvVars()
@@ -256,11 +258,11 @@ func dockerComposeBuildImages() error {
 	}
 
 	args := []string{"-p", dockerComposeProjectName(), "build", "--force-rm"}
-	if _, noCache := os.LookupEnv("DOCKER_NOCACHE"); noCache {
+	if cfg.Docker.NoCache {
 		args = append(args, "--no-cache")
 	}
 
-	if _, forcePull := os.LookupEnv("DOCKER_PULL"); forcePull {
+	if cfg.Docker.ForcePull {
 		args = append(args, "--pull")
 	}
 

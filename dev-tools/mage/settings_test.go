@@ -5,7 +5,6 @@
 package mage
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,8 +19,7 @@ func TestGetVersion(t *testing.T) {
 
 func TestAgentPackageVersion(t *testing.T) {
 	t.Run("agent package version without env var", func(t *testing.T) {
-		os.Unsetenv(agentPackageVersionEnvVar)
-		initGlobals()
+		ResetConfigForTest()
 		expectedPkgVersion, err := BeatQualifiedVersion()
 		require.NoError(t, err)
 		actualPkgVersion, err := AgentPackageVersion()
@@ -30,20 +28,21 @@ func TestAgentPackageVersion(t *testing.T) {
 	})
 
 	t.Run("agent package version env var set", func(t *testing.T) {
+		ResetConfigForTest()
 		expectedPkgVersion := "1.2.3-specialrelease+abcdef"
 		t.Setenv(agentPackageVersionEnvVar, expectedPkgVersion)
-		initGlobals()
 		actualPkgVersion, err := AgentPackageVersion()
 		require.NoError(t, err)
 		assert.Equal(t, expectedPkgVersion, actualPkgVersion)
 	})
 
 	t.Run("agent package version function must be mapped", func(t *testing.T) {
+		ResetConfigForTest()
 		t.Setenv(agentPackageVersionEnvVar, "1.2.3-specialrelease+abcdef")
-		initGlobals()
-		assert.Contains(t, FuncMap, agentPackageVersionMappedFunc)
-		require.IsType(t, FuncMap[agentPackageVersionMappedFunc], func() (string, error) { return "", nil })
-		mappedFuncPkgVersion, err := FuncMap[agentPackageVersionMappedFunc].(func() (string, error))()
+		funcMap := FuncMap()
+		assert.Contains(t, funcMap, agentPackageVersionMappedFunc)
+		require.IsType(t, funcMap[agentPackageVersionMappedFunc], func() (string, error) { return "", nil })
+		mappedFuncPkgVersion, err := funcMap[agentPackageVersionMappedFunc].(func() (string, error))()
 		require.NoError(t, err)
 		expectedPkgVersion, err := AgentPackageVersion()
 		require.NoError(t, err)

@@ -234,13 +234,14 @@ func (r *IntegrationRunner) Test(mageTarget string, test func() error) error {
 	}
 
 	// Honor the TEST_ENVIRONMENT value if set.
-	if testEnvVar, isSet := os.LookupEnv("TEST_ENVIRONMENT"); isSet {
-		enabled, err := strconv.ParseBool(testEnvVar)
+	cfg := MustGetConfig()
+	if cfg.IntegrationTest.TestEnvironmentSet {
+		enabled, err := strconv.ParseBool(cfg.IntegrationTest.TestEnvironment)
 		if err != nil {
 			return fmt.Errorf("failed to parse TEST_ENVIRONMENT value: %w", err)
 		}
 		if !enabled {
-			return fmt.Errorf("TEST_ENVIRONMENT=%s", testEnvVar)
+			return fmt.Errorf("TEST_ENVIRONMENT=%s", cfg.IntegrationTest.TestEnvironment)
 		}
 	}
 

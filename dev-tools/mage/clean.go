@@ -27,6 +27,7 @@ var DefaultCleanPaths = []string{
 
 // Clean clean generated build artifacts and caches.
 func Clean(pathLists ...[]string) error {
+	cfg := MustGetConfig()
 	if len(pathLists) == 0 {
 		pathLists = [][]string{DefaultCleanPaths}
 	}
@@ -38,8 +39,8 @@ func Clean(pathLists ...[]string) error {
 			}
 		}
 	}
-	if CrossBuildMountBuildCache {
-		return sh.Run("docker", "volume", "rm", "-f", CrossBuildBuildCacheVolumeName)
+	if cfg.CrossBuild.MountBuildCache {
+		return sh.Run("docker", "volume", "rm", "-f", cfg.CrossBuild.BuildCacheVolumeName)
 	}
 	return nil
 }

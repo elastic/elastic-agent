@@ -5,6 +5,7 @@
 package mage
 
 import (
+	"context"
 	"fmt"
 	"go/build"
 	"os"
@@ -13,6 +14,25 @@ import (
 	"strings"
 	"sync"
 )
+
+// configContextKey is the key used to store EnvConfig in context.
+type configContextKey struct{}
+
+// ConfigFromContext returns the EnvConfig from the context if present,
+// otherwise loads it from environment variables. This is the preferred
+// way to get configuration in mage targets that receive a context.
+func ConfigFromContext(ctx context.Context) *EnvConfig {
+	if cfg, ok := ctx.Value(configContextKey{}).(*EnvConfig); ok && cfg != nil {
+		return cfg
+	}
+	return MustGetConfig()
+}
+
+// ContextWithConfig returns a new context with the given EnvConfig stored in it.
+// Use this to pass configuration to dependent mage targets via mg.CtxDeps.
+func ContextWithConfig(ctx context.Context, cfg *EnvConfig) context.Context {
+	return context.WithValue(ctx, configContextKey{}, cfg)
+}
 
 // EnvConfig holds all configuration read from environment variables.
 // Use GetConfig() to access the singleton instance after initialization.
@@ -31,6 +51,173 @@ type EnvConfig struct {
 
 	// Packaging configuration
 	Packaging PackagingConfig
+
+	// IntegrationTest configuration
+	IntegrationTest IntegrationTestConfig
+
+	// Docker configuration
+	Docker DockerConfig
+
+	// Kubernetes configuration
+	Kubernetes KubernetesConfig
+
+	// PlatformFilters holds additional platform filters to apply.
+	// These are applied after the base platform list is determined.
+	PlatformFilters []string
+
+	// SelectedPackageTypes overrides the package types from PACKAGES env var.
+	// If nil, the env var value is used.
+	SelectedPackageTypes []PackageType
+
+	// SelectedDockerVariants overrides the docker variants from DOCKER_VARIANTS env var.
+	// If nil, the env var value is used.
+	SelectedDockerVariants []DockerVariant
+}
+
+// Clone returns a deep copy of the EnvConfig.
+// Use this when you need to modify config without affecting other users.
+func (c *EnvConfig) Clone() *EnvConfig {
+	clone := *c
+	// Deep copy slices
+	if c.Test.Tags != nil {
+		clone.Test.Tags = make([]string, len(c.Test.Tags))
+		copy(clone.Test.Tags, c.Test.Tags)
+	}
+	if c.PlatformFilters != nil {
+		clone.PlatformFilters = make([]string, len(c.PlatformFilters))
+		copy(clone.PlatformFilters, c.PlatformFilters)
+	}
+	if c.SelectedPackageTypes != nil {
+		clone.SelectedPackageTypes = make([]PackageType, len(c.SelectedPackageTypes))
+		copy(clone.SelectedPackageTypes, c.SelectedPackageTypes)
+	}
+	if c.SelectedDockerVariants != nil {
+		clone.SelectedDockerVariants = make([]DockerVariant, len(c.SelectedDockerVariants))
+		copy(clone.SelectedDockerVariants, c.SelectedDockerVariants)
+	}
+	return &clone
+}
+
+// WithDevBuild returns a copy of the config with DevBuild set to the given value.
+func (c *EnvConfig) WithDevBuild(enabled bool) *EnvConfig {
+	clone := c.Clone()
+	clone.Build.DevBuild = enabled
+	return clone
+}
+
+// WithExternalBuild returns a copy of the config with ExternalBuild set to the given value.
+func (c *EnvConfig) WithExternalBuild(enabled bool) *EnvConfig {
+	clone := c.Clone()
+	clone.Build.ExternalBuild = enabled
+	return clone
+}
+
+// WithFIPSBuild returns a copy of the config with FIPSBuild set to the given value.
+func (c *EnvConfig) WithFIPSBuild(enabled bool) *EnvConfig {
+	clone := c.Clone()
+	clone.Build.FIPSBuild = enabled
+	return clone
+}
+
+// WithSnapshot returns a copy of the config with Snapshot set to the given value.
+func (c *EnvConfig) WithSnapshot(enabled bool) *EnvConfig {
+	clone := c.Clone()
+	clone.Build.Snapshot = enabled
+	return clone
+}
+
+// WithPlatformFilter returns a copy of the config with an additional platform filter.
+func (c *EnvConfig) WithPlatformFilter(filter string) *EnvConfig {
+	clone := c.Clone()
+	clone.PlatformFilters = append(clone.PlatformFilters, filter)
+	return clone
+}
+
+// WithPackageTypes returns a copy of the config with the specified package types.
+func (c *EnvConfig) WithPackageTypes(types []PackageType) *EnvConfig {
+	clone := c.Clone()
+	clone.SelectedPackageTypes = types
+	return clone
+}
+
+// WithDockerVariants returns a copy of the config with the specified docker variants.
+func (c *EnvConfig) WithDockerVariants(variants []DockerVariant) *EnvConfig {
+	clone := c.Clone()
+	clone.SelectedDockerVariants = variants
+	return clone
+}
+
+// WithPlatforms returns a copy of the config with the specified platforms string.
+// This replaces any existing platform configuration.
+func (c *EnvConfig) WithPlatforms(platforms string) *EnvConfig {
+	clone := c.Clone()
+	clone.CrossBuild.Platforms = platforms
+	clone.PlatformFilters = nil // Clear filters when setting platforms explicitly
+	return clone
+}
+
+// WithAddedPackageType returns a copy of the config with the specified package type added.
+// If the package type is already selected, returns a clone with no changes.
+func (c *EnvConfig) WithAddedPackageType(pkgType PackageType) *EnvConfig {
+	clone := c.Clone()
+	currentTypes := c.GetPackageTypes()
+	for _, t := range currentTypes {
+		if t == pkgType {
+			return clone // already selected
+		}
+	}
+	clone.SelectedPackageTypes = append(currentTypes, pkgType)
+	return clone
+}
+
+// WithBeatVersion returns a copy of the config with the specified beat version.
+func (c *EnvConfig) WithBeatVersion(version string) *EnvConfig {
+	clone := c.Clone()
+	clone.Build.BeatVersion = version
+	clone.Build.BeatVersionSet = true
+	return clone
+}
+
+// WithAgentCommitHashOverride returns a copy of the config with the specified commit hash override.
+func (c *EnvConfig) WithAgentCommitHashOverride(hash string) *EnvConfig {
+	clone := c.Clone()
+	clone.Build.AgentCommitHashOverride = hash
+	return clone
+}
+
+// WithAgentDropPath returns a copy of the config with the specified agent drop path.
+func (c *EnvConfig) WithAgentDropPath(path string) *EnvConfig {
+	clone := c.Clone()
+	clone.Packaging.AgentDropPath = path
+	return clone
+}
+
+// WithStackProvisioner returns a copy of the config with the specified stack provisioner.
+func (c *EnvConfig) WithStackProvisioner(provisioner string) *EnvConfig {
+	clone := c.Clone()
+	clone.IntegrationTest.StackProvisioner = provisioner
+	return clone
+}
+
+// WithTestGroups returns a copy of the config with the specified test groups.
+func (c *EnvConfig) WithTestGroups(groups string) *EnvConfig {
+	clone := c.Clone()
+	clone.IntegrationTest.Groups = groups
+	return clone
+}
+
+// WithAgentBuildDir returns a copy of the config with the specified agent build directory.
+func (c *EnvConfig) WithAgentBuildDir(path string) *EnvConfig {
+	clone := c.Clone()
+	clone.IntegrationTest.AgentBuildDir = path
+	return clone
+}
+
+// WithTestBinaryName returns a copy of the config with the specified test binary name.
+func (c *EnvConfig) WithTestBinaryName(name string) *EnvConfig {
+	clone := c.Clone()
+	clone.IntegrationTest.BinaryName = name
+	return clone
 }
 
 // BuildConfig contains build-related configuration.
@@ -47,11 +234,17 @@ type BuildConfig struct {
 	// Snapshot indicates whether this is a snapshot build (from SNAPSHOT env var)
 	Snapshot bool
 
+	// SnapshotSet indicates whether SNAPSHOT env var was explicitly set
+	SnapshotSet bool
+
 	// DevBuild indicates whether this is a development build (from DEV env var)
 	DevBuild bool
 
 	// ExternalBuild indicates whether to use external artifact builds (from EXTERNAL env var)
 	ExternalBuild bool
+
+	// ExternalBuildSet indicates whether EXTERNAL env var was explicitly set
+	ExternalBuildSet bool
 
 	// FIPSBuild indicates whether to build FIPS-compliant binaries (from FIPS env var)
 	FIPSBuild bool
@@ -67,6 +260,15 @@ type BuildConfig struct {
 
 	// MaxParallel is the maximum number of parallel jobs (from MAX_PARALLEL env var)
 	MaxParallel int
+
+	// BeatVersion overrides the beat version (from BEAT_VERSION or set programmatically)
+	BeatVersion string
+
+	// BeatVersionSet indicates if BeatVersion was explicitly set (env or programmatic)
+	BeatVersionSet bool
+
+	// AgentCommitHashOverride overrides the commit hash for packaging (from AGENT_COMMIT_HASH_OVERRIDE or set programmatically)
+	AgentCommitHashOverride string
 }
 
 // BeatConfig contains Beat metadata configuration.
@@ -148,6 +350,134 @@ type PackagingConfig struct {
 
 	// UsePackageVersion enables reading version from .package-version file (from USE_PACKAGE_VERSION env var)
 	UsePackageVersion bool
+
+	// AgentDropPath is the path for dropping agent artifacts (from AGENT_DROP_PATH env var)
+	AgentDropPath string
+
+	// KeepArchive indicates whether to keep the archive after packaging (from KEEP_ARCHIVE env var)
+	KeepArchive bool
+}
+
+// IntegrationTestConfig contains integration test related configuration.
+type IntegrationTestConfig struct {
+	// AgentVersion is the agent version for integration tests (from AGENT_VERSION env var)
+	AgentVersion string
+
+	// AgentStackVersion is the stack version for integration tests (from AGENT_STACK_VERSION env var)
+	AgentStackVersion string
+
+	// AgentBuildDir is the build directory for agent artifacts (from AGENT_BUILD_DIR env var)
+	AgentBuildDir string
+
+	// StackProvisioner specifies the stack provisioner to use (from STACK_PROVISIONER env var)
+	// Valid values: "stateful", "serverless"
+	StackProvisioner string
+
+	// InstanceProvisioner specifies the instance provisioner to use (from INSTANCE_PROVISIONER env var)
+	// Valid values: "ogc", "multipass", "kind"
+	InstanceProvisioner string
+
+	// ESSRegion is the ESS region for testing (from TEST_INTEG_AUTH_ESS_REGION env var)
+	ESSRegion string
+
+	// GCPDatacenter is the GCP datacenter for testing (from TEST_INTEG_AUTH_GCP_DATACENTER env var)
+	GCPDatacenter string
+
+	// GCPProject is the GCP project for testing (from TEST_INTEG_AUTH_GCP_PROJECT env var)
+	GCPProject string
+
+	// GCPEmailDomain is the expected email domain for GCP auth (from TEST_INTEG_AUTH_EMAIL_DOMAIN env var)
+	GCPEmailDomain string
+
+	// GCPServiceTokenFile is the path to GCP service token file (from TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE env var)
+	GCPServiceTokenFile string
+
+	// Platforms specifies the test platforms (from TEST_PLATFORMS env var)
+	Platforms string
+
+	// Packages specifies the test packages (from TEST_PACKAGES env var)
+	Packages string
+
+	// PackagesDefined indicates whether TEST_PACKAGES was explicitly set
+	PackagesDefined bool
+
+	// Groups specifies the test groups (from TEST_GROUPS env var)
+	Groups string
+
+	// DefinePrefix is the test define prefix (from TEST_DEFINE_PREFIX env var)
+	DefinePrefix string
+
+	// DefineTests specifies the tests to run (from TEST_DEFINE_TESTS env var)
+	DefineTests string
+
+	// BinaryName is the binary name for testing (from TEST_BINARY_NAME env var)
+	BinaryName string
+
+	// RepoPath is the repository path for testing (from TEST_INTEG_REPO_PATH env var)
+	RepoPath string
+
+	// TimestampEnabled enables timestamps in test output (from TEST_INTEG_TIMESTAMP env var)
+	TimestampEnabled bool
+
+	// RunUntilFailure runs tests until a failure occurs (from TEST_RUN_UNTIL_FAILURE env var)
+	RunUntilFailure bool
+
+	// CleanOnExit cleans up on exit (from TEST_INTEG_CLEAN_ON_EXIT env var)
+	CleanOnExit bool
+
+	// LongRunning enables long running tests (from TEST_LONG_RUNNING env var)
+	LongRunning string
+
+	// LongTestRuntime specifies the runtime for long tests (from LONG_TEST_RUNTIME env var)
+	LongTestRuntime string
+
+	// CollectDiag enables diagnostic collection (from AGENT_COLLECT_DIAG env var)
+	CollectDiag string
+
+	// KeepInstalled keeps the agent installed after tests (from AGENT_KEEP_INSTALLED env var)
+	KeepInstalled string
+
+	// BuildAgent indicates whether to build the agent before tests (from BUILD_AGENT env var)
+	BuildAgent bool
+
+	// GoTestFlags contains additional flags for go test (from GOTEST_FLAGS env var)
+	GoTestFlags string
+
+	// TestEnvironment enables/disables the test environment (from TEST_ENVIRONMENT env var)
+	TestEnvironment string
+
+	// TestEnvironmentSet indicates whether TEST_ENVIRONMENT was explicitly set
+	TestEnvironmentSet bool
+}
+
+// DockerConfig contains Docker-related configuration.
+type DockerConfig struct {
+	// ImportSource overrides the docker import source (from DOCKER_IMPORT_SOURCE env var)
+	ImportSource string
+
+	// CustomImageTag overrides the docker image tag (from CUSTOM_IMAGE_TAG env var)
+	CustomImageTag string
+
+	// CIElasticAgentDockerImage overrides the CI docker image (from CI_ELASTIC_AGENT_DOCKER_IMAGE env var)
+	CIElasticAgentDockerImage string
+
+	// NoCache disables docker build cache (from DOCKER_NOCACHE env var)
+	NoCache bool
+
+	// ForcePull forces docker to pull images (from DOCKER_PULL env var)
+	ForcePull bool
+
+	// WindowsNpcap enables Windows NPCAP support (from WINDOWS_NPCAP env var)
+	WindowsNpcap bool
+}
+
+// KubernetesConfig contains Kubernetes-related configuration.
+type KubernetesConfig struct {
+	// K8sVersion is the Kubernetes version (from K8S_VERSION env var)
+	K8sVersion string
+
+	// KindSkipDelete skips Kind cluster deletion (from KIND_SKIP_DELETE env var)
+	KindSkipDelete bool
 }
 
 var (
@@ -163,6 +493,21 @@ func GetConfig() (*EnvConfig, error) {
 		globalConfig, globalConfigErr = LoadConfig()
 	})
 	return globalConfig, globalConfigErr
+}
+
+// ResetConfig resets the global config singleton so it will be reloaded
+// on the next call to GetConfig(). Use this when environment variables
+// have been changed and the config needs to be reloaded.
+func ResetConfig() {
+	globalConfigOnce = sync.Once{}
+	globalConfig = nil
+	globalConfigErr = nil
+}
+
+// ResetConfigForTest resets the global config singleton so it will be reloaded
+// on the next call to GetConfig(). This should ONLY be used in tests.
+func ResetConfigForTest() {
+	ResetConfig()
 }
 
 // MustGetConfig returns the singleton EnvConfig instance, panicking on error.
@@ -192,6 +537,9 @@ func LoadConfig() (*EnvConfig, error) {
 
 	cfg.loadCrossBuildConfig()
 	cfg.loadPackagingConfig()
+	cfg.loadIntegrationTestConfig()
+	cfg.loadDockerConfig()
+	cfg.loadKubernetesConfig()
 
 	return cfg, nil
 }
@@ -205,6 +553,7 @@ func (c *EnvConfig) loadBuildConfig() error {
 
 	var err error
 
+	_, c.Build.SnapshotSet = os.LookupEnv("SNAPSHOT")
 	c.Build.Snapshot, err = parseBoolEnv("SNAPSHOT", false)
 	if err != nil {
 		return fmt.Errorf("failed to parse SNAPSHOT: %w", err)
@@ -215,6 +564,7 @@ func (c *EnvConfig) loadBuildConfig() error {
 		return fmt.Errorf("failed to parse DEV: %w", err)
 	}
 
+	_, c.Build.ExternalBuildSet = os.LookupEnv("EXTERNAL")
 	c.Build.ExternalBuild, err = parseBoolEnv("EXTERNAL", false)
 	if err != nil {
 		return fmt.Errorf("failed to parse EXTERNAL: %w", err)
@@ -236,6 +586,12 @@ func (c *EnvConfig) loadBuildConfig() error {
 	if c.Build.MaxParallel == 0 {
 		c.Build.MaxParallel = runtime.NumCPU()
 	}
+
+	// Read BEAT_VERSION override
+	c.Build.BeatVersion, c.Build.BeatVersionSet = os.LookupEnv("BEAT_VERSION")
+
+	// Read AGENT_COMMIT_HASH_OVERRIDE
+	c.Build.AgentCommitHashOverride = envOr("AGENT_COMMIT_HASH_OVERRIDE", "")
 
 	return nil
 }
@@ -294,6 +650,56 @@ func (c *EnvConfig) loadPackagingConfig() {
 	c.Packaging.ManifestURL = envOr("MANIFEST_URL", "")
 	c.Packaging.PackagingFromManifest = c.Packaging.ManifestURL != ""
 	c.Packaging.UsePackageVersion = envOr("USE_PACKAGE_VERSION", "") == "true"
+	c.Packaging.AgentDropPath = envOr("AGENT_DROP_PATH", "")
+	c.Packaging.KeepArchive = envOr("KEEP_ARCHIVE", "") != ""
+}
+
+// loadIntegrationTestConfig loads integration test configuration from environment variables.
+func (c *EnvConfig) loadIntegrationTestConfig() {
+	c.IntegrationTest.AgentVersion = envOr("AGENT_VERSION", "")
+	c.IntegrationTest.AgentStackVersion = envOr("AGENT_STACK_VERSION", "")
+	c.IntegrationTest.AgentBuildDir = envOr("AGENT_BUILD_DIR", "")
+	c.IntegrationTest.StackProvisioner = envOr("STACK_PROVISIONER", "")
+	c.IntegrationTest.InstanceProvisioner = envOr("INSTANCE_PROVISIONER", "")
+	c.IntegrationTest.ESSRegion = envOr("TEST_INTEG_AUTH_ESS_REGION", "")
+	c.IntegrationTest.GCPDatacenter = envOr("TEST_INTEG_AUTH_GCP_DATACENTER", "")
+	c.IntegrationTest.GCPProject = envOr("TEST_INTEG_AUTH_GCP_PROJECT", "")
+	c.IntegrationTest.GCPEmailDomain = envOr("TEST_INTEG_AUTH_EMAIL_DOMAIN", "")
+	c.IntegrationTest.GCPServiceTokenFile = envOr("TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE", "")
+	c.IntegrationTest.Platforms = envOr("TEST_PLATFORMS", "")
+	_, c.IntegrationTest.PackagesDefined = os.LookupEnv("TEST_PACKAGES")
+	c.IntegrationTest.Packages = envOr("TEST_PACKAGES", "")
+	c.IntegrationTest.Groups = envOr("TEST_GROUPS", "")
+	c.IntegrationTest.DefinePrefix = envOr("TEST_DEFINE_PREFIX", "")
+	c.IntegrationTest.DefineTests = envOr("TEST_DEFINE_TESTS", "")
+	c.IntegrationTest.BinaryName = envOr("TEST_BINARY_NAME", "")
+	c.IntegrationTest.RepoPath = envOr("TEST_INTEG_REPO_PATH", "")
+	c.IntegrationTest.TimestampEnabled = envOr("TEST_INTEG_TIMESTAMP", "") == "true"
+	c.IntegrationTest.RunUntilFailure = envOr("TEST_RUN_UNTIL_FAILURE", "") == "true"
+	c.IntegrationTest.CleanOnExit = envOr("TEST_INTEG_CLEAN_ON_EXIT", "") != "false"
+	c.IntegrationTest.LongRunning = envOr("TEST_LONG_RUNNING", "")
+	c.IntegrationTest.LongTestRuntime = envOr("LONG_TEST_RUNTIME", "")
+	c.IntegrationTest.CollectDiag = envOr("AGENT_COLLECT_DIAG", "")
+	c.IntegrationTest.KeepInstalled = envOr("AGENT_KEEP_INSTALLED", "")
+	c.IntegrationTest.BuildAgent = envOr("BUILD_AGENT", "") == "true"
+	c.IntegrationTest.GoTestFlags = envOr("GOTEST_FLAGS", "")
+	c.IntegrationTest.TestEnvironment, c.IntegrationTest.TestEnvironmentSet = os.LookupEnv("TEST_ENVIRONMENT")
+}
+
+// loadDockerConfig loads Docker-related configuration from environment variables.
+func (c *EnvConfig) loadDockerConfig() {
+	c.Docker.ImportSource = envOr("DOCKER_IMPORT_SOURCE", "")
+	c.Docker.CustomImageTag = envOr("CUSTOM_IMAGE_TAG", "")
+	c.Docker.CIElasticAgentDockerImage = envOr("CI_ELASTIC_AGENT_DOCKER_IMAGE", "")
+	_, c.Docker.NoCache = os.LookupEnv("DOCKER_NOCACHE")
+	_, c.Docker.ForcePull = os.LookupEnv("DOCKER_PULL")
+	c.Docker.WindowsNpcap = envOr("WINDOWS_NPCAP", "") == "true"
+}
+
+// loadKubernetesConfig loads Kubernetes-related configuration from environment variables.
+func (c *EnvConfig) loadKubernetesConfig() {
+	c.Kubernetes.K8sVersion = envOr("K8S_VERSION", "")
+	c.Kubernetes.KindSkipDelete = envOr("KIND_SKIP_DELETE", "") == "true"
 }
 
 // envOr returns the value of the specified environment variable if it is
@@ -336,4 +742,191 @@ func (c *EnvConfig) TestTagsWithFIPS() []string {
 		tags = append(tags, "requirefips", "ms_tls13kdf")
 	}
 	return tags
+}
+
+// GetPlatforms returns the parsed platform list from PLATFORMS env var.
+// If PLATFORMS is empty, returns the default platform list.
+// Platform filters from the config's PlatformFilters are applied to the result.
+// Note: linux/386 and windows/386 are always filtered out as they are not supported.
+func (c *EnvConfig) GetPlatforms() BuildPlatformList {
+	var platforms BuildPlatformList
+	if c.CrossBuild.Platforms != "" {
+		platforms = NewPlatformList(c.CrossBuild.Platforms)
+	} else {
+		platforms = BuildPlatforms.Defaults()
+	}
+
+	// Filter out unsupported platforms
+	platforms = platforms.Filter("!linux/386")
+	platforms = platforms.Filter("!windows/386")
+
+	// Apply platform filters from config
+	for _, filter := range c.PlatformFilters {
+		platforms = platforms.Filter(filter)
+	}
+
+	return platforms
+}
+
+// GetPackageTypes returns the package types to use.
+// If SelectedPackageTypes is set in the config, returns that.
+// Otherwise parses from PACKAGES env var.
+// If PACKAGES is empty, returns nil (meaning all package types are selected).
+func (c *EnvConfig) GetPackageTypes() []PackageType {
+	// Check config override first
+	if c.SelectedPackageTypes != nil {
+		return c.SelectedPackageTypes
+	}
+	// Fall back to env var
+	if c.CrossBuild.Packages == "" {
+		return nil
+	}
+	var types []PackageType
+	for _, pkgtype := range strings.Split(c.CrossBuild.Packages, ",") {
+		var p PackageType
+		if err := p.UnmarshalText([]byte(pkgtype)); err == nil {
+			types = append(types, p)
+		}
+	}
+	return types
+}
+
+// GetDockerVariants returns the docker variants to use.
+// If SelectedDockerVariants is set in the config, returns that.
+// Otherwise parses from DOCKER_VARIANTS env var.
+// If DOCKER_VARIANTS is empty, returns nil (meaning all variants are selected).
+func (c *EnvConfig) GetDockerVariants() []DockerVariant {
+	// Check config override first
+	if c.SelectedDockerVariants != nil {
+		return c.SelectedDockerVariants
+	}
+	// Fall back to env var
+	if c.CrossBuild.DockerVariants == "" {
+		return nil
+	}
+	var variants []DockerVariant
+	for _, variant := range strings.Split(c.CrossBuild.DockerVariants, ",") {
+		var v DockerVariant
+		if err := v.UnmarshalText([]byte(variant)); err == nil {
+			variants = append(variants, v)
+		}
+	}
+	return variants
+}
+
+// IsPackageTypeSelected returns true if SelectedPackageTypes is empty or if
+// pkgType is present on SelectedPackageTypes. It returns false otherwise.
+func (c *EnvConfig) IsPackageTypeSelected(pkgType PackageType) bool {
+	selectedTypes := c.GetPackageTypes()
+	if len(selectedTypes) == 0 {
+		return true
+	}
+
+	for _, t := range selectedTypes {
+		if t == pkgType {
+			return true
+		}
+	}
+	return false
+}
+
+// IsDockerVariantSelected returns true if SelectedDockerVariants is empty or if
+// docVariant is present on SelectedDockerVariants. It returns false otherwise.
+func (c *EnvConfig) IsDockerVariantSelected(docVariant DockerVariant) bool {
+	selectedVariants := c.GetDockerVariants()
+	if len(selectedVariants) == 0 {
+		return true
+	}
+
+	for _, v := range selectedVariants {
+		if v == docVariant {
+			return true
+		}
+	}
+	return false
+}
+
+// Platforms returns the current platform list with all filters applied.
+// This is a convenience function that calls MustGetConfig().GetPlatforms().
+func Platforms() BuildPlatformList {
+	return MustGetConfig().GetPlatforms()
+}
+
+// DevBuild returns true if this is a development build.
+// This is a convenience function that calls MustGetConfig().Build.DevBuild.
+func DevBuild() bool {
+	return MustGetConfig().Build.DevBuild
+}
+
+// ExternalBuild returns true if external artifacts should be used.
+// This is a convenience function that calls MustGetConfig().Build.ExternalBuild.
+func ExternalBuild() bool {
+	return MustGetConfig().Build.ExternalBuild
+}
+
+// FIPSBuild returns true if this is a FIPS-compliant build.
+// This is a convenience function that calls MustGetConfig().Build.FIPSBuild.
+func FIPSBuild() bool {
+	return MustGetConfig().Build.FIPSBuild
+}
+
+// BeatLicense returns the beat license.
+// This is a convenience function that calls MustGetConfig().Beat.License.
+func BeatLicense() string {
+	return MustGetConfig().Beat.License
+}
+
+// BeatDescription returns the beat description.
+// This is a convenience function that calls MustGetConfig().Beat.Description.
+func BeatDescription() string {
+	return MustGetConfig().Beat.Description
+}
+
+// InitConfig is a no-op provided for backward compatibility.
+// Configuration is now loaded on-demand via GetConfig()/MustGetConfig().
+// Use the With* methods on EnvConfig to create modified configs.
+func InitConfig() {
+	// No-op - config is loaded on demand
+}
+
+// MustInitConfig is a no-op provided for backward compatibility.
+// Configuration is now loaded on-demand via GetConfig()/MustGetConfig().
+func MustInitConfig() {
+	// No-op - config is loaded on demand
+}
+
+// PackagingFromManifest returns true if packaging from manifest is enabled.
+// This is a convenience function that calls MustGetConfig().Packaging.PackagingFromManifest.
+func PackagingFromManifest() bool {
+	return MustGetConfig().Packaging.PackagingFromManifest
+}
+
+// ManifestURL returns the manifest URL for packaging.
+// This is a convenience function that calls MustGetConfig().Packaging.ManifestURL.
+func ManifestURL() string {
+	return MustGetConfig().Packaging.ManifestURL
+}
+
+// SelectedPackageTypes returns the selected package types.
+// This is a convenience function that calls MustGetConfig().GetPackageTypes().
+func SelectedPackageTypes() []PackageType {
+	return MustGetConfig().GetPackageTypes()
+}
+
+// SelectedDockerVariants returns the selected docker variants.
+// This is a convenience function that calls MustGetConfig().GetDockerVariants().
+func SelectedDockerVariants() []DockerVariant {
+	return MustGetConfig().GetDockerVariants()
+}
+
+// Snapshot returns true if this is a snapshot build.
+// This is a convenience function that calls MustGetConfig().Build.Snapshot.
+func Snapshot() bool {
+	return MustGetConfig().Build.Snapshot
+}
+
+// CrossBuildMountModcache returns true if the mod cache should be mounted in crossbuild containers.
+// This is a convenience function that calls MustGetConfig().CrossBuild.MountModcache.
+func CrossBuildMountModcache() bool {
+	return MustGetConfig().CrossBuild.MountModcache
 }

@@ -351,7 +351,7 @@ func (s *PackageSpec) ExtraVar(key, value string) {
 
 // Expand expands a templated string using data from the spec.
 func (s PackageSpec) Expand(in string, args ...map[string]interface{}) (string, error) {
-	return expandTemplate("inline", in, FuncMap,
+	return expandTemplate("inline", in, FuncMap(),
 		EnvMap(append([]map[string]interface{}{s.evalContext, s.toMap()}, args...)...))
 }
 

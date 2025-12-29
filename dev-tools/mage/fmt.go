@@ -65,6 +65,7 @@ func GoImports() error {
 // AddLicenseHeaders adds license headers to .go files. It applies the
 // appropriate license header based on the value of devtools.BeatLicense.
 func AddLicenseHeaders() error {
+	cfg := MustGetConfig()
 	if os.Getenv("CHECK_HEADERS_DISABLED") != "" {
 		return nil
 	}
@@ -74,11 +75,11 @@ func AddLicenseHeaders() error {
 	mg.Deps(InstallGoLicenser)
 
 	var license string
-	switch BeatLicense {
+	switch cfg.Beat.License {
 	case "Elasticv2", "Elastic License 2.0":
 		license = "Elasticv2"
 	default:
-		return fmt.Errorf("unknown license type %s", BeatLicense)
+		return fmt.Errorf("unknown license type %s", cfg.Beat.License)
 	}
 
 	licenser := gotool.Licenser
