@@ -25,8 +25,14 @@ func Beats(targetVersion string) error {
 func BeatsModule(targetVersion string) error {
 	goArgs := []string{"mod", "edit", "-require", fmt.Sprintf("%s@%s", BeatsModulePath, targetVersion)}
 
+	fmt.Println("Fetching beats submodule")
+	err := mage.Run(nil, os.Stdout, os.Stderr, "git", "beats", "fetch")
+	if err != nil {
+		return err
+	}
+
 	fmt.Println("Updating beats submodule")
-	err := mage.Run(nil, os.Stdout, os.Stderr, "git", "beats", "checkout", targetVersion)
+	err = mage.Run(nil, os.Stdout, os.Stderr, "git", "beats", "checkout", targetVersion)
 	if err != nil {
 		return err
 	}
