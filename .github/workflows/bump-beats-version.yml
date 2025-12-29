@@ -22,6 +22,9 @@ jobs:
     steps:
     - id: generator
       uses: elastic/oblt-actions/elastic/active-branches@v1
+      with:
+        exclude-branches: "7.17,8.17,8.18,9.0"
+        filter-branches: true
 
   update-beats:
     permissions:
