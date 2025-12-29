@@ -52,7 +52,7 @@ func TestRestrictUpgradeDeb(t *testing.T) {
 
 		assert.Eventuallyf(t, func() bool {
 			// Note that this updates err in the parent function
-			err = fixture.IsHealthy(ctx)
+			err = fixture.IsHealthyOrDegradedFromOutput(ctx)
 
 			return err == nil
 		}, 5*time.Minute, time.Second, "Elastic-Agent did not report healthy.")

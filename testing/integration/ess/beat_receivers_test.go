@@ -712,8 +712,6 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
-    status_reporting:
-      enabled: false
 agent.monitoring.enabled: false
 `
 
@@ -976,8 +974,6 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
-    status_reporting:
-      enabled: false
 agent.monitoring.enabled: false
 `
 
@@ -1065,8 +1061,6 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
-    status_reporting:
-      enabled: false
 agent.monitoring.enabled: false
 `
 	err = fixture.Configure(ctx, []byte(configNoComponents))
