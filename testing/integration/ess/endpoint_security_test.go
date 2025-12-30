@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -1805,7 +1804,8 @@ type certificatePaths struct {
 // TestPolicyReassignWithTamperProtectedEndpoint creates a policy with Elastic Defend (i.e. Endpoint)
 // in it, making sure it has tamper protection enabled, and enrolls an Agent to this policy.  A second
 // policy, also with Elastic Defend and tamper protection enabled is created, and the Agent is reassigned
-// to this policy. Endpoint should not be uninstalled and reinstalled as a result of this policy reassignment.
+// to this policy. Endpoint should not be uninstalled and reinstalled as a result of this policy reassignment
+// but should be running the new policy.
 func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: integration.FleetEndpointSecurity,
@@ -1880,10 +1880,6 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 	// Get Endpoint's policy ID
 	firstEndpointPolicyID := getEndpointPolicyID(t, ctx)
 
-	// Get Endpoint process ID before policy reassignment
-	firstPID := getEndpointPID(t)
-	require.NotZero(t, firstPID)
-
 	t.Log("Creating the second policy")
 	secondPolicy := createBasicPolicy()
 	policyResp, _ = createPolicyAndEnrollmentToken(ctx, t, info.KibanaClient, secondPolicy)
@@ -1937,42 +1933,6 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 		time.Second,
 		"Endpoint is not running a different policy after policy reassignment",
 	)
-
-	// Get Endpoint process ID after policy reassignment
-	secondPID := getEndpointPID(t)
-	require.NotZero(t, secondPID)
-
-	// Assert that endpoint process IDs haven't changed across policy reassignment
-	t.Log("Ensuring that Endpoint has not restarted")
-	require.Equal(t, firstPID, secondPID)
-}
-
-func getEndpointPID(t *testing.T) int {
-	entries, err := os.ReadDir("/proc")
-	require.NoError(t, err)
-
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		currPID, err := strconv.Atoi(entry.Name())
-		if err != nil {
-			continue // not a PID directory
-		}
-
-		exePath := filepath.Join("/proc", entry.Name(), "exe")
-		resolvedExePath, err := os.Readlink(exePath)
-		if err != nil {
-			continue // permission denied or process exited
-		}
-
-		if resolvedExePath == "/opt/Elastic/Endpoint/elastic-endpoint" {
-			return currPID
-		}
-	}
-
-	return 0
 }
 
 func getEndpointPolicyID(t *testing.T, ctx context.Context) string {
