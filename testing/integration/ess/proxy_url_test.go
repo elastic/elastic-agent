@@ -28,6 +28,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -946,12 +947,10 @@ func TestFleetDownloadProxyURL(t *testing.T) {
 
 	t.Log("Ensure upgrade has failed")
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		status, err := startFixture.ExecStatusRaw(ctx)
+		status, err := startFixture.ExecStatus(ctx)
 		require.NoError(c, err)
-		require.NotNil(c, status["upgrade_details"], "Agent status does not contain upgrade_details.")
-		upgradeDetails, ok := status["upgrade_details"].(map[string]any)
-		require.True(t, ok, "expected upgrade_details to be an object, got type: %T", status["upgrade_details"])
-		require.Equal(c, "UPG_FAILED", upgradeDetails["state"])
+		require.NotNil(c, status.UpgradeDetails, "Agent status does not contain upgrade_details.")
+		require.Equal(c, details.StateFailed, status.UpgradeDetails.State)
 	}, time.Minute*5, time.Second, "Unable to verify that upgrade has failed.")
 
 	proxy := proxytest.New(t,
@@ -997,9 +996,9 @@ func TestFleetDownloadProxyURL(t *testing.T) {
 
 	t.Log("Ensure upgrade starts")
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		status, err := startFixture.ExecStatusRaw(ctx)
+		status, err := startFixture.ExecStatus(ctx)
 		require.NoError(c, err)
-		require.NotNil(c, status["upgrade_details"], "Agent status does not contain upgrade_details.")
+		require.NotNil(c, status.UpgradeDetails, "Agent status does not contain upgrade_details.")
 	}, time.Minute*5, time.Second, "Unable to verify that upgrade details appear.")
 
 	t.Log("Waiting for upgrade watcher to start...")
