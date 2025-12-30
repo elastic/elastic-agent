@@ -9,7 +9,6 @@ import (
 	"os"
 
 	"github.com/magefile/mage/mg"
-	"github.com/magefile/mage/sh"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
@@ -26,14 +25,8 @@ func Beats(branch string, targetVersion string) error {
 func BeatsModule(branch string, targetVersion string) error {
 	goArgs := []string{"mod", "edit", "-require", fmt.Sprintf("%s@%s", BeatsModulePath, targetVersion)}
 
-	fmt.Println("Determining current branch")
-	branch, err := sh.Output("git", "branch", "--show-current")
-	if err != nil {
-		return err
-	}
-
 	fmt.Printf("Fetching branch '%s' in beats submodule\n", branch)
-	err = mage.Run(nil, os.Stdout, os.Stderr, "git", "beats", "fetch", "origin", branch)
+	err := mage.Run(nil, os.Stdout, os.Stderr, "git", "beats", "fetch", "origin", branch)
 	if err != nil {
 		return err
 	}
