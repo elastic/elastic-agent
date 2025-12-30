@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -49,16 +50,24 @@ func TestRestrictUpgradeDeb(t *testing.T) {
 		_, err = fixture.InstallWithoutEnroll(ctx, &installOpts)
 		require.NoError(t, err)
 
-		require.Eventuallyf(t, func() bool {
-			err = fixture.IsHealthy(ctx)
+		assert.Eventuallyf(t, func() bool {
+			// Note that this updates err in the parent function
+			err = fixture.IsHealthyOrDegradedFromOutput(ctx)
+
 			return err == nil
-		}, 5*time.Minute, time.Second,
-			"Elastic-Agent did not report healthy. Agent status error: \"%v\"",
-			err,
-		)
+		}, 5*time.Minute, time.Second, "Elastic-Agent did not report healthy.")
+		if err != nil {
+			t.Logf("Agent status error: \"%v\"", err)
+
+			status, err := fixture.ExecStatus(ctx)
+			require.NoError(t, err, "must get Agent status")
+
+			require.FailNow(t, "Agent status:", status)
+		}
 
 		out, err := fixture.Exec(ctx, []string{"upgrade", "1.0.0"})
 		require.Error(t, err)
 		require.Contains(t, string(out), coordinator.ErrNotUpgradable.Error())
+
 	})
 }

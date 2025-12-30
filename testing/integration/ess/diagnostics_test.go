@@ -474,8 +474,6 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
-    status_reporting:
-      enabled: false
 agent.monitoring.enabled: false
 agent.internal.runtime.filebeat.filestream: otel
 `
@@ -518,7 +516,7 @@ agent.internal.runtime.filebeat.filestream: otel
 	require.NoError(t, err)
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		err = f.IsHealthy(ctx)
+		err = f.IsHealthyOrDegradedFromOutput(ctx)
 		require.NoErrorf(collect, err, "agent is not healthy: %s", err)
 		require.Containsf(collect, output.String(), "Diagnostics extension started", "expected log: %s", output.String())
 	}, 30*time.Second, 1*time.Second)
