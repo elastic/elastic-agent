@@ -1765,7 +1765,7 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 		testLogger,
 		logp.InfoLevel,
 		testLogger,
-		nil,
+		&info.AgentInfo{},
 		nil,
 		beatMonitoringConfigGetter,
 		time.Second,
