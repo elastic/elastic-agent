@@ -130,7 +130,6 @@ type OTelManager struct {
 // NewOTelManager returns a OTelManager.
 func NewOTelManager(
 	logger *logger.Logger,
-	logLevel logp.Level,
 	baseLogger *logger.Logger,
 	agentInfo info.Agent,
 	agentCollectorConfig *configuration.CollectorConfig,
@@ -166,7 +165,7 @@ func NewOTelManager(
 
 	executable := filepath.Join(paths.Components(), collectorBinaryName)
 	recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
-	exec, err = newSubprocessExecution(logLevel, executable, hcUUIDStr, collectorMetricsPort, collectorHealthCheckPort)
+	exec, err = newSubprocessExecution(executable, hcUUIDStr, collectorMetricsPort, collectorHealthCheckPort)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create subprocess execution: %w", err)
 	}

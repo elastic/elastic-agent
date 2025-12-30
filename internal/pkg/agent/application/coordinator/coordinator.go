@@ -1674,7 +1674,7 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 	}
 	c.currentCfg = currentCfg
 
-	// check if log level has changed in standalone agent config
+	// check if log level has changed in received agent config
 	ll := currentCfg.Settings.LoggingConfig.Level
 	if ll != c.state.LogLevel {
 		// set log level for the coordinator

@@ -40,7 +40,7 @@ const (
 
 // newSubprocessExecution creates a new execution which runs the otel collector in a subprocess. A metricsPort or
 // healthCheckPort of 0 will result in a random port being used.
-func newSubprocessExecution(logLevel logp.Level, collectorPath string, uuid string, metricsPort int, healthCheckPort int) (*subprocessExecution, error) {
+func newSubprocessExecution(collectorPath string, uuid string, metricsPort int, healthCheckPort int) (*subprocessExecution, error) {
 	componentType, err := component.NewType(healthCheckExtensionName)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create component type: %w", err)
@@ -53,7 +53,6 @@ func newSubprocessExecution(logLevel logp.Level, collectorPath string, uuid stri
 			fmt.Sprintf("--%s", OtelSetSupervisedFlagName),
 			fmt.Sprintf("--%s=%s", OtelSupervisedMonitoringURLFlagName, monitoring.EDOTMonitoringEndpoint()),
 		},
-		logLevel:                 logLevel,
 		healthCheckExtensionID:   healthCheckExtensionID,
 		collectorMetricsPort:     metricsPort,
 		collectorHealthCheckPort: healthCheckPort,

@@ -29,7 +29,6 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/logptest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
@@ -96,7 +95,7 @@ func (e *testExecution) startCollector(ctx context.Context, level string, baseLo
 	defer e.mtx.Unlock()
 
 	var err error
-	e.handle, err = e.exec.startCollector(ctx, "info", baseLogger, logger, cfg, errCh, statusCh, forceFetchStatusCh)
+	e.handle, err = e.exec.startCollector(ctx, level, baseLogger, logger, cfg, errCh, statusCh, forceFetchStatusCh)
 	return e.handle, err
 }
 
@@ -356,7 +355,7 @@ func TestOTelManager_Run(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				return newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
@@ -388,7 +387,7 @@ func TestOTelManager_Run(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				return newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
@@ -421,7 +420,7 @@ func TestOTelManager_Run(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				return newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
@@ -468,7 +467,7 @@ func TestOTelManager_Run(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				return newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
@@ -507,7 +506,7 @@ func TestOTelManager_Run(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				return newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
@@ -552,7 +551,7 @@ func TestOTelManager_Run(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				subprocessExec, err := newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				subprocessExec, err := newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 				if err != nil {
 					return nil, err
 				}
@@ -609,7 +608,7 @@ func TestOTelManager_Run(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				subprocessExec, err := newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				subprocessExec, err := newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 				if err != nil {
 					return nil, err
 				}
@@ -666,7 +665,7 @@ func TestOTelManager_Run(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				return newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
@@ -705,7 +704,7 @@ func TestOTelManager_Run(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				return newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 			},
 			restarter:           newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			skipListeningErrors: true,
@@ -756,7 +755,7 @@ func TestOTelManager_Run(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				return newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
@@ -894,13 +893,13 @@ func TestOTelManager_Logging(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				return newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 			},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// the execution mode passed here is overridden below so it is irrelevant
-			m, err := NewOTelManager(l, logp.DebugLevel, base, nil, nil, nil, waitTimeForStop)
+			m, err := NewOTelManager(l, base, nil, nil, nil, waitTimeForStop)
 			require.NoError(t, err, "could not create otel manager")
 
 			executionMode, err := tc.execModeFn(m.collectorRunErr)
@@ -971,7 +970,7 @@ func TestOTelManager_Ports(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				return newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), metricsPort, healthCheckPort)
+				return newSubprocessExecution(testBinary, hcUUID.String(), metricsPort, healthCheckPort)
 			},
 			healthCheckEnabled: true,
 		},
@@ -992,7 +991,7 @@ func TestOTelManager_Ports(t *testing.T) {
 			// the execution mode passed here is overridden below so it is irrelevant
 			m, err := NewOTelManager(
 				l,
-				logp.DebugLevel,
+
 				base,
 				nil,
 				&agentCollectorConfig,
@@ -1115,7 +1114,7 @@ func TestOTelManager_PortConflict(t *testing.T) {
 	// the execution mode passed here is overridden below so it is irrelevant
 	m, err := NewOTelManager(
 		l,
-		logp.DebugLevel,
+
 		base,
 		nil,
 		nil,
@@ -1123,7 +1122,7 @@ func TestOTelManager_PortConflict(t *testing.T) {
 		waitTimeForStop,
 	)
 	require.NoError(t, err, "could not create otel manager")
-	executionMode, err := newSubprocessExecution(logp.DebugLevel, testBinary, strings.TrimPrefix(m.healthCheckExtID, "extension:healthcheckv2/"), 0, 0)
+	executionMode, err := newSubprocessExecution(testBinary, strings.TrimPrefix(m.healthCheckExtID, "extension:healthcheckv2/"), 0, 0)
 	require.NoError(t, err, "could not create subprocess execution mode")
 	m.execution = executionMode
 
@@ -1763,7 +1762,7 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 	// Create manager with test dependencies
 	mgr, err := NewOTelManager(
 		testLogger,
-		logp.DebugLevel,
+
 		testLogger,
 		agentInfo,
 		nil,
@@ -1859,7 +1858,7 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 	// Create manager with test dependencies
 	mgr, err := NewOTelManager(
 		testLogger,
-		logp.DebugLevel,
+
 		testLogger,
 		agentInfo,
 		nil,
