@@ -1675,19 +1675,21 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 	c.currentCfg = currentCfg
 
 	// check if log level has changed in received agent config
-	ll := currentCfg.Settings.LoggingConfig.Level
-	if ll != c.state.LogLevel {
-		// set log level for the coordinator
-		c.setLogLevel(ll)
-		// set global log level
-		logger.SetLevel(ll)
-		// set agent log level.
-		// this is used by other parts of the agent to report the log level eg. otel manager
-		err = c.agentInfo.SetLogLevel(ctx, ll.String())
-		if err != nil {
-			c.logger.Errorf("failed to set agent log level: %v", err)
+	if c.agentInfo.IsStandalone() {
+		ll := currentCfg.Settings.LoggingConfig.Level
+		if ll != c.state.LogLevel {
+			// set log level for the coordinator
+			c.setLogLevel(ll)
+			// set global log level
+			logger.SetLevel(ll)
+			// set agent log level.
+			// this is used by other parts of the agent to report the log level eg. otel manager
+			err = c.agentInfo.SetLogLevel(ctx, ll.String())
+			if err != nil {
+				c.logger.Errorf("failed to set agent log level: %v", err)
+			}
+			c.logger.Infof("log level changed to %s", ll.String())
 		}
-		c.logger.Infof("log level changed to %s", ll.String())
 	}
 
 	if c.vars != nil {

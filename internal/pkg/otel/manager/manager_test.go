@@ -900,7 +900,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// the execution mode passed here is overridden below so it is irrelevant
-			m, err := NewOTelManager(l, base, nil, nil, nil, waitTimeForStop)
+			m, err := NewOTelManager(l, base, &info.AgentInfo{}, nil, nil, waitTimeForStop)
 			require.NoError(t, err, "could not create otel manager")
 
 			executionMode, err := tc.execModeFn(m.collectorRunErr)
@@ -992,9 +992,8 @@ func TestOTelManager_Ports(t *testing.T) {
 			// the execution mode passed here is overridden below so it is irrelevant
 			m, err := NewOTelManager(
 				l,
-
 				base,
-				nil,
+				&info.AgentInfo{},
 				&agentCollectorConfig,
 				nil,
 				waitTimeForStop,
@@ -1115,9 +1114,8 @@ func TestOTelManager_PortConflict(t *testing.T) {
 	// the execution mode passed here is overridden below so it is irrelevant
 	m, err := NewOTelManager(
 		l,
-
 		base,
-		nil,
+		&info.AgentInfo{},
 		nil,
 		nil,
 		waitTimeForStop,
@@ -1752,7 +1750,6 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 	// Setup test logger and dependencies
 	testLogger, _ := loggertest.New("test")
-	agentInfo := &info.AgentInfo{}
 	beatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
 	collectorStarted := make(chan struct{})
 
@@ -1763,9 +1760,8 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 	// Create manager with test dependencies
 	mgr, err := NewOTelManager(
 		testLogger,
-
 		testLogger,
-		agentInfo,
+		&info.AgentInfo{},
 		nil,
 		beatMonitoringConfigGetter,
 		time.Second,
@@ -1859,7 +1855,6 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 	// Create manager with test dependencies
 	mgr, err := NewOTelManager(
 		testLogger,
-
 		testLogger,
 		agentInfo,
 		nil,
