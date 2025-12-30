@@ -819,6 +819,7 @@ func TestOTelManager_Run(t *testing.T) {
 				collectorRunErr:   make(chan error),
 				recoveryTimer:     tc.restarter,
 				stopTimeout:       waitTimeForStop,
+				agentInfo:         &info.AgentInfo{},
 			}
 
 			executionMode, err := tc.execModeFn(m.collectorRunErr)
