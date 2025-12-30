@@ -91,7 +91,8 @@ receivers:
       s3_prefix: 'test'
     encodings:
       - extension: awslogs_encoding/elbaccess
-
+  prometheusremotewrite:
+    endpoint: 0.0.0.0:9090
 
 connectors:
   spanmetrics:
@@ -185,6 +186,7 @@ service:
         - apache
         - mysql
         - postgresql
+        - prometheusremotewrite
 
     metrics/aggregated:
       receivers:
