@@ -134,6 +134,7 @@ type OTelManager struct {
 // NewOTelManager returns a OTelManager.
 func NewOTelManager(
 	logger *logger.Logger,
+	logLevel logp.Level,
 	baseLogger *logger.Logger,
 	agentInfo info.Agent,
 	agentCollectorConfig *configuration.CollectorConfig,
@@ -191,7 +192,7 @@ func NewOTelManager(
 		recoveryTimer:    recoveryTimer,
 		collectorRunErr:  make(chan error),
 		stopTimeout:      stopTimeout,
-		logLevel:         agentInfo.LogLevel(),
+		logLevel:         logLevel.String(),
 	}, nil
 }
 
