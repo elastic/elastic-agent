@@ -64,6 +64,7 @@ type configUpdate struct {
 	collectorCfg  *confmap.Conf
 	monitoringCfg *monitoringCfg.MonitoringConfig
 	components    []component.Component
+	logLevel      logp.Level
 }
 
 // OTelManager is a manager that manages the lifecycle of the OTel collector inside of the Elastic Agent.
@@ -125,6 +126,9 @@ type OTelManager struct {
 
 	// stopTimeout is the timeout to wait for the collector to stop.
 	stopTimeout time.Duration
+
+	// log level of the collector
+	logLevel string
 }
 
 // NewOTelManager returns a OTelManager.
@@ -187,6 +191,7 @@ func NewOTelManager(
 		recoveryTimer:    recoveryTimer,
 		collectorRunErr:  make(chan error),
 		stopTimeout:      stopTimeout,
+		logLevel:         agentInfo.LogLevel(),
 	}, nil
 }
 
@@ -228,7 +233,8 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 			newRetries := m.recoveryRetries.Add(1)
 			m.logger.Infof("collector recovery restarting, total retries: %d", newRetries)
-			m.proc, err = m.execution.startCollector(ctx, m.agentInfo.LogLevel(), m.baseLogger, m.logger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+			// we use log level set on agentInfo at
+			m.proc, err = m.execution.startCollector(ctx, m.logLevel, m.baseLogger, m.logger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh, forceFetchStatusCh)
 			if err != nil {
 				// report a startup error (this gets reported as status)
 				m.reportStartupErr(ctx, err)
@@ -258,7 +264,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 				// in this rare case the collector stopped running but a configuration was
 				// provided and the collector stopped with a clean exit
-				m.proc, err = m.execution.startCollector(ctx, m.agentInfo.LogLevel(), m.baseLogger, m.logger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+				m.proc, err = m.execution.startCollector(ctx, m.logLevel, m.baseLogger, m.logger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh, forceFetchStatusCh)
 				if err != nil {
 					// report a startup error (this gets reported as status)
 					m.reportStartupErr(ctx, err)
@@ -305,6 +311,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			configChanged, configUpdateErr := m.maybeUpdateMergedConfig(mergedCfg)
 			m.collectorCfg = cfgUpdate.collectorCfg
 			m.components = cfgUpdate.components
+			m.logLevel = cfgUpdate.logLevel.String()
 			m.mx.Unlock()
 
 			if configUpdateErr != nil {
@@ -315,7 +322,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				m.logger.Debugf(
 					"new config hash (%d) is different than the old config hash (%d), applying update",
 					m.mergedCollectorCfgHash, previousConfigHash)
-				applyErr := m.applyMergedConfig(ctx, collectorStatusCh, m.collectorRunErr, forceFetchStatusCh)
+				applyErr := m.applyMergedConfig(ctx, collectorStatusCh, m.collectorRunErr, forceFetchStatusCh, cfgUpdate.logLevel)
 				// only report the error if we actually apply the update
 				// otherwise, we could override an actual error with a nil in the channel when the collector
 				// state doesn't actually change
@@ -375,7 +382,7 @@ func buildMergedConfig(
 		}
 
 		// get log level from agent info
-		level := translate.GetOTelLogLevel(agentInfo.LogLevel())
+		level := translate.GetOTelLogLevel(cfgUpdate.logLevel.String())
 		if err := componentOtelCfg.Merge(confmap.NewFromStringMap(map[string]any{"service::telemetry::logs::level": level})); err != nil {
 			return nil, fmt.Errorf("failed to set log level in otel config: %w", err)
 		}
@@ -522,7 +529,12 @@ func injectMonitoringReceiver(
 	return config.Merge(confmap.NewFromStringMap(receiverCfg))
 }
 
-func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh chan *status.AggregateStatus, collectorRunErr chan error, forceFetchStatusCh chan struct{}) error {
+func (m *OTelManager) applyMergedConfig(ctx context.Context,
+	collectorStatusCh chan *status.AggregateStatus,
+	collectorRunErr chan error,
+	forceFetchStatusCh chan struct{},
+	logLevel logp.Level,
+) error {
 	if m.proc != nil {
 		m.proc.Stop(m.stopTimeout)
 		m.proc = nil
@@ -550,7 +562,7 @@ func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh c
 	} else {
 		// either a new configuration or the first configuration
 		// that results in the collector being started
-		proc, err := m.execution.startCollector(ctx, m.agentInfo.LogLevel(), m.baseLogger, m.logger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+		proc, err := m.execution.startCollector(ctx, logLevel.String(), m.baseLogger, m.logger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
 		if err != nil {
 			// failed to create the collector (this is different then
 			// it's failing to run). we do not retry creation on failure
@@ -570,11 +582,12 @@ func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh c
 }
 
 // Update sends collector configuration and component updates to the manager's run loop.
-func (m *OTelManager) Update(cfg *confmap.Conf, monitoring *monitoringCfg.MonitoringConfig, components []component.Component) {
+func (m *OTelManager) Update(cfg *confmap.Conf, monitoring *monitoringCfg.MonitoringConfig, ll logp.Level, components []component.Component) {
 	cfgUpdate := configUpdate{
 		collectorCfg:  cfg,
 		monitoringCfg: monitoring,
 		components:    components,
+		logLevel:      ll,
 	}
 
 	// we care only about the latest config update

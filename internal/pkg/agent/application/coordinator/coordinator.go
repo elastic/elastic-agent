@@ -162,7 +162,7 @@ type OTelManager interface {
 	Runner
 
 	// Update updates the current plain configuration for the otel collector and components.
-	Update(*confmap.Conf, *monitoringCfg.MonitoringConfig, []component.Component)
+	Update(*confmap.Conf, *monitoringCfg.MonitoringConfig, logp.Level, []component.Component)
 
 	// WatchCollector returns a channel to watch for collector status updates.
 	WatchCollector() <-chan *status.AggregateStatus
@@ -1674,7 +1674,7 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 	}
 	c.currentCfg = currentCfg
 
-	// check if log level has changed in received agent config
+	// check if log level has changed for standalone elastic-agent
 	if c.agentInfo.IsStandalone() {
 		ll := currentCfg.Settings.LoggingConfig.Level
 		if ll != c.state.LogLevel {
@@ -1682,12 +1682,6 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 			c.setLogLevel(ll)
 			// set global log level
 			logger.SetLevel(ll)
-			// set agent log level.
-			// this is used by other parts of the agent to report the log level eg. otel manager
-			err = c.agentInfo.SetLogLevel(ctx, ll.String())
-			if err != nil {
-				c.logger.Errorf("failed to set agent log level: %v", err)
-			}
 			c.logger.Infof("log level changed to %s", ll.String())
 		}
 	}
@@ -1893,7 +1887,7 @@ func (c *Coordinator) updateManagersWithConfig(model *component.Model) {
 		}
 		c.logger.With("component_ids", componentIDs).Info("Using OpenTelemetry collector runtime.")
 	}
-	c.otelMgr.Update(c.otelCfg, c.currentCfg.Settings.MonitoringConfig, otelModel.Components)
+	c.otelMgr.Update(c.otelCfg, c.currentCfg.Settings.MonitoringConfig, c.state.LogLevel, otelModel.Components)
 }
 
 // splitModelBetweenManager splits the model components between the runtime manager and the otel manager.
