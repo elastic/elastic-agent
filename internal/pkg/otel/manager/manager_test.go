@@ -1225,35 +1225,41 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 		components          []component.Component
 		expectedKeys        []string
 		expectedErrorString string
+		expectedLogLevel    string
 	}{
 		{
-			name:         "nil config returns nil",
-			collectorCfg: nil,
-			components:   nil,
+			name:             "nil config returns nil",
+			collectorCfg:     nil,
+			components:       nil,
+			expectedLogLevel: "",
 		},
 		{
-			name:         "empty config returns empty config",
-			collectorCfg: nil,
-			components:   nil,
-			expectedKeys: []string{},
+			name:             "empty config returns empty config",
+			collectorCfg:     nil,
+			components:       nil,
+			expectedKeys:     []string{},
+			expectedLogLevel: "",
 		},
 		{
-			name:         "collector config only",
-			collectorCfg: confmap.NewFromStringMap(testConfig),
-			components:   nil,
-			expectedKeys: []string{"receivers", "exporters", "service", "processors"},
+			name:             "collector config only",
+			collectorCfg:     confmap.NewFromStringMap(testConfig),
+			components:       nil,
+			expectedKeys:     []string{"receivers", "exporters", "service", "processors"},
+			expectedLogLevel: "info",
 		},
 		{
-			name:         "components only",
-			collectorCfg: nil,
-			components:   []component.Component{testComp},
-			expectedKeys: []string{"receivers", "exporters", "service"},
+			name:             "components only",
+			collectorCfg:     nil,
+			components:       []component.Component{testComp},
+			expectedKeys:     []string{"receivers", "exporters", "service"},
+			expectedLogLevel: "DEBUG",
 		},
 		{
-			name:         "both collector config and components",
-			collectorCfg: confmap.NewFromStringMap(testConfig),
-			components:   []component.Component{testComp},
-			expectedKeys: []string{"receivers", "exporters", "service", "processors"},
+			name:             "both collector config and components",
+			collectorCfg:     confmap.NewFromStringMap(testConfig),
+			components:       []component.Component{testComp},
+			expectedKeys:     []string{"receivers", "exporters", "service", "processors"},
+			expectedLogLevel: "info",
 		},
 		{
 			name:         "component config generation error",
@@ -1265,6 +1271,7 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 				// Missing InputSpec which should cause an error during config generation
 			}},
 			expectedErrorString: "failed to generate otel config: unknown otel receiver type for input type: filestream",
+			expectedLogLevel:    "",
 		},
 	}
 
@@ -1273,6 +1280,7 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 			cfgUpdate := configUpdate{
 				collectorCfg: tt.collectorCfg,
 				components:   tt.components,
+				logLevel:     logp.DebugLevel,
 			}
 			result, err := buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter, logptest.NewTestingLogger(t, ""))
 
@@ -1288,6 +1296,11 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 			if len(tt.expectedKeys) == 0 {
 				assert.Nil(t, result)
 				return
+			}
+
+			// assert log level provided by user is given precedence.
+			if tt.expectedLogLevel != "" {
+				assert.Equal(t, tt.expectedLogLevel, result.Get("service::telemetry::logs::level"))
 			}
 
 			require.NotNil(t, result)

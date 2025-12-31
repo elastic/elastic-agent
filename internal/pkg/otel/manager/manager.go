@@ -234,7 +234,6 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 			newRetries := m.recoveryRetries.Add(1)
 			m.logger.Infof("collector recovery restarting, total retries: %d", newRetries)
-			// we use log level set on agentInfo at
 			m.proc, err = m.execution.startCollector(ctx, m.logLevel, m.baseLogger, m.logger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh, forceFetchStatusCh)
 			if err != nil {
 				// report a startup error (this gets reported as status)
@@ -312,7 +311,14 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			configChanged, configUpdateErr := m.maybeUpdateMergedConfig(mergedCfg)
 			m.collectorCfg = cfgUpdate.collectorCfg
 			m.components = cfgUpdate.components
-			m.logLevel = cfgUpdate.logLevel.String()
+			// set the log level defined in service::telemetry::log::level setting
+			if mergedCfg.IsSet("service::telemetry::logs::level") {
+				m.logLevel = mergedCfg.Get("service::telemetry::logs::level").(string) // we know this always be a string. Should not panic
+			} else {
+				// this condition is only true is mergedCfg is nil
+				// In that case, use coordinator's log level
+				m.logLevel = cfgUpdate.logLevel.String()
+			}
 			m.mx.Unlock()
 
 			if configUpdateErr != nil {
@@ -323,7 +329,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				m.logger.Debugf(
 					"new config hash (%d) is different than the old config hash (%d), applying update",
 					m.mergedCollectorCfgHash, previousConfigHash)
-				applyErr := m.applyMergedConfig(ctx, collectorStatusCh, m.collectorRunErr, forceFetchStatusCh, cfgUpdate.logLevel)
+				applyErr := m.applyMergedConfig(ctx, collectorStatusCh, m.collectorRunErr, forceFetchStatusCh, m.logLevel)
 				// only report the error if we actually apply the update
 				// otherwise, we could override an actual error with a nil in the channel when the collector
 				// state doesn't actually change
@@ -534,7 +540,7 @@ func (m *OTelManager) applyMergedConfig(ctx context.Context,
 	collectorStatusCh chan *status.AggregateStatus,
 	collectorRunErr chan error,
 	forceFetchStatusCh chan struct{},
-	logLevel logp.Level,
+	logLevel string,
 ) error {
 	if m.proc != nil {
 		m.proc.Stop(m.stopTimeout)
@@ -563,7 +569,7 @@ func (m *OTelManager) applyMergedConfig(ctx context.Context,
 	} else {
 		// either a new configuration or the first configuration
 		// that results in the collector being started
-		proc, err := m.execution.startCollector(ctx, logLevel.String(), m.baseLogger, m.logger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+		proc, err := m.execution.startCollector(ctx, logLevel, m.baseLogger, m.logger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
 		if err != nil {
 			// failed to create the collector (this is different then
 			// it's failing to run). we do not retry creation on failure

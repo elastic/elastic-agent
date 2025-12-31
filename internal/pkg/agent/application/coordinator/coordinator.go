@@ -1686,10 +1686,7 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 		}
 	}
 
-	if c.vars != nil {
-		return c.refreshComponentModel(ctx)
-	}
-	return nil
+	return c.refreshComponentModel(ctx)
 }
 
 // Generate the AST for a new incoming configuration and, if successful,
