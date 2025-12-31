@@ -5,7 +5,7 @@ go 1.24.11
 replace github.com/elastic/elastic-agent => ../../
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251225191548-49bda8d4ecc2
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251230130149-3d4a974c3051
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.30.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.24.0
@@ -300,7 +300,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20251113000200-a6f7cddc8520 // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.24.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.27.0 // indirect
-	github.com/elastic/sarama v1.19.1-0.20250603175145-7672917f26b6 // indirect
+	github.com/elastic/sarama v1.19.1-0.20251224062803-313637a62841 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.35.0 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.2.1 // indirect
