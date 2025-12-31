@@ -529,8 +529,8 @@ github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintaker
 github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.24.0/go.mod h1:6g/yGt22LRR0n76vZikZ0UGu0OJ6OmDOxCNCVwzywsA=
 github.com/elastic/opentelemetry-lib v0.27.0 h1:+6WFaynpU0fifa2S3Nys0G8J8OwNWoGFQrCmgWSpn1s=
 github.com/elastic/opentelemetry-lib v0.27.0/go.mod h1:Va/NCTtn9ofZ0lUy3bUg3SYnEbJtLY6rWFgkOsVoKHc=
-github.com/elastic/sarama v1.19.1-0.20250603175145-7672917f26b6 h1:2COw7kzXkIyS4hKNUl5qw0KolrwncrY4VVNpngVNo8I=
-github.com/elastic/sarama v1.19.1-0.20250603175145-7672917f26b6/go.mod h1:Ua/oXS4NS+U/pp/urxgzEGWd1MvocHA+yd4Bu4+Eb80=
+github.com/elastic/sarama v1.19.1-0.20251224062803-313637a62841 h1:arI5QqFbuPfR1Ee4lgLUuYT5pCxVMTTQIZnn1q3/6Qs=
+github.com/elastic/sarama v1.19.1-0.20251224062803-313637a62841/go.mod h1:2mh/PhvJXqGFxvVT+24fOW1dNc6oTFa8M+FzLAWgTJU=
 github.com/elastic/tk-btf v0.2.0 h1:8Am3b2mNIoG7RIoD6EVCnhhrdJySuAUUnnkaCU3EGAM=
 github.com/elastic/tk-btf v0.2.0/go.mod h1:yxzXvfHaTMgtpasIzrSn1wPeKKjNyiL/UUc7LRBis2A=
 github.com/elastic/toutoumomoma v0.0.0-20240626215117-76e39db18dfb h1:8SvKmGOYyxKi6jB0nvV1lpxEHfIS6tQ40x1BXBhKMsE=
