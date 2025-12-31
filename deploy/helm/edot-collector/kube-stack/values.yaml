@@ -615,6 +615,6 @@ instrumentation:
   dotnet:
     image: docker.elastic.co/observability/elastic-otel-dotnet:1.2.0
   python:
-    image: docker.elastic.co/observability/elastic-otel-python:1.10.2
+    image: docker.elastic.co/observability/elastic-otel-python:1.11.0
   go:
     image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.23.0
