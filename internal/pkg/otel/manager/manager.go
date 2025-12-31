@@ -312,11 +312,10 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			m.collectorCfg = cfgUpdate.collectorCfg
 			m.components = cfgUpdate.components
 			// set the log level defined in service::telemetry::log::level setting
-			if mergedCfg.IsSet("service::telemetry::logs::level") {
+			if mergedCfg != nil && mergedCfg.IsSet("service::telemetry::logs::level") {
 				m.logLevel = mergedCfg.Get("service::telemetry::logs::level").(string) // we know this always be a string. Should not panic
 			} else {
-				// this condition is only true is mergedCfg is nil
-				// In that case, use coordinator's log level
+				// when ergedCfg is nil use coordinator's log level
 				m.logLevel = cfgUpdate.logLevel.String()
 			}
 			m.mx.Unlock()
