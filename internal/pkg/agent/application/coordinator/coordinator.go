@@ -1675,6 +1675,7 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 	c.currentCfg = currentCfg
 
 	// check if log level has changed for standalone elastic-agent
+	// we'd have to update both the periodic and once config watchers and refactor initialization in application.go to do otherwise.
 	if c.agentInfo.IsStandalone() {
 		ll := currentCfg.Settings.LoggingConfig.Level
 		if ll != c.state.LogLevel {
