@@ -30,6 +30,7 @@ import (
 	mysqlreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/mysqlreceiver"
 	nginxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver"
 	postgresqlreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/postgresqlreceiver"
+	prometheusremotewritereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusremotewritereceiver"
 	receivercreator "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator"
 	redisreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver"
 	sqlserverreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver"
@@ -144,6 +145,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			windowseventlogreceiver.NewFactory(),
 			awss3receiver.NewFactory(),
 			windowsperfcountersreceiver.NewFactory(),
+			prometheusremotewritereceiver.NewFactory(),
 		}
 
 		// some receivers are only available on certain OS.
