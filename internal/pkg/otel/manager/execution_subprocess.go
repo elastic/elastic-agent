@@ -52,9 +52,6 @@ func newSubprocessExecution(collectorPath string, uuid string, metricsPort int, 
 		collectorArgs: []string{
 			fmt.Sprintf("--%s", OtelSetSupervisedFlagName),
 			fmt.Sprintf("--%s=%s", OtelSupervisedMonitoringURLFlagName, monitoring.EDOTMonitoringEndpoint()),
-			// edot logger here is being configured to log at debug.
-			// For more control: use service::telemetry::logs::level
-			fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, "debug"),
 		},
 		healthCheckExtensionID:   healthCheckExtensionID,
 		collectorMetricsPort:     metricsPort,
@@ -86,6 +83,8 @@ func (r *subprocessExecution) startCollector(
 	statusCh chan *status.AggregateStatus,
 	forceFetchStatusCh chan struct{},
 ) (collectorHandle, error) {
+	// this method unpacks the incoming logger and conditonally sets it on r.logLevel
+	// use r.logLevel from this point onwards
 	if err := r.setLogLevelFromString(logLevel); err != nil {
 		return nil, fmt.Errorf("failed to set log level for otel collector: %w", err)
 	}
@@ -131,8 +130,11 @@ func (r *subprocessExecution) startCollector(
 	// Set the environment variable for the collector metrics port. See comment at the constant definition for more information.
 	env = append(env, fmt.Sprintf("%s=%d", componentmonitoring.OtelCollectorMetricsPortEnvVarName, collectorMetricsPort))
 
+	// set collector args
+	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, r.logLevel))
+
 	processInfo, err := process.Start(r.collectorPath,
-		process.WithArgs(r.collectorArgs),
+		process.WithArgs(collectorArgs),
 		process.WithEnv(env),
 		process.WithCmdOptions(func(c *exec.Cmd) error {
 			c.Stdin = bytes.NewReader(confBytes)

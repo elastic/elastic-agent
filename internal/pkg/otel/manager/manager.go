@@ -313,9 +313,11 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			m.components = cfgUpdate.components
 			// set the log level defined in service::telemetry::log::level setting
 			if mergedCfg != nil && mergedCfg.IsSet("service::telemetry::logs::level") {
-				m.logLevel = mergedCfg.Get("service::telemetry::logs::level").(string) // we know this always be a string. Should not panic
+				if logLevel, ok := mergedCfg.Get("service::telemetry::logs::level").(string); ok {
+					m.logLevel = logLevel
+				}
 			} else {
-				// when ergedCfg is nil use coordinator's log level
+				// when emrgedCfg is nil use coordinator's log level
 				m.logLevel = cfgUpdate.logLevel.String()
 			}
 			m.mx.Unlock()
@@ -328,7 +330,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				m.logger.Debugf(
 					"new config hash (%d) is different than the old config hash (%d), applying update",
 					m.mergedCollectorCfgHash, previousConfigHash)
-				applyErr := m.applyMergedConfig(ctx, collectorStatusCh, m.collectorRunErr, forceFetchStatusCh, m.logLevel)
+				applyErr := m.applyMergedConfig(ctx, collectorStatusCh, m.collectorRunErr, forceFetchStatusCh)
 				// only report the error if we actually apply the update
 				// otherwise, we could override an actual error with a nil in the channel when the collector
 				// state doesn't actually change
@@ -539,7 +541,6 @@ func (m *OTelManager) applyMergedConfig(ctx context.Context,
 	collectorStatusCh chan *status.AggregateStatus,
 	collectorRunErr chan error,
 	forceFetchStatusCh chan struct{},
-	logLevel string,
 ) error {
 	if m.proc != nil {
 		m.proc.Stop(m.stopTimeout)
@@ -568,7 +569,7 @@ func (m *OTelManager) applyMergedConfig(ctx context.Context,
 	} else {
 		// either a new configuration or the first configuration
 		// that results in the collector being started
-		proc, err := m.execution.startCollector(ctx, logLevel, m.baseLogger, m.logger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+		proc, err := m.execution.startCollector(ctx, m.logLevel, m.baseLogger, m.logger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
 		if err != nil {
 			// failed to create the collector (this is different then
 			// it's failing to run). we do not retry creation on failure
