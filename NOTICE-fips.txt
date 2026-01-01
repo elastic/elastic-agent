@@ -1,5 +1,5 @@
 Elastic Beats
-Copyright 2014-2025 Elasticsearch BV
+Copyright 2014-2026 Elasticsearch BV
 
 This product includes software developed by The Apache Software 
 Foundation (http://www.apache.org/).
@@ -787,7 +787,7 @@ Contents of probable licence file $GOMODCACHE/github.com/dolmen-go/contextio@v0.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/beats/v7
-Version: v7.0.0-alpha2.0.20251230084137-d5447f54c591
+Version: v7.0.0-alpha2.0.20251231185901-0286d5985e53
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
