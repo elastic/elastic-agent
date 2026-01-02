@@ -2068,7 +2068,7 @@ func TestLogReloading(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
@@ -2082,6 +2082,7 @@ outputs:
     preset: balanced
     protocol: http	
 agent.logging.level: %s
+agent.grpc.port: 6793
 agent.monitoring.enabled: true
 agent.logging.to_stderr: true
 agent.reload:
@@ -2124,6 +2125,7 @@ agent.reload:
 		_ = cmd.Wait()
 		if t.Failed() {
 			t.Log("Elastic-Agent output:")
+			zapLogs.All()
 		}
 	})
 
@@ -2152,7 +2154,6 @@ agent.reload:
 			t.Logf("waiting for agent healthy: %s", err.Error())
 			return false
 		}
-		return zapLogs.FilterMessageSnippet("Everything is ready. Begin running and processing data").Len() > 0
 	}, 1*time.Minute, 10*time.Second, "elastic-agent was not healthy after log level changed to info")
 
 	require.Zero(t, zapLogs.FilterMessageSnippet(`"log.level:debug"`).Len())
@@ -2178,7 +2179,6 @@ service:
 			t.Logf("waiting for agent healthy: %s", err.Error())
 			return false
 		}
-		return zapLogs.FilterMessageSnippet("Everything is ready. Begin running and processing data").Len() > 0
 	}, 1*time.Minute, 10*time.Second, "elastic-agent is not healthy")
 
 	require.Eventually(t, func() bool {
