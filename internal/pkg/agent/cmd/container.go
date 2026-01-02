@@ -572,11 +572,23 @@ func buildFleetServerConnStr(cfg fleetServerConfig) (string, error) {
 
 func kibanaFetchPolicy(cfg setupConfig, client *kibana.Client, streams *cli.IOStreams) (*kibanaPolicy, error) {
 	var policies kibanaPolicies
-	err := performGET(cfg, client, "/api/fleet/agent_policies", &policies, streams.Err, "Kibana fetch policy")
-	if err != nil {
-		return nil, err
+	params := url.Values{}
+	page := 1
+	for {
+		params.Set("page", strconv.Itoa(page))
+		err := performGETWithParams(cfg, client, "/api/fleet/agent_policies", params, &policies, streams.Err, "Kibana fetch policy")
+		if err != nil {
+			return nil, err
+		}
+		policy, err := findPolicy(cfg, policies.Items)
+		if err == nil {
+			return policy, nil
+		}
+		if page*policies.PerPage > policies.Total {
+			return nil, err
+		}
+		page++
 	}
-	return findPolicy(cfg, policies.Items)
 }
 
 func kibanaFetchToken(cfg setupConfig, client *kibana.Client, policy *kibanaPolicy, streams *cli.IOStreams, tokenName string) (string, error) {
@@ -723,9 +735,13 @@ func isTrue(val string) bool {
 }
 
 func performGET(cfg setupConfig, client *kibana.Client, path string, response interface{}, writer io.Writer, msg string) error {
+	return performGETWithParams(cfg, client, path, nil, response, writer, msg)
+}
+
+func performGETWithParams(cfg setupConfig, client *kibana.Client, path string, params url.Values, response interface{}, writer io.Writer, msg string) error {
 	var lastErr error
 	for i := 0; i < cfg.Kibana.RetryMaxCount; i++ {
-		code, result, err := client.Request("GET", path, nil, nil, nil)
+		code, result, err := client.Request("GET", path, params, nil, nil)
 		if err != nil || code != 200 {
 			if err != nil {
 				err = fmt.Errorf("http GET request to %s%s fails: %w. Response: %s",
@@ -979,7 +995,10 @@ type kibanaPolicy struct {
 }
 
 type kibanaPolicies struct {
-	Items []kibanaPolicy `json:"items"`
+	Items   []kibanaPolicy `json:"items"`
+	Page    int            `json:"page"`
+	PerPage int            `json:"perPage"`
+	Total   int            `json:"total"`
 }
 
 type kibanaAPIKey struct {

@@ -9,10 +9,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -690,6 +692,101 @@ func TestShouldEnroll(t *testing.T) {
 			require.Equal(t, tc.expectedShouldEnroll, actualShouldEnroll)
 			if tc.expectedSavedConfig != nil {
 				tc.expectedSavedConfig(t, savedConfig)
+			}
+		})
+	}
+}
+
+func TestKibanaFetchPolicyPages(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !r.URL.Query().Has("page") {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		page, err := strconv.Atoi(r.URL.Query().Get("page"))
+		if err != nil || page < 1 {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		var resp []byte
+		switch page {
+		case 1:
+			resp = []byte(`{"items": [{
+		      "id": "test-id-1",
+		      "name": "Policy 1",
+		      "status": "active",
+		      "is_default": false,
+		      "is_default_fleet_server": false
+		    }, {
+		      "id": "test-id-2",
+		      "name": "Policy 2",
+		      "status": "active",
+		      "is_default": false,
+		      "is_default_fleet_server": false
+		    }], "total": 3, "page": 1, "perPage": 2}`)
+		case 2:
+			resp = []byte(`{"items": [{
+		      "id": "test-id-3",
+		      "name": "Policy 3",
+		      "status": "active",
+		      "is_default": false,
+		      "is_default_fleet_server": false
+		    }], "total": 3, "page": 2, "perPage": 2}`)
+		default:
+			resp = []byte(fmt.Sprintf(`{"items": [], "total": 3, "page": %d, "perPage": 2}`, page))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(resp) //nolint: errcheck // test server
+	}))
+	defer server.Close()
+
+	tests := []struct {
+		name       string
+		policyName string
+		found      bool
+	}{{
+		name:       "found on page 1",
+		policyName: "Policy 2",
+		found:      true,
+	}, {
+		name:       "found on page 2",
+		policyName: "Policy 3",
+		found:      true,
+	}, {
+		name:       "not found",
+		policyName: "Policy 4",
+		found:      false,
+	}}
+
+	kClient := &kibana.Client{
+		Connection: kibana.Connection{
+			URL:  server.URL,
+			HTTP: server.Client(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := setupConfig{
+				Fleet: fleetConfig{
+					TokenPolicyName: tc.policyName,
+				},
+				Kibana: kibanaConfig{
+					RetryMaxCount:      1,
+					RetrySleepDuration: 10 * time.Millisecond,
+				},
+			}
+			streams, _, _, _ := cli.NewTestingIOStreams()
+
+			policy, err := kibanaFetchPolicy(cfg, kClient, streams)
+			if tc.found {
+				require.NoError(t, err)
+				require.NotNil(t, policy)
+			} else {
+				require.Nil(t, policy)
+				require.Error(t, err)
 			}
 		})
 	}
