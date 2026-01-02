@@ -271,48 +271,52 @@ func PerformUpgrade(
 		endVersion.Less(*version.NewParsedSemVer(8, 12, 0, "", "")) ||
 		startParsedVersion.Less(*version.NewParsedSemVer(8, 10, 0, "", ""))
 
-	if upgradeOpts.preInstallHook != nil {
-		if err := upgradeOpts.preInstallHook(); err != nil {
-			return fmt.Errorf("pre install hook failed: %w", err)
-		}
-	}
-
-	logger.Logf("Installing version %q", startParsedVersion.VersionWithPrerelease())
-
 	// install the start agent
 	var nonInteractiveFlag bool
 	if Version_8_2_0.Less(*startParsedVersion) {
 		nonInteractiveFlag = true
 	}
+
 	installOpts := atesting.InstallOpts{
 		NonInteractive: nonInteractiveFlag,
 		Force:          true,
 		Privileged:     !(*upgradeOpts.unprivileged),
 		InstallServers: upgradeOpts.installServers,
 	}
-	output, err := startFixture.Install(ctx, &installOpts)
-	if err != nil {
-		return fmt.Errorf("failed to install start agent (err: %w) [output: %s]", err, string(output))
-	}
 
-	if upgradeOpts.postInstallHook != nil {
-		if err := upgradeOpts.postInstallHook(); err != nil {
-			return fmt.Errorf("post install hook failed: %w", err)
+	if !upgradeOpts.SkipInstall {
+		if upgradeOpts.preInstallHook != nil {
+			if err := upgradeOpts.preInstallHook(); err != nil {
+				return fmt.Errorf("pre install hook failed: %w", err)
+			}
 		}
-	}
 
-	// wait for the agent to be healthy and correct version
-	err = WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, logger)
-	if err != nil {
-		// context added by WaitHealthyAndVersion
-		return err
-	}
+		logger.Logf("Installing version %q", startParsedVersion.VersionWithPrerelease())
 
-	// validate installation is correct
-	if InstallChecksAllowed(!installOpts.Privileged, startVersion) {
-		err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged})
+		output, err := startFixture.Install(ctx, &installOpts)
 		if err != nil {
-			return fmt.Errorf("pre-upgrade installation checks failed: %w", err)
+			return fmt.Errorf("failed to install start agent (err: %w) [output: %s]", err, string(output))
+		}
+
+		if upgradeOpts.postInstallHook != nil {
+			if err := upgradeOpts.postInstallHook(); err != nil {
+				return fmt.Errorf("post install hook failed: %w", err)
+			}
+		}
+
+		// wait for the agent to be healthy and correct version
+		err = WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, logger)
+		if err != nil {
+			// context added by WaitHealthyAndVersion
+			return err
+		}
+
+		// validate installation is correct
+		if InstallChecksAllowed(!installOpts.Privileged, startVersion) {
+			err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged})
+			if err != nil {
+				return fmt.Errorf("pre-upgrade installation checks failed: %w", err)
+			}
 		}
 	}
 
