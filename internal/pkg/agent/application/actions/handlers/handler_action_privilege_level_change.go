@@ -159,7 +159,6 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 }
 
 func targetingSameUser(currentUID, currentGID, targetUID, targetGID string) bool {
-	// only allow changing to unprivileged from privileged
 	if currentGID == targetGID && currentUID == targetUID {
 		// no change
 		return false
