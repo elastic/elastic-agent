@@ -7,6 +7,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"os/user"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -16,6 +17,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 type reexecCoordinator interface {
@@ -62,13 +64,6 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 		return fmt.Errorf("unsupported action, ActionPrivilegeLevelChange supports only downgrading permissions")
 	}
 
-	// ensure no component issues
-	err := componentvalidation.EnsureNoServiceComponentIssues()
-	if err != nil {
-		h.log.Debugf("handlerPrivilegeLevelChange: found issues with components: %v", err)
-		return err
-	}
-
 	var username, groupname, password string
 	if action.Data.UserInfo != nil {
 		username = action.Data.UserInfo.Username
@@ -77,6 +72,45 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 	}
 	username, password = install.UnprivilegedUser(username, password)
 	groupname = install.UnprivilegedGroup(groupname)
+
+	// if not root we should fail straight away unless we're changing to same user
+	isRoot, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("failed to determine root/Administrator: %w", err)
+	}
+
+	if !isRoot {
+		// check if we're already running as the desired user
+		gid, err := install.FindGID(groupname)
+		if err != nil {
+			return fmt.Errorf("failed to find GID for group %s: %w", groupname, err)
+		}
+		uid, err := install.FindUID(username)
+		if err != nil {
+			return fmt.Errorf("failed to find UID for user %s: %w", username, err)
+		}
+
+		currentUser, err := user.Current()
+		if err != nil {
+			return fmt.Errorf("failed to get current user: %w", err)
+		}
+
+		if targetingSameUser(currentUser.Uid, currentUser.Gid, fmt.Sprint(uid), fmt.Sprint(gid)) {
+			// already running as desired user, do not fail the action
+			// some form of deduplication
+			h.log.Infof("already running as user %s and group %s, no changes required", username, groupname)
+			return nil
+		}
+
+		return fmt.Errorf("cannot change privilege level when not running as root/Administrator")
+	}
+
+	// ensure no component issues
+	err = componentvalidation.EnsureNoServiceComponentIssues()
+	if err != nil {
+		h.log.Debugf("handlerPrivilegeLevelChange: found issues with components: %v", err)
+		return err
+	}
 
 	// apply empty config to stop processing
 	stopComponents(ctx, h.ch, a, acker, nil)
@@ -117,6 +151,16 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 	// restart
 	h.coord.ReExec(nil)
 	return nil
+}
+
+func targetingSameUser(currentUID, currentGID, targetUID, targetGID string) bool {
+	// only allow changing to unprivileged from privileged
+	if currentGID == targetGID && currentUID == targetUID {
+		// no change
+		return false
+	}
+
+	return true
 }
 
 func (h *PrivilegeLevelChange) ackFailure(ctx context.Context, err error, action *fleetapi.ActionPrivilegeLevelChange, acker acker.Acker) {
