@@ -719,9 +719,9 @@ func TestKibanaFetchPolicyPages(t *testing.T) {
 		      "is_default_fleet_server": false
 		    }], "total": 2, "page": 2, "perPage": 1}`)
 		}
-		//w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(resp)
+		w.Write(resp) //nolint: errcheck // test server
 	}))
 	defer server.Close()
 
