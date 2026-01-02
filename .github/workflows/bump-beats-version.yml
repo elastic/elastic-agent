@@ -22,6 +22,9 @@ jobs:
     steps:
     - id: generator
       uses: elastic/oblt-actions/elastic/active-branches@v1
+      with:
+        exclude-branches: "7.17"
+        filter-branches: true
 
   update-beats:
     permissions:
@@ -90,4 +93,4 @@ jobs:
       with:
         bot-token: ${{ secrets.SLACK_BOT_TOKEN }}
         channel-id: "#ingest-notifications"
-        message: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@agent-team` please look what's going on <${{ env.JOB_URL }}|here>"
+        message: ":traffic_cone: updatecli failed for `${{ github.repository }}@${{ github.ref_name }}`, `@agent-control-plane-team` please look what's going on <${{ env.JOB_URL }}|here>"

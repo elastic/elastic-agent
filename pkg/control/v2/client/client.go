@@ -286,7 +286,11 @@ func (c *client) Version(ctx context.Context) (Version, error) {
 	}
 	bt, err := time.Parse(control.TimeFormat(), res.BuildTime)
 	if err != nil {
-		return Version{}, err
+		var innerErr error
+		bt, innerErr = time.Parse(control.OldTimeFormat(), res.BuildTime) // If format fails, fall back to old format
+		if innerErr != nil {
+			return Version{}, errors.Join(err, innerErr)
+		}
 	}
 	return Version{
 		Version:   res.Version,
