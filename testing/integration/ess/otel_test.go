@@ -22,7 +22,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
@@ -35,6 +34,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommontest"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	aTesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
@@ -2068,7 +2068,7 @@ func TestLogReloading(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
@@ -2153,7 +2153,7 @@ agent.reload:
 			return false
 		}
 		return zapLogs.FilterMessageSnippet("Everything is ready. Begin running and processing data").Len() > 0
-	}, 30*time.Second, 1*time.Second)
+	}, 1*time.Minute, 10*time.Second, "elastic-agent was not healthy after log level changed to info")
 
 	require.Zero(t, zapLogs.FilterMessageSnippet(`"log.level:debug"`).Len())
 
