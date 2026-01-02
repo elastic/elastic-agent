@@ -694,3 +694,79 @@ func TestShouldEnroll(t *testing.T) {
 		})
 	}
 }
+
+func TestKibanaFetchPolicyPages(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !r.URL.Query().Has("page") {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		var resp []byte
+		if r.URL.Query().Get("page") == "1" {
+			resp = []byte(`{"items": [{
+                      "id": "test-id-1",
+		      "name": "Policy 1",
+		      "status": "active",
+		      "is_default": false,
+		      "is_default_fleet_server": false
+		    }], "total": 2, "page": 1, "perPage": 1}`)
+		} else {
+			resp = []byte(`{"items": [{
+                      "id": "test-id-2",
+		      "name": "Policy 2",
+		      "status": "active",
+		      "is_default": false,
+		      "is_default_fleet_server": false
+		    }], "total": 2, "page": 2, "perPage": 1}`)
+		}
+		//w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(resp)
+	}))
+	defer server.Close()
+
+	tests := []struct {
+		name       string
+		policyName string
+		found      bool
+	}{{
+		name:       "found on page 2",
+		policyName: "Policy 2",
+		found:      true,
+	}, {
+		name:       "not found",
+		policyName: "Policy 3",
+		found:      false,
+	}}
+
+	kClient := &kibana.Client{
+		Connection: kibana.Connection{
+			URL:  server.URL,
+			HTTP: server.Client(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := setupConfig{
+				Fleet: fleetConfig{
+					TokenPolicyName: tc.policyName,
+				},
+				Kibana: kibanaConfig{
+					RetryMaxCount:      1,
+					RetrySleepDuration: 10 * time.Millisecond,
+				},
+			}
+			streams, _, _, _ := cli.NewTestingIOStreams()
+
+			policy, err := kibanaFetchPolicy(cfg, kClient, streams)
+			if tc.found {
+				require.NoError(t, err)
+				require.NotNil(t, policy)
+			} else {
+				require.Nil(t, policy)
+				require.Error(t, err)
+			}
+		})
+	}
+}

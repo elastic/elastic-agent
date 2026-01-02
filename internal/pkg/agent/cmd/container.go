@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -572,11 +573,39 @@ func buildFleetServerConnStr(cfg fleetServerConfig) (string, error) {
 
 func kibanaFetchPolicy(cfg setupConfig, client *kibana.Client, streams *cli.IOStreams) (*kibanaPolicy, error) {
 	var policies kibanaPolicies
-	err := performGET(cfg, client, "/api/fleet/agent_policies", &policies, streams.Err, "Kibana fetch policy")
-	if err != nil {
-		return nil, err
+	params := url.Values{}
+	page := 1
+	attempt := 0
+	for {
+		params.Set("page", strconv.Itoa(page))
+		code, result, err := client.Request(http.MethodGet, "/api/fleet/agent_policies", params, nil, nil)
+		if err != nil || code != http.StatusOK {
+			if err != nil {
+				err = fmt.Errorf("http GET request to %s/api/fleet/agent_policies fails: %w. Response: %s", client.URL, err, truncateString(result))
+			} else if code != http.StatusOK {
+				err = fmt.Errorf("http GET request to %s/api/fleet/agent_policies fails. StatusCode: %d Response: %s", client.URL, code, truncateString(result))
+			}
+			fmt.Fprintf(streams.Err, "Kibana fetch policy page %d failed: %s\n", page, err)
+			if attempt >= cfg.Kibana.RetryMaxCount {
+				return nil, err
+			}
+			attempt++
+			<-time.After(cfg.Kibana.RetrySleepDuration)
+			continue
+		}
+		attempt = 0 // reset attempt counter
+		if err = json.Unmarshal(result, &policies); err != nil {
+			return nil, err
+		}
+		policy, err := findPolicy(cfg, policies.Items)
+		if err == nil {
+			return policy, nil
+		}
+		if page*policies.PerPage > policies.Total {
+			return nil, err
+		}
+		page++
 	}
-	return findPolicy(cfg, policies.Items)
 }
 
 func kibanaFetchToken(cfg setupConfig, client *kibana.Client, policy *kibanaPolicy, streams *cli.IOStreams, tokenName string) (string, error) {
@@ -979,7 +1008,10 @@ type kibanaPolicy struct {
 }
 
 type kibanaPolicies struct {
-	Items []kibanaPolicy `json:"items"`
+	Items   []kibanaPolicy `json:"items"`
+	Page    int            `json:"page"`
+	PerPage int            `json:"perPage"`
+	Total   int            `json:"total"`
 }
 
 type kibanaAPIKey struct {
