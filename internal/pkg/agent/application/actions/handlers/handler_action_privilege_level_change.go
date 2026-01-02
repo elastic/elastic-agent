@@ -79,6 +79,19 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 		return fmt.Errorf("failed to determine root/Administrator: %w", err)
 	}
 
+	ackCommitFn := func() {
+		if err := acker.Ack(ctx, a); err != nil {
+			h.log.Errorw("failed to ACK an action",
+				"error.message", err,
+				"action", a)
+		}
+		if err := acker.Commit(ctx); err != nil {
+			h.log.Errorw("failed to commit ACK of an action",
+				"error.message", err,
+				"action", a)
+		}
+	}
+
 	if !isRoot {
 		// check if we're already running as the desired user
 		gid, err := install.FindGID(groupname)
@@ -98,7 +111,9 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 		if targetingSameUser(currentUser.Uid, currentUser.Gid, fmt.Sprint(uid), fmt.Sprint(gid)) {
 			// already running as desired user, do not fail the action
 			// some form of deduplication
-			h.log.Infof("already running as user %s and group %s, no changes required", username, groupname)
+			h.log.Warnf("already running as user %s and group %s, no changes required", username, groupname)
+			// ack action so it's not hanging
+			ackCommitFn()
 			return nil
 		}
 
@@ -124,16 +139,7 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 	}
 
 	// ack
-	if err := acker.Ack(ctx, a); err != nil {
-		h.log.Errorw("failed to ACK an action",
-			"error.message", err,
-			"action", a)
-	}
-	if err := acker.Commit(ctx); err != nil {
-		h.log.Errorw("failed to commit ACK of an action",
-			"error.message", err,
-			"action", a)
-	}
+	ackCommitFn()
 
 	// check everything is properly set up
 	userName, groupName, err := install.GetDesiredUser()
