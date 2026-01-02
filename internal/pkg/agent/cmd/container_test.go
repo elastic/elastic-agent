@@ -713,13 +713,13 @@ func TestKibanaFetchPolicyPages(t *testing.T) {
 		switch page {
 		case 1:
 			resp = []byte(`{"items": [{
-                      "id": "test-id-1",
+		      "id": "test-id-1",
 		      "name": "Policy 1",
 		      "status": "active",
 		      "is_default": false,
 		      "is_default_fleet_server": false
 		    }, {
-                      "id": "test-id-2",
+		      "id": "test-id-2",
 		      "name": "Policy 2",
 		      "status": "active",
 		      "is_default": false,
@@ -727,7 +727,7 @@ func TestKibanaFetchPolicyPages(t *testing.T) {
 		    }], "total": 3, "page": 1, "perPage": 2}`)
 		case 2:
 			resp = []byte(`{"items": [{
-                      "id": "test-id-3",
+		      "id": "test-id-3",
 		      "name": "Policy 3",
 		      "status": "active",
 		      "is_default": false,
