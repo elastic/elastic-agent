@@ -61,6 +61,8 @@ linters:
         - github.com/meraki/dashboard-api-go/v3
         - go.opentelemetry.io/otel/exporters/prometheus
         - github.com/elastic/elastic-agent/internal/edot
+        - github.com/open-telemetry/opentelemetry-collector-contrib/internal/healthcheck
+        - github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status
       replace-local: true
     gomodguard:
       blocked:
