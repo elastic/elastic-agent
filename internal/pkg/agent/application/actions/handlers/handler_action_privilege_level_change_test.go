@@ -9,10 +9,11 @@ import (
 	"os/user"
 	"testing"
 
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 func TestIsTargetingSameUser(t *testing.T) {
