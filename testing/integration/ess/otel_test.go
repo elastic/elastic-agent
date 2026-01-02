@@ -2042,6 +2042,7 @@ agent.internal.runtime.metricbeat:
 	require.NoErrorf(t, err, "error uninstalling classic agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
 }
 
+// This tests that live reloading the log level works correctly
 func TestLogReloading(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: integration.Default,
