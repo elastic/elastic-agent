@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -575,26 +574,10 @@ func kibanaFetchPolicy(cfg setupConfig, client *kibana.Client, streams *cli.IOSt
 	var policies kibanaPolicies
 	params := url.Values{}
 	page := 1
-	attempt := 0
 	for {
 		params.Set("page", strconv.Itoa(page))
-		code, result, err := client.Request(http.MethodGet, "/api/fleet/agent_policies", params, nil, nil)
-		if err != nil || code != http.StatusOK {
-			if err != nil {
-				err = fmt.Errorf("http GET request to %s/api/fleet/agent_policies fails: %w. Response: %s", client.URL, err, truncateString(result))
-			} else if code != http.StatusOK {
-				err = fmt.Errorf("http GET request to %s/api/fleet/agent_policies fails. StatusCode: %d Response: %s", client.URL, code, truncateString(result))
-			}
-			fmt.Fprintf(streams.Err, "Kibana fetch policy page %d failed: %s\n", page, err)
-			if attempt >= cfg.Kibana.RetryMaxCount {
-				return nil, err
-			}
-			attempt++
-			<-time.After(cfg.Kibana.RetrySleepDuration)
-			continue
-		}
-		attempt = 0 // reset attempt counter
-		if err = json.Unmarshal(result, &policies); err != nil {
+		err := performGETWithParams(cfg, client, "/api/fleet/agent_policies", params, &policies, streams.Err, "Kibana fetch policy")
+		if err != nil {
 			return nil, err
 		}
 		policy, err := findPolicy(cfg, policies.Items)
@@ -752,9 +735,13 @@ func isTrue(val string) bool {
 }
 
 func performGET(cfg setupConfig, client *kibana.Client, path string, response interface{}, writer io.Writer, msg string) error {
+	return performGETWithParams(cfg, client, path, nil, response, writer, msg)
+}
+
+func performGETWithParams(cfg setupConfig, client *kibana.Client, path string, params url.Values, response interface{}, writer io.Writer, msg string) error {
 	var lastErr error
 	for i := 0; i < cfg.Kibana.RetryMaxCount; i++ {
-		code, result, err := client.Request("GET", path, nil, nil, nil)
+		code, result, err := client.Request("GET", path, params, nil, nil)
 		if err != nil || code != 200 {
 			if err != nil {
 				err = fmt.Errorf("http GET request to %s%s fails: %w. Response: %s",

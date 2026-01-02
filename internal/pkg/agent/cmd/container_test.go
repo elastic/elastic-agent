@@ -9,10 +9,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -701,23 +703,38 @@ func TestKibanaFetchPolicyPages(t *testing.T) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
+		page, err := strconv.Atoi(r.URL.Query().Get("page"))
+		if err != nil || page < 1 {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
 		var resp []byte
-		if r.URL.Query().Get("page") == "1" {
+		switch page {
+		case 1:
 			resp = []byte(`{"items": [{
                       "id": "test-id-1",
 		      "name": "Policy 1",
 		      "status": "active",
 		      "is_default": false,
 		      "is_default_fleet_server": false
-		    }], "total": 2, "page": 1, "perPage": 1}`)
-		} else {
-			resp = []byte(`{"items": [{
+		    }, {
                       "id": "test-id-2",
 		      "name": "Policy 2",
 		      "status": "active",
 		      "is_default": false,
 		      "is_default_fleet_server": false
-		    }], "total": 2, "page": 2, "perPage": 1}`)
+		    }], "total": 3, "page": 1, "perPage": 2}`)
+		case 2:
+			resp = []byte(`{"items": [{
+                      "id": "test-id-3",
+		      "name": "Policy 3",
+		      "status": "active",
+		      "is_default": false,
+		      "is_default_fleet_server": false
+		    }], "total": 3, "page": 2, "perPage": 2}`)
+		default:
+			resp = []byte(fmt.Sprintf(`{"items": [], "total": 3, "page": %d, "perPage": 2}`, page))
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -730,12 +747,16 @@ func TestKibanaFetchPolicyPages(t *testing.T) {
 		policyName string
 		found      bool
 	}{{
-		name:       "found on page 2",
+		name:       "found on page 1",
 		policyName: "Policy 2",
 		found:      true,
 	}, {
-		name:       "not found",
+		name:       "found on page 2",
 		policyName: "Policy 3",
+		found:      true,
+	}, {
+		name:       "not found",
+		policyName: "Policy 4",
 		found:      false,
 	}}
 
