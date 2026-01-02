@@ -73,7 +73,6 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 	username, password = install.UnprivilegedUser(username, password)
 	groupname = install.UnprivilegedGroup(groupname)
 
-	// if not root we should fail straight away unless we're changing to same user
 	isRoot, err := utils.HasRoot()
 	if err != nil {
 		return fmt.Errorf("failed to determine root/Administrator: %w", err)
