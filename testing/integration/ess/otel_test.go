@@ -2139,11 +2139,6 @@ agent.reload:
 	cfg = fmt.Sprintf(logConfig, esURL, "info")
 	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
 
-	// wait for log level reload
-	require.Eventually(t, func() bool {
-		return zapLogs.FilterMessageSnippet("log level changed to info").Len() > 0
-	}, 1*time.Minute, 10*time.Second, "log level did not change")
-
 	// reset logs
 	zapLogs.TakeAll()
 
@@ -2154,6 +2149,7 @@ agent.reload:
 			t.Logf("waiting for agent healthy: %s", err.Error())
 			return false
 		}
+		return zapLogs.FilterMessageSnippet("Everything is ready. Begin running and processing data").Len() > 0
 	}, 1*time.Minute, 10*time.Second, "elastic-agent was not healthy after log level changed to info")
 
 	require.Zero(t, zapLogs.FilterMessageSnippet(`"log.level:debug"`).Len())
@@ -2165,12 +2161,13 @@ service:
     logs:
       level: debug
 `
-	// reset zap logs
-	zapLogs.TakeAll()
 
 	// add service::telemetry::logs::level:debug
 	cfg = fmt.Sprintf(logConfig, esURL, "info")
 	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
+
+	// reset zap logs
+	zapLogs.TakeAll()
 
 	// wait for elastic agent to be healthy and OTel collector to re-start
 	require.Eventually(t, func() bool {
@@ -2179,6 +2176,7 @@ service:
 			t.Logf("waiting for agent healthy: %s", err.Error())
 			return false
 		}
+		return zapLogs.FilterMessageSnippet("Everything is ready. Begin running and processing data").Len() > 0
 	}, 1*time.Minute, 10*time.Second, "elastic-agent is not healthy")
 
 	require.Eventually(t, func() bool {
