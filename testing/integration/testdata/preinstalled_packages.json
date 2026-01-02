@@ -1,7 +1,7 @@
 {
     "force": true,
     "packages": [
-        { "name": "endpoint", "version": "9.0.0" },
+        { "name": "endpoint", "version": "9.2.0" },
         { "name": "system", "version": "1.67.3" },
         { "name": "auditd_manager", "version": "1.19.0" },
         { "name": "fleet_server", "version": "1.5.0" },
