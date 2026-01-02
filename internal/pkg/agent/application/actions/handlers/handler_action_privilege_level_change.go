@@ -59,6 +59,15 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 		}
 	}()
 
+	isRoot, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("failed to determine root/Administrator: %w", err)
+	}
+
+	return h.handleChange(ctx, a, acker, action, isRoot)
+}
+
+func (h *PrivilegeLevelChange) handleChange(ctx context.Context, a fleetapi.Action, acker acker.Acker, action *fleetapi.ActionPrivilegeLevelChange, isRoot bool) (rerr error) {
 	if !action.Data.Unprivileged {
 		// only unprivileged supported at this point
 		return fmt.Errorf("unsupported action, ActionPrivilegeLevelChange supports only downgrading permissions")
@@ -72,11 +81,6 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 	}
 	username, password = install.UnprivilegedUser(username, password)
 	groupname = install.UnprivilegedGroup(groupname)
-
-	isRoot, err := utils.HasRoot()
-	if err != nil {
-		return fmt.Errorf("failed to determine root/Administrator: %w", err)
-	}
 
 	ackCommitFn := func() {
 		if err := acker.Ack(ctx, a); err != nil {
@@ -120,7 +124,7 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 	}
 
 	// ensure no component issues
-	err = componentvalidation.EnsureNoServiceComponentIssues()
+	err := componentvalidation.EnsureNoServiceComponentIssues()
 	if err != nil {
 		h.log.Debugf("handlerPrivilegeLevelChange: found issues with components: %v", err)
 		return err
@@ -161,10 +165,10 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 func targetingSameUser(currentUID, currentGID, targetUID, targetGID string) bool {
 	if currentGID == targetGID && currentUID == targetUID {
 		// no change
-		return false
+		return true
 	}
 
-	return true
+	return false
 }
 
 func (h *PrivilegeLevelChange) ackFailure(ctx context.Context, err error, action *fleetapi.ActionPrivilegeLevelChange, acker acker.Acker) {

@@ -4,7 +4,16 @@
 
 package handlers
 
-import "testing"
+import (
+	"context"
+	"os/user"
+	"testing"
+
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+)
 
 func TestIsTargetingSameUser(t *testing.T) {
 	tests := []struct {
@@ -21,7 +30,7 @@ func TestIsTargetingSameUser(t *testing.T) {
 			currentGID:  "1000",
 			targetUID:   "1000",
 			targetGID:   "1000",
-			expectEqual: false,
+			expectEqual: true,
 		},
 		{
 			name:        "different user same group",
@@ -29,7 +38,7 @@ func TestIsTargetingSameUser(t *testing.T) {
 			currentGID:  "1000",
 			targetUID:   "1001",
 			targetGID:   "1000",
-			expectEqual: true,
+			expectEqual: false,
 		},
 		{
 			name:        "same user different group",
@@ -37,7 +46,7 @@ func TestIsTargetingSameUser(t *testing.T) {
 			currentGID:  "1000",
 			targetUID:   "1000",
 			targetGID:   "1001",
-			expectEqual: true,
+			expectEqual: false,
 		},
 		{
 			name:        "different user and different group",
@@ -45,7 +54,7 @@ func TestIsTargetingSameUser(t *testing.T) {
 			currentGID:  "1000",
 			targetUID:   "1001",
 			targetGID:   "1001",
-			expectEqual: true,
+			expectEqual: false,
 		},
 	}
 
@@ -57,4 +66,54 @@ func TestIsTargetingSameUser(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAckerIsInvokedForSameUser(t *testing.T) {
+	log, _ := logger.New("", false)
+	h := &PrivilegeLevelChange{
+		log: log,
+	}
+
+	acker := &mockAcker{}
+
+	currentUser, err := user.Current()
+	require.NoError(t, err)
+
+	group, err := user.LookupGroupId(currentUser.Gid)
+	require.NoError(t, err)
+
+	action := &fleetapi.ActionPrivilegeLevelChange{
+		ActionID:   "id",
+		ActionType: "PRIVILEGE_LEVEL_CHANGE",
+		Data: fleetapi.ActionPrivilegeLevelChangeData{
+			Unprivileged: true,
+			UserInfo: &fleetapi.UserInfo{
+				Username:  currentUser.Username,
+				Groupname: group.Name,
+			},
+		},
+	}
+
+	acker.On("Ack", mock.Anything, action).Return(nil)
+	acker.On("Commit", mock.Anything).Return(nil)
+
+	ctx := context.Background()
+
+	err = h.handleChange(ctx, action, acker, action, false)
+	require.NoError(t, err)
+	acker.IsMethodCallable(t, "Ack")
+	acker.IsMethodCallable(t, "Commit")
+}
+
+type mockAcker struct {
+	mock.Mock
+}
+
+func (m *mockAcker) Ack(ctx context.Context, a fleetapi.Action) error {
+	args := m.Called(ctx, a)
+	return args.Error(0)
+}
+func (m *mockAcker) Commit(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
 }
