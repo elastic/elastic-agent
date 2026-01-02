@@ -16,17 +16,17 @@ import (
 
 const BeatsModulePath = "github.com/elastic/beats/v7"
 
-func Beats(targetVersion string) error {
-	mg.SerialDeps(mg.F(BeatsModule, targetVersion), common.Notice)
+func Beats(branch string, targetVersion string) error {
+	mg.SerialDeps(mg.F(BeatsModule, branch, targetVersion), common.Notice)
 
 	return nil
 }
 
-func BeatsModule(targetVersion string) error {
+func BeatsModule(branch string, targetVersion string) error {
 	goArgs := []string{"mod", "edit", "-require", fmt.Sprintf("%s@%s", BeatsModulePath, targetVersion)}
 
-	fmt.Println("Fetching beats submodule")
-	err := mage.Run(nil, os.Stdout, os.Stderr, "git", "beats", "fetch")
+	fmt.Printf("Fetching branch '%s' in beats submodule\n", branch)
+	err := mage.Run(nil, os.Stdout, os.Stderr, "git", "beats", "fetch", "origin", branch)
 	if err != nil {
 		return err
 	}
