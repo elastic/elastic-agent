@@ -2135,12 +2135,12 @@ agent.reload:
 		return (zapLogs.FilterMessageSnippet("otelcol.component.kind").FilterMessageSnippet(`"log.level":"debug"`).Len() > 1)
 	}, 1*time.Minute, 10*time.Second, "could not find debug logs")
 
+	// reset logs
+	zapLogs.TakeAll()
+
 	// set agent.logging.level: info
 	cfg = fmt.Sprintf(logConfig, esURL, "info")
 	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
-
-	// reset logs
-	zapLogs.TakeAll()
 
 	// wait for elastic agent to be healthy and OTel collector to start
 	require.Eventually(t, func() bool {
@@ -2152,7 +2152,11 @@ agent.reload:
 		return zapLogs.FilterMessageSnippet("Everything is ready. Begin running and processing data").Len() > 0
 	}, 1*time.Minute, 10*time.Second, "elastic-agent was not healthy after log level changed to info")
 
-	require.Zero(t, zapLogs.FilterMessageSnippet(`"log.level:debug"`).Len())
+	// reset logs because log level may not have taken effect between shutdown and restart
+	zapLogs.TakeAll()
+	// wait for logs from OTel inputs to populate.
+	time.Sleep(30 * time.Second)
+	require.Zero(t, zapLogs.FilterMessageSnippet(`"log.level":"debug"`).Len())
 
 	// set collector logs to debug
 	logConfig = logConfig + `
