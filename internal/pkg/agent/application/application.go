@@ -270,7 +270,8 @@ func New(
 
 	otelManager, err := otelmanager.NewOTelManager(
 		log.Named("otel_manager"),
-		logLevel, baseLogger,
+		logLevel,
+		baseLogger,
 		agentInfo,
 		cfg.Settings.Collector,
 		monitor.ComponentMonitoringConfig,
