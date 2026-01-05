@@ -724,13 +724,13 @@ func TestKibanaFetchPolicy(t *testing.T) {
 				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"items":[{
+				_ = w.Write([]byte(`{"items":[{
 				    "id": "test-id",
 				    "name": "test-policy",
 				    "status": "active",
 				    "is_default": false,
 				    "is_default_fleet_server": false
-				    }]}`)) //nolint: errcheck // test server
+				    }]}`))
 			}))
 			return server
 		},
@@ -760,17 +760,17 @@ func TestKibanaFetchPolicy(t *testing.T) {
 				if kuery == "name: test-policy" {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)
-					w.Write([]byte(`{"items": []}`))
+					_ = w.Write([]byte(`{"items": []}`))
 				} else if kuery == "is_default: true" {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)
-					w.Write([]byte(`{"items":[{
+					_ = w.Write([]byte(`{"items":[{
 				    "id": "test-id",
 				    "name": "other name",
 				    "status": "active",
 				    "is_default": true,
 				    "is_default_fleet_server": false
-				    }]}`)) //nolint: errcheck // test server
+				    }]}`))
 				} else {
 					w.WriteHeader(http.StatusBadRequest)
 				}
@@ -797,7 +797,7 @@ func TestKibanaFetchPolicy(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"items": []}`))
+				_ = w.Write([]byte(`{"items": []}`))
 			}))
 			return server
 		},
@@ -825,13 +825,13 @@ func TestKibanaFetchPolicy(t *testing.T) {
 				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"item":{
+				_ = w.Write([]byte(`{"item":{
 				    "id": "test-server-policy-id",
 				    "name": "test-server-policy",
 				    "status": "active",
 				    "is_default": false,
 				    "is_default_fleet_server": false
-				    }}`)) //nolint: errcheck // test server
+				    }}`))
 			}))
 			return server
 		},
@@ -873,13 +873,13 @@ func TestKibanaFetchPolicy(t *testing.T) {
 				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"items":[{
+				_ = w.Write([]byte(`{"items":[{
 				    "id": "test-server-policy-id",
 				    "name": "test-server-policy",
 				    "status": "active",
 				    "is_default": false,
 				    "is_default_fleet_server": true
-				    }]}`)) //nolint: errcheck // test server
+				    }]}`))
 			}))
 			return server
 		},
@@ -913,7 +913,7 @@ func TestKibanaFetchPolicy(t *testing.T) {
 				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"items":[]}`)) //nolint: errcheck // test server
+				_ = w.Write([]byte(`{"items":[]}`))
 			}))
 			return server
 		},
