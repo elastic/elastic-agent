@@ -29,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/kibana"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -865,15 +866,17 @@ func TestContainerCMDEnrollByPolicyName(t *testing.T) {
 	err = cmd.Start()
 	require.NoError(t, err)
 
-	require.Eventuallyf(t, func() bool {
+	require.EventuallyWithTf(t, func(c *assert.CollectT) {
 		// This will return errors until it connects to the agent,
 		// they're mostly noise because until the agent starts running
 		// we will get connection errors. If the test fails
 		// the agent logs will be present in the error message
 		// which should help to explain why the agent was not
 		// healthy.
-		err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv(env)))
-		return err == nil
+		status, err := agentFixture.ExecStatus(ctx, atesting.WithCmdOptions(withEnv(env)))
+		require.NoError(c, err)
+		require.Equal(c, int(cproto.State_HEALTHY), status.State, "agent status is not healthy")
+		require.Equal(c, int(cproto.State_HEALTHY), status.FleetState, "fleet state is not healthy")
 	},
 		5*time.Minute, time.Second,
 		"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",

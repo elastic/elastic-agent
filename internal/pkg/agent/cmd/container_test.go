@@ -956,7 +956,6 @@ func TestKibanaFetchPolicy(t *testing.T) {
 func TestKibanaFetchToken(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/fleet/enrollment_api_keys/test-key" {
-			t.Logf("path: %s, kuery: %s", r.URL.Path, r.URL.Query().Get("kuery"))
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_, err := w.Write([]byte(`{"item":{
