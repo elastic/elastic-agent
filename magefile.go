@@ -2400,9 +2400,7 @@ func (Integration) UpdatePackageVersion(ctx context.Context) error {
 	return nil
 }
 
-var (
-	stateDir = ".integration-cache"
-)
+var stateDir = ".integration-cache"
 
 // readFrameworkState reads the state file from the integration test framework
 func readFrameworkState() (runner.State, error) {
@@ -3721,7 +3719,17 @@ func (Otel) PrepareBeats() error {
 	if err := os.Remove(beatsGitPath); err != nil {
 		return fmt.Errorf("failed to remove beats/.git file: %w", err)
 	}
-	if err := filecopy.Copy(gitdirAbsPath, beatsGitPath); err != nil {
+	copyOpts := filecopy.Options{
+		Skip: func(info os.FileInfo, src, dest string) (bool, error) {
+			switch {
+			case (info.Mode() & fs.ModeSocket) != 0:
+				return true, nil
+			default:
+				return false, nil
+			}
+		},
+	}
+	if err := filecopy.Copy(gitdirAbsPath, beatsGitPath, copyOpts); err != nil {
 		return fmt.Errorf("failed to copy git directory: %w", err)
 	}
 
