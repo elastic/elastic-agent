@@ -810,7 +810,7 @@ func TestMonitoringConfigOtelOutputSupport(t *testing.T) {
 				"type":  "elasticsearch",
 				"hosts": []string{"localhost:9200"},
 			},
-			expectPrometheusMonitoring: true,
+			expectPrometheusMonitoring: false,
 			monitoringRuntimeManager:   monitoringcfg.OtelRuntimeManager,
 		},
 		{

@@ -2,37 +2,6 @@
 name: Bump beats
 pipelineid: 'updatecli-update-beats-{{ requiredEnv "BRANCH_NAME" }}'
 
-scms:
-  default:
-    kind: github
-    spec:
-      user: '{{ requiredEnv "GITHUB_ACTOR" }}'
-      username: '{{ requiredEnv "GITHUB_ACTOR" }}'
-      owner: '{{ .scm.owner }}'
-      repository: '{{ .scm.repository }}'
-      token: '{{ requiredEnv "GITHUB_TOKEN" }}'
-      branch: '{{ requiredEnv "BRANCH_NAME" }}'
-      commitusingapi: true
-      force: false
-
-actions:
-  default:
-    title: '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Update elastic/beats to {{ source "beats" }}'
-    kind: github/pullrequest
-    scmid: default
-    spec:
-      automerge: false
-      labels:
-      - automation
-      - skip-changelog
-      - "Team:Elastic-Agent-Control-Plane"
-      description: |-
-        ### What
-        Update `elastic/beats` to the latest version on branch `{{ requiredEnv "BRANCH_NAME" }}`.
-
-        *Changeset*
-        * https://github.com/elastic/beats/compare/{{ source "gomod" }}...{{ source "beats" }}
-
 sources:
   beats:
     kind: json
@@ -60,7 +29,6 @@ conditions:
     name: Is version 'github.com/elastic/beats@{{ source "beats" }}' not updated in 'go.mod'?
     kind: shell
     disablesourceinput: true
-    scmid: default
     spec:
       command: '[ {{ source "beats" }} != {{ source "gomod" }} ]'
     failwhen: false
@@ -69,10 +37,16 @@ targets:
   beats:
     name: 'Update to elastic/beats@{{ source "beats" }}'
     sourceid: beats
-    scmid: default
     kind: shell
     spec:
       command: .ci/scripts/update-beats.sh
       environments:
       - name: PATH
       - name: HOME
+  export-versions:
+    name: "Export the previous and new beats version to /tmp/.beats-previous-version and  /tmp/.beats-new-version files"
+    disablesourceinput: true
+    kind: shell
+    spec:
+      command: |
+        echo "{{ source "gomod" }}" > /tmp/.beats-previous-version && echo "{{ source "beats" }}" > /tmp/.beats-new-version

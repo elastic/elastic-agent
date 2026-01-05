@@ -116,7 +116,7 @@ func (c *client) Version(ctx context.Context) (Version, error) {
 	if err != nil {
 		return Version{}, err
 	}
-	bt, err := time.Parse(control.TimeFormat(), res.BuildTime)
+	bt, err := time.Parse(control.OldTimeFormat(), res.BuildTime)
 	if err != nil {
 		return Version{}, err
 	}

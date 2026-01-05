@@ -25,11 +25,16 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/mapstr"
+
+	otelcomponent "go.opentelemetry.io/collector/component"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	elasticmonitoringreceiver "github.com/elastic/elastic-agent/internal/pkg/otel/receivers/elasticmonitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -56,8 +61,9 @@ type collectorRecoveryTimer interface {
 }
 
 type configUpdate struct {
-	collectorCfg *confmap.Conf
-	components   []component.Component
+	collectorCfg  *confmap.Conf
+	monitoringCfg *monitoringCfg.MonitoringConfig
+	components    []component.Component
 }
 
 // OTelManager is a manager that manages the lifecycle of the OTel collector inside of the Elastic Agent.
@@ -381,6 +387,17 @@ func buildMergedConfig(
 		if err != nil {
 			return nil, fmt.Errorf("failed to merge component otel config: %w", err)
 		}
+
+		if mCfg := cfgUpdate.monitoringCfg; mCfg != nil {
+			if mCfg.Enabled && mCfg.MonitorMetrics {
+				// Metrics monitoring is enabled, inject a receiver for the
+				// collector's internal telemetry.
+				err := injectMonitoringReceiver(mergedOtelCfg, mCfg, agentInfo)
+				if err != nil {
+					return nil, fmt.Errorf("merging internal telemetry config: %w", err)
+				}
+			}
+		}
 	}
 
 	// Merge with base collector config if it exists
@@ -421,6 +438,82 @@ func injectDiagnosticsExtension(config *confmap.Conf) error {
 	}
 
 	return config.Merge(confmap.NewFromStringMap(extensionCfg))
+}
+
+func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentInfo info.Agent) map[string]any {
+	namespace := "default"
+	if monitoring.Namespace != "" {
+		namespace = monitoring.Namespace
+	}
+	return map[string]any{
+		"data_stream": map[string]any{
+			"dataset":   "elastic_agent.elastic_agent",
+			"namespace": namespace,
+			"type":      "metrics",
+		},
+		"event": map[string]any{
+			"dataset": "elastic_agent.elastic_agent",
+		},
+		"elastic_agent": map[string]any{
+			"id":       agentInfo.AgentID(),
+			"process":  "elastic-agent",
+			"snapshot": agentInfo.Snapshot(),
+			"version":  agentInfo.Version(),
+		},
+		"agent": mapstr.M{
+			"id": agentInfo.AgentID(),
+		},
+		"component": mapstr.M{
+			"binary": "elastic-agent",
+			"id":     "elastic-agent/collector",
+		},
+		"metricset": mapstr.M{
+			"name": "stats",
+		},
+	}
+}
+
+func injectMonitoringReceiver(
+	config *confmap.Conf,
+	monitoring *monitoringCfg.MonitoringConfig,
+	agentInfo info.Agent,
+) error {
+	receiverType := otelcomponent.MustNewType(elasticmonitoringreceiver.Name)
+	receiverName := "collector/internal-telemetry-monitoring"
+	receiverID := translate.GetReceiverID(receiverType, receiverName).String()
+	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
+	exporterType := otelcomponent.MustNewType("elasticsearch")
+	exporterID := translate.GetExporterID(exporterType, componentmonitoring.MonitoringOutput).String()
+	monitoringExporterFound := false
+	if config.IsSet("exporters") {
+		// Search the defined exporters for one with the expected id for monitoring
+		for exporter := range config.Get("exporters").(map[string]any) {
+			if exporter == exporterID {
+				monitoringExporterFound = true
+			}
+		}
+	}
+	if !monitoringExporterFound {
+		// We can't monitor OTel metrics without OTel-based monitoring
+		return nil
+	}
+	receiverCfg := map[string]any{
+		"receivers": map[string]any{
+			receiverID: map[string]any{
+				"event_template": monitoringEventTemplate(monitoring, agentInfo),
+				"interval":       monitoring.MetricsPeriod,
+			},
+		},
+		"service": map[string]any{
+			"pipelines": map[string]any{
+				pipelineID: map[string]any{
+					"receivers": []string{receiverID},
+					"exporters": []string{exporterID},
+				},
+			},
+		},
+	}
+	return config.Merge(confmap.NewFromStringMap(receiverCfg))
 }
 
 func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh chan *status.AggregateStatus, collectorRunErr chan error, forceFetchStatusCh chan struct{}) error {
@@ -471,10 +564,11 @@ func (m *OTelManager) applyMergedConfig(ctx context.Context, collectorStatusCh c
 }
 
 // Update sends collector configuration and component updates to the manager's run loop.
-func (m *OTelManager) Update(cfg *confmap.Conf, components []component.Component) {
+func (m *OTelManager) Update(cfg *confmap.Conf, monitoring *monitoringCfg.MonitoringConfig, components []component.Component) {
 	cfgUpdate := configUpdate{
-		collectorCfg: cfg,
-		components:   components,
+		collectorCfg:  cfg,
+		monitoringCfg: monitoring,
+		components:    components,
 	}
 
 	// we care only about the latest config update

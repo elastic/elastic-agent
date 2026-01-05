@@ -533,10 +533,7 @@ func TestContainerCMDAgentMonitoringRuntimeExperimental(t *testing.T) {
 				status, err := agentFixture.ExecStatus(ctx, atesting.WithCmdOptions(withEnv(env)))
 				require.NoErrorf(ct, err, "error getting agent status")
 
-				expectedComponentCount := 4 // process runtime
-				if tc.expectedRuntimeName == string(monitoringCfg.OtelRuntimeManager) {
-					expectedComponentCount = 5
-				}
+				expectedComponentCount := 4
 
 				require.Len(ct, status.Components, expectedComponentCount, "expected right number of components in agent status")
 
@@ -657,10 +654,7 @@ func TestContainerCMDAgentMonitoringRuntimeExperimentalPolicy(t *testing.T) {
 				status, err := agentFixture.ExecStatus(ctx, atesting.WithCmdOptions(withEnv(env)))
 				require.NoErrorf(ct, err, "error getting agent status")
 
-				expectedComponentCount := 4 // process runtime
-				if tc.expectedRuntimeName == string(monitoringCfg.OtelRuntimeManager) {
-					expectedComponentCount = 5
-				}
+				expectedComponentCount := 4
 
 				require.Len(ct, status.Components, expectedComponentCount, "expected right number of components in agent status")
 

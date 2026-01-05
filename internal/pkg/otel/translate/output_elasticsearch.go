@@ -300,6 +300,12 @@ func cfgDecodeHookFunc() mapstructure.DecodeHookFunc {
 				return nil, fmt.Errorf("failed parsing ssl supported_protocols: %w", err)
 			}
 			return []tlscommon.TLSVersion{tlsVersion}, nil
+		case t == reflect.TypeOf([]tlscommon.TLSCurveType{tlscommon.TLSCurveType(0)}):
+			tlsCurveType := tlscommon.TLSCurveType(0)
+			if err := tlsCurveType.Unpack(data); err != nil {
+				return nil, fmt.Errorf("failed parsing ssl curve_types: %w", err)
+			}
+			return []tlscommon.TLSCurveType{tlsCurveType}, nil
 		default:
 			return data, nil
 		}

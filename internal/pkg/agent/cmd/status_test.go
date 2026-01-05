@@ -265,7 +265,7 @@ func TestHumanDurationUntil(t *testing.T) {
 	}{
 		"valid_time": {
 			targetTimeStr:          now.Add(3 * time.Hour).Format(control.TimeFormat()),
-			expectedDurationRegexp: `^2h59m59\.\d+s$`,
+			expectedDurationRegexp: `^3h0m0s$`,
 		},
 		"invalid_time": {
 			targetTimeStr:          "foobar",

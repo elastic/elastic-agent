@@ -258,36 +258,35 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 
 	// 2. Assert monitoring logs and metrics are available on ES
 	for _, tc := range tests {
-		require.Eventuallyf(t,
-			func() bool {
-				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
-				defer findCancel()
-				mustClauses := []map[string]any{
-					{"match": map[string]any{"data_stream.type": tc.dsType}},
-					{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
-					{"match": map[string]any{"data_stream.namespace": processNamespace}},
-				}
-				mustClauses = append(mustClauses, tc.query...)
-				rawQuery := map[string]any{
-					"query": map[string]any{
-						"bool": map[string]any{
-							"must":   mustClauses,
-							"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestamp}}},
-						},
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+			defer findCancel()
+			mustClauses := []map[string]any{
+				{"match": map[string]any{"data_stream.type": tc.dsType}},
+				{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
+				{"match": map[string]any{"data_stream.namespace": processNamespace}},
+			}
+			mustClauses = append(mustClauses, tc.query...)
+			rawQuery := map[string]any{
+				"query": map[string]any{
+					"bool": map[string]any{
+						"must":   mustClauses,
+						"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestamp}}},
 					},
-					"sort": []map[string]any{
-						{"@timestamp": map[string]any{"order": "asc"}},
-					},
-				}
+				},
+				"sort": []map[string]any{
+					{"@timestamp": map[string]any{"order": "asc"}},
+				},
+			}
 
-				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
-				require.NoError(t, err)
-				if docs.Hits.Total.Value != 0 {
-					key := tc.dsType + "-" + tc.dsDataset + "-" + processNamespace
-					agentDocs[key] = docs
-				}
-				return docs.Hits.Total.Value > 0
-			},
+			docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
+			require.NoError(collect, err)
+			if docs.Hits.Total.Value != 0 {
+				key := tc.dsType + "-" + tc.dsDataset + "-" + processNamespace
+				agentDocs[key] = docs
+			}
+			require.Greater(collect, docs.Hits.Total.Value, 0)
+		},
 			2*time.Minute, 5*time.Second,
 			"agent monitoring classic no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestamp, tc.dsType, tc.dsDataset, processNamespace, tc.query)
 	}
@@ -323,42 +322,41 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		var statusErr error
 		status, statusErr := beatReceiverFixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
-		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 4)
+		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 3)
 	}, 1*time.Minute, 1*time.Second)
 
 	// 5. Assert monitoring logs and metrics are available on ES (for otel mode)
 	for _, tc := range tests {
-		require.Eventuallyf(t,
-			func() bool {
-				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
-				defer findCancel()
-				mustClauses := []map[string]any{
-					{"match": map[string]any{"data_stream.type": tc.dsType}},
-					{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
-					{"match": map[string]any{"data_stream.namespace": receiverNamespace}},
-				}
-				mustClauses = append(mustClauses, tc.query...)
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+			defer findCancel()
+			mustClauses := []map[string]any{
+				{"match": map[string]any{"data_stream.type": tc.dsType}},
+				{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
+				{"match": map[string]any{"data_stream.namespace": receiverNamespace}},
+			}
+			mustClauses = append(mustClauses, tc.query...)
 
-				rawQuery := map[string]any{
-					"query": map[string]any{
-						"bool": map[string]any{
-							"must":   mustClauses,
-							"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestampBeatReceiver}}},
-						},
+			rawQuery := map[string]any{
+				"query": map[string]any{
+					"bool": map[string]any{
+						"must":   mustClauses,
+						"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestampBeatReceiver}}},
 					},
-					"sort": []map[string]any{
-						{"@timestamp": map[string]any{"order": "asc"}},
-					},
-				}
+				},
+				"sort": []map[string]any{
+					{"@timestamp": map[string]any{"order": "asc"}},
+				},
+			}
 
-				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
-				require.NoError(t, err)
-				if docs.Hits.Total.Value != 0 {
-					key := tc.dsType + "-" + tc.dsDataset + "-" + receiverNamespace
-					otelDocs[key] = docs
-				}
-				return docs.Hits.Total.Value > 0
-			},
+			docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
+			require.NoError(collect, err)
+			if docs.Hits.Total.Value != 0 {
+				key := tc.dsType + "-" + tc.dsDataset + "-" + receiverNamespace
+				otelDocs[key] = docs
+			}
+			require.Greater(collect, docs.Hits.Total.Value, 0)
+		},
 			4*time.Minute, 5*time.Second,
 			"agent monitoring beats receivers no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestampBeatReceiver, tc.dsType, tc.dsDataset, receiverNamespace, tc.query)
 	}
@@ -715,8 +713,6 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
-    status_reporting:
-      enabled: false
 agent.monitoring.enabled: false
 `
 
@@ -818,7 +814,6 @@ agent.monitoring.enabled: false
 const (
 	otelRuntimeUnsupportedLogLineStart                 = "otel runtime is not supported for component"
 	otelRuntimeMonitoringOutputUnsupportedLogLineStart = "otel runtime is not supported for monitoring output"
-	prometheusInputSkippedLogLine                      = "The Otel prometheus metrics monitoring input can't run in a beats process, skipping"
 )
 
 // TestBeatsReceiverProcessRuntimeFallback verifies that we fall back to the process runtime if the otel runtime
@@ -913,7 +908,6 @@ outputs:
 
 	// verify we've logged a warning about using the process runtime
 	var unsupportedLogRecords []map[string]any
-	var prometheusUnsupportedLogRecord map[string]any
 	var monitoringOutputUnsupportedLogRecord map[string]any
 	for _, line := range strings.Split(string(logsBytes), "\n") {
 		line = strings.TrimSpace(line)
@@ -929,9 +923,6 @@ outputs:
 			if strings.HasPrefix(message, otelRuntimeUnsupportedLogLineStart) {
 				unsupportedLogRecords = append(unsupportedLogRecords, logRecord)
 			}
-			if strings.HasPrefix(message, prometheusInputSkippedLogLine) {
-				prometheusUnsupportedLogRecord = logRecord
-			}
 			if strings.HasPrefix(message, otelRuntimeMonitoringOutputUnsupportedLogLineStart) {
 				monitoringOutputUnsupportedLogRecord = logRecord
 			}
@@ -946,7 +937,6 @@ outputs:
 	})
 
 	assert.Len(t, unsupportedLogRecords, 1, "one log line for each component we try to run")
-	assert.NotEmpty(t, prometheusUnsupportedLogRecord, "should get a log line about Otel prometheus metrics input being skipped")
 	assert.NotEmpty(t, monitoringOutputUnsupportedLogRecord, "should get a log line about monitoring output not being supported")
 }
 
@@ -985,8 +975,6 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
-    status_reporting:
-      enabled: false
 agent.monitoring.enabled: false
 `
 
@@ -1074,8 +1062,6 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
-    status_reporting:
-      enabled: false
 agent.monitoring.enabled: false
 `
 	err = fixture.Configure(ctx, []byte(configNoComponents))
@@ -1712,7 +1698,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 	healthCheck(ctx,
 		"Everything is ready. Begin running and processing data.",
 		component.OtelRuntimeManager,
-		4,
+		3,
 		otelTimestamp)
 
 	// restart 3 times, checks path definition is stable
@@ -1727,7 +1713,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 		healthCheck(ctx,
 			"Everything is ready. Begin running and processing data.",
 			component.OtelRuntimeManager,
-			4,
+			3,
 			restartTimestamp)
 	}
 
