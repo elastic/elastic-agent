@@ -7,7 +7,6 @@ package cmd
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -192,68 +191,6 @@ func TestBuildEnrollArgs(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestKibanaFetchToken(t *testing.T) {
-	t.Run("should fetch details from items in the api response", func(t *testing.T) {
-		mux := http.NewServeMux()
-		mux.HandleFunc("/api/fleet/enrollment_api_keys/", func(w http.ResponseWriter, r *http.Request) {
-			basePath := "/api/fleet/enrollment_api_keys/"
-
-			apiKey := kibanaAPIKey{
-				ID:       "id",
-				PolicyID: "policyID",
-				Name:     "tokenName",
-				APIKey:   "apiKey",
-			}
-
-			trimmed := strings.TrimPrefix(r.URL.String(), basePath)
-			if trimmed == "" {
-				apiKeys := kibanaAPIKeys{
-					Items: []kibanaAPIKey{
-						apiKey,
-					},
-				}
-				b, err := json.Marshal(apiKeys)
-				require.NoError(t, err)
-
-				_, err = w.Write(b)
-				require.NoError(t, err)
-
-				return
-			}
-
-			keyDetail := kibanaAPIKeyDetail{
-				Item: apiKey,
-			}
-			b, err := json.Marshal(keyDetail)
-			require.NoError(t, err)
-
-			_, err = w.Write(b)
-			require.NoError(t, err)
-		})
-
-		policy := kibanaPolicy{
-			ID: "policyID",
-		}
-
-		server := httptest.NewServer(mux)
-		defer server.Close()
-
-		client := &kibana.Client{
-			Connection: kibana.Connection{
-				URL:          server.URL,
-				Username:     "",
-				Password:     "",
-				APIKey:       "",
-				ServiceToken: "",
-				HTTP:         &http.Client{},
-			},
-		}
-		ak, err := kibanaFetchToken(setupConfig{Kibana: kibanaConfig{RetryMaxCount: 1}}, client, &policy, cli.NewIOStreams(), "tokenName")
-		require.NoError(t, err)
-		require.Equal(t, "apiKey", ak)
-	})
 }
 
 func TestShouldEnroll(t *testing.T) {
@@ -846,6 +783,58 @@ func TestKibanaFetchPolicy(t *testing.T) {
 			IsDefaultFleetServer: false,
 		},
 	}, {
+		name: "found fleet-server policy by name",
+		cfg: setupConfig{
+			FleetServer: fleetServerConfig{
+				Enable:   true,
+				PolicyID: "test-server-policy-id",
+			},
+			Fleet: fleetConfig{
+				TokenPolicyName: "test-server-policy",
+			},
+			Kibana: kibanaConfig{
+				RetryMaxCount:      1,
+				RetrySleepDuration: 10 * time.Millisecond,
+			},
+		},
+		server: func(t *testing.T) *httptest.Server {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/api/fleet/agent_policies/test-server-policy-id" {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusNotFound)
+					_, err := w.Write([]byte(`{"statusCode": 404, "error": "NotFound", "message": "not found"}`))
+					require.NoError(t, err)
+					return
+				}
+				if !r.URL.Query().Has("kuery") {
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				switch r.URL.Query().Get("kuery") {
+				case `name: "test-server-policy"`:
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					_, err := w.Write([]byte(`{"items":[{
+				    "id": "test-server-policy-id",
+				    "name": "test-server-policy",
+				    "status": "active",
+				    "is_default": false,
+				    "is_default_fleet_server": false
+				    }]}`))
+					require.NoError(t, err)
+				default:
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+			}))
+			return server
+		},
+		policy: &kibanaPolicy{
+			Name:                 "test-server-policy",
+			IsDefault:            false,
+			IsDefaultFleetServer: false,
+		},
+	}, {
 		name: "found fleet-server policy by is_default_fleet_server flag",
 		cfg: setupConfig{
 			FleetServer: fleetServerConfig{
@@ -873,20 +862,27 @@ func TestKibanaFetchPolicy(t *testing.T) {
 					w.WriteHeader(http.StatusBadRequest)
 					return
 				}
-				if r.URL.Query().Get("kuery") != "is_default_fleet_server: true" {
-					w.WriteHeader(http.StatusBadRequest)
-					return
-				}
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusOK)
-				_, err := w.Write([]byte(`{"items":[{
+				switch r.URL.Query().Get("kuery") {
+				case `name: "test-policy"`:
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					_, err := w.Write([]byte(`{"items":[]}`))
+					require.NoError(t, err)
+				case "is_default_fleet_server: true":
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					_, err := w.Write([]byte(`{"items":[{
 				    "id": "test-server-policy-id",
 				    "name": "test-server-policy",
 				    "status": "active",
 				    "is_default": false,
 				    "is_default_fleet_server": true
 				    }]}`))
-				require.NoError(t, err)
+					require.NoError(t, err)
+				default:
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
 			}))
 			return server
 		},
@@ -955,4 +951,80 @@ func TestKibanaFetchPolicy(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestKibanaFetchToken(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/fleet/enrollment_api_keys/test-key" {
+			t.Logf("path: %s, kuery: %s", r.URL.Path, r.URL.Query().Get("kuery"))
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte(`{"item":{
+			    "id": "test-key",
+			    "name": "test key",
+			    "active": true,
+			    "policy_id": "test-policy-id",
+			    "api_key": "key-value"
+			}}`))
+			require.NoError(t, err)
+			require.NoError(t, err)
+			return
+		}
+		if !r.URL.Query().Has("kuery") {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if r.URL.Query().Get("kuery") != `name: "test-key-name" and policy_id: "test-policy-id"` {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte(`{"items":[{
+		    "id": "test-key",
+		    "name": "test key",
+		    "active": true,
+		    "policy_id": "test-policy-id"
+		}]}`))
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	cfg := setupConfig{
+		Kibana: kibanaConfig{
+			RetryMaxCount:      1,
+			RetrySleepDuration: 10 * time.Millisecond,
+		},
+	}
+
+	client := &kibana.Client{
+		Connection: kibana.Connection{
+			URL:  server.URL,
+			HTTP: server.Client(),
+		},
+	}
+	streams, _, _, _ := cli.NewTestingIOStreams()
+
+	t.Run("succeeds", func(t *testing.T) {
+		policy := &kibanaPolicy{
+			ID:   "test-policy-id",
+			Name: "test policy",
+		}
+		tokenName := "test-key-name"
+
+		token, err := kibanaFetchToken(cfg, client, policy, streams, tokenName)
+		require.NoError(t, err)
+		require.Equal(t, "key-value", token)
+	})
+	t.Run("fetch api keys return no matches", func(t *testing.T) {
+		policy := &kibanaPolicy{
+			ID:   "bad-policy-id",
+			Name: "bad policy",
+		}
+		tokenName := "bad-key-name"
+
+		token, err := kibanaFetchToken(cfg, client, policy, streams, tokenName)
+		require.Error(t, err)
+		require.Empty(t, token)
+	})
 }

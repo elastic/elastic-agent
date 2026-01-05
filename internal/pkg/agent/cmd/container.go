@@ -576,7 +576,7 @@ func buildFleetServerConnStr(cfg fleetServerConfig) (string, error) {
 // Otherwise the policy is searched for by name, if that fails, we request the default policy.
 func kibanaFetchPolicy(cfg setupConfig, client *kibana.Client, streams *cli.IOStreams) (*kibanaPolicy, error) {
 	if cfg.FleetServer.Enable {
-		return kibanaFetchFleetServerPolicy(cfg, client, streams.Err)
+		return kibanaFetchFleetServerPolicy(cfg, client, streams)
 	}
 
 	// lookup policy by name
@@ -592,6 +592,7 @@ func kibanaFetchPolicy(cfg setupConfig, client *kibana.Client, streams *cli.IOSt
 		return &policies.Items[0], nil
 	}
 
+	fmt.Fprintf(streams.Out, "Unable to find policy by name: %q, fallback search for default policy...\n", cfg.Fleet.TokenPolicyName)
 	// fallback to default flag
 	params.Set("kuery", "is_default: true")
 	err = performGETWithParams(cfg, client, "/api/fleet/agent_policies", params, &policies, streams.Err, "Kibana fetch policy")
@@ -601,21 +602,23 @@ func kibanaFetchPolicy(cfg setupConfig, client *kibana.Client, streams *cli.IOSt
 	if len(policies.Items) == 0 {
 		return nil, fmt.Errorf("policy not found")
 	}
+	fmt.Fprintf(streams.Out, "Fallback search for default policy found id: %s\n", policies.Items[0].ID)
 	return &policies.Items[0], nil
 }
 
 func kibanaFetchToken(cfg setupConfig, client *kibana.Client, policy *kibanaPolicy, streams *cli.IOStreams, tokenName string) (string, error) {
 	var keys kibanaAPIKeys
-	err := performGET(cfg, client, "/api/fleet/enrollment_api_keys", &keys, streams.Err, "Kibana fetch token")
+	params := url.Values{}
+	params.Set("kuery", fmt.Sprintf("name: %q and policy_id: %q", tokenName, policy.ID))
+	err := performGETWithParams(cfg, client, "/api/fleet/enrollment_api_keys", params, &keys, streams.Err, "Kibana fetch token")
 	if err != nil {
 		return "", err
 	}
-	key, err := findKey(keys.Items, policy, tokenName)
-	if err != nil {
-		return "", err
+	if len(keys.Items) == 0 {
+		return "", fmt.Errorf(`unable to find enrollment token named "%s" in policy "%s"`, tokenName, policy.Name)
 	}
 	var keyDetail kibanaAPIKeyDetail
-	err = performGET(cfg, client, fmt.Sprintf("/api/fleet/enrollment_api_keys/%s", key.ID), &keyDetail, streams.Err, "Kibana fetch token detail")
+	err = performGET(cfg, client, fmt.Sprintf("/api/fleet/enrollment_api_keys/%s", keys.Items[0].ID), &keyDetail, streams.Err, "Kibana fetch token detail")
 	if err != nil {
 		return "", err
 	}
@@ -642,16 +645,6 @@ func kibanaClient(cfg kibanaConfig, headers map[string]string) (*kibana.Client, 
 		Transport:     transport,
 		Headers:       headers,
 	}, 0, "Elastic-Agent", version.GetDefaultVersion(), version.Commit(), version.BuildTime().String())
-}
-
-func findKey(keys []kibanaAPIKey, policy *kibanaPolicy, tokenName string) (*kibanaAPIKey, error) {
-	for _, key := range keys {
-		name := strings.TrimSpace(tokenNameStrip.ReplaceAllString(key.Name, ""))
-		if name == tokenName && key.PolicyID == policy.ID {
-			return &key, nil
-		}
-	}
-	return nil, fmt.Errorf(`unable to find enrollment token named "%s" in policy "%s"`, tokenName, policy.Name)
 }
 
 func envWithDefault(def string, keys ...string) string {
@@ -1235,44 +1228,60 @@ func ackFleet(ctx context.Context, client fleetclient.Sender, agentID string) er
 }
 
 // kibanaFetchFleetServerPolicy is used to gather the fleet-server policy from Kibana, first by a direct ID, lookup and if that fails by checking the is_default_fleet_server flag.
-func kibanaFetchFleetServerPolicy(cfg setupConfig, client *kibana.Client, errOut io.Writer) (*kibanaPolicy, error) {
+func kibanaFetchFleetServerPolicy(cfg setupConfig, client *kibana.Client, streams *cli.IOStreams) (*kibanaPolicy, error) {
 	var policy kibanaPolicyResp
 
 	// We need to do an explicit get here instead of using client.GetPolicy as we want to "ignore" a 404 response
 	// Kibana returns a 404 if the policy ID does not exist, in this case we'll fall back to making another request for the default fleet-server policy.
-	for i := 0; i < cfg.Kibana.RetryMaxCount; i++ {
-		code, result, err := client.Request(http.MethodGet, "/api/fleet/agent_policies/"+cfg.FleetServer.PolicyID, nil, nil, nil)
-		if err != nil || (code != http.StatusOK && code != http.StatusNotFound) {
-			if err != nil {
-				err = fmt.Errorf("http GET request to %s/api/fleet/agent_policies/%s fails: %w. Response: %s",
-					client.URL, cfg.FleetServer.PolicyID, err, truncateString(result))
-			} else {
-				err = fmt.Errorf("http GET request to %s/api/fleet/agent_policies/%s fails. StatusCode: %d Response: %s",
-					client.URL, cfg.FleetServer.PolicyID, code, truncateString(result))
+	if cfg.FleetServer.PolicyID != "" {
+		for i := 0; i < cfg.Kibana.RetryMaxCount; i++ {
+			code, result, err := client.Request(http.MethodGet, "/api/fleet/agent_policies/"+cfg.FleetServer.PolicyID, nil, nil, nil)
+			if err != nil || (code != http.StatusOK && code != http.StatusNotFound) {
+				if err != nil {
+					err = fmt.Errorf("http GET request to %s/api/fleet/agent_policies/%s fails: %w. Response: %s",
+						client.URL, cfg.FleetServer.PolicyID, err, truncateString(result))
+				} else {
+					err = fmt.Errorf("http GET request to %s/api/fleet/agent_policies/%s fails. StatusCode: %d Response: %s",
+						client.URL, cfg.FleetServer.PolicyID, code, truncateString(result))
+				}
+				fmt.Fprintf(streams.Err, "Kibana fetch policy by ID failed: %v\n", err)
+				<-time.After(cfg.Kibana.RetrySleepDuration)
+				continue
 			}
-			fmt.Fprintf(errOut, "Kibana fetch policy by ID failed: %v\n", err)
-			<-time.After(cfg.Kibana.RetrySleepDuration)
-			continue
+			if code == http.StatusOK {
+				if err := json.Unmarshal(result, &policy); err != nil {
+					return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+				}
+				// Successfully found the policy
+				return &policy.Item, nil
+			}
 		}
-		if code == http.StatusOK {
-			if err := json.Unmarshal(result, &policy); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-			}
-			// Successfully found the policy
-			return &policy.Item, nil
+	}
+
+	var policies kibanaPolicies
+	params := url.Values{}
+	// fallback search for policy by name
+	if cfg.Fleet.TokenPolicyName != "" {
+		params.Set("kuery", fmt.Sprintf("name: %q", cfg.Fleet.TokenPolicyName))
+		err := performGETWithParams(cfg, client, "/api/fleet/agent_policies", params, &policies, streams.Err, "Kibana fetch policy")
+		if err != nil {
+			return nil, fmt.Errorf("unable to fetch fleet-server policy by name lookup: %w", err)
+		}
+		if len(policies.Items) > 0 {
+			return &policies.Items[0], nil
 		}
 	}
 
 	// fallback search for default policy
-	var policies kibanaPolicies
-	params := url.Values{}
+	fmt.Fprintln(streams.Out, "Fallback search for default fleet-server policy...")
 	params.Set("kuery", "is_default_fleet_server: true")
-	err := performGETWithParams(cfg, client, "/api/fleet/agent_policies", params, &policies, errOut, "Kibana fetch policy")
+	err := performGETWithParams(cfg, client, "/api/fleet/agent_policies", params, &policies, streams.Err, "Kibana fetch policy")
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch fleet-server policy by is_default_fleet_server lookup: %w", err)
 	}
 	if len(policies.Items) == 0 {
 		return nil, fmt.Errorf("policy not found")
 	}
+	fmt.Fprintf(streams.Out, "Fallback search for default fleet-server policy succeeded id: %s\n", policies.Items[0].ID)
 	return &policies.Items[0], nil
 }
