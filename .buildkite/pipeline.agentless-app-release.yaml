@@ -89,5 +89,9 @@ steps:
                 SYNTHETICS_TAG: "agentless-ci"
       YAML
       fi
+    plugins:
+    - sparse-checkout#v1.3.1:
+        paths:
+        - .buildkite
     agents:
       image: docker.elastic.co/ci-agent-images/serverless-helm-builder:0.0.2@sha256:d00e8a7a0ab3618cfaacb0a7b1e1b06ee29728eb2b44de602374bd8f6b9b92ac
