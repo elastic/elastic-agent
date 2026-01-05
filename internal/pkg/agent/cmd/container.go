@@ -582,7 +582,7 @@ func kibanaFetchPolicy(cfg setupConfig, client *kibana.Client, streams *cli.IOSt
 	// lookup policy by name
 	var policies kibanaPolicies
 	params := url.Values{}
-	params.Set("kuery", "name: "+cfg.Fleet.TokenPolicyName)
+	params.Set("kuery", fmt.Sprintf("name: %q", cfg.Fleet.TokenPolicyName))
 	err := performGETWithParams(cfg, client, "/api/fleet/agent_policies", params, &policies, streams.Err, "Kibana fetch policy")
 	if err != nil {
 		return nil, err

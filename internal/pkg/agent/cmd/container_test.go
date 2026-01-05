@@ -718,7 +718,7 @@ func TestKibanaFetchPolicy(t *testing.T) {
 					w.WriteHeader(http.StatusBadRequest)
 					return
 				}
-				if kuery := r.URL.Query().Get("kuery"); kuery != "name: test-policy" {
+				if kuery := r.URL.Query().Get("kuery"); kuery != `name: "test-policy"` {
 					w.WriteHeader(http.StatusBadRequest)
 					return
 				}
@@ -758,7 +758,7 @@ func TestKibanaFetchPolicy(t *testing.T) {
 					return
 				}
 				kuery := r.URL.Query().Get("kuery")
-				if kuery == "name: test-policy" {
+				if kuery == `name: "test-policy"` {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)
 					_, err := w.Write([]byte(`{"items": []}`))
