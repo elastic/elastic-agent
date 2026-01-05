@@ -5,7 +5,16 @@
 # upgrade integration tests.
 
 testVersions:
+<<<<<<< HEAD
   - 8.18.8
   - 8.17.10
   - 7.17.30-SNAPSHOT
+=======
+  - 9.3.0-SNAPSHOT
+  - 9.2.4-SNAPSHOT
+  - 9.2.3
+  - 9.1.9
+  - 8.19.10-SNAPSHOT
+  - 8.19.9
+>>>>>>> 079554b66 (Drop 7.17.30-SNAPSHOT from testVersions (#12074))
   - 7.17.29
