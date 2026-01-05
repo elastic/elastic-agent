@@ -757,13 +757,13 @@ func TestKibanaFetchPolicy(t *testing.T) {
 					w.WriteHeader(http.StatusBadRequest)
 					return
 				}
-				kuery := r.URL.Query().Get("kuery")
-				if kuery == `name: "test-policy"` {
+				switch r.URL.Query().Get("kuery") {
+				case `name: "test-policy"`:
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)
 					_, err := w.Write([]byte(`{"items": []}`))
 					require.NoError(t, err)
-				} else if kuery == "is_default: true" {
+				case "is_default: true":
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)
 					_, err := w.Write([]byte(`{"items":[{
@@ -774,7 +774,7 @@ func TestKibanaFetchPolicy(t *testing.T) {
 				    "is_default_fleet_server": false
 				    }]}`))
 					require.NoError(t, err)
-				} else {
+				default:
 					w.WriteHeader(http.StatusBadRequest)
 				}
 			}))
