@@ -699,7 +699,7 @@ func TestKibanaFetchPolicy(t *testing.T) {
 	tests := []struct {
 		name   string
 		cfg    setupConfig
-		server func() *httptest.Server
+		server func(t *testing.T) *httptest.Server
 		policy *kibanaPolicy
 	}{{
 		name: "found by name lookup",
@@ -712,7 +712,7 @@ func TestKibanaFetchPolicy(t *testing.T) {
 				RetrySleepDuration: 10 * time.Millisecond,
 			},
 		},
-		server: func() *httptest.Server {
+		server: func(t *testing.T) *httptest.Server {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if !r.URL.Query().Has("kuery") {
 					w.WriteHeader(http.StatusBadRequest)
@@ -724,13 +724,14 @@ func TestKibanaFetchPolicy(t *testing.T) {
 				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
-				_ = w.Write([]byte(`{"items":[{
+				_, err := w.Write([]byte(`{"items":[{
 				    "id": "test-id",
 				    "name": "test-policy",
 				    "status": "active",
 				    "is_default": false,
 				    "is_default_fleet_server": false
 				    }]}`))
+				require.NoError(t, err)
 			}))
 			return server
 		},
@@ -750,7 +751,7 @@ func TestKibanaFetchPolicy(t *testing.T) {
 				RetrySleepDuration: 10 * time.Millisecond,
 			},
 		},
-		server: func() *httptest.Server {
+		server: func(t *testing.T) *httptest.Server {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if !r.URL.Query().Has("kuery") {
 					w.WriteHeader(http.StatusBadRequest)
@@ -760,17 +761,19 @@ func TestKibanaFetchPolicy(t *testing.T) {
 				if kuery == "name: test-policy" {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)
-					_ = w.Write([]byte(`{"items": []}`))
+					_, err := w.Write([]byte(`{"items": []}`))
+					require.NoError(t, err)
 				} else if kuery == "is_default: true" {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusOK)
-					_ = w.Write([]byte(`{"items":[{
+					_, err := w.Write([]byte(`{"items":[{
 				    "id": "test-id",
 				    "name": "other name",
 				    "status": "active",
 				    "is_default": true,
 				    "is_default_fleet_server": false
 				    }]}`))
+					require.NoError(t, err)
 				} else {
 					w.WriteHeader(http.StatusBadRequest)
 				}
@@ -793,11 +796,12 @@ func TestKibanaFetchPolicy(t *testing.T) {
 				RetrySleepDuration: 10 * time.Millisecond,
 			},
 		},
-		server: func() *httptest.Server {
+		server: func(t *testing.T) *httptest.Server {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
-				_ = w.Write([]byte(`{"items": []}`))
+				_, err := w.Write([]byte(`{"items": []}`))
+				require.NoError(t, err)
 			}))
 			return server
 		},
@@ -817,7 +821,7 @@ func TestKibanaFetchPolicy(t *testing.T) {
 				RetrySleepDuration: 10 * time.Millisecond,
 			},
 		},
-		server: func() *httptest.Server {
+		server: func(t *testing.T) *httptest.Server {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path != "/api/fleet/agent_policies/test-server-policy-id" {
 					w.WriteHeader(http.StatusBadRequest)
@@ -825,13 +829,14 @@ func TestKibanaFetchPolicy(t *testing.T) {
 				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
-				_ = w.Write([]byte(`{"item":{
+				_, err := w.Write([]byte(`{"item":{
 				    "id": "test-server-policy-id",
 				    "name": "test-server-policy",
 				    "status": "active",
 				    "is_default": false,
 				    "is_default_fleet_server": false
 				    }}`))
+				require.NoError(t, err)
 			}))
 			return server
 		},
@@ -855,12 +860,13 @@ func TestKibanaFetchPolicy(t *testing.T) {
 				RetrySleepDuration: 10 * time.Millisecond,
 			},
 		},
-		server: func() *httptest.Server {
+		server: func(t *testing.T) *httptest.Server {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == "/api/fleet/agent_policies/test-server-policy-id" {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusNotFound)
-					w.Write([]byte(`{"statusCode": 404, "error": "NotFound", "message": "not found"}`))
+					_, err := w.Write([]byte(`{"statusCode": 404, "error": "NotFound", "message": "not found"}`))
+					require.NoError(t, err)
 					return
 				}
 				if !r.URL.Query().Has("kuery") {
@@ -873,13 +879,14 @@ func TestKibanaFetchPolicy(t *testing.T) {
 				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
-				_ = w.Write([]byte(`{"items":[{
+				_, err := w.Write([]byte(`{"items":[{
 				    "id": "test-server-policy-id",
 				    "name": "test-server-policy",
 				    "status": "active",
 				    "is_default": false,
 				    "is_default_fleet_server": true
 				    }]}`))
+				require.NoError(t, err)
 			}))
 			return server
 		},
@@ -903,17 +910,19 @@ func TestKibanaFetchPolicy(t *testing.T) {
 				RetrySleepDuration: 10 * time.Millisecond,
 			},
 		},
-		server: func() *httptest.Server {
+		server: func(t *testing.T) *httptest.Server {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == "/api/fleet/agent_policies/test-server-policy-id" {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusNotFound)
-					w.Write([]byte(`{"statusCode": 404, "error": "NotFound", "message": "not found"}`))
+					_, err := w.Write([]byte(`{"statusCode": 404, "error": "NotFound", "message": "not found"}`))
+					require.NoError(t, err)
 					return
 				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
-				_ = w.Write([]byte(`{"items":[]}`))
+				_, err := w.Write([]byte(`{"items":[]}`))
+				require.NoError(t, err)
 			}))
 			return server
 		},
@@ -922,7 +931,7 @@ func TestKibanaFetchPolicy(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			server := tc.server()
+			server := tc.server(t)
 			defer server.Close()
 
 			client := &kibana.Client{
