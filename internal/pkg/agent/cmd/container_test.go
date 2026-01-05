@@ -961,7 +961,7 @@ func TestKibanaFetchToken(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			_, err := w.Write([]byte(`{"item":{
 			    "id": "test-key",
-			    "name": "test key",
+			    "name": "Default (73b9d7da-a8d4-4554-9fc3-7be9bd13e85b)",
 			    "active": true,
 			    "policy_id": "test-policy-id",
 			    "api_key": "key-value"
@@ -974,7 +974,7 @@ func TestKibanaFetchToken(t *testing.T) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		if r.URL.Query().Get("kuery") != `name: "test-key-name" and policy_id: "test-policy-id"` {
+		if r.URL.Query().Get("kuery") != `active: true and policy_id: "test-policy-id"` {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -982,10 +982,18 @@ func TestKibanaFetchToken(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, err := w.Write([]byte(`{"items":[{
 		    "id": "test-key",
-		    "name": "test key",
+		    "name": "Default (73b9d7da-a8d4-4554-9fc3-7be9bd13e85b)",
 		    "active": true,
 		    "policy_id": "test-policy-id"
-		}]}`))
+		}, {
+		    "id": "test-key",
+		    "name": "other test key",
+		    "active": true,
+		    "policy_id": "test-policy-id"
+		}],
+		"perPage": 10000,
+		"page": 1,
+		"total": 2}`))
 		require.NoError(t, err)
 	}))
 	defer server.Close()
@@ -1010,7 +1018,7 @@ func TestKibanaFetchToken(t *testing.T) {
 			ID:   "test-policy-id",
 			Name: "test policy",
 		}
-		tokenName := "test-key-name"
+		tokenName := "Default"
 
 		token, err := kibanaFetchToken(cfg, client, policy, streams, tokenName)
 		require.NoError(t, err)
@@ -1021,7 +1029,7 @@ func TestKibanaFetchToken(t *testing.T) {
 			ID:   "bad-policy-id",
 			Name: "bad policy",
 		}
-		tokenName := "bad-key-name"
+		tokenName := "Default"
 
 		token, err := kibanaFetchToken(cfg, client, policy, streams, tokenName)
 		require.Error(t, err)

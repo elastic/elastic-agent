@@ -608,17 +608,36 @@ func kibanaFetchPolicy(cfg setupConfig, client *kibana.Client, streams *cli.IOSt
 
 func kibanaFetchToken(cfg setupConfig, client *kibana.Client, policy *kibanaPolicy, streams *cli.IOStreams, tokenName string) (string, error) {
 	var keys kibanaAPIKeys
+	page := 1
 	params := url.Values{}
-	params.Set("kuery", fmt.Sprintf("name: %q and policy_id: %q", tokenName, policy.ID))
-	err := performGETWithParams(cfg, client, "/api/fleet/enrollment_api_keys", params, &keys, streams.Err, "Kibana fetch token")
-	if err != nil {
-		return "", err
-	}
-	if len(keys.Items) == 0 {
-		return "", fmt.Errorf(`unable to find enrollment token named "%s" in policy "%s"`, tokenName, policy.Name)
+	// kuery is unable to match on a `name: "Default *"` pattern as the * is interpreted literally.
+	params.Set("kuery", fmt.Sprintf("active: true and policy_id: %q", policy.ID))
+	params.Set("perPage", "10000") // set to a very high value to avoid paging
+	var key *kibanaAPIKey
+	for {
+		params.Set("page", strconv.Itoa(page))
+		err := performGETWithParams(cfg, client, "/api/fleet/enrollment_api_keys", params, &keys, streams.Err, "Kibana fetch token")
+		if err != nil {
+			return "", err
+		}
+		if len(keys.Items) == 0 {
+			return "", fmt.Errorf(`unable to find enrollment token named "%s" in policy "%s"`, tokenName, policy.Name)
+		}
+
+		key, err = findKey(keys.Items, policy, tokenName)
+		if err != nil {
+			if keys.Total < keys.PerPage*keys.Page {
+				// No keys found, return an error
+				return "", err
+			}
+		}
+		if key != nil {
+			break
+		}
+		page++
 	}
 	var keyDetail kibanaAPIKeyDetail
-	err = performGET(cfg, client, fmt.Sprintf("/api/fleet/enrollment_api_keys/%s", keys.Items[0].ID), &keyDetail, streams.Err, "Kibana fetch token detail")
+	err := performGET(cfg, client, fmt.Sprintf("/api/fleet/enrollment_api_keys/%s", key.ID), &keyDetail, streams.Err, "Kibana fetch token detail")
 	if err != nil {
 		return "", err
 	}
@@ -645,6 +664,16 @@ func kibanaClient(cfg kibanaConfig, headers map[string]string) (*kibana.Client, 
 		Transport:     transport,
 		Headers:       headers,
 	}, 0, "Elastic-Agent", version.GetDefaultVersion(), version.Commit(), version.BuildTime().String())
+}
+
+func findKey(keys []kibanaAPIKey, policy *kibanaPolicy, tokenName string) (*kibanaAPIKey, error) {
+	for _, key := range keys {
+		name := strings.TrimSpace(tokenNameStrip.ReplaceAllString(key.Name, ""))
+		if name == tokenName && key.PolicyID == policy.ID {
+			return &key, nil
+		}
+	}
+	return nil, fmt.Errorf(`unable to find enrollment token named "%s" in policy "%s"`, tokenName, policy.Name)
 }
 
 func envWithDefault(def string, keys ...string) string {
@@ -991,7 +1020,10 @@ type kibanaAPIKey struct {
 }
 
 type kibanaAPIKeys struct {
-	Items []kibanaAPIKey `json:"items"`
+	Items   []kibanaAPIKey `json:"items"`
+	Total   int            `json:"total"`
+	PerPage int            `json:"perPage"`
+	Page    int            `json:"page"`
 }
 
 type kibanaAPIKeyDetail struct {
