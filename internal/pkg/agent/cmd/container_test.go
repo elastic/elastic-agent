@@ -9,12 +9,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -697,93 +695,251 @@ func TestShouldEnroll(t *testing.T) {
 	}
 }
 
-func TestKibanaFetchPolicyPages(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !r.URL.Query().Has("page") {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		page, err := strconv.Atoi(r.URL.Query().Get("page"))
-		if err != nil || page < 1 {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-
-		var resp []byte
-		switch page {
-		case 1:
-			resp = []byte(`{"items": [{
-		      "id": "test-id-1",
-		      "name": "Policy 1",
-		      "status": "active",
-		      "is_default": false,
-		      "is_default_fleet_server": false
-		    }, {
-		      "id": "test-id-2",
-		      "name": "Policy 2",
-		      "status": "active",
-		      "is_default": false,
-		      "is_default_fleet_server": false
-		    }], "total": 3, "page": 1, "perPage": 2}`)
-		case 2:
-			resp = []byte(`{"items": [{
-		      "id": "test-id-3",
-		      "name": "Policy 3",
-		      "status": "active",
-		      "is_default": false,
-		      "is_default_fleet_server": false
-		    }], "total": 3, "page": 2, "perPage": 2}`)
-		default:
-			resp = []byte(fmt.Sprintf(`{"items": [], "total": 3, "page": %d, "perPage": 2}`, page))
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write(resp) //nolint: errcheck // test server
-	}))
-	defer server.Close()
-
+func TestKibanaFetchPolicy(t *testing.T) {
 	tests := []struct {
-		name       string
-		policyName string
-		found      bool
+		name   string
+		cfg    setupConfig
+		server func() *httptest.Server
+		policy *kibanaPolicy
 	}{{
-		name:       "found on page 1",
-		policyName: "Policy 2",
-		found:      true,
-	}, {
-		name:       "found on page 2",
-		policyName: "Policy 3",
-		found:      true,
-	}, {
-		name:       "not found",
-		policyName: "Policy 4",
-		found:      false,
-	}}
-
-	kClient := &kibana.Client{
-		Connection: kibana.Connection{
-			URL:  server.URL,
-			HTTP: server.Client(),
+		name: "found by name lookup",
+		cfg: setupConfig{
+			Fleet: fleetConfig{
+				TokenPolicyName: "test-policy",
+			},
+			Kibana: kibanaConfig{
+				RetryMaxCount:      1,
+				RetrySleepDuration: 10 * time.Millisecond,
+			},
 		},
-	}
+		server: func() *httptest.Server {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if !r.URL.Query().Has("kuery") {
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				if kuery := r.URL.Query().Get("kuery"); kuery != "name: test-policy" {
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"items":[{
+				    "id": "test-id",
+				    "name": "test-policy",
+				    "status": "active",
+				    "is_default": false,
+				    "is_default_fleet_server": false
+				    }]}`)) //nolint: errcheck // test server
+			}))
+			return server
+		},
+		policy: &kibanaPolicy{
+			Name:                 "test-policy",
+			IsDefault:            false,
+			IsDefaultFleetServer: false,
+		},
+	}, {
+		name: "found  by is_default flag",
+		cfg: setupConfig{
+			Fleet: fleetConfig{
+				TokenPolicyName: "test-policy",
+			},
+			Kibana: kibanaConfig{
+				RetryMaxCount:      1,
+				RetrySleepDuration: 10 * time.Millisecond,
+			},
+		},
+		server: func() *httptest.Server {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if !r.URL.Query().Has("kuery") {
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				kuery := r.URL.Query().Get("kuery")
+				if kuery == "name: test-policy" {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					w.Write([]byte(`{"items": []}`))
+				} else if kuery == "is_default: true" {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					w.Write([]byte(`{"items":[{
+				    "id": "test-id",
+				    "name": "other name",
+				    "status": "active",
+				    "is_default": true,
+				    "is_default_fleet_server": false
+				    }]}`)) //nolint: errcheck // test server
+				} else {
+					w.WriteHeader(http.StatusBadRequest)
+				}
+			}))
+			return server
+		},
+		policy: &kibanaPolicy{
+			Name:                 "other name",
+			IsDefault:            true,
+			IsDefaultFleetServer: false,
+		},
+	}, {
+		name: "not found",
+		cfg: setupConfig{
+			Fleet: fleetConfig{
+				TokenPolicyName: "test-policy",
+			},
+			Kibana: kibanaConfig{
+				RetryMaxCount:      1,
+				RetrySleepDuration: 10 * time.Millisecond,
+			},
+		},
+		server: func() *httptest.Server {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"items": []}`))
+			}))
+			return server
+		},
+		policy: nil,
+	}, {
+		name: "found fleet-server policy by id",
+		cfg: setupConfig{
+			FleetServer: fleetServerConfig{
+				Enable:   true,
+				PolicyID: "test-server-policy-id",
+			},
+			Fleet: fleetConfig{
+				TokenPolicyName: "test-policy",
+			},
+			Kibana: kibanaConfig{
+				RetryMaxCount:      1,
+				RetrySleepDuration: 10 * time.Millisecond,
+			},
+		},
+		server: func() *httptest.Server {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/api/fleet/agent_policies/test-server-policy-id" {
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"item":{
+				    "id": "test-server-policy-id",
+				    "name": "test-server-policy",
+				    "status": "active",
+				    "is_default": false,
+				    "is_default_fleet_server": false
+				    }}`)) //nolint: errcheck // test server
+			}))
+			return server
+		},
+		policy: &kibanaPolicy{
+			Name:                 "test-server-policy",
+			IsDefault:            false,
+			IsDefaultFleetServer: false,
+		},
+	}, {
+		name: "found fleet-server policy by is_default_fleet_server flag",
+		cfg: setupConfig{
+			FleetServer: fleetServerConfig{
+				Enable:   true,
+				PolicyID: "test-server-policy-id",
+			},
+			Fleet: fleetConfig{
+				TokenPolicyName: "test-policy",
+			},
+			Kibana: kibanaConfig{
+				RetryMaxCount:      1,
+				RetrySleepDuration: 10 * time.Millisecond,
+			},
+		},
+		server: func() *httptest.Server {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/api/fleet/agent_policies/test-server-policy-id" {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusNotFound)
+					w.Write([]byte(`{"statusCode": 404, "error": "NotFound", "message": "not found"}`))
+					return
+				}
+				if !r.URL.Query().Has("kuery") {
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				if r.URL.Query().Get("kuery") != "is_default_fleet_server: true" {
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"items":[{
+				    "id": "test-server-policy-id",
+				    "name": "test-server-policy",
+				    "status": "active",
+				    "is_default": false,
+				    "is_default_fleet_server": true
+				    }]}`)) //nolint: errcheck // test server
+			}))
+			return server
+		},
+		policy: &kibanaPolicy{
+			Name:                 "test-server-policy",
+			IsDefault:            false,
+			IsDefaultFleetServer: true,
+		},
+	}, {
+		name: "fleet-server policy not found",
+		cfg: setupConfig{
+			FleetServer: fleetServerConfig{
+				Enable:   true,
+				PolicyID: "test-server-policy-id",
+			},
+			Fleet: fleetConfig{
+				TokenPolicyName: "test-policy",
+			},
+			Kibana: kibanaConfig{
+				RetryMaxCount:      1,
+				RetrySleepDuration: 10 * time.Millisecond,
+			},
+		},
+		server: func() *httptest.Server {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/api/fleet/agent_policies/test-server-policy-id" {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusNotFound)
+					w.Write([]byte(`{"statusCode": 404, "error": "NotFound", "message": "not found"}`))
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(`{"items":[]}`)) //nolint: errcheck // test server
+			}))
+			return server
+		},
+		policy: nil,
+	}}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			cfg := setupConfig{
-				Fleet: fleetConfig{
-					TokenPolicyName: tc.policyName,
-				},
-				Kibana: kibanaConfig{
-					RetryMaxCount:      1,
-					RetrySleepDuration: 10 * time.Millisecond,
+			server := tc.server()
+			defer server.Close()
+
+			client := &kibana.Client{
+				Connection: kibana.Connection{
+					URL:  server.URL,
+					HTTP: server.Client(),
 				},
 			}
-			streams, _, _, _ := cli.NewTestingIOStreams()
 
-			policy, err := kibanaFetchPolicy(cfg, kClient, streams)
-			if tc.found {
+			streams, _, _, _ := cli.NewTestingIOStreams()
+			policy, err := kibanaFetchPolicy(tc.cfg, client, streams)
+			if tc.policy != nil {
 				require.NoError(t, err)
 				require.NotNil(t, policy)
+				require.Equal(t, tc.policy.Name, policy.Name)
+				require.Equal(t, tc.policy.IsDefault, policy.IsDefault)
+				require.Equal(t, tc.policy.IsDefaultFleetServer, policy.IsDefaultFleetServer)
 			} else {
 				require.Nil(t, policy)
 				require.Error(t, err)
