@@ -5,7 +5,6 @@
 package mage
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -17,17 +16,9 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
-// Package packages the Beat for distribution. It generates packages based on
-// the set of target platforms and registered packaging specifications.
-// This is a convenience wrapper around PackageWithContext that uses the global config.
-func Package() error {
-	return PackageWithContext(context.Background())
-}
-
-// PackageWithContext packages the Beat for distribution using config from context.
+// Package packages the Beat for distribution using the provided config.
 // It generates packages based on the set of target platforms and registered packaging specifications.
-func PackageWithContext(ctx context.Context) error {
-	cfg := ConfigFromContext(ctx)
+func Package(cfg *EnvConfig) error {
 	fmt.Println("--- Package artifact")
 	platforms := cfg.GetPlatforms()
 	if len(platforms) == 0 {
@@ -93,6 +84,7 @@ func PackageWithContext(ctx context.Context) error {
 				agentPackageDrop := cfg.Packaging.AgentDropPath
 
 				spec := pkg.Spec.Clone()
+				spec.cfg = cfg
 				spec.OS = target.GOOS()
 				spec.Arch = packageArch
 				spec.Snapshot = cfg.Build.Snapshot
@@ -129,40 +121,6 @@ func PackageWithContext(ctx context.Context) error {
 		Parallel(v...)
 	}
 	return nil
-}
-
-// IsPackageTypeSelected returns true if SelectedPackageTypes is empty or if
-// pkgType is present on SelectedPackageTypes. It returns false otherwise.
-func IsPackageTypeSelected(pkgType PackageType) bool {
-	cfg := MustGetConfig()
-	selectedTypes := cfg.GetPackageTypes()
-	if len(selectedTypes) == 0 {
-		return true
-	}
-
-	for _, t := range selectedTypes {
-		if t == pkgType {
-			return true
-		}
-	}
-	return false
-}
-
-// IsDockerVariantSelected returns true if SelectedDockerVariants is empty or if
-// docVariant is present on SelectedDockerVariants. It returns false otherwise.
-func IsDockerVariantSelected(docVariant DockerVariant) bool {
-	cfg := MustGetConfig()
-	selectedVariants := cfg.GetDockerVariants()
-	if len(selectedVariants) == 0 {
-		return true
-	}
-
-	for _, v := range selectedVariants {
-		if v == docVariant {
-			return true
-		}
-	}
-	return false
 }
 
 type packageBuilder struct {
@@ -230,8 +188,7 @@ func WithRootUserContainer() func(params *testPackagesParams) {
 
 // TestPackages executes the package tests on the produced binaries. These tests
 // inspect things like file ownership and mode.
-func TestPackages(options ...TestPackagesOption) error {
-	cfg := MustGetConfig()
+func TestPackages(cfg *EnvConfig, options ...TestPackagesOption) error {
 	fmt.Println("--- TestPackages")
 	params := testPackagesParams{}
 	for _, opt := range options {
@@ -247,7 +204,7 @@ func TestPackages(options ...TestPackagesOption) error {
 		args = append(args, "-v")
 	}
 
-	args = append(args, MustExpand("{{ elastic_beats_dir }}/dev-tools/packaging/testing/package_test.go"))
+	args = append(args, MustExpand(cfg, "{{ elastic_beats_dir }}/dev-tools/packaging/testing/package_test.go"))
 
 	if params.HasModules {
 		args = append(args, "--modules")
@@ -273,8 +230,8 @@ func TestPackages(options ...TestPackagesOption) error {
 		args = append(args, "-root-owner")
 	}
 
-	args = append(args, "-files", MustExpand("{{.PWD}}/build/distributions/*"))
-	args = append(args, "--source-root", MustExpand("{{.PWD}}"))
+	args = append(args, "-files", MustExpand(cfg, "{{.PWD}}/build/distributions/*"))
+	args = append(args, "--source-root", MustExpand(cfg, "{{.PWD}}"))
 
 	if out, err := goTest(args...); err != nil {
 		if mg.Verbose() {
@@ -289,8 +246,7 @@ func TestPackages(options ...TestPackagesOption) error {
 // TestLinuxForCentosGLIBC checks the GLIBC requirements of linux/amd64 and
 // linux/386 binaries to ensure they meet the requirements for RHEL 6 which has
 // glibc 2.12.
-func TestLinuxForCentosGLIBC() error {
-	cfg := MustGetConfig()
+func TestLinuxForCentosGLIBC(cfg *EnvConfig) error {
 	platform := cfg.Platform()
 	switch platform.Name {
 	case "linux/amd64", "linux/386":

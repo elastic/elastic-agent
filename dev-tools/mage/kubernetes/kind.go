@@ -18,7 +18,14 @@ import (
 )
 
 // KindIntegrationTestStep setups a kind environment.
-type KindIntegrationTestStep struct{}
+type KindIntegrationTestStep struct {
+	cfg *devtools.EnvConfig
+}
+
+// SetConfig sets the configuration for the step.
+func (m *KindIntegrationTestStep) SetConfig(cfg *devtools.EnvConfig) {
+	m.cfg = cfg
+}
 
 // Name returns the kind name.
 func (m *KindIntegrationTestStep) Name() string {
@@ -53,8 +60,7 @@ func (m *KindIntegrationTestStep) Setup(env map[string]string) error {
 		}
 		return nil
 	}
-
-	clusterName := kubernetesClusterName()
+	clusterName := kubernetesClusterName(m.cfg)
 	stdOut := io.Discard
 	stdErr := io.Discard
 	if mg.Verbose() {
@@ -75,7 +81,6 @@ func (m *KindIntegrationTestStep) Setup(env map[string]string) error {
 		return err
 	}
 
-	cfg := devtools.MustGetConfig()
 	args := []string{
 		"create",
 		"cluster",
@@ -84,7 +89,7 @@ func (m *KindIntegrationTestStep) Setup(env map[string]string) error {
 		"--wait",
 		"300s",
 	}
-	kubeVersion := cfg.Kubernetes.K8sVersion
+	kubeVersion := m.cfg.Kubernetes.K8sVersion
 	if kubeVersion != "" {
 		args = append(args, "--image", fmt.Sprintf("kindest/node:%s", kubeVersion))
 	}
@@ -113,9 +118,8 @@ func (m *KindIntegrationTestStep) Teardown(env map[string]string) error {
 		stdErr = os.Stderr
 	}
 
-	cfg := devtools.MustGetConfig()
 	name, created := env["KIND_CLUSTER"]
-	if created && !cfg.Kubernetes.KindSkipDelete {
+	if created && !m.cfg.Kubernetes.KindSkipDelete {
 		_, err := sh.Exec(
 			env,
 			stdOut,

@@ -45,12 +45,7 @@ type TestBinaryArgs struct {
 	InputFiles []string
 }
 
-func makeGoTestArgs(name string) GoTestArgs {
-	cfg := MustGetConfig()
-	return makeGoTestArgsWithConfig(cfg, name)
-}
-
-func makeGoTestArgsWithConfig(cfg *EnvConfig, name string) GoTestArgs {
+func makeGoTestArgs(cfg *EnvConfig, name string) GoTestArgs {
 	fileName := fmt.Sprintf("build/TEST-go-%s", strings.ReplaceAll(strings.ToLower(name), " ", "_"))
 	params := GoTestArgs{
 		LogName:         name,
@@ -67,12 +62,7 @@ func makeGoTestArgsWithConfig(cfg *EnvConfig, name string) GoTestArgs {
 	return params
 }
 
-func makeGoTestArgsForModule(name, module string) GoTestArgs {
-	cfg := MustGetConfig()
-	return makeGoTestArgsForModuleWithConfig(cfg, name, module)
-}
-
-func makeGoTestArgsForModuleWithConfig(cfg *EnvConfig, name, module string) GoTestArgs {
+func makeGoTestArgsForModule(cfg *EnvConfig, name, module string) GoTestArgs {
 	fileName := fmt.Sprintf("build/TEST-go-%s-%s",
 		strings.ReplaceAll(strings.ToLower(name), " ", "_"),
 		strings.ReplaceAll(strings.ToLower(module), " ", "_"),
@@ -93,56 +83,29 @@ func makeGoTestArgsForModuleWithConfig(cfg *EnvConfig, name, module string) GoTe
 
 // DefaultGoTestUnitArgs returns a default set of arguments for running
 // all unit tests. We tag unit test files with '!integration'.
-func DefaultGoTestUnitArgs() GoTestArgs { return makeGoTestArgs("Unit") }
-
-// DefaultGoTestUnitArgsWithConfig returns a default set of arguments for running
-// all unit tests, using the provided config.
-func DefaultGoTestUnitArgsWithConfig(cfg *EnvConfig) GoTestArgs {
-	return makeGoTestArgsWithConfig(cfg, "Unit")
+func DefaultGoTestUnitArgs(cfg *EnvConfig) GoTestArgs {
+	return makeGoTestArgs(cfg, "Unit")
 }
 
 // DefaultGoTestIntegrationArgs returns a default set of arguments for running
 // all integration tests. We tag integration test files with 'integration'.
-func DefaultGoTestIntegrationArgs() GoTestArgs {
-	args := makeGoTestArgs("Integration")
-	args.Tags = append(args.Tags, "integration")
-	return args
-}
-
-// DefaultGoTestIntegrationArgsWithConfig returns a default set of arguments for running
-// all integration tests, using the provided config.
-func DefaultGoTestIntegrationArgsWithConfig(cfg *EnvConfig) GoTestArgs {
-	args := makeGoTestArgsWithConfig(cfg, "Integration")
+func DefaultGoTestIntegrationArgs(cfg *EnvConfig) GoTestArgs {
+	args := makeGoTestArgs(cfg, "Integration")
 	args.Tags = append(args.Tags, "integration")
 	return args
 }
 
 // GoTestIntegrationArgsForModule returns a default set of arguments for running
 // module integration tests. We tag integration test files with 'integration'.
-func GoTestIntegrationArgsForModule(module string) GoTestArgs {
-	args := makeGoTestArgsForModule("Integration", module)
-	args.Tags = append(args.Tags, "integration")
-	return args
-}
-
-// GoTestIntegrationArgsForModuleWithConfig returns a default set of arguments for running
-// module integration tests, using the provided config.
-func GoTestIntegrationArgsForModuleWithConfig(cfg *EnvConfig, module string) GoTestArgs {
-	args := makeGoTestArgsForModuleWithConfig(cfg, "Integration", module)
+func GoTestIntegrationArgsForModule(cfg *EnvConfig, module string) GoTestArgs {
+	args := makeGoTestArgsForModule(cfg, "Integration", module)
 	args.Tags = append(args.Tags, "integration")
 	return args
 }
 
 // DefaultTestBinaryArgs returns the default arguments for building
 // a binary for testing.
-func DefaultTestBinaryArgs() TestBinaryArgs {
-	cfg := MustGetConfig()
-	return DefaultTestBinaryArgsWithConfig(cfg)
-}
-
-// DefaultTestBinaryArgsWithConfig returns the default arguments for building
-// a binary for testing, using the provided config.
-func DefaultTestBinaryArgsWithConfig(cfg *EnvConfig) TestBinaryArgs {
+func DefaultTestBinaryArgs(cfg *EnvConfig) TestBinaryArgs {
 	return TestBinaryArgs{
 		Name: cfg.Beat.Name,
 	}
@@ -159,6 +122,7 @@ func DefaultTestBinaryArgsWithConfig(cfg *EnvConfig) TestBinaryArgs {
 // Use RACE_DETECTOR=true to enable the race detector.
 // Use MODULE=module to run only tests for `module`.
 func GoTestIntegrationForModule(ctx context.Context) error {
+	cfg := ConfigFromContext(ctx)
 	module := EnvOr("MODULE", "")
 	modulesDirEntry, err := os.ReadDir("./module")
 	if err != nil {
@@ -179,12 +143,12 @@ func GoTestIntegrationForModule(ctx context.Context) error {
 		// Set MODULE because only want that modules tests to run inside the testing environment.
 		env := map[string]string{"MODULE": fi.Name()}
 		passThroughEnvs(env, IntegrationTestEnvVars()...)
-		runners, err := NewIntegrationRunners(path.Join("./module", fi.Name()), env)
+		runners, err := NewIntegrationRunners(cfg, path.Join("./module", fi.Name()), env)
 		if err != nil {
 			return fmt.Errorf("test setup failed for module %s: %w", fi.Name(), err)
 		}
 		err = runners.Test("goIntegTest", func() error {
-			err := GoTest(ctx, GoTestIntegrationArgsForModule(fi.Name()))
+			err := GoTest(ctx, GoTestIntegrationArgsForModule(cfg, fi.Name()))
 			if err != nil {
 				return err
 			}
@@ -403,22 +367,14 @@ func makeCommand(ctx context.Context, env map[string]string, cmd string, args ..
 }
 
 // BuildSystemTestBinary runs BuildSystemTestGoBinary with default values.
-func BuildSystemTestBinary() error {
-	return BuildSystemTestGoBinary(DefaultTestBinaryArgs())
+func BuildSystemTestBinary(cfg *EnvConfig) error {
+	return BuildSystemTestGoBinary(cfg, DefaultTestBinaryArgs(cfg))
 }
 
-// BuildSystemTestGoBinary build a binary for testing that is instrumented for
+// BuildSystemTestGoBinary builds a binary for testing that is instrumented for
 // testing and measuring code coverage. The binary is only instrumented for
 // coverage when TEST_COVERAGE=true (default is false).
-func BuildSystemTestGoBinary(binArgs TestBinaryArgs) error {
-	cfg := MustGetConfig()
-	return BuildSystemTestGoBinaryWithConfig(cfg, binArgs)
-}
-
-// BuildSystemTestGoBinaryWithConfig builds a binary for testing that is instrumented for
-// testing and measuring code coverage. The binary is only instrumented for
-// coverage when TEST_COVERAGE=true (default is false).
-func BuildSystemTestGoBinaryWithConfig(cfg *EnvConfig, binArgs TestBinaryArgs) error {
+func BuildSystemTestGoBinary(cfg *EnvConfig, binArgs TestBinaryArgs) error {
 	args := []string{
 		"test", "-c",
 		"-o", binArgs.Name + ".test",

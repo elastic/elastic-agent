@@ -75,12 +75,6 @@ func (b BuildArgs) ParseBuildTags() []string {
 	return flags
 }
 
-// DefaultBuildArgs returns the default BuildArgs for use in builds.
-func DefaultBuildArgs() BuildArgs {
-	cfg := MustGetConfig()
-	return DefaultBuildArgsWithConfig(cfg)
-}
-
 // DefaultBuildArgsWithConfig returns the default BuildArgs for use in builds.
 func DefaultBuildArgsWithConfig(cfg *EnvConfig) BuildArgs {
 	args := BuildArgs{
@@ -126,15 +120,10 @@ func DefaultBuildArgsWithConfig(cfg *EnvConfig) BuildArgs {
 	return args
 }
 
-// positionIndependentCodeSupported checks if the target platform support position independent code (or ASLR).
+// positionIndependentCodeSupportedWithConfig checks if the target platform support position independent code (or ASLR).
 //
 // The list of supported platforms is compiled based on the Go release notes: https://golang.org/doc/devel/release.html
 // The list has been updated according to the Go version: 1.16
-func positionIndependentCodeSupported() bool {
-	cfg := MustGetConfig()
-	return positionIndependentCodeSupportedWithConfig(cfg)
-}
-
 func positionIndependentCodeSupportedWithConfig(cfg *EnvConfig) bool {
 	platform := cfg.Platform()
 	return oneOf(platform.GOOS, "darwin") ||
@@ -156,13 +145,6 @@ func oneOf(value string, lst ...string) bool {
 	return false
 }
 
-// DefaultGolangCrossBuildArgs returns the default BuildArgs for use in
-// cross-builds.
-func DefaultGolangCrossBuildArgs() BuildArgs {
-	cfg := MustGetConfig()
-	return DefaultGolangCrossBuildArgsWithConfig(cfg)
-}
-
 // DefaultGolangCrossBuildArgsWithConfig returns the default BuildArgs for use in
 // cross-builds.
 func DefaultGolangCrossBuildArgsWithConfig(cfg *EnvConfig) BuildArgs {
@@ -182,10 +164,9 @@ func DefaultGolangCrossBuildArgsWithConfig(cfg *EnvConfig) BuildArgs {
 	return args
 }
 
-// GolangCrossBuild invokes "go build" inside of the golang-crossbuild Docker
+// GolangCrossBuildWithConfig invokes "go build" inside of the golang-crossbuild Docker
 // environment.
-func GolangCrossBuild(params BuildArgs) error {
-	cfg := MustGetConfig()
+func GolangCrossBuildWithConfig(cfg *EnvConfig, params BuildArgs) error {
 	if os.Getenv("GOLANG_CROSSBUILD") != "1" {
 		return errors.New("Use the crossBuild target. golangCrossBuild can " +
 			"only be executed within the golang-crossbuild docker environment")
@@ -202,12 +183,11 @@ func GolangCrossBuild(params BuildArgs) error {
 		return err
 	}
 
-	return Build(params)
+	return BuildWithConfig(cfg, params)
 }
 
-// Build invokes "go build" to produce a binary.
-func Build(params BuildArgs) error {
-	cfg := MustGetConfig()
+// BuildWithConfig invokes "go build" to produce a binary.
+func BuildWithConfig(cfg *EnvConfig, params BuildArgs) error {
 	fmt.Println(">> build: Building", params.Name)
 
 	binaryName := params.Name + binaryExtension(cfg.Build.GOOS)
@@ -252,7 +232,7 @@ func Build(params BuildArgs) error {
 	}
 	if len(ldflags) > 0 {
 		args = append(args, "-ldflags")
-		args = append(args, MustExpand(strings.Join(ldflags, " ")))
+		args = append(args, MustExpand(cfg, strings.Join(ldflags, " ")))
 	}
 
 	if len(params.InputFiles) > 0 {
@@ -261,7 +241,7 @@ func Build(params BuildArgs) error {
 
 	if cfg.Build.GOOS == "windows" && params.WinMetadata {
 		log.Println("Generating a .syso containing Windows file metadata.")
-		syso, err := MakeWindowsSysoFile()
+		syso, err := MakeWindowsSysoFileWithConfig(cfg)
 		if err != nil {
 			return fmt.Errorf("failed generating Windows .syso metadata file: %w", err)
 		}
@@ -315,19 +295,18 @@ func Run(env map[string]string, stdout, stderr io.Writer, cmd string, workingDir
 	return err
 }
 
-// MakeWindowsSysoFile generates a .syso file containing metadata about the
+// MakeWindowsSysoFileWithConfig generates a .syso file containing metadata about the
 // executable file like vendor, version, copyright. The linker automatically
 // discovers the .syso file and incorporates it into the Windows exe. This
 // allows users to view metadata about the exe in the Details tab of the file
 // properties viewer.
-func MakeWindowsSysoFile() (string, error) {
-	cfg := MustGetConfig()
-	version, err := BeatQualifiedVersion()
+func MakeWindowsSysoFileWithConfig(cfg *EnvConfig) (string, error) {
+	version, err := BeatQualifiedVersion(cfg)
 	if err != nil {
 		return "", err
 	}
 
-	commit, err := CommitHash()
+	commit, err := cfg.Build.CommitHash()
 	if err != nil {
 		return "", err
 	}

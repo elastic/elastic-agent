@@ -25,6 +25,12 @@ func init() {
 
 // IntegrationTester integration tester
 type IntegrationTester struct {
+	cfg *mage.EnvConfig
+}
+
+// SetConfig sets the configuration for the tester.
+func (d *IntegrationTester) SetConfig(cfg *mage.EnvConfig) {
+	d.cfg = cfg
 }
 
 // Name returns kubernetes name.
@@ -119,7 +125,7 @@ func (d *IntegrationTester) Test(dir string, mageTarget string, env map[string]s
 
 	destDir := filepath.Join("/go/src", repo.CanonicalRootImportPath)
 	workDir := filepath.Join(destDir, repo.SubDir)
-	remote, err := NewKubeRemote(kubeConfig, "default", kubernetesClusterName(), workDir, destDir, repo.RootDir)
+	remote, err := NewKubeRemote(kubeConfig, "default", kubernetesClusterName(d.cfg), workDir, destDir, repo.RootDir)
 	if err != nil {
 		return err
 	}
@@ -160,20 +166,20 @@ func waitKubeStateMetricsReadiness(env map[string]string, stdOut, stdErr io.Writ
 }
 
 // kubernetesClusterName generates a name for the Kubernetes cluster.
-func kubernetesClusterName() string {
-	commit, err := mage.CommitHash()
+func kubernetesClusterName(cfg *mage.EnvConfig) string {
+	commit, err := cfg.Build.CommitHash()
 	if err != nil {
 		panic(fmt.Errorf("failed to construct kind cluster name: %w", err))
 	}
 
-	version, err := mage.BeatQualifiedVersion()
+	version, err := mage.BeatQualifiedVersion(cfg)
 	if err != nil {
 		panic(fmt.Errorf("failed to construct kind cluster name: %w", err))
 	}
 	version = strings.NewReplacer(".", "-").Replace(version)
 
 	clusterName := "{{.BeatName}}-{{.Version}}-{{.ShortCommit}}-{{.StackEnvironment}}"
-	clusterName = mage.MustExpand(clusterName, map[string]interface{}{
+	clusterName = mage.MustExpand(cfg, clusterName, map[string]interface{}{
 		"StackEnvironment": mage.StackEnvironment,
 		"ShortCommit":      commit[:10],
 		"Version":          version,

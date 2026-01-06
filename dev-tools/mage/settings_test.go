@@ -12,39 +12,44 @@ import (
 )
 
 func TestGetVersion(t *testing.T) {
-	bp, err := BeatQualifiedVersion()
+	cfg, err := LoadConfig()
+	require.NoError(t, err)
+	bp, err := BeatQualifiedVersion(cfg)
 	assert.NoError(t, err)
 	_ = bp
 }
 
 func TestAgentPackageVersion(t *testing.T) {
 	t.Run("agent package version without env var", func(t *testing.T) {
-		ResetConfigForTest()
-		expectedPkgVersion, err := BeatQualifiedVersion()
+		cfg, err := LoadConfig()
 		require.NoError(t, err)
-		actualPkgVersion, err := AgentPackageVersion()
+		expectedPkgVersion, err := BeatQualifiedVersion(cfg)
+		require.NoError(t, err)
+		actualPkgVersion, err := AgentPackageVersion(cfg)
 		require.NoError(t, err)
 		assert.Equal(t, expectedPkgVersion, actualPkgVersion)
 	})
 
 	t.Run("agent package version env var set", func(t *testing.T) {
-		ResetConfigForTest()
+		cfg, err := LoadConfig()
+		require.NoError(t, err)
 		expectedPkgVersion := "1.2.3-specialrelease+abcdef"
-		t.Setenv(agentPackageVersionEnvVar, expectedPkgVersion)
-		actualPkgVersion, err := AgentPackageVersion()
+		cfg.Packaging.AgentPackageVersion = expectedPkgVersion
+		actualPkgVersion, err := AgentPackageVersion(cfg)
 		require.NoError(t, err)
 		assert.Equal(t, expectedPkgVersion, actualPkgVersion)
 	})
 
 	t.Run("agent package version function must be mapped", func(t *testing.T) {
-		ResetConfigForTest()
-		t.Setenv(agentPackageVersionEnvVar, "1.2.3-specialrelease+abcdef")
-		funcMap := FuncMap()
+		cfg, err := LoadConfig()
+		require.NoError(t, err)
+		cfg.Packaging.AgentPackageVersion = "1.2.3-specialrelease+abcdef"
+		funcMap := FuncMap(cfg)
 		assert.Contains(t, funcMap, agentPackageVersionMappedFunc)
 		require.IsType(t, funcMap[agentPackageVersionMappedFunc], func() (string, error) { return "", nil })
 		mappedFuncPkgVersion, err := funcMap[agentPackageVersionMappedFunc].(func() (string, error))()
 		require.NoError(t, err)
-		expectedPkgVersion, err := AgentPackageVersion()
+		expectedPkgVersion, err := AgentPackageVersion(cfg)
 		require.NoError(t, err)
 		assert.Equal(t, expectedPkgVersion, mappedFuncPkgVersion)
 	})

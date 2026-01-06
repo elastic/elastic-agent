@@ -26,6 +26,6 @@ func init() {
 // Use TEST_COVERAGE=true to enable code coverage profiling.
 // Use RACE_DETECTOR=true to enable the race detector.
 func GoUnitTest(ctx context.Context) error {
-	cfg := devtools.MustGetConfig()
-	return devtools.GoTest(ctx, devtools.DefaultGoTestUnitArgsWithConfig(cfg))
+	cfg := devtools.ConfigFromContext(ctx)
+	return devtools.GoTest(ctx, devtools.DefaultGoTestUnitArgs(cfg))
 }

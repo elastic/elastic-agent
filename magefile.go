@@ -254,9 +254,10 @@ func (Build) GenerateConfig() error {
 // windowsArchiveRootBinaryForGoArch compiles a binary to be placed at the root of the windows elastic-agent archive. This binary
 // is a thin proxy to the actual elastic-agent binary that resides in the data/elastic-agent-{commit-short-sha}
 // directory of the archive.
-func (Build) windowsArchiveRootBinaryForGoArch(cfg *devtools.EnvConfig, goarch string) error {
+func (Build) windowsArchiveRootBinaryForGoArch(ctx context.Context, goarch string) error {
 	fmt.Printf("--- Compiling root binary for %s windows archive\n", goarch)
-	hashShort, err := devtools.CommitHashShort()
+	cfg := devtools.ConfigFromContext(ctx)
+	hashShort, err := cfg.Build.CommitHashShort()
 	if err != nil {
 		return fmt.Errorf("error getting commit hash: %w", err)
 	}
@@ -297,7 +298,7 @@ func (Build) windowsArchiveRootBinaryForGoArch(cfg *devtools.EnvConfig, goarch s
 		args.CGO = true
 	}
 
-	return devtools.Build(args)
+	return devtools.BuildWithConfig(cfg, args)
 }
 
 // WindowsArchiveRootBinary compiles a binary to be placed at the root of the windows elastic-agent archive. This binary
@@ -307,21 +308,21 @@ func (Build) WindowsArchiveRootBinary(ctx context.Context) {
 	cfg := devtools.ConfigFromContext(ctx)
 	for _, p := range cfg.GetPlatforms() {
 		if p.GOOS() == "windows" {
-			mg.Deps(mg.F(Build.windowsArchiveRootBinaryForGoArch, cfg, p.GOARCH()))
+			mg.CtxDeps(ctx, mg.F(Build.windowsArchiveRootBinaryForGoArch, p.GOARCH()))
 		}
 	}
 }
 
 // GolangCrossBuild build the Beat binary inside of the golang-builder.
 // Do not use directly, use crossBuild instead.
-func GolangCrossBuild() error {
-	cfg := devtools.MustGetConfig()
-	params := devtools.DefaultGolangCrossBuildArgs()
+func GolangCrossBuild(ctx context.Context) error {
+	cfg := devtools.ConfigFromContext(ctx)
+	params := devtools.DefaultGolangCrossBuildArgsWithConfig(cfg)
 	params.OutputDir = "build/golang-crossbuild"
 	params.Package = "github.com/elastic/elastic-agent"
 	injectBuildVars(cfg, params.Vars)
 
-	if err := devtools.GolangCrossBuild(params); err != nil {
+	if err := devtools.GolangCrossBuildWithConfig(cfg, params); err != nil {
 		return err
 	}
 
@@ -329,15 +330,15 @@ func GolangCrossBuild() error {
 }
 
 // Binary build the fleet artifact.
-func (Build) Binary() error {
+func (Build) Binary(ctx context.Context) error {
 	mg.Deps(Prepare.Env)
 
-	cfg := devtools.MustGetConfig()
-	buildArgs := devtools.DefaultBuildArgs()
+	cfg := devtools.ConfigFromContext(ctx)
+	buildArgs := devtools.DefaultBuildArgsWithConfig(cfg)
 	buildArgs.OutputDir = buildDir
 	injectBuildVars(cfg, buildArgs.Vars)
 
-	return devtools.Build(buildArgs)
+	return devtools.BuildWithConfig(cfg, buildArgs)
 }
 
 // Clean up dev environment.
@@ -528,14 +529,16 @@ func (Test) All() {
 // Unit runs all the unit tests.
 func (Test) Unit(ctx context.Context) error {
 	mg.Deps(Prepare.Env, Build.TestBinaries)
-	params := devtools.DefaultGoTestUnitArgs()
+	cfg := devtools.ConfigFromContext(ctx)
+	params := devtools.DefaultGoTestUnitArgs(cfg)
 	return devtools.GoTest(ctx, params)
 }
 
 // FIPSOnlyUnit runs all the unit tests with GODEBUG=fips140=only.
 func (Test) FIPSOnlyUnit(ctx context.Context) error {
 	mg.Deps(Prepare.Env, Build.TestBinaries)
-	params := devtools.DefaultGoTestUnitArgs()
+	cfg := devtools.ConfigFromContext(ctx)
+	params := devtools.DefaultGoTestUnitArgs(cfg)
 	params.Env["GODEBUG"] = "fips140=only"
 	return devtools.GoTest(ctx, params)
 }
@@ -768,9 +771,10 @@ func FixDRADockerArtifacts() error {
 }
 
 // TestPackages tests the generated packages (i.e. file modes, owners, groups).
-func TestPackages() error {
+func TestPackages(ctx context.Context) error {
+	cfg := devtools.ConfigFromContext(ctx)
 	fmt.Println("--- TestPackages, the generated packages (i.e. file modes, owners, groups).")
-	return devtools.TestPackages()
+	return devtools.TestPackages(cfg)
 }
 
 // RunGo runs go command and output the feedback to the stdout and the stderr.
@@ -808,9 +812,10 @@ func EnsureCrossBuildOutputDir() error {
 }
 
 // CrossBuild cross-builds the beat for all target platforms.
-func CrossBuild() error {
+func CrossBuild(ctx context.Context) error {
 	mg.Deps(EnsureCrossBuildOutputDir)
-	return devtools.CrossBuild()
+	cfg := devtools.ConfigFromContext(ctx)
+	return devtools.CrossBuild(cfg)
 }
 
 // PackageAgentCore cross-builds and packages distribution artifacts containing
@@ -834,12 +839,13 @@ func PackageAgentCore(ctx context.Context) error {
 	devtools.UseElasticAgentCorePackaging()
 
 	// ran directly as we don't want mage to cache that it already called devtools.Package
-	return devtools.PackageWithContext(ctx)
+	return devtools.Package(devtools.ConfigFromContext(ctx))
 }
 
 // Config generates both the short/reference/docker.
-func Config() {
-	mg.Deps(configYML)
+func Config(ctx context.Context) error {
+	cfg := devtools.ConfigFromContext(ctx)
+	return devtools.Config(cfg, devtools.AllConfigTypes, ConfigFileParams(), ".")
 }
 
 // ControlProto generates pkg/agent/control/proto module.
@@ -872,10 +878,6 @@ func BuildPGP() error {
 
 	fmt.Printf(">> BuildPGP from %s to %s\n", in, out)
 	return RunGo("run", goF, "--in", in, "--output", out)
-}
-
-func configYML() error {
-	return devtools.Config(devtools.AllConfigTypes, ConfigFileParams(), ".")
 }
 
 // ConfigFileParams returns the parameters for generating OSS config.
@@ -961,7 +963,7 @@ func (Cloud) Image(ctx context.Context) {
 // DOCKER_IMPORT_SOURCE - override source for import
 func (Cloud) Load(ctx context.Context) error {
 	cfg := devtools.ConfigFromContext(ctx)
-	agentVersion, err := mage.AgentPackageVersion()
+	agentVersion, err := devtools.AgentPackageVersion(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to get agent package version: %w", err)
 	}
@@ -981,7 +983,7 @@ func (Cloud) Load(ctx context.Context) error {
 // Previous login to elastic registry is required!
 func (Cloud) Push(ctx context.Context) error {
 	cfg := devtools.ConfigFromContext(ctx)
-	agentVersion, err := mage.AgentPackageVersion()
+	agentVersion, err := devtools.AgentPackageVersion(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to get agent package version: %w", err)
 	}
@@ -994,7 +996,7 @@ func (Cloud) Push(ctx context.Context) error {
 	if cfg.Docker.CustomImageTag != "" {
 		targetTag = cfg.Docker.CustomImageTag
 	} else {
-		targetTag = fmt.Sprintf("%s-%s-%d", agentVersion, dockerCommitHash(), time.Now().Unix())
+		targetTag = fmt.Sprintf("%s-%s-%d", agentVersion, dockerCommitHash(cfg), time.Now().Unix())
 	}
 	var targetCloudImageName string
 	if cfg.Docker.CIElasticAgentDockerImage != "" {
@@ -1033,12 +1035,16 @@ func (Devmachine) Create(instanceName string) error {
 	return devmachine.Run(instanceName)
 }
 
-func Clean() {
-	mg.Deps(devtools.Clean, Build.Clean)
+func Clean(ctx context.Context) error {
+	if err := (Build{}).Clean(); err != nil {
+		return err
+	}
+	cfg := devtools.ConfigFromContext(ctx)
+	return devtools.Clean(cfg)
 }
 
-func dockerCommitHash() string {
-	commit, err := devtools.CommitHash()
+func dockerCommitHash(cfg *devtools.EnvConfig) string {
+	commit, err := cfg.Build.CommitHash()
 	if err == nil && len(commit) > commitLen {
 		return commit[:commitLen]
 	}
@@ -1053,7 +1059,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 
 	supportedEnvs := map[string]int{"FLEET_ENROLLMENT_TOKEN": 0, "FLEET_ENROLL": 0, "FLEET_SETUP": 0, "FLEET_TOKEN_NAME": 0, "KIBANA_HOST": 0, "KIBANA_PASSWORD": 0, "KIBANA_USERNAME": 0}
 
-	tag := dockerTag()
+	tag := dockerTag(cfg)
 	dockerImageOut, err := sh.Output("docker", "image", "ls")
 	if err != nil {
 		return err
@@ -1119,14 +1125,14 @@ func packageAgent(ctx context.Context, dependenciesVersion string, manifestRespo
 
 	if dependenciesVersion == "" {
 		// Get beat version - first check BEAT_VERSION env var, then fall back to default
-		beatVersion, _ := mage.BeatQualifiedVersion()
+		beatVersion, _ := devtools.BeatQualifiedVersion(cfg)
 		if beatVersion == "" {
 			dependenciesVersion = bversion.GetDefaultVersion()
 		} else {
 			dependenciesVersion = beatVersion
 		}
 		// add the snapshot suffix if needed
-		dependenciesVersion += devtools.MaybeSnapshotSuffix()
+		dependenciesVersion += devtools.MaybeSnapshotSuffix(cfg)
 	}
 	log.Printf("Packaging with dependenciesVersion: %s", dependenciesVersion)
 
@@ -1173,7 +1179,7 @@ func packageAgent(ctx context.Context, dependenciesVersion string, manifestRespo
 	}
 
 	// build package and test
-	if err := devtools.PackageWithContext(ctx); err != nil {
+	if err := devtools.Package(devtools.ConfigFromContext(ctx)); err != nil {
 		return err
 	}
 	return nil
@@ -1876,10 +1882,10 @@ func dockerBuild(tag string) error {
 	return sh.Run("docker", "build", "-t", tag, ".")
 }
 
-func dockerTag() string {
+func dockerTag(cfg *devtools.EnvConfig) string {
 	tagBase := "elastic-agent"
 
-	commit := dockerCommitHash()
+	commit := dockerCommitHash(cfg)
 	if len(commit) > 0 {
 		return fmt.Sprintf("%s-%s", tagBase, commit)
 	}
@@ -1947,25 +1953,26 @@ type checksumFile struct {
 // binaries having already been built.
 //
 // Use SNAPSHOT=true to build snapshots.
-func Ironbank() error {
+func Ironbank(ctx context.Context) error {
 	fmt.Println("--- Package Ironbank distribution")
 	if runtime.GOARCH != "amd64" {
 		fmt.Printf(">> IronBank images are only supported for amd64 arch (%s is not supported)\n", runtime.GOARCH)
 		return nil
 	}
-	if err := prepareIronbankBuild(); err != nil {
+	cfg := devtools.ConfigFromContext(ctx)
+	if err := prepareIronbankBuild(cfg); err != nil {
 		return fmt.Errorf("failed to prepare the IronBank context: %w", err)
 	}
-	if err := saveIronbank(); err != nil {
+	if err := saveIronbank(cfg); err != nil {
 		return fmt.Errorf("failed to save artifacts for IronBank: %w", err)
 	}
 	return nil
 }
 
-func saveIronbank() error {
+func saveIronbank(cfg *devtools.EnvConfig) error {
 	fmt.Println(">> saveIronbank: save the IronBank container context.")
 
-	ironbank := getIronbankContextName()
+	ironbank := getIronbankContextName(cfg)
 	buildDir := filepath.Join("build", ironbank)
 	if _, err := os.Stat(buildDir); os.IsNotExist(err) {
 		return fmt.Errorf("cannot find the folder with the ironbank context: %+v", err)
@@ -2001,23 +2008,23 @@ func saveIronbank() error {
 	return nil
 }
 
-func getIronbankContextName() string {
-	ver, _ := devtools.BeatQualifiedVersion()
+func getIronbankContextName(cfg *devtools.EnvConfig) string {
+	ver, _ := devtools.BeatQualifiedVersion(cfg)
 	defaultBinaryName := "{{.Name}}-ironbank-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}"
-	outputDir, _ := devtools.Expand(defaultBinaryName+"-docker-build-context", map[string]interface{}{
+	outputDir, _ := devtools.Expand(cfg, defaultBinaryName+"-docker-build-context", map[string]interface{}{
 		"Name":    "elastic-agent",
 		"Version": ver,
 	})
 	return outputDir
 }
 
-func prepareIronbankBuild() error {
+func prepareIronbankBuild(cfg *devtools.EnvConfig) error {
 	fmt.Println(">> prepareIronbankBuild: prepare the IronBank container context.")
-	buildDir := filepath.Join("build", getIronbankContextName())
+	buildDir := filepath.Join("build", getIronbankContextName(cfg))
 	templatesDir := filepath.Join("dev-tools", "packaging", "templates", "ironbank")
 
 	data := map[string]interface{}{
-		"MajorMinor": majorMinor(),
+		"MajorMinor": majorMinor(cfg),
 	}
 
 	err := filepath.WalkDir(templatesDir, func(path string, d fs.DirEntry, _ error) error {
@@ -2027,7 +2034,7 @@ func prepareIronbankBuild() error {
 				".tmpl",
 			)
 
-			err := devtools.ExpandFile(path, target, data)
+			err := devtools.ExpandFile(cfg, path, target, data)
 			if err != nil {
 				return fmt.Errorf("expanding template '%s' to '%s': %w", path, target, err)
 			}
@@ -2046,8 +2053,8 @@ func prepareIronbankBuild() error {
 	return nil
 }
 
-func majorMinor() string {
-	if v, _ := devtools.BeatQualifiedVersion(); v != "" {
+func majorMinor(cfg *devtools.EnvConfig) string {
+	if v, _ := devtools.BeatQualifiedVersion(cfg); v != "" {
 		parts := strings.SplitN(v, ".", 3)
 		return parts[0] + "." + parts[1]
 	}
@@ -2055,7 +2062,7 @@ func majorMinor() string {
 }
 
 // Clean cleans up the integration testing leftovers
-func (Integration) Clean() error {
+func (Integration) Clean(ctx context.Context) error {
 	fmt.Println("--- Clean mage artifacts")
 	_ = os.RemoveAll(".agent-testing")
 
@@ -2066,7 +2073,7 @@ func (Integration) Clean() error {
 	_, err := os.Stat(".integration-cache")
 	if err == nil {
 		// .integration-cache exists; need to run `Clean` from the runner
-		cfg := devtools.MustGetConfig()
+		cfg := devtools.ConfigFromContext(ctx)
 		r, err := createTestRunner(cfg, false, "", "")
 		if err != nil {
 			return fmt.Errorf("error creating test runner: %w", err)
@@ -2108,7 +2115,7 @@ func (Integration) Local(ctx context.Context, testName string) error {
 	_ = os.RemoveAll(".agent-testing/local")
 
 	// run the integration tests but only run test that can run locally
-	params := devtools.DefaultGoTestIntegrationArgs()
+	params := devtools.DefaultGoTestIntegrationArgs(cfg)
 	params.Tags = append(params.Tags, "local")
 	params.Packages = []string{
 		"github.com/elastic/elastic-agent/testing/integration/...",
@@ -3450,11 +3457,11 @@ func hasCleanOnExit(cfg *devtools.EnvConfig) bool {
 
 // GolangCrossBuild builds the elastic-otel-collector binary in the golang-crossbuild container.
 // Don't call directly; called from otel:crossBuild.
-func (Otel) GolangCrossBuild() error {
+func (Otel) GolangCrossBuild(ctx context.Context) error {
 	mg.Deps(EnsureCrossBuildOutputDir)
 
-	cfg := mage.MustGetConfig()
-	params := devtools.DefaultGolangCrossBuildArgs()
+	cfg := devtools.ConfigFromContext(ctx)
+	params := devtools.DefaultGolangCrossBuildArgsWithConfig(cfg)
 	params.Name = "elastic-otel-collector-" + cfg.Build.GOOS + "-" + cfg.Platform().Arch
 	params.OutputDir = "build/golang-crossbuild"
 	params.WorkDir = "internal/edot"
@@ -3463,7 +3470,7 @@ func (Otel) GolangCrossBuild() error {
 	injectBuildVars(cfg, params.Vars)
 
 	// embedded packetbeat is only included in a non-FIPS build
-	if !mage.FIPSBuild() {
+	if !cfg.Build.FIPSBuild {
 		// requires the NPCAP installer on Windows
 		// ending '/' is required or the installer will not be copied to the correct location
 		if err := xpacketbeat.CopyNPCAPInstaller("beats/x-pack/packetbeat/npcap/installer/"); err != nil {
@@ -3495,41 +3502,44 @@ func (Otel) GolangCrossBuild() error {
 		}
 	}
 
-	if err := devtools.GolangCrossBuild(params); err != nil {
+	if err := devtools.GolangCrossBuildWithConfig(cfg, params); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// npcapImageSelector is similar to xpacketbeat.ImageSelector, using a single variable to enable it. Sadly
+// npcapImageSelectorWithConfig is similar to xpacketbeat.ImageSelector, using a single variable to enable it. Sadly
 // xpacketbeat.ImageSelector cannot be used directly because it will use its own devtools that comes from the beats
 // repository and will duplicate global state that is not correct for the elastic-agent.
-func npcapImageSelector(platform string) (string, error) {
-	cfg := devtools.MustGetConfig()
-	image, err := devtools.CrossBuildImage(platform)
-	if err != nil {
-		return "", err
-	}
-	if !cfg.Docker.WindowsNpcap {
+func npcapImageSelectorWithConfig(windowsNpcap bool) devtools.ImageSelectorFunc {
+	return func(cfg *devtools.EnvConfig, platform string) (string, error) {
+		image, err := devtools.CrossBuildImage(cfg, platform)
+		if err != nil {
+			return "", err
+		}
+		if !windowsNpcap {
+			return image, nil
+		}
+		if platform == "windows/amd64" {
+			image = strings.ReplaceAll(image, "beats-dev", "observability-ci") // Temporarily work around naming of npcap image.
+			image = strings.ReplaceAll(image, "main", "npcap-"+xpacketbeat.NpcapVersion+"-debian11")
+		}
 		return image, nil
 	}
-	if platform == "windows/amd64" {
-		image = strings.ReplaceAll(image, "beats-dev", "observability-ci") // Temporarily work around naming of npcap image.
-		image = strings.ReplaceAll(image, "main", "npcap-"+xpacketbeat.NpcapVersion+"-debian11")
-	}
-	return image, nil
 }
 
 // CrossBuild builds the elastic-otel-collector binary in the golang-crossbuild container.
-func (Otel) CrossBuild() error {
+func (Otel) CrossBuild(ctx context.Context) error {
 	mg.Deps(EnsureCrossBuildOutputDir)
+
+	cfg := devtools.ConfigFromContext(ctx)
 
 	// Download modules from internal/edot before crossbuilding.
 	// The crossbuild process mounts the host's module cache read-only into the container,
 	// so all dependencies must be downloaded before the build starts.
 	// internal/edot has its own go.mod with different dependencies than the main module.
-	if mage.CrossBuildMountModcache() {
+	if cfg.CrossBuild.MountModcache {
 		fmt.Println(">> Downloading modules for internal/edot")
 		if err := sh.Run("go", "-C", "internal/edot", "mod", "download"); err != nil {
 			return fmt.Errorf("failed to download modules for internal/edot: %w", err)
@@ -3539,14 +3549,14 @@ func (Otel) CrossBuild() error {
 	opts := []devtools.CrossBuildOption{devtools.WithName("elastic-otel-collector"), devtools.WithTarget("otel:golangCrossBuild")}
 
 	// embedded packetbeat is only included in a non-FIPS build
-	if !mage.FIPSBuild() {
+	if !cfg.Build.FIPSBuild {
 		// download the NPCAP installer
 		mg.SerialDeps(xpacketbeat.GetNpcapInstallerFn(filepath.Join("beats", "x-pack", "packetbeat")))
 		// use the npcap build image for windows
-		opts = append(opts, devtools.ImageSelector(npcapImageSelector))
+		opts = append(opts, devtools.ImageSelector(npcapImageSelectorWithConfig(cfg.Docker.WindowsNpcap)))
 	}
 
-	return devtools.CrossBuild(opts...)
+	return devtools.CrossBuild(cfg, opts...)
 }
 
 func (Otel) Readme() error {
@@ -3711,9 +3721,10 @@ func (Otel) OsquerybeatCrossBuildExt() error {
 	return nil
 }
 
-func (Otel) Prepare() {
+func (Otel) Prepare(ctx context.Context) {
+	cfg := devtools.ConfigFromContext(ctx)
 	deps := []interface{}{Otel.MetricbeatPrepareLightModules}
-	if !mage.FIPSBuild() {
+	if !cfg.Build.FIPSBuild {
 		// fips build doesn't embed osquerybeat
 		deps = append(deps, Otel.OsquerybeatFetchOsqueryDistros, Otel.OsquerybeatCrossBuildExt)
 	}
@@ -4104,11 +4115,11 @@ func (h Helm) UpdateDependencies() error {
 }
 
 // Package packages the Elastic-Agent Helm chart. Note that you need to set SNAPSHOT="false" to build a production-ready package.
-func (h Helm) Package() error {
+func (h Helm) Package(ctx context.Context) error {
 	fmt.Println("--- Package Helm chart distribution")
 	mg.SerialDeps(h.BuildDependencies)
 
-	cfg := devtools.MustGetConfig()
+	cfg := devtools.ConfigFromContext(ctx)
 	// need to explicitly set SNAPSHOT="false" to produce a production-ready package
 	productionPackage := cfg.Build.SnapshotSet && !cfg.Build.Snapshot
 
