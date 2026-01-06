@@ -5,6 +5,7 @@
 package mage
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,13 +27,16 @@ var (
 
 // Format adds license headers, formats .go files with goimports, and formats
 // .py files with autopep8.
-func Format() {
+func Format(ctx context.Context) error {
+	cfg := ConfigFromContext(ctx)
 	// Don't run AddLicenseHeaders and GoImports concurrently because they
 	// both can modify the same files.
 	if BeatProjectType != CommunityProject {
-		mg.Deps(AddLicenseHeaders)
+		if err := AddLicenseHeaders(cfg); err != nil {
+			return err
+		}
 	}
-	mg.Deps(GoImports)
+	return GoImports()
 }
 
 // GoImports executes goimports against all .go files in and below the CWD.
@@ -64,8 +68,7 @@ func GoImports() error {
 
 // AddLicenseHeaders adds license headers to .go files. It applies the
 // appropriate license header based on the value of devtools.BeatLicense.
-func AddLicenseHeaders() error {
-	cfg := MustGetConfig()
+func AddLicenseHeaders(cfg *EnvConfig) error {
 	if os.Getenv("CHECK_HEADERS_DISABLED") != "" {
 		return nil
 	}

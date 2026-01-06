@@ -12,20 +12,29 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
+
+	"github.com/magefile/mage/sh"
+)
+
+const (
+	DefaultName        = "elastic-agent"
+	DefaultDescription = "Elastic Agent - single, unified way to add monitoring for logs, metrics, and other types of data to a host."
+	DefaultLicense     = "Elastic License 2.0"
+	DefaultVendor      = "Elastic"
+	DefaultUser        = "root"
 )
 
 // configContextKey is the key used to store EnvConfig in context.
 type configContextKey struct{}
 
 // ConfigFromContext returns the EnvConfig from the context if present,
-// otherwise loads it from environment variables. This is the preferred
+// otherwise loads a fresh config from environment variables. This is the preferred
 // way to get configuration in mage targets that receive a context.
 func ConfigFromContext(ctx context.Context) *EnvConfig {
 	if cfg, ok := ctx.Value(configContextKey{}).(*EnvConfig); ok && cfg != nil {
 		return cfg
 	}
-	return MustGetConfig()
+	return MustLoadConfig()
 }
 
 // ContextWithConfig returns a new context with the given EnvConfig stored in it.
@@ -35,7 +44,8 @@ func ContextWithConfig(ctx context.Context, cfg *EnvConfig) context.Context {
 }
 
 // EnvConfig holds all configuration read from environment variables.
-// Use GetConfig() to access the singleton instance after initialization.
+// Use LoadConfig() or MustLoadConfig() to create a new instance, or
+// ConfigFromContext() to get config from a context.
 type EnvConfig struct {
 	// Build configuration
 	Build BuildConfig
@@ -269,6 +279,35 @@ type BuildConfig struct {
 
 	// AgentCommitHashOverride overrides the commit hash for packaging (from AGENT_COMMIT_HASH_OVERRIDE or set programmatically)
 	AgentCommitHashOverride string
+
+	// commitHash is the commit hash of the current build. Can be overriden via the AGENT_COMMIT_HASH_OVERRIDE env var.
+	// We lazy load this value, because inside crossbuild containers, fetching it can fail.
+	commitHash string
+}
+
+func (bc *BuildConfig) CommitHash() (string, error) {
+	if bc.AgentCommitHashOverride != "" {
+		return bc.AgentCommitHashOverride, nil
+	}
+	if bc.commitHash == "" {
+		var err error
+		bc.commitHash, err = sh.Output("git", "rev-parse", "HEAD")
+		if err != nil {
+			return "", fmt.Errorf("failed to get commit hash: %w", err)
+		}
+	}
+	return bc.commitHash, nil
+}
+
+func (bc *BuildConfig) CommitHashShort() (string, error) {
+	shortHash, err := bc.CommitHash()
+	if err != nil {
+		return "", err
+	}
+	if len(shortHash) > 6 {
+		shortHash = shortHash[:6]
+	}
+	return shortHash, nil
 }
 
 // BeatConfig contains Beat metadata configuration.
@@ -480,39 +519,10 @@ type KubernetesConfig struct {
 	KindSkipDelete bool
 }
 
-var (
-	globalConfig     *EnvConfig
-	globalConfigOnce sync.Once
-	globalConfigErr  error
-)
-
-// GetConfig returns the singleton EnvConfig instance, loading it if necessary.
-// This function is safe for concurrent use.
-func GetConfig() (*EnvConfig, error) {
-	globalConfigOnce.Do(func() {
-		globalConfig, globalConfigErr = LoadConfig()
-	})
-	return globalConfig, globalConfigErr
-}
-
-// ResetConfig resets the global config singleton so it will be reloaded
-// on the next call to GetConfig(). Use this when environment variables
-// have been changed and the config needs to be reloaded.
-func ResetConfig() {
-	globalConfigOnce = sync.Once{}
-	globalConfig = nil
-	globalConfigErr = nil
-}
-
-// ResetConfigForTest resets the global config singleton so it will be reloaded
-// on the next call to GetConfig(). This should ONLY be used in tests.
-func ResetConfigForTest() {
-	ResetConfig()
-}
-
-// MustGetConfig returns the singleton EnvConfig instance, panicking on error.
-func MustGetConfig() *EnvConfig {
-	cfg, err := GetConfig()
+// MustLoadConfig reads all configuration from environment variables and returns a new EnvConfig.
+// It panics if config loading fails. Use this when you need config but don't have a context.
+func MustLoadConfig() *EnvConfig {
+	cfg, err := LoadConfig()
 	if err != nil {
 		panic(fmt.Errorf("failed to load config: %w", err))
 	}
@@ -520,8 +530,7 @@ func MustGetConfig() *EnvConfig {
 }
 
 // LoadConfig reads all configuration from environment variables and returns a new EnvConfig.
-// This can be called multiple times to get fresh configuration, but GetConfig() should
-// be preferred for normal use as it caches the result.
+// Each call returns a fresh config loaded from the current environment.
 func LoadConfig() (*EnvConfig, error) {
 	cfg := &EnvConfig{}
 
@@ -598,16 +607,14 @@ func (c *EnvConfig) loadBuildConfig() error {
 
 // loadBeatConfig loads Beat metadata configuration from environment variables.
 func (c *EnvConfig) loadBeatConfig() {
-	const defaultName = "elastic-agent"
-
-	c.Beat.Name = envOr("BEAT_NAME", defaultName)
+	c.Beat.Name = envOr("BEAT_NAME", DefaultName)
 	c.Beat.ServiceName = envOr("BEAT_SERVICE_NAME", c.Beat.Name)
 	c.Beat.IndexPrefix = envOr("BEAT_INDEX_PREFIX", c.Beat.Name)
-	c.Beat.Description = envOr("BEAT_DESCRIPTION", "")
-	c.Beat.Vendor = envOr("BEAT_VENDOR", "Elastic")
-	c.Beat.License = envOr("BEAT_LICENSE", "Elastic License 2.0")
+	c.Beat.Description = envOr("BEAT_DESCRIPTION", DefaultDescription)
+	c.Beat.Vendor = envOr("BEAT_VENDOR", DefaultVendor)
+	c.Beat.License = envOr("BEAT_LICENSE", DefaultLicense)
 	c.Beat.URL = envOr("BEAT_URL", "https://www.elastic.co/beats/"+c.Beat.Name)
-	c.Beat.User = envOr("BEAT_USER", "root")
+	c.Beat.User = envOr("BEAT_USER", DefaultUser)
 }
 
 // loadTestConfig loads test-related configuration from environment variables.
@@ -844,89 +851,4 @@ func (c *EnvConfig) IsDockerVariantSelected(docVariant DockerVariant) bool {
 		}
 	}
 	return false
-}
-
-// Platforms returns the current platform list with all filters applied.
-// This is a convenience function that calls MustGetConfig().GetPlatforms().
-func Platforms() BuildPlatformList {
-	return MustGetConfig().GetPlatforms()
-}
-
-// DevBuild returns true if this is a development build.
-// This is a convenience function that calls MustGetConfig().Build.DevBuild.
-func DevBuild() bool {
-	return MustGetConfig().Build.DevBuild
-}
-
-// ExternalBuild returns true if external artifacts should be used.
-// This is a convenience function that calls MustGetConfig().Build.ExternalBuild.
-func ExternalBuild() bool {
-	return MustGetConfig().Build.ExternalBuild
-}
-
-// FIPSBuild returns true if this is a FIPS-compliant build.
-// This is a convenience function that calls MustGetConfig().Build.FIPSBuild.
-func FIPSBuild() bool {
-	return MustGetConfig().Build.FIPSBuild
-}
-
-// BeatLicense returns the beat license.
-// This is a convenience function that calls MustGetConfig().Beat.License.
-func BeatLicense() string {
-	return MustGetConfig().Beat.License
-}
-
-// BeatDescription returns the beat description.
-// This is a convenience function that calls MustGetConfig().Beat.Description.
-func BeatDescription() string {
-	return MustGetConfig().Beat.Description
-}
-
-// InitConfig is a no-op provided for backward compatibility.
-// Configuration is now loaded on-demand via GetConfig()/MustGetConfig().
-// Use the With* methods on EnvConfig to create modified configs.
-func InitConfig() {
-	// No-op - config is loaded on demand
-}
-
-// MustInitConfig is a no-op provided for backward compatibility.
-// Configuration is now loaded on-demand via GetConfig()/MustGetConfig().
-func MustInitConfig() {
-	// No-op - config is loaded on demand
-}
-
-// PackagingFromManifest returns true if packaging from manifest is enabled.
-// This is a convenience function that calls MustGetConfig().Packaging.PackagingFromManifest.
-func PackagingFromManifest() bool {
-	return MustGetConfig().Packaging.PackagingFromManifest
-}
-
-// ManifestURL returns the manifest URL for packaging.
-// This is a convenience function that calls MustGetConfig().Packaging.ManifestURL.
-func ManifestURL() string {
-	return MustGetConfig().Packaging.ManifestURL
-}
-
-// SelectedPackageTypes returns the selected package types.
-// This is a convenience function that calls MustGetConfig().GetPackageTypes().
-func SelectedPackageTypes() []PackageType {
-	return MustGetConfig().GetPackageTypes()
-}
-
-// SelectedDockerVariants returns the selected docker variants.
-// This is a convenience function that calls MustGetConfig().GetDockerVariants().
-func SelectedDockerVariants() []DockerVariant {
-	return MustGetConfig().GetDockerVariants()
-}
-
-// Snapshot returns true if this is a snapshot build.
-// This is a convenience function that calls MustGetConfig().Build.Snapshot.
-func Snapshot() bool {
-	return MustGetConfig().Build.Snapshot
-}
-
-// CrossBuildMountModcache returns true if the mod cache should be mounted in crossbuild containers.
-// This is a convenience function that calls MustGetConfig().CrossBuild.MountModcache.
-func CrossBuildMountModcache() bool {
-	return MustGetConfig().CrossBuild.MountModcache
 }
