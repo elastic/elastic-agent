@@ -148,7 +148,6 @@ steps:
 
   - group: "macOS tests"
     key: "macos-unit-tests"
-    skip: "MacOS agents are being lost during test execution"
     steps:
       - label: "Unit tests - macOS 15 ARM"
         command: ".buildkite/scripts/steps/unit-tests.sh"
