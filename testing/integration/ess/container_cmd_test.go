@@ -839,6 +839,8 @@ func TestContainerCMDEnrollByPolicyName(t *testing.T) {
 
 	// Populate fleet with a lot of policies to test retrieval by name
 	// Kibana's default page size is 20
+	// Include the special characters that must be escapted \():<>"* in KQL in the name
+	// See https://www.elastic.co/docs/reference/query-languages/kql
 	t.Log("Populate fleet with extra policies")
 	policyID := ""
 	for i := 0; i < 30; i++ {
@@ -847,7 +849,7 @@ func TestContainerCMDEnrollByPolicyName(t *testing.T) {
 			ctx,
 			agentFixture,
 			info,
-			fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String()),
+			fmt.Sprintf("%s \\():<>\"* %s", t.Name(), uuid.Must(uuid.NewV4()).String()),
 			"")
 	}
 	// Use the last ID to get the policy, we want the name
