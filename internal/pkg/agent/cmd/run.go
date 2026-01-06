@@ -353,6 +353,9 @@ func runElasticAgent(
 			errors.M(errors.MetaKeyPath, paths.AgentConfigFile()))
 	}
 
+	// Set the initial log level (either default or from config file)
+	logger.SetLevel(logLvl)
+
 	// Ensure that the log level now matches what is configured in the agentInfo.
 	var lvl logp.Level
 	err = lvl.Unpack(agentInfo.LogLevel())

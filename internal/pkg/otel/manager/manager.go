@@ -315,9 +315,11 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			if mergedCfg != nil && mergedCfg.IsSet("service::telemetry::logs::level") {
 				if logLevel, ok := mergedCfg.Get("service::telemetry::logs::level").(string); ok {
 					m.logLevel = logLevel
+				} else {
+					m.logger.Warn("failed to access log level from service::telemetry::logs::level")
 				}
 			} else {
-				// when emrgedCfg is nil use coordinator's log level
+				// when mergedCfg is nil use coordinator's log level
 				m.logLevel = cfgUpdate.logLevel.String()
 			}
 			m.mx.Unlock()
@@ -389,7 +391,6 @@ func buildMergedConfig(
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}
 
-		// get log level from agent info
 		level := translate.GetOTelLogLevel(cfgUpdate.logLevel.String())
 		if err := componentOtelCfg.Merge(confmap.NewFromStringMap(map[string]any{"service::telemetry::logs::level": level})); err != nil {
 			return nil, fmt.Errorf("failed to set log level in otel config: %w", err)
