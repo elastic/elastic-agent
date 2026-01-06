@@ -2314,17 +2314,12 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 
 	// limit the number of snapshot branches to the maxSnapshots
 	targetSnapshotBranches := branches[:maxSnapshots]
-
-	// we also want to always include the latest snapshot from lts release branches
-	ltsBranches := []string{
-		// 7.17 is an LTS branch so we need to include it always
-		"7.17",
-	}
+	var ltsBranches []string
 
 	// if we have a newer version of the agent, we want to include the latest snapshot from 8.19 LTS branch
 	if agentVersion.Major() > 8 || agentVersion.Major() == 8 && agentVersion.Minor() > 19 {
 		// order is important
-		ltsBranches = append([]string{"8.19"}, ltsBranches...)
+		ltsBranches = []string{"8.19"}
 	}
 
 	// need to include the LTS branches, sort them and remove duplicates
@@ -2339,7 +2334,7 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 		UpgradeToVersion: bversion.Agent,
 		CurrentMajors:    1,
 		PreviousMinors:   2,
-		PreviousMajors:   1,
+		PreviousMajors:   2,
 		SnapshotBranches: targetSnapshotBranches,
 	}
 	b, _ := json.MarshalIndent(reqs, "", "  ")
@@ -2405,9 +2400,7 @@ func (Integration) UpdatePackageVersion(ctx context.Context) error {
 	return nil
 }
 
-var (
-	stateDir = ".integration-cache"
-)
+var stateDir = ".integration-cache"
 
 // readFrameworkState reads the state file from the integration test framework
 func readFrameworkState() (runner.State, error) {
@@ -3726,7 +3719,17 @@ func (Otel) PrepareBeats() error {
 	if err := os.Remove(beatsGitPath); err != nil {
 		return fmt.Errorf("failed to remove beats/.git file: %w", err)
 	}
-	if err := filecopy.Copy(gitdirAbsPath, beatsGitPath); err != nil {
+	copyOpts := filecopy.Options{
+		Skip: func(info os.FileInfo, src, dest string) (bool, error) {
+			switch {
+			case (info.Mode() & fs.ModeSocket) != 0:
+				return true, nil
+			default:
+				return false, nil
+			}
+		},
+	}
+	if err := filecopy.Copy(gitdirAbsPath, beatsGitPath, copyOpts); err != nil {
 		return fmt.Errorf("failed to copy git directory: %w", err)
 	}
 
