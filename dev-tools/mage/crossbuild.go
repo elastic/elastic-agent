@@ -28,7 +28,7 @@ const defaultCrossBuildTarget = "golangCrossBuild"
 type CrossBuildOption func(params *crossBuildParams)
 
 // ImageSelectorFunc returns the name of the builder image.
-type ImageSelectorFunc func(platform string) (string, error)
+type ImageSelectorFunc func(cfg *EnvConfig, platform string) (string, error)
 
 // WithName adjust the name of the cross build action.
 func WithName(name string) CrossBuildOption {
@@ -95,8 +95,7 @@ type crossBuildParams struct {
 }
 
 // CrossBuild executes a given build target once for each target platform.
-func CrossBuild(options ...CrossBuildOption) error {
-	cfg := MustGetConfig()
+func CrossBuild(cfg *EnvConfig, options ...CrossBuildOption) error {
 	params := crossBuildParams{Platforms: cfg.GetPlatforms(), Target: defaultCrossBuildTarget, ImageSelector: CrossBuildImage}
 	params.Name = "Elastic-Agent"
 	for _, opt := range options {
@@ -123,7 +122,7 @@ func CrossBuild(options ...CrossBuildOption) error {
 				args := DefaultBuildArgsWithConfig(cfg)
 				args.OutputDir = filepath.Join("build", "golang-crossbuild")
 				args.Name += "-" + platform.GOOS + "-" + platform.Arch
-				return Build(args)
+				return BuildWithConfig(cfg, args)
 
 			}
 		}
@@ -151,7 +150,7 @@ func CrossBuild(options ...CrossBuildOption) error {
 		if !buildPlatform.Flags.CanCrossBuild() {
 			return fmt.Errorf("unsupported cross build platform %v", buildPlatform.Name)
 		}
-		builder := GolangCrossBuilder{buildPlatform.Name, params.Target, params.InDir, params.ImageSelector}
+		builder := GolangCrossBuilder{Platform: buildPlatform.Name, Target: params.Target, InDir: params.InDir, ImageSelector: params.ImageSelector, Config: cfg}
 		if params.Serial {
 			if err := builder.Build(); err != nil {
 				return fmt.Errorf("failed cross-building target=%s for platform=%s: %w",
@@ -171,11 +170,10 @@ func CrossBuild(options ...CrossBuildOption) error {
 // CrossBuildXPack executes the 'golangCrossBuild' target in the Beat's
 // associated x-pack directory to produce a version of the Beat that contains
 // Elastic licensed content.
-func CrossBuildXPack(options ...CrossBuildOption) error {
-	cfg := MustGetConfig()
+func CrossBuildXPack(cfg *EnvConfig, options ...CrossBuildOption) error {
 	o := []CrossBuildOption{InDir("x-pack", cfg.Beat.Name)}
 	o = append(o, options...)
-	return CrossBuild(o...)
+	return CrossBuild(cfg, o...)
 }
 
 // buildMage pre-compiles the magefile to a binary using the GOARCH parameter.
@@ -188,7 +186,7 @@ func buildMage() error {
 }
 
 // CrossBuildImage build the docker image.
-func CrossBuildImage(platform string) (string, error) {
+func CrossBuildImage(cfg *EnvConfig, platform string) (string, error) {
 	tagSuffix := "main"
 
 	switch {
@@ -219,7 +217,6 @@ func CrossBuildImage(platform string) (string, error) {
 		return "", err
 	}
 
-	cfg := MustGetConfig()
 	if cfg.Build.FIPSBuild {
 		tagSuffix += "-fips"
 	}
@@ -234,11 +231,15 @@ type GolangCrossBuilder struct {
 	Target        string
 	InDir         string
 	ImageSelector ImageSelectorFunc
+	Config        *EnvConfig
 }
 
 // Build executes the build inside of Docker.
 func (b GolangCrossBuilder) Build() error {
-	cfg := MustGetConfig()
+	if b.Config == nil {
+		return fmt.Errorf("GolangCrossBuilder.Config must be set")
+	}
+	cfg := b.Config
 	fmt.Printf(">> %v: Building for %v\n", b.Target, b.Platform)
 
 	repoInfo, err := GetProjectRepoInfo()
@@ -270,7 +271,7 @@ func (b GolangCrossBuilder) Build() error {
 	buildCmd = filepath.ToSlash(buildCmd)
 
 	dockerRun := sh.RunCmd("docker", "run")
-	image, err := b.ImageSelector(b.Platform)
+	image, err := b.ImageSelector(cfg, b.Platform)
 	if err != nil {
 		return fmt.Errorf("failed to determine golang-crossbuild image tag: %w", err)
 	}

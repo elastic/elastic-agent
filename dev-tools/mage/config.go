@@ -53,12 +53,11 @@ type ConfigParams struct {
 
 // Config generates config files. Set DEV_OS and DEV_ARCH to change the target
 // host for the generated configs. Defaults to linux/amd64.
-func Config(types ConfigFileType, args ConfigFileParams, targetDir string) error {
-	cfg := MustGetConfig()
+func Config(cfg *EnvConfig, types ConfigFileType, args ConfigFileParams, targetDir string) error {
 	// Short
 	if types.IsShort() {
 		file := filepath.Join(targetDir, cfg.Beat.Name+".yml")
-		if err := makeConfigTemplate(file, 0600, args, ShortConfigType); err != nil {
+		if err := makeConfigTemplateWithConfig(cfg, file, 0600, args, ShortConfigType); err != nil {
 			return fmt.Errorf("failed making short config: %w", err)
 		}
 	}
@@ -66,7 +65,7 @@ func Config(types ConfigFileType, args ConfigFileParams, targetDir string) error
 	// Reference
 	if types.IsReference() {
 		file := filepath.Join(targetDir, cfg.Beat.Name+".reference.yml")
-		if err := makeConfigTemplate(file, 0644, args, ReferenceConfigType); err != nil {
+		if err := makeConfigTemplateWithConfig(cfg, file, 0644, args, ReferenceConfigType); err != nil {
 			return fmt.Errorf("failed making reference config: %w", err)
 		}
 	}
@@ -74,7 +73,7 @@ func Config(types ConfigFileType, args ConfigFileParams, targetDir string) error
 	// Docker
 	if types.IsDocker() {
 		file := filepath.Join(targetDir, cfg.Beat.Name+".docker.yml")
-		if err := makeConfigTemplate(file, 0600, args, DockerConfigType); err != nil {
+		if err := makeConfigTemplateWithConfig(cfg, file, 0600, args, DockerConfigType); err != nil {
 			return fmt.Errorf("failed making docker config: %w", err)
 		}
 	}
@@ -82,7 +81,7 @@ func Config(types ConfigFileType, args ConfigFileParams, targetDir string) error
 	return nil
 }
 
-func makeConfigTemplate(destination string, mode os.FileMode, confParams ConfigFileParams, typ ConfigFileType) error {
+func makeConfigTemplateWithConfig(cfg *EnvConfig, destination string, mode os.FileMode, confParams ConfigFileParams, typ ConfigFileType) error {
 	// Determine what type to build and set some parameters.
 	var confFile ConfigParams
 	var tmplParams map[string]interface{}
@@ -107,7 +106,6 @@ func makeConfigTemplate(destination string, mode os.FileMode, confParams ConfigF
 	// Rather than adding more "ExcludeX"/"UseX" options consider overwriting
 	// one of the libbeat templates in your project by adding a file with the
 	// same name to your _meta/config directory.
-	cfg := MustGetConfig()
 	params := map[string]interface{}{
 		"GOOS":                           cfg.CrossBuild.DevOS,
 		"GOARCH":                         cfg.CrossBuild.DevArch,
@@ -126,7 +124,7 @@ func makeConfigTemplate(destination string, mode os.FileMode, confParams ConfigF
 	}
 	params = joinMaps(params, confParams.ExtraVars, tmplParams)
 	tmpl := template.New("config").Option("missingkey=error")
-	funcs := joinMaps(FuncMap(), template.FuncMap{
+	funcs := joinMaps(FuncMap(cfg), template.FuncMap{
 		"header":    header,
 		"subheader": subheader,
 		"indent":    indent,
@@ -167,7 +165,7 @@ func makeConfigTemplate(destination string, mode os.FileMode, confParams ConfigF
 	}
 	defer out.Close()
 
-	if err = tmpl.Execute(out, EnvMap(params)); err != nil {
+	if err = tmpl.Execute(out, EnvMap(cfg, params)); err != nil {
 		return fmt.Errorf("failed building %v: %w", destination, err)
 	}
 
