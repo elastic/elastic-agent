@@ -47,14 +47,14 @@ const (
 )
 
 // Expand expands the given Go text/template string.
-func Expand(in string, args ...map[string]interface{}) (string, error) {
-	return expandTemplate(inlineTemplate, in, FuncMap(), EnvMap(args...))
+func Expand(cfg *EnvConfig, in string, args ...map[string]interface{}) (string, error) {
+	return expandTemplate(inlineTemplate, in, FuncMap(cfg), EnvMap(cfg, args...))
 }
 
 // MustExpand expands the given Go text/template string. It panics if there is
 // an error.
-func MustExpand(in string, args ...map[string]interface{}) string {
-	out, err := Expand(in, args...)
+func MustExpand(cfg *EnvConfig, in string, args ...map[string]interface{}) string {
+	out, err := Expand(cfg, in, args...)
 	if err != nil {
 		panic(err)
 	}
@@ -63,16 +63,8 @@ func MustExpand(in string, args ...map[string]interface{}) string {
 
 // ExpandFile expands the Go text/template read from src and writes the output
 // to dst.
-func ExpandFile(src, dst string, args ...map[string]interface{}) error {
-	return expandFile(src, dst, EnvMap(args...))
-}
-
-// MustExpandFile expands the Go text/template read from src and writes the
-// output to dst. It panics if there is an error.
-func MustExpandFile(src, dst string, args ...map[string]interface{}) {
-	if err := ExpandFile(src, dst, args...); err != nil {
-		panic(err)
-	}
+func ExpandFile(cfg *EnvConfig, src, dst string, args ...map[string]interface{}) error {
+	return expandFile(cfg, src, dst, EnvMap(cfg, args...))
 }
 
 func expandTemplate(name, tmpl string, funcs template.FuncMap, args ...map[string]interface{}) (string, error) {
@@ -117,18 +109,18 @@ func joinMaps(args ...map[string]interface{}) map[string]interface{} {
 	return out
 }
 
-func expandFile(src, dst string, args ...map[string]interface{}) error {
+func expandFile(cfg *EnvConfig, src, dst string, args ...map[string]interface{}) error {
 	tmplData, err := os.ReadFile(src)
 	if err != nil {
 		return fmt.Errorf("failed reading from template %v, %w", src, err)
 	}
 
-	output, err := expandTemplate(src, string(tmplData), FuncMap(), args...)
+	output, err := expandTemplate(src, string(tmplData), FuncMap(cfg), args...)
 	if err != nil {
 		return err
 	}
 
-	dst, err = expandTemplate(inlineTemplate, dst, FuncMap(), args...)
+	dst, err = expandTemplate(inlineTemplate, dst, FuncMap(cfg), args...)
 	if err != nil {
 		return err
 	}
@@ -521,12 +513,13 @@ var (
 	parallelJobsSemaphore chan int
 )
 
-func parallelJobs() chan int {
+func parallelJobs(ctx context.Context) chan int {
 	parallelJobsLock.Lock()
 	defer parallelJobsLock.Unlock()
 
 	if parallelJobsSemaphore == nil {
-		max := numParallel()
+		cfg := ConfigFromContext(ctx)
+		max := numParallelWithConfig(cfg)
 		parallelJobsSemaphore = make(chan int, max)
 		log.Println("Max parallel jobs =", max)
 	}
@@ -534,9 +527,7 @@ func parallelJobs() chan int {
 	return parallelJobsSemaphore
 }
 
-func numParallel() int {
-	cfg := MustGetConfig()
-
+func numParallelWithConfig(cfg *EnvConfig) int {
 	// Use the configured max parallel from Config if set
 	if cfg.Build.MaxParallel > 0 {
 		maxParallel := cfg.Build.MaxParallel
@@ -591,10 +582,10 @@ func ParallelCtx(ctx context.Context, fns ...interface{}) {
 					mu.Unlock()
 				}
 				wg.Done()
-				<-parallelJobs()
+				<-parallelJobs(ctx)
 			}()
 			waitStart := time.Now()
-			parallelJobs() <- 1
+			parallelJobs(ctx) <- 1
 			log.Println("Parallel job waited", time.Since(waitStart), "before starting.")
 			if err := fw(ctx); err != nil {
 				mu.Lock()
@@ -836,8 +827,7 @@ func IsUpToDate(dst string, sources ...string) bool {
 
 // OSSBeatDir returns the OSS beat directory. You can pass paths and they will
 // be joined and appended to the OSS beat dir.
-func OSSBeatDir(path ...string) string {
-	cfg := MustGetConfig()
+func OSSBeatDir(cfg *EnvConfig, path ...string) string {
 	ossDir := CWD()
 
 	// Check if we need to correct ossDir because it's in x-pack.
@@ -854,8 +844,7 @@ func OSSBeatDir(path ...string) string {
 
 // XPackBeatDir returns the X-Pack beat directory. You can pass paths and they
 // will be joined and appended to the X-Pack beat dir.
-func XPackBeatDir(path ...string) string {
-	cfg := MustGetConfig()
+func XPackBeatDir(cfg *EnvConfig, path ...string) string {
 	// Check if we have an X-Pack only beats
 	cur := CWD()
 
@@ -864,7 +853,7 @@ func XPackBeatDir(path ...string) string {
 		return filepath.Join(append([]string{tmp}, path...)...)
 	}
 
-	return OSSBeatDir(append([]string{XPackDir, cfg.Beat.Name}, path...)...)
+	return OSSBeatDir(cfg, append([]string{XPackDir, cfg.Beat.Name}, path...)...)
 }
 
 // createDir creates the parent directory for the given file.

@@ -21,8 +21,6 @@ import (
 	"golang.org/x/text/language"
 	"gopkg.in/yaml.v3"
 
-	"github.com/magefile/mage/sh"
-
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 )
@@ -39,15 +37,12 @@ const (
 
 	elasticAgentModulePath = "github.com/elastic/elastic-agent"
 
-	defaultName = "elastic-agent"
-
 	// Env vars
 	// agent package version
 	agentPackageVersionEnvVar = "AGENT_PACKAGE_VERSION"
 	//ManifestUrlEnvVar is the name fo the environment variable containing the Manifest URL to be used for packaging agent
 	ManifestUrlEnvVar = "MANIFEST_URL"
 	// AgentCommitHashEnvVar allows to override agent commit hash string during packaging
-	AgentCommitHashEnvVar = "AGENT_COMMIT_HASH_OVERRIDE"
 
 	// Mapped functions
 	agentPackageVersionMappedFunc    = "agent_package_version"
@@ -63,12 +58,12 @@ const XPackDir = "../x-pack"
 var BeatProjectType ProjectType
 
 // FuncMap returns template functions that use the config.
-func FuncMap() map[string]interface{} {
+func FuncMap(cfg *EnvConfig) map[string]interface{} {
 	return map[string]interface{}{
 		"beat_doc_branch":                BeatDocBranch,
-		"beat_version":                   BeatQualifiedVersion,
-		"commit":                         CommitHash,
-		"commit_short":                   CommitHashShort,
+		"beat_version":                   func() (string, error) { return BeatQualifiedVersion(cfg) },
+		"commit":                         func() (string, error) { return cfg.Build.CommitHash() },
+		"commit_short":                   func() (string, error) { return cfg.Build.CommitHashShort() },
 		"date":                           BuildDate,
 		"elastic_beats_dir":              ElasticBeatsDir,
 		"go_version":                     GoVersion,
@@ -77,9 +72,9 @@ func FuncMap() map[string]interface{} {
 		"tolower":                        strings.ToLower,
 		"contains":                       strings.Contains,
 		"substring":                      Substring,
-		agentPackageVersionMappedFunc:    AgentPackageVersion,
-		agentManifestGeneratorMappedFunc: PackageManifest,
-		snapshotSuffix:                   MaybeSnapshotSuffix,
+		agentPackageVersionMappedFunc:    func() (string, error) { return AgentPackageVersion(cfg) },
+		agentManifestGeneratorMappedFunc: func(fips bool) (string, error) { return PackageManifest(cfg, fips) },
+		snapshotSuffix:                   func() string { return MaybeSnapshotSuffix(cfg) },
 	}
 }
 
@@ -99,8 +94,8 @@ var ErrUnknownProjectType = fmt.Errorf("unknown ProjectType")
 // EnvMap returns map containing the common settings variables and all variables
 // from the environment. args are appended to the output prior to adding the
 // environment variables (so env vars have the highest precedence).
-func EnvMap(args ...map[string]interface{}) map[string]interface{} {
-	envMap := varMap(args...)
+func EnvMap(cfg *EnvConfig, args ...map[string]interface{}) map[string]interface{} {
+	envMap := varMap(cfg, args...)
 
 	// Add the environment (highest precedence).
 	for _, e := range os.Environ() {
@@ -111,12 +106,7 @@ func EnvMap(args ...map[string]interface{}) map[string]interface{} {
 	return envMap
 }
 
-func varMap(args ...map[string]interface{}) map[string]interface{} {
-	cfg := MustGetConfig()
-	return varMapWithConfig(cfg, args...)
-}
-
-func varMapWithConfig(cfg *EnvConfig, args ...map[string]interface{}) map[string]interface{} {
+func varMap(cfg *EnvConfig, args ...map[string]interface{}) map[string]interface{} {
 	data := map[string]interface{}{
 		"GOOS":            cfg.Build.GOOS,
 		"GOARCH":          cfg.Build.GOARCH,
@@ -152,7 +142,7 @@ func varMapWithConfig(cfg *EnvConfig, args ...map[string]interface{}) map[string
 	return data
 }
 
-func dumpVariables() (string, error) {
+func dumpVariables(cfg *EnvConfig) (string, error) {
 	var dumpTemplate = `## Variables
 
 GOOS             = {{.GOOS}}
@@ -191,12 +181,12 @@ agent_package_version        = {{ agent_package_version}}
 snapshot_suffix              = {{ snapshot_suffix }}
 `
 
-	return Expand(dumpTemplate)
+	return Expand(cfg, dumpTemplate)
 }
 
 // DumpVariables writes the template variables and values to stdout.
-func DumpVariables() error {
-	out, err := dumpVariables()
+func DumpVariables(cfg *EnvConfig) error {
+	out, err := dumpVariables(cfg)
 	if err != nil {
 		return err
 	}
@@ -205,95 +195,28 @@ func DumpVariables() error {
 	return nil
 }
 
-var (
-	commitHash     string
-	commitHashOnce sync.Once
-)
-
-// CommitHash returns the full length git commit hash.
-// It checks the global config's AgentCommitHashOverride first, then falls back to git.
-func CommitHash() (string, error) {
-	var err error
-	commitHashOnce.Do(func() {
-		// Check commit hash override from config first
-		cfg := MustGetConfig()
-		commitHash = cfg.Build.AgentCommitHashOverride
-		if commitHash == "" {
-			// no override found, get the hash from HEAD
-			commitHash, err = sh.Output("git", "rev-parse", "HEAD")
-		}
-	})
-	return commitHash, err
-}
-
-// CommitHashWithConfig returns the full length git commit hash using the provided config.
-// This variant does not use caching, making it suitable for contexts where
-// different configs may be passed.
-func CommitHashWithConfig(cfg *EnvConfig) (string, error) {
-	// Check commit hash override from config first
-	if cfg.Build.AgentCommitHashOverride != "" {
-		return cfg.Build.AgentCommitHashOverride, nil
-	}
-	// no override found, get the hash from HEAD
-	return sh.Output("git", "rev-parse", "HEAD")
-}
-
-// CommitHashShort returns the short length git commit hash.
-func CommitHashShort() (string, error) {
-	shortHash, err := CommitHash()
-	if len(shortHash) > 6 {
-		shortHash = shortHash[:6]
-	}
-	return shortHash, err
-}
-
-// CommitHashShortWithConfig returns the short length git commit hash using the provided config.
-func CommitHashShortWithConfig(cfg *EnvConfig) (string, error) {
-	shortHash, err := CommitHashWithConfig(cfg)
-	if len(shortHash) > 6 {
-		shortHash = shortHash[:6]
-	}
-	return shortHash, err
-}
-
-// TagContainsCommit returns true or false depending on if the current commit is part of a git tag.
-func TagContainsCommit() (bool, error) {
-	commitHash, err := CommitHash()
-	if err != nil {
-		return false, err
-	}
-
-	out, err := sh.Output("git", "tag", "--contains", commitHash)
-	if err != nil {
-		return false, err
-	}
-
-	return strings.TrimSpace(out) != "", nil
-}
-
-func AgentPackageVersion() (string, error) {
-	cfg := MustGetConfig()
+// AgentPackageVersion returns the agent package version using the provided config.
+func AgentPackageVersion(cfg *EnvConfig) (string, error) {
 	if cfg.Packaging.AgentPackageVersion != "" {
 		return cfg.Packaging.AgentPackageVersion, nil
 	}
 
-	return BeatQualifiedVersion()
+	return BeatQualifiedVersion(cfg)
 }
 
-func PackageManifest(fips bool) (string, error) {
-	cfg := MustGetConfig()
-
-	packageVersion, err := AgentPackageVersion()
+// PackageManifest generates the package manifest using the provided config.
+func PackageManifest(cfg *EnvConfig, fips bool) (string, error) {
+	packageVersion, err := AgentPackageVersion(cfg)
 	if err != nil {
 		return "", fmt.Errorf("retrieving agent package version: %w", err)
 	}
 
-	hash, err := CommitHash()
+	hash, err := cfg.Build.CommitHash()
 	if err != nil {
 		return "", fmt.Errorf("retrieving agent commit hash: %w", err)
 	}
 
-	commitHashShort, err := CommitHashShort()
+	commitHashShort, err := cfg.Build.CommitHashShort()
 	if err != nil {
 		return "", fmt.Errorf("retrieving agent commit hash: %w", err)
 	}
@@ -430,27 +353,17 @@ func GoVersion() (string, error) {
 
 var (
 	beatVersionRegex = regexp.MustCompile(`(?m)^const defaultBeatVersion = "(.+)"\r?$`)
-	beatVersionValue string
-	beatVersionErr   error
-	beatVersionOnce  sync.Once
 
 	flavorsRegistry    map[string][]string
 	flavorsRegistryErr error
 	flavorsOnce        sync.Once
 )
 
-// BeatQualifiedVersion returns the Beat's qualified version.  The value can be overwritten by
-// setting VERSION_QUALIFIER in the environment.
-func BeatQualifiedVersion() (string, error) {
-	cfg := MustGetConfig()
-	return BeatQualifiedVersionWithConfig(cfg)
-}
-
-// BeatQualifiedVersionWithConfig returns the Beat's qualified version using the provided config.
+// BeatQualifiedVersion returns the Beat's qualified version using the provided config.
 // This variant does not use caching, making it suitable for contexts where
 // different configs may be passed.
-func BeatQualifiedVersionWithConfig(cfg *EnvConfig) (string, error) {
-	version, err := BeatVersionWithConfig(cfg)
+func BeatQualifiedVersion(cfg *EnvConfig) (string, error) {
+	version, err := BeatVersion(cfg)
 	if err != nil {
 		return "", err
 	}
@@ -461,27 +374,10 @@ func BeatQualifiedVersionWithConfig(cfg *EnvConfig) (string, error) {
 	return version + "-" + cfg.Build.VersionQualifier, nil
 }
 
-// BeatVersion returns the Beat's version. The value can be overridden by
-// setting BEAT_VERSION in the environment or through the config.
-func beatVersion() (string, error) {
-	beatVersionOnce.Do(func() {
-		// Check config first for BeatVersion override
-		cfg := MustGetConfig()
-		if cfg.Build.BeatVersionSet {
-			beatVersionValue = cfg.Build.BeatVersion
-			return
-		}
-
-		beatVersionValue, beatVersionErr = getBuildVariableSources().GetBeatVersion()
-	})
-
-	return beatVersionValue, beatVersionErr
-}
-
-// BeatVersionWithConfig returns the Beat's version using the provided config.
+// BeatVersion returns the Beat's version using the provided config.
 // This variant does not use caching, making it suitable for contexts where
 // different configs may be passed.
-func BeatVersionWithConfig(cfg *EnvConfig) (string, error) {
+func BeatVersion(cfg *EnvConfig) (string, error) {
 	// Check config first for BeatVersion override
 	if cfg.Build.BeatVersionSet {
 		return cfg.Build.BeatVersion, nil
