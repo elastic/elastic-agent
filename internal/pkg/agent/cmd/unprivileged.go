@@ -15,8 +15,8 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install/componentvalidation"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client/wait"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
@@ -72,7 +72,7 @@ func unprivilegedCmd(streams *cli.IOStreams, cmd *cobra.Command) (err error) {
 	}
 
 	// cannot switch to unprivileged when service components have issues
-	err = ensureNoServiceComponentIssues()
+	err = componentvalidation.EnsureNoServiceComponentIssues()
 	if err != nil {
 		// error already adds context
 		return err
@@ -118,42 +118,4 @@ func unprivilegedCmd(streams *cli.IOStreams, cmd *cobra.Command) (err error) {
 	}
 
 	return nil
-}
-
-func ensureNoServiceComponentIssues() error {
-	ctx := context.Background()
-	l, err := newErrorLogger()
-	if err != nil {
-		return fmt.Errorf("failed to create error logger: %w", err)
-	}
-	// this forces the component calculation to always compute with no root
-	// this allows any runtime preventions to error for a component when it has a no root support
-	comps, err := getComponentsFromPolicy(ctx, l, paths.ConfigFile(), 0, forceNonRoot)
-	if err != nil {
-		return fmt.Errorf("failed to create component model from policy: %w", err)
-	}
-	var errs []error
-	for _, comp := range comps {
-		if comp.InputSpec == nil {
-			// no spec (safety net)
-			continue
-		}
-		if comp.InputSpec.Spec.Service == nil {
-			// not a service component, allowed to exist (even if it needs root)
-			continue
-		}
-		if comp.Err != nil {
-			// service component has an error (most likely because it cannot run without root)
-			errs = append(errs, fmt.Errorf("%s -> %w", comp.ID, comp.Err))
-		}
-	}
-	if len(errs) > 0 {
-		return fmt.Errorf("unable to switch to unprivileged mode due to the following service based components having issues: %w", errors.Join(errs...))
-	}
-	return nil
-}
-
-func forceNonRoot(detail component.PlatformDetail) component.PlatformDetail {
-	detail.User.Root = false
-	return detail
 }

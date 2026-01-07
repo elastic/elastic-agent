@@ -19,8 +19,8 @@ import (
 )
 
 var flavorsRegistry = map[string][]string{
-	"basic":   {"agentbeat", "endpoint-security", "pf-host-agent"},
-	"servers": {"agentbeat", "endpoint-security", "pf-host-agent", "cloudbeat", "apm-server", "fleet-server", "pf-elastic-symbolizer", "pf-elastic-collector"},
+	"basic":   {"elastic-otel-collector", "endpoint-security", "pf-host-agent"},
+	"servers": {"elastic-otel-collector", "endpoint-security", "pf-host-agent", "cloudbeat", "apm-server", "fleet-server", "pf-elastic-symbolizer", "pf-elastic-collector"},
 }
 
 var manifest = v1.PackageManifest{
@@ -50,11 +50,11 @@ func TestSubpathsForComponent(t *testing.T) {
 		},
 		{
 			name:      "basic component returns paths",
-			component: "agentbeat",
+			component: "elastic-otel-collector",
 			wantSubpaths: []string{
-				"agentbeat" + binarySuffix,
-				"agentbeat.yml",
-				"agentbeat.spec.yml",
+				"elastic-otel-collector" + binarySuffix,
+				"elastic-otel-collector.yml",
+				"elastic-otel-collector.spec.yml",
 			},
 			specFileContent: "version: 2",
 		},
@@ -124,12 +124,12 @@ func TestAllowedSubpathsForFlavor(t *testing.T) {
 			name:   "basic flavor with specs",
 			flavor: FlavorBasic,
 			specFiles: map[string]string{
-				"agentbeat": "component_files:\n- modules/*\n- data/*\n",
+				"elastic-otel-collector": "component_files:\n- modules/*\n- data/*\n",
 			},
 			wantSubpaths: []string{
-				"agentbeat" + binarySuffix,
-				"agentbeat.yml",
-				"agentbeat.spec.yml",
+				"elastic-otel-collector" + binarySuffix,
+				"elastic-otel-collector.yml",
+				"elastic-otel-collector.spec.yml",
 				"modules/*",
 				"data/*",
 			},
@@ -149,14 +149,14 @@ func TestAllowedSubpathsForFlavor(t *testing.T) {
 			name:   "servers flavor with specs",
 			flavor: FlavorServers,
 			specFiles: map[string]string{
-				"agentbeat":  "component_files:\n- modules/*\n",
-				"apm-server": "component_files:\n- apm.bundle.zip\n",
-				"cloudbeat":  "component_files:\n- rules/*\n",
+				"elastic-otel-collector": "component_files:\n- modules/*\n",
+				"apm-server":             "component_files:\n- apm.bundle.zip\n",
+				"cloudbeat":              "component_files:\n- rules/*\n",
 			},
 			wantSubpaths: []string{
-				"agentbeat" + binarySuffix,
-				"agentbeat.yml",
-				"agentbeat.spec.yml",
+				"elastic-otel-collector" + binarySuffix,
+				"elastic-otel-collector.yml",
+				"elastic-otel-collector.spec.yml",
 				"modules/*",
 				"apm-server" + binarySuffix,
 				"apm-server.yml",
@@ -258,12 +258,12 @@ func TestSkipComponentsPathWithSubpathsFn(t *testing.T) {
 		{
 			name: "exact matches",
 			allowedPaths: []string{
-				"agentbeat.exe",
-				"agentbeat.yml",
+				"elastic-otel-collector.exe",
+				"elastic-otel-collector.yml",
 			},
 			testPaths: map[string]bool{
-				filepath.Join("data", "components", "agentbeat.exe"): false, // allowed
-				filepath.Join("data", "components", "other.exe"):     true,  // skipped
+				filepath.Join("data", "components", "elastic-otel-collector.exe"): false, // allowed
+				filepath.Join("data", "components", "other.exe"):                  true,  // skipped
 			},
 		},
 
@@ -307,7 +307,7 @@ func TestSkipComponentsPathFn(t *testing.T) {
 			name:   "basic flavor components",
 			flavor: FlavorBasic,
 			specFiles: map[string]string{
-				"agentbeat": "component_files:\n- data/*\n- logs/*\n",
+				"elastic-otel-collector": "component_files:\n- data/*\n- logs/*\n",
 			},
 			testPaths: map[string]bool{
 				filepath.Join("data", "components", "data", "file.txt"):   false,
@@ -338,14 +338,14 @@ func TestSkipComponentsPathFn(t *testing.T) {
 			name:   "no spec file",
 			flavor: FlavorBasic,
 			testPaths: map[string]bool{
-				filepath.Join("data", "components", "agentbeat.exe"): true,
+				filepath.Join("data", "components", "elastic-otel-collector.exe"): true,
 			},
 		},
 		{
 			name:   "no flavor falls back to keep all",
 			flavor: "",
 			specFiles: map[string]string{
-				"agentbeat": "component_files:\n- data/*\n",
+				"elastic-otel-collector": "component_files:\n- data/*\n",
 			},
 			testPaths: map[string]bool{
 				filepath.Join("data", "components", "data", "file.txt"):   false,
@@ -455,7 +455,7 @@ func TestSpecsForFlavor(t *testing.T) {
 			name:   "basic flavor",
 			flavor: FlavorBasic,
 			wantSpecs: []string{
-				"agentbeat.spec.yml",
+				"elastic-otel-collector.spec.yml",
 				"endpoint-security.spec.yml",
 				"pf-host-agent.spec.yml",
 			},
@@ -464,7 +464,7 @@ func TestSpecsForFlavor(t *testing.T) {
 			name:   "servers flavor",
 			flavor: FlavorServers,
 			wantSpecs: []string{
-				"agentbeat.spec.yml",
+				"elastic-otel-collector.spec.yml",
 				"endpoint-security.spec.yml",
 				"pf-host-agent.spec.yml",
 				"cloudbeat.spec.yml",

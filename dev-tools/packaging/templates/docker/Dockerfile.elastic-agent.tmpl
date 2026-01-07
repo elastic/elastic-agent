@@ -36,9 +36,11 @@ RUN true && \
     rm {{ $beatBinary }} && \
     ln -s {{ $beatHome }}/data/elastic-agent-{{ commit_short }}/elastic-agent {{ $beatBinary }} && \
     chmod 0755 {{ $beatHome }}/data/elastic-agent-*/elastic-agent && \
-    chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/*beat && \
+    chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/elastic-otel-collector && \
+    (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/cloudbeat || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/osquery* || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/apm-server || true) && \
+    (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/cloud-defend || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/endpoint-security || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/fleet-server || true) && \
     (chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/pf-elastic-collector || true) && \
@@ -53,12 +55,11 @@ RUN true && \
 {{- end }}
 
 {{- if eq .Variant "cloud" }}
-    mkdir -p /opt/agentbeat /opt/filebeat /opt/metricbeat && \
+    mkdir -p /opt/filebeat /opt/metricbeat && \
     cp -f {{ $beatHome }}/data/cloud_downloads/filebeat.sh /opt/filebeat/filebeat && \
     chmod +x /opt/filebeat/filebeat && \
     cp -f {{ $beatHome }}/data/cloud_downloads/metricbeat.sh /opt/metricbeat/metricbeat && \
     chmod +x /opt/metricbeat/metricbeat && \
-    tar xf {{ $beatHome }}/data/cloud_downloads/agentbeat-*.tar.gz -C /opt/agentbeat --strip-components=1 && \
     rm -rf {{ $beatHome }}/data/cloud_downloads && \
 {{- end }}
     true
@@ -195,8 +196,8 @@ RUN mkdir /app && \
 
 {{- if eq .Variant "service" }}
 RUN apk add --no-cache git make python-3.11 py3.11-pip && \
-    unzip {{ $beatHome }}/data/service/connectors-*.zip -d {{ $beatHome }}/data/service && \
-    mv {{ $beatHome }}/data/service/elasticsearch_connectors-* /usr/share/connectors && \
+    unzip {{ $beatHome }}/data/service/connectors-*.zip -d {{ $beatHome }}/data/service/connectors && \
+    mv {{ $beatHome }}/data/service/connectors /usr/share/connectors && \
     PYTHON=python3.11 make -C /usr/share/connectors clean install install-agent && \
     chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/connectors
 {{- end }}

@@ -16,7 +16,6 @@ import (
 	"github.com/jaypipes/ghw"
 	"github.com/kardianos/service"
 	"github.com/otiai10/copy"
-	"github.com/schollz/progressbar/v3"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -40,7 +39,7 @@ const (
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
-func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt *progressbar.ProgressBar, streams *cli.IOStreams, customUser, customGroup, userPassword string, flavor string) (utils.FileOwner, error) {
+func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt ProgressDescriber, streams *cli.IOStreams, customUser, customGroup, userPassword string, flavor string) (utils.FileOwner, error) {
 	dir, err := findDirectory()
 	if err != nil {
 		return utils.FileOwner{}, errors.New(err, "failed to discover the source directory for installation", errors.TypeFilesystem)

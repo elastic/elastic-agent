@@ -26,11 +26,29 @@ The EDOT Collector can run in [Agent](https://opentelemetry.io/docs/collector/de
 
 The following sample config files for Agent mode are available:
 
+::::{tab-set}
+
+:::{tab-item} Linux
+
 | Use Cases | Direct ingestion into {{es}} | Managed OTLP Endpoint |
 |---|---|---|
 | Platform logs | [Logs - ES] | [Logs - OTLP] |
 | Platform logs and host metrics | [Logs &#124; Metrics - ES] | [Logs &#124; Metrics - OTLP] |
 | Platform logs, host metrics, <br> and application telemetry | [Logs &#124; Metrics &#124; App - ES]<br>(*default*) | [Logs &#124; Metrics &#124; App - OTLP]<br>(*default*) |
+
+:::
+
+:::{tab-item} Windows
+
+| Use Cases | Direct ingestion into {{es}} | Managed OTLP Endpoint |
+|---|---|---|
+| Platform logs | [Logs - ES (Windows)] | [Logs - OTLP (Windows)] |
+| Platform logs and host metrics | [Logs &#124; Metrics - ES (Windows)] | [Logs &#124; Metrics - OTLP (Windows)] |
+| Platform logs, host metrics, <br> and application telemetry | [Logs &#124; Metrics &#124; App - ES (Windows)]<br>(*default*) | [Logs &#124; Metrics &#124; App - OTLP (Windows)]<br>(*default*) |
+
+:::
+
+::::
 
 Use the previous example configurations as a reference when configuring your contrib Collector or customizing your EDOT Collector configuration.
 
@@ -44,14 +62,14 @@ Learn more about the configuration options for the `elasticsearch` exporter in t
 
 The `elasticsearch` exporter comes with two relevant data ingestion modes:
 
-- `ecs`: Writes data in backwards compatible Elastic Common Schema (ECS) format. Original attribute names and semantics might be lost during translation.
+- `ecs`: Writes data in backwards compatible {{product.ecs}} format. Original attribute names and semantics might be lost during translation.
 - `otel`: OTel attribute names and semantics are preserved.
 
 The goal of EDOT is to preserve OTel data formats and semantics as much as possible, so `otel` is the default mode for the EDOT Collector. Some use cases might require data to be exported in ECS format for backwards compatibility.
 
 #### Logs collection pipeline
 
-For logs collection, the default configuration uses the [`filelog`] receiver to read log entries from files. In addition, the [`resourcedetection`] processor enriches the log entries with metadata about the corresponding host and operating system.
+For logs collection, the default configuration uses the [`filelog`] receiver to read log entries from files. Also, the [`resourcedetection`] processor enriches the log entries with metadata about the corresponding host and operating system.
 
 :::{note}
 The `from_context: client_metadata` option in the `resource` processor only applies to transport-level metadata. It cannot extract custom application attributes.
@@ -65,7 +83,7 @@ Data is exported directly to {{es}} using the [`elasticsearch`] exporter in `OTe
 
 The application pipeline in the EDOT Collector receives data from OTel SDKs through the [`OTLP`] receiver. While logs and metrics are exported verbatim into {{es}}, traces require two additional components.
 
-{applies_to}`edot_collector: ga 9.2` The [`elasticapm` processor](../components/elasticapmprocessor.md) enriches trace data with additional attributes that improve the user experience in the {{product.observability}} UIs. In addition, the [`elasticapm` connector](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector) generates pre-aggregated APM metrics from tracing data.
+{applies_to}`edot_collector: ga 9.2` The [`elasticapm` processor](../components/elasticapmprocessor.md) enriches trace data with additional attributes that improve the user experience in the {{product.observability}} UIs. In addition, the [`elasticapm` connector](../components/elasticapmconnector.md) generates pre-aggregated APM metrics from tracing data.
 
 Application-related OTel data is ingested into {{es}} in OTel-native format using the [`elasticsearch`] exporter.
 
@@ -75,6 +93,8 @@ Both the `elasticapm` processor and the `elasticapm` connector are required for 
 * Use the EDOT Collector with the available configuration to ingest data into {{es}}.
 * [Build a custom, EDOT-like Collector](/reference/edot-collector/custom-collector.md) for ingesting data into {{es}}.
 * Use Elastic's [managed OTLP endpoint](docs-content://solutions/observability/get-started/opentelemetry/quickstart/serverless/index.md) that does the enrichment for you.
+
+If you're running EDOT Collector 9.x with Elastic Stack 8.18 or 8.19, use the deprecated `elastictrace` processor instead of `elasticapm` processor as specified in the configuration for your Stack version.
 :::
 
 #### Host metrics collection pipeline
@@ -84,6 +104,12 @@ The host metrics pipeline uses the [`hostmetrics`] receiver to collect `disk`, `
 For backwards compatibility, host metrics are translated into ECS-compatible system metrics using the [`elasticinframetrics`] processor. Finally, metrics are ingested in `ecs` format through the [`elasticsearch`] exporter.
 
 The [`resourcedetection`] processor enriches the metrics with meta information about the corresponding host and operating system. The [`attributes`] and [`resource`] processor are used to set some fields for proper routing of the ECS-based system metrics data into corresponding {{es}} data streams.
+
+:::{note}
+:applies_to: edot_collector: ga 9.2
+
+The `elasticinframetrics` processor is deprecated in EDOT Collector 9.2 but is retained for backwards compatibility. If you're running EDOT Collector 9.x with {{product.elastic-stack}} 8.18 or 8.19, continue using this processor as specified in the configuration for your Stack version.
+:::
 
 ::::{important}
 :::{include} ../_snippets/process-config.md
@@ -142,8 +168,8 @@ The following example configuration files are available for the Gateway mode:
 % start:edot-gateway-9x-table
 | Version | Configuration  |
 |---------|----------------|
-| 9.2     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.0/internal/pkg/otel/samples/linux/gateway.yml) |
-| 9.1     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.1.6/internal/pkg/otel/samples/linux/gateway.yml) |
+| 9.2     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/linux/gateway.yml) |
+| 9.1     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.1.9/internal/pkg/otel/samples/linux/gateway.yml) |
 | 9.0     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.0.8/internal/pkg/otel/samples/linux/gateway.yml) |
 % end:edot-gateway-9x-table
 ::::
@@ -152,7 +178,7 @@ The following example configuration files are available for the Gateway mode:
 % start:edot-gateway-8x-table
 | Version | Configuration  |
 |---------|----------------|
-| 8.19    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.19.6/internal/pkg/otel/samples/linux/gateway.yml) |
+| 8.19    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.19.9/internal/pkg/otel/samples/linux/gateway.yml) |
 | 8.18    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.18.8/internal/pkg/otel/samples/linux/gateway.yml) |
 | 8.17    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.17.10/internal/pkg/otel/samples/linux/gateway.yml) |
 % end:edot-gateway-8x-table
@@ -221,7 +247,8 @@ processors:
 
 :::{note}
 :applies_to: edot_collector: ga 9.2
-The `elasticapm` processor replaces the deprecated `elastictrace` processor.
+
+The `elasticapm` processor replaces the deprecated `elastictrace` processor. If you're running EDOT Collector 9.x with Elastic Stack 8.18 or 8.19, use the `elastictrace` processor and the `elasticinframetrics` processor as specified in the Gateway configuration for your Stack version.
 :::
 
 ### Data export
@@ -264,10 +291,32 @@ The EDOT Collector can be configured to use [APM Agent Central Configuration](do
 
 To activate the central configuration feature, add the [`apmconfig`](https://github.com/elastic/opentelemetry-collector-components/blob/main/extension/apmconfigextension/README.md). For example:
 
-:::{include} ../_snippets/edot-collector-auth.md
-:::
+```yaml
+extensions:
+  apikeyauth:
+    endpoint: "${ELASTIC_ENDPOINT}"
+    application_privileges:
+      - application: "apm"
+        privileges: ["config_agent:read"]
+        resources: ["*"]
 
-Create an API Key following [these instructions](docs-content://deploy-manage/api-keys/elasticsearch-api-keys.md). The API key must have `config_agent:read` permissions and resources set to `-`.
+  apmconfig:
+    opamp:
+      protocols:
+        http:
+          auth:
+            authenticator: apikeyauth
+```
+
+::::{note}
+The EDOT Collector doesn't store or embed the {{es}} API key.
+
+Each EDOT SDK sends its own API key in the `Authorization` header (for example: `Authorization: ApiKey <Base64(id:key)>`).
+
+The `apikeyauth` extension only validates incoming API keys against {{es}}, ensuring they include the `apm` to `config_agent:read` privilege and `resources: ["*"]`.
+::::
+
+Create an API Key following [these instructions](docs-content://deploy-manage/api-keys/elasticsearch-api-keys.md). The API key must include the application privilege `config_agent:read` with resources set to `"*"`.
 
 ## Secure connection
 
@@ -296,25 +345,23 @@ extensions:
 
 In addition to TLS, you can configure authentication to ensure that only authorized agents can communicate with the extension and retrieve their corresponding remote configurations.
 
-The `apmconfig` extension supports any configauth authenticator. Use the `apikeyauth` extension to authenticate with Elasticsearch API keys:
+The `apmconfig` extension supports any `configauth` authenticator. Use the `apikeyauth` extension to authenticate with {{es}} API keys:
 
 ```yaml
 extensions:
   apikeyauth:
-    endpoint: "<YOUR_ELASTICSEARCH_ENDPOINT>"
+    endpoint: "${ELASTIC_ENDPOINT}"
     application_privileges:
       - application: "apm"
-        privileges:
-          - "config_agent:read"
-        resources:
-          - "-"
+        privileges: ["config_agent:read"]
+        resources: ["*"]
+
   apmconfig:
     opamp:
       protocols:
         http:
           auth:
             authenticator: apikeyauth
-   ...
 ```
 
 Create an API key with the minimum required application permissions through {{kib}} under **Observability** → **Applications** → **Settings** → **Agent Keys**, or by using the Elasticsearch Security API:
@@ -358,17 +405,26 @@ The server expects incoming HTTP requests to include an API key with sufficient 
 [`elasticsearch`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/elasticsearchexporter
 [`elasticinframetrics`]: https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticinframetricsprocessor
 [`elasticapm` processor]: https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticapmprocessor
-[`elasticapm` connector]: https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector
+[`elasticapm` connector]: ../components/elasticapmconnector.md
 [`resource`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourceprocessor
 [`resourcedetection`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor
 [`OTLP`]: https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver
-[Logs - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/platformlogs.yml
-[Logs - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/managed_otlp/platformlogs.yml
-[Logs &#124; Metrics - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/platformlogs_hostmetrics.yml
-[Logs &#124; Metrics - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/managed_otlp/platformlogs_hostmetrics.yml
-[Logs &#124; Metrics &#124; App - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/logs_metrics_traces.yml
-[Logs &#124; Metrics &#124; App - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v{{version.edot_collector}}/internal/pkg/otel/samples/linux/managed_otlp/logs_metrics_traces.yml
-[Gateway mode]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/heads/main/internal/pkg/otel/samples/linux/gateway.yml
+% start:edot-samples-links
+[Logs - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/linux/platformlogs.yml
+[Logs - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/linux/managed_otlp/platformlogs.yml
+[Logs &#124; Metrics - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/linux/platformlogs_hostmetrics.yml
+[Logs &#124; Metrics - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/linux/managed_otlp/platformlogs_hostmetrics.yml
+[Logs &#124; Metrics &#124; App - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/linux/logs_metrics_traces.yml
+[Logs &#124; Metrics &#124; App - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/linux/managed_otlp/logs_metrics_traces.yml
+[Logs - ES (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/windows/platformlogs.yml
+[Logs - OTLP (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/windows/managed_otlp/platformlogs.yml
+[Logs &#124; Metrics - ES (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/windows/platformlogs_hostmetrics.yml
+[Logs &#124; Metrics - OTLP (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/windows/managed_otlp/platformlogs_hostmetrics.yml
+[Logs &#124; Metrics &#124; App - ES (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/windows/logs_metrics_traces.yml
+[Logs &#124; Metrics &#124; App - OTLP (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/windows/managed_otlp/logs_metrics_traces.yml
+
+% end:edot-samples-links
+[Gateway mode]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/heads/main/internal/edot/samples/linux/gateway.yml
 
 
 ### Secure SDK to Collector connection (TLS)
@@ -469,3 +525,17 @@ exporters:
 mTLS ensures that only authorized collectors can send telemetry data.
 
 For {{ecloud}} and {{serverless-full}} deployments, mTLS is not required. TLS and API key authentication are enforced automatically.
+
+## Configuration compatibility with Elastic Stack versions
+
+While EDOT Collector 9.x is compatible with {{product.elastic-stack}} 8.18 and 8.19, users running these Stack versions should use the EDOT Collector configuration aligned with their Stack version to ensure the end-to-end experience works properly with {{product.kibana}} Observability UIs. Refer to [Migrate components](/reference/edot-collector/components/migrate-components.md) to migrate your configuration to the new components.
+
+::::{important}
+If you're upgrading EDOT Collector to 9.x but keeping your {{product.elastic-stack}} on 8.18 or 8.19:
+
+- Use the configuration examples for your Stack version (8.18 or 8.19), not the latest 9.x configuration.
+- Continue using deprecated components (such as `elasticinframetrics` and `elastictrace` processors) that are included in the configuration for your Stack version.
+- These deprecated components are retained in EDOT Collector 9.x specifically to maintain backwards compatibility during the official deprecation window.
+
+For Gateway mode configurations by Stack version, refer to the [Gateway mode section](#gateway-mode).
+::::

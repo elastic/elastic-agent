@@ -245,9 +245,9 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	err = classicFixture.Configure(ctx, updatedPolicyBytes)
 	require.NoError(t, err, "error configuring fixture")
 
+	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	output, err := classicFixture.InstallWithoutEnroll(ctx, &installOpts)
 	require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
-	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error
@@ -258,36 +258,35 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 
 	// 2. Assert monitoring logs and metrics are available on ES
 	for _, tc := range tests {
-		require.Eventuallyf(t,
-			func() bool {
-				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
-				defer findCancel()
-				mustClauses := []map[string]any{
-					{"match": map[string]any{"data_stream.type": tc.dsType}},
-					{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
-					{"match": map[string]any{"data_stream.namespace": processNamespace}},
-				}
-				mustClauses = append(mustClauses, tc.query...)
-				rawQuery := map[string]any{
-					"query": map[string]any{
-						"bool": map[string]any{
-							"must":   mustClauses,
-							"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestamp}}},
-						},
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+			defer findCancel()
+			mustClauses := []map[string]any{
+				{"match": map[string]any{"data_stream.type": tc.dsType}},
+				{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
+				{"match": map[string]any{"data_stream.namespace": processNamespace}},
+			}
+			mustClauses = append(mustClauses, tc.query...)
+			rawQuery := map[string]any{
+				"query": map[string]any{
+					"bool": map[string]any{
+						"must":   mustClauses,
+						"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestamp}}},
 					},
-					"sort": []map[string]any{
-						{"@timestamp": map[string]any{"order": "asc"}},
-					},
-				}
+				},
+				"sort": []map[string]any{
+					{"@timestamp": map[string]any{"order": "asc"}},
+				},
+			}
 
-				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
-				require.NoError(t, err)
-				if docs.Hits.Total.Value != 0 {
-					key := tc.dsType + "-" + tc.dsDataset + "-" + processNamespace
-					agentDocs[key] = docs
-				}
-				return docs.Hits.Total.Value > 0
-			},
+			docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
+			require.NoError(collect, err)
+			if docs.Hits.Total.Value != 0 {
+				key := tc.dsType + "-" + tc.dsDataset + "-" + processNamespace
+				agentDocs[key] = docs
+			}
+			require.Greater(collect, docs.Hits.Total.Value, 0)
+		},
 			2*time.Minute, 5*time.Second,
 			"agent monitoring classic no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestamp, tc.dsType, tc.dsDataset, processNamespace, tc.query)
 	}
@@ -323,42 +322,41 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		var statusErr error
 		status, statusErr := beatReceiverFixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
-		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 4)
+		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 3)
 	}, 1*time.Minute, 1*time.Second)
 
 	// 5. Assert monitoring logs and metrics are available on ES (for otel mode)
 	for _, tc := range tests {
-		require.Eventuallyf(t,
-			func() bool {
-				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
-				defer findCancel()
-				mustClauses := []map[string]any{
-					{"match": map[string]any{"data_stream.type": tc.dsType}},
-					{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
-					{"match": map[string]any{"data_stream.namespace": receiverNamespace}},
-				}
-				mustClauses = append(mustClauses, tc.query...)
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+			defer findCancel()
+			mustClauses := []map[string]any{
+				{"match": map[string]any{"data_stream.type": tc.dsType}},
+				{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
+				{"match": map[string]any{"data_stream.namespace": receiverNamespace}},
+			}
+			mustClauses = append(mustClauses, tc.query...)
 
-				rawQuery := map[string]any{
-					"query": map[string]any{
-						"bool": map[string]any{
-							"must":   mustClauses,
-							"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestampBeatReceiver}}},
-						},
+			rawQuery := map[string]any{
+				"query": map[string]any{
+					"bool": map[string]any{
+						"must":   mustClauses,
+						"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestampBeatReceiver}}},
 					},
-					"sort": []map[string]any{
-						{"@timestamp": map[string]any{"order": "asc"}},
-					},
-				}
+				},
+				"sort": []map[string]any{
+					{"@timestamp": map[string]any{"order": "asc"}},
+				},
+			}
 
-				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
-				require.NoError(t, err)
-				if docs.Hits.Total.Value != 0 {
-					key := tc.dsType + "-" + tc.dsDataset + "-" + receiverNamespace
-					otelDocs[key] = docs
-				}
-				return docs.Hits.Total.Value > 0
-			},
+			docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
+			require.NoError(collect, err)
+			if docs.Hits.Total.Value != 0 {
+				key := tc.dsType + "-" + tc.dsDataset + "-" + receiverNamespace
+				otelDocs[key] = docs
+			}
+			require.Greater(collect, docs.Hits.Total.Value, 0)
+		},
 			4*time.Minute, 5*time.Second,
 			"agent monitoring beats receivers no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestampBeatReceiver, tc.dsType, tc.dsDataset, receiverNamespace, tc.query)
 	}
@@ -382,9 +380,6 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 			"data_stream.namespace",
 			"elastic_agent.id",
 			"event.ingested",
-
-			// only in receiver doc
-			"agent.otelcol",
 		}
 		switch tc.onlyCompareKeys {
 		case true:
@@ -442,6 +437,8 @@ func TestAgentMetricsInput(t *testing.T) {
     to_stderr: true
   monitoring:
     _runtime_experimental: {{.RuntimeExperimental}}
+  internal.runtime.metricbeat:
+    system/metrics: {{.RuntimeExperimental}}
 inputs:
   # Collecting system metrics
   - type: system/metrics
@@ -449,7 +446,6 @@ inputs:
     data_stream.namespace: {{.Namespace}}
     use_output: default
     {{if ne .RuntimeExperimental "" }}
-    _runtime_experimental: {{.RuntimeExperimental}}
     {{end}}
     streams:
       {{range $mset := .Metricsets}}
@@ -593,10 +589,6 @@ outputs:
 
 			// for short periods of time, the beats binary version can be out of sync with the beat receiver version
 			"agent.version",
-
-			// only in receiver doc
-			"agent.otelcol.component.id",
-			"agent.otelcol.component.kind",
 		}
 
 		stripNondeterminism := func(m mapstr.M, mset string) {
@@ -707,11 +699,12 @@ func TestBeatsReceiverLogs(t *testing.T) {
 	configTemplate := `agent.logging.level: info
 agent.logging.to_stderr: true
 agent.logging.to_files: false
+agent.internal.runtime.metricbeat:
+  system/metrics: {{.RuntimeExperimental}}
 inputs:
   # Collecting system metrics
   - type: system/metrics
     id: unique-system-metrics-input
-    _runtime_experimental: {{.RuntimeExperimental}}
     streams:
       - metricsets:
         - cpu
@@ -817,6 +810,12 @@ agent.monitoring.enabled: false
 	}
 }
 
+// Log lines TestBeatsReceiverProcessRuntimeFallback checks for
+const (
+	otelRuntimeUnsupportedLogLineStart                 = "otel runtime is not supported for component"
+	otelRuntimeMonitoringOutputUnsupportedLogLineStart = "otel runtime is not supported for monitoring output"
+)
+
 // TestBeatsReceiverProcessRuntimeFallback verifies that we fall back to the process runtime if the otel runtime
 // does not support the requested configuration.
 func TestBeatsReceiverProcessRuntimeFallback(t *testing.T) {
@@ -834,10 +833,17 @@ func TestBeatsReceiverProcessRuntimeFallback(t *testing.T) {
 
 	config := `agent.logging.to_stderr: true
 agent.logging.to_files: false
+agent.internal.runtime.metricbeat:
+  system/metrics: otel
 inputs:
-  # Collecting system metrics
   - type: system/metrics
     id: unique-system-metrics-input
+    streams:
+      - metricsets:
+        - cpu
+  - type: system/metrics
+    id: unique-system-metrics-input-2
+    use_output: supported
     _runtime_experimental: otel
     streams:
       - metricsets:
@@ -848,7 +854,14 @@ outputs:
     hosts: [http://localhost:9200]
     api_key: placeholder
     indices: [] # not supported by the elasticsearch exporter
-agent.monitoring.enabled: false
+    status_reporting:
+      enabled: false
+  supported:
+    type: elasticsearch
+    hosts: [http://localhost:9200]
+    api_key: placeholder
+    status_reporting:
+      enabled: false
 `
 
 	// this is the context for the whole test, with a global timeout defined
@@ -871,14 +884,31 @@ agent.monitoring.enabled: false
 		var statusErr error
 		status, statusErr := fixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
-		// we should be running beats processes even though the otel runtime was requested
-		assertBeatsHealthy(collect, &status, component.ProcessRuntimeManager, 1)
+		// we should be running beats processes for components with default output even though the otel runtime was requested
+		// agent should be healthy
+		assert.Equal(collect, int(cproto.State_HEALTHY), status.State)
+		assert.Equal(collect, 5, len(status.Components))
+
+		// all the components should be healthy, their units should be healthy, and they should identify
+		// themselves as running in the process runtime if they're using the default or monitoring outputs
+		for _, comp := range status.Components {
+			assert.Equal(collect, int(cproto.State_HEALTHY), comp.State)
+			expectedComponentVersionInfoName := componentVersionInfoNameForRuntime(component.OtelRuntimeManager)
+			if strings.HasSuffix(comp.ID, "default") || strings.HasSuffix(comp.ID, "monitoring") {
+				expectedComponentVersionInfoName = componentVersionInfoNameForRuntime(component.ProcessRuntimeManager)
+			}
+			assert.Equal(collect, expectedComponentVersionInfoName, comp.VersionInfo.Name)
+			for _, unit := range comp.Units {
+				assert.Equal(collect, int(cproto.State_HEALTHY), unit.State)
+			}
+		}
 	}, 1*time.Minute, 1*time.Second)
 	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
 	require.NoError(t, err)
 
 	// verify we've logged a warning about using the process runtime
-	var unsupportedLogRecord map[string]any
+	var unsupportedLogRecords []map[string]any
+	var monitoringOutputUnsupportedLogRecord map[string]any
 	for _, line := range strings.Split(string(logsBytes), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -889,9 +919,13 @@ agent.monitoring.enabled: false
 			continue
 		}
 
-		if message, ok := logRecord["message"].(string); ok && strings.HasPrefix(message, "otel runtime is not supported") {
-			unsupportedLogRecord = logRecord
-			break
+		if message, ok := logRecord["message"].(string); ok {
+			if strings.HasPrefix(message, otelRuntimeUnsupportedLogLineStart) {
+				unsupportedLogRecords = append(unsupportedLogRecords, logRecord)
+			}
+			if strings.HasPrefix(message, otelRuntimeMonitoringOutputUnsupportedLogLineStart) {
+				monitoringOutputUnsupportedLogRecord = logRecord
+			}
 		}
 	}
 
@@ -902,11 +936,8 @@ agent.monitoring.enabled: false
 		}
 	})
 
-	require.NotNil(t, unsupportedLogRecord, "unsupported log message should be present")
-	message, ok := unsupportedLogRecord["message"].(string)
-	require.True(t, ok, "log message field should be a string")
-	expectedMessage := "otel runtime is not supported for component system/metrics-default, switching to process runtime, reason: unsupported configuration for system/metrics-default: error translating config for output: default, unit: system/metrics-default, error: indices is currently not supported: unsupported operation"
-	assert.Equal(t, expectedMessage, message)
+	assert.Len(t, unsupportedLogRecords, 1, "one log line for each component we try to run")
+	assert.NotEmpty(t, monitoringOutputUnsupportedLogRecord, "should get a log line about monitoring output not being supported")
 }
 
 // TestComponentWorkDir verifies that the component working directory is not deleted when moving the component from
@@ -927,14 +958,15 @@ func TestComponentWorkDir(t *testing.T) {
 	type configOptions struct {
 		RuntimeExperimental string
 	}
-	configTemplate := `agent.logging.level: info
+	configTemplate := `agent.logging.level: debug
 agent.logging.to_stderr: true
 agent.logging.to_files: false
+agent.internal.runtime.metricbeat:
+  system/metrics: {{.RuntimeExperimental}}
 inputs:
   # Collecting system metrics
   - type: system/metrics
     id: unique-system-metrics-input
-    _runtime_experimental: {{.RuntimeExperimental}}
     streams:
       - metricsets:
         - cpu
@@ -978,13 +1010,14 @@ agent.monitoring.enabled: false
 	var componentID, componentWorkDir string
 	var workDirCreated time.Time
 
-	// wait for component to appear in status
+	// wait for component to appear in status and be healthy
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error
 		status, statusErr := fixture.ExecStatus(ctx)
 		require.NoError(collect, statusErr)
 		require.Equal(collect, 1, len(status.Components))
 		componentStatus := status.Components[0]
+		assert.Equal(collect, cproto.State_HEALTHY, cproto.State(componentStatus.State))
 		componentID = componentStatus.ID
 	}, 2*time.Minute, 5*time.Second)
 
@@ -1001,13 +1034,17 @@ agent.monitoring.enabled: false
 	err = fixture.Configure(ctx, receiverConfig)
 	require.NoError(t, err)
 
+	// wait for component to appear in status and be healthy or degraded
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var statusErr error
 		status, statusErr := fixture.ExecStatus(ctx)
 		require.NoError(collect, statusErr)
 		require.Equal(collect, 1, len(status.Components))
 		componentStatus := status.Components[0]
-		assert.Equal(collect, "beats-receiver", componentStatus.VersionInfo.Name)
+		require.Equal(collect, "beats-receiver", componentStatus.VersionInfo.Name)
+		componentState := cproto.State(componentStatus.State)
+		assert.Truef(collect, componentState == cproto.State_HEALTHY || componentState == cproto.State_DEGRADED,
+			"component state should be HEALTHY or DEGRADED, got %s", componentState.String())
 	}, 2*time.Minute, 5*time.Second)
 
 	// the component working directory should still exist
@@ -1050,13 +1087,8 @@ func assertCollectorComponentsHealthy(t *assert.CollectT, status *atesting.Agent
 }
 
 func assertBeatsHealthy(t *assert.CollectT, status *atesting.AgentStatusOutput, runtime component.RuntimeManager, componentCount int) {
-	var componentVersionInfoName string
-	switch runtime {
-	case "otel":
-		componentVersionInfoName = "beats-receiver"
-	default:
-		componentVersionInfoName = "beat-v2-client"
-	}
+	t.Helper()
+	componentVersionInfoName := componentVersionInfoNameForRuntime(runtime)
 
 	// agent should be healthy
 	assert.Equal(t, int(cproto.State_HEALTHY), status.State)
@@ -1164,11 +1196,11 @@ func TestSensitiveLogsESExporter(t *testing.T) {
 	require.NoError(t, err)
 
 	configTemplate := `
+agent.internal.runtime.filebeat.filestream: otel
 inputs:
   - type: filestream
     id: filestream-e2e
     use_output: default
-    _runtime_experimental: otel
     streams:
       - id: e2e
         data_stream:
@@ -1250,7 +1282,7 @@ agent.logging.stderr: true
 	}
 
 	var monitoringDoc estools.Documents
-	assert.EventuallyWithT(t,
+	require.EventuallyWithT(t,
 		func(ct *assert.CollectT) {
 			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer findCancel()
@@ -1260,7 +1292,7 @@ agent.logging.stderr: true
 
 			assert.GreaterOrEqual(ct, monitoringDoc.Hits.Total.Value, 1)
 		},
-		2*time.Minute, 5*time.Second,
+		3*time.Minute, 5*time.Second,
 		"Expected at least %d log, got %d", 1, monitoringDoc.Hits.Total.Value)
 
 	inputField := monitoringDoc.Hits.Hits[0].Source["input"]
@@ -1351,7 +1383,6 @@ inputs:
   - type: filestream
     id: filestream-e2e
     use_output: default
-    _runtime_experimental: otel
     streams:
       - id: e2e
         data_stream:
@@ -1372,6 +1403,7 @@ agent:
     metrics: false
     logs: true
     _runtime_experimental: otel
+agent.internal.runtime.filebeat.filestream: otel
 agent.logging.level: debug
 agent.logging.stderr: true
 `
@@ -1483,9 +1515,8 @@ func setStrictMapping(client *elasticsearch.Client, index string) error {
 	defer cancel()
 
 	// Build request
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut,
-		esEndpoint+"/_index_template/no-dynamic-template",
-		bytes.NewReader(jsonData))
+	url := fmt.Sprintf("%s/_index_template/%s", esEndpoint, index)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(jsonData))
 	if err != nil {
 		return fmt.Errorf("could not create http request to ES server: %v", err)
 	}
@@ -1497,8 +1528,15 @@ func setStrictMapping(client *elasticsearch.Client, index string) error {
 	if err != nil {
 		return fmt.Errorf("error performing request: %v", err)
 	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("incorrect response code: %v", err)
+		responseBody, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return fmt.Errorf("unexpected status code: %d, error reading response body: %w", resp.StatusCode, readErr)
+		}
+		return fmt.Errorf("unexpected status code: %d, response body: %s", resp.StatusCode, responseBody)
 	}
 	return nil
 }
@@ -1660,7 +1698,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 	healthCheck(ctx,
 		"Everything is ready. Begin running and processing data.",
 		component.OtelRuntimeManager,
-		4,
+		3,
 		otelTimestamp)
 
 	// restart 3 times, checks path definition is stable
@@ -1675,7 +1713,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 		healthCheck(ctx,
 			"Everything is ready. Begin running and processing data.",
 			component.OtelRuntimeManager,
-			4,
+			3,
 			restartTimestamp)
 	}
 
@@ -1779,4 +1817,17 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 	// Uninstall
 	combinedOutput, err = fut.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
 	require.NoErrorf(t, err, "error uninstalling beat receiver agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
+}
+
+func componentVersionInfoNameForRuntime(runtime component.RuntimeManager) string {
+	var componentVersionInfoName string
+	switch runtime {
+	case component.OtelRuntimeManager:
+		componentVersionInfoName = "beats-receiver"
+	case component.ProcessRuntimeManager:
+		componentVersionInfoName = "beat-v2-client"
+	default:
+		componentVersionInfoName = componentVersionInfoNameForRuntime(component.DefaultRuntimeManager)
+	}
+	return componentVersionInfoName
 }

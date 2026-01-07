@@ -33,6 +33,8 @@ outputs:
     api_key: "example-key"
     preset: balanced
     allow_older_versions: true
+    status_reporting:
+      enabled: false
 
 inputs:
   - type: system/metrics

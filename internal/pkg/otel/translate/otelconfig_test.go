@@ -54,7 +54,7 @@ func TestBeatNameToDefaultDatastreamType(t *testing.T) {
 		t.Run(fmt.Sprintf("%v", tt.beatName), func(t *testing.T) {
 			comp := component.Component{
 				InputSpec: &component.InputRuntimeSpec{
-					BinaryName: "agentbeat",
+					BinaryName: "elastic-otel-collector",
 					Spec: component.InputSpec{
 						Command: &component.CommandSpec{
 							Args: []string{tt.beatName},
@@ -88,7 +88,7 @@ func TestGetSignalForComponent(t *testing.T) {
 			expectedError: fmt.Errorf("unknown otel signal for input type: %s", "test"),
 		},
 		{
-			name: "not agentbeat",
+			name: "not elastic-otel-collector",
 			component: component.Component{
 				InputType: "test",
 				InputSpec: &component.InputRuntimeSpec{
@@ -102,7 +102,7 @@ func TestGetSignalForComponent(t *testing.T) {
 			component: component.Component{
 				InputType: "filestream",
 				InputSpec: &component.InputRuntimeSpec{
-					BinaryName: "agentbeat",
+					BinaryName: "elastic-otel-collector",
 					Spec: component.InputSpec{
 						Command: &component.CommandSpec{
 							Args: []string{"filebeat"},
@@ -117,7 +117,7 @@ func TestGetSignalForComponent(t *testing.T) {
 			component: component.Component{
 				InputType: "filestream",
 				InputSpec: &component.InputRuntimeSpec{
-					BinaryName: "agentbeat",
+					BinaryName: "elastic-otel-collector",
 					Spec: component.InputSpec{
 						Command: &component.CommandSpec{
 							Args: []string{"metricbeat"},
@@ -309,6 +309,9 @@ func TestGetOtelConfig(t *testing.T) {
 			"logs_dynamic_id": map[string]any{
 				"enabled": true,
 			},
+			"logs_dynamic_pipeline": map[string]any{
+				"enabled": true,
+			},
 			"include_source_on_error": true,
 			"auth": map[string]any{
 				"authenticator": "beatsauth/_agent-component/" + outputName,
@@ -404,10 +407,8 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 			},
-			"output": map[string]any{
-				"otelconsumer": map[string]any{},
-			},
 			"path": map[string]any{
+				"home": paths.Components(),
 				"data": filepath.Join(paths.Run(), id),
 			},
 			"queue": map[string]any{
@@ -477,7 +478,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "filestream",
 						OutputType: "elasticsearch",
 						InputSpec: &component.InputRuntimeSpec{
-							BinaryName: "agentbeat",
+							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
 								Command: &component.CommandSpec{
 									Args: []string{"filebeat"},
@@ -529,7 +530,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "filestream",
 						OutputType: "elasticsearch",
 						InputSpec: &component.InputRuntimeSpec{
-							BinaryName: "agentbeat",
+							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
 								Command: &component.CommandSpec{
 									Args: []string{"filebeat"},
@@ -554,7 +555,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "filestream",
 						OutputType: "elasticsearch",
 						InputSpec: &component.InputRuntimeSpec{
-							BinaryName: "agentbeat",
+							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
 								Command: &component.CommandSpec{
 									Args: []string{"filebeat"},
@@ -613,7 +614,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "filestream",
 						OutputType: "elasticsearch",
 						InputSpec: &component.InputRuntimeSpec{
-							BinaryName: "agentbeat",
+							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
 								Command: &component.CommandSpec{
 									Args: []string{"filebeat"},
@@ -638,7 +639,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "filestream",
 						OutputType: "elasticsearch",
 						InputSpec: &component.InputRuntimeSpec{
-							BinaryName: "agentbeat",
+							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
 								Command: &component.CommandSpec{
 									Args: []string{"filebeat"},
@@ -695,7 +696,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "beat/metrics",
 						OutputType: "elasticsearch",
 						InputSpec: &component.InputRuntimeSpec{
-							BinaryName: "agentbeat",
+							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
 								Command: &component.CommandSpec{
 									Args: []string{"metricbeat"},
@@ -740,10 +741,8 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
-						"output": map[string]any{
-							"otelconsumer": map[string]any{},
-						},
 						"path": map[string]any{
+							"home": paths.Components(),
 							"data": filepath.Join(paths.Run(), "beat-metrics-monitoring"),
 						},
 						"queue": map[string]any{
@@ -795,7 +794,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "system/metrics",
 						OutputType: "elasticsearch",
 						InputSpec: &component.InputRuntimeSpec{
-							BinaryName: "agentbeat",
+							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
 								Command: &component.CommandSpec{
 									Args: []string{"metricbeat"},
@@ -851,10 +850,8 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
-						"output": map[string]any{
-							"otelconsumer": map[string]any{},
-						},
 						"path": map[string]any{
+							"home": paths.Components(),
 							"data": filepath.Join(paths.Run(), "system-metrics"),
 						},
 						"queue": map[string]any{
@@ -938,7 +935,7 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 		ID:        "filebeat-test-id",
 		InputType: "filestream",
 		InputSpec: &component.InputRuntimeSpec{
-			BinaryName: "agentbeat",
+			BinaryName: "elastic-otel-collector",
 			Spec: component.InputSpec{
 				Name: "filestream",
 				Command: &component.CommandSpec{
@@ -973,7 +970,7 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 		ID:        "metricbeat-test-id",
 		InputType: "system/metrics",
 		InputSpec: &component.InputRuntimeSpec{
-			BinaryName: "agentbeat",
+			BinaryName: "elastic-otel-collector",
 			Spec: component.InputSpec{
 				Name: "system/metrics",
 				Command: &component.CommandSpec{
@@ -1041,7 +1038,7 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 				ID:        "no-inputs-test-id",
 				InputType: "filestream",
 				InputSpec: &component.InputRuntimeSpec{
-					BinaryName: "agentbeat",
+					BinaryName: "elastic-otel-collector",
 					Spec: component.InputSpec{
 						Name: "filestream",
 						Command: &component.CommandSpec{
@@ -1103,7 +1100,6 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			assert.True(t, ok, "receiver config should be a map")
 
 			// Verify configuration section presence
-			assert.Contains(t, receiverConfig, "output", "output config should be present")
 			assert.Contains(t, receiverConfig, "path", "path config should be present")
 			assert.Contains(t, receiverConfig, "logging", "logging config should be present")
 			assert.Contains(t, receiverConfig, tt.expectedBeatName, fmt.Sprintf("%s config should be present", tt.expectedBeatName))
@@ -1139,7 +1135,7 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 				InputType:  "filestream",
 				OutputType: "elasticsearch",
 				InputSpec: &component.InputRuntimeSpec{
-					BinaryName: "agentbeat",
+					BinaryName: "elastic-otel-collector",
 					Spec: component.InputSpec{
 						Command: &component.CommandSpec{
 							Args: []string{"filebeat"},
@@ -1203,7 +1199,7 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 				InputType:  "filestream",
 				OutputType: "elasticsearch",
 				InputSpec: &component.InputRuntimeSpec{
-					BinaryName: "agentbeat",
+					BinaryName: "elastic-otel-collector",
 					Spec: component.InputSpec{
 						Command: &component.CommandSpec{
 							Args: []string{"filebeat"},
@@ -1309,10 +1305,10 @@ func TestGetBeatsAuthExtensionConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "with ssl enabled and verification_mode full",
+			name: "with ssl enabled and verification_mode certificate",
 			outputCfg: map[string]any{
 				"ssl.enabled":           true,
-				"ssl.verification_mode": "full",
+				"ssl.verification_mode": "certificate",
 			},
 			expected: map[string]any{
 				"continue_on_error":       true,
@@ -1331,9 +1327,39 @@ func TestGetBeatsAuthExtensionConfig(t *testing.T) {
 					"key_passphrase_path":     "",
 					"renegotiation":           int64(0),
 					"supported_protocols":     []interface{}{},
-					"verification_mode":       uint64(0),
+					"verification_mode":       uint64(2),
 				},
 				"timeout": "1m30s",
+			},
+		},
+		{
+			name: "with kerberos is enabled",
+			outputCfg: map[string]any{
+				"kerberos": map[string]any{
+					"enabled":     true,
+					"auth_type":   "password",
+					"config_path": "temp/krb5.conf",
+					"username":    "beats",
+					"password":    "testing",
+					"realm":       "elastic",
+				},
+			},
+			expected: map[string]any{
+				"continue_on_error":       true,
+				"idle_connection_timeout": "3s",
+				"timeout":                 "1m30s",
+				"kerberos": map[string]any{
+					"enabled":          true,
+					"auth_type":        "password",
+					"config_path":      "temp/krb5.conf",
+					"username":         "beats",
+					"password":         "testing",
+					"realm":            "elastic",
+					"enable_krb5_fast": false,
+					"service_name":     "",
+					"keytab":           "",
+				},
+				"proxy_disable": false,
 			},
 		},
 	}
@@ -1350,6 +1376,77 @@ func TestGetBeatsAuthExtensionConfig(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				assert.Equal(t, tt.expected, actual)
+			}
+		})
+	}
+}
+
+func TestVerifyOutputIsOtelSupported(t *testing.T) {
+	tests := []struct {
+		name          string
+		outputType    string
+		outputCfg     map[string]any
+		expectedError string
+	}{
+		{
+			name:       "supported output - elasticsearch",
+			outputType: "elasticsearch",
+			outputCfg: map[string]any{
+				"type":  "elasticsearch",
+				"hosts": []any{"localhost:9200"},
+			},
+		},
+		{
+			name:          "unsupported output type - kafka",
+			outputType:    "kafka",
+			outputCfg:     map[string]any{},
+			expectedError: "unsupported output type: kafka",
+		},
+		{
+			name:          "unsupported output type - logstash",
+			outputType:    "logstash",
+			outputCfg:     map[string]any{},
+			expectedError: "unsupported output type: logstash",
+		},
+		{
+			name:       "unsupported configuration - indices field",
+			outputType: "elasticsearch",
+			outputCfg: map[string]any{
+				"type":    "elasticsearch",
+				"hosts":   []any{"localhost:9200"},
+				"indices": []any{},
+			},
+			expectedError: "unsupported configuration for elasticsearch:",
+		},
+		{
+			name:       "unsupported configuration - negative retries",
+			outputType: "elasticsearch",
+			outputCfg: map[string]any{
+				"type":        "elasticsearch",
+				"hosts":       []any{"localhost:9200"},
+				"max_retries": -1,
+			},
+			expectedError: "unsupported configuration for elasticsearch:",
+		},
+		{
+			name:       "supported configuration - 0 retries",
+			outputType: "elasticsearch",
+			outputCfg: map[string]any{
+				"type":        "elasticsearch",
+				"hosts":       []any{"localhost:9200"},
+				"max_retries": 0,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := VerifyOutputIsOtelSupported(tt.outputType, tt.outputCfg)
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
 			}
 		})
 	}

@@ -363,19 +363,18 @@ func (c *commandRuntime) start(comm Communicator) error {
 	}
 	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentID, c.current.ID))
 	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentType, c.getSpecType()))
-	uid := os.Geteuid()
 	workDir := c.current.WorkDirPath(paths.Run())
 	path, err := filepath.Abs(c.getSpecBinaryPath())
 	if err != nil {
 		return fmt.Errorf("failed to determine absolute path: %w", err)
 	}
-	err = utils.HasStrictExecPerms(path, uid)
+	err = utils.HasStrictExecPerms(path)
 	if err != nil {
 		return fmt.Errorf("execution of component prevented: %w", err)
 	}
 
 	if err := c.monitor.Prepare(c.current.ID); err != nil {
-		return err
+		return fmt.Errorf("failed to prepare component monitoring resources: %w", err)
 	}
 	args := c.monitor.EnrichArgs(c.current.ID, c.getSpecBinaryName(), cmdSpec.Args)
 
@@ -391,7 +390,7 @@ func (c *commandRuntime) start(comm Communicator) error {
 		process.WithEnv(env),
 		process.WithCmdOptions(attachOutErr(c.logStd, c.logErr), dirPath(workDir)))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to start process: %w", err)
 	}
 
 	c.proc = proc
@@ -430,7 +429,11 @@ func (c *commandRuntime) stop(ctx context.Context) error {
 	}(c.proc, cmdSpec.Timeouts.Stop)
 
 	c.log.Debugf("gracefully stopping pid %d", c.proc.PID)
-	return c.proc.Stop()
+
+	if stopErr := c.proc.Stop(); stopErr != nil {
+		return fmt.Errorf("failed to stop process %s: %w", c.proc.Cmd.String(), stopErr)
+	}
+	return nil
 }
 
 func (c *commandRuntime) startWatcher(info *process.Info, comm Communicator) {

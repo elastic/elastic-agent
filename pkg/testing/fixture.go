@@ -55,6 +55,7 @@ type Fixture struct {
 	srcPackage string
 	workDir    string
 	extractDir string
+	socketPath string
 
 	installed   bool
 	installOpts *InstallOpts
@@ -186,10 +187,19 @@ func NewFixture(t *testing.T, version string, opts ...FixtureOpt) (*Fixture, err
 }
 
 // Client returns the Elastic Agent communication client.
+// This client is shared across multiple calls to Client()
 func (f *Fixture) Client() client.Client {
 	f.cMx.RLock()
 	defer f.cMx.RUnlock()
 	return f.c
+}
+
+// NewClient returns a new Elastic Agent communication client.
+// The client is NOT shared across multiple calls but a new instance is allocated every time
+func (f *Fixture) NewClient() client.Client {
+	f.cMx.Lock()
+	defer f.cMx.Unlock()
+	return client.New(client.WithAddress(f.socketPath))
 }
 
 // Version returns the Elastic Agent version.
@@ -566,12 +576,16 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 	stdOut := newLogWatcher(logProxy)
 	stdErr := newLogWatcher(logProxy)
 
-	args := []string{command, "-e"}
-	if disableEncryptedStore {
-		args = append(args, "--disable-encrypted-store")
-	}
-	if enableTestingMode {
-		args = append(args, "--testing-mode")
+	args := []string{command}
+	if command != "otel" {
+		// otel command doesn't share these arguments with elastic-agent
+		args = append(args, "-e")
+		if disableEncryptedStore {
+			args = append(args, "--disable-encrypted-store")
+		}
+		if enableTestingMode {
+			args = append(args, "--testing-mode")
+		}
 	}
 
 	args = append(args, f.additionalArgs...)
@@ -938,11 +952,57 @@ func (f *Fixture) IsHealthy(ctx context.Context, opts ...statusOpt) error {
 	}
 
 	if status.State != int(cproto.State_HEALTHY) {
-		return fmt.Errorf("agent isn't healthy, current status: %s",
-			client.State(status.State)) //nolint:gosec // value will never be over 32-bit
+		return fmt.Errorf("agent isn't healthy, current state: %s, full status: %+v",
+			client.State(status.State), status) //nolint:gosec // value will never be over 32-bit
 	}
 
 	return nil
+}
+
+// IsHealthyOrDegradedFromOutput works like IsHealthy, but accepts a Degraded status if the reason is an output in that state.
+// This is useful for tests where we have an ES output, but no actual ES, and we don't care about sending data
+// anywhere.
+func (f *Fixture) IsHealthyOrDegradedFromOutput(ctx context.Context, opts ...statusOpt) error {
+	status, err := f.ExecStatus(ctx, opts...)
+	if err != nil {
+		return fmt.Errorf("agent status returned an error: %w", err)
+	}
+
+	invalidStateErr := fmt.Errorf("agent isn't healthy, current state: %s, full status: %+v",
+		ProtoStateFromInt(status.State), status)
+	switch ProtoStateFromInt(status.State) {
+	case cproto.State_HEALTHY:
+		return nil
+	case cproto.State_DEGRADED:
+		// handled below
+	default:
+		return invalidStateErr
+	}
+
+	for _, compState := range status.Components {
+		switch ProtoStateFromInt(compState.State) {
+		case cproto.State_HEALTHY, cproto.State_DEGRADED:
+		default:
+			return invalidStateErr
+		}
+		for _, unitState := range compState.Units {
+			switch ProtoStateFromInt(unitState.State) {
+			case cproto.State_HEALTHY:
+			case cproto.State_DEGRADED:
+				if cproto.UnitType(unitState.UnitType) != cproto.UnitType_OUTPUT { //nolint:gosec // value will never be over 32-bit
+					return invalidStateErr
+				}
+			default:
+				return invalidStateErr
+			}
+		}
+	}
+
+	return nil
+}
+
+func ProtoStateFromInt(state int) cproto.State {
+	return cproto.State(state) //nolint:gosec // value will never be over 32-bit
 }
 
 // IsInstalled returns true if this fixture has been installed
@@ -1134,6 +1194,12 @@ func (f *Fixture) prepareComponents(workDir string, components ...UsableComponen
 	}
 
 	return nil
+}
+
+func (f *Fixture) setSocketPath(socketPath string) {
+	f.cMx.Lock()
+	defer f.cMx.Unlock()
+	f.socketPath = socketPath
 }
 
 func (f *Fixture) setClient(c client.Client) {
@@ -1605,6 +1671,7 @@ type AgentBinaryVersion struct {
 	Commit    string `yaml:"commit"`
 	BuildTime string `yaml:"build_time"`
 	Snapshot  bool   `yaml:"snapshot"`
+	Fips      bool   `yaml:"fips"`
 }
 
 // String returns the version string.

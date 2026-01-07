@@ -8,7 +8,7 @@ on:
 
 jobs:
   filter:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 1
     outputs:
       matrix: ${{ steps.generator.outputs.matrix }}
@@ -31,8 +31,9 @@ jobs:
       matrix: ${{ fromJson(needs.filter.outputs.matrix) }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
+          submodules: true
           ref: "${{ matrix.branch }}"
 
           # no depth limit

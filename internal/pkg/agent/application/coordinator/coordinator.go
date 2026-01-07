@@ -8,16 +8,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
-
 	"go.opentelemetry.io/collector/component/componentstatus"
+
+	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
+	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 
@@ -159,7 +162,7 @@ type OTelManager interface {
 	Runner
 
 	// Update updates the current plain configuration for the otel collector and components.
-	Update(*confmap.Conf, []component.Component)
+	Update(*confmap.Conf, *monitoringCfg.MonitoringConfig, logp.Level, []component.Component)
 
 	// WatchCollector returns a channel to watch for collector status updates.
 	WatchCollector() <-chan *status.AggregateStatus
@@ -224,10 +227,6 @@ type VarsManager interface {
 	Watch() <-chan []*transpiler.Vars
 }
 
-// ComponentsModifier is a function that takes the computed components model and modifies it before
-// passing it into the components runtime manager.
-type ComponentsModifier func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error)
-
 // managerShutdownTimeout is how long the coordinator will wait during shutdown
 // to receive termination states from its managers.
 // Note: The current timeout (5s) is shorter than the default stop timeout for
@@ -249,7 +248,8 @@ type Coordinator struct {
 	agentInfo info.Agent
 	isManaged bool
 
-	cfg        *configuration.Configuration
+	initialCfg *configuration.Configuration
+	currentCfg *configuration.Configuration
 	specs      component.RuntimeSpecs
 	fleetAcker acker.Acker
 
@@ -267,7 +267,7 @@ type Coordinator struct {
 	otelCfg *confmap.Conf
 
 	caps      capabilities.Capabilities
-	modifiers []ComponentsModifier
+	modifiers []component.ComponentsModifier
 
 	// The current state of the Coordinator. This value and its subfields are
 	// safe to read directly from within the main Coordinator goroutine.
@@ -439,7 +439,7 @@ func New(
 	otelMgr OTelManager,
 	fleetAcker acker.Acker,
 	initialUpgradeDetails *details.Details,
-	modifiers ...ComponentsModifier,
+	modifiers ...component.ComponentsModifier,
 ) *Coordinator {
 	var fleetState cproto.State
 	var fleetMessage string
@@ -458,7 +458,8 @@ func New(
 	}
 	c := &Coordinator{
 		logger:     logger,
-		cfg:        cfg,
+		initialCfg: cfg,
+		currentCfg: cfg,
 		agentInfo:  agentInfo,
 		isManaged:  isManaged,
 		specs:      specs,
@@ -616,7 +617,7 @@ func (c *Coordinator) Migrate(
 	backoffFactory func(done <-chan struct{}) backoff.Backoff,
 	notifyFn func(context.Context, *fleetapi.ActionMigrate) error,
 ) error {
-	if c.specs.Platform().OS == component.Container {
+	if c.isContainerizedEnvironment() {
 		return ErrContainerNotSupported
 	}
 	if !c.isManaged {
@@ -854,6 +855,22 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 			return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
 		}
 
+		if errors.Is(err, upgrade.ErrNoRollbacksAvailable) && action != nil && release.VersionWithSnapshot() == action.Data.Version {
+			// when manually rolling back the action store is not copied back, so it's likely that the rolled back agent
+			// will receive (again) the rollback action because it's using an ackToken from before the rollback action
+			// was received by the "upgraded" elastic-agent.
+			// This block here is to avoid setting an error state because the rollback requested no longer exist after
+			// having performed the rollback once.
+			// A better test would be to compare actionIDs but there's no way to persist the actionID of the rollback action
+			// from the upgraded agent to the rolled back agent (upgrade details is reset when the upgrade marker is deleted)
+			c.logger.Infow(
+				"Received a rollback action with the same version as current and no rollbacks available, ignoring the likely replayed action",
+				"action_id", action.ID())
+			c.ClearOverrideState()
+			det.SetState(details.StateRollback)
+			return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
+		}
+
 		c.logger.Errorw("upgrade failed", "error", logp.Error(err))
 		// If ErrInsufficientDiskSpace is in the error chain, we want to set the
 		// the error to ErrInsufficientDiskSpace so that the error message is
@@ -865,10 +882,17 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		det.Fail(err)
 		return err
 	}
+
 	if cb != nil {
 		det.SetState(details.StateRestarting)
 		c.ReExec(cb)
 	}
+
+	if uOpts.rollback {
+		// Ack the rollback action, since there's no restart callback returned, this is still run
+		return c.upgradeMgr.AckAction(ctx, c.fleetAcker, action)
+	}
+
 	return nil
 }
 
@@ -1154,10 +1178,10 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			Description: "current local configuration of the running Elastic Agent",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
-				if c.cfg == nil {
+				if c.initialCfg == nil {
 					return []byte("error: failed no local configuration")
 				}
-				o, err := yaml.Marshal(c.cfg)
+				o, err := yaml.Marshal(c.initialCfg)
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
 				}
@@ -1611,6 +1635,14 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 		c.logger.Errorf("failed to add secret markers: %v", err)
 	}
 
+	// override retrieved config from Fleet with persisted config from AgentConfig file
+
+	if c.caps != nil {
+		if err := applyPersistedConfig(c.logger, cfg, paths.ConfigFile(), c.isContainerizedEnvironment, c.caps.AllowFleetOverride); err != nil {
+			return fmt.Errorf("could not apply persisted configuration: %w", err)
+		}
+	}
+
 	// perform and verify ast translation
 	m, err := cfg.ToMapStr()
 	if err != nil {
@@ -1636,10 +1668,26 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 	}
 	c.setProtection(protectionConfig)
 
-	if c.vars != nil {
-		return c.refreshComponentModel(ctx)
+	currentCfg, err := configuration.NewFromConfig(cfg)
+	if err != nil {
+		return fmt.Errorf("invalid configuration: %w", err)
 	}
-	return nil
+	c.currentCfg = currentCfg
+
+	// check if log level has changed for standalone elastic-agent
+	// we'd have to update both the periodic and once config watchers and refactor initialization in application.go to do otherwise.
+	if c.agentInfo.IsStandalone() {
+		ll := currentCfg.Settings.LoggingConfig.Level
+		if ll != c.state.LogLevel {
+			// set log level for the coordinator
+			c.setLogLevel(ll)
+			// set global log level
+			logger.SetLevel(ll)
+			c.logger.Infof("log level changed to %s", ll.String())
+		}
+	}
+
+	return c.refreshComponentModel(ctx)
 }
 
 // Generate the AST for a new incoming configuration and, if successful,
@@ -1692,6 +1740,35 @@ func (c *Coordinator) generateAST(cfg *config.Config, m map[string]interface{}) 
 	return nil
 }
 
+func applyPersistedConfig(logger *logger.Logger, cfg *config.Config, configFile string, checkFns ...func() bool) error {
+	for checkNo, checkFn := range checkFns {
+		if !checkFn() {
+			// Feature is disabled, nothing to do
+			logger.Infof("Applying persisted configuration is disabled by check with idx %d.", checkNo)
+			return nil
+		}
+	}
+
+	f, err := os.OpenFile(configFile, os.O_RDONLY, 0)
+	if err != nil && os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("opening config file: %w", err)
+	}
+	defer f.Close()
+
+	persisted, err := config.NewConfigFrom(f)
+	if err != nil {
+		return fmt.Errorf("parsing persisted config: %w", err)
+	}
+
+	err = cfg.Merge(persisted)
+	if err != nil {
+		return fmt.Errorf("merging persisted config: %w", err)
+	}
+	return nil
+}
+
 // observeASTVars identifies the variables that are referenced in the computed AST and passed to
 // the varsMgr so it knows what providers are being referenced. If a providers is not being
 // referenced then the provider does not need to be running.
@@ -1735,10 +1812,13 @@ func (c *Coordinator) processVars(ctx context.Context, vars []*transpiler.Vars) 
 
 // Called on the main Coordinator goroutine.
 func (c *Coordinator) processLogLevel(ctx context.Context, ll logp.Level) {
-	c.setLogLevel(ll)
-	err := c.refreshComponentModel(ctx)
-	if err != nil {
-		c.logger.Errorf("updating log level: %s", err.Error())
+	// do not refresh component model if log level did not change
+	if c.state.LogLevel != ll {
+		c.setLogLevel(ll)
+		err := c.refreshComponentModel(ctx)
+		if err != nil {
+			c.logger.Errorf("updating log level: %s", err.Error())
+		}
 	}
 }
 
@@ -1805,14 +1885,13 @@ func (c *Coordinator) updateManagersWithConfig(model *component.Model) {
 		}
 		c.logger.With("component_ids", componentIDs).Info("Using OpenTelemetry collector runtime.")
 	}
-	c.otelMgr.Update(c.otelCfg, otelModel.Components)
+	c.otelMgr.Update(c.otelCfg, c.currentCfg.Settings.MonitoringConfig, c.state.LogLevel, otelModel.Components)
 }
 
 // splitModelBetweenManager splits the model components between the runtime manager and the otel manager.
 func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtimeModel *component.Model, otelModel *component.Model) {
 	var otelComponents, runtimeComponents []component.Component
 	for _, comp := range model.Components {
-		c.maybeOverrideRuntimeForComponent(&comp)
 		switch comp.RuntimeManager {
 		case component.OtelRuntimeManager:
 			otelComponents = append(otelComponents, comp)
@@ -1838,7 +1917,7 @@ func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtime
 // Normally, we use the runtime set in the component itself via the configuration, but
 // we may also fall back to the process runtime if the otel runtime is unsupported for
 // some reason. One example is the output using unsupported config options.
-func (c *Coordinator) maybeOverrideRuntimeForComponent(comp *component.Component) {
+func maybeOverrideRuntimeForComponent(logger *logger.Logger, comp *component.Component) {
 	if comp.RuntimeManager == component.ProcessRuntimeManager {
 		// do nothing, the process runtime can handle any component
 		return
@@ -1847,7 +1926,7 @@ func (c *Coordinator) maybeOverrideRuntimeForComponent(comp *component.Component
 		// check if the component is actually supported
 		err := translate.VerifyComponentIsOtelSupported(comp)
 		if err != nil {
-			c.logger.Warnf("otel runtime is not supported for component %s, switching to process runtime, reason: %v", comp.ID, err)
+			logger.Warnf("otel runtime is not supported for component %s, switching to process runtime, reason: %v", comp.ID, err)
 			comp.RuntimeManager = component.ProcessRuntimeManager
 		}
 	}
@@ -1937,8 +2016,16 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		existingCompState[comp.Component.ID] = comp.State.Pid
 	}
 
+	otelRuntimeModifier := func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
+		for i := range comps {
+			maybeOverrideRuntimeForComponent(c.logger, &comps[i])
+		}
+		return comps, nil
+	}
 	comps, err := c.specs.ToComponents(
 		cfg,
+		c.currentCfg.Settings.Internal.Runtime,
+		append(c.modifiers, otelRuntimeModifier),
 		configInjector,
 		c.state.LogLevel,
 		c.agentInfo,
@@ -1950,13 +2037,6 @@ func (c *Coordinator) generateComponentModel() (err error) {
 
 	// Filter any disallowed inputs/outputs from the components
 	comps = c.filterByCapabilities(comps)
-
-	for _, modifier := range c.modifiers {
-		comps, err = modifier(comps, cfg)
-		if err != nil {
-			return fmt.Errorf("failed to modify components: %w", err)
-		}
-	}
 
 	// If we made it this far, update our internal derived values and
 	// return with no error
@@ -2357,4 +2437,8 @@ func computeEnrollOptions(ctx context.Context, cfgPath string, cfgFleetPath stri
 
 	options = enroll.FromFleetConfig(cfg.Fleet)
 	return options, nil
+}
+
+func (c *Coordinator) isContainerizedEnvironment() bool {
+	return c.specs.Platform().OS == component.Container
 }

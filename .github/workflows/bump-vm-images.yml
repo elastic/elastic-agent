@@ -17,7 +17,7 @@ env:
 
 jobs:
   filter:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 1
     outputs:
       matrix: ${{ steps.generator.outputs.matrix }}
@@ -40,8 +40,9 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.filter.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
+          submodules: true
           # NOTE: as long as the updatecli bump differs between branches, we need to
           # checkout the branch that we are going to bump that we are going to bump
           # this is needed to ensure that the updatecli bump is done against the correct updatecli

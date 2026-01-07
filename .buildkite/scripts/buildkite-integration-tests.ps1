@@ -90,7 +90,7 @@ finally
     if (Test-Path $outputXML)
     {
         # Install junit2html if not installed
-        go install github.com/alexec/junit2html@latest
+        go install github.com/kitproj/junit2html@latest
         Get-Content $outputXML | junit2html > "build/TEST-report.html"
     }
     else

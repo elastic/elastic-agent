@@ -27,7 +27,7 @@ metadata:
 
 spec:
   type: tool
-  owner: group:agentless-team
+  owner: group:ingest-managed-jobs
   lifecycle: experimental
   system: agentless
 
@@ -509,7 +509,7 @@ spec:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ
         observablt-robots:
-          access_level: MANAGE_BUILD_AND_READ  
+          access_level: MANAGE_BUILD_AND_READ
         # See https://buildkite.com/docs/pipelines/configure/step-types/trigger-step#permissions
         # Otherwise even if merge commits in the main or any branch, they will fail
         everyone:
@@ -560,7 +560,7 @@ spec:
         prefix_pull_request_fork_branch_names: false
         skip_pull_request_builds_for_existing_commits: false
       teams:
-        agentless-team:
+        ingest-managed-jobs:
           access_level: MANAGE_BUILD_AND_READ
         cloud-tooling:
           access_level: MANAGE_BUILD_AND_READ
@@ -606,7 +606,7 @@ spec:
         build_pull_requests: false
         trigger_mode: none
       teams:
-        agentless-team:
+        ingest-managed-jobs:
           access_level: MANAGE_BUILD_AND_READ
         cloud-tooling:
           access_level: MANAGE_BUILD_AND_READ

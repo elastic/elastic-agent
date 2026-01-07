@@ -19,7 +19,6 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
-
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -37,15 +36,121 @@ type HeadersProvider interface {
 
 type RuntimeManager string
 
+type RuntimeConfig struct {
+	Default    string            `yaml:"default" config:"default" json:"default"`
+	Filebeat   BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
+	Metricbeat BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
+}
+
+type BeatRuntimeConfig struct {
+	Default   string            `yaml:"default" config:"default" json:"default"`
+	InputType map[string]string `yaml:",inline,omitempty" config:",inline,omitempty" json:",inline,omitempty"`
+}
+
+func DefaultRuntimeConfig() *RuntimeConfig {
+	return &RuntimeConfig{
+		Default: string(DefaultRuntimeManager),
+		Metricbeat: BeatRuntimeConfig{
+			InputType: map[string]string{
+				"activemq/metrics":      string(OtelRuntimeManager),
+				"apache/metrics":        string(OtelRuntimeManager),
+				"beat/metrics":          string(OtelRuntimeManager),
+				"containerd/metrics":    string(OtelRuntimeManager),
+				"docker/metrics":        string(OtelRuntimeManager),
+				"elasticsearch/metrics": string(OtelRuntimeManager),
+				"etcd/metrics":          string(OtelRuntimeManager),
+				"http/metrics":          string(OtelRuntimeManager),
+				"jolokia/metrics":       string(OtelRuntimeManager),
+				"kafka/metrics":         string(OtelRuntimeManager),
+				"kibana/metrics":        string(OtelRuntimeManager),
+				"linux/metrics":         string(OtelRuntimeManager),
+				"logstash/metrics":      string(OtelRuntimeManager),
+				"memcached/metrics":     string(OtelRuntimeManager),
+				"mongodb/metrics":       string(OtelRuntimeManager),
+				"mysql/metrics":         string(OtelRuntimeManager),
+				"nats/metrics":          string(OtelRuntimeManager),
+				"nginx/metrics":         string(OtelRuntimeManager),
+				"rabbitmq/metrics":      string(OtelRuntimeManager),
+				"sql/metrics":           string(OtelRuntimeManager),
+				"stan/metrics":          string(OtelRuntimeManager),
+				"statsd/metrics":        string(OtelRuntimeManager),
+				"system/metrics":        string(OtelRuntimeManager),
+				"vsphere/metrics":       string(OtelRuntimeManager),
+			},
+		},
+	}
+}
+
+func (r *RuntimeConfig) Validate() error {
+	validateRuntime := func(val string, allowEmpty bool) error {
+		if allowEmpty && val == "" {
+			return nil
+		}
+		switch RuntimeManager(val) {
+		case "", OtelRuntimeManager, ProcessRuntimeManager:
+			return nil
+		default:
+			return fmt.Errorf("invalid runtime manager: %s, must be either %s or %s",
+				val, OtelRuntimeManager, ProcessRuntimeManager)
+		}
+	}
+	if err := validateRuntime(r.Default, false); err != nil {
+		return err
+	}
+	for _, beatConfig := range []BeatRuntimeConfig{r.Filebeat, r.Metricbeat} {
+		if err := validateRuntime(beatConfig.Default, true); err != nil {
+			return err
+		}
+		for _, val := range beatConfig.InputType {
+			if err := validateRuntime(val, false); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (r *RuntimeConfig) BeatRuntimeConfig(beatName string) *BeatRuntimeConfig {
+	switch beatName {
+	case "filebeat":
+		return &r.Filebeat
+	case "metricbeat":
+		return &r.Metricbeat
+	default:
+		return nil
+	}
+}
+
+func (r *RuntimeConfig) RuntimeManagerForInputType(inputType string, beatName string) RuntimeManager {
+	beatRuntimeConfig := r.BeatRuntimeConfig(beatName)
+	if beatRuntimeConfig != nil {
+		// Check if there's a specific runtime manager for this input type
+		if manager, ok := beatRuntimeConfig.InputType[inputType]; ok {
+			return RuntimeManager(manager)
+		}
+		// Check if the beat has a default runtime manager
+		if beatRuntimeConfig.Default != "" {
+			return RuntimeManager(beatRuntimeConfig.Default)
+		}
+	}
+	// Fall back to global default
+	if r.Default != "" {
+		return RuntimeManager(r.Default)
+	}
+	return DefaultRuntimeManager
+}
+
 const (
 	// defaultUnitLogLevel is the default log level that a unit will get if one is not defined.
 	defaultUnitLogLevel                  = client.UnitLogLevelInfo
 	headersKey                           = "headers"
 	elasticsearchType                    = "elasticsearch"
-	workDirPathMod                       = 0770
+	workDirPathMod                       = 0o770
 	ProcessRuntimeManager                = RuntimeManager("process")
 	OtelRuntimeManager                   = RuntimeManager("otel")
 	DefaultRuntimeManager RuntimeManager = ProcessRuntimeManager
+	enabledKey                           = "enabled"
+	typeKey                              = "type"
 )
 
 // ErrInputRuntimeCheckFail error is used when an input specification runtime prevention check occurs.
@@ -240,10 +345,15 @@ func (c *Component) Type() string {
 // command has a different name.
 func (c *Component) BinaryName() string {
 	if c.InputSpec != nil {
-		if c.InputSpec.Spec.Command != nil && c.InputSpec.Spec.Command.Name != "" {
-			return c.InputSpec.Spec.Command.Name
-		}
-		return c.InputSpec.BinaryName
+		return c.InputSpec.CommandName()
+	}
+	return ""
+}
+
+// BeatName returns the beat binary name that would be used to run this component.
+func (c *Component) BeatName() string {
+	if c.InputSpec != nil {
+		return c.InputSpec.BeatName()
 	}
 	return ""
 }
@@ -285,6 +395,10 @@ func (c *Component) PrepareWorkDir(parentDirPath string) error {
 func (c *Component) RemoveWorkDir(parentDirPath string) error {
 	return os.RemoveAll(c.WorkDirPath(parentDirPath))
 }
+
+// ComponentsModifier is a function that takes the computed components model and modifies it before
+// passing it into the components runtime manager.
+type ComponentsModifier func(comps []Component, cfg map[string]interface{}) ([]Component, error)
 
 // Model is the components model with signed policy data
 // This replaces former top level []Components with the top Model that captures signed policy data.
@@ -339,14 +453,24 @@ type Model struct {
 // the current runtime specification.
 func (r *RuntimeSpecs) ToComponents(
 	policy map[string]interface{},
+	runtimeCfg *RuntimeConfig,
+	modifiers []ComponentsModifier,
 	monitoringInjector GenerateMonitoringCfgFn,
 	ll logp.Level,
 	headers HeadersProvider,
 	currentServiceCompInts map[string]uint64,
 ) ([]Component, error) {
-	components, err := r.PolicyToComponents(policy, ll, headers)
+	components, err := r.PolicyToComponents(policy, runtimeCfg, ll, headers)
 	if err != nil {
 		return nil, err
+	}
+
+	// Do this here so the monitoring injector has a more accurate view of what components are running
+	for _, modifier := range modifiers {
+		components, err = modifier(components, policy)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if monitoringInjector != nil {
@@ -357,9 +481,16 @@ func (r *RuntimeSpecs) ToComponents(
 
 		if monitoringCfg != nil {
 			// monitoring is enabled
-			monitoringComps, err := r.PolicyToComponents(monitoringCfg, ll, headers)
+			monitoringComps, err := r.PolicyToComponents(monitoringCfg, runtimeCfg, ll, headers)
 			if err != nil {
 				return nil, fmt.Errorf("failed to generate monitoring components: %w", err)
+			}
+
+			for _, modifier := range modifiers {
+				monitoringComps, err = modifier(monitoringComps, policy)
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			components = append(components, monitoringComps...)
@@ -381,11 +512,11 @@ func unitForInput(input inputI, id string) Unit {
 }
 
 func unitForOutput(output outputI, id string) Unit {
-	cfg, cfgErr := ExpectedConfig(output.config)
+	cfg, cfgErr := ExpectedConfig(output.Config)
 	return Unit{
 		ID:       id,
 		Type:     client.UnitTypeOutput,
-		LogLevel: output.logLevel,
+		LogLevel: output.LogLevel,
 		Config:   cfg,
 		Err:      cfgErr,
 	}
@@ -399,22 +530,36 @@ func (r *RuntimeSpecs) componentsForInputType(
 	output outputI,
 	featureFlags *features.Flags,
 	componentConfig *ComponentConfig,
+	runtimeConfig *RuntimeConfig,
 ) []Component {
 	var components []Component
 	inputSpec, componentErr := r.GetInput(inputType)
 
 	// Treat as non isolated units component on error of reading the input spec
 	if componentErr != nil || !inputSpec.Spec.IsolateUnits {
-		componentID := fmt.Sprintf("%s-%s", inputType, output.name)
-		if componentErr == nil && !containsStr(inputSpec.Spec.Outputs, output.outputType) {
+		// Components are generally identified by their input type and output name. However, for
+		// Service Runtime components, there can only ever be a single instance of the component running,
+		// as a service. So we identify these only by their input type. This way, if the output for a service
+		// component were to change, it would not result in a different ID for that component. By keeping the same
+		// ID, we prevent the component from being identified as a new one and the corresponding service from being
+		// unnecessarily stopped and started.
+		componentID := fmt.Sprintf("%s-%s", inputType, output.Name)
+		if inputSpec.Spec.Service != nil {
+			componentID = inputType
+		}
+
+		if componentErr == nil && !containsStr(inputSpec.Spec.Outputs, output.OutputType) {
 			// This output is unsupported.
 			componentErr = ErrOutputNotSupported
 		}
 
 		unitsForRuntimeManager := make(map[RuntimeManager][]Unit)
-		for _, input := range output.inputs[inputType] {
+		for _, input := range output.Inputs[inputType] {
 			if input.enabled {
 				unitID := fmt.Sprintf("%s-%s", componentID, input.id)
+				if input.runtimeManager == "" {
+					input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName())
+				}
 				unitsForRuntimeManager[input.runtimeManager] = append(
 					unitsForRuntimeManager[input.runtimeManager],
 					unitForInput(input, unitID),
@@ -435,22 +580,36 @@ func (r *RuntimeSpecs) componentsForInputType(
 					Err:                   componentErr,
 					InputSpec:             &inputSpec,
 					InputType:             inputType,
-					OutputType:            output.outputType,
+					OutputType:            output.OutputType,
 					Units:                 units,
 					RuntimeManager:        runtimeManager,
 					Features:              featureFlags.AsProto(),
 					Component:             componentConfig.AsProto(),
-					OutputStatusReporting: extractStatusReporting(output.config),
+					OutputStatusReporting: extractStatusReporting(output.Config),
 				})
 			}
 		}
 	} else {
-		for _, input := range output.inputs[inputType] {
+		for _, input := range output.Inputs[inputType] {
 			// Units are being mapped to components, so we need a unique ID for each.
-			componentID := fmt.Sprintf("%s-%s-%s", inputType, output.name, input.id)
-			if componentErr == nil && !containsStr(inputSpec.Spec.Outputs, output.outputType) {
+			// Components are generally identified by their input type and output name. However, for
+			// Service Runtime components, there can only ever be a single instance of the component running,
+			// as a service. So we identify these only by their input type. This way, if the output for a service
+			// component were to change, it would not result in a different ID for that component. By keeping the same
+			// ID, we prevent the component from being identified as a new one and the corresponding service from being
+			// unnecessarily stopped and started.
+			componentID := fmt.Sprintf("%s-%s-%s", inputType, output.Name, input.id)
+			if inputSpec.Spec.Service != nil {
+				componentID = fmt.Sprintf("%s-%s", inputType, input.id)
+			}
+
+			if componentErr == nil && !containsStr(inputSpec.Spec.Outputs, output.OutputType) {
 				// This output is unsupported.
 				componentErr = ErrOutputNotSupported
+			}
+
+			if input.runtimeManager == "" {
+				input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName())
 			}
 
 			var units []Unit
@@ -465,12 +624,12 @@ func (r *RuntimeSpecs) componentsForInputType(
 					Err:                   componentErr,
 					InputSpec:             &inputSpec,
 					InputType:             inputType,
-					OutputType:            output.outputType,
+					OutputType:            output.OutputType,
 					Units:                 units,
 					RuntimeManager:        input.runtimeManager,
 					Features:              featureFlags.AsProto(),
 					Component:             componentConfig.AsProto(),
-					OutputStatusReporting: extractStatusReporting(output.config),
+					OutputStatusReporting: extractStatusReporting(output.Config),
 				})
 			}
 		}
@@ -478,15 +637,20 @@ func (r *RuntimeSpecs) componentsForInputType(
 	return components
 }
 
-func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *features.Flags, componentConfig *ComponentConfig) []Component {
+func (r *RuntimeSpecs) componentsForOutput(
+	output outputI,
+	featureFlags *features.Flags,
+	componentConfig *ComponentConfig,
+	runtimeConfig *RuntimeConfig,
+) []Component {
 	var components []Component
-	for inputType := range output.inputs {
+	for inputType := range output.Inputs {
 		// No need for error checking at this stage -- we are guaranteed
 		// to get a Component/s back. If there is an error that prevents it/them
 		// from running then it will be in the Component's Err field and
 		// we will report it later. The only thing we skip is a component/s
 		// with no units.
-		typeComponents := r.componentsForInputType(inputType, output, featureFlags, componentConfig)
+		typeComponents := r.componentsForInputType(inputType, output, featureFlags, componentConfig, runtimeConfig)
 		for _, component := range typeComponents {
 			if len(component.Units) > 0 {
 				components = append(components, component)
@@ -499,6 +663,7 @@ func (r *RuntimeSpecs) componentsForOutput(output outputI, featureFlags *feature
 // PolicyToComponents takes the policy and generates a component model.
 func (r *RuntimeSpecs) PolicyToComponents(
 	policy map[string]interface{},
+	runtimeCfg *RuntimeConfig,
 	ll logp.Level,
 	headers HeadersProvider,
 ) ([]Component, error) {
@@ -537,9 +702,9 @@ func (r *RuntimeSpecs) PolicyToComponents(
 	var components []Component
 	for _, outputName := range outputKeys {
 		output := outputsMap[outputName]
-		if output.enabled {
+		if output.Enabled {
 			components = append(components,
-				r.componentsForOutput(output, featureFlags, componentConfig)...)
+				r.componentsForOutput(output, featureFlags, componentConfig, runtimeCfg)...)
 		}
 	}
 
@@ -576,7 +741,12 @@ func injectInputPolicyID(fleetPolicy map[string]interface{}, inputConfig map[str
 
 // toIntermediate takes the policy and returns it into an intermediate representation that is easier to map into a set
 // of components.
-func toIntermediate(policy map[string]interface{}, aliasMapping map[string]string, ll logp.Level, headers HeadersProvider) (map[string]outputI, error) {
+func toIntermediate(
+	policy map[string]interface{},
+	aliasMapping map[string]string,
+	ll logp.Level,
+	headers HeadersProvider,
+) (map[string]outputI, error) {
 	const (
 		outputsKey        = "outputs"
 		enabledKey        = "enabled"
@@ -605,60 +775,12 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 		if !ok {
 			return nil, fmt.Errorf("invalid 'outputs.%s', expected a map not a %T", name, outputRaw)
 		}
-		typeRaw, ok := output[typeKey]
-		if !ok {
-			return nil, fmt.Errorf("invalid 'outputs.%s', 'type' missing", name)
-		}
-		t, ok := typeRaw.(string)
-		if !ok {
-			return nil, fmt.Errorf("invalid 'outputs.%s.type', expected a string not a %T", name, typeRaw)
-		}
-		enabled := true
-		if enabledRaw, ok := output[enabledKey]; ok {
-			enabledVal, ok := enabledRaw.(bool)
-			if !ok {
-				return nil, fmt.Errorf("invalid 'outputs.%s.enabled', expected a bool not a %T", name, enabledRaw)
-			}
-			enabled = enabledVal
-			delete(output, enabledKey)
-		}
-		logLevel, err := getLogLevel(output, ll)
+		parsedOutput, err := ParseOutput(name, output, ll, headers)
 		if err != nil {
-			return nil, fmt.Errorf("invalid 'outputs.%s.log_level', %w", name, err)
+			return nil, err
 		}
 
-		// inject headers configured during enroll
-		if t == elasticsearchType && headers != nil {
-			// can be nil when called from install/uninstall
-			if agentHeaders := headers.Headers(); len(agentHeaders) > 0 {
-				headers := make(map[string]interface{})
-				if existingHeadersRaw, found := output[headersKey]; found {
-					existingHeaders, ok := existingHeadersRaw.(map[string]interface{})
-					if !ok {
-						return nil, fmt.Errorf("invalid 'outputs.headers', expected a map not a %T", outputRaw)
-					}
-					headers = existingHeaders
-				}
-
-				for headerName, headerVal := range agentHeaders {
-					// only set headers for those that are not already set
-					if _, ok := headers[headerName]; !ok {
-						headers[headerName] = headerVal
-					}
-				}
-
-				output[headersKey] = headers
-			}
-		}
-
-		outputsMap[name] = outputI{
-			name:       name,
-			enabled:    enabled,
-			logLevel:   logLevel,
-			outputType: t,
-			config:     output,
-			inputs:     make(map[string][]inputI),
-		}
+		outputsMap[name] = *parsedOutput
 	}
 
 	// map the inputs to the outputs
@@ -728,7 +850,7 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 			return nil, fmt.Errorf("invalid 'inputs.%d.log_level', %w", idx, err)
 		}
 
-		runtimeManager := DefaultRuntimeManager
+		var runtimeManager RuntimeManager
 		// determine the runtime manager for the input
 		if runtimeManagerRaw, ok := input[runtimeManagerKey]; ok {
 			runtimeManagerStr, ok := runtimeManagerRaw.(string)
@@ -749,7 +871,7 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 		// allows individual inputs (like endpoint) to detect policy changes more easily.
 		injectInputPolicyID(policy, input)
 
-		output.inputs[t] = append(output.inputs[t], inputI{
+		output.Inputs[t] = append(output.Inputs[t], inputI{
 			idx:            idx,
 			id:             id,
 			enabled:        enabled,
@@ -763,6 +885,64 @@ func toIntermediate(policy map[string]interface{}, aliasMapping map[string]strin
 		return nil, nil
 	}
 	return outputsMap, nil
+}
+
+// ParseOutput parses the output configuration into an intermediate structured representation.
+func ParseOutput(outputName string, outputConfig map[string]any, ll logp.Level, headers HeadersProvider) (*outputI, error) {
+	typeRaw, ok := outputConfig[typeKey]
+	if !ok {
+		return nil, fmt.Errorf("invalid 'outputs.%s', 'type' missing", outputName)
+	}
+	t, ok := typeRaw.(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid 'outputs.%s.type', expected a string not a %T", outputName, typeRaw)
+	}
+	enabled := true
+	if enabledRaw, ok := outputConfig[enabledKey]; ok {
+		enabledVal, ok := enabledRaw.(bool)
+		if !ok {
+			return nil, fmt.Errorf("invalid 'outputs.%s.enabled', expected a bool not a %T", outputName, enabledRaw)
+		}
+		enabled = enabledVal
+		delete(outputConfig, enabledKey)
+	}
+	logLevel, err := getLogLevel(outputConfig, ll)
+	if err != nil {
+		return nil, fmt.Errorf("invalid 'outputs.%s.log_level', %w", outputName, err)
+	}
+
+	// inject headers configured during enroll
+	if t == elasticsearchType && headers != nil {
+		// can be nil when called from install/uninstall
+		if agentHeaders := headers.Headers(); len(agentHeaders) > 0 {
+			headers := make(map[string]interface{})
+			if existingHeadersRaw, found := outputConfig[headersKey]; found {
+				existingHeaders, ok := existingHeadersRaw.(map[string]interface{})
+				if !ok {
+					return nil, fmt.Errorf("invalid 'outputs.headers', expected a map not a %T", outputConfig)
+				}
+				headers = existingHeaders
+			}
+
+			for headerName, headerVal := range agentHeaders {
+				// only set headers for those that are not already set
+				if _, ok := headers[headerName]; !ok {
+					headers[headerName] = headerVal
+				}
+			}
+
+			outputConfig[headersKey] = headers
+		}
+	}
+
+	return &outputI{
+		Name:       outputName,
+		Enabled:    enabled,
+		LogLevel:   logLevel,
+		OutputType: t,
+		Config:     outputConfig,
+		Inputs:     make(map[string][]inputI),
+	}, nil
 }
 
 type inputI struct {
@@ -780,20 +960,20 @@ type inputI struct {
 }
 
 type outputI struct {
-	name       string
-	enabled    bool
-	logLevel   client.UnitLogLevel
-	outputType string
+	Name       string
+	Enabled    bool
+	LogLevel   client.UnitLogLevel
+	OutputType string
 
 	// The raw configuration for this output, with small cleanups:
 	// - enabled key is removed
 	// - log_level key is removed
 	// - if outputType is "elasticsearch", headers key is extended by adding any
 	//   values in AgentInfo.esHeaders
-	config map[string]interface{}
+	Config map[string]interface{}
 
 	// inputs directed at this output, keyed by canonical (non-alias) type.
-	inputs map[string][]inputI
+	Inputs map[string][]inputI
 }
 
 // varsForPlatform sets the runtime variables that are available in the
@@ -853,7 +1033,7 @@ func validateRuntimeChecks(
 
 func hasDuplicate(outputsMap map[string]outputI, id string) bool {
 	for _, o := range outputsMap {
-		for _, i := range o.inputs {
+		for _, i := range o.Inputs {
 			for _, j := range i {
 				if j.id == id {
 					return true

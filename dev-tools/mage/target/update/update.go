@@ -6,24 +6,45 @@ package update
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/magefile/mage/mg"
-	"github.com/magefile/mage/sh"
 
+	"github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/target/common"
 )
 
 const BeatsModulePath = "github.com/elastic/beats/v7"
 
-func Beats(targetVersion string) error {
-	mg.SerialDeps(mg.F(BeatsModule, targetVersion), common.Notice)
+func Beats(branch string, targetVersion string) error {
+	mg.SerialDeps(mg.F(BeatsModule, branch, targetVersion), common.Notice)
 
 	return nil
 }
 
-func BeatsModule(targetVersion string) error {
-	goArgs := []string{"get", fmt.Sprintf("%s@%s", BeatsModulePath, targetVersion)}
-	err := sh.RunV(mg.GoCmd(), goArgs...)
+func BeatsModule(branch string, targetVersion string) error {
+	goArgs := []string{"mod", "edit", "-require", fmt.Sprintf("%s@%s", BeatsModulePath, targetVersion)}
+
+	fmt.Printf("Fetching branch '%s' in beats submodule\n", branch)
+	err := mage.Run(nil, os.Stdout, os.Stderr, "git", "beats", "fetch", "origin", branch)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Updating beats submodule")
+	err = mage.Run(nil, os.Stdout, os.Stderr, "git", "beats", "checkout", targetVersion)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Updating beats module in edot package")
+	err = mage.Run(nil, os.Stdout, os.Stderr, "go", "internal/edot", goArgs...)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Updating beats module in elastic-agent package")
+	err = mage.Run(nil, os.Stdout, os.Stderr, "go", "", goArgs...)
 	if err != nil {
 		return err
 	}

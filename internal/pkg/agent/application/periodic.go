@@ -17,6 +17,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
+// periodic checks for local configuration changes
 type periodic struct {
 	log      *logger.Logger
 	period   time.Duration
@@ -147,6 +148,7 @@ func newPeriodic(
 	}
 }
 
+// localConfigChange implements coordinator.ConfigChange for local file changes.
 type localConfigChange struct {
 	cfg *config.Config
 }

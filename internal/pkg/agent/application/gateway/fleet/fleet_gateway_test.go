@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -20,6 +22,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+	"go.opentelemetry.io/collector/component/componentstatus"
+
+	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
+
+	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -29,6 +38,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
+	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -82,16 +93,10 @@ func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGat
 
 		stateStore := newStateStore(t, log)
 
-		gateway, err := newFleetGatewayWithScheduler(
-			log,
-			settings,
-			agentInfo,
-			client,
-			scheduler,
-			noop.New(),
-			stateStore,
-			NewCheckinStateFetcher(emptyStateFetcher),
-		)
+		mockRollbacksSrc := newMockRollbacksSource(t)
+		mockRollbacksSrc.EXPECT().Get().Return(nil, nil)
+
+		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
 
 		require.NoError(t, err)
 
@@ -221,16 +226,10 @@ func TestFleetGateway(t *testing.T) {
 		log, _ := logger.New("tst", false)
 		stateStore := newStateStore(t, log)
 
-		gateway, err := newFleetGatewayWithScheduler(
-			log,
-			settings,
-			agentInfo,
-			client,
-			scheduler,
-			noop.New(),
-			stateStore,
-			NewCheckinStateFetcher(emptyStateFetcher),
-		)
+		mockRollbacksSrc := newMockRollbacksSource(t)
+		mockRollbacksSrc.EXPECT().Get().Return(nil, nil)
+
+		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
 		require.NoError(t, err)
 
 		waitFn := ackSeq(
@@ -270,19 +269,13 @@ func TestFleetGateway(t *testing.T) {
 		log, _ := logger.New("tst", false)
 		stateStore := newStateStore(t, log)
 
-		gateway, err := newFleetGatewayWithScheduler(
-			log,
-			&fleetGatewaySettings{
-				Duration: d,
-				Backoff:  &backoffSettings{Init: 1 * time.Second, Max: 30 * time.Second},
-			},
-			agentInfo,
-			client,
-			scheduler,
-			noop.New(),
-			stateStore,
-			NewCheckinStateFetcher(emptyStateFetcher),
-		)
+		mockRollbacksSrc := newMockRollbacksSource(t)
+		mockRollbacksSrc.EXPECT().Get().Return(nil, nil)
+
+		gateway, err := newFleetGatewayWithScheduler(log, &fleetGatewaySettings{
+			Duration: d,
+			Backoff:  &backoffSettings{Init: 1 * time.Second, Max: 30 * time.Second},
+		}, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
 		require.NoError(t, err)
 
 		ch2 := client.Answer(func(_ context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
@@ -332,16 +325,10 @@ func TestFleetGateway(t *testing.T) {
 			}
 		}
 
-		gateway, err := newFleetGatewayWithScheduler(
-			log,
-			settings,
-			agentInfo,
-			client,
-			scheduler,
-			noop.New(),
-			stateStore,
-			NewCheckinStateFetcher(stateFetcher),
-		)
+		mockRollbacksSrc := newMockRollbacksSource(t)
+		mockRollbacksSrc.EXPECT().Get().Return(nil, nil)
+
+		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(stateFetcher), mockRollbacksSrc)
 
 		require.NoError(t, err)
 
@@ -401,16 +388,10 @@ func TestFleetGateway(t *testing.T) {
 		err := stateStore.Save()
 		require.NoError(t, err)
 
-		gateway, err := newFleetGatewayWithScheduler(
-			log,
-			settings,
-			agentInfo,
-			client,
-			scheduler,
-			noop.New(),
-			stateStore,
-			NewCheckinStateFetcher(emptyStateFetcher),
-		)
+		mockRollbacksSrc := newMockRollbacksSource(t)
+		mockRollbacksSrc.EXPECT().Get().Return(nil, nil)
+
+		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
 		require.NoError(t, err)
 
 		waitFn := ackSeq(
@@ -459,19 +440,13 @@ func TestFleetGateway(t *testing.T) {
 
 		stateFetcher := NewFastCheckinStateFetcher(log, emptyStateFetcher, stateChannel)
 
-		gateway, err := newFleetGatewayWithScheduler(
-			log,
-			&fleetGatewaySettings{
-				Duration: 5 * time.Second,
-				Backoff:  &backoffSettings{Init: 10 * time.Millisecond, Max: 30 * time.Second},
-			},
-			agentInfo,
-			client,
-			scheduler,
-			noop.New(),
-			stateStore,
-			stateFetcher,
-		)
+		mockRollbacksSrc := newMockRollbacksSource(t)
+		mockRollbacksSrc.EXPECT().Get().Return(nil, nil)
+
+		gateway, err := newFleetGatewayWithScheduler(log, &fleetGatewaySettings{
+			Duration: 5 * time.Second,
+			Backoff:  &backoffSettings{Init: 10 * time.Millisecond, Max: 30 * time.Second},
+		}, agentInfo, client, scheduler, noop.New(), stateStore, stateFetcher, mockRollbacksSrc)
 		require.NoError(t, err)
 
 		requestSent := make(chan struct{}, 10)
@@ -873,4 +848,379 @@ func TestFastCheckinStateFetcher(t *testing.T) {
 		assert.Nil(t, s.cancel)
 		s.mutex.Unlock()
 	})
+}
+
+func TestConvertToCheckingComponents(t *testing.T) {
+	tests := []struct {
+		name       string
+		components []runtime.ComponentComponentState
+		collector  *status.AggregateStatus
+		expected   []fleetapi.CheckinComponent
+	}{
+		{
+			name:       "Nil inputs",
+			components: nil,
+			collector:  nil,
+			expected:   nil,
+		},
+		{
+			name:       "Empty inputs",
+			components: []runtime.ComponentComponentState{},
+			collector:  &status.AggregateStatus{},
+			expected:   []fleetapi.CheckinComponent{},
+		},
+		{
+			name: "Only agent components",
+			components: []runtime.ComponentComponentState{
+				{
+					Component: component.Component{ID: "comp-1", InputSpec: &component.InputRuntimeSpec{InputType: "log"}},
+					State: runtime.ComponentState{
+						State:   eaclient.UnitStateHealthy,
+						Message: "Component is healthy",
+					},
+				},
+				{
+					Component: component.Component{ID: "comp-2", InputSpec: &component.InputRuntimeSpec{InputType: "log"}},
+					State: runtime.ComponentState{
+						State:   eaclient.UnitStateDegraded,
+						Message: "Component is degraded",
+						Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+							{UnitID: "unit-1", UnitType: eaclient.UnitTypeInput}: {
+								State:   eaclient.UnitStateFailed,
+								Message: "Input unit failed",
+								Payload: map[string]interface{}{"error": "some error"},
+							},
+						},
+					},
+				},
+			},
+			collector: nil,
+			expected: []fleetapi.CheckinComponent{
+				{
+					ID:      "comp-1",
+					Type:    "log",
+					Status:  "HEALTHY",
+					Message: "Component is healthy",
+				},
+				{
+					ID:      "comp-2",
+					Type:    "log",
+					Status:  "DEGRADED",
+					Message: "Component is degraded",
+					Units: []fleetapi.CheckinUnit{
+						{
+							ID:      "unit-1",
+							Type:    "input",
+							Status:  "FAILED",
+							Message: "Input unit failed",
+							Payload: map[string]interface{}{"error": "some error"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:       "Only OTel components",
+			components: nil,
+			collector: &status.AggregateStatus{
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					"extensions": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							"extensions:healthcheck": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+						},
+					},
+					"pipeline:logs": {
+						Event: componentstatus.NewRecoverableErrorEvent(fmt.Errorf("pipeline error")),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							"receiver:filebeat": {
+								Event: componentstatus.NewEvent(componentstatus.StatusStarting),
+							},
+							"exporter:elasticsearch": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							"processor:batch": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+						},
+					},
+				},
+			},
+			expected: []fleetapi.CheckinComponent{
+				{
+					ID:      "extensions",
+					Type:    "otel",
+					Status:  "HEALTHY",
+					Message: "Healthy",
+					Units: []fleetapi.CheckinUnit{
+						{
+							ID:      "extensions:healthcheck",
+							Type:    "",
+							Status:  "HEALTHY",
+							Message: "Healthy",
+						},
+					},
+				},
+				{
+					ID:      "pipeline:logs",
+					Type:    "otel",
+					Status:  "DEGRADED",
+					Message: "Recoverable: pipeline error",
+					Units: []fleetapi.CheckinUnit{
+						{
+							ID:      "exporter:elasticsearch",
+							Type:    "output",
+							Status:  "HEALTHY",
+							Message: "Healthy",
+						},
+						{
+							ID:      "processor:batch",
+							Type:    "",
+							Status:  "HEALTHY",
+							Message: "Healthy",
+						},
+						{
+							ID:      "receiver:filebeat",
+							Type:    "input",
+							Status:  "STARTING",
+							Message: "Starting",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Both agent and OTel components",
+			components: []runtime.ComponentComponentState{
+				{
+					Component: component.Component{ID: "comp-1", InputSpec: &component.InputRuntimeSpec{InputType: "log"}},
+					State: runtime.ComponentState{
+						State:   eaclient.UnitStateHealthy,
+						Message: "Component is healthy",
+					},
+				},
+			},
+			collector: &status.AggregateStatus{
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					"pipeline:logs": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+				},
+			},
+			expected: []fleetapi.CheckinComponent{
+				{
+					ID:      "comp-1",
+					Type:    "log",
+					Status:  "HEALTHY",
+					Message: "Component is healthy",
+				},
+				{
+					ID:      "pipeline:logs",
+					Type:    "otel",
+					Status:  "HEALTHY",
+					Message: "Healthy",
+				},
+			},
+		},
+		{
+			name: "Unknown states and types",
+			components: []runtime.ComponentComponentState{
+				{
+					Component: component.Component{ID: "comp-1", InputSpec: &component.InputRuntimeSpec{InputType: "log"}},
+					State: runtime.ComponentState{
+						State:   eaclient.UnitState(99),
+						Message: "Unknown state",
+						Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+							{UnitID: "unit-1", UnitType: eaclient.UnitType(99)}: {
+								State:   eaclient.UnitState(99),
+								Message: "Unknown unit state",
+							},
+						},
+					},
+				},
+			},
+			collector: nil,
+			expected: []fleetapi.CheckinComponent{
+				{
+					ID:      "comp-1",
+					Type:    "log",
+					Status:  "",
+					Message: "Unknown state",
+					Units: []fleetapi.CheckinUnit{
+						{
+							ID:      "unit-1",
+							Type:    "",
+							Status:  "",
+							Message: "Unknown unit state",
+						},
+					},
+				},
+			},
+		},
+		{
+			name:       "OTel component with invalid ID",
+			components: []runtime.ComponentComponentState{},
+			collector: &status.AggregateStatus{
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					"invalid-id": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							"invalid-unit-id": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+						},
+					},
+				},
+			},
+			expected: []fleetapi.CheckinComponent{
+				{
+					ID:      "invalid-id",
+					Type:    "otel",
+					Status:  "HEALTHY",
+					Message: "Healthy",
+					Units: []fleetapi.CheckinUnit{
+						{
+							ID:      "invalid-unit-id",
+							Type:    "",
+							Status:  "HEALTHY",
+							Message: "Healthy",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := convertToCheckinComponents(logp.NewNopLogger(), tt.components, tt.collector)
+			// Testify diffs are nicer if we sort and compare directly vs using ElementsMathc
+			slices.SortFunc(result, func(a, b fleetapi.CheckinComponent) int {
+				return strings.Compare(a.ID, b.ID)
+			})
+			for _, c := range result {
+				slices.SortFunc(c.Units, func(a, b fleetapi.CheckinUnit) int {
+					return strings.Compare(a.ID, b.ID)
+				})
+			}
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestAvailableRollbacks(t *testing.T) {
+	testcases := []struct {
+		name                  string
+		setup                 func(t *testing.T, rbSource *mockRollbacksSource, client *testingClient)
+		wantErr               assert.ErrorAssertionFunc
+		assertCheckinResponse func(t *testing.T, resp *fleetapi.CheckinResponse)
+	}{
+		{
+			name: "no available rollbacks - normal checkin",
+			setup: func(t *testing.T, rbSource *mockRollbacksSource, client *testingClient) {
+				rbSource.EXPECT().Get().Return(nil, nil)
+				client.Answer(func(_ context.Context, _ http.Header, body io.Reader) (*http.Response, error) {
+					unmarshaled := map[string]interface{}{}
+					err := json.NewDecoder(body).Decode(&unmarshaled)
+					assert.NoError(t, err, "error decoding checkin body")
+					assert.NotContains(t, unmarshaled, "available_rollbacks")
+					return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       io.NopCloser(strings.NewReader("{}")),
+						},
+						nil
+				})
+			},
+			wantErr:               assert.NoError,
+			assertCheckinResponse: nil,
+		},
+		{
+			name: "valid available rollbacks - assert key and value",
+			setup: func(t *testing.T, rbSource *mockRollbacksSource, client *testingClient) {
+
+				validUntil := time.Now().UTC().Add(time.Minute)
+				// truncate to the second to avoid different precision due to marshal/unmarshal
+				validUntil = validUntil.Truncate(time.Second)
+
+				rbSource.EXPECT().Get().Return(map[string]ttl.TTLMarker{
+					"data/elastic-agent-1.2.3-abcdef": {
+						Version:    "1.2.3",
+						Hash:       "abcdef",
+						ValidUntil: validUntil,
+					},
+				}, nil)
+				client.Answer(func(_ context.Context, _ http.Header, body io.Reader) (*http.Response, error) {
+					unmarshaled := map[string]json.RawMessage{}
+					err := json.NewDecoder(body).Decode(&unmarshaled)
+					assert.NoError(t, err, "error decoding checkin body")
+					if assert.Contains(t, unmarshaled, "upgrade") {
+						// verify that we got the correct data
+						var actualUpgrade fleetapi.CheckinUpgrade
+						err = json.Unmarshal(unmarshaled["upgrade"], &actualUpgrade)
+						require.NoError(t, err, "error decoding upgrade info from checkin body")
+
+						expected := []fleetapi.CheckinRollback{{
+							Version:    "1.2.3",
+							ValidUntil: validUntil,
+						}}
+						assert.Equal(t, expected, actualUpgrade.Rollbacks)
+					}
+
+					return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       io.NopCloser(strings.NewReader("{}")),
+						},
+						nil
+				})
+			},
+			wantErr:               assert.NoError,
+			assertCheckinResponse: nil,
+		},
+		{
+			name: "Error getting rollbacks should not make the checkin error out, just omit available_rollbacks",
+			setup: func(t *testing.T, rbSource *mockRollbacksSource, client *testingClient) {
+				rbSource.EXPECT().Get().Return(nil, errors.New("some error getting rollbacks"))
+				client.Answer(func(_ context.Context, _ http.Header, body io.Reader) (*http.Response, error) {
+					unmarshaled := map[string]interface{}{}
+					err := json.NewDecoder(body).Decode(&unmarshaled)
+					assert.NoError(t, err, "error decoding checkin body")
+					assert.NotContains(t, unmarshaled, "available_rollbacks")
+
+					return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       io.NopCloser(strings.NewReader("{}")),
+						},
+						nil
+				})
+			},
+			wantErr:               assert.NoError,
+			assertCheckinResponse: nil,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			stepperScheduler := scheduler.NewStepper()
+			testClient := newTestingClient()
+			log, _ := logger.New("fleet_gateway", false)
+
+			stateStore := newStateStore(t, log)
+
+			mockRollbacksSrc := newMockRollbacksSource(t)
+
+			mockAgentInfo := new(testAgentInfo)
+
+			tc.setup(t, mockRollbacksSrc, testClient)
+
+			gateway, err := newFleetGatewayWithScheduler(log, defaultGatewaySettings, mockAgentInfo, testClient, stepperScheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
+			require.NoError(t, err, "error creating gateway")
+			checkinResponse, _, err := gateway.execute(t.Context())
+			tc.wantErr(t, err)
+			if tc.assertCheckinResponse != nil {
+				tc.assertCheckinResponse(t, checkinResponse)
+			}
+		})
+	}
 }

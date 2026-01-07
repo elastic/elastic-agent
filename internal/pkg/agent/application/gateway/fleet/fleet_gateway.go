@@ -12,6 +12,9 @@ import (
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -23,7 +26,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/otelhelpers"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/internal/pkg/scheduler"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -77,6 +80,10 @@ type stateStore interface {
 	Action() fleetapi.Action
 }
 
+type rollbacksSource interface {
+	Get() (map[string]ttl.TTLMarker, error)
+}
+
 type FleetGateway struct {
 	log                *logger.Logger
 	client             client.Sender
@@ -90,6 +97,7 @@ type FleetGateway struct {
 	stateFetcher       StateFetcher
 	errCh              chan error
 	actionCh           chan []fleetapi.Action
+	rollbackSource     rollbacksSource
 }
 
 // New creates a new fleet gateway
@@ -100,7 +108,8 @@ func New(
 	acker acker.Acker,
 	stateStore stateStore,
 	stateFetcher StateFetcher,
-	cfg configuration.FleetCheckin,
+	cfg *configuration.FleetCheckin,
+	source rollbacksSource,
 ) (*FleetGateway, error) {
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	st := defaultGatewaySettings
@@ -114,6 +123,7 @@ func New(
 		acker,
 		stateStore,
 		stateFetcher,
+		source,
 	)
 }
 
@@ -126,18 +136,20 @@ func newFleetGatewayWithScheduler(
 	acker acker.Acker,
 	stateStore stateStore,
 	stateFetcher StateFetcher,
+	source rollbacksSource,
 ) (*FleetGateway, error) {
 	return &FleetGateway{
-		log:          log,
-		client:       client,
-		settings:     settings,
-		agentInfo:    agentInfo,
-		scheduler:    scheduler,
-		acker:        acker,
-		stateFetcher: stateFetcher,
-		stateStore:   stateStore,
-		errCh:        make(chan error),
-		actionCh:     make(chan []fleetapi.Action, 1),
+		log:            log,
+		client:         client,
+		settings:       settings,
+		agentInfo:      agentInfo,
+		scheduler:      scheduler,
+		acker:          acker,
+		stateFetcher:   stateFetcher,
+		stateStore:     stateStore,
+		errCh:          make(chan error),
+		actionCh:       make(chan []fleetapi.Action, 1),
+		rollbackSource: source,
 	}, nil
 }
 
@@ -178,6 +190,7 @@ func (f *FleetGateway) Run(ctx context.Context) error {
 			actions := make([]fleetapi.Action, len(resp.Actions))
 			copy(actions, resp.Actions)
 			if len(actions) > 0 {
+				f.log.Infow("received new actions from Fleet checkin", "actions", actions)
 				f.actionCh <- actions
 			}
 		}
@@ -263,8 +276,8 @@ func (f *FleetGateway) doExecute(ctx context.Context, bo backoff.Backoff) (*flee
 	return nil, ctx.Err()
 }
 
-func (f *FleetGateway) convertToCheckinComponents(components []runtime.ComponentComponentState, collector *status.AggregateStatus) []fleetapi.CheckinComponent {
-	if components == nil {
+func convertToCheckinComponents(logger *logp.Logger, components []runtime.ComponentComponentState, collector *status.AggregateStatus) []fleetapi.CheckinComponent {
+	if components == nil && (collector == nil || len(collector.ComponentStatusMap) == 0) {
 		return nil
 	}
 	stateString := func(s eaclient.UnitState) string {
@@ -277,6 +290,21 @@ func (f *FleetGateway) convertToCheckinComponents(components []runtime.Component
 	unitTypeString := func(t eaclient.UnitType) string {
 		if typ := t.String(); typ != "unknown" {
 			return typ
+		}
+		return ""
+	}
+
+	otelComponentTypeString := func(componentStatusId string) string {
+		kind, _, err := translate.ParseEntityStatusId(componentStatusId)
+		if err != nil {
+			logger.Warnf("failed to parse component status id '%s': %v", componentStatusId, err)
+			return ""
+		}
+		switch kind {
+		case "receiver":
+			return "input"
+		case "exporter":
+			return "output"
 		}
 		return ""
 	}
@@ -319,7 +347,7 @@ func (f *FleetGateway) convertToCheckinComponents(components []runtime.Component
 	// and each subcomponent is a unit.
 	if collector != nil {
 		for id, item := range collector.ComponentStatusMap {
-			state, msg := otelhelpers.StateWithMessage(item)
+			state, msg := translate.StateWithMessage(item)
 
 			checkinComponent := fleetapi.CheckinComponent{
 				ID:      id,
@@ -331,11 +359,12 @@ func (f *FleetGateway) convertToCheckinComponents(components []runtime.Component
 			if len(item.ComponentStatusMap) > 0 {
 				units := make([]fleetapi.CheckinUnit, 0, len(item.ComponentStatusMap))
 				for unitId, unitItem := range item.ComponentStatusMap {
-					unitState, unitMsg := otelhelpers.StateWithMessage(unitItem)
+					unitState, unitMsg := translate.StateWithMessage(unitItem)
 					units = append(units, fleetapi.CheckinUnit{
 						ID:      unitId,
 						Status:  stateString(unitState),
 						Message: unitMsg,
+						Type:    otelComponentTypeString(unitId),
 					})
 				}
 				checkinComponent.Units = units
@@ -365,7 +394,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	state, stateCtx := f.stateFetcher.FetchState(ctx)
 
 	// convert components into checkin components structure
-	components := f.convertToCheckinComponents(state.Components, state.Collector)
+	components := convertToCheckinComponents(f.log, state.Components, state.Collector)
 
 	f.log.Debugf("correcting agent loglevel from %s to %s using coordinator state", ecsMeta.Elastic.Agent.LogLevel, state.LogLevel.String())
 	// Fix loglevel with the current log level used by coordinator
@@ -374,6 +403,29 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	action := f.stateStore.Action()
 	agentPolicyID := getPolicyID(action)
 	policyRevisionIDX := getPolicyRevisionIDX(action)
+
+	// get available rollbacks
+	rollbacks, err := f.rollbackSource.Get()
+	if err != nil {
+		f.log.Warnf("error getting available rollbacks: %s", err.Error())
+		// this should already be nil but let's make sure that we don't include rollbacks in checkin body when encountering errors
+		rollbacks = nil
+	}
+
+	var validRollbacks []fleetapi.CheckinRollback
+	if len(rollbacks) > 0 {
+		now := time.Now()
+		validRollbacks = make([]fleetapi.CheckinRollback, 0, len(rollbacks))
+		for _, rollback := range rollbacks {
+			if rollback.ValidUntil.After(now) {
+				// map the `ttl.Marker` to the `fleetapi.CheckinRollback`
+				validRollbacks = append(validRollbacks, fleetapi.CheckinRollback{
+					Version:    rollback.Version,
+					ValidUntil: rollback.ValidUntil,
+				})
+			}
+		}
+	}
 
 	// checkin
 	cmd := fleetapi.NewCheckinCmd(f.agentInfo, f.client)
@@ -386,6 +438,9 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 		UpgradeDetails:    state.UpgradeDetails,
 		AgentPolicyID:     agentPolicyID,
 		PolicyRevisionIDX: policyRevisionIDX,
+	}
+	if len(validRollbacks) > 0 {
+		req.Upgrade.Rollbacks = validRollbacks
 	}
 
 	resp, took, err := cmd.Execute(stateCtx, req)
@@ -615,8 +670,12 @@ func (s *CheckinStateFetcher) FetchState(ctx context.Context) (coordinator.State
 func (s *CheckinStateFetcher) Done()                                     {}
 func (s *CheckinStateFetcher) StartStateWatch(ctx context.Context) error { return nil }
 
-func getBackoffSettings(cfg configuration.FleetCheckin) *backoffSettings {
+func getBackoffSettings(cfg *configuration.FleetCheckin) *backoffSettings {
 	bo := defaultFleetBackoffSettings
+
+	if cfg == nil {
+		return &defaultFleetBackoffSettings
+	}
 
 	if cfg.RequestBackoffInit > 0 {
 		bo.Init = cfg.RequestBackoffInit
