@@ -33,7 +33,7 @@ require (
 	go.opentelemetry.io/collector/extension/memorylimiterextension v0.119.0
 	go.opentelemetry.io/collector/processor/batchprocessor v0.119.0
 	go.opentelemetry.io/collector/receiver/otlpreceiver v0.119.0
-	go.opentelemetry.io/ebpf-profiler v0.0.202536
+	go.opentelemetry.io/ebpf-profiler v0.0.202601
 	golang.org/x/crypto v0.36.0
 	github.com/elastic/elastic-agent-autodiscover v0.9.0
 )
@@ -134,8 +134,8 @@ replace (
 			{
 				ComponentType: "receiver",
 				Name:          "profiling",
-				Version:       "v0.0.202536",
-				Link:          "https://github.com/open-telemetry/opentelemetry-ebpf-profiler/blob/v0.0.202536/README.md",
+				Version:       "v0.0.202601",
+				Link:          "https://github.com/open-telemetry/opentelemetry-ebpf-profiler/blob/v0.0.202601/README.md",
 			},
 			{
 				ComponentType: "receiver",
