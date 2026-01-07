@@ -1401,7 +1401,11 @@ func (f *fakeOTelManager) Errors() <-chan error {
 	return f.errChan
 }
 
+<<<<<<< HEAD
 func (f *fakeOTelManager) Update(cfg *confmap.Conf, components []component.Component) {
+=======
+func (f *fakeOTelManager) Update(cfg *confmap.Conf, monitoring *monitoringCfg.MonitoringConfig, ll logp.Level, components []component.Component) {
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 	var collectorResult, componentResult error
 	if f.updateCollectorCallback != nil {
 		collectorResult = f.updateCollectorCallback(cfg)

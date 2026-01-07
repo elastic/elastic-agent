@@ -247,8 +247,13 @@ func New(
 
 	otelManager, err := otelmanager.NewOTelManager(
 		log.Named("otel_manager"),
+<<<<<<< HEAD
 		logLevel, baseLogger,
 		otelmanager.SubprocessExecutionMode,
+=======
+		logLevel,
+		baseLogger,
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 		agentInfo,
 		cfg.Settings.Collector,
 		monitor.ComponentMonitoringConfig,
