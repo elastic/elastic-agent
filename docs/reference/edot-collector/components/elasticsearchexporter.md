@@ -145,7 +145,7 @@ exporters:
 
 ### Deprecated batcher configuration
 ```{applies_to}
-stack: ga 9.0, deprecated 9.2
+stack: ga 9.0, deprecated 9.2, removed 9.3
 ```
 
 :::{warning}
@@ -180,7 +180,7 @@ The {{es}} exporter uses the [{{es}} Bulk API](https://www.elastic.co/docs/api/d
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `num_workers` | `runtime.NumCPU()` | Note that this config is deprecated and will be used to configure `sending_queue::num_consumers` if `sending_queue::num_consumers` is not explicitly defined. Number of workers publishing bulk requests concurrently. |
+| `num_workers` | `runtime.NumCPU()` | Number of workers publishing bulk requests concurrently. This setting is deprecated and is used to configure `sending_queue::num_consumers` if `sending_queue::num_consumers` is not explicitly defined.  |
 | `flush::bytes` | `5000000` | Write buffer flush size limit before compression. A bulk request are sent immediately when its buffer exceeds this limit. This value should be much lower than Elasticsearch's `http.max_content_length` config to avoid HTTP 413 Entity Too Large error. Keep this value under 5 MB. |
 | `flush::interval` | `10s` | Write buffer flush time limit. |
 | `retry::enabled` | `true` | Turns on or off request retry on error. Failed requests are retried with exponential backoff. |
@@ -191,10 +191,10 @@ The {{es}} exporter uses the [{{es}} Bulk API](https://www.elastic.co/docs/api/d
 | `retry::retry_on_status` | `[429]` | Status codes that trigger request or document level retries. Request level retry and document level retry status codes are shared and cannot be configured separately. To avoid duplicates, it defaults to `[429]`. |
 
 :::{note}
-The `flush::interval` config is ignored when using `sending_queue` (enabled by default) or when `batcher::enabled` config is explicitly set.
+The `flush::interval` config is ignored when using `sending_queue` ({applies_to}`stack: ga 9.3`) or when `batcher::enabled` config is explicitly set ({applies_to}`stack: removed 9.3`).
 :::
 
-Starting from {{es}} 8.18 and higher, the [`include_source_on_error`](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk#operation-bulk-include_source_on_error) query parameter allows users to receive the source document in the error response if there were parsing errors in the bulk request. In the exporter, the equivalent configuration is also named `include_source_on_error`.
+Starting from {{es}} 8.18 and later, the [`include_source_on_error`](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk#operation-bulk-include_source_on_error) query parameter allows users to receive the source document in the error response if there were parsing errors in the bulk request. In the exporter, the equivalent configuration is also named `include_source_on_error`.
 
 - `include_source_on_error`:
   - `true`: Turns on bulk index responses to include source document on error. {applies_to}`stack: ga 8.18`
