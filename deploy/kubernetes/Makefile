@@ -7,7 +7,7 @@ BRANCH_VERSION=$(shell cut -d. -f1-2 <<< '${BEAT_VERSION}')
 
 #variables needed for ci-create-kubernetes-templates-pull-request
 ELASTIC_AGENT_REPO=kibana
-ELASTIC_AGENT_REPO_PATH=x-pack/plugins/fleet/server/services/
+ELASTIC_AGENT_REPO_PATH=x-pack/platform/plugins/shared/fleet/server/services/
 FILE_REPO=elastic_agent_manifest.ts
 ELASTIC_AGENT_BRANCH=update-k8s-templates-$(shell date "+%Y%m%d%H%M%S")
 GITHUB_USERNAME?=elasticmachine

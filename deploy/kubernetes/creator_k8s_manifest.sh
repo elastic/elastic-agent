@@ -1,6 +1,6 @@
 #!/bin/bash
-#### 
-# Bash Script that creates the needed https://github.com/elastic/kibana/blob/main/x-pack/plugins/fleet/server/services/elastic_agent_manifest.ts
+####
+# Bash Script that creates the needed https://github.com/elastic/kibana/blob/main/x-pack/platform/plugins/shared/fleet/server/services/elastic_agent_manifest.ts
 # The script takes as an argument the path of elastic-agent manifests
 # Eg. ./creator_k8s_manifest.sh deploy/kubernetes
 ####
