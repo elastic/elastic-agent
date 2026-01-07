@@ -380,7 +380,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
-	github.com/gomodule/redigo v1.9.2 // indirect
+	github.com/gomodule/redigo v1.9.3 // indirect
 	github.com/google/cel-go v0.26.0 // indirect
 	github.com/google/flatbuffers v25.2.10+incompatible // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
@@ -461,7 +461,7 @@ require (
 	github.com/mdlayher/vsock v1.2.1 // indirect
 	github.com/meraki/dashboard-api-go/v3 v3.0.9 // indirect
 	github.com/microsoft/go-mssqldb v1.9.4 // indirect
-	github.com/microsoft/wmi v0.34.0 // indirect
+	github.com/microsoft/wmi v0.37.0 // indirect
 	github.com/miekg/dns v1.1.68 // indirect
 	github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8 // indirect
 	github.com/minio/c2goasm v0.0.0-20190812172519-36a3d3bbc4f3 // indirect
