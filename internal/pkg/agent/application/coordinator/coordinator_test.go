@@ -201,11 +201,41 @@ func TestComponentUpdateDiff(t *testing.T) {
 				},
 			},
 			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Len(t, logs.Components.Added, 0)
+				require.Len(t, logs.Components.Removed, 0)
+				require.Len(t, logs.Components.Updated, 1)
 				require.Contains(t, logs.Components.Updated[0], "unit-three: added")
 				require.Contains(t, logs.Components.Updated[0], "unit-x: removed")
 			},
 		},
 		{
+			name: "test-updated-component-input-id",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{ID: "input-one"},
+					},
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{ID: "input-two"},
+					},
+				},
+			},
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Len(t, logs.Components.Added, 0)
+				require.Len(t, logs.Components.Removed, 0)
+				require.Len(t, logs.Components.Updated, 1)
+				require.Contains(t, logs.Components.Updated[0], "input-two: added")
+				require.Contains(t, logs.Components.Updated[0], "input-one: removed")
+			},
+		}, {
 			name: "just-change-output",
 			old: []component.Component{
 				{
@@ -220,6 +250,9 @@ func TestComponentUpdateDiff(t *testing.T) {
 				},
 			},
 			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Len(t, logs.Components.Added, 0)
+				require.Len(t, logs.Components.Removed, 0)
+				require.Len(t, logs.Components.Updated, 0)
 				require.Equal(t, []string{"elasticsearch"}, logs.Outputs.Removed)
 				require.Equal(t, []string{"logstash"}, logs.Outputs.Added)
 			},
@@ -1457,7 +1490,7 @@ func (f *fakeOTelManager) Errors() <-chan error {
 	return f.errChan
 }
 
-func (f *fakeOTelManager) Update(cfg *confmap.Conf, monitoring *monitoringCfg.MonitoringConfig, components []component.Component) {
+func (f *fakeOTelManager) Update(cfg *confmap.Conf, monitoring *monitoringCfg.MonitoringConfig, ll logp.Level, components []component.Component) {
 	var collectorResult, componentResult error
 	if f.updateCollectorCallback != nil {
 		collectorResult = f.updateCollectorCallback(cfg)

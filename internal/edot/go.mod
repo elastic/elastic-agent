@@ -8,9 +8,9 @@ replace github.com/elastic/elastic-agent => ../../
 replace github.com/elastic/beats/v7 => ../../beats
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20251231151632-ff9d3fa7c5bd
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260106221314-c263623c52da
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-	github.com/elastic/elastic-agent-libs v0.30.0
+	github.com/elastic/elastic-agent-libs v0.31.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.24.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.25.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.24.0
@@ -460,7 +460,7 @@ require (
 	github.com/mdlayher/socket v0.4.1 // indirect
 	github.com/mdlayher/vsock v1.2.1 // indirect
 	github.com/meraki/dashboard-api-go/v3 v3.0.9 // indirect
-	github.com/microsoft/go-mssqldb v1.9.4 // indirect
+	github.com/microsoft/go-mssqldb v1.9.5 // indirect
 	github.com/microsoft/wmi v0.38.3 // indirect
 	github.com/miekg/dns v1.1.68 // indirect
 	github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8 // indirect
