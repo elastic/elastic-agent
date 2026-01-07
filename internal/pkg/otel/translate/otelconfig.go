@@ -100,10 +100,78 @@ func GetOtelConfig(
 	return otelConfig, nil
 }
 
+<<<<<<< HEAD
 // IsComponentOtelSupported checks if the given component can be run in an Otel Collector.
 func IsComponentOtelSupported(comp *component.Component) bool {
 	return slices.Contains(OtelSupportedOutputTypes, comp.OutputType) &&
 		slices.Contains(OtelSupportedInputTypes, comp.InputType)
+=======
+func GetOTelLogLevel(level string) string {
+	if level != "" {
+		switch strings.ToLower(level) {
+		case "debug":
+			return "DEBUG"
+		case "info":
+			return "INFO"
+		case "warning":
+			return "WARN"
+		case "error":
+			return "ERROR"
+		default:
+			return "INFO"
+		}
+	}
+	return "INFO"
+}
+
+// VerifyComponentIsOtelSupported verifies that the given component can be run in an Otel Collector. It returns an error
+// indicating what the problem is, if it can't.
+func VerifyComponentIsOtelSupported(comp *component.Component) error {
+	if !slices.Contains(OtelSupportedOutputTypes, comp.OutputType) {
+		return fmt.Errorf("unsupported output type: %s", comp.OutputType)
+	}
+
+	// check if given input is supported in OTel runtime
+	// this includes all metricbeat inputs and some filebeat inputs for now
+	if !slices.Contains(OtelSupportedInputTypes, comp.InputType) {
+		return fmt.Errorf("unsupported input type: %s", comp.InputType)
+	}
+
+	// check if the actual configuration is supported. We need to actually generate the config and look for
+	// the right kind of error
+	_, compErr := getCollectorConfigForComponent(comp, &info.AgentInfo{}, func(unitID, binary string) map[string]any {
+		return nil
+	}, logp.NewNopLogger())
+	if errors.Is(compErr, errors.ErrUnsupported) {
+		return fmt.Errorf("unsupported configuration for %s: %w", comp.ID, compErr)
+	}
+
+	return nil
+}
+
+// VerifyOutputIsOtelSupported verifies that the given output can be converted into an Otel Collector exporter. It
+// returns an error indicating what the problem is, if it can't.
+func VerifyOutputIsOtelSupported(outputType string, outputCfg map[string]any) error {
+	if !slices.Contains(OtelSupportedOutputTypes, outputType) {
+		return fmt.Errorf("unsupported output type: %s", outputType)
+	}
+	exporterType, err := OutputTypeToExporterType(outputType)
+	if err != nil {
+		return err
+	}
+
+	outputCfgC, err := config.NewConfigFrom(outputCfg)
+	if err != nil {
+		return err
+	}
+
+	_, err = OutputConfigToExporterConfig(logp.NewNopLogger(), exporterType, outputCfgC)
+	if errors.Is(err, errors.ErrUnsupported) {
+		return fmt.Errorf("unsupported configuration for %s: %w", outputType, err)
+	}
+
+	return nil
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 }
 
 // getSupportedComponents returns components from the given model that can be run in an Otel Collector.

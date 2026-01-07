@@ -240,7 +240,22 @@ func New(
 		return nil, nil, nil, errors.New(err, "failed to initialize composable controller")
 	}
 
+<<<<<<< HEAD
 	otelManager := otelmanager.NewOTelManager(log.Named("otel_manager"), baseLogger)
+=======
+	otelManager, err := otelmanager.NewOTelManager(
+		log.Named("otel_manager"),
+		logLevel,
+		baseLogger,
+		agentInfo,
+		cfg.Settings.Collector,
+		monitor.ComponentMonitoringConfig,
+		otelmanager.CollectorStopTimeout,
+	)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)
+	}
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelManager, actionAcker, initialUpgradeDetails, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the

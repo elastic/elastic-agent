@@ -22,6 +22,13 @@ import (
 	"text/template"
 	"time"
 
+<<<<<<< HEAD
+=======
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
+
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,6 +39,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommontest"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	aTesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
@@ -2152,3 +2160,425 @@ service:
 
 	cancel()
 }
+<<<<<<< HEAD
+=======
+
+func TestOtelBeatsAuthExtensionInvalidCertificates(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			// {Type: define.Windows}, we don't support otel on Windows yet
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	// Create the otel configuration file
+	type otelConfigOptions struct {
+		ESEndpoint string
+		ESApiKey   string
+		Index      string
+	}
+	esEndpoint, err := integration.GetESHost()
+	require.NoError(t, err, "error getting elasticsearch endpoint")
+	esApiKey, err := createESApiKey(info.ESClient)
+	require.NoError(t, err, "error creating API key")
+	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	index := "logs-integration-" + info.Namespace
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	otelConfigTemplate := `
+extensions:
+  beatsauth:
+    continue_on_error: true
+    ssl:
+      enabled: true
+      verification_mode: none
+      certificate: /nonexistent.pem
+      key: /nonexistent.key
+      key_passphrase: null
+      key_passphrase_path: null
+      verification_mode: none
+receivers:
+  metricbeatreceiver:
+    metricbeat:
+      modules:
+        - module: system
+          enabled: true
+          period: 1s
+          processes:
+            - '.*'
+          metricsets:
+            - cpu
+    queue.mem.flush.timeout: 0s
+exporters:
+  elasticsearch/log:
+    endpoints:
+      - {{.ESEndpoint}}
+    api_key: {{.ESApiKey}}
+    logs_index: {{.Index}}
+    sending_queue:
+      wait_for_result: true # Avoid losing data on shutdown
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 1
+    auth:
+      authenticator: beatsauth
+    mapping:
+      mode: bodymap
+service:
+  extensions: [beatsauth]
+  pipelines:
+    logs:
+      receivers:
+        - metricbeatreceiver
+      exporters:
+        - elasticsearch/log
+`
+	var otelConfigBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("otelConfig").Parse(otelConfigTemplate)).Execute(&otelConfigBuffer,
+			otelConfigOptions{
+				ESEndpoint: esEndpoint,
+				ESApiKey:   esApiKey.Encoded,
+				Index:      index,
+			}))
+
+	// configure elastic-agent.yml
+	err = fixture.Configure(ctx, otelConfigBuffer.Bytes())
+
+	// prepare agent command
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err, "cannot prepare Elastic-Agent command: %w", err)
+
+	output := strings.Builder{}
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	// start elastic-agent
+	err = cmd.Start()
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+		require.NotNil(collect, status.Collector)
+		require.NotNil(collect, status.Collector.ComponentStatusMap)
+
+		pipelines, exists := status.Collector.ComponentStatusMap["pipeline:logs"]
+		require.True(collect, exists)
+
+		receiver, exists := pipelines.ComponentStatusMap["receiver:metricbeatreceiver"]
+		require.True(collect, exists)
+		require.EqualValues(collect, receiver.Status, cproto.State_HEALTHY)
+
+		exporter, exists := pipelines.ComponentStatusMap["exporter:elasticsearch/log"]
+		require.True(collect, exists)
+		require.EqualValues(collect, exporter.Status, cproto.State_DEGRADED)
+	}, 2*time.Minute, 5*time.Second)
+
+	cancel()
+}
+
+func TestOutputStatusReporting(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Sudo:  true,
+		Group: integration.Default,
+		Local: false,
+		Stack: nil,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+	})
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	// Create the otel configuration file
+	type otelConfigOptions struct {
+		StatusReportingEnabled bool
+	}
+	configTemplate := `
+inputs:
+  - type: system/metrics
+    id: http-metrics-test
+    use_output: default
+    streams:
+    - metricsets:
+       - cpu
+      period: 1s
+      data_stream:
+        dataset: e2e
+      namespace: "json_namespace"
+agent.reload:
+  period: 1s
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [http://localhost:9200]
+    api_key: placeholder
+    preset: "balanced"
+    status_reporting:
+      enabled: {{.StatusReportingEnabled}}
+agent.monitoring:
+  metrics: false
+  logs: false
+  http:
+    enabled: true
+    port: 6792
+agent.grpc:
+    port: 6790
+agent.internal.runtime.metricbeat:
+  system/metrics: otel
+`
+
+	var configBuffer bytes.Buffer
+	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+		otelConfigOptions{
+			StatusReportingEnabled: true,
+		})
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	installOpts := aTesting.InstallOpts{
+		NonInteractive: true,
+		Privileged:     true,
+		Force:          true,
+		Develop:        true,
+	}
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+
+	output, err := fixture.InstallWithoutEnroll(ctx, &installOpts)
+	require.NoErrorf(t, err, "error install withouth enroll: %s\ncombinedoutput:\n%s", err, string(output))
+
+	require.Eventually(t, func() bool {
+		status, err := fixture.ExecStatus(ctx)
+		if err != nil {
+			t.Logf("waiting for agent degraded: %s", err.Error())
+			return false
+		}
+		return status.State == int(cproto.State_DEGRADED)
+	}, 30*time.Second, 1*time.Second)
+
+	// Disable status reporting.
+	// This should result in HEALTHY state
+	configBuffer.Reset()
+	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+		otelConfigOptions{
+			StatusReportingEnabled: false,
+		})
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 1*time.Minute, 1*time.Second)
+
+	// Enabled status reporting and keep using localhost.
+	// This should result in DEGRADED state
+	configBuffer.Reset()
+	template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+		otelConfigOptions{
+			StatusReportingEnabled: true,
+		})
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		status, err := fixture.ExecStatus(ctx)
+		if err != nil {
+			t.Logf("waiting for agent degraded: %s", err.Error())
+			return false
+		}
+		return status.State == int(cproto.State_DEGRADED)
+	}, 30*time.Second, 1*time.Second)
+
+	combinedOutput, err := fixture.Uninstall(ctx, &aTesting.UninstallOpts{Force: true})
+	require.NoErrorf(t, err, "error uninstalling classic agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
+}
+
+// This tests that live reloading the log level works correctly
+func TestLogReloading(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		Stack: &define.Stack{},
+	})
+
+	// Flow of the test
+	// 1. Start elastic-agent with debug logs
+	// 2. Change the log level to info without restarting
+	// 3. Ensure no debug logs are printed
+	// 4. Set service::telemetry::logs::level: debug
+	// 5. Ensure service::telemetry::logs::level is given precedence even when agent logs are set to info
+
+	// Create the otel configuration file
+	type otelConfigOptions struct {
+		ESEndpoint string
+		ESApiKey   string
+		Index      string
+		CAFile     string
+	}
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	logConfig := `
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - %s
+    preset: balanced
+    protocol: http	
+agent.logging.level: %s
+agent.grpc.port: 6793
+agent.monitoring.enabled: true
+agent.logging.to_stderr: true
+agent.reload:
+  period: 1s
+`
+
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
+	// start with debug logs
+	cfg := fmt.Sprintf(logConfig, esURL, "debug")
+
+	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	if err != nil {
+		t.Fatalf("cannot prepare Elastic-Agent command: %s", err)
+	}
+
+	observer, zapLogs := observer.New(zap.DebugLevel)
+	logger := zap.New(observer)
+	zapWriter := &ZapWriter{logger: logger, level: zap.InfoLevel}
+	cmd.Stderr = zapWriter
+	cmd.Stdout = zapWriter
+
+	require.NoError(t, cmd.Start())
+
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 30*time.Second, 1*time.Second)
+
+	// Make sure the Elastic-Agent process is not running before
+	// exiting the test
+	t.Cleanup(func() {
+		// Ignore the error because we cancelled the context,
+		// and that always returns an error
+		_ = cmd.Wait()
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			zapLogs.All()
+		}
+	})
+
+	require.Eventually(t, func() bool {
+		// we ensure OTel runtime inputs have started with correct level
+		// and not just agent logs
+		return (zapLogs.FilterMessageSnippet("otelcol.component.kind").FilterMessageSnippet(`"log.level":"debug"`).Len() > 1)
+	}, 1*time.Minute, 10*time.Second, "could not find debug logs")
+
+	// reset logs
+	zapLogs.TakeAll()
+
+	// set agent.logging.level: info
+	cfg = fmt.Sprintf(logConfig, esURL, "info")
+	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
+
+	// wait for elastic agent to be healthy and OTel collector to start
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return zapLogs.FilterMessageSnippet("Everything is ready. Begin running and processing data").Len() > 0
+	}, 1*time.Minute, 10*time.Second, "elastic-agent was not healthy after log level changed to info")
+
+	// if debug level was enabled, we would fine this message
+	require.Zero(t, zapLogs.FilterMessageSnippet(`Starting health check extension V2`).Len())
+
+	// set collector logs to debug
+	logConfig = logConfig + `
+service:
+  telemetry:
+    logs:
+      level: debug
+`
+
+	// add service::telemetry::logs::level:debug
+	cfg = fmt.Sprintf(logConfig, esURL, "info")
+	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
+
+	// reset zap logs
+	zapLogs.TakeAll()
+
+	// wait for elastic agent to be healthy and OTel collector to re-start
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return zapLogs.FilterMessageSnippet("Everything is ready. Begin running and processing data").Len() > 0
+	}, 1*time.Minute, 10*time.Second, "elastic-agent is not healthy")
+
+	require.Eventually(t, func() bool {
+		// we ensure inputs have reloaded with correct level
+		// and not just agent logs
+		return (zapLogs.FilterMessageSnippet("otelcol.component.kind").FilterMessageSnippet(`"log.level":"debug"`).Len() > 1)
+	}, 1*time.Minute, 10*time.Second, "collector setting for log level was not given precedence")
+}
+
+type ZapWriter struct {
+	logger *zap.Logger
+	level  zapcore.Level
+}
+
+func (w *ZapWriter) Write(p []byte) (n int, err error) {
+	msg := strings.TrimSpace(string(p))
+	if msg != "" {
+		w.logger.Check(w.level, msg).Write()
+	}
+	return len(p), nil
+}
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))

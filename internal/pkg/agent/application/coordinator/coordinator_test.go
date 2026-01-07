@@ -1396,6 +1396,44 @@ func (f *fakeOTelManager) Run(ctx context.Context) error {
 }
 
 func (f *fakeOTelManager) Errors() <-chan error {
+<<<<<<< HEAD
+=======
+	return f.errChan
+}
+
+func (f *fakeOTelManager) Update(cfg *confmap.Conf, monitoring *monitoringCfg.MonitoringConfig, ll logp.Level, components []component.Component) {
+	var collectorResult, componentResult error
+	if f.updateCollectorCallback != nil {
+		collectorResult = f.updateCollectorCallback(cfg)
+	}
+	if f.errChan != nil && collectorResult != nil {
+		// If a reporting channel is set, send the collectorResult to it
+		f.errChan <- collectorResult
+	}
+	if f.updateComponentCallback != nil {
+		componentResult = f.updateComponentCallback(components)
+	}
+	if f.errChan != nil && componentResult != nil {
+		// If a reporting channel is set, send the componentResult to it
+		f.errChan <- componentResult
+	}
+}
+
+func (f *fakeOTelManager) WatchCollector() <-chan *status.AggregateStatus {
+	return f.collectorStatusChan
+}
+
+func (f *fakeOTelManager) WatchComponents() <-chan []runtime.ComponentComponentState {
+	return f.componentStateChan
+}
+
+func (f *fakeOTelManager) MergedOtelConfig() *confmap.Conf { return nil }
+
+func (f *fakeOTelManager) PerformDiagnostics(ctx context.Context, reqs ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic {
+	if f.performDiagnosticsCallback != nil {
+		return f.performDiagnosticsCallback(ctx, reqs...)
+	}
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 	return nil
 }
 

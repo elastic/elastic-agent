@@ -139,8 +139,13 @@ type RuntimeManager interface {
 type OTelManager interface {
 	Runner
 
+<<<<<<< HEAD
 	// Update updates the current configuration for OTel.
 	Update(cfg *confmap.Conf)
+=======
+	// Update updates the current plain configuration for the otel collector and components.
+	Update(*confmap.Conf, *monitoringCfg.MonitoringConfig, logp.Level, []component.Component)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 
 	// Watch returns the chanel to watch for configuration changes.
 	Watch() <-chan *status.AggregateStatus
@@ -1458,10 +1463,20 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 
 	// c.setProtection(protectionConfig)
 
-	if c.vars != nil {
-		return c.refreshComponentModel(ctx)
+	// check if log level has changed for standalone elastic-agent
+	// we'd have to update both the periodic and once config watchers and refactor initialization in application.go to do otherwise.
+	if c.agentInfo.IsStandalone() {
+		ll := currentCfg.Settings.LoggingConfig.Level
+		if ll != c.state.LogLevel {
+			// set log level for the coordinator
+			c.setLogLevel(ll)
+			// set global log level
+			logger.SetLevel(ll)
+			c.logger.Infof("log level changed to %s", ll.String())
+		}
 	}
-	return nil
+
+	return c.refreshComponentModel(ctx)
 }
 
 // Generate the AST for a new incoming configuration and, if successful,
@@ -1574,10 +1589,13 @@ func (c *Coordinator) processVars(ctx context.Context, vars []*transpiler.Vars) 
 
 // Called on the main Coordinator goroutine.
 func (c *Coordinator) processLogLevel(ctx context.Context, ll logp.Level) {
-	c.setLogLevel(ll)
-	err := c.refreshComponentModel(ctx)
-	if err != nil {
-		c.logger.Errorf("updating log level: %s", err.Error())
+	// do not refresh component model if log level did not change
+	if c.state.LogLevel != ll {
+		c.setLogLevel(ll)
+		err := c.refreshComponentModel(ctx)
+		if err != nil {
+			c.logger.Errorf("updating log level: %s", err.Error())
+		}
 	}
 }
 
@@ -1650,6 +1668,7 @@ func (c *Coordinator) updateOtelManagerConfig(model *component.Model) error {
 		}
 		c.logger.With("component_ids", componentIDs).Warn("The Otel runtime manager is HIGHLY EXPERIMENTAL and only intended for testing. Use at your own risk.")
 	}
+<<<<<<< HEAD
 	if componentOtelCfg != nil {
 		err := finalOtelCfg.Merge(componentOtelCfg)
 		if err != nil {
@@ -1672,6 +1691,9 @@ func (c *Coordinator) updateOtelManagerConfig(model *component.Model) error {
 	c.otelMgr.Update(finalOtelCfg)
 	c.finalOtelCfg = finalOtelCfg
 	return nil
+=======
+	c.otelMgr.Update(c.otelCfg, c.currentCfg.Settings.MonitoringConfig, c.state.LogLevel, otelModel.Components)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 }
 
 // splitModelBetweenManager splits the model components between the runtime manager and the otel manager.
