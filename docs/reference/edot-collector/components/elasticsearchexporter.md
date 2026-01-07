@@ -109,23 +109,24 @@ The `elasticsearch.index` attribute is removed from the final document if it exi
 
 ### Queuing and batching
 
-The {{es}} exporter supports the common `sending_queue` settings which support both queueing and batching. The default sending queue is configured to do async batching with the following configuration:
+The {{es}} exporter supports the common `sending_queue` settings, which enable both queuing and batching. The default sending queue is configured to do async batching with the following configuration:
 
 ```yaml
 sending_queue:
   enabled: true
-  num_consumers: runtime.NumCPU()
-  queue_size: <based on queue.mem.events>
+  sizer: requests
+  num_consumers: 10
+  queue_size: 10
   block_on_overflow: true
-  wait_for_result: true
+  wait_for_result: false
   batch:
     flush_timeout: 10s
-    min_size: 0
-    max_size: <based on flush::bytes>
-    sizer: items
+    min_size: 1e+6
+    max_size: 5e+6
+    sizer: bytes
 ```
 
-The default configurations are chosen to be closer to the defaults with the exporter's previous inbuilt batching feature. For more details on the `sending_queue` settings, see the [exporterhelper documentation](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/exporterhelper/README.md).
+The default configurations are chosen to be closer to the defaults with the exporter's previous built-in batching feature. For more details on the `sending_queue` settings, refer to the [`exporterhelper` documentation](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/exporterhelper/README.md).
 
 You can customize the sending queue configuration:
 
@@ -143,10 +144,9 @@ exporters:
 ```
 
 ### Deprecated batcher configuration
-
-::::{applies-switch}
-
-:::{applies-item} stack: ga 9.0, deprecated 9.2
+```{applies_to}
+stack: ga 9.0, deprecated 9.2
+```
 
 :::{warning}
 The `batcher` configuration is deprecated and will be removed in a future version. Use `sending_queue::batch` instead.
@@ -163,7 +163,7 @@ Batching can be enabled and configured with the `batcher` section, using [common
 
 For example:
 
-```yaml subs=true
+```yaml
 exporters:
   elasticsearch:
     endpoint: https://elasticsearch:9200
@@ -173,8 +173,6 @@ exporters:
       max_size: 10000
       flush_timeout: 5s
 ```
-:::
-::::
 
 ## Bulk indexing
 
@@ -182,7 +180,7 @@ The {{es}} exporter uses the [{{es}} Bulk API](https://www.elastic.co/docs/api/d
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `num_workers` | `runtime.NumCPU()` | Number of workers publishing bulk requests concurrently. Note this isn't applicable when using `sending_queue` (enabled by default) or when `batcher::enabled` is explicitly set. |
+| `num_workers` | `runtime.NumCPU()` | Note that this config is deprecated and will be used to configure `sending_queue::num_consumers` if `sending_queue::num_consumers` is not explicitly defined. Number of workers publishing bulk requests concurrently. |
 | `flush::bytes` | `5000000` | Write buffer flush size limit before compression. A bulk request are sent immediately when its buffer exceeds this limit. This value should be much lower than Elasticsearch's `http.max_content_length` config to avoid HTTP 413 Entity Too Large error. Keep this value under 5 MB. |
 | `flush::interval` | `10s` | Write buffer flush time limit. |
 | `retry::enabled` | `true` | Turns on or off request retry on error. Failed requests are retried with exponential backoff. |
@@ -193,7 +191,7 @@ The {{es}} exporter uses the [{{es}} Bulk API](https://www.elastic.co/docs/api/d
 | `retry::retry_on_status` | `[429]` | Status codes that trigger request or document level retries. Request level retry and document level retry status codes are shared and cannot be configured separately. To avoid duplicates, it defaults to `[429]`. |
 
 :::{note}
-The `flush::interval` config is ignored when using `sending_queue` (enabled by default) or when `batcher::enabled` config is explicitly set to true or false.
+The `flush::interval` config is ignored when using `sending_queue` (enabled by default) or when `batcher::enabled` config is explicitly set.
 :::
 
 Starting from {{es}} 8.18 and higher, the [`include_source_on_error`](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk#operation-bulk-include_source_on_error) query parameter allows users to receive the source document in the error response if there were parsing errors in the bulk request. In the exporter, the equivalent configuration is also named `include_source_on_error`.
