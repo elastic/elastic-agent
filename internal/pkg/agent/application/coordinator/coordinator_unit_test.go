@@ -467,7 +467,14 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 		}
 	}()
 
+<<<<<<< HEAD
 	upgradeMgr, err := upgrade.NewUpgrader(log, &artifact.Config{}, nil, &info.AgentInfo{}, new(upgrade.AgentWatcherHelper))
+=======
+	tmpDir := t.TempDir()
+	agentInfo, err := info.NewAgentInfo(ctx, false)
+	require.NoError(t, err)
+	upgradeMgr, err := upgrade.NewUpgrader(log, &artifact.Config{}, nil, agentInfo, new(upgrade.AgentWatcherHelper), ttl.NewTTLMarkerRegistry(nil, tmpDir))
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 	require.NoError(t, err, "errored when creating a new upgrader")
 
 	// Channels have buffer length 1, so we don't have to run on multiple
@@ -499,6 +506,7 @@ func TestCoordinatorReportsInvalidPolicy(t *testing.T) {
 		ast:                emptyAST(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 		secretMarkerFunc:   testSecretMarkerFunc,
+		agentInfo:          agentInfo,
 	}
 
 	// Send an invalid config update and confirm that Coordinator reports
@@ -591,6 +599,9 @@ func TestCoordinatorReportsComponentModelError(t *testing.T) {
 	defer cancel()
 	logger := logp.NewLogger("testing")
 
+	agentInfo, err := info.NewAgentInfo(t.Context(), false)
+	require.NoError(t, err)
+
 	// Channels have buffer length 1 so we don't have to run on multiple
 	// goroutines.
 	stateChan := make(chan State, 1)
@@ -616,6 +627,7 @@ func TestCoordinatorReportsComponentModelError(t *testing.T) {
 		ast:                emptyAST(t),
 		componentPIDTicker: time.NewTicker(time.Second * 30),
 		secretMarkerFunc:   testSecretMarkerFunc,
+		agentInfo:          agentInfo,
 	}
 
 	// This configuration produces a valid AST but its EQL condition is

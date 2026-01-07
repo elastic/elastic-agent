@@ -157,7 +157,11 @@ type OTelManager interface {
 	Runner
 
 	// Update updates the current plain configuration for the otel collector and components.
+<<<<<<< HEAD
 	Update(*confmap.Conf, []component.Component)
+=======
+	Update(*confmap.Conf, *monitoringCfg.MonitoringConfig, logp.Level, []component.Component)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 
 	// WatchCollector returns a channel to watch for collector status updates.
 	WatchCollector() <-chan *status.AggregateStatus
@@ -1631,10 +1635,31 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 	}
 	c.setProtection(protectionConfig)
 
+<<<<<<< HEAD
 	if c.vars != nil {
 		return c.refreshComponentModel(ctx)
+=======
+	currentCfg, err := configuration.NewFromConfig(cfg)
+	if err != nil {
+		return fmt.Errorf("invalid configuration: %w", err)
 	}
-	return nil
+	c.currentCfg = currentCfg
+
+	// check if log level has changed for standalone elastic-agent
+	// we'd have to update both the periodic and once config watchers and refactor initialization in application.go to do otherwise.
+	if c.agentInfo.IsStandalone() {
+		ll := currentCfg.Settings.LoggingConfig.Level
+		if ll != c.state.LogLevel {
+			// set log level for the coordinator
+			c.setLogLevel(ll)
+			// set global log level
+			logger.SetLevel(ll)
+			c.logger.Infof("log level changed to %s", ll.String())
+		}
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
+	}
+
+	return c.refreshComponentModel(ctx)
 }
 
 // Generate the AST for a new incoming configuration and, if successful,
@@ -1730,10 +1755,13 @@ func (c *Coordinator) processVars(ctx context.Context, vars []*transpiler.Vars) 
 
 // Called on the main Coordinator goroutine.
 func (c *Coordinator) processLogLevel(ctx context.Context, ll logp.Level) {
-	c.setLogLevel(ll)
-	err := c.refreshComponentModel(ctx)
-	if err != nil {
-		c.logger.Errorf("updating log level: %s", err.Error())
+	// do not refresh component model if log level did not change
+	if c.state.LogLevel != ll {
+		c.setLogLevel(ll)
+		err := c.refreshComponentModel(ctx)
+		if err != nil {
+			c.logger.Errorf("updating log level: %s", err.Error())
+		}
 	}
 }
 
@@ -1800,7 +1828,11 @@ func (c *Coordinator) updateManagersWithConfig(model *component.Model) {
 		}
 		c.logger.With("component_ids", componentIDs).Info("Using OpenTelemetry collector runtime.")
 	}
+<<<<<<< HEAD
 	c.otelMgr.Update(c.otelCfg, otelModel.Components)
+=======
+	c.otelMgr.Update(c.otelCfg, c.currentCfg.Settings.MonitoringConfig, c.state.LogLevel, otelModel.Components)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 }
 
 // splitModelBetweenManager splits the model components between the runtime manager and the otel manager.

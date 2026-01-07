@@ -91,12 +91,12 @@ type testExecution struct {
 	handle collectorHandle
 }
 
-func (e *testExecution) startCollector(ctx context.Context, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
+func (e *testExecution) startCollector(ctx context.Context, level string, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
 
 	var err error
-	e.handle, err = e.exec.startCollector(ctx, baseLogger, logger, cfg, errCh, statusCh, forceFetchStatusCh)
+	e.handle, err = e.exec.startCollector(ctx, level, baseLogger, logger, cfg, errCh, statusCh, forceFetchStatusCh)
 	return e.handle, err
 }
 
@@ -118,6 +118,7 @@ type mockExecution struct {
 
 func (e *mockExecution) startCollector(
 	ctx context.Context,
+	level string,
 	_ *logger.Logger,
 	_ *logger.Logger,
 	cfg *confmap.Conf,
@@ -352,26 +353,38 @@ func TestOTelManager_Run(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				return newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
+<<<<<<< HEAD
 				m.Update(cfg, nil)
+=======
+				m.Update(cfg, nil, logp.InfoLevel, nil)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 				e.EnsureHealthy(t, updateTime)
 
 				// trigger update
 				updateTime = time.Now()
 				ok := cfg.Delete("service::telemetry::logs::level") // modify the config
 				require.True(t, ok)
+<<<<<<< HEAD
 				m.Update(cfg, nil)
+=======
+				m.Update(cfg, nil, logp.InfoLevel, nil)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 				e.EnsureHealthy(t, updateTime)
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
+<<<<<<< HEAD
 				m.Update(nil, nil)
+=======
+				m.Update(nil, nil, logp.InfoLevel, nil)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 				e.EnsureOffWithoutError(t, updateTime)
 				assert.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 				assert.Equal(t, uint32(0), m.recoveryRetries.Load(), "recovery retries should be 0")
@@ -384,14 +397,18 @@ func TestOTelManager_Run(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				return newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
+<<<<<<< HEAD
 				m.Update(cfg, nil)
+=======
+				m.Update(cfg, nil, logp.InfoLevel, nil)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 				e.EnsureHealthy(t, updateTime)
 
 				// stop it, this should be restarted by the manager
@@ -404,7 +421,11 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
+<<<<<<< HEAD
 				m.Update(nil, nil)
+=======
+				m.Update(nil, nil, logp.InfoLevel, nil)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 				e.EnsureOffWithoutError(t, updateTime)
 				assert.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 				assert.Equal(t, uint32(0), m.recoveryRetries.Load(), "recovery retries should be 0")
@@ -417,14 +438,18 @@ func TestOTelManager_Run(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				return newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
+<<<<<<< HEAD
 				m.Update(cfg, nil)
+=======
+				m.Update(cfg, nil, logp.InfoLevel, nil)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 				e.EnsureHealthy(t, updateTime)
 				assert.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 0")
 
@@ -451,7 +476,11 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
+<<<<<<< HEAD
 				m.Update(nil, nil)
+=======
+				m.Update(nil, nil, logp.InfoLevel, nil)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 				e.EnsureOffWithoutError(t, updateTime)
 				assert.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 				assert.Equal(t, uint32(3), seenRecoveredTimes, "recovery retries should be 3")
@@ -464,7 +493,7 @@ func TestOTelManager_Run(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				return newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
@@ -475,7 +504,11 @@ func TestOTelManager_Run(t *testing.T) {
 				})
 
 				cfg := confmap.NewFromStringMap(testConfig)
+<<<<<<< HEAD
 				m.Update(cfg, nil)
+=======
+				m.Update(cfg, nil, logp.InfoLevel, nil)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 
 				seenRecoveredTimes := uint32(0)
 				require.Eventually(t, func() bool {
@@ -490,7 +523,11 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
+<<<<<<< HEAD
 				m.Update(nil, nil)
+=======
+				m.Update(nil, nil, logp.InfoLevel, nil)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 				e.EnsureOffWithoutError(t, updateTime)
 				require.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 				assert.GreaterOrEqual(t, uint32(3), seenRecoveredTimes, "recovery retries should be 3")
@@ -503,7 +540,7 @@ func TestOTelManager_Run(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				return newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
@@ -515,7 +552,11 @@ func TestOTelManager_Run(t *testing.T) {
 				})
 
 				cfg := confmap.NewFromStringMap(testConfig)
+<<<<<<< HEAD
 				m.Update(cfg, nil)
+=======
+				m.Update(cfg, nil, logp.InfoLevel, nil)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 
 				// ensure that it reports a generic fatal error for all components, a panic cannot be assigned to
 				// a specific component in the collector
@@ -548,7 +589,7 @@ func TestOTelManager_Run(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				subprocessExec, err := newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				subprocessExec, err := newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 				if err != nil {
 					return nil, err
 				}
@@ -572,7 +613,11 @@ func TestOTelManager_Run(t *testing.T) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
+<<<<<<< HEAD
 				m.Update(cfg, nil)
+=======
+				m.Update(cfg, nil, logp.InfoLevel, nil)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 				e.EnsureHealthy(t, updateTime)
 
 				// stop the manager to simulate that elastic-agent is shutting down
@@ -605,7 +650,7 @@ func TestOTelManager_Run(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				subprocessExec, err := newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				subprocessExec, err := newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 				if err != nil {
 					return nil, err
 				}
@@ -629,7 +674,11 @@ func TestOTelManager_Run(t *testing.T) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
+<<<<<<< HEAD
 				m.Update(cfg, nil)
+=======
+				m.Update(cfg, nil, logp.InfoLevel, nil)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 				e.EnsureHealthy(t, updateTime)
 
 				// stop the manager to simulate that elastic-agent is shutting down
@@ -662,7 +711,7 @@ func TestOTelManager_Run(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				return newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
@@ -688,7 +737,11 @@ func TestOTelManager_Run(t *testing.T) {
 				require.NoError(t, err, "failed to inject user health extension")
 
 				updateTime := time.Now()
+<<<<<<< HEAD
 				m.Update(cfg, nil)
+=======
+				m.Update(cfg, nil, logp.InfoLevel, nil)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 				e.EnsureHealthy(t, updateTime)
 
 				assert.EqualValues(t, 1, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 1")
@@ -701,7 +754,7 @@ func TestOTelManager_Run(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				return newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 			},
 			restarter:           newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			skipListeningErrors: true,
@@ -716,7 +769,11 @@ func TestOTelManager_Run(t *testing.T) {
 					//
 					// this does give a good test of a truly invalid configuration
 					cfg := confmap.New() // empty config
+<<<<<<< HEAD
 					m.Update(cfg, nil)
+=======
+					m.Update(cfg, nil, logp.InfoLevel, nil)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 
 					// delay between updates to ensure the collector will have to fail
 					<-time.After(100 * time.Millisecond)
@@ -752,7 +809,7 @@ func TestOTelManager_Run(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				return newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 			},
 			restarter: newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute),
 			testFn: func(t *testing.T, m *OTelManager, e *EventListener, exec *testExecution, managerCtxCancel context.CancelFunc, collectorRunErr chan error) {
@@ -775,7 +832,11 @@ func TestOTelManager_Run(t *testing.T) {
 						},
 					},
 				})
+<<<<<<< HEAD
 				m.Update(cfg, nil)
+=======
+				m.Update(cfg, nil, logp.InfoLevel, nil)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 				e.EnsureFatal(t, time.Now().Add(time.Second), func(collectT *assert.CollectT, _ *EventTime[error], latestStatus *EventTime[*status.AggregateStatus]) {
 					status := latestStatus.Value()
 
@@ -816,6 +877,7 @@ func TestOTelManager_Run(t *testing.T) {
 				collectorRunErr:   make(chan error),
 				recoveryTimer:     tc.restarter,
 				stopTimeout:       waitTimeForStop,
+				agentInfo:         &info.AgentInfo{},
 			}
 
 			executionMode, err := tc.execModeFn(m.collectorRunErr)
@@ -890,13 +952,17 @@ func TestOTelManager_Logging(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				return newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), 0, 0)
+				return newSubprocessExecution(testBinary, hcUUID.String(), 0, 0)
 			},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// the execution mode passed here is overridden below so it is irrelevant
+<<<<<<< HEAD
 			m, err := NewOTelManager(l, logp.DebugLevel, base, SubprocessExecutionMode, nil, nil, nil, waitTimeForStop)
+=======
+			m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, nil, waitTimeForStop)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 			require.NoError(t, err, "could not create otel manager")
 
 			executionMode, err := tc.execModeFn(m.collectorRunErr)
@@ -921,7 +987,11 @@ func TestOTelManager_Logging(t *testing.T) {
 			}()
 
 			cfg := confmap.NewFromStringMap(testConfig)
+<<<<<<< HEAD
 			m.Update(cfg, nil)
+=======
+			m.Update(cfg, nil, logp.InfoLevel, nil)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 
 			// the collector should log to the base logger
 			assert.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -967,7 +1037,7 @@ func TestOTelManager_Ports(t *testing.T) {
 				if err != nil {
 					return nil, fmt.Errorf("cannot generate UUID: %w", err)
 				}
-				return newSubprocessExecution(logp.DebugLevel, testBinary, hcUUID.String(), metricsPort, healthCheckPort)
+				return newSubprocessExecution(testBinary, hcUUID.String(), metricsPort, healthCheckPort)
 			},
 			healthCheckEnabled: true,
 		},
@@ -988,9 +1058,15 @@ func TestOTelManager_Ports(t *testing.T) {
 			// the execution mode passed here is overridden below so it is irrelevant
 			m, err := NewOTelManager(
 				l,
+<<<<<<< HEAD
 				logp.DebugLevel,
 				base, SubprocessExecutionMode,
 				nil,
+=======
+				logp.InfoLevel,
+				base,
+				&info.AgentInfo{},
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 				&agentCollectorConfig,
 				nil,
 				waitTimeForStop,
@@ -1021,7 +1097,11 @@ func TestOTelManager_Ports(t *testing.T) {
 
 			cfg := confmap.NewFromStringMap(testConfig)
 			cfg.Delete("service::telemetry::metrics::level") // change this to default
+<<<<<<< HEAD
 			m.Update(cfg, nil)
+=======
+			m.Update(cfg, nil, logp.InfoLevel, nil)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 
 			// wait until status reflects the config update
 			require.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -1111,15 +1191,21 @@ func TestOTelManager_PortConflict(t *testing.T) {
 	// the execution mode passed here is overridden below so it is irrelevant
 	m, err := NewOTelManager(
 		l,
+<<<<<<< HEAD
 		logp.DebugLevel,
 		base, SubprocessExecutionMode,
 		nil,
+=======
+		logp.InfoLevel,
+		base,
+		&info.AgentInfo{},
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 		nil,
 		nil,
 		waitTimeForStop,
 	)
 	require.NoError(t, err, "could not create otel manager")
-	executionMode, err := newSubprocessExecution(logp.DebugLevel, testBinary, strings.TrimPrefix(m.healthCheckExtID, "extension:healthcheckv2/"), 0, 0)
+	executionMode, err := newSubprocessExecution(testBinary, strings.TrimPrefix(m.healthCheckExtID, "extension:healthcheckv2/"), 0, 0)
 	require.NoError(t, err, "could not create subprocess execution mode")
 	m.execution = executionMode
 
@@ -1145,7 +1231,11 @@ func TestOTelManager_PortConflict(t *testing.T) {
 	// no retries, collector is not running
 	assert.Equal(t, uint32(0), m.recoveryRetries.Load())
 
+<<<<<<< HEAD
 	m.Update(cfg, nil)
+=======
+	m.Update(cfg, nil, logp.InfoLevel, nil)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 
 	// wait until status reflects the config update
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -1220,35 +1310,41 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 		components          []component.Component
 		expectedKeys        []string
 		expectedErrorString string
+		expectedLogLevel    string
 	}{
 		{
-			name:         "nil config returns nil",
-			collectorCfg: nil,
-			components:   nil,
+			name:             "nil config returns nil",
+			collectorCfg:     nil,
+			components:       nil,
+			expectedLogLevel: "",
 		},
 		{
-			name:         "empty config returns empty config",
-			collectorCfg: nil,
-			components:   nil,
-			expectedKeys: []string{},
+			name:             "empty config returns empty config",
+			collectorCfg:     nil,
+			components:       nil,
+			expectedKeys:     []string{},
+			expectedLogLevel: "",
 		},
 		{
-			name:         "collector config only",
-			collectorCfg: confmap.NewFromStringMap(testConfig),
-			components:   nil,
-			expectedKeys: []string{"receivers", "exporters", "service", "processors"},
+			name:             "collector config only",
+			collectorCfg:     confmap.NewFromStringMap(testConfig),
+			components:       nil,
+			expectedKeys:     []string{"receivers", "exporters", "service", "processors"},
+			expectedLogLevel: "info",
 		},
 		{
-			name:         "components only",
-			collectorCfg: nil,
-			components:   []component.Component{testComp},
-			expectedKeys: []string{"receivers", "exporters", "service"},
+			name:             "components only",
+			collectorCfg:     nil,
+			components:       []component.Component{testComp},
+			expectedKeys:     []string{"receivers", "exporters", "service"},
+			expectedLogLevel: "DEBUG",
 		},
 		{
-			name:         "both collector config and components",
-			collectorCfg: confmap.NewFromStringMap(testConfig),
-			components:   []component.Component{testComp},
-			expectedKeys: []string{"receivers", "exporters", "service", "processors"},
+			name:             "both collector config and components",
+			collectorCfg:     confmap.NewFromStringMap(testConfig),
+			components:       []component.Component{testComp},
+			expectedKeys:     []string{"receivers", "exporters", "service", "processors"},
+			expectedLogLevel: "info",
 		},
 		{
 			name:         "component config generation error",
@@ -1260,6 +1356,7 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 				// Missing InputSpec which should cause an error during config generation
 			}},
 			expectedErrorString: "failed to generate otel config: unknown otel receiver type for input type: filestream",
+			expectedLogLevel:    "",
 		},
 	}
 
@@ -1268,6 +1365,7 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 			cfgUpdate := configUpdate{
 				collectorCfg: tt.collectorCfg,
 				components:   tt.components,
+				logLevel:     logp.DebugLevel,
 			}
 			result, err := buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter, logptest.NewTestingLogger(t, ""))
 
@@ -1283,6 +1381,11 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 			if len(tt.expectedKeys) == 0 {
 				assert.Nil(t, result)
 				return
+			}
+
+			// assert log level provided by user is given precedence.
+			if tt.expectedLogLevel != "" {
+				assert.Equal(t, tt.expectedLogLevel, result.Get("service::telemetry::logs::level"))
 			}
 
 			require.NotNil(t, result)
@@ -1599,7 +1702,11 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	components := []component.Component{testComp}
 
 	t.Run("collector config is passed down to the collector execution", func(t *testing.T) {
+<<<<<<< HEAD
 		mgr.Update(collectorCfg, nil)
+=======
+		mgr.Update(collectorCfg, nil, logp.InfoLevel, nil)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 		select {
 		case <-collectorStarted:
 		case <-ctx.Done():
@@ -1632,7 +1739,11 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	})
 
 	t.Run("component config is passed down to the otel manager", func(t *testing.T) {
+<<<<<<< HEAD
 		mgr.Update(collectorCfg, components)
+=======
+		mgr.Update(collectorCfg, nil, logp.InfoLevel, components)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 		select {
 		case <-collectorStarted:
 		case <-ctx.Done():
@@ -1648,7 +1759,11 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	})
 
 	t.Run("empty collector config leaves the component config running", func(t *testing.T) {
+<<<<<<< HEAD
 		mgr.Update(nil, components)
+=======
+		mgr.Update(nil, nil, logp.InfoLevel, components)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 		select {
 		case <-collectorStarted:
 		case <-ctx.Done():
@@ -1748,7 +1863,6 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 	// Setup test logger and dependencies
 	testLogger, _ := loggertest.New("test")
-	agentInfo := &info.AgentInfo{}
 	beatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
 	collectorStarted := make(chan struct{})
 
@@ -1759,10 +1873,14 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 	// Create manager with test dependencies
 	mgr, err := NewOTelManager(
 		testLogger,
-		logp.DebugLevel,
+		logp.InfoLevel,
 		testLogger,
+<<<<<<< HEAD
 		SubprocessExecutionMode, // irrelevant, we'll override it
 		agentInfo,
+=======
+		&info.AgentInfo{},
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 		nil,
 		beatMonitoringConfigGetter,
 		time.Second,
@@ -1800,7 +1918,11 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 		},
 	}
 	// start the collector by giving it a mock config
+<<<<<<< HEAD
 	mgr.Update(nil, components)
+=======
+	mgr.Update(nil, nil, logp.InfoLevel, components)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 	select {
 	case <-ctx.Done():
 		t.Fatal("timeout waiting for collector status update")
@@ -1823,7 +1945,11 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 	assert.Equal(t, componentState.State.State, client.UnitStateHealthy)
 
 	// stop the component by sending a nil config
+<<<<<<< HEAD
 	mgr.Update(nil, nil)
+=======
+	mgr.Update(nil, nil, logp.InfoLevel, nil)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 
 	// then send a nil status, indicating the collector is not running the component anymore
 	// do this a few times to see if the STOPPED state isn't lost along the way
@@ -1856,7 +1982,7 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 	// Create manager with test dependencies
 	mgr, err := NewOTelManager(
 		testLogger,
-		logp.DebugLevel,
+		logp.InfoLevel,
 		testLogger,
 		SubprocessExecutionMode, // irrelevant, we'll override it
 		agentInfo,
@@ -1883,7 +2009,11 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 		Event: componentstatus.NewEvent(componentstatus.StatusStarting),
 	}
 	// start the collector by giving it a mock config
+<<<<<<< HEAD
 	mgr.Update(nil, components)
+=======
+	mgr.Update(nil, nil, logp.InfoLevel, components)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 	select {
 	case <-ctx.Done():
 		t.Fatal("timeout waiting for collector status update")
@@ -1907,7 +2037,11 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 	assert.Equal(t, componentState.State.Message, "STARTING")
 
 	// stop the component by sending a nil config
+<<<<<<< HEAD
 	mgr.Update(nil, nil)
+=======
+	mgr.Update(nil, nil, logp.InfoLevel, nil)
+>>>>>>> 85b7e9932 ((bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used (#11998))
 
 	// then send a nil status, indicating the collector is not running the component anymore
 	// do this a few times to see if the STOPPED state isn't lost along the way
