@@ -109,6 +109,10 @@ The `elasticsearch.index` attribute is removed from the final document if it exi
 
 ### Queuing and batching
 
+```{applies_to}
+stack: ga 9.3
+```
+
 The {{es}} exporter supports the common `sending_queue` settings, which enable both queuing and batching. The default sending queue is configured to do async batching with the following configuration:
 
 ```yaml
@@ -144,12 +148,13 @@ exporters:
 ```
 
 ### Deprecated batcher configuration
+
 ```{applies_to}
 stack: ga 9.0, deprecated 9.2, removed 9.3
 ```
 
 :::{warning}
-The `batcher` configuration is deprecated and will be removed in a future version. Use `sending_queue::batch` instead.
+The `batcher` configuration has been removed in {{edot}} Collector 9.3. Use `sending_queue::batch` instead.
 :::
 
 Batching can be enabled and configured with the `batcher` section, using [common `batcher` settings](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/exporterhelper/internal/queue_sender.go).
