@@ -55,7 +55,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [nopreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/nopreceiver/v0.141.0/receiver/nopreceiver/README.md) | v0.141.0 |
 | [otlpreceiver](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/otlpreceiver/v0.141.0/receiver/otlpreceiver/README.md) | v0.141.0 |
 | [postgresqlreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/postgresqlreceiver/v0.141.0/receiver/postgresqlreceiver/README.md) | v0.141.0 |
-| [profiling](https://github.com/open-telemetry/opentelemetry-ebpf-profiler/blob/v0.0.202547/README.md) | v0.0.202547 |
+| [profiling](https://github.com/open-telemetry/opentelemetry-ebpf-profiler/blob/v0.0.202601/README.md) | v0.0.202601 |
 | [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusreceiver/v0.141.0/receiver/prometheusreceiver/README.md) | v0.141.0 |
 | [prometheusremotewritereceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusremotewritereceiver/v0.141.0/receiver/prometheusremotewritereceiver/README.md) | v0.141.0 |
 | [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.141.0/receiver/receivercreator/README.md) | v0.141.0 |
