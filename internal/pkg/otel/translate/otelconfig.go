@@ -145,6 +145,24 @@ func GetOtelConfig(
 	return otelConfig, nil
 }
 
+func GetOTelLogLevel(level string) string {
+	if level != "" {
+		switch strings.ToLower(level) {
+		case "debug":
+			return "DEBUG"
+		case "info":
+			return "INFO"
+		case "warning":
+			return "WARN"
+		case "error":
+			return "ERROR"
+		default:
+			return "INFO"
+		}
+	}
+	return "INFO"
+}
+
 // VerifyComponentIsOtelSupported verifies that the given component can be run in an Otel Collector. It returns an error
 // indicating what the problem is, if it can't.
 func VerifyComponentIsOtelSupported(comp *component.Component) error {
