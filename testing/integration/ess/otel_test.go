@@ -22,7 +22,9 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
@@ -32,6 +34,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommontest"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	aTesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
@@ -2037,4 +2040,162 @@ agent.internal.runtime.metricbeat:
 
 	combinedOutput, err := fixture.Uninstall(ctx, &aTesting.UninstallOpts{Force: true})
 	require.NoErrorf(t, err, "error uninstalling classic agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
+}
+
+// This tests that live reloading the log level works correctly
+func TestLogReloading(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		Stack: &define.Stack{},
+	})
+
+	// Flow of the test
+	// 1. Start elastic-agent with debug logs
+	// 2. Change the log level to info without restarting
+	// 3. Ensure no debug logs are printed
+	// 4. Set service::telemetry::logs::level: debug
+	// 5. Ensure service::telemetry::logs::level is given precedence even when agent logs are set to info
+
+	// Create the otel configuration file
+	type otelConfigOptions struct {
+		ESEndpoint string
+		ESApiKey   string
+		Index      string
+		CAFile     string
+	}
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	logConfig := `
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - %s
+    preset: balanced
+    protocol: http	
+agent.logging.level: %s
+agent.grpc.port: 6793
+agent.monitoring.enabled: true
+agent.logging.to_stderr: true
+agent.reload:
+  period: 1s
+`
+
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
+	// start with debug logs
+	cfg := fmt.Sprintf(logConfig, esURL, "debug")
+
+	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	if err != nil {
+		t.Fatalf("cannot prepare Elastic-Agent command: %s", err)
+	}
+
+	observer, zapLogs := observer.New(zap.DebugLevel)
+	logger := zap.New(observer)
+	zapWriter := &ZapWriter{logger: logger, level: zap.InfoLevel}
+	cmd.Stderr = zapWriter
+	cmd.Stdout = zapWriter
+
+	require.NoError(t, cmd.Start())
+
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 30*time.Second, 1*time.Second)
+
+	// Make sure the Elastic-Agent process is not running before
+	// exiting the test
+	t.Cleanup(func() {
+		// Ignore the error because we cancelled the context,
+		// and that always returns an error
+		_ = cmd.Wait()
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			zapLogs.All()
+		}
+	})
+
+	require.Eventually(t, func() bool {
+		// we ensure OTel runtime inputs have started with correct level
+		// and not just agent logs
+		return (zapLogs.FilterMessageSnippet("otelcol.component.kind").FilterMessageSnippet(`"log.level":"debug"`).Len() > 1)
+	}, 1*time.Minute, 10*time.Second, "could not find debug logs")
+
+	// reset logs
+	zapLogs.TakeAll()
+
+	// set agent.logging.level: info
+	cfg = fmt.Sprintf(logConfig, esURL, "info")
+	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
+
+	// wait for elastic agent to be healthy and OTel collector to start
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return zapLogs.FilterMessageSnippet("Everything is ready. Begin running and processing data").Len() > 0
+	}, 1*time.Minute, 10*time.Second, "elastic-agent was not healthy after log level changed to info")
+
+	// if debug level was enabled, we would fine this message
+	require.Zero(t, zapLogs.FilterMessageSnippet(`Starting health check extension V2`).Len())
+
+	// set collector logs to debug
+	logConfig = logConfig + `
+service:
+  telemetry:
+    logs:
+      level: debug
+`
+
+	// add service::telemetry::logs::level:debug
+	cfg = fmt.Sprintf(logConfig, esURL, "info")
+	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
+
+	// reset zap logs
+	zapLogs.TakeAll()
+
+	// wait for elastic agent to be healthy and OTel collector to re-start
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return zapLogs.FilterMessageSnippet("Everything is ready. Begin running and processing data").Len() > 0
+	}, 1*time.Minute, 10*time.Second, "elastic-agent is not healthy")
+
+	require.Eventually(t, func() bool {
+		// we ensure inputs have reloaded with correct level
+		// and not just agent logs
+		return (zapLogs.FilterMessageSnippet("otelcol.component.kind").FilterMessageSnippet(`"log.level":"debug"`).Len() > 1)
+	}, 1*time.Minute, 10*time.Second, "collector setting for log level was not given precedence")
+}
+
+type ZapWriter struct {
+	logger *zap.Logger
+	level  zapcore.Level
+}
+
+func (w *ZapWriter) Write(p []byte) (n int, err error) {
+	msg := strings.TrimSpace(string(p))
+	if msg != "" {
+		w.logger.Check(w.level, msg).Write()
+	}
+	return len(p), nil
 }
