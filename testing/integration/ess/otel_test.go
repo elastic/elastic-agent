@@ -2080,7 +2080,7 @@ outputs:
     hosts:
       - %s
     preset: balanced
-    protocol: http	
+    protocol: http
 agent.logging.level: %s
 agent.grpc.port: 6793
 agent.monitoring.enabled: true
@@ -2146,19 +2146,11 @@ agent.reload:
 			t.Logf("waiting for agent healthy: %s", err.Error())
 			return false
 		}
-<<<<<<< HEAD
-		return zapLogs.FilterMessageSnippet("Everything is ready. Begin running and processing data").Len() > 0
-	}, 1*time.Minute, 10*time.Second, "elastic-agent was not healthy after log level changed to info")
-
-	// if debug level was enabled, we would fine this message
-	require.Zero(t, zapLogs.FilterMessageSnippet(`Starting health check extension V2`).Len())
-=======
 		return zapLogs.FilterMessageSnippet("Everything is ready. Begin running and processing data").Len() > 1
 	}, 90*time.Second, 10*time.Second, "elastic-agent was not healthy after log level changed to info")
 
 	// this debug log should not be present again after re-loading
 	require.Equal(t, 1, zapLogs.FilterMessageSnippet(`Starting health check extension V2`).Len())
->>>>>>> 023091862 ((fix) Flaky test TestLogReloading (#12159))
 
 	// set collector logs to debug
 	logConfig = logConfig + `
