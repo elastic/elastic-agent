@@ -1182,7 +1182,7 @@ func packageAgent(ctx context.Context, dependenciesVersion string, manifestRespo
 			dependenciesVersion = beatVersion
 		}
 		// add the snapshot suffix if needed
-		dependenciesVersion += devtools.SnapshotSuffix()
+		dependenciesVersion += devtools.MaybeSnapshotSuffix()
 	}
 	log.Printf("Packaging with dependenciesVersion: %s", dependenciesVersion)
 
