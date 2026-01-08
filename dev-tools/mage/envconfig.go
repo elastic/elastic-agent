@@ -190,7 +190,6 @@ func (c *EnvConfig) WithAddedPackageType(pkgType PackageType) *EnvConfig {
 func (c *EnvConfig) WithBeatVersion(version string) *EnvConfig {
 	clone := c.Clone()
 	clone.Build.BeatVersion = version
-	clone.Build.BeatVersionSet = true
 	return clone
 }
 
@@ -250,7 +249,10 @@ type BuildConfig struct {
 	// Snapshot indicates whether this is a snapshot build (from SNAPSHOT env var)
 	Snapshot bool
 
-	// SnapshotSet indicates whether SNAPSHOT env var was explicitly set
+	// SnapshotSet indicates whether SNAPSHOT env var was explicitly set.
+	// This is needed to distinguish "not set" from "explicitly set to false"
+	// in contexts where the default varies (e.g., cloud images default to true).
+	// TODO: consider refactoring to use *bool or restructuring context-specific defaults.
 	SnapshotSet bool
 
 	// DevBuild indicates whether this is a development build (from DEV env var)
@@ -259,7 +261,10 @@ type BuildConfig struct {
 	// ExternalBuild indicates whether to use external artifact builds (from EXTERNAL env var)
 	ExternalBuild bool
 
-	// ExternalBuildSet indicates whether EXTERNAL env var was explicitly set
+	// ExternalBuildSet indicates whether EXTERNAL env var was explicitly set.
+	// This is needed to distinguish "not set" from "explicitly set to false"
+	// in contexts where the default varies (e.g., cloud images default to true).
+	// TODO: consider refactoring to use *bool or restructuring context-specific defaults.
 	ExternalBuildSet bool
 
 	// FIPSBuild indicates whether to build FIPS-compliant binaries (from FIPS env var)
@@ -280,9 +285,6 @@ type BuildConfig struct {
 	// BeatVersion overrides the beat version (from BEAT_VERSION or set programmatically)
 	BeatVersion string
 
-	// BeatVersionSet indicates if BeatVersion was explicitly set (env or programmatic)
-	BeatVersionSet bool
-
 	// AgentCommitHashOverride overrides the commit hash for packaging (from AGENT_COMMIT_HASH_OVERRIDE or set programmatically)
 	AgentCommitHashOverride string
 
@@ -296,14 +298,8 @@ type BuildConfig struct {
 	// BeatGoVersion overrides the Go version (from BEAT_GO_VERSION env var)
 	BeatGoVersion string
 
-	// BeatGoVersionSet indicates if BeatGoVersion was explicitly set
-	BeatGoVersionSet bool
-
 	// BeatDocBranch overrides the documentation branch (from BEAT_DOC_BRANCH env var)
 	BeatDocBranch string
-
-	// BeatDocBranchSet indicates if BeatDocBranch was explicitly set
-	BeatDocBranchSet bool
 }
 
 func (bc *BuildConfig) CommitHash() (string, error) {
@@ -458,9 +454,6 @@ type IntegrationTestConfig struct {
 	// Packages specifies the test packages (from TEST_PACKAGES env var)
 	Packages string
 
-	// PackagesDefined indicates whether TEST_PACKAGES was explicitly set
-	PackagesDefined bool
-
 	// Groups specifies the test groups (from TEST_GROUPS env var)
 	Groups string
 
@@ -503,11 +496,9 @@ type IntegrationTestConfig struct {
 	// GoTestFlags contains additional flags for go test (from GOTEST_FLAGS env var)
 	GoTestFlags string
 
-	// TestEnvironment enables/disables the test environment (from TEST_ENVIRONMENT env var)
-	TestEnvironment string
-
-	// TestEnvironmentSet indicates whether TEST_ENVIRONMENT was explicitly set
-	TestEnvironmentSet bool
+	// TestEnvironmentEnabled indicates if the test environment is enabled (from TEST_ENVIRONMENT env var).
+	// Defaults to true if not set.
+	TestEnvironmentEnabled bool
 }
 
 // DockerConfig contains Docker-related configuration.
@@ -591,7 +582,9 @@ func LoadConfig() (*EnvConfig, error) {
 
 	cfg.loadCrossBuildConfig()
 	cfg.loadPackagingConfig()
-	cfg.loadIntegrationTestConfig()
+	if err := cfg.loadIntegrationTestConfig(); err != nil {
+		return nil, fmt.Errorf("loading integration test config: %w", err)
+	}
 	cfg.loadDockerConfig()
 	cfg.loadKubernetesConfig()
 	cfg.loadDevMachineConfig()
@@ -644,7 +637,7 @@ func (c *EnvConfig) loadBuildConfig() error {
 	}
 
 	// Read BEAT_VERSION override
-	c.Build.BeatVersion, c.Build.BeatVersionSet = os.LookupEnv("BEAT_VERSION")
+	c.Build.BeatVersion = envOr("BEAT_VERSION", "")
 
 	// Read AGENT_COMMIT_HASH_OVERRIDE
 	c.Build.AgentCommitHashOverride = envOr("AGENT_COMMIT_HASH_OVERRIDE", "")
@@ -653,10 +646,10 @@ func (c *EnvConfig) loadBuildConfig() error {
 	c.Build.GolangCrossBuild = envOr("GOLANG_CROSSBUILD", "") == "1"
 
 	// Read BEAT_GO_VERSION override
-	c.Build.BeatGoVersion, c.Build.BeatGoVersionSet = os.LookupEnv("BEAT_GO_VERSION")
+	c.Build.BeatGoVersion = envOr("BEAT_GO_VERSION", "")
 
 	// Read BEAT_DOC_BRANCH override
-	c.Build.BeatDocBranch, c.Build.BeatDocBranchSet = os.LookupEnv("BEAT_DOC_BRANCH")
+	c.Build.BeatDocBranch = envOr("BEAT_DOC_BRANCH", "")
 
 	return nil
 }
@@ -718,7 +711,7 @@ func (c *EnvConfig) loadPackagingConfig() {
 }
 
 // loadIntegrationTestConfig loads integration test configuration from environment variables.
-func (c *EnvConfig) loadIntegrationTestConfig() {
+func (c *EnvConfig) loadIntegrationTestConfig() error {
 	c.IntegrationTest.AgentVersion = envOr("AGENT_VERSION", "")
 	c.IntegrationTest.AgentStackVersion = envOr("AGENT_STACK_VERSION", "")
 	c.IntegrationTest.AgentBuildDir = envOr("AGENT_BUILD_DIR", "")
@@ -730,7 +723,6 @@ func (c *EnvConfig) loadIntegrationTestConfig() {
 	c.IntegrationTest.GCPEmailDomain = envOr("TEST_INTEG_AUTH_EMAIL_DOMAIN", "")
 	c.IntegrationTest.GCPServiceTokenFile = envOr("TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE", "")
 	c.IntegrationTest.Platforms = envOr("TEST_PLATFORMS", "")
-	_, c.IntegrationTest.PackagesDefined = os.LookupEnv("TEST_PACKAGES")
 	c.IntegrationTest.Packages = envOr("TEST_PACKAGES", "")
 	c.IntegrationTest.Groups = envOr("TEST_GROUPS", "")
 	c.IntegrationTest.DefinePrefix = envOr("TEST_DEFINE_PREFIX", "")
@@ -746,7 +738,14 @@ func (c *EnvConfig) loadIntegrationTestConfig() {
 	c.IntegrationTest.KeepInstalled = envOr("AGENT_KEEP_INSTALLED", "")
 	c.IntegrationTest.BuildAgent = envOr("BUILD_AGENT", "") == "true"
 	c.IntegrationTest.GoTestFlags = envOr("GOTEST_FLAGS", "")
-	c.IntegrationTest.TestEnvironment, c.IntegrationTest.TestEnvironmentSet = os.LookupEnv("TEST_ENVIRONMENT")
+
+	var err error
+	c.IntegrationTest.TestEnvironmentEnabled, err = parseBoolEnv("TEST_ENVIRONMENT", true)
+	if err != nil {
+		return fmt.Errorf("failed to parse TEST_ENVIRONMENT: %w", err)
+	}
+
+	return nil
 }
 
 // loadDockerConfig loads Docker-related configuration from environment variables.
