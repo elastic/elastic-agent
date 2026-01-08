@@ -53,7 +53,7 @@ type ConfigParams struct {
 
 // Config generates config files. Set DEV_OS and DEV_ARCH to change the target
 // host for the generated configs. Defaults to linux/amd64.
-func Config(cfg *EnvConfig, types ConfigFileType, args ConfigFileParams, targetDir string) error {
+func Config(cfg *Settings, types ConfigFileType, args ConfigFileParams, targetDir string) error {
 	// Short
 	if types.IsShort() {
 		file := filepath.Join(targetDir, cfg.Beat.Name+".yml")
@@ -81,7 +81,7 @@ func Config(cfg *EnvConfig, types ConfigFileType, args ConfigFileParams, targetD
 	return nil
 }
 
-func makeConfigTemplate(cfg *EnvConfig, destination string, mode os.FileMode, confParams ConfigFileParams, typ ConfigFileType) error {
+func makeConfigTemplate(cfg *Settings, destination string, mode os.FileMode, confParams ConfigFileParams, typ ConfigFileType) error {
 	// Determine what type to build and set some parameters.
 	var confFile ConfigParams
 	var tmplParams map[string]interface{}

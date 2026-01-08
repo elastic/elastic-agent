@@ -19,11 +19,11 @@ import (
 
 // KindIntegrationTestStep setups a kind environment.
 type KindIntegrationTestStep struct {
-	cfg *devtools.EnvConfig
+	cfg *devtools.Settings
 }
 
 // SetConfig sets the configuration for the step.
-func (m *KindIntegrationTestStep) SetConfig(cfg *devtools.EnvConfig) {
+func (m *KindIntegrationTestStep) SetConfig(cfg *devtools.Settings) {
 	m.cfg = cfg
 }
 

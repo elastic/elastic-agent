@@ -112,7 +112,7 @@ type PackageSpec struct {
 	ExtraTags               []string               `yaml:"extra_tags,omitempty"`  // Optional
 	Components              []packaging.BinarySpec `yaml:"components"`            // Optional: Components required for this package
 
-	cfg                    *EnvConfig
+	cfg                    *Settings
 	evalContext            map[string]interface{}
 	packageDir             string
 	localPreInstallScript  string

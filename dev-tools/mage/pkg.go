@@ -18,7 +18,7 @@ import (
 
 // Package packages the Beat for distribution using the provided config.
 // It generates packages based on the set of target platforms and registered packaging specifications.
-func Package(cfg *EnvConfig) error {
+func Package(cfg *Settings) error {
 	fmt.Println("--- Package artifact")
 	platforms := cfg.GetPlatforms()
 	if len(platforms) == 0 {
@@ -188,7 +188,7 @@ func WithRootUserContainer() func(params *testPackagesParams) {
 
 // TestPackages executes the package tests on the produced binaries. These tests
 // inspect things like file ownership and mode.
-func TestPackages(cfg *EnvConfig, options ...TestPackagesOption) error {
+func TestPackages(cfg *Settings, options ...TestPackagesOption) error {
 	fmt.Println("--- TestPackages")
 	params := testPackagesParams{}
 	for _, opt := range options {
@@ -246,7 +246,7 @@ func TestPackages(cfg *EnvConfig, options ...TestPackagesOption) error {
 // TestLinuxForCentosGLIBC checks the GLIBC requirements of linux/amd64 and
 // linux/386 binaries to ensure they meet the requirements for RHEL 6 which has
 // glibc 2.12.
-func TestLinuxForCentosGLIBC(cfg *EnvConfig) error {
+func TestLinuxForCentosGLIBC(cfg *Settings) error {
 	platform := cfg.Platform()
 	switch platform.Name {
 	case "linux/amd64", "linux/386":

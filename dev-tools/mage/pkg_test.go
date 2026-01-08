@@ -16,7 +16,7 @@ import (
 
 func testPackageSpec(t testing.TB) PackageSpec {
 	t.Helper()
-	cfg, err := LoadConfig()
+	cfg, err := LoadSettings()
 	require.NoError(t, err)
 	return PackageSpec{
 		Name:     "brewbeat",
@@ -98,7 +98,7 @@ func TestRepoRoot(t *testing.T) {
 }
 
 func TestDumpVariables(t *testing.T) {
-	cfg, err := LoadConfig()
+	cfg, err := LoadSettings()
 	require.NoError(t, err)
 	out, err := dumpVariables(cfg)
 	require.NoError(t, err)

@@ -12,7 +12,7 @@ import (
 )
 
 func TestGetVersion(t *testing.T) {
-	cfg, err := LoadConfig()
+	cfg, err := LoadSettings()
 	require.NoError(t, err)
 	bp, err := BeatQualifiedVersion(cfg)
 	assert.NoError(t, err)
@@ -21,7 +21,7 @@ func TestGetVersion(t *testing.T) {
 
 func TestAgentPackageVersion(t *testing.T) {
 	t.Run("agent package version without env var", func(t *testing.T) {
-		cfg, err := LoadConfig()
+		cfg, err := LoadSettings()
 		require.NoError(t, err)
 		expectedPkgVersion, err := BeatQualifiedVersion(cfg)
 		require.NoError(t, err)
@@ -31,7 +31,7 @@ func TestAgentPackageVersion(t *testing.T) {
 	})
 
 	t.Run("agent package version env var set", func(t *testing.T) {
-		cfg, err := LoadConfig()
+		cfg, err := LoadSettings()
 		require.NoError(t, err)
 		expectedPkgVersion := "1.2.3-specialrelease+abcdef"
 		cfg.Packaging.AgentPackageVersion = expectedPkgVersion
@@ -41,7 +41,7 @@ func TestAgentPackageVersion(t *testing.T) {
 	})
 
 	t.Run("agent package version function must be mapped", func(t *testing.T) {
-		cfg, err := LoadConfig()
+		cfg, err := LoadSettings()
 		require.NoError(t, err)
 		cfg.Packaging.AgentPackageVersion = "1.2.3-specialrelease+abcdef"
 		funcMap := FuncMap(cfg)

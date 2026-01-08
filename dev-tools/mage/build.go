@@ -77,7 +77,7 @@ func (b BuildArgs) ParseBuildTags() []string {
 }
 
 // DefaultBuildArgs returns the default BuildArgs for use in builds.
-func DefaultBuildArgs(cfg *EnvConfig) BuildArgs {
+func DefaultBuildArgs(cfg *Settings) BuildArgs {
 	args := BuildArgs{
 		Name: cfg.Beat.Name,
 		CGO:  build.Default.CgoEnabled,
@@ -125,7 +125,7 @@ func DefaultBuildArgs(cfg *EnvConfig) BuildArgs {
 //
 // The list of supported platforms is compiled based on the Go release notes: https://golang.org/doc/devel/release.html
 // The list has been updated according to the Go version: 1.16
-func positionIndependentCodeSupported(cfg *EnvConfig) bool {
+func positionIndependentCodeSupported(cfg *Settings) bool {
 	platform := cfg.Platform()
 	return oneOf(platform.GOOS, "darwin") ||
 		(platform.GOOS == "linux" && oneOf(platform.GOARCH, "riscv64", "amd64", "arm", "arm64", "ppc64le", "386")) ||
@@ -148,7 +148,7 @@ func oneOf(value string, lst ...string) bool {
 
 // DefaultGolangCrossBuildArgs returns the default BuildArgs for use in
 // cross-builds.
-func DefaultGolangCrossBuildArgs(cfg *EnvConfig) BuildArgs {
+func DefaultGolangCrossBuildArgs(cfg *Settings) BuildArgs {
 	args := DefaultBuildArgs(cfg)
 	platform := cfg.Platform()
 	args.Name += "-" + platform.GOOS + "-" + platform.Arch
@@ -167,7 +167,7 @@ func DefaultGolangCrossBuildArgs(cfg *EnvConfig) BuildArgs {
 
 // GolangCrossBuildWith invokes "go build" inside of the golang-crossbuild Docker
 // environment.
-func GolangCrossBuildWith(ctx context.Context, cfg *EnvConfig, params BuildArgs) error {
+func GolangCrossBuildWith(ctx context.Context, cfg *Settings, params BuildArgs) error {
 	if !cfg.Build.GolangCrossBuild {
 		return errors.New("Use the crossBuild target. golangCrossBuild can " +
 			"only be executed within the golang-crossbuild docker environment")
@@ -188,7 +188,7 @@ func GolangCrossBuildWith(ctx context.Context, cfg *EnvConfig, params BuildArgs)
 }
 
 // Build invokes "go build" to produce a binary.
-func Build(ctx context.Context, cfg *EnvConfig, params BuildArgs) error {
+func Build(ctx context.Context, cfg *Settings, params BuildArgs) error {
 	fmt.Println(">> build: Building", params.Name)
 
 	binaryName := params.Name + binaryExtension(cfg.Build.GOOS)
@@ -301,7 +301,7 @@ func Run(ctx context.Context, env map[string]string, stdout, stderr io.Writer, c
 // discovers the .syso file and incorporates it into the Windows exe. This
 // allows users to view metadata about the exe in the Details tab of the file
 // properties viewer.
-func MakeWindowsSysoFile(cfg *EnvConfig) (string, error) {
+func MakeWindowsSysoFile(cfg *Settings) (string, error) {
 	version, err := BeatQualifiedVersion(cfg)
 	if err != nil {
 		return "", err
