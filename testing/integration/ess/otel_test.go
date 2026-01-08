@@ -2,8 +2,6 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build integration
-
 package ess
 
 import (
@@ -2135,9 +2133,6 @@ agent.reload:
 		return (zapLogs.FilterMessageSnippet("otelcol.component.kind").FilterMessageSnippet(`"log.level":"debug"`).Len() > 1)
 	}, 1*time.Minute, 10*time.Second, "could not find debug logs")
 
-	// reset logs
-	zapLogs.TakeAll()
-
 	// set agent.logging.level: info
 	cfg = fmt.Sprintf(logConfig, esURL, "info")
 	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
@@ -2149,11 +2144,11 @@ agent.reload:
 			t.Logf("waiting for agent healthy: %s", err.Error())
 			return false
 		}
-		return zapLogs.FilterMessageSnippet("Everything is ready. Begin running and processing data").Len() > 0
+		return zapLogs.FilterMessageSnippet("Everything is ready. Begin running and processing data").Len() > 1
 	}, 90*time.Second, 10*time.Second, "elastic-agent was not healthy after log level changed to info")
 
-	// if debug level was enabled, we would find this message
-	require.Zero(t, zapLogs.FilterMessageSnippet(`Starting health check extension V2`).Len())
+	// this debug log should not be present again after re-loading
+	require.Equal(t, 1, zapLogs.FilterMessageSnippet(`Starting health check extension V2`).Len())
 
 	// set collector logs to debug
 	logConfig = logConfig + `
