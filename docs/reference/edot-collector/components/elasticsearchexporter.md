@@ -62,11 +62,11 @@ Documents are statically or dynamically routed to the target index or data strea
 
 Static mode routes documents to `logs_index` for log records, `metrics_index` for data points, and `traces_index` for spans, if these configs aren't empty respectively.
 
-### Dynamic mode (Index attribute)
+### Dynamic mode (index attribute)
 
 Dynamic mode (Index attribute) routes documents to index name specified in `elasticsearch.index` attribute, with the following order of precedence: log record / data point / span attribute -> scope attribute -> resource attribute if the attribute exists.
 
-### Dynamic mode (Data stream routing)
+### Dynamic mode (data stream routing)
 
 Dynamic mode (Data stream routing) routes documents to data stream constructed from `${data_stream.type}-${data_stream.dataset}-${data_stream.namespace}`,
 where `data_stream.type` is `logs` for log records, `metrics` for data points, and `traces` for spans, and is static. The following rules apply:
@@ -150,7 +150,7 @@ stack: ga 9.0, deprecated 9.2, removed 9.3
 ```
 
 :::{warning}
-The `batcher` configuration has been removed in {{edot}} Collector 9.3. Use `sending_queue::batch` instead.
+The `batcher` configuration is removed in {{edot}} Collector 9.3. Use `sending_queue::batch` instead.
 :::
 
 Batching can be enabled and configured with the `batcher` section, using [common `batcher` settings](https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/exporterhelper/internal/queue_sender.go).
@@ -181,7 +181,7 @@ The {{es}} exporter uses the [{{es}} Bulk API](https://www.elastic.co/docs/api/d
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `num_workers` | `runtime.NumCPU()` | Number of workers publishing bulk requests concurrently. This setting is deprecated and is used to configure `sending_queue::num_consumers` if `sending_queue::num_consumers` is not explicitly defined.  |
+| `num_workers` | `runtime.NumCPU()` | Deprecated. Number of workers publishing bulk requests concurrently. This setting configures `sending_queue::num_consumers` if `sending_queue::num_consumers` is not explicitly defined.  ||
 | `flush::bytes` | `5000000` | Write buffer flush size limit before compression. A bulk request are sent immediately when its buffer exceeds this limit. This value should be much lower than Elasticsearch's `http.max_content_length` config to avoid HTTP 413 Entity Too Large error. Keep this value under 5 MB. |
 | `flush::interval` | `10s` | Write buffer flush time limit. |
 | `retry::enabled` | `true` | Turns on or off request retry on error. Failed requests are retried with exponential backoff. |
