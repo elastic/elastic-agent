@@ -71,6 +71,12 @@ type EnvConfig struct {
 	// Kubernetes configuration
 	Kubernetes KubernetesConfig
 
+	// DevMachine configuration
+	DevMachine DevMachineConfig
+
+	// Fmt configuration
+	Fmt FmtConfig
+
 	// PlatformFilters holds additional platform filters to apply.
 	// These are applied after the base platform list is determined.
 	PlatformFilters []string
@@ -283,6 +289,21 @@ type BuildConfig struct {
 	// commitHash is the commit hash of the current build. Can be overridden via the AGENT_COMMIT_HASH_OVERRIDE env var.
 	// We lazy load this value, because inside crossbuild containers, fetching it can fail.
 	commitHash string
+
+	// GolangCrossBuild indicates we're inside a golang-crossbuild container (from GOLANG_CROSSBUILD env var)
+	GolangCrossBuild bool
+
+	// BeatGoVersion overrides the Go version (from BEAT_GO_VERSION env var)
+	BeatGoVersion string
+
+	// BeatGoVersionSet indicates if BeatGoVersion was explicitly set
+	BeatGoVersionSet bool
+
+	// BeatDocBranch overrides the documentation branch (from BEAT_DOC_BRANCH env var)
+	BeatDocBranch string
+
+	// BeatDocBranchSet indicates if BeatDocBranch was explicitly set
+	BeatDocBranchSet bool
 }
 
 func (bc *BuildConfig) CommitHash() (string, error) {
@@ -519,6 +540,30 @@ type KubernetesConfig struct {
 	KindSkipDelete bool
 }
 
+// DevMachineConfig contains configuration for dev machine provisioning.
+type DevMachineConfig struct {
+	// MachineImage is the GCP machine image to use (from MACHINE_IMAGE env var)
+	// Defaults to "family/platform-ingest-elastic-agent-ubuntu-2204"
+	MachineImage string
+
+	// Zone is the GCP zone to use (from ZONE env var)
+	// Defaults to "us-central1-a"
+	Zone string
+}
+
+const (
+	// DefaultDevMachineImage is the default GCP machine image for dev machines.
+	DefaultDevMachineImage = "family/platform-ingest-elastic-agent-ubuntu-2204"
+	// DefaultDevMachineZone is the default GCP zone for dev machines.
+	DefaultDevMachineZone = "us-central1-a"
+)
+
+// FmtConfig contains configuration for formatting tools.
+type FmtConfig struct {
+	// CheckHeadersDisabled disables license header checking (from CHECK_HEADERS_DISABLED env var)
+	CheckHeadersDisabled bool
+}
+
 // MustLoadConfig reads all configuration from environment variables and returns a new EnvConfig.
 // It panics if config loading fails. Use this when you need config but don't have a context.
 func MustLoadConfig() *EnvConfig {
@@ -549,6 +594,8 @@ func LoadConfig() (*EnvConfig, error) {
 	cfg.loadIntegrationTestConfig()
 	cfg.loadDockerConfig()
 	cfg.loadKubernetesConfig()
+	cfg.loadDevMachineConfig()
+	cfg.loadFmtConfig()
 
 	return cfg, nil
 }
@@ -601,6 +648,15 @@ func (c *EnvConfig) loadBuildConfig() error {
 
 	// Read AGENT_COMMIT_HASH_OVERRIDE
 	c.Build.AgentCommitHashOverride = envOr("AGENT_COMMIT_HASH_OVERRIDE", "")
+
+	// Read GOLANG_CROSSBUILD
+	c.Build.GolangCrossBuild = envOr("GOLANG_CROSSBUILD", "") == "1"
+
+	// Read BEAT_GO_VERSION override
+	c.Build.BeatGoVersion, c.Build.BeatGoVersionSet = os.LookupEnv("BEAT_GO_VERSION")
+
+	// Read BEAT_DOC_BRANCH override
+	c.Build.BeatDocBranch, c.Build.BeatDocBranchSet = os.LookupEnv("BEAT_DOC_BRANCH")
 
 	return nil
 }
@@ -707,6 +763,17 @@ func (c *EnvConfig) loadDockerConfig() {
 func (c *EnvConfig) loadKubernetesConfig() {
 	c.Kubernetes.K8sVersion = envOr("K8S_VERSION", "")
 	c.Kubernetes.KindSkipDelete = envOr("KIND_SKIP_DELETE", "") == "true"
+}
+
+// loadDevMachineConfig loads dev machine provisioning configuration from environment variables.
+func (c *EnvConfig) loadDevMachineConfig() {
+	c.DevMachine.MachineImage = envOr("MACHINE_IMAGE", DefaultDevMachineImage)
+	c.DevMachine.Zone = envOr("ZONE", DefaultDevMachineZone)
+}
+
+// loadFmtConfig loads formatting tools configuration from environment variables.
+func (c *EnvConfig) loadFmtConfig() {
+	_, c.Fmt.CheckHeadersDisabled = os.LookupEnv("CHECK_HEADERS_DISABLED")
 }
 
 // envOr returns the value of the specified environment variable if it is
