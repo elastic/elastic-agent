@@ -1141,19 +1141,8 @@ func runAgent(ctx context.Context, env map[string]string) error {
 func packageAgent(ctx context.Context, platforms []string, dependenciesVersion string, manifestResponse *manifest.Build, packageTypes []mage.PackageType, agentPackaging mg.Fn, agentBinaryTargets ...interface{}) error {
 	fmt.Println("--- Package Elastic-Agent")
 
-<<<<<<< HEAD
 	if mg.Verbose() {
 		log.Printf("--- Packaging dependenciesVersion[%s], %+v \n", dependenciesVersion, platforms)
-=======
-	if dependenciesVersion == "" {
-		if beatVersion, found := os.LookupEnv("BEAT_VERSION"); !found {
-			dependenciesVersion = bversion.GetDefaultVersion()
-		} else {
-			dependenciesVersion = beatVersion
-		}
-		// add the snapshot suffix if needed
-		dependenciesVersion += devtools.MaybeSnapshotSuffix()
->>>>>>> f684ab33d (Fix artifact url resolution for packaging (#12133))
 	}
 
 	log.Println("--- Running packaging function")
