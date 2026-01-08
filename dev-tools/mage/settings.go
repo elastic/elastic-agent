@@ -37,9 +37,6 @@ const (
 
 	elasticAgentModulePath = "github.com/elastic/elastic-agent"
 
-	// Env vars
-	// agent package version
-	agentPackageVersionEnvVar = "AGENT_PACKAGE_VERSION"
 	//ManifestUrlEnvVar is the name fo the environment variable containing the Manifest URL to be used for packaging agent
 	ManifestUrlEnvVar = "MANIFEST_URL"
 	// AgentCommitHashEnvVar allows to override agent commit hash string during packaging

@@ -280,7 +280,7 @@ type BuildConfig struct {
 	// AgentCommitHashOverride overrides the commit hash for packaging (from AGENT_COMMIT_HASH_OVERRIDE or set programmatically)
 	AgentCommitHashOverride string
 
-	// commitHash is the commit hash of the current build. Can be overriden via the AGENT_COMMIT_HASH_OVERRIDE env var.
+	// commitHash is the commit hash of the current build. Can be overridden via the AGENT_COMMIT_HASH_OVERRIDE env var.
 	// We lazy load this value, because inside crossbuild containers, fetching it can fail.
 	commitHash string
 }
