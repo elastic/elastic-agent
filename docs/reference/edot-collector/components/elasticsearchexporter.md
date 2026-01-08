@@ -181,7 +181,7 @@ The {{es}} exporter uses the [{{es}} Bulk API](https://www.elastic.co/docs/api/d
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `num_workers` | `runtime.NumCPU()` | Deprecated. Number of workers publishing bulk requests concurrently. This setting configures `sending_queue::num_consumers` if `sending_queue::num_consumers` is not explicitly defined.  ||
+| `num_workers` | `runtime.NumCPU()` | Deprecated. Number of workers publishing bulk requests concurrently. This setting configures `sending_queue::num_consumers` if `sending_queue::num_consumers` is not explicitly defined.  |
 | `flush::bytes` | `5000000` | Write buffer flush size limit before compression. A bulk request are sent immediately when its buffer exceeds this limit. This value should be much lower than Elasticsearch's `http.max_content_length` config to avoid HTTP 413 Entity Too Large error. Keep this value under 5 MB. |
 | `flush::interval` | `10s` | Write buffer flush time limit. |
 | `retry::enabled` | `true` | Turns on or off request retry on error. Failed requests are retried with exponential backoff. |
