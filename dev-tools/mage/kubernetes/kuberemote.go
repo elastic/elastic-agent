@@ -206,7 +206,8 @@ func (r *KubeRemote) syncServiceAccount() error {
 
 // createPod creates the pod.
 func (r *KubeRemote) createPod(env map[string]string, cmd ...string) (*apiv1.Pod, error) {
-	version, err := mage.GoVersion()
+	cfg := mage.MustLoadConfig()
+	version, err := mage.GoVersion(cfg)
 	if err != nil {
 		return nil, err
 	}

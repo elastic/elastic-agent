@@ -213,7 +213,7 @@ func CrossBuildImage(cfg *EnvConfig, platform string) (string, error) {
 		tagSuffix = "windows-arm64-debian12"
 	}
 
-	goVersion, err := GoVersion()
+	goVersion, err := GoVersion(cfg)
 	if err != nil {
 		return "", err
 	}
