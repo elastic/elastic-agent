@@ -76,8 +76,8 @@ func (b BuildArgs) ParseBuildTags() []string {
 	return flags
 }
 
-// DefaultBuildArgsWithConfig returns the default BuildArgs for use in builds.
-func DefaultBuildArgsWithConfig(cfg *EnvConfig) BuildArgs {
+// DefaultBuildArgs returns the default BuildArgs for use in builds.
+func DefaultBuildArgs(cfg *EnvConfig) BuildArgs {
 	args := BuildArgs{
 		Name: cfg.Beat.Name,
 		CGO:  build.Default.CgoEnabled,
@@ -92,7 +92,7 @@ func DefaultBuildArgsWithConfig(cfg *EnvConfig) BuildArgs {
 		args.Vars[elasticAgentModulePath+"/version.qualifier"] = "{{ .Qualifier }}"
 	}
 
-	if positionIndependentCodeSupportedWithConfig(cfg) {
+	if positionIndependentCodeSupported(cfg) {
 		args.ExtraFlags = append(args.ExtraFlags, "-buildmode", "pie")
 	}
 
@@ -121,11 +121,11 @@ func DefaultBuildArgsWithConfig(cfg *EnvConfig) BuildArgs {
 	return args
 }
 
-// positionIndependentCodeSupportedWithConfig checks if the target platform support position independent code (or ASLR).
+// positionIndependentCodeSupported checks if the target platform support position independent code (or ASLR).
 //
 // The list of supported platforms is compiled based on the Go release notes: https://golang.org/doc/devel/release.html
 // The list has been updated according to the Go version: 1.16
-func positionIndependentCodeSupportedWithConfig(cfg *EnvConfig) bool {
+func positionIndependentCodeSupported(cfg *EnvConfig) bool {
 	platform := cfg.Platform()
 	return oneOf(platform.GOOS, "darwin") ||
 		(platform.GOOS == "linux" && oneOf(platform.GOARCH, "riscv64", "amd64", "arm", "arm64", "ppc64le", "386")) ||
@@ -146,10 +146,10 @@ func oneOf(value string, lst ...string) bool {
 	return false
 }
 
-// DefaultGolangCrossBuildArgsWithConfig returns the default BuildArgs for use in
+// DefaultGolangCrossBuildArgs returns the default BuildArgs for use in
 // cross-builds.
-func DefaultGolangCrossBuildArgsWithConfig(cfg *EnvConfig) BuildArgs {
-	args := DefaultBuildArgsWithConfig(cfg)
+func DefaultGolangCrossBuildArgs(cfg *EnvConfig) BuildArgs {
+	args := DefaultBuildArgs(cfg)
 	platform := cfg.Platform()
 	args.Name += "-" + platform.GOOS + "-" + platform.Arch
 	args.OutputDir = filepath.Join("build", "golang-crossbuild")
@@ -165,9 +165,9 @@ func DefaultGolangCrossBuildArgsWithConfig(cfg *EnvConfig) BuildArgs {
 	return args
 }
 
-// GolangCrossBuildWithConfig invokes "go build" inside of the golang-crossbuild Docker
+// GolangCrossBuildWith invokes "go build" inside of the golang-crossbuild Docker
 // environment.
-func GolangCrossBuildWithConfig(ctx context.Context, cfg *EnvConfig, params BuildArgs) error {
+func GolangCrossBuildWith(ctx context.Context, cfg *EnvConfig, params BuildArgs) error {
 	if os.Getenv("GOLANG_CROSSBUILD") != "1" {
 		return errors.New("Use the crossBuild target. golangCrossBuild can " +
 			"only be executed within the golang-crossbuild docker environment")
@@ -184,11 +184,11 @@ func GolangCrossBuildWithConfig(ctx context.Context, cfg *EnvConfig, params Buil
 		return err
 	}
 
-	return BuildWithConfig(ctx, cfg, params)
+	return Build(ctx, cfg, params)
 }
 
-// BuildWithConfig invokes "go build" to produce a binary.
-func BuildWithConfig(ctx context.Context, cfg *EnvConfig, params BuildArgs) error {
+// Build invokes "go build" to produce a binary.
+func Build(ctx context.Context, cfg *EnvConfig, params BuildArgs) error {
 	fmt.Println(">> build: Building", params.Name)
 
 	binaryName := params.Name + binaryExtension(cfg.Build.GOOS)
@@ -242,7 +242,7 @@ func BuildWithConfig(ctx context.Context, cfg *EnvConfig, params BuildArgs) erro
 
 	if cfg.Build.GOOS == "windows" && params.WinMetadata {
 		log.Println("Generating a .syso containing Windows file metadata.")
-		syso, err := MakeWindowsSysoFileWithConfig(cfg)
+		syso, err := MakeWindowsSysoFile(cfg)
 		if err != nil {
 			return fmt.Errorf("failed generating Windows .syso metadata file: %w", err)
 		}
@@ -296,12 +296,12 @@ func Run(ctx context.Context, env map[string]string, stdout, stderr io.Writer, c
 	return err
 }
 
-// MakeWindowsSysoFileWithConfig generates a .syso file containing metadata about the
+// MakeWindowsSysoFile generates a .syso file containing metadata about the
 // executable file like vendor, version, copyright. The linker automatically
 // discovers the .syso file and incorporates it into the Windows exe. This
 // allows users to view metadata about the exe in the Details tab of the file
 // properties viewer.
-func MakeWindowsSysoFileWithConfig(cfg *EnvConfig) (string, error) {
+func MakeWindowsSysoFile(cfg *EnvConfig) (string, error) {
 	version, err := BeatQualifiedVersion(cfg)
 	if err != nil {
 		return "", err
