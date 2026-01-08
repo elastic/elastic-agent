@@ -120,10 +120,10 @@ func CrossBuild(ctx context.Context, cfg *EnvConfig, options ...CrossBuildOption
 				}
 				// This is basically a short-out so we can attempt to build on AIX in a relatively generic way
 				log.Printf("Target is building for AIX, skipping normal crossbuild process")
-				args := DefaultBuildArgsWithConfig(cfg)
+				args := DefaultBuildArgs(cfg)
 				args.OutputDir = filepath.Join("build", "golang-crossbuild")
 				args.Name += "-" + platform.GOOS + "-" + platform.Arch
-				return BuildWithConfig(ctx, cfg, args)
+				return Build(ctx, cfg, args)
 
 			}
 		}
