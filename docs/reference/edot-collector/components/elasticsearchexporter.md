@@ -48,24 +48,7 @@ The exporter supports standard OpenTelemetry TLS configuration for secure connec
 
 ## Mapping modes
 
-<<<<<<< HEAD
-The exporter supports several mapping modes that determine how your telemetry data is preprocessed and stored in Elastic. You can configure the mapping mode through the `mapping` setting:
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `mapping::mode` | `otel` | The default mapping mode. Valid modes are: `none`, `ecs`, `otel`, `raw`, `bodymap`. |
-| `mapping::allowed_modes` | All mapping modes | A list of allowed mapping modes that can be requested through client metadata or scope attributes. |
-
-### OTel mapping mode
-
-```{applies_to}
-stack: ga 8.12
-```
-
-The default mapping mode is `otel`. In the `otel` mapping mode, the Elasticsearch Exporter stores documents in Elastic's preferred OTel-native schema. In this mapping mode, documents use the original attribute names and closely follow the event structure from the OTLP events.
-=======
 The exporter uses the `otel` mapping mode by default. In this mode, the {{es}} Exporter stores documents in Elastic's preferred OTel-native schema. Documents use the original attribute names and closely follow the event structure from the OTLP events.
->>>>>>> 75bd91f2a (Update ES exporter docs (#11017))
 
 ### ECS mapping mode
 
@@ -227,21 +210,12 @@ The Elasticsearch exporter uses the [Elasticsearch Bulk API](https://www.elastic
 The `flush::interval` config is ignored when using `sending_queue` ({applies_to}`stack: ga 9.3`) or when the `batcher::enabled` config ({applies_to}`stack: removed 9.3`) is explicitly set.
 :::
 
-<<<<<<< HEAD
-Starting from Elasticsearch 8.18 and higher, the [`include_source_on_error`](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk#operation-bulk-include_source_on_error) query parameter allows users to receive the source document in the error response if there were parsing errors in the bulk request. In the exporter, the equivalent configuration is also named `include_source_on_error`.
-
-- `include_source_on_error`:
-  - `true`: Turns on bulk index responses to include source document on error. {applies_to}`stack: ga 8.18`
-  - `false`: Turns off including source document on bulk index error responses. {applies_to}`stack: ga 8.18`
-  - `null` (default): Backward-compatible option for older Elasticsearch versions. By default, the error reason is discarded from bulk index responses entirely. Only the error type is returned.
-=======
 The [`include_source_on_error`](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk#operation-bulk-include_source_on_error) query parameter allows users to receive the source document in the error response if there were parsing errors in the bulk request. In the exporter, the equivalent configuration is also named `include_source_on_error`.
 
 - `include_source_on_error`:
   - `true`: Turns on bulk index responses to include source document on error.
   - `false`: Turns off including source document on bulk index error responses.
   - `null` (default): Backward-compatible option for older {{es}} versions. By default, the error reason is discarded from bulk index responses entirely. Only the error type is returned.
->>>>>>> 75bd91f2a (Update ES exporter docs (#11017))
 
 :::{warning}
 The exporter might log error responses containing request payload, causing potential sensitive data to be exposed in logs.
