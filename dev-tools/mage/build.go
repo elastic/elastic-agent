@@ -168,7 +168,7 @@ func DefaultGolangCrossBuildArgs(cfg *EnvConfig) BuildArgs {
 // GolangCrossBuildWith invokes "go build" inside of the golang-crossbuild Docker
 // environment.
 func GolangCrossBuildWith(ctx context.Context, cfg *EnvConfig, params BuildArgs) error {
-	if os.Getenv("GOLANG_CROSSBUILD") != "1" {
+	if !cfg.Build.GolangCrossBuild {
 		return errors.New("Use the crossBuild target. golangCrossBuild can " +
 			"only be executed within the golang-crossbuild docker environment")
 	}

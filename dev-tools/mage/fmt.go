@@ -69,7 +69,7 @@ func GoImports() error {
 // AddLicenseHeaders adds license headers to .go files. It applies the
 // appropriate license header based on the value of devtools.BeatLicense.
 func AddLicenseHeaders(cfg *EnvConfig) error {
-	if os.Getenv("CHECK_HEADERS_DISABLED") != "" {
+	if cfg.Fmt.CheckHeadersDisabled {
 		return nil
 	}
 

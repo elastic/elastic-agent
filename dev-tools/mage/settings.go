@@ -57,13 +57,13 @@ var BeatProjectType ProjectType
 // FuncMap returns template functions that use the config.
 func FuncMap(cfg *EnvConfig) map[string]interface{} {
 	return map[string]interface{}{
-		"beat_doc_branch":                BeatDocBranch,
+		"beat_doc_branch":                func() (string, error) { return BeatDocBranchFromConfig(cfg) },
 		"beat_version":                   func() (string, error) { return BeatQualifiedVersion(cfg) },
 		"commit":                         func() (string, error) { return cfg.Build.CommitHash() },
 		"commit_short":                   func() (string, error) { return cfg.Build.CommitHashShort() },
 		"date":                           BuildDate,
 		"elastic_beats_dir":              ElasticBeatsDir,
-		"go_version":                     GoVersion,
+		"go_version":                     func() (string, error) { return GoVersionFromConfig(cfg) },
 		"repo":                           GetProjectRepoInfo,
 		"title":                          func(s string) string { return cases.Title(language.English, cases.NoLower).String(s) },
 		"tolower":                        strings.ToLower,
@@ -335,17 +335,23 @@ var (
 
 // GoVersion returns the version of Go defined in the project's .go-version
 // file.
+// Deprecated: Use GoVersionFromConfig instead.
 func GoVersion() (string, error) {
 	goVersionOnce.Do(func() {
-		goVersionValue = os.Getenv("BEAT_GO_VERSION")
-		if goVersionValue != "" {
-			return
-		}
-
 		goVersionValue, goVersionErr = getBuildVariableSources().GetGoVersion()
 	})
 
 	return goVersionValue, goVersionErr
+}
+
+// GoVersionFromConfig returns the version of Go using the provided config.
+// If BeatGoVersion is set in the config, it returns that value.
+// Otherwise falls back to reading from the .go-version file.
+func GoVersionFromConfig(cfg *EnvConfig) (string, error) {
+	if cfg.Build.BeatGoVersionSet {
+		return cfg.Build.BeatGoVersion, nil
+	}
+	return GoVersion()
 }
 
 var (
@@ -400,17 +406,23 @@ var (
 
 // BeatDocBranch returns the documentation branch name associated with the
 // Beat branch.
+// Deprecated: Use BeatDocBranchFromConfig instead.
 func BeatDocBranch() (string, error) {
 	beatDocBranchOnce.Do(func() {
-		beatDocBranchValue = os.Getenv("BEAT_DOC_BRANCH")
-		if beatDocBranchValue != "" {
-			return
-		}
-
 		beatDocBranchValue, beatDocBranchErr = getBuildVariableSources().GetDocBranch()
 	})
 
 	return beatDocBranchValue, beatDocBranchErr
+}
+
+// BeatDocBranchFromConfig returns the documentation branch using the provided config.
+// If BeatDocBranch is set in the config, it returns that value.
+// Otherwise falls back to reading from the doc branch file.
+func BeatDocBranchFromConfig(cfg *EnvConfig) (string, error) {
+	if cfg.Build.BeatDocBranchSet {
+		return cfg.Build.BeatDocBranch, nil
+	}
+	return BeatDocBranch()
 }
 
 // --- BuildVariableSources
