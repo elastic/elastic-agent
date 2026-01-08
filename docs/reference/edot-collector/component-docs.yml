@@ -33,6 +33,10 @@ components:
     doc_path: "/reference/edot-collector/components/hostmetricsreceiver.md"
     title: "Host metrics receiver"
 
+  prometheusremotewritereceiver:
+    doc_path: "/reference/edot-collector/components/prometheusremotewritereceiver.md"
+    title: "Prometheus remote write receiver"
+
   # Processors
   elasticapmprocessor:
     doc_path: "/reference/edot-collector/components/elasticapmprocessor.md"
