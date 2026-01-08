@@ -519,7 +519,7 @@ func parallelJobs(ctx context.Context) chan int {
 
 	if parallelJobsSemaphore == nil {
 		cfg := ConfigFromContext(ctx)
-		max := numParallelWithConfig(cfg)
+		max := numParallel(cfg)
 		parallelJobsSemaphore = make(chan int, max)
 		log.Println("Max parallel jobs =", max)
 	}
@@ -527,7 +527,7 @@ func parallelJobs(ctx context.Context) chan int {
 	return parallelJobsSemaphore
 }
 
-func numParallelWithConfig(cfg *EnvConfig) int {
+func numParallel(cfg *EnvConfig) int {
 	// Use the configured max parallel from Config if set
 	if cfg.Build.MaxParallel > 0 {
 		maxParallel := cfg.Build.MaxParallel

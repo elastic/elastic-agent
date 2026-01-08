@@ -57,7 +57,7 @@ func Config(cfg *EnvConfig, types ConfigFileType, args ConfigFileParams, targetD
 	// Short
 	if types.IsShort() {
 		file := filepath.Join(targetDir, cfg.Beat.Name+".yml")
-		if err := makeConfigTemplateWithConfig(cfg, file, 0600, args, ShortConfigType); err != nil {
+		if err := makeConfigTemplate(cfg, file, 0600, args, ShortConfigType); err != nil {
 			return fmt.Errorf("failed making short config: %w", err)
 		}
 	}
@@ -65,7 +65,7 @@ func Config(cfg *EnvConfig, types ConfigFileType, args ConfigFileParams, targetD
 	// Reference
 	if types.IsReference() {
 		file := filepath.Join(targetDir, cfg.Beat.Name+".reference.yml")
-		if err := makeConfigTemplateWithConfig(cfg, file, 0644, args, ReferenceConfigType); err != nil {
+		if err := makeConfigTemplate(cfg, file, 0644, args, ReferenceConfigType); err != nil {
 			return fmt.Errorf("failed making reference config: %w", err)
 		}
 	}
@@ -73,7 +73,7 @@ func Config(cfg *EnvConfig, types ConfigFileType, args ConfigFileParams, targetD
 	// Docker
 	if types.IsDocker() {
 		file := filepath.Join(targetDir, cfg.Beat.Name+".docker.yml")
-		if err := makeConfigTemplateWithConfig(cfg, file, 0600, args, DockerConfigType); err != nil {
+		if err := makeConfigTemplate(cfg, file, 0600, args, DockerConfigType); err != nil {
 			return fmt.Errorf("failed making docker config: %w", err)
 		}
 	}
@@ -81,7 +81,7 @@ func Config(cfg *EnvConfig, types ConfigFileType, args ConfigFileParams, targetD
 	return nil
 }
 
-func makeConfigTemplateWithConfig(cfg *EnvConfig, destination string, mode os.FileMode, confParams ConfigFileParams, typ ConfigFileType) error {
+func makeConfigTemplate(cfg *EnvConfig, destination string, mode os.FileMode, confParams ConfigFileParams, typ ConfigFileType) error {
 	// Determine what type to build and set some parameters.
 	var confFile ConfigParams
 	var tmplParams map[string]interface{}

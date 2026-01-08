@@ -298,7 +298,7 @@ func (Build) windowsArchiveRootBinaryForGoArch(ctx context.Context, goarch strin
 		args.CGO = true
 	}
 
-	return devtools.BuildWithConfig(ctx, cfg, args)
+	return devtools.Build(ctx, cfg, args)
 }
 
 // WindowsArchiveRootBinary compiles a binary to be placed at the root of the windows elastic-agent archive. This binary
@@ -317,12 +317,12 @@ func (Build) WindowsArchiveRootBinary(ctx context.Context) {
 // Do not use directly, use crossBuild instead.
 func GolangCrossBuild(ctx context.Context) error {
 	cfg := devtools.ConfigFromContext(ctx)
-	params := devtools.DefaultGolangCrossBuildArgsWithConfig(cfg)
+	params := devtools.DefaultGolangCrossBuildArgs(cfg)
 	params.OutputDir = "build/golang-crossbuild"
 	params.Package = "github.com/elastic/elastic-agent"
 	injectBuildVars(cfg, params.Vars)
 
-	if err := devtools.GolangCrossBuildWithConfig(ctx, cfg, params); err != nil {
+	if err := devtools.GolangCrossBuildWith(ctx, cfg, params); err != nil {
 		return err
 	}
 
@@ -334,11 +334,11 @@ func (Build) Binary(ctx context.Context) error {
 	mg.Deps(Prepare.Env)
 
 	cfg := devtools.ConfigFromContext(ctx)
-	buildArgs := devtools.DefaultBuildArgsWithConfig(cfg)
+	buildArgs := devtools.DefaultBuildArgs(cfg)
 	buildArgs.OutputDir = buildDir
 	injectBuildVars(cfg, buildArgs.Vars)
 
-	return devtools.BuildWithConfig(ctx, cfg, buildArgs)
+	return devtools.Build(ctx, cfg, buildArgs)
 }
 
 // Clean up dev environment.
@@ -3461,7 +3461,7 @@ func (Otel) GolangCrossBuild(ctx context.Context) error {
 	mg.Deps(EnsureCrossBuildOutputDir)
 
 	cfg := devtools.ConfigFromContext(ctx)
-	params := devtools.DefaultGolangCrossBuildArgsWithConfig(cfg)
+	params := devtools.DefaultGolangCrossBuildArgs(cfg)
 	params.Name = "elastic-otel-collector-" + cfg.Build.GOOS + "-" + cfg.Platform().Arch
 	params.OutputDir = "build/golang-crossbuild"
 	params.WorkDir = "internal/edot"
@@ -3502,7 +3502,7 @@ func (Otel) GolangCrossBuild(ctx context.Context) error {
 		}
 	}
 
-	if err := devtools.GolangCrossBuildWithConfig(ctx, cfg, params); err != nil {
+	if err := devtools.GolangCrossBuildWith(ctx, cfg, params); err != nil {
 		return err
 	}
 
