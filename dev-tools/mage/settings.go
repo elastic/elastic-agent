@@ -63,7 +63,7 @@ func FuncMap(cfg *EnvConfig) map[string]interface{} {
 		"commit_short":                   func() (string, error) { return cfg.Build.CommitHashShort() },
 		"date":                           BuildDate,
 		"elastic_beats_dir":              ElasticBeatsDir,
-		"go_version":                     func() (string, error) { return GoVersionFromConfig(cfg) },
+		"go_version":                     func() (string, error) { return GoVersion(cfg) },
 		"repo":                           GetProjectRepoInfo,
 		"title":                          func(s string) string { return cases.Title(language.English, cases.NoLower).String(s) },
 		"tolower":                        strings.ToLower,
@@ -333,25 +333,19 @@ var (
 	goVersionOnce  sync.Once
 )
 
-// GoVersion returns the version of Go defined in the project's .go-version
-// file.
-// Deprecated: Use GoVersionFromConfig instead.
-func GoVersion() (string, error) {
+// GoVersion returns the version of Go using the provided config.
+// If BeatGoVersion is set in the config, it returns that value.
+// Otherwise falls back to reading from the .go-version file.
+func GoVersion(cfg *EnvConfig) (string, error) {
+	if cfg.Build.BeatGoVersion != "" {
+		return cfg.Build.BeatGoVersion, nil
+	}
+
 	goVersionOnce.Do(func() {
 		goVersionValue, goVersionErr = getBuildVariableSources().GetGoVersion()
 	})
 
 	return goVersionValue, goVersionErr
-}
-
-// GoVersionFromConfig returns the version of Go using the provided config.
-// If BeatGoVersion is set in the config, it returns that value.
-// Otherwise falls back to reading from the .go-version file.
-func GoVersionFromConfig(cfg *EnvConfig) (string, error) {
-	if cfg.Build.BeatGoVersionSet {
-		return cfg.Build.BeatGoVersion, nil
-	}
-	return GoVersion()
 }
 
 var (
@@ -382,7 +376,7 @@ func BeatQualifiedVersion(cfg *EnvConfig) (string, error) {
 // different configs may be passed.
 func BeatVersion(cfg *EnvConfig) (string, error) {
 	// Check config first for BeatVersion override
-	if cfg.Build.BeatVersionSet {
+	if cfg.Build.BeatVersion != "" {
 		return cfg.Build.BeatVersion, nil
 	}
 	return getBuildVariableSources().GetBeatVersion()
@@ -419,7 +413,7 @@ func BeatDocBranch() (string, error) {
 // If BeatDocBranch is set in the config, it returns that value.
 // Otherwise falls back to reading from the doc branch file.
 func BeatDocBranchFromConfig(cfg *EnvConfig) (string, error) {
-	if cfg.Build.BeatDocBranchSet {
+	if cfg.Build.BeatDocBranch != "" {
 		return cfg.Build.BeatDocBranch, nil
 	}
 	return BeatDocBranch()

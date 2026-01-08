@@ -3150,7 +3150,7 @@ func testPlatforms(cfg *devtools.EnvConfig) []string {
 }
 
 func testPackages(cfg *devtools.EnvConfig) []string {
-	if !cfg.IntegrationTest.PackagesDefined {
+	if cfg.IntegrationTest.Packages == "" {
 		return nil
 	}
 

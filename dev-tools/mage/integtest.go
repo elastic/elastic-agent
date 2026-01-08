@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"github.com/magefile/mage/mg"
 )
@@ -245,14 +244,8 @@ func (r *IntegrationRunner) Test(mageTarget string, test func() error) error {
 	}
 
 	// Honor the TEST_ENVIRONMENT value if set.
-	if r.cfg.IntegrationTest.TestEnvironmentSet {
-		enabled, err := strconv.ParseBool(r.cfg.IntegrationTest.TestEnvironment)
-		if err != nil {
-			return fmt.Errorf("failed to parse TEST_ENVIRONMENT value: %w", err)
-		}
-		if !enabled {
-			return fmt.Errorf("TEST_ENVIRONMENT=%s", r.cfg.IntegrationTest.TestEnvironment)
-		}
+	if !r.cfg.IntegrationTest.TestEnvironmentEnabled {
+		return fmt.Errorf("TEST_ENVIRONMENT is disabled")
 	}
 
 	// Pass config to tester if it supports ConfigSetter interface.
