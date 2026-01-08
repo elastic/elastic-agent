@@ -453,7 +453,7 @@ func untar(sourceFile, destinationDir string) error {
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err = os.MkdirAll(path, os.FileMode(header.Mode)); err != nil {
+			if err = os.MkdirAll(path, header.FileInfo().Mode()); err != nil {
 				return err
 			}
 		case tar.TypeReg:
@@ -471,7 +471,7 @@ func untar(sourceFile, destinationDir string) error {
 				return err
 			}
 
-			if err = os.Chmod(path, os.FileMode(header.Mode)); err != nil {
+			if err = os.Chmod(path, header.FileInfo().Mode()); err != nil {
 				return err
 			}
 
@@ -780,8 +780,8 @@ func GetSHA512Hash(file string) (string, error) {
 }
 
 // Mage executes mage targets in the specified directory.
-func Mage(dir string, targets ...string) error {
-	c := exec.Command("mage", targets...)
+func Mage(ctx context.Context, dir string, targets ...string) error {
+	c := exec.CommandContext(ctx, "mage", targets...)
 	c.Dir = dir
 	if mg.Verbose() {
 		c.Env = append(os.Environ(), "MAGEFILE_VERBOSE=1")

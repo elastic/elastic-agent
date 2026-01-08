@@ -5,6 +5,7 @@
 package mage
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"go/build"
@@ -166,7 +167,7 @@ func DefaultGolangCrossBuildArgsWithConfig(cfg *EnvConfig) BuildArgs {
 
 // GolangCrossBuildWithConfig invokes "go build" inside of the golang-crossbuild Docker
 // environment.
-func GolangCrossBuildWithConfig(cfg *EnvConfig, params BuildArgs) error {
+func GolangCrossBuildWithConfig(ctx context.Context, cfg *EnvConfig, params BuildArgs) error {
 	if os.Getenv("GOLANG_CROSSBUILD") != "1" {
 		return errors.New("Use the crossBuild target. golangCrossBuild can " +
 			"only be executed within the golang-crossbuild docker environment")
@@ -183,11 +184,11 @@ func GolangCrossBuildWithConfig(cfg *EnvConfig, params BuildArgs) error {
 		return err
 	}
 
-	return BuildWithConfig(cfg, params)
+	return BuildWithConfig(ctx, cfg, params)
 }
 
 // BuildWithConfig invokes "go build" to produce a binary.
-func BuildWithConfig(cfg *EnvConfig, params BuildArgs) error {
+func BuildWithConfig(ctx context.Context, cfg *EnvConfig, params BuildArgs) error {
 	fmt.Println(">> build: Building", params.Name)
 
 	binaryName := params.Name + binaryExtension(cfg.Build.GOOS)
@@ -257,10 +258,10 @@ func BuildWithConfig(cfg *EnvConfig, params BuildArgs) error {
 	if mg.Verbose() {
 		output = os.Stdout
 	}
-	return Run(env, output, os.Stderr, "go", params.WorkDir, args...)
+	return Run(ctx, env, output, os.Stderr, "go", params.WorkDir, args...)
 }
 
-func Run(env map[string]string, stdout, stderr io.Writer, cmd string, workingDir string, args ...string) (err error) {
+func Run(ctx context.Context, env map[string]string, stdout, stderr io.Writer, cmd string, workingDir string, args ...string) (err error) {
 	expand := func(s string) string {
 		s2, ok := env[s]
 		if ok {
@@ -273,7 +274,7 @@ func Run(env map[string]string, stdout, stderr io.Writer, cmd string, workingDir
 		args[i] = os.Expand(args[i], expand)
 	}
 
-	c := exec.Command(cmd, args...)
+	c := exec.CommandContext(ctx, cmd, args...)
 	c.Env = os.Environ()
 	for k, v := range env {
 		c.Env = append(c.Env, k+"="+v)
