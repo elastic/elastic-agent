@@ -396,7 +396,7 @@ func PerformUpgrade(
 	// show the state as UPG_WATCHING.
 	if !upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck {
 		logger.Logf("Checking upgrade details state while Upgrade Watcher is running")
-		if err := waitUpgradeDetailsState(ctx, startFixture, details.StateWatching, 2*time.Minute, 10*time.Second, logger); err != nil {
+		if err := waitUpgradeDetailsState(ctx, startFixture, details.StateWatching, 2*time.Minute, 1*time.Second, logger); err != nil {
 			// error context added by waitUpgradeDetailsState
 			return err
 		}
@@ -610,12 +610,15 @@ func waitUpgradeDetailsState(ctx context.Context, f *atesting.Fixture, expectedS
 		case <-t.C:
 			status, err := f.ExecStatus(ctx)
 			if err != nil && status.IsZero() {
+				logger.Logf("error executing status command: %s", err.Error())
 				lastErr = err
 				continue
 			}
+			actualUpgradeDetails := status.UpgradeDetails
+			logger.Logf("retrieved upgrade details: %+v", actualUpgradeDetails)
 
 			if expectedState == "" {
-				if status.UpgradeDetails == nil {
+				if actualUpgradeDetails == nil {
 					// Expected and actual match, so we're good
 					return nil
 				}
@@ -624,17 +627,17 @@ func waitUpgradeDetailsState(ctx context.Context, f *atesting.Fixture, expectedS
 				continue
 			}
 
-			if status.UpgradeDetails == nil {
+			if actualUpgradeDetails == nil {
 				lastErr = fmt.Errorf("upgrade details not found in status but expected upgrade details state was [%s]", expectedState)
 				continue
 			}
 
 			// Neither expected nor actual are nil, so compare the two
-			if status.UpgradeDetails.State == expectedState {
+			if actualUpgradeDetails.State == expectedState {
 				return nil
 			}
 
-			lastErr = fmt.Errorf("upgrade details state in status [%s] is not the same as expected upgrade details state  [%s]", status.UpgradeDetails.State, expectedState)
+			lastErr = fmt.Errorf("upgrade details state in status [%s] is not the same as expected upgrade details state  [%s]", actualUpgradeDetails.State, expectedState)
 			continue
 		}
 	}

@@ -461,11 +461,6 @@ func TestCleanupRollbacks(t *testing.T) {
 		{
 			name: "agent should clear rollbacks upon initiating a new upgrade",
 			fixturesSetup: func(t *testing.T) []upgradeOperation {
-				// Consecutive upgrades do not seem to do well on windows (we get a timeout waiting for the upgraded agent to be healthy), skip the test there for the moment
-				if runtime.GOOS == "windows" {
-					t.Skip("This test would be failing with error, although since on windows there seem to be an issue with consecutive upgrades, skip it for the moment")
-				}
-
 				baseFixture, firstRepackagedFixture := prepareCommitAndRepackagedFixtures(t, now)
 				currentVersion, err := version.ParseVersion(define.Version())
 				require.NoErrorf(t, err, "define.Version() %q is not parsable.", define.Version())
