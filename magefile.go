@@ -360,16 +360,31 @@ func (Build) Clean() error {
 	if err := os.RemoveAll(absBuildDir); err != nil {
 		return fmt.Errorf("cannot remove build dir '%s': %w", absBuildDir, err)
 	}
+	return nil
+}
 
-	testBinariesPath, err := getTestBinariesPath()
+// CleanKeepDistributions deletes the build directory but keeps the distributions directory.
+func (Build) CleanKeepDistributions() error {
+	absBuildDir, err := filepath.Abs(buildDir)
 	if err != nil {
-		return fmt.Errorf("cannot remove test binaries: %w", err)
+		return fmt.Errorf("cannot get absolute path of build dir: %w", err)
 	}
 
-	if mg.Verbose() {
-		fmt.Println("removed", absBuildDir)
-		for _, b := range testBinariesPath {
-			fmt.Println("removed", b)
+	entries, err := os.ReadDir(absBuildDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil // Directory doesn't exist, nothing to clean
+		}
+		return fmt.Errorf("cannot read build dir '%s': %w", absBuildDir, err)
+	}
+
+	for _, entry := range entries {
+		if entry.Name() == "distributions" {
+			continue
+		}
+		entryPath := filepath.Join(absBuildDir, entry.Name())
+		if err := os.RemoveAll(entryPath); err != nil {
+			return fmt.Errorf("cannot remove '%s': %w", entryPath, err)
 		}
 	}
 
@@ -580,8 +595,9 @@ func Package(ctx context.Context) error {
 		panic("elastic-agent package is expected to build at least one platform package")
 	}
 
-	// needs elastic-agent-core built first
-	mg.Deps(PackageAgentCore)
+	// needs elastic-agent-core built first (removes any extra files in build to ensure the following steps don't
+	// rely on any files that elastic-agent-core placed during the build process)
+	mg.SerialDeps(PackageAgentCore, Build.CleanKeepDistributions)
 
 	// switch to the main package target
 	mage.UseElasticAgentPackaging()
@@ -1175,14 +1191,16 @@ func runAgent(ctx context.Context, env map[string]string) error {
 func packageAgent(ctx context.Context, dependenciesVersion string, manifestResponse *manifest.Build) error {
 	fmt.Println("--- Package elastic-agent")
 
+	var coreVersion string
+	if beatVersion, found := os.LookupEnv("BEAT_VERSION"); !found {
+		coreVersion = bversion.GetDefaultVersion()
+	} else {
+		coreVersion = beatVersion
+	}
+	// add the snapshot suffix if needed
+	coreVersion += devtools.SnapshotSuffix()
 	if dependenciesVersion == "" {
-		if beatVersion, found := os.LookupEnv("BEAT_VERSION"); !found {
-			dependenciesVersion = bversion.GetDefaultVersion()
-		} else {
-			dependenciesVersion = beatVersion
-		}
-		// add the snapshot suffix if needed
-		dependenciesVersion += devtools.SnapshotSuffix()
+		dependenciesVersion = coreVersion
 	}
 	log.Printf("Packaging with dependenciesVersion: %s", dependenciesVersion)
 
@@ -1219,7 +1237,7 @@ func packageAgent(ctx context.Context, dependenciesVersion string, manifestRespo
 	flattenDependencies(mage.Platforms.Names(), dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse, dependencies)
 
 	// extract elastic-agent-core to be used for packaging
-	err = extractAgentCoreForPackage(ctx, manifestResponse, dependenciesVersion)
+	err = extractAgentCoreForPackage(ctx, manifestResponse, coreVersion)
 	if err != nil {
 		return err
 	}
@@ -1526,6 +1544,10 @@ func PackageUsingDRA(ctx context.Context) error {
 	manifestURL := os.Getenv(mage.ManifestUrlEnvVar)
 	if manifestURL == "" {
 		fmt.Println("NOTICE: No MANIFEST_URL was provided, using elastic-agent-core packages from build/distributions.")
+		dependenciesVersion = os.Getenv("DRA_VERSION")
+		if mage.Snapshot && !strings.HasSuffix(dependenciesVersion, devtools.SnapshotSuffix()) {
+			dependenciesVersion += devtools.SnapshotSuffix()
+		}
 	} else {
 		var parsedVersion *version.ParsedSemVer
 		manifestResponse, parsedVersion, err = downloadManifestAndSetVersion(ctx, devtools.ManifestURL)
