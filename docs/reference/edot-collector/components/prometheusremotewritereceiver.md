@@ -2,11 +2,11 @@
 navigation_title: Prometheus remote Write receiver
 description: The Prometheus remote write receiver is an OpenTelemetry Collector component that receives metrics from Prometheus using the remote write protocol.
 applies_to:
-  stack:
+  stack: ga 9.3
   serverless:
     observability:
   product:
-    edot_collector:
+    edot_collector: ga 9.3
 products:
   - id: elastic-agent
   - id: observability
