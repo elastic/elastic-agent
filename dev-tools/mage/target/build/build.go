@@ -12,6 +12,6 @@ import (
 
 // Build builds the Beat binary.
 func Build(ctx context.Context) error {
-	cfg := devtools.ConfigFromContext(ctx)
+	cfg := devtools.SettingsFromContext(ctx)
 	return devtools.Build(ctx, cfg, devtools.DefaultBuildArgs(cfg))
 }

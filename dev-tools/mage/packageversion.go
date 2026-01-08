@@ -26,7 +26,7 @@ type packageVersion struct {
 
 // GetPackageVersionInfo reads the package version file if USE_PACKAGE_VERSION is set.
 // Returns nil if USE_PACKAGE_VERSION is not set or the file doesn't exist.
-func GetPackageVersionInfo(cfg *EnvConfig) (*packageVersion, error) {
+func GetPackageVersionInfo(cfg *Settings) (*packageVersion, error) {
 	if !cfg.Packaging.UsePackageVersion {
 		return nil, nil
 	}

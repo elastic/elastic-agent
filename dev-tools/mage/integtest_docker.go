@@ -33,12 +33,12 @@ func init() {
 
 // DockerIntegrationTester returns build image
 type DockerIntegrationTester struct {
-	cfg             *EnvConfig
+	cfg             *Settings
 	buildImagesOnce sync.Once
 }
 
 // SetConfig sets the configuration for the tester.
-func (d *DockerIntegrationTester) SetConfig(cfg *EnvConfig) {
+func (d *DockerIntegrationTester) SetConfig(cfg *Settings) {
 	d.cfg = cfg
 }
 
