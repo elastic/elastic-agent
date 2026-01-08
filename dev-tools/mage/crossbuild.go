@@ -5,6 +5,7 @@
 package mage
 
 import (
+	"context"
 	"fmt"
 	"go/build"
 	"log"
@@ -95,7 +96,7 @@ type crossBuildParams struct {
 }
 
 // CrossBuild executes a given build target once for each target platform.
-func CrossBuild(cfg *EnvConfig, options ...CrossBuildOption) error {
+func CrossBuild(ctx context.Context, cfg *EnvConfig, options ...CrossBuildOption) error {
 	params := crossBuildParams{Platforms: cfg.GetPlatforms(), Target: defaultCrossBuildTarget, ImageSelector: CrossBuildImage}
 	params.Name = "Elastic-Agent"
 	for _, opt := range options {
@@ -122,7 +123,7 @@ func CrossBuild(cfg *EnvConfig, options ...CrossBuildOption) error {
 				args := DefaultBuildArgsWithConfig(cfg)
 				args.OutputDir = filepath.Join("build", "golang-crossbuild")
 				args.Name += "-" + platform.GOOS + "-" + platform.Arch
-				return BuildWithConfig(cfg, args)
+				return BuildWithConfig(ctx, cfg, args)
 
 			}
 		}
@@ -170,10 +171,10 @@ func CrossBuild(cfg *EnvConfig, options ...CrossBuildOption) error {
 // CrossBuildXPack executes the 'golangCrossBuild' target in the Beat's
 // associated x-pack directory to produce a version of the Beat that contains
 // Elastic licensed content.
-func CrossBuildXPack(cfg *EnvConfig, options ...CrossBuildOption) error {
+func CrossBuildXPack(ctx context.Context, cfg *EnvConfig, options ...CrossBuildOption) error {
 	o := []CrossBuildOption{InDir("x-pack", cfg.Beat.Name)}
 	o = append(o, options...)
-	return CrossBuild(cfg, o...)
+	return CrossBuild(ctx, cfg, o...)
 }
 
 // buildMage pre-compiles the magefile to a binary using the GOARCH parameter.

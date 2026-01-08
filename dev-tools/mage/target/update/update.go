@@ -5,6 +5,7 @@
 package update
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -22,29 +23,29 @@ func Beats(branch string, targetVersion string) error {
 	return nil
 }
 
-func BeatsModule(branch string, targetVersion string) error {
+func BeatsModule(ctx context.Context, branch string, targetVersion string) error {
 	goArgs := []string{"mod", "edit", "-require", fmt.Sprintf("%s@%s", BeatsModulePath, targetVersion)}
 
 	fmt.Printf("Fetching branch '%s' in beats submodule\n", branch)
-	err := mage.Run(nil, os.Stdout, os.Stderr, "git", "beats", "fetch", "origin", branch)
+	err := mage.Run(ctx, nil, os.Stdout, os.Stderr, "git", "beats", "fetch", "origin", branch)
 	if err != nil {
 		return err
 	}
 
 	fmt.Println("Updating beats submodule")
-	err = mage.Run(nil, os.Stdout, os.Stderr, "git", "beats", "checkout", targetVersion)
+	err = mage.Run(ctx, nil, os.Stdout, os.Stderr, "git", "beats", "checkout", targetVersion)
 	if err != nil {
 		return err
 	}
 
 	fmt.Println("Updating beats module in edot package")
-	err = mage.Run(nil, os.Stdout, os.Stderr, "go", "internal/edot", goArgs...)
+	err = mage.Run(ctx, nil, os.Stdout, os.Stderr, "go", "internal/edot", goArgs...)
 	if err != nil {
 		return err
 	}
 
 	fmt.Println("Updating beats module in elastic-agent package")
-	err = mage.Run(nil, os.Stdout, os.Stderr, "go", "", goArgs...)
+	err = mage.Run(ctx, nil, os.Stdout, os.Stderr, "go", "", goArgs...)
 	if err != nil {
 		return err
 	}

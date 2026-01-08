@@ -298,7 +298,7 @@ func (Build) windowsArchiveRootBinaryForGoArch(ctx context.Context, goarch strin
 		args.CGO = true
 	}
 
-	return devtools.BuildWithConfig(cfg, args)
+	return devtools.BuildWithConfig(ctx, cfg, args)
 }
 
 // WindowsArchiveRootBinary compiles a binary to be placed at the root of the windows elastic-agent archive. This binary
@@ -322,7 +322,7 @@ func GolangCrossBuild(ctx context.Context) error {
 	params.Package = "github.com/elastic/elastic-agent"
 	injectBuildVars(cfg, params.Vars)
 
-	if err := devtools.GolangCrossBuildWithConfig(cfg, params); err != nil {
+	if err := devtools.GolangCrossBuildWithConfig(ctx, cfg, params); err != nil {
 		return err
 	}
 
@@ -338,7 +338,7 @@ func (Build) Binary(ctx context.Context) error {
 	buildArgs.OutputDir = buildDir
 	injectBuildVars(cfg, buildArgs.Vars)
 
-	return devtools.BuildWithConfig(cfg, buildArgs)
+	return devtools.BuildWithConfig(ctx, cfg, buildArgs)
 }
 
 // Clean up dev environment.
@@ -815,7 +815,7 @@ func EnsureCrossBuildOutputDir() error {
 func CrossBuild(ctx context.Context) error {
 	mg.Deps(EnsureCrossBuildOutputDir)
 	cfg := devtools.ConfigFromContext(ctx)
-	return devtools.CrossBuild(cfg)
+	return devtools.CrossBuild(ctx, cfg)
 }
 
 // PackageAgentCore cross-builds and packages distribution artifacts containing
@@ -3502,7 +3502,7 @@ func (Otel) GolangCrossBuild(ctx context.Context) error {
 		}
 	}
 
-	if err := devtools.GolangCrossBuildWithConfig(cfg, params); err != nil {
+	if err := devtools.GolangCrossBuildWithConfig(ctx, cfg, params); err != nil {
 		return err
 	}
 
@@ -3556,7 +3556,7 @@ func (Otel) CrossBuild(ctx context.Context) error {
 		opts = append(opts, devtools.ImageSelector(npcapImageSelectorWithConfig(cfg.Docker.WindowsNpcap)))
 	}
 
-	return devtools.CrossBuild(cfg, opts...)
+	return devtools.CrossBuild(ctx, cfg, opts...)
 }
 
 func (Otel) Readme() error {
