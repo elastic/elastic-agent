@@ -72,7 +72,7 @@ func (steps IntegrationTestSteps) Name() string {
 //
 // In the case that Setup fails on a step, Teardown will be called on the previous
 // successful steps.
-func (steps IntegrationTestSteps) Setup(cfg *EnvConfig, env map[string]string) error {
+func (steps IntegrationTestSteps) Setup(cfg *Settings, env map[string]string) error {
 	for i, step := range steps {
 		if mg.Verbose() {
 			fmt.Printf("Setup %s...\n", step.Name())
@@ -134,12 +134,12 @@ type IntegrationTester interface {
 
 // ConfigSetter is an optional interface that testers can implement to receive config.
 type ConfigSetter interface {
-	SetConfig(cfg *EnvConfig)
+	SetConfig(cfg *Settings)
 }
 
 // IntegrationRunner performs the running of the integration tests.
 type IntegrationRunner struct {
-	cfg    *EnvConfig
+	cfg    *Settings
 	steps  IntegrationTestSteps
 	tester IntegrationTester
 	dir    string
@@ -150,7 +150,7 @@ type IntegrationRunner struct {
 type IntegrationRunners []*IntegrationRunner
 
 // NewIntegrationRunners returns the integration test runners discovered from the provided path.
-func NewIntegrationRunners(cfg *EnvConfig, path string, passInEnv map[string]string) (IntegrationRunners, error) {
+func NewIntegrationRunners(cfg *Settings, path string, passInEnv map[string]string) (IntegrationRunners, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
@@ -193,7 +193,7 @@ func NewIntegrationRunners(cfg *EnvConfig, path string, passInEnv map[string]str
 }
 
 // NewDockerIntegrationRunner returns an integration runner configured only for docker.
-func NewDockerIntegrationRunner(cfg *EnvConfig, passThroughEnvVars ...string) (*IntegrationRunner, error) {
+func NewDockerIntegrationRunner(cfg *Settings, passThroughEnvVars ...string) (*IntegrationRunner, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
@@ -205,7 +205,7 @@ func NewDockerIntegrationRunner(cfg *EnvConfig, passThroughEnvVars ...string) (*
 	return initRunner(cfg, tester, cwd, nil, passThroughEnvVars...)
 }
 
-func initRunner(cfg *EnvConfig, tester IntegrationTester, dir string, passInEnv map[string]string, passThroughEnvVars ...string) (*IntegrationRunner, error) {
+func initRunner(cfg *Settings, tester IntegrationTester, dir string, passInEnv map[string]string, passThroughEnvVars ...string) (*IntegrationRunner, error) {
 	var runnerSteps IntegrationTestSteps
 	requirements := tester.StepRequirements()
 	if requirements != nil {

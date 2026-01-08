@@ -28,7 +28,7 @@ var (
 // Format adds license headers, formats .go files with goimports, and formats
 // .py files with autopep8.
 func Format(ctx context.Context) error {
-	cfg := ConfigFromContext(ctx)
+	cfg := SettingsFromContext(ctx)
 	// Don't run AddLicenseHeaders and GoImports concurrently because they
 	// both can modify the same files.
 	if BeatProjectType != CommunityProject {
@@ -68,7 +68,7 @@ func GoImports() error {
 
 // AddLicenseHeaders adds license headers to .go files. It applies the
 // appropriate license header based on the value of devtools.BeatLicense.
-func AddLicenseHeaders(cfg *EnvConfig) error {
+func AddLicenseHeaders(cfg *Settings) error {
 	if cfg.Fmt.CheckHeadersDisabled {
 		return nil
 	}

@@ -206,7 +206,7 @@ func (r *KubeRemote) syncServiceAccount() error {
 
 // createPod creates the pod.
 func (r *KubeRemote) createPod(env map[string]string, cmd ...string) (*apiv1.Pod, error) {
-	cfg := mage.MustLoadConfig()
+	cfg := mage.MustLoadSettings()
 	version, err := mage.GoVersion(cfg)
 	if err != nil {
 		return nil, err
@@ -268,7 +268,7 @@ func (r *KubeRemote) rsync(port uint16, stdout, stderr io.Writer) error {
 		"-a", fmt.Sprintf("%s/", r.syncDir),
 		fmt.Sprintf("root@localhost:%s", r.destDir),
 	}
-	cmd := exec.Command("rsync", args...)
+	cmd := exec.CommandContext(context.TODO(), "rsync", args...)
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	return cmd.Run()
