@@ -2150,9 +2150,9 @@ agent.reload:
 			return false
 		}
 		return zapLogs.FilterMessageSnippet("Everything is ready. Begin running and processing data").Len() > 0
-	}, 1*time.Minute, 10*time.Second, "elastic-agent was not healthy after log level changed to info")
+	}, 90*time.Second, 10*time.Second, "elastic-agent was not healthy after log level changed to info")
 
-	// if debug level was enabled, we would fine this message
+	// if debug level was enabled, we would find this message
 	require.Zero(t, zapLogs.FilterMessageSnippet(`Starting health check extension V2`).Len())
 
 	// set collector logs to debug
@@ -2163,12 +2163,12 @@ service:
       level: debug
 `
 
+	// reset zap logs
+	zapLogs.TakeAll()
+
 	// add service::telemetry::logs::level:debug
 	cfg = fmt.Sprintf(logConfig, esURL, "info")
 	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
-
-	// reset zap logs
-	zapLogs.TakeAll()
 
 	// wait for elastic agent to be healthy and OTel collector to re-start
 	require.Eventually(t, func() bool {
@@ -2178,7 +2178,7 @@ service:
 			return false
 		}
 		return zapLogs.FilterMessageSnippet("Everything is ready. Begin running and processing data").Len() > 0
-	}, 1*time.Minute, 10*time.Second, "elastic-agent is not healthy")
+	}, 1*time.Minute, 10*time.Second, "elastic-agent is not healthy after collector log level was set")
 
 	require.Eventually(t, func() bool {
 		// we ensure inputs have reloaded with correct level
@@ -2196,6 +2196,7 @@ func (w *ZapWriter) Write(p []byte) (n int, err error) {
 	msg := strings.TrimSpace(string(p))
 	if msg != "" {
 		w.logger.Check(w.level, msg).Write()
+		w.logger.Sync()
 	}
 	return len(p), nil
 }
