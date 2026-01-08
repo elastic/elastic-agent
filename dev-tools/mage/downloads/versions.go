@@ -424,6 +424,7 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 	if strings.HasSuffix(version, devtools.SnapshotSuffix) {
 		downloadURLResolvers = []DownloadURLResolver{
 			NewArtifactSnapshotURLResolver(artifactName, artifact, project, version),
+			NewArtifactURLResolver(artifactName, artifact, version),
 		}
 	} else {
 		downloadURLResolvers = []DownloadURLResolver{
