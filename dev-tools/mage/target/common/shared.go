@@ -12,6 +12,6 @@ import (
 
 // DumpVariables writes the template variables and values to stdout.
 func DumpVariables(ctx context.Context) error {
-	cfg := devtools.ConfigFromContext(ctx)
+	cfg := devtools.SettingsFromContext(ctx)
 	return devtools.DumpVariables(cfg)
 }

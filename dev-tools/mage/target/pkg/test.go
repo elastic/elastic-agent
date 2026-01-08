@@ -13,6 +13,6 @@ import (
 // PackageTest tests the generated packages in build/distributions. It checks
 // things like file ownership/mode, package attributes, etc.
 func PackageTest(ctx context.Context) error {
-	cfg := devtools.ConfigFromContext(ctx)
+	cfg := devtools.SettingsFromContext(ctx)
 	return devtools.TestPackages(cfg)
 }

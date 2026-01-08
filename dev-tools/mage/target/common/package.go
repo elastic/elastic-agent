@@ -16,7 +16,7 @@ import (
 
 // PackageSystemTests packages the python system tests results
 func PackageSystemTests(ctx context.Context) error {
-	cfg := devtools.ConfigFromContext(ctx)
+	cfg := devtools.SettingsFromContext(ctx)
 	excludes := []string{".ci", ".git", ".github", "vendor", "dev-tools"}
 
 	// include run and docker-logs as they are the directories we want to compress

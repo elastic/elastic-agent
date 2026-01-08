@@ -26,7 +26,7 @@ var DefaultCleanPaths = []string{
 }
 
 // Clean cleans generated build artifacts and caches.
-func Clean(cfg *EnvConfig, pathLists ...[]string) error {
+func Clean(cfg *Settings, pathLists ...[]string) error {
 	if len(pathLists) == 0 {
 		pathLists = [][]string{DefaultCleanPaths}
 	}

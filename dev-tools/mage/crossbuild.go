@@ -29,7 +29,7 @@ const defaultCrossBuildTarget = "golangCrossBuild"
 type CrossBuildOption func(params *crossBuildParams)
 
 // ImageSelectorFunc returns the name of the builder image.
-type ImageSelectorFunc func(cfg *EnvConfig, platform string) (string, error)
+type ImageSelectorFunc func(cfg *Settings, platform string) (string, error)
 
 // WithName adjust the name of the cross build action.
 func WithName(name string) CrossBuildOption {
@@ -96,7 +96,7 @@ type crossBuildParams struct {
 }
 
 // CrossBuild executes a given build target once for each target platform.
-func CrossBuild(ctx context.Context, cfg *EnvConfig, options ...CrossBuildOption) error {
+func CrossBuild(ctx context.Context, cfg *Settings, options ...CrossBuildOption) error {
 	params := crossBuildParams{Platforms: cfg.GetPlatforms(), Target: defaultCrossBuildTarget, ImageSelector: CrossBuildImage}
 	params.Name = "Elastic-Agent"
 	for _, opt := range options {
@@ -171,7 +171,7 @@ func CrossBuild(ctx context.Context, cfg *EnvConfig, options ...CrossBuildOption
 // CrossBuildXPack executes the 'golangCrossBuild' target in the Beat's
 // associated x-pack directory to produce a version of the Beat that contains
 // Elastic licensed content.
-func CrossBuildXPack(ctx context.Context, cfg *EnvConfig, options ...CrossBuildOption) error {
+func CrossBuildXPack(ctx context.Context, cfg *Settings, options ...CrossBuildOption) error {
 	o := []CrossBuildOption{InDir("x-pack", cfg.Beat.Name)}
 	o = append(o, options...)
 	return CrossBuild(ctx, cfg, o...)
@@ -187,7 +187,7 @@ func buildMage() error {
 }
 
 // CrossBuildImage build the docker image.
-func CrossBuildImage(cfg *EnvConfig, platform string) (string, error) {
+func CrossBuildImage(cfg *Settings, platform string) (string, error) {
 	tagSuffix := "main"
 
 	switch {
@@ -232,7 +232,7 @@ type GolangCrossBuilder struct {
 	Target        string
 	InDir         string
 	ImageSelector ImageSelectorFunc
-	Config        *EnvConfig
+	Config        *Settings
 }
 
 // Build executes the build inside of Docker.

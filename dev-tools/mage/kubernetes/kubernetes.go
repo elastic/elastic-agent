@@ -25,11 +25,11 @@ func init() {
 
 // IntegrationTester integration tester
 type IntegrationTester struct {
-	cfg *mage.EnvConfig
+	cfg *mage.Settings
 }
 
 // SetConfig sets the configuration for the tester.
-func (d *IntegrationTester) SetConfig(cfg *mage.EnvConfig) {
+func (d *IntegrationTester) SetConfig(cfg *mage.Settings) {
 	d.cfg = cfg
 }
 
@@ -166,7 +166,7 @@ func waitKubeStateMetricsReadiness(env map[string]string, stdOut, stdErr io.Writ
 }
 
 // kubernetesClusterName generates a name for the Kubernetes cluster.
-func kubernetesClusterName(cfg *mage.EnvConfig) string {
+func kubernetesClusterName(cfg *mage.Settings) string {
 	commit, err := cfg.Build.CommitHash()
 	if err != nil {
 		panic(fmt.Errorf("failed to construct kind cluster name: %w", err))

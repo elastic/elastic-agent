@@ -47,13 +47,13 @@ const (
 )
 
 // Expand expands the given Go text/template string.
-func Expand(cfg *EnvConfig, in string, args ...map[string]interface{}) (string, error) {
+func Expand(cfg *Settings, in string, args ...map[string]interface{}) (string, error) {
 	return expandTemplate(inlineTemplate, in, FuncMap(cfg), EnvMap(cfg, args...))
 }
 
 // MustExpand expands the given Go text/template string. It panics if there is
 // an error.
-func MustExpand(cfg *EnvConfig, in string, args ...map[string]interface{}) string {
+func MustExpand(cfg *Settings, in string, args ...map[string]interface{}) string {
 	out, err := Expand(cfg, in, args...)
 	if err != nil {
 		panic(err)
@@ -63,7 +63,7 @@ func MustExpand(cfg *EnvConfig, in string, args ...map[string]interface{}) strin
 
 // ExpandFile expands the Go text/template read from src and writes the output
 // to dst.
-func ExpandFile(cfg *EnvConfig, src, dst string, args ...map[string]interface{}) error {
+func ExpandFile(cfg *Settings, src, dst string, args ...map[string]interface{}) error {
 	return expandFile(cfg, src, dst, EnvMap(cfg, args...))
 }
 
@@ -109,7 +109,7 @@ func joinMaps(args ...map[string]interface{}) map[string]interface{} {
 	return out
 }
 
-func expandFile(cfg *EnvConfig, src, dst string, args ...map[string]interface{}) error {
+func expandFile(cfg *Settings, src, dst string, args ...map[string]interface{}) error {
 	tmplData, err := os.ReadFile(src)
 	if err != nil {
 		return fmt.Errorf("failed reading from template %v, %w", src, err)
@@ -518,7 +518,7 @@ func parallelJobs(ctx context.Context) chan int {
 	defer parallelJobsLock.Unlock()
 
 	if parallelJobsSemaphore == nil {
-		cfg := ConfigFromContext(ctx)
+		cfg := SettingsFromContext(ctx)
 		max := numParallel(cfg)
 		parallelJobsSemaphore = make(chan int, max)
 		log.Println("Max parallel jobs =", max)
@@ -527,7 +527,7 @@ func parallelJobs(ctx context.Context) chan int {
 	return parallelJobsSemaphore
 }
 
-func numParallel(cfg *EnvConfig) int {
+func numParallel(cfg *Settings) int {
 	// Use the configured max parallel from Config if set
 	if cfg.Build.MaxParallel > 0 {
 		maxParallel := cfg.Build.MaxParallel
@@ -827,7 +827,7 @@ func IsUpToDate(dst string, sources ...string) bool {
 
 // OSSBeatDir returns the OSS beat directory. You can pass paths and they will
 // be joined and appended to the OSS beat dir.
-func OSSBeatDir(cfg *EnvConfig, path ...string) string {
+func OSSBeatDir(cfg *Settings, path ...string) string {
 	ossDir := CWD()
 
 	// Check if we need to correct ossDir because it's in x-pack.
@@ -844,7 +844,7 @@ func OSSBeatDir(cfg *EnvConfig, path ...string) string {
 
 // XPackBeatDir returns the X-Pack beat directory. You can pass paths and they
 // will be joined and appended to the X-Pack beat dir.
-func XPackBeatDir(cfg *EnvConfig, path ...string) string {
+func XPackBeatDir(cfg *Settings, path ...string) string {
 	// Check if we have an X-Pack only beats
 	cur := CWD()
 
