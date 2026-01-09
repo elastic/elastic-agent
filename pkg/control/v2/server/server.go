@@ -17,6 +17,7 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v1/proto"
 	v1server "github.com/elastic/elastic-agent/pkg/control/v1/server"
@@ -45,6 +46,10 @@ type TestModeConfigSetter interface {
 	SetConfig(ctx context.Context, cfg string) error
 }
 
+type RollbacksSource interface {
+	Get() (map[string]ttl.TTLMarker, error)
+}
+
 // Server is the daemon side of the control protocol.
 type Server struct {
 	cproto.UnimplementedElasticAgentControlServer
@@ -58,18 +63,20 @@ type Server struct {
 	diagHooks  diagnostics.Hooks
 	grpcConfig *configuration.GRPCConfig
 
-	tmSetter TestModeConfigSetter
+	tmSetter       TestModeConfigSetter
+	rollbackSource RollbacksSource
 }
 
 // New creates a new control protocol server.
-func New(log *logger.Logger, agentInfo info.Agent, coord *coordinator.Coordinator, tracer *apm.Tracer, diagHooks diagnostics.Hooks, grpcConfig *configuration.GRPCConfig) *Server {
+func New(log *logger.Logger, agentInfo info.Agent, coord *coordinator.Coordinator, tracer *apm.Tracer, diagHooks diagnostics.Hooks, grpcConfig *configuration.GRPCConfig, rollbackSource RollbacksSource) *Server {
 	return &Server{
-		logger:     log,
-		agentInfo:  agentInfo,
-		coord:      coord,
-		tracer:     tracer,
-		diagHooks:  diagHooks,
-		grpcConfig: grpcConfig,
+		logger:         log,
+		agentInfo:      agentInfo,
+		coord:          coord,
+		tracer:         tracer,
+		diagHooks:      diagHooks,
+		grpcConfig:     grpcConfig,
+		rollbackSource: rollbackSource,
 	}
 }
 
@@ -360,6 +367,27 @@ func (s *Server) Configure(ctx context.Context, req *cproto.ConfigureRequest) (*
 		return nil, err
 	}
 	return &cproto.Empty{}, nil
+}
+
+func (s *Server) AvailableRollbacks(context.Context, *cproto.Empty) (*cproto.AvailableRollbacksResponse, error) {
+	rollbacks, err := s.rollbackSource.Get()
+	if err != nil {
+		return &cproto.AvailableRollbacksResponse{
+			Error: fmt.Sprintf("error fetching rollbacks: %s", err.Error()),
+		}, nil
+	}
+	protoRollbacks := make([]*cproto.AvailableRollback, 0, len(rollbacks))
+	for home, ttlMarker := range rollbacks {
+		protoRollbacks = append(protoRollbacks, &cproto.AvailableRollback{
+			VersionedHome: home,
+			Version:       ttlMarker.Version,
+			ValidUntil:    ttlMarker.ValidUntil.Format(time.RFC3339),
+		})
+	}
+	return &cproto.AvailableRollbacksResponse{
+		Rollbacks: protoRollbacks,
+		Error:     "",
+	}, nil
 }
 
 func stateToProto(state *coordinator.State, agentInfo info.Agent) (*cproto.StateResponse, error) {
