@@ -104,8 +104,9 @@ func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, opt
 		if !owner.IsWellKnown(windows.WinBuiltinAdministratorsSid) {
 			return fmt.Errorf("%s not owned by Administrators", topPath)
 		}
-		// that is 1 unique SID, it should not have anymore
-		if len(sids) > 1 {
+		// that is 2 unique SID, it should not have anymore
+		// Administrators and INTERACTIVE
+		if len(sids) > 2 {
 			return fmt.Errorf("DACL has more than allowed ACE for %s", topPath)
 		}
 	}
