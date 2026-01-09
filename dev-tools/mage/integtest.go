@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"github.com/magefile/mage/mg"
 )
@@ -73,10 +72,14 @@ func (steps IntegrationTestSteps) Name() string {
 //
 // In the case that Setup fails on a step, Teardown will be called on the previous
 // successful steps.
-func (steps IntegrationTestSteps) Setup(env map[string]string) error {
+func (steps IntegrationTestSteps) Setup(cfg *Settings, env map[string]string) error {
 	for i, step := range steps {
 		if mg.Verbose() {
 			fmt.Printf("Setup %s...\n", step.Name())
+		}
+		// Pass config to step if it supports ConfigSetter interface.
+		if setter, ok := step.(ConfigSetter); ok {
+			setter.SetConfig(cfg)
 		}
 		if err := step.Setup(env); err != nil {
 			prev := i - 1
@@ -129,8 +132,14 @@ type IntegrationTester interface {
 	StepRequirements() IntegrationTestSteps
 }
 
+// ConfigSetter is an optional interface that testers can implement to receive config.
+type ConfigSetter interface {
+	SetConfig(cfg *Settings)
+}
+
 // IntegrationRunner performs the running of the integration tests.
 type IntegrationRunner struct {
+	cfg    *Settings
 	steps  IntegrationTestSteps
 	tester IntegrationTester
 	dir    string
@@ -141,7 +150,7 @@ type IntegrationRunner struct {
 type IntegrationRunners []*IntegrationRunner
 
 // NewIntegrationRunners returns the integration test runners discovered from the provided path.
-func NewIntegrationRunners(path string, passInEnv map[string]string) (IntegrationRunners, error) {
+func NewIntegrationRunners(cfg *Settings, path string, passInEnv map[string]string) (IntegrationRunners, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
@@ -158,7 +167,7 @@ func NewIntegrationRunners(path string, passInEnv map[string]string) (Integratio
 		if !use {
 			continue
 		}
-		runner, err := initRunner(t, dir, passInEnv)
+		runner, err := initRunner(cfg, t, dir, passInEnv)
 		if err != nil {
 			return nil, fmt.Errorf("initializing %s runner: %w", t.Name(), err)
 		}
@@ -174,7 +183,7 @@ func NewIntegrationRunners(path string, passInEnv map[string]string) (Integratio
 		if !ok {
 			return nil, fmt.Errorf("docker integration test runner not registered")
 		}
-		runner, err := initRunner(tester, dir, passInEnv)
+		runner, err := initRunner(cfg, tester, dir, passInEnv)
 		if err != nil {
 			return nil, fmt.Errorf("initializing docker runner: %w", err)
 		}
@@ -184,7 +193,7 @@ func NewIntegrationRunners(path string, passInEnv map[string]string) (Integratio
 }
 
 // NewDockerIntegrationRunner returns an integration runner configured only for docker.
-func NewDockerIntegrationRunner(passThroughEnvVars ...string) (*IntegrationRunner, error) {
+func NewDockerIntegrationRunner(cfg *Settings, passThroughEnvVars ...string) (*IntegrationRunner, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
@@ -193,10 +202,10 @@ func NewDockerIntegrationRunner(passThroughEnvVars ...string) (*IntegrationRunne
 	if !ok {
 		return nil, fmt.Errorf("docker integration test runner not registered")
 	}
-	return initRunner(tester, cwd, nil, passThroughEnvVars...)
+	return initRunner(cfg, tester, cwd, nil, passThroughEnvVars...)
 }
 
-func initRunner(tester IntegrationTester, dir string, passInEnv map[string]string, passThroughEnvVars ...string) (*IntegrationRunner, error) {
+func initRunner(cfg *Settings, tester IntegrationTester, dir string, passInEnv map[string]string, passThroughEnvVars ...string) (*IntegrationRunner, error) {
 	var runnerSteps IntegrationTestSteps
 	requirements := tester.StepRequirements()
 	if requirements != nil {
@@ -218,6 +227,7 @@ func initRunner(tester IntegrationTester, dir string, passInEnv map[string]strin
 	}
 
 	runner := &IntegrationRunner{
+		cfg:    cfg,
 		steps:  runnerSteps,
 		tester: tester,
 		dir:    dir,
@@ -234,25 +244,23 @@ func (r *IntegrationRunner) Test(mageTarget string, test func() error) error {
 	}
 
 	// Honor the TEST_ENVIRONMENT value if set.
-	if testEnvVar, isSet := os.LookupEnv("TEST_ENVIRONMENT"); isSet {
-		enabled, err := strconv.ParseBool(testEnvVar)
-		if err != nil {
-			return fmt.Errorf("failed to parse TEST_ENVIRONMENT value: %w", err)
-		}
-		if !enabled {
-			return fmt.Errorf("TEST_ENVIRONMENT=%s", testEnvVar)
-		}
+	if !r.cfg.IntegrationTest.TestEnvironmentEnabled {
+		return fmt.Errorf("TEST_ENVIRONMENT is disabled")
+	}
+
+	// Pass config to tester if it supports ConfigSetter interface.
+	if setter, ok := r.tester.(ConfigSetter); ok {
+		setter.SetConfig(r.cfg)
 	}
 
 	// log missing requirements and do nothing
 	err := r.tester.HasRequirements()
 	if err != nil {
 		fmt.Printf("skipping test run with %s due to missing requirements: %s\n", r.tester.Name(), err)
-		//nolint:nilerr // log error; and return (otherwise on machines without requirements it will mark the tests as failed)
 		return nil
 	}
 
-	if err := r.steps.Setup(r.env); err != nil {
+	if err := r.steps.Setup(r.cfg, r.env); err != nil {
 		return err
 	}
 
