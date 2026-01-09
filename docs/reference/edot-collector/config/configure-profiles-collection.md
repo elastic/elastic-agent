@@ -2,15 +2,11 @@
 navigation_title: Profiles collection
 description: Learn how to configure and customize profiles collection through the Elastic Distribution of OpenTelemetry Collector.
 applies_to:
-<<<<<<< HEAD
-  stack: preview 9.2
-=======
-  stack: preview 9.3+
->>>>>>> 9a8cb1d19 ([do not merge] Docs: Update applies_to syntax (#12153))
+  stack: preview 9.2+
   serverless:
     observability:
   product:
-    edot_collector: preview 9.3+
+    edot_collector: preview 9.2+
 products:
   - id: observability
   - id: edot-collector
