@@ -45,9 +45,9 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 
 	// https://docs.microsoft.com/en-us/windows/win32/secauthz/access-mask
 	grants := make([]acl.ExplicitAccess, 0, 4)
+	grants = append(grants, acl.GrantSidWithInheritance(0x00100021, interactiveSID, acl.CONTAINER_INHERIT_ACE)) // list content control of all acl's, only containers inherit, otherwise file content would be readable
 	grants = append(grants, acl.GrantSid(0xF10F0000, systemSID))                                                // full control of all acl's
 	grants = append(grants, acl.GrantSid(0xF10F0000, administratorsSID))                                        // full control of all acl's
-	grants = append(grants, acl.GrantSidWithInheritance(0x00100021, interactiveSID, acl.CONTAINER_INHERIT_ACE)) // list content control of all acl's, only containers inherit, otherwise file content would be readable
 
 	// user gets grant based on the mask
 	userSID := administratorsSID // defaults to owned by Administrators

@@ -96,8 +96,8 @@ func checkPlatform(ctx context.Context, f *atesting.Fixture, topPath string, opt
 		if !hasWellKnownSID(sids, windows.WinBuiltinAdministratorsSid) {
 			return fmt.Errorf("path %s should have ACE for Administrators", topPath)
 		}
-		// that is 3 unique SID's, it should not have anymore
-		if len(sids) > 3 {
+		// that is 4 unique SID's, it should not have anymore
+		if len(sids) > 4 {
 			return fmt.Errorf("DACL has more than allowed ACE for %s (unprivileged): %v", topPath, sids)
 		}
 	} else {
