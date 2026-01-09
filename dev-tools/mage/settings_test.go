@@ -15,7 +15,7 @@ import (
 func TestGetVersion(t *testing.T) {
 	cfg, err := LoadSettings()
 	require.NoError(t, err)
-	bp, err := BeatQualifiedVersion(cfg)
+	bp, err := cfg.BeatQualifiedVersion()
 	assert.NoError(t, err)
 	_ = bp
 }
@@ -24,7 +24,7 @@ func TestAgentPackageVersion(t *testing.T) {
 	t.Run("agent package version without env var", func(t *testing.T) {
 		cfg, err := LoadSettings()
 		require.NoError(t, err)
-		expectedPkgVersion, err := BeatQualifiedVersion(cfg)
+		expectedPkgVersion, err := cfg.BeatQualifiedVersion()
 		require.NoError(t, err)
 		actualPkgVersion, err := AgentPackageVersion(cfg)
 		require.NoError(t, err)

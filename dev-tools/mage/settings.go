@@ -17,8 +17,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/magefile/mage/sh"
 	"golang.org/x/text/cases"
@@ -73,14 +71,14 @@ var BeatProjectType ProjectType
 // FuncMap returns template functions that use the config.
 func FuncMap(cfg *Settings) map[string]interface{} {
 	return map[string]interface{}{
-		"beat_doc_branch":                func() (string, error) { return BeatDocBranchFromConfig(cfg) },
-		"beat_version":                   func() (string, error) { return BeatQualifiedVersion(cfg) },
+		"beat_doc_branch":                func() (string, error) { return cfg.DocBranch() },
+		"beat_version":                   func() (string, error) { return cfg.BeatQualifiedVersion() },
 		"commit":                         func() (string, error) { return cfg.Build.CommitHash() },
 		"commit_short":                   func() (string, error) { return cfg.Build.CommitHashShort() },
-		"date":                           BuildDate,
-		"elastic_beats_dir":              ElasticBeatsDir,
-		"go_version":                     func() (string, error) { return GoVersion(cfg) },
-		"repo":                           GetProjectRepoInfo,
+		"date":                           cfg.BuildDate,
+		"elastic_beats_dir":              func() (string, error) { return cfg.ElasticBeatsDir() },
+		"go_version":                     func() (string, error) { return cfg.GoVersion() },
+		"repo":                           func() (*ProjectRepoInfo, error) { return cfg.RepoInfo, nil },
 		"title":                          func(s string) string { return cases.Title(language.English, cases.NoLower).String(s) },
 		"tolower":                        strings.ToLower,
 		"contains":                       strings.Contains,
@@ -214,7 +212,7 @@ func AgentPackageVersion(cfg *Settings) (string, error) {
 		return cfg.Packaging.AgentPackageVersion, nil
 	}
 
-	return BeatQualifiedVersion(cfg)
+	return cfg.BeatQualifiedVersion()
 }
 
 // PackageManifest generates the package manifest using the provided config.
@@ -234,7 +232,7 @@ func PackageManifest(cfg *Settings, fips bool) (string, error) {
 		return "", fmt.Errorf("retrieving agent commit hash: %w", err)
 	}
 
-	registry, err := loadFlavorsRegistry()
+	registry, err := cfg.FlavorsRegistry()
 	if err != nil {
 		return "", fmt.Errorf("retrieving agent flavors: %w", err)
 	}
@@ -288,307 +286,25 @@ func GenerateSnapshotSuffix(snapshot bool) string {
 	return SnapshotSuffix
 }
 
-var (
-	elasticBeatsDirValue string
-	elasticBeatsDirErr   error
-	elasticBeatsDirLock  sync.Mutex
-)
-
-// SetElasticBeatsDir sets the internal elastic beats dir to a preassigned value
-func SetElasticBeatsDir(path string) {
-	elasticBeatsDirLock.Lock()
-	defer elasticBeatsDirLock.Unlock()
-
-	elasticBeatsDirValue = path
-}
-
-// ElasticBeatsDir returns the path to Elastic beats dir.
-func ElasticBeatsDir() (string, error) {
-	elasticBeatsDirLock.Lock()
-	defer elasticBeatsDirLock.Unlock()
-
-	if elasticBeatsDirValue != "" || elasticBeatsDirErr != nil {
-		return elasticBeatsDirValue, elasticBeatsDirErr
-	}
-
-	elasticBeatsDirValue, elasticBeatsDirErr = findElasticBeatsDir()
-	if elasticBeatsDirErr == nil {
-		log.Println("Found Elastic Beats dir at", elasticBeatsDirValue)
-	}
-	return elasticBeatsDirValue, elasticBeatsDirErr
-}
-
-// findElasticBeatsDir returns the root directory of the Elastic Beats module, using "go list".
-//
-// When running within the Elastic Beats repo, this will return the repo root. Otherwise,
-// it will return the root directory of the module from within the module cache or vendor
-// directory.
-func findElasticBeatsDir() (string, error) {
-	repo, err := GetProjectRepoInfo()
-	if err != nil {
-		return "", err
-	}
-	if repo.IsElasticBeats() {
-		return repo.RootDir, nil
-	}
-	return gotool.ListModuleCacheDir(elasticAgentModulePath)
-}
-
-var (
-	buildDate = time.Now().UTC().Format(time.RFC3339)
-)
-
-// BuildDate returns the time that the build started.
-func BuildDate() string {
-	return buildDate
-}
-
-var (
-	goVersionValue string
-	goVersionErr   error
-	goVersionOnce  sync.Once
-)
-
-// GoVersion returns the version of Go using the provided config.
-// If BeatGoVersion is set in the config, it returns that value.
-// Otherwise falls back to reading from the .go-version file.
-func GoVersion(cfg *Settings) (string, error) {
-	if cfg.Build.BeatGoVersion != "" {
-		return cfg.Build.BeatGoVersion, nil
-	}
-
-	goVersionOnce.Do(func() {
-		goVersionValue, goVersionErr = getBuildVariableSources().GetGoVersion()
-	})
-
-	return goVersionValue, goVersionErr
-}
-
-var (
-	beatVersionRegex = regexp.MustCompile(`(?m)^const defaultBeatVersion = "(.+)"\r?$`)
-
-	flavorsRegistry    map[string][]string
-	flavorsRegistryErr error
-	flavorsOnce        sync.Once
-)
-
-// BeatQualifiedVersion returns the Beat's qualified version using the provided config.
-// This variant does not use caching, making it suitable for contexts where
-// different configs may be passed.
-func BeatQualifiedVersion(cfg *Settings) (string, error) {
-	version, err := BeatVersion(cfg)
+// BeatQualifiedVersion returns the Beat's qualified version.
+// If a version qualifier is set, it appends it to the version.
+func (s *Settings) BeatQualifiedVersion() (string, error) {
+	version, err := s.BeatVersion()
 	if err != nil {
 		return "", err
 	}
 	// version qualifier can intentionally be set to "" to override build time var
-	if !cfg.Build.VersionQualified || cfg.Build.VersionQualifier == "" {
+	if !s.Build.VersionQualified || s.Build.VersionQualifier == "" {
 		return version, nil
 	}
-	return version + "-" + cfg.Build.VersionQualifier, nil
-}
-
-// BeatVersion returns the Beat's version using the provided config.
-// This variant does not use caching, making it suitable for contexts where
-// different configs may be passed.
-func BeatVersion(cfg *Settings) (string, error) {
-	// Check config first for BeatVersion override
-	if cfg.Build.BeatVersion != "" {
-		return cfg.Build.BeatVersion, nil
-	}
-	return getBuildVariableSources().GetBeatVersion()
-}
-
-func loadFlavorsRegistry() (map[string][]string, error) {
-	flavorsOnce.Do(func() {
-		flavorsRegistry, flavorsRegistryErr = getBuildVariableSources().GetFlavorsRegistry()
-	})
-
-	return flavorsRegistry, flavorsRegistryErr
+	return version + "-" + s.Build.VersionQualifier, nil
 }
 
 var (
+	beatVersionRegex       = regexp.MustCompile(`(?m)^const defaultBeatVersion = "(.+)"\r?$`)
 	beatDocBranchRegex     = regexp.MustCompile(`(?m)doc-branch:\s*([^\s]+)\r?$`)
 	beatDocSiteBranchRegex = regexp.MustCompile(`(?m)doc-site-branch:\s*([^\s]+)\r?$`)
-	beatDocBranchValue     string
-	beatDocBranchErr       error
-	beatDocBranchOnce      sync.Once
 )
-
-// BeatDocBranch returns the documentation branch name associated with the
-// Beat branch.
-// Deprecated: Use BeatDocBranchFromConfig instead.
-func BeatDocBranch() (string, error) {
-	beatDocBranchOnce.Do(func() {
-		beatDocBranchValue, beatDocBranchErr = getBuildVariableSources().GetDocBranch()
-	})
-
-	return beatDocBranchValue, beatDocBranchErr
-}
-
-// BeatDocBranchFromConfig returns the documentation branch using the provided config.
-// If BeatDocBranch is set in the config, it returns that value.
-// Otherwise falls back to reading from the doc branch file.
-func BeatDocBranchFromConfig(cfg *Settings) (string, error) {
-	if cfg.Build.BeatDocBranch != "" {
-		return cfg.Build.BeatDocBranch, nil
-	}
-	return BeatDocBranch()
-}
-
-// --- BuildVariableSources
-
-var (
-	// DefaultBeatBuildVariableSources contains the default locations build
-	// variables are read from by Elastic Beats.
-	DefaultBeatBuildVariableSources = &BuildVariableSources{
-		BeatVersion:     "{{ elastic_beats_dir }}/version/version.go",
-		GoVersion:       "{{ elastic_beats_dir }}/.go-version",
-		DocBranch:       "{{ elastic_beats_dir }}/version/docs/version.asciidoc",
-		FlavorsRegistry: "{{ elastic_beats_dir }}/_meta/.flavors",
-	}
-
-	buildVariableSources     *BuildVariableSources
-	buildVariableSourcesLock sync.Mutex
-)
-
-// SetBuildVariableSources sets the BuildVariableSources that defines where
-// certain build data should be sourced from. Community Beats must call this.
-func SetBuildVariableSources(s *BuildVariableSources) {
-	buildVariableSourcesLock.Lock()
-	defer buildVariableSourcesLock.Unlock()
-
-	buildVariableSources = s
-}
-
-func getBuildVariableSources() *BuildVariableSources {
-	buildVariableSourcesLock.Lock()
-	defer buildVariableSourcesLock.Unlock()
-
-	if buildVariableSources != nil {
-		return buildVariableSources
-	}
-
-	repo, err := GetProjectRepoInfo()
-	if err != nil {
-		panic(err)
-	}
-	if repo.IsElasticBeats() {
-		buildVariableSources = DefaultBeatBuildVariableSources
-		return buildVariableSources
-	}
-
-	panic(fmt.Errorf("magefile must call devtools.SetBuildVariableSources() "+
-		"because it is not an elastic beat (repo=%+v)", repo.RootImportPath))
-}
-
-// BuildVariableSources is used to explicitly define what files contain build
-// variables and how to parse the values from that file. This removes ambiguity
-// about where the data is sources and allows a degree of customization for
-// community Beats.
-//
-// Default parsers are used if one is not defined.
-type BuildVariableSources struct {
-	// File containing the Beat version.
-	BeatVersion string
-
-	// Parses the Beat version from the BeatVersion file.
-	BeatVersionParser func(data []byte) (string, error)
-
-	// File containing the Go version to be used in cross-builds.
-	GoVersion string
-
-	// Parses the Go version from the GoVersion file.
-	GoVersionParser func(data []byte) (string, error)
-
-	// File containing the documentation branch.
-	DocBranch string
-
-	// Parses the documentation branch from the DocBranch file.
-	DocBranchParser func(data []byte) (string, error)
-
-	// File containing definition of flavors.
-	FlavorsRegistry string
-}
-
-func (s *BuildVariableSources) expandVar(in string) (string, error) {
-	return expandTemplate("inline", in, map[string]interface{}{
-		"elastic_beats_dir": ElasticBeatsDir,
-	})
-}
-
-// GetBeatVersion reads the BeatVersion file and parses the version from it.
-func (s *BuildVariableSources) GetBeatVersion() (string, error) {
-	file, err := s.expandVar(s.BeatVersion)
-	if err != nil {
-		return "", err
-	}
-
-	data, err := os.ReadFile(file)
-	if err != nil {
-		return "", fmt.Errorf("failed to read beat version file=%v: %w", file, err)
-	}
-
-	if s.BeatVersionParser == nil {
-		s.BeatVersionParser = parseBeatVersion
-	}
-	return s.BeatVersionParser(data)
-}
-
-// GetGoVersion reads the GoVersion file and parses the version from it.
-func (s *BuildVariableSources) GetGoVersion() (string, error) {
-	file, err := s.expandVar(s.GoVersion)
-	if err != nil {
-		return "", err
-	}
-
-	data, err := os.ReadFile(file)
-	if err != nil {
-		return "", fmt.Errorf("failed to read go version file=%v: %w", file, err)
-	}
-
-	if s.GoVersionParser == nil {
-		s.GoVersionParser = parseGoVersion
-	}
-	return s.GoVersionParser(data)
-}
-
-// GetFlavorsRegistry reads the flavors file and parses the list of components of it.
-func (s *BuildVariableSources) GetFlavorsRegistry() (map[string][]string, error) {
-	file, err := s.expandVar(s.FlavorsRegistry)
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := os.ReadFile(file)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read flavors from file=%v: %w", file, err)
-	}
-
-	registry := make(map[string][]string)
-	if err := yaml.Unmarshal(data, registry); err != nil {
-		return nil, fmt.Errorf("failed to parse flavors: %w", err)
-	}
-
-	return registry, nil
-}
-
-// GetDocBranch reads the DocBranch file and parses the branch from it.
-func (s *BuildVariableSources) GetDocBranch() (string, error) {
-	file, err := s.expandVar(s.DocBranch)
-	if err != nil {
-		return "", err
-	}
-
-	data, err := os.ReadFile(file)
-	if err != nil {
-		return "", fmt.Errorf("failed to read doc branch file=%v: %w", file, err)
-	}
-
-	if s.DocBranchParser == nil {
-		s.DocBranchParser = parseDocBranch
-	}
-	return s.DocBranchParser(data)
-}
 
 func parseBeatVersion(data []byte) (string, error) {
 	matches := beatVersionRegex.FindSubmatch(data)
@@ -597,10 +313,6 @@ func parseBeatVersion(data []byte) (string, error) {
 	}
 
 	return "", errors.New("failed to parse beat version file")
-}
-
-func parseGoVersion(data []byte) (string, error) {
-	return strings.TrimSpace(string(data)), nil
 }
 
 func parseDocBranch(data []byte) (string, error) {
@@ -632,26 +344,6 @@ type ProjectRepoInfo struct {
 // github.com/elastic/beats.
 func (r *ProjectRepoInfo) IsElasticBeats() bool {
 	return r.CanonicalRootImportPath == elasticAgentImportPath
-}
-
-var (
-	repoInfoValue *ProjectRepoInfo
-	repoInfoErr   error
-	repoInfoOnce  sync.Once
-)
-
-// GetProjectRepoInfo returns information about the repo including the root
-// import path and the current directory's import path.
-func GetProjectRepoInfo() (*ProjectRepoInfo, error) {
-	repoInfoOnce.Do(func() {
-		if isUnderGOPATH() {
-			repoInfoValue, repoInfoErr = getProjectRepoInfoUnderGopath()
-		} else {
-			repoInfoValue, repoInfoErr = getProjectRepoInfoWithModules()
-		}
-	})
-
-	return repoInfoValue, repoInfoErr
 }
 
 func isUnderGOPATH() bool {
@@ -942,6 +634,34 @@ type Settings struct {
 	// SelectedDockerVariants overrides the docker variants from DOCKER_VARIANTS env var.
 	// If nil, the env var value is used.
 	SelectedDockerVariants []DockerVariant
+
+	// RepoInfo contains information about the project's repo.
+	// Initialized during LoadSettings().
+	RepoInfo *ProjectRepoInfo
+
+	// elasticBeatsDir is the path to the Elastic Beats directory.
+	// Initialized during LoadSettings().
+	elasticBeatsDir string
+
+	// goVersion is the Go version read from .go-version file.
+	// Initialized during LoadSettings().
+	goVersion string
+
+	// docBranch is the documentation branch read from version/docs/version.asciidoc.
+	// Initialized during LoadSettings().
+	docBranch string
+
+	// beatVersion is the Beat version read from version/version.go.
+	// Initialized during LoadSettings().
+	beatVersion string
+
+	// flavorsRegistry is the map of flavors read from _meta/.flavors.
+	// Initialized during LoadSettings().
+	flavorsRegistry map[string][]string
+
+	// buildDate is the timestamp when settings were loaded (build started).
+	// Initialized during LoadSettings().
+	buildDate string
 }
 
 // DefaultSettings returns a new Settings instance with all default values.
@@ -1531,6 +1251,18 @@ func LoadSettings() (*Settings, error) {
 	s.loadDevMachineSettingsFromEnv()
 	s.loadFmtSettingsFromEnv()
 
+	// Initialize repo info, elastic beats dir, and build variables.
+	// These depend on the filesystem and must be initialized in order.
+	if err := s.initRepoInfo(); err != nil {
+		return nil, fmt.Errorf("initializing repo info: %w", err)
+	}
+	if err := s.initElasticBeatsDir(); err != nil {
+		return nil, fmt.Errorf("initializing elastic beats dir: %w", err)
+	}
+	if err := s.initBuildVariables(); err != nil {
+		return nil, fmt.Errorf("initializing build variables: %w", err)
+	}
+
 	return s, nil
 }
 
@@ -1850,6 +1582,87 @@ func (s *Settings) loadFmtSettingsFromEnv() {
 	}
 }
 
+// initRepoInfo initializes the ProjectRepoInfo for this Settings instance.
+func (s *Settings) initRepoInfo() error {
+	var err error
+	if isUnderGOPATH() {
+		s.RepoInfo, err = getProjectRepoInfoUnderGopath()
+	} else {
+		s.RepoInfo, err = getProjectRepoInfoWithModules()
+	}
+	return err
+}
+
+// initElasticBeatsDir initializes the elasticBeatsDir for this Settings instance.
+// Must be called after initRepoInfo.
+func (s *Settings) initElasticBeatsDir() error {
+	if s.RepoInfo == nil {
+		return fmt.Errorf("RepoInfo must be initialized before elasticBeatsDir")
+	}
+	if s.RepoInfo.IsElasticBeats() {
+		s.elasticBeatsDir = s.RepoInfo.RootDir
+		log.Println("Found Elastic Beats dir at", s.elasticBeatsDir)
+		return nil
+	}
+	var err error
+	s.elasticBeatsDir, err = gotool.ListModuleCacheDir(elasticAgentModulePath)
+	if err == nil {
+		log.Println("Found Elastic Beats dir at", s.elasticBeatsDir)
+	}
+	return err
+}
+
+// initBuildVariables loads build variables from files in elasticBeatsDir.
+// Must be called after initElasticBeatsDir.
+func (s *Settings) initBuildVariables() error {
+	if s.elasticBeatsDir == "" {
+		return fmt.Errorf("elasticBeatsDir must be initialized before build variables")
+	}
+
+	// Load Go version from .go-version file
+	goVersionFile := filepath.Join(s.elasticBeatsDir, ".go-version")
+	data, err := os.ReadFile(goVersionFile)
+	if err != nil {
+		return fmt.Errorf("failed to read go version file=%v: %w", goVersionFile, err)
+	}
+	s.goVersion = strings.TrimSpace(string(data))
+
+	// Load doc branch from version/docs/version.asciidoc
+	docBranchFile := filepath.Join(s.elasticBeatsDir, "version", "docs", "version.asciidoc")
+	data, err = os.ReadFile(docBranchFile)
+	if err != nil {
+		return fmt.Errorf("failed to read doc branch file=%v: %w", docBranchFile, err)
+	}
+	s.docBranch, err = parseDocBranch(data)
+	if err != nil {
+		return fmt.Errorf("failed to parse doc branch: %w", err)
+	}
+
+	// Load beat version from version/version.go
+	beatVersionFile := filepath.Join(s.elasticBeatsDir, "version", "version.go")
+	data, err = os.ReadFile(beatVersionFile)
+	if err != nil {
+		return fmt.Errorf("failed to read beat version file=%v: %w", beatVersionFile, err)
+	}
+	s.beatVersion, err = parseBeatVersion(data)
+	if err != nil {
+		return fmt.Errorf("failed to parse beat version: %w", err)
+	}
+
+	// Load flavors registry from _meta/.flavors
+	flavorsFile := filepath.Join(s.elasticBeatsDir, "_meta", ".flavors")
+	data, err = os.ReadFile(flavorsFile)
+	if err != nil {
+		return fmt.Errorf("failed to read flavors file=%v: %w", flavorsFile, err)
+	}
+	s.flavorsRegistry = make(map[string][]string)
+	if err := yaml.Unmarshal(data, s.flavorsRegistry); err != nil {
+		return fmt.Errorf("failed to parse flavors: %w", err)
+	}
+
+	return nil
+}
+
 // parseBoolEnv parses a boolean environment variable with a default value.
 func parseBoolEnv(name string, def bool) (bool, error) {
 	v := os.Getenv(name)
@@ -1880,6 +1693,72 @@ func (s *Settings) TestTagsWithFIPS() []string {
 		tags = append(tags, "requirefips", "ms_tls13kdf")
 	}
 	return tags
+}
+
+// ElasticBeatsDir returns the path to the Elastic Beats directory.
+// The value is initialized during LoadSettings().
+func (s *Settings) ElasticBeatsDir() (string, error) {
+	if s.elasticBeatsDir == "" {
+		return "", fmt.Errorf("elasticBeatsDir not initialized; call LoadSettings() first")
+	}
+	return s.elasticBeatsDir, nil
+}
+
+// SetElasticBeatsDir sets the Elastic Beats directory path on the settings.
+func (s *Settings) SetElasticBeatsDir(path string) {
+	s.elasticBeatsDir = path
+}
+
+// GoVersion returns the Go version.
+// If BeatGoVersion override is set, it returns that value.
+// Otherwise returns the value loaded from the .go-version file.
+func (s *Settings) GoVersion() (string, error) {
+	if s.Build.BeatGoVersion != "" {
+		return s.Build.BeatGoVersion, nil
+	}
+	if s.goVersion == "" {
+		return "", fmt.Errorf("goVersion not initialized; call LoadSettings() first")
+	}
+	return s.goVersion, nil
+}
+
+// DocBranch returns the documentation branch.
+// If BeatDocBranch override is set, it returns that value.
+// Otherwise returns the value loaded from the doc branch file.
+func (s *Settings) DocBranch() (string, error) {
+	if s.Build.BeatDocBranch != "" {
+		return s.Build.BeatDocBranch, nil
+	}
+	if s.docBranch == "" {
+		return "", fmt.Errorf("docBranch not initialized; call LoadSettings() first")
+	}
+	return s.docBranch, nil
+}
+
+// BeatVersion returns the Beat version.
+// If Build.BeatVersion override is set, it returns that value.
+// Otherwise returns the value loaded from the version file.
+func (s *Settings) BeatVersion() (string, error) {
+	if s.Build.BeatVersion != "" {
+		return s.Build.BeatVersion, nil
+	}
+	if s.beatVersion == "" {
+		return "", fmt.Errorf("beatVersion not initialized; call LoadSettings() first")
+	}
+	return s.beatVersion, nil
+}
+
+// FlavorsRegistry returns the flavors registry loaded from the flavors file.
+func (s *Settings) FlavorsRegistry() (map[string][]string, error) {
+	if s.flavorsRegistry == nil {
+		return nil, fmt.Errorf("flavorsRegistry not initialized; call LoadSettings() first")
+	}
+	return s.flavorsRegistry, nil
+}
+
+// BuildDate returns the timestamp when settings were loaded (build started).
+func (s *Settings) BuildDate() string {
+	return s.buildDate
 }
 
 // GetPlatforms returns the parsed platform list from PLATFORMS env var.

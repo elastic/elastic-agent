@@ -75,10 +75,7 @@ func (d *DockerIntegrationTester) Test(dir string, mageTarget string, cfg *Setti
 	}
 
 	// Determine the path to use inside the container.
-	repo, err := GetProjectRepoInfo()
-	if err != nil {
-		return err
-	}
+	repo := cfg.RepoInfo
 	dockerRepoRoot := filepath.Join("/go/src", repo.CanonicalRootImportPath)
 	dockerGoCache := filepath.Join(dockerRepoRoot, "build/docker-gocache")
 	magePath := filepath.Join("/go/src", repo.CanonicalRootImportPath, repo.SubDir, "build/mage-linux-"+cfg.Build.GOARCH)
@@ -116,7 +113,7 @@ func (d *DockerIntegrationTester) Test(dir string, mageTarget string, cfg *Setti
 		mageTarget,
 	)
 
-	composeEnv, err := integTestDockerComposeEnvVars()
+	composeEnv, err := integTestDockerComposeEnvVars(cfg)
 	if err != nil {
 		return err
 	}
@@ -189,16 +186,11 @@ func (d *DockerIntegrationTester) saveDockerComposeLogs(rootDir string, mageTarg
 }
 
 // InsideTest performs the tests inside of environment.
-func (d *DockerIntegrationTester) InsideTest(test func() error) error {
+func (d *DockerIntegrationTester) InsideTest(test func() error, cfg *Settings) error {
 	// Fix file permissions after test is done writing files as root.
 	if runtime.GOOS != "windows" {
-		repo, err := GetProjectRepoInfo()
-		if err != nil {
-			return err
-		}
-
 		// Handle virtualenv and the current project dir.
-		defer DockerChown(path.Join(repo.RootDir, "build"))
+		defer DockerChown(path.Join(cfg.RepoInfo.RootDir, "build"))
 		defer DockerChown(".")
 	}
 	return test()
@@ -207,8 +199,8 @@ func (d *DockerIntegrationTester) InsideTest(test func() error) error {
 // integTestDockerComposeEnvVars returns the environment variables used for
 // executing docker-compose (not the variables passed into the containers).
 // docker-compose uses these when evaluating docker-compose.yml files.
-func integTestDockerComposeEnvVars() (map[string]string, error) {
-	esBeatsDir, err := ElasticBeatsDir()
+func integTestDockerComposeEnvVars(cfg *Settings) (map[string]string, error) {
+	esBeatsDir, err := cfg.ElasticBeatsDir()
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +223,7 @@ func (d *DockerIntegrationTester) dockerComposeProjectName(cfg *Settings) string
 		panic(fmt.Errorf("failed to construct docker compose project name: %w", err))
 	}
 
-	version, err := BeatQualifiedVersion(cfg)
+	version, err := cfg.BeatQualifiedVersion()
 	if err != nil {
 		panic(fmt.Errorf("failed to construct docker compose project name: %w", err))
 	}
@@ -250,7 +242,7 @@ func (d *DockerIntegrationTester) dockerComposeProjectName(cfg *Settings) string
 func (d *DockerIntegrationTester) dockerComposeBuildImages(cfg *Settings) error {
 	fmt.Println(">> Building docker images")
 
-	composeEnv, err := integTestDockerComposeEnvVars()
+	composeEnv, err := integTestDockerComposeEnvVars(cfg)
 	if err != nil {
 		return err
 	}

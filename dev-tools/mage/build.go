@@ -176,7 +176,7 @@ func GolangCrossBuild(ctx context.Context, cfg *Settings, params BuildArgs) erro
 	defer DockerChown(filepath.Join(params.OutputDir, params.Name+binaryExtension(cfg.Build.GOOS)))
 	defer DockerChown(filepath.Join(params.OutputDir))
 
-	mountPoint, err := ElasticBeatsDir()
+	mountPoint, err := cfg.ElasticBeatsDir()
 	if err != nil {
 		return err
 	}
@@ -302,7 +302,7 @@ func Run(ctx context.Context, env map[string]string, stdout, stderr io.Writer, c
 // allows users to view metadata about the exe in the Details tab of the file
 // properties viewer.
 func MakeWindowsSysoFile(cfg *Settings) (string, error) {
-	version, err := BeatQualifiedVersion(cfg)
+	version, err := cfg.BeatQualifiedVersion()
 	if err != nil {
 		return "", err
 	}

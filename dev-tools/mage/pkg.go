@@ -5,6 +5,7 @@
 package mage
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -18,7 +19,7 @@ import (
 
 // Package packages the Beat for distribution using the provided config.
 // It generates packages based on the set of target platforms and registered packaging specifications.
-func Package(cfg *Settings) error {
+func Package(ctx context.Context, cfg *Settings) error {
 	fmt.Println("--- Package artifact")
 	platforms := cfg.GetPlatforms()
 	if len(platforms) == 0 {
@@ -118,7 +119,7 @@ func Package(cfg *Settings) error {
 
 	for k, v := range tasks {
 		fmt.Printf(">> package: Building %s\n", k)
-		Parallel(v...)
+		ParallelCtx(ctx, v...)
 	}
 	return nil
 }
@@ -129,10 +130,10 @@ type packageBuilder struct {
 	Type     PackageType
 }
 
-func (b packageBuilder) Build() error {
+func (b packageBuilder) Build(ctx context.Context) error {
 	fmt.Printf(">> package: Building %v type=%v for platform=%v fips=%v\n", b.Spec.Name, b.Type, b.Platform.Name, b.Spec.FIPS)
 	log.Printf("Package spec: %+v", b.Spec)
-	if err := b.Type.Build(b.Spec); err != nil {
+	if err := b.Type.Build(ctx, b.Spec); err != nil {
 		return fmt.Errorf("failed building %v type=%v for platform=%v fips=%v : %w",
 			b.Spec.Name, b.Type, b.Platform.Name, b.Spec.FIPS, err)
 	}

@@ -82,10 +82,7 @@ func (d *IntegrationTester) Test(dir string, mageTarget string, cfg *mage.Settin
 	}
 
 	// Determine the path to use inside the pod.
-	repo, err := mage.GetProjectRepoInfo()
-	if err != nil {
-		return err
-	}
+	repo := cfg.RepoInfo
 	magePath := filepath.Join("/go/src", repo.CanonicalRootImportPath, repo.SubDir, "build/mage-linux-amd64")
 
 	// Apply the manifest from the dir. This is the requirements for the tests that will
@@ -102,8 +99,7 @@ func (d *IntegrationTester) Test(dir string, mageTarget string, cfg *mage.Settin
 		}
 	}()
 
-	err = waitKubeStateMetricsReadiness(env, stdOut, stdErr)
-	if err != nil {
+	if err := waitKubeStateMetricsReadiness(env, stdOut, stdErr); err != nil {
 		return err
 	}
 
@@ -119,7 +115,7 @@ func (d *IntegrationTester) Test(dir string, mageTarget string, cfg *mage.Settin
 	destDir := filepath.Join("/go/src", repo.CanonicalRootImportPath)
 	workDir := filepath.Join(destDir, repo.SubDir)
 	// determine the Go version
-	goVersion, err := mage.GoVersion(cfg)
+	goVersion, err := cfg.GoVersion()
 	if err != nil {
 		return fmt.Errorf("failed to determine Go version: %w", err)
 	}
@@ -136,7 +132,7 @@ func (d *IntegrationTester) Test(dir string, mageTarget string, cfg *mage.Settin
 }
 
 // InsideTest performs the tests inside of environment.
-func (d *IntegrationTester) InsideTest(test func() error) error {
+func (d *IntegrationTester) InsideTest(test func() error, _ *mage.Settings) error {
 	return test()
 }
 
@@ -170,7 +166,7 @@ func kubernetesClusterName(cfg *mage.Settings) string {
 		panic(fmt.Errorf("failed to construct kind cluster name: %w", err))
 	}
 
-	version, err := mage.BeatQualifiedVersion(cfg)
+	version, err := cfg.BeatQualifiedVersion()
 	if err != nil {
 		panic(fmt.Errorf("failed to construct kind cluster name: %w", err))
 	}

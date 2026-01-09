@@ -27,7 +27,7 @@ func TestNewRunner_Clean(t *testing.T) {
 	settings, err := mage.LoadSettings()
 	require.NoError(t, err)
 
-	goVersion, err := mage.GoVersion(settings)
+	goVersion, err := settings.GoVersion()
 	require.NoError(t, err)
 
 	cfg := common.Config{

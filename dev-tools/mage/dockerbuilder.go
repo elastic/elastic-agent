@@ -7,6 +7,7 @@ package mage
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -57,7 +58,7 @@ func newDockerBuilder(spec PackageSpec) (*dockerBuilder, error) {
 	}, nil
 }
 
-func (b *dockerBuilder) Build() error {
+func (b *dockerBuilder) Build(ctx context.Context) error {
 	if err := os.RemoveAll(b.buildDir); err != nil {
 		return fmt.Errorf("failed to clean existing build directory %s: %w", b.buildDir, err)
 	}
@@ -83,13 +84,13 @@ func (b *dockerBuilder) Build() error {
 		return fmt.Errorf("failed to build docker: %w", err)
 	}
 
-	if err := b.dockerSave(tag); err != nil {
+	if err := b.dockerSave(ctx, tag); err != nil {
 		return fmt.Errorf("failed to save docker as artifact: %w", err)
 	}
 
 	// additional tags should not be created with
 	for _, tag := range additionalTags {
-		if err := b.dockerSave(tag, map[string]interface{}{
+		if err := b.dockerSave(ctx, tag, map[string]interface{}{
 			// effectively override the name used from b.ImageName() to the tag
 			"Name": strings.ReplaceAll(tag, ":", "-"),
 		}); err != nil {
@@ -158,7 +159,7 @@ func (b *dockerBuilder) copyFiles() error {
 }
 
 func (b *dockerBuilder) prepareBuild() error {
-	elasticBeatsDir, err := ElasticBeatsDir()
+	elasticBeatsDir, err := b.cfg.ElasticBeatsDir()
 	if err != nil {
 		return err
 	}
@@ -282,7 +283,7 @@ func (b *dockerBuilder) dockerBuild() (string, []string, error) {
 	return mainTag, extraTags, sh.Run("docker", args...)
 }
 
-func (b *dockerBuilder) dockerSave(tag string, templateExtraArgs ...map[string]interface{}) error {
+func (b *dockerBuilder) dockerSave(ctx context.Context, tag string, templateExtraArgs ...map[string]interface{}) error {
 	if _, err := os.Stat(DistributionsDir); os.IsNotExist(err) {
 		err := os.MkdirAll(DistributionsDir, 0750)
 		if err != nil {
@@ -310,7 +311,7 @@ func (b *dockerBuilder) dockerSave(tag string, templateExtraArgs ...map[string]i
 	}
 
 	var stderr bytes.Buffer
-	cmd := exec.Command("docker", "save", tag)
+	cmd := exec.CommandContext(ctx, "docker", "save", tag)
 	cmd.Stderr = &stderr
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

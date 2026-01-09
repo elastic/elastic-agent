@@ -22,30 +22,23 @@ var Packages []OSPackageArgs
 
 // UseElasticAgentCorePackaging configures the package target to build binary packages
 // for an Elastic Agent.
-func UseElasticAgentCorePackaging() {
-	MustUsePackaging("elastic_agent_core", packageSpecFile)
+func UseElasticAgentCorePackaging(cfg *Settings) {
+	MustUsePackaging("elastic_agent_core", packageSpecFile, cfg)
 }
 
 // UseElasticAgentPackaging configures the package target to build packages for
 // an Elastic Agent.
-func UseElasticAgentPackaging() {
+func UseElasticAgentPackaging(cfg *Settings) {
 	// Prepare binaries so they can be packed into agent
-	MustUsePackaging("elastic_agent_packaging", packageSpecFile)
-}
-
-// UseElasticAgentDemoPackaging configures the package target to build packages for
-// an Elastic Agent demo purposes.
-func UseElasticAgentDemoPackaging() {
-	// Prepare binaries so they can be packed into agent
-	MustUsePackaging("elastic_beat_agent_demo_binaries", packageSpecFile)
+	MustUsePackaging("elastic_agent_packaging", packageSpecFile, cfg)
 }
 
 // MustUsePackaging will load a named spec from a named file, if any errors
 // occurs when loading the specs it will panic.
 //
 // NOTE: we assume that specFile is relative to the beatsDir.
-func MustUsePackaging(specName, specFile string) {
-	beatsDir, err := ElasticBeatsDir()
+func MustUsePackaging(specName, specFile string, cfg *Settings) {
+	beatsDir, err := cfg.ElasticBeatsDir()
 	if err != nil {
 		panic(err)
 	}
@@ -59,7 +52,8 @@ func MustUsePackaging(specName, specFile string) {
 // LoadLocalNamedSpec loads the named package spec from the packages.yml in the
 // current directory.
 func LoadLocalNamedSpec(name string) {
-	beatsDir, err := ElasticBeatsDir()
+	cfg := MustLoadSettings()
+	beatsDir, err := cfg.ElasticBeatsDir()
 	if err != nil {
 		panic(err)
 	}
