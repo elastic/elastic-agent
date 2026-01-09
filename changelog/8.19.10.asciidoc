@@ -1,0 +1,41 @@
+// begin 8.19.10 relnotes
+
+[[release-notes-8.19.10]]
+==  8.19.10
+
+Review important information about the  8.19.10 release.
+
+
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[enhancements-8.19.10]]
+=== Enhancements
+
+
+
+
+* Update OTel Collector components to v0.141.0. https://github.com/elastic/elastic-agent/pull/11671[#11671] 
+
+
+
+
+[discrete]
+[[bug-fixes-8.19.10]]
+=== Bug fixes
+
+
+
+
+* Fix signature verification using the upgrade command with the --source-uri flag for fleet-managed agents. https://github.com/elastic/elastic-agent/pull/11826[#11826] https://github.com/elastic/elastic-agent/issues/11152[#11152]
+* Fix FLEET_TOKEN_POLICY_NAME environment variable for the container command to handle cases where there are more than 20 agent policies available. https://github.com/elastic/elastic-agent/pull/12073[#12073] https://github.com/elastic/elastic-agent/issues/12069[#12069]
+
+// end 8.19.10 relnotes
