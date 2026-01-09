@@ -5,8 +5,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/12135
-        - https://github.com/elastic/elastic-agent/pull/12153
+        - https://github.com/elastic/elastic-agent/pull/10268
       issue: []
       impact: ""
       action: ""
@@ -19,8 +18,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/12135
-        - https://github.com/elastic/elastic-agent/pull/12153
+        - https://github.com/elastic/elastic-agent/pull/11826
       issue:
         - https://github.com/elastic/elastic-agent/issues/11152
       impact: ""
@@ -34,8 +32,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/12135
-        - https://github.com/elastic/elastic-agent/pull/12153
+        - https://github.com/elastic/elastic-agent/pull/11844
       issue: []
       impact: ""
       action: ""
@@ -48,8 +45,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/12135
-        - https://github.com/elastic/elastic-agent/pull/12153
+        - https://github.com/elastic/elastic-agent/pull/12073
       issue:
         - https://github.com/elastic/elastic-agent/issues/12069
       impact: ""
@@ -57,4 +53,18 @@ entries:
       timestamp: 1767391687
       file:
         name: 1767391687-Container-entrypoint-searches-for-policy.yaml
+        checksum: 9d1344a8c23ff9c33be25a147fe43fe5058ebaa2
+    - kind: bug-fix
+      summary: Handle string to []string conversion for elasticsearch config translation.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11732
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/11352
+      impact: ""
+      action: ""
+      timestamp: 1767391687
+      file:
+        name: 1765397848-handle-string-to-slice-string-for-elasticsearch-config-translation
         checksum: 9d1344a8c23ff9c33be25a147fe43fe5058ebaa2
