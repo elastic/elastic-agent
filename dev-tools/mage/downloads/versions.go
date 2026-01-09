@@ -17,11 +17,11 @@ import (
 	"sync"
 	"time"
 
-	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
-
 	"github.com/Jeffail/gabs/v2"
 	"github.com/cenkalti/backoff/v4"
 	"go.elastic.co/apm/v2"
+
+	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 )
 
 // BeatsLocalPath is the path to a local copy of the Beats git repository
@@ -417,19 +417,19 @@ func FetchProjectBinaryForSnapshots(ctx context.Context, useCISnapshots bool, pr
 		elasticAgentNamespace = "beats"
 	}
 
-	// look up the binaries, first checking releases, then artifacts
-	// if a snapshot is requested, check snapshots first
+	// look up the binaries
+	// use the snapshot resolver if the artifact version is a snapshot
+	// otherwise try the release resolver, and then the artifact one
 	var downloadURLResolvers []DownloadURLResolver
-	if strings.HasSuffix(version, devtools.SnapshotSuffix()) {
+	if strings.HasSuffix(version, devtools.SnapshotSuffix) {
 		downloadURLResolvers = []DownloadURLResolver{
 			NewArtifactSnapshotURLResolver(artifactName, artifact, project, version),
 			NewArtifactURLResolver(artifactName, artifact, version),
-			NewReleaseURLResolver(elasticAgentNamespace, artifactName, artifact)}
+		}
 	} else {
 		downloadURLResolvers = []DownloadURLResolver{
 			NewReleaseURLResolver(elasticAgentNamespace, artifactName, artifact),
 			NewArtifactURLResolver(artifactName, artifact, version),
-			NewArtifactSnapshotURLResolver(artifactName, artifact, project, version),
 		}
 	}
 	downloadURL, downloadShaURL, err = getDownloadURLFromResolvers(downloadURLResolvers)
