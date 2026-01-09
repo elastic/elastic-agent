@@ -2825,12 +2825,12 @@ Contents of probable licence file $GOMODCACHE/github.com/oklog/ulid/v2@v2.1.1/LI
 
 
 --------------------------------------------------------------------------------
-Dependency : github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status
-Version: v0.141.0
+Dependency : github.com/swiatekm/opentelemetry-collector-contrib/pkg/status
+Version: v0.0.0-20251215151250-0b5f133ca522
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status@v0.141.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/swiatekm/opentelemetry-collector-contrib/pkg/status@v0.0.0-20251215151250-0b5f133ca522/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004

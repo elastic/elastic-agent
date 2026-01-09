@@ -741,4 +741,6 @@ replace (
 	github.com/google/gopacket => github.com/elastic/gopacket v1.1.20-0.20241002174017-e8c5fda595e6
 	github.com/insomniacslk/dhcp => github.com/elastic/dhcp v0.0.0-20200227161230-57ec251c7eb3 // indirect
 	github.com/meraki/dashboard-api-go/v3 => github.com/tommyers-elastic/dashboard-api-go/v3 v3.0.0-20250616163611-a325b49669a4
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/healthcheck => github.com/swiatekm/opentelemetry-collector-contrib/internal/healthcheck v0.0.0-20251215151250-0b5f133ca522
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status => github.com/swiatekm/opentelemetry-collector-contrib/pkg/status v0.0.0-20251215151250-0b5f133ca522
 )
