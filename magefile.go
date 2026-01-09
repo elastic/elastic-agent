@@ -322,7 +322,7 @@ func GolangCrossBuild(ctx context.Context) error {
 	params.Package = "github.com/elastic/elastic-agent"
 	injectBuildVars(cfg, params.Vars)
 
-	if err := devtools.GolangCrossBuildWith(ctx, cfg, params); err != nil {
+	if err := devtools.GolangCrossBuild(ctx, cfg, params); err != nil {
 		return err
 	}
 
@@ -3503,7 +3503,7 @@ func (Otel) GolangCrossBuild(ctx context.Context) error {
 		}
 	}
 
-	if err := devtools.GolangCrossBuildWith(ctx, cfg, params); err != nil {
+	if err := devtools.GolangCrossBuild(ctx, cfg, params); err != nil {
 		return err
 	}
 
