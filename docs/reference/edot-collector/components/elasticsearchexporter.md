@@ -161,7 +161,7 @@ exporters:
 ### Deprecated batcher configuration
 
 ```{applies_to}
-stack: ga 9.0, deprecated 9.2, removed 9.3
+stack: ga 9.0-9.1, deprecated =9.2, removed 9.3+
 ```
 
 :::{warning}
