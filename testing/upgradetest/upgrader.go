@@ -271,48 +271,52 @@ func PerformUpgrade(
 		endVersion.Less(*version.NewParsedSemVer(8, 12, 0, "", "")) ||
 		startParsedVersion.Less(*version.NewParsedSemVer(8, 10, 0, "", ""))
 
-	if upgradeOpts.preInstallHook != nil {
-		if err := upgradeOpts.preInstallHook(); err != nil {
-			return fmt.Errorf("pre install hook failed: %w", err)
-		}
-	}
-
-	logger.Logf("Installing version %q", startParsedVersion.VersionWithPrerelease())
-
 	// install the start agent
 	var nonInteractiveFlag bool
 	if Version_8_2_0.Less(*startParsedVersion) {
 		nonInteractiveFlag = true
 	}
+
 	installOpts := atesting.InstallOpts{
 		NonInteractive: nonInteractiveFlag,
 		Force:          true,
 		Privileged:     !(*upgradeOpts.unprivileged),
 		InstallServers: upgradeOpts.installServers,
 	}
-	output, err := startFixture.Install(ctx, &installOpts)
-	if err != nil {
-		return fmt.Errorf("failed to install start agent (err: %w) [output: %s]", err, string(output))
-	}
 
-	if upgradeOpts.postInstallHook != nil {
-		if err := upgradeOpts.postInstallHook(); err != nil {
-			return fmt.Errorf("post install hook failed: %w", err)
+	if !upgradeOpts.SkipInstall {
+		if upgradeOpts.preInstallHook != nil {
+			if err := upgradeOpts.preInstallHook(); err != nil {
+				return fmt.Errorf("pre install hook failed: %w", err)
+			}
 		}
-	}
 
-	// wait for the agent to be healthy and correct version
-	err = WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, logger)
-	if err != nil {
-		// context added by WaitHealthyAndVersion
-		return err
-	}
+		logger.Logf("Installing version %q", startParsedVersion.VersionWithPrerelease())
 
-	// validate installation is correct
-	if InstallChecksAllowed(!installOpts.Privileged, startVersion) {
-		err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged})
+		output, err := startFixture.Install(ctx, &installOpts)
 		if err != nil {
-			return fmt.Errorf("pre-upgrade installation checks failed: %w", err)
+			return fmt.Errorf("failed to install start agent (err: %w) [output: %s]", err, string(output))
+		}
+
+		if upgradeOpts.postInstallHook != nil {
+			if err := upgradeOpts.postInstallHook(); err != nil {
+				return fmt.Errorf("post install hook failed: %w", err)
+			}
+		}
+
+		// wait for the agent to be healthy and correct version
+		err = WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, logger)
+		if err != nil {
+			// context added by WaitHealthyAndVersion
+			return err
+		}
+
+		// validate installation is correct
+		if InstallChecksAllowed(!installOpts.Privileged, startVersion) {
+			err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged})
+			if err != nil {
+				return fmt.Errorf("pre-upgrade installation checks failed: %w", err)
+			}
 		}
 	}
 
@@ -392,7 +396,7 @@ func PerformUpgrade(
 	// show the state as UPG_WATCHING.
 	if !upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck {
 		logger.Logf("Checking upgrade details state while Upgrade Watcher is running")
-		if err := waitUpgradeDetailsState(ctx, startFixture, details.StateWatching, 2*time.Minute, 10*time.Second, logger); err != nil {
+		if err := waitUpgradeDetailsState(ctx, startFixture, details.StateWatching, 2*time.Minute, 1*time.Second, logger); err != nil {
 			// error context added by waitUpgradeDetailsState
 			return err
 		}
@@ -606,12 +610,15 @@ func waitUpgradeDetailsState(ctx context.Context, f *atesting.Fixture, expectedS
 		case <-t.C:
 			status, err := f.ExecStatus(ctx)
 			if err != nil && status.IsZero() {
+				logger.Logf("error executing status command: %s", err.Error())
 				lastErr = err
 				continue
 			}
+			actualUpgradeDetails := status.UpgradeDetails
+			logger.Logf("retrieved upgrade details: %+v", actualUpgradeDetails)
 
 			if expectedState == "" {
-				if status.UpgradeDetails == nil {
+				if actualUpgradeDetails == nil {
 					// Expected and actual match, so we're good
 					return nil
 				}
@@ -620,17 +627,17 @@ func waitUpgradeDetailsState(ctx context.Context, f *atesting.Fixture, expectedS
 				continue
 			}
 
-			if status.UpgradeDetails == nil {
+			if actualUpgradeDetails == nil {
 				lastErr = fmt.Errorf("upgrade details not found in status but expected upgrade details state was [%s]", expectedState)
 				continue
 			}
 
 			// Neither expected nor actual are nil, so compare the two
-			if status.UpgradeDetails.State == expectedState {
+			if actualUpgradeDetails.State == expectedState {
 				return nil
 			}
 
-			lastErr = fmt.Errorf("upgrade details state in status [%s] is not the same as expected upgrade details state  [%s]", status.UpgradeDetails.State, expectedState)
+			lastErr = fmt.Errorf("upgrade details state in status [%s] is not the same as expected upgrade details state  [%s]", actualUpgradeDetails.State, expectedState)
 			continue
 		}
 	}
