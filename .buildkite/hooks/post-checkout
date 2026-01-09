@@ -39,6 +39,12 @@ if [[ "${pull_request}" == "false" ]]; then
     exit 0
 fi
 
+if ! git symbolic-ref -q HEAD; then
+    echo "Detached HEAD, skipping"
+    exit 0
+fi
+
+
 TARGET_BRANCH="${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-master}"
 PR_COMMIT="${BUILDKITE_COMMIT}"
 PR_ID=${BUILDKITE_PULL_REQUEST}
