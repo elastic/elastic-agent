@@ -2,11 +2,11 @@
 navigation_title: Profiles collection
 description: Learn how to configure and customize profiles collection through the Elastic Distribution of OpenTelemetry Collector.
 applies_to:
-  stack: preview 9.3+
+  stack: preview 9.2+
   serverless:
     observability:
   product:
-    edot_collector: preview 9.3+
+    edot_collector: preview 9.2+
 products:
   - id: observability
   - id: edot-collector
@@ -44,6 +44,32 @@ You can configure the components to generate and report metrics exclusively from
 
 The following example generates profiling metrics by frame, frame type, and classification:
 
+::::{applies-switch}
+
+:::{applies-item} stack: preview =9.2
+```yaml
+connectors:
+  profilingmetrics:
+    by_frame: true
+    by_frametype: true
+    by_classification: true
+
+receivers:
+  profiling:
+    SamplesPerSecond: 19
+
+service:
+  pipelines:
+    profiles:
+      receivers: [ profiling ]
+      exporters: [ profilingmetrics ]
+    metrics:
+      receivers: [ profilingmetrics ]
+      exporters: [ elasticsearch ]
+```
+:::
+
+:::{applies-item} stack: preview 9.3+
 ```yaml
 connectors:
   profilingmetrics:
@@ -60,6 +86,9 @@ service:
       receivers: [ profilingmetrics ]
       exporters: [ elasticsearch ]
 ```
+:::
+
+::::
 
 ## Kubernetes deployments
 
