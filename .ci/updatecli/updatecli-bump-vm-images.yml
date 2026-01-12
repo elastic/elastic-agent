@@ -5,30 +5,26 @@ pipelineid: 'updatecli-update-vm-images-{{ requiredEnv "BRANCH_NAME" }}'
 
 scms:
   githubConfig:
-    kind: github
+    kind: git
     spec:
+      url: https://github.com/{{ .scm.owner }}/{{ .scm.repository }}.git
       user: '{{ requiredEnv "GITHUB_ACTOR" }}'
       username: '{{ requiredEnv "GITHUB_ACTOR" }}'
-      owner: '{{ .scm.owner }}'
-      repository: '{{ .scm.repository }}'
-      token: '{{ requiredEnv "GITHUB_TOKEN" }}'
-      commitusingapi: true
+      password: '{{ requiredEnv "GITHUB_TOKEN" }}'
       branch: '{{ requiredEnv "BRANCH_NAME" }}'
-      force: false
-      submodule: false
+      submodules: false
 
 actions:
   elastic-agent:
-    kind: github/pullrequest
+    kind: shell
     scmid: githubConfig
-    sourceid: latestGoVersion
     spec:
-      automerge: false
-      labels:
-        - dependencies
-        - backport-skip
-        - skip-changelog
-      title: '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Bump VM Image version to {{ source "latestVersion" }}'
+      command: |
+        gh pr create --fill --label dependencies --label backport-skip --label skip-changelog --title '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Bump VM Image version to {{ source "latestVersion" }}' || gh pr edit --add-label dependencies --add-label backport-skip --add-label skip-changelog
+      environments:
+        - name: GITHUB_TOKEN
+        - name: GH_TOKEN
+          value: '{{ requiredEnv "GITHUB_TOKEN" }}'
 
 sources:
   latestVersion:
