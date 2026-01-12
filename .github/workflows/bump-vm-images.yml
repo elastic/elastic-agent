@@ -42,7 +42,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: true
+          # NOTE: There's no need to checkout the submodules when bumping the vm images
+          submodules: false
           # NOTE: as long as the updatecli bump differs between branches, we need to
           # checkout the branch that we are going to bump that we are going to bump
           # this is needed to ensure that the updatecli bump is done against the correct updatecli
