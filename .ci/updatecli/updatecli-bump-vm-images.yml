@@ -14,6 +14,7 @@ scms:
       token: '{{ requiredEnv "GITHUB_TOKEN" }}'
       commitusingapi: true
       branch: '{{ requiredEnv "BRANCH_NAME" }}'
+      directory: '{{ requiredEnv "GITHUB_WORKSPACE" }}'
       force: false
 
 actions:
