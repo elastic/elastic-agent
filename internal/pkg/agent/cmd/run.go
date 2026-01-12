@@ -353,19 +353,17 @@ func runElasticAgent(
 			errors.M(errors.MetaKeyPath, paths.AgentConfigFile()))
 	}
 
+	// Set the initial log level (either default or from config file)
+	logger.SetLevel(logLvl)
+
 	// Ensure that the log level now matches what is configured in the agentInfo.
-	if agentInfo.LogLevel() != "" {
-		var lvl logp.Level
-		err = lvl.Unpack(agentInfo.LogLevel())
-		if err != nil {
-			l.Error(errors.New(err, "failed to parse agent information log level"))
-		} else {
-			logLvl = lvl
-			logger.SetLevel(lvl)
-		}
+	var lvl logp.Level
+	err = lvl.Unpack(agentInfo.LogLevel())
+	if err != nil {
+		l.Error(errors.New(err, "failed to parse agent information log level"))
 	} else {
-		// Set the initial log level (either default or from config file)
-		logger.SetLevel(logLvl)
+		logLvl = lvl
+		logger.SetLevel(lvl)
 	}
 
 	// initiate agent watcher
