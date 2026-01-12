@@ -42,7 +42,6 @@ conditions:
     name: Check if defined latest version differs
     kind: file
     sourceid: latestVersion
-    scmid: githubConfig
     spec:
       file: .buildkite/pipeline.yml
       matchpattern: 'platform-ingest-elastic-agent-(.+)-{{ source "latestVersion" }}'
