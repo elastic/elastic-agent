@@ -609,7 +609,7 @@ func TestToComponents(t *testing.T) {
 				{
 					InputType:  "endpoint",
 					OutputType: "elasticsearch",
-					ID:         "endpoint-default",
+					ID:         "endpoint",
 					InputSpec: &InputRuntimeSpec{
 						InputType:  "endpoint",
 						BinaryName: "endpoint-security",
@@ -618,7 +618,7 @@ func TestToComponents(t *testing.T) {
 					Err: NewErrInputRuntimeCheckFail("Elastic Defend doesn't support RHEL7 on arm64"),
 					Units: []Unit{
 						{
-							ID:       "endpoint-default",
+							ID:       "endpoint",
 							Type:     client.UnitTypeOutput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{
@@ -626,7 +626,7 @@ func TestToComponents(t *testing.T) {
 							}),
 						},
 						{
-							ID:       "endpoint-default-endpoint-0",
+							ID:       "endpoint-endpoint-0",
 							Type:     client.UnitTypeInput,
 							LogLevel: defaultUnitLogLevel,
 							Config: MustExpectedConfig(map[string]interface{}{

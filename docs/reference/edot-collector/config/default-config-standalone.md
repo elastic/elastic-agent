@@ -185,11 +185,13 @@ The following example configuration files are available for the Gateway mode:
 ::::
 :::::
 
-Use the previous example configuration as a reference when configuring your Gateway Collector or customizing your EDOT Collector configuration.
+Use the previous example configurations as a reference when configuring your Gateway Collector or customizing your EDOT Collector configuration.
 
-### Data collection and processing
+### Data collection
 
-The EDOT Collector in Gateway mode collects data from other Collectors using the OTLP protocol. By default, the sample Gateway configuration listens on port `4317` for gRPC and port `4318` for HTTP.
+The EDOT Collector in Gateway mode collects data from other Collectors using the OTLP protocol. 
+
+By default, the sample Gateway configuration listens on port `4317` for gRPC and port `4318` for HTTP.
 
 ```yaml
 receivers:
@@ -201,29 +203,12 @@ receivers:
         endpoint: 0.0.0.0:4318 # Listen on all interfaces
 ```
 
-The routing connector splits infrastructure metrics from other metrics and routes them to the appropriate Elastic Common Schema pipelines. Other metrics are exported in OTel-native format through the [`elasticsearch`] exporter.
-
-```yaml
-connectors:
-  routing:
-    default_pipelines: [metrics/otel]
-    error_mode: ignore
-    table:
-      - context: metric
-        statement: route() where IsMatch(instrumentation_scope.name, "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver/internal/scraper/*")
-        pipelines: [metrics/infra/ecs, metrics/otel]
-  elasticapm: {}
-```
-
 ### Data processing and transformation
 
 The Gateway configuration includes several processors to transform and optimize the collected data:
 
 ```yaml
 processors:
-  elasticinframetrics:
-    add_system_metrics: true
-    drop_original: true
   attributes/dataset:
     actions:
       - key: event.dataset
@@ -266,12 +251,6 @@ exporters:
     api_key: ${ELASTIC_API_KEY}
     mapping:
       mode: otel
-  elasticsearch/ecs:
-    endpoints:
-      - ${ELASTIC_ENDPOINT}
-    api_key: ${ELASTIC_API_KEY}
-    mapping:
-      mode: ecs
 ```
 
 ### Pipeline configuration
@@ -399,34 +378,6 @@ POST /_security/api_key
 
 The server expects incoming HTTP requests to include an API key with sufficient privileges, using the following header format: `Authorization: ApiKey <base64(id:api_key)>`.
 
-[`attributes`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/attributesprocessor
-[`filelog`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/filelogreceiver
-[`hostmetrics`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/hostmetricsreceiver
-[`elasticsearch`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/elasticsearchexporter
-[`elasticinframetrics`]: https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticinframetricsprocessor
-[`elasticapm` processor]: https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticapmprocessor
-[`elasticapm` connector]: ../components/elasticapmconnector.md
-[`resource`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourceprocessor
-[`resourcedetection`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor
-[`OTLP`]: https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver
-% start:edot-samples-links
-[Logs - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/linux/platformlogs.yml
-[Logs - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/linux/managed_otlp/platformlogs.yml
-[Logs &#124; Metrics - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/linux/platformlogs_hostmetrics.yml
-[Logs &#124; Metrics - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/linux/managed_otlp/platformlogs_hostmetrics.yml
-[Logs &#124; Metrics &#124; App - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/linux/logs_metrics_traces.yml
-[Logs &#124; Metrics &#124; App - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/linux/managed_otlp/logs_metrics_traces.yml
-[Logs - ES (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/windows/platformlogs.yml
-[Logs - OTLP (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/windows/managed_otlp/platformlogs.yml
-[Logs &#124; Metrics - ES (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/windows/platformlogs_hostmetrics.yml
-[Logs &#124; Metrics - OTLP (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/windows/managed_otlp/platformlogs_hostmetrics.yml
-[Logs &#124; Metrics &#124; App - ES (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/windows/logs_metrics_traces.yml
-[Logs &#124; Metrics &#124; App - OTLP (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/windows/managed_otlp/logs_metrics_traces.yml
-
-% end:edot-samples-links
-[Gateway mode]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/heads/main/internal/edot/samples/linux/gateway.yml
-
-
 ### Secure SDK to Collector connection (TLS)
 
 To secure the connection between the {{edot}} SDKs and the EDOT Collector, configure TLS on both ends.
@@ -476,7 +427,7 @@ This encrypts data between SDKs and the Collector over both gRPC and HTTP protoc
 
 ### Secure the connection between the EDOT Collector and Elastic
 
-In addition to securing communication between the {{edot}} SDKs and the `apmconfigextension`, you should secure the connection between the EDOT Collector and {{es}} endpoints.
+After securing communication between the {{edot}} SDKs and the `apmconfigextension`, you should secure the connection between the EDOT Collector and {{es}} endpoints.
 
 The EDOT Collector uses the `elasticsearch/otel` or `elasticsearch/ecs` exporter to send telemetry data to Elastic. Elastic recommends using HTTPS to encrypt the connection and verify the server's certificate.
 
@@ -539,3 +490,30 @@ If you're upgrading EDOT Collector to 9.x but keeping your {{product.elastic-sta
 
 For Gateway mode configurations by Stack version, refer to the [Gateway mode section](#gateway-mode).
 ::::
+
+[`attributes`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/attributesprocessor
+[`filelog`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/filelogreceiver
+[`hostmetrics`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/hostmetricsreceiver
+[`elasticsearch`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/elasticsearchexporter
+[`elasticinframetrics`]: https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticinframetricsprocessor
+[`elasticapm` processor]: https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticapmprocessor
+[`elasticapm` connector]: ../components/elasticapmconnector.md
+[`resource`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourceprocessor
+[`resourcedetection`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor
+[`OTLP`]: https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver
+% start:edot-samples-links
+[Logs - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/linux/platformlogs.yml
+[Logs - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/linux/managed_otlp/platformlogs.yml
+[Logs &#124; Metrics - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/linux/platformlogs_hostmetrics.yml
+[Logs &#124; Metrics - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/linux/managed_otlp/platformlogs_hostmetrics.yml
+[Logs &#124; Metrics &#124; App - ES]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/linux/logs_metrics_traces.yml
+[Logs &#124; Metrics &#124; App - OTLP]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/linux/managed_otlp/logs_metrics_traces.yml
+[Logs - ES (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/windows/platformlogs.yml
+[Logs - OTLP (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/windows/managed_otlp/platformlogs.yml
+[Logs &#124; Metrics - ES (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/windows/platformlogs_hostmetrics.yml
+[Logs &#124; Metrics - OTLP (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/windows/managed_otlp/platformlogs_hostmetrics.yml
+[Logs &#124; Metrics &#124; App - ES (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/windows/logs_metrics_traces.yml
+[Logs &#124; Metrics &#124; App - OTLP (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.3/internal/pkg/otel/samples/windows/managed_otlp/logs_metrics_traces.yml
+
+% end:edot-samples-links
+[Gateway mode]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/heads/main/internal/edot/samples/linux/gateway.yml
