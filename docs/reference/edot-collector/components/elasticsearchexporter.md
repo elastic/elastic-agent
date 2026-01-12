@@ -253,7 +253,7 @@ The following are the main known issues with the {{es}} exporter:
 
 | Issue | Cause | Solution |
 |-------|-------|----------|
-| **version_conflict_engine_exception** | TSDB data streams require unique documents per timestamp. Occurs with OTel mapping mode on {{es}} 8.16+ or ECS mode with system integration streams. | Update to {{es}} version 8.17.6 or higher and the {{es}} exporter version 0.121.0 or higher, or install a custom component template. Remove batch processors to prevent metric splitting. |
+| **version_conflict_engine_exception** | TSDB data streams require unique documents per timestamp. Occurs with OTel mapping mode on {{es}} 8.16+ or ECS mode with system integration streams. | Update to {{es}} version 8.17.6 or later and the {{es}} exporter version 0.124.0 or later, or install a custom component template. Remove batch processors to prevent metric splitting. |
 | **flush failed (400) illegal_argument_exception** | OTel mapping mode, which is default from version 0.122.0, requires {{es}} 8.12 or higher. | Upgrade {{es}} to 8.12 or higher or use alternative mapping modes. |
 
 ## Troubleshooting
