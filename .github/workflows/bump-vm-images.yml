@@ -42,7 +42,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          # NOTE: There's no need to checkout the submodules when bumping the vm images
           submodules: false
           # NOTE: as long as the updatecli bump differs between branches, we need to
           # checkout the branch that we are going to bump that we are going to bump
@@ -50,6 +49,9 @@ jobs:
           # pipeline. For instance, https://github.com/elastic/elastic-agent/pull/8035 was not
           # backported to the short lived branches.
           ref: ${{ matrix.branch }}
+
+      - name: Remove .gitmodules to prevent submodule issues
+        run: rm -f .gitmodules
 
       - uses: elastic/oblt-actions/updatecli/run@v1
         with:
