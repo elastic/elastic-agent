@@ -5,26 +5,29 @@ pipelineid: 'updatecli-update-vm-images-{{ requiredEnv "BRANCH_NAME" }}'
 
 scms:
   githubConfig:
-    kind: git
+    kind: github
     spec:
-      url: https://github.com/{{ .scm.owner }}/{{ .scm.repository }}.git
       user: '{{ requiredEnv "GITHUB_ACTOR" }}'
       username: '{{ requiredEnv "GITHUB_ACTOR" }}'
-      password: '{{ requiredEnv "GITHUB_TOKEN" }}'
+      owner: '{{ .scm.owner }}'
+      repository: '{{ .scm.repository }}'
+      token: '{{ requiredEnv "GITHUB_TOKEN" }}'
+      commitusingapi: true
       branch: '{{ requiredEnv "BRANCH_NAME" }}'
-      submodules: false
+      force: false
 
 actions:
   elastic-agent:
-    kind: shell
+    kind: github/pullrequest
     scmid: githubConfig
+    sourceid: latestVersion
     spec:
-      command: |
-        gh pr create --fill --label dependencies --label backport-skip --label skip-changelog --title '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Bump VM Image version to {{ source "latestVersion" }}' || gh pr edit --add-label dependencies --add-label backport-skip --add-label skip-changelog
-      environments:
-        - name: GITHUB_TOKEN
-        - name: GH_TOKEN
-          value: '{{ requiredEnv "GITHUB_TOKEN" }}'
+      automerge: false
+      labels:
+        - dependencies
+        - backport-skip
+        - skip-changelog
+      title: '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Bump VM Image version to {{ source "latestVersion" }}'
 
 sources:
   latestVersion:
@@ -39,6 +42,7 @@ conditions:
     name: Check if defined latest version differs
     kind: shell
     sourceid: latestVersion
+    scmid: githubConfig
     spec:
       command: 'grep -q -v {{ source "latestVersion" }} .buildkite/pipeline.yml #'
 
