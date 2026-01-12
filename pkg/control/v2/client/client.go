@@ -191,8 +191,8 @@ type DiagnosticComponentResult struct {
 }
 
 type AvailableRollback struct {
-	VersionedHome string    `json:"versioned_home,omitempty" yaml:"versioned_home,omitempty"`
 	Version       string    `json:"version,omitempty" yaml:"version,omitempty"`
+	VersionedHome string    `json:"versioned_home,omitempty" yaml:"versioned_home,omitempty"`
 	ValidUntil    time.Time `json:"valid_until" yaml:"valid_until"`
 }
 
