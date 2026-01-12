@@ -335,11 +335,11 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		switch unit.Type {
 		case client.UnitTypeInput:
 			if receiverStatus != nil {
-				compState.Units[unitKey] = getComponentUnitState(receiverStatus, unit, comp.ID)
+				compState.Units[unitKey] = getComponentUnitState(receiverStatus, unit, &comp)
 			}
 		case client.UnitTypeOutput:
 			if exporterStatus != nil {
-				compState.Units[unitKey] = getComponentUnitState(exporterStatus, unit, comp.ID)
+				compState.Units[unitKey] = getComponentUnitState(exporterStatus, unit, &comp)
 			}
 		}
 	}
@@ -375,7 +375,7 @@ func getComponentStartingState(comp component.Component) runtime.ComponentCompon
 		compState.Units[unitKey] = getComponentUnitState(&status.AggregateStatus{
 			Event:              componentstatus.NewEvent(componentstatus.StatusStarting),
 			ComponentStatusMap: map[string]*status.AggregateStatus{},
-		}, unit, comp.ID)
+		}, unit, &comp)
 	}
 	return runtime.ComponentComponentState{
 		Component: comp,
@@ -414,7 +414,7 @@ func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus, comp component.
 }
 
 // getComponentUnitState extracts component unit state from otel status.
-func getComponentUnitState(otelUnitStatus *status.AggregateStatus, unit component.Unit, componentID string) runtime.ComponentUnitState {
+func getComponentUnitState(otelUnitStatus *status.AggregateStatus, unit component.Unit, comp *component.Component) runtime.ComponentUnitState {
 	topLevelState, topLevelMessage := StateWithMessage(otelUnitStatus)
 
 	if unit.Config == nil || unit.Type == client.UnitTypeOutput {
@@ -477,7 +477,7 @@ func getComponentUnitState(otelUnitStatus *status.AggregateStatus, unit componen
 
 	// get the unit status from input statuses
 	// this can happen for filestream, which is allowed to have a configuration without streams
-	unitInputId := unit.GetInputID(componentID)
+	unitInputId := comp.GetBeatInputIDForUnit(unit.ID)
 	unitStatus, ok := inputStatusMap[unitInputId]
 	if ok {
 		unitState, unitMessage := StateWithMessage(serializablestatus.FromSerializableEvent(unitStatus))

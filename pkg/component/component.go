@@ -188,17 +188,6 @@ type Unit struct {
 	Err error `yaml:"error,omitempty"`
 }
 
-func (u *Unit) GetInputID(componentID string) string {
-	if u.Type == client.UnitTypeOutput {
-		return ""
-	}
-	inputID, found := strings.CutPrefix(fmt.Sprintf("%s-", componentID), u.ID)
-	if !found {
-		return ""
-	}
-	return inputID
-}
-
 // Signed Strongly typed configuration for the signed data
 type Signed struct {
 	Data      string `yaml:"data"`      // Signed base64 encoded json bytes
@@ -367,6 +356,34 @@ func (c *Component) BeatName() string {
 		return c.InputSpec.BeatName()
 	}
 	return ""
+}
+
+// GetBeatInputIDForUnit returns the ID of the corresponding input or module in the beat configuration for the unit.
+// If the unit doesn't run in a beat or isn't an input in the first place, it returns an empty string.
+func (c *Component) GetBeatInputIDForUnit(unitID string) string {
+	if c.BeatName() == "" {
+		return ""
+	}
+	found := false
+	var unit Unit
+	for _, u := range c.Units {
+		if u.ID == unitID {
+			unit = u
+			found = true
+			break
+		}
+	}
+	if !found {
+		return ""
+	}
+	if unit.Type == client.UnitTypeOutput {
+		return ""
+	}
+	inputID, found := strings.CutPrefix(unitID, fmt.Sprintf("%s-", c.ID))
+	if !found {
+		return ""
+	}
+	return inputID
 }
 
 // WorkDirName returns the name of the component's working directory.

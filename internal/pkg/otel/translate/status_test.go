@@ -492,7 +492,17 @@ func TestGetComponentUnitState(t *testing.T) {
 			},
 		},
 	}
-	componentId := "test-component"
+	comp := &component.Component{
+		ID:             "test-component",
+		RuntimeManager: component.OtelRuntimeManager,
+		Units: []component.Unit{
+			unit,
+			{
+				ID:   "output-1",
+				Type: client.UnitTypeOutput,
+			},
+		},
+	}
 
 	tests := []struct {
 		name     string
@@ -547,7 +557,7 @@ func TestGetComponentUnitState(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getComponentUnitState(tt.status, unit, componentId)
+			result := getComponentUnitState(tt.status, unit, comp)
 			assert.Equal(t, tt.expected.State, result.State)
 			assert.Equal(t, tt.expected.Message, result.Message)
 			assert.Equal(t, tt.expected.Payload, result.Payload)
@@ -769,7 +779,17 @@ func TestGetComponentUnitStateWithStreamAttributes(t *testing.T) {
 			},
 		},
 	}
-	componentID := "filestream-default"
+	comp := &component.Component{
+		ID:             "test-component",
+		RuntimeManager: component.OtelRuntimeManager,
+		Units: []component.Unit{
+			unit,
+			{
+				ID:   "output-1",
+				Type: client.UnitTypeOutput,
+			},
+		},
+	}
 
 	tests := []struct {
 		name     string
@@ -949,7 +969,7 @@ func TestGetComponentUnitStateWithStreamAttributes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getComponentUnitState(tt.status, unit, componentID)
+			result := getComponentUnitState(tt.status, unit, comp)
 			assert.Equal(t, tt.expected.State, result.State)
 			assert.Equal(t, tt.expected.Message, result.Message)
 			assert.Equal(t, tt.expected.Payload, result.Payload)
@@ -958,68 +978,58 @@ func TestGetComponentUnitStateWithStreamAttributes(t *testing.T) {
 }
 
 func TestGetComponentUnitStateWithUnitInputStatus(t *testing.T) {
-	// Test the unit status from input attributes path
-	// GetInputID returns: strings.CutPrefix(componentID + "-", unitID)
-	// So with componentID = "test-comp" and unitID = "test", GetInputID returns "-comp-"
-	componentID := "test-comp"
+	// Test the unit aggStatus from input attributes path
+	// This can only happen for filestream, which is allowed to not have streams defined
 	unit := component.Unit{
-		ID:   "test", // This is a prefix of componentID, so GetInputID returns "-comp-"
+		ID:   "filestream-default-filestream-1", // This is what the component package sets as the unit id if there's no stream defined
 		Type: client.UnitTypeInput,
 		Config: &proto.UnitExpectedConfig{
-			Streams: []*proto.Stream{
-				{Id: "stream-1"},
-			},
+			Streams: []*proto.Stream{},
 		},
 	}
-
-	tests := []struct {
-		name     string
-		status   *status.AggregateStatus
-		expected runtime.ComponentUnitState
-	}{
-		{
-			name: "unit status from input attributes overrides stream status computation",
-			status: aggregateStatusWithAttributes(
-				componentstatus.StatusOK,
-				nil,
-				map[string]any{
-					"inputs": map[string]any{
-						"stream-1": map[string]any{
-							"status": "StatusOK",
-							"error":  "",
-						},
-						// This key matches what GetInputID returns: "-comp-"
-						"-comp-": map[string]any{
-							"status": "StatusRecoverableError",
-							"error":  "unit level error",
-						},
-					},
-				},
-			),
-			// Unit status from inputStatusMap takes precedence over stream status computation
-			expected: runtime.ComponentUnitState{
-				State:   client.UnitStateDegraded,
-				Message: "Recoverable: unit level error",
-				Payload: map[string]any{
-					"streams": map[string]map[string]string{
-						"stream-1": {
-							"error":  "",
-							"status": client.UnitStateHealthy.String(),
-						},
-					},
+	comp := &component.Component{
+		ID:             "filestream-default",
+		RuntimeManager: component.OtelRuntimeManager,
+		Units: []component.Unit{
+			unit,
+			{
+				ID:   "output-1",
+				Type: client.UnitTypeOutput,
+			},
+		},
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Command: &component.CommandSpec{
+					Args: []string{"filebeat"},
 				},
 			},
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := getComponentUnitState(tt.status, unit, componentID)
-			assert.Equal(t, tt.expected.State, result.State)
-			assert.Equal(t, tt.expected.Message, result.Message)
-			assert.Equal(t, tt.expected.Payload, result.Payload)
-		})
+	aggStatus := aggregateStatusWithAttributes(
+		componentstatus.StatusOK,
+		nil,
+		map[string]any{
+			"inputs": map[string]any{
+				"filestream-1": map[string]any{
+					"status": "StatusRecoverableError",
+					"error":  "unit level error",
+				},
+			},
+		},
+	)
+
+	expectedState := runtime.ComponentUnitState{
+		State:   client.UnitStateDegraded,
+		Message: "Recoverable: unit level error",
+		Payload: nil,
 	}
+
+	result := getComponentUnitState(aggStatus, unit, comp)
+	assert.Equal(t, expectedState.State, result.State)
+	assert.Equal(t, expectedState.Message, result.Message)
+	assert.Equal(t, expectedState.Payload, result.Payload)
 }
 
 func TestUnitStateFromStreamStatuses(t *testing.T) {
