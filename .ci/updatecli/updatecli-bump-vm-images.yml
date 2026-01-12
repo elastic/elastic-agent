@@ -40,11 +40,13 @@ sources:
 conditions:
   latestVersion-check:
     name: Check if defined latest version differs
-    kind: shell
+    kind: file
     sourceid: latestVersion
     scmid: githubConfig
     spec:
-      command: 'grep -q -v {{ source "latestVersion" }} .buildkite/pipeline.yml #'
+      file: .buildkite/pipeline.yml
+      matchpattern: 'platform-ingest-elastic-agent-(.+)-{{ source "latestVersion" }}'
+    failwhen: true
 
 # NOTE: if you add a new target file, please update the .mergify.yml file
 #       to include the new file for the approval and automatic merge
