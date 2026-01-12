@@ -40,7 +40,7 @@ const (
 
 // newSubprocessExecution creates a new execution which runs the otel collector in a subprocess. A metricsPort or
 // healthCheckPort of 0 will result in a random port being used.
-func newSubprocessExecution(logLevel logp.Level, collectorPath string, uuid string, metricsPort int, healthCheckPort int) (*subprocessExecution, error) {
+func newSubprocessExecution(collectorPath string, uuid string, metricsPort int, healthCheckPort int) (*subprocessExecution, error) {
 	componentType, err := component.NewType(healthCheckExtensionName)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create component type: %w", err)
@@ -51,10 +51,8 @@ func newSubprocessExecution(logLevel logp.Level, collectorPath string, uuid stri
 		collectorPath: collectorPath,
 		collectorArgs: []string{
 			fmt.Sprintf("--%s", OtelSetSupervisedFlagName),
-			fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, logLevel.String()),
 			fmt.Sprintf("--%s=%s", OtelSupervisedMonitoringURLFlagName, monitoring.EDOTMonitoringEndpoint()),
 		},
-		logLevel:                 logLevel,
 		healthCheckExtensionID:   healthCheckExtensionID,
 		collectorMetricsPort:     metricsPort,
 		collectorHealthCheckPort: healthCheckPort,
@@ -62,10 +60,10 @@ func newSubprocessExecution(logLevel logp.Level, collectorPath string, uuid stri
 	}, nil
 }
 
+// subprocessExecution implements collectorExecution by running the collector in a subprocess.
 type subprocessExecution struct {
 	collectorPath            string
 	collectorArgs            []string
-	logLevel                 logp.Level
 	healthCheckExtensionID   string
 	collectorMetricsPort     int
 	collectorHealthCheckPort int
@@ -74,7 +72,22 @@ type subprocessExecution struct {
 
 // startCollector starts a supervised collector and monitors its health. Process exit errors are sent to the
 // processErrCh channel. Other run errors, such as not able to connect to the health endpoint, are sent to the runErrCh channel.
-func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, processErrCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
+func (r *subprocessExecution) startCollector(
+	ctx context.Context,
+	logLevel string,
+	baseLogger *logger.Logger,
+	logger *logger.Logger,
+	cfg *confmap.Conf,
+	processErrCh chan error,
+	statusCh chan *status.AggregateStatus,
+	forceFetchStatusCh chan struct{},
+) (collectorHandle, error) {
+	var lvl logp.Level
+	err := lvl.Unpack(logLevel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack the log level '%s': %w", logLevel, err)
+	}
+
 	if cfg == nil {
 		// configuration is required
 		return nil, errors.New("no configuration provided")
@@ -106,17 +119,21 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 	}
 
 	stdOutLast := newZapLast(baseLogger.Core())
-	stdOut := runtimeLogger.NewLogWriterWithDefaults(stdOutLast, zapcore.Level(r.logLevel))
+	stdOut := runtimeLogger.NewLogWriterWithDefaults(stdOutLast, zapcore.Level(lvl))
 	// info level for stdErr because by default collector writes to stderr
 	stdErrLast := newZapLast(baseLogger.Core())
-	stdErr := runtimeLogger.NewLogWriterWithDefaults(stdErrLast, zapcore.Level(r.logLevel))
+	stdErr := runtimeLogger.NewLogWriterWithDefaults(stdErrLast, zapcore.Level(lvl))
 
 	procCtx, procCtxCancel := context.WithCancel(ctx)
 	env := os.Environ()
 	// Set the environment variable for the collector metrics port. See comment at the constant definition for more information.
 	env = append(env, fmt.Sprintf("%s=%d", componentmonitoring.OtelCollectorMetricsPortEnvVarName, collectorMetricsPort))
+
+	// set collector args
+	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
+
 	processInfo, err := process.Start(r.collectorPath,
-		process.WithArgs(r.collectorArgs),
+		process.WithArgs(collectorArgs),
 		process.WithEnv(env),
 		process.WithCmdOptions(func(c *exec.Cmd) error {
 			c.Stdin = bytes.NewReader(confBytes)

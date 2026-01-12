@@ -54,6 +54,7 @@ const (
 	agentPackageVersionMappedFunc    = "agent_package_version"
 	agentManifestGeneratorMappedFunc = "manifest"
 	snapshotSuffix                   = "snapshot_suffix"
+	SnapshotSuffix                   = "-SNAPSHOT"
 )
 
 // Common settings with defaults derived from files, CWD, and environment.
@@ -120,7 +121,7 @@ var (
 		"substring":                      Substring,
 		agentPackageVersionMappedFunc:    AgentPackageVersion,
 		agentManifestGeneratorMappedFunc: PackageManifest,
-		snapshotSuffix:                   SnapshotSuffix,
+		snapshotSuffix:                   MaybeSnapshotSuffix,
 	}
 )
 
@@ -395,7 +396,9 @@ func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, ful
 	return string(yamlBytes), nil
 }
 
-func SnapshotSuffix() string {
+// MaybeSnapshotSuffix returns the snapshot suffix for the artifact version, or an empty string if the build isn't a
+// snapshot.
+func MaybeSnapshotSuffix() string {
 	return GenerateSnapshotSuffix(Snapshot)
 }
 
@@ -415,7 +418,7 @@ func GenerateSnapshotSuffix(snapshot bool) string {
 		return ""
 	}
 
-	return "-SNAPSHOT"
+	return SnapshotSuffix
 }
 
 var (

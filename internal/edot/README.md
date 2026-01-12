@@ -57,6 +57,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [postgresqlreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/postgresqlreceiver/v0.141.0/receiver/postgresqlreceiver/README.md) | v0.141.0 |
 | [profiling](https://github.com/open-telemetry/opentelemetry-ebpf-profiler/blob/v0.0.202547/README.md) | v0.0.202547 |
 | [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusreceiver/v0.141.0/receiver/prometheusreceiver/README.md) | v0.141.0 |
+| [prometheusremotewritereceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusremotewritereceiver/v0.141.0/receiver/prometheusremotewritereceiver/README.md) | v0.141.0 |
 | [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.141.0/receiver/receivercreator/README.md) | v0.141.0 |
 | [redisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/redisreceiver/v0.141.0/receiver/redisreceiver/README.md) | v0.141.0 |
 | [sqlserverreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/sqlserverreceiver/v0.141.0/receiver/sqlserverreceiver/README.md) | v0.141.0 |
