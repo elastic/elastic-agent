@@ -54,7 +54,6 @@ targets:
   update-buildkite-pipeline:
     name: "Update .buildkite/pipeline.yml"
     sourceid: latestVersion
-    scmid: githubConfig
     kind: file
     spec:
       file: .buildkite/pipeline.yml
@@ -64,7 +63,6 @@ targets:
   update-buildkite-bk.integration.pipeline:
     name: "Update .buildkite/bk.integration.pipeline.yml"
     sourceid: latestVersion
-    scmid: githubConfig
     kind: file
     spec:
       file: .buildkite/bk.integration.pipeline.yml
@@ -74,7 +72,6 @@ targets:
   update-integration.pipeline:
     name: "Update .buildkite/integration.pipeline.yml"
     sourceid: latestVersion
-    scmid: githubConfig
     kind: file
     spec:
       file: .buildkite/integration.pipeline.yml
@@ -84,7 +81,6 @@ targets:
   update-buildkite-bk.integration-fips.pipeline:
     name: "Update .buildkite/bk.integration-fips.pipeline.yml"
     sourceid: latestVersion
-    scmid: githubConfig
     kind: file
     spec:
       file: .buildkite/bk.integration-fips.pipeline.yml
@@ -94,7 +90,6 @@ targets:
   update-buildkite-pipeline.elastic-agent-binary-dra:
     name: "Update .buildkite/pipeline.elastic-agent-binary-dra.yml"
     sourceid: latestVersion
-    scmid: githubConfig
     kind: file
     spec:
       file: .buildkite/pipeline.elastic-agent-binary-dra.yml
@@ -104,7 +99,6 @@ targets:
   update-buildkite-pipeline.elastic-agent-package:
     name: "Update .buildkite/pipeline.elastic-agent-package.yml"
     sourceid: latestVersion
-    scmid: githubConfig
     kind: file
     spec:
       file: .buildkite/pipeline.elastic-agent-package.yml
