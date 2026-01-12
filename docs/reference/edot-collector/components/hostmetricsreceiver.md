@@ -27,7 +27,7 @@ The `hostmetricsreceiver` is included by default in the EDOT Collector for both 
 
 In standalone deployments, the host metrics receiver is part of the default [host metrics collection pipeline](../config/default-config-standalone.md#host-metrics-collection-pipeline). It collects system metrics at 60-second intervals and can be configured to export either:
 
-- Directly to {{es}} using the `elasticsearch` exporter (with optional ECS translation through the `elasticinframetrics` processor).
+- Directly to {{es}} using the `elasticsearch` exporter.
 - To the [{{motlp}}](opentelemetry://reference/motlp.md) using the `otlp` exporter.
 
 ### Kubernetes deployment
@@ -149,7 +149,7 @@ Be aware of these constraints and behaviors when using the host metrics receiver
 
 * **Filesystem scraper requires careful filtering**: Without proper exclusions, the filesystem scraper can collect metrics from hundreds of temporary, virtual, or container-specific mount points, generating unnecessary data. Always configure `exclude_mount_points` and `exclude_fs_types` appropriately.
 
-* **Metric format differs from {{agent}} system integration**: Host metrics collected through OpenTelemetry use different field names and structure compared to {{agent}}'s traditional system integration. The [`elasticinframetrics` processor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticinframetricsprocessor) is required to translate OTel metrics into ECS-compatible format for use with existing Infrastructure dashboards.
+* **Metric format differs from {{agent}} system integration**: Host metrics collected through OpenTelemetry use different field names and structure compared to {{agent}}'s traditional system integration.
 
 ## Resources
 

@@ -11,6 +11,7 @@ toc:
       - file: config/tail-based-sampling.md
       - file: config/authentication-methods.md
       - file: config/configure-profiles-collection.md
+      - file: config/custom-data-streams.md
       - file: components/migrate-components.md
       - file: config/proxy.md
   - file: components.md
@@ -26,6 +27,7 @@ toc:
       - file: components/k8sclusterreceiver.md
       - file: components/k8sobjectsreceiver.md
       - file: components/kubeletstatsreceiver.md
+      - file: components/prometheusremotewritereceiver.md
   - file: customization.md
     children:
       - file: custom-collector.md

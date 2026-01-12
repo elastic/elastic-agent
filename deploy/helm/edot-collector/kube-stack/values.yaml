@@ -116,15 +116,6 @@ collectors:
       receivers:
         # [K8s Events Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8seventsreceiver)
         k8s_events: {}
-        # [K8s Objects Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sobjectsreceiver)
-        # NOTE: The k8sobjects receiver for K8s Events collection is being replaced by the k8s_events receiver, it might be removed in future versions of this configuration
-        k8sobjects:
-          objects:
-            - name: events
-              mode: "watch"
-              group: "events.k8s.io"
-              exclude_watch_type:
-                - "DELETED"
         # [K8s Cluster Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sclusterreceiver)
         k8s_cluster:
           collection_interval: 60s
@@ -164,7 +155,6 @@ collectors:
               - k8s_cluster
           logs:
             receivers:
-              - k8sobjects
               - k8s_events
             processors:
               - resourcedetection/eks
