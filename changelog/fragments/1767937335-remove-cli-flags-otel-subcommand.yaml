@@ -19,10 +19,10 @@ summary: Remove Elastic Agent global CLI flags from `otel` subcommand.
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 description: |
-  The elastic-agent otel subcommand no longer accepts global CLI flags such as `-c`, `--path.home`, `--path.config`, `--path.data`, and `--path.logs`. 
+  The `elastic-agent otel` subcommand no longer accepts global CLI flags that had no effect: `-c`, `--path.home`, `--path.home.unversioned`, `--path.config`, `--path.logs`, `--path.socket` and `--path.downloads`.
 
 # REQUIRED for breaking-change, deprecation, known-issue
-impact: Removal of these flags can result in otel subcommand failure, if they being are used.
+impact: Removal of these flags can result in otel subcommand failure, if they being are used. These flags had no effect on the otel subcommand behavior.
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # action:
