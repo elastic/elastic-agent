@@ -38,6 +38,7 @@ import (
 type Fixture struct {
 	t       *testing.T
 	version string
+	hash    string
 	caller  string
 
 	fetcher         Fetcher
@@ -207,6 +208,19 @@ func (f *Fixture) Version() string {
 	return f.version
 }
 
+// Hash returns the Elastic Agent build commit hash (populated only after the fixture has been prepared/extracted)
+func (f *Fixture) Hash() string {
+	return f.hash
+}
+
+// ShortHash returns the Elastic Agent build commit hash in short form (populated only after the fixture has been prepared/extracted)
+func (f *Fixture) ShortHash() string {
+	if len(f.hash) < 6 {
+		return f.hash
+	}
+	return f.hash[:6]
+}
+
 // Prepare prepares the Elastic Agent for usage.
 //
 // This must be called before `Configure`, `Run`, or `Install` can be called.
@@ -256,6 +270,18 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	}
 	f.extractDir = finalDir
 	f.workDir = finalDir
+
+	// not done for certain types of packages
+	if f.packageFormat != "deb" && f.packageFormat != "rpm" {
+		// collect the hash: it's done by reading the `.build_hash.txt` (the same information can be gathered by the manifest but that involves YAML unmarshalling)
+
+		hashBytes, err := os.ReadFile(filepath.Join(finalDir, ".build_hash.txt"))
+		if err != nil {
+			return fmt.Errorf("reading .build_hash.txt from the extracted archive: %w", err)
+		}
+		f.hash = string(hashBytes)
+	}
+
 	return nil
 }
 
