@@ -33,9 +33,11 @@ import (
 )
 
 const (
-	OtelSetSupervisedFlagName           = "supervised"
-	OtelSupervisedLoggingLevelFlagName  = "supervised.logging.level"
-	OtelSupervisedMonitoringURLFlagName = "supervised.monitoring.url"
+	OtelSetSupervisedFlagName                 = "supervised"
+	OtelSupervisedLoggingLevelFlagName        = "supervised.logging.level"
+	OtelSupervisedMonitoringURLFlagName       = "supervised.monitoring.url"
+	OtelFeatureGateFlagName                   = "feature-gates"
+	OtelElasticsearchExporterTelemetryFeature = "telemetry.newPipelineTelemetry"
 )
 
 // newSubprocessExecution creates a new execution which runs the otel collector in a subprocess. A metricsPort or
@@ -52,6 +54,10 @@ func newSubprocessExecution(collectorPath string, uuid string, metricsPort int, 
 		collectorArgs: []string{
 			fmt.Sprintf("--%s", OtelSetSupervisedFlagName),
 			fmt.Sprintf("--%s=%s", OtelSupervisedMonitoringURLFlagName, monitoring.EDOTMonitoringEndpoint()),
+			// Enable feature gate to report internal telemetry for the Elasticsearch exporter partitioned
+			// partitioned by the exporter instance (e.g. separating the monitoring exporter from general
+			// inputs), matching the behavior of other Collector telemetry metrics like queue state.
+			fmt.Sprintf("--%s=%s", OtelFeatureGateFlagName, OtelElasticsearchExporterTelemetryFeature),
 		},
 		healthCheckExtensionID:   healthCheckExtensionID,
 		collectorMetricsPort:     metricsPort,
