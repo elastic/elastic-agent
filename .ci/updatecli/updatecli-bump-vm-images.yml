@@ -18,16 +18,20 @@ scms:
 
 actions:
   elastic-agent:
-    kind: github/pullrequest
-    scmid: githubConfig
-    sourceid: latestVersion
+    kind: shell
     spec:
-      automerge: false
-      labels:
-        - dependencies
-        - backport-skip
-        - skip-changelog
-      title: '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Bump VM Image version to {{ source "latestVersion" }}'
+      command: |
+        git config user.name "{{ requiredEnv "GITHUB_ACTOR" }}"
+        git config user.email "{{ requiredEnv "GITHUB_ACTOR" }}@users.noreply.github.com"
+        git add -A
+        git commit -m "[{{ requiredEnv "BRANCH_NAME" }}][Automation] Bump VM Image version to {{ source "latestVersion" }}" || echo "No changes to commit"
+        git push origin HEAD
+        gh pr create --fill --label dependencies --label backport-skip --label skip-changelog --title '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Bump VM Image version to {{ source "latestVersion" }}' || gh pr edit --add-label dependencies --add-label backport-skip --add-label skip-changelog || echo "PR creation skipped"
+      environments:
+        - name: PATH
+        - name: GITHUB_TOKEN
+        - name: GH_TOKEN
+          value: '{{ requiredEnv "GITHUB_TOKEN" }}'
 
 sources:
   latestVersion:
