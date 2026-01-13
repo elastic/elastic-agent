@@ -8,7 +8,7 @@ git reset --quiet --hard
 $env:GOTMPDIR = "$env:BUILDKITE_BUILD_CHECKOUT_PATH"
 
 Write-Host "--- Build"
-mage build
+GOEXPERIMENT=nodwarf5 mage build
 
 if ($LASTEXITCODE -ne 0) {
   exit 1
