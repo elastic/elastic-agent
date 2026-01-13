@@ -651,6 +651,14 @@ type Settings struct {
 	// BuildDate is the timestamp when settings were loaded (build started).
 	// Initialized during LoadSettings().
 	BuildDate string
+
+	// packageSpecs holds all package specifications loaded from the packages.yml file.
+	// Initialized during LoadSettings().
+	packageSpecs map[string][]OSPackageArgs
+
+	// Packages holds the selected package specifications for the current build.
+	// This is set by UseElasticAgentPackaging etc.
+	Packages []OSPackageArgs
 }
 
 // DefaultSettings returns a new Settings instance with all default values.
@@ -767,6 +775,10 @@ func (s *Settings) Clone() *Settings {
 	if s.SelectedDockerVariants != nil {
 		clone.SelectedDockerVariants = make([]DockerVariant, len(s.SelectedDockerVariants))
 		copy(clone.SelectedDockerVariants, s.SelectedDockerVariants)
+	}
+	if s.Packages != nil {
+		clone.Packages = make([]OSPackageArgs, len(s.Packages))
+		copy(clone.Packages, s.Packages)
 	}
 	return &clone
 }
@@ -1672,6 +1684,18 @@ func (s *Settings) initBuildVariables() error {
 		return fmt.Errorf("failed to parse flavors: %w", err)
 	}
 
+	// Load package specs from packages.yml
+	pkgSpecFile := filepath.Join(s.ElasticBeatsDir, packageSpecFile)
+	s.packageSpecs, err = LoadSpecs(pkgSpecFile)
+	if err != nil {
+		return fmt.Errorf("failed to load package specs: %w", err)
+	}
+	for _, specName := range expectedSpecNames {
+		if _, ok := s.packageSpecs[specName]; !ok {
+			return fmt.Errorf("missing expected package spec '%s'", specName)
+		}
+	}
+
 	return nil
 }
 
@@ -1837,4 +1861,45 @@ func (s *Settings) IsDockerVariantSelected(docVariant DockerVariant) bool {
 		}
 	}
 	return false
+}
+
+// --- Packaging spec selection ---
+
+const packageSpecFile = "dev-tools/packaging/packages.yml"
+
+var expectedSpecNames = []string{
+	"elastic_agent_core",
+	"elastic_agent_packaging",
+}
+
+// UseElasticAgentCorePackaging selects the elastic_agent_core package spec
+// for building binary packages for an Elastic Agent.
+func (s *Settings) UseElasticAgentCorePackaging() {
+	s.MustSelectPackageSpec("elastic_agent_core")
+}
+
+// UseElasticAgentPackaging selects the elastic_agent_packaging package spec
+// for building packages for an Elastic Agent.
+func (s *Settings) UseElasticAgentPackaging() {
+	s.MustSelectPackageSpec("elastic_agent_packaging")
+}
+
+func (s *Settings) MustSelectPackageSpec(packageSpecName string) {
+	err := s.SelectPackageSpec(packageSpecName)
+	if err != nil {
+		panic(err)
+	}
+}
+
+// SelectPackageSpec selects a package specification by name from the pre-loaded specs.
+// The specs are loaded during Settings initialization from packages.yml.
+func (s *Settings) SelectPackageSpec(name string) error {
+	packages, found := s.packageSpecs[name]
+	if !found {
+		return fmt.Errorf("%v not found in package specs", name)
+	}
+
+	log.Printf("%v package spec selected", name)
+	s.Packages = packages
+	return nil
 }

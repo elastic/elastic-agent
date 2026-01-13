@@ -27,14 +27,14 @@ func Package(ctx context.Context, cfg *Settings) error {
 		return nil
 	}
 
-	if len(Packages) == 0 {
+	if len(cfg.Packages) == 0 {
 		return fmt.Errorf("no package specs are registered. Call " +
 			"UseElasticAgentPackaging or UseElasticAgentCorePackaging first")
 	}
 
 	if mg.Verbose() {
-		debugSelectedPackageSpecsWithPlatform := make([]string, 0, len(Packages))
-		for _, p := range Packages {
+		debugSelectedPackageSpecsWithPlatform := make([]string, 0, len(cfg.Packages))
+		for _, p := range cfg.Packages {
 			debugSelectedPackageSpecsWithPlatform = append(debugSelectedPackageSpecsWithPlatform, fmt.Sprintf("spec %s on %s/%s", p.Spec.Name, p.OS, p.Arch))
 		}
 
@@ -43,7 +43,7 @@ func Package(ctx context.Context, cfg *Settings) error {
 
 	tasks := make(map[string][]interface{})
 	for _, target := range platforms {
-		for _, pkg := range Packages {
+		for _, pkg := range cfg.Packages {
 			if pkg.OS != target.GOOS() || pkg.Arch != "" && pkg.Arch != target.Arch() {
 				continue
 			}

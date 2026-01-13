@@ -579,7 +579,7 @@ func Package(ctx context.Context) error {
 	mg.CtxDeps(ctx, PackageAgentCore)
 
 	// switch to the main package target
-	mage.UseElasticAgentPackaging(cfg)
+	cfg.UseElasticAgentPackaging()
 
 	if cfg.Packaging.PackagingFromManifest {
 		// manifest is not passed into packageAgent below because we want packageAgent to go through the
@@ -602,9 +602,10 @@ func Package(ctx context.Context) error {
 
 // DownloadManifest downloads the provided manifest file into the predefined folder and downloads all components in the manifest.
 func DownloadManifest(ctx context.Context) error {
-	cfg := mage.SettingsFromContext(ctx)
-	// Enforce that we use the correct elastic-agent packaging, to correctly load component dependencies
-	devtools.UseElasticAgentPackaging(cfg)
+	// Load elastic-agent packaging specs to correctly load component dependencies
+	cfg := devtools.SettingsFromContext(ctx)
+	cfg.UseElasticAgentPackaging()
+	ctx = devtools.ContextWithSettings(ctx, cfg)
 	return downloadManifest(ctx, cfg)
 }
 
@@ -628,7 +629,7 @@ func downloadManifest(ctx context.Context, cfg *mage.Settings, filters ...packag
 		return errAtLeastOnePlatform
 	}
 
-	dependencies, err := extractComponentsFromSelectedPkgSpecs(cfg, devtools.Packages)
+	dependencies, err := extractComponentsFromSelectedPkgSpecs(cfg, cfg.Packages)
 	if err != nil {
 		return fmt.Errorf("failed extracting dependencies: %w", err)
 	}
@@ -833,10 +834,9 @@ func PackageAgentCore(ctx context.Context) error {
 	mg.CtxDeps(ctx, Update, Otel.Prepare, Otel.CrossBuild, CrossBuild, Build.WindowsArchiveRootBinary)
 
 	fmt.Println("--- Package elastic-agent-core")
-	devtools.UseElasticAgentCorePackaging(cfg)
-
+	cfg.UseElasticAgentCorePackaging()
 	// ran directly as we don't want mage to cache that it already called devtools.Package
-	return devtools.Package(ctx, devtools.SettingsFromContext(ctx))
+	return devtools.Package(ctx, cfg)
 }
 
 // Config generates both the short/reference/docker.
@@ -1059,7 +1059,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	// docker does not exists for this commit, build it
 	if !strings.Contains(dockerImageOut, tag) {
 		// produce docker package
-		mage.UseElasticAgentPackaging(cfg)
+		cfg.UseElasticAgentPackaging()
 		err = packageAgent(ctx, cfg, "", nil)
 		if err != nil {
 			return fmt.Errorf("failed to package elastic-agent: %w", err)
@@ -1126,7 +1126,7 @@ func packageAgent(ctx context.Context, cfg *mage.Settings, dependenciesVersion s
 	}
 	log.Printf("Packaging with dependenciesVersion: %s", dependenciesVersion)
 
-	dependencies, err := extractComponentsFromSelectedPkgSpecs(cfg, devtools.Packages)
+	dependencies, err := extractComponentsFromSelectedPkgSpecs(cfg, cfg.Packages)
 	if err != nil {
 		return fmt.Errorf("failed extracting dependencies: %w", err)
 	}
@@ -1456,7 +1456,7 @@ func PackageUsingDRA(ctx context.Context) error {
 	}
 
 	// final package build
-	mage.UseElasticAgentPackaging(cfg)
+	cfg.UseElasticAgentPackaging()
 
 	// When MANIFEST_URL is not provided in the environment elastic-agent-core packages from build/distributions
 	// will be used instead of pulling from the manifest.
