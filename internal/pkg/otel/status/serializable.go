@@ -125,6 +125,10 @@ func CompareStatuses(s1, s2 *status.AggregateStatus) bool {
 		}
 	}
 
+	if !s1.Attributes().Equal(s2.Attributes()) {
+		return false
+	}
+
 	if len(s1.ComponentStatusMap) != len(s2.ComponentStatusMap) {
 		return false
 	}

@@ -14,10 +14,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component/componentstatus"
+	"go.opentelemetry.io/collector/pdata/pcommon"
 )
 
 func TestCompareAggregateStatuses(t *testing.T) {
 	timestamp := time.Now()
+	attributes := pcommon.NewMap()
+	attributes.PutStr("key", "value")
+
 	for _, tc := range []struct {
 		name     string
 		s1, s2   *status.AggregateStatus
@@ -27,16 +31,18 @@ func TestCompareAggregateStatuses(t *testing.T) {
 			name: "equal statuses",
 			s1: &status.AggregateStatus{
 				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
+					status:     componentstatus.StatusOK,
+					timestamp:  timestamp,
+					attributes: pcommon.NewMap(),
+					err:        nil,
 				},
 			},
 			s2: &status.AggregateStatus{
 				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
+					status:     componentstatus.StatusOK,
+					timestamp:  timestamp,
+					attributes: pcommon.NewMap(),
+					err:        nil,
 				},
 			},
 			expected: true,
@@ -45,16 +51,18 @@ func TestCompareAggregateStatuses(t *testing.T) {
 			name: "unequal statuses",
 			s1: &status.AggregateStatus{
 				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
+					status:     componentstatus.StatusOK,
+					timestamp:  timestamp,
+					attributes: pcommon.NewMap(),
+					err:        nil,
 				},
 			},
 			s2: &status.AggregateStatus{
 				Event: &healthCheckEvent{
-					status:    componentstatus.StatusPermanentError,
-					timestamp: timestamp,
-					err:       nil,
+					status:     componentstatus.StatusPermanentError,
+					timestamp:  timestamp,
+					attributes: pcommon.NewMap(),
+					err:        nil,
 				},
 			},
 			expected: false,
@@ -63,16 +71,38 @@ func TestCompareAggregateStatuses(t *testing.T) {
 			name: "unequal errors",
 			s1: &status.AggregateStatus{
 				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
+					status:     componentstatus.StatusOK,
+					timestamp:  timestamp,
+					attributes: pcommon.NewMap(),
+					err:        nil,
 				},
 			},
 			s2: &status.AggregateStatus{
 				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       errors.New("error"),
+					status:     componentstatus.StatusOK,
+					timestamp:  timestamp,
+					attributes: pcommon.NewMap(),
+					err:        errors.New("error"),
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "unequal attributes",
+			s1: &status.AggregateStatus{
+				Event: &healthCheckEvent{
+					status:     componentstatus.StatusOK,
+					timestamp:  timestamp,
+					attributes: pcommon.NewMap(),
+					err:        nil,
+				},
+			},
+			s2: &status.AggregateStatus{
+				Event: &healthCheckEvent{
+					status:     componentstatus.StatusOK,
+					timestamp:  timestamp,
+					attributes: attributes,
+					err:        errors.New("error"),
 				},
 			},
 			expected: false,
@@ -81,32 +111,36 @@ func TestCompareAggregateStatuses(t *testing.T) {
 			name: "unequal component statuses",
 			s1: &status.AggregateStatus{
 				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
+					status:     componentstatus.StatusOK,
+					timestamp:  timestamp,
+					attributes: pcommon.NewMap(),
+					err:        nil,
 				},
 				ComponentStatusMap: map[string]*status.AggregateStatus{
 					"component1": {
 						Event: &healthCheckEvent{
-							status:    componentstatus.StatusOK,
-							timestamp: timestamp,
-							err:       nil,
+							status:     componentstatus.StatusOK,
+							timestamp:  timestamp,
+							attributes: pcommon.NewMap(),
+							err:        nil,
 						},
 					},
 				},
 			},
 			s2: &status.AggregateStatus{
 				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
+					status:     componentstatus.StatusOK,
+					timestamp:  timestamp,
+					attributes: pcommon.NewMap(),
+					err:        nil,
 				},
 				ComponentStatusMap: map[string]*status.AggregateStatus{
 					"component1": {
 						Event: &healthCheckEvent{
-							status:    componentstatus.StatusStopped,
-							timestamp: timestamp,
-							err:       nil,
+							status:     componentstatus.StatusStopped,
+							timestamp:  timestamp,
+							attributes: pcommon.NewMap(),
+							err:        nil,
 						},
 					},
 				},
@@ -117,39 +151,44 @@ func TestCompareAggregateStatuses(t *testing.T) {
 			name: "more components",
 			s1: &status.AggregateStatus{
 				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
+					status:     componentstatus.StatusOK,
+					timestamp:  timestamp,
+					attributes: pcommon.NewMap(),
+					err:        nil,
 				},
 				ComponentStatusMap: map[string]*status.AggregateStatus{
 					"component1": {
 						Event: &healthCheckEvent{
-							status:    componentstatus.StatusOK,
-							timestamp: timestamp,
-							err:       nil,
+							status:     componentstatus.StatusOK,
+							timestamp:  timestamp,
+							attributes: pcommon.NewMap(),
+							err:        nil,
 						},
 					},
 					"component2": {
 						Event: &healthCheckEvent{
-							status:    componentstatus.StatusOK,
-							timestamp: timestamp,
-							err:       nil,
+							status:     componentstatus.StatusOK,
+							timestamp:  timestamp,
+							attributes: pcommon.NewMap(),
+							err:        nil,
 						},
 					},
 				},
 			},
 			s2: &status.AggregateStatus{
 				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
+					status:     componentstatus.StatusOK,
+					timestamp:  timestamp,
+					attributes: pcommon.NewMap(),
+					err:        nil,
 				},
 				ComponentStatusMap: map[string]*status.AggregateStatus{
 					"component1": {
 						Event: &healthCheckEvent{
-							status:    componentstatus.StatusOK,
-							timestamp: timestamp,
-							err:       nil,
+							status:     componentstatus.StatusOK,
+							timestamp:  timestamp,
+							attributes: pcommon.NewMap(),
+							err:        nil,
 						},
 					},
 				},
@@ -160,32 +199,36 @@ func TestCompareAggregateStatuses(t *testing.T) {
 			name: "completely different components",
 			s1: &status.AggregateStatus{
 				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
+					status:     componentstatus.StatusOK,
+					timestamp:  timestamp,
+					attributes: pcommon.NewMap(),
+					err:        nil,
 				},
 				ComponentStatusMap: map[string]*status.AggregateStatus{
 					"component1": {
 						Event: &healthCheckEvent{
-							status:    componentstatus.StatusOK,
-							timestamp: timestamp,
-							err:       nil,
+							status:     componentstatus.StatusOK,
+							timestamp:  timestamp,
+							attributes: pcommon.NewMap(),
+							err:        nil,
 						},
 					},
 				},
 			},
 			s2: &status.AggregateStatus{
 				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
+					status:     componentstatus.StatusOK,
+					timestamp:  timestamp,
+					attributes: pcommon.NewMap(),
+					err:        nil,
 				},
 				ComponentStatusMap: map[string]*status.AggregateStatus{
 					"component3": {
 						Event: &healthCheckEvent{
-							status:    componentstatus.StatusOK,
-							timestamp: timestamp,
-							err:       nil,
+							status:     componentstatus.StatusOK,
+							timestamp:  timestamp,
+							attributes: pcommon.NewMap(),
+							err:        nil,
 						},
 					},
 				},
@@ -196,32 +239,36 @@ func TestCompareAggregateStatuses(t *testing.T) {
 			name: "unequal component errors",
 			s1: &status.AggregateStatus{
 				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
+					status:     componentstatus.StatusOK,
+					timestamp:  timestamp,
+					attributes: pcommon.NewMap(),
+					err:        nil,
 				},
 				ComponentStatusMap: map[string]*status.AggregateStatus{
 					"component1": {
 						Event: &healthCheckEvent{
-							status:    componentstatus.StatusOK,
-							timestamp: timestamp,
-							err:       errors.New("error1"),
+							status:     componentstatus.StatusOK,
+							timestamp:  timestamp,
+							attributes: pcommon.NewMap(),
+							err:        errors.New("error1"),
 						},
 					},
 				},
 			},
 			s2: &status.AggregateStatus{
 				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
+					status:     componentstatus.StatusOK,
+					timestamp:  timestamp,
+					attributes: pcommon.NewMap(),
+					err:        nil,
 				},
 				ComponentStatusMap: map[string]*status.AggregateStatus{
 					"component1": {
 						Event: &healthCheckEvent{
-							status:    componentstatus.StatusOK,
-							timestamp: timestamp,
-							err:       errors.New("error2"),
+							status:     componentstatus.StatusOK,
+							timestamp:  timestamp,
+							attributes: pcommon.NewMap(),
+							err:        errors.New("error2"),
 						},
 					},
 				},
@@ -238,9 +285,10 @@ func TestCompareAggregateStatuses(t *testing.T) {
 			name: "one nil",
 			s1: &status.AggregateStatus{
 				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
+					status:     componentstatus.StatusOK,
+					timestamp:  timestamp,
+					attributes: pcommon.NewMap(),
+					err:        nil,
 				},
 			},
 			s2:       nil,
