@@ -16,6 +16,12 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+func Cmd(ctx context.Context, path string, arg ...string) *exec.Cmd {
+	// getCmd never returns an error
+	cmd, _ := getCmd(ctx, path, []string{}, os.Geteuid(), os.Getgid(), arg...)
+	return cmd
+}
+
 func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ...string) (*exec.Cmd, error) {
 	var cmd *exec.Cmd
 	if ctx == nil {

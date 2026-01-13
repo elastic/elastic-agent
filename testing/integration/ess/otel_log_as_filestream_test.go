@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"text/template"
@@ -276,6 +277,13 @@ func StopElasticAgentOtel(t *testing.T, cmd *exec.Cmd, f *fs.LogFile) {
 		t,
 		process.Terminate(cmd.Process),
 		"cannot send terminate signal to Elastic Agent")
+
+	// On Windows cmd.Wait always returns an error: exit status 0xc000013a
+	// and the process is not gracefully terminated, so we ignore those checks.
+	if runtime.GOOS == "windows" {
+		cmd.Wait()
+		return
+	}
 
 	require.NoError(t, cmd.Wait(), "Elastic Agent exited with an error")
 
