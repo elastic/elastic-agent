@@ -20,6 +20,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+<<<<<<< HEAD
+=======
+        # NOTE: no need for submodules here.
+        #with:
+        #  submodules: true
+>>>>>>> 9159bd2c2 (updatecli: no submodules and remove 7.17 filter if using filter-branches (#12168))
 
       - uses: elastic/oblt-actions/updatecli/run@v1
         with:
