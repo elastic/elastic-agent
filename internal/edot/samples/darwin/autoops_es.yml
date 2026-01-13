@@ -5,7 +5,7 @@ receivers:
         # Metrics
         - module: autoops_es
           hosts: ${env:AUTOOPS_ES_URL}
-          period: 30s
+          period: 10s
           metricsets:
             - cat_shards
             - node_stats
