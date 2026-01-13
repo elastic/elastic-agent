@@ -1,0 +1,43 @@
+version: 8.19.10
+entries:
+    - kind: enhancement
+      summary: Update OTel Collector components to v0.141.0.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11671
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1765186217
+      file:
+        name: 1765186217-update-otel-components-to-v0.141.0.yaml
+        checksum: 575b17e1411036b248791e8c6dc18a2b4e23c134
+    - kind: bug-fix
+      summary: Fix signature verification using the upgrade command with the --source-uri flag for fleet-managed agents
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/11826
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/11152
+      impact: ""
+      action: ""
+      timestamp: 1765835845
+      file:
+        name: 1765835845-Allow-use-of---source-uri-flag-when-upgrading-fleet-managed-agents.yaml
+        checksum: 018aa38560d8af20c1d1f45ab209e27ae45fdef4
+    - kind: bug-fix
+      summary: Fix FLEET_TOKEN_POLICY_NAME environment variable for the container command to handle cases where there are more than 20 agent policies available.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12135
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/12069
+      impact: ""
+      action: ""
+      timestamp: 1767391687
+      file:
+        name: 1767391687-Container-entrypoint-searches-for-policy.yaml
+        checksum: 9d1344a8c23ff9c33be25a147fe43fe5058ebaa2
