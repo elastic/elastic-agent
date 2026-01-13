@@ -43,6 +43,7 @@ if [ "$FIPS" != "true" ]; then
   MAGE_TARGETS+=("ironbank")
 fi
 MAGE_TARGETS+=("fixDRADockerArtifacts")
+MAGE_TARGETS+=("helm:package")
 
 # Package and fix the DRA artifacts
 mage "${MAGE_TARGETS[@]}"
