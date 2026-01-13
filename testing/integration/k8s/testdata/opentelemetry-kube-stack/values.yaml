@@ -114,9 +114,9 @@ defaultCRConfig:
   #   otlp:
   #     protocols:
   #       grpc:
-  #         endpoint: ${env:OTEL_K8S_POD_IP}:4317
+  #         endpoint: ${env:MY_POD_IP}:4317
   #       http:
-  #         endpoint: ${env:OTEL_K8S_POD_IP}:4318
+  #         endpoint: ${env:MY_POD_IP}:4318
   # exporters:
   #   otlp:
   #     endpoint: "otel-collector.default:4317"
