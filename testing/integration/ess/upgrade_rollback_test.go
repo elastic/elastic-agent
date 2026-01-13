@@ -20,6 +20,7 @@ import (
 	"github.com/kardianos/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -351,6 +352,7 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 				return fromFixture, toFixture
 			},
 			rollbackTrigger: func(ctx context.Context, t *testing.T, client client.Client, startFixture, endFixture *atesting.Fixture) {
+				assertListRollbacks(ctx, t, startFixture)
 				t.Logf("sending version=%s rollback=%v upgrade to agent", startFixture.Version(), true)
 				retVal, err := client.Upgrade(ctx, startFixture.Version(), true, "", false, false)
 				require.NoError(t, err, "error triggering manual rollback to version %s", startFixture.Version())
@@ -366,6 +368,8 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 				return fromFixture, toFixture
 			},
 			rollbackTrigger: func(ctx context.Context, t *testing.T, client client.Client, startFixture, endFixture *atesting.Fixture) {
+				assertListRollbacks(ctx, t, startFixture)
+
 				// trim -SNAPSHOT at the end of the fixture version as that is reported as a separate flag
 				expectedVersion := endFixture.Version()
 				expectedSnapshot := false
@@ -413,6 +417,24 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 		})
 	}
 
+}
+
+func assertListRollbacks(ctx context.Context, t *testing.T, startFixture *atesting.Fixture) {
+	t.Helper()
+	t.Logf("requesting available rollbacks")
+	cmdOutput, err := startFixture.Exec(ctx, []string{"upgrade", "list-rollbacks", "-o", "yaml"})
+	if assert.NoError(t, err, "error listing available rollbacks") {
+		var rollbacks []client.AvailableRollback
+		err = yaml.Unmarshal(cmdOutput, &rollbacks)
+		if assert.NoError(t, err, "error unmarshalling rollbacks") {
+			if assert.Len(t, rollbacks, 1, "expected one rollback") {
+				assert.Equal(t, rollbacks[0].Version, startFixture.Version, "expected available rollback to start version")
+				assert.Equal(t, rollbacks[0].VersionedHome, filepath.Join("data", fmt.Sprintf("elastic-agent-%s-%s", startFixture.Version(), startFixture.ShortHash())))
+				assert.Greater(t, rollbacks[0].ValidUntil, time.Now(), "expected valid until")
+			}
+
+		}
+	}
 }
 
 func TestCleanupRollbacks(t *testing.T) {
