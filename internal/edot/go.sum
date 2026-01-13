@@ -530,6 +530,10 @@ github.com/elastic/opentelemetry-collector-components/processor/lsmintervalproce
 github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.24.0/go.mod h1:wSZ3EkTt2C5St1Eezd05DZ6H3oAewNkbnQeBR6ukKxY=
 github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.24.0 h1:rUcFsE55tHX7MjZLj+MEvQSaLFmxXa9Rb8LaGMp6fKw=
 github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.24.0/go.mod h1:6g/yGt22LRR0n76vZikZ0UGu0OJ6OmDOxCNCVwzywsA=
+github.com/elastic/opentelemetry-collector-contrib/internal/healthcheck v0.0.0-20260113162120-ad842251e9e4 h1:NO3gUhVEYpseLlsdo04w1hJeiO4UitWUfwGeT9u1hMo=
+github.com/elastic/opentelemetry-collector-contrib/internal/healthcheck v0.0.0-20260113162120-ad842251e9e4/go.mod h1:tF9H8+S/AmPwrkXpa8Qr3QmUDisnukldx3VYisUMWF8=
+github.com/elastic/opentelemetry-collector-contrib/pkg/status v0.0.0-20260113162120-ad842251e9e4 h1:OFbsckvfzIbGr/o3+mwo/irmghM/vSy05MQGe6A4A98=
+github.com/elastic/opentelemetry-collector-contrib/pkg/status v0.0.0-20260113162120-ad842251e9e4/go.mod h1:umNY2+bbiGqUGKdsRMvxRT2e+jJE37EP/C5g/WAKsb8=
 github.com/elastic/opentelemetry-lib v0.27.0 h1:+6WFaynpU0fifa2S3Nys0G8J8OwNWoGFQrCmgWSpn1s=
 github.com/elastic/opentelemetry-lib v0.27.0/go.mod h1:Va/NCTtn9ofZ0lUy3bUg3SYnEbJtLY6rWFgkOsVoKHc=
 github.com/elastic/sarama v1.19.1-0.20251224062803-313637a62841 h1:arI5QqFbuPfR1Ee4lgLUuYT5pCxVMTTQIZnn1q3/6Qs=
@@ -1429,10 +1433,6 @@ github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXl
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
-github.com/swiatekm/opentelemetry-collector-contrib/internal/healthcheck v0.0.0-20251215151250-0b5f133ca522 h1:IoVj2Y8BqXetRzhlEqqrtiMMQTpNkMg+dtR1/ieXnoc=
-github.com/swiatekm/opentelemetry-collector-contrib/internal/healthcheck v0.0.0-20251215151250-0b5f133ca522/go.mod h1:tF9H8+S/AmPwrkXpa8Qr3QmUDisnukldx3VYisUMWF8=
-github.com/swiatekm/opentelemetry-collector-contrib/pkg/status v0.0.0-20251215151250-0b5f133ca522 h1:m5Zq4qBlseHTI65Yus6V23OEo7PFd9Ngg9f0TEMLFuY=
-github.com/swiatekm/opentelemetry-collector-contrib/pkg/status v0.0.0-20251215151250-0b5f133ca522/go.mod h1:umNY2+bbiGqUGKdsRMvxRT2e+jJE37EP/C5g/WAKsb8=
 github.com/teambition/rrule-go v1.8.2 h1:lIjpjvWTj9fFUZCmuoVDrKVOtdiyzbzc93qTmRVe/J8=
 github.com/teambition/rrule-go v1.8.2/go.mod h1:Ieq5AbrKGciP1V//Wq8ktsTXwSwJHDD5mD/wLBGl3p4=
 github.com/testcontainers/testcontainers-go v0.40.0 h1:pSdJYLOVgLE8YdUY2FHQ1Fxu+aMnb6JfVz1mxk7OeMU=

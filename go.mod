@@ -351,8 +351,8 @@ replace (
 replace go.opentelemetry.io/otel/exporters/prometheus => go.opentelemetry.io/otel/exporters/prometheus v0.58.0
 
 replace (
-	github.com/open-telemetry/opentelemetry-collector-contrib/internal/healthcheck => github.com/swiatekm/opentelemetry-collector-contrib/internal/healthcheck v0.0.0-20251215151250-0b5f133ca522
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status => github.com/swiatekm/opentelemetry-collector-contrib/pkg/status v0.0.0-20251215151250-0b5f133ca522
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/healthcheck => github.com/elastic/opentelemetry-collector-contrib/internal/healthcheck v0.0.0-20260113162120-ad842251e9e4
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status => github.com/elastic/opentelemetry-collector-contrib/pkg/status v0.0.0-20260113162120-ad842251e9e4
 )
 
 tool golang.org/x/tools/cmd/deadcode
