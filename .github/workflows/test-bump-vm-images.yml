@@ -1,0 +1,32 @@
+---
+name: test-bump-vm-images
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to test the bump on'
+        required: false
+        default: 'main'
+
+permissions:
+  contents: read
+
+jobs:
+  bump:
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: false
+
+      - uses: elastic/oblt-actions/updatecli/run@v1
+        with:
+          command: apply --config .ci/updatecli/updatecli-bump-vm-images.yml --values .ci/updatecli/values.d/scm.yml --push=false
+          version-file: .updatecli-version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH_NAME: ${{ inputs.branch }}
