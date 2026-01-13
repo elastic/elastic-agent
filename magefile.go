@@ -4207,11 +4207,10 @@ func (h Helm) Package() error {
 
 	// Create a copy with the DRA naming convention
 	// TODO: as soon as we confirm DRA works as expected we will replace the original naming
-	originalName := fmt.Sprintf("elastic-agent-%s.tgz", agentChartVersion)
 	alternativeName := fmt.Sprintf("elastic-agent-helm-chart-%s.tgz", agentChartVersion)
 
-	srcFile := filepath.Join(packagePath, originalName)
-	dstFile := filepath.Join(packagePath, alternativeName)
+	srcFile := packagePath
+	dstFile := filepath.Join(filepath.Dir(packagePath), alternativeName)
 
 	if err := copyFile(srcFile, dstFile); err != nil {
 		return fmt.Errorf("failed to create alternative package name: %w", err)

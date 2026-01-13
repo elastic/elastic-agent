@@ -39,10 +39,10 @@ fi
 
 MAGE_TARGETS=("packageUsingDRA")
 if [ "$FIPS" != "true" ]; then
-  # Build ironbank only on non-FIPS builds
-  MAGE_TARGETS+=("ironbank")
   # Build helm package only on non-FIPS builds
   MAGE_TARGETS+=("helm:package")
+  # Build ironbank only on non-FIPS builds
+  MAGE_TARGETS+=("ironbank")
 fi
 MAGE_TARGETS+=("fixDRADockerArtifacts")
 
