@@ -22,6 +22,11 @@ jobs:
     steps:
     - id: generator
       uses: elastic/oblt-actions/elastic/active-branches@v1
+<<<<<<< HEAD
+=======
+      with:
+        filter-branches: true
+>>>>>>> 9159bd2c2 (updatecli: no submodules and remove 7.17 filter if using filter-branches (#12168))
 
   update-beats:
     permissions:

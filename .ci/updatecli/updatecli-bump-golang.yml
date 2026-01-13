@@ -12,7 +12,13 @@ scms:
       repository: '{{ .scm.repository }}'
       token: '{{ requiredEnv "GITHUB_TOKEN" }}'
       commitusingapi: true
+<<<<<<< HEAD
       branch: main
+=======
+      branch: '{{ .scm.branch }}'
+      force: false
+      submodules: false
+>>>>>>> 9159bd2c2 (updatecli: no submodules and remove 7.17 filter if using filter-branches (#12168))
 
 actions:
   elastic-agent:
