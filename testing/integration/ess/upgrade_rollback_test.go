@@ -352,7 +352,7 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 				return fromFixture, toFixture
 			},
 			rollbackTrigger: func(ctx context.Context, t *testing.T, client client.Client, startFixture, endFixture *atesting.Fixture) {
-				assertListRollbacks(ctx, t, startFixture)
+				assertListRollbacks(ctx, t, startFixture, time.Now().Add(10*time.Minute))
 				t.Logf("sending version=%s rollback=%v upgrade to agent", startFixture.Version(), true)
 				retVal, err := client.Upgrade(ctx, startFixture.Version(), true, "", false, false)
 				require.NoError(t, err, "error triggering manual rollback to version %s", startFixture.Version())
@@ -368,7 +368,7 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 				return fromFixture, toFixture
 			},
 			rollbackTrigger: func(ctx context.Context, t *testing.T, client client.Client, startFixture, endFixture *atesting.Fixture) {
-				assertListRollbacks(ctx, t, startFixture)
+				assertListRollbacks(ctx, t, startFixture, time.Now().Add(9*time.Minute))
 
 				// trim -SNAPSHOT at the end of the fixture version as that is reported as a separate flag
 				expectedVersion := endFixture.Version()
@@ -419,7 +419,7 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 
 }
 
-func assertListRollbacks(ctx context.Context, t *testing.T, startFixture *atesting.Fixture) {
+func assertListRollbacks(ctx context.Context, t *testing.T, startFixture *atesting.Fixture, expectedValidUntil time.Time) {
 	t.Helper()
 	t.Logf("requesting available rollbacks")
 	cmdOutput, err := startFixture.Exec(ctx, []string{"upgrade", "list-rollbacks", "-o", "yaml"})
@@ -430,7 +430,7 @@ func assertListRollbacks(ctx context.Context, t *testing.T, startFixture *atesti
 			if assert.Len(t, rollbacks, 1, "expected one rollback") {
 				assert.Equal(t, rollbacks[0].Version, startFixture.Version, "expected available rollback to start version")
 				assert.Equal(t, rollbacks[0].VersionedHome, filepath.Join("data", fmt.Sprintf("elastic-agent-%s-%s", startFixture.Version(), startFixture.ShortHash())))
-				assert.Greater(t, rollbacks[0].ValidUntil, time.Now(), "expected valid until")
+				assert.WithinDuration(t, expectedValidUntil, rollbacks[0].ValidUntil, 2*time.Minute, "expected valid until")
 			}
 
 		}
