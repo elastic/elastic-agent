@@ -360,6 +360,11 @@ func (c *Component) BeatName() string {
 
 // GetBeatInputIDForUnit returns the ID of the corresponding input or module in the beat configuration for the unit.
 // If the unit doesn't run in a beat or isn't an input in the first place, it returns an empty string.
+// This function is only needed for the special case where an agent input that runs in a beat process doesn't specify
+// streams. Then, the stream name becomes the input id. Reversing this process is necessary when the input runs in
+// a beat receiver and we want to translate status back.
+// The function can be made fully generic with more effort, the scope was narrowed to make the implementation simpler
+// and easier to review.
 func (c *Component) GetBeatInputIDForUnit(unitID string) string {
 	if c.BeatName() == "" {
 		return ""
