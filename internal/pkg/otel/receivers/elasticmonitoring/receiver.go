@@ -12,6 +12,7 @@ import (
 
 	"github.com/elastic/beats/v7/x-pack/otel/otelmap"
 	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/internaltelemetry"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
@@ -85,19 +86,21 @@ func (mr *monitoringReceiver) run() {
 }
 
 func (mr *monitoringReceiver) updateMetrics() {
-	exporterMetrics, err := collectMetrics(mr.runCtx)
+	resourceMetrics, err := internaltelemetry.ReadMetrics(mr.runCtx)
 	if err != nil {
 		// This isn't inherently an error state, internal telemetry could
 		// be manually disabled, but it's not the expected path.
 		mr.logger.Info("couldn't collect metrics", zap.Error(err))
 		return
 	}
+
+	exporterMetrics := convertScopeMetrics(resourceMetrics.ScopeMetrics)
 	for exporter, metrics := range exporterMetrics {
-		mr.sendMetricsEvent(exporter, metrics)
+		mr.sendExporterMetricsEvent(exporter, metrics)
 	}
 }
 
-func (mr *monitoringReceiver) sendMetricsEvent(exporter string, metrics exporterMetrics) {
+func (mr *monitoringReceiver) sendExporterMetricsEvent(exporter string, metrics exporterMetrics) {
 	pLogs := plog.NewLogs()
 	resourceLogs := pLogs.ResourceLogs().AppendEmpty()
 	sourceLogs := resourceLogs.ScopeLogs().AppendEmpty()

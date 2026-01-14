@@ -5,34 +5,57 @@
 package elasticmonitoring
 
 import (
-	"context"
 	"strings"
 
 	"go.opentelemetry.io/otel/sdk/instrumentation"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/internaltelemetry"
 )
 
 // A summary of current metrics values for a particular exporter
 type exporterMetrics struct {
-	queue_size     *int64
-	queue_capacity *int64
+	queueSize     *int64
+	queueCapacity *int64
 
-	sent_log_records   *int64
-	sent_spans         *int64
-	sent_metric_points *int64
+	sentLogs    *int64
+	sentSpans   *int64
+	sentMetrics *int64
 
-	send_failed_log_records   *int64
-	send_failed_spans         *int64
-	send_failed_metric_points *int64
+	failedLogs    *int64
+	failedSpans   *int64
+	failedMetrics *int64
 
-	docs_processed     *int64
-	docs_retried       *int64
-	bulk_request_count *int64
-	flushed_bytes      *int64
+	docsProcessed *int64
+	docsRetried   *int64
+	bulkRequests  *int64
+	flushedBytes  *int64
 }
+
+const (
+	beatsQueueFilledEventsKey   = "beat.stats.libbeat.pipeline.queue.filled.events"
+	beatsQueueMaxEventsKey      = "beat.stats.libbeat.pipeline.queue.max_events"
+	beatsQueueFilledPctKey      = "beat.stats.libbeat.pipeline.queue.filled.pct"
+	beatsOutputEventsAckedKey   = "beat.stats.libbeat.output.events.acked"
+	beatsOutputEventsDroppedKey = "beat.stats.libbeat.output.events.dropped"
+	beatsOutputEventsTotalKey   = "beat.stats.libbeat.output.events.total"
+	beatsOutputEventsFailedKey  = "beat.stats.libbeat.output.events.failed"
+	beatsOutputEventsBatchesKey = "beat.stats.libbeat.output.events.batches"
+	beatsOutputWriteBytesKey    = "beat.stats.libbeat.output.write.bytes"
+
+	otelQueueCapacityKey = "otelcol_exporter_queue_capacity"
+	otelQueueSizeKey     = "otelcol_exporter_queue_size"
+	otelSentLogsKey      = "otelcol_exporter_sent_log_records"
+	otelSentSpansKey     = "otelcol_exporter_sent_spans"
+	otelSentMetricsKey   = "otelcol_exporter_sent_metric_points"
+	otelFailedLogsKey    = "otelcol_exporter_send_failed_log_records"
+	otelFailedSpansKey   = "otelcol_exporter_send_failed_spans"
+	otelFailedMetricsKey = "otelcol_exporter_send_failed_metric_points"
+	otelDocsProcessedKey = "otelcol.elasticsearch.docs.processed"
+	otelDocsRetriedKey   = "otelcol.elasticsearch.docs.retried"
+	otelBulkRequestsKey  = "otelcol.elasticsearch.bulk_requests.count"
+	otelFlushedBytesKey  = "otelcol.elasticsearch.flushed.bytes"
+)
 
 // Add the integer referenced by value, if it isn't nil, to the given
 // referenced sum, initializing the sum if needed.
@@ -56,72 +79,54 @@ func set(target **int64, value *int64) {
 	}
 }
 
-func (em *exporterMetrics) add(m exporterMetrics) {
-	add(&em.queue_size, m.queue_size)
-	set(&em.queue_capacity, m.queue_capacity)
-
-	add(&em.sent_log_records, m.sent_log_records)
-	add(&em.sent_spans, m.sent_spans)
-	add(&em.sent_metric_points, m.sent_metric_points)
-
-	add(&em.send_failed_log_records, m.send_failed_log_records)
-	add(&em.send_failed_spans, m.send_failed_spans)
-	add(&em.send_failed_metric_points, m.send_failed_metric_points)
-
-	add(&em.docs_processed, m.docs_processed)
-	add(&em.docs_retried, m.docs_retried)
-	add(&em.bulk_request_count, m.bulk_request_count)
-	add(&em.flushed_bytes, m.flushed_bytes)
-}
-
 // Add the given metrics as fields on the event, with field names following
 // the legacy schema for Beats metrics.
 func addMetricsToEventFields(em exporterMetrics, event *mapstr.M) {
-	if em.queue_size != nil {
-		_, _ = event.Put("beat.stats.libbeat.pipeline.queue.filled.events", *em.queue_size)
+	if em.queueSize != nil {
+		_, _ = event.Put(beatsQueueFilledEventsKey, *em.queueSize)
 	}
-	if em.queue_capacity != nil {
-		_, _ = event.Put("beat.stats.libbeat.pipeline.queue.max_events", *em.queue_capacity)
+	if em.queueCapacity != nil {
+		_, _ = event.Put(beatsQueueMaxEventsKey, *em.queueCapacity)
 	}
-	if em.queue_size != nil && em.queue_capacity != nil && *em.queue_capacity > 0 {
-		filled := float64(*em.queue_size) / float64(*em.queue_capacity)
-		_, _ = event.Put("beat.stats.libbeat.pipeline.queue.filled.pct", filled)
+	if em.queueSize != nil && em.queueCapacity != nil && *em.queueCapacity > 0 {
+		filled := float64(*em.queueSize) / float64(*em.queueCapacity)
+		_, _ = event.Put(beatsQueueFilledPctKey, filled)
 	}
-	var sent_total int64
-	if em.sent_log_records != nil {
-		sent_total += *em.sent_log_records
+	var sentTotal int64
+	if em.sentLogs != nil {
+		sentTotal += *em.sentLogs
 	}
-	if em.sent_spans != nil {
-		sent_total += *em.sent_spans
+	if em.sentSpans != nil {
+		sentTotal += *em.sentSpans
 	}
-	if em.sent_metric_points != nil {
-		sent_total += *em.sent_spans
+	if em.sentMetrics != nil {
+		sentTotal += *em.sentMetrics
 	}
-	_, _ = event.Put("beat.stats.libbeat.output.events.acked", sent_total)
+	_, _ = event.Put(beatsOutputEventsAckedKey, sentTotal)
 
-	var failed_total int64
-	if em.send_failed_log_records != nil {
-		failed_total += *em.send_failed_log_records
+	var failedTotal int64
+	if em.failedLogs != nil {
+		failedTotal += *em.failedLogs
 	}
-	if em.send_failed_spans != nil {
-		failed_total += *em.send_failed_spans
+	if em.failedSpans != nil {
+		failedTotal += *em.failedSpans
 	}
-	if em.send_failed_metric_points != nil {
-		failed_total += *em.send_failed_metric_points
+	if em.failedMetrics != nil {
+		failedTotal += *em.failedMetrics
 	}
-	_, _ = event.Put("beat.stats.libbeat.output.events.dropped", failed_total)
+	_, _ = event.Put(beatsOutputEventsDroppedKey, failedTotal)
 
-	if em.docs_processed != nil {
-		_, _ = event.Put("beat.stats.libbeat.output.events.total", *em.docs_processed)
+	if em.docsProcessed != nil {
+		_, _ = event.Put(beatsOutputEventsTotalKey, *em.docsProcessed)
 	}
-	if em.docs_retried != nil {
-		_, _ = event.Put("beat.stats.libbeat.output.events.failed", *em.docs_retried)
+	if em.docsRetried != nil {
+		_, _ = event.Put(beatsOutputEventsFailedKey, *em.docsRetried)
 	}
-	if em.bulk_request_count != nil {
-		_, _ = event.Put("beat.stats.libbeat.output.events.batches", *em.bulk_request_count)
+	if em.bulkRequests != nil {
+		_, _ = event.Put(beatsOutputEventsBatchesKey, *em.bulkRequests)
 	}
-	if em.flushed_bytes != nil {
-		_, _ = event.Put("beat.stats.libbeat.output.write.bytes", *em.flushed_bytes)
+	if em.flushedBytes != nil {
+		_, _ = event.Put(beatsOutputWriteBytesKey, *em.flushedBytes)
 	}
 }
 
@@ -129,30 +134,30 @@ func addMetricsToEventFields(em exporterMetrics, event *mapstr.M) {
 // add it to the given metrics struct.
 func addValue(metrics *exporterMetrics, name string, value int64) {
 	switch name {
-	case "otelcol_exporter_queue_size":
-		add(&metrics.queue_size, &value)
-	case "otelcol_exporter_queue_capacity":
-		set(&metrics.queue_capacity, &value)
-	case "otelcol_exporter_sent_log_records":
-		add(&metrics.sent_log_records, &value)
-	case "otelcol_exporter_sent_spans":
-		add(&metrics.sent_spans, &value)
-	case "otelcol_exporter_sent_metric_points":
-		add(&metrics.sent_metric_points, &value)
-	case "otelcol_exporter_send_failed_log_records":
-		add(&metrics.send_failed_log_records, &value)
-	case "otelcol_exporter_send_failed_spans":
-		add(&metrics.send_failed_spans, &value)
-	case "otelcol_exporter_send_failed_metric_points":
-		add(&metrics.send_failed_metric_points, &value)
-	case "otelcol.elasticsearch.docs.processed":
-		add(&metrics.docs_processed, &value)
-	case "otelcol.elasticsearch.docs.retried":
-		add(&metrics.docs_retried, &value)
-	case "otelcol.elasticsearch.bulk_requests.count":
-		add(&metrics.bulk_request_count, &value)
-	case "otelcol.elasticsearch.flushed.bytes":
-		add(&metrics.flushed_bytes, &value)
+	case otelQueueSizeKey:
+		add(&metrics.queueSize, &value)
+	case otelQueueCapacityKey:
+		set(&metrics.queueCapacity, &value)
+	case otelSentLogsKey:
+		add(&metrics.sentLogs, &value)
+	case otelSentSpansKey:
+		add(&metrics.sentSpans, &value)
+	case otelSentMetricsKey:
+		add(&metrics.sentMetrics, &value)
+	case otelFailedLogsKey:
+		add(&metrics.failedLogs, &value)
+	case otelFailedSpansKey:
+		add(&metrics.failedSpans, &value)
+	case otelFailedMetricsKey:
+		add(&metrics.failedMetrics, &value)
+	case otelDocsProcessedKey:
+		add(&metrics.docsProcessed, &value)
+	case otelDocsRetriedKey:
+		add(&metrics.docsRetried, &value)
+	case otelBulkRequestsKey:
+		add(&metrics.bulkRequests, &value)
+	case otelFlushedBytesKey:
+		add(&metrics.flushedBytes, &value)
 	}
 }
 
@@ -191,32 +196,27 @@ func exporterIDForScope(scope instrumentation.Scope) string {
 	return id.AsString()
 }
 
-func collectMetrics(ctx context.Context) (map[string]exporterMetrics, error) {
+func convertScopeMetrics(scopeMetrics []metricdata.ScopeMetrics) map[string]exporterMetrics {
 	const elasticsearchPrefix = "elasticsearch/"
 	const monitoringSuffix = "monitoring"
 	exporters := map[string]exporterMetrics{}
 
-	metrics, err := internaltelemetry.ReadMetrics(ctx)
-	if err != nil {
-		return nil, err
-	}
-	for _, scopeMetrics := range metrics.ScopeMetrics {
-		exporterID := exporterIDForScope(scopeMetrics.Scope)
-		metrics := exporters[exporterID]
+	for _, sm := range scopeMetrics {
+		exporterID := exporterIDForScope(sm.Scope)
+		if !strings.HasPrefix(exporterID, elasticsearchPrefix) {
+			// Only handle metrics corresponding to exporter state we know how
+			// to monitor (just elasticsearch for now)
+			continue
+		}
 
-		for _, met := range scopeMetrics.Metrics {
+		// The same exporter can appear many times in different metrics
+		// blocks and we want to aggregate all of them, so load the existing
+		// values first.
+		metrics := exporters[exporterID]
+		for _, met := range sm.Metrics {
 			addMetric(&metrics, met)
 		}
 		exporters[exporterID] = metrics
 	}
-
-	result := map[string]exporterMetrics{}
-	// Only return entries corresponding to exporter state we know how to
-	// monitor (just elasticsearch for now)
-	for k, v := range exporters {
-		if strings.HasPrefix(k, elasticsearchPrefix) {
-			result[k] = v
-		}
-	}
-	return result, nil
+	return exporters
 }
