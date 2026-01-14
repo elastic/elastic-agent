@@ -41,13 +41,6 @@ func Notice() (err error) {
 	return nil
 }
 
-const (
-	// Paths to the independent go.mod files relative to the repository root.
-	elasticAgentGoModPath         = "."
-	elasticOtelCollectorGoModPath = "./internal/edot"
-	elasticArchiveProxyGoModPath  = "./wrapper/windows/archive-proxy"
-)
-
 // generateNotice generates a generateNotice file with the name outputFilename.
 // see getDependentModules for use of additionalTags.
 func generateNotice(outputFilename string, additionalTags ...string) error {
@@ -62,23 +55,16 @@ func generateNotice(outputFilename string, additionalTags ...string) error {
 		return err
 	}
 
+	goModPaths := []string{".", "./internal/edot", "./wrapper/windows/archive-proxy"}
 	alreadyListedModulesMap := make(map[string]struct{})
-	goListJSONOutput, err := getDependentModules(elasticAgentGoModPath, alreadyListedModulesMap, additionalTags...)
-	if err != nil {
-		return fmt.Errorf("unable to fetch list of dependent modules in '%s': %w", elasticAgentGoModPath, err)
+	goListJSON := []byte{}
+	for _, path := range goModPaths {
+		modulesJSON, err := getDependentModules(path, alreadyListedModulesMap, additionalTags...)
+		if err != nil {
+			return fmt.Errorf("unable to fetch list of dependent modules in '%s': %w", filepath.Join(path, "go.mod"), err)
+		}
+		goListJSON = append(goListJSON, modulesJSON...)
 	}
-
-	// modulesOtel, err := getDependentModules(elasticOtelCollectorGoModPath, additionalTags...)
-	// if err != nil {
-	// 	return fmt.Errorf("unable to fetch list of dependent modules in '%s': %w", elasticOtelCollectorGoModPath, err)
-	// }
-	// modules = append(modules, modulesOtel...)
-
-	modulesArchiveProxy, err := getDependentModules(elasticArchiveProxyGoModPath, alreadyListedModulesMap, additionalTags...)
-	if err != nil {
-		return fmt.Errorf("unable to fetch list of dependent modules in '%s': %w", elasticArchiveProxyGoModPath, err)
-	}
-	goListJSONOutput = append(goListJSONOutput, modulesArchiveProxy...)
 
 	// piping output of the first command to the second
 	// similar to former Makefile implementation
@@ -90,9 +76,6 @@ func generateNotice(outputFilename string, additionalTags ...string) error {
 	// -noticeTemplate dev-tools/notice/NOTICE.txt.tmpl \
 	// -noticeOut {outputFilename} \
 	// -depsOut ""
-	// listCmdArgs := []string{"list", "-m", "-json"}
-	// listCmdArgs = append(listCmdArgs, modules...)
-	// listCmd := exec.Command("go", listCmdArgs...)
 	licDetectCmd := exec.Command("go", "run", "go.elastic.co/go-licence-detector",
 		"-includeIndirect",
 		"-rules", "dev-tools/notice/rules.json",
@@ -106,7 +89,7 @@ func generateNotice(outputFilename string, additionalTags ...string) error {
 	defer w.Close()
 
 	var buf bytes.Buffer
-	licDetectCmd.Stdin = bytes.NewReader(goListJSONOutput)
+	licDetectCmd.Stdin = bytes.NewReader(goListJSON)
 	licDetectCmd.Stderr = &buf
 
 	if err := licDetectCmd.Start(); err != nil {
