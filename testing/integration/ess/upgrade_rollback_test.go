@@ -428,7 +428,7 @@ func assertListRollbacks(ctx context.Context, t *testing.T, startFixture *atesti
 		err = yaml.Unmarshal(cmdOutput, &rollbacks)
 		if assert.NoError(t, err, "error unmarshalling rollbacks") {
 			if assert.Len(t, rollbacks, 1, "expected one rollback") {
-				assert.Equal(t, rollbacks[0].Version, startFixture.Version, "expected available rollback to start version")
+				assert.Equal(t, rollbacks[0].Version, startFixture.Version(), "expected available rollback to start version")
 				assert.Equal(t, rollbacks[0].VersionedHome, filepath.Join("data", fmt.Sprintf("elastic-agent-%s-%s", startFixture.Version(), startFixture.ShortHash())))
 				assert.WithinDuration(t, expectedValidUntil, rollbacks[0].ValidUntil, 2*time.Minute, "expected valid until")
 			}
