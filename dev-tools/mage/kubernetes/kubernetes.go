@@ -125,7 +125,13 @@ func (d *IntegrationTester) Test(dir string, mageTarget string, env map[string]s
 
 	destDir := filepath.Join("/go/src", repo.CanonicalRootImportPath)
 	workDir := filepath.Join(destDir, repo.SubDir)
-	remote, err := NewKubeRemote(kubeConfig, "default", kubernetesClusterName(d.cfg), workDir, destDir, repo.RootDir)
+	// determine the Go version
+	goVersion, err := mage.GoVersion(d.cfg)
+	if err != nil {
+		return fmt.Errorf("failed to determine Go version: %w", err)
+	}
+	insideEnv["GO_VERSION"] = goVersion
+	remote, err := NewKubeRemote(kubeConfig, "default", kubernetesClusterName(d.cfg), goVersion, workDir, destDir, repo.RootDir)
 	if err != nil {
 		return err
 	}
