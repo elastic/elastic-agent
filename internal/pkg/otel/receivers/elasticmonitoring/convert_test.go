@@ -19,8 +19,8 @@ func esExporterScope(exporterID string) instrumentation.Scope {
 	return instrumentation.Scope{
 		Name: "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter",
 		Attributes: attribute.NewSet(
-			attribute.String("otelcol.component.kind", "exporter"),
-			attribute.String("otelcol.component.id", exporterID),
+			attribute.String(otelComponentKindKey, "exporter"),
+			attribute.String(otelComponentIDKey, exporterID),
 		),
 	}
 }
@@ -59,7 +59,7 @@ func TestConvertAllMetrics(t *testing.T) {
 		failedLogs    = int64(4)
 		failedSpans   = int64(5)
 		failedMetrics = int64(6)
-		docsProcessed = int64(7)
+		docsProcessed = int64(100)
 		docsRetried   = int64(8)
 		bulkRequests  = int64(9)
 		flushedBytes  = int64(10)
@@ -101,14 +101,16 @@ func TestConvertAllMetrics(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, float64(queueSize)/float64(queueCapacity), filledPct)
 
+	expectedSent := sentLogs + sentSpans + sentMetrics
 	eventsAcked, err := beatEvent.GetValue(beatsOutputEventsAckedKey)
 	assert.NoError(t, err)
-	assert.Equal(t, sentLogs+sentSpans+sentMetrics, eventsAcked)
+	assert.Equal(t, expectedSent, eventsAcked)
 
 	// Subtlety: what beats calls "dropped", OTel calls "failed."
+	expectedFailed := failedLogs + failedSpans + failedMetrics
 	eventsDropped, err := beatEvent.GetValue(beatsOutputEventsDroppedKey)
 	assert.NoError(t, err)
-	assert.Equal(t, failedLogs+failedSpans+failedMetrics, eventsDropped)
+	assert.Equal(t, expectedFailed, eventsDropped)
 
 	eventsTotal, err := beatEvent.GetValue(beatsOutputEventsTotalKey)
 	assert.NoError(t, err)
@@ -122,4 +124,9 @@ func TestConvertAllMetrics(t *testing.T) {
 	writeBytes, err := beatEvent.GetValue(beatsOutputWriteBytesKey)
 	assert.NoError(t, err)
 	assert.Equal(t, flushedBytes, writeBytes)
+
+	expectedActive := docsProcessed - expectedSent - expectedFailed
+	active, err := beatEvent.GetValue(beatsOutputEventsActiveKey)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedActive, active)
 }

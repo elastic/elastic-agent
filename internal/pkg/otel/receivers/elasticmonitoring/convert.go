@@ -36,9 +36,10 @@ const (
 	beatsQueueFilledEventsKey   = "beat.stats.libbeat.pipeline.queue.filled.events"
 	beatsQueueMaxEventsKey      = "beat.stats.libbeat.pipeline.queue.max_events"
 	beatsQueueFilledPctKey      = "beat.stats.libbeat.pipeline.queue.filled.pct"
+	beatsOutputEventsTotalKey   = "beat.stats.libbeat.output.events.total"
+	beatsOutputEventsActiveKey  = "beat.stats.libbeat.output.events.active"
 	beatsOutputEventsAckedKey   = "beat.stats.libbeat.output.events.acked"
 	beatsOutputEventsDroppedKey = "beat.stats.libbeat.output.events.dropped"
-	beatsOutputEventsTotalKey   = "beat.stats.libbeat.output.events.total"
 	beatsOutputEventsFailedKey  = "beat.stats.libbeat.output.events.failed"
 	beatsOutputEventsBatchesKey = "beat.stats.libbeat.output.events.batches"
 	beatsOutputWriteBytesKey    = "beat.stats.libbeat.output.write.bytes"
@@ -55,6 +56,9 @@ const (
 	otelDocsRetriedKey   = "otelcol.elasticsearch.docs.retried"
 	otelBulkRequestsKey  = "otelcol.elasticsearch.bulk_requests.count"
 	otelFlushedBytesKey  = "otelcol.elasticsearch.flushed.bytes"
+
+	otelComponentIDKey   = "otelcol.component.id"
+	otelComponentKindKey = "otelcol.component.kind"
 )
 
 // Add the integer referenced by value, if it isn't nil, to the given
@@ -76,57 +80,6 @@ func set(target **int64, value *int64) {
 	if value != nil {
 		v := *value
 		*target = &v
-	}
-}
-
-// Add the given metrics as fields on the event, with field names following
-// the legacy schema for Beats metrics.
-func addMetricsToEventFields(em exporterMetrics, event *mapstr.M) {
-	if em.queueSize != nil {
-		_, _ = event.Put(beatsQueueFilledEventsKey, *em.queueSize)
-	}
-	if em.queueCapacity != nil {
-		_, _ = event.Put(beatsQueueMaxEventsKey, *em.queueCapacity)
-	}
-	if em.queueSize != nil && em.queueCapacity != nil && *em.queueCapacity > 0 {
-		filled := float64(*em.queueSize) / float64(*em.queueCapacity)
-		_, _ = event.Put(beatsQueueFilledPctKey, filled)
-	}
-	var sentTotal int64
-	if em.sentLogs != nil {
-		sentTotal += *em.sentLogs
-	}
-	if em.sentSpans != nil {
-		sentTotal += *em.sentSpans
-	}
-	if em.sentMetrics != nil {
-		sentTotal += *em.sentMetrics
-	}
-	_, _ = event.Put(beatsOutputEventsAckedKey, sentTotal)
-
-	var failedTotal int64
-	if em.failedLogs != nil {
-		failedTotal += *em.failedLogs
-	}
-	if em.failedSpans != nil {
-		failedTotal += *em.failedSpans
-	}
-	if em.failedMetrics != nil {
-		failedTotal += *em.failedMetrics
-	}
-	_, _ = event.Put(beatsOutputEventsDroppedKey, failedTotal)
-
-	if em.docsProcessed != nil {
-		_, _ = event.Put(beatsOutputEventsTotalKey, *em.docsProcessed)
-	}
-	if em.docsRetried != nil {
-		_, _ = event.Put(beatsOutputEventsFailedKey, *em.docsRetried)
-	}
-	if em.bulkRequests != nil {
-		_, _ = event.Put(beatsOutputEventsBatchesKey, *em.bulkRequests)
-	}
-	if em.flushedBytes != nil {
-		_, _ = event.Put(beatsOutputWriteBytesKey, *em.flushedBytes)
 	}
 }
 
@@ -184,12 +137,12 @@ func addMetric(metrics *exporterMetrics, met metricdata.Metrics) {
 // Given an internal telemetry scope, return the ID of the corresponding
 // exporter if there is one.
 func exporterIDForScope(scope instrumentation.Scope) string {
-	kind, ok := scope.Attributes.Value("otelcol.component.kind")
+	kind, ok := scope.Attributes.Value(otelComponentKindKey)
 	if !ok || kind.AsString() != "exporter" {
 		// Only exporter components have an exporter ID to return.
 		return ""
 	}
-	id, ok := scope.Attributes.Value("otelcol.component.id")
+	id, ok := scope.Attributes.Value(otelComponentIDKey)
 	if !ok {
 		return ""
 	}
@@ -198,7 +151,6 @@ func exporterIDForScope(scope instrumentation.Scope) string {
 
 func convertScopeMetrics(scopeMetrics []metricdata.ScopeMetrics) map[string]exporterMetrics {
 	const elasticsearchPrefix = "elasticsearch/"
-	const monitoringSuffix = "monitoring"
 	exporters := map[string]exporterMetrics{}
 
 	for _, sm := range scopeMetrics {
@@ -219,4 +171,58 @@ func convertScopeMetrics(scopeMetrics []metricdata.ScopeMetrics) map[string]expo
 		exporters[exporterID] = metrics
 	}
 	return exporters
+}
+
+// Add the given metrics as fields on the event, with field names following
+// the legacy schema for Beats metrics.
+func addMetricsToEventFields(em exporterMetrics, event *mapstr.M) {
+	if em.queueSize != nil {
+		_, _ = event.Put(beatsQueueFilledEventsKey, *em.queueSize)
+	}
+	if em.queueCapacity != nil {
+		_, _ = event.Put(beatsQueueMaxEventsKey, *em.queueCapacity)
+	}
+	if em.queueSize != nil && em.queueCapacity != nil && *em.queueCapacity > 0 {
+		filled := float64(*em.queueSize) / float64(*em.queueCapacity)
+		_, _ = event.Put(beatsQueueFilledPctKey, filled)
+	}
+	var sentTotal int64
+	if em.sentLogs != nil {
+		sentTotal += *em.sentLogs
+	}
+	if em.sentSpans != nil {
+		sentTotal += *em.sentSpans
+	}
+	if em.sentMetrics != nil {
+		sentTotal += *em.sentMetrics
+	}
+	_, _ = event.Put(beatsOutputEventsAckedKey, sentTotal)
+
+	var failedTotal int64
+	if em.failedLogs != nil {
+		failedTotal += *em.failedLogs
+	}
+	if em.failedSpans != nil {
+		failedTotal += *em.failedSpans
+	}
+	if em.failedMetrics != nil {
+		failedTotal += *em.failedMetrics
+	}
+	_, _ = event.Put(beatsOutputEventsDroppedKey, failedTotal)
+
+	if em.docsProcessed != nil {
+		_, _ = event.Put(beatsOutputEventsTotalKey, *em.docsProcessed)
+
+		active := *em.docsProcessed - sentTotal - failedTotal
+		_, _ = event.Put(beatsOutputEventsActiveKey, active)
+	}
+	if em.docsRetried != nil {
+		_, _ = event.Put(beatsOutputEventsFailedKey, *em.docsRetried)
+	}
+	if em.bulkRequests != nil {
+		_, _ = event.Put(beatsOutputEventsBatchesKey, *em.bulkRequests)
+	}
+	if em.flushedBytes != nil {
+		_, _ = event.Put(beatsOutputWriteBytesKey, *em.flushedBytes)
+	}
 }
