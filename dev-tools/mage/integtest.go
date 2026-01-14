@@ -55,9 +55,9 @@ type IntegrationTestSetupStep interface {
 	// when a step is defined as a dependency of a tester.
 	Use(dir string) (bool, error)
 	// Setup sets up the environment for the integration test.
-	Setup(env map[string]string) error
+	Setup(cfg *Settings, env map[string]string) error
 	// Teardown brings down the environment for the integration test.
-	Teardown(env map[string]string) error
+	Teardown(cfg *Settings, env map[string]string) error
 }
 
 // IntegrationTestSteps wraps all the steps and completes the in the order added.
@@ -77,15 +77,11 @@ func (steps IntegrationTestSteps) Setup(cfg *Settings, env map[string]string) er
 		if mg.Verbose() {
 			fmt.Printf("Setup %s...\n", step.Name())
 		}
-		// Pass config to step if it supports ConfigSetter interface.
-		if setter, ok := step.(ConfigSetter); ok {
-			setter.SetConfig(cfg)
-		}
-		if err := step.Setup(env); err != nil {
+		if err := step.Setup(cfg, env); err != nil {
 			prev := i - 1
 			if prev >= 0 {
 				// errors ignored
-				_ = steps.teardownFrom(prev, env)
+				_ = steps.teardownFrom(prev, cfg, env)
 			}
 			return fmt.Errorf("%s setup failed: %w", step.Name(), err)
 		}
@@ -98,17 +94,17 @@ func (steps IntegrationTestSteps) Setup(cfg *Settings, env map[string]string) er
 // In the case a teardown step fails the error is recorded but the
 // previous steps teardown is still called. This guarantees that teardown
 // will always be called for each step.
-func (steps IntegrationTestSteps) Teardown(env map[string]string) error {
-	return steps.teardownFrom(len(steps)-1, env)
+func (steps IntegrationTestSteps) Teardown(cfg *Settings, env map[string]string) error {
+	return steps.teardownFrom(len(steps)-1, cfg, env)
 }
 
-func (steps IntegrationTestSteps) teardownFrom(start int, env map[string]string) error {
+func (steps IntegrationTestSteps) teardownFrom(start int, cfg *Settings, env map[string]string) error {
 	var errs []error
 	for i := start; i >= 0; i-- {
 		if mg.Verbose() {
 			fmt.Printf("Teardown %s...\n", steps[i].Name())
 		}
-		if err := steps[i].Teardown(env); err != nil {
+		if err := steps[i].Teardown(cfg, env); err != nil {
 			errs = append(errs, fmt.Errorf("%s teardown failed: %w", steps[i].Name(), err))
 		}
 	}
@@ -124,17 +120,12 @@ type IntegrationTester interface {
 	// HasRequirements returns an error if requirements are missing.
 	HasRequirements() error
 	// Test performs executing the test inside the environment.
-	Test(dir string, mageTarget string, env map[string]string) error
+	Test(dir string, mageTarget string, cfg *Settings, env map[string]string) error
 	// InsideTest performs the actual test on the inside of environment.
 	InsideTest(test func() error) error
 	// StepRequirements returns the steps this tester requires. These
 	// are always placed before other autodiscover steps.
 	StepRequirements() IntegrationTestSteps
-}
-
-// ConfigSetter is an optional interface that testers can implement to receive config.
-type ConfigSetter interface {
-	SetConfig(cfg *Settings)
 }
 
 // IntegrationRunner performs the running of the integration tests.
@@ -248,11 +239,6 @@ func (r *IntegrationRunner) Test(mageTarget string, test func() error) error {
 		return fmt.Errorf("TEST_ENVIRONMENT is disabled")
 	}
 
-	// Pass config to tester if it supports ConfigSetter interface.
-	if setter, ok := r.tester.(ConfigSetter); ok {
-		setter.SetConfig(r.cfg)
-	}
-
 	// log missing requirements and do nothing
 	err := r.tester.HasRequirements()
 	if err != nil {
@@ -271,7 +257,7 @@ func (r *IntegrationRunner) Test(mageTarget string, test func() error) error {
 			err = recoverErr.(error)
 			if !inTeardown {
 				// ignore errors
-				_ = r.steps.Teardown(r.env)
+				_ = r.steps.Teardown(r.cfg, r.env)
 			}
 		}
 	}()
@@ -280,14 +266,14 @@ func (r *IntegrationRunner) Test(mageTarget string, test func() error) error {
 		fmt.Printf(">> Running testing inside of %s...\n", r.tester.Name())
 	}
 
-	err = r.tester.Test(r.dir, mageTarget, r.env)
+	err = r.tester.Test(r.dir, mageTarget, r.cfg, r.env)
 
 	if mg.Verbose() {
 		fmt.Printf(">> Done running testing inside of %s...\n", r.tester.Name())
 	}
 
 	inTeardown = true
-	if teardownErr := r.steps.Teardown(r.env); teardownErr != nil {
+	if teardownErr := r.steps.Teardown(r.cfg, r.env); teardownErr != nil {
 		if err == nil {
 			// test didn't error, but teardown did
 			err = teardownErr
