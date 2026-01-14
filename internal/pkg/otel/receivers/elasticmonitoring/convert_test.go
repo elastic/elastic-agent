@@ -7,12 +7,13 @@ package elasticmonitoring
 import (
 	"testing"
 
-	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/instrumentation"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+
+	"github.com/elastic/elastic-agent-libs/mapstr"
 )
 
 func esExporterScope(exporterID string) instrumentation.Scope {
