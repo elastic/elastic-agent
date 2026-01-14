@@ -18,14 +18,7 @@ import (
 )
 
 // KindIntegrationTestStep setups a kind environment.
-type KindIntegrationTestStep struct {
-	cfg *devtools.Settings
-}
-
-// SetConfig sets the configuration for the step.
-func (m *KindIntegrationTestStep) SetConfig(cfg *devtools.Settings) {
-	m.cfg = cfg
-}
+type KindIntegrationTestStep struct{}
 
 // Name returns the kind name.
 func (m *KindIntegrationTestStep) Name() string {
@@ -43,7 +36,7 @@ func (m *KindIntegrationTestStep) Use(dir string) (bool, error) {
 // Setup ensures that a kubernetes cluster is up and running.
 //
 // If `KUBECONFIG` is already deinfed in the env then it will do nothing.
-func (m *KindIntegrationTestStep) Setup(env map[string]string) error {
+func (m *KindIntegrationTestStep) Setup(cfg *devtools.Settings, env map[string]string) error {
 
 	envVars := []string{"KUBECONFIG", "KUBE_CONFIG"}
 	for _, envVar := range envVars {
@@ -60,7 +53,7 @@ func (m *KindIntegrationTestStep) Setup(env map[string]string) error {
 		}
 		return nil
 	}
-	clusterName := kubernetesClusterName(m.cfg)
+	clusterName := kubernetesClusterName(cfg)
 	stdOut := io.Discard
 	stdErr := io.Discard
 	if mg.Verbose() {
@@ -89,7 +82,7 @@ func (m *KindIntegrationTestStep) Setup(env map[string]string) error {
 		"--wait",
 		"300s",
 	}
-	kubeVersion := m.cfg.Kubernetes.K8sVersion
+	kubeVersion := cfg.Kubernetes.K8sVersion
 	if kubeVersion != "" {
 		args = append(args, "--image", fmt.Sprintf("kindest/node:%s", kubeVersion))
 	}
@@ -110,7 +103,7 @@ func (m *KindIntegrationTestStep) Setup(env map[string]string) error {
 }
 
 // Teardown destroys the kubernetes cluster.
-func (m *KindIntegrationTestStep) Teardown(env map[string]string) error {
+func (m *KindIntegrationTestStep) Teardown(cfg *devtools.Settings, env map[string]string) error {
 	stdOut := io.Discard
 	stdErr := io.Discard
 	if mg.Verbose() {
@@ -119,7 +112,7 @@ func (m *KindIntegrationTestStep) Teardown(env map[string]string) error {
 	}
 
 	name, created := env["KIND_CLUSTER"]
-	if created && !m.cfg.Kubernetes.KindSkipDelete {
+	if created && !cfg.Kubernetes.KindSkipDelete {
 		_, err := sh.Exec(
 			env,
 			stdOut,

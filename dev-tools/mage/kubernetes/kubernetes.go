@@ -24,14 +24,7 @@ func init() {
 }
 
 // IntegrationTester integration tester
-type IntegrationTester struct {
-	cfg *mage.Settings
-}
-
-// SetConfig sets the configuration for the tester.
-func (d *IntegrationTester) SetConfig(cfg *mage.Settings) {
-	d.cfg = cfg
-}
+type IntegrationTester struct{}
 
 // Name returns kubernetes name.
 func (d *IntegrationTester) Name() string {
@@ -61,7 +54,7 @@ func (d *IntegrationTester) StepRequirements() mage.IntegrationTestSteps {
 }
 
 // Test performs the tests with kubernetes.
-func (d *IntegrationTester) Test(dir string, mageTarget string, env map[string]string) error {
+func (d *IntegrationTester) Test(dir string, mageTarget string, cfg *mage.Settings, env map[string]string) error {
 	stdOut := io.Discard
 	stdErr := io.Discard
 	if mg.Verbose() {
@@ -126,12 +119,12 @@ func (d *IntegrationTester) Test(dir string, mageTarget string, env map[string]s
 	destDir := filepath.Join("/go/src", repo.CanonicalRootImportPath)
 	workDir := filepath.Join(destDir, repo.SubDir)
 	// determine the Go version
-	goVersion, err := mage.GoVersion(d.cfg)
+	goVersion, err := mage.GoVersion(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to determine Go version: %w", err)
 	}
 	insideEnv["GO_VERSION"] = goVersion
-	remote, err := NewKubeRemote(kubeConfig, "default", kubernetesClusterName(d.cfg), goVersion, workDir, destDir, repo.RootDir)
+	remote, err := NewKubeRemote(kubeConfig, "default", kubernetesClusterName(cfg), goVersion, workDir, destDir, repo.RootDir)
 	if err != nil {
 		return err
 	}
