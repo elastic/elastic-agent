@@ -752,13 +752,17 @@ func (f *Fixture) PrepareAgentCommand(ctx context.Context, args []string, opts .
 	}
 
 	// #nosec G204 -- Not so many ways to support variadic arguments to the elastic-agent command :(
-	cmd := process.Cmd(ctx, f.binaryPath(), args...)
-	/* cmd := exec.CommandContext(ctx, f.binaryPath(), args...) */
+	cmd, err := process.Cmd(ctx, f.binaryPath(), args...)
+	if err != nil {
+		return nil, fmt.Errorf("cannot instantiate exec.Cmd: %w", err)
+	}
+
 	for _, o := range opts {
 		if err := o(cmd); err != nil {
 			return nil, fmt.Errorf("error adding opts to Exec: %w", err)
 		}
 	}
+
 	return cmd, nil
 }
 
