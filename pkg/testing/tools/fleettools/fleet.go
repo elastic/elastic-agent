@@ -80,6 +80,15 @@ func DefaultURL(ctx context.Context, client *kibana.Client) (string, error) {
 	return "", errors.New("unable to determine default fleet server URL")
 }
 
+func SwitchAgent(ctx context.Context, client *kibana.Client, agentID string) error {
+	privilegeLevelChangeReq := kibana.AgentPrivilegeLevelChangeRequest{}
+	err := client.AgentPrivilegeLevelChange(ctx, agentID, privilegeLevelChangeReq)
+	if err != nil {
+		return fmt.Errorf("unable to change privilege level for agent with ID [%s]: %w", agentID, err)
+	}
+	return nil
+}
+
 // NewEnrollParams creates a new policy with monitoring logs and metrics,
 // an enrollment token and returns an EnrollParams with the information to enroll
 // an agent. If an error happens, it returns nil and a non-nil error.
