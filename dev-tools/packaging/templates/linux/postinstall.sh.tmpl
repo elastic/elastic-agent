@@ -2,16 +2,25 @@
 
 set -e
 
+PREFIX=""
+if [[ ${RPM_INSTALL_PREFIX:-/} != "/" ]]; then
+    PREFIX=${RPM_INSTALL_PREFIX}
+fi
+
 commit_hash="{{ commit_short }}"
 version_dir="{{agent_package_version}}{{snapshot_suffix}}"
-symlink_dir="/usr/share/elastic-agent/bin"
-symlink="/usr/share/elastic-agent/bin/elastic-agent"
-new_agent_dir="/var/lib/elastic-agent/data/elastic-agent-$version_dir-$commit_hash"
+symlink_dir="${PREFIX}/usr/share/elastic-agent/bin"
+new_agent_dir="${PREFIX}/var/lib/elastic-agent/data/elastic-agent-$version_dir-$commit_hash"
 new_endpoint_component_bin="$new_agent_dir/components/endpoint-security"
 
+symlink="/usr/share/elastic-agent/bin/elastic-agent"
 # delete $symlink if exists
+# check version without a prefix 1st in case of upgrade
 if test -L "$symlink"; then
     echo "found symlink $symlink, unlink"
+    unlink "$symlink"
+elif test -L "${PREFIX}${symlink}"; then
+    echo "found symlink ${PREFIX}${symlink}, unlink"
     unlink "$symlink"
 fi
 
@@ -42,11 +51,28 @@ else
     echo "$SERVICE_NAME is not installed"
 fi
 
-
 # create symlink to the new agent
+symlink="${PREFIX}${symlink}"
 mkdir -p "$symlink_dir"
 echo "create symlink "$symlink" to "$new_agent_dir/elastic-agent""
 ln -s "$new_agent_dir/elastic-agent" "$symlink"
+
+if [[ ${PREFIX} != "" ]]; then
+    echo "Prefix: ${PREFIX} detected, editing service file"
+    # Replace old paths in service file with new ones, use # as delimiter
+    sed -i "s#/etc/elastic-agent/elastic-agent.yml#${PREFIX}/etc/elastic-agent/elastic-agent.yml#g" ${PREFIX}/lib/systemd/system/elastic-agent.service
+    sed -i "s#/usr/bin/elastic-agent#${PREFIX}/usr/bin/elastic-agent#g" ${PREFIX}/lib/systemd/system/elastic-agent.service
+
+    echo "editing elastic-agent wrapper"
+    # Replace paths in wrapper script
+    sed -i "s#/usr/share/elastic-agent/bin/elastic-agent#${PREFIX}/usr/share/elastic-agent/bin/elastic-agent#g" ${PREFIX}/usr/bin/elastic-agent
+    sed -i "s#/var/lib/elastic-agent#${PREFIX}/var/lib/elastic-agent#g" ${PREFIX}/usr/bin/elastic-agent
+    sed -i "s#/etc/elastic-agent#${PREFIX}/etc/elastic-agent#g" ${PREFIX}/usr/bin/elastic-agent
+    # TODO Do we need to change paths.logs?
+
+    echo "link ${PREFIX}/lib/systemd/system/elastic-agent.service to /lib/systemd/system/elastic-agent.service"
+    ln -s ${PREFIX}/lib/systemd/system/elastic-agent.service /lib/systemd/system/elastic-agent.service
+fi
 
 $new_agent_dir/elastic-agent apply-flavor
 

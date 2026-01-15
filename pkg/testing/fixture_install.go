@@ -111,7 +111,7 @@ func (f FleetBootstrapOpts) toCmdArgs() []string {
 
 // InstallOpts specifies the options for the install command
 type InstallOpts struct {
-	BasePath       string // --base-path
+	BasePath       string // --base-path or --prefix for RPM installs
 	Force          bool   // --force
 	Insecure       bool   // --insecure
 	NonInteractive bool   // --non-interactive
@@ -584,8 +584,13 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 		return nil, fmt.Errorf("failed to prepare: %w", err)
 	}
 
+	installArgs := []string{"-E", "rpm", "-i", "-v"}
+	if installOpts.BasePath != "" {
+		installArgs = append(installArgs, "--prefix", installOpts.BasePath)
+	}
+	installArgs = append(installArgs, f.srcPackage)
 	// sudo rpm -iv elastic-agent rpm
-	cmd := exec.CommandContext(ctx, "sudo", "-E", "rpm", "-i", "-v", f.srcPackage) // #nosec G204 -- Need to pass in name of package
+	cmd := exec.CommandContext(ctx, "sudo", installArgs...) // #nosec G204 -- Need to pass in name of package
 	if installOpts.InstallServers {
 		cmd.Env = append(cmd.Env, "ELASTIC_AGENT_FLAVOR=servers")
 	}

@@ -2,6 +2,11 @@
 
 set -e
 
+PREFIX=""
+if [[ ${RPM_INSTALL_PREFIX:-/} != "/" ]]; then
+    PREFIX=${RPM_INSTALL_PREFIX}
+fi
+
 # we need to stop the agent to have all components stopped as well
 if systemctl --quiet is-active elastic-agent; then
   echo "elastic-agent is running, stopping it"
@@ -39,10 +44,18 @@ fi
 
 commit_hash="{{ commit_short }}"
 version_dir="{{agent_package_version}}{{snapshot_suffix}}"
-symlink="/usr/share/elastic-agent/bin/elastic-agent"
-flavor_file="/var/lib/elastic-agent/.flavor"
-new_agent_dir="/var/lib/elastic-agent/data/elastic-agent-$version_dir-$commit_hash"
+flavor_file="${PREFIX}/var/lib/elastic-agent/.flavor"
+new_agent_dir="${PREFIX}/var/lib/elastic-agent/data/elastic-agent-$version_dir-$commit_hash"
 old_agent_dir=""
+
+symlink="/usr/share/elastic-agent/bin/elastic-agent"
+if test -L "$symlink"; then
+    # Existing symlink is not prefix aware, nop
+    :
+elif test -L "${PREFIX}${symlink}"; then
+    # Existing symlink is prefix aware
+    symlink="${PREFIX}${symlink}"
+fi
 
 # upon upgrade we migrate the current symlink to an upgrade symlink as the previous
 # installed version will remove the symlink

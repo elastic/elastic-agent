@@ -2,7 +2,11 @@
 
 set -e
 
-symlink="/usr/share/elastic-agent/bin/elastic-agent"
+PREFIX=""
+if [[ ${RPM_INSTALL_PREFIX:-/} != "/" ]]; then
+    PREFIX=${RPM_INSTALL_PREFIX}
+fi
+symlink="${PREFIX}/usr/share/elastic-agent/bin/elastic-agent"
 
 case "$1" in
   purge)
@@ -24,6 +28,13 @@ case "$1" in
   *)
     ;;
 esac
+
+if [[ ${PREFIX} != "" ]]; then
+    if test -L /lib/systemd/system/elastic-agent.service; then
+        echo "Found elastic-agent.service link, unlink"
+        unlink /lib/systemd/system/elastic-agent.service
+    fi
+fi
 
 echo "systemd daemon-reload"
 systemctl daemon-reload 2> /dev/null
