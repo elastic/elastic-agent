@@ -495,11 +495,25 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 	}
 }
 
+// exporterIDToOutputNameLookup compiles the mapping from raw collector
+// exporter IDs to the policy output names that generated them, so internal
+// telemetry monitoring can associate metrics with the user-defined name.
+func exporterIDToOutputNameLookup() (map[string]string, error) {
+	exporterType, err := translate.OutputTypeToExporterType(comp.OutputType)
+	if err != nil {
+		return nil, err
+	}
+	exporterID := translate.GetExporterID(exporterType, comp.OutputName)
+
+}
+
 func injectMonitoringReceiver(
 	config *confmap.Conf,
 	monitoring *monitoringCfg.MonitoringConfig,
 	agentInfo info.Agent,
+	components []component.Component,
 ) error {
+
 	receiverType := otelcomponent.MustNewType(elasticmonitoringreceiver.Name)
 	receiverName := "collector/internal-telemetry-monitoring"
 	receiverID := translate.GetReceiverID(receiverType, receiverName).String()

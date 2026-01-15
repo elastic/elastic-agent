@@ -1479,7 +1479,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 		name                  string
 		unit                  component.Unit
 		exporterType          otelcomponent.Type
-		inputType             string
+		outputName            string
 		expectedExportersCfg  map[string]any
 		expectedQueueSettings map[string]any
 		expectedExtensionCfg  map[string]any
@@ -1489,7 +1489,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 			name:          "error on input unit type",
 			unit:          component.Unit{ID: "input-unit", Type: client.UnitTypeInput},
 			exporterType:  esExporterType,
-			inputType:     "filestream",
+			outputName:    "default",
 			expectedError: "unit type is an input, expected output",
 		},
 		{
@@ -1500,7 +1500,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 				Config: component.MustExpectedConfig(map[string]any{"type": "elasticsearch"}),
 			},
 			exporterType:  unsupportedExporterType,
-			inputType:     "filestream",
+			outputName:    "default",
 			expectedError: "no config translation function for exporter type: unsupported",
 		},
 		{
@@ -1511,7 +1511,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 				Config: component.MustExpectedConfig(map[string]any{"unsupported": true}),
 			},
 			exporterType:  esExporterType,
-			inputType:     "filestream",
+			outputName:    "default",
 			expectedError: "unsupported config",
 		},
 		{
@@ -1522,7 +1522,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 				Config: component.MustExpectedConfig(map[string]any{"hosts": []any{"es:9200"}}),
 			},
 			exporterType: esExporterType,
-			inputType:    "filestream",
+			outputName:   "default",
 			expectedExportersCfg: map[string]any{
 				"elasticsearch/_agent-component/default": map[string]any{
 					"hosts":      []interface{}{"es:9200"},
@@ -1553,7 +1553,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 				}),
 			},
 			exporterType: esExporterType,
-			inputType:    "filestream",
+			outputName:   "default",
 			expectedExportersCfg: map[string]any{
 				"elasticsearch/_agent-component/default": map[string]any{
 					"hosts":      []interface{}{"es:9200"},
@@ -1587,7 +1587,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 				}),
 			},
 			exporterType: esExporterType,
-			inputType:    "filestream",
+			outputName:   "default",
 			expectedExportersCfg: map[string]any{
 				"elasticsearch/_agent-component/default": map[string]any{
 					"hosts":      []any{}, // from override
@@ -1624,7 +1624,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 				}),
 			},
 			exporterType: esExporterType,
-			inputType:    "filestream",
+			outputName:   "default",
 			expectedExportersCfg: map[string]any{
 				"elasticsearch/_agent-component/default": map[string]any{
 					"hosts":      []interface{}{"es:9200"},
@@ -1648,7 +1648,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			exportersCfg, queueSettings, extensionCfg, err := unitToExporterConfig(tt.unit, tt.exporterType, tt.inputType, logger)
+			exportersCfg, queueSettings, extensionCfg, err := unitToExporterConfig(tt.unit, tt.outputName, tt.exporterType, logger)
 
 			if tt.expectedError != "" {
 				require.Error(t, err)
