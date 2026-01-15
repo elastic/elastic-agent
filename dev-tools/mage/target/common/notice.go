@@ -158,7 +158,7 @@ func generateNotice(outputFilename string, additionalTags ...string) error {
 // output by "go list -m -json". If additionalTags are specified, only files
 // that would be compiled with those build tags + "linux,darwin,windows" are examined.
 func getDependentModules(goModPath string, alreadyListedModulesMap map[string]struct{}, additionalTags ...string) ([]byte, error) {
-	tags := append([]string{"linux", "darwin", "windows"}, additionalTags...)
+	tags := append([]string{"linux", "darwin", "windows", "amd64", "arm64"}, additionalTags...)
 
 	listDepsArgs := []string{
 		"list",
