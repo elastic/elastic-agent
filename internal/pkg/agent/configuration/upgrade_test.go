@@ -28,7 +28,8 @@ func TestParseUpgradeConfig(t *testing.T) {
 					},
 				},
 				Rollback: &UpgradeRollbackConfig{
-					Window: defaultRollbackWindowDuration,
+					Window:          defaultRollbackWindowDuration,
+					CleanupInterval: defaultRollbackCleanupInterval,
 				},
 			},
 		},
@@ -46,7 +47,8 @@ func TestParseUpgradeConfig(t *testing.T) {
 					},
 				},
 				Rollback: &UpgradeRollbackConfig{
-					Window: defaultRollbackWindowDuration,
+					Window:          defaultRollbackWindowDuration,
+					CleanupInterval: defaultRollbackCleanupInterval,
 				},
 			},
 		},
@@ -66,7 +68,8 @@ func TestParseUpgradeConfig(t *testing.T) {
 					},
 				},
 				Rollback: &UpgradeRollbackConfig{
-					Window: defaultRollbackWindowDuration,
+					Window:          defaultRollbackWindowDuration,
+					CleanupInterval: defaultRollbackCleanupInterval,
 				},
 			},
 		},
@@ -82,7 +85,25 @@ func TestParseUpgradeConfig(t *testing.T) {
 					},
 				},
 				Rollback: &UpgradeRollbackConfig{
-					Window: 8 * time.Hour,
+					Window:          8 * time.Hour,
+					CleanupInterval: defaultRollbackCleanupInterval,
+				},
+			},
+		},
+		"cleanup_interval": {
+			cfg: map[string]any{
+				"rollback.cleanup_interval": "1m",
+			},
+			expected: UpgradeConfig{
+				Watcher: &UpgradeWatcherConfig{
+					GracePeriod: defaultGracePeriodDuration,
+					ErrorCheck: UpgradeWatcherCheckConfig{
+						Interval: defaultStatusCheckInterval,
+					},
+				},
+				Rollback: &UpgradeRollbackConfig{
+					Window:          defaultRollbackWindowDuration,
+					CleanupInterval: 1 * time.Minute,
 				},
 			},
 		},
