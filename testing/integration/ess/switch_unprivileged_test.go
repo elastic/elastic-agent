@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v5"
+	"github.com/gofrs/uuid/v5"
 	"github.com/schollz/progressbar/v3"
 	"github.com/stretchr/testify/require"
 
@@ -26,6 +27,7 @@ import (
 	v2proto "github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
@@ -249,33 +251,24 @@ func TestSwitchToUnprivilegedDeduplication(t *testing.T) {
 
 	kibClient := stack.KibanaClient
 
-	t.Log("Creating Agent policy...")
-	policyResp, err := kibClient.CreatePolicy(ctx, createBasicPolicy())
-	require.NoError(t, err, "creating Agent policy failed")
-
-	t.Log("Creating Agent enrollment API key...")
-	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
-		PolicyID: policyResp.ID,
-	}
-	enrollmentToken, err := kibClient.CreateEnrollmentAPIKey(ctx, createEnrollmentApiKeyReq)
-	require.NoError(t, err, "creating Agent enrollment API key failed")
-
-	t.Log("Getting default Fleet Server URL...")
-	fleetServerURL, err := fleettools.DefaultURL(ctx, kibClient)
-	require.NoError(t, err, "getting default Fleet Server URL failed")
-
-	t.Logf("Installing Elastic Agent")
-	installOpts := atesting.InstallOpts{
-		Force: true,
-		EnrollOpts: atesting.EnrollOpts{
-			URL:             fleetServerURL,
-			EnrollmentToken: enrollmentToken.APIKey,
+	t.Log("Enrolling the agent in Fleet")
+	policyUUID := uuid.Must(uuid.NewV4()).String()
+	createPolicyReq := kibana.AgentPolicy{
+		Name:        "test-policy-" + policyUUID,
+		Namespace:   "default",
+		Description: "Test policy " + policyUUID,
+		MonitoringEnabled: []kibana.MonitoringEnabledOption{
+			kibana.MonitoringEnabledLogs,
+			kibana.MonitoringEnabledMetrics,
 		},
-		Privileged: true,
 	}
-	output, err := fixture.Install(ctx, &installOpts)
-	t.Logf("install start agent output:\n%s", string(output))
-	require.NoError(t, err, "installing Elastic Agent failed")
+	installOpts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+		Privileged:     false, // ensure always unprivileged
+	}
+	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, kibClient, createPolicyReq)
+	require.NoErrorf(t, err, "Policy Response was: %v", policyResp)
 
 	t.Log("Waiting for Agent to be healthy...")
 	err = WaitHealthyAndUnprivileged(ctx, fixture, false, 2*time.Minute, 10*time.Second, t)
