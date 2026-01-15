@@ -265,7 +265,7 @@ func TestSwitchToUnprivilegedDeduplication(t *testing.T) {
 	installOpts := atesting.InstallOpts{
 		NonInteractive: true,
 		Force:          true,
-		Privileged:     false, // ensure always unprivileged
+		Privileged:     true, // start privileged, then switch
 	}
 	policyResp, _, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, fixture, kibClient, createPolicyReq)
 	require.NoErrorf(t, err, "Policy Response was: %v", policyResp)
