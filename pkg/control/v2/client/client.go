@@ -190,6 +190,12 @@ type DiagnosticComponentResult struct {
 	Results     []DiagnosticFileResult
 }
 
+type AvailableRollback struct {
+	Version       string    `json:"version,omitempty" yaml:"version,omitempty"`
+	VersionedHome string    `json:"versioned_home,omitempty" yaml:"versioned_home,omitempty"`
+	ValidUntil    time.Time `json:"valid_until" yaml:"valid_until"`
+}
+
 // Client communicates to Elastic Agent through the control protocol.
 type Client interface {
 	// Connect connects to the running Elastic Agent.
@@ -216,6 +222,8 @@ type Client interface {
 	// Configure sends a new configuration to the Elastic Agent.
 	// Only works in the case that Elastic Agent is started in testing mode.
 	Configure(ctx context.Context, config string) error
+	// AvailableRollbacks returns all the existing elastic-agent installs that can be used to rollback the agent
+	AvailableRollbacks(ctx context.Context) ([]AvailableRollback, error)
 }
 
 // ClientStateWatch allows the state of the running Elastic Agent to be watched.
@@ -479,6 +487,29 @@ func (c *client) DiagnosticUnits(ctx context.Context, units ...DiagnosticUnitReq
 func (c *client) Configure(ctx context.Context, config string) error {
 	_, err := c.client.Configure(ctx, &cproto.ConfigureRequest{Config: config})
 	return err
+}
+
+// AvailableRollbacks returns all the existing elastic-agent installs that can be used to rollback the agent
+func (c *client) AvailableRollbacks(ctx context.Context) ([]AvailableRollback, error) {
+	rollbackResponse, err := c.client.AvailableRollbacks(ctx, &cproto.Empty{})
+	if err != nil {
+		return nil, fmt.Errorf("failed retrieving available rollbacks: %w", err)
+	}
+	rollbacks := make([]AvailableRollback, 0, len(rollbackResponse.GetRollbacks()))
+	for _, rollback := range rollbackResponse.GetRollbacks() {
+		parsedTime, parseTimeErr := time.Parse(time.RFC3339, rollback.ValidUntil)
+		if parseTimeErr != nil {
+			err = errors.Join(err, fmt.Errorf("failed parsing valid_until for %s: %w", rollback.VersionedHome, parseTimeErr))
+			continue
+		}
+		rollbacks = append(rollbacks, AvailableRollback{
+			VersionedHome: rollback.VersionedHome,
+			Version:       rollback.Version,
+			ValidUntil:    parsedTime,
+		})
+	}
+
+	return rollbacks, err
 }
 
 type stateWatcher struct {
