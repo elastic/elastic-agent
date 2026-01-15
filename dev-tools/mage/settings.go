@@ -944,6 +944,100 @@ type Settings struct {
 	SelectedDockerVariants []DockerVariant
 }
 
+// DefaultSettings returns a new Settings instance with all default values.
+// It does not read from environment variables - use LoadSettings() for that.
+// This is useful for tests that need settings without environment influence.
+func DefaultSettings() *Settings {
+	s := &Settings{}
+	s.setDefaults()
+	return s
+}
+
+// setDefaults sets all default values for the settings.
+// This is called by NewSettings() and should not read from environment variables.
+func (s *Settings) setDefaults() {
+	s.setBuildDefaults()
+	s.setBeatDefaults()
+	s.setTestDefaults()
+	s.setCrossBuildDefaults()
+	s.setPackagingDefaults()
+	s.setIntegrationTestDefaults()
+	s.setDockerDefaults()
+	s.setKubernetesDefaults()
+	s.setDevMachineDefaults()
+	s.setFmtDefaults()
+}
+
+// setBuildDefaults sets default values for BuildSettings.
+func (s *Settings) setBuildDefaults() {
+	s.Build.GOOS = build.Default.GOOS
+	s.Build.GOARCH = build.Default.GOARCH
+	s.Build.MaxParallel = runtime.NumCPU()
+}
+
+// setBeatDefaults sets default values for BeatSettings.
+func (s *Settings) setBeatDefaults() {
+	s.Beat.Name = DefaultName
+	s.Beat.ServiceName = DefaultName
+	s.Beat.IndexPrefix = DefaultName
+	s.Beat.Description = DefaultDescription
+	s.Beat.Vendor = DefaultVendor
+	s.Beat.License = DefaultLicense
+	s.Beat.URL = "https://www.elastic.co/beats/" + DefaultName
+	s.Beat.User = DefaultUser
+}
+
+// setTestDefaults sets default values for TestSettings.
+// Currently no non-zero defaults.
+func (s *Settings) setTestDefaults() {
+	// No non-zero defaults
+}
+
+// setCrossBuildDefaults sets default values for CrossBuildSettings.
+func (s *Settings) setCrossBuildDefaults() {
+	s.CrossBuild.MountModcache = true
+	s.CrossBuild.MountBuildCache = true
+	s.CrossBuild.BuildCacheVolumeName = "elastic-agent-crossbuild-build-cache"
+	s.CrossBuild.DevOS = "linux"
+	s.CrossBuild.DevArch = "amd64"
+}
+
+// setPackagingDefaults sets default values for PackagingSettings.
+// Currently no non-zero defaults.
+func (s *Settings) setPackagingDefaults() {
+	// No non-zero defaults
+}
+
+// setIntegrationTestDefaults sets default values for IntegrationTestSettings.
+func (s *Settings) setIntegrationTestDefaults() {
+	s.IntegrationTest.CleanOnExit = true
+	s.IntegrationTest.TestEnvironmentEnabled = true
+}
+
+// setDockerDefaults sets default values for DockerSettings.
+// Currently no non-zero defaults.
+func (s *Settings) setDockerDefaults() {
+	// No non-zero defaults
+}
+
+// setKubernetesDefaults sets default values for KubernetesSettings.
+// Currently no non-zero defaults.
+func (s *Settings) setKubernetesDefaults() {
+	// No non-zero defaults
+}
+
+// setDevMachineDefaults sets default values for DevMachineSettings.
+func (s *Settings) setDevMachineDefaults() {
+	s.DevMachine.MachineImage = DefaultDevMachineImage
+	s.DevMachine.Zone = DefaultDevMachineZone
+}
+
+// setFmtDefaults sets default values for FmtSettings.
+// Currently no non-zero defaults.
+func (s *Settings) setFmtDefaults() {
+	// No non-zero defaults
+}
+
 // Clone returns a deep copy of the Settings.
 // Use this when you need to modify settings without affecting other users.
 func (s *Settings) Clone() *Settings {
@@ -1413,121 +1507,151 @@ func MustLoadSettings() *Settings {
 }
 
 // LoadSettings reads all settings from environment variables and returns a new Settings.
-// Each call returns a fresh settings loaded from the current environment.
+// Each call returns a fresh settings with defaults, then overridden by environment variables.
 func LoadSettings() (*Settings, error) {
-	s := &Settings{}
+	s := DefaultSettings()
 
-	if err := s.loadBuildSettings(); err != nil {
+	if err := s.loadBuildSettingsFromEnv(); err != nil {
 		return nil, fmt.Errorf("loading build settings: %w", err)
 	}
 
-	s.loadBeatSettings()
+	s.loadBeatSettingsFromEnv()
 
-	if err := s.loadTestSettings(); err != nil {
+	if err := s.loadTestSettingsFromEnv(); err != nil {
 		return nil, fmt.Errorf("loading test settings: %w", err)
 	}
 
-	s.loadCrossBuildSettings()
-	s.loadPackagingSettings()
-	if err := s.loadIntegrationTestSettings(); err != nil {
+	s.loadCrossBuildSettingsFromEnv()
+	s.loadPackagingSettingsFromEnv()
+	if err := s.loadIntegrationTestSettingsFromEnv(); err != nil {
 		return nil, fmt.Errorf("loading integration test settings: %w", err)
 	}
-	s.loadDockerSettings()
-	s.loadKubernetesSettings()
-	s.loadDevMachineSettings()
-	s.loadFmtSettings()
+	s.loadDockerSettingsFromEnv()
+	s.loadKubernetesSettingsFromEnv()
+	s.loadDevMachineSettingsFromEnv()
+	s.loadFmtSettingsFromEnv()
 
 	return s, nil
 }
 
-// loadBuildSettings loads build-related settings from environment variables.
-func (s *Settings) loadBuildSettings() error {
-	s.Build.GOOS = build.Default.GOOS
-	s.Build.GOARCH = build.Default.GOARCH
-	s.Build.GOARM = envOr("GOARM", "")
-	s.Build.CI = envOr("CI", "")
+// loadBuildSettingsFromEnv overrides build settings from environment variables.
+// Defaults should already be set via setBuildDefaults().
+func (s *Settings) loadBuildSettingsFromEnv() error {
+	if v := os.Getenv("GOARM"); v != "" {
+		s.Build.GOARM = v
+	}
+	if v := os.Getenv("CI"); v != "" {
+		s.Build.CI = v
+	}
 
 	var err error
 
 	_, s.Build.SnapshotSet = os.LookupEnv("SNAPSHOT")
-	s.Build.Snapshot, err = parseBoolEnv("SNAPSHOT", false)
+	s.Build.Snapshot, err = parseBoolEnv("SNAPSHOT", s.Build.Snapshot)
 	if err != nil {
 		return fmt.Errorf("failed to parse SNAPSHOT: %w", err)
 	}
 
-	s.Build.DevBuild, err = parseBoolEnv("DEV", false)
+	s.Build.DevBuild, err = parseBoolEnv("DEV", s.Build.DevBuild)
 	if err != nil {
 		return fmt.Errorf("failed to parse DEV: %w", err)
 	}
 
 	_, s.Build.ExternalBuildSet = os.LookupEnv("EXTERNAL")
-	s.Build.ExternalBuild, err = parseBoolEnv("EXTERNAL", false)
+	s.Build.ExternalBuild, err = parseBoolEnv("EXTERNAL", s.Build.ExternalBuild)
 	if err != nil {
 		return fmt.Errorf("failed to parse EXTERNAL: %w", err)
 	}
 
-	s.Build.FIPSBuild, err = parseBoolEnv("FIPS", false)
+	s.Build.FIPSBuild, err = parseBoolEnv("FIPS", s.Build.FIPSBuild)
 	if err != nil {
 		return fmt.Errorf("failed to parse FIPS: %w", err)
 	}
 
 	s.Build.VersionQualifier, s.Build.VersionQualified = os.LookupEnv("VERSION_QUALIFIER")
 
-	// Parse MAX_PARALLEL with fallback to CPU count
+	// Parse MAX_PARALLEL - only override if set
 	if maxParallel := os.Getenv("MAX_PARALLEL"); maxParallel != "" {
 		if num, err := strconv.Atoi(maxParallel); err == nil && num > 0 {
 			s.Build.MaxParallel = num
 		}
 	}
-	if s.Build.MaxParallel == 0 {
-		s.Build.MaxParallel = runtime.NumCPU()
+
+	if v := os.Getenv("BEAT_VERSION"); v != "" {
+		s.Build.BeatVersion = v
 	}
 
-	// Read BEAT_VERSION override
-	s.Build.BeatVersion = envOr("BEAT_VERSION", "")
+	if v := os.Getenv("AGENT_COMMIT_HASH_OVERRIDE"); v != "" {
+		s.Build.AgentCommitHashOverride = v
+	}
 
-	// Read AGENT_COMMIT_HASH_OVERRIDE
-	s.Build.AgentCommitHashOverride = envOr("AGENT_COMMIT_HASH_OVERRIDE", "")
+	s.Build.GolangCrossBuild = os.Getenv("GOLANG_CROSSBUILD") == "1"
 
-	// Read GOLANG_CROSSBUILD
-	s.Build.GolangCrossBuild = envOr("GOLANG_CROSSBUILD", "") == "1"
+	if v := os.Getenv("BEAT_GO_VERSION"); v != "" {
+		s.Build.BeatGoVersion = v
+	}
 
-	// Read BEAT_GO_VERSION override
-	s.Build.BeatGoVersion = envOr("BEAT_GO_VERSION", "")
-
-	// Read BEAT_DOC_BRANCH override
-	s.Build.BeatDocBranch = envOr("BEAT_DOC_BRANCH", "")
+	if v := os.Getenv("BEAT_DOC_BRANCH"); v != "" {
+		s.Build.BeatDocBranch = v
+	}
 
 	return nil
 }
 
-// loadBeatSettings loads Beat metadata settings from environment variables.
-func (s *Settings) loadBeatSettings() {
-	s.Beat.Name = envOr("BEAT_NAME", DefaultName)
-	s.Beat.ServiceName = envOr("BEAT_SERVICE_NAME", s.Beat.Name)
-	s.Beat.IndexPrefix = envOr("BEAT_INDEX_PREFIX", s.Beat.Name)
-	s.Beat.Description = envOr("BEAT_DESCRIPTION", DefaultDescription)
-	s.Beat.Vendor = envOr("BEAT_VENDOR", DefaultVendor)
-	s.Beat.License = envOr("BEAT_LICENSE", DefaultLicense)
-	s.Beat.URL = envOr("BEAT_URL", "https://www.elastic.co/beats/"+s.Beat.Name)
-	s.Beat.User = envOr("BEAT_USER", DefaultUser)
+// loadBeatSettingsFromEnv overrides beat settings from environment variables.
+// Defaults should already be set via setBeatDefaults().
+func (s *Settings) loadBeatSettingsFromEnv() {
+	if v := os.Getenv("BEAT_NAME"); v != "" {
+		s.Beat.Name = v
+		// Update dependent defaults if BeatName changed and they weren't explicitly set
+		if os.Getenv("BEAT_SERVICE_NAME") == "" {
+			s.Beat.ServiceName = v
+		}
+		if os.Getenv("BEAT_INDEX_PREFIX") == "" {
+			s.Beat.IndexPrefix = v
+		}
+		if os.Getenv("BEAT_URL") == "" {
+			s.Beat.URL = "https://www.elastic.co/beats/" + v
+		}
+	}
+	if v := os.Getenv("BEAT_SERVICE_NAME"); v != "" {
+		s.Beat.ServiceName = v
+	}
+	if v := os.Getenv("BEAT_INDEX_PREFIX"); v != "" {
+		s.Beat.IndexPrefix = v
+	}
+	if v := os.Getenv("BEAT_DESCRIPTION"); v != "" {
+		s.Beat.Description = v
+	}
+	if v := os.Getenv("BEAT_VENDOR"); v != "" {
+		s.Beat.Vendor = v
+	}
+	if v := os.Getenv("BEAT_LICENSE"); v != "" {
+		s.Beat.License = v
+	}
+	if v := os.Getenv("BEAT_URL"); v != "" {
+		s.Beat.URL = v
+	}
+	if v := os.Getenv("BEAT_USER"); v != "" {
+		s.Beat.User = v
+	}
 }
 
-// loadTestSettings loads test-related settings from environment variables.
-func (s *Settings) loadTestSettings() error {
+// loadTestSettingsFromEnv overrides test settings from environment variables.
+// Defaults should already be set via setTestDefaults().
+func (s *Settings) loadTestSettingsFromEnv() error {
 	var err error
 
-	s.Test.RaceDetector, err = parseBoolEnv("RACE_DETECTOR", false)
+	s.Test.RaceDetector, err = parseBoolEnv("RACE_DETECTOR", s.Test.RaceDetector)
 	if err != nil {
 		return fmt.Errorf("failed to parse RACE_DETECTOR: %w", err)
 	}
 
-	s.Test.Coverage, err = parseBoolEnv("TEST_COVERAGE", false)
+	s.Test.Coverage, err = parseBoolEnv("TEST_COVERAGE", s.Test.Coverage)
 	if err != nil {
 		return fmt.Errorf("failed to parse TEST_COVERAGE: %w", err)
 	}
 
-	// Parse TEST_TAGS
 	if tags := os.Getenv("TEST_TAGS"); tags != "" {
 		s.Test.Tags = strings.Split(strings.Trim(tags, ", "), ",")
 	}
@@ -1535,59 +1659,137 @@ func (s *Settings) loadTestSettings() error {
 	return nil
 }
 
-// loadCrossBuildSettings loads cross-build settings from environment variables.
-func (s *Settings) loadCrossBuildSettings() {
-	s.CrossBuild.Platforms = envOr("PLATFORMS", "")
-	s.CrossBuild.Packages = envOr("PACKAGES", "")
-	s.CrossBuild.DockerVariants = envOr("DOCKER_VARIANTS", "")
-	s.CrossBuild.MountModcache = envOr("CROSSBUILD_MOUNT_MODCACHE", "true") == "true"
-	s.CrossBuild.MountBuildCache = envOr("CROSSBUILD_MOUNT_GOCACHE", "true") == "true"
-	s.CrossBuild.BuildCacheVolumeName = "elastic-agent-crossbuild-build-cache"
-	s.CrossBuild.DevOS = envOr("DEV_OS", "linux")
-	s.CrossBuild.DevArch = envOr("DEV_ARCH", "amd64")
+// loadCrossBuildSettingsFromEnv overrides cross-build settings from environment variables.
+// Defaults should already be set via setCrossBuildDefaults().
+func (s *Settings) loadCrossBuildSettingsFromEnv() {
+	if v := os.Getenv("PLATFORMS"); v != "" {
+		s.CrossBuild.Platforms = v
+	}
+	if v := os.Getenv("PACKAGES"); v != "" {
+		s.CrossBuild.Packages = v
+	}
+	if v := os.Getenv("DOCKER_VARIANTS"); v != "" {
+		s.CrossBuild.DockerVariants = v
+	}
+	if v, ok := os.LookupEnv("CROSSBUILD_MOUNT_MODCACHE"); ok {
+		s.CrossBuild.MountModcache = v == "true"
+	}
+	if v, ok := os.LookupEnv("CROSSBUILD_MOUNT_GOCACHE"); ok {
+		s.CrossBuild.MountBuildCache = v == "true"
+	}
+	if v := os.Getenv("DEV_OS"); v != "" {
+		s.CrossBuild.DevOS = v
+	}
+	if v := os.Getenv("DEV_ARCH"); v != "" {
+		s.CrossBuild.DevArch = v
+	}
 }
 
-// loadPackagingSettings loads packaging-related settings from environment variables.
-func (s *Settings) loadPackagingSettings() {
-	s.Packaging.AgentPackageVersion = envOr("AGENT_PACKAGE_VERSION", "")
-	s.Packaging.ManifestURL = envOr("MANIFEST_URL", "")
-	s.Packaging.PackagingFromManifest = s.Packaging.ManifestURL != ""
-	s.Packaging.UsePackageVersion = envOr("USE_PACKAGE_VERSION", "") == "true"
-	s.Packaging.AgentDropPath = envOr("AGENT_DROP_PATH", "")
-	s.Packaging.KeepArchive = envOr("KEEP_ARCHIVE", "") != ""
+// loadPackagingSettingsFromEnv overrides packaging settings from environment variables.
+// Defaults should already be set via setPackagingDefaults().
+func (s *Settings) loadPackagingSettingsFromEnv() {
+	if v := os.Getenv("AGENT_PACKAGE_VERSION"); v != "" {
+		s.Packaging.AgentPackageVersion = v
+	}
+	if v := os.Getenv("MANIFEST_URL"); v != "" {
+		s.Packaging.ManifestURL = v
+		s.Packaging.PackagingFromManifest = true
+	}
+	if os.Getenv("USE_PACKAGE_VERSION") == "true" {
+		s.Packaging.UsePackageVersion = true
+	}
+	if v := os.Getenv("AGENT_DROP_PATH"); v != "" {
+		s.Packaging.AgentDropPath = v
+	}
+	if _, ok := os.LookupEnv("KEEP_ARCHIVE"); ok {
+		s.Packaging.KeepArchive = true
+	}
 }
 
-// loadIntegrationTestSettings loads integration test settings from environment variables.
-func (s *Settings) loadIntegrationTestSettings() error {
-	s.IntegrationTest.AgentVersion = envOr("AGENT_VERSION", "")
-	s.IntegrationTest.AgentStackVersion = envOr("AGENT_STACK_VERSION", "")
-	s.IntegrationTest.AgentBuildDir = envOr("AGENT_BUILD_DIR", "")
-	s.IntegrationTest.StackProvisioner = envOr("STACK_PROVISIONER", "")
-	s.IntegrationTest.InstanceProvisioner = envOr("INSTANCE_PROVISIONER", "")
-	s.IntegrationTest.ESSRegion = envOr("TEST_INTEG_AUTH_ESS_REGION", "")
-	s.IntegrationTest.GCPDatacenter = envOr("TEST_INTEG_AUTH_GCP_DATACENTER", "")
-	s.IntegrationTest.GCPProject = envOr("TEST_INTEG_AUTH_GCP_PROJECT", "")
-	s.IntegrationTest.GCPEmailDomain = envOr("TEST_INTEG_AUTH_EMAIL_DOMAIN", "")
-	s.IntegrationTest.GCPServiceTokenFile = envOr("TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE", "")
-	s.IntegrationTest.Platforms = envOr("TEST_PLATFORMS", "")
-	s.IntegrationTest.Packages = envOr("TEST_PACKAGES", "")
-	s.IntegrationTest.Groups = envOr("TEST_GROUPS", "")
-	s.IntegrationTest.DefinePrefix = envOr("TEST_DEFINE_PREFIX", "")
-	s.IntegrationTest.DefineTests = envOr("TEST_DEFINE_TESTS", "")
-	s.IntegrationTest.BinaryName = envOr("TEST_BINARY_NAME", "")
-	s.IntegrationTest.RepoPath = envOr("TEST_INTEG_REPO_PATH", "")
-	s.IntegrationTest.TimestampEnabled = envOr("TEST_INTEG_TIMESTAMP", "") == "true"
-	s.IntegrationTest.RunUntilFailure = envOr("TEST_RUN_UNTIL_FAILURE", "") == "true"
-	s.IntegrationTest.CleanOnExit = envOr("TEST_INTEG_CLEAN_ON_EXIT", "") != "false"
-	s.IntegrationTest.LongRunning = envOr("TEST_LONG_RUNNING", "")
-	s.IntegrationTest.LongTestRuntime = envOr("LONG_TEST_RUNTIME", "")
-	s.IntegrationTest.CollectDiag = envOr("AGENT_COLLECT_DIAG", "")
-	s.IntegrationTest.KeepInstalled = envOr("AGENT_KEEP_INSTALLED", "")
-	s.IntegrationTest.BuildAgent = envOr("BUILD_AGENT", "") == "true"
-	s.IntegrationTest.GoTestFlags = envOr("GOTEST_FLAGS", "")
+// loadIntegrationTestSettingsFromEnv overrides integration test settings from environment variables.
+// Defaults should already be set via setIntegrationTestDefaults().
+func (s *Settings) loadIntegrationTestSettingsFromEnv() error {
+	if v := os.Getenv("AGENT_VERSION"); v != "" {
+		s.IntegrationTest.AgentVersion = v
+	}
+	if v := os.Getenv("AGENT_STACK_VERSION"); v != "" {
+		s.IntegrationTest.AgentStackVersion = v
+	}
+	if v := os.Getenv("AGENT_BUILD_DIR"); v != "" {
+		s.IntegrationTest.AgentBuildDir = v
+	}
+	if v := os.Getenv("STACK_PROVISIONER"); v != "" {
+		s.IntegrationTest.StackProvisioner = v
+	}
+	if v := os.Getenv("INSTANCE_PROVISIONER"); v != "" {
+		s.IntegrationTest.InstanceProvisioner = v
+	}
+	if v := os.Getenv("TEST_INTEG_AUTH_ESS_REGION"); v != "" {
+		s.IntegrationTest.ESSRegion = v
+	}
+	if v := os.Getenv("TEST_INTEG_AUTH_GCP_DATACENTER"); v != "" {
+		s.IntegrationTest.GCPDatacenter = v
+	}
+	if v := os.Getenv("TEST_INTEG_AUTH_GCP_PROJECT"); v != "" {
+		s.IntegrationTest.GCPProject = v
+	}
+	if v := os.Getenv("TEST_INTEG_AUTH_EMAIL_DOMAIN"); v != "" {
+		s.IntegrationTest.GCPEmailDomain = v
+	}
+	if v := os.Getenv("TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE"); v != "" {
+		s.IntegrationTest.GCPServiceTokenFile = v
+	}
+	if v := os.Getenv("TEST_PLATFORMS"); v != "" {
+		s.IntegrationTest.Platforms = v
+	}
+	if v := os.Getenv("TEST_PACKAGES"); v != "" {
+		s.IntegrationTest.Packages = v
+	}
+	if v := os.Getenv("TEST_GROUPS"); v != "" {
+		s.IntegrationTest.Groups = v
+	}
+	if v := os.Getenv("TEST_DEFINE_PREFIX"); v != "" {
+		s.IntegrationTest.DefinePrefix = v
+	}
+	if v := os.Getenv("TEST_DEFINE_TESTS"); v != "" {
+		s.IntegrationTest.DefineTests = v
+	}
+	if v := os.Getenv("TEST_BINARY_NAME"); v != "" {
+		s.IntegrationTest.BinaryName = v
+	}
+	if v := os.Getenv("TEST_INTEG_REPO_PATH"); v != "" {
+		s.IntegrationTest.RepoPath = v
+	}
+	if os.Getenv("TEST_INTEG_TIMESTAMP") == "true" {
+		s.IntegrationTest.TimestampEnabled = true
+	}
+	if os.Getenv("TEST_RUN_UNTIL_FAILURE") == "true" {
+		s.IntegrationTest.RunUntilFailure = true
+	}
+	if os.Getenv("TEST_INTEG_CLEAN_ON_EXIT") == "false" {
+		s.IntegrationTest.CleanOnExit = false
+	}
+	if v := os.Getenv("TEST_LONG_RUNNING"); v != "" {
+		s.IntegrationTest.LongRunning = v
+	}
+	if v := os.Getenv("LONG_TEST_RUNTIME"); v != "" {
+		s.IntegrationTest.LongTestRuntime = v
+	}
+	if v := os.Getenv("AGENT_COLLECT_DIAG"); v != "" {
+		s.IntegrationTest.CollectDiag = v
+	}
+	if v := os.Getenv("AGENT_KEEP_INSTALLED"); v != "" {
+		s.IntegrationTest.KeepInstalled = v
+	}
+	if os.Getenv("BUILD_AGENT") == "true" {
+		s.IntegrationTest.BuildAgent = true
+	}
+	if v := os.Getenv("GOTEST_FLAGS"); v != "" {
+		s.IntegrationTest.GoTestFlags = v
+	}
 
 	var err error
-	s.IntegrationTest.TestEnvironmentEnabled, err = parseBoolEnv("TEST_ENVIRONMENT", true)
+	s.IntegrationTest.TestEnvironmentEnabled, err = parseBoolEnv("TEST_ENVIRONMENT", s.IntegrationTest.TestEnvironmentEnabled)
 	if err != nil {
 		return fmt.Errorf("failed to parse TEST_ENVIRONMENT: %w", err)
 	}
@@ -1595,31 +1797,57 @@ func (s *Settings) loadIntegrationTestSettings() error {
 	return nil
 }
 
-// loadDockerSettings loads Docker-related settings from environment variables.
-func (s *Settings) loadDockerSettings() {
-	s.Docker.ImportSource = envOr("DOCKER_IMPORT_SOURCE", "")
-	s.Docker.CustomImageTag = envOr("CUSTOM_IMAGE_TAG", "")
-	s.Docker.CIElasticAgentDockerImage = envOr("CI_ELASTIC_AGENT_DOCKER_IMAGE", "")
-	_, s.Docker.NoCache = os.LookupEnv("DOCKER_NOCACHE")
-	_, s.Docker.ForcePull = os.LookupEnv("DOCKER_PULL")
-	s.Docker.WindowsNpcap = envOr("WINDOWS_NPCAP", "") == "true"
+// loadDockerSettingsFromEnv overrides Docker settings from environment variables.
+// Defaults should already be set via setDockerDefaults().
+func (s *Settings) loadDockerSettingsFromEnv() {
+	if v := os.Getenv("DOCKER_IMPORT_SOURCE"); v != "" {
+		s.Docker.ImportSource = v
+	}
+	if v := os.Getenv("CUSTOM_IMAGE_TAG"); v != "" {
+		s.Docker.CustomImageTag = v
+	}
+	if v := os.Getenv("CI_ELASTIC_AGENT_DOCKER_IMAGE"); v != "" {
+		s.Docker.CIElasticAgentDockerImage = v
+	}
+	if _, ok := os.LookupEnv("DOCKER_NOCACHE"); ok {
+		s.Docker.NoCache = true
+	}
+	if _, ok := os.LookupEnv("DOCKER_PULL"); ok {
+		s.Docker.ForcePull = true
+	}
+	if os.Getenv("WINDOWS_NPCAP") == "true" {
+		s.Docker.WindowsNpcap = true
+	}
 }
 
-// loadKubernetesSettings loads Kubernetes-related settings from environment variables.
-func (s *Settings) loadKubernetesSettings() {
-	s.Kubernetes.K8sVersion = envOr("K8S_VERSION", "")
-	s.Kubernetes.KindSkipDelete = envOr("KIND_SKIP_DELETE", "") == "true"
+// loadKubernetesSettingsFromEnv overrides Kubernetes settings from environment variables.
+// Defaults should already be set via setKubernetesDefaults().
+func (s *Settings) loadKubernetesSettingsFromEnv() {
+	if v := os.Getenv("K8S_VERSION"); v != "" {
+		s.Kubernetes.K8sVersion = v
+	}
+	if os.Getenv("KIND_SKIP_DELETE") == "true" {
+		s.Kubernetes.KindSkipDelete = true
+	}
 }
 
-// loadDevMachineSettings loads dev machine provisioning settings from environment variables.
-func (s *Settings) loadDevMachineSettings() {
-	s.DevMachine.MachineImage = envOr("MACHINE_IMAGE", DefaultDevMachineImage)
-	s.DevMachine.Zone = envOr("ZONE", DefaultDevMachineZone)
+// loadDevMachineSettingsFromEnv overrides dev machine settings from environment variables.
+// Defaults should already be set via setDevMachineDefaults().
+func (s *Settings) loadDevMachineSettingsFromEnv() {
+	if v := os.Getenv("MACHINE_IMAGE"); v != "" {
+		s.DevMachine.MachineImage = v
+	}
+	if v := os.Getenv("ZONE"); v != "" {
+		s.DevMachine.Zone = v
+	}
 }
 
-// loadFmtSettings loads formatting tools settings from environment variables.
-func (s *Settings) loadFmtSettings() {
-	_, s.Fmt.CheckHeadersDisabled = os.LookupEnv("CHECK_HEADERS_DISABLED")
+// loadFmtSettingsFromEnv overrides formatting settings from environment variables.
+// Defaults should already be set via setFmtDefaults().
+func (s *Settings) loadFmtSettingsFromEnv() {
+	if _, ok := os.LookupEnv("CHECK_HEADERS_DISABLED"); ok {
+		s.Fmt.CheckHeadersDisabled = true
+	}
 }
 
 // envOr returns the value of the specified environment variable if it is
