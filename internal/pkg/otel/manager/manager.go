@@ -498,13 +498,20 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 // exporterIDToOutputNameLookup compiles the mapping from raw collector
 // exporter IDs to the policy output names that generated them, so internal
 // telemetry monitoring can associate metrics with the user-defined name.
-func exporterIDToOutputNameLookup() (map[string]string, error) {
-	exporterType, err := translate.OutputTypeToExporterType(comp.OutputType)
-	if err != nil {
-		return nil, err
+func exporterIDToOutputNameLookup(components []component.Component) (map[string]string, error) {
+	lookup := map[string]string{}
+	for _, comp := range components {
+		exporterType, err := translate.OutputTypeToExporterType(comp.OutputType)
+		if err != nil {
+			return nil, err
+		}
+		exporterID := translate.GetExporterID(exporterType, comp.OutputName)
+		// There may be collisions since multiple components can be generated
+		// from the same output, but this is fine since they will all have
+		// the same name as well.
+		lookup[exporterID.String()] = comp.OutputName
 	}
-	exporterID := translate.GetExporterID(exporterType, comp.OutputName)
-
+	return lookup, nil
 }
 
 func injectMonitoringReceiver(
@@ -513,7 +520,6 @@ func injectMonitoringReceiver(
 	agentInfo info.Agent,
 	components []component.Component,
 ) error {
-
 	receiverType := otelcomponent.MustNewType(elasticmonitoringreceiver.Name)
 	receiverName := "collector/internal-telemetry-monitoring"
 	receiverID := translate.GetReceiverID(receiverType, receiverName).String()
@@ -533,11 +539,16 @@ func injectMonitoringReceiver(
 		// We can't monitor OTel metrics without OTel-based monitoring
 		return nil
 	}
+	outputNameLookup, err := exporterIDToOutputNameLookup(components)
+	if err != nil {
+		return fmt.Errorf("couldn't map exporter IDs to output names: %w", err)
+	}
 	receiverCfg := map[string]any{
 		"receivers": map[string]any{
 			receiverID: map[string]any{
 				"event_template": monitoringEventTemplate(monitoring, agentInfo),
 				"interval":       monitoring.MetricsPeriod,
+				"exporter_names": outputNameLookup,
 			},
 		},
 		"service": map[string]any{
