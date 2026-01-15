@@ -158,6 +158,7 @@ service:
         - otlp
         - nop
         - elasticapmintake
+        - elasticmonitoringreceiver
 
     logs/forward_receive:
       receivers:
