@@ -94,8 +94,7 @@
             "user_settings_json": {
               "xpack.fleet.enableExperimental": ["agentTamperProtectionEnabled", "enableAgentPrivilegeLevelChange"],
               "xpack.fleet.internal.registry.kibanaVersionCheckEnabled": false,
-              "server.restrictInternalApis": false,
-              ""
+              "server.restrictInternalApis": false
             }
           }
         },
