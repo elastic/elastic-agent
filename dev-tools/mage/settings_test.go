@@ -58,8 +58,7 @@ func TestAgentPackageVersion(t *testing.T) {
 
 func TestSettingsClone(t *testing.T) {
 	t.Run("clone creates independent copy", func(t *testing.T) {
-		original, err := LoadSettings()
-		require.NoError(t, err)
+		original := DefaultSettings()
 		original.Build.DevBuild = true
 		original.Test.Tags = []string{"tag1", "tag2"}
 		original.PlatformFilters = []string{"linux/amd64"}
@@ -90,8 +89,7 @@ func TestSettingsClone(t *testing.T) {
 	})
 
 	t.Run("clone handles nil slices", func(t *testing.T) {
-		original, err := LoadSettings()
-		require.NoError(t, err)
+		original := DefaultSettings()
 		original.Test.Tags = nil
 		original.PlatformFilters = nil
 		original.SelectedPackageTypes = nil
@@ -108,9 +106,7 @@ func TestSettingsClone(t *testing.T) {
 
 func TestSettingsWithMethods(t *testing.T) {
 	t.Run("WithDevBuild", func(t *testing.T) {
-		original, err := LoadSettings()
-		require.NoError(t, err)
-		original.Build.DevBuild = false
+		original := DefaultSettings()
 
 		modified := original.WithDevBuild(true)
 
@@ -119,9 +115,7 @@ func TestSettingsWithMethods(t *testing.T) {
 	})
 
 	t.Run("WithExternalBuild", func(t *testing.T) {
-		original, err := LoadSettings()
-		require.NoError(t, err)
-		original.Build.ExternalBuild = false
+		original := DefaultSettings()
 
 		modified := original.WithExternalBuild(true)
 
@@ -130,9 +124,7 @@ func TestSettingsWithMethods(t *testing.T) {
 	})
 
 	t.Run("WithFIPSBuild", func(t *testing.T) {
-		original, err := LoadSettings()
-		require.NoError(t, err)
-		original.Build.FIPSBuild = false
+		original := DefaultSettings()
 
 		modified := original.WithFIPSBuild(true)
 
@@ -141,9 +133,7 @@ func TestSettingsWithMethods(t *testing.T) {
 	})
 
 	t.Run("WithSnapshot", func(t *testing.T) {
-		original, err := LoadSettings()
-		require.NoError(t, err)
-		original.Build.Snapshot = false
+		original := DefaultSettings()
 
 		modified := original.WithSnapshot(true)
 
@@ -152,8 +142,7 @@ func TestSettingsWithMethods(t *testing.T) {
 	})
 
 	t.Run("WithPlatformFilter", func(t *testing.T) {
-		original, err := LoadSettings()
-		require.NoError(t, err)
+		original := DefaultSettings()
 		original.PlatformFilters = []string{"linux/amd64"}
 
 		modified := original.WithPlatformFilter("darwin/arm64")
@@ -163,8 +152,7 @@ func TestSettingsWithMethods(t *testing.T) {
 	})
 
 	t.Run("WithPackageTypes", func(t *testing.T) {
-		original, err := LoadSettings()
-		require.NoError(t, err)
+		original := DefaultSettings()
 
 		modified := original.WithPackageTypes([]PackageType{TarGz, Zip})
 
@@ -173,8 +161,7 @@ func TestSettingsWithMethods(t *testing.T) {
 	})
 
 	t.Run("WithDockerVariants", func(t *testing.T) {
-		original, err := LoadSettings()
-		require.NoError(t, err)
+		original := DefaultSettings()
 
 		modified := original.WithDockerVariants([]DockerVariant{Basic, Cloud})
 
@@ -183,8 +170,7 @@ func TestSettingsWithMethods(t *testing.T) {
 	})
 
 	t.Run("WithPlatforms", func(t *testing.T) {
-		original, err := LoadSettings()
-		require.NoError(t, err)
+		original := DefaultSettings()
 		original.PlatformFilters = []string{"!windows"}
 
 		modified := original.WithPlatforms("linux/amd64,darwin/arm64")
@@ -194,8 +180,7 @@ func TestSettingsWithMethods(t *testing.T) {
 	})
 
 	t.Run("WithAddedPackageType", func(t *testing.T) {
-		original, err := LoadSettings()
-		require.NoError(t, err)
+		original := DefaultSettings()
 		original.SelectedPackageTypes = []PackageType{TarGz}
 
 		modified := original.WithAddedPackageType(Zip)
@@ -205,8 +190,7 @@ func TestSettingsWithMethods(t *testing.T) {
 	})
 
 	t.Run("WithAddedPackageType does not duplicate", func(t *testing.T) {
-		original, err := LoadSettings()
-		require.NoError(t, err)
+		original := DefaultSettings()
 		original.SelectedPackageTypes = []PackageType{TarGz, Zip}
 
 		modified := original.WithAddedPackageType(TarGz)
@@ -215,8 +199,7 @@ func TestSettingsWithMethods(t *testing.T) {
 	})
 
 	t.Run("WithBeatVersion", func(t *testing.T) {
-		original, err := LoadSettings()
-		require.NoError(t, err)
+		original := DefaultSettings()
 
 		modified := original.WithBeatVersion("1.2.3")
 
@@ -225,8 +208,7 @@ func TestSettingsWithMethods(t *testing.T) {
 	})
 
 	t.Run("WithAgentCommitHashOverride", func(t *testing.T) {
-		original, err := LoadSettings()
-		require.NoError(t, err)
+		original := DefaultSettings()
 
 		modified := original.WithAgentCommitHashOverride("abc123")
 
@@ -235,8 +217,7 @@ func TestSettingsWithMethods(t *testing.T) {
 	})
 
 	t.Run("WithAgentDropPath", func(t *testing.T) {
-		original, err := LoadSettings()
-		require.NoError(t, err)
+		original := DefaultSettings()
 
 		modified := original.WithAgentDropPath("/path/to/drop")
 
@@ -245,8 +226,7 @@ func TestSettingsWithMethods(t *testing.T) {
 	})
 
 	t.Run("WithStackProvisioner", func(t *testing.T) {
-		original, err := LoadSettings()
-		require.NoError(t, err)
+		original := DefaultSettings()
 
 		modified := original.WithStackProvisioner("serverless")
 
@@ -255,8 +235,7 @@ func TestSettingsWithMethods(t *testing.T) {
 	})
 
 	t.Run("WithTestGroups", func(t *testing.T) {
-		original, err := LoadSettings()
-		require.NoError(t, err)
+		original := DefaultSettings()
 
 		modified := original.WithTestGroups("group1,group2")
 
@@ -265,8 +244,7 @@ func TestSettingsWithMethods(t *testing.T) {
 	})
 
 	t.Run("WithAgentBuildDir", func(t *testing.T) {
-		original, err := LoadSettings()
-		require.NoError(t, err)
+		original := DefaultSettings()
 
 		modified := original.WithAgentBuildDir("/build/dir")
 
@@ -275,8 +253,7 @@ func TestSettingsWithMethods(t *testing.T) {
 	})
 
 	t.Run("WithTestBinaryName", func(t *testing.T) {
-		original, err := LoadSettings()
-		require.NoError(t, err)
+		original := DefaultSettings()
 
 		modified := original.WithTestBinaryName("test-binary")
 
@@ -287,26 +264,26 @@ func TestSettingsWithMethods(t *testing.T) {
 
 func TestSettingsBinaryExt(t *testing.T) {
 	t.Run("returns .exe for windows", func(t *testing.T) {
-		s := &Settings{}
+		s := DefaultSettings()
 		s.Build.GOOS = "windows"
 		assert.Equal(t, ".exe", s.BinaryExt())
 	})
 
 	t.Run("returns empty string for linux", func(t *testing.T) {
-		s := &Settings{}
+		s := DefaultSettings()
 		s.Build.GOOS = "linux"
 		assert.Equal(t, "", s.BinaryExt())
 	})
 
 	t.Run("returns empty string for darwin", func(t *testing.T) {
-		s := &Settings{}
+		s := DefaultSettings()
 		s.Build.GOOS = "darwin"
 		assert.Equal(t, "", s.BinaryExt())
 	})
 }
 
 func TestSettingsPlatform(t *testing.T) {
-	s := &Settings{}
+	s := DefaultSettings()
 	s.Build.GOOS = "linux"
 	s.Build.GOARCH = "amd64"
 	s.Build.GOARM = ""
@@ -319,7 +296,7 @@ func TestSettingsPlatform(t *testing.T) {
 
 func TestSettingsTestTagsWithFIPS(t *testing.T) {
 	t.Run("returns original tags when FIPS disabled", func(t *testing.T) {
-		s := &Settings{}
+		s := DefaultSettings()
 		s.Test.Tags = []string{"tag1", "tag2"}
 		s.Build.FIPSBuild = false
 
@@ -329,7 +306,7 @@ func TestSettingsTestTagsWithFIPS(t *testing.T) {
 	})
 
 	t.Run("appends FIPS tags when FIPS enabled", func(t *testing.T) {
-		s := &Settings{}
+		s := DefaultSettings()
 		s.Test.Tags = []string{"tag1"}
 		s.Build.FIPSBuild = true
 
@@ -339,7 +316,7 @@ func TestSettingsTestTagsWithFIPS(t *testing.T) {
 	})
 
 	t.Run("does not modify original tags", func(t *testing.T) {
-		s := &Settings{}
+		s := DefaultSettings()
 		s.Test.Tags = []string{"tag1"}
 		s.Build.FIPSBuild = true
 
@@ -349,7 +326,7 @@ func TestSettingsTestTagsWithFIPS(t *testing.T) {
 	})
 
 	t.Run("handles nil tags with FIPS enabled", func(t *testing.T) {
-		s := &Settings{}
+		s := DefaultSettings()
 		s.Test.Tags = nil
 		s.Build.FIPSBuild = true
 
@@ -361,7 +338,7 @@ func TestSettingsTestTagsWithFIPS(t *testing.T) {
 
 func TestSettingsGetPackageTypes(t *testing.T) {
 	t.Run("returns SelectedPackageTypes when set", func(t *testing.T) {
-		s := &Settings{}
+		s := DefaultSettings()
 		s.SelectedPackageTypes = []PackageType{TarGz, Zip}
 		s.CrossBuild.Packages = "rpm,deb" // should be ignored
 
@@ -371,7 +348,7 @@ func TestSettingsGetPackageTypes(t *testing.T) {
 	})
 
 	t.Run("parses from env var when SelectedPackageTypes is nil", func(t *testing.T) {
-		s := &Settings{}
+		s := DefaultSettings()
 		s.CrossBuild.Packages = "targz,zip"
 
 		types := s.GetPackageTypes()
@@ -380,7 +357,7 @@ func TestSettingsGetPackageTypes(t *testing.T) {
 	})
 
 	t.Run("returns nil when both are empty", func(t *testing.T) {
-		s := &Settings{}
+		s := DefaultSettings()
 
 		types := s.GetPackageTypes()
 
@@ -390,7 +367,7 @@ func TestSettingsGetPackageTypes(t *testing.T) {
 
 func TestSettingsGetDockerVariants(t *testing.T) {
 	t.Run("returns SelectedDockerVariants when set", func(t *testing.T) {
-		s := &Settings{}
+		s := DefaultSettings()
 		s.SelectedDockerVariants = []DockerVariant{Basic, Cloud}
 		s.CrossBuild.DockerVariants = "complete" // should be ignored
 
@@ -400,7 +377,7 @@ func TestSettingsGetDockerVariants(t *testing.T) {
 	})
 
 	t.Run("parses from env var when SelectedDockerVariants is nil", func(t *testing.T) {
-		s := &Settings{}
+		s := DefaultSettings()
 		s.CrossBuild.DockerVariants = "basic,cloud"
 
 		variants := s.GetDockerVariants()
@@ -409,7 +386,7 @@ func TestSettingsGetDockerVariants(t *testing.T) {
 	})
 
 	t.Run("returns nil when both are empty", func(t *testing.T) {
-		s := &Settings{}
+		s := DefaultSettings()
 
 		variants := s.GetDockerVariants()
 
@@ -419,14 +396,14 @@ func TestSettingsGetDockerVariants(t *testing.T) {
 
 func TestSettingsIsPackageTypeSelected(t *testing.T) {
 	t.Run("returns true when no types selected", func(t *testing.T) {
-		s := &Settings{}
+		s := DefaultSettings()
 
 		assert.True(t, s.IsPackageTypeSelected(TarGz))
 		assert.True(t, s.IsPackageTypeSelected(Zip))
 	})
 
 	t.Run("returns true when type is in selected list", func(t *testing.T) {
-		s := &Settings{}
+		s := DefaultSettings()
 		s.SelectedPackageTypes = []PackageType{TarGz, Zip}
 
 		assert.True(t, s.IsPackageTypeSelected(TarGz))
@@ -434,7 +411,7 @@ func TestSettingsIsPackageTypeSelected(t *testing.T) {
 	})
 
 	t.Run("returns false when type is not in selected list", func(t *testing.T) {
-		s := &Settings{}
+		s := DefaultSettings()
 		s.SelectedPackageTypes = []PackageType{TarGz}
 
 		assert.False(t, s.IsPackageTypeSelected(Zip))
@@ -444,14 +421,14 @@ func TestSettingsIsPackageTypeSelected(t *testing.T) {
 
 func TestSettingsIsDockerVariantSelected(t *testing.T) {
 	t.Run("returns true when no variants selected", func(t *testing.T) {
-		s := &Settings{}
+		s := DefaultSettings()
 
 		assert.True(t, s.IsDockerVariantSelected(Basic))
 		assert.True(t, s.IsDockerVariantSelected(Cloud))
 	})
 
 	t.Run("returns true when variant is in selected list", func(t *testing.T) {
-		s := &Settings{}
+		s := DefaultSettings()
 		s.SelectedDockerVariants = []DockerVariant{Basic, Cloud}
 
 		assert.True(t, s.IsDockerVariantSelected(Basic))
@@ -459,7 +436,7 @@ func TestSettingsIsDockerVariantSelected(t *testing.T) {
 	})
 
 	t.Run("returns false when variant is not in selected list", func(t *testing.T) {
-		s := &Settings{}
+		s := DefaultSettings()
 		s.SelectedDockerVariants = []DockerVariant{Basic}
 
 		assert.False(t, s.IsDockerVariantSelected(Cloud))
@@ -469,8 +446,7 @@ func TestSettingsIsDockerVariantSelected(t *testing.T) {
 
 func TestSettingsContext(t *testing.T) {
 	t.Run("ContextWithSettings stores settings", func(t *testing.T) {
-		original, err := LoadSettings()
-		require.NoError(t, err)
+		original := DefaultSettings()
 		original.Build.DevBuild = true
 
 		ctx := ContextWithSettings(context.Background(), original)
@@ -538,7 +514,7 @@ func TestGenerateSnapshotSuffix(t *testing.T) {
 
 func TestMaybeSnapshotSuffix(t *testing.T) {
 	t.Run("returns suffix when snapshot is true", func(t *testing.T) {
-		s := &Settings{}
+		s := DefaultSettings()
 		s.Build.Snapshot = true
 
 		result := MaybeSnapshotSuffix(s)
@@ -547,7 +523,7 @@ func TestMaybeSnapshotSuffix(t *testing.T) {
 	})
 
 	t.Run("returns empty when snapshot is false", func(t *testing.T) {
-		s := &Settings{}
+		s := DefaultSettings()
 		s.Build.Snapshot = false
 
 		result := MaybeSnapshotSuffix(s)
@@ -606,8 +582,52 @@ func TestBuildSettingsCommitHashShort(t *testing.T) {
 	})
 }
 
+func TestDefaultSettings(t *testing.T) {
+	t.Run("sets all defaults correctly without reading env vars", func(t *testing.T) {
+		// Set env vars that should NOT affect DefaultSettings()
+		t.Setenv("BEAT_NAME", "should-be-ignored")
+		t.Setenv("SNAPSHOT", "true")
+		t.Setenv("DEV", "true")
+
+		settings := DefaultSettings()
+
+		assert.NotNil(t, settings)
+
+		// Beat defaults - should not be affected by env vars
+		assert.Equal(t, DefaultName, settings.Beat.Name)
+		assert.Equal(t, DefaultName, settings.Beat.ServiceName)
+		assert.Equal(t, DefaultName, settings.Beat.IndexPrefix)
+		assert.Equal(t, DefaultDescription, settings.Beat.Description)
+		assert.Equal(t, DefaultVendor, settings.Beat.Vendor)
+		assert.Equal(t, DefaultLicense, settings.Beat.License)
+		assert.Equal(t, DefaultUser, settings.Beat.User)
+		assert.Equal(t, "https://www.elastic.co/beats/"+DefaultName, settings.Beat.URL)
+
+		// Build defaults - should not be affected by env vars
+		assert.False(t, settings.Build.Snapshot)
+		assert.False(t, settings.Build.DevBuild)
+		assert.Greater(t, settings.Build.MaxParallel, 0)
+
+		// Dev machine defaults
+		assert.Equal(t, DefaultDevMachineImage, settings.DevMachine.MachineImage)
+		assert.Equal(t, DefaultDevMachineZone, settings.DevMachine.Zone)
+
+		// CrossBuild defaults
+		assert.Equal(t, "linux", settings.CrossBuild.DevOS)
+		assert.Equal(t, "amd64", settings.CrossBuild.DevArch)
+		assert.True(t, settings.CrossBuild.MountModcache)
+		assert.True(t, settings.CrossBuild.MountBuildCache)
+		assert.Equal(t, "elastic-agent-crossbuild-build-cache", settings.CrossBuild.BuildCacheVolumeName)
+
+		// IntegrationTest defaults
+		assert.True(t, settings.IntegrationTest.CleanOnExit)
+		assert.True(t, settings.IntegrationTest.TestEnvironmentEnabled)
+	})
+}
+
 func TestLoadSettings(t *testing.T) {
-	t.Run("sets all defaults correctly", func(t *testing.T) {
+	t.Run("applies defaults before env vars", func(t *testing.T) {
+		// No env vars set - should get defaults
 		settings, err := LoadSettings()
 
 		require.NoError(t, err)
@@ -615,8 +635,8 @@ func TestLoadSettings(t *testing.T) {
 
 		// Beat defaults
 		assert.Equal(t, DefaultName, settings.Beat.Name)
-		assert.Equal(t, DefaultName, settings.Beat.ServiceName) // defaults to BeatName
-		assert.Equal(t, DefaultName, settings.Beat.IndexPrefix) // defaults to BeatName
+		assert.Equal(t, DefaultName, settings.Beat.ServiceName)
+		assert.Equal(t, DefaultName, settings.Beat.IndexPrefix)
 		assert.Equal(t, DefaultDescription, settings.Beat.Description)
 		assert.Equal(t, DefaultVendor, settings.Beat.Vendor)
 		assert.Equal(t, DefaultLicense, settings.Beat.License)
