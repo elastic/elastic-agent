@@ -81,7 +81,18 @@ func DefaultURL(ctx context.Context, client *kibana.Client) (string, error) {
 }
 
 func SwitchAgent(ctx context.Context, client *kibana.Client, agentID string) error {
-	privilegeLevelChangeReq := kibana.AgentPrivilegeLevelChangeRequest{}
+	userInfo := struct {
+		Groupname string `json:"groupname"`
+		Password  string `json:"password"`
+		Username  string `json:"username"`
+	}{
+		Username:  "",
+		Groupname: "",
+		Password:  "",
+	}
+	privilegeLevelChangeReq := kibana.AgentPrivilegeLevelChangeRequest{
+		UserInfo: &userInfo,
+	}
 	err := client.AgentPrivilegeLevelChange(ctx, agentID, privilegeLevelChangeReq)
 	if err != nil {
 		return fmt.Errorf("unable to change privilege level for agent with ID [%s]: %w", agentID, err)
