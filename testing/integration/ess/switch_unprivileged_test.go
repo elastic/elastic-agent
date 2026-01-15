@@ -221,7 +221,7 @@ func TestSwitchUnprivilegedWithBasePath(t *testing.T) {
 
 func TestSwitchToUnprivilegedDeduplication(t *testing.T) {
 	stack := define.Require(t, define.Requirements{
-		Group: integration.Default,
+		Group: integration.Fleet,
 		Stack: &define.Stack{},
 		OS: []define.OS{
 			{
@@ -311,6 +311,7 @@ func TestSwitchToUnprivilegedDeduplication(t *testing.T) {
 			if err != nil {
 				switchErr = errors.Join(switchErr, fmt.Errorf("switching agent privilege level: %w", err))
 			}
+			switchWg.Done()
 		}()
 	}
 
