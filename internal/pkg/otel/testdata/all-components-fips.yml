@@ -58,6 +58,7 @@ receivers:
       grpc:
   zipkin:
   docker_stats:
+  elasticmonitoringreceiver:
 
 connectors:
   spanmetrics:

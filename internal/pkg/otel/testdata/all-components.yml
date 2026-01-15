@@ -93,6 +93,7 @@ receivers:
       - extension: awslogs_encoding/elbaccess
   prometheusremotewrite:
     endpoint: 0.0.0.0:9090
+  elasticmonitoringreceiver:
 
 connectors:
   spanmetrics:

@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/instrumentation"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+	"go.uber.org/zap"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
 )
@@ -79,6 +80,7 @@ func TestConvertAllMetrics(t *testing.T) {
 			sumMetric(otelDocsProcessedKey, docsProcessed),
 			sumMetric(otelDocsRetriedKey, docsRetried),
 			sumMetric(otelFlushedBytesKey, flushedBytes),
+			sumMetric(otelBulkRequestsKey, bulkRequests),
 		},
 	}
 	result := convertScopeMetrics([]metricdata.ScopeMetrics{scopeMetrics})
@@ -88,7 +90,7 @@ func TestConvertAllMetrics(t *testing.T) {
 	require.Truef(t, ok, "Exporter metrics should contain metrics for the id '%v'", exporterID)
 
 	beatEvent := mapstr.M{}
-	addMetricsToEventFields(metrics, &beatEvent)
+	addMetricsToEventFields(zap.NewNop(), metrics, &beatEvent)
 
 	maxEvents, err := beatEvent.GetValue(beatsQueueMaxEventsKey)
 	assert.NoError(t, err)
@@ -130,4 +132,10 @@ func TestConvertAllMetrics(t *testing.T) {
 	active, err := beatEvent.GetValue(beatsOutputEventsActiveKey)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedActive, active)
+
+	// The ES exporter doesn't have a concept of batches that is semantically
+	// identical to Beats, but bulk requests are a close analogue.
+	batches, err := beatEvent.GetValue(beatsOutputEventsBatchesKey)
+	assert.NoError(t, err)
+	assert.Equal(t, bulkRequests, batches)
 }

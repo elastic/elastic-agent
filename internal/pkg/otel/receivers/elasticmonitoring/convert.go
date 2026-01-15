@@ -9,6 +9,7 @@ import (
 
 	"go.opentelemetry.io/otel/sdk/instrumentation"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+	"go.uber.org/zap"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
 )
@@ -173,18 +174,26 @@ func convertScopeMetrics(scopeMetrics []metricdata.ScopeMetrics) map[string]expo
 	return exporters
 }
 
+func mapstrSetWithErrorLog(logger *zap.Logger, event *mapstr.M, key string, value interface{}) {
+	_, err := event.Put(key, value)
+	if err != nil {
+		logger.Error("Couldn't set key while generating metrics event",
+			zap.String("key", key), zap.Error(err))
+	}
+}
+
 // Add the given metrics as fields on the event, with field names following
 // the legacy schema for Beats metrics.
-func addMetricsToEventFields(em exporterMetrics, event *mapstr.M) {
+func addMetricsToEventFields(logger *zap.Logger, em exporterMetrics, event *mapstr.M) {
 	if em.queueSize != nil {
-		_, _ = event.Put(beatsQueueFilledEventsKey, *em.queueSize)
+		mapstrSetWithErrorLog(logger, event, beatsQueueFilledEventsKey, *em.queueSize)
 	}
 	if em.queueCapacity != nil {
-		_, _ = event.Put(beatsQueueMaxEventsKey, *em.queueCapacity)
+		mapstrSetWithErrorLog(logger, event, beatsQueueMaxEventsKey, *em.queueCapacity)
 	}
 	if em.queueSize != nil && em.queueCapacity != nil && *em.queueCapacity > 0 {
 		filled := float64(*em.queueSize) / float64(*em.queueCapacity)
-		_, _ = event.Put(beatsQueueFilledPctKey, filled)
+		mapstrSetWithErrorLog(logger, event, beatsQueueFilledPctKey, filled)
 	}
 	var sentTotal int64
 	if em.sentLogs != nil {
@@ -196,7 +205,7 @@ func addMetricsToEventFields(em exporterMetrics, event *mapstr.M) {
 	if em.sentMetrics != nil {
 		sentTotal += *em.sentMetrics
 	}
-	_, _ = event.Put(beatsOutputEventsAckedKey, sentTotal)
+	mapstrSetWithErrorLog(logger, event, beatsOutputEventsAckedKey, sentTotal)
 
 	var failedTotal int64
 	if em.failedLogs != nil {
@@ -208,21 +217,21 @@ func addMetricsToEventFields(em exporterMetrics, event *mapstr.M) {
 	if em.failedMetrics != nil {
 		failedTotal += *em.failedMetrics
 	}
-	_, _ = event.Put(beatsOutputEventsDroppedKey, failedTotal)
+	mapstrSetWithErrorLog(logger, event, beatsOutputEventsDroppedKey, failedTotal)
 
 	if em.docsProcessed != nil {
-		_, _ = event.Put(beatsOutputEventsTotalKey, *em.docsProcessed)
+		mapstrSetWithErrorLog(logger, event, beatsOutputEventsTotalKey, *em.docsProcessed)
 
 		active := *em.docsProcessed - sentTotal - failedTotal
-		_, _ = event.Put(beatsOutputEventsActiveKey, active)
+		mapstrSetWithErrorLog(logger, event, beatsOutputEventsActiveKey, active)
 	}
 	if em.docsRetried != nil {
-		_, _ = event.Put(beatsOutputEventsFailedKey, *em.docsRetried)
+		mapstrSetWithErrorLog(logger, event, beatsOutputEventsFailedKey, *em.docsRetried)
 	}
 	if em.bulkRequests != nil {
-		_, _ = event.Put(beatsOutputEventsBatchesKey, *em.bulkRequests)
+		mapstrSetWithErrorLog(logger, event, beatsOutputEventsBatchesKey, *em.bulkRequests)
 	}
 	if em.flushedBytes != nil {
-		_, _ = event.Put(beatsOutputWriteBytesKey, *em.flushedBytes)
+		mapstrSetWithErrorLog(logger, event, beatsOutputWriteBytesKey, *em.flushedBytes)
 	}
 }
