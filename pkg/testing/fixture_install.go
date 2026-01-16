@@ -587,6 +587,11 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 	installArgs := []string{"-E", "rpm", "-i", "-v"}
 	if installOpts.BasePath != "" {
 		installArgs = append(installArgs, "--prefix", installOpts.BasePath)
+		// Make sure that prefix is available to agentFixture so other agent commands can use it
+		if f.installOpts == nil {
+			f.installOpts = &InstallOpts{}
+		}
+		f.installOpts.BasePath = installOpts.BasePath
 	}
 	installArgs = append(installArgs, f.srcPackage)
 	// sudo rpm -iv elastic-agent rpm
