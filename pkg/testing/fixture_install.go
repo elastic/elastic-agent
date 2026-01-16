@@ -464,6 +464,9 @@ func getProcesses(t *gotesting.T, regex string) []runningProcess {
 
 func (f *Fixture) SetDebRpmClient() error {
 	workDir := "/var/lib/elastic-agent"
+	if f.installOpts != nil && f.installOpts.BasePath != "" {
+		workDir = f.installOpts.BasePath + workDir
+	}
 	socketPath, err := control.AddressFromPath(f.operatingSystem, workDir)
 	if err != nil {
 		return fmt.Errorf("failed to get control protcol address: %w", err)
