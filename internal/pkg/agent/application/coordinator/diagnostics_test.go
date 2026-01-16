@@ -414,6 +414,7 @@ func TestDiagnosticComponentsActual(t *testing.T) {
 					Err:        errors.New("component error"),
 					InputType:  "test-input",
 					OutputType: "test-output",
+					OutputName: "test-name",
 					Units: []component.Unit{
 						{
 							ID:       "test-unit",
@@ -443,6 +444,7 @@ components:
     error: "component error"
     input_type: "test-input"
     output_type: "test-output"
+    output_name: "test-name"
     units:
       - id: test-unit
         error: {}
