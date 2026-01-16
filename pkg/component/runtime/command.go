@@ -527,9 +527,7 @@ func createLogWriter(comp component.Component, baseLog *logger.Logger, cmdSpec *
 			"binary":  binaryName,
 			"dataset": dataset,
 		},
-		"log", map[string]interface{}{
-			"source": comp.ID,
-		},
+		"log.source", comp.ID,
 	)
 	return newLogWriter(logger.Core(), cmdSpec.Log, ll, unitLevels, src)
 }
