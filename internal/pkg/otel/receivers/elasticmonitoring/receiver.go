@@ -96,6 +96,7 @@ func (mr *monitoringReceiver) updateMetrics() {
 
 	exporterMetrics := convertScopeMetrics(resourceMetrics.ScopeMetrics)
 	for exporter, metrics := range exporterMetrics {
+<<<<<<< HEAD
 		componentID, ok := mr.config.ExporterNames[exporter]
 		if !ok {
 			mr.logger.Warn("Reporting metrics for exporter with no specified component name", zap.String("exporter_id", exporter))
@@ -106,6 +107,13 @@ func (mr *monitoringReceiver) updateMetrics() {
 }
 
 func (mr *monitoringReceiver) sendExporterMetricsEvent(componentID string, metrics exporterMetrics) {
+=======
+		mr.sendExporterMetricsEvent(exporter, metrics)
+	}
+}
+
+func (mr *monitoringReceiver) sendExporterMetricsEvent(exporter string, metrics exporterMetrics) {
+>>>>>>> 0da64ad67d8eef4f59b0462e6a4b7930d6d07791
 	pLogs := plog.NewLogs()
 	resourceLogs := pLogs.ResourceLogs().AppendEmpty()
 	sourceLogs := resourceLogs.ScopeLogs().AppendEmpty()
@@ -115,7 +123,11 @@ func (mr *monitoringReceiver) sendExporterMetricsEvent(componentID string, metri
 	// Initialize to the configured event template
 	beatEvent := mapstr.M(mr.config.EventTemplate.Fields).Clone()
 	addMetricsToEventFields(mr.logger, metrics, &beatEvent)
+<<<<<<< HEAD
 	_, _ = beatEvent.Put("component.id", componentID)
+=======
+	_, _ = beatEvent.Put("component.id", exporter)
+>>>>>>> 0da64ad67d8eef4f59b0462e6a4b7930d6d07791
 
 	// Set timestamp
 	now := time.Now()
