@@ -105,11 +105,20 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/gotestsum v1.13.0
+<<<<<<< HEAD
 	helm.sh/helm/v3 v3.15.4
 	k8s.io/api v0.32.3
 	k8s.io/apimachinery v0.32.3
 	k8s.io/cli-runtime v0.32.2
 	k8s.io/client-go v0.32.3
+=======
+	helm.sh/helm/v3 v3.19.5
+	howett.net/plist v1.0.1
+	k8s.io/api v0.34.2
+	k8s.io/apimachinery v0.34.2
+	k8s.io/cli-runtime v0.34.2
+	k8s.io/client-go v0.34.2
+>>>>>>> 013ff34f8 (build(deps): bump helm.sh/helm/v3 from 3.19.4 to 3.19.5 (#12271))
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.70
 	sigs.k8s.io/e2e-framework v0.4.0
 	sigs.k8s.io/kustomize/api v0.18.0
