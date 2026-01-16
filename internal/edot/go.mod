@@ -8,9 +8,9 @@ replace github.com/elastic/elastic-agent => ../../
 replace github.com/elastic/beats/v7 => ../../beats
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260109153220-fbef8dea04f2
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260115160129-adc57ca64a56
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-	github.com/elastic/elastic-agent-libs v0.31.0
+	github.com/elastic/elastic-agent-libs v0.32.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.24.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.25.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.24.0
@@ -47,6 +47,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusremotewritereceiver v0.141.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.141.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver v0.141.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/snmpreceiver v0.141.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver v0.141.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver v0.141.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver v0.141.0
@@ -77,6 +78,7 @@ require (
 	github.com/fsnotify/fsevents v0.1.1 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75 // indirect
+	github.com/gosnmp/gosnmp v1.42.1 // indirect
 	github.com/insomniacslk/dhcp v0.0.0-20220119180841-3c283ff8b7dd // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.141.0 // indirect
