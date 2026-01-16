@@ -509,7 +509,7 @@ func exporterIDToOutputNameLookup(components []component.Component) (map[string]
 		// There may be collisions since multiple components can be generated
 		// from the same output, but this is fine since they will all have
 		// the same name as well.
-		lookup[exporterID.String()] = comp.OutputName
+		lookup[exporterID.String()] = fmt.Sprintf("%v-%v", exporterType, comp.OutputName)
 	}
 	return lookup, nil
 }
