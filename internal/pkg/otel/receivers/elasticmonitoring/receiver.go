@@ -96,11 +96,16 @@ func (mr *monitoringReceiver) updateMetrics() {
 
 	exporterMetrics := convertScopeMetrics(resourceMetrics.ScopeMetrics)
 	for exporter, metrics := range exporterMetrics {
-		mr.sendExporterMetricsEvent(exporter, metrics)
+		componentID, ok := mr.config.ExporterNames[exporter]
+		if !ok {
+			mr.logger.Warn("Reporting metrics for exporter with no specified component name", zap.String("exporter_id", exporter))
+			componentID = exporter
+		}
+		mr.sendExporterMetricsEvent(componentID, metrics)
 	}
 }
 
-func (mr *monitoringReceiver) sendExporterMetricsEvent(exporter string, metrics exporterMetrics) {
+func (mr *monitoringReceiver) sendExporterMetricsEvent(componentID string, metrics exporterMetrics) {
 	pLogs := plog.NewLogs()
 	resourceLogs := pLogs.ResourceLogs().AppendEmpty()
 	sourceLogs := resourceLogs.ScopeLogs().AppendEmpty()
@@ -110,7 +115,7 @@ func (mr *monitoringReceiver) sendExporterMetricsEvent(exporter string, metrics 
 	// Initialize to the configured event template
 	beatEvent := mapstr.M(mr.config.EventTemplate.Fields).Clone()
 	addMetricsToEventFields(mr.logger, metrics, &beatEvent)
-	_, _ = beatEvent.Put("component.id", exporter)
+	_, _ = beatEvent.Put("component.id", componentID)
 
 	// Set timestamp
 	now := time.Now()
@@ -142,6 +147,6 @@ func (mr *monitoringReceiver) sendExporterMetricsEvent(exporter string, metrics 
 	err := mr.consumer.ConsumeLogs(mr.runCtx, pLogs)
 	if err != nil && mr.runCtx.Err() == nil {
 		// Don't log an error if the context is cancelled, that's just a normal shutdown
-		mr.logger.Error("error sending internal telemetry log record", zap.String("exporter", exporter), zap.Error(err))
+		mr.logger.Error("error sending internal telemetry log record", zap.String("exporter", componentID), zap.Error(err))
 	}
 }
