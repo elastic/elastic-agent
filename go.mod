@@ -77,8 +77,14 @@ require (
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
+<<<<<<< HEAD
 	gotest.tools/gotestsum v1.12.2
 	helm.sh/helm/v3 v3.19.4
+=======
+	gotest.tools/gotestsum v1.13.0
+	helm.sh/helm/v3 v3.19.5
+	howett.net/plist v1.0.1
+>>>>>>> 013ff34f8 (build(deps): bump helm.sh/helm/v3 from 3.19.4 to 3.19.5 (#12271))
 	k8s.io/api v0.34.2
 	k8s.io/apimachinery v0.34.2
 	k8s.io/cli-runtime v0.34.2
