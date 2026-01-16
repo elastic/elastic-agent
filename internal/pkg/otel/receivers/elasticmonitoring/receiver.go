@@ -147,6 +147,6 @@ func (mr *monitoringReceiver) sendExporterMetricsEvent(componentID string, metri
 	err := mr.consumer.ConsumeLogs(mr.runCtx, pLogs)
 	if err != nil && mr.runCtx.Err() == nil {
 		// Don't log an error if the context is cancelled, that's just a normal shutdown
-		mr.logger.Error("error sending internal telemetry log record", zap.String("exporter", componentID), zap.Error(err))
+		mr.logger.Error("error sending internal telemetry log record", zap.String("component.id", componentID), zap.Error(err))
 	}
 }

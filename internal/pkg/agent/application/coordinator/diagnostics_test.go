@@ -296,6 +296,7 @@ func TestDiagnosticComponentsExpected(t *testing.T) {
 			ID:         "filestream-component",
 			InputType:  "filestream",
 			OutputType: "elasticsearch",
+			OutputName: "default",
 			InputSpec: &component.InputRuntimeSpec{
 				InputType:  "filestream",
 				BinaryName: "filestream-binary",
@@ -317,6 +318,7 @@ components:
   - id: filestream-component
     input_type: filestream
     output_type: elasticsearch
+    output_name: default
     input_spec:
       binary_name: filestream-binary
       binary_path: filestream-path
@@ -351,6 +353,7 @@ func TestDiagnosticComponentsExpectedWithAPM(t *testing.T) {
 			ID:         "some-apm-aware-component",
 			InputType:  "filestream",
 			OutputType: "elasticsearch",
+			OutputName: "default",
 			Component: &proto.Component{
 				ApmConfig: &proto.APMConfig{
 					Elastic: &proto.ElasticAPM{
@@ -375,6 +378,7 @@ components:
   - id: some-apm-aware-component
     input_type: filestream
     output_type: elasticsearch
+    output_name: default
     units: []
     component:
       limits: null
