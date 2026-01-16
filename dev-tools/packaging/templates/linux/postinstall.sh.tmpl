@@ -21,7 +21,7 @@ if test -L "$symlink"; then
     unlink "$symlink"
 elif test -L "${PREFIX}${symlink}"; then
     echo "found symlink ${PREFIX}${symlink}, unlink"
-    unlink "$symlink"
+    unlink "${PREFIX}$symlink"
 fi
 
 SERVICE_NAME="ElasticEndpoint"
@@ -58,20 +58,26 @@ echo "create symlink "$symlink" to "$new_agent_dir/elastic-agent""
 ln -s "$new_agent_dir/elastic-agent" "$symlink"
 
 if [[ ${PREFIX} != "" ]]; then
-    echo "Prefix: ${PREFIX} detected, editing service file"
-    # Replace old paths in service file with new ones, use # as delimiter
-    sed -i "s#/etc/elastic-agent/elastic-agent.yml#${PREFIX}/etc/elastic-agent/elastic-agent.yml#g" ${PREFIX}/lib/systemd/system/elastic-agent.service
-    sed -i "s#/usr/bin/elastic-agent#${PREFIX}/usr/bin/elastic-agent#g" ${PREFIX}/lib/systemd/system/elastic-agent.service
+    if test -f ${PREFIX}/lib/systemd/system/elastic-agent.service; then
+        echo "Prefix: ${PREFIX} detected, editing service file"
+        # Replace old paths in service file with new ones, use # as delimiter
+        sed -i "s#/etc/elastic-agent/elastic-agent.yml#${PREFIX}/etc/elastic-agent/elastic-agent.yml#g" ${PREFIX}/lib/systemd/system/elastic-agent.service
+        sed -i "s#/usr/bin/elastic-agent#${PREFIX}/usr/bin/elastic-agent#g" ${PREFIX}/lib/systemd/system/elastic-agent.service
+    fi
 
-    echo "editing elastic-agent wrapper"
-    # Replace paths in wrapper script
-    sed -i "s#/usr/share/elastic-agent/bin/elastic-agent#${PREFIX}/usr/share/elastic-agent/bin/elastic-agent#g" ${PREFIX}/usr/bin/elastic-agent
-    sed -i "s#/var/lib/elastic-agent#${PREFIX}/var/lib/elastic-agent#g" ${PREFIX}/usr/bin/elastic-agent
-    sed -i "s#/etc/elastic-agent#${PREFIX}/etc/elastic-agent#g" ${PREFIX}/usr/bin/elastic-agent
-    # TODO Do we need to change paths.logs?
+    if test -f ${PREFIX}/usr/bin/elastic-agent; then
+        echo "editing elastic-agent wrapper"
+        # Replace paths in wrapper script
+        sed -i "s#/usr/share/elastic-agent/bin/elastic-agent#${PREFIX}/usr/share/elastic-agent/bin/elastic-agent#g" ${PREFIX}/usr/bin/elastic-agent
+        sed -i "s#/var/lib/elastic-agent#${PREFIX}/var/lib/elastic-agent#g" ${PREFIX}/usr/bin/elastic-agent
+        sed -i "s#/etc/elastic-agent#${PREFIX}/etc/elastic-agent#g" ${PREFIX}/usr/bin/elastic-agent
+        # TODO Do we need to change paths.logs?
+    fi
 
-    echo "link ${PREFIX}/lib/systemd/system/elastic-agent.service to /lib/systemd/system/elastic-agent.service"
-    ln -s ${PREFIX}/lib/systemd/system/elastic-agent.service /lib/systemd/system/elastic-agent.service
+    if ! test -L /lib/systemd/system/elastic-agent.service; then
+        echo "link ${PREFIX}/lib/systemd/system/elastic-agent.service to /lib/systemd/system/elastic-agent.service"
+        ln -s ${PREFIX}/lib/systemd/system/elastic-agent.service /lib/systemd/system/elastic-agent.service
+    fi
 fi
 
 $new_agent_dir/elastic-agent apply-flavor

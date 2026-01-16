@@ -99,6 +99,23 @@ if test -L "$symlink"; then
         else
             echo "didn't find $old_run_path"
         fi
+
+        if [[ ${PREFIX} != "" ]]; then
+            # Upgrade detected, prefix present
+            if test -f ${PREFIX}/usr/bin/elastic-agent; then
+                echo "Prefix: ${PREFIX} detected, editing elastic-agent wrapper"
+                sed -i "s#/usr/share/elastic-agent/bin/elastic-agent#${PREFIX}/usr/share/elastic-agent/bin/elastic-agent#g" ${PREFIX}/usr/bin/elastic-agent
+                sed -i "s#/var/lib/elastic-agent#${PREFIX}/var/lib/elastic-agent#g" ${PREFIX}/usr/bin/elastic-agent
+                sed -i "s#/etc/elastic-agent#${PREFIX}/etc/elastic-agent#g" ${PREFIX}/usr/bin/elastic-agent
+                # TODO Do we need to change paths.logs?
+            fi
+
+            if test -f ${PREFIX}/lib/systemd/system/elastic-agent.service; then
+                echo "Prefix: ${PREFIX} detected, editing service file"
+                sed -i "s#/etc/elastic-agent/elastic-agent.yml#${PREFIX}/etc/elastic-agent/elastic-agent.yml#g" ${PREFIX}/lib/systemd/system/elastic-agent.service
+                sed -i "s#/usr/bin/elastic-agent#${PREFIX}/usr/bin/elastic-agent#g" ${PREFIX}/lib/systemd/system/elastic-agent.service
+            fi
+        fi
     fi
 else
 	echo "no previous installation found"
