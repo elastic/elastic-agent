@@ -477,6 +477,7 @@ func TestGetOtelConfig(t *testing.T) {
 						ID:         "filestream-default",
 						InputType:  "filestream",
 						OutputType: "elasticsearch",
+						OutputName: "default",
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -522,90 +523,6 @@ func TestGetOtelConfig(t *testing.T) {
 			}),
 		},
 		{
-			name: "multiple filestream inputs and output types",
-			model: &component.Model{
-				Components: []component.Component{
-					{
-						ID:         "filestream-primaryOutput",
-						InputType:  "filestream",
-						OutputType: "elasticsearch",
-						InputSpec: &component.InputRuntimeSpec{
-							BinaryName: "elastic-otel-collector",
-							Spec: component.InputSpec{
-								Command: &component.CommandSpec{
-									Args: []string{"filebeat"},
-								},
-							},
-						},
-						Units: []component.Unit{
-							{
-								ID:     "filestream-unit",
-								Type:   client.UnitTypeInput,
-								Config: component.MustExpectedConfig(fileStreamConfig),
-							},
-							{
-								ID:     "filestream-primaryOutput",
-								Type:   client.UnitTypeOutput,
-								Config: component.MustExpectedConfig(esOutputConfig(extraParams{"ssl.verification_mode", "certificate"})),
-							},
-						},
-					},
-					{
-						ID:         "filestream-secondaryOutput",
-						InputType:  "filestream",
-						OutputType: "elasticsearch",
-						InputSpec: &component.InputRuntimeSpec{
-							BinaryName: "elastic-otel-collector",
-							Spec: component.InputSpec{
-								Command: &component.CommandSpec{
-									Args: []string{"filebeat"},
-								},
-							},
-						},
-						Units: []component.Unit{
-							{
-								ID:     "filestream-unit-2",
-								Type:   client.UnitTypeInput,
-								Config: component.MustExpectedConfig(fileStreamConfig),
-							},
-							{
-								ID:     "filestream-secondaryOutput",
-								Type:   client.UnitTypeOutput,
-								Config: component.MustExpectedConfig(esOutputConfig(extraParams{"ssl.ca_trusted_fingerprint", "b9a10bbe64ee9826abeda6546fc988c8bf798b41957c33d05db736716513dc9c"})),
-							},
-						},
-					},
-				},
-			},
-			expectedConfig: confmap.NewFromStringMap(map[string]any{
-				"exporters": map[string]any{
-					"elasticsearch/_agent-component/primaryOutput":   expectedESConfig("primaryOutput"),
-					"elasticsearch/_agent-component/secondaryOutput": expectedESConfig("secondaryOutput"),
-				},
-				"extensions": map[string]any{
-					"beatsauth/_agent-component/primaryOutput":   expectedExtensionConfig(extraParams{"ssl", map[string]any{"verification_mode": uint64(2)}}),
-					"beatsauth/_agent-component/secondaryOutput": expectedExtensionConfig(extraParams{"ssl", map[string]any{"ca_trusted_fingerprint": "b9a10bbe64ee9826abeda6546fc988c8bf798b41957c33d05db736716513dc9c"}}),
-				},
-				"receivers": map[string]any{
-					"filebeatreceiver/_agent-component/filestream-primaryOutput":   expectedFilestreamConfig("filestream-primaryOutput"),
-					"filebeatreceiver/_agent-component/filestream-secondaryOutput": expectedFilestreamConfig("filestream-secondaryOutput"),
-				},
-				"service": map[string]any{
-					"extensions": []any{"beatsauth/_agent-component/primaryOutput", "beatsauth/_agent-component/secondaryOutput"},
-					"pipelines": map[string]any{
-						"logs/_agent-component/filestream-primaryOutput": map[string][]string{
-							"exporters": {"elasticsearch/_agent-component/primaryOutput"},
-							"receivers": {"filebeatreceiver/_agent-component/filestream-primaryOutput"},
-						},
-						"logs/_agent-component/filestream-secondaryOutput": map[string][]string{
-							"exporters": {"elasticsearch/_agent-component/secondaryOutput"},
-							"receivers": {"filebeatreceiver/_agent-component/filestream-secondaryOutput"},
-						},
-					},
-				},
-			}),
-		},
-		{
 			name: "multiple filestream inputs and one output",
 			model: &component.Model{
 				Components: []component.Component{
@@ -613,6 +530,7 @@ func TestGetOtelConfig(t *testing.T) {
 						ID:         "filestream1-default",
 						InputType:  "filestream",
 						OutputType: "elasticsearch",
+						OutputName: "default",
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -638,6 +556,7 @@ func TestGetOtelConfig(t *testing.T) {
 						ID:         "filestream2-default",
 						InputType:  "filestream",
 						OutputType: "elasticsearch",
+						OutputName: "default",
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -695,6 +614,7 @@ func TestGetOtelConfig(t *testing.T) {
 						ID:         "beat-metrics-monitoring",
 						InputType:  "beat/metrics",
 						OutputType: "elasticsearch",
+						OutputName: "default",
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -793,6 +713,7 @@ func TestGetOtelConfig(t *testing.T) {
 						ID:         "system-metrics",
 						InputType:  "system/metrics",
 						OutputType: "elasticsearch",
+						OutputName: "default",
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -1134,6 +1055,7 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 				ID:         "supported-comp",
 				InputType:  "filestream",
 				OutputType: "elasticsearch",
+				OutputName: "default",
 				InputSpec: &component.InputRuntimeSpec{
 					BinaryName: "elastic-otel-collector",
 					Spec: component.InputSpec{
@@ -1171,6 +1093,7 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 				ID:         "unsupported-output",
 				InputType:  "filestream",
 				OutputType: "kafka", // unsupported
+				OutputName: "default",
 			},
 			expectedError: "unsupported output type: kafka",
 		},
@@ -1180,6 +1103,7 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 				ID:         "unsupported-output",
 				InputType:  "filestream",
 				OutputType: "logstash", // unsupported
+				OutputName: "default",
 			},
 			expectedError: "unsupported output type: logstash",
 		},
@@ -1189,6 +1113,7 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 				ID:         "unsupported-input",
 				InputType:  "stdin", // unsupported
 				OutputType: "elasticsearch",
+				OutputName: "default",
 			},
 			expectedError: "unsupported input type: stdin",
 		},
@@ -1198,6 +1123,7 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 				ID:         "unsupported-config",
 				InputType:  "filestream",
 				OutputType: "elasticsearch",
+				OutputName: "default",
 				InputSpec: &component.InputRuntimeSpec{
 					BinaryName: "elastic-otel-collector",
 					Spec: component.InputSpec{
@@ -1480,7 +1406,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 		unit                  component.Unit
 		exporterType          otelcomponent.Type
 		outputName            string
-		expectedExportersCfg  map[string]any
+		expectedExporterCfg   map[string]any
 		expectedQueueSettings map[string]any
 		expectedExtensionCfg  map[string]any
 		expectedError         string
@@ -1523,13 +1449,11 @@ func TestUnitToExporterConfig(t *testing.T) {
 			},
 			exporterType: esExporterType,
 			outputName:   "default",
-			expectedExportersCfg: map[string]any{
-				"elasticsearch/_agent-component/default": map[string]any{
-					"hosts":      []interface{}{"es:9200"},
-					"translated": true,
-					"auth": map[string]any{
-						"authenticator": "beatsauth/_agent-component/default",
-					},
+			expectedExporterCfg: map[string]any{
+				"hosts":      []interface{}{"es:9200"},
+				"translated": true,
+				"auth": map[string]any{
+					"authenticator": "beatsauth/_agent-component/default",
 				},
 			},
 			expectedQueueSettings: nil,
@@ -1554,14 +1478,12 @@ func TestUnitToExporterConfig(t *testing.T) {
 			},
 			exporterType: esExporterType,
 			outputName:   "default",
-			expectedExportersCfg: map[string]any{
-				"elasticsearch/_agent-component/default": map[string]any{
-					"hosts":      []interface{}{"es:9200"},
-					"queue":      map[string]any{"mem": map[string]any{"events": float64(100)}},
-					"translated": true,
-					"auth": map[string]any{
-						"authenticator": "beatsauth/_agent-component/default",
-					},
+			expectedExporterCfg: map[string]any{
+				"hosts":      []interface{}{"es:9200"},
+				"queue":      map[string]any{"mem": map[string]any{"events": float64(100)}},
+				"translated": true,
+				"auth": map[string]any{
+					"authenticator": "beatsauth/_agent-component/default",
 				},
 			},
 			expectedQueueSettings: map[string]any{"mem": map[string]any{"events": float64(100)}},
@@ -1588,13 +1510,11 @@ func TestUnitToExporterConfig(t *testing.T) {
 			},
 			exporterType: esExporterType,
 			outputName:   "default",
-			expectedExportersCfg: map[string]any{
-				"elasticsearch/_agent-component/default": map[string]any{
-					"hosts":      []any{}, // from override
-					"translated": true,
-					"auth": map[string]any{
-						"authenticator": "beatsauth/_agent-component/default",
-					},
+			expectedExporterCfg: map[string]any{
+				"hosts":      []any{}, // from override
+				"translated": true,
+				"auth": map[string]any{
+					"authenticator": "beatsauth/_agent-component/default",
 				},
 			},
 			expectedQueueSettings: nil,
@@ -1625,13 +1545,11 @@ func TestUnitToExporterConfig(t *testing.T) {
 			},
 			exporterType: esExporterType,
 			outputName:   "default",
-			expectedExportersCfg: map[string]any{
-				"elasticsearch/_agent-component/default": map[string]any{
-					"hosts":      []interface{}{"es:9200"},
-					"translated": true,
-					"auth": map[string]any{
-						"authenticator": "beatsauth/_agent-component/default",
-					},
+			expectedExporterCfg: map[string]any{
+				"hosts":      []interface{}{"es:9200"},
+				"translated": true,
+				"auth": map[string]any{
+					"authenticator": "beatsauth/_agent-component/default",
 				},
 			},
 			expectedQueueSettings: nil,
@@ -1657,7 +1575,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.expectedExportersCfg, exportersCfg)
+			assert.Equal(t, tt.expectedExporterCfg, exportersCfg)
 			assert.Equal(t, tt.expectedQueueSettings, queueSettings)
 			assert.Equal(t, tt.expectedExtensionCfg, extensionCfg)
 		})

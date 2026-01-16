@@ -297,8 +297,10 @@ func getCollectorConfigForComponent(
 	}
 
 	fullConfig := map[string]any{
-		"receivers":  receiversConfig,
-		"exporters":  exporterConfig,
+		"receivers": receiversConfig,
+		"exporters": map[string]any{
+			exporterID.String(): exporterConfig,
+		},
 		"extensions": extensionConfig,
 		"service": map[string]any{
 			"extensions": extensionKey,
