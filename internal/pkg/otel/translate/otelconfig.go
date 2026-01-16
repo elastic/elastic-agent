@@ -416,7 +416,7 @@ func getExporterConfigForComponent(comp *component.Component, exporterType otelc
 			return unitToExporterConfig(unit, comp.OutputName, exporterType, logger)
 		}
 	}
-	return nil, nil, nil, fmt.Errorf("output unit not found for component '%v'", comp.ID)
+	return nil, nil, nil, nil
 }
 
 // getSignalForComponent returns the otel signal for the given component. Currently, this is always logs, even for
