@@ -264,6 +264,10 @@ func StartElasticAgentOtel(
 	)
 	require.NoError(t, err, "cannot prepare Elastic Agent command")
 
+	// This allows us to properly handle signals on Windows
+	cmd, err = process.Cmd(ctx, cmd.Path, cmd.Args[1:]...)
+	require.NoError(t, err, "cannot create exec.Cmd for Elastic Agent")
+
 	cmd.Stderr = f
 	cmd.Stdout = f
 
