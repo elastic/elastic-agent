@@ -470,7 +470,8 @@ func TestSerializableStatusJSONDeserialization(t *testing.T) {
 			require.NoError(t, err, "JSON unmarshaling should not fail")
 
 			// Check status
-			aggStatus := FromSerializableStatus(&ss)
+			aggStatus, err := FromSerializableStatus(&ss)
+			require.NoError(t, err, "FromSerializableStatus should not fail")
 			assert.Equal(t, tt.expectedStatus, aggStatus.Status())
 
 			// Check error
@@ -569,7 +570,8 @@ func TestSerializableStatusJSONDeserializationHealthcheckv2Format(t *testing.T) 
 	require.NoError(t, err, "JSON unmarshaling should not fail")
 
 	// Verify top-level status
-	aggStatus := FromSerializableStatus(&ss)
+	aggStatus, err := FromSerializableStatus(&ss)
+	require.NoError(t, err, "FromSerializableStatus should not fail")
 	assert.Equal(t, componentstatus.StatusRecoverableError, aggStatus.Status())
 	require.NotNil(t, aggStatus.Err())
 	assert.Contains(t, aggStatus.Err().Error(), "connection refused")
@@ -724,7 +726,8 @@ func TestFromSerializableEvent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			event := FromSerializableEvent(tt.event)
+			event, err := FromSerializableEvent(tt.event)
+			require.NoError(t, err)
 
 			if tt.event == nil {
 				assert.Nil(t, event)
@@ -887,7 +890,8 @@ func TestFromSerializableStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := FromSerializableStatus(tt.input)
+			result, err := FromSerializableStatus(tt.input)
+			require.NoError(t, err)
 			require.NotNil(t, result)
 			tt.checkFn(t, result)
 		})
@@ -902,6 +906,8 @@ func TestAggregateStatusHelper(t *testing.T) {
 		assert.Nil(t, result.Err())
 		assert.NotNil(t, result.ComponentStatusMap)
 		assert.Empty(t, result.ComponentStatusMap)
+		assert.NotNil(t, result.Attributes())
+		assert.Empty(t, result.Attributes().AsRaw())
 	})
 
 	t.Run("creates status with error", func(t *testing.T) {

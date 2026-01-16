@@ -6,6 +6,7 @@ package status
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
@@ -56,8 +57,11 @@ func (e *healthCheckEvent) Err() error                     { return e.err }
 func (e *healthCheckEvent) Attributes() pcommon.Map        { return e.attributes }
 
 // FromSerializableStatus reconstructs an AggregateStatus from serializableStatus.
-func FromSerializableStatus(ss *SerializableStatus) *status.AggregateStatus {
-	ev := FromSerializableEvent(ss.SerializableEvent)
+func FromSerializableStatus(ss *SerializableStatus) (*status.AggregateStatus, error) {
+	ev, err := FromSerializableEvent(ss.SerializableEvent)
+	if err != nil {
+		return nil, err
+	}
 
 	as := &status.AggregateStatus{
 		Event:              ev,
@@ -65,16 +69,20 @@ func FromSerializableStatus(ss *SerializableStatus) *status.AggregateStatus {
 	}
 
 	for k, cs := range ss.ComponentStatuses {
-		as.ComponentStatusMap[k] = FromSerializableStatus(cs)
+		componentStatus, componentErr := FromSerializableStatus(cs)
+		if componentErr != nil {
+			return nil, fmt.Errorf("failed to deserialize component status %s: %w", k, componentErr)
+		}
+		as.ComponentStatusMap[k] = componentStatus
 	}
 
-	return as
+	return as, nil
 }
 
 // FromSerializableEvent reconstructs a status.Event from SerializableEvent.
-func FromSerializableEvent(se *SerializableEvent) status.Event {
+func FromSerializableEvent(se *SerializableEvent) (status.Event, error) {
 	if se == nil {
-		return nil
+		return nil, nil
 	}
 
 	var err error
@@ -88,14 +96,16 @@ func FromSerializableEvent(se *SerializableEvent) status.Event {
 	}
 
 	attributes := pcommon.NewMap()
-	// TODO: handle the error here
-	_ = attributes.FromRaw(se.Attributes)
+	parseErr := attributes.FromRaw(se.Attributes)
+	if parseErr != nil {
+		panic(fmt.Errorf("error parsing event attributes %v: %w", se.Attributes, parseErr))
+	}
 	return &healthCheckEvent{
 		status:     statusVal,
 		timestamp:  se.Timestamp,
 		err:        err,
 		attributes: attributes,
-	}
+	}, nil
 }
 
 // CompareStatuses checks if two AggregateStatuses are equal, excluding timestamp.
@@ -148,9 +158,10 @@ func CompareStatuses(s1, s2 *status.AggregateStatus) bool {
 func AggregateStatus(sts componentstatus.Status, err error) *status.AggregateStatus {
 	return &status.AggregateStatus{
 		Event: &healthCheckEvent{
-			status:    sts,
-			timestamp: time.Now(),
-			err:       err,
+			status:     sts,
+			timestamp:  time.Now(),
+			err:        err,
+			attributes: pcommon.NewMap(),
 		},
 		ComponentStatusMap: make(map[string]*status.AggregateStatus),
 	}

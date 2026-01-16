@@ -60,7 +60,7 @@ func AllComponentsStatuses(ctx context.Context, httpHealthCheckPort int) (*otels
 		return nil, fmt.Errorf("failed to unmarshal serializable status: %w", err)
 	}
 
-	return status.FromSerializableStatus(serStatus), nil
+	return status.FromSerializableStatus(serStatus)
 }
 
 // injectHealthCheckV2Extension injects the healthcheckv2 extension into the provided configuration.

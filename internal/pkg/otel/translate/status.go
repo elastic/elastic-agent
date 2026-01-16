@@ -451,7 +451,7 @@ func getComponentUnitState(otelUnitStatus *status.AggregateStatus, unit componen
 		var streamMsg string
 		var isError bool
 		if streamStatus, ok := unitStreamStatuses[stream.Id]; ok {
-			streamStatusEvent := serializablestatus.FromSerializableEvent(streamStatus)
+			streamStatusEvent := streamStatusToStatusEvent(streamStatus)
 			isError = streamStatusEvent.Err() != nil
 			streamState, streamMsg = StateWithMessage(streamStatusEvent)
 		} else {
@@ -480,7 +480,7 @@ func getComponentUnitState(otelUnitStatus *status.AggregateStatus, unit componen
 	unitInputId := comp.GetBeatInputIDForUnit(unit.ID)
 	unitStatus, ok := inputStatusMap[unitInputId]
 	if ok {
-		unitState, unitMessage := StateWithMessage(serializablestatus.FromSerializableEvent(unitStatus))
+		unitState, unitMessage := StateWithMessage(streamStatusToStatusEvent(unitStatus))
 		return runtime.ComponentUnitState{
 			State:   unitState,
 			Message: unitMessage,
@@ -512,7 +512,7 @@ func unitStateFromStreamStatuses(streamStatuses map[string]*serializablestatus.S
 	reportedMsg := ""
 
 	for _, s := range streamStatuses {
-		state, message := StateWithMessage(serializablestatus.FromSerializableEvent(s))
+		state, message := StateWithMessage(streamStatusToStatusEvent(s))
 		switch state {
 		case client.UnitStateDegraded:
 			if reportedState != client.UnitStateDegraded {
@@ -527,6 +527,12 @@ func unitStateFromStreamStatuses(streamStatuses map[string]*serializablestatus.S
 		}
 	}
 	return reportedState, reportedMsg
+}
+
+func streamStatusToStatusEvent(streamStatus *serializablestatus.SerializableEvent) status.Event {
+	// the below translation can't fail here, because stream statuses cannot have attributes
+	streamStatusEvent, _ := serializablestatus.FromSerializableEvent(streamStatus)
+	return streamStatusEvent
 }
 
 // ParseEntityStatusId parses an entity status ID into its kind and entity ID. An entity can be a pipeline or otel component.

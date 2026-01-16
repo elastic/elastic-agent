@@ -1089,7 +1089,7 @@ func aggregateStatusWithAttributes(s componentstatus.Status, err error, attribut
 	if err != nil {
 		errStr = err.Error()
 	}
-	event := serializablestatus.FromSerializableEvent(&serializablestatus.SerializableEvent{
+	event, _ := serializablestatus.FromSerializableEvent(&serializablestatus.SerializableEvent{
 		StatusString: s.String(), // Status.String() returns "StatusOK", "StatusRecoverableError", etc.
 		Error:        errStr,
 		Attributes:   attributes,
