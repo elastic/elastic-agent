@@ -98,8 +98,12 @@ func (mr *monitoringReceiver) updateMetrics() {
 	// Log the new metrics data so there is a record for troubleshooting in the logs / diagnostics
 	var metricsStringBuilder strings.Builder
 	encoder := json.NewEncoder(&metricsStringBuilder)
-	encoder.Encode(resourceMetrics.ScopeMetrics)
-	mr.logger.Info("Collector internal telemetry metrics updated", zap.String("metrics", metricsStringBuilder.String()))
+	err = encoder.Encode(resourceMetrics.ScopeMetrics)
+	if err == nil {
+		mr.logger.Info("Collector internal telemetry metrics updated", zap.String("metrics", metricsStringBuilder.String()))
+	} else {
+		mr.logger.Error("Updating collector internal telemetry metrics: failed to encode metrics struct", zap.Error(err))
+	}
 
 	exporterMetrics := convertScopeMetrics(resourceMetrics.ScopeMetrics)
 	for exporter, metrics := range exporterMetrics {
