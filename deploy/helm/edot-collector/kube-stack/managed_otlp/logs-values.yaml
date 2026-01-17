@@ -231,9 +231,9 @@ collectors:
         otlp:
           protocols:
             grpc:
-              endpoint: ${env:MY_POD_IP}:4317
+              endpoint: ${env:OTEL_K8S_POD_IP}:4317
             http:
-              endpoint: ${env:MY_POD_IP}:4318
+              endpoint: ${env:OTEL_K8S_POD_IP}:4318
       processors: {}
       exporters:
         debug:
