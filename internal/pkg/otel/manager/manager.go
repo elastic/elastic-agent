@@ -414,7 +414,7 @@ func buildMergedConfig(
 			if mCfg.Enabled && mCfg.MonitorMetrics {
 				// Metrics monitoring is enabled, inject a receiver for the
 				// collector's internal telemetry.
-				err := injectMonitoringReceiver(mergedOtelCfg, mCfg, agentInfo)
+				err := injectMonitoringReceiver(mergedOtelCfg, mCfg, agentInfo, cfgUpdate.components)
 				if err != nil {
 					return nil, fmt.Errorf("merging internal telemetry config: %w", err)
 				}
@@ -495,10 +495,30 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 	}
 }
 
+// exporterIDToOutputNameLookup compiles the mapping from raw collector
+// exporter IDs to the policy output names that generated them, so internal
+// telemetry monitoring can associate metrics with the user-defined name.
+func exporterIDToOutputNameLookup(components []component.Component) (map[string]string, error) {
+	lookup := map[string]string{}
+	for _, comp := range components {
+		exporterType, err := translate.OutputTypeToExporterType(comp.OutputType)
+		if err != nil {
+			return nil, err
+		}
+		exporterID := translate.GetExporterID(exporterType, comp.OutputName)
+		// There may be collisions since multiple components can be generated
+		// from the same output, but this is fine since they will all have
+		// the same name as well.
+		lookup[exporterID.String()] = fmt.Sprintf("%v-%v", exporterType, comp.OutputName)
+	}
+	return lookup, nil
+}
+
 func injectMonitoringReceiver(
 	config *confmap.Conf,
 	monitoring *monitoringCfg.MonitoringConfig,
 	agentInfo info.Agent,
+	components []component.Component,
 ) error {
 	receiverType := otelcomponent.MustNewType(elasticmonitoringreceiver.Name)
 	receiverName := "collector/internal-telemetry-monitoring"
@@ -519,11 +539,16 @@ func injectMonitoringReceiver(
 		// We can't monitor OTel metrics without OTel-based monitoring
 		return nil
 	}
+	outputNameLookup, err := exporterIDToOutputNameLookup(components)
+	if err != nil {
+		return fmt.Errorf("couldn't map exporter IDs to output names: %w", err)
+	}
 	receiverCfg := map[string]any{
 		"receivers": map[string]any{
 			receiverID: map[string]any{
 				"event_template": monitoringEventTemplate(monitoring, agentInfo),
 				"interval":       monitoring.MetricsPeriod,
+				"exporter_names": outputNameLookup,
 			},
 		},
 		"service": map[string]any{
