@@ -758,6 +758,7 @@ func (f *Fixture) PrepareAgentCommand(ctx context.Context, args []string, opts .
 			return nil, fmt.Errorf("error adding opts to Exec: %w", err)
 		}
 	}
+
 	return cmd, nil
 }
 
