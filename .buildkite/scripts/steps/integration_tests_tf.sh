@@ -25,7 +25,7 @@ ESS_REGION=${ESS_REGION:-""}
 # Override the stack version from `.package-version` contents
 # There is a time when the current snapshot is not available on cloud yet, so we cannot use the latest version automatically
 # This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
-STACK_VERSION="$(jq -r '.version' .package-version)"
+STACK_VERSION="$(jq -r '.stack_version' .package-version)"
 STACK_BUILD_ID="$(jq -r '.stack_build_id' .package-version)"
 if [[ "${FIPS:-false}" == "true" ]]; then
   # FRH testing environment does not have same stack build IDs as CFT environment so
@@ -68,7 +68,7 @@ else
   # test binaries are needed only when running integration tests outside of k8s
   echo "~~~ Building test binaries"
   mage build:testBinaries
-  
+
   if [ "$TEST_SUDO" == "true" ]; then
     sudo -E .buildkite/scripts/buildkite-integration-tests.sh $@
   else

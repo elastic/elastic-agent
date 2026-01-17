@@ -21,6 +21,7 @@ type packageVersion struct {
 	ManifestURL  string `json:"manifest_url"`
 	SummaryURL   string `json:"summary_url"`
 	CoreVersion  string `json:"core_version"`
+	StackVersion string `json:"stack_version"`
 	StackBuildID string `json:"stack_build_id"`
 }
 
@@ -51,7 +52,7 @@ func initPackageVersion() error {
 
 	_ = os.Setenv("BEAT_VERSION", pv.CoreVersion)
 	_ = os.Setenv("AGENT_VERSION", pv.Version)
-	_ = os.Setenv("AGENT_STACK_VERSION", pv.Version)
+	_ = os.Setenv("AGENT_STACK_VERSION", pv.StackVersion)
 	_ = os.Setenv("SNAPSHOT", "true")
 
 	dropPath := filepath.Join("build", "distributions", "elastic-agent-drop")
@@ -65,14 +66,15 @@ func initPackageVersion() error {
 	return nil
 }
 
-func UpdatePackageVersion(version string, buildID string, manifestURL string, summaryURL string) error {
+func UpdatePackageVersion(version, buildID, stackVersion, stackBuildId, manifestURL, summaryURL string) error {
 	packageVersion := packageVersion{
 		Version:      version,
 		BuildID:      buildID,
 		ManifestURL:  manifestURL,
 		SummaryURL:   summaryURL,
 		CoreVersion:  strings.ReplaceAll(version, "-SNAPSHOT", ""),
-		StackBuildID: fmt.Sprintf("%s-SNAPSHOT", buildID),
+		StackVersion: stackVersion,
+		StackBuildID: stackBuildId,
 	}
 
 	if err := writePackageVersion(packageVersion); err != nil {
