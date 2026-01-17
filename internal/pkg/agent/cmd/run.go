@@ -175,7 +175,7 @@ func runElasticAgentCritical(
 	locker := filelock.NewAppLocker(paths.Data(), paths.AgentLockFileName)
 	lockErr := locker.TryLock()
 	if lockErr != nil {
-		errs = append(errs, fmt.Errorf("failed to get app lock: %w", err))
+		errs = append(errs, fmt.Errorf("failed to get app lock: %w", lockErr))
 	}
 	defer func() {
 		_ = locker.Unlock()
