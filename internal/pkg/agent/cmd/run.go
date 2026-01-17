@@ -178,7 +178,7 @@ func runElasticAgentCritical(
 	locker := filelock.NewAppLocker(paths.Data(), paths.AgentLockFileName)
 	lockErr := locker.TryLock()
 	if lockErr != nil {
-		errs = append(errs, fmt.Errorf("failed to get app lock: %w", err))
+		errs = append(errs, fmt.Errorf("failed to get app lock: %w", lockErr))
 	}
 	defer func() {
 		_ = locker.Unlock()
@@ -420,7 +420,7 @@ func runElasticAgent(
 	diagHooks := diagnostics.GlobalHooks()
 	diagHooks = append(diagHooks, coord.DiagnosticHooks()...)
 	controlLog := l.Named("control")
-	control := server.New(controlLog, agentInfo, coord, tracer, diagHooks, cfg.Settings.GRPC)
+	control := server.New(controlLog, agentInfo, coord, tracer, diagHooks, cfg.Settings.GRPC, availableRollbacksSource)
 
 	// if the configMgr implements the TestModeConfigSetter in means that Elastic Agent is in testing mode and
 	// the configuration will come in over the control protocol, so we set the config setting on the control protocol
