@@ -1,0 +1,320 @@
+products:
+- product: elastic-agent
+  target: 9.3.0
+  lifecycle: ga
+entries:
+- file:
+    name: 1768597462-bundle-all-beats-into-elastic-otel-collector-(make.yaml
+    checksum: 4802202e7b2d3ce9c2b6d95dca9b1fd613451a35
+  type: enhancement
+  title: Bundle all beats into elastic-otel-collector (make default build) [beats submodule]
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11821
+- file:
+    name: 1768597453-set-path.home-for-beat-receivers-to-be-components-.yaml
+    checksum: 8db45846bba039afd02e247f94c1221aba063c11
+  type: bug-fix
+  title: set path.home for beat receivers to be components dir
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11726
+- file:
+    name: 1768597441-add-kafka-receiver-and-exporter-to-core-components.yaml
+    checksum: bec4dd7dcdad327e65df2015e0ed77fbed08d3ff
+  type: other
+  title: Add Kafka receiver and exporter to core components
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/10988
+- file:
+    name: 1768597448-fix-spec-invalid-rendered-values-null.yaml
+    checksum: 2b7aacaccf5701031e0eb2ca986cde440e1ffab9
+  type: bug-fix
+  title: 'fix: spec invalid rendered values "null"'
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11481
+- file:
+    name: 1768597442-add-windowsperfcounters-receiver.yaml
+    checksum: 2ce9ff084b3b69a8dbb2eae92c676c0e07f3e0ab
+  type: feature
+  title: add windowsperfcounters receiver
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11418
+- file:
+    name: 1768597545-add-environment.yml-file-to-diagnostics.yaml
+    checksum: fcfdcbe859e9ceab43b0019ce930a442d4788a57
+  type: bug-fix
+  title: Add environment.yml file to diagnostics
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11484
+- file:
+    name: 1768597451-upgrade-otel-to-0.141.0-and-1.37.0.yaml
+    checksum: e7cafd48bc0b7099a52cc37d7cbb6ec8aaf428a8
+  type: enhancement
+  title: Upgrade otel to 0.141.0 and 1.37.0
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11671
+- file:
+    name: 1768597463-handle-curve_types-to-[]curve_types-conversion-in-.yaml
+    checksum: 3dc65ad789af9562aec4d84ae3fbb7a627bedbad
+  type: bug-fix
+  title: handle curve_types to []curve_types conversion in beat es config
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11892
+- file:
+    name: 1768597449-make-otel-runtime-default-for-system-metrics.yaml
+    checksum: 8c98a897741e82e3b13e1dba9fa5a54c0d313e04
+  type: enhancement
+  title: make otel runtime default for system/metrics
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11613
+- file:
+    name: 1768597447-allow-setting-the-otel-runtime-per-input-type.yaml
+    checksum: 707e40276a6472806e3390217454925c16b59c10
+  type: feature
+  title: Allow setting the otel runtime per input type
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11186
+- file:
+    name: 1768597450-add-default-option-to-allow-merging-multiple-agent.yaml
+    checksum: 92f1df8481a1a71938d350900a3c463d19283ad5
+  type: bug-fix
+  title: Add default option to allow merging multiple agent config keys
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11619
+- file:
+    name: 1768597467-container-entrypoint-retrieves-policy-and-enrollme.yaml
+    checksum: df66701ba9426410dc47436e0295ce6ce1aa1c13
+  type: bug-fix
+  title: Container entrypoint retrieves policy and enrollment token when more than 20 are present
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/12073
+- file:
+    name: 1768597437-add-logstash-output-to-elastic-agent-standalone.yaml
+    checksum: e899a3e00356b8e9d194790a5b569cd9b43cda45
+  type: feature
+  title: Add Logstash Output to Elastic Agent Standalone
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/10644
+- file:
+    name: 1768597435-handle-`privilege_level_change`-action.yaml
+    checksum: cc602bf9f4314ad25f4e0d65960cc9f289c165e9
+  type: feature
+  title: Handle `PRIVILEGE_LEVEL_CHANGE` action
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/10231
+- file:
+    name: 1768597466-(bugfix)-log-level-does-not-change-when-standalone.yaml
+    checksum: b412f1d6555d8f8785141a8ea0c34e287724e511
+  type: bug-fix
+  title: (bugfix) log level does not change when standalone agent is reloaded or when otel runtime is used
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11998
+- file:
+    name: 1768597460-fix-signature-verification-using-the-upgrade-comma.yaml
+    checksum: 7a62c3b865f878e9c509027568d331a8cf597600
+  type: bug-fix
+  title: Fix signature verification using the upgrade command with the --source-uri flag for fleet-managed agents
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11826
+- file:
+    name: 1768597458-ingest-collector-internal-telemetry-via-in-process.yaml
+    checksum: 3a363131764fe29684cd7eb74ba72b0ff4ff2643
+  type: feature
+  title: Ingest collector internal telemetry via in-process hooks
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11813
+- file:
+    name: 1768597457-improve-input-not-supported-error-to-mention-insta.yaml
+    checksum: 56b6d34b26adb7334f9a372cd73f400b78a79733
+  type: enhancement
+  title: Improve input not supported error to mention installation flavors.
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11825
+- file:
+    name: 1768597456-make-use-`compression`-and-ga-rotated-logs.yaml
+    checksum: 86fccde9fff685b6811434bf6fe1ad10535c1a48
+  type: feature
+  title: Make use `compression` and GA rotated logs
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11783
+- file:
+    name: 1768597469-kube-stack-update-otel-collector-gateway-to-use-ot.yaml
+    checksum: 95b00616ecce341814cb01a712f82a0d72adce82
+  type: bug-fix
+  title: 'kube-stack: Update OTel collector gateway to use OTEL_K8S_POD_IP instead of MY_POD_IP'
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/12205
+- file:
+    name: 1768597464-add-prometheus-remote-write-receiver.yaml
+    checksum: bfa3f4aa292ae421cbc916b38c15816e5faa5bf4
+  type: enhancement
+  title: add prometheus remote write receiver
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11937
+- file:
+    name: 1768597465-avoid-uninstalling-and-re-installing-service-compo.yaml
+    checksum: 857f4b2b34656335b4710d8985e61b2bef2e454e
+  type: bug-fix
+  title: Avoid uninstalling and re-installing service components on policy change
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11740
+- file:
+    name: 1768597470-report-app-lock-errors-correctly.yaml
+    checksum: ab3545444480b84f2b5f25d249f9e857f23369ad
+  type: bug-fix
+  title: Report app lock errors correctly
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/12225
+- file:
+    name: 1768597438-add-awslogsencodingextension.yaml
+    checksum: c862bf6cab83feb6af9bddb1ca7a143661ceddb7
+  type: feature
+  title: add awslogsencodingextension
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11107
+- file:
+    name: 1768597455-limit-metricbeat-receiver-to-list-of-known-inputs.yaml
+    checksum: 0ea8b64a671a91911a0eaca537065306cdcd4be0
+  type: enhancement
+  title: limit metricbeat receiver to list of known inputs
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11754
+- file:
+    name: 1768597468-add-changelog-entry-for-otel-subcommand-flag-issue.yaml
+    checksum: f3a2b6ddf8e57f6f320fd1e95aee9b34897baea5
+  type: breaking-change
+  title: add changelog entry for otel subcommand flag issue
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/12187
+- file:
+    name: 1768597452-hide-healthcheckv2-from-agent-status..yaml
+    checksum: 4eddf4a7d472a9ea87d1051cf4fd5640d9a67382
+  type: bug-fix
+  title: Hide healthcheckv2 from agent status.
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11718
+- file:
+    name: 1768597440-ensure-the-self-monitoring-configuration-knows-the.yaml
+    checksum: 127b991a44ce18dd9045a76f30ee0931caff39cd
+  type: bug-fix
+  title: Ensure the self-monitoring configuration knows the actual component runtime
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11300
+- file:
+    name: 1768597444-report-crashing-otel-process-cleanly-with-proper-s.yaml
+    checksum: 0ac2692ee7b4e7a1bf3eac0d7319d0d3744cf62d
+  type: bug-fix
+  title: Report crashing OTEL process cleanly with proper status reporting
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11448
+- file:
+    name: 1768597443--enable-cpu-and-disk-hostmetrics-scrapers.yaml
+    checksum: 3e45d68ef4efd39ac974ecafd8100ac4ac4c9530
+  type: feature
+  title: ': Enable cpu and disk hostmetrics scrapers'
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11423
+- file:
+    name: 1768597446-reintroduce-cloud-defend-to-agent-container-images.yaml
+    checksum: e4f6ed6b6342207aafaa6a6a0628e890de248416
+  type: enhancement
+  title: Reintroduce cloud defend to agent container images
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11795
+- file:
+    name: 1768597461-k8s-add-`service.instance.id`-to-k8s-attributes.yaml
+    checksum: c1a42b47f227bdb469c76f76476f081815e3d3fa
+  type: enhancement
+  title: 'k8s: Add `service.instance.id` to k8s attributes'
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11844
+- file:
+    name: 1768597454-change-elasticsearch-configuration-decodehook-func.yaml
+    checksum: 0355bebaa0044905a27071df77dac50abe7aa389
+  type: bug-fix
+  title: change elasticsearch configuration DecodeHook function to handle string to []string
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/11732
+- file:
+    name: 1768597471-feat-add-snmp-receiver-to-edot-collector.yaml
+    checksum: 947e11946964c535ad8744cb3edc167e3b1435cf
+  type: feature
+  title: 'feat: add SNMP receiver to EDOT Collector'
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/12239
+- file:
+    name: 1768597436-add-awss3receiver.yaml
+    checksum: 850ea968f567b61a0457613217d8fd01336714a5
+  type: feature
+  title: add awss3receiver
+  products:
+  - product: elastic-agent
+    target: 9.3.0
+  pr: https://github.com/elastic/elastic-agent/pull/10515
