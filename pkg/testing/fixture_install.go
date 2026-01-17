@@ -111,7 +111,7 @@ func (f FleetBootstrapOpts) toCmdArgs() []string {
 
 // InstallOpts specifies the options for the install command
 type InstallOpts struct {
-	BasePath       string // --base-path
+	BasePath       string // --base-path or --prefix for RPM installs
 	Force          bool   // --force
 	Insecure       bool   // --insecure
 	NonInteractive bool   // --non-interactive
@@ -464,6 +464,9 @@ func getProcesses(t *gotesting.T, regex string) []runningProcess {
 
 func (f *Fixture) SetDebRpmClient() error {
 	workDir := "/var/lib/elastic-agent"
+	if f.installOpts != nil && f.installOpts.BasePath != "" {
+		workDir = f.installOpts.BasePath + workDir
+	}
 	socketPath, err := control.AddressFromPath(f.operatingSystem, workDir)
 	if err != nil {
 		return fmt.Errorf("failed to get control protcol address: %w", err)
@@ -584,8 +587,18 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 		return nil, fmt.Errorf("failed to prepare: %w", err)
 	}
 
+	installArgs := []string{"-E", "rpm", "-i", "-v"}
+	if installOpts.BasePath != "" {
+		installArgs = append(installArgs, "--prefix", installOpts.BasePath)
+		// Make sure that prefix is available to agentFixture so other agent commands can use it
+		if f.installOpts == nil {
+			f.installOpts = &InstallOpts{}
+		}
+		f.installOpts.BasePath = installOpts.BasePath
+	}
+	installArgs = append(installArgs, f.srcPackage)
 	// sudo rpm -iv elastic-agent rpm
-	cmd := exec.CommandContext(ctx, "sudo", "-E", "rpm", "-i", "-v", f.srcPackage) // #nosec G204 -- Need to pass in name of package
+	cmd := exec.CommandContext(ctx, "sudo", installArgs...) // #nosec G204 -- Need to pass in name of package
 	if installOpts.InstallServers {
 		cmd.Env = append(cmd.Env, "ELASTIC_AGENT_FLAVOR=servers")
 	}
@@ -639,6 +652,9 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 
 	// rpm install doesn't enroll, so need to do that
 	enrollArgs := []string{"elastic-agent", "enroll"}
+	if installOpts.BasePath != "" {
+		enrollArgs := []string{installOpts.BasePath + "/elastic-agent", "enroll"}
+	}
 	if installOpts.Force {
 		enrollArgs = append(enrollArgs, "--force")
 	}
