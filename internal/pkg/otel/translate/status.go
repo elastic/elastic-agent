@@ -10,10 +10,13 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	otelcomponent "go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/pipeline"
+
+	serializablestatus "github.com/elastic/elastic-agent/internal/pkg/otel/status"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -129,7 +132,7 @@ func HasStatus(current *status.AggregateStatus, s componentstatus.Status) bool {
 }
 
 // StateWithMessage returns a `client.UnitState` and message for the current status.
-func StateWithMessage(current *status.AggregateStatus) (client.UnitState, string) {
+func StateWithMessage(current status.Event) (client.UnitState, string) {
 	s := current.Status()
 	switch s {
 	case componentstatus.StatusNone:
@@ -139,6 +142,11 @@ func StateWithMessage(current *status.AggregateStatus) (client.UnitState, string
 	case componentstatus.StatusStarting:
 		return client.UnitStateStarting, "Starting"
 	case componentstatus.StatusOK:
+		if current.Err() != nil && current.Err().Error() != "" {
+			// our own implementation of status.Event can have errors form events with StatusOK, representing
+			// informational diagnostic messages
+			return client.UnitStateHealthy, current.Err().Error()
+		}
 		return client.UnitStateHealthy, "Healthy"
 	case componentstatus.StatusRecoverableError:
 		if current.Err() != nil {
@@ -327,11 +335,11 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		switch unit.Type {
 		case client.UnitTypeInput:
 			if receiverStatus != nil {
-				compState.Units[unitKey] = getComponentUnitState(receiverStatus, unit)
+				compState.Units[unitKey] = getComponentUnitState(receiverStatus, unit, &comp)
 			}
 		case client.UnitTypeOutput:
 			if exporterStatus != nil {
-				compState.Units[unitKey] = getComponentUnitState(exporterStatus, unit)
+				compState.Units[unitKey] = getComponentUnitState(exporterStatus, unit, &comp)
 			}
 		}
 	}
@@ -367,7 +375,7 @@ func getComponentStartingState(comp component.Component) runtime.ComponentCompon
 		compState.Units[unitKey] = getComponentUnitState(&status.AggregateStatus{
 			Event:              componentstatus.NewEvent(componentstatus.StatusStarting),
 			ComponentStatusMap: map[string]*status.AggregateStatus{},
-		}, unit)
+		}, unit, &comp)
 	}
 	return runtime.ComponentComponentState{
 		Component: comp,
@@ -406,37 +414,125 @@ func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus, comp component.
 }
 
 // getComponentUnitState extracts component unit state from otel status.
-func getComponentUnitState(otelUnitStatus *status.AggregateStatus, unit component.Unit) runtime.ComponentUnitState {
-	unitStatus, unitMessage := StateWithMessage(otelUnitStatus)
-	var streamStatus map[string]map[string]string
+func getComponentUnitState(otelUnitStatus *status.AggregateStatus, unit component.Unit, comp *component.Component) runtime.ComponentUnitState {
+	topLevelState, topLevelMessage := StateWithMessage(otelUnitStatus)
 
-	if unit.Config != nil {
-		streamStatus = make(map[string]map[string]string, len(unit.Config.Streams))
-		for _, stream := range unit.Config.Streams {
-			// For now, set the stream status to the same as the unit status.
-			var errorString string
-			if otelUnitStatus.Err() != nil {
-				errorString = unitMessage
+	if unit.Config == nil || unit.Type == client.UnitTypeOutput {
+		return runtime.ComponentUnitState{
+			State:   topLevelState,
+			Message: topLevelMessage,
+		}
+	}
+
+	// inputStatusMap is the full map of input statuses for all units running inside the component
+	var inputStatusMap map[string]*serializablestatus.SerializableEvent
+
+	// unitStreamStatuses is the map of stream statuses relevant to the unit based on streams in the configuration
+	var unitStreamStatuses map[string]*serializablestatus.SerializableEvent
+
+	statusAttributes := otelUnitStatus.Attributes().AsRaw()
+
+	if inputStatuses, ok := statusAttributes["inputs"]; ok {
+		err := mapstructure.Decode(inputStatuses, &inputStatusMap)
+		if err == nil {
+			// get the stream statuses relevant to the unit based on streams in the configuration
+			unitStreamStatuses = make(map[string]*serializablestatus.SerializableEvent, len(unit.Config.Streams))
+			for _, stream := range unit.Config.Streams {
+				if inputStatus, ok := inputStatusMap[stream.Id]; ok {
+					unitStreamStatuses[stream.Id] = inputStatus
+				}
 			}
-			streamStatus[stream.Id] = map[string]string{
-				"error":  errorString,
-				"status": unitStatus.String(),
-			}
+		}
+	}
+
+	streamStatuses := make(map[string]map[string]string, len(unit.Config.Streams))
+	for _, stream := range unit.Config.Streams {
+		var streamState client.UnitState
+		var streamMsg string
+		var isError bool
+		if streamStatus, ok := unitStreamStatuses[stream.Id]; ok {
+			streamStatusEvent := streamStatusToStatusEvent(streamStatus)
+			isError = streamStatusEvent.Err() != nil
+			streamState, streamMsg = StateWithMessage(streamStatusEvent)
+		} else {
+			streamState, streamMsg = topLevelState, topLevelMessage
+			isError = otelUnitStatus.Err() != nil
+		}
+		// for streams, the message field is only for errors
+		if !isError {
+			streamMsg = ""
+		}
+		streamStatuses[stream.Id] = map[string]string{
+			"error":  streamMsg,
+			"status": streamState.String(),
 		}
 	}
 
 	var payload map[string]any
-	if len(streamStatus) > 0 {
+	if len(streamStatuses) > 0 {
 		payload = map[string]any{
-			"streams": streamStatus,
+			"streams": streamStatuses,
+		}
+	}
+
+	// get the unit status from input statuses
+	// this can happen for filestream, which is allowed to have a configuration without streams
+	unitInputId := comp.GetBeatInputIDForUnit(unit.ID)
+	unitStatus, ok := inputStatusMap[unitInputId]
+	if ok {
+		unitState, unitMessage := StateWithMessage(streamStatusToStatusEvent(unitStatus))
+		return runtime.ComponentUnitState{
+			State:   unitState,
+			Message: unitMessage,
+			Payload: payload,
+		}
+	}
+
+	// if there's no singular unit status, we need to compute it from stream statuses, if they're present
+	if len(unitStreamStatuses) > 0 {
+		unitState, unitMessage := unitStateFromStreamStatuses(unitStreamStatuses)
+		return runtime.ComponentUnitState{
+			State:   unitState,
+			Message: unitMessage,
+			Payload: payload,
 		}
 	}
 
 	return runtime.ComponentUnitState{
-		State:   unitStatus,
-		Message: unitMessage,
+		State:   topLevelState,
+		Message: topLevelMessage,
 		Payload: payload,
 	}
+}
+
+// unitStateFromStreamStatuses computes the unit state based on the stream statuses.
+// This is a copy of the logic in https://github.com/elastic/beats/blob/main/x-pack/libbeat/common/otelbeat/status/reporter.go
+func unitStateFromStreamStatuses(streamStatuses map[string]*serializablestatus.SerializableEvent) (unitState client.UnitState, unitMessage string) {
+	reportedState := client.UnitStateHealthy
+	reportedMsg := ""
+
+	for _, s := range streamStatuses {
+		state, message := StateWithMessage(streamStatusToStatusEvent(s))
+		switch state {
+		case client.UnitStateDegraded:
+			if reportedState != client.UnitStateDegraded {
+				reportedState = client.UnitStateDegraded
+				reportedMsg = message
+			}
+		case client.UnitStateFailed:
+			// we've encountered a failed stream.
+			// short-circuit and return, as Failed state takes precedence over other states
+			return state, message
+		default:
+		}
+	}
+	return reportedState, reportedMsg
+}
+
+func streamStatusToStatusEvent(streamStatus *serializablestatus.SerializableEvent) status.Event {
+	// the below translation can't fail here, because stream statuses cannot have attributes
+	streamStatusEvent, _ := serializablestatus.FromSerializableEvent(streamStatus)
+	return streamStatusEvent
 }
 
 // ParseEntityStatusId parses an entity status ID into its kind and entity ID. An entity can be a pipeline or otel component.
