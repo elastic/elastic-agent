@@ -1999,11 +1999,12 @@ type checksumFile struct {
 	Checksum string `yaml:"sha512"`
 }
 
-// Package packages elastic-agent for the IronBank distribution, relying on the
+// Ironbank packages elastic-agent for the IronBank distribution, relying on the
 // binaries having already been built.
 //
 // Use SNAPSHOT=true to build snapshots.
 func Ironbank() error {
+	fmt.Println("--- Package Ironbank distribution")
 	if runtime.GOARCH != "amd64" {
 		fmt.Printf(">> IronBank images are only supported for amd64 arch (%s is not supported)\n", runtime.GOARCH)
 		return nil
@@ -4140,6 +4141,7 @@ func (h Helm) UpdateDependencies() error {
 
 // Package packages the Elastic-Agent Helm chart. Note that you need to set SNAPSHOT="false" to build a production-ready package.
 func (h Helm) Package() error {
+	fmt.Println("--- Package Helm chart distribution")
 	mg.SerialDeps(h.BuildDependencies)
 
 	// need to explicitly set SNAPSHOT="false" to produce a production-ready package
@@ -4200,10 +4202,22 @@ func (h Helm) Package() error {
 	}
 
 	packageAction := action.NewPackage()
-	_, err = packageAction.Run(helmChartPath, nil)
+	packagePath, err := packageAction.Run(helmChartPath, nil)
 	if err != nil {
 		return fmt.Errorf("failed to package helm chart: %w", err)
 	}
+
+	// Create a copy with the DRA naming convention
+	// TODO: as soon as we confirm DRA works as expected we will replace the original naming
+	alternativeName := fmt.Sprintf("elastic-agent-helm-chart-%s.tgz", agentChartVersion)
+
+	srcFile := packagePath
+	dstFile := filepath.Join(filepath.Dir(packagePath), alternativeName)
+
+	if err := copyFile(srcFile, dstFile); err != nil {
+		return fmt.Errorf("failed to create alternative package name: %w", err)
+	}
+
 	return nil
 }
 
