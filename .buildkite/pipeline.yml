@@ -298,6 +298,12 @@ steps:
       (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
       build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
     command: "buildkite-agent pipeline upload .buildkite/integration.pipeline.yml"
+    plugins:
+    - sparse-checkout#v1.3.1:
+        paths:
+        - .buildkite
+        - .go-version
+        - version/version.go
     env:
       BUILDKITE_PULL_REQUEST: ${BUILDKITE_PULL_REQUEST}
       BUILDKITE_PULL_REQUEST_BASE_BRANCH: ${BUILDKITE_PULL_REQUEST_BASE_BRANCH}
@@ -355,6 +361,12 @@ steps:
     commands:
       - .buildkite/scripts/steps/trigger-elastic-agent-package.sh
       - .buildkite/scripts/steps/trigger-elastic-agent-package.sh | buildkite-agent pipeline upload
+    plugins:
+    - sparse-checkout#v1.3.1:
+        paths:
+        - .buildkite
+        - .go-version
+        - version/version.go
     if_changed:
       include:
         - .buildkite/pipeline.elastic-agent-package.yml
