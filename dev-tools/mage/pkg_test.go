@@ -10,10 +10,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
 
-func testPackageSpec() PackageSpec {
+func testPackageSpec(t testing.TB) PackageSpec {
+	t.Helper()
+	cfg, err := LoadSettings()
+	require.NoError(t, err)
 	return PackageSpec{
 		Name:     "brewbeat",
 		Version:  "7.0.0",
@@ -33,6 +37,7 @@ func testPackageSpec() PackageSpec {
 				Mode:    0644,
 			},
 		},
+		cfg: cfg,
 	}
 }
 
@@ -63,14 +68,16 @@ func TestPackageDeb(t *testing.T) {
 }
 
 func testPackage(t testing.TB, pack func(PackageSpec) error) {
-	spec := testPackageSpec().Evaluate()
+	spec := testPackageSpec(t).Evaluate()
 
 	readme := spec.Files["README.txt"]
 	readmePath := filepath.ToSlash(filepath.Clean(readme.Source))
 	assert.True(t, strings.HasPrefix(readmePath, packageStagingDir))
 
 	commit := spec.ExtraTags[0]
-	expected := "git-" + commitHash[:12]
+	expectedCommitHash, err := spec.cfg.Build.CommitHash()
+	require.NoError(t, err)
+	expected := "git-" + expectedCommitHash[:12]
 	assert.Equal(t, expected, commit)
 
 	if err := pack(spec); err != nil {
@@ -91,10 +98,10 @@ func TestRepoRoot(t *testing.T) {
 }
 
 func TestDumpVariables(t *testing.T) {
-	out, err := dumpVariables()
-	if err != nil {
-		t.Fatal(err)
-	}
+	cfg, err := LoadSettings()
+	require.NoError(t, err)
+	out, err := dumpVariables(cfg)
+	require.NoError(t, err)
 	t.Log(out)
 }
 
