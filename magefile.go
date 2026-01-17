@@ -3862,8 +3862,10 @@ func (h Helm) RenderExamples() error {
 func (Helm) UpdateAgentVersion() error {
 	agentVersion := bversion.GetParsedAgentPackageVersion().CoreVersion()
 	agentSnapshotVersion := agentVersion + "-SNAPSHOT"
-	// until the Helm chart reaches GA this remains with -beta suffix
-	agentChartVersion := agentVersion + "-beta"
+	// until the Helm chart reaches GA this remains with -SNAPSHOT suffix
+	// that's to differentiate it from the released charts in the Helm repo using
+	// the same versioning scheme as the Unified Release process.
+	agentChartVersion := agentVersion + "-SNAPSHOT"
 
 	for yamlFile, keyVals := range map[string][]struct {
 		key   string
@@ -4153,7 +4155,7 @@ func (h Helm) Package() error {
 		agentImageTag = agentImageTag + "-SNAPSHOT"
 	}
 
-	agentChartVersion := agentCoreVersion + "-beta"
+	agentChartVersion := agentCoreVersion + "-SNAPSHOT"
 	switch {
 	case productionPackage && agentVersion.Major() >= 9:
 		// for 9.0.0 and later versions, elastic-agent Helm chart is GA
