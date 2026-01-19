@@ -150,7 +150,7 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 		}
 		settings.otelSettings = edotOtelCol.NewSettings(release.Version(), []string{configProvider.URI()},
 			edotOtelCol.WithConfigProviderFactory(configProvider.NewFactory()),
-			edotOtelCol.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf, true)),
+			edotOtelCol.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)),
 		)
 
 		// setup logger
@@ -188,7 +188,7 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 
 		settings.otelSettings.DisableGracefulShutdown = false
 	} else {
-		settings.otelSettings = edotOtelCol.NewSettings(release.Version(), configFiles, edotOtelCol.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf, true)))
+		settings.otelSettings = edotOtelCol.NewSettings(release.Version(), configFiles, edotOtelCol.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)))
 	}
 	return settings, nil
 }
