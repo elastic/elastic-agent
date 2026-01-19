@@ -15,10 +15,19 @@ import (
 type forceExtension struct {
 	name   string
 	config map[string]any
+
+	// preserve indicates whether to preserve existing extension configuration.
+	// If true, existing configuration is not overwritten.
+	// If false, existing configuration is overwritten.
+	preserve bool
 }
 
 func (fe *forceExtension) Convert(ctx context.Context, conf *confmap.Conf) error {
 	err := func() error {
+		if fe.preserve && conf.IsSet("extensions::"+fe.name) {
+			// already defined, nothing to do
+			return nil
+		}
 		err := conf.Merge(confmap.NewFromStringMap(map[string]interface{}{
 			"extensions": map[string]interface{}{
 				fe.name: fe.config,
@@ -75,8 +84,8 @@ func (fe *forceExtension) Convert(ctx context.Context, conf *confmap.Conf) error
 	return nil
 }
 
-func NewForceExtensionConverterFactory(name string, config map[string]any) confmap.ConverterFactory {
+func NewForceExtensionConverterFactory(name string, config map[string]any, overwrite bool) confmap.ConverterFactory {
 	return confmap.NewConverterFactory(func(_ confmap.ConverterSettings) confmap.Converter {
-		return &forceExtension{name, config}
+		return &forceExtension{name, config, overwrite}
 	})
 }
