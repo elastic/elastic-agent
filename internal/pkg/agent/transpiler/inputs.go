@@ -16,6 +16,7 @@ const (
 	// an input defines a set of streams and after conditions are applied all the streams are removed then
 	// the entire input is removed.
 	streamsKey = "streams"
+	idKey      = "id"
 )
 
 // RenderInputs renders dynamic inputs section
@@ -102,6 +103,44 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 		nInputs = append(nInputs, promoteProcessors(node.d))
 	}
 	return NewList(nInputs), nil
+}
+
+// GetInputToVarsMap returns a map of input id to vars used by said input.
+func GetInputToVarsMap(inputs Node, varsArray []*Vars) (map[string][]string, error) {
+	l, ok := inputs.Value().(*List)
+	if !ok {
+		return nil, fmt.Errorf("inputs must be an array")
+	}
+	inputToVars := map[string][]string{}
+	for _, inputNode := range l.Value().([]Node) {
+		idNode, found := inputNode.Find(idKey)
+		if !found {
+			return nil, fmt.Errorf("input must have an id: %s", inputNode.String())
+		}
+		idKeyNode, ok := idNode.(*Key)
+		if !ok {
+			return nil, fmt.Errorf("input id must be a single value: %s", inputNode.String())
+		}
+		for _, vars := range varsArray {
+			concreteIdNode, err := idKeyNode.Apply(vars)
+			if errors.Is(err, ErrNoMatch) {
+				// has a variable that didn't exist, so we ignore it
+				continue
+			}
+			if err != nil {
+				return nil, err
+			}
+			if concreteIdNode != nil {
+				idStrNode, ok := concreteIdNode.Value().(*StrVal)
+				if !ok {
+					return nil, fmt.Errorf("input id must be a string: %s", concreteIdNode.String())
+				}
+				inputToVars[idStrNode.String()] = inputNode.Vars(nil, "")
+			}
+		}
+
+	}
+	return inputToVars, nil
 }
 
 type varIDMap struct {

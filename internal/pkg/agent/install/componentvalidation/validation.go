@@ -110,7 +110,16 @@ func GetComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath stri
 	}
 
 	// Compute the components from the computed configuration.
-	comps, err := specs.ToComponents(m, cfg.Settings.Internal.Runtime, nil, monitorFn, lvl, agentInfo, map[string]uint64{})
+	comps, err := specs.ToComponents(
+		m,
+		cfg.Settings.Internal.Runtime,
+		nil,
+		monitorFn,
+		lvl,
+		agentInfo,
+		map[string]uint64{},
+		map[string]bool{},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to render components: %w", err)
 	}
