@@ -653,7 +653,7 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 	// rpm install doesn't enroll, so need to do that
 	enrollArgs := []string{"elastic-agent", "enroll"}
 	if installOpts.BasePath != "" {
-		enrollArgs = []string{installOpts.BasePath + "/elastic-agent", "enroll"}
+		enrollArgs = []string{installOpts.BasePath + "/usr/bin/elastic-agent", "enroll"}
 	}
 	if installOpts.Force {
 		enrollArgs = append(enrollArgs, "--force")
