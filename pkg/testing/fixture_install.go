@@ -598,6 +598,7 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 	}
 	installArgs = append(installArgs, f.srcPackage)
 	// sudo rpm -iv elastic-agent rpm
+	f.t.Logf("[test %s] RPM install command: %v", f.t.Name(), installArgs)
 	cmd := exec.CommandContext(ctx, "sudo", installArgs...) // #nosec G204 -- Need to pass in name of package
 	if installOpts.InstallServers {
 		cmd.Env = append(cmd.Env, "ELASTIC_AGENT_FLAVOR=servers")
@@ -638,7 +639,7 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 	// start elastic-agent
 	out, err = exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
 	if err != nil {
-		return out, fmt.Errorf("systemctl start elastic-agent failed: %w", err)
+		return out, fmt.Errorf("systemctl start elastic-agent failed: %w output: %s", err, string(out))
 	}
 
 	err = f.SetDebRpmClient()
