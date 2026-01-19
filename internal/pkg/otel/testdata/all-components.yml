@@ -93,6 +93,15 @@ receivers:
       - extension: awslogs_encoding/elbaccess
   prometheusremotewrite:
     endpoint: 0.0.0.0:9090
+  elasticmonitoringreceiver:
+  snmp:
+    metrics:
+      snmp.uptime:
+        unit: s
+        gauge:
+          value_type: int
+        scalar_oids:
+          - oid: ".1.3.6.1.2.1.1.8.0"
 
 connectors:
   spanmetrics:
@@ -149,6 +158,7 @@ service:
         - otlp
         - nop
         - elasticapmintake
+        - elasticmonitoringreceiver
 
     logs/forward_receive:
       receivers:
@@ -187,6 +197,7 @@ service:
         - mysql
         - postgresql
         - prometheusremotewrite
+        - snmp
 
     metrics/aggregated:
       receivers:
