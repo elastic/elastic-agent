@@ -17,6 +17,8 @@ import (
 
 	"go.opentelemetry.io/collector/component/componentstatus"
 
+	"github.com/elastic/elastic-agent/internal/pkg/composable"
+
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
@@ -1800,6 +1802,34 @@ func (c *Coordinator) observeASTVars(ctx context.Context) error {
 	return nil
 }
 
+// TODO: docstring
+func (c *Coordinator) getDynamicInputs() (map[string]bool, error) {
+	if c.varsMgr == nil {
+		// No varsMgr (only happens in testing)
+		return nil, nil
+	}
+	dynamicInputs := make(map[string]bool)
+	if c.ast != nil {
+		inputs, ok := transpiler.Lookup(c.ast, "inputs")
+		if ok {
+			inputToVars, err := transpiler.GetInputToVarsMap(inputs, c.vars)
+			if err != nil {
+				return nil, err
+			}
+			for inputId, vars := range inputToVars {
+				for _, v := range vars {
+					varProviderName := composable.ProviderNameFromVarName(v)
+					if composable.IsDynamic(varProviderName) {
+						dynamicInputs[inputId] = true
+						break
+					}
+				}
+			}
+		}
+	}
+	return dynamicInputs, nil
+}
+
 // processVars updates the transpiler vars in the Coordinator.
 // Called on the main Coordinator goroutine.
 func (c *Coordinator) processVars(ctx context.Context, vars []*transpiler.Vars) {
@@ -1929,6 +1959,13 @@ func maybeOverrideRuntimeForComponent(logger *logger.Logger, comp *component.Com
 			logger.Warnf("otel runtime is not supported for component %s, switching to process runtime, reason: %v", comp.ID, err)
 			comp.RuntimeManager = component.ProcessRuntimeManager
 		}
+
+		// check if the component is dynamic
+		// dynamic components can cause problem for the otel collector because of its expensive configuration reloading
+		if comp.Dynamic {
+			logger.Warnf("Component %s uses dynamic variable providers, switching to process runtime", comp.ID)
+			comp.RuntimeManager = component.ProcessRuntimeManager
+		}
 	}
 }
 
@@ -2022,6 +2059,13 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		}
 		return comps, nil
 	}
+	var dynamicInputs map[string]bool
+	dynamicInputs, err = c.getDynamicInputs()
+	if err != nil {
+		c.logger.Warnf("Failed to determine dynamic inputs: %v", err)
+		dynamicInputs = make(map[string]bool)
+	}
+	c.logger.With("dynamic_inputs", dynamicInputs).Debugf("Dynamic inputs found")
 	comps, err := c.specs.ToComponents(
 		cfg,
 		c.currentCfg.Settings.Internal.Runtime,
@@ -2030,6 +2074,7 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		c.state.LogLevel,
 		c.agentInfo,
 		existingCompState,
+		dynamicInputs,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to render components: %w", err)
