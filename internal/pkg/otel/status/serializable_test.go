@@ -616,11 +616,12 @@ func TestSerializableStatusJSONDeserializationHealthcheckv2Format(t *testing.T) 
 
 func TestFromSerializableEvent(t *testing.T) {
 	tests := []struct {
-		name           string
-		event          *SerializableEvent
-		expectedStatus componentstatus.Status
-		expectedErr    string
-		checkAttrs     bool
+		name             string
+		event            *SerializableEvent
+		expectedStatus   componentstatus.Status
+		expectedErr      string
+		checkAttrs       bool
+		expectedParseErr string
 	}{
 		{
 			name:           "nil event returns nil",
@@ -706,7 +707,7 @@ func TestFromSerializableEvent(t *testing.T) {
 			expectedStatus: componentstatus.StatusNone,
 		},
 		{
-			name: "event with attributes",
+			name: "event with valid attributes",
 			event: &SerializableEvent{
 				Healthy:      true,
 				StatusString: "StatusOK",
@@ -722,11 +723,29 @@ func TestFromSerializableEvent(t *testing.T) {
 			expectedStatus: componentstatus.StatusOK,
 			checkAttrs:     true,
 		},
+		{
+			name: "event with invalid attributes",
+			event: &SerializableEvent{
+				Healthy:      true,
+				StatusString: "StatusOK",
+				Timestamp:    time.Now(),
+				Attributes: map[string]any{
+					"invalid": make(chan int),
+				},
+			},
+			expectedStatus:   componentstatus.StatusOK,
+			expectedParseErr: "error parsing event attributes",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			event, err := FromSerializableEvent(tt.event)
+			if tt.expectedParseErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedParseErr)
+				return
+			}
 			require.NoError(t, err)
 
 			if tt.event == nil {

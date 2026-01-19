@@ -98,7 +98,7 @@ func FromSerializableEvent(se *SerializableEvent) (status.Event, error) {
 	attributes := pcommon.NewMap()
 	parseErr := attributes.FromRaw(se.Attributes)
 	if parseErr != nil {
-		panic(fmt.Errorf("error parsing event attributes %v: %w", se.Attributes, parseErr))
+		return nil, fmt.Errorf("error parsing event attributes %v: %w", se.Attributes, parseErr)
 	}
 	return &healthCheckEvent{
 		status:     statusVal,
