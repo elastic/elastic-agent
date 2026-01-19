@@ -482,8 +482,8 @@ github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumpti
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic/go.mod h1:0vCBR1wgGwZeGmloJ+eCWIZF2S47grTXRzj2mftg2Nk=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
 github.com/elastic/bayeux v1.0.5/go.mod h1:CSI4iP7qeo5MMlkznGvYKftp8M7qqP/3nzmVZoXHY68=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260115195531-92378c9f417c h1:cg+vEA5v976/XGMSSjhWuw082IZKO84r5r7PgVyj7mY=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260115195531-92378c9f417c/go.mod h1:TQNtdsCxxA42dj1jLk7aNeRMnE82ihqIvf0Dx5YA+a0=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260116190456-75c0f1006947 h1:LQaIMMaspdG6uJtQG8qvGBEGTUpGhfQybQ4TXbiWQ3I=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260116190456-75c0f1006947/go.mod h1:TQNtdsCxxA42dj1jLk7aNeRMnE82ihqIvf0Dx5YA+a0=
 github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae h1:OiShmbWAyGU0MS0ADJWr1/QgeLIZliMk9xsrFicR3/s=
 github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae/go.mod h1:D2IckZVXARugvikE4fv1glvaJMohKSZRzrPsxCjo9O0=
 github.com/elastic/elastic-agent-autodiscover v0.10.0 h1:WJ4zl9uSfk1kHmn2B/0byQBLIL607Zt4LNfOgV7+XN0=
@@ -2200,8 +2200,8 @@ gotest.tools/gotestsum v1.13.0/go.mod h1:7f0NS5hFb0dWr4NtcsAsF0y1kzjEFfAil0HiBQJ
 gotest.tools/v3 v3.0.2/go.mod h1:3SzNCllyD9/Y+b5r9JIKQ474KzkZyqLqEfYqMsX94Bk=
 gotest.tools/v3 v3.5.2 h1:7koQfIKdy+I8UTetycgUqXWSDwpgv193Ka+qRsmBY8Q=
 gotest.tools/v3 v3.5.2/go.mod h1:LtdLGcnqToBH83WByAAi/wiwSFCArdFIUV/xxN4pcjA=
-helm.sh/helm/v3 v3.19.4 h1:E2yFBejmZBczWr5LblhjZbvAOAwVumfBO1AtN3nqI30=
-helm.sh/helm/v3 v3.19.4/go.mod h1:PC1rk7PqacpkV4acUFMLStOOis7QM9Jq3DveHBInu4s=
+helm.sh/helm/v3 v3.19.5 h1:l8zDGBhPaF2z5pTR5ASku/yZwi0qZrWthWMzvf1ZruE=
+helm.sh/helm/v3 v3.19.5/go.mod h1:PC1rk7PqacpkV4acUFMLStOOis7QM9Jq3DveHBInu4s=
 honnef.co/go/tools v0.0.0-20190102054323-c2f93a96b099/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
 honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
 howett.net/plist v1.0.1 h1:37GdZ8tP09Q35o9ych3ehygcsL+HqKSwzctveSlarvM=
