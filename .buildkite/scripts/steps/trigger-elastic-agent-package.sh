@@ -15,7 +15,7 @@ if [ ! -f .package-version ]; then
 fi
 
 # No need for the snapshot but the three digits version is required
-BEAT_VERSION=$(jq -r .version .core_version)
+BEAT_VERSION=$(jq -r .core_version .package-version)
 MANIFEST_URL=$(jq -r .manifest_url .package-version)
 
 cat << EOF
