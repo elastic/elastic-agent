@@ -940,6 +940,144 @@ outputs:
 	assert.NotEmpty(t, monitoringOutputUnsupportedLogRecord, "should get a log line about monitoring output not being supported")
 }
 
+// TestBeatsReceiverSubcomponentStatus verifies that we correctly reflect the status of beats inputs in the elastic
+// agent component and unit statuses.
+func TestBeatsReceiverSubcomponentStatus(t *testing.T) {
+	_ = define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: nil,
+	})
+
+	// This configuration contains two system/metrics inputs, each with two identical metricsets:
+	// * one for cpu, always healthy
+	// * one for processes, can't read data for some processes if not running as root
+	// The second metricset will emit a message about not being able to read process data. For the first input, this
+	// results in a Healthy status, but the second input is configured to become degraded in that case. The test
+	// verifies both of these conditions.
+	config := `agent:
+  logging:
+    to_stderr: true
+    to_files: false
+    level: debug
+  monitoring:
+    enabled: false
+inputs:
+- data_stream:
+    namespace: default
+  id: unique-system-metrics-input
+  streams:
+  - data_stream:
+      dataset: system.cpu
+    metricsets:
+    - cpu
+    id: unique-system-metrics-input-cpu
+  - data_stream:
+      dataset: system.process
+    metricsets:
+    - process
+    id: unique-system-metrics-input-process
+  type: system/metrics
+  use_output: default
+- data_stream:
+    namespace: default
+  id: unique-system-metrics-input-2
+  streams:
+  - data_stream:
+      dataset: system.cpu
+    metricsets:
+    - cpu
+    id: unique-system-metrics-input-2-cpu
+  - data_stream:
+      dataset: system.process
+    metricsets:
+    - process
+    id: unique-system-metrics-input-2-process
+    degrade_on_partial: true
+  type: system/metrics
+  use_output: default
+outputs:
+  default:
+    api_key: placeholder
+    hosts:
+    - 127.0.0.1:9200
+    type: elasticsearch
+    status_reporting:
+      enabled: false
+`
+
+	// this is the context for the whole test, with a global timeout defined
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	// set up a standalone agent
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	err = fixture.Configure(ctx, []byte(config))
+	require.NoError(t, err)
+
+	installOutput, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: false, Force: true})
+	require.NoError(t, err, "install failed, output: %s", string(installOutput))
+
+	expectedComponentCount := 1
+	expectedUnitCountPerComponent := 3 // one unit per system/metrics input and one output
+	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+		// we should be running beats processes for components, the whole agent should be degraded
+		assert.Equal(collect, int(cproto.State_DEGRADED), status.State)
+		require.Len(collect, status.Components, expectedComponentCount, "There should be one component")
+
+		comp := status.Components[0]
+		assert.Equal(collect, int(cproto.State_DEGRADED), comp.State)
+		expectedComponentVersionInfoName := componentVersionInfoNameForRuntime(component.OtelRuntimeManager)
+		assert.Equal(collect, expectedComponentVersionInfoName, comp.VersionInfo.Name)
+		assert.Lenf(collect, comp.Units, expectedUnitCountPerComponent, "There should be %d units", expectedUnitCountPerComponent)
+		for _, unit := range comp.Units {
+			if unit.UnitType == int(cproto.UnitType_OUTPUT) {
+				continue
+			}
+			var expectedUnitState int
+			if unit.UnitID == "system/metrics-default-unique-system-metrics-input-2" {
+				expectedUnitState = int(cproto.State_DEGRADED)
+			} else {
+				expectedUnitState = int(cproto.State_HEALTHY)
+			}
+			assert.Equalf(collect, expectedUnitState, unit.State,
+				"Expected unit %s to be in state %d, got %d", unit.UnitID, expectedUnitState, unit.State)
+			unitPayload := unit.Payload
+			require.Lenf(collect, unitPayload.Streams, 2,
+				"Expected unit %s to have 2 streams, got %d", unit.UnitID, len(unitPayload.Streams))
+			for streamName, streamState := range unitPayload.Streams {
+				if strings.Contains(streamName, "cpu") {
+					assert.Equal(collect, streamState.Status, "HEALTHY")
+					assert.Empty(collect, streamState.Error)
+				} else if strings.Contains(streamName, "process") {
+					var expectedStreamState string
+					if streamName == "unique-system-metrics-input-2-process" {
+						expectedStreamState = "DEGRADED"
+					} else {
+						expectedStreamState = "HEALTHY"
+					}
+					assert.Equalf(collect, streamState.Status, expectedStreamState,
+						"Expected stream %s to be in state %s, got %s", streamName, expectedStreamState, streamState.Status)
+					assert.Containsf(collect, streamState.Error, "Error fetching data for metricset system.process",
+						"Invalid error message for stream %s: %s", streamName, streamState.Error)
+				}
+			}
+		}
+	}, 1*time.Minute, 1*time.Second)
+}
+
 // TestComponentWorkDir verifies that the component working directory is not deleted when moving the component from
 // the process runtime to the otel runtime.
 func TestComponentWorkDir(t *testing.T) {
