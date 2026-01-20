@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent/internal/edot
 
-go 1.24.11
+go 1.24.12
 
 // use in-repo directory
 replace github.com/elastic/elastic-agent => ../../
@@ -8,7 +8,7 @@ replace github.com/elastic/elastic-agent => ../../
 replace github.com/elastic/beats/v7 => ../../beats
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260114232812-990735bb782a
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260119184508-00e189e569e3
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.32.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.24.0
@@ -316,7 +316,7 @@ require (
 	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
 	github.com/elastic/go-perf v0.0.0-20241029065020-30bec95324b8 // indirect
 	github.com/elastic/go-seccomp-bpf v1.6.0 // indirect
-	github.com/elastic/go-sfdc v0.0.0-20241010131323-8e176480d727 // indirect
+	github.com/elastic/go-sfdc v0.0.0-20251207194532-c5aadd4a4e06 // indirect
 	github.com/elastic/go-structform v0.0.12 // indirect
 	github.com/elastic/go-sysinfo v1.15.4 // indirect
 	github.com/elastic/go-ucfg v0.8.9-0.20250307075119-2a22403faaea // indirect
@@ -743,4 +743,9 @@ replace (
 	github.com/google/gopacket => github.com/elastic/gopacket v1.1.20-0.20241002174017-e8c5fda595e6
 	github.com/insomniacslk/dhcp => github.com/elastic/dhcp v0.0.0-20200227161230-57ec251c7eb3 // indirect
 	github.com/meraki/dashboard-api-go/v3 => github.com/tommyers-elastic/dashboard-api-go/v3 v3.0.0-20250616163611-a325b49669a4
+	// The replaces below refer to the following branch: https://github.com/elastic/opentelemetry-collector-contrib/tree/v0141-healthcheck-patched
+	// They contain an additional patch created from the content of https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/43744
+	// They should be removed after the above PR is merged and we upgrade to the respective otel contrib release.
+	github.com/open-telemetry/opentelemetry-collector-contrib/internal/healthcheck => github.com/elastic/opentelemetry-collector-contrib/internal/healthcheck v0.0.0-20260113162120-ad842251e9e4
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status => github.com/elastic/opentelemetry-collector-contrib/pkg/status v0.0.0-20260113162120-ad842251e9e4
 )
