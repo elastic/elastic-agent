@@ -18,6 +18,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -901,6 +902,8 @@ func setPaths(statePath, configPath, logsPath, socketPath string, writePaths boo
 	paths.SetTop(topPath)
 	paths.SetConfig(configPath)
 	paths.SetControlSocket(socketPath)
+	diagnosticSocketPath := paths.SocketFromPath(runtime.GOOS, topPath, paths.DiagnosticsExtensionSocketName)
+	paths.SetDiagnosticsExtensionSocket(diagnosticSocketPath)
 	// when custom top path is provided the home directory is not versioned
 	paths.SetVersionHome(false)
 	// install path stays on container default mount (otherwise a bind mounted directory could have noexec set)

@@ -885,3 +885,72 @@ func TestContainerCMDEnrollByPolicyName(t *testing.T) {
 		err, agentOutput,
 	)
 }
+
+func TestContainerCMDDiagnosticsSocket(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack: &define.Stack{},
+		Local: false,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+		Group: "container",
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+
+	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	// prepare must be called otherwise `agentFixture.WorkDir()` will be empty
+	// and it must be set so the `STATE_PATH` below gets a valid path.
+	err = agentFixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
+	if err != nil {
+		t.Fatalf("could not get Fleet URL: %s", err)
+	}
+
+	_, enrollmentToken := createPolicy(
+		t,
+		ctx,
+		agentFixture,
+		info,
+		fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String()),
+		"")
+
+	// create a new state directory, as the tempDir might exceed socket path character limit (104 characters)
+	stateDir, err := os.MkdirTemp("/tmp", "state*")
+	t.Cleanup(func() {
+		_ = os.RemoveAll(stateDir)
+	})
+	require.NoError(t, err)
+	env := []string{
+		"FLEET_ENROLL=1",
+		"FLEET_URL=" + fleetURL,
+		"FLEET_ENROLLMENT_TOKEN=" + enrollmentToken,
+		// As the agent isn't built for a container, it's upgradable, triggering
+		// the start of the upgrade watcher. If `STATE_PATH` isn't set, the
+		// upgrade watcher will commence from a different path within the
+		// container, distinct from the current execution path.
+		"STATE_PATH=" + stateDir,
+	}
+
+	cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, env)
+	t.Logf(">> running binary with: %v", cmd.Args)
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("error running container cmd: %s", err)
+	}
+
+	require.EventuallyWithT(t, func(tt *assert.CollectT) {
+		require.Contains(tt, agentOutput.String(), "Diagnostics extension started")
+		_, err := os.Stat(filepath.Join(stateDir, "data", "edot-diagnostics-extension.sock"))
+		require.NoError(tt, err)
+	},
+		5*time.Minute, time.Second,
+		"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",
+		err, agentOutput,
+	)
+}
