@@ -603,9 +603,9 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 	if installOpts.InstallServers {
 		cmd.Env = append(cmd.Env, "ELASTIC_AGENT_FLAVOR=servers")
 	}
-	out, err := cmd.CombinedOutput()
+	installOut, err := cmd.CombinedOutput()
 	if err != nil {
-		return out, fmt.Errorf("rpm install failed: %w output:%s", err, string(out))
+		return installOut, fmt.Errorf("rpm install failed: %w output:%s", err, string(installlOut))
 	}
 
 	f.t.Cleanup(func() {
@@ -639,10 +639,15 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 	stat, err := os.Stat("/lib/systemd/system/elastic-agent.service") // remove after debugging test
 	f.t.Logf("service file lookup: %+v err: %v", stat, err)
 
+	out, err := exec.CommandContext(ctx, "sudo", "systemctl", "daemon-reload").CombinedOutput()
+	if err != nil {
+		return out, fmt.Errorf("systemctl daemon-reload failed: %w output: %s", err, string(out))
+	}
+
 	// start elastic-agent
 	out, err = exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
 	if err != nil {
-		return out, fmt.Errorf("systemctl start elastic-agent failed: %w output: %s", err, string(out))
+		return out, fmt.Errorf("systemctl start elastic-agent failed: %w output: %s install output: %s", err, string(out), string(installOut))
 	}
 
 	err = f.SetDebRpmClient()
