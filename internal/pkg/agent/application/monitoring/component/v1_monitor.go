@@ -1179,7 +1179,7 @@ func dropPeriodicMetricsLogsProcessor() map[string]any {
 		"drop_event": map[string]interface{}{
 			"when": map[string]interface{}{
 				"regexp": map[string]interface{}{
-					"message": "^Non-zero metrics in the last",
+					"message": "(^Non-zero metrics in the last)|(^Collector internal telemetry metrics updated)",
 				},
 			},
 		},
