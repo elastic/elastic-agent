@@ -1850,16 +1850,6 @@ func (s *Settings) loadFmtSettingsFromEnv() {
 	}
 }
 
-// envOr returns the value of the specified environment variable if it is
-// non-empty. Otherwise it returns def.
-func envOr(name, def string) string {
-	v := os.Getenv(name)
-	if v == "" {
-		return def
-	}
-	return v
-}
-
 // parseBoolEnv parses a boolean environment variable with a default value.
 func parseBoolEnv(name string, def bool) (bool, error) {
 	v := os.Getenv(name)
