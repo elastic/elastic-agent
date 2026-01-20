@@ -27,7 +27,8 @@ inputs:
     - drop_event:
         when:
           regexp:
-            message: ^Non-zero metrics in the last
+            message: (^Non-zero metrics in the last)|(^Collector internal telemetry
+              metrics updated)
     - drop_event:
         when:
           equals:
