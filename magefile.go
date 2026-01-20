@@ -4214,6 +4214,7 @@ func (h Helm) Package() error {
 	srcFile := packagePath
 	dstFile := filepath.Join(filepath.Dir(packagePath), alternativeName)
 
+	fmt.Println(">>> CopyFile from %s to %s", srcFile, dstFile)
 	if err := copyFile(srcFile, dstFile); err != nil {
 		return fmt.Errorf("failed to create alternative package name: %w", err)
 	}
