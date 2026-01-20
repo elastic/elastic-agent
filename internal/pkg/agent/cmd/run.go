@@ -17,6 +17,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
+
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
 
 	"go.elastic.co/apm/v2"
@@ -174,7 +176,7 @@ func runElasticAgentCritical(
 	locker := filelock.NewAppLocker(paths.Data(), paths.AgentLockFileName)
 	lockErr := locker.TryLock()
 	if lockErr != nil {
-		errs = append(errs, fmt.Errorf("failed to get app lock: %w", err))
+		errs = append(errs, fmt.Errorf("failed to get app lock: %w", lockErr))
 	}
 	defer func() {
 		_ = locker.Unlock()
@@ -715,7 +717,19 @@ func setupMetrics(
 	tracer *apm.Tracer,
 	coord *coordinator.Coordinator,
 ) (*reload.ServerReloader, error) {
-	if err := report.SetupMetrics(logger, agentName, version.GetDefaultVersion()); err != nil {
+	uid, err := uuid.NewV4()
+	if err != nil {
+		return nil, err
+	}
+	ephemeralId := uid.String()
+	if err := report.SetupMetricsOptions(report.MetricOptions{
+		Name:           agentName,
+		Version:        version.GetDefaultVersion(),
+		EphemeralID:    ephemeralId,
+		Logger:         logger,
+		SystemMetrics:  monitoringLib.Default.GetOrCreateRegistry("system"),
+		ProcessMetrics: monitoringLib.Default.GetOrCreateRegistry("beat"),
+	}); err != nil {
 		return nil, err
 	}
 
