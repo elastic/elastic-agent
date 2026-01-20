@@ -19,6 +19,10 @@ type forceExtension struct {
 
 func (fe *forceExtension) Convert(ctx context.Context, conf *confmap.Conf) error {
 	err := func() error {
+		if conf.IsSet("extensions::" + fe.name) {
+			// already defined by the user, nothing to do
+			return nil
+		}
 		err := conf.Merge(confmap.NewFromStringMap(map[string]interface{}{
 			"extensions": map[string]interface{}{
 				fe.name: fe.config,

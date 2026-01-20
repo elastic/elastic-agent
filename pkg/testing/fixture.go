@@ -1580,6 +1580,10 @@ type AgentStatusOutput struct {
 			Message  string `json:"message"`
 			Payload  struct {
 				OsqueryVersion string `json:"osquery_version"`
+				Streams        map[string]struct {
+					Error  string `json:"error"`
+					Status string `json:"status"`
+				} `json:"streams"`
 			} `json:"payload"`
 		} `json:"units"`
 		VersionInfo AgentStatusOutputVersionInfo `json:"version_info,omitempty"`
