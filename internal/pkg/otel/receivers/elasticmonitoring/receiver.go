@@ -6,8 +6,6 @@ package elasticmonitoring
 
 import (
 	"context"
-	"encoding/json"
-	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -96,14 +94,7 @@ func (mr *monitoringReceiver) updateMetrics() {
 		return
 	}
 	// Log the new metrics data so there is a record for troubleshooting in the logs / diagnostics
-	var metricsStringBuilder strings.Builder
-	encoder := json.NewEncoder(&metricsStringBuilder)
-	err = encoder.Encode(resourceMetrics.ScopeMetrics)
-	if err == nil {
-		mr.logger.Info("Collector internal telemetry metrics updated", zap.String("metrics", metricsStringBuilder.String()))
-	} else {
-		mr.logger.Error("Updating collector internal telemetry metrics: failed to encode metrics struct", zap.Error(err))
-	}
+	mr.logger.Info("Collector internal telemetry metrics updated", zap.Reflect("metrics", resourceMetrics.ScopeMetrics))
 
 	exporterMetrics := convertScopeMetrics(resourceMetrics.ScopeMetrics)
 	for exporter, metrics := range exporterMetrics {
