@@ -1184,15 +1184,6 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			expectedError: "unsupported output type: logstash",
 		},
 		{
-			name: "unsupported input type",
-			component: &component.Component{
-				ID:         "unsupported-input",
-				InputType:  "stdin", // unsupported
-				OutputType: "elasticsearch",
-			},
-			expectedError: "unsupported input type: stdin",
-		},
-		{
 			name: "unsupported configuration",
 			component: &component.Component{
 				ID:         "unsupported-config",

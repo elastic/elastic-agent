@@ -51,42 +51,7 @@ type (
 )
 
 var (
-	OtelSupportedOutputTypes        = []string{"elasticsearch"}
-	OtelSupportedFilebeatInputTypes = []string{
-		"filestream",
-		"journald",
-		"log",
-		"winlog",
-	}
-
-	OtelSupportedMetricbeatInputTypes = []string{
-		"activemq/metrics",
-		"apache/metrics",
-		"beat/metrics",
-		"containerd/metrics",
-		"docker/metrics",
-		"elasticsearch/metrics",
-		"etcd/metrics",
-		"http/metrics",
-		"jolokia/metrics",
-		"kafka/metrics",
-		"kibana/metrics",
-		"linux/metrics",
-		"logstash/metrics",
-		"memcached/metrics",
-		"mongodb/metrics",
-		"mysql/metrics",
-		"nats/metrics",
-		"nginx/metrics",
-		"prometheus/metrics",
-		"rabbitmq/metrics",
-		"sql/metrics",
-		"stan/metrics",
-		"statsd/metrics",
-		"system/metrics",
-		"vsphere/metrics",
-	}
-	OtelSupportedInputTypes          = slices.Concat(OtelSupportedFilebeatInputTypes, OtelSupportedMetricbeatInputTypes)
+	OtelSupportedOutputTypes         = []string{"elasticsearch"}
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
 		otelcomponent.MustNewType("elasticsearch"): translateEsOutputToExporter,
 	}
@@ -168,12 +133,6 @@ func GetOTelLogLevel(level string) string {
 func VerifyComponentIsOtelSupported(comp *component.Component) error {
 	if !slices.Contains(OtelSupportedOutputTypes, comp.OutputType) {
 		return fmt.Errorf("unsupported output type: %s", comp.OutputType)
-	}
-
-	// check if given input is supported in OTel runtime
-	// this includes all metricbeat inputs and some filebeat inputs for now
-	if !slices.Contains(OtelSupportedInputTypes, comp.InputType) {
-		return fmt.Errorf("unsupported input type: %s", comp.InputType)
 	}
 
 	// check if the actual configuration is supported. We need to actually generate the config and look for
