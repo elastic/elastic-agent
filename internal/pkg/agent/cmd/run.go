@@ -17,6 +17,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
+
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
 
 	"go.elastic.co/apm/v2"
@@ -715,10 +717,18 @@ func setupMetrics(
 	tracer *apm.Tracer,
 	coord *coordinator.Coordinator,
 ) (*reload.ServerReloader, error) {
+	uid, err := uuid.NewV4()
+	if err != nil {
+		return nil, err
+	}
+	ephemeralId := uid.String()
 	if err := report.SetupMetricsOptions(report.MetricOptions{
-		Name:    agentName,
-		Logger:  logger,
-		Version: version.GetDefaultVersion(),
+		Name:           agentName,
+		Version:        version.GetDefaultVersion(),
+		EphemeralID:    ephemeralId,
+		Logger:         logger,
+		SystemMetrics:  monitoringLib.Default.GetOrCreateRegistry("system"),
+		ProcessMetrics: monitoringLib.Default.GetOrCreateRegistry("beat"),
 	}); err != nil {
 		return nil, err
 	}
