@@ -636,6 +636,9 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 		}
 	})
 
+	stat, err := os.Stat("/lib/systemd/system/elastic-agent.service") // remove after debugging test
+	f.t.Logf("service file lookup: %+v err: %v", stat, err)
+
 	// start elastic-agent
 	out, err = exec.CommandContext(ctx, "sudo", "systemctl", "start", "elastic-agent").CombinedOutput()
 	if err != nil {
