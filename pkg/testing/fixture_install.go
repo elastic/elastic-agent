@@ -605,7 +605,7 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 	}
 	installOut, err := cmd.CombinedOutput()
 	if err != nil {
-		return installOut, fmt.Errorf("rpm install failed: %w output:%s", err, string(installlOut))
+		return installOut, fmt.Errorf("rpm install failed: %w output:%s", err, string(installOut))
 	}
 
 	f.t.Cleanup(func() {
