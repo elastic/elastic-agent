@@ -1,11 +1,11 @@
 module github.com/elastic/elastic-agent/internal/edot
 
-go 1.24.11
+go 1.24.12
 
 replace github.com/elastic/elastic-agent => ../../
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260116190456-75c0f1006947
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260120214917-7cd775db9d84
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.31.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.24.0
