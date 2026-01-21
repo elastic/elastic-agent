@@ -17,9 +17,11 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"gopkg.in/yaml.v3"
 
+	"github.com/elastic/elastic-agent/internal/pkg/otel/status"
+
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
-	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+	otelstatus "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap/zapcore"
@@ -33,14 +35,16 @@ import (
 )
 
 const (
-	OtelSetSupervisedFlagName           = "supervised"
-	OtelSupervisedLoggingLevelFlagName  = "supervised.logging.level"
-	OtelSupervisedMonitoringURLFlagName = "supervised.monitoring.url"
+	OtelSetSupervisedFlagName                 = "supervised"
+	OtelSupervisedLoggingLevelFlagName        = "supervised.logging.level"
+	OtelSupervisedMonitoringURLFlagName       = "supervised.monitoring.url"
+	OtelFeatureGatesFlagName                  = "feature-gates"
+	OtelElasticsearchExporterTelemetryFeature = "telemetry.newPipelineTelemetry"
 )
 
 // newSubprocessExecution creates a new execution which runs the otel collector in a subprocess. A metricsPort or
 // healthCheckPort of 0 will result in a random port being used.
-func newSubprocessExecution(logLevel logp.Level, collectorPath string, uuid string, metricsPort int, healthCheckPort int) (*subprocessExecution, error) {
+func newSubprocessExecution(collectorPath string, uuid string, metricsPort int, healthCheckPort int) (*subprocessExecution, error) {
 	componentType, err := component.NewType(healthCheckExtensionName)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create component type: %w", err)
@@ -51,10 +55,12 @@ func newSubprocessExecution(logLevel logp.Level, collectorPath string, uuid stri
 		collectorPath: collectorPath,
 		collectorArgs: []string{
 			fmt.Sprintf("--%s", OtelSetSupervisedFlagName),
-			fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, logLevel.String()),
 			fmt.Sprintf("--%s=%s", OtelSupervisedMonitoringURLFlagName, monitoring.EDOTMonitoringEndpoint()),
+			// Enable feature gate to report internal telemetry for the Elasticsearch exporter partitioned
+			// by the exporter instance (e.g. separating the monitoring exporter from general inputs),
+			// matching the behavior of other Collector telemetry metrics like queue state.
+			fmt.Sprintf("--%s=%s", OtelFeatureGatesFlagName, OtelElasticsearchExporterTelemetryFeature),
 		},
-		logLevel:                 logLevel,
 		healthCheckExtensionID:   healthCheckExtensionID,
 		collectorMetricsPort:     metricsPort,
 		collectorHealthCheckPort: healthCheckPort,
@@ -62,10 +68,10 @@ func newSubprocessExecution(logLevel logp.Level, collectorPath string, uuid stri
 	}, nil
 }
 
+// subprocessExecution implements collectorExecution by running the collector in a subprocess.
 type subprocessExecution struct {
 	collectorPath            string
 	collectorArgs            []string
-	logLevel                 logp.Level
 	healthCheckExtensionID   string
 	collectorMetricsPort     int
 	collectorHealthCheckPort int
@@ -74,7 +80,22 @@ type subprocessExecution struct {
 
 // startCollector starts a supervised collector and monitors its health. Process exit errors are sent to the
 // processErrCh channel. Other run errors, such as not able to connect to the health endpoint, are sent to the runErrCh channel.
-func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, processErrCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
+func (r *subprocessExecution) startCollector(
+	ctx context.Context,
+	logLevel string,
+	baseLogger *logger.Logger,
+	logger *logger.Logger,
+	cfg *confmap.Conf,
+	processErrCh chan error,
+	statusCh chan *otelstatus.AggregateStatus,
+	forceFetchStatusCh chan struct{},
+) (collectorHandle, error) {
+	var lvl logp.Level
+	err := lvl.Unpack(logLevel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack the log level '%s': %w", logLevel, err)
+	}
+
 	if cfg == nil {
 		// configuration is required
 		return nil, errors.New("no configuration provided")
@@ -106,17 +127,21 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 	}
 
 	stdOutLast := newZapLast(baseLogger.Core())
-	stdOut := runtimeLogger.NewLogWriterWithDefaults(stdOutLast, zapcore.Level(r.logLevel))
+	stdOut := runtimeLogger.NewLogWriterWithDefaults(stdOutLast, zapcore.Level(lvl))
 	// info level for stdErr because by default collector writes to stderr
 	stdErrLast := newZapLast(baseLogger.Core())
-	stdErr := runtimeLogger.NewLogWriterWithDefaults(stdErrLast, zapcore.Level(r.logLevel))
+	stdErr := runtimeLogger.NewLogWriterWithDefaults(stdErrLast, zapcore.Level(lvl))
 
 	procCtx, procCtxCancel := context.WithCancel(ctx)
 	env := os.Environ()
 	// Set the environment variable for the collector metrics port. See comment at the constant definition for more information.
 	env = append(env, fmt.Sprintf("%s=%d", componentmonitoring.OtelCollectorMetricsPortEnvVarName, collectorMetricsPort))
+
+	// set collector args
+	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
+
 	processInfo, err := process.Start(r.collectorPath,
-		process.WithArgs(r.collectorArgs),
+		process.WithArgs(collectorArgs),
 		process.WithEnv(env),
 		process.WithCmdOptions(func(c *exec.Cmd) error {
 			c.Stdin = bytes.NewReader(confBytes)
@@ -148,7 +173,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 		defer func() {
 			close(healthCheckDone)
 		}()
-		currentStatus := aggregateStatus(componentstatus.StatusStarting, nil)
+		currentStatus := status.AggregateStatus(componentstatus.StatusStarting, nil)
 		r.reportSubprocessCollectorStatus(ctx, statusCh, currentStatus)
 
 		// specify a max duration of not being able to get the status from the collector
@@ -175,7 +200,7 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 			} else {
 				maxFailuresTimer.Reset(maxFailuresDuration)
 				removeManagedHealthCheckExtensionStatus(statuses, r.healthCheckExtensionID)
-				if !compareStatuses(currentStatus, statuses) {
+				if !status.CompareStatuses(currentStatus, statuses) {
 					currentStatus = statuses
 					r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
 				}
@@ -191,11 +216,11 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 			case <-healthCheckPollTimer.C:
 				healthCheckPollTimer.Reset(healthCheckPollDuration)
 			case <-maxFailuresTimer.C:
-				failedToConnectStatuses := aggregateStatus(
+				failedToConnectStatuses := status.AggregateStatus(
 					componentstatus.StatusRecoverableError,
 					errors.New("failed to connect to collector"),
 				)
-				if !compareStatuses(currentStatus, failedToConnectStatuses) {
+				if !status.CompareStatuses(currentStatus, failedToConnectStatuses) {
 					currentStatus = statuses
 					r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
 				}
@@ -242,17 +267,17 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 }
 
 // cloneCollectorStatus creates a deep copy of the provided AggregateStatus.
-func cloneCollectorStatus(aStatus *status.AggregateStatus) *status.AggregateStatus {
+func cloneCollectorStatus(aStatus *otelstatus.AggregateStatus) *otelstatus.AggregateStatus {
 	if aStatus == nil {
 		return nil
 	}
 
-	st := &status.AggregateStatus{
+	st := &otelstatus.AggregateStatus{
 		Event: aStatus.Event,
 	}
 
 	if len(aStatus.ComponentStatusMap) > 0 {
-		st.ComponentStatusMap = make(map[string]*status.AggregateStatus, len(aStatus.ComponentStatusMap))
+		st.ComponentStatusMap = make(map[string]*otelstatus.AggregateStatus, len(aStatus.ComponentStatusMap))
 		for k, cs := range aStatus.ComponentStatusMap {
 			st.ComponentStatusMap[k] = cloneCollectorStatus(cs)
 		}
@@ -261,7 +286,7 @@ func cloneCollectorStatus(aStatus *status.AggregateStatus) *status.AggregateStat
 	return st
 }
 
-func (r *subprocessExecution) reportSubprocessCollectorStatus(ctx context.Context, statusCh chan *status.AggregateStatus, collectorStatus *status.AggregateStatus) {
+func (r *subprocessExecution) reportSubprocessCollectorStatus(ctx context.Context, statusCh chan *otelstatus.AggregateStatus, collectorStatus *otelstatus.AggregateStatus) {
 	// we need to clone the status to prevent any mutation on the receiver side
 	// affecting the original ref
 	clonedStatus := cloneCollectorStatus(collectorStatus)
@@ -299,7 +324,7 @@ func (r *subprocessExecution) getCollectorPorts() (healthCheckPort int, metricsP
 	return healthCheckPort, metricsPort, nil
 }
 
-func removeManagedHealthCheckExtensionStatus(status *status.AggregateStatus, healthCheckExtensionID string) {
+func removeManagedHealthCheckExtensionStatus(status *otelstatus.AggregateStatus, healthCheckExtensionID string) {
 	extensions, exists := status.ComponentStatusMap["extensions"]
 	if !exists {
 		return

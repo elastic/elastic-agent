@@ -273,6 +273,10 @@ type Component struct {
 	// The logical output type, i.e. the type of output that was requested.
 	OutputType string `yaml:"output_type"`
 
+	// The user-assigned name in the original policy for the output config that
+	// generated this component's output unit.
+	OutputName string `yaml:"output_name"`
+
 	RuntimeManager RuntimeManager `yaml:"-"`
 
 	// Units that should be running inside this component.
@@ -356,6 +360,39 @@ func (c *Component) BeatName() string {
 		return c.InputSpec.BeatName()
 	}
 	return ""
+}
+
+// GetBeatInputIDForUnit returns the ID of the corresponding input or module in the beat configuration for the unit.
+// If the unit doesn't run in a beat or isn't an input in the first place, it returns an empty string.
+// This function is only needed for the special case where an agent input that runs in a beat process doesn't specify
+// streams. Then, the stream name becomes the input id. Reversing this process is necessary when the input runs in
+// a beat receiver and we want to translate status back.
+// The function can be made fully generic with more effort, the scope was narrowed to make the implementation simpler
+// and easier to review.
+func (c *Component) GetBeatInputIDForUnit(unitID string) string {
+	if c.BeatName() == "" {
+		return ""
+	}
+	found := false
+	var unit Unit
+	for _, u := range c.Units {
+		if u.ID == unitID {
+			unit = u
+			found = true
+			break
+		}
+	}
+	if !found {
+		return ""
+	}
+	if unit.Type == client.UnitTypeOutput {
+		return ""
+	}
+	inputID, found := strings.CutPrefix(unitID, fmt.Sprintf("%s-", c.ID))
+	if !found {
+		return ""
+	}
+	return inputID
 }
 
 // WorkDirName returns the name of the component's working directory.
@@ -537,7 +574,17 @@ func (r *RuntimeSpecs) componentsForInputType(
 
 	// Treat as non isolated units component on error of reading the input spec
 	if componentErr != nil || !inputSpec.Spec.IsolateUnits {
+		// Components are generally identified by their input type and output name. However, for
+		// Service Runtime components, there can only ever be a single instance of the component running,
+		// as a service. So we identify these only by their input type. This way, if the output for a service
+		// component were to change, it would not result in a different ID for that component. By keeping the same
+		// ID, we prevent the component from being identified as a new one and the corresponding service from being
+		// unnecessarily stopped and started.
 		componentID := fmt.Sprintf("%s-%s", inputType, output.Name)
+		if inputSpec.Spec.Service != nil {
+			componentID = inputType
+		}
+
 		if componentErr == nil && !containsStr(inputSpec.Spec.Outputs, output.OutputType) {
 			// This output is unsupported.
 			componentErr = ErrOutputNotSupported
@@ -546,7 +593,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 		unitsForRuntimeManager := make(map[RuntimeManager][]Unit)
 		for _, input := range output.Inputs[inputType] {
 			if input.enabled {
-				unitID := fmt.Sprintf("%s-%s", componentID, input.id)
+				unitID := GetInputUnitId(componentID, input.id)
 				if input.runtimeManager == "" {
 					input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName())
 				}
@@ -571,6 +618,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 					InputSpec:             &inputSpec,
 					InputType:             inputType,
 					OutputType:            output.OutputType,
+					OutputName:            output.Name,
 					Units:                 units,
 					RuntimeManager:        runtimeManager,
 					Features:              featureFlags.AsProto(),
@@ -582,7 +630,17 @@ func (r *RuntimeSpecs) componentsForInputType(
 	} else {
 		for _, input := range output.Inputs[inputType] {
 			// Units are being mapped to components, so we need a unique ID for each.
+			// Components are generally identified by their input type and output name. However, for
+			// Service Runtime components, there can only ever be a single instance of the component running,
+			// as a service. So we identify these only by their input type. This way, if the output for a service
+			// component were to change, it would not result in a different ID for that component. By keeping the same
+			// ID, we prevent the component from being identified as a new one and the corresponding service from being
+			// unnecessarily stopped and started.
 			componentID := fmt.Sprintf("%s-%s-%s", inputType, output.Name, input.id)
+			if inputSpec.Spec.Service != nil {
+				componentID = fmt.Sprintf("%s-%s", inputType, input.id)
+			}
+
 			if componentErr == nil && !containsStr(inputSpec.Spec.Outputs, output.OutputType) {
 				// This output is unsupported.
 				componentErr = ErrOutputNotSupported
@@ -594,7 +652,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 
 			var units []Unit
 			if input.enabled {
-				unitID := fmt.Sprintf("%s-unit", componentID)
+				unitID := GetOutputUnitId(componentID)
 				units = append(units, unitForInput(input, unitID))
 
 				// each component gets its own output, because of unit isolation
@@ -605,6 +663,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 					InputSpec:             &inputSpec,
 					InputType:             inputType,
 					OutputType:            output.OutputType,
+					OutputName:            output.Name,
 					Units:                 units,
 					RuntimeManager:        input.runtimeManager,
 					Features:              featureFlags.AsProto(),
@@ -1084,4 +1143,12 @@ func extractStatusReporting(cfg map[string]interface{}) *StatusReporting {
 	return &StatusReporting{
 		Enabled: enabled,
 	}
+}
+
+func GetInputUnitId(componentID string, inputID string) string {
+	return fmt.Sprintf("%s-%s", componentID, inputID)
+}
+
+func GetOutputUnitId(componentID string) string {
+	return fmt.Sprintf("%s-unit", componentID)
 }

@@ -258,36 +258,35 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 
 	// 2. Assert monitoring logs and metrics are available on ES
 	for _, tc := range tests {
-		require.Eventuallyf(t,
-			func() bool {
-				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
-				defer findCancel()
-				mustClauses := []map[string]any{
-					{"match": map[string]any{"data_stream.type": tc.dsType}},
-					{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
-					{"match": map[string]any{"data_stream.namespace": processNamespace}},
-				}
-				mustClauses = append(mustClauses, tc.query...)
-				rawQuery := map[string]any{
-					"query": map[string]any{
-						"bool": map[string]any{
-							"must":   mustClauses,
-							"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestamp}}},
-						},
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+			defer findCancel()
+			mustClauses := []map[string]any{
+				{"match": map[string]any{"data_stream.type": tc.dsType}},
+				{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
+				{"match": map[string]any{"data_stream.namespace": processNamespace}},
+			}
+			mustClauses = append(mustClauses, tc.query...)
+			rawQuery := map[string]any{
+				"query": map[string]any{
+					"bool": map[string]any{
+						"must":   mustClauses,
+						"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestamp}}},
 					},
-					"sort": []map[string]any{
-						{"@timestamp": map[string]any{"order": "asc"}},
-					},
-				}
+				},
+				"sort": []map[string]any{
+					{"@timestamp": map[string]any{"order": "asc"}},
+				},
+			}
 
-				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
-				require.NoError(t, err)
-				if docs.Hits.Total.Value != 0 {
-					key := tc.dsType + "-" + tc.dsDataset + "-" + processNamespace
-					agentDocs[key] = docs
-				}
-				return docs.Hits.Total.Value > 0
-			},
+			docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
+			require.NoError(collect, err)
+			if docs.Hits.Total.Value != 0 {
+				key := tc.dsType + "-" + tc.dsDataset + "-" + processNamespace
+				agentDocs[key] = docs
+			}
+			require.Greater(collect, docs.Hits.Total.Value, 0)
+		},
 			2*time.Minute, 5*time.Second,
 			"agent monitoring classic no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestamp, tc.dsType, tc.dsDataset, processNamespace, tc.query)
 	}
@@ -323,42 +322,41 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		var statusErr error
 		status, statusErr := beatReceiverFixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
-		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 4)
+		assertBeatsHealthy(collect, &status, component.OtelRuntimeManager, 3)
 	}, 1*time.Minute, 1*time.Second)
 
 	// 5. Assert monitoring logs and metrics are available on ES (for otel mode)
 	for _, tc := range tests {
-		require.Eventuallyf(t,
-			func() bool {
-				findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
-				defer findCancel()
-				mustClauses := []map[string]any{
-					{"match": map[string]any{"data_stream.type": tc.dsType}},
-					{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
-					{"match": map[string]any{"data_stream.namespace": receiverNamespace}},
-				}
-				mustClauses = append(mustClauses, tc.query...)
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+			defer findCancel()
+			mustClauses := []map[string]any{
+				{"match": map[string]any{"data_stream.type": tc.dsType}},
+				{"match": map[string]any{"data_stream.dataset": tc.dsDataset}},
+				{"match": map[string]any{"data_stream.namespace": receiverNamespace}},
+			}
+			mustClauses = append(mustClauses, tc.query...)
 
-				rawQuery := map[string]any{
-					"query": map[string]any{
-						"bool": map[string]any{
-							"must":   mustClauses,
-							"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestampBeatReceiver}}},
-						},
+			rawQuery := map[string]any{
+				"query": map[string]any{
+					"bool": map[string]any{
+						"must":   mustClauses,
+						"filter": map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": timestampBeatReceiver}}},
 					},
-					"sort": []map[string]any{
-						{"@timestamp": map[string]any{"order": "asc"}},
-					},
-				}
+				},
+				"sort": []map[string]any{
+					{"@timestamp": map[string]any{"order": "asc"}},
+				},
+			}
 
-				docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
-				require.NoError(t, err)
-				if docs.Hits.Total.Value != 0 {
-					key := tc.dsType + "-" + tc.dsDataset + "-" + receiverNamespace
-					otelDocs[key] = docs
-				}
-				return docs.Hits.Total.Value > 0
-			},
+			docs, err := estools.PerformQueryForRawQuery(findCtx, rawQuery, tc.dsType+"-*", info.ESClient)
+			require.NoError(collect, err)
+			if docs.Hits.Total.Value != 0 {
+				key := tc.dsType + "-" + tc.dsDataset + "-" + receiverNamespace
+				otelDocs[key] = docs
+			}
+			require.Greater(collect, docs.Hits.Total.Value, 0)
+		},
 			4*time.Minute, 5*time.Second,
 			"agent monitoring beats receivers no documents found for timestamp: %s, type: %s, dataset: %s, namespace: %s, query: %v", timestampBeatReceiver, tc.dsType, tc.dsDataset, receiverNamespace, tc.query)
 	}
@@ -715,8 +713,6 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
-    status_reporting:
-      enabled: false
 agent.monitoring.enabled: false
 `
 
@@ -818,7 +814,6 @@ agent.monitoring.enabled: false
 const (
 	otelRuntimeUnsupportedLogLineStart                 = "otel runtime is not supported for component"
 	otelRuntimeMonitoringOutputUnsupportedLogLineStart = "otel runtime is not supported for monitoring output"
-	prometheusInputSkippedLogLine                      = "The Otel prometheus metrics monitoring input can't run in a beats process, skipping"
 )
 
 // TestBeatsReceiverProcessRuntimeFallback verifies that we fall back to the process runtime if the otel runtime
@@ -913,7 +908,6 @@ outputs:
 
 	// verify we've logged a warning about using the process runtime
 	var unsupportedLogRecords []map[string]any
-	var prometheusUnsupportedLogRecord map[string]any
 	var monitoringOutputUnsupportedLogRecord map[string]any
 	for _, line := range strings.Split(string(logsBytes), "\n") {
 		line = strings.TrimSpace(line)
@@ -929,9 +923,6 @@ outputs:
 			if strings.HasPrefix(message, otelRuntimeUnsupportedLogLineStart) {
 				unsupportedLogRecords = append(unsupportedLogRecords, logRecord)
 			}
-			if strings.HasPrefix(message, prometheusInputSkippedLogLine) {
-				prometheusUnsupportedLogRecord = logRecord
-			}
 			if strings.HasPrefix(message, otelRuntimeMonitoringOutputUnsupportedLogLineStart) {
 				monitoringOutputUnsupportedLogRecord = logRecord
 			}
@@ -946,8 +937,145 @@ outputs:
 	})
 
 	assert.Len(t, unsupportedLogRecords, 1, "one log line for each component we try to run")
-	assert.NotEmpty(t, prometheusUnsupportedLogRecord, "should get a log line about Otel prometheus metrics input being skipped")
 	assert.NotEmpty(t, monitoringOutputUnsupportedLogRecord, "should get a log line about monitoring output not being supported")
+}
+
+// TestBeatsReceiverSubcomponentStatus verifies that we correctly reflect the status of beats inputs in the elastic
+// agent component and unit statuses.
+func TestBeatsReceiverSubcomponentStatus(t *testing.T) {
+	_ = define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: nil,
+	})
+
+	// This configuration contains two system/metrics inputs, each with two identical metricsets:
+	// * one for cpu, always healthy
+	// * one for processes, can't read data for some processes if not running as root
+	// The second metricset will emit a message about not being able to read process data. For the first input, this
+	// results in a Healthy status, but the second input is configured to become degraded in that case. The test
+	// verifies both of these conditions.
+	config := `agent:
+  logging:
+    to_stderr: true
+    to_files: false
+    level: debug
+  monitoring:
+    enabled: false
+inputs:
+- data_stream:
+    namespace: default
+  id: unique-system-metrics-input
+  streams:
+  - data_stream:
+      dataset: system.cpu
+    metricsets:
+    - cpu
+    id: unique-system-metrics-input-cpu
+  - data_stream:
+      dataset: system.process
+    metricsets:
+    - process
+    id: unique-system-metrics-input-process
+  type: system/metrics
+  use_output: default
+- data_stream:
+    namespace: default
+  id: unique-system-metrics-input-2
+  streams:
+  - data_stream:
+      dataset: system.cpu
+    metricsets:
+    - cpu
+    id: unique-system-metrics-input-2-cpu
+  - data_stream:
+      dataset: system.process
+    metricsets:
+    - process
+    id: unique-system-metrics-input-2-process
+    degrade_on_partial: true
+  type: system/metrics
+  use_output: default
+outputs:
+  default:
+    api_key: placeholder
+    hosts:
+    - 127.0.0.1:9200
+    type: elasticsearch
+    status_reporting:
+      enabled: false
+`
+
+	// this is the context for the whole test, with a global timeout defined
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	// set up a standalone agent
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	err = fixture.Configure(ctx, []byte(config))
+	require.NoError(t, err)
+
+	installOutput, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: false, Force: true})
+	require.NoError(t, err, "install failed, output: %s", string(installOutput))
+
+	expectedComponentCount := 1
+	expectedUnitCountPerComponent := 3 // one unit per system/metrics input and one output
+	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+		// we should be running beats processes for components, the whole agent should be degraded
+		assert.Equal(collect, int(cproto.State_DEGRADED), status.State)
+		require.Len(collect, status.Components, expectedComponentCount, "There should be one component")
+
+		comp := status.Components[0]
+		assert.Equal(collect, int(cproto.State_DEGRADED), comp.State)
+		expectedComponentVersionInfoName := componentVersionInfoNameForRuntime(component.OtelRuntimeManager)
+		assert.Equal(collect, expectedComponentVersionInfoName, comp.VersionInfo.Name)
+		assert.Lenf(collect, comp.Units, expectedUnitCountPerComponent, "There should be %d units", expectedUnitCountPerComponent)
+		for _, unit := range comp.Units {
+			if unit.UnitType == int(cproto.UnitType_OUTPUT) {
+				continue
+			}
+			var expectedUnitState int
+			if unit.UnitID == "system/metrics-default-unique-system-metrics-input-2" {
+				expectedUnitState = int(cproto.State_DEGRADED)
+			} else {
+				expectedUnitState = int(cproto.State_HEALTHY)
+			}
+			assert.Equalf(collect, expectedUnitState, unit.State,
+				"Expected unit %s to be in state %d, got %d", unit.UnitID, expectedUnitState, unit.State)
+			unitPayload := unit.Payload
+			require.Lenf(collect, unitPayload.Streams, 2,
+				"Expected unit %s to have 2 streams, got %d", unit.UnitID, len(unitPayload.Streams))
+			for streamName, streamState := range unitPayload.Streams {
+				if strings.Contains(streamName, "cpu") {
+					assert.Equal(collect, streamState.Status, "HEALTHY")
+					assert.Empty(collect, streamState.Error)
+				} else if strings.Contains(streamName, "process") {
+					var expectedStreamState string
+					if streamName == "unique-system-metrics-input-2-process" {
+						expectedStreamState = "DEGRADED"
+					} else {
+						expectedStreamState = "HEALTHY"
+					}
+					assert.Equalf(collect, streamState.Status, expectedStreamState,
+						"Expected stream %s to be in state %s, got %s", streamName, expectedStreamState, streamState.Status)
+					assert.Containsf(collect, streamState.Error, "Error fetching data for metricset system.process",
+						"Invalid error message for stream %s: %s", streamName, streamState.Error)
+				}
+			}
+		}
+	}, 1*time.Minute, 1*time.Second)
 }
 
 // TestComponentWorkDir verifies that the component working directory is not deleted when moving the component from
@@ -985,8 +1113,6 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
-    status_reporting:
-      enabled: false
 agent.monitoring.enabled: false
 `
 
@@ -1074,8 +1200,6 @@ outputs:
     type: elasticsearch
     hosts: [http://localhost:9200]
     api_key: placeholder
-    status_reporting:
-      enabled: false
 agent.monitoring.enabled: false
 `
 	err = fixture.Configure(ctx, []byte(configNoComponents))
@@ -1712,7 +1836,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 	healthCheck(ctx,
 		"Everything is ready. Begin running and processing data.",
 		component.OtelRuntimeManager,
-		4,
+		3,
 		otelTimestamp)
 
 	// restart 3 times, checks path definition is stable
@@ -1727,7 +1851,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 		healthCheck(ctx,
 			"Everything is ready. Begin running and processing data.",
 			component.OtelRuntimeManager,
-			4,
+			3,
 			restartTimestamp)
 	}
 

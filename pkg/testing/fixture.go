@@ -38,6 +38,7 @@ import (
 type Fixture struct {
 	t       *testing.T
 	version string
+	hash    string
 	caller  string
 
 	fetcher         Fetcher
@@ -207,6 +208,19 @@ func (f *Fixture) Version() string {
 	return f.version
 }
 
+// Hash returns the Elastic Agent build commit hash (populated only after the fixture has been prepared/extracted)
+func (f *Fixture) Hash() string {
+	return f.hash
+}
+
+// ShortHash returns the Elastic Agent build commit hash in short form (populated only after the fixture has been prepared/extracted)
+func (f *Fixture) ShortHash() string {
+	if len(f.hash) < 6 {
+		return f.hash
+	}
+	return f.hash[:6]
+}
+
 // Prepare prepares the Elastic Agent for usage.
 //
 // This must be called before `Configure`, `Run`, or `Install` can be called.
@@ -256,6 +270,18 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 	}
 	f.extractDir = finalDir
 	f.workDir = finalDir
+
+	// not done for certain types of packages
+	if f.packageFormat != "deb" && f.packageFormat != "rpm" {
+		// collect the hash: it's done by reading the `.build_hash.txt` (the same information can be gathered by the manifest but that involves YAML unmarshalling)
+
+		hashBytes, err := os.ReadFile(filepath.Join(finalDir, ".build_hash.txt"))
+		if err != nil {
+			return fmt.Errorf("reading .build_hash.txt from the extracted archive: %w", err)
+		}
+		f.hash = string(hashBytes)
+	}
+
 	return nil
 }
 
@@ -952,11 +978,57 @@ func (f *Fixture) IsHealthy(ctx context.Context, opts ...statusOpt) error {
 	}
 
 	if status.State != int(cproto.State_HEALTHY) {
-		return fmt.Errorf("agent isn't healthy, current status: %s",
-			client.State(status.State)) //nolint:gosec // value will never be over 32-bit
+		return fmt.Errorf("agent isn't healthy, current state: %s, full status: %+v",
+			client.State(status.State), status) //nolint:gosec // value will never be over 32-bit
 	}
 
 	return nil
+}
+
+// IsHealthyOrDegradedFromOutput works like IsHealthy, but accepts a Degraded status if the reason is an output in that state.
+// This is useful for tests where we have an ES output, but no actual ES, and we don't care about sending data
+// anywhere.
+func (f *Fixture) IsHealthyOrDegradedFromOutput(ctx context.Context, opts ...statusOpt) error {
+	status, err := f.ExecStatus(ctx, opts...)
+	if err != nil {
+		return fmt.Errorf("agent status returned an error: %w", err)
+	}
+
+	invalidStateErr := fmt.Errorf("agent isn't healthy, current state: %s, full status: %+v",
+		ProtoStateFromInt(status.State), status)
+	switch ProtoStateFromInt(status.State) {
+	case cproto.State_HEALTHY:
+		return nil
+	case cproto.State_DEGRADED:
+		// handled below
+	default:
+		return invalidStateErr
+	}
+
+	for _, compState := range status.Components {
+		switch ProtoStateFromInt(compState.State) {
+		case cproto.State_HEALTHY, cproto.State_DEGRADED:
+		default:
+			return invalidStateErr
+		}
+		for _, unitState := range compState.Units {
+			switch ProtoStateFromInt(unitState.State) {
+			case cproto.State_HEALTHY:
+			case cproto.State_DEGRADED:
+				if cproto.UnitType(unitState.UnitType) != cproto.UnitType_OUTPUT { //nolint:gosec // value will never be over 32-bit
+					return invalidStateErr
+				}
+			default:
+				return invalidStateErr
+			}
+		}
+	}
+
+	return nil
+}
+
+func ProtoStateFromInt(state int) cproto.State {
+	return cproto.State(state) //nolint:gosec // value will never be over 32-bit
 }
 
 // IsInstalled returns true if this fixture has been installed
@@ -1507,6 +1579,10 @@ type AgentStatusOutput struct {
 			Message  string `json:"message"`
 			Payload  struct {
 				OsqueryVersion string `json:"osquery_version"`
+				Streams        map[string]struct {
+					Error  string `json:"error"`
+					Status string `json:"status"`
+				} `json:"streams"`
 			} `json:"payload"`
 		} `json:"units"`
 		VersionInfo AgentStatusOutputVersionInfo `json:"version_info,omitempty"`

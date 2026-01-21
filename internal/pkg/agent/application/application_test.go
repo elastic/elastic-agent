@@ -59,6 +59,8 @@ func TestLimitsLog(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
+	rollbackSrc := newMockRollbacksSource(t)
+
 	_, _, _, err := New(
 		ctx,
 		log,
@@ -72,6 +74,7 @@ func TestLimitsLog(t *testing.T) {
 		true,              // disable monitoring
 		nil,               // no configuration overrides
 		nil,
+		rollbackSrc,
 	)
 	require.NoError(t, err)
 
@@ -393,13 +396,6 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 					},
 				}, nil)
 
-				mockRollbackSource.EXPECT().Set(map[string]ttl.TTLMarker{
-					oldAgentInstallPath: {
-						Version:    "1.2.3",
-						Hash:       "oldversionhash",
-						ValidUntil: tomorrow,
-					},
-				}).Return(nil)
 				return nil, mockRollbackSource
 			},
 			postNormalizeAssertions: nil,
@@ -425,8 +421,8 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 					},
 					nil,
 				)
-				// expect removal of the existing ttlmarker
-				mockRollbackSource.EXPECT().Set(map[string]ttl.TTLMarker{}).Return(nil)
+
+				mockRollbackSource.EXPECT().Remove(filepath.Join("data", "elastic-agent-1.2.3-oldver")).Return(nil)
 				return nil, mockRollbackSource
 			},
 			postNormalizeAssertions: func(t *testing.T, topDir string, _ *upgrade.UpdateMarker) {

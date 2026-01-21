@@ -10,8 +10,8 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1765760468"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1765760468"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1768438928"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1768438928"
 
 steps:
   - input: "Build parameters"
@@ -177,6 +177,9 @@ steps:
       ls -lahR build/
 
       echo "+++ Running DRA publish step"
+      if [[ -z "$${MANIFEST_URL}" ]]; then
+        export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
+      fi
       if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
         export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
       fi
@@ -191,6 +194,13 @@ steps:
       if [[ -z "$${DRA_WORKFLOW}" ]]; then
         DRA_WORKFLOW=$(buildkite-agent meta-data get DRA_WORKFLOW --default "")
         export DRA_WORKFLOW
+      fi
+      if [[ -z "$${MANIFEST_URL}" ]]; then
+        # Triggered from a PR with no manifest URL. The build in that case is always a snapshot build.
+        # Ensure that the BEAT_VERSION that is passed to the DRA publish script is a SNAPSHOT version.
+        if [[ "${BEAT_VERSION}" != *-SNAPSHOT ]]; then
+          BEAT_VERSION="${BEAT_VERSION}-SNAPSHOT"
+        fi
       fi
       .buildkite/scripts/steps/dra-publish.sh
 

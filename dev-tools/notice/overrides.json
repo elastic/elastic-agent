@@ -21,3 +21,4 @@
 {"name": "github.com/JohnCGriffin/overflow", "licenceFile": "README.md", "licenceType": "MIT"}
 {"name": "github.com/elastic/cloud-on-k8s/v2", "licenceType": "Elastic"}
 {"name": "github.com/elastic/elastic-agent/internal/edot", "licenceType": "Elastic"}
+{"name": "github.com/elastic/ebpfevents", "licenceType": "Apache-2.0"}

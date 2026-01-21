@@ -2,11 +2,11 @@
 navigation_title: Elastic APM processor
 description: The Elastic APM processor is an OpenTelemetry Collector component that enriches OTel data for optimal use with Elastic APM.
 applies_to:
-  stack:
+  stack: ga 9.2+
   serverless:
     observability:
   product:
-    edot_collector: ga 9.2
+    edot_collector: ga 9.2+
 products:
   - id: elastic-agent
   - id: observability
@@ -32,7 +32,6 @@ In standalone deployments, the Elastic APM processor is used in both agent and g
 **Gateway mode**: The processor is part of the [Gateway mode pipeline](../config/default-config-standalone.md#gateway-mode), where it enriches traces received from other collectors running in agent mode before ingesting them into {{es}}.
 
 :::{note}
-:applies_to: edot_collector: ga 9.2
 The `elasticapm` processor replaces the deprecated `elastictrace` processor. If you're upgrading from an older version, update your configuration to use `elasticapm` instead of `elastictrace`.
 :::
 

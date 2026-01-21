@@ -20,10 +20,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/pkg/utils"
+
 	"github.com/gofrs/uuid/v5"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
@@ -206,6 +207,12 @@ func runOrSkip(t *testing.T, req Requirements, local bool) *Info {
 	if DryRun {
 		return dryRun(t, req)
 	}
+
+	t.Cleanup(func() {
+		if runtime.GOOS != "windows" {
+			_ = os.RemoveAll("/tmp/elastic-agent") // clean up any leftover data from tests
+		}
+	})
 
 	namespace, err := getNamespace(t, local)
 	if err != nil {
