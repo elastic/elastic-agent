@@ -2475,8 +2475,25 @@ func (Integration) UpdatePackageVersion(ctx context.Context) error {
 		return fmt.Errorf("failed to get latest build for branch %q: %w", currentReleaseBranch, err)
 	}
 
+	// If a release is available with the same core version as the latest snapshot, use the release. This can
+	// happen after a new release, before a stack snapshot is available. In that event, older snapshots might not be
+	// available.
+	var stackVersion, stackBuildId string
+	releasesResponse, err := devtools.FetchStackReleases(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to fetch stack releases: %w", err)
+	}
+	latestReleaseForBranch := releasesResponse.GetLatestPatchForMinor(currentReleaseBranch)
+	if latestReleaseForBranch != nil && strings.HasPrefix(branchInformation.Version, latestReleaseForBranch.Version) {
+		stackVersion = latestReleaseForBranch.Version
+		stackBuildId = ""
+	} else {
+		stackVersion = branchInformation.Version
+		stackBuildId = fmt.Sprintf("%s-SNAPSHOT", branchInformation.BuildID)
+	}
+
 	err = devtools.UpdatePackageVersion(
-		branchInformation.Version, branchInformation.BuildID,
+		branchInformation.Version, branchInformation.BuildID, stackVersion, stackBuildId,
 		branchInformation.ManifestURL, branchInformation.SummaryURL)
 	if err != nil {
 		return fmt.Errorf("failed to write package version: %w", err)
