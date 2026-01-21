@@ -462,8 +462,6 @@ github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.141
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.141.0/go.mod h1:QaA5DvWjGF/jOzcKW2fzmmPs6NJNO470wWLXU6xnxM8=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.141.0 h1:Qld0XhVUI81Fyx0y4lPRuKCYws9OpBqhyALteFAIwUU=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.141.0/go.mod h1:7f7+goLrZ8HYMfm810sBxscn33kGaQJFWcLJgJ5tq5A=
-github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.143.0 h1:oJjHO+juQ0yhKs94vYRmdWpK3+EitrhTFi2E7vNQa3w=
-github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.143.0/go.mod h1:UUWkycAgRXadUIriVld5i38i3YZd3iSN5vWZId86OnQ=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJwooC2xJA040=
