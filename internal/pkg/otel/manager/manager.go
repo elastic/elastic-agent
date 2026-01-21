@@ -478,7 +478,7 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 		},
 		"elastic_agent": map[string]any{
 			"id":       agentInfo.AgentID(),
-			"process":  "elastic-agent",
+			"process":  "elastic-otel-collector",
 			"snapshot": agentInfo.Snapshot(),
 			"version":  agentInfo.Version(),
 		},
@@ -486,8 +486,8 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 			"id": agentInfo.AgentID(),
 		},
 		"component": mapstr.M{
-			"binary": "elastic-agent",
-			"id":     "elastic-agent/collector",
+			"binary": "elastic-otel-collector",
+			"id":     "elastic-otel-collector",
 		},
 		"metricset": mapstr.M{
 			"name": "stats",
