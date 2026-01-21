@@ -8,7 +8,7 @@ replace github.com/elastic/elastic-agent => ../../
 replace github.com/elastic/beats/v7 => ../../beats
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260119184508-00e189e569e3
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260120231300-a88dd0f6847e
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.32.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.24.0
