@@ -266,3 +266,37 @@ To achieve the intended delivery guarantee, the exporter that receives events fr
 Additionally, the retry settings must be enabled on the exporter, using a backoff policy that retries until the operation succeeds. By default, `max_retries` is set to 3, which is how most Beats behave. Standalone Filebeat, however, retries indefinitely. Beats receivers don't support unlimited retries yet, and this is being tracked at https://github.com/elastic/beats/issues/47892.
 
 Beat receivers also require the Beat-internal memory queue to run in synchronous mode for delivery guarantees. This is enabled by setting `queue.mem.flush.timeout: 0s` in each receiver configuration, as shown in the example above.
+
+### Beat stats
+
+Standalone beats expose telemetry data via the [stats metricset](https://www.elastic.co/docs/reference/beats/metricbeat/metricbeat-metricset-beat-stats). When running beats as receivers in the OpenTelemetry collector, this telemetry data is partially available, computed from otel and exporter components and ingested via the `elasticmonitoringreceiver`.
+
+```yaml
+receivers:
+  elasticmonitoringreceiver:
+    interval: 60s
+// ...
+service:
+  pipelines:
+    mypipeline:
+      receivers: [elasticmonitoringreceiver, ...]
+```
+
+Receiver events are generated per exporter and follow the format below:
+
+```json
+{"beat":{"stats":{"libbeat":{"output":{"events":{"batches":10,"acked":4,"dropped":2,"total":6,"active":0,"failed":4},"write":{"bytes":1968}},"pipeline":{"queue":{"max_events":3200,"filled":{"events":0,"pct":0.0}}}}}},"component":{"id":"elasticsearch/1"},"@timestamp":"2026-01-21T12:13:00.546Z"}
+```
+
+Below is a list of metrics currently available when using the elasticmonitoringreceiver. Note that their semantics may differ slightly from those in standalone Beats, as they are derived from a set of [internal collector metrics](https://opentelemetry.io/docs/collector/internal-telemetry/) and [internal elasticsearchexporter metrics](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/documentation.md#internal-telemetry).
+
+- `beat.stats.libbeat.pipeline.queue.filled.events`: otelcol_exporter_queue_size
+- `beat.stats.libbeat.pipeline.queue.max_events`: otelcol_exporter_queue_capacity
+- `beat.stats.libbeat.pipeline.queue.filled.pct`: derived from queue size / capacity
+- `beat.stats.libbeat.output.events.total`: otelcol.elasticsearch.docs.processed
+- `beat.stats.libbeat.output.events.active`: otelcol.elasticsearch.docs.processed - (otelcol_exporter_send_failed_log_records + otelcol_exporter_send_failed_spans + otelcol_exporter_send_failed_metric_points)
+- `beat.stats.libbeat.output.events.acked`: otelcol_exporter_sent_metric_points + otelcol_exporter_sent_spans + otelcol_exporter_sent_log_records
+- `beat.stats.libbeat.output.events.dropped`: otelcol_exporter_send_failed_log_records + otelcol_exporter_send_failed_spans + otelcol_exporter_send_failed_metric_points
+- `beat.stats.libbeat.output.events.failed`: otelcol.elasticsearch.docs.retried.
+- `beat.stats.libbeat.output.events.batches`: otelcol.elasticsearch.bulk_requests.count
+- `beat.stats.libbeat.output.write.bytes`: otelcol.elasticsearch.flushed.bytes
