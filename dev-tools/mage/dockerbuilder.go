@@ -243,11 +243,7 @@ func (b *dockerBuilder) dockerBuild() (string, []string, error) {
 		}
 		// if building cross-platform, add the arch name to the tag
 		tagSuffix = "-" + b.Arch
-		args = []string{
-			"buildx",
-			"build",
-			"--platform", platform,
-		}
+		args = append(args, "--platform", platform)
 	}
 
 	mainTag := fmt.Sprintf("%s:%s", b.imageName, b.Version)
