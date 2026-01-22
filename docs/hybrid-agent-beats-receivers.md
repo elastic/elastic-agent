@@ -269,7 +269,7 @@ Beat receivers also require the Beat-internal memory queue to run in synchronous
 
 ### Beat stats
 
-Standalone beats expose telemetry data via the [stats metricset](https://www.elastic.co/docs/reference/beats/metricbeat/metricbeat-metricset-beat-stats). When running beats as receivers in the OpenTelemetry collector, this telemetry data is partially available, computed from otel and exporter components and ingested via the `elasticmonitoringreceiver`.
+Standalone beats expose telemetry data via the [stats endpoint](https://www.elastic.co/guide/en/beats/filebeat/current/http-endpoint.html#_stats). When running beats as receivers in the OpenTelemetry collector, this telemetry data is partially available, computed from otel and exporter components and ingested via the `elasticmonitoringreceiver`.
 
 ```yaml
 receivers:
