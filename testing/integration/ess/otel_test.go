@@ -2211,14 +2211,14 @@ func TestMonitoringReceiver(t *testing.T) {
 
 	cfg := `receivers:
   elasticmonitoringreceiver:
-    interval: 1s
+    interval: 3s
 exporters:
   elasticsearch/1:
     endpoints:
       - {{.ESEndpoint}}
     api_key: {{.ESApiKey}}
     max_conns_per_host: 1
-    index: logs-otel-monitoring-{{.TestId}}-default
+    logs_index: logs-otel-monitoring-{{.TestId}}-default
     retry:
       enabled: true
       initial_interval: 1s
@@ -2303,7 +2303,7 @@ service:
 			docs = result
 		},
 		90*time.Second,
-		time.Second,
+		100*time.Millisecond,
 		"did not find the expected number of monitoring events")
 
 	require.Equal(t, 2, len(docs.Hits.Hits), "should have exactly 2 monitoring documents")
