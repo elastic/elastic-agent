@@ -15,6 +15,8 @@ service:
       receivers: [elasticmonitoringreceiver, ...]
 ```
 
+> In order to fetch exporter metrics, the `telemetry.newPipelineTelemetry` should be enabled.
+
 Receiver events are generated per exporter and follow the format below:
 
 ```json
