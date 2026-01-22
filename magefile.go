@@ -1011,9 +1011,9 @@ func (Cloud) Load() error {
 
 	devtools.FIPSBuild = fipsVal
 
-	source := "build/distributions/elastic-agent-cloud-" + agentVersion + "-SNAPSHOT-linux-" + runtime.GOARCH + ".docker.tar.gz"
+	source := devtools.DistributionsDir + "/elastic-agent-cloud-" + agentVersion + "-SNAPSHOT-linux-" + runtime.GOARCH + ".docker.tar.gz"
 	if fipsVal {
-		source = "build/distributions/elastic-agent-cloud-fips-" + agentVersion + "-SNAPSHOT-linux-" + runtime.GOARCH + ".docker.tar.gz"
+		source = devtools.DistributionsDir + "/elastic-agent-cloud-fips-" + agentVersion + "-SNAPSHOT-linux-" + runtime.GOARCH + ".docker.tar.gz"
 	}
 	if envSource, ok := os.LookupEnv("DOCKER_IMPORT_SOURCE"); ok && envSource != "" {
 		source = envSource
@@ -2027,9 +2027,8 @@ func saveIronbank() error {
 		return fmt.Errorf("cannot find the folder with the ironbank context: %+v", err)
 	}
 
-	distributionsDir := "build/distributions"
-	if _, err := os.Stat(distributionsDir); os.IsNotExist(err) {
-		err := os.MkdirAll(distributionsDir, 0o750)
+	if _, err := os.Stat(devtools.DistributionsDir); os.IsNotExist(err) {
+		err := os.MkdirAll(devtools.DistributionsDir, 0o750)
 		if err != nil {
 			return fmt.Errorf("cannot create folder for docker artifacts: %+v", err)
 		}
@@ -2043,7 +2042,7 @@ func saveIronbank() error {
 
 	// move the folder to the parent folder, there are two parent folder since
 	// buildDir contains a two folders dir.
-	tarGzFile := filepath.Join("..", "..", distributionsDir, ironbank+".tar.gz")
+	tarGzFile := filepath.Join("..", "..", devtools.DistributionsDir, ironbank+".tar.gz")
 
 	// Save the build context as tar.gz artifact
 	err := devtools.Tar("./", tarGzFile)
@@ -4212,9 +4211,10 @@ func (h Helm) Package() error {
 	alternativeName := fmt.Sprintf("elastic-agent-helm-chart-%s.tgz", agentChartVersion)
 
 	srcFile := packagePath
-	dstFile := filepath.Join(filepath.Dir(packagePath), alternativeName)
+	dstFile := filepath.Join(devtools.DistributionsDir, alternativeName)
 
-	fmt.Println(">>> CopyFile from %s to %s", srcFile, dstFile)
+	fmt.Printf(">>> CopyFile from %s to %s\n", srcFile, dstFile)
+	devtools.CreateDir(dstFile)
 	if err := copyFile(srcFile, dstFile); err != nil {
 		return fmt.Errorf("failed to create alternative package name: %w", err)
 	}
