@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -21,6 +20,7 @@ import (
 	"github.com/gofrs/uuid/v5"
 	"github.com/schollz/progressbar/v3"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
@@ -293,23 +293,21 @@ func TestSwitchToUnprivilegedDeduplication(t *testing.T) {
 
 	t.Logf("Switching agent privilege level...")
 
-	var switchWg sync.WaitGroup
-	var switchErr error
+	switchErrg := new(errgroup.Group)
 
 	var actionsCount = 5
+	errors := make([]string, actionsCount)
 	for i := 0; i < actionsCount-1; i++ {
-		switchWg.Add(1)
-		go func() {
+		switchErrg.Go(func() error {
 			err := fleettools.SwitchAgent(ctx, kibClient, agentID)
-			if err != nil {
-				switchErr = errors.Join(switchErr, fmt.Errorf("switching agent privilege level: %w", err))
-			}
-			switchWg.Done()
-		}()
+			errors[i] = err.Error()
+			return err
+		})
 	}
 
-	switchWg.Wait()
-	require.NoError(t, switchErr, "switching agent privilege level failed")
+	switchErr := switchErrg.Wait()
+	// log all errors
+	require.NoErrorf(t, switchErr, "switching agent privilege level failed: %s", strings.Join(errors, "; "))
 
 	t.Log("Waiting for switched Agent status to be online...")
 	_, err = backoff.Retry(ctx, func() (any, error) {
