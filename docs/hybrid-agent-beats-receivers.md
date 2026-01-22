@@ -288,7 +288,7 @@ Receiver events are generated per exporter and follow the format below:
 {"beat":{"stats":{"libbeat":{"output":{"events":{"batches":10,"acked":4,"dropped":2,"total":6,"active":0,"failed":4},"write":{"bytes":1968}},"pipeline":{"queue":{"max_events":3200,"filled":{"events":0,"pct":0.0}}}}}},"component":{"id":"elasticsearch/1"},"@timestamp":"2026-01-21T12:13:00.546Z"}
 ```
 
-Below is a list of metrics currently available when using the elasticmonitoringreceiver. Note that their semantics may differ slightly from those in standalone Beats, as they are derived from a set of [internal collector metrics](https://opentelemetry.io/docs/collector/internal-telemetry/) and [internal elasticsearchexporter metrics](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/documentation.md#internal-telemetry).
+Here is a list of metrics currently available when using the `elasticmonitoringreceiver`. Note that their semantics may differ from those in standalone Beats, as they are derived from a set of [internal collector metrics](https://opentelemetry.io/docs/collector/internal-telemetry/) and [internal elasticsearchexporter metrics](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/documentation.md#internal-telemetry).
 
 - `beat.stats.libbeat.pipeline.queue.filled.events`: otelcol_exporter_queue_size
 - `beat.stats.libbeat.pipeline.queue.max_events`: otelcol_exporter_queue_capacity
