@@ -2195,7 +2195,7 @@ func TestMonitoringReceiver(t *testing.T) {
 		Stack: &define.Stack{},
 	})
 
-	testId := info.Namespace
+	indexName := strings.ToLower("logs-generic-default-" + info.Namespace)
 	tempDir := aTesting.TempDir(t, "..", "..", "..", "build")
 	cfgFilePath := filepath.Join(tempDir, "otel.yml")
 
@@ -2218,7 +2218,7 @@ exporters:
       - {{.ESEndpoint}}
     api_key: {{.ESApiKey}}
     max_conns_per_host: 1
-    logs_index: logs-otel-monitoring-{{.TestId}}-default
+    logs_index: {{.Index}}
     retry:
       enabled: true
       initial_interval: 1s
@@ -2247,11 +2247,11 @@ service:
 	configParams := struct {
 		ESEndpoint string
 		ESApiKey   string
-		TestId     string
+		Index      string
 	}{
 		ESEndpoint: esHost,
 		ESApiKey:   esApiKey.Encoded,
-		TestId:     testId,
+		Index:      indexName,
 	}
 
 	var configBuffer bytes.Buffer
@@ -2281,7 +2281,6 @@ service:
 	}()
 
 	// Wait for monitoring events to be indexed in Elasticsearch
-	indexName := "logs-otel-monitoring-" + testId + "-default"
 	var docs estools.Documents
 	require.EventuallyWithT(
 		t,
@@ -2292,7 +2291,7 @@ service:
 			result, err := estools.GetAllLogsForIndexWithContext(
 				findCtx,
 				esClient,
-				indexName)
+				".ds-"+indexName+"*")
 			require.NoError(c, err)
 			require.Equalf(
 				c,
