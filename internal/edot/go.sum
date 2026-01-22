@@ -450,8 +450,8 @@ github.com/elastic/elastic-agent-autodiscover v0.10.0 h1:WJ4zl9uSfk1kHmn2B/0byQB
 github.com/elastic/elastic-agent-autodiscover v0.10.0/go.mod h1:Nf3zh9FcJ9nTTswTwDTUAqXmvQllOrNliM6xmORSxwE=
 github.com/elastic/elastic-agent-client/v7 v7.17.2 h1:Cl2TeABqWZgW40t5fchGWT/sRk4MDDLWA0d8iHHOxLA=
 github.com/elastic/elastic-agent-client/v7 v7.17.2/go.mod h1:5irRFqp6HLqtu1S+OeY0jg8x7K6PLL+DW+PwVk1vJnk=
-github.com/elastic/elastic-agent-libs v0.31.0 h1:3i/a0n40VPpx+vyB6oBZkTpcsjEGd2LKBiJjSI//j38=
-github.com/elastic/elastic-agent-libs v0.31.0/go.mod h1:0xUg7alsNE/WhY9DZRIdTYW75nqSHC1octIAg//j/PQ=
+github.com/elastic/elastic-agent-libs v0.32.0 h1:CO5+Lz7inFG/yi3dTPBzTKScqv/ObS9qikl4fidMETw=
+github.com/elastic/elastic-agent-libs v0.32.0/go.mod h1:0xUg7alsNE/WhY9DZRIdTYW75nqSHC1octIAg//j/PQ=
 github.com/elastic/elastic-agent-system-metrics v0.13.6 h1:Gwy3siqs5aHAP6RlLXel/irnedXvqdQ+tAzPq/2QOlY=
 github.com/elastic/elastic-agent-system-metrics v0.13.6/go.mod h1:JNfnZrC0viAjlJRUzQKKuMpDlXgjXBn4WdWEXQF7jcA=
 github.com/elastic/elastic-transport-go/v8 v8.8.0 h1:7k1Ua+qluFr6p1jfJjGDl97ssJS/P7cHNInzfxgBQAo=
@@ -484,8 +484,8 @@ github.com/elastic/go-quark v0.3.0 h1:d4vokx0psEJo+93fnhvWpTJMggPd9rfMJSleoLva4x
 github.com/elastic/go-quark v0.3.0/go.mod h1:bO/XIGZBUJGxyiJ9FTsSYn9YlfOTRJnmOP+iBE2FyjA=
 github.com/elastic/go-seccomp-bpf v1.6.0 h1:NYduiYxRJ0ZkIyQVwlSskcqPPSg6ynu5pK0/d7SQATs=
 github.com/elastic/go-seccomp-bpf v1.6.0/go.mod h1:5tFsTvH4NtWGfpjsOQD53H8HdVQ+zSZFRUDSGevC0Kc=
-github.com/elastic/go-sfdc v0.0.0-20241010131323-8e176480d727 h1:yuiN60oaQUz2PtNpNhDI2H6zrCdfiiptmNdwV5WUaKA=
-github.com/elastic/go-sfdc v0.0.0-20241010131323-8e176480d727/go.mod h1:sw1pzz4pIqzDQxFWt3dFoG2uIUFAfThxlMfWpjH590E=
+github.com/elastic/go-sfdc v0.0.0-20251207194532-c5aadd4a4e06 h1:TEeq+uvg9+B0f+8JdaqzAdtmhgz9KX/OGtKyQAKA4ac=
+github.com/elastic/go-sfdc v0.0.0-20251207194532-c5aadd4a4e06/go.mod h1:sw1pzz4pIqzDQxFWt3dFoG2uIUFAfThxlMfWpjH590E=
 github.com/elastic/go-structform v0.0.12 h1:HXpzlAKyej8T7LobqKDThUw7BMhwV6Db24VwxNtgxCs=
 github.com/elastic/go-structform v0.0.12/go.mod h1:CZWf9aIRYY5SuKSmOhtXScE5uQiLZNqAFnwKR4OrIM4=
 github.com/elastic/go-sysinfo v1.15.4 h1:A3zQcunCxik14MgXu39cXFXcIw2sFXZ0zL886eyiv1Q=
@@ -530,6 +530,10 @@ github.com/elastic/opentelemetry-collector-components/processor/lsmintervalproce
 github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.24.0/go.mod h1:wSZ3EkTt2C5St1Eezd05DZ6H3oAewNkbnQeBR6ukKxY=
 github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.24.0 h1:rUcFsE55tHX7MjZLj+MEvQSaLFmxXa9Rb8LaGMp6fKw=
 github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.24.0/go.mod h1:6g/yGt22LRR0n76vZikZ0UGu0OJ6OmDOxCNCVwzywsA=
+github.com/elastic/opentelemetry-collector-contrib/internal/healthcheck v0.0.0-20260113162120-ad842251e9e4 h1:NO3gUhVEYpseLlsdo04w1hJeiO4UitWUfwGeT9u1hMo=
+github.com/elastic/opentelemetry-collector-contrib/internal/healthcheck v0.0.0-20260113162120-ad842251e9e4/go.mod h1:tF9H8+S/AmPwrkXpa8Qr3QmUDisnukldx3VYisUMWF8=
+github.com/elastic/opentelemetry-collector-contrib/pkg/status v0.0.0-20260113162120-ad842251e9e4 h1:OFbsckvfzIbGr/o3+mwo/irmghM/vSy05MQGe6A4A98=
+github.com/elastic/opentelemetry-collector-contrib/pkg/status v0.0.0-20260113162120-ad842251e9e4/go.mod h1:umNY2+bbiGqUGKdsRMvxRT2e+jJE37EP/C5g/WAKsb8=
 github.com/elastic/opentelemetry-lib v0.27.0 h1:+6WFaynpU0fifa2S3Nys0G8J8OwNWoGFQrCmgWSpn1s=
 github.com/elastic/opentelemetry-lib v0.27.0/go.mod h1:Va/NCTtn9ofZ0lUy3bUg3SYnEbJtLY6rWFgkOsVoKHc=
 github.com/elastic/sarama v1.19.1-0.20251224062803-313637a62841 h1:arI5QqFbuPfR1Ee4lgLUuYT5pCxVMTTQIZnn1q3/6Qs=
@@ -771,6 +775,8 @@ github.com/gorilla/sessions v1.2.1 h1:DHd3rPN5lE3Ts3D8rKkQ8x/0kqfeNmBAaiSi+o7Fsg
 github.com/gorilla/sessions v1.2.1/go.mod h1:dk2InVEVJ0sfLlnXv9EAgkf6ecYs/i80K/zI+bUmuGM=
 github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 h1:JeSE6pjso5THxAzdVpqr6/geYxZytqFMBCOtn/ujyeo=
 github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674/go.mod h1:r4w70xmWCQKmi1ONH4KIaBptdivuRPyosB9RmPlGEwA=
+github.com/gosnmp/gosnmp v1.42.1 h1:MEJxhpC5v1coL3tFRix08PYmky9nyb1TLRRgJAmXm8A=
+github.com/gosnmp/gosnmp v1.42.1/go.mod h1:CxVS6bXqmWZlafUj9pZUnQX5e4fAltqPcijxWpCitDo=
 github.com/grafana/regexp v0.0.0-20250905093917-f7b3be9d1853 h1:cLN4IBkmkYZNnk7EAJ0BHIethd+J6LqxFNw5mSiI2bM=
 github.com/grafana/regexp v0.0.0-20250905093917-f7b3be9d1853/go.mod h1:+JKpmjMGhpgPL+rXZ5nsZieVzvarn86asRlBg4uNGnk=
 github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 h1:+9834+KizmvFV7pXQGSXQTsaWhq2GjuNUt0aUU0YBYw=
@@ -1137,8 +1143,6 @@ github.com/open-telemetry/opentelemetry-collector-contrib/internal/filter v0.141
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/filter v0.141.0/go.mod h1:QTceC+e3mAclBVDvBUuWvOvzRcIBikDr7jPJ4d/OgHs=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/gopsutilenv v0.141.0 h1:oogTgVI6xpteIjklDRV4qhKu8uhgrBCpdLq+SLgDavw=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/gopsutilenv v0.141.0/go.mod h1:zqz+PDW3woK1SJGzkozF6/158Du5p0VlxGlGHe677QA=
-github.com/open-telemetry/opentelemetry-collector-contrib/internal/healthcheck v0.141.0 h1:Ib8U2EOQq54eRDf33sAK8e2M7aA5UVWfnC5DSEdebk8=
-github.com/open-telemetry/opentelemetry-collector-contrib/internal/healthcheck v0.141.0/go.mod h1:SSQbMNwi8G+rrCMAQxan7lk6nyqLRZ4F7+9sIDXxyDc=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig v0.141.0 h1:23XwDn4lYAIGTKuL5Ex94+KpdLodUdf1sXB02ZUrCQE=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig v0.141.0/go.mod h1:MNTSHMl1wybxq7SMUy/Ew7JYr2cf70+JVCySwA2zBRI=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/kafka v0.141.0 h1:sYXJ024Y/JNUJ6K5LMF/cAYgW580RicjwYvVIJJteFs=
@@ -1177,8 +1181,6 @@ github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.141.0 
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.141.0/go.mod h1:3S0jKFJOdukRxfVUdtR+ymXqB7Rr8kjXLkWK7ESOKqE=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.141.0 h1:VX10o0qIXQiUTkvHtGrpdr6UWJ9yNjgSkL/cVLmdTFY=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza v0.141.0/go.mod h1:KBnG3v77MKoruqf+/o97jyKmZTjKXOb/HIQjVTiaQIc=
-github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.141.0 h1:bsAO48ojRBMA0dk/RR7LIurkoYZfKTFxnrCQofiFNbI=
-github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.141.0/go.mod h1:eVHnGSqQGxwjlF9svzO1LRRgmMWKLWVKXSCHKRzHfRM=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/azure v0.141.0 h1:s87GaaCxBAUZRNsuzEc1ytgZENlmO0tCHllRmOqwMgk=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/azure v0.141.0/go.mod h1:yz4PL34ed39URi4DBUtvoBAtOZHWI95eMuxW+0/bRIk=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/jaeger v0.141.0 h1:G7LQ0plv/NYpPu0Cvym+nwtuiNP6F2vljZEMeUbs6Kk=
@@ -1255,6 +1257,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreat
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.141.0/go.mod h1:DKEXyGsFdghEpxLPfyYAY9IfxwfSNp5nYRAYVTRczKE=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver v0.141.0 h1:uhAD/FddRWieeE64zqrOP+6YXQK5Qk3Asy3/qBR2B/0=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver v0.141.0/go.mod h1:9Pe90gR74m5Ln4/UOLKCGJagp8YpZDKGfwOOSacjO7E=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/snmpreceiver v0.141.0 h1:nsCIEVlOrD8pKbZCCcKgAgbvfFrjcR/4kaCtgMCXF4I=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/snmpreceiver v0.141.0/go.mod h1:rW4puBDrXnbe3wRPXLsGiDkzaFW3SxA0f6ZPZe2YuyY=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver v0.141.0 h1:sIP0VCQnF2J3r/t6EYg/DqoyHQrRGU2aB1VfnIeLS6o=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver v0.141.0/go.mod h1:MNkexLegJvVF6dnu+1kgMFh6PE+wSz4IyK43HK8WpLs=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver v0.141.0 h1:jPE3pFKZuPFlb5Z5ifaqjdWcTd7TwqUEvVCkcPbpp+w=

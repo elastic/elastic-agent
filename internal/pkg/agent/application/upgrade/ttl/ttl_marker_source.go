@@ -5,6 +5,7 @@
 package ttl
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -53,6 +54,21 @@ func (T TTLMarkerRegistry) Set(m map[string]TTLMarker) error {
 
 	// create all the remaining markers
 	return T.addOrReplace(m)
+}
+
+func (T TTLMarkerRegistry) Remove(versionedHome string) error {
+	markerFilePath := filepath.Join(T.baseDir, versionedHome, ttlMarkerName)
+	if _, err := os.Stat(markerFilePath); errors.Is(err, os.ErrNotExist) {
+		// marker file does not exist, nothing to do
+		return nil
+	}
+
+	T.log.Debugf("Removing marker for versionedHome: %s", versionedHome)
+	err := os.Remove(markerFilePath)
+	if err != nil {
+		return fmt.Errorf("removing ttl marker for %q: %w", versionedHome, err)
+	}
+	return nil
 }
 
 func (T TTLMarkerRegistry) Get() (map[string]TTLMarker, error) {
@@ -108,7 +124,7 @@ func readTTLMarker(filePath string) (TTLMarker, error) {
 }
 
 func writeTTLMarker(filePath string, marker TTLMarker) error {
-	file, err := os.Create(filePath)
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0660)
 	if err != nil {
 		return fmt.Errorf("failed to open %q: %w", filePath, err)
 	}
