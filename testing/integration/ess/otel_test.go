@@ -2184,6 +2184,158 @@ service:
 	}, 1*time.Minute, 10*time.Second, "collector setting for log level was not given precedence")
 }
 
+func TestMonitoringReceiver(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	testId := info.Namespace
+	tempDir := aTesting.TempDir(t, "..", "..", "..", "build")
+	cfgFilePath := filepath.Join(tempDir, "otel.yml")
+
+	esHost, err := integration.GetESHost()
+	require.NoError(t, err, "failed to get ES host")
+	require.True(t, len(esHost) > 0)
+
+	esClient := info.ESClient
+	require.NotNil(t, esClient)
+	esApiKey, err := createESApiKey(esClient)
+	require.NoError(t, err, "failed to get api key")
+	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+
+	cfg := `receivers:
+  elasticmonitoringreceiver:
+    interval: 1s
+exporters:
+  elasticsearch/1:
+    endpoints:
+      - {{.ESEndpoint}}
+    api_key: {{.ESApiKey}}
+    max_conns_per_host: 1
+    index: logs-otel-monitoring-{{.TestId}}-default
+    retry:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 1m0s
+      max_retries: 3
+    sending_queue:
+      batch:
+        flush_timeout: 10s
+        max_size: 1
+        min_size: 1
+        sizer: items
+      block_on_overflow: true
+      enabled: true
+      num_consumers: 1
+      queue_size: 3200
+      wait_for_result: true
+
+service:
+  pipelines:
+    logs:
+      receivers: [elasticmonitoringreceiver]
+      exporters:
+        - elasticsearch/1
+`
+
+	configParams := struct {
+		ESEndpoint string
+		ESApiKey   string
+		TestId     string
+	}{
+		ESEndpoint: esHost,
+		ESApiKey:   esApiKey.Encoded,
+		TestId:     testId,
+	}
+
+	var configBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("config").Parse(cfg)).Execute(&configBuffer, configParams),
+	)
+	require.NoError(t, os.WriteFile(cfgFilePath, configBuffer.Bytes(), 0o600))
+
+	// Create fixture and prepare agent
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", cfgFilePath}))
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	// Remove elastic-agent.yml so it's purely OTel mode
+	require.NoError(t, os.Remove(filepath.Join(fixture.WorkDir(), "elastic-agent.yml")))
+
+	// Start the collector
+	var fixtureWg sync.WaitGroup
+	fixtureWg.Add(1)
+	go func() {
+		defer fixtureWg.Done()
+		err = fixture.RunOtelWithClient(ctx)
+	}()
+
+	// Wait for monitoring events to be indexed in Elasticsearch
+	indexName := "logs-otel-monitoring-" + testId + "-default"
+	var docs estools.Documents
+	require.EventuallyWithT(
+		t,
+		func(c *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer findCancel()
+
+			result, err := estools.GetAllLogsForIndexWithContext(
+				findCtx,
+				esClient,
+				indexName)
+			require.NoError(c, err)
+			require.Equalf(
+				c,
+				2,
+				result.Hits.Total.Value,
+				"expecting exactly 2 monitoring events, got %d",
+				result.Hits.Total.Value)
+			docs = result
+		},
+		90*time.Second,
+		time.Second,
+		"did not find the expected number of monitoring events")
+
+	require.Equal(t, 2, len(docs.Hits.Hits), "should have exactly 2 monitoring documents")
+	var ev mapstr.M
+	ev = docs.Hits.Hits[len(docs.Hits.Hits)-1].Source
+	ev = ev.Flatten()
+
+	require.NotEmpty(t, ev["@timestamp"], "expected @timestamp to be set")
+	ev.Delete("@timestamp")
+	require.Greater(t, ev["beat.stats.libbeat.output.write.bytes"], float64(0))
+	ev.Delete("beat.stats.libbeat.output.write.bytes")
+
+	expected := mapstr.M{
+		"beat.stats.libbeat.pipeline.queue.max_events":    float64(3200),
+		"beat.stats.libbeat.pipeline.queue.filled.events": float64(0),
+		"beat.stats.libbeat.pipeline.queue.filled.pct":    float64(0),
+		"beat.stats.libbeat.output.events.total":          float64(1),
+		"beat.stats.libbeat.output.events.active":         float64(0),
+		"beat.stats.libbeat.output.events.acked":          float64(1),
+		"beat.stats.libbeat.output.events.dropped":        float64(0),
+		"beat.stats.libbeat.output.events.batches":        float64(1),
+		"component.id": "elasticsearch/1",
+	}
+
+	require.Empty(t, cmp.Diff(expected, ev), "metrics do not match expected values")
+
+	// Stop the collector
+	cancel()
+	fixtureWg.Wait()
+	require.True(t, err == nil || err == context.Canceled || err == context.DeadlineExceeded, "Retrieved unexpected error: %s", err.Error())
+}
+
 type ZapWriter struct {
 	logger *zap.Logger
 	level  zapcore.Level
