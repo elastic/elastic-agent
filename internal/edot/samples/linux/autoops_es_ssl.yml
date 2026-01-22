@@ -10,6 +10,8 @@ receivers:
             - cat_shards
             - node_stats
             - tasks_management
+          ssl.certificate_authorities:
+            - ${env:AUTOOPS_ES_CA}
         # Less Frequent Metrics
         - module: autoops_es
           hosts: ${env:AUTOOPS_ES_URL}
@@ -17,6 +19,8 @@ receivers:
           metricsets:
             - cluster_health
             - cluster_settings
+          ssl.certificate_authorities:
+            - ${env:AUTOOPS_ES_CA}
         # Templates and License Details
         - module: autoops_es
           hosts: ${env:AUTOOPS_ES_URL}
@@ -26,14 +30,14 @@ receivers:
             - component_template
             - index_template
             - license
+          ssl.certificate_authorities:
+            - ${env:AUTOOPS_ES_CA}
     processors:
       - add_fields:
           target: autoops_es
           fields:
             temp_resource_id: ${env:AUTOOPS_TEMP_RESOURCE_ID}
             token: ${env:AUTOOPS_TOKEN}
-    output:
-      otelconsumer:
     telemetry_types: ["logs"]
 
 exporters:
