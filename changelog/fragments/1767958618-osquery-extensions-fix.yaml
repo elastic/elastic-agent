@@ -18,7 +18,12 @@ summary: osquery-extensions-fix
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-description: Fixing file permission issues for osquery extensions on Windows.
+description:  | 
+  Fixing file permission issues for osquery extensions on Windows.
+  It approches the problem by adding List Content permission to Logged in users so Directory permissions are not altered by UAC when traversing Agent directory structure.
+  After this user won't be prompted with UAC and when opening e.g log files, instead user will run into access denied in editor of choice. 
+  Elevated editor must be used to open files that require elevated permissions.
+
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:
