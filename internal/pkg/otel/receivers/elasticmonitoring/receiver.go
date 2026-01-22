@@ -12,6 +12,7 @@ import (
 
 	"github.com/elastic/beats/v7/x-pack/otel/otelmap"
 	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/internaltelemetry"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
@@ -85,19 +86,28 @@ func (mr *monitoringReceiver) run() {
 }
 
 func (mr *monitoringReceiver) updateMetrics() {
-	exporterMetrics, err := collectMetrics(mr.runCtx)
+	resourceMetrics, err := internaltelemetry.ReadMetrics(mr.runCtx)
 	if err != nil {
 		// This isn't inherently an error state, internal telemetry could
 		// be manually disabled, but it's not the expected path.
 		mr.logger.Info("couldn't collect metrics", zap.Error(err))
 		return
 	}
+	// Log the new metrics data so there is a record for troubleshooting in the logs / diagnostics
+	mr.logger.Info("Collector internal telemetry metrics updated", zap.Reflect("metrics", resourceMetrics.ScopeMetrics))
+
+	exporterMetrics := convertScopeMetrics(resourceMetrics.ScopeMetrics)
 	for exporter, metrics := range exporterMetrics {
-		mr.sendMetricsEvent(exporter, metrics)
+		componentID, ok := mr.config.ExporterNames[exporter]
+		if !ok {
+			mr.logger.Warn("Reporting metrics for exporter with no specified component name", zap.String("exporter_id", exporter))
+			componentID = exporter
+		}
+		mr.sendExporterMetricsEvent(componentID, metrics)
 	}
 }
 
-func (mr *monitoringReceiver) sendMetricsEvent(exporter string, metrics exporterMetrics) {
+func (mr *monitoringReceiver) sendExporterMetricsEvent(componentID string, metrics exporterMetrics) {
 	pLogs := plog.NewLogs()
 	resourceLogs := pLogs.ResourceLogs().AppendEmpty()
 	sourceLogs := resourceLogs.ScopeLogs().AppendEmpty()
@@ -106,8 +116,8 @@ func (mr *monitoringReceiver) sendMetricsEvent(exporter string, metrics exporter
 
 	// Initialize to the configured event template
 	beatEvent := mapstr.M(mr.config.EventTemplate.Fields).Clone()
-	metrics.addToEventFields(&beatEvent)
-	_, _ = beatEvent.Put("component.id", exporter)
+	addMetricsToEventFields(mr.logger, metrics, &beatEvent)
+	_, _ = beatEvent.Put("component.id", componentID)
 
 	// Set timestamp
 	now := time.Now()
@@ -139,6 +149,6 @@ func (mr *monitoringReceiver) sendMetricsEvent(exporter string, metrics exporter
 	err := mr.consumer.ConsumeLogs(mr.runCtx, pLogs)
 	if err != nil && mr.runCtx.Err() == nil {
 		// Don't log an error if the context is cancelled, that's just a normal shutdown
-		mr.logger.Error("error sending internal telemetry log record", zap.String("exporter", exporter), zap.Error(err))
+		mr.logger.Error("error sending internal telemetry log record", zap.String("component.id", componentID), zap.Error(err))
 	}
 }
