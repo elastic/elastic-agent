@@ -2307,7 +2307,7 @@ service:
 
 	require.Equal(t, 2, len(docs.Hits.Hits), "should have exactly 2 monitoring documents")
 	var ev mapstr.M
-	ev = docs.Hits.Hits[len(docs.Hits.Hits)-1].Source
+	ev = docs.Hits.Hits[0].Source
 	ev = ev.Flatten()
 
 	require.NotEmpty(t, ev["@timestamp"], "expected @timestamp to be set")
