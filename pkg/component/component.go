@@ -273,6 +273,10 @@ type Component struct {
 	// The logical output type, i.e. the type of output that was requested.
 	OutputType string `yaml:"output_type"`
 
+	// The user-assigned name in the original policy for the output config that
+	// generated this component's output unit.
+	OutputName string `yaml:"output_name"`
+
 	RuntimeManager RuntimeManager `yaml:"-"`
 
 	// Units that should be running inside this component.
@@ -614,6 +618,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 					InputSpec:             &inputSpec,
 					InputType:             inputType,
 					OutputType:            output.OutputType,
+					OutputName:            output.Name,
 					Units:                 units,
 					RuntimeManager:        runtimeManager,
 					Features:              featureFlags.AsProto(),
@@ -658,6 +663,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 					InputSpec:             &inputSpec,
 					InputType:             inputType,
 					OutputType:            output.OutputType,
+					OutputName:            output.Name,
 					Units:                 units,
 					RuntimeManager:        input.runtimeManager,
 					Features:              featureFlags.AsProto(),
