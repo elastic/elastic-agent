@@ -4,7 +4,7 @@ set -euo pipefail
 source .buildkite/scripts/steps/ess.sh
 source .buildkite/scripts/steps/fleet.sh
 
-STACK_VERSION="$(jq -r '.version' .package-version)"
+STACK_VERSION="$(jq -r '.stack_version' .package-version)"
 STACK_BUILD_ID="$(jq -r '.stack_build_id' .package-version)"
 if [[ "${FIPS:-false}" == "true" ]]; then
   # FRH testing environment does not have same stack build IDs as CFT environment so
