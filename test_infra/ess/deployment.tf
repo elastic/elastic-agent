@@ -93,7 +93,7 @@ locals {
 
 # If we have defined a stack version, validate that this version exists on that region and return it.
 data "ec_stack" "latest" {
-  version_regex = split("-", var.stack_version)[0] # Remove -SNAPSHOT suffix in the stack filter.
+  version_regex = var.stack_version
   region        = local.ess_region
 }
 
