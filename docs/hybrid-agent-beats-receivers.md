@@ -278,7 +278,7 @@ receivers:
 // ...
 service:
   pipelines:
-    mypipeline:
+    logs:
       receivers: [elasticmonitoringreceiver, ...]
 ```
 
