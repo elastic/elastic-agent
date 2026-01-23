@@ -8,19 +8,24 @@ receivers:
           period: 10s
           metricsets:
             - cat_shards
-            - cluster_health
-            - cluster_settings
-            - license
             - node_stats
             - tasks_management
-        # Templates
+        # Less Frequent Metrics
         - module: autoops_es
           hosts: ${env:AUTOOPS_ES_URL}
-          period: 24h
+          period: 1m
+          metricsets:
+            - cluster_health
+            - cluster_settings
+        # Templates and License Details
+        - module: autoops_es
+          hosts: ${env:AUTOOPS_ES_URL}
+          period: 1d
           metricsets:
             - cat_template
             - component_template
             - index_template
+            - license
     processors:
       - add_fields:
           target: autoops_es
