@@ -7,6 +7,7 @@
 package k8s
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -632,4 +633,37 @@ type ESResponse struct {
 			} `json:"buckets"`
 		} `json:"files_count"`
 	} `json:"aggregations"`
+}
+
+func k8sReadPodLogLines(ctx context.Context, clientSet *kubernetes.Clientset, namespace string, podName string, opts *corev1.PodLogOptions, maxLines int) ([]string, error) {
+	req := clientSet.CoreV1().Pods(namespace).GetLogs(podName, opts)
+	logs, err := req.Stream(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer logs.Close()
+
+	return readPodLogLines(logs, maxLines)
+}
+
+func readPodLogLines(r io.Reader, maxLines int) ([]string, error) {
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	lines := []string{}
+	index := 0
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		index++
+		lines = append(lines, line)
+		if maxLines > 0 && index >= maxLines {
+			break
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return lines, nil
 }
