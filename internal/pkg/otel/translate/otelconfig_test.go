@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
+	internalConfig "github.com/elastic/elastic-agent/internal/pkg/config"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -28,6 +29,7 @@ import (
 	"go.opentelemetry.io/collector/pipeline"
 
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 func TestBeatNameToDefaultDatastreamType(t *testing.T) {
@@ -319,7 +321,7 @@ func TestGetOtelConfig(t *testing.T) {
 		}
 	}
 
-	defaultProcessors := func(streamId, dataset string, namespace string) []any {
+	inputProcessors := func(streamId, dataset string, namespace string) []any {
 		return []any{
 			mapstr.M{
 				"add_fields": mapstr.M{
@@ -377,8 +379,8 @@ func TestGetOtelConfig(t *testing.T) {
 	}
 
 	// expects input id
-	expectedFilestreamConfig := func(id string) map[string]any {
-		return map[string]any{
+	expectedFilestreamConfig := func(id string, opts ...filestreamConfigOption) (config map[string]any) {
+		config = map[string]any{
 			"filebeat": map[string]any{
 				"inputs": []map[string]any{
 					{
@@ -391,7 +393,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"/var/log/*.log",
 						},
 						"index":      "logs-generic-1-default",
-						"processors": defaultProcessors("test-1", "generic-1", "logs"),
+						"processors": inputProcessors("test-1", "generic-1", "logs"),
 					},
 					{
 						"id":   "test-2",
@@ -403,7 +405,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"/var/log/*.log",
 						},
 						"index":      "logs-generic-2-default",
-						"processors": defaultProcessors("test-2", "generic-2", "logs"),
+						"processors": inputProcessors("test-2", "generic-2", "logs"),
 					},
 				},
 			},
@@ -437,8 +439,18 @@ func TestGetOtelConfig(t *testing.T) {
 				"enabled": true,
 				"host":    "localhost",
 			},
+			"processors": []map[string]any{
+				{"add_host_metadata": map[string]any{"when.not.contains.tags": "forwarded"}},
+				{"add_cloud_metadata": nil},
+				{"add_docker_metadata": nil},
+				{"add_kubernetes_metadata": nil},
+			},
 			"management.otel.enabled": true,
 		}
+		for _, opt := range opts {
+			opt.apply(config)
+		}
+		return config
 	}
 
 	getBeatMonitoringConfig := func(_, _ string) map[string]any {
@@ -451,10 +463,11 @@ func TestGetOtelConfig(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		model          *component.Model
-		expectedConfig *confmap.Conf
-		expectedError  error
+		name              string
+		model             *component.Model
+		expectedConfig    *confmap.Conf
+		expectedError     error
+		defaultProcessors *bool // value of the default_processors feature flag
 	}{
 		{
 			name: "no supported components",
@@ -510,6 +523,60 @@ func TestGetOtelConfig(t *testing.T) {
 				},
 				"receivers": map[string]any{
 					"filebeatreceiver/_agent-component/filestream-default": expectedFilestreamConfig("filestream-default"),
+				},
+				"service": map[string]any{
+					"extensions": []any{"beatsauth/_agent-component/default"},
+					"pipelines": map[string]any{
+						"logs/_agent-component/filestream-default": map[string][]string{
+							"exporters": {"elasticsearch/_agent-component/default"},
+							"receivers": {"filebeatreceiver/_agent-component/filestream-default"},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name:              "filestream with default processors disabled",
+			defaultProcessors: func() *bool { b := false; return &b }(),
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "filestream-default",
+						InputType:  "filestream",
+						OutputType: "elasticsearch",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"filebeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "filestream-unit",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(fileStreamConfig),
+							},
+							{
+								ID:     "filestream-default",
+								Type:   client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(esOutputConfig()),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"elasticsearch/_agent-component/default": expectedESConfig("default"),
+				},
+				"extensions": map[string]any{
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
+				},
+				"receivers": map[string]any{
+					"filebeatreceiver/_agent-component/filestream-default": expectedFilestreamConfig("filestream-default", withDefaultProcessors(false)),
 				},
 				"service": map[string]any{
 					"extensions": []any{"beatsauth/_agent-component/default"},
@@ -656,7 +723,7 @@ func TestGetOtelConfig(t *testing.T) {
 									"index":       "metrics-generic-1-default",
 									"metricsets":  []interface{}{"stats"},
 									"period":      "60s",
-									"processors":  defaultProcessors("test-1", "generic-1", "metrics"),
+									"processors":  inputProcessors("test-1", "generic-1", "metrics"),
 									"module":      "beat",
 								},
 							},
@@ -690,6 +757,12 @@ func TestGetOtelConfig(t *testing.T) {
 						"http": map[string]any{
 							"enabled": true,
 							"host":    "localhost",
+						},
+						"processors": []map[string]any{
+							{"add_host_metadata": nil},
+							{"add_cloud_metadata": nil},
+							{"add_docker_metadata": nil},
+							{"add_kubernetes_metadata": nil},
 						},
 						"management.otel.enabled": true,
 					},
@@ -767,7 +840,7 @@ func TestGetOtelConfig(t *testing.T) {
 											"data_stream.dataset": "system.filesystem",
 										},
 									},
-									"processors": defaultProcessors("test-1", "generic-1", "metrics"),
+									"processors": inputProcessors("test-1", "generic-1", "metrics"),
 								},
 							},
 						},
@@ -801,6 +874,12 @@ func TestGetOtelConfig(t *testing.T) {
 							"enabled": true,
 							"host":    "localhost",
 						},
+						"processors": []map[string]any{
+							{"add_host_metadata": nil},
+							{"add_cloud_metadata": nil},
+							{"add_docker_metadata": nil},
+							{"add_kubernetes_metadata": nil},
+						},
 						"management.otel.enabled": true,
 					},
 				},
@@ -818,6 +897,19 @@ func TestGetOtelConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.defaultProcessors != nil {
+				originalValue := features.DefaultProcessors()
+				defer func() {
+					err := features.Apply(internalConfig.MustNewConfigFrom(map[string]any{
+						"agent.features.default_processors.enabled": originalValue,
+					}))
+					require.NoError(t, err)
+				}()
+				err := features.Apply(internalConfig.MustNewConfigFrom(map[string]any{
+					"agent.features.default_processors.enabled": *tt.defaultProcessors,
+				}))
+				require.NoError(t, err)
+			}
 			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, getBeatMonitoringConfig, logp.NewNopLogger())
 			if actualConf == nil || tt.expectedConfig == nil {
 				assert.Equal(t, tt.expectedConfig, actualConf)
@@ -833,6 +925,27 @@ func TestGetOtelConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+type filestreamConfigOption interface {
+	apply(config map[string]any)
+}
+
+type withDefaultProcessorsOption struct {
+	value bool
+}
+
+func (w withDefaultProcessorsOption) apply(config map[string]any) {
+	if config == nil {
+		return
+	}
+	if !w.value {
+		delete(config, "processors")
+	}
+}
+
+func withDefaultProcessors(value bool) filestreamConfigOption {
+	return withDefaultProcessorsOption{value: value}
 }
 
 func TestGetReceiversConfigForComponent(t *testing.T) {

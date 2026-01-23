@@ -32,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 // This is a prefix we add to all names of Otel entities in the configuration. Its purpose is to avoid collisions with
@@ -344,6 +345,12 @@ func getReceiversConfigForComponent(
 		receiverConfig["queue"] = outputQueueConfig
 	}
 
+	// If the `default_processors` feature flag is enabled,
+	// explicitly configure default processors in Beat receivers.
+	if features.DefaultProcessors() {
+		receiverConfig["processors"] = getDefaultProcessors(beatName)
+	}
+
 	// add monitoring config if necessary
 	// we enable the basic monitoring endpoint by default, because we want to use it for diagnostics even if
 	// agent self-monitoring is disabled
@@ -364,6 +371,24 @@ func getReceiversConfigForComponent(
 	return map[string]any{
 		receiverId.String(): receiverConfig,
 	}, nil
+}
+
+func getDefaultProcessors(beatName string) []map[string]any {
+	addHostMetadata := map[string]any{
+		"add_host_metadata": nil,
+	}
+	if beatName == "filebeat" {
+		addHostMetadata["add_host_metadata"] = map[string]any{
+			"when.not.contains.tags": "forwarded",
+		}
+	}
+
+	return []map[string]any{
+		addHostMetadata,
+		{"add_cloud_metadata": nil},
+		{"add_docker_metadata": nil},
+		{"add_kubernetes_metadata": nil},
+	}
 }
 
 // getExporterConfigForComponent returns the exporter configuration and queue settings for a component. Note that a
