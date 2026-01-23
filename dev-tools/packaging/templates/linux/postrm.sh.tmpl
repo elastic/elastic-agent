@@ -6,7 +6,8 @@ PREFIX=""
 if [[ ${RPM_INSTALL_PREFIX:-/} != "/" ]]; then
     PREFIX=${RPM_INSTALL_PREFIX}
 fi
-symlink="${PREFIX}/usr/share/elastic-agent/bin/elastic-agent"
+default_symlink="/usr/share/elastic-agent/bin/elastic-agent"
+prefix_symlink="${PREFIX}${default_symlink}"
 
 case "$1" in
   purge)
@@ -20,9 +21,13 @@ case "$1" in
       systemctl --quiet stop elastic-agent
     fi
     # delete symlink if exists
-    if test -L "$symlink"; then
-      echo "found symlink $symlink, unlink"
-      unlink "$symlink"
+    if test -L "$default_symlink"; then
+      echo "found symlink $default_symlink, unlink"
+      unlink "$default_symlink"
+    fi
+    if test -L "$prefix_symlink"; then
+      echo "found symlink $prefix_symlink, unlink"
+      unlink "$prefix_symlink"
     fi
     if test -L /lib/systemd/system/elastic-agent.service; then
         echo "Found elastic-agent.service link, unlink"
