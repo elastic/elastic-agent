@@ -16,6 +16,7 @@ import (
 	"go.opentelemetry.io/collector/confmap/provider/httpsprovider"
 	"go.opentelemetry.io/collector/confmap/provider/yamlprovider"
 	"go.opentelemetry.io/collector/extension"
+	"go.opentelemetry.io/collector/featuregate"
 
 	"go.opentelemetry.io/collector/otelcol"
 )
@@ -66,6 +67,7 @@ func WithExtensionFactory(factory extension.Factory) SettingOpt {
 }
 
 func NewSettings(version string, configPaths []string, opts ...SettingOpt) *otelcol.CollectorSettings {
+	featuregate.GlobalRegistry().Set("telemetry.newPipelineTelemetry", true)
 	buildInfo := component.BuildInfo{
 		Command:     os.Args[0],
 		Description: buildDescription,
