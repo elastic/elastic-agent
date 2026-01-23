@@ -7,6 +7,7 @@
 package k8s
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -563,3 +564,107 @@ func queryK8sNamespaceDataStream(dsType, dataset, datastreamNamespace, k8snamesp
 		},
 	}
 }
+<<<<<<< HEAD
+=======
+
+// PerformQuery performs an Elasticsearch search query using the provided client.
+// TODO: add it to elastic-agent-libs/testing/estools
+func PerformQuery(ctx context.Context, queryRaw map[string]interface{}, index string, client elastictransport.Interface) (ESResponse, error) {
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(queryRaw)
+	if err != nil {
+		return ESResponse{}, fmt.Errorf("error creating ES query: %w", err)
+	}
+
+	es := esapi.New(client)
+	res, err := es.Search(
+		es.Search.WithIndex(index),
+		es.Search.WithExpandWildcards("all"),
+		es.Search.WithBody(&buf),
+		es.Search.WithTrackTotalHits(true),
+		es.Search.WithPretty(),
+		es.Search.WithContext(ctx),
+		es.Search.WithSize(300),
+	)
+
+	if err != nil {
+		return ESResponse{}, fmt.Errorf("error performing ES search: %w", err)
+	}
+
+	if res.StatusCode >= 300 || res.StatusCode < 200 {
+		return ESResponse{}, fmt.Errorf("non-200 return code: %v, response: '%s'", res.StatusCode, res.String())
+	}
+
+	resp := ESResponse{}
+	err = json.NewDecoder(res.Body).Decode(&resp)
+	if err != nil {
+		return ESResponse{}, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	return resp, nil
+}
+
+// ESResponse represents a Elasticsearch search response.
+// TODO: add it to elastic-agent-libs/testing/estools
+type ESResponse struct {
+	Took     int  `json:"took"`
+	TimedOut bool `json:"timed_out"`
+	Shards   struct {
+		Total      int `json:"total"`
+		Successful int `json:"successful"`
+		Skipped    int `json:"skipped"`
+		Failed     int `json:"failed"`
+	} `json:"_shards"`
+	Hits struct {
+		Total struct {
+			Value    int    `json:"value"`
+			Relation string `json:"relation"`
+		} `json:"total"`
+		MaxScore any   `json:"max_score"`
+		Hits     []any `json:"hits"`
+	} `json:"hits"`
+	Aggregations struct {
+		FilesCount struct {
+			DocCountErrorUpperBound int `json:"doc_count_error_upper_bound"`
+			SumOtherDocCount        int `json:"sum_other_doc_count"`
+			Buckets                 []struct {
+				Key      string `json:"key"`
+				DocCount int    `json:"doc_count"`
+			} `json:"buckets"`
+		} `json:"files_count"`
+	} `json:"aggregations"`
+}
+
+func k8sReadPodLogLines(ctx context.Context, clientSet *kubernetes.Clientset, namespace string, podName string, opts *corev1.PodLogOptions, maxLines int) ([]string, error) {
+	req := clientSet.CoreV1().Pods(namespace).GetLogs(podName, opts)
+	logs, err := req.Stream(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer logs.Close()
+
+	return readPodLogLines(logs, maxLines)
+}
+
+func readPodLogLines(r io.Reader, maxLines int) ([]string, error) {
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	lines := []string{}
+	index := 0
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		index++
+		lines = append(lines, line)
+		if maxLines > 0 && index >= maxLines {
+			break
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return lines, nil
+}
+>>>>>>> 77d514158 (Use log.source instead of log object to avoid key collision (#12283))
