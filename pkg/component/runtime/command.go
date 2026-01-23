@@ -337,9 +337,10 @@ func (c *commandRuntime) forceCompState(state client.UnitState, msg string) {
 // compState updates just the component state not all the units.
 func (c *commandRuntime) compState(state client.UnitState) {
 	msg := stateUnknownMessage
-	if state == client.UnitStateHealthy {
+	switch state {
+	case client.UnitStateHealthy:
 		msg = fmt.Sprintf("Healthy: communicating with pid '%d'", c.proc.PID)
-	} else if state == client.UnitStateDegraded {
+	case client.UnitStateDegraded:
 		if c.missedCheckins == 1 {
 			msg = fmt.Sprintf("Degraded: pid '%d' missed 1 check-in", c.proc.PID)
 		} else {
@@ -443,7 +444,7 @@ func (c *commandRuntime) startWatcher(info *process.Info, comm Communicator) {
 	go func() {
 		err := comm.WriteStartUpInfo(info.Stdin)
 		if err != nil {
-			_, _ = c.logErr.Write([]byte(fmt.Sprintf("Failed: failed to provide connection information to spawned pid '%d': %s", info.PID, err)))
+			_, _ = fmt.Fprintf(c.logErr, "Failed: failed to provide connection information to spawned pid '%d': %s", info.PID, err)
 			// kill instantly
 			_ = info.Kill()
 		} else {
@@ -550,15 +551,11 @@ func attachOutErr(stdOut *logWriter, stdErr *logWriter) process.CmdOption {
 func createLogWriter(comp component.Component, baseLog *logger.Logger, cmdSpec *component.CommandSpec, typeStr string, binaryName string, ll zapcore.Level, unitLevels map[string]zapcore.Level, src logSource) *logWriter {
 	dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
 	logger := baseLog.With(
-		"component", map[string]interface{}{
-			"id":      comp.ID,
-			"type":    typeStr,
-			"binary":  binaryName,
-			"dataset": dataset,
-		},
-		"log", map[string]interface{}{
-			"source": comp.ID,
-		},
+		"component.id", comp.ID,
+		"component.type", typeStr,
+		"component.binary", binaryName,
+		"component.dataset", dataset,
+		"log.source", comp.ID,
 	)
 	return newLogWriter(logger.Core(), cmdSpec.Log, ll, unitLevels, src)
 }
