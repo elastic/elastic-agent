@@ -123,7 +123,6 @@ func (d *IntegrationTester) Test(dir string, mageTarget string, cfg *mage.Settin
 	if err != nil {
 		return fmt.Errorf("failed to determine Go version: %w", err)
 	}
-	insideEnv["GO_VERSION"] = goVersion
 	remote, err := NewKubeRemote(kubeConfig, "default", kubernetesClusterName(cfg), goVersion, workDir, destDir, repo.RootDir)
 	if err != nil {
 		return err
