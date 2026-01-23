@@ -3603,8 +3603,9 @@ func (Otel) MetricbeatPrepareLightModules() error {
 
 // StripOsquerydGolangCrossBuild runs inside of the cross-build container.
 // Don't call directly; this is called from otel:osquerybeatFetchOsqueryDistros.
-func (Otel) StripOsquerydGolangCrossBuild() error {
-	for _, platform := range devtools.Platforms {
+func (Otel) StripOsquerydGolangCrossBuild(ctx context.Context) error {
+	cfg := devtools.SettingsFromContext(ctx)
+	for _, platform := range cfg.GetPlatforms() {
 		if platform.GOOS() != os.Getenv("GOOS") || platform.Arch() != os.Getenv("GOARCH") {
 			// only run on specific os/arch combination
 			continue
@@ -3632,13 +3633,14 @@ func (Otel) StripOsquerydGolangCrossBuild() error {
 	return nil
 }
 
-func (Otel) OsquerybeatFetchOsqueryDistros() error {
+func (Otel) OsquerybeatFetchOsqueryDistros(ctx context.Context) error {
+	cfg := devtools.SettingsFromContext(ctx)
 	mg.Deps(osquerybeat.FetchOsqueryDistros)
 
 	// crossBuild container is used to strip the osqueryd binary (strip needs to be built for the specific
 	// os/architecture for it to work properly)
 	opts := []devtools.CrossBuildOption{devtools.WithName("strip-osqueryd"), devtools.WithTarget("otel:stripOsquerydGolangCrossBuild"), devtools.ForPlatforms("linux")}
-	return devtools.CrossBuild(opts...)
+	return devtools.CrossBuild(ctx, cfg, opts...)
 }
 
 // PrepareBeats converts the beats submodule's .git file to a real .git directory.
