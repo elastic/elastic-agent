@@ -20,7 +20,7 @@ prefix_symlink="${PREFIX}/usr/share/elastic-agent/bin/elastic-agent"
 if test -L "$default_symlink"; then
     echo "found symlink $default_symlink, unlink"
     unlink "$default_symlink"
-elif test -L "prefix_symlink"; then
+elif test -L "$prefix_symlink"; then
     echo "found symlink $prefix_symlink, unlink"
     unlink "$prefix_symlink"
 fi
