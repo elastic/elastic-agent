@@ -15,7 +15,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/collector/featuregate"
 	"go.opentelemetry.io/collector/otelcol"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
@@ -36,7 +35,7 @@ exporters:
       enabled: true
       initial_interval: 1s
       max_interval: 1m0s
-      max_retries: 3
+      max_retries: 1
     sending_queue:
       batch:
         flush_timeout: 10s
@@ -60,17 +59,27 @@ service:
 	monitoringReceived := make(chan mapstr.M, 1)
 
 	var eventCount int
+	failedEvents := make(map[string]struct{})
 	deterministicHandler := func(action api.Action, event []byte) int {
 		var curEvent mapstr.M
 		require.NoError(t, json.Unmarshal(event, &curEvent))
 
-		// wait for second event to ensure some metrics have non-zero values
-		if ok, _ := curEvent.HasKey("beat.stats"); ok && eventCount > 0 {
-			monitoringReceived <- curEvent
+		timestamp := curEvent["@timestamp"].(string)
+
+		// If we've already failed this event once, succeed on retry
+		if _, alreadyFailed := failedEvents[timestamp]; alreadyFailed {
+			// Check if this is a beat.stats event and we have enough events processed
+			if ok, _ := curEvent.HasKey("beat.stats"); ok && eventCount > 3 {
+				monitoringReceived <- curEvent
+				return http.StatusOK
+			}
+			return http.StatusOK
 		}
 
+		// First time seeing this event, fail it
+		failedEvents[timestamp] = struct{}{}
 		eventCount++
-		return http.StatusOK
+		return http.StatusTooManyRequests
 	}
 
 	esURL := integration.StartMockESDeterministic(t, deterministicHandler)
@@ -87,9 +96,6 @@ service:
 	)
 
 	settings := NewSettings("test", []string{"yaml:" + configBuffer.String()})
-
-	// enable exporter metrics
-	featuregate.GlobalRegistry().Set("telemetry.newPipelineTelemetry", true)
 
 	collector, err := otelcol.NewCollector(*settings)
 	require.NoError(t, err)
@@ -123,11 +129,12 @@ service:
 		"beat.stats.libbeat.pipeline.queue.max_events":    float64(3200),
 		"beat.stats.libbeat.pipeline.queue.filled.events": float64(0),
 		"beat.stats.libbeat.pipeline.queue.filled.pct":    float64(0),
-		"beat.stats.libbeat.output.events.total":          float64(1),
+		"beat.stats.libbeat.output.events.total":          float64(3),
 		"beat.stats.libbeat.output.events.active":         float64(0),
-		"beat.stats.libbeat.output.events.acked":          float64(1),
+		"beat.stats.libbeat.output.events.acked":          float64(3),
 		"beat.stats.libbeat.output.events.dropped":        float64(0),
-		"beat.stats.libbeat.output.events.batches":        float64(1),
+		"beat.stats.libbeat.output.events.batches":        float64(6),
+		"beat.stats.libbeat.output.events.failed":         float64(3),
 		"component.id": "elasticsearch/1",
 	}
 
