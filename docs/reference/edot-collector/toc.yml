@@ -11,11 +11,7 @@ toc:
       - file: config/tail-based-sampling.md
       - file: config/authentication-methods.md
       - file: config/configure-profiles-collection.md
-<<<<<<< HEAD
-=======
       - file: config/custom-data-streams.md
-      - file: components/migrate-components.md
->>>>>>> fa62ef325 (Add Custom data streams docs (#11659))
       - file: config/proxy.md
   - file: components.md
     children:
