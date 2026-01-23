@@ -297,7 +297,7 @@ func TestSwitchToUnprivilegedDeduplication(t *testing.T) {
 
 	var actionsCount = 5
 	errors := make([]string, actionsCount)
-	for i := 0; i < actionsCount-1; i++ {
+	for i := 0; i < actionsCount; i++ {
 		switchErrg.Go(func() error {
 			err := fleettools.SwitchAgent(ctx, kibClient, agentID)
 			if err != nil {
