@@ -1104,9 +1104,19 @@ func addSymlinkToTar(tmpdir string, ar *tar.Writer, baseDir string, pkgFile Pack
 }
 
 // PackageDocker packages the Beat into a docker image.
+// Set DOCKER_NO_TEMPLATE=true to use the new template-free build path.
 func PackageDocker(spec PackageSpec) error {
 	if err := HaveDocker(); err != nil {
 		return fmt.Errorf("docker daemon required to build images: %w", err)
+	}
+
+	if UseNoTemplateDockerBuild() {
+		log.Println("Using template-free Docker build (DOCKER_NO_TEMPLATE=true)")
+		b, err := newDockerBuilderNoTemplate(spec)
+		if err != nil {
+			return err
+		}
+		return b.Build()
 	}
 
 	b, err := newDockerBuilder(spec)
