@@ -260,6 +260,36 @@ func (b *dockerBuilderNoTemplate) getBuildArgs() []string {
 	return args
 }
 
+// getTargetStage returns the Dockerfile target stage for the current variant
+func (b *dockerBuilderNoTemplate) getTargetStage() string {
+	switch b.DockerVariant {
+	case Basic:
+		return "basic"
+	case UBI:
+		return "basic" // UBI is an alias for basic
+	case Wolfi:
+		return "wolfi"
+	case Complete:
+		return "complete"
+	case WolfiComplete:
+		return "complete-wolfi"
+	case Cloud:
+		return "cloud"
+	case Service:
+		return "service"
+	case Slim:
+		return "basic" // Slim uses basic stage
+	case SlimWolfi:
+		return "wolfi" // Slim wolfi uses wolfi stage
+	case EdotCollector:
+		return "basic" // EDOT uses basic stage
+	case EdotCollectorWolfi:
+		return "wolfi" // EDOT wolfi uses wolfi stage
+	default:
+		return "basic"
+	}
+}
+
 func (b *dockerBuilderNoTemplate) dockerBuild() (string, []string, error) {
 	platform := fmt.Sprintf("%s/%s", "linux", b.Arch)
 	tagSuffix := ""
@@ -304,6 +334,12 @@ func (b *dockerBuilderNoTemplate) dockerBuild() (string, []string, error) {
 
 	// Add build args
 	args = append(args, b.getBuildArgs()...)
+
+	// Add target stage based on variant
+	targetStage := b.getTargetStage()
+	if targetStage != "" {
+		args = append(args, "--target", targetStage)
+	}
 
 	args = append(args, b.buildDir)
 
