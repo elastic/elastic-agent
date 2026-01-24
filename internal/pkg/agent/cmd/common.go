@@ -92,6 +92,7 @@ func NewCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Command {
 	cmd.AddCommand(newLogsCommandWithArgs(args, streams))
 	cmd.AddCommand(newOtelCommandWithArgs(args, streams))
 	cmd.AddCommand(newApplyFlavorCommandWithArgs(args, streams))
+	cmd.AddCommand(newEncryptConfig(args, streams))
 
 	// windows special hidden sub-command (only added on Windows)
 	reexec := newReExecWindowsCommand(args, streams)
