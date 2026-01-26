@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/collector/featuregate"
 	"go.opentelemetry.io/collector/otelcol"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
@@ -97,6 +98,7 @@ service:
 
 	settings := NewSettings("test", []string{"yaml:" + configBuffer.String()})
 
+	featuregate.GlobalRegistry().Set("telemetry.newPipelineTelemetry", true)
 	collector, err := otelcol.NewCollector(*settings)
 	require.NoError(t, err)
 	require.NotNil(t, collector)
