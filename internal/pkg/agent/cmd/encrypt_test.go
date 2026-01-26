@@ -5,7 +5,6 @@
 package cmd
 
 import (
-	_ "embed"
 	"os"
 	"path/filepath"
 	"testing"
@@ -56,6 +55,7 @@ func TestEncryptConfig(t *testing.T) {
 		t.Run("checkExistingEnc", func(t *testing.T) {
 			err := checkExistingEnc(dest, storage.WithVaultPath(vaultDir))
 			require.NoError(t, err)
+			// verify that checkExistingEnv does not make a file by accident
 			_, err = os.Stat(dest)
 			require.ErrorIs(t, err, os.ErrNotExist)
 		})
@@ -92,6 +92,7 @@ func TestEncryptConfig(t *testing.T) {
 		require.NotEqualValues(t, origBytes, replaceBytes, "Expected encrypted config to be replaced.")
 
 		t.Run("checkExistingEnc", func(t *testing.T) {
+			// encryted config created from fleet.yaml must fail the check
 			err := checkExistingEnc(dest, storage.WithVaultPath(vaultDir))
 			require.Error(t, err)
 		})
