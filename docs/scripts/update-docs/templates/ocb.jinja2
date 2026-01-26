@@ -21,37 +21,31 @@ dist:
 
 receivers:
 {%- for comp in grouped_components.get('Receivers', []) %}
-  {{ comp.name }}:
-    gomod: {{ comp.dep }}
+  - gomod: {{ comp.dep }}
 {%- endfor %}
 
 processors:
 {%- for comp in grouped_components.get('Processors', []) %}
-  {{ comp.name }}:
-    gomod: {{ comp.dep }}
+  - gomod: {{ comp.dep }}
 {%- endfor %}
 
 exporters:
 {%- for comp in grouped_components.get('Exporters', []) %}
-  {{ comp.name }}:
-    gomod: {{ comp.dep }}
+  - gomod: {{ comp.dep }}
 {%- endfor %}
 
 connectors:
 {%- for comp in grouped_components.get('Connectors', []) %}
-  {{ comp.name }}:
-    gomod: {{ comp.dep }}
+  - gomod: {{ comp.dep }}
 {%- endfor %}
 
 extensions:
 {%- for comp in grouped_components.get('Extensions', []) %}
-  {{ comp.name }}:
-    gomod: {{ comp.dep }}
+  - gomod: {{ comp.dep }}
 {%- endfor %}
 
 providers:
 {%- for comp in grouped_components.get('Providers', []) %}
-  {{ comp.name }}:
-    gomod: {{ comp.dep }}
+  - gomod: {{ comp.dep }}
 {%- endfor %}
 ```

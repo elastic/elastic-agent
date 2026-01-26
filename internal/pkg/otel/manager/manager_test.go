@@ -32,7 +32,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/logptest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
-	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -2143,7 +2142,7 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 			"exporter": map[string]any{
 				"prometheus": map[string]any{
 					"host":                "localhost",
-					"port":                fmt.Sprintf("${env:%s}", componentmonitoring.OtelCollectorMetricsPortEnvVarName),
+					"port":                fmt.Sprintf("${env:%s}", OtelCollectorMetricsPortEnvVarName),
 					"without_scope_info":  true,
 					"without_units":       true,
 					"without_type_suffix": true,
