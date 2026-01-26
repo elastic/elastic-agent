@@ -2196,8 +2196,6 @@ func TestMonitoringReceiver(t *testing.T) {
 	})
 
 	indexName := strings.ToLower("logs-generic-default-" + info.Namespace)
-	tempDir := aTesting.TempDir(t, "..", "..", "..", "build")
-	cfgFilePath := filepath.Join(tempDir, "otel.yml")
 
 	esHost, err := integration.GetESHost()
 	require.NoError(t, err, "failed to get ES host")
@@ -2209,7 +2207,9 @@ func TestMonitoringReceiver(t *testing.T) {
 	require.NoError(t, err, "failed to get api key")
 	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
 
-	cfg := `receivers:
+	cfg := `
+agent.logging.to_stderr: true
+receivers:
   elasticmonitoringreceiver:
     interval: 3s
 exporters:
@@ -2258,28 +2258,44 @@ service:
 	require.NoError(t,
 		template.Must(template.New("config").Parse(cfg)).Execute(&configBuffer, configParams),
 	)
-	require.NoError(t, os.WriteFile(cfgFilePath, configBuffer.Bytes(), 0o600))
 
 	// Create fixture and prepare agent
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", cfgFilePath, "--feature-gates", "telemetry.newPipelineTelemetry"}))
-
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
 	defer cancel()
 	err = fixture.Prepare(ctx)
 	require.NoError(t, err)
 
-	// Remove elastic-agent.yml so it's purely OTel mode
-	require.NoError(t, os.Remove(filepath.Join(fixture.WorkDir(), "elastic-agent.yml")))
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+	require.NoError(t, err)
 
-	// Start the collector
-	var fixtureWg sync.WaitGroup
-	fixtureWg.Add(1)
-	go func() {
-		defer fixtureWg.Done()
-		err = fixture.RunOtelWithClient(ctx)
-	}()
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err)
+	cmd.WaitDelay = 1 * time.Second
+
+	output := strings.Builder{}
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	require.NoError(t, cmd.Start(), "could not start otel collector")
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 1*time.Minute, 1*time.Second)
 
 	// Wait for monitoring events to be indexed in Elasticsearch
 	var docs estools.Documents
@@ -2330,10 +2346,7 @@ service:
 
 	require.Empty(t, cmp.Diff(expected, ev), "metrics do not match expected values")
 
-	// Stop the collector
 	cancel()
-	fixtureWg.Wait()
-	require.True(t, err == nil || err == context.Canceled || err == context.DeadlineExceeded, "Retrieved unexpected error: %s", err.Error())
 }
 
 type ZapWriter struct {
