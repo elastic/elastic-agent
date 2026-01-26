@@ -8,11 +8,15 @@ Standalone beats expose telemetry data via the [stats endpoint](https://www.elas
 receivers:
   elasticmonitoringreceiver:
     interval: 60s
+exporters:
+  elasticsearch/1:
 // ...
 service:
   pipelines:
     logs:
-      receivers: [elasticmonitoringreceiver, ...]
+      receivers: [elasticmonitoringreceiver]
+      exporters:
+        - elasticsearch/1
 ```
 
 > In order to fetch exporter metrics, the `telemetry.newPipelineTelemetry` feature gate should be enabled.
