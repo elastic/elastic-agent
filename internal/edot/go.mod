@@ -8,7 +8,7 @@ replace github.com/elastic/elastic-agent => ../../
 replace github.com/elastic/beats/v7 => ../../beats
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260122152052-5e37672f2b70
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260123212032-c9e93a708f90
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.32.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.24.0
@@ -324,7 +324,7 @@ require (
 	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
 	github.com/elastic/lunes v0.2.0 // indirect
-	github.com/elastic/mito v1.24.0 // indirect
+	github.com/elastic/mito v1.24.1 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20251113000200-a6f7cddc8520 // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.24.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.27.0 // indirect
