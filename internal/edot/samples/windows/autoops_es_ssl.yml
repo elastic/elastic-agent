@@ -1,0 +1,65 @@
+receivers:
+  metricbeatreceiver:
+    metricbeat:
+      modules:
+        # Metrics
+        - module: autoops_es
+          hosts: ${env:AUTOOPS_ES_URL}
+          period: 10s
+          metricsets:
+            - cat_shards
+            - node_stats
+            - tasks_management
+          ssl.certificate_authorities:
+            - ${env:AUTOOPS_ES_CA}
+        # Less Frequent Metrics
+        - module: autoops_es
+          hosts: ${env:AUTOOPS_ES_URL}
+          period: 1m
+          metricsets:
+            - cluster_health
+            - cluster_settings
+          ssl.certificate_authorities:
+            - ${env:AUTOOPS_ES_CA}
+        # Templates and License Details
+        - module: autoops_es
+          hosts: ${env:AUTOOPS_ES_URL}
+          period: 24h
+          metricsets:
+            - cat_template
+            - component_template
+            - index_template
+            - license
+          ssl.certificate_authorities:
+            - ${env:AUTOOPS_ES_CA}
+    processors:
+      - add_fields:
+          target: autoops_es
+          fields:
+            temp_resource_id: ${env:AUTOOPS_TEMP_RESOURCE_ID}
+            token: ${env:AUTOOPS_TOKEN}
+    telemetry_types: ["logs"]
+
+exporters:
+  otlphttp:
+    headers:
+      Authorization: "AutoOpsToken ${env:AUTOOPS_TOKEN}"
+    endpoint: ${env:AUTOOPS_OTEL_URL}
+    sending_queue:
+      batch:
+        flush_timeout: 1s
+        min_size: 1048576 # 1 MiB uncompressed
+        max_size: 4194304 # 4 MiB uncompressed
+      block_on_overflow: true
+      enabled: true
+      queue_size: 52428800 # 50 MiB uncompressed
+      sizer: bytes
+
+service:
+  pipelines:
+    logs:
+      receivers: [metricbeatreceiver]
+      exporters: [otlphttp]
+  telemetry:
+    logs:
+      encoding: json
