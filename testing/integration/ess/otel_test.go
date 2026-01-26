@@ -2261,7 +2261,8 @@ service:
 	require.NoError(t, os.WriteFile(cfgFilePath, configBuffer.Bytes(), 0o600))
 
 	// Create fixture and prepare agent
-	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", cfgFilePath}))
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), aTesting.WithAdditionalArgs([]string{"--config", cfgFilePath, "--feature-gates", "telemetry.newPipelineTelemetry"}))
+
 	require.NoError(t, err)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
