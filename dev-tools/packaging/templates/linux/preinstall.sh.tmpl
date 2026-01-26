@@ -2,9 +2,6 @@
 
 set -e
 
-echo "ENV VARS"
-printenv
-
 PREFIX=""
 if [[ ${RPM_INSTALL_PREFIX:-/} != "/" ]]; then
     PREFIX=${RPM_INSTALL_PREFIX}

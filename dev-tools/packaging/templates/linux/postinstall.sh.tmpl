@@ -56,7 +56,7 @@ mkdir -p "$symlink_dir"
 
 if [[ ${PREFIX} != "" ]]; then
     # create symlink to the new agent
-    echo "create symlink "$prefix_symlink" to "$new_agent_dir/elastic-agent""
+    echo "create symlink \"${prefix_symlink}\" to \"${new_agent_dir}/elastic-agent\""
     ln -s "$new_agent_dir/elastic-agent" "$prefix_symlink"
 
     if test -f ${PREFIX}/lib/systemd/system/elastic-agent.service; then
@@ -81,7 +81,7 @@ if [[ ${PREFIX} != "" ]]; then
     fi
 else
     # create symlink to the new agent
-    echo "create symlink "$default_symlink" to "$new_agent_dir/elastic-agent""
+    echo "create symlink \"${default_symlink}\" to \"${new_agent_dir}/elastic-agent\""
     ln -s "$new_agent_dir/elastic-agent" "$default_symlink"
 fi
 
