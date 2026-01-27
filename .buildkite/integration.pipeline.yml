@@ -171,11 +171,7 @@ steps:
     depends_on:
     - int-packaging
     command: |
-      #!/usr/bin/env bash
-      source .buildkite/scripts/common.sh
-      mkdir -p build/distributions
-      buildkite-agent artifact download build/distributions/elastic-agent-* .
-      mage testPackages
+      .buildkite/scripts/steps/package-tests.sh
     agents:
       provider: "gcp"
       machineType: "n2-standard-8"
