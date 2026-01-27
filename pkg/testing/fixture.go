@@ -1060,6 +1060,9 @@ func (f *Fixture) binaryPath() string {
 	}
 	if f.packageFormat == "deb" || f.packageFormat == "rpm" {
 		workDir = "/usr/bin"
+		if f.installOpts != nil && f.installOpts.BasePath != "" {
+			workDir = f.installOpts.BasePath + workDir
+		}
 	}
 	defaultBin := "elastic-agent"
 	if f.binaryName != "" {
