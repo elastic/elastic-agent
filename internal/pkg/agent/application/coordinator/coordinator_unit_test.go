@@ -1177,9 +1177,10 @@ service:
 
 		// Create a policy where the filestream input uses a dynamic provider variable.
 		// The input is configured for OTel runtime, but because it uses a dynamic provider
-		// (local_dynamic), it should be switched to process runtime.
+		// (local_dynamic) and dynamic_inputs is set to "process", it should be switched to process runtime.
 		cfg := config.MustNewConfigFrom(`
 agent.internal.runtime.filebeat.filestream: otel
+agent.internal.runtime.dynamic_inputs: process
 outputs:
   default:
     type: elasticsearch
@@ -2609,31 +2610,88 @@ func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
 	logger := logp.NewLogger("testing")
 
 	t.Run("process runtime is not changed", func(t *testing.T) {
+		runtimeCfg := &pkgcomponent.RuntimeConfig{
+			DynamicInputs: "process",
+		}
 		comp := pkgcomponent.Component{
 			ID:             "test-component",
 			RuntimeManager: pkgcomponent.ProcessRuntimeManager,
 			Dynamic:        false,
 		}
-		maybeOverrideRuntimeForComponent(logger, &comp)
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
 		assert.Equal(t, pkgcomponent.ProcessRuntimeManager, comp.RuntimeManager, "ProcessRuntimeManager should not be changed")
 
 		// Even if dynamic, ProcessRuntimeManager should stay
 		comp.Dynamic = true
-		maybeOverrideRuntimeForComponent(logger, &comp)
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
 		assert.Equal(t, pkgcomponent.ProcessRuntimeManager, comp.RuntimeManager, "ProcessRuntimeManager should not be changed even when dynamic")
 	})
 
-	t.Run("dynamic otel component switches to process runtime", func(t *testing.T) {
+	t.Run("dynamic otel component switches to process runtime when configured", func(t *testing.T) {
+		runtimeCfg := &pkgcomponent.RuntimeConfig{
+			DynamicInputs: "process",
+		}
 		comp := pkgcomponent.Component{
 			ID:             "test-component",
 			RuntimeManager: pkgcomponent.OtelRuntimeManager,
 			Dynamic:        true,
 		}
-		maybeOverrideRuntimeForComponent(logger, &comp)
-		assert.Equal(t, pkgcomponent.ProcessRuntimeManager, comp.RuntimeManager, "Dynamic OTel component should switch to ProcessRuntimeManager")
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
+		assert.Equal(t, pkgcomponent.ProcessRuntimeManager, comp.RuntimeManager, "Dynamic OTel component should switch to ProcessRuntimeManager when DynamicInputs is 'process'")
+	})
+
+	t.Run("dynamic otel component stays otel when DynamicInputs is empty", func(t *testing.T) {
+		runtimeCfg := &pkgcomponent.RuntimeConfig{
+			DynamicInputs: "",
+		}
+		comp := pkgcomponent.Component{
+			ID:             "test-component",
+			RuntimeManager: pkgcomponent.OtelRuntimeManager,
+			Dynamic:        true,
+			OutputType:     "elasticsearch",
+			Units: []pkgcomponent.Unit{
+				{
+					ID:   "test-unit",
+					Type: client.UnitTypeOutput,
+					Config: &proto.UnitExpectedConfig{
+						Type: "elasticsearch",
+					},
+				},
+			},
+		}
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
+		// When DynamicInputs is empty, dynamic components should NOT be switched
+		assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager, "Dynamic OTel component should stay as OTel when DynamicInputs is empty")
+	})
+
+	t.Run("dynamic otel component stays otel when DynamicInputs is otel", func(t *testing.T) {
+		runtimeCfg := &pkgcomponent.RuntimeConfig{
+			DynamicInputs: "otel",
+		}
+		comp := pkgcomponent.Component{
+			ID:             "test-component",
+			RuntimeManager: pkgcomponent.OtelRuntimeManager,
+			Dynamic:        true,
+			OutputType:     "elasticsearch",
+			Units: []pkgcomponent.Unit{
+				{
+					ID:   "test-unit",
+					Type: client.UnitTypeOutput,
+					Config: &proto.UnitExpectedConfig{
+						Type: "elasticsearch",
+					},
+				},
+			},
+		}
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
+		// When DynamicInputs matches the current runtime, no switch should happen
+		assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager, "Dynamic OTel component should stay as OTel when DynamicInputs is 'otel'")
 	})
 
 	t.Run("non-dynamic otel component stays as otel runtime", func(t *testing.T) {
+		runtimeCfg := &pkgcomponent.RuntimeConfig{
+			DynamicInputs: "process",
+		}
 		// This test verifies the component stays as OTel when:
 		// - RuntimeManager is OtelRuntimeManager
 		// - Dynamic is false
@@ -2653,12 +2711,13 @@ func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
 				},
 			},
 		}
-		maybeOverrideRuntimeForComponent(logger, &comp)
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
 		// Note: the component may still be switched to ProcessRuntimeManager by
 		// VerifyComponentIsOtelSupported if there are other unsupported features
 		// For this test, we're just verifying the Dynamic flag check
 		// Since there's no error from VerifyComponentIsOtelSupported in this minimal case,
 		// the runtime should stay as OTel unless the translate package rejects it
+		assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager, "Non-dynamic OTel component should stay as OTel even when DynamicInputs is 'process'")
 	})
 }
 
