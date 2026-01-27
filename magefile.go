@@ -1190,7 +1190,12 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 		mg.Deps(Build.WindowsArchiveRootBinary)
 	}
 
+<<<<<<< HEAD
 	mg.SerialDeps(devtools.Package, TestPackages)
+=======
+	// build package and test
+	mg.SerialDeps(devtools.Package)
+>>>>>>> b4035f9ee (Don't run tests as part of the package target (#12439))
 	return nil
 }
 
