@@ -1225,7 +1225,7 @@ func packageAgent(ctx context.Context, dependenciesVersion string, manifestRespo
 	}
 
 	// build package and test
-	mg.SerialDeps(devtools.Package, TestPackages)
+	mg.SerialDeps(devtools.Package)
 	return nil
 }
 
