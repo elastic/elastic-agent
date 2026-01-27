@@ -163,6 +163,18 @@ steps:
 
   - label: "Triggering Integration tests"
     command: "buildkite-agent pipeline upload .buildkite/bk.integration.pipeline.yml"
+    plugins:
+    - sparse-checkout#v1.3.1:
+        paths:
+        - .buildkite
+        - .go-version
+        - version/version.go
 
   - label: "Triggering custom FIPS integration tests"
     command: "buildkite-agent pipeline upload .buildkite/bk.integration-fips.pipeline.yml"
+    plugins:
+    - sparse-checkout#v1.3.1:
+        paths:
+        - .buildkite
+        - .go-version
+        - version/version.go
