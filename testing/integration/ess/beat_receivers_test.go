@@ -1006,7 +1006,7 @@ providers:
 		assert.NoError(collect, statusErr)
 		// we should be running a single component in a beat process
 		assert.Equal(collect, int(cproto.State_HEALTHY), status.State)
-		assert.Equal(collect, 1, len(status.Components))
+		require.Equal(collect, 1, len(status.Components))
 		comp := status.Components[0]
 
 		assert.Equal(collect, int(cproto.State_HEALTHY), comp.State)
