@@ -1947,7 +1947,7 @@ func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtime
 // Normally, we use the runtime set in the component itself via the configuration, but
 // we may also fall back to the process runtime if the otel runtime is unsupported for
 // some reason. One example is the output using unsupported config options.
-func maybeOverrideRuntimeForComponent(logger *logger.Logger, comp *component.Component) {
+func maybeOverrideRuntimeForComponent(logger *logger.Logger, runtimeCfg *component.RuntimeConfig, comp *component.Component) {
 	if comp.RuntimeManager == component.ProcessRuntimeManager {
 		// do nothing, the process runtime can handle any component
 		return
@@ -1960,11 +1960,12 @@ func maybeOverrideRuntimeForComponent(logger *logger.Logger, comp *component.Com
 			comp.RuntimeManager = component.ProcessRuntimeManager
 		}
 
-		// check if the component is dynamic
-		// dynamic components can cause problem for the otel collector because of its expensive configuration reloading
-		if comp.Dynamic {
-			logger.Warnf("Component %s uses dynamic variable providers, switching to process runtime", comp.ID)
-			comp.RuntimeManager = component.ProcessRuntimeManager
+		// check if the component is dynamic and use the right runtime
+		// dynamic components can cause problems for the otel collector because of its expensive configuration reloading
+		dynamicRuntimeManager := component.RuntimeManager(runtimeCfg.DynamicInputs)
+		if runtimeCfg.DynamicInputs != "" && comp.Dynamic && comp.RuntimeManager != dynamicRuntimeManager {
+			logger.Warnf("Component %s uses dynamic variable providers, switching to %s runtime", comp.ID, dynamicRuntimeManager)
+			comp.RuntimeManager = dynamicRuntimeManager
 		}
 	}
 }
@@ -2055,7 +2056,7 @@ func (c *Coordinator) generateComponentModel() (err error) {
 
 	otelRuntimeModifier := func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
 		for i := range comps {
-			maybeOverrideRuntimeForComponent(c.logger, &comps[i])
+			maybeOverrideRuntimeForComponent(c.logger, c.currentCfg.Settings.Internal.Runtime, &comps[i])
 		}
 		return comps, nil
 	}

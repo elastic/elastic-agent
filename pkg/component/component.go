@@ -37,9 +37,10 @@ type HeadersProvider interface {
 type RuntimeManager string
 
 type RuntimeConfig struct {
-	Default    string            `yaml:"default" config:"default" json:"default"`
-	Filebeat   BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
-	Metricbeat BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
+	Default       string            `yaml:"default" config:"default" json:"default"`
+	Filebeat      BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
+	Metricbeat    BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
+	DynamicInputs string            `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
 }
 
 type BeatRuntimeConfig struct {
@@ -49,7 +50,8 @@ type BeatRuntimeConfig struct {
 
 func DefaultRuntimeConfig() *RuntimeConfig {
 	return &RuntimeConfig{
-		Default: string(DefaultRuntimeManager),
+		Default:       string(DefaultRuntimeManager),
+		DynamicInputs: "",
 		Metricbeat: BeatRuntimeConfig{
 			InputType: map[string]string{
 				"activemq/metrics":      string(OtelRuntimeManager),

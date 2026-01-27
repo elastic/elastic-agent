@@ -962,6 +962,7 @@ func TestBeatsReceiverDynamicInputProcessRuntimeFallback(t *testing.T) {
 	config := `agent.logging.to_stderr: true
 agent.logging.to_files: false
 agent.monitoring.enabled: false
+agent.internal.runtime.dynamic_inputs: process
 inputs:
   - type: system/metrics
     id: "${local_dynamic.id}"
