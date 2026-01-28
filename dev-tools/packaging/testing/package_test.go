@@ -34,6 +34,7 @@ import (
 
 	"github.com/blakesmith/ar"
 	"github.com/cavaliergopher/rpm"
+	"github.com/docker/go-units"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
