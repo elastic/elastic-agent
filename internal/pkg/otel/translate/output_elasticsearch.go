@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"reflect"
 	"slices"
@@ -30,8 +31,9 @@ import (
 type esToOTelOptions struct {
 	elasticsearch.ElasticsearchConfig `config:",inline"`
 
-	Index  string `config:"index"`
-	Preset string `config:"preset"`
+	Index         string `config:"index"`
+	Preset        string `config:"preset"`
+	RetryOnStatus []int  `config:"retry_on_status"`
 }
 
 var defaultOptions = esToOTelOptions{
@@ -39,6 +41,22 @@ var defaultOptions = esToOTelOptions{
 
 	Index:  "",       // Dynamic routing is disabled if index is set
 	Preset: "custom", // default is custom if not set
+	RetryOnStatus: []int{
+		// 429
+		http.StatusTooManyRequests,
+		// 5xx
+		http.StatusInternalServerError,
+		http.StatusNotImplemented,
+		http.StatusBadGateway,
+		http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout,
+		http.StatusHTTPVersionNotSupported,
+		http.StatusVariantAlsoNegotiates,
+		http.StatusInsufficientStorage,
+		http.StatusLoopDetected,
+		http.StatusNotExtended,
+		http.StatusNetworkAuthenticationRequired,
+	},
 }
 
 // ToOTelConfig converts a Beat config into OTel elasticsearch exporter config
@@ -147,6 +165,7 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 		"max_retries":      escfg.MaxRetries,
 		"initial_interval": escfg.Backoff.Init, // backoff.init
 		"max_interval":     escfg.Backoff.Max,  // backoff.max
+		"retry_on_status":  escfg.RetryOnStatus,
 	}
 	if escfg.MaxRetries == 0 {
 		// Disable retries
