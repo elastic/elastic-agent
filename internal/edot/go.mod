@@ -11,6 +11,7 @@ require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260127161044-9eacb5bf9883
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.32.0
+	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.24.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.25.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.24.0
@@ -64,6 +65,7 @@ require (
 )
 
 require (
+	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/alexbrainman/sspi v0.0.0-20210105120005-909beea2cc74 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.1 // indirect
 	github.com/bluekeyes/go-gitdiff v0.7.1 // indirect
@@ -75,24 +77,39 @@ require (
 	github.com/elastic/go-quark v0.3.0 // indirect
 	github.com/elastic/tk-btf v0.2.0 // indirect
 	github.com/elastic/toutoumomoma v0.0.0-20240626215117-76e39db18dfb // indirect
+	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/fsnotify/fsevents v0.1.1 // indirect
+	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75 // indirect
 	github.com/gosnmp/gosnmp v1.42.1 // indirect
 	github.com/insomniacslk/dhcp v0.0.0-20220119180841-3c283ff8b7dd // indirect
+	github.com/jaypipes/ghw v0.12.0 // indirect
+	github.com/jaypipes/pcidb v1.0.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
+	github.com/mattn/go-runewidth v0.0.16 // indirect
+	github.com/mileusna/useragent v1.3.5 // indirect
+	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
+	github.com/moby/spdystream v0.5.0 // indirect
+	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.141.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.141.0 // indirect
 	github.com/osquery/osquery-go v0.0.0-20231108163517-e3cde127e724 // indirect
+	github.com/otiai10/copy v1.14.0 // indirect
 	github.com/pkg/xattr v0.4.9 // indirect
+	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/sajari/regression v1.0.1 // indirect
 	github.com/samuel/go-parser v0.0.0-20130731160455-ca8abbf65d0e // indirect
 	github.com/samuel/go-thrift v0.0.0-20140522043831-2187045faa54 // indirect
+	github.com/schollz/progressbar/v3 v3.13.1 // indirect
 	github.com/teambition/rrule-go v1.8.2 // indirect
+	github.com/winlabs/gowin32 v0.0.0-20240930213947-f504d7e14639 // indirect
 	go.opentelemetry.io/collector/component/componentstatus v0.141.0 // indirect
 	go.opentelemetry.io/collector/component/componenttest v0.141.0 // indirect
 	go.opentelemetry.io/collector/config/confighttp v0.141.0 // indirect
 	go.opentelemetry.io/collector/processor/processorhelper v0.141.0 // indirect
 	mvdan.cc/garble v0.12.1 // indirect
+	sigs.k8s.io/e2e-framework v0.4.0 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 )
@@ -386,7 +403,7 @@ require (
 	github.com/google/cel-go v0.26.0 // indirect
 	github.com/google/flatbuffers v25.2.10+incompatible // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
-	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/google/go-cmp v0.7.0
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/go-tpm v0.9.7 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
