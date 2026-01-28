@@ -25,10 +25,6 @@ description: >-
   events under certain failure conditions.
 
 # REQUIRED for breaking-change, deprecation, known-issue
-# impact:
-
-
-# REQUIRED for breaking-change, deprecation, known-issue
 # action:
 
 # REQUIRED for all kinds
