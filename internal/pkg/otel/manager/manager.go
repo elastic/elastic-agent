@@ -45,6 +45,9 @@ const (
 	// CollectorStopTimeout is the duration to wait for the collector to stop. Note: this needs to be shorter
 	// than 5 * time.Second (coordinator.managerShutdownTimeout) otherwise we might end up with a defunct process.
 	CollectorStopTimeout = 3 * time.Second
+	// OtelCollectorMetricsPortEnvVarName is the name of the environment variable used to pass the collector metrics
+	// port to the managed EDOT collector.
+	OtelCollectorMetricsPortEnvVarName = "EDOT_COLLECTOR_METRICS_PORT"
 )
 
 type collectorRecoveryTimer interface {
@@ -478,7 +481,7 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 		},
 		"elastic_agent": map[string]any{
 			"id":       agentInfo.AgentID(),
-			"process":  "elastic-agent",
+			"process":  "elastic-otel-collector",
 			"snapshot": agentInfo.Snapshot(),
 			"version":  agentInfo.Version(),
 		},
@@ -486,8 +489,8 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 			"id": agentInfo.AgentID(),
 		},
 		"component": mapstr.M{
-			"binary": "elastic-agent",
-			"id":     "elastic-agent/collector",
+			"binary": "elastic-otel-collector",
+			"id":     "elastic-otel-collector",
 		},
 		"metricset": mapstr.M{
 			"name": "stats",
@@ -841,7 +844,7 @@ func addCollectorMetricsReader(conf *confmap.Conf) error {
 					"host": "localhost",
 					// The OTel manager is required to set this environment variable. See comment at the constant
 					// definition for more information.
-					"port": fmt.Sprintf("${env:%s}", componentmonitoring.OtelCollectorMetricsPortEnvVarName),
+					"port": fmt.Sprintf("${env:%s}", OtelCollectorMetricsPortEnvVarName),
 					// this is the default configuration from the otel collector
 					"without_scope_info":  true,
 					"without_units":       true,

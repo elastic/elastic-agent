@@ -437,7 +437,7 @@ inputs:
     - add_fields:
         fields:
           id: ""
-          process: elastic-agent/collector
+          process: elastic-otel-collector
           snapshot: false
           version: placeholder
         target: elastic_agent
@@ -468,7 +468,7 @@ inputs:
     - add_fields:
         fields:
           binary: elastic-agent
-          id: elastic-agent/collector
+          id: elastic-otel-collector
         target: component
   - data_stream:
       dataset: elastic_agent.elastic_agent
