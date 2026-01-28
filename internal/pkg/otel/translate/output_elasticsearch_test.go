@@ -56,6 +56,19 @@ retry:
   initial_interval: 42s
   max_interval: 7m0s
   max_retries: 3
+  retry_on_status:
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
 sending_queue:
   batch:
     flush_timeout: 10s
@@ -103,6 +116,19 @@ retry:
   initial_interval: 1s
   max_interval: 1m0s
   max_retries: 3
+  retry_on_status:
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
 sending_queue:
   batch:
     flush_timeout: 10s
@@ -147,6 +173,19 @@ retry:
   initial_interval: 1s
   max_interval: 1m0s
   max_retries: 3
+  retry_on_status:
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
 sending_queue:
   batch:
     flush_timeout: 10s
@@ -195,6 +234,19 @@ retry:
   initial_interval: 1s
   max_interval: 1m0s
   max_retries: 3
+  retry_on_status:
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
 sending_queue:
   batch:
     flush_timeout: 10s
@@ -244,6 +296,19 @@ retry:
   initial_interval: 1s
   max_interval: 1m0s
   max_retries: 3
+  retry_on_status:
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
 logs_index: some-index
 password: changeme
 user: elastic
@@ -304,6 +369,19 @@ retry:
   initial_interval: 5s
   max_interval: 5m0s
   max_retries: 3
+  retry_on_status:
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
 logs_index: some-index
 password: changeme
 user: elastic
@@ -406,6 +484,19 @@ retry:
   initial_interval: 42s
   max_interval: 7m0s
   max_retries: 5
+  retry_on_status:
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
 sending_queue:
   batch:
     flush_timeout: 10s
@@ -518,6 +609,19 @@ retry:
   initial_interval: 1s
   max_interval: 1m0s
   max_retries: 3
+  retry_on_status:
+  - 429
+  - 500
+  - 501
+  - 502
+  - 503
+  - 504
+  - 505
+  - 506
+  - 507
+  - 508
+  - 510
+  - 511
 max_conns_per_host: 2
 user: elastic
 sending_queue:
