@@ -853,6 +853,19 @@ func containerCfgOverrides(cfg *configuration.Configuration) {
 		cfg.Settings.LoggingConfig.ToFiles = false
 	}
 
+	if envBool("HTTPPROF") {
+		// sanity checks to ensure monitoring config is setup
+		if cfg.Settings.MonitoringConfig == nil {
+			cfg.Settings.MonitoringConfig = monitoringCfg.DefaultConfig()
+		}
+
+		if cfg.Settings.MonitoringConfig.Pprof == nil {
+			cfg.Settings.MonitoringConfig.Pprof = &monitoringCfg.PprofConfig{}
+		}
+
+		cfg.Settings.MonitoringConfig.Pprof.Enabled = true
+	}
+
 	eventsToStderrEnv := envWithDefault("false", "EVENTS_TO_STDERR")
 	eventsToStderr, err := strconv.ParseBool(eventsToStderrEnv)
 	if err != nil {
