@@ -29,6 +29,7 @@ fleet.enc.lock
 env.sh
 .artifacts
 /docs/.artifacts
+.lock
 
 # Editor swap files
 *.swp

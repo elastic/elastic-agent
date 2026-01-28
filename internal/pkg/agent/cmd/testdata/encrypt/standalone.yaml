@@ -1,0 +1,6 @@
+agent:
+  id: test-agent
+  logging:
+    level: debug
+fleet:
+  enabled: false
