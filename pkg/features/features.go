@@ -25,9 +25,12 @@ const defaultTamperProtection = true
 // 9.2 - disabled (acks are sent)
 const defaultDisablePolicyChangeAcks = false
 
+const defaultDefaultProcessors = true
+
 var (
 	current = Flags{
-		tamperProtection: defaultTamperProtection,
+		tamperProtection:  defaultTamperProtection,
+		defaultProcessors: defaultDefaultProcessors,
 	}
 )
 
@@ -42,6 +45,7 @@ type Flags struct {
 
 	tamperProtection        bool
 	disablePolicyChangeAcks bool
+	defaultProcessors       bool
 }
 
 type cfg struct {
@@ -56,6 +60,9 @@ type cfg struct {
 			DisablePolicyChangeAcks *struct {
 				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
 			} `json:"disable_policy_change_acks" yaml:"disable_policy_change_acks" config:"disable_policy_change_acks"`
+			DefaultProcessors *struct {
+				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
+			} `json:"default_processors,omitempty" yaml:"default_processors,omitempty" config:"default_processors,omitempty"`
 		} `json:"features" yaml:"features" config:"features"`
 	} `json:"agent" yaml:"agent" config:"agent"`
 }
@@ -79,6 +86,13 @@ func (f *Flags) DisablePolicyChangeAcks() bool {
 	defer f.mu.RUnlock()
 
 	return f.disablePolicyChangeAcks
+}
+
+func (f *Flags) DefaultProcessors() bool {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	return f.defaultProcessors
 }
 
 func (f *Flags) AsProto() *proto.Features {
@@ -141,6 +155,13 @@ func (f *Flags) setDisablePolicyChangeAcks(newValue bool) {
 	defer f.mu.Unlock()
 
 	f.disablePolicyChangeAcks = newValue
+}
+
+func (f *Flags) setDefaultProcessors(newValue bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.defaultProcessors = newValue
 }
 
 // setSource sets the source from he given cfg.
@@ -214,6 +235,12 @@ func Parse(policy any) (*Flags, error) {
 		flags.setDisablePolicyChangeAcks(defaultDisablePolicyChangeAcks)
 	}
 
+	if parsedFlags.Agent.Features.DefaultProcessors != nil {
+		flags.setDefaultProcessors(parsedFlags.Agent.Features.DefaultProcessors.Enabled)
+	} else {
+		flags.setDefaultProcessors(defaultDefaultProcessors)
+	}
+
 	if err := flags.setSource(parsedFlags); err != nil {
 		return nil, fmt.Errorf("error creating feature flags source: %w", err)
 	}
@@ -237,6 +264,7 @@ func Apply(c *config.Config) error {
 	current.setFQDN(parsed.FQDN())
 	current.setTamperProtection(parsed.TamperProtection())
 	current.setDisablePolicyChangeAcks(parsed.DisablePolicyChangeAcks())
+	current.setDefaultProcessors(parsed.DefaultProcessors())
 	return err
 }
 
@@ -253,4 +281,9 @@ func TamperProtection() bool {
 // DisablePolicyChangeAcks reports if the agent will stop using ACKs for POLICY_CHANGE actions.
 func DisablePolicyChangeAcks() bool {
 	return current.DisablePolicyChangeAcks()
+}
+
+// DefaultProcessors reports if default processors should be applied.
+func DefaultProcessors() bool {
+	return current.DefaultProcessors()
 }
