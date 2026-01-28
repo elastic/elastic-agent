@@ -1101,7 +1101,7 @@ func readDocker(t *testing.T, dockerFile string, filterWorkingDir bool) (*packag
 	uncompressed, err := os.CreateTemp(tempDir, dockerFileName)
 	require.NoError(t, err)
 
-	_, err = io.CopyN(uncompressed, gz, 1024*1024*1024*10) // setting a maximum because gosec complains otherwise
+	_, err = io.CopyN(uncompressed, gz, 10*units.GiB) // setting a maximum because gosec complains otherwise
 	if !errors.Is(err, io.EOF) {
 		require.NoError(t, err)
 	}
