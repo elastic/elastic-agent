@@ -116,7 +116,7 @@ func TestMTLS(t *testing.T) {
 
 	// get new beats authenticator
 	beatsauth := newAuthenticator(t, beatsauthextension.Config{
-		BeatAuthConfig: beatsauthCfg["beatsauth/_agent-component/default"].(map[string]any), //nolint: errcheck // it is a test
+		BeatAuthConfig: beatsauthCfg["beatsauth/_agent-component/default"].(map[string]any),
 	})
 
 	// start extension
@@ -179,7 +179,7 @@ func TestKeyPassPhrase(t *testing.T) {
 
 	// get new beats authenticator
 	beatsauth := newAuthenticator(t, beatsauthextension.Config{
-		BeatAuthConfig: beatsauthCfg["beatsauth/_agent-component/default"].(map[string]any), //nolint: errcheck // it is a test
+		BeatAuthConfig: beatsauthCfg["beatsauth/_agent-component/default"].(map[string]any),
 	})
 
 	// start extension
@@ -236,7 +236,7 @@ func TestCATrustedFingerPrint(t *testing.T) {
 
 	// get new beats authenticator
 	beatsauth := newAuthenticator(t, beatsauthextension.Config{
-		BeatAuthConfig: beatsauthCfg["beatsauth/_agent-component/default"].(map[string]any), //nolint: errcheck // it is a test
+		BeatAuthConfig: beatsauthCfg["beatsauth/_agent-component/default"].(map[string]any),
 	})
 
 	// start extension
@@ -405,11 +405,11 @@ func TestVerificationMode(t *testing.T) {
 			exp := newTestESExporter(t, exporterCfg)
 
 			authConfig := beatsauthextension.Config{
-				BeatAuthConfig: beatsauthCfg["beatsauth/_agent-component/default"].(map[string]any), //nolint: errcheck // it is a test
+				BeatAuthConfig: beatsauthCfg["beatsauth/_agent-component/default"].(map[string]any),
 			}
 
 			if test.ignoreCerts {
-				delete(authConfig.BeatAuthConfig["ssl"].(map[string]any), "certificate_authorities") //nolint: errcheck // it is a test
+				delete(authConfig.BeatAuthConfig["ssl"].(map[string]any), "certificate_authorities")
 			}
 
 			// get new beats authenticator
@@ -558,7 +558,7 @@ func TestProxyHTTP(t *testing.T) {
 
 			// get new beats authenticator
 			beatsauth := newAuthenticator(t, beatsauthextension.Config{
-				BeatAuthConfig: beatsauthCfg["beatsauth/_agent-component/default"].(map[string]any), //nolint: errcheck // it is a test
+				BeatAuthConfig: beatsauthCfg["beatsauth/_agent-component/default"].(map[string]any),
 			})
 
 			// start extension
@@ -619,7 +619,7 @@ func newTestESExporter(t *testing.T, exporterCfg map[string]any) (ESexporter exp
 		},
 	}
 
-	esConf := confmap.NewFromStringMap(exporterCfg) //nolint: errcheck // it is a test
+	esConf := confmap.NewFromStringMap(exporterCfg)
 
 	// unmarshall user config into ES exporter config
 	require.NoError(t, esConf.Unmarshal(cfg), "error unmarshalling user config into ES config")
