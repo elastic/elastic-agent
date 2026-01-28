@@ -203,8 +203,8 @@ github.com/elastic/gosigar v0.14.3 h1:xwkKwPia+hSfg9GqrCUKYdId102m9qTJIIr7egmK/u
 github.com/elastic/gosigar v0.14.3/go.mod h1:iXRIGg2tLnu7LBdpqzyQfGDEidKCfWcCMS0WKyPWoMs=
 github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6 h1:JVNuBrmOoqLJgp9o68YBMnOrXCzQI3mCppW+suwRSlw=
 github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6/go.mod h1:cXqWcLnmu5y4QveTb2hjk7rgzkHMuZsqeXtbJpNAcu0=
-github.com/elastic/opentelemetry-collector-contrib/pkg/status v0.0.0-20260113162120-ad842251e9e4 h1:OFbsckvfzIbGr/o3+mwo/irmghM/vSy05MQGe6A4A98=
-github.com/elastic/opentelemetry-collector-contrib/pkg/status v0.0.0-20260113162120-ad842251e9e4/go.mod h1:umNY2+bbiGqUGKdsRMvxRT2e+jJE37EP/C5g/WAKsb8=
+github.com/elastic/opentelemetry-collector-contrib/pkg/status v0.0.0-20260128133812-7296485a6185 h1:qqjgwjuieQxGWOWjEwaC+k60NqPGEx2uY71qp5rPZeU=
+github.com/elastic/opentelemetry-collector-contrib/pkg/status v0.0.0-20260128133812-7296485a6185/go.mod h1:SUBfpA6bGw4clvLmiq0Hfpn9m7WAYYnB0Z3M69Ex2wk=
 github.com/emicklei/go-restful/v3 v3.12.2 h1:DhwDP0vY3k8ZzE0RunuJy8GhNpPL6zqLkDf9B/a0/xU=
 github.com/emicklei/go-restful/v3 v3.12.2/go.mod h1:6n3XBCmQQb25CM2LCACGz8ukIrRry+4bhvbpWn3mrbc=
 github.com/evanphx/json-patch v5.9.11+incompatible h1:ixHHqfcGvxhWkniF1tWxBHA0yb4Z+d1UQi45df52xW8=
