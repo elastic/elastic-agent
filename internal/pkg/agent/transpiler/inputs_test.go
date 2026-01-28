@@ -810,3 +810,238 @@ func mustMakeVarsP(id string, mapping map[string]interface{}, processorKey strin
 	}
 	return v
 }
+
+func TestGetInputToVarsMap(t *testing.T) {
+	testcases := map[string]struct {
+		input     Node
+		varsArray []*Vars
+		expected  map[string][]string
+		errMsg    string
+	}{
+		"inputs not list": {
+			input: NewKey("inputs", NewStrVal("not list")),
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{}),
+			},
+			errMsg: "inputs must be an array",
+		},
+		"input missing id": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("type", NewStrVal("logfile")),
+				}),
+			})),
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{}),
+			},
+			errMsg: "input must have an id",
+		},
+		"single input with static id": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("id", NewStrVal("input-1")),
+					NewKey("type", NewStrVal("logfile")),
+				}),
+			})),
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{}),
+			},
+			expected: map[string][]string{
+				"input-1": nil,
+			},
+		},
+		"single input with variable id": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("id", NewStrVal("input-${var1.name}")),
+					NewKey("type", NewStrVal("logfile")),
+				}),
+			})),
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "test",
+					},
+				}),
+			},
+			expected: map[string][]string{
+				"input-test": {"var1.name"},
+			},
+		},
+		"multiple inputs with different ids": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("id", NewStrVal("input-1")),
+					NewKey("type", NewStrVal("logfile")),
+				}),
+				NewDict([]Node{
+					NewKey("id", NewStrVal("input-2")),
+					NewKey("type", NewStrVal("metrics")),
+				}),
+			})),
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{}),
+			},
+			expected: map[string][]string{
+				"input-1": nil,
+				"input-2": nil,
+			},
+		},
+		"input with multiple vars in id": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("id", NewStrVal("input-${var1.name}-${var1.region}")),
+					NewKey("type", NewStrVal("logfile")),
+				}),
+			})),
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name":   "test",
+						"region": "us-west",
+					},
+				}),
+			},
+			expected: map[string][]string{
+				"input-test-us-west": {"var1.name", "var1.region"},
+			},
+		},
+		"multiple vars produce multiple ids": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("id", NewStrVal("input-${var1.name}")),
+					NewKey("type", NewStrVal("logfile")),
+				}),
+			})),
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "test1",
+					},
+				}),
+				mustMakeVars(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "test2",
+					},
+				}),
+			},
+			expected: map[string][]string{
+				"input-test1": {"var1.name"},
+				"input-test2": {"var1.name"},
+			},
+		},
+		"var with missing key is skipped": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("id", NewStrVal("input-${var1.name}")),
+					NewKey("type", NewStrVal("logfile")),
+				}),
+			})),
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"other": "value",
+					},
+				}),
+				mustMakeVars(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "test",
+					},
+				}),
+			},
+			expected: map[string][]string{
+				"input-test": {"var1.name"},
+			},
+		},
+		"input with vars in body": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("id", NewStrVal("input-1")),
+					NewKey("type", NewStrVal("logfile")),
+					NewKey("path", NewStrVal("/var/log/${var1.app}.log")),
+				}),
+			})),
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"app": "myapp",
+					},
+				}),
+			},
+			expected: map[string][]string{
+				"input-1": {"var1.app"},
+			},
+		},
+		"empty vars array": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("id", NewStrVal("input-1")),
+					NewKey("type", NewStrVal("logfile")),
+				}),
+			})),
+			varsArray: []*Vars{},
+			expected:  map[string][]string{},
+		},
+		"empty inputs list": {
+			input: NewKey("inputs", NewList([]Node{})),
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{}),
+			},
+			expected: map[string][]string{},
+		},
+		"input with nested vars in streams": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("id", NewStrVal("input-1")),
+					NewKey("type", NewStrVal("logfile")),
+					NewKey("streams", NewList([]Node{
+						NewDict([]Node{
+							NewKey("paths", NewList([]Node{
+								NewStrVal("/var/log/${var1.name}.log"),
+							})),
+						}),
+					})),
+				}),
+			})),
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "test",
+					},
+				}),
+			},
+			expected: map[string][]string{
+				"input-1": {"var1.name"},
+			},
+		},
+		"bad variable syntax in id": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("id", NewStrVal("${var1.name|'missing ending quote}")),
+					NewKey("type", NewStrVal("logfile")),
+				}),
+			})),
+			varsArray: []*Vars{
+				mustMakeVars(map[string]interface{}{
+					"var1": map[string]interface{}{
+						"name": "test",
+					},
+				}),
+			},
+			errMsg: "missing ending",
+		},
+	}
+
+	for name, test := range testcases {
+		t.Run(name, func(t *testing.T) {
+			result, err := GetInputToVarsMap(test.input, test.varsArray)
+			if test.errMsg != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), test.errMsg)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, test.expected, result)
+			}
+		})
+	}
+}
