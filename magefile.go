@@ -1216,7 +1216,8 @@ func packageAgent(ctx context.Context, platforms devtools.BuildPlatformList, dep
 		}
 	}
 
-	mg.SerialDeps(devtools.Package, TestPackages)
+	// build package and test
+	mg.SerialDeps(devtools.Package)
 	return nil
 }
 
