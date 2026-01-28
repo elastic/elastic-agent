@@ -1190,7 +1190,8 @@ func packageAgent(ctx context.Context, platforms []string, dependenciesVersion s
 		mg.Deps(Build.WindowsArchiveRootBinary)
 	}
 
-	mg.SerialDeps(devtools.Package, TestPackages)
+	// build package and test
+	mg.SerialDeps(devtools.Package)
 	return nil
 }
 

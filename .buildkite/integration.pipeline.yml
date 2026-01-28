@@ -52,8 +52,6 @@ steps:
           PACKAGES: "zip,tar.gz,rpm,deb"
           OTEL_COMPONENT: "true"
         command: ".buildkite/scripts/steps/integration-package.sh"
-        artifact_paths:
-          - build/distributions/**
         retry:
           automatic:
             limit: 1
@@ -106,8 +104,6 @@ steps:
           PACKAGES: "tar.gz,zip"
           OTEL_COMPONENT: "true"
         command: ".buildkite/scripts/steps/integration-package.sh"
-        artifact_paths:
-          - build/distributions/**
         retry:
           automatic:
             limit: 1
@@ -209,8 +205,6 @@ steps:
           OTEL_COMPONENT: "true"
         command: |
           .buildkite/scripts/steps/integration-package.sh
-        artifact_paths:
-          - build/distributions/**
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
@@ -227,8 +221,6 @@ steps:
           OTEL_COMPONENT: "true"
         command: |
           .buildkite/scripts/steps/integration-package.sh
-        artifact_paths:
-          - build/distributions/**
         agents:
           provider: "aws"
           instanceType: "c6g.2xlarge"
@@ -240,3 +232,14 @@ steps:
 
   - label: "Triggering custom FIPS integration tests"
     command: "buildkite-agent pipeline upload .buildkite/bk.integration-fips.pipeline.yml"
+
+  - label: "Test packages"
+    depends_on:
+    - int-packaging
+    command: |
+      .buildkite/scripts/steps/package-tests.sh
+    agents:
+      provider: "gcp"
+      machineType: "n2-standard-8"
+      diskSizeGb: 200
+      image: "${IMAGE_UBUNTU_2204_X86_64}"
