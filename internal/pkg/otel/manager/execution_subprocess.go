@@ -17,10 +17,6 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"gopkg.in/yaml.v3"
 
-	"github.com/elastic/elastic-agent/internal/pkg/otel/status"
-
-	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
-
 	otelstatus "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
@@ -29,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/status"
 	runtimeLogger "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -135,7 +132,7 @@ func (r *subprocessExecution) startCollector(
 	procCtx, procCtxCancel := context.WithCancel(ctx)
 	env := os.Environ()
 	// Set the environment variable for the collector metrics port. See comment at the constant definition for more information.
-	env = append(env, fmt.Sprintf("%s=%d", componentmonitoring.OtelCollectorMetricsPortEnvVarName, collectorMetricsPort))
+	env = append(env, fmt.Sprintf("%s=%d", OtelCollectorMetricsPortEnvVarName, collectorMetricsPort))
 
 	// set collector args
 	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))

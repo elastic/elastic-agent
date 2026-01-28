@@ -10,7 +10,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 
 	"github.com/magefile/mage/mg"
@@ -64,11 +63,6 @@ func Package() error {
 
 				if pkgType == Docker && !IsDockerVariantSelected(pkg.Spec.DockerVariant) {
 					log.Printf("Skipping %s docker variant type because it is not selected", pkg.Spec.DockerVariant)
-					continue
-				}
-
-				if target.Name == "linux/arm64" && pkgType == Docker && runtime.GOARCH != "arm64" {
-					log.Printf("Skipping Docker package type because build host isn't arm")
 					continue
 				}
 
@@ -236,6 +230,7 @@ func TestPackages(options ...TestPackagesOption) error {
 	goTest := sh.OutCmd("go", "test")
 
 	var args []string
+	args = append(args, "--timeout", "30m")
 	if mg.Verbose() {
 		args = append(args, "-v")
 	}

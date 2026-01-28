@@ -225,9 +225,7 @@ func runElasticAgentCritical(
 	// Make sure to flush any buffered logs before we're done.
 	defer baseLogger.Sync() //nolint:errcheck // flushing buffered logs is best effort.
 
-	l := baseLogger.With("log", map[string]interface{}{
-		"source": agentName,
-	})
+	l := baseLogger.With("log.source", agentName)
 
 	// at this point the logger is working, so any errors that we hit can now be logged and returned
 	if len(errs) > 0 {
