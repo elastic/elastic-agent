@@ -528,10 +528,10 @@ github.com/elastic/opentelemetry-collector-components/processor/lsmintervalproce
 github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.29.0/go.mod h1:1mm/rOgc0CdsFWbK07bZQ+iKovX8QlfM+2Cj1UVg978=
 github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.29.0 h1:NVJCv/Kx+4kIGopHIux//tZ96V4ZCpjxqhJ1iwYarfc=
 github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.29.0/go.mod h1:p0rjwwGZHnAdBXmTOfj5dAQwLu7ST6VSqt4rij5/Hls=
-github.com/elastic/opentelemetry-collector-contrib/internal/healthcheck v0.0.0-20260113162120-ad842251e9e4 h1:NO3gUhVEYpseLlsdo04w1hJeiO4UitWUfwGeT9u1hMo=
-github.com/elastic/opentelemetry-collector-contrib/internal/healthcheck v0.0.0-20260113162120-ad842251e9e4/go.mod h1:tF9H8+S/AmPwrkXpa8Qr3QmUDisnukldx3VYisUMWF8=
-github.com/elastic/opentelemetry-collector-contrib/pkg/status v0.0.0-20260113162120-ad842251e9e4 h1:OFbsckvfzIbGr/o3+mwo/irmghM/vSy05MQGe6A4A98=
-github.com/elastic/opentelemetry-collector-contrib/pkg/status v0.0.0-20260113162120-ad842251e9e4/go.mod h1:umNY2+bbiGqUGKdsRMvxRT2e+jJE37EP/C5g/WAKsb8=
+github.com/elastic/opentelemetry-collector-contrib/internal/healthcheck v0.0.0-20260128133812-7296485a6185 h1:aRSrcupifvg4jt7FSqdzkUfSUnjrgHD58keqBWIodEE=
+github.com/elastic/opentelemetry-collector-contrib/internal/healthcheck v0.0.0-20260128133812-7296485a6185/go.mod h1:f4z241ihV6Wy6XgkoH9gaMOTmwk3i6B2MGL5NcqUcYM=
+github.com/elastic/opentelemetry-collector-contrib/pkg/status v0.0.0-20260128133812-7296485a6185 h1:qqjgwjuieQxGWOWjEwaC+k60NqPGEx2uY71qp5rPZeU=
+github.com/elastic/opentelemetry-collector-contrib/pkg/status v0.0.0-20260128133812-7296485a6185/go.mod h1:SUBfpA6bGw4clvLmiq0Hfpn9m7WAYYnB0Z3M69Ex2wk=
 github.com/elastic/opentelemetry-lib v0.30.0 h1:uqNHV9nHFldLicHU1kO4OSgmYNSFHSHa2LwJzrCSkMA=
 github.com/elastic/opentelemetry-lib v0.30.0/go.mod h1:axTrLdeCICbBxah8vCPPyLeIUETT0t7dgu/oR2w7Tcw=
 github.com/elastic/sarama v1.19.1-0.20251224062803-313637a62841 h1:arI5QqFbuPfR1Ee4lgLUuYT5pCxVMTTQIZnn1q3/6Qs=
