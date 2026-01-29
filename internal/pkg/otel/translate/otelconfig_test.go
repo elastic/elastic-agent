@@ -377,12 +377,19 @@ func TestGetOtelConfig(t *testing.T) {
 		}
 	}
 
-	defaultGlobalProcessors := []map[string]any{
+	defaultGlobalProcessorsForFilebeat := []map[string]any{
 		{
 			"add_host_metadata": map[string]any{
 				"when.not.contains.tags": "forwarded",
 			},
 		},
+		{"add_cloud_metadata": nil},
+		{"add_docker_metadata": nil},
+		{"add_kubernetes_metadata": nil},
+	}
+
+	defaultGlobalProcessorsForMetricbeat := []map[string]any{
+		{"add_host_metadata": nil},
 		{"add_cloud_metadata": nil},
 		{"add_docker_metadata": nil},
 		{"add_kubernetes_metadata": nil},
@@ -432,7 +439,7 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 			},
-			"processors": defaultGlobalProcessors,
+			"processors": defaultGlobalProcessorsForFilebeat,
 			"logging": map[string]any{
 				"with_fields": map[string]any{
 					"component": map[string]any{
@@ -687,7 +694,7 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
-						"processors": defaultGlobalProcessors,
+						"processors": defaultGlobalProcessorsForMetricbeat,
 						"logging": map[string]any{
 							"with_fields": map[string]any{
 								"component": map[string]any{
@@ -798,7 +805,7 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
-						"processors": defaultGlobalProcessors,
+						"processors": defaultGlobalProcessorsForMetricbeat,
 						"logging": map[string]any{
 							"with_fields": map[string]any{
 								"component": map[string]any{
