@@ -12,14 +12,14 @@ require (
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.32.0
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
-	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.24.0
-	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.25.0
-	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.24.0
-	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.24.0
-	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.24.0
-	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.24.0
-	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.24.0
-	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.24.0
+	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.29.0
+	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.29.0
+	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.29.0
+	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.29.0
+	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.29.0
+	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.29.0
+	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.29.0
+	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.29.0
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.144.0
