@@ -1,0 +1,34 @@
+// begin 8.19.11 relnotes
+
+[[release-notes-8.19.11]]
+==  8.19.11
+
+Review important information about the  8.19.11 release.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[bug-fixes-8.19.11]]
+=== Bug fixes
+
+
+
+
+* Osquery-extensions-fix. https://github.com/elastic/elastic-agent/pull/12455[#12455] https://github.com/elastic/elastic-agent/pull/12494[#12494] https://github.com/elastic/elastic-agent/pull/12495[#12495] https://github.com/elastic/elastic-agent/pull/11724[#11724] 
+* Emit the correct error message when the app lock cannot be acquired. https://github.com/elastic/elastic-agent/pull/12455[#12455] https://github.com/elastic/elastic-agent/pull/12494[#12494] https://github.com/elastic/elastic-agent/pull/12495[#12495] https://github.com/elastic/elastic-agent/pull/11724[#11724] 
+* Fix elasticsearch retry behavior in OTEL runtime for reliable delivery. https://github.com/elastic/elastic-agent/pull/12455[#12455] https://github.com/elastic/elastic-agent/pull/12494[#12494] https://github.com/elastic/elastic-agent/pull/12495[#12495] https://github.com/elastic/elastic-agent/pull/11724[#11724] 
+
+// end 8.19.11 relnotes
