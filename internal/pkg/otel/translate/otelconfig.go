@@ -344,18 +344,18 @@ func getReceiversConfigForComponent(
 		receiverConfig["queue"] = outputQueueConfig
 	}
 
-	var addHostMetadataConfig map[string]any
+	addHostMetadata := map[string]any{
+		"add_host_metadata": nil,
+	}
 	if beatName == "filebeat" {
-		addHostMetadataConfig = map[string]any{
+		addHostMetadata["add_host_metadata"] = map[string]any{
 			"when.not.contains.tags": "forwarded",
 		}
 	}
 
 	// Explicitly configure default processors for Beat receivers.
 	receiverConfig["processors"] = []map[string]any{
-		{
-			"add_host_metadata": addHostMetadataConfig,
-		},
+		addHostMetadata,
 		{"add_cloud_metadata": nil},
 		{"add_docker_metadata": nil},
 		{"add_kubernetes_metadata": nil},
