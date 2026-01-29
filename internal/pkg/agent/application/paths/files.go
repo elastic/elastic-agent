@@ -17,8 +17,8 @@ const defaultAgentCapabilitiesFile = "capabilities.yml"
 // defaultAgentFleetYmlFile is a name of file used to store agent information
 const defaultAgentFleetYmlFile = "fleet.yml"
 
-// defaultAgentFleetFile is a name of file used to store agent information encrypted
-const defaultAgentFleetFile = "fleet.enc"
+// DefaultAgentFleetFile is a name of file used to store agent information encrypted
+const DefaultAgentFleetFile = "fleet.enc"
 
 // defaultAgentEnrollFile is a name of file used to enroll agent on first-start
 const defaultAgentEnrollFile = "enroll.yml"
@@ -46,14 +46,14 @@ func AgentConfigYmlFile() string {
 
 // AgentConfigFile is a name of file used to store agent information
 func AgentConfigFile() string {
-	return filepath.Join(Config(), defaultAgentFleetFile)
+	return filepath.Join(Config(), DefaultAgentFleetFile)
 }
 
 // AgentConfigFileLock is a locker for agent config file updates.
 func AgentConfigFileLock() *filelock.AppLocker {
 	return filelock.NewAppLocker(
 		Config(),
-		fmt.Sprintf("%s.lock", defaultAgentFleetFile),
+		fmt.Sprintf("%s.lock", DefaultAgentFleetFile),
 	)
 }
 

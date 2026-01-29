@@ -22,6 +22,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -489,4 +490,98 @@ func createFakeAgentInstall(t *testing.T, topDir, version, hash string, useVersi
 
 	// return the path relative to top exactly like the step_unpack does
 	return relVersionedHomePath
+}
+
+func TestApplicationStandaloneEncrypted(t *testing.T) {
+	log, _ := loggertest.New("TestApplicationStandaloneEncrypted")
+
+	cfgPath := paths.Config()
+	t.Cleanup(func() { paths.SetConfig(cfgPath) })
+
+	paths.SetConfig(t.TempDir())
+	err := os.WriteFile(paths.ConfigFile(), []byte(`agent:
+  features:
+    encrypted_config:
+      enabled: true
+  logging:
+    level: debug`), 0640)
+	require.NoError(t, err)
+
+	t.Log("Ensure New encrypts config")
+	_, _, _, err = New(
+		t.Context(),
+		log,
+		log,
+		logp.DebugLevel,
+		&info.AgentInfo{},
+		nil,
+		nil,
+		false, // not in testing mode - we are testing fs interactions
+		time.Second,
+		true,
+		nil,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+
+	encBytes, err := os.ReadFile(paths.AgentConfigFile())
+	require.NoError(t, err)
+
+	ymlBytes, err := os.ReadFile(paths.ConfigFile())
+	require.NoError(t, err)
+	require.EqualValues(t, storage.DefaultAgentEncryptedStandaloneConfig, ymlBytes, "unexpected contents in elastic-agent.yml")
+
+	t.Log("Ensure New does not alter contents when no changes are made")
+	_, _, _, err = New(
+		t.Context(),
+		log,
+		log,
+		logp.DebugLevel,
+		&info.AgentInfo{},
+		nil,
+		nil,
+		false, // not in testing mode - we are testing fs interactions
+		time.Second,
+		true,
+		nil,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+	encBytes2, err := os.ReadFile(paths.AgentConfigFile())
+	require.NoError(t, err)
+	require.EqualValues(t, encBytes, encBytes2, "fleet.enc contents have chagned")
+
+	ymlBytes, err = os.ReadFile(paths.ConfigFile())
+	require.NoError(t, err)
+	require.EqualValues(t, storage.DefaultAgentEncryptedStandaloneConfig, ymlBytes, "unexpected contents in elastic-agent.yml")
+
+	t.Log("Ensure that setting encrypted_config to false deletes fleet.enc")
+	err = os.WriteFile(paths.ConfigFile(), []byte(`agent:
+  features:
+    encrypted_config:
+      enabled: false
+  logging:
+    level: debug`), 0640)
+	require.NoError(t, err)
+
+	_, _, _, err = New(
+		t.Context(),
+		log,
+		log,
+		logp.DebugLevel,
+		&info.AgentInfo{},
+		nil,
+		nil,
+		false, // not in testing mode - we are testing fs interactions
+		time.Second,
+		true,
+		nil,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+	_, err = os.Stat(paths.AgentConfigFile())
+	require.ErrorIs(t, err, os.ErrNotExist)
 }

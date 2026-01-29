@@ -6,7 +6,9 @@ package storage
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -17,6 +19,9 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
+
+//go:embed testdata/elastic-agent.yml
+var agentConfig []byte
 
 func TestNewEncryptedDiskStore(t *testing.T) {
 
@@ -104,4 +109,25 @@ func TestNewEncryptedDiskStore(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEncryptConfigOnPath(t *testing.T) {
+	dir := t.TempDir()
+	sourceCfg := filepath.Join(dir, paths.DefaultConfigName)
+	err := os.WriteFile(sourceCfg, agentConfig, 0640)
+	require.NoError(t, err)
+
+	err = EncryptConfigOnPath(dir)
+	require.NoError(t, err)
+
+	_, err = os.Stat(filepath.Join(dir, paths.DefaultAgentVaultPath))
+	require.NoError(t, err, "expected to create vault in destination dir")
+	_, err = os.Stat(filepath.Join(dir, "fleet.enc"))
+	require.NoError(t, err, "expected to create fleet.enc in destiniation dir")
+
+	_, err = os.Stat(sourceCfg)
+	require.NoError(t, err, "expected source config file to still exist.")
+	p, err := os.ReadFile(sourceCfg)
+	require.NoError(t, err, "unable to read source config file")
+	require.EqualValues(t, DefaultAgentEncryptedStandaloneConfig, p)
 }
