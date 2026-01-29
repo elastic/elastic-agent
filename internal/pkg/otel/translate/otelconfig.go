@@ -344,6 +344,18 @@ func getReceiversConfigForComponent(
 		receiverConfig["queue"] = outputQueueConfig
 	}
 
+	// Explicitly configure default processors for Beat receivers.
+	receiverConfig["processors"] = []map[string]any{
+		{
+			"add_host_metadata": map[string]any{
+				"when.not.contains.tags": "forwarded",
+			},
+		},
+		{"add_cloud_metadata": nil},
+		{"add_docker_metadata": nil},
+		{"add_kubernetes_metadata": nil},
+	}
+
 	// add monitoring config if necessary
 	// we enable the basic monitoring endpoint by default, because we want to use it for diagnostics even if
 	// agent self-monitoring is disabled
