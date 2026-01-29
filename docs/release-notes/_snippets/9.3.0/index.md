@@ -6,23 +6,23 @@ _This release also includes: [Breaking changes](/release-notes/breaking-changes.
 ### Features and enhancements [elastic-agent-9.3.0-features-enhancements]
 
 
-* Add support for logstash output to elastic agent standalone helm chart. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
-* Enable cpu and disk hostmetrics scrapers for Darwin configurations. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
+* Add support for logstash output to elastic agent standalone helm chart. [#10644](https://github.com/elastic/elastic-agent/pull/10644)
+* Enable cpu and disk hostmetrics scrapers for Darwin configurations. [#11423](https://github.com/elastic/elastic-agent/pull/11423)
 
-* Add support for downgrading a running Agent&#39;s privileges from Fleet. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
-* Add awss3receiver. [#10515](https://github.com/elastic/elastic-agent/pull/10515) [#604](https://github.com/elastic/obs-integration-team/issues/604)
-* Edot-add-awslogsencodingextension. [#11107](https://github.com/elastic/elastic-agent/pull/11107) 
+* Add support for downgrading a running Agent&#39;s privileges from Fleet. [#10231](https://github.com/elastic/elastic-agent/pull/10231)
+* Add awss3receiver to EDOT. [#10515](https://github.com/elastic/elastic-agent/pull/10515) [#604](https://github.com/elastic/obs-integration-team/issues/604)
+* Add awslogsencodingextension to EDOT. [#11107](https://github.com/elastic/elastic-agent/pull/11107) 
 * Add opex to elastic-agent helm chart. This change adds the Opex-CCM support to the offical elastic-agent helm chart deployment. [#9363](https://github.com/elastic/elastic-agent/pull/9363) 
 * Add windowseventlogreceiver to EDOT. [#11418](https://github.com/elastic/elastic-agent/pull/11418) 
-* Allow setting component runtime per input type. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
-* Improve metrics monitoring coverage for OTel-based ingestion. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
+* Allow setting component runtime per input type. [#11186](https://github.com/elastic/elastic-agent/pull/11186)
+* Improve metrics monitoring coverage for OTel-based ingestion. [#11813](https://github.com/elastic/elastic-agent/pull/11813)
 
   Extend ingestion of OTel collector internal telemetry to give more detailed metrics, including support for both monitoring and non-monitoring components in the same collector.
 * Allow manually initiating an upgrade rollback within a configurable window. [#11955](https://github.com/elastic/elastic-agent/pull/11955) [#6881](https://github.com/elastic/elastic-agent/issues/6881)
-* Add SNMP receiver to EDOT Collector. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
-* Restore cloud-defend to the basic and complete Docker images. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
+* Add SNMP receiver to EDOT Collector. [#12239](https://github.com/elastic/elastic-agent/pull/12239)
+* Restore cloud-defend to the basic and complete Docker images. [#11795](https://github.com/elastic/elastic-agent/pull/11795)
 * Make otel default runtime for system\metrics input. [#11613](https://github.com/elastic/elastic-agent/pull/11613) 
-* Update OTel Collector components to v0.141.0. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
+* Update OTel Collector components to v0.141.0. [#11671](https://github.com/elastic/elastic-agent/pull/11671)
 * Change default runtime for select metricbeat inputs. [#11754](https://github.com/elastic/elastic-agent/pull/11754) 
 
   The following metricbeat inputs will use the otel runtime by default if the elasticsearch output is used:
@@ -53,16 +53,16 @@ _This release also includes: [Breaking changes](/release-notes/breaking-changes.
     - &#34;vsphere/metrics&#34;
   
   This will result in a memory reduction since fewer agentbeat processes are started, because the otel runtime runs within the collector process.  If the policy is not compatible with the otel runtime, it will fall back to the process runtime.
-* Improve input not supported error message to reference installation flavors. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
-* Add service.instance.id to k8s attributes in helm charts. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
-* Reduce installation size for all versions of the Elastic Agent. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
+* Improve input not supported error message to reference installation flavors. [#11825](https://github.com/elastic/elastic-agent/pull/11825)
+* Add service.instance.id to k8s attributes in helm charts. [#11844](https://github.com/elastic/elastic-agent/pull/11844) 
+* Reduce installation size for all versions of the Elastic Agent. [#11821](https://github.com/elastic/elastic-agent/pull/11821)
 
   The Elastic Agent now ships with a single elastic-otel-collector binary that contains both the
   OTEL collector, beats receivers, and beat modules. This reduces the size of the Elastic Agent roughly
   ~200MB (amount depends on the platform). The elastic-agent.exe has also been greatly reduced from ~400M to ~75M.
   
 * Add prometheusremotewrite receiver to EDOT. [#11937](https://github.com/elastic/elastic-agent/pull/11937) 
-* Replace elastic-agent/collector component name with elastic-otel-collector in self-monitoring. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
+* Replace elastic-agent/collector component name with elastic-otel-collector in self-monitoring. [#12364](https://github.com/elastic/elastic-agent/pull/12364)
 
   Make self-monitoring metrics consistently use the name of the new elastic-otel-collector binary executing the EDOT collector and beats receivers.
 
@@ -72,20 +72,20 @@ _This release also includes: [Breaking changes](/release-notes/breaking-changes.
 ### Fixes [elastic-agent-9.3.0-fixes]
 
 
-* Report crashing otel process cleanly with proper status reporting. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
-* Fix kube-stack null template evaluation for Helm v4. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
+* Report crashing otel process cleanly with proper status reporting. [#11448](https://github.com/elastic/elastic-agent/pull/11448)
+* Fix kube-stack null template evaluation for Helm v4. [#11481](https://github.com/elastic/elastic-agent/pull/11481)
 
-* Ensure the self-monitoring configuration accounts for the runtime components actually run in. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
-* Add environment.yaml file to diagnostics. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) [#10966](https://github.com/elastic/elastic-agent/issues/10966)
-* Merge multiple agent keys when loading config. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) [#3717](https://github.com/elastic/elastic-agent/issues/3717)
-* Hide healthcheckv2 from status output. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
+* Ensure the self-monitoring configuration accounts for the runtime components actually run in. [#11300](https://github.com/elastic/elastic-agent/pull/11300)
+* Add environment.yaml file to diagnostics. [#11484](https://github.com/elastic/elastic-agent/pull/11484) [#10966](https://github.com/elastic/elastic-agent/issues/10966)
+* Merge multiple agent keys when loading config. [#11619](https://github.com/elastic/elastic-agent/pull/11619) [#3717](https://github.com/elastic/elastic-agent/issues/3717)
+* Hide healthcheckv2 from status output. [#11718](https://github.com/elastic/elastic-agent/pull/11718)
 * Set path.home for beat receivers to components directory. [#11726](https://github.com/elastic/elastic-agent/pull/11726) [#48010](https://github.com/elastic/beats/issues/48010)
-* Fix signature verification using the upgrade command with the --source-uri flag for fleet-managed agents. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) [#11152](https://github.com/elastic/elastic-agent/issues/11152)
+* Fix signature verification using the upgrade command with the --source-uri flag for fleet-managed agents. [#11826](https://github.com/elastic/elastic-agent/pull/11826) [#11152](https://github.com/elastic/elastic-agent/issues/11152)
 * Handle curve_types to []curve_types conversion for elasticsearch config translation. [#11892](https://github.com/elastic/elastic-agent/pull/11892) [#11776](https://github.com/elastic/elastic-agent/issues/11776)
-* Avoid uninstall and reinstalling service components on policy changes or reassignments. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
-* Fix reloading agent.logging.level for standalone Elastic Agent. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
-* Fix FLEET_TOKEN_POLICY_NAME environment variable for the container command to handle cases where there are more than 20 agent policies available. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) [#12069](https://github.com/elastic/elastic-agent/issues/12069)
-* This updates the kube-stack otel gateway collector endpoint to be OTEL_K8S_POD_IP as the previous value was causing an undefined log warning. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
-* Emit the correct error message when the app lock cannot be acquired. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
-* Fix diagnostics socket path for read-only container filesystems. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) [#11572](https://github.com/elastic/elastic-agent/issues/11572)
+* Avoid uninstall and reinstalling service components on policy changes or reassignments. [#11740](https://github.com/elastic/elastic-agent/pull/11740)
+* Fix reloading agent.logging.level for standalone Elastic Agent. [#11998](https://github.com/elastic/elastic-agent/pull/11998)
+* Fix FLEET_TOKEN_POLICY_NAME environment variable for the container command to handle cases where there are more than 20 agent policies available. [#12073](https://github.com/elastic/elastic-agent/pull/12073) [#12069](https://github.com/elastic/elastic-agent/issues/12069)
+* This updates the kube-stack otel gateway collector endpoint to be OTEL_K8S_POD_IP as the previous value was causing an undefined log warning. [#12205](https://github.com/elastic/elastic-agent/pull/12205)
+* Emit the correct error message when the app lock cannot be acquired. [#12225](https://github.com/elastic/elastic-agent/pull/12225)
+* Fix diagnostics socket path for read-only container filesystems. [#12312](https://github.com/elastic/elastic-agent/pull/12312) [#11572](https://github.com/elastic/elastic-agent/issues/11572)
 
