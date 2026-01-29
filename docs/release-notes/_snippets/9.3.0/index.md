@@ -12,10 +12,10 @@ _This release also includes: [Breaking changes](/release-notes/breaking-changes.
 * Add support for downgrading a running Agent&#39;s privileges from Fleet. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
 * Add awss3receiver. [#10515](https://github.com/elastic/elastic-agent/pull/10515) [#604](https://github.com/elastic/obs-integration-team/issues/604)
 * Edot-add-awslogsencodingextension. [#11107](https://github.com/elastic/elastic-agent/pull/11107) 
-* Added opex to elastic-agent helm chart, This change will add the Opex-CCM support to the offical elastic-agent helm chart deployment. [#9363](https://github.com/elastic/elastic-agent/pull/9363) 
+* Add opex to elastic-agent helm chart. This change adds the Opex-CCM support to the offical elastic-agent helm chart deployment. [#9363](https://github.com/elastic/elastic-agent/pull/9363) 
 * Add windowseventlogreceiver to EDOT. [#11418](https://github.com/elastic/elastic-agent/pull/11418) 
 * Allow setting component runtime per input type. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
-* Improved metrics monitoring coverage for OTel-based ingestion. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
+* Improve metrics monitoring coverage for OTel-based ingestion. [#12393](https://github.com/elastic/elastic-agent/pull/12393) [#12337](https://github.com/elastic/elastic-agent/pull/12337) [#12387](https://github.com/elastic/elastic-agent/pull/12387) 
 
   Extend ingestion of OTel collector internal telemetry to give more detailed metrics, including support for both monitoring and non-monitoring components in the same collector.
 * Allow manually initiating an upgrade rollback within a configurable window. [#11955](https://github.com/elastic/elastic-agent/pull/11955) [#6881](https://github.com/elastic/elastic-agent/issues/6881)
