@@ -1802,7 +1802,10 @@ func (c *Coordinator) observeASTVars(ctx context.Context) error {
 	return nil
 }
 
-// TODO: docstring
+// getDynamicInputs returns the set of dynamic inputs in the current AST. Dynamic inputs are defined as inputs whose
+// definition includes variables from dynamic providers. Such inputs can change rapidly depending on the environment,
+// resulting in frequent configuration reloads.
+// Returns a map of input ID to bool. The input IDs are fully resolved if they contain variables.
 func (c *Coordinator) getDynamicInputs() (map[string]bool, error) {
 	if c.varsMgr == nil {
 		// No varsMgr (only happens in testing)
