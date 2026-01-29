@@ -87,7 +87,6 @@ This section provides a summary of components included in the Elastic Distributi
 | [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.144.0/processor/batchprocessor/README.md) | v0.144.0 |
 | [cumulativetodeltaprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/cumulativetodeltaprocessor/v0.144.0/processor/cumulativetodeltaprocessor/README.md) | v0.144.0 |
 | [elasticapmprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticapmprocessor/v0.29.0/processor/elasticapmprocessor/README.md) | v0.29.0 |
-| [elasticinframetricsprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elasticinframetricsprocessor/v0.29.0/processor/elasticinframetricsprocessor/README.md) | v0.29.0 |
 | [elastictraceprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/elastictraceprocessor/v0.29.0/processor/elastictraceprocessor/README.md) | v0.29.0 |
 | [filterprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/filterprocessor/v0.144.0/processor/filterprocessor/README.md) | v0.144.0 |
 | [geoipprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/geoipprocessor/v0.144.0/processor/geoipprocessor/README.md) | v0.144.0 |
