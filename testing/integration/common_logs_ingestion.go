@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	"go.opentelemetry.io/otel/sdk/metric"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
@@ -125,6 +126,33 @@ func StartMockES(t *testing.T, percentDuplicate, percentTooMany, percentNonIndex
 		time.Now().Add(time.Hour),
 		0,
 		percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge, 0))
+
+	s := httptest.NewServer(mux)
+	t.Cleanup(s.Close)
+
+	return s.URL
+}
+
+// StartMockESDeterministic starts a MockES on a random port using httptest.NewServer
+// with a deterministic handler. It registers a cleanup function to close the server
+// when the test finishes. The server will use deterministic responses based on the
+// provided handler.
+func StartMockESDeterministic(t *testing.T, deterministicHandler func(action mockes.Action, event []byte) int) string {
+	uid := uuid.Must(uuid.NewV4())
+
+	reader := metric.NewManualReader()
+	provider := metric.NewMeterProvider(metric.WithReader(reader))
+
+	mux := http.NewServeMux()
+	mux.Handle("/", mockes.NewDeterministicAPIHandler(
+		uid,
+		"",
+		provider,
+		time.Now().Add(24*time.Hour),
+		0,
+		0,
+		deterministicHandler,
+	))
 
 	s := httptest.NewServer(mux)
 	t.Cleanup(s.Close)

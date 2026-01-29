@@ -292,6 +292,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"initial_interval": 1 * time.Second,
 				"max_interval":     1 * time.Minute,
 				"max_retries":      3,
+				"retry_on_status":  []int{429, 500, 501, 502, 503, 504, 505, 506, 507, 508, 510, 511},
 			},
 			"sending_queue": map[string]any{
 				"enabled":           true,

@@ -114,6 +114,8 @@ func (mr *monitoringReceiver) sendExporterMetricsEvent(componentID string, metri
 	logRecords := sourceLogs.LogRecords()
 	logRecord := logRecords.AppendEmpty()
 
+	sourceLogs.Scope().Attributes().PutStr("elastic.mapping.mode", "bodymap")
+
 	// Initialize to the configured event template
 	beatEvent := mapstr.M(mr.config.EventTemplate.Fields).Clone()
 	addMetricsToEventFields(mr.logger, metrics, &beatEvent)
