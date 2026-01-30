@@ -347,6 +347,9 @@ type Coordinator struct {
 	// The current variables
 	vars []*transpiler.Vars
 
+	// A map of input id to the list of variables used by that input
+	inputToVars map[string][]string
+
 	// The policy after spec and variable substitution
 	derivedConfig map[string]interface{}
 
@@ -1658,7 +1661,7 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 	}
 
 	// pass the observed vars from the AST to the varsMgr
-	err = c.observeASTVars(ctx)
+	c.inputToVars, err = c.observeASTVars(ctx)
 	if err != nil {
 		// only possible error here is the context being cancelled
 		return err
@@ -1774,16 +1777,22 @@ func applyPersistedConfig(logger *logger.Logger, cfg *config.Config, configFile 
 // observeASTVars identifies the variables that are referenced in the computed AST and passed to
 // the varsMgr so it knows what providers are being referenced. If a providers is not being
 // referenced then the provider does not need to be running.
-func (c *Coordinator) observeASTVars(ctx context.Context) error {
+func (c *Coordinator) observeASTVars(ctx context.Context) (inputToVars map[string][]string, err error) {
 	if c.varsMgr == nil {
 		// No varsMgr (only happens in testing)
-		return nil
+		return nil, nil
 	}
 	var vars []string
 	if c.ast != nil {
 		inputs, ok := transpiler.Lookup(c.ast, "inputs")
 		if ok {
-			vars = inputs.Vars(vars, c.varsMgr.DefaultProvider())
+			inputToVars, err = transpiler.GetInputToVarsMap(inputs, c.vars)
+			if err != nil {
+				return nil, err
+			}
+			for _, inputVars := range inputToVars {
+				vars = append(vars, inputVars...)
+			}
 		}
 		outputs, ok := transpiler.Lookup(c.ast, "outputs")
 		if ok {
@@ -1793,44 +1802,31 @@ func (c *Coordinator) observeASTVars(ctx context.Context) error {
 	updated, err := c.varsMgr.Observe(ctx, vars)
 	if err != nil {
 		// context cancel
-		return err
+		return nil, err
 	}
 	if updated != nil {
 		// provided an updated set of vars (observed changed)
 		c.vars = updated
 	}
-	return nil
+	return inputToVars, nil
 }
 
 // getDynamicInputs returns the set of dynamic inputs in the current AST. Dynamic inputs are defined as inputs whose
 // definition includes variables from dynamic providers. Such inputs can change rapidly depending on the environment,
 // resulting in frequent configuration reloads.
 // Returns a map of input ID to bool. The input IDs are fully resolved if they contain variables.
-func (c *Coordinator) getDynamicInputs() (map[string]bool, error) {
-	if c.varsMgr == nil {
-		// No varsMgr (only happens in testing)
-		return nil, nil
-	}
+func getDynamicInputs(inputToVars map[string][]string) map[string]bool {
 	dynamicInputs := make(map[string]bool)
-	if c.ast != nil {
-		inputs, ok := transpiler.Lookup(c.ast, "inputs")
-		if ok {
-			inputToVars, err := transpiler.GetInputToVarsMap(inputs, c.vars)
-			if err != nil {
-				return nil, err
-			}
-			for inputId, vars := range inputToVars {
-				for _, v := range vars {
-					varProviderName := composable.ProviderNameFromVarName(v)
-					if composable.IsDynamic(varProviderName) {
-						dynamicInputs[inputId] = true
-						break
-					}
-				}
+	for inputId, vars := range inputToVars {
+		for _, v := range vars {
+			varProviderName := composable.ProviderNameFromVarName(v)
+			if composable.IsDynamic(varProviderName) {
+				dynamicInputs[inputId] = true
+				break
 			}
 		}
 	}
-	return dynamicInputs, nil
+	return dynamicInputs
 }
 
 // processVars updates the transpiler vars in the Coordinator.
@@ -2063,12 +2059,7 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		}
 		return comps, nil
 	}
-	var dynamicInputs map[string]bool
-	dynamicInputs, err = c.getDynamicInputs()
-	if err != nil {
-		c.logger.Warnf("Failed to determine dynamic inputs: %v", err)
-		dynamicInputs = make(map[string]bool)
-	}
+	dynamicInputs := getDynamicInputs(c.inputToVars)
 	c.logger.With("dynamic_inputs", dynamicInputs).Debugf("Dynamic inputs found")
 	comps, err := c.specs.ToComponents(
 		cfg,

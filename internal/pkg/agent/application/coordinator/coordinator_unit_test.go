@@ -28,6 +28,7 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
+	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 
@@ -55,7 +56,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
-	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/localdynamic"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
@@ -2726,76 +2726,27 @@ func TestGetDynamicInputs(t *testing.T) {
 	// This is done via import side effects in the actual application
 	_ = composable.Providers
 
-	t.Run("returns nil when varsMgr is nil", func(t *testing.T) {
-		coord := &Coordinator{
-			varsMgr: nil,
-		}
-		result, err := coord.getDynamicInputs()
-		require.NoError(t, err)
-		assert.Nil(t, result)
-	})
-
-	t.Run("returns empty map when ast is nil", func(t *testing.T) {
-		coord := &Coordinator{
-			varsMgr: &fakeVarsManager{},
-			ast:     nil,
-		}
-		result, err := coord.getDynamicInputs()
-		require.NoError(t, err)
+	t.Run("returns empty map when inputToVars is nil", func(t *testing.T) {
+		result := getDynamicInputs(nil)
 		assert.NotNil(t, result)
 		assert.Empty(t, result)
 	})
 
-	t.Run("returns empty map when no inputs in ast", func(t *testing.T) {
-		ast, err := transpiler.NewAST(map[string]interface{}{
-			"outputs": map[string]interface{}{
-				"default": map[string]interface{}{
-					"type": "elasticsearch",
-				},
-			},
-		})
-		require.NoError(t, err)
-
-		coord := &Coordinator{
-			varsMgr: &fakeVarsManager{},
-			ast:     ast,
-		}
-		result, err := coord.getDynamicInputs()
-		require.NoError(t, err)
+	t.Run("returns empty map when inputToVars is empty", func(t *testing.T) {
+		result := getDynamicInputs(map[string][]string{})
 		assert.NotNil(t, result)
 		assert.Empty(t, result)
 	})
 
 	t.Run("identifies inputs with dynamic provider variables", func(t *testing.T) {
-		// Create an AST with inputs that use dynamic provider variables
+		// Create inputToVars map with a static input and a dynamic input
 		// The `local_dynamic` provider is registered via import side effect above
-		ast, err := transpiler.NewAST(map[string]interface{}{
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"id":   "static-input",
-					"type": "filestream",
-					"path": "/var/log/messages",
-				},
-				map[string]interface{}{
-					"id":   "dynamic-input",
-					"type": "filestream",
-					"path": "${local_dynamic.path}",
-				},
-			},
-		})
-		require.NoError(t, err)
-
-		// Create vars that match the inputs
-		vars, err := transpiler.NewVars("", map[string]interface{}{}, nil, "")
-		require.NoError(t, err)
-
-		coord := &Coordinator{
-			varsMgr: &fakeVarsManager{},
-			ast:     ast,
-			vars:    []*transpiler.Vars{vars},
+		inputToVars := map[string][]string{
+			"static-input":  {}, // no variables
+			"dynamic-input": {"local_dynamic.path"},
 		}
-		result, err := coord.getDynamicInputs()
-		require.NoError(t, err)
+
+		result := getDynamicInputs(inputToVars)
 		assert.NotNil(t, result)
 		// The static-input should NOT be marked as dynamic
 		assert.False(t, result["static-input"], "static-input should not be marked as dynamic")
@@ -2804,33 +2755,12 @@ func TestGetDynamicInputs(t *testing.T) {
 	})
 
 	t.Run("inputs with non-dynamic provider variables are not marked dynamic", func(t *testing.T) {
-		// Create an AST with inputs that use non-dynamic (context) provider variables
-		ast, err := transpiler.NewAST(map[string]interface{}{
-			"inputs": []interface{}{
-				map[string]interface{}{
-					"id":   "env-input",
-					"type": "filestream",
-					"path": "${env.HOME}/logs",
-				},
-			},
-		})
-		require.NoError(t, err)
-
-		// Create vars that include the env provider
-		vars, err := transpiler.NewVars("", map[string]interface{}{
-			"env": map[string]interface{}{
-				"HOME": "/home/user",
-			},
-		}, nil, "")
-		require.NoError(t, err)
-
-		coord := &Coordinator{
-			varsMgr: &fakeVarsManager{},
-			ast:     ast,
-			vars:    []*transpiler.Vars{vars},
+		// Create inputToVars map with an input using env provider (context provider, not dynamic)
+		inputToVars := map[string][]string{
+			"env-input": {"env.HOME"},
 		}
-		result, err := coord.getDynamicInputs()
-		require.NoError(t, err)
+
+		result := getDynamicInputs(inputToVars)
 		assert.NotNil(t, result)
 		// The env provider is a context provider, not a dynamic provider
 		// So this input should NOT be marked as dynamic
