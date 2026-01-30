@@ -15,6 +15,8 @@ env:
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1767879728"
   IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1767879728"
   ASDF_TERRAFORM_VERSION: 1.9.2
+  BUILDKITE_PLUGIN_S3_CACHE_BUCKET: "elastic-agent-ci-go-cache"
+  BUILDKITE_PLUGIN_S3_CACHE_PREFIX: "elastic-agent-test"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -45,6 +47,31 @@ common:
         path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
         field: "apiKey"
         env_var: "EC_API_KEY"
+  - aws_oidc: &aws_oidc
+      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-aws-buildkite-oidc.tf
+      elastic/oblt-aws-auth#v0.2.0:
+  - base_cache_settings: &base_cache_settings
+      manifest:
+      - go.mod
+      - go.sum
+      - internal/edot/go.mod
+      - internal/edot/go.sum
+      - .go-version
+      backend: s3
+      restore: pipeline
+      save:
+      - file
+      - branch
+      compression: tgz
+  - linux_cache_settings: &linux_cache_settings
+      <<: *base_cache_settings
+      path: /opt/buildkite-agent/.cache/go-build
+  - windows_cache_settings: &windows_cache_settings
+      <<: *base_cache_settings
+      path: /c/Users/buildkite/AppData/Local/go-build
+  - macos_cache_settings: &macos_cache_settings
+      <<: *base_cache_settings
+      path: /Users/admin/Library/Caches/go-build
   # key to hold the list of k8s version to test against
   - k8s_test:
     versions: &k8s_test_versions
@@ -148,6 +175,10 @@ steps:
             limit: 1
         plugins:
           - *vault_ec_key_prod
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *windows_cache_settings
+              key-extra: "windows/amd64,integration"
 
       - label: "Windows:2025:amd64:sudo"
         depends_on:
@@ -169,6 +200,10 @@ steps:
           image: "${IMAGE_WIN_2025}"
         plugins:
           - *vault_ec_key_prod
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *windows_cache_settings
+              key-extra: "windows/amd64,integration"
 
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-amd64
@@ -189,6 +224,10 @@ steps:
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         plugins:
           - *vault_ec_key_prod
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *linux_cache_settings
+              key-extra: "linux/amd64,integration"
 
   - group: "Stateful: Windows"
     key: integration-tests-win
@@ -218,6 +257,10 @@ steps:
             limit: 1
         plugins:
           - *vault_ec_key_prod
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *windows_cache_settings
+              key-extra: "windows/amd64,integration"
         matrix:
           - default
           - fleet
@@ -248,6 +291,10 @@ steps:
             limit: 1
         plugins:
           - *vault_ec_key_prod
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *windows_cache_settings
+              key-extra: "windows/amd64,integration"
         matrix:
           - default
 
@@ -271,6 +318,10 @@ steps:
             limit: 1
         plugins:
           - *vault_ec_key_prod
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *windows_cache_settings
+              key-extra: "windows/amd64,integration"
         matrix:
           - default
           - fleet
@@ -301,6 +352,10 @@ steps:
           image: "${IMAGE_WIN_2025}"
         plugins:
           - *vault_ec_key_prod
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *windows_cache_settings
+              key-extra: "windows/amd64,integration"
         matrix:
           - default
 
@@ -331,6 +386,10 @@ steps:
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         plugins:
           - *vault_ec_key_prod
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *linux_cache_settings
+              key-extra: "linux/amd64,integration"
         matrix:
           - default
 
@@ -356,6 +415,10 @@ steps:
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         plugins:
           - *vault_ec_key_prod
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *linux_cache_settings
+              key-extra: "linux/amd64,integration"
         matrix:
           - default
           - upgrade
@@ -392,6 +455,10 @@ steps:
             limit: 1
         plugins:
           - *vault_ec_key_prod
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *linux_cache_settings
+              key-extra: "linux/arm64,integration"
         matrix:
           - default
           - upgrade
@@ -430,6 +497,10 @@ steps:
           instanceType: "m6g.xlarge"
         plugins:
           - *vault_ec_key_prod
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *linux_cache_settings
+              key-extra: "linux/arm64,integration"
         matrix:
           - default
 
@@ -460,6 +531,10 @@ steps:
           image: "{{matrix.image}}"
         plugins:
           - *vault_ec_key_prod
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *linux_cache_settings
+              key-extra: "linux/amd64,integration"
         matrix:
           setup:
             image:
@@ -490,6 +565,10 @@ steps:
           image: "{{matrix.image}}"
         plugins:
           - *vault_ec_key_prod
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *linux_cache_settings
+              key-extra: "linux/amd64,integration"
         matrix:
           setup:
             image:
@@ -536,6 +615,10 @@ steps:
             limit: 1
         plugins:
           - *vault_ec_key_prod
+          - *aws_oidc
+          - cache#v1.8.0:
+              <<: *linux_cache_settings
+              key-extra: "linux/amd64,integration"
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
