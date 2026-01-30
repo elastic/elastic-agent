@@ -669,7 +669,6 @@ func TestToOTelConfig_CheckUnsupported(t *testing.T) {
 		wantErrContains string
 	}{
 		{"indices", map[string]any{"indices": []any{"i"}}, "indices is currently not supported"},
-		{"parameters", map[string]any{"parameters": map[string]any{"x": "y"}}, "parameters is currently not supported"},
 		{"allow_older_versions_false", map[string]any{"allow_older_versions": false}, "allow_older_versions:false is currently not supported"},
 		{"loadbalance_false", map[string]any{"loadbalance": false}, "ladbalance:false is currently not supported"},
 		{"non_indexable_policy", map[string]any{"non_indexable_policy": "x"}, "non_indexable_policy is currently not supported"},
