@@ -16,6 +16,15 @@ import (
 	"syscall"
 )
 
+// Cmd returns an *exec.Cmd with the current environment variables set in the
+// returned Cmd and it also sets Pdeathsig to syscall.SIGKILL, so if caller
+// process dies, the child process is also killed. The child process has its
+// GID and UID set to match the caller, no other groups are set.
+// An error is only returned if the current GID or UID are nit Int32.
+func Cmd(ctx context.Context, path string, arg ...string) (*exec.Cmd, error) {
+	return getCmd(ctx, path, []string{}, os.Geteuid(), os.Getgid(), arg...)
+}
+
 func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ...string) (*exec.Cmd, error) {
 	var cmd *exec.Cmd
 	if ctx == nil {
@@ -32,8 +41,8 @@ func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ..
 			// then also kill the children (only supported on linux)
 			Pdeathsig: syscall.SIGKILL,
 			Credential: &syscall.Credential{
-				Uid:         uint32(uid),
-				Gid:         uint32(gid),
+				Uid:         uint32(uid), //nolint:gosec // G115 Conversion from int to uint32 is safe here.
+				Gid:         uint32(gid), //nolint:gosec // G115 Conversion from int to uint32 is safe here.
 				NoSetGroups: true,
 			},
 		}
