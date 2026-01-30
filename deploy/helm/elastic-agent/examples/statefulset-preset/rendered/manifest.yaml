@@ -6,7 +6,7 @@ metadata:
   name: agent-netflow-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.4.0-beta
+    helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.4.0
@@ -79,7 +79,7 @@ metadata:
   name: agent-netflow-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.4.0-beta
+    helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.4.0
@@ -99,7 +99,7 @@ metadata:
   name: agent-netflow-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.4.0-beta
+    helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.4.0
