@@ -26,7 +26,6 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 	"testing"
 
@@ -986,19 +985,10 @@ func readDocker(t *testing.T, dockerFile string, filterWorkingDir bool) (*packag
 	f, err := os.Open(dockerFile)
 	require.NoError(t, err)
 
-<<<<<<< HEAD
-	file, err := os.Open(dockerFile)
-	require.NoError(t, err)
-	defer file.Close()
-
-	var info *dockerInfo
-	layers := make(map[string]*packageFile)
-=======
 	gz, err := gzip.NewReader(f)
 	require.NoError(t, err)
 
 	_, dockerFileName := path.Split(dockerFile)
->>>>>>> 44814ff4e (Use google/go-containerregistry to parse OCI images in packaging tests (#11724))
 
 	tempDir := t.TempDir()
 	uncompressed, err := os.CreateTemp(tempDir, dockerFileName)
@@ -1018,11 +1008,7 @@ func readDocker(t *testing.T, dockerFile string, filterWorkingDir bool) (*packag
 	configFile, err := img.ConfigFile()
 	require.NoError(t, err, "failed to get config file from image")
 
-	imgSize, err := img.Size()
-	require.NoError(t, err, "failed to get image size")
-	info := &dockerInfo{
-		Size: imgSize,
-	}
+	info := &dockerInfo{}
 	info.Config.Entrypoint = configFile.Config.Entrypoint
 	info.Config.Labels = configFile.Config.Labels
 	info.Config.User = configFile.Config.User
