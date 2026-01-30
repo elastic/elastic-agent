@@ -301,7 +301,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			// and reset the retry count
 			m.recoveryTimer.Stop()
 			m.recoveryRetries.Store(0)
-			mergedCfg, err := buildMergedConfig(cfgUpdate, m.agentInfo, m.beatMonitoringConfigGetter, m.baseLogger)
+			mergedCfg, err := buildMergedConfig(cfgUpdate, m.agentInfo, m.beatMonitoringConfigGetter, m.logger)
 			if err != nil {
 				// critical error, merging the configuration should always work
 				reportErr(ctx, m.errCh, err)
@@ -398,7 +398,6 @@ func buildMergedConfig(
 		if err := componentOtelCfg.Merge(confmap.NewFromStringMap(map[string]any{"service::telemetry::logs::level": level})); err != nil {
 			return nil, fmt.Errorf("failed to set log level in otel config: %w", err)
 		}
-
 	}
 
 	// If both configs are nil, return nil so the manager knows to stop the collector
