@@ -320,7 +320,7 @@ func TestGetOtelConfig(t *testing.T) {
 		}
 	}
 
-	defaultProcessors := func(streamId, dataset string, namespace string) []any {
+	defaultInputProcessors := func(streamId, dataset string, namespace string) []any {
 		return []any{
 			mapstr.M{
 				"add_fields": mapstr.M{
@@ -377,6 +377,24 @@ func TestGetOtelConfig(t *testing.T) {
 		}
 	}
 
+	defaultGlobalProcessorsForFilebeat := []map[string]any{
+		{
+			"add_host_metadata": map[string]any{
+				"when.not.contains.tags": "forwarded",
+			},
+		},
+		{"add_cloud_metadata": nil},
+		{"add_docker_metadata": nil},
+		{"add_kubernetes_metadata": nil},
+	}
+
+	defaultGlobalProcessorsForMetricbeat := []map[string]any{
+		{"add_host_metadata": nil},
+		{"add_cloud_metadata": nil},
+		{"add_docker_metadata": nil},
+		{"add_kubernetes_metadata": nil},
+	}
+
 	// expects input id
 	expectedFilestreamConfig := func(id string) map[string]any {
 		return map[string]any{
@@ -392,7 +410,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"/var/log/*.log",
 						},
 						"index":      "logs-generic-1-default",
-						"processors": defaultProcessors("test-1", "generic-1", "logs"),
+						"processors": defaultInputProcessors("test-1", "generic-1", "logs"),
 					},
 					{
 						"id":   "test-2",
@@ -404,7 +422,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"/var/log/*.log",
 						},
 						"index":      "logs-generic-2-default",
-						"processors": defaultProcessors("test-2", "generic-2", "logs"),
+						"processors": defaultInputProcessors("test-2", "generic-2", "logs"),
 					},
 				},
 			},
@@ -421,6 +439,7 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 			},
+			"processors": defaultGlobalProcessorsForFilebeat,
 			"logging": map[string]any{
 				"with_fields": map[string]any{
 					"component": map[string]any{
@@ -657,7 +676,7 @@ func TestGetOtelConfig(t *testing.T) {
 									"index":       "metrics-generic-1-default",
 									"metricsets":  []interface{}{"stats"},
 									"period":      "60s",
-									"processors":  defaultProcessors("test-1", "generic-1", "metrics"),
+									"processors":  defaultInputProcessors("test-1", "generic-1", "metrics"),
 									"module":      "beat",
 								},
 							},
@@ -675,6 +694,7 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
+						"processors": defaultGlobalProcessorsForMetricbeat,
 						"logging": map[string]any{
 							"with_fields": map[string]any{
 								"component": map[string]any{
@@ -768,7 +788,7 @@ func TestGetOtelConfig(t *testing.T) {
 											"data_stream.dataset": "system.filesystem",
 										},
 									},
-									"processors": defaultProcessors("test-1", "generic-1", "metrics"),
+									"processors": defaultInputProcessors("test-1", "generic-1", "metrics"),
 								},
 							},
 						},
@@ -785,6 +805,7 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
+						"processors": defaultGlobalProcessorsForMetricbeat,
 						"logging": map[string]any{
 							"with_fields": map[string]any{
 								"component": map[string]any{
