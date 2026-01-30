@@ -37,9 +37,10 @@ type HeadersProvider interface {
 type RuntimeManager string
 
 type RuntimeConfig struct {
-	Default    string            `yaml:"default" config:"default" json:"default"`
-	Filebeat   BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
-	Metricbeat BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
+	Default       string            `yaml:"default" config:"default" json:"default"`
+	Filebeat      BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
+	Metricbeat    BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
+	DynamicInputs string            `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
 }
 
 type BeatRuntimeConfig struct {
@@ -49,7 +50,8 @@ type BeatRuntimeConfig struct {
 
 func DefaultRuntimeConfig() *RuntimeConfig {
 	return &RuntimeConfig{
-		Default: string(DefaultRuntimeManager),
+		Default:       string(DefaultRuntimeManager),
+		DynamicInputs: "",
 		Metricbeat: BeatRuntimeConfig{
 			InputType: map[string]string{
 				"activemq/metrics":      string(OtelRuntimeManager),
@@ -279,6 +281,11 @@ type Component struct {
 
 	RuntimeManager RuntimeManager `yaml:"-"`
 
+	// An input is considered dynamic if its definition uses variables from dynamic providers. In practice, this
+	// indicates that its configuration may change at runtime, possibly very frequently. A component is dynamic if
+	// it contains at least one dynamic unit.
+	Dynamic bool `yaml:"-"`
+
 	// Units that should be running inside this component.
 	Units []Unit `yaml:"units"`
 
@@ -496,8 +503,9 @@ func (r *RuntimeSpecs) ToComponents(
 	ll logp.Level,
 	headers HeadersProvider,
 	currentServiceCompInts map[string]uint64,
+	dynamicInputs map[string]bool,
 ) ([]Component, error) {
-	components, err := r.PolicyToComponents(policy, runtimeCfg, ll, headers)
+	components, err := r.PolicyToComponents(policy, runtimeCfg, ll, headers, dynamicInputs)
 	if err != nil {
 		return nil, err
 	}
@@ -518,7 +526,7 @@ func (r *RuntimeSpecs) ToComponents(
 
 		if monitoringCfg != nil {
 			// monitoring is enabled
-			monitoringComps, err := r.PolicyToComponents(monitoringCfg, runtimeCfg, ll, headers)
+			monitoringComps, err := r.PolicyToComponents(monitoringCfg, runtimeCfg, ll, headers, map[string]bool{})
 			if err != nil {
 				return nil, fmt.Errorf("failed to generate monitoring components: %w", err)
 			}
@@ -591,6 +599,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 		}
 
 		unitsForRuntimeManager := make(map[RuntimeManager][]Unit)
+		var hasDynamicInputs bool
 		for _, input := range output.Inputs[inputType] {
 			if input.enabled {
 				unitID := GetInputUnitId(componentID, input.id)
@@ -601,6 +610,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 					unitsForRuntimeManager[input.runtimeManager],
 					unitForInput(input, unitID),
 				)
+				hasDynamicInputs = hasDynamicInputs || input.dynamic
 			}
 		}
 
@@ -621,6 +631,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 					OutputName:            output.Name,
 					Units:                 units,
 					RuntimeManager:        runtimeManager,
+					Dynamic:               hasDynamicInputs,
 					Features:              featureFlags.AsProto(),
 					Component:             componentConfig.AsProto(),
 					OutputStatusReporting: extractStatusReporting(output.Config),
@@ -666,6 +677,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 					OutputName:            output.Name,
 					Units:                 units,
 					RuntimeManager:        input.runtimeManager,
+					Dynamic:               input.dynamic,
 					Features:              featureFlags.AsProto(),
 					Component:             componentConfig.AsProto(),
 					OutputStatusReporting: extractStatusReporting(output.Config),
@@ -705,6 +717,7 @@ func (r *RuntimeSpecs) PolicyToComponents(
 	runtimeCfg *RuntimeConfig,
 	ll logp.Level,
 	headers HeadersProvider,
+	dynamicInputs map[string]bool,
 ) ([]Component, error) {
 	// get feature flags from policy
 	featureFlags, err := features.Parse(policy)
@@ -712,7 +725,7 @@ func (r *RuntimeSpecs) PolicyToComponents(
 		return nil, fmt.Errorf("could not parse feature flags from policy: %w", err)
 	}
 
-	outputsMap, err := toIntermediate(policy, r.aliasMapping, ll, headers)
+	outputsMap, err := toIntermediate(policy, r.aliasMapping, ll, headers, dynamicInputs)
 	if err != nil {
 		return nil, err
 	}
@@ -785,6 +798,7 @@ func toIntermediate(
 	aliasMapping map[string]string,
 	ll logp.Level,
 	headers HeadersProvider,
+	dynamicInputs map[string]bool,
 ) (map[string]outputI, error) {
 	const (
 		outputsKey        = "outputs"
@@ -918,6 +932,7 @@ func toIntermediate(
 			inputType:      t,
 			config:         input,
 			runtimeManager: runtimeManager,
+			dynamic:        dynamicInputs[id],
 		})
 	}
 	if len(outputsMap) == 0 {
@@ -991,6 +1006,9 @@ type inputI struct {
 	logLevel       client.UnitLogLevel
 	inputType      string // canonical (non-alias) type
 	runtimeManager RuntimeManager
+	// An input is considered dynamic if its definition uses variables from dynamic providers. In practice, this
+	// indicates that its configuration may change at runtime, possibly very frequently.
+	dynamic bool
 
 	// The raw configuration for this input, with small cleanups:
 	// - the "enabled", "use_output", and "log_level" keys are removed

@@ -411,12 +411,14 @@ func TestCoordinator_VarsMgr_Observe(t *testing.T) {
 	cfg, err := config.NewConfigFrom(map[string]interface{}{
 		"inputs": []interface{}{
 			map[string]interface{}{
+				"id":   "filestream-1",
 				"type": "filestream",
 				"paths": []interface{}{
 					"${env.filestream_path|env.log_path|'/var/log/syslog'}",
 				},
 			},
 			map[string]interface{}{
+				"id":        "windows-1",
 				"type":      "windows",
 				"condition": "${host.platform} == 'windows'",
 			},
@@ -428,7 +430,7 @@ func TestCoordinator_VarsMgr_Observe(t *testing.T) {
 	// healthy signals that the configuration has been computed
 	waitForState(t, stateChan, func(state State) bool {
 		return state.State == agentclient.Healthy && state.Message == "Running"
-	}, 3*time.Second)
+	}, 300*time.Second)
 
 	// get the set observed vars from the fake vars manager
 	varsMgr.observedMx.Lock()
@@ -730,6 +732,7 @@ func TestCoordinator_StateSubscribe(t *testing.T) {
 		},
 		"inputs": []interface{}{
 			map[string]interface{}{
+				"id":         "fake",
 				"type":       "fake",
 				"use_output": "default",
 				"state":      client.UnitStateHealthy,

@@ -327,8 +327,8 @@ func (c *controller) Observe(ctx context.Context, vars []string) ([]*transpiler.
 	// inform the provider on which variables it needs to provide values for.
 	topLevel := make(map[string]bool)
 	for _, v := range vars {
-		vs := strings.SplitN(v, ".", 2)
-		topLevel[vs[0]] = true
+		providerName := ProviderNameFromVarName(v)
+		topLevel[providerName] = true
 	}
 	// blocks waiting for an updated set of variables
 	ch := make(chan []*transpiler.Vars)
@@ -786,4 +786,8 @@ func drainChan[T any](ch chan T) {
 			return
 		}
 	}
+}
+
+func ProviderNameFromVarName(varName string) string {
+	return strings.SplitN(varName, ".", 2)[0]
 }

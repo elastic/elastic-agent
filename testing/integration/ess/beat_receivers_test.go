@@ -940,6 +940,114 @@ outputs:
 	assert.NotEmpty(t, monitoringOutputUnsupportedLogRecord, "should get a log line about monitoring output not being supported")
 }
 
+const (
+	otelDynamicVariableLogLineTemplate = "Component %s uses dynamic variable providers, switching to process runtime"
+)
+
+// TestBeatsReceiverDynamicInputProcessRuntimeFallback verifies that we fall back to the process runtime if the input
+// uses variables from a dynamic provider.
+func TestBeatsReceiverDynamicInputProcessRuntimeFallback(t *testing.T) {
+	_ = define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: nil,
+	})
+
+	config := `agent.logging.to_stderr: true
+agent.logging.to_files: false
+agent.monitoring.enabled: false
+agent.internal.runtime.dynamic_inputs: process
+inputs:
+  - type: system/metrics
+    id: "${local_dynamic.id}"
+    streams:
+      - metricsets:
+        - cpu
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [http://localhost:9200]
+    api_key: placeholder
+    status_reporting:
+      enabled: false
+providers:
+  local_dynamic:
+    items:
+    - vars:
+        id: system-metrics-1
+`
+
+	// this is the context for the whole test, with a global timeout defined
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	// set up a standalone agent
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	err = fixture.Configure(ctx, []byte(config))
+	require.NoError(t, err)
+
+	installOutput, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true})
+	require.NoError(t, err, "install failed, output: %s", string(installOutput))
+
+	var compId string
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+		// we should be running a single component in a beat process
+		assert.Equal(collect, int(cproto.State_HEALTHY), status.State)
+		require.Equal(collect, 1, len(status.Components))
+		comp := status.Components[0]
+
+		assert.Equal(collect, int(cproto.State_HEALTHY), comp.State)
+		expectedComponentVersionInfoName := componentVersionInfoNameForRuntime(component.ProcessRuntimeManager)
+		assert.Equal(collect, expectedComponentVersionInfoName, comp.VersionInfo.Name)
+		for _, unit := range comp.Units {
+			assert.Equal(collect, int(cproto.State_HEALTHY), unit.State)
+		}
+		compId = comp.ID
+	}, 1*time.Minute, 1*time.Second)
+	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
+	require.NoError(t, err)
+
+	// verify we've logged a warning about using the process runtime
+	foundLogMessage := false
+	expectedMessage := fmt.Sprintf(otelDynamicVariableLogLineTemplate, compId)
+	for _, line := range strings.Split(string(logsBytes), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var logRecord struct {
+			Message string
+		}
+		if unmarshalErr := json.Unmarshal([]byte(line), &logRecord); unmarshalErr != nil {
+			continue
+		}
+
+		foundLogMessage = foundLogMessage || logRecord.Message == expectedMessage
+	}
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent logs seen by the test:")
+			t.Log(string(logsBytes))
+		}
+	})
+
+	assert.True(t, foundLogMessage, "there should be a log line with a warning about falling back to process runtime")
+}
+
 // TestBeatsReceiverSubcomponentStatus verifies that we correctly reflect the status of beats inputs in the elastic
 // agent component and unit statuses.
 func TestBeatsReceiverSubcomponentStatus(t *testing.T) {

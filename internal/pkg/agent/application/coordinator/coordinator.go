@@ -17,6 +17,8 @@ import (
 
 	"go.opentelemetry.io/collector/component/componentstatus"
 
+	"github.com/elastic/elastic-agent/internal/pkg/composable"
+
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
@@ -344,6 +346,9 @@ type Coordinator struct {
 
 	// The current variables
 	vars []*transpiler.Vars
+
+	// A map of input id to the list of variables used by that input
+	inputToVars map[string][]string
 
 	// The policy after spec and variable substitution
 	derivedConfig map[string]interface{}
@@ -1656,7 +1661,7 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 	}
 
 	// pass the observed vars from the AST to the varsMgr
-	err = c.observeASTVars(ctx)
+	c.inputToVars, err = c.observeASTVars(ctx)
 	if err != nil {
 		// only possible error here is the context being cancelled
 		return err
@@ -1772,16 +1777,22 @@ func applyPersistedConfig(logger *logger.Logger, cfg *config.Config, configFile 
 // observeASTVars identifies the variables that are referenced in the computed AST and passed to
 // the varsMgr so it knows what providers are being referenced. If a providers is not being
 // referenced then the provider does not need to be running.
-func (c *Coordinator) observeASTVars(ctx context.Context) error {
+func (c *Coordinator) observeASTVars(ctx context.Context) (inputToVars map[string][]string, err error) {
 	if c.varsMgr == nil {
 		// No varsMgr (only happens in testing)
-		return nil
+		return nil, nil
 	}
 	var vars []string
 	if c.ast != nil {
 		inputs, ok := transpiler.Lookup(c.ast, "inputs")
 		if ok {
-			vars = inputs.Vars(vars, c.varsMgr.DefaultProvider())
+			inputToVars, err = transpiler.GetInputToVarsMap(inputs, c.vars)
+			if err != nil {
+				return nil, err
+			}
+			for _, inputVars := range inputToVars {
+				vars = append(vars, inputVars...)
+			}
 		}
 		outputs, ok := transpiler.Lookup(c.ast, "outputs")
 		if ok {
@@ -1791,13 +1802,31 @@ func (c *Coordinator) observeASTVars(ctx context.Context) error {
 	updated, err := c.varsMgr.Observe(ctx, vars)
 	if err != nil {
 		// context cancel
-		return err
+		return nil, err
 	}
 	if updated != nil {
 		// provided an updated set of vars (observed changed)
 		c.vars = updated
 	}
-	return nil
+	return inputToVars, nil
+}
+
+// getDynamicInputs returns the set of dynamic inputs in the current AST. Dynamic inputs are defined as inputs whose
+// definition includes variables from dynamic providers. Such inputs can change rapidly depending on the environment,
+// resulting in frequent configuration reloads.
+// Returns a map of input ID to bool. The input IDs are fully resolved if they contain variables.
+func getDynamicInputs(inputToVars map[string][]string) map[string]bool {
+	dynamicInputs := make(map[string]bool)
+	for inputId, vars := range inputToVars {
+		for _, v := range vars {
+			varProviderName := composable.ProviderNameFromVarName(v)
+			if composable.IsDynamic(varProviderName) {
+				dynamicInputs[inputId] = true
+				break
+			}
+		}
+	}
+	return dynamicInputs
 }
 
 // processVars updates the transpiler vars in the Coordinator.
@@ -1917,7 +1946,7 @@ func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtime
 // Normally, we use the runtime set in the component itself via the configuration, but
 // we may also fall back to the process runtime if the otel runtime is unsupported for
 // some reason. One example is the output using unsupported config options.
-func maybeOverrideRuntimeForComponent(logger *logger.Logger, comp *component.Component) {
+func maybeOverrideRuntimeForComponent(logger *logger.Logger, runtimeCfg *component.RuntimeConfig, comp *component.Component) {
 	if comp.RuntimeManager == component.ProcessRuntimeManager {
 		// do nothing, the process runtime can handle any component
 		return
@@ -1928,6 +1957,14 @@ func maybeOverrideRuntimeForComponent(logger *logger.Logger, comp *component.Com
 		if err != nil {
 			logger.Warnf("otel runtime is not supported for component %s, switching to process runtime, reason: %v", comp.ID, err)
 			comp.RuntimeManager = component.ProcessRuntimeManager
+		}
+
+		// check if the component is dynamic and use the right runtime
+		// dynamic components can cause problems for the otel collector because of its expensive configuration reloading
+		dynamicRuntimeManager := component.RuntimeManager(runtimeCfg.DynamicInputs)
+		if runtimeCfg.DynamicInputs != "" && comp.Dynamic && comp.RuntimeManager != dynamicRuntimeManager {
+			logger.Warnf("Component %s uses dynamic variable providers, switching to %s runtime", comp.ID, dynamicRuntimeManager)
+			comp.RuntimeManager = dynamicRuntimeManager
 		}
 	}
 }
@@ -2018,10 +2055,12 @@ func (c *Coordinator) generateComponentModel() (err error) {
 
 	otelRuntimeModifier := func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
 		for i := range comps {
-			maybeOverrideRuntimeForComponent(c.logger, &comps[i])
+			maybeOverrideRuntimeForComponent(c.logger, c.currentCfg.Settings.Internal.Runtime, &comps[i])
 		}
 		return comps, nil
 	}
+	dynamicInputs := getDynamicInputs(c.inputToVars)
+	c.logger.With("dynamic_inputs", dynamicInputs).Debugf("Dynamic inputs found")
 	comps, err := c.specs.ToComponents(
 		cfg,
 		c.currentCfg.Settings.Internal.Runtime,
@@ -2030,6 +2069,7 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		c.state.LogLevel,
 		c.agentInfo,
 		existingCompState,
+		dynamicInputs,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to render components: %w", err)
