@@ -155,16 +155,18 @@ compression_params:
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
 	})
 
-	t.Run("test hosts can be a string", func(t *testing.T) {
+	t.Run("test hosts can be a string and parameters is respected", func(t *testing.T) {
 		beatCfg := `
 hosts: "localhost:9200"
 index: "some-index"
 api_key: "TiNAGG4BaaMdaH1tRfuU:KnR6yE41RrSowb0kQ0HWoA"
+parameters:
+  somekey : somevalue
 `
 
 		OTelCfg := `
 endpoints:
-  - http://localhost:9200
+  - http://localhost:9200?somekey=somevalue
 logs_index: some-index
 logs_dynamic_pipeline:
   enabled: true
