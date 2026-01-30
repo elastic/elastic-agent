@@ -314,16 +314,11 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			configChanged, configUpdateErr := m.maybeUpdateMergedConfig(mergedCfg)
 			m.collectorCfg = cfgUpdate.collectorCfg
 			m.components = cfgUpdate.components
-			// set the log level defined in service::telemetry::log::level setting
-			if mergedCfg != nil && mergedCfg.IsSet("service::telemetry::logs::level") {
-				if logLevel, ok := mergedCfg.Get("service::telemetry::logs::level").(string); ok {
-					m.logLevel = logLevel
-				} else {
-					m.logger.Warn("failed to access log level from service::telemetry::logs::level")
-				}
+			lvl, err := newLogLevelAfterConfigUpdate(cfgUpdate, mergedCfg)
+			if err != nil {
+				m.logger.Warnf("failed to determine new log level: %s", err)
 			} else {
-				// when mergedCfg is nil use coordinator's log level
-				m.logLevel = cfgUpdate.logLevel.String()
+				m.logLevel = lvl
 			}
 			m.mx.Unlock()
 
@@ -373,6 +368,23 @@ func (m *OTelManager) Run(ctx context.Context) error {
 // Errors returns channel that can send an error that affects the state of the running agent.
 func (m *OTelManager) Errors() <-chan error {
 	return m.errCh
+}
+
+// newLogLevelAfterConfigUpdate returns the manager log level after a configuration update, which can
+// be the log level set directly in the collector configuration or if that is not set, the log level
+// of the coordinator (the log level set in the Elastic Agent configuration).
+func newLogLevelAfterConfigUpdate(cfgUpdate configUpdate, mergedCfg *confmap.Conf) (string, error) {
+	// set the log level defined in service::telemetry::log::level setting
+	if mergedCfg != nil && mergedCfg.IsSet("service::telemetry::logs::level") {
+		if logLevel, ok := mergedCfg.Get("service::telemetry::logs::level").(string); ok {
+			return logLevel, nil
+		} else {
+			return "", errors.New("service::telemetry::logs::level found but was not of type string")
+		}
+	} else {
+		// when mergedCfg is nil use coordinator's log level
+		return cfgUpdate.logLevel.String(), nil
+	}
 }
 
 // buildMergedConfig combines collector configuration with component-derived configuration.
