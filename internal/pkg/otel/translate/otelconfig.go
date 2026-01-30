@@ -350,7 +350,11 @@ func getReceiversConfigForComponent(
 	// add monitoring config if necessary
 	// we enable the basic monitoring endpoint by default, because we want to use it for diagnostics even if
 	// agent self-monitoring is disabled
-	monitoringConfig := beatMonitoringConfigGetter(comp.ID, beatName)
+	var monitoringConfig map[string]any
+	if beatMonitoringConfigGetter != nil {
+		monitoringConfig = beatMonitoringConfigGetter(comp.ID, beatName)
+	}
+
 	if monitoringConfig == nil {
 		endpoint := monitoringhelpers.BeatsMonitoringEndpoint(comp.ID)
 		monitoringConfig = map[string]any{
