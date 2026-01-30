@@ -110,22 +110,34 @@ func GetOtelConfig(
 	return otelConfig, nil
 }
 
-func GetOTelLogLevel(level string) string {
-	if level != "" {
-		switch strings.ToLower(level) {
-		case "debug":
-			return "DEBUG"
-		case "info":
-			return "INFO"
-		case "warning":
-			return "WARN"
-		case "error":
-			return "ERROR"
-		default:
-			return "INFO"
-		}
+func LogpLogLevelToOTel(lvl logp.Level) string {
+	switch lvl {
+	case logp.DebugLevel:
+		return "DEBUG"
+	case logp.InfoLevel:
+		return "INFO"
+	case logp.WarnLevel:
+		return "WARN"
+	case logp.ErrorLevel:
+		return "ERROR"
+	default:
+		return "INFO"
 	}
-	return "INFO"
+}
+
+func OTelLogLevelToLogp(lvl string) logp.Level {
+	switch strings.ToUpper(lvl) {
+	case "DEBUG":
+		return logp.DebugLevel
+	case "INFO":
+		return logp.InfoLevel
+	case "WARN":
+		return logp.WarnLevel
+	case "ERROR":
+		return logp.ErrorLevel
+	default:
+		return logp.InfoLevel
+	}
 }
 
 // VerifyComponentIsOtelSupported verifies that the given component can be run in an Otel Collector. It returns an error

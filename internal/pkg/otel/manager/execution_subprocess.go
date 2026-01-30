@@ -79,7 +79,7 @@ type subprocessExecution struct {
 // processErrCh channel. Other run errors, such as not able to connect to the health endpoint, are sent to the runErrCh channel.
 func (r *subprocessExecution) startCollector(
 	ctx context.Context,
-	logLevel string,
+	lvl logp.Level,
 	baseLogger *logger.Logger,
 	logger *logger.Logger,
 	cfg *confmap.Conf,
@@ -87,12 +87,6 @@ func (r *subprocessExecution) startCollector(
 	statusCh chan *otelstatus.AggregateStatus,
 	forceFetchStatusCh chan struct{},
 ) (collectorHandle, error) {
-	var lvl logp.Level
-	err := lvl.Unpack(logLevel)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unpack the log level '%s': %w", logLevel, err)
-	}
-
 	if cfg == nil {
 		// configuration is required
 		return nil, errors.New("no configuration provided")

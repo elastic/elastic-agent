@@ -131,7 +131,7 @@ type OTelManager struct {
 	stopTimeout time.Duration
 
 	// log level of the collector
-	logLevel string
+	logLevel logp.Level
 }
 
 // NewOTelManager returns a OTelManager.
@@ -195,7 +195,7 @@ func NewOTelManager(
 		recoveryTimer:    recoveryTimer,
 		collectorRunErr:  make(chan error),
 		stopTimeout:      stopTimeout,
-		logLevel:         logLevel.String(),
+		logLevel:         logLevel,
 	}, nil
 }
 
@@ -373,17 +373,17 @@ func (m *OTelManager) Errors() <-chan error {
 // newLogLevelAfterConfigUpdate returns the manager log level after a configuration update, which can
 // be the log level set directly in the collector configuration or if that is not set, the log level
 // of the coordinator (the log level set in the Elastic Agent configuration).
-func newLogLevelAfterConfigUpdate(cfgUpdate configUpdate, mergedCfg *confmap.Conf) (string, error) {
+func newLogLevelAfterConfigUpdate(cfgUpdate configUpdate, mergedCfg *confmap.Conf) (logp.Level, error) {
 	// set the log level defined in service::telemetry::log::level setting
 	if mergedCfg != nil && mergedCfg.IsSet("service::telemetry::logs::level") {
-		if logLevel, ok := mergedCfg.Get("service::telemetry::logs::level").(string); ok {
-			return logLevel, nil
+		if otelLevel, ok := mergedCfg.Get("service::telemetry::logs::level").(string); ok {
+			return translate.OTelLogLevelToLogp(otelLevel), nil
 		} else {
-			return "", errors.New("service::telemetry::logs::level found but was not of type string")
+			return logp.DebugLevel, errors.New("service::telemetry::logs::level found but was not of type string")
 		}
 	} else {
 		// when mergedCfg is nil use coordinator's log level
-		return cfgUpdate.logLevel.String(), nil
+		return cfgUpdate.logLevel, nil
 	}
 }
 
@@ -406,7 +406,7 @@ func buildMergedConfig(
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}
 
-		level := translate.GetOTelLogLevel(cfgUpdate.logLevel.String())
+		level := translate.LogpLogLevelToOTel(cfgUpdate.logLevel)
 		if err := componentOtelCfg.Merge(confmap.NewFromStringMap(map[string]any{"service::telemetry::logs::level": level})); err != nil {
 			return nil, fmt.Errorf("failed to set log level in otel config: %w", err)
 		}
