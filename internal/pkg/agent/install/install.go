@@ -19,10 +19,14 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
+	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -98,6 +102,27 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt Pr
 	}
 
 	pt.Describe("Successfully copied files")
+
+	// Check if standalone-agent install needs to encrypt config.
+	rawConfig, err := config.LoadFile(cfgFile)
+	if err != nil {
+		return utils.FileOwner{}, fmt.Errorf("error loading config file: %w", err)
+	}
+	cfg, err := configuration.NewFromConfig(rawConfig)
+	if err != nil {
+		return utils.FileOwner{}, fmt.Errorf("error parsing config file: %w", err)
+	}
+	featureFlags, err := features.Parse(rawConfig)
+	if err != nil {
+		return utils.FileOwner{}, fmt.Errorf("unable to read feature flags: %w", err)
+	}
+	if configuration.IsStandalone(cfg.Fleet) && featureFlags.EncryptedConfig() {
+		log.Info("Encrypting standalone agent config")
+		err := storage.EncryptConfigOnPath(topPath)
+		if err != nil {
+			return utils.FileOwner{}, fmt.Errorf("unable to encrypt config: %w", err)
+		}
+	}
 
 	// place shell wrapper, if present on platform
 	if paths.ShellWrapperPath() != "" {

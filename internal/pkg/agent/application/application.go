@@ -5,8 +5,10 @@
 package application
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -181,20 +183,43 @@ func New(
 		configMgr = newTestingModeConfigManager(log)
 	} else if configuration.IsStandalone(cfg.Fleet) {
 		log.Info("Parsed configuration and determined agent is managed locally")
-
-		loader := config.NewLoader(log, paths.ExternalInputs())
-		rawCfgMap, err := rawConfig.ToMapStr()
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to transform agent configuration into a map: %w", err)
+		if err := features.Apply(rawConfig); err != nil {
+			return nil, nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
 		}
-		discover := config.Discoverer(pathConfigFile, cfg.Settings.Path, paths.ExternalInputs(),
-			kubernetes.GetHintsInputConfigPath(log, rawCfgMap))
-		if !cfg.Settings.Reload.Enabled {
-			log.Debug("Reloading of configuration is off")
-			configMgr = newOnce(log, discover, loader)
+		if features.EncryptedConfig() {
+			p, err := os.ReadFile(pathConfigFile)
+			if err != nil {
+				log.Errorf("Failed to read %q for standalone agent with encryption enabled: %v", pathConfigFile, err)
+			} else if !bytes.Equal(storage.DefaultAgentEncryptedStandaloneConfig, p) {
+				log.Debug("Detected config file change, re-encrypting...")
+				if err := storage.EncryptConfigOnPath(paths.Config()); err != nil {
+					return nil, nil, nil, fmt.Errorf("failed to encrypt config file: %w", err)
+				}
+			}
+
+			log.Debug("Loading encrypted config")
+			configMgr = newEncryptedOnce(log, paths.AgentConfigFile())
 		} else {
-			log.Debugf("Reloading of configuration is on, frequency is set to %s", cfg.Settings.Reload.Period)
-			configMgr = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader)
+			_, err := os.Stat(paths.AgentConfigFile())
+			if err == nil {
+				// fleet.enc exists, but elastic-agent.yml does not have agent.features.encrypted_config.enabled: true,
+				// do a best effort delete
+				_ = os.Remove(paths.AgentConfigFile())
+			}
+			loader := config.NewLoader(log, paths.ExternalInputs())
+			rawCfgMap, err := rawConfig.ToMapStr()
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to transform agent configuration into a map: %w", err)
+			}
+			discover := config.Discoverer(pathConfigFile, cfg.Settings.Path, paths.ExternalInputs(),
+				kubernetes.GetHintsInputConfigPath(log, rawCfgMap))
+			if !cfg.Settings.Reload.Enabled {
+				log.Debug("Reloading of configuration is off")
+				configMgr = newOnce(log, discover, loader)
+			} else {
+				log.Debugf("Reloading of configuration is on, frequency is set to %s", cfg.Settings.Reload.Period)
+				configMgr = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader)
+			}
 		}
 	} else {
 		isManaged = true
