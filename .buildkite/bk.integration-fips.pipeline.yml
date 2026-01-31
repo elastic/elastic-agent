@@ -4,9 +4,9 @@ env:
   ASDF_MAGE_VERSION: 1.14.0
   MS_GOTOOLCHAIN_TELEMETRY_ENABLED: "0"
 
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1767879728"
-  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-1767879728"
-  IMAGE_UBUNTU_ARM64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1767879728"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1769648509"
+  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-1769648509"
+  IMAGE_UBUNTU_ARM64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1769648509"
   ASDF_TERRAFORM_VERSION: 1.9.2
 
 # This section is used to define the plugins that will be used in the pipeline.
