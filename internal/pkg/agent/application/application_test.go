@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
+	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/limits"
 )
@@ -493,6 +494,7 @@ func createFakeAgentInstall(t *testing.T, topDir, version, hash string, useVersi
 }
 
 func TestApplicationStandaloneEncrypted(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "encrypted disk storage does not use NewGCMWithRandomNonce.")
 	log, _ := loggertest.New("TestApplicationStandaloneEncrypted")
 
 	cfgPath := paths.Config()

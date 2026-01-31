@@ -122,8 +122,6 @@ func TestStandaloneEncyptedConfigInstall(t *testing.T) {
 		err = os.WriteFile(filepath.Join(topPath, "elastic-agent.yml"), polBytes, 0640)
 		require.NoError(t, err)
 
-		t.Logf("CONFIG: %s", string(polBytes))
-
 		t.Log("Restart agent")
 		err = fixture.ExecRestart(ctx)
 		require.NoError(t, err)

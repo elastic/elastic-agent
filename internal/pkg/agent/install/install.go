@@ -103,7 +103,7 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt Pr
 
 	pt.Describe("Successfully copied files")
 
-	// Check is standalone-agent install needs to encrypt config.
+	// Check if standalone-agent install needs to encrypt config.
 	rawConfig, err := config.LoadFile(cfgFile)
 	if err != nil {
 		return utils.FileOwner{}, fmt.Errorf("error loading config file: %w", err)

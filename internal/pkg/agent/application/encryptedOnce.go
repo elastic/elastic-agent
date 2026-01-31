@@ -40,7 +40,7 @@ func (e *encryptedOnce) Run(ctx context.Context) error {
 
 	reader, err := store.Load()
 	if err != nil {
-		return fmt.Errorf("unable to laod encrypted disk store: %w", err)
+		return fmt.Errorf("unable to load encrypted disk store: %w", err)
 	}
 
 	rawConfig, err := config.NewConfigFrom(reader)
