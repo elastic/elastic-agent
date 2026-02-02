@@ -55,7 +55,7 @@ require (
 	github.com/winlabs/gowin32 v0.0.0-20240930213947-f504d7e14639
 	go.elastic.co/apm/module/apmgorilla/v2 v2.6.0
 	go.elastic.co/apm/module/apmgrpc/v2 v2.6.0
-	go.elastic.co/apm/v2 v2.7.1
+	go.elastic.co/apm/v2 v2.7.2
 	go.elastic.co/ecszap v1.0.3
 	go.elastic.co/go-licence-detector v0.10.0
 	go.opentelemetry.io/collector/component/componentstatus v0.144.0
@@ -288,12 +288,16 @@ require (
 	github.com/eapache/go-xerial-snappy v0.0.0-20230731223053-c322873962e3 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
 	github.com/ebitengine/purego v0.9.1 // indirect
+<<<<<<< HEAD
 	github.com/eclipse/paho.mqtt.golang v1.5.1 // indirect
 	github.com/edsrzf/mmap-go v1.2.0 // indirect
 	github.com/elastic/apm-data v1.19.5 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
 	github.com/elastic/go-docappender/v2 v2.12.0 // indirect
+=======
+	github.com/elastic/go-docappender/v2 v2.12.1 // indirect
+>>>>>>> b4cf69358 (build(deps): bump github.com/elastic/go-docappender/v2 from 2.12.0 to 2.12.1 (#12518))
 	github.com/elastic/go-freelru v0.16.0 // indirect
 	github.com/elastic/go-grok v0.3.1 // indirect
 	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
@@ -436,6 +440,7 @@ require (
 	github.com/jcmturner/gokrb5/v8 v8.4.4 // indirect
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
 	github.com/jmoiron/sqlx v1.4.0 // indirect
+<<<<<<< HEAD
 	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/josharian/native v1.1.0 // indirect
@@ -444,6 +449,9 @@ require (
 	github.com/kamstrup/intmap v0.5.1 // indirect
 	github.com/klauspost/asmfmt v1.3.2 // indirect
 	github.com/klauspost/compress v1.18.2 // indirect
+=======
+	github.com/klauspost/compress v1.18.3 // indirect
+>>>>>>> b4cf69358 (build(deps): bump github.com/elastic/go-docappender/v2 from 2.12.0 to 2.12.1 (#12518))
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/knadh/koanf/providers/confmap v1.0.0 // indirect
 	github.com/knadh/koanf/v2 v2.3.0 // indirect
@@ -659,10 +667,15 @@ require (
 	github.com/yuin/goldmark v1.7.13 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
+<<<<<<< HEAD
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.1 // indirect
 	go.elastic.co/apm/module/apmhttp/v2 v2.7.1 // indirect
+=======
+	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.2 // indirect
+	go.elastic.co/apm/module/apmhttp/v2 v2.7.2 // indirect
+>>>>>>> b4cf69358 (build(deps): bump github.com/elastic/go-docappender/v2 from 2.12.0 to 2.12.1 (#12518))
 	go.elastic.co/apm/module/apmzap/v2 v2.7.0 // indirect
 	go.elastic.co/fastjson v1.5.1 // indirect
 	go.etcd.io/bbolt v1.4.3 // indirect
