@@ -131,13 +131,13 @@ type OTelManager struct {
 	stopTimeout time.Duration
 
 	// log level of the collector
-	logLevel logp.Level
+	collectorLogLevel logp.Level
 }
 
 // NewOTelManager returns a OTelManager.
 func NewOTelManager(
 	logger *logger.Logger,
-	logLevel logp.Level,
+	collectorLogLevel logp.Level,
 	collectorLogger *logger.Logger,
 	agentInfo info.Agent,
 	agentCollectorConfig *configuration.CollectorConfig,
@@ -188,14 +188,14 @@ func NewOTelManager(
 		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
 		// componentStateCh uses a buffer channel to ensure that no state transitions are missed and to prevent
 		// any possible case of deadlock, 5 is used just to give a small buffer.
-		componentStateCh: make(chan []runtime.ComponentComponentState, 5),
-		updateCh:         make(chan configUpdate, 1),
-		doneChan:         make(chan struct{}),
-		execution:        exec,
-		recoveryTimer:    recoveryTimer,
-		collectorRunErr:  make(chan error),
-		stopTimeout:      stopTimeout,
-		logLevel:         logLevel,
+		componentStateCh:  make(chan []runtime.ComponentComponentState, 5),
+		updateCh:          make(chan configUpdate, 1),
+		doneChan:          make(chan struct{}),
+		execution:         exec,
+		recoveryTimer:     recoveryTimer,
+		collectorRunErr:   make(chan error),
+		stopTimeout:       stopTimeout,
+		collectorLogLevel: collectorLogLevel,
 	}, nil
 }
 
@@ -237,7 +237,8 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 			newRetries := m.recoveryRetries.Add(1)
 			m.managerLogger.Infof("collector recovery restarting, total retries: %d", newRetries)
-			m.proc, err = m.execution.startCollector(ctx, m.logLevel, m.collectorLogger, m.managerLogger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+			m.proc, err = m.execution.startCollector(ctx, m.collectorLogLevel, m.collectorLogger,
+				m.managerLogger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh, forceFetchStatusCh)
 			if err != nil {
 				// report a startup error (this gets reported as status)
 				m.reportStartupErr(ctx, err)
@@ -267,7 +268,8 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 				// in this rare case the collector stopped running but a configuration was
 				// provided and the collector stopped with a clean exit
-				m.proc, err = m.execution.startCollector(ctx, m.logLevel, m.collectorLogger, m.managerLogger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+				m.proc, err = m.execution.startCollector(ctx, m.collectorLogLevel, m.collectorLogger,
+					m.managerLogger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh, forceFetchStatusCh)
 				if err != nil {
 					// report a startup error (this gets reported as status)
 					m.reportStartupErr(ctx, err)
@@ -318,7 +320,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			if err != nil {
 				m.managerLogger.Warnf("failed to determine new log level: %s", err)
 			} else {
-				m.logLevel = lvl
+				m.collectorLogLevel = lvl
 			}
 			m.mx.Unlock()
 
@@ -613,7 +615,8 @@ func (m *OTelManager) applyMergedConfig(ctx context.Context,
 	} else {
 		// either a new configuration or the first configuration
 		// that results in the collector being started
-		proc, err := m.execution.startCollector(ctx, m.logLevel, m.collectorLogger, m.managerLogger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+		proc, err := m.execution.startCollector(ctx, m.collectorLogLevel, m.collectorLogger,
+			m.managerLogger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
 		if err != nil {
 			// failed to create the collector (this is different then
 			// it's failing to run). we do not retry creation on failure
