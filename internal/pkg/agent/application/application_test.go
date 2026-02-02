@@ -560,7 +560,10 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 	require.EqualValues(t, storage.DefaultAgentEncryptedStandaloneConfig, ymlBytes, "unexpected contents in elastic-agent.yml")
 
 	t.Log("Change elastic-agent.yml to have same contents with different structure, should not re-encrypt")
-	err = os.WriteFile(paths.ConfigFile(), []byte(`agent.features.encrypted_config.enabled: true`), 0640)
+	err = os.WriteFile(paths.ConfigFile(), []byte(`agent:
+  features:
+    encrypted_config:
+      enabled: true`), 0640)
 	require.NoError(t, err)
 
 	_, _, _, err = New(
