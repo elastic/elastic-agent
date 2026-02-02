@@ -150,11 +150,7 @@ require (
 	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/ebitengine/purego v0.9.1 // indirect
-<<<<<<< HEAD
-=======
 	github.com/elastic/go-docappender/v2 v2.12.1 // indirect
-	github.com/elastic/go-freelru v0.16.0 // indirect
->>>>>>> b4cf69358 (build(deps): bump github.com/elastic/go-docappender/v2 from 2.12.0 to 2.12.1 (#12518))
 	github.com/elastic/go-structform v0.0.12 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect
@@ -213,12 +209,7 @@ require (
 	github.com/jcmturner/goidentity/v6 v6.0.1 // indirect
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
 	github.com/jmoiron/sqlx v1.4.0 // indirect
-<<<<<<< HEAD
-	github.com/klauspost/compress v1.18.2 // indirect
-=======
 	github.com/klauspost/compress v1.18.3 // indirect
-	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
->>>>>>> b4cf69358 (build(deps): bump github.com/elastic/go-docappender/v2 from 2.12.0 to 2.12.1 (#12518))
 	github.com/knadh/koanf/providers/confmap v1.0.0 // indirect
 	github.com/knadh/koanf/v2 v2.3.0 // indirect
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
