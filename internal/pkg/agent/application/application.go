@@ -5,11 +5,11 @@
 package application
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"time"
 
 	"go.elastic.co/apm/v2"
@@ -187,10 +187,21 @@ func New(
 			return nil, nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
 		}
 		if features.EncryptedConfig() {
-			p, err := os.ReadFile(pathConfigFile)
+			// compare embedded config as a map to rawConfig as a map to determine if file has changed
+			embeddedConfig, err := config.NewConfigFrom(storage.DefaultAgentEncryptedStandalone)
 			if err != nil {
-				log.Errorf("Failed to read %q for standalone agent with encryption enabled: %v", pathConfigFile, err)
-			} else if !bytes.Equal(storage.DefaultAgentEncryptedStandaloneConfig, p) {
+				return nil, nil, nil, fmt.Errorf("unable to load embedded defaults as config: %w", err)
+			}
+			embeddedMap, err := embeddedConfig.ToMapString(config.NoResolveOptions...)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("unable to unpack embedded defaults as map: %w", err)
+			}
+			rawMap, err := rawConfig.ToMapSting(config.NoResolveOptions...)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("unable to unpack config as map: %w", err)
+			}
+
+			if !reflect.DeepEqual(embeddedMap, rawMap) {
 				log.Debug("Detected config file change, re-encrypting...")
 				if err := storage.EncryptConfigOnPath(paths.Config()); err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to encrypt config file: %w", err)
