@@ -251,13 +251,13 @@ func extractAgentInstallsFromMarker(updateMarker *UpdateMarker) (previous agentI
 	return previous, current, nil
 }
 
-func getAvailableRollbacks(rollbackWindow time.Duration, now time.Time, currentVersion string, parsedCurrentVersion *version.ParsedSemVer, currentVersionedHome string, currentHash string) map[string]ttl.TTLMarker {
+func getAvailableRollbacks(rollbackWindow time.Duration, now time.Time, from, to agentInstall) map[string]ttl.TTLMarker {
 	if rollbackWindow == disableRollbackWindow {
 		// if there's no rollback window it means that no rollback should survive the watcher cleanup at the end of the grace period.
 		return nil
 	}
 
-	if parsedCurrentVersion == nil || parsedCurrentVersion.Less(*Version_9_3_0_SNAPSHOT) {
+	if to.parsedVersion == nil || to.parsedVersion.Less(*Version_9_3_0_SNAPSHOT) {
 		// the version we are upgrading to does not support manual rollbacks
 		return nil
 	}
@@ -265,9 +265,9 @@ func getAvailableRollbacks(rollbackWindow time.Duration, now time.Time, currentV
 	// when multiple rollbacks will be supported, read the existing descriptor
 	// at this stage we can get by with a single rollback
 	res := make(map[string]ttl.TTLMarker, 1)
-	res[currentVersionedHome] = ttl.TTLMarker{
-		Version:    currentVersion,
-		Hash:       currentHash,
+	res[from.versionedHome] = ttl.TTLMarker{
+		Version:    from.version,
+		Hash:       from.hash,
 		ValidUntil: now.Add(rollbackWindow),
 	}
 

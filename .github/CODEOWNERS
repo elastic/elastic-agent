@@ -36,8 +36,8 @@ changelog/fragments/
 /internal/edot/samples @elastic/ingest-otel-data @elastic/ingest-docs
 /internal/edot/components.yml @elastic/ingest-otel-leads
 /internal/pkg/composable/providers/kubernetes @elastic/elastic-agent-control-plane
-/internal/edot/samples/darwin/autoops_es.yml @elastic/opex
-/internal/edot/samples/linux/autoops_es.yml @elastic/opex
-/internal/edot/samples/windows/autoops_es.yml @elastic/opex
+/internal/edot/samples/darwin/autoops_es*.yml @elastic/opex
+/internal/edot/samples/linux/autoops_es*.yml @elastic/opex
+/internal/edot/samples/windows/autoops_es*.yml @elastic/opex
 /deploy/helm/elastic-agent/templates/integrations/_auto_ops @elastic.opex
 

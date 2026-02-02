@@ -38,12 +38,6 @@ import (
 )
 
 const (
-	// OtelCollectorMetricsPortEnvVarName is the name of the environment variable used to pass the collector metrics
-	// port to the managed EDOT collector. It exists because by default we use a random port for this, and we want to
-	// determine it as late as possible. However, the monitoring manager is instantiated early in the application
-	// startup process, so instead we rely on this variable. The OTel manager is required to set it whenever it starts
-	// a collector.
-	OtelCollectorMetricsPortEnvVarName = "EDOT_COLLECTOR_METRICS_PORT"
 	// args: data path, pipeline name, application name
 	logFileFormat = "%s/logs/%s"
 	// args: data path, install path, pipeline name, application name
@@ -70,9 +64,8 @@ const (
 	fileBeatName               = "filebeat"
 	collectorName              = "collector"
 
-	monitoringMetricsUnitID         = "metrics-monitoring"
-	monitoringFilesUnitsID          = "filestream-monitoring"
-	prometheusMonitoringComponentId = "prometheus/" + monitoringMetricsUnitID
+	monitoringMetricsUnitID = "metrics-monitoring"
+	monitoringFilesUnitsID  = "filestream-monitoring"
 
 	windowsOS = "windows"
 )
@@ -473,12 +466,6 @@ func (b *BeatsMonitor) monitoringNamespace() string {
 	return defaultMonitoringNamespace
 }
 
-func (b *BeatsMonitor) getCollectorTelemetryEndpoint() string {
-	// The OTel manager is required to set the environment variable. See comment at the constant definition for more
-	// information.
-	return fmt.Sprintf("localhost:${env:%s}", OtelCollectorMetricsPortEnvVarName)
-}
-
 // injectMetricsInput injects monitoring config for agent monitoring to the `cfg` object.
 func (b *BeatsMonitor) injectMetricsInput(
 	cfg map[string]interface{},
@@ -513,28 +500,6 @@ func (b *BeatsMonitor) injectMetricsInput(
 			"streams":               httpStreams,
 			"_runtime_experimental": string(monitoringRuntime),
 		},
-	}
-
-	// We only add this stream if the Otel manager is enabled and the respective component info exists. This is a
-	// special case where this input shouldn't exists if the output doesn't support otel, which we check while
-	// creating the component infos.
-	if usingOtelRuntime(componentInfos) && slices.ContainsFunc(componentInfos, func(ci componentInfo) bool {
-		return ci.ID == prometheusMonitoringComponentId
-	}) {
-		prometheusStream := b.getPrometheusStream()
-		inputs = append(inputs, map[string]interface{}{
-			idKey:        fmt.Sprintf("%s-collector", monitoringMetricsUnitID),
-			"name":       fmt.Sprintf("%s-collector", monitoringMetricsUnitID),
-			"type":       "prometheus/metrics",
-			useOutputKey: MonitoringOutput,
-			"data_stream": map[string]interface{}{
-				"namespace": monitoringNamespace,
-			},
-			"streams": []any{prometheusStream},
-			// hardcode this to run in the otel runtime
-			// it won't work in a beat process because we don't set the required environment variable there
-			"_runtime_experimental": monitoringCfg.OtelRuntimeManager,
-		})
 	}
 
 	// add system/process metrics for services that can't be monitored via json/beats metrics
@@ -752,42 +717,6 @@ func (b *BeatsMonitor) getHttpStreams(
 	return httpStreams
 }
 
-// getPrometheusStream returns the stream definition for prometheus/metrics input.
-// Note: The return type must be []any due to protobuf serialization quirks.
-func (b *BeatsMonitor) getPrometheusStream() any {
-	monitoringNamespace := b.monitoringNamespace()
-
-	// Send these metrics through the metricbeat monitoring datastream, since
-	// the processors will convert any usable metrics into ECS equivalents
-	// so they're visible in Agent dashboards.
-	dataset := "elastic_agent.elastic_agent"
-	indexName := fmt.Sprintf("metrics-%s-%s", dataset, monitoringNamespace)
-
-	prometheusHost := b.getCollectorTelemetryEndpoint()
-
-	otelStream := map[string]any{
-		idKey: fmt.Sprintf("%s-collector", monitoringMetricsUnitID),
-		"data_stream": map[string]interface{}{
-			"type":      "metrics",
-			"dataset":   dataset,
-			"namespace": monitoringNamespace,
-		},
-		// "collector" here is the coincidental name of the Prometheus metricset
-		// in metricbeat, nothing to do with the OTel collector.
-		"metricsets":   []interface{}{"collector"},
-		"metrics_path": "/metrics",
-		"hosts":        []interface{}{prometheusHost},
-		"namespace":    monitoringNamespace,
-		"period":       b.config.C.MetricsPeriod.String(),
-		"index":        indexName,
-		"processors":   processorsForCollectorPrometheusStream(monitoringNamespace, dataset, b.agentInfo),
-	}
-	if b.config.C.FailureThreshold != nil {
-		otelStream[failureThresholdKey] = *b.config.C.FailureThreshold
-	}
-	return otelStream
-}
-
 // getBeatsStreams returns stream definitions for beats inputs.
 // Note: The return type must be []any due to protobuf serialization quirks.
 func (b *BeatsMonitor) getBeatsStreams(
@@ -1002,45 +931,6 @@ func processorsForAgentHttpStream(binaryName, processName, unitID, namespace, da
 	}
 }
 
-// processorsForCollectorPrometheusStream returns the processors used for the OTel
-// collector prometheus metrics
-func processorsForCollectorPrometheusStream(namespace, dataset string, agentInfo info.Agent) []any {
-	return []interface{}{
-		addDataStreamFieldsProcessor(dataset, namespace),
-		addEventFieldsProcessor(dataset),
-		addElasticAgentFieldsProcessor(agentName, agentInfo),
-		addAgentFieldsProcessor(agentInfo.AgentID()),
-		addComponentFieldsProcessor(agentName, agentName+"/"+collectorName),
-		// Set the metricset name to "stats" since we're remapping the OTel
-		// telemetry to look like the Beats stats metricset.
-		addMetricsetOverrideProcessor("stats"),
-		addPrometheusMetricsRemapProcessor(),
-	}
-}
-
-func addMetricsetOverrideProcessor(metricset string) map[string]any {
-	return map[string]any{
-		"add_fields": map[string]any{
-			"target": "metricset",
-			"fields": map[string]any{
-				"name": metricset,
-			},
-		},
-	}
-}
-
-//go:embed otel_remap.js
-var prometheusRemapJS string
-
-func addPrometheusMetricsRemapProcessor() map[string]any {
-	return map[string]any{
-		"script": map[string]any{
-			"lang":   "javascript",
-			"source": prometheusRemapJS,
-		},
-	}
-}
-
 // addElasticAgentFieldsProcessor returns a processor definition that adds agent information in an `elastic_agent` field.
 func addElasticAgentFieldsProcessor(processName string, agentInfo info.Agent) map[string]any {
 	return map[string]any{
@@ -1179,7 +1069,7 @@ func dropPeriodicMetricsLogsProcessor() map[string]any {
 		"drop_event": map[string]interface{}{
 			"when": map[string]interface{}{
 				"regexp": map[string]interface{}{
-					"message": "^Non-zero metrics in the last",
+					"message": "(^Non-zero metrics in the last)|(^Collector internal telemetry metrics updated)",
 				},
 			},
 		},

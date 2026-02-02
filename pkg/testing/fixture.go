@@ -1060,6 +1060,9 @@ func (f *Fixture) binaryPath() string {
 	}
 	if f.packageFormat == "deb" || f.packageFormat == "rpm" {
 		workDir = "/usr/bin"
+		if f.installOpts != nil && f.installOpts.BasePath != "" {
+			workDir = f.installOpts.BasePath + workDir
+		}
 	}
 	defaultBin := "elastic-agent"
 	if f.binaryName != "" {
@@ -1579,6 +1582,10 @@ type AgentStatusOutput struct {
 			Message  string `json:"message"`
 			Payload  struct {
 				OsqueryVersion string `json:"osquery_version"`
+				Streams        map[string]struct {
+					Error  string `json:"error"`
+					Status string `json:"status"`
+				} `json:"streams"`
 			} `json:"payload"`
 		} `json:"units"`
 		VersionInfo AgentStatusOutputVersionInfo `json:"version_info,omitempty"`

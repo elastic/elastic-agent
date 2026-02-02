@@ -166,3 +166,14 @@ steps:
 
   - label: "Triggering custom FIPS integration tests"
     command: "buildkite-agent pipeline upload .buildkite/bk.integration-fips.pipeline.yml"
+
+  - label: "Test packages"
+    depends_on:
+    - int-packaging
+    command: |
+      .buildkite/scripts/steps/package-tests.sh
+    agents:
+      provider: "gcp"
+      machineType: "n2-standard-8"
+      diskSizeGb: 200
+      image: "${IMAGE_UBUNTU_2204_X86_64}"
