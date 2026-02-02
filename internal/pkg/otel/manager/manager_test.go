@@ -82,6 +82,33 @@ var (
 			},
 		},
 	}
+
+	testConfigNoLogLevel = map[string]interface{}{
+		"receivers": map[string]interface{}{
+			"nop": map[string]interface{}{},
+		},
+		"processors": map[string]interface{}{
+			"batch": map[string]interface{}{},
+		},
+		"exporters": map[string]interface{}{
+			"nop": map[string]interface{}{},
+		},
+		"service": map[string]interface{}{
+			"telemetry": map[string]interface{}{
+				"metrics": map[string]interface{}{
+					"level":   "none",
+					"readers": []any{},
+				},
+			},
+			"pipelines": map[string]interface{}{
+				"logs": map[string]interface{}{
+					"receivers":  []string{"nop"},
+					"processors": []string{"batch"},
+					"exporters":  []string{"nop"},
+				},
+			},
+		},
+	}
 )
 
 type testExecution struct {
@@ -90,7 +117,7 @@ type testExecution struct {
 	handle collectorHandle
 }
 
-func (e *testExecution) startCollector(ctx context.Context, level string, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
+func (e *testExecution) startCollector(ctx context.Context, level logp.Level, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
 
@@ -117,7 +144,7 @@ type mockExecution struct {
 
 func (e *mockExecution) startCollector(
 	ctx context.Context,
-	level string,
+	level logp.Level,
 	_ *logger.Logger,
 	_ *logger.Logger,
 	cfg *confmap.Conf,
@@ -1214,9 +1241,14 @@ func newTestLogger() *logger.Logger {
 
 func TestOTelManager_buildMergedConfig(t *testing.T) {
 	// Common parameters used across all test cases
-	commonAgentInfo := &info.AgentInfo{}
-	commonBeatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
-	testComp := testComponent("test-component")
+	var (
+		commonAgentInfo                  = &info.AgentInfo{}
+		commonBeatMonitoringConfigGetter = mockBeatMonitoringConfigGetter
+		testComp                         = testComponent("test-component")
+		invalidLogpLevel                 = logp.DebugLevel - 1
+		testOtelConfigLevel              = logp.InfoLevel
+		configUpdateLevel                = logp.WarnLevel
+	)
 
 	tests := []struct {
 		name                string
@@ -1224,41 +1256,48 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 		components          []component.Component
 		expectedKeys        []string
 		expectedErrorString string
-		expectedLogLevel    string
+		expectedLogLevel    logp.Level
 	}{
 		{
 			name:             "nil config returns nil",
 			collectorCfg:     nil,
 			components:       nil,
-			expectedLogLevel: "",
+			expectedLogLevel: invalidLogpLevel,
 		},
 		{
 			name:             "empty config returns empty config",
 			collectorCfg:     nil,
 			components:       nil,
 			expectedKeys:     []string{},
-			expectedLogLevel: "",
+			expectedLogLevel: invalidLogpLevel,
 		},
 		{
 			name:             "collector config only",
 			collectorCfg:     confmap.NewFromStringMap(testConfig),
 			components:       nil,
 			expectedKeys:     []string{"receivers", "exporters", "service", "processors"},
-			expectedLogLevel: "info",
+			expectedLogLevel: testOtelConfigLevel,
 		},
 		{
 			name:             "components only",
 			collectorCfg:     nil,
 			components:       []component.Component{testComp},
 			expectedKeys:     []string{"receivers", "exporters", "service"},
-			expectedLogLevel: "DEBUG",
+			expectedLogLevel: configUpdateLevel,
 		},
 		{
-			name:             "both collector config and components",
+			name:             "collector config with log level config and components",
 			collectorCfg:     confmap.NewFromStringMap(testConfig),
 			components:       []component.Component{testComp},
 			expectedKeys:     []string{"receivers", "exporters", "service", "processors"},
-			expectedLogLevel: "info",
+			expectedLogLevel: testOtelConfigLevel,
+		},
+		{
+			name:             "collector config without log level config and components",
+			collectorCfg:     confmap.NewFromStringMap(testConfigNoLogLevel),
+			components:       []component.Component{testComp},
+			expectedKeys:     []string{"receivers", "exporters", "service", "processors"},
+			expectedLogLevel: configUpdateLevel,
 		},
 		{
 			name:         "component config generation error",
@@ -1270,7 +1309,7 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 				// Missing InputSpec which should cause an error during config generation
 			}},
 			expectedErrorString: "failed to generate otel config: unknown otel receiver type for input type: filestream",
-			expectedLogLevel:    "",
+			expectedLogLevel:    -1,
 		},
 	}
 
@@ -1279,7 +1318,7 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 			cfgUpdate := configUpdate{
 				collectorCfg: tt.collectorCfg,
 				components:   tt.components,
-				logLevel:     logp.DebugLevel,
+				logLevel:     configUpdateLevel,
 			}
 			result, err := buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter, logptest.NewTestingLogger(t, ""))
 
@@ -1298,8 +1337,10 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 			}
 
 			// assert log level provided by user is given precedence.
-			if tt.expectedLogLevel != "" {
-				assert.Equal(t, tt.expectedLogLevel, result.Get("service::telemetry::logs::level"))
+			if tt.expectedLogLevel > invalidLogpLevel {
+				lvl, err := newLogLevelAfterConfigUpdate(cfgUpdate, result)
+				assert.NoError(t, err, "newLogLevelAfterConfigUpdate() call failed")
+				assert.Equal(t, tt.expectedLogLevel, lvl)
 			}
 
 			require.NotNil(t, result)
