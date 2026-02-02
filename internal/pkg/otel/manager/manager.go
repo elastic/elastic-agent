@@ -377,7 +377,7 @@ func newLogLevelAfterConfigUpdate(cfgUpdate configUpdate, mergedCfg *confmap.Con
 	// set the log level defined in service::telemetry::log::level setting
 	if mergedCfg != nil && mergedCfg.IsSet("service::telemetry::logs::level") {
 		if otelLevel, ok := mergedCfg.Get("service::telemetry::logs::level").(string); ok {
-			return translate.OTelLogLevelToLogp(otelLevel), nil
+			return translate.OTelLogLevelToLogp(otelLevel)
 		} else {
 			return logp.DebugLevel, errors.New("service::telemetry::logs::level found but was not of type string")
 		}
@@ -406,7 +406,11 @@ func buildMergedConfig(
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}
 
-		level := translate.LogpLogLevelToOTel(cfgUpdate.logLevel)
+		level, err := translate.LogpLogLevelToOTel(cfgUpdate.logLevel)
+		if err != nil {
+			return nil, fmt.Errorf("failed to translate log level: %s", cfgUpdate.logLevel)
+		}
+
 		if err := componentOtelCfg.Merge(confmap.NewFromStringMap(map[string]any{"service::telemetry::logs::level": level})); err != nil {
 			return nil, fmt.Errorf("failed to set log level in otel config: %w", err)
 		}

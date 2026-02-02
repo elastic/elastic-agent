@@ -110,33 +110,33 @@ func GetOtelConfig(
 	return otelConfig, nil
 }
 
-func LogpLogLevelToOTel(lvl logp.Level) string {
+func LogpLogLevelToOTel(lvl logp.Level) (string, error) {
 	switch lvl {
 	case logp.DebugLevel:
-		return "DEBUG"
+		return "DEBUG", nil
 	case logp.InfoLevel:
-		return "INFO"
+		return "INFO", nil
 	case logp.WarnLevel:
-		return "WARN"
+		return "WARN", nil
 	case logp.ErrorLevel:
-		return "ERROR"
+		return "ERROR", nil
 	default:
-		return "INFO"
+		return "UNKNOWN", fmt.Errorf("unknown logp level: %s", lvl)
 	}
 }
 
-func OTelLogLevelToLogp(lvl string) logp.Level {
+func OTelLogLevelToLogp(lvl string) (logp.Level, error) {
 	switch strings.ToUpper(lvl) {
 	case "DEBUG":
-		return logp.DebugLevel
+		return logp.DebugLevel, nil
 	case "INFO":
-		return logp.InfoLevel
+		return logp.InfoLevel, nil
 	case "WARN":
-		return logp.WarnLevel
+		return logp.WarnLevel, nil
 	case "ERROR":
-		return logp.ErrorLevel
+		return logp.ErrorLevel, nil
 	default:
-		return logp.InfoLevel
+		return logp.Level(-128), fmt.Errorf("unknown otel level: %s", lvl)
 	}
 }
 
