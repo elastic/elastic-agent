@@ -27,8 +27,8 @@ Review important information about the  8.19.11 release.
 
 
 
-* Osquery-extensions-fix. https://github.com/elastic/elastic-agent/pull/12455[#12455] https://github.com/elastic/elastic-agent/pull/12494[#12494] https://github.com/elastic/elastic-agent/pull/12495[#12495] https://github.com/elastic/elastic-agent/pull/11724[#11724] 
-* Emit the correct error message when the app lock cannot be acquired. https://github.com/elastic/elastic-agent/pull/12455[#12455] https://github.com/elastic/elastic-agent/pull/12494[#12494] https://github.com/elastic/elastic-agent/pull/12495[#12495] https://github.com/elastic/elastic-agent/pull/11724[#11724] 
-* Fix elasticsearch retry behavior in OTEL runtime for reliable delivery. https://github.com/elastic/elastic-agent/pull/12455[#12455] https://github.com/elastic/elastic-agent/pull/12494[#12494] https://github.com/elastic/elastic-agent/pull/12495[#12495] https://github.com/elastic/elastic-agent/pull/11724[#11724] 
+* OSQuery - Add list capabilities to directories for interactive users. https://github.com/elastic/elastic-agent/pull/12189[#12189] 
+* Emit the correct error message when the app lock cannot be acquired. https://github.com/elastic/elastic-agent/pull/12225[#12225]
+* Fix elasticsearch retry behavior in OTEL runtime for reliable delivery. https://github.com/elastic/elastic-agent/pull/12455[#12455]
 
 // end 8.19.11 relnotes
