@@ -559,6 +559,34 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, storage.DefaultAgentEncryptedStandaloneConfig, ymlBytes, "unexpected contents in elastic-agent.yml")
 
+	t.Log("Change elastic-agent.yml to have same contents with different structure, should not re-encrypt")
+	err = os.WriteFile(paths.ConfigFile(), []byte(`agent.features.encrypted_config.enabled: true`), 0640)
+	require.NoError(t, err)
+
+	_, _, _, err = New(
+		t.Context(),
+		log,
+		log,
+		logp.DebugLevel,
+		&info.AgentInfo{},
+		nil,
+		nil,
+		false, // not in testing mode - we are testing fs interactions
+		time.Second,
+		true,
+		nil,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+	encBytes3, err := os.ReadFile(paths.AgentConfigFile())
+	require.NoError(t, err)
+	require.EqualValues(t, encBytes, encBytes3, "fleet.enc contents have chagned")
+
+	ymlBytes, err = os.ReadFile(paths.ConfigFile())
+	require.NoError(t, err)
+	require.NotEqualValues(t, storage.DefaultAgentEncryptedStandaloneConfig, ymlBytes, "unexpected contents in elastic-agent.yml")
+
 	t.Log("Ensure that setting encrypted_config to false deletes fleet.enc")
 	err = os.WriteFile(paths.ConfigFile(), []byte(`agent:
   features:

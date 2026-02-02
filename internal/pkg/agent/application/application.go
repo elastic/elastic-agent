@@ -187,21 +187,33 @@ func New(
 			return nil, nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
 		}
 		if features.EncryptedConfig() {
-			// compare embedded config as a map to rawConfig as a map to determine if file has changed
-			embeddedConfig, err := config.NewConfigFrom(storage.DefaultAgentEncryptedStandalone)
+			// Ensure elastic-agent.yml contents have not changed.
+			embeddedConfig, err := config.NewConfigFrom(storage.DefaultAgentEncryptedStandaloneConfig)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("unable to load embedded defaults as config: %w", err)
 			}
-			embeddedMap, err := embeddedConfig.ToMapString(config.NoResolveOptions...)
+
+			opts := make([]interface{}, 0, len(config.NoResolveOptions))
+			for _, opt := range config.NoResolveOptions {
+				opts = append(opts, opt)
+			}
+			embeddedMap, err := embeddedConfig.ToMapStr(opts...)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("unable to unpack embedded defaults as map: %w", err)
 			}
-			rawMap, err := rawConfig.ToMapSting(config.NoResolveOptions...)
+
+			// reread config file, rawConfig contains injected attributes, not just  the encryption feature flag.
+			fileConfig, err := config.LoadFile(pathConfigFile)
 			if err != nil {
-				return nil, nil, nil, fmt.Errorf("unable to unpack config as map: %w", err)
+				return nil, nil, nil, fmt.Errorf("unable to load file config: %w", err)
+
+			}
+			fileMap, err := fileConfig.ToMapStr(opts...)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("unable to unpack file config as map: %w", err)
 			}
 
-			if !reflect.DeepEqual(embeddedMap, rawMap) {
+			if !reflect.DeepEqual(embeddedMap, fileMap) {
 				log.Debug("Detected config file change, re-encrypting...")
 				if err := storage.EncryptConfigOnPath(paths.Config()); err != nil {
 					return nil, nil, nil, fmt.Errorf("failed to encrypt config file: %w", err)
