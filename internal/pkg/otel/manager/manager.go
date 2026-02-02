@@ -374,15 +374,15 @@ func (m *OTelManager) Errors() <-chan error {
 // be the log level set directly in the collector configuration or if that is not set, the log level
 // of the coordinator (the log level set in the Elastic Agent configuration).
 func newLogLevelAfterConfigUpdate(cfgUpdate configUpdate, mergedCfg *confmap.Conf) (logp.Level, error) {
-	// set the log level defined in service::telemetry::log::level setting
+	// Prefer the log level defined in the collector configuration to prioritize a user defined collector log level.
 	if mergedCfg != nil && mergedCfg.IsSet("service::telemetry::logs::level") {
 		if otelLevel, ok := mergedCfg.Get("service::telemetry::logs::level").(string); ok {
-			return translate.OTelLogLevelToLogp(otelLevel)
+			return translate.OTelLevelToLogp(otelLevel)
 		} else {
 			return logp.DebugLevel, errors.New("service::telemetry::logs::level found but was not of type string")
 		}
 	} else {
-		// when mergedCfg is nil use coordinator's log level
+		// Otherwise, use the log level set by the Elastic Agent configuration.
 		return cfgUpdate.logLevel, nil
 	}
 }
@@ -406,7 +406,7 @@ func buildMergedConfig(
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}
 
-		level, err := translate.LogpLogLevelToOTel(cfgUpdate.logLevel)
+		level, err := translate.LogpLevelToOTel(cfgUpdate.logLevel)
 		if err != nil {
 			return nil, fmt.Errorf("failed to translate log level: %s", cfgUpdate.logLevel)
 		}

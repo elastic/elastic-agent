@@ -1623,17 +1623,17 @@ func TestLogLevelConversion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.logpLvl >= logp.DebugLevel {
-				otelLogpLvl, err := LogpLogLevelToOTel(tt.logpLvl)
+				otelLogpLvl, err := LogpLevelToOTel(tt.logpLvl)
 				require.NoError(t, err)
 
-				logpLvl, err := OTelLogLevelToLogp(otelLogpLvl)
+				logpLvl, err := OTelLevelToLogp(otelLogpLvl)
 				require.NoError(t, err)
 				require.Equal(t, tt.logpLvl, logpLvl)
 			} else {
-				unknownOTel, err := LogpLogLevelToOTel(tt.logpLvl)
+				unknownOTel, err := LogpLevelToOTel(tt.logpLvl)
 				require.Error(t, err)
 
-				_, err = OTelLogLevelToLogp(unknownOTel)
+				_, err = OTelLevelToLogp(unknownOTel)
 				require.Error(t, err)
 			}
 		})

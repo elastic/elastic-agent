@@ -110,7 +110,7 @@ func GetOtelConfig(
 	return otelConfig, nil
 }
 
-func LogpLogLevelToOTel(lvl logp.Level) (string, error) {
+func LogpLevelToOTel(lvl logp.Level) (string, error) {
 	switch lvl {
 	case logp.DebugLevel:
 		return "DEBUG", nil
@@ -125,7 +125,7 @@ func LogpLogLevelToOTel(lvl logp.Level) (string, error) {
 	}
 }
 
-func OTelLogLevelToLogp(lvl string) (logp.Level, error) {
+func OTelLevelToLogp(lvl string) (logp.Level, error) {
 	switch strings.ToUpper(lvl) {
 	case "DEBUG":
 		return logp.DebugLevel, nil
