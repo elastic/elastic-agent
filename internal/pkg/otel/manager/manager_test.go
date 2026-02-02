@@ -836,8 +836,8 @@ func TestOTelManager_Run(t *testing.T) {
 			base, obs := loggertest.New("otel")
 
 			m := &OTelManager{
-				logger:            l,
-				baseLogger:        base,
+				managerLogger:     l,
+				collectorLogger:   base,
 				errCh:             make(chan error, 1), // holds at most one error
 				updateCh:          make(chan configUpdate, 1),
 				collectorStatusCh: make(chan *status.AggregateStatus),
@@ -1480,7 +1480,7 @@ func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mgr := &OTelManager{
-				logger:                 newTestLogger(),
+				managerLogger:          newTestLogger(),
 				components:             tt.components,
 				healthCheckExtID:       "extension:healthcheckv2/uuid",
 				currentComponentStates: make(map[string]runtime.ComponentComponentState),
@@ -1587,7 +1587,7 @@ func TestOTelManager_processComponentStates(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mgr := &OTelManager{
-				logger:                 newTestLogger(),
+				managerLogger:          newTestLogger(),
 				currentComponentStates: tt.currentComponentStates,
 			}
 
@@ -1615,8 +1615,8 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 
 	// Create manager with test dependencies
 	mgr := OTelManager{
-		logger:                     testLogger,
-		baseLogger:                 testLogger,
+		managerLogger:              testLogger,
+		collectorLogger:            testLogger,
 		errCh:                      make(chan error, 1), // holds at most one error
 		updateCh:                   make(chan configUpdate, 1),
 		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
