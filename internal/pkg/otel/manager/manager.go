@@ -131,7 +131,7 @@ type OTelManager struct {
 	stopTimeout time.Duration
 
 	// log level of the collector
-	logLevel string
+	logLevel logp.Level
 }
 
 // NewOTelManager returns a OTelManager.
@@ -195,7 +195,7 @@ func NewOTelManager(
 		recoveryTimer:    recoveryTimer,
 		collectorRunErr:  make(chan error),
 		stopTimeout:      stopTimeout,
-		logLevel:         logLevel.String(),
+		logLevel:         logLevel,
 	}, nil
 }
 
@@ -301,7 +301,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			// and reset the retry count
 			m.recoveryTimer.Stop()
 			m.recoveryRetries.Store(0)
-			mergedCfg, err := buildMergedConfig(cfgUpdate, m.agentInfo, m.beatMonitoringConfigGetter, m.baseLogger)
+			mergedCfg, err := buildMergedConfig(cfgUpdate, m.agentInfo, m.beatMonitoringConfigGetter, m.logger)
 			if err != nil {
 				// critical error, merging the configuration should always work
 				reportErr(ctx, m.errCh, err)
@@ -314,16 +314,11 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			configChanged, configUpdateErr := m.maybeUpdateMergedConfig(mergedCfg)
 			m.collectorCfg = cfgUpdate.collectorCfg
 			m.components = cfgUpdate.components
-			// set the log level defined in service::telemetry::log::level setting
-			if mergedCfg != nil && mergedCfg.IsSet("service::telemetry::logs::level") {
-				if logLevel, ok := mergedCfg.Get("service::telemetry::logs::level").(string); ok {
-					m.logLevel = logLevel
-				} else {
-					m.logger.Warn("failed to access log level from service::telemetry::logs::level")
-				}
+			lvl, err := newLogLevelAfterConfigUpdate(cfgUpdate, mergedCfg)
+			if err != nil {
+				m.logger.Warnf("failed to determine new log level: %s", err)
 			} else {
-				// when mergedCfg is nil use coordinator's log level
-				m.logLevel = cfgUpdate.logLevel.String()
+				m.logLevel = lvl
 			}
 			m.mx.Unlock()
 
@@ -375,6 +370,23 @@ func (m *OTelManager) Errors() <-chan error {
 	return m.errCh
 }
 
+// newLogLevelAfterConfigUpdate returns the manager log level after a configuration update, which can
+// be the log level set directly in the collector configuration or if that is not set, the log level
+// of the coordinator (the log level set in the Elastic Agent configuration).
+func newLogLevelAfterConfigUpdate(cfgUpdate configUpdate, mergedCfg *confmap.Conf) (logp.Level, error) {
+	// Prefer the log level defined in the collector configuration to prioritize a user defined collector log level.
+	if mergedCfg != nil && mergedCfg.IsSet("service::telemetry::logs::level") {
+		if otelLevel, ok := mergedCfg.Get("service::telemetry::logs::level").(string); ok {
+			return translate.OTelLevelToLogp(otelLevel)
+		} else {
+			return logp.DebugLevel, errors.New("service::telemetry::logs::level found but was not of type string")
+		}
+	} else {
+		// Otherwise, use the log level set by the Elastic Agent configuration.
+		return cfgUpdate.logLevel, nil
+	}
+}
+
 // buildMergedConfig combines collector configuration with component-derived configuration.
 func buildMergedConfig(
 	cfgUpdate configUpdate,
@@ -394,11 +406,14 @@ func buildMergedConfig(
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}
 
-		level := translate.GetOTelLogLevel(cfgUpdate.logLevel.String())
+		level, err := translate.LogpLevelToOTel(cfgUpdate.logLevel)
+		if err != nil {
+			return nil, fmt.Errorf("failed to translate log level: %s", cfgUpdate.logLevel)
+		}
+
 		if err := componentOtelCfg.Merge(confmap.NewFromStringMap(map[string]any{"service::telemetry::logs::level": level})); err != nil {
 			return nil, fmt.Errorf("failed to set log level in otel config: %w", err)
 		}
-
 	}
 
 	// If both configs are nil, return nil so the manager knows to stop the collector
