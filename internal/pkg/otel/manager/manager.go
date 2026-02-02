@@ -67,7 +67,7 @@ type configUpdate struct {
 	collectorCfg  *confmap.Conf
 	monitoringCfg *monitoringCfg.MonitoringConfig
 	components    []component.Component
-	logLevel      logp.Level
+	agentLogLevel logp.Level
 }
 
 // OTelManager is a manager that manages the lifecycle of the OTel collector inside of the Elastic Agent.
@@ -385,7 +385,7 @@ func newLogLevelAfterConfigUpdate(cfgUpdate configUpdate, mergedCfg *confmap.Con
 		}
 	} else {
 		// Otherwise, use the log level set by the Elastic Agent configuration.
-		return cfgUpdate.logLevel, nil
+		return cfgUpdate.agentLogLevel, nil
 	}
 }
 
@@ -408,9 +408,9 @@ func buildMergedConfig(
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}
 
-		level, err := translate.LogpLevelToOTel(cfgUpdate.logLevel)
+		level, err := translate.LogpLevelToOTel(cfgUpdate.agentLogLevel)
 		if err != nil {
-			return nil, fmt.Errorf("failed to translate log level: %s", cfgUpdate.logLevel)
+			return nil, fmt.Errorf("failed to translate log level: %s", cfgUpdate.agentLogLevel)
 		}
 
 		if err := componentOtelCfg.Merge(confmap.NewFromStringMap(map[string]any{"service::telemetry::logs::level": level})); err != nil {
@@ -641,7 +641,7 @@ func (m *OTelManager) Update(cfg *confmap.Conf, monitoring *monitoringCfg.Monito
 		collectorCfg:  cfg,
 		monitoringCfg: monitoring,
 		components:    components,
-		logLevel:      ll,
+		agentLogLevel: ll,
 	}
 
 	// we care only about the latest config update

@@ -1316,9 +1316,9 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfgUpdate := configUpdate{
-				collectorCfg: tt.collectorCfg,
-				components:   tt.components,
-				logLevel:     configUpdateLevel,
+				collectorCfg:  tt.collectorCfg,
+				components:    tt.components,
+				agentLogLevel: configUpdateLevel,
 			}
 			result, err := buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter, logptest.NewTestingLogger(t, ""))
 
