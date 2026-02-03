@@ -179,7 +179,6 @@ func (r *subprocessExecution) startCollector(
 		defer healthCheckPollTimer.Stop()
 		client := http.Client{}
 		for {
-			logger.Infof("Fetching otel collector status")
 			statuses, err := AllComponentsStatuses(procCtx, client, httpHealthCheckPort)
 			if err != nil {
 				switch {
