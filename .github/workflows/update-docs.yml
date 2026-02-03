@@ -16,9 +16,11 @@ jobs:
       issues: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
+          submodules: true
           fetch-depth: 0  # Fetch all history including tags
+          persist-credentials: false  # Avoid credential conflicts with create-pull-request
       
       - name: Add upstream remote and fetch tags
         run: |
@@ -67,7 +69,7 @@ jobs:
       
       - name: Create Pull Request
         if: steps.check_branch.outputs.branch_exists == 'false'
-        uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
+        uses: peter-evans/create-pull-request@c0f553fe549906ede9cf27b5156039d195d2ece0 # v8.1.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "docs: update generated documentation for ${{ steps.get_version.outputs.version }}"
@@ -82,7 +84,7 @@ jobs:
             
             ## References
             - **Source go.mod**: https://github.com/elastic/elastic-agent/blob/${{ steps.get_version.outputs.version }}/go.mod
-            - **Source core-components.yaml**: https://github.com/elastic/elastic-agent/blob/${{ steps.get_version.outputs.version }}/internal/pkg/otel/core-components.yaml
+            - **Source components.yaml**: https://github.com/elastic/elastic-agent/blob/${{ steps.get_version.outputs.version }}/internal/edot/components.yaml
             - **Release tag**: https://github.com/elastic/elastic-agent/tree/${{ steps.get_version.outputs.version }}
             
             This is an automated PR created by the documentation update workflow.

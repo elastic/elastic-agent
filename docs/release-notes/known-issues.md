@@ -23,10 +23,67 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+:::{dropdown} Elastic Agent becomes unhealthy when an Elasticsearch output used for monitoring specifies any list parameter as a string
+**Applies to: {{agent}} 9.2.1, 9.2.2**
+
+On November 21st 2025, a known issue was discovered that causes Elastic Agent to become unhealthy when a list parameter is specified as a string. Examples for the `hosts` and `ssl.certificate_authorities` parameters follow:
+
+`Otel manager failed: failed to generate otel config: error translating config for output: monitoring, unit: http/metrics-monitoring, error: failed decoding config. decoding failed due to the following error(s): 'hosts' source data must be an array or slice, got string`
+
+`OTel manager failed: failed to generate otel config: error translating config for output: monitoring, unit: filestream-monitoring, error: failed decoding config. decoding failed due to the following error(s): 'ssl.certificate_authorities' source data must be an array or slice, got string`
+
+This occurs when the parameter of an Elasticsearch output that is set as the monitoring output is defined as a string instead of a list:
+
+```yaml callouts=false
+output.elasticsearch:
+  hosts: "https://myEShost:9200" # string instead of list
+  ssl.certificate_authorities: "/tmp/ca.pem" # string instead of list
+```
+
+
+**Workaround**
+
+Affected users can change the affected parameter from a string to a list:
+
+```yaml callouts=false
+output.elasticsearch:
+  hosts: ["https://myEShost:9200"] # list/array instead of string
+  ssl.certificate_authorities: ["/tmp/ca.pem"] # list/array instead of string
+```
+
+The fix for the `hosts` parameter was included in version 9.2.2, which restores support for both the string and list formats of the `hosts` parameter.
+
+A general fix for the remaining parameters will be included in an upcoming patch release. See [Issue #11352](https://github.com/elastic/elastic-agent/issues/11352).
+:::
+
+:::{dropdown} Elastic Agent becomes unhealthy with a host URL parsing error related to the Prometheus collector metricset
+**Applies to: {{agent}} 9.2.1**
+
+On November 13th 2025, a known issue was discovered that causes Elastic Agent to become unhealthy with the error `host parsing failed for prometheus-collector: error parsing URL: parse "http://localhost:EDOT_COLLECTOR_METRICS_PORT": invalid port ":EDOT_COLLECTOR_METRICS_PORT" after host`.
+
+This problem has no effect on the operation of Elastic Agent besides incorrectly marking it as unhealthy. The `prometheus/metrics` input that is
+affected is incorrectly created when certain output types (Logstash, Kafka) or output parameters (for example, `loadbalance`) are used.
+
+For more information, check [#11169](https://github.com/elastic/elastic-agent/issues/11169).
+
+**Workaround**
+
+Affected users must set the **Monitoring runtime** advanced policy setting in {{fleet}} to the **Process** runtime to work around this issue. This is the runtime
+mode that is already being used when this problem occurs. The same can be done in a standalone agent by setting `agent.monitoring._runtime_experimental: process` in its `elastic-agent.yaml` file:
+
+```yaml
+agent.monitoring:
+    _runtime_experimental: process
+```
+
+For more details, check [the comments](https://github.com/elastic/elastic-agent/issues/11169#issuecomment-3553232394) in the related issue.
+
+The fix will be included in version 9.2.2.
+:::
 
 :::{dropdown} Failed upgrades leave {{agent}} stuck until restart
 
-**Applies to: {{agent}} 8.18.7, 9.0.7** 
+**Applies to: {{agent}} 8.18.7, 9.0.7**
 
 On September 17, 2025, a known issue was discovered that can cause {{agent}} upgrades to get stuck if an upgrade attempt fails under specific conditions. This happens because the coordinator’s `overrideState` remains set, leaving the agent in a state that appears to be upgrading.
 
@@ -41,8 +98,8 @@ This issue is triggered if the upgrade fails during one of the early checks insi
 **Symptoms**
 
 - {{fleet}} shows the upgrade action in progress, even though the upgrade remains stuck
-- No further upgrade attempts succeed 
-- Elastic Agent status shows an override state indicating upgrade 
+- No further upgrade attempts succeed
+- Elastic Agent status shows an override state indicating upgrade
 
 **Workaround**
 

@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	"go.opentelemetry.io/otel/sdk/metric"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
@@ -132,6 +133,33 @@ func StartMockES(t *testing.T, percentDuplicate, percentTooMany, percentNonIndex
 	return s.URL
 }
 
+// StartMockESDeterministic starts a MockES on a random port using httptest.NewServer
+// with a deterministic handler. It registers a cleanup function to close the server
+// when the test finishes. The server will use deterministic responses based on the
+// provided handler.
+func StartMockESDeterministic(t *testing.T, deterministicHandler func(action mockes.Action, event []byte) int) string {
+	uid := uuid.Must(uuid.NewV4())
+
+	reader := metric.NewManualReader()
+	provider := metric.NewMeterProvider(metric.WithReader(reader))
+
+	mux := http.NewServeMux()
+	mux.Handle("/", mockes.NewDeterministicAPIHandler(
+		uid,
+		"",
+		provider,
+		time.Now().Add(24*time.Hour),
+		0,
+		0,
+		deterministicHandler,
+	))
+
+	s := httptest.NewServer(mux)
+	t.Cleanup(s.Close)
+
+	return s.URL
+}
+
 // checkHealthAtStartup ensures all the beats and agent are healthy and working before we continue
 func checkHealthAtStartup(t *testing.T, ctx context.Context, agentFixture *atesting.Fixture) {
 	// because we need to separately fetch the PIDs, wait until everything is healthy before we look for running beats
@@ -210,6 +238,9 @@ func TestMonitoringLogsAreShipped(
 			"elastic-agent-client error: rpc error: code = Canceled desc = context canceled", // can happen on restart
 			"failed to invoke rollback watcher: failed to start Upgrade Watcher",             // on debian this happens probably need to fix.
 			"falling back to IMDSv1: operation error ec2imds: getToken",                      // okay for the cloud metadata to not work
+			"bulk indexer flush error",          // can happen on restart (caused by context canceled)
+			"Exporting failed. Dropping data.",  // can happen on restart (caused by context canceled)
+			"Exporting failed. Rejecting data.", // can happen on restart (caused by context canceled)
 		})
 	})
 	t.Logf("error logs: Got %d documents", len(docs.Hits.Hits))

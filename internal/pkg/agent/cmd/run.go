@@ -14,11 +14,13 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	fleetgateway "github.com/elastic/elastic-agent/internal/pkg/agent/application/gateway/fleet"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 
 	"go.elastic.co/apm/v2"
@@ -176,7 +178,7 @@ func runElasticAgentCritical(
 	locker := filelock.NewAppLocker(paths.Data(), paths.AgentLockFileName)
 	lockErr := locker.TryLock()
 	if lockErr != nil {
-		errs = append(errs, fmt.Errorf("failed to get app lock: %w", err))
+		errs = append(errs, fmt.Errorf("failed to get app lock: %w", lockErr))
 	}
 	defer func() {
 		_ = locker.Unlock()
@@ -223,9 +225,7 @@ func runElasticAgentCritical(
 	// Make sure to flush any buffered logs before we're done.
 	defer baseLogger.Sync() //nolint:errcheck // flushing buffered logs is best effort.
 
-	l := baseLogger.With("log", map[string]interface{}{
-		"source": agentName,
-	})
+	l := baseLogger.With("log.source", agentName)
 
 	// at this point the logger is working, so any errors that we hit can now be logged and returned
 	if len(errs) > 0 {
@@ -284,6 +284,11 @@ func runElasticAgent(
 				return fmt.Errorf("failed to find group: %w", err)
 			}
 			ownership.GID = gid
+		}
+
+		// check capabilities permissions before fixing them
+		if err := checkCapabilitiesPerms(paths.AgentCapabilitiesPath(), userName, ownership.UID); err != nil {
+			return fmt.Errorf("invalid capabilities file permissions: %w", err)
 		}
 
 		topPath := paths.Top()
@@ -348,19 +353,17 @@ func runElasticAgent(
 			errors.M(errors.MetaKeyPath, paths.AgentConfigFile()))
 	}
 
+	// Set the initial log level (either default or from config file)
+	logger.SetLevel(logLvl)
+
 	// Ensure that the log level now matches what is configured in the agentInfo.
-	if agentInfo.LogLevel() != "" {
-		var lvl logp.Level
-		err = lvl.Unpack(agentInfo.LogLevel())
-		if err != nil {
-			l.Error(errors.New(err, "failed to parse agent information log level"))
-		} else {
-			logLvl = lvl
-			logger.SetLevel(lvl)
-		}
+	var lvl logp.Level
+	err = lvl.Unpack(agentInfo.LogLevel())
+	if err != nil {
+		l.Error(errors.New(err, "failed to parse agent information log level"))
 	} else {
-		// Set the initial log level (either default or from config file)
-		logger.SetLevel(logLvl)
+		logLvl = lvl
+		logger.SetLevel(lvl)
 	}
 
 	// initiate agent watcher
@@ -391,8 +394,12 @@ func runElasticAgent(
 	}
 
 	isBootstrap := configuration.IsFleetServerBootstrap(cfg.Fleet)
+
+	// create an availableRollbackSource
+	availableRollbacksSource := ttl.NewTTLMarkerRegistry(l, paths.Top())
+
 	coord, configMgr, _, err := application.New(ctx, l, baseLogger, logLvl, agentInfo, rex, tracer, testingMode,
-		fleetInitTimeout, isBootstrap, override, initialUpgradeMarker, modifiers...)
+		fleetInitTimeout, isBootstrap, override, initialUpgradeMarker, availableRollbacksSource, modifiers...)
 	if err != nil {
 		return err
 	}
@@ -411,7 +418,7 @@ func runElasticAgent(
 	diagHooks := diagnostics.GlobalHooks()
 	diagHooks = append(diagHooks, coord.DiagnosticHooks()...)
 	controlLog := l.Named("control")
-	control := server.New(controlLog, agentInfo, coord, tracer, diagHooks, cfg.Settings.GRPC)
+	control := server.New(controlLog, agentInfo, coord, tracer, diagHooks, cfg.Settings.GRPC, availableRollbacksSource)
 
 	// if the configMgr implements the TestModeConfigSetter in means that Elastic Agent is in testing mode and
 	// the configuration will come in over the control protocol, so we set the config setting on the control protocol
@@ -462,6 +469,21 @@ func runElasticAgent(
 		appErr <- err
 	}()
 
+	wg := new(sync.WaitGroup)
+	additionalGoroutinesContext, cancelAdditionalGoroutines := context.WithCancel(ctx)
+	defer cancelAdditionalGoroutines()
+	// Spawn the rollbacks cleanup goroutine
+	relativeHomePath, homePathErr := filepath.Rel(paths.Top(), paths.Home())
+	if homePathErr == nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			upgrade.PeriodicallyCleanRollbacks(additionalGoroutinesContext, l, paths.Top(), relativeHomePath, availableRollbacksSource, cfg.Settings.Upgrade.Rollback.CleanupInterval)
+		}()
+	} else {
+		l.Warnw("Error calculating relative path for versioned home. Rollback cleanup will not be scheduled ", "topPath", paths.Top(), "homePath", paths.Home(), "error", homePathErr)
+	}
+
 	// listen for signals
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP)
@@ -472,15 +494,18 @@ LOOP:
 		select {
 		case <-stop:
 			l.Info("service.ProcessWindowsControlEvents invoked stop function. Shutting down")
+			cancelAdditionalGoroutines()
 			break LOOP
 		case <-appDone:
 			l.Info("application done, coordinator exited")
 			logShutdown = false
+			cancelAdditionalGoroutines()
 			break LOOP
 		case <-rex.ShutdownChan():
 			l.Info("reexec shutdown channel triggered")
 			isRex = true
 			logShutdown = false
+			cancelAdditionalGoroutines()
 			break LOOP
 		case sig := <-signals:
 			l.Infof("signal %q received", sig)
@@ -489,6 +514,7 @@ LOOP:
 				isRex = true
 				rex.ReExec(nil)
 			} else {
+				cancelAdditionalGoroutines()
 				break LOOP
 			}
 		}
@@ -499,7 +525,8 @@ LOOP:
 	}
 	cancel()
 	err = <-appErr
-
+	// wait for goroutines to shut down
+	wg.Wait()
 	if logShutdown {
 		l.Info("Shutting down completed.")
 	}

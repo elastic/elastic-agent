@@ -29,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/kibana"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -42,8 +43,8 @@ func createPolicy(
 	agentFixture *atesting.Fixture,
 	info *define.Info,
 	policyName string,
-	dataOutputID string) (string, string) {
-
+	dataOutputID string,
+) (string, string) {
 	createPolicyReq := kibana.AgentPolicy{
 		Name:        policyName,
 		Namespace:   info.Namespace,
@@ -89,8 +90,8 @@ func prepareAgentCMD(
 	ctx context.Context,
 	agentFixture *atesting.Fixture,
 	args []string,
-	env []string) (*exec.Cmd, *strings.Builder) {
-
+	env []string,
+) (*exec.Cmd, *strings.Builder) {
 	cmd, err := agentFixture.PrepareAgentCommand(ctx, args)
 	if err != nil {
 		t.Fatalf("could not prepare agent command: %s", err)
@@ -531,12 +532,9 @@ func TestContainerCMDAgentMonitoringRuntimeExperimental(t *testing.T) {
 			// Verify that components are using the expected runtime
 			require.EventuallyWithTf(t, func(ct *assert.CollectT) {
 				status, err := agentFixture.ExecStatus(ctx, atesting.WithCmdOptions(withEnv(env)))
-				require.NoErrorf(t, err, "error getting agent status")
+				require.NoErrorf(ct, err, "error getting agent status")
 
-				expectedComponentCount := 4 // process runtime
-				if tc.expectedRuntimeName == string(monitoringCfg.OtelRuntimeManager) {
-					expectedComponentCount = 5
-				}
+				expectedComponentCount := 4
 
 				require.Len(ct, status.Components, expectedComponentCount, "expected right number of components in agent status")
 
@@ -550,15 +548,15 @@ func TestContainerCMDAgentMonitoringRuntimeExperimental(t *testing.T) {
 					}
 					t.Logf("Component ID: %s, version info: %s, runtime: %s", comp.ID, comp.VersionInfo.Name, compRuntime)
 					switch comp.ID {
-					case "beat/metrics-monitoring", "filestream-monitoring", "prometheus/metrics-monitoring":
+					case "beat/metrics-monitoring", "filestream-monitoring":
 						// Monitoring components should use the expected runtime
-						assert.Equalf(t, tc.expectedRuntimeName, compRuntime, "expected correct runtime name for monitoring component %s with id %s", comp.Name, comp.ID)
+						assert.Equalf(ct, tc.expectedRuntimeName, compRuntime, "expected correct runtime name for monitoring component %s with id %s", comp.Name, comp.ID)
 					case "http/metrics-monitoring":
 						// The comp.VersionInfo.Name for this component is empty at times.
 						// See https://github.com/elastic/elastic-agent/issues/11162.
 					default:
-						// Non-monitoring components should use the default runtime
-						assert.Equalf(t, string(component.DefaultRuntimeManager), compRuntime, "expected default runtime for non-monitoring component %s with id %s", comp.Name, comp.ID)
+						// Non-monitoring components are not controlled by the env variable
+						continue
 					}
 				}
 			}, 1*time.Minute, 1*time.Second,
@@ -655,12 +653,9 @@ func TestContainerCMDAgentMonitoringRuntimeExperimentalPolicy(t *testing.T) {
 			// Verify that components are using the expected runtime
 			require.EventuallyWithTf(t, func(ct *assert.CollectT) {
 				status, err := agentFixture.ExecStatus(ctx, atesting.WithCmdOptions(withEnv(env)))
-				require.NoErrorf(t, err, "error getting agent status")
+				require.NoErrorf(ct, err, "error getting agent status")
 
-				expectedComponentCount := 4 // process runtime
-				if tc.expectedRuntimeName == string(monitoringCfg.OtelRuntimeManager) {
-					expectedComponentCount = 5
-				}
+				expectedComponentCount := 4
 
 				require.Len(ct, status.Components, expectedComponentCount, "expected right number of components in agent status")
 
@@ -676,13 +671,13 @@ func TestContainerCMDAgentMonitoringRuntimeExperimentalPolicy(t *testing.T) {
 					switch comp.ID {
 					case "beat/metrics-monitoring", "filestream-monitoring", "prometheus/metrics-monitoring":
 						// Monitoring components should use the expected runtime
-						assert.Equalf(t, tc.expectedRuntimeName, compRuntime, "unexpected runtime name for monitoring component %s with id %s", comp.Name, comp.ID)
+						assert.Equalf(ct, tc.expectedRuntimeName, compRuntime, "unexpected runtime name for monitoring component %s with id %s", comp.Name, comp.ID)
 					case "http/metrics-monitoring":
 						// The comp.VersionInfo.Name for this component is empty at times.
 						// See https://github.com/elastic/elastic-agent/issues/11162.
 					default:
 						// Non-monitoring components should use the default runtime
-						assert.Equalf(t, string(component.DefaultRuntimeManager), compRuntime, "expected default runtime for non-monitoring component %s with id %s", comp.Name, comp.ID)
+						assert.Equalf(ct, string(component.DefaultRuntimeManager), compRuntime, "expected default runtime for non-monitoring component %s with id %s", comp.Name, comp.ID)
 					}
 				}
 			}, 1*time.Minute, 1*time.Second,
@@ -759,6 +754,10 @@ agent:
   monitoring:
     enabled: true
     metrics: true
+  internal:
+    runtime:
+      metricbeat:
+        system/metrics: process
 
 inputs:
   - id: system-metrics
@@ -775,7 +774,7 @@ inputs:
 
 	config := fmt.Sprintf(configTemplate, esAddr)
 	configPath := filepath.Join(workDir, "elastic-agent.yml")
-	err := os.WriteFile(configPath, []byte(config), 0644)
+	err := os.WriteFile(configPath, []byte(config), 0o644)
 	if err != nil {
 		t.Fatalf("failed to write agent config file: %s", err)
 	}
@@ -812,4 +811,146 @@ func setAgentMonitoringRuntime(t *testing.T, info *define.Info, policyID string,
 	}
 
 	t.Logf("Successfully set monitoring to process runtime for policy %s", policyID)
+}
+
+func TestContainerCMDEnrollByPolicyName(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack: &define.Stack{},
+		Local: false,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+		Group: "container",
+	})
+
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
+	defer cancel()
+
+	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+	err = agentFixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
+	require.NoError(t, err)
+
+	// Populate fleet with a lot of policies to test retrieval by name
+	// Kibana's default page size is 20
+	// Include the special characters that must be escapted \():<>"* in KQL in the name
+	// See https://www.elastic.co/docs/reference/query-languages/kql
+	t.Log("Populate fleet with extra policies")
+	policyID := ""
+	for i := 0; i < 30; i++ {
+		policyID, _ = createPolicy(
+			t,
+			ctx,
+			agentFixture,
+			info,
+			fmt.Sprintf("%s \\():<>\"* %s", t.Name(), uuid.Must(uuid.NewV4()).String()),
+			"")
+	}
+	// Use the last ID to get the policy, we want the name
+	resp, err := info.KibanaClient.GetPolicy(ctx, policyID)
+	require.NoError(t, err)
+
+	env := []string{
+		"FLEET_ENROLL=1",
+		"FLEET_URL=" + fleetURL,
+		"KIBANA_FLEET_HOST=" + info.KibanaClient.Connection.URL,
+		"FLEET_TOKEN_POLICY_NAME=" + resp.Name,
+		"KIBANA_FLEET_USERNAME=" + info.KibanaClient.Connection.Username,
+		"KIBANA_FLEET_PASSWORD=" + info.KibanaClient.Connection.Password,
+		"STATE_PATH=" + agentFixture.WorkDir(),
+	}
+	cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, env)
+	t.Logf(">> running binary with: %v", cmd.Args)
+	err = cmd.Start()
+	require.NoError(t, err)
+
+	require.EventuallyWithTf(t, func(c *assert.CollectT) {
+		// This will return errors until it connects to the agent,
+		// they're mostly noise because until the agent starts running
+		// we will get connection errors. If the test fails
+		// the agent logs will be present in the error message
+		// which should help to explain why the agent was not
+		// healthy.
+		status, err := agentFixture.ExecStatus(ctx, atesting.WithCmdOptions(withEnv(env)))
+		require.NoError(c, err)
+		require.Equal(c, int(cproto.State_HEALTHY), status.State, "agent status is not healthy")
+		require.Equal(c, int(cproto.State_HEALTHY), status.FleetState, "fleet state is not healthy")
+	},
+		5*time.Minute, time.Second,
+		"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",
+		err, agentOutput,
+	)
+}
+
+func TestContainerCMDDiagnosticsSocket(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack: &define.Stack{},
+		Local: false,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+		Group: "container",
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	defer cancel()
+
+	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	// prepare must be called otherwise `agentFixture.WorkDir()` will be empty
+	// and it must be set so the `STATE_PATH` below gets a valid path.
+	err = agentFixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	fleetURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
+	if err != nil {
+		t.Fatalf("could not get Fleet URL: %s", err)
+	}
+
+	_, enrollmentToken := createPolicy(
+		t,
+		ctx,
+		agentFixture,
+		info,
+		fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String()),
+		"")
+
+	// create a new state directory, as the tempDir might exceed socket path character limit (104 characters)
+	stateDir, err := os.MkdirTemp("/tmp", "state*")
+	t.Cleanup(func() {
+		_ = os.RemoveAll(stateDir)
+	})
+	require.NoError(t, err)
+	env := []string{
+		"FLEET_ENROLL=1",
+		"FLEET_URL=" + fleetURL,
+		"FLEET_ENROLLMENT_TOKEN=" + enrollmentToken,
+		// As the agent isn't built for a container, it's upgradable, triggering
+		// the start of the upgrade watcher. If `STATE_PATH` isn't set, the
+		// upgrade watcher will commence from a different path within the
+		// container, distinct from the current execution path.
+		"STATE_PATH=" + stateDir,
+	}
+
+	cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, env)
+	t.Logf(">> running binary with: %v", cmd.Args)
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("error running container cmd: %s", err)
+	}
+
+	require.EventuallyWithT(t, func(tt *assert.CollectT) {
+		require.Contains(tt, agentOutput.String(), "Diagnostics extension started")
+		_, err := os.Stat(filepath.Join(stateDir, "data", "edot-diagnostics-extension.sock"))
+		require.NoError(tt, err)
+	},
+		5*time.Minute, time.Second,
+		"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",
+		err, agentOutput,
+	)
 }

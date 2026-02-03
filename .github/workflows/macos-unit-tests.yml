@@ -24,8 +24,9 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
+          submodules: true
           # pkg/testing/tools/git TestGetReleaseBranches test require full git history
           fetch-depth: 0
 

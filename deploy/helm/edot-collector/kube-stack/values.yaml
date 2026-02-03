@@ -17,7 +17,7 @@ crds:
 defaultCRConfig:
   image:
     repository: "docker.elastic.co/elastic-agent/elastic-agent"
-    tag: "9.3.0"
+    tag: "9.4.0"
   targetAllocator:
     enabled: false # Enable/disable the Operator's Target allocator.
     # Refer to: https://github.com/open-telemetry/opentelemetry-operator/tree/main/cmd/otel-allocator
@@ -112,18 +112,10 @@ collectors:
               # Service attributes added based on https://opentelemetry.io/docs/specs/semconv/non-normative/k8s-attributes/#service-attributes
               - "service.name"
               - "service.version"
+              - "service.instance.id"
       receivers:
         # [K8s Events Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8seventsreceiver)
-        k8s_events:
-        # [K8s Objects Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sobjectsreceiver)
-        # NOTE: The k8sobjects receiver for K8s Events collection is being replaced by the k8s_events receiver, it might be removed in future versions of this configuration
-        k8sobjects:
-          objects:
-            - name: events
-              mode: "watch"
-              group: "events.k8s.io"
-              exclude_watch_type:
-                - "DELETED"
+        k8s_events: {}
         # [K8s Cluster Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sclusterreceiver)
         k8s_cluster:
           collection_interval: 60s
@@ -163,7 +155,6 @@ collectors:
               - k8s_cluster
           logs:
             receivers:
-              - k8sobjects
               - k8s_events
             processors:
               - resourcedetection/eks
@@ -316,6 +307,7 @@ collectors:
               # Service attributes added based on https://opentelemetry.io/docs/specs/semconv/non-normative/k8s-attributes/#service-attributes
               - "service.name"
               - "service.version"
+              - "service.instance.id"
       receivers:
         # [OTLP Receiver](https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver)
         otlp:
@@ -546,9 +538,9 @@ collectors:
         otlp:
           protocols:
             grpc:
-              endpoint: ${env:MY_POD_IP}:4317
+              endpoint: ${env:OTEL_K8S_POD_IP}:4317
             http:
-              endpoint: ${env:MY_POD_IP}:4318
+              endpoint: ${env:OTEL_K8S_POD_IP}:4318
       processors:
         batch:
           send_batch_size: 1000
@@ -590,7 +582,7 @@ collectors:
           metrics/aggregated-otel-metrics:
             receivers:
               - elasticapm
-            processors:
+            processors: []
             exporters:
               - debug
               - elasticsearch/otel
@@ -599,6 +591,7 @@ collectors:
 instrumentation:
   name: elastic-instrumentation
   enabled: true # Enable/disable auto-instrumentation.
+  env: []
   exporter:
     endpoint: http://opentelemetry-kube-stack-daemon-collector.opentelemetry-operator-system.svc.cluster.local:4318 # The daemonset OpenTelemetry Collector endpoint where telemetry data will be exported.
   propagators:

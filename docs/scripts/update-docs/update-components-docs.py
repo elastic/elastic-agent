@@ -24,14 +24,147 @@ TABLE_TAG = 'edot-collector-components-table'
 DEPS_TAG = 'edot-collector-components-ocb'
 GATEWAY_9X_TAG = 'edot-gateway-9x-table'
 GATEWAY_8X_TAG = 'edot-gateway-8x-table'
+SAMPLES_LINKS_TAG = 'edot-samples-links'
 
 EDOT_COLLECTOR_DIR = '../../../docs/reference/edot-collector'
 TEMPLATE_COLLECTOR_COMPONENTS_TABLE = 'templates/components-table.jinja2'
 TEMPLATE_COLLECTOR_OCB_FILE = 'templates/ocb.jinja2'
 TEMPLATE_GATEWAY_TABLE = 'templates/gateway-table.jinja2'
+TEMPLATE_SAMPLES_LINKS = 'templates/samples-links.jinja2'
 COMPONENT_DOCS_YAML = '../../../docs/reference/edot-collector/component-docs.yml'
 DEFAULT_CONFIG_FILE = '../../../docs/reference/edot-collector/config/default-config-standalone.md'
-COMPONENTS_YAML = '../../../internal/pkg/otel/components.yml'
+COMPONENTS_YAML = '../../../internal/edot/components.yml'
+# Path migration configuration
+# Each entry defines: new_path, old_path, and the version where the change occurred
+PATH_MIGRATIONS = {
+    'gomod': {
+        'new': 'internal/edot/go.mod',
+        'old': 'go.mod',
+        'since': (9, 0, 0),  # EDOT go.mod exists from 9.0.0+
+    },
+    'components_yml': {
+        'new': 'internal/edot/components.yml',
+        'old': 'internal/pkg/otel/components.yml',
+        'since': (9, 3, 0),  # Moved in PR #11821
+        'exists_since': (9, 2, 1),  # File was added in v9.2.1 via PR #11040
+    },
+    'samples': {
+        'new': 'internal/edot/samples',
+        'old': 'internal/pkg/otel/samples',
+        'since': (9, 3, 0),  # Moved in PR #11821
+    },
+    'gateway': {
+        'new': 'internal/edot/samples/linux/gateway.yml',
+        'old': 'internal/pkg/otel/samples/linux/gateway.yml',
+        'since': (9, 3, 0),  # Moved in PR #11821
+    },
+}
+
+
+def parse_version_tag(tag):
+    """Parse a version tag into a tuple of (major, minor, patch).
+    
+    Args:
+        tag: Git tag string (e.g., 'v9.2.2', '9.2.2', 'v9.3.0-test')
+        
+    Returns:
+        Tuple of (major, minor, patch) integers, or None if parsing fails
+    """
+    # Remove 'v' prefix if present
+    version_str = tag.lstrip('v')
+    
+    # Match semantic version pattern (allows suffixes like -test, -rc1, etc.)
+    match = re.match(r'^(\d+)\.(\d+)\.(\d+)', version_str)
+    if match:
+        return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    return None
+
+
+def resolve_path_for_tag(tag, path_type, fallback_to_file_check=True):
+    """Resolve the correct file path for a given tag using semantic versioning.
+    
+    This is the consolidated path resolution function that handles all path
+    migrations based on version comparison rather than file existence checks.
+    
+    Args:
+        tag: Git tag to resolve path for (e.g., 'v9.2.2')
+        path_type: Key from PATH_MIGRATIONS ('gomod', 'components_yml', 'samples', 'gateway')
+        fallback_to_file_check: If True and version parsing fails, fall back to file existence check
+        
+    Returns:
+        The correct path string for the tag, or None if the file doesn't exist
+    """
+    if path_type not in PATH_MIGRATIONS:
+        raise ValueError(f"Unknown path type: {path_type}. Valid types: {list(PATH_MIGRATIONS.keys())}")
+    
+    config = PATH_MIGRATIONS[path_type]
+    new_path = config['new']
+    old_path = config['old']
+    since_version = config['since']
+    exists_since = config.get('exists_since')  # Optional: when file was first added
+    
+    version = parse_version_tag(tag)
+    
+    if version is not None:
+        # Use semantic version comparison (fast, no subprocess)
+        if version >= since_version:
+            return new_path
+        else:
+            # Check if file exists at this version (for files added after initial release)
+            if exists_since and version < exists_since:
+                return None
+            return old_path
+    elif fallback_to_file_check:
+        # Fallback to file existence check for non-standard tags
+        if check_file_exists_at_tag(new_path, tag):
+            return new_path
+        elif check_file_exists_at_tag(old_path, tag):
+            return old_path
+        return None
+    else:
+        return None
+
+
+def check_file_exists_at_tag(file_path, tag):
+    """Check if a file exists at a specific Git tag.
+    
+    Note: This is slower than version-based resolution. Use resolve_path_for_tag()
+    when possible, which uses semantic versioning for faster lookups.
+    """
+    try:
+        subprocess.run(
+            ['git', 'cat-file', '-e', f'{tag}:{file_path}'],
+            capture_output=True,
+            check=True
+        )
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+# Convenience functions that use the consolidated resolver
+def get_gomod_path_for_tag(tag):
+    """Get the correct go.mod path for a tag."""
+    path = resolve_path_for_tag(tag, 'gomod')
+    # go.mod always exists, fall back to root if new path doesn't exist
+    return path if path else 'go.mod'
+
+
+def get_components_yaml_path_for_tag(tag):
+    """Get the correct components.yml path for a tag, or None if it doesn't exist."""
+    return resolve_path_for_tag(tag, 'components_yml')
+
+
+def get_gateway_samples_path_for_tag(tag):
+    """Get the correct gateway.yml path for a tag, or None if it doesn't exist."""
+    return resolve_path_for_tag(tag, 'gateway')
+
+
+def get_samples_base_path_for_tag(tag):
+    """Get the correct samples base path for a tag."""
+    path = resolve_path_for_tag(tag, 'samples')
+    # Samples always exist in one location or another
+    return path if path else PATH_MIGRATIONS['samples']['old']
 
 
 def read_file_from_git_tag(file_path, tag):
@@ -78,8 +211,12 @@ def get_core_components(version='main'):
     latest_version = get_latest_version()
     version_tag = f"v{latest_version}"
     
-    # Always read from Git tag
-    components_path = 'internal/pkg/otel/components.yml'
+    # Determine correct components.yml path for this version (handles path migration)
+    components_path = get_components_yaml_path_for_tag(version_tag)
+    if components_path is None:
+        print(f"Warning: components.yml not found at tag {version_tag}. Assuming no core components defined.")
+        return []
+    
     print(f"Reading core components from tag {version_tag}: {components_path}")
     content = read_file_from_git_tag(components_path, version_tag)
     if content is None:
@@ -96,8 +233,12 @@ def get_deprecated_components(version='main'):
     latest_version = get_latest_version()
     version_tag = f"v{latest_version}"
     
-    # Always read from Git tag
-    components_path = 'internal/pkg/otel/components.yml'
+    # Determine correct components.yml path for this version (handles path migration)
+    components_path = get_components_yaml_path_for_tag(version_tag)
+    if components_path is None:
+        print(f"Warning: components.yml not found at tag {version_tag}. Assuming no deprecated components.")
+        return []
+    
     print(f"Reading deprecated components from tag {version_tag}: {components_path}")
     content = read_file_from_git_tag(components_path, version_tag)
     if content is None:
@@ -118,8 +259,12 @@ def get_component_annotations(version='main'):
     latest_version = get_latest_version()
     version_tag = f"v{latest_version}"
     
-    # Always read from Git tag
-    components_path = 'internal/pkg/otel/components.yml'
+    # Determine correct components.yml path for this version (handles path migration)
+    components_path = get_components_yaml_path_for_tag(version_tag)
+    if components_path is None:
+        print(f"Warning: components.yml not found at tag {version_tag}. Assuming no annotations.")
+        return {}
+    
     print(f"Reading component annotations from tag {version_tag}: {components_path}")
     content = read_file_from_git_tag(components_path, version_tag)
     if content is None:
@@ -167,8 +312,8 @@ def get_otel_col_upstream_version():
     latest_version = get_latest_version()
     version_tag = f"v{latest_version}"
     
-    # Always read from Git tag
-    go_mod_path = 'go.mod'
+    # Determine correct go.mod path for this version (handles path migration)
+    go_mod_path = get_gomod_path_for_tag(version_tag)
     print(f"Reading go.mod from tag {version_tag}: {go_mod_path}")
     content = read_file_from_git_tag(go_mod_path, version_tag)
     if content is None:
@@ -190,8 +335,8 @@ def get_otel_components(version='main', component_docs_mapping=None):
     latest_version = get_latest_version()
     version_tag = f"v{latest_version}"
     
-    # Always read from Git tag
-    go_mod_path = 'go.mod'
+    # Determine correct go.mod path for this version (handles path migration)
+    go_mod_path = get_gomod_path_for_tag(version_tag)
     print(f"Reading go.mod from tag {version_tag}: {go_mod_path}")
     elastic_agent_go_mod = read_file_from_git_tag(go_mod_path, version_tag)
     if elastic_agent_go_mod is None:
@@ -414,18 +559,6 @@ def get_minor_versions_above(major_version, min_minor):
     filtered = [v for v in all_versions if v['minor'] >= min_minor]
     return filtered
 
-def check_file_exists_at_tag(file_path, tag):
-    """Check if a file exists at a specific Git tag"""
-    try:
-        subprocess.run(
-            ['git', 'cat-file', '-e', f'{tag}:{file_path}'],
-            capture_output=True,
-            check=True
-        )
-        return True
-    except subprocess.CalledProcessError:
-        return False
-
 def get_gateway_versions(major_version, min_minor):
     """Get version data for gateway configuration table
     
@@ -441,20 +574,21 @@ def get_gateway_versions(major_version, min_minor):
     # Get all minor versions >= min_minor with their latest patches
     versions = get_minor_versions_above(major_version, min_minor)
     
-    # Filter to only versions where gateway.yml exists
-    gateway_file = 'internal/pkg/otel/samples/linux/gateway.yml'
     valid_versions = []
     
     for version_info in versions:
         version_str = f"{major_version}.{version_info['minor']}"
         tag_name = version_info['tag']
         
-        if check_file_exists_at_tag(gateway_file, tag_name):
+        # Determine correct gateway.yml path for this version (handles path migration)
+        gateway_path = get_gateway_samples_path_for_tag(tag_name)
+        if gateway_path is not None:
             valid_versions.append({
                 'version': version_str,
-                'tag': tag_name
+                'tag': tag_name,
+                'gateway_path': gateway_path
             })
-            print(f"  {version_str} → {tag_name}")
+            print(f"  {version_str} → {tag_name} ({gateway_path})")
         else:
             print(f"  Skipping {version_str}: gateway.yml not found at {tag_name}")
     
@@ -515,6 +649,23 @@ def generate_markdown():
     }
     render_components_into_file(EDOT_COLLECTOR_DIR, data, TEMPLATE_COLLECTOR_COMPONENTS_TABLE, TABLE_TAG)
     render_components_into_file(EDOT_COLLECTOR_DIR, data, TEMPLATE_COLLECTOR_OCB_FILE, DEPS_TAG)
+    
+    # Update sample configuration links
+    print("\nUpdating sample configuration links...")
+    version_tag = f"v{col_version}"
+    samples_base_path = get_samples_base_path_for_tag(version_tag)
+    print(f"  Version {col_version} → {samples_base_path}")
+    samples_data = {
+        'version': col_version,
+        'samples_path': samples_base_path
+    }
+    render_components_into_file(
+        os.path.dirname(DEFAULT_CONFIG_FILE),
+        samples_data,
+        TEMPLATE_SAMPLES_LINKS,
+        SAMPLES_LINKS_TAG
+    )
+    print("Sample configuration links updated successfully!")
     
     # Update gateway configuration tables
     print("\nUpdating gateway configuration tables...")

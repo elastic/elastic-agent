@@ -17,7 +17,6 @@ import (
 	"debug/buildinfo"
 	"debug/elf"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -25,6 +24,7 @@ import (
 	"io"
 	"maps"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -34,6 +34,8 @@ import (
 
 	"github.com/blakesmith/ar"
 	"github.com/cavaliergopher/rpm"
+	"github.com/docker/go-units"
+	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -101,10 +103,12 @@ func TestTar(t *testing.T) {
 	tarFiles := getFiles(t, regexp.MustCompile(`-\w+\.tar\.gz$`))
 	for _, tarFile := range tarFiles {
 		t.Run(filepath.Base(tarFile), func(t *testing.T) {
+			if strings.Contains(tarFile, "-core-") {
+				t.Skip("core package is not checked")
+			}
 			fipsPackage := strings.Contains(tarFile, "-fips-")
 			checkTar(t, tarFile, fipsPackage)
 		})
-
 	}
 }
 
@@ -112,6 +116,9 @@ func TestZip(t *testing.T) {
 	zips := getFiles(t, regexp.MustCompile(`^\w+\S+.zip$`))
 	for _, zip := range zips {
 		t.Run(filepath.Base(zip), func(t *testing.T) {
+			if strings.Contains(zip, "-core-") {
+				t.Skip("core package is not checked")
+			}
 			checkZip(t, zip)
 		})
 	}
@@ -421,7 +428,7 @@ func checkDocker(t *testing.T, file string, fipsPackage bool) (string, int64) {
 		return checkEdotCollectorDocker(t, file)
 	}
 
-	p, info, err := readDocker(file, true)
+	p, info, err := readDocker(t, file, true)
 	if err != nil {
 		t.Errorf("error reading file %v: %v", file, err)
 		return "", -1
@@ -474,7 +481,7 @@ func dockerName(file string, labels map[string]string) (string, error) {
 }
 
 func checkEdotCollectorDocker(t *testing.T, file string) (string, int64) {
-	p, info, err := readDocker(file, true)
+	p, info, err := readDocker(t, file, true)
 	if err != nil {
 		t.Errorf("error reading file %v: %v", file, err)
 		return "", -1
@@ -500,7 +507,7 @@ func checkEdotCollectorDocker(t *testing.T, file string) (string, int64) {
 }
 
 func checkCompleteDocker(t *testing.T, file string) {
-	p, _, err := readDocker(file, false)
+	p, _, err := readDocker(t, file, false)
 	if err != nil {
 		t.Errorf("error reading file %v: %v", file, err)
 	}
@@ -1079,78 +1086,83 @@ func openZip(zipFile string) (*zip.ReadCloser, error) {
 	return r, nil
 }
 
-func readDocker(dockerFile string, filterWorkingDir bool) (*packageFile, *dockerInfo, error) {
-	// Read the manifest file first so that the config file and layer
-	// names are known in advance.
-	manifest, err := getDockerManifest(dockerFile)
-	if err != nil {
-		return nil, nil, err
+func readDocker(t *testing.T, dockerFile string, filterWorkingDir bool) (*packageFile, *dockerInfo, error) {
+	t.Helper()
+
+	// Decompress the .tar.gz file, go-containerregistry wants uncompressed here
+	f, err := os.Open(dockerFile)
+	require.NoError(t, err)
+
+	gz, err := gzip.NewReader(f)
+	require.NoError(t, err)
+
+	_, dockerFileName := path.Split(dockerFile)
+
+	tempDir := t.TempDir()
+	uncompressed, err := os.CreateTemp(tempDir, dockerFileName)
+	require.NoError(t, err)
+
+	_, err = io.CopyN(uncompressed, gz, 10*units.GiB) // setting a maximum because gosec complains otherwise
+	if !errors.Is(err, io.EOF) {
+		require.NoError(t, err)
 	}
+	require.NoError(t, uncompressed.Close())
 
-	file, err := os.Open(dockerFile)
-	if err != nil {
-		return nil, nil, err
+	// Load the Docker image tarball using go-containerregistry
+	img, err := tarball.ImageFromPath(uncompressed.Name(), nil)
+	require.NoError(t, err, "failed to load Docker image from %s", dockerFile)
+
+	// Get the config file which contains entrypoint, labels, user, workingDir
+	configFile, err := img.ConfigFile()
+	require.NoError(t, err, "failed to get config file from image")
+
+	imgSize, err := img.Size()
+	require.NoError(t, err, "failed to get image size")
+	info := &dockerInfo{
+		Size: imgSize,
 	}
-	defer file.Close()
+	info.Config.Entrypoint = configFile.Config.Entrypoint
+	info.Config.Labels = configFile.Config.Labels
+	info.Config.User = configFile.Config.User
+	info.Config.WorkingDir = configFile.Config.WorkingDir
 
-	var info *dockerInfo
-
-	stat, err := file.Stat()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	layers := make(map[string]*packageFile)
-
-	gzipReader, err := gzip.NewReader(file)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer gzipReader.Close()
-
-	tarReader := tar.NewReader(gzipReader)
-	for {
-		header, err := tarReader.Next()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return nil, nil, err
-		}
-
-		switch {
-		case header.Name == manifest.Config:
-			info, err = readDockerInfo(tarReader)
-			if err != nil {
-				return nil, nil, err
-			}
-		case slices.Contains(manifest.Layers, header.Name):
-			layer, err := readTarContents(header.Name, tarReader)
-			if err != nil {
-				return nil, nil, err
-			}
-			layers[header.Name] = layer
-		}
-	}
-
-	if len(info.Config.Entrypoint) == 0 {
-		return nil, nil, fmt.Errorf("no entrypoint")
-	}
-
+	require.NotZero(t, len(info.Config.Entrypoint), "no entrypoint")
 	workingDir := info.Config.WorkingDir
 	entrypoint := info.Config.Entrypoint[0]
 
+	// Get all layers and read their contents
+	layers, err := img.Layers()
+	require.NoError(t, err, "failed to get layers from image")
+
 	// Read layers in order and for each file keep only the entry seen in the later layer
 	p := &packageFile{Name: filepath.Base(dockerFile), Contents: map[string]packageEntry{}}
-	for _, layer := range manifest.Layers {
-		layerFile, found := layers[layer]
-		if !found {
-			return nil, nil, fmt.Errorf("layer not found: %s", layer)
-		}
-		for name, entry := range layerFile.Contents {
+	for _, layer := range layers {
+		rc, err := layer.Uncompressed()
+		require.NoError(t, err, "failed to get uncompressed layer")
+
+		tarReader := tar.NewReader(rc)
+		for {
+			header, err := tarReader.Next()
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				assert.NoError(t, rc.Close())
+				require.NoError(t, err)
+			}
+
+			name := header.Name
 			if excludedPathsPattern.MatchString(name) {
 				continue
 			}
+
+			entry := packageEntry{
+				File: name,
+				UID:  header.Uid,
+				GID:  header.Gid,
+				Mode: header.FileInfo().Mode(),
+			}
+
 			// Check only files in working dir and entrypoint
 			if !filterWorkingDir || strings.HasPrefix("/"+name, workingDir) || "/"+name == entrypoint {
 				p.Contents[name] = entry
@@ -1162,20 +1174,11 @@ func readDocker(dockerFile string, filterWorkingDir bool) (*packageFile, *docker
 				}
 			}
 		}
+		assert.NoError(t, rc.Close())
 	}
 
-	if len(p.Contents) == 0 {
-		return nil, nil, fmt.Errorf("no files found in docker working directory (%s)", info.Config.WorkingDir)
-	}
-
-	info.Size = stat.Size()
+	require.NotZero(t, len(p.Contents), fmt.Sprintf("no files found in docker working directory (%s)", info.Config.WorkingDir))
 	return p, info, nil
-}
-
-type dockerManifest struct {
-	Config   string
-	RepoTags []string
-	Layers   []string
 }
 
 type dockerInfo struct {
@@ -1186,78 +1189,6 @@ type dockerInfo struct {
 		WorkingDir string
 	} `json:"config"`
 	Size int64
-}
-
-func readDockerInfo(r io.Reader) (*dockerInfo, error) {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-
-	var info dockerInfo
-	err = json.Unmarshal(data, &info)
-	if err != nil {
-		return nil, err
-	}
-
-	return &info, nil
-}
-
-// getDockerManifest opens a gzipped tar file to read the Docker manifest.json
-// that it is expected to contain.
-func getDockerManifest(file string) (*dockerManifest, error) {
-	f, err := os.Open(file)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	gzipReader, err := gzip.NewReader(f)
-	if err != nil {
-		return nil, err
-	}
-	defer gzipReader.Close()
-
-	var manifest *dockerManifest
-	tarReader := tar.NewReader(gzipReader)
-	for {
-		header, err := tarReader.Next()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return nil, err
-		}
-
-		if header.Name == "manifest.json" {
-			manifest, err = readDockerManifest(tarReader)
-			if err != nil {
-				return nil, err
-			}
-			break
-		}
-	}
-
-	return manifest, nil
-}
-
-func readDockerManifest(r io.Reader) (*dockerManifest, error) {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-
-	var manifests []*dockerManifest
-	err = json.Unmarshal(data, &manifests)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(manifests) != 1 {
-		return nil, fmt.Errorf("one and only one manifest expected, %d found", len(manifests))
-	}
-
-	return manifests[0], nil
 }
 
 func checkSha512PackageHash(t *testing.T, packageFile string) {

@@ -17,6 +17,8 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 
+	"github.com/elastic/elastic-agent-libs/logp"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
@@ -33,16 +35,11 @@ func TestMonitoringFull(t *testing.T) {
 	require.NoError(t, err, "Error creating agent info")
 
 	policy := map[string]any{
-		"agent": map[string]any{
-			"monitoring": map[string]any{
-				"metrics": true,
-				"http": map[string]any{
-					"enabled": false,
-				},
-			},
-		},
 		"outputs": map[string]any{
-			"default": map[string]any{},
+			"default": map[string]any{
+				"hosts": []string{"localhost:9200"},
+				"type":  "elasticsearch",
+			},
 		},
 	}
 
@@ -106,23 +103,17 @@ func TestMonitoringFull(t *testing.T) {
 			ExpectedConfigPath: filepath.Join(".", "testdata", "monitoring_config_full_otel.yaml"),
 		},
 	}
-
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
+			monitoringCfg := &monitoringConfig{
+				C: monitoringcfg.DefaultConfig(),
+			}
+			monitoringCfg.C.RuntimeManager = tc.RuntimeManager
 			testMon := BeatsMonitor{
-				enabled: true,
-				config: &monitoringConfig{
-					C: &monitoringcfg.MonitoringConfig{
-						Enabled:        true,
-						MonitorMetrics: true,
-						MonitorLogs:    true,
-						HTTP: &monitoringcfg.MonitoringHTTPConfig{
-							Enabled: true,
-						},
-						RuntimeManager: tc.RuntimeManager,
-					},
-				},
+				enabled:   true,
+				config:    monitoringCfg,
 				agentInfo: agentInfo,
+				logger:    logp.NewNopLogger(),
 			}
 
 			expectedConfigBytes, err := os.ReadFile(tc.ExpectedConfigPath)
@@ -164,26 +155,13 @@ func TestMonitoringWithEndpoint(t *testing.T) {
 	testMon := BeatsMonitor{
 		enabled: true,
 		config: &monitoringConfig{
-			C: &monitoringcfg.MonitoringConfig{
-				Enabled:        true,
-				MonitorMetrics: true,
-				HTTP: &monitoringcfg.MonitoringHTTPConfig{
-					Enabled: true,
-				},
-			},
+			C: monitoringcfg.DefaultConfig(),
 		},
 		agentInfo: agentInfo,
+		logger:    logp.NewNopLogger(),
 	}
 
 	policy := map[string]any{
-		"agent": map[string]any{
-			"monitoring": map[string]any{
-				"metrics": true,
-				"http": map[string]any{
-					"enabled": false,
-				},
-			},
-		},
 		"outputs": map[string]any{
 			"default": map[string]any{},
 		},
@@ -250,6 +228,8 @@ func TestMonitoringConfigMetricsInterval(t *testing.T) {
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)
 	require.NoError(t, err, "Error creating agent info")
 	components := []component.Component{{ID: "foobeat", InputSpec: &component.InputRuntimeSpec{BinaryName: "filebeat"}}}
+	defaultConfigWithoutLogs := monitoringcfg.DefaultConfig()
+	defaultConfigWithoutLogs.MonitorLogs = false
 
 	tcs := []struct {
 		name             string
@@ -260,28 +240,14 @@ func TestMonitoringConfigMetricsInterval(t *testing.T) {
 		{
 			name: "default metrics interval",
 			monitoringCfg: &monitoringConfig{
-				C: &monitoringcfg.MonitoringConfig{
-					Enabled:        true,
-					MonitorMetrics: true,
-					HTTP: &monitoringcfg.MonitoringHTTPConfig{
-						Enabled: false,
-					},
-				},
+				C: defaultConfigWithoutLogs,
 			},
 			policy: map[string]any{
-				"agent": map[string]any{
-					"monitoring": map[string]any{
-						"metrics": true,
-						"http": map[string]any{
-							"enabled": false,
-						},
-					},
-				},
 				"outputs": map[string]any{
 					"default": map[string]any{},
 				},
 			},
-			expectedInterval: defaultMetricsCollectionInterval,
+			expectedInterval: monitoringcfg.DefaultMetricsCollectionInterval,
 		},
 		{
 			name: "agent config metrics interval",
@@ -290,53 +256,18 @@ func TestMonitoringConfigMetricsInterval(t *testing.T) {
 					Enabled:        true,
 					MonitorMetrics: true,
 					HTTP: &monitoringcfg.MonitoringHTTPConfig{
-						Enabled: false,
+						Enabled: true,
 					},
-					MetricsPeriod: "20s",
+					UseOutput:     monitoringcfg.DefaultOutputName,
+					MetricsPeriod: time.Second * 20,
 				},
 			},
 			policy: map[string]any{
-				"agent": map[string]any{
-					"monitoring": map[string]any{
-						"metrics": true,
-						"http": map[string]any{
-							"enabled": false,
-						},
-					},
-				},
 				"outputs": map[string]any{
 					"default": map[string]any{},
 				},
 			},
 			expectedInterval: 20 * time.Second,
-		},
-		{
-			name: "policy metrics interval",
-			monitoringCfg: &monitoringConfig{
-				C: &monitoringcfg.MonitoringConfig{
-					Enabled:        true,
-					MonitorMetrics: true,
-					HTTP: &monitoringcfg.MonitoringHTTPConfig{
-						Enabled: false,
-					},
-					MetricsPeriod: "20s",
-				},
-			},
-			policy: map[string]any{
-				"agent": map[string]any{
-					"monitoring": map[string]any{
-						"metrics": true,
-						"http": map[string]any{
-							"enabled": false,
-						},
-						"metrics_period": "10s",
-					},
-				},
-				"outputs": map[string]any{
-					"default": map[string]any{},
-				},
-			},
-			expectedInterval: 10 * time.Second,
 		},
 	}
 
@@ -347,6 +278,7 @@ func TestMonitoringConfigMetricsInterval(t *testing.T) {
 				config:          tc.monitoringCfg,
 				operatingSystem: runtime.GOOS,
 				agentInfo:       agentInfo,
+				logger:          logp.NewNopLogger(),
 			}
 			got, err := b.MonitoringConfig(tc.policy, components, map[string]uint64{}) // put a componentID/binary mapping to have something in the beats monitoring input
 			assert.NoError(t, err)
@@ -396,9 +328,9 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)
 	require.NoError(t, err, "Error creating agent info")
 	components := []component.Component{{ID: "foobeat", InputSpec: &component.InputRuntimeSpec{BinaryName: "filebeat"}}}
-
+	defaultConfigWithoutLogs := monitoringcfg.DefaultConfig()
+	defaultConfigWithoutLogs.MonitorLogs = false
 	sampleSevenErrorsStreamThreshold := uint(7)
-	sampleTenErrorsStreamThreshold := uint(10)
 
 	tcs := []struct {
 		name              string
@@ -409,28 +341,14 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 		{
 			name: "default failure threshold",
 			monitoringCfg: &monitoringConfig{
-				C: &monitoringcfg.MonitoringConfig{
-					Enabled:        true,
-					MonitorMetrics: true,
-					HTTP: &monitoringcfg.MonitoringHTTPConfig{
-						Enabled: false,
-					},
-				},
+				C: defaultConfigWithoutLogs,
 			},
 			policy: map[string]any{
-				"agent": map[string]any{
-					"monitoring": map[string]any{
-						"metrics": true,
-						"http": map[string]any{
-							"enabled": false,
-						},
-					},
-				},
 				"outputs": map[string]any{
 					"default": map[string]any{},
 				},
 			},
-			expectedThreshold: defaultMetricsStreamFailureThreshold,
+			expectedThreshold: monitoringcfg.DefaultMetricsStreamFailureThreshold,
 		},
 		{
 			name: "agent config failure threshold",
@@ -439,137 +357,18 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 					Enabled:        true,
 					MonitorMetrics: true,
 					HTTP: &monitoringcfg.MonitoringHTTPConfig{
-						Enabled: false,
+						Enabled: true,
 					},
+					UseOutput:        monitoringcfg.DefaultOutputName,
 					FailureThreshold: &sampleSevenErrorsStreamThreshold,
 				},
 			},
 			policy: map[string]any{
-				"agent": map[string]any{
-					"monitoring": map[string]any{
-						"metrics": true,
-						"http": map[string]any{
-							"enabled": false,
-						},
-					},
-				},
 				"outputs": map[string]any{
 					"default": map[string]any{},
 				},
 			},
 			expectedThreshold: sampleSevenErrorsStreamThreshold,
-		},
-		{
-			name: "policy failure threshold uint",
-			monitoringCfg: &monitoringConfig{
-				C: &monitoringcfg.MonitoringConfig{
-					Enabled:        true,
-					MonitorMetrics: true,
-					HTTP: &monitoringcfg.MonitoringHTTPConfig{
-						Enabled: false,
-					},
-					FailureThreshold: &sampleSevenErrorsStreamThreshold,
-				},
-			},
-			policy: map[string]any{
-				"agent": map[string]any{
-					"monitoring": map[string]any{
-						"metrics": true,
-						"http": map[string]any{
-							"enabled": false,
-						},
-						failureThresholdKey: sampleTenErrorsStreamThreshold,
-					},
-				},
-				"outputs": map[string]any{
-					"default": map[string]any{},
-				},
-			},
-			expectedThreshold: sampleTenErrorsStreamThreshold,
-		},
-		{
-			name: "policy failure threshold int",
-			monitoringCfg: &monitoringConfig{
-				C: &monitoringcfg.MonitoringConfig{
-					Enabled:        true,
-					MonitorMetrics: true,
-					HTTP: &monitoringcfg.MonitoringHTTPConfig{
-						Enabled: false,
-					},
-					FailureThreshold: &sampleSevenErrorsStreamThreshold,
-				},
-			},
-			policy: map[string]any{
-				"agent": map[string]any{
-					"monitoring": map[string]any{
-						"metrics": true,
-						"http": map[string]any{
-							"enabled": false,
-						},
-						failureThresholdKey: 10,
-					},
-				},
-				"outputs": map[string]any{
-					"default": map[string]any{},
-				},
-			},
-			expectedThreshold: sampleTenErrorsStreamThreshold,
-		},
-		{
-			name: "policy failure threshold string",
-			monitoringCfg: &monitoringConfig{
-				C: &monitoringcfg.MonitoringConfig{
-					Enabled:        true,
-					MonitorMetrics: true,
-					HTTP: &monitoringcfg.MonitoringHTTPConfig{
-						Enabled: false,
-					},
-					FailureThreshold: &sampleSevenErrorsStreamThreshold,
-				},
-			},
-			policy: map[string]any{
-				"agent": map[string]any{
-					"monitoring": map[string]any{
-						"metrics": true,
-						"http": map[string]any{
-							"enabled": false,
-						},
-						failureThresholdKey: "10",
-					},
-				},
-				"outputs": map[string]any{
-					"default": map[string]any{},
-				},
-			},
-			expectedThreshold: sampleTenErrorsStreamThreshold,
-		},
-		{
-			name: "policy failure threshold float64",
-			monitoringCfg: &monitoringConfig{
-				C: &monitoringcfg.MonitoringConfig{
-					Enabled:        true,
-					MonitorMetrics: true,
-					HTTP: &monitoringcfg.MonitoringHTTPConfig{
-						Enabled: false,
-					},
-					FailureThreshold: &sampleSevenErrorsStreamThreshold,
-				},
-			},
-			policy: map[string]any{
-				"agent": map[string]any{
-					"monitoring": map[string]any{
-						"metrics": true,
-						"http": map[string]any{
-							"enabled": false,
-						},
-						failureThresholdKey: float64(10),
-					},
-				},
-				"outputs": map[string]any{
-					"default": map[string]any{},
-				},
-			},
-			expectedThreshold: sampleTenErrorsStreamThreshold,
 		},
 	}
 
@@ -580,6 +379,7 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 				config:          tc.monitoringCfg,
 				operatingSystem: runtime.GOOS,
 				agentInfo:       agentInfo,
+				logger:          logp.NewNopLogger(),
 			}
 			got, err := b.MonitoringConfig(tc.policy, components, map[string]uint64{}) // put a componentID/binary mapping to have something in the beats monitoring input
 			assert.NoError(t, err)
@@ -623,146 +423,6 @@ func TestMonitoringConfigMetricsFailureThreshold(t *testing.T) {
 	}
 }
 
-func TestErrorMonitoringConfigMetricsFailureThreshold(t *testing.T) {
-	agentInfo, err := info.NewAgentInfo(context.Background(), false)
-	components := []component.Component{{ID: "foobeat", InputSpec: &component.InputRuntimeSpec{BinaryName: "filebeat"}}}
-	require.NoError(t, err, "Error creating agent info")
-
-	tcs := []struct {
-		name          string
-		monitoringCfg *monitoringConfig
-		policy        map[string]any
-		assertError   assert.ErrorAssertionFunc
-	}{
-		{
-			name: "invalid policy failure threshold float64",
-			monitoringCfg: &monitoringConfig{
-				C: &monitoringcfg.MonitoringConfig{
-					Enabled:        true,
-					MonitorMetrics: true,
-					HTTP: &monitoringcfg.MonitoringHTTPConfig{
-						Enabled: false,
-					},
-					FailureThreshold: nil,
-				},
-			},
-			policy: map[string]any{
-				"agent": map[string]any{
-					"monitoring": map[string]any{
-						"metrics": true,
-						"http": map[string]any{
-							"enabled": false,
-						},
-						failureThresholdKey: float64(-1),
-					},
-				},
-				"outputs": map[string]any{
-					"default": map[string]any{},
-				},
-			},
-			assertError: assert.Error,
-		},
-		{
-			name: "invalid policy failure threshold string",
-			monitoringCfg: &monitoringConfig{
-				C: &monitoringcfg.MonitoringConfig{
-					Enabled:        true,
-					MonitorMetrics: true,
-					HTTP: &monitoringcfg.MonitoringHTTPConfig{
-						Enabled: false,
-					},
-					FailureThreshold: nil,
-				},
-			},
-			policy: map[string]any{
-				"agent": map[string]any{
-					"monitoring": map[string]any{
-						"metrics": true,
-						"http": map[string]any{
-							"enabled": false,
-						},
-						failureThresholdKey: "foobar",
-					},
-				},
-				"outputs": map[string]any{
-					"default": map[string]any{},
-				},
-			},
-			assertError: assert.Error,
-		},
-		{
-			name: "invalid policy failure threshold negative number as string",
-			monitoringCfg: &monitoringConfig{
-				C: &monitoringcfg.MonitoringConfig{
-					Enabled:        true,
-					MonitorMetrics: true,
-					HTTP: &monitoringcfg.MonitoringHTTPConfig{
-						Enabled: false,
-					},
-					FailureThreshold: nil,
-				},
-			},
-			policy: map[string]any{
-				"agent": map[string]any{
-					"monitoring": map[string]any{
-						"metrics": true,
-						"http": map[string]any{
-							"enabled": false,
-						},
-						failureThresholdKey: "-12",
-					},
-				},
-				"outputs": map[string]any{
-					"default": map[string]any{},
-				},
-			},
-			assertError: assert.Error,
-		},
-		{
-			name: "invalid policy failure threshold negative int",
-			monitoringCfg: &monitoringConfig{
-				C: &monitoringcfg.MonitoringConfig{
-					Enabled:        true,
-					MonitorMetrics: true,
-					HTTP: &monitoringcfg.MonitoringHTTPConfig{
-						Enabled: false,
-					},
-					FailureThreshold: nil,
-				},
-			},
-			policy: map[string]any{
-				"agent": map[string]any{
-					"monitoring": map[string]any{
-						"metrics": true,
-						"http": map[string]any{
-							"enabled": false,
-						},
-						failureThresholdKey: -12,
-					},
-				},
-				"outputs": map[string]any{
-					"default": map[string]any{},
-				},
-			},
-			assertError: assert.Error,
-		},
-	}
-
-	for _, tc := range tcs {
-		t.Run(tc.name, func(t *testing.T) {
-			b := &BeatsMonitor{
-				enabled:         true,
-				config:          tc.monitoringCfg,
-				operatingSystem: runtime.GOOS,
-				agentInfo:       agentInfo,
-			}
-
-			_, err := b.MonitoringConfig(tc.policy, components, map[string]uint64{}) // put a componentID/binary mapping to have something in the beats monitoring input
-			tc.assertError(t, err)
-		})
-	}
-}
-
 func TestMonitoringConfigComponentFields(t *testing.T) {
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)
 	require.NoError(t, err, "Error creating agent info")
@@ -771,20 +431,14 @@ func TestMonitoringConfigComponentFields(t *testing.T) {
 		C: &monitoringcfg.MonitoringConfig{
 			Enabled:        true,
 			MonitorMetrics: true,
-			Namespace:      "tiaog",
 			HTTP: &monitoringcfg.MonitoringHTTPConfig{
 				Enabled: false,
 			},
+			UseOutput: monitoringcfg.DefaultOutputName,
 		},
 	}
 
 	policy := map[string]any{
-		"agent": map[string]any{
-			"monitoring": map[string]any{
-				"metrics": true,
-				"logs":    false,
-			},
-		},
 		"outputs": map[string]any{
 			"default": map[string]any{},
 		},
@@ -794,6 +448,7 @@ func TestMonitoringConfigComponentFields(t *testing.T) {
 		enabled:   true,
 		config:    cfg,
 		agentInfo: agentInfo,
+		logger:    logp.NewNopLogger(),
 	}
 
 	components := []component.Component{
@@ -885,16 +540,11 @@ func TestMonitoringConfigForBeatsReceivers(t *testing.T) {
 				Enabled: false,
 			},
 			RuntimeManager: monitoringcfg.DefaultRuntimeManager,
+			UseOutput:      monitoringcfg.DefaultOutputName,
 		},
 	}
 
 	policy := map[string]any{
-		"agent": map[string]any{
-			"monitoring": map[string]any{
-				"metrics": true,
-				"logs":    false,
-			},
-		},
 		"outputs": map[string]any{
 			"default": map[string]any{},
 		},
@@ -904,6 +554,7 @@ func TestMonitoringConfigForBeatsReceivers(t *testing.T) {
 		enabled:   true,
 		config:    cfg,
 		agentInfo: agentInfo,
+		logger:    logp.NewNopLogger(),
 	}
 
 	components := []component.Component{
@@ -959,92 +610,81 @@ func TestMonitoringConfigForBeatsReceivers(t *testing.T) {
 }
 
 func TestMonitoringWithOtelRuntime(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-	}{
-		{
-			name: "otel runtime subprocess",
+	agentInfo, err := info.NewAgentInfo(context.Background(), false)
+	require.NoError(t, err, "Error creating agent info")
+
+	cfg := &monitoringConfig{
+		C: &monitoringcfg.MonitoringConfig{
+			Enabled:        true,
+			MonitorLogs:    true,
+			MonitorMetrics: true,
+			Namespace:      "test",
+			HTTP: &monitoringcfg.MonitoringHTTPConfig{
+				Enabled: false,
+			},
+			RuntimeManager: monitoringcfg.OtelRuntimeManager,
+			UseOutput:      monitoringcfg.DefaultOutputName,
 		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			agentInfo, err := info.NewAgentInfo(context.Background(), false)
-			require.NoError(t, err, "Error creating agent info")
-
-			cfg := &monitoringConfig{
-				C: &monitoringcfg.MonitoringConfig{
-					Enabled:        true,
-					MonitorLogs:    true,
-					MonitorMetrics: true,
-					Namespace:      "test",
-					HTTP: &monitoringcfg.MonitoringHTTPConfig{
-						Enabled: false,
-					},
-					RuntimeManager: monitoringcfg.OtelRuntimeManager,
-				},
-			}
-
-			policy := map[string]any{
-				"agent": map[string]any{
-					"monitoring": map[string]any{
-						"metrics": true,
-						"logs":    false,
-					},
-				},
-				"outputs": map[string]any{
-					"default": map[string]any{},
-				},
-			}
-
-			b := &BeatsMonitor{
-				enabled:   true,
-				config:    cfg,
-				agentInfo: agentInfo,
-			}
-
-			components := []component.Component{
-				{
-					ID: "filestream-receiver",
-					InputSpec: &component.InputRuntimeSpec{
-						Spec: component.InputSpec{
-							Command: &component.CommandSpec{
-								Name: "filebeat",
-							},
-						},
-					},
-					RuntimeManager: component.OtelRuntimeManager,
-				},
-			}
-			monitoringCfgMap, err := b.MonitoringConfig(policy, components, map[string]uint64{})
-			require.NoError(t, err)
-
-			// Verify that if we're using filebeat receiver, there's no filebeat input
-			var monitoringCfg struct {
-				Inputs []struct {
-					ID             string
-					RuntimeManager string `mapstructure:"_runtime_experimental"`
-					Streams        []struct {
-						ID string `mapstructure:"id"`
-					} `mapstructure:"streams"`
-				}
-			}
-			err = mapstructure.Decode(monitoringCfgMap, &monitoringCfg)
-			require.NoError(t, err)
-			edotSubprocessStreamID := fmt.Sprintf("%s-edot-collector", monitoringMetricsUnitID)
-			foundEdotSubprocessStream := false
-			for _, input := range monitoringCfg.Inputs {
-				assert.Equal(t, monitoringcfg.OtelRuntimeManager, input.RuntimeManager)
-				if !foundEdotSubprocessStream && input.ID == "metrics-monitoring-agent" {
-					for _, stream := range input.Streams {
-						if stream.ID == edotSubprocessStreamID {
-							foundEdotSubprocessStream = true
-							break
-						}
-					}
-				}
-			}
-			require.True(t, foundEdotSubprocessStream, "edot subprocess stream not found")
-		})
 	}
+
+	policy := map[string]any{
+		"outputs": map[string]any{
+			"default": map[string]any{
+				"hosts": []string{"localhost:9200"},
+				"type":  "elasticsearch",
+			},
+		},
+	}
+
+	b := &BeatsMonitor{
+		enabled:   true,
+		config:    cfg,
+		agentInfo: agentInfo,
+		logger:    logp.NewNopLogger(),
+	}
+
+	components := []component.Component{
+		{
+			ID: "filestream-receiver",
+			InputSpec: &component.InputRuntimeSpec{
+				Spec: component.InputSpec{
+					Command: &component.CommandSpec{
+						Name: "filebeat",
+					},
+				},
+			},
+			RuntimeManager: component.OtelRuntimeManager,
+		},
+	}
+	monitoringCfgMap, err := b.MonitoringConfig(policy, components, map[string]uint64{})
+	require.NoError(t, err)
+
+	// Verify that if we're using filebeat receiver, there's no filebeat input
+	var monitoringCfg struct {
+		Inputs []struct {
+			ID             string
+			RuntimeManager string `mapstructure:"_runtime_experimental"`
+			Streams        []struct {
+				ID string `mapstructure:"id"`
+			} `mapstructure:"streams"`
+		}
+	}
+	err = mapstructure.Decode(monitoringCfgMap, &monitoringCfg)
+	require.NoError(t, err)
+	edotSubprocessStreamID := fmt.Sprintf("%s-edot-collector", monitoringMetricsUnitID)
+	foundEdotSubprocessStream := false
+	for _, input := range monitoringCfg.Inputs {
+		assert.Equal(t, monitoringcfg.OtelRuntimeManager, input.RuntimeManager)
+		if !foundEdotSubprocessStream && input.ID == "metrics-monitoring-agent" {
+			for _, stream := range input.Streams {
+				if stream.ID == edotSubprocessStreamID {
+					foundEdotSubprocessStream = true
+					break
+				}
+			}
+		}
+	}
+	require.True(t, foundEdotSubprocessStream, "edot subprocess stream not found")
 }
 
 func TestEnrichArgs(t *testing.T) {
@@ -1084,6 +724,7 @@ func TestEnrichArgs(t *testing.T) {
 			b := &BeatsMonitor{
 				enabled: test.enabled,
 				config:  &test.config,
+				logger:  logp.NewNopLogger(),
 			}
 			args := b.EnrichArgs(unitID, test.binaryName, nil)
 			// replace socket path with placeholder, it's annoying to do cross-platform tests on these
@@ -1117,7 +758,7 @@ func TestMonitorReload(t *testing.T) {
 	monitorcfg.MonitorLogs = false
 	monitorcfg.MonitorMetrics = false
 
-	beatsMonitor := New(true, "", monitorcfg, nil)
+	beatsMonitor := New(true, "", monitorcfg, nil, logp.NewNopLogger())
 	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, false)
 	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, false)
 
@@ -1133,4 +774,248 @@ agent.monitoring:
 
 	assert.Equal(t, beatsMonitor.config.C.MonitorLogs, true)
 	assert.Equal(t, beatsMonitor.config.C.MonitorMetrics, true)
+}
+
+func TestMonitoringConfigOtelOutputSupport(t *testing.T) {
+	agentInfo, err := info.NewAgentInfo(context.Background(), false)
+	require.NoError(t, err, "Error creating agent info")
+
+	testCases := []struct {
+		name                       string
+		outputConfig               map[string]any
+		expectPrometheusMonitoring bool
+		monitoringRuntimeManager   string
+	}{
+		{
+			name: "kafka output - should NOT have prometheus monitoring",
+			outputConfig: map[string]any{
+				"type":  "kafka",
+				"hosts": []string{"localhost:9092"},
+			},
+			expectPrometheusMonitoring: false,
+			monitoringRuntimeManager:   monitoringcfg.ProcessRuntimeManager,
+		},
+		{
+			name: "logstash output - should NOT have prometheus monitoring",
+			outputConfig: map[string]any{
+				"type":  "logstash",
+				"hosts": []string{"localhost:9092"},
+			},
+			expectPrometheusMonitoring: false,
+			monitoringRuntimeManager:   monitoringcfg.ProcessRuntimeManager,
+		},
+		{
+			name: "elasticsearch output - should have prometheus monitoring",
+			outputConfig: map[string]any{
+				"type":  "elasticsearch",
+				"hosts": []string{"localhost:9200"},
+			},
+			expectPrometheusMonitoring: false,
+			monitoringRuntimeManager:   monitoringcfg.OtelRuntimeManager,
+		},
+		{
+			name: "elasticsearch with unsupported config - should NOT have prometheus monitoring",
+			outputConfig: map[string]any{
+				"type":    "elasticsearch",
+				"hosts":   []string{"localhost:9200"},
+				"indices": []any{},
+			},
+			expectPrometheusMonitoring: false,
+			monitoringRuntimeManager:   monitoringcfg.ProcessRuntimeManager,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testMon := BeatsMonitor{
+				enabled: true,
+				config: &monitoringConfig{
+					C: &monitoringcfg.MonitoringConfig{
+						Enabled:        true,
+						MonitorMetrics: true,
+						MonitorLogs:    false,
+						HTTP: &monitoringcfg.MonitoringHTTPConfig{
+							Enabled: false,
+						},
+						RuntimeManager: monitoringcfg.OtelRuntimeManager,
+						UseOutput:      monitoringcfg.DefaultOutputName,
+					},
+				},
+				agentInfo: agentInfo,
+				logger:    logp.NewNopLogger(),
+			}
+
+			policy := map[string]any{
+				"agent": map[string]any{
+					"monitoring": map[string]any{
+						"metrics": true,
+						"http": map[string]any{
+							"enabled": false,
+						},
+					},
+				},
+				"outputs": map[string]any{
+					"default": tc.outputConfig,
+				},
+			}
+
+			// Add a component that uses the OTel runtime to trigger prometheus monitoring
+			components := []component.Component{
+				{
+					ID: "filestream-otel",
+					InputSpec: &component.InputRuntimeSpec{
+						BinaryName: "filebeat",
+						Spec: component.InputSpec{
+							Command: &component.CommandSpec{
+								Name: "filebeat",
+							},
+						},
+					},
+					RuntimeManager: component.OtelRuntimeManager,
+				},
+			}
+
+			outCfg, err := testMon.MonitoringConfig(policy, components, map[string]uint64{})
+			require.NoError(t, err)
+
+			// Check for prometheus/metrics input
+			inputs := outCfg["inputs"].([]any)
+			foundPrometheusInput := false
+			for _, input := range inputs {
+				var inputStruct struct {
+					ID      string `mapstructure:"id"`
+					Type    string `mapstructure:"type"`
+					Runtime string `mapstructure:"_runtime_experimental"`
+				}
+				require.NoError(t, mapstructure.Decode(input, &inputStruct))
+				foundPrometheusInput = foundPrometheusInput || inputStruct.Type == "prometheus/metrics"
+				assert.Equalf(t, tc.monitoringRuntimeManager, inputStruct.Runtime,
+					"expected monitoring runtime manager %s for input %s, got %s",
+					tc.monitoringRuntimeManager, inputStruct.ID, inputStruct.Runtime)
+			}
+
+			assert.Equal(t, tc.expectPrometheusMonitoring, foundPrometheusInput,
+				"Prometheus monitoring presence mismatch for output type")
+		})
+	}
+}
+
+func TestMonitoringConfigParameterParsing(t *testing.T) {
+	agentInfo, err := info.NewAgentInfo(context.Background(), false)
+	require.NoError(t, err, "Error creating agent info")
+	components := []component.Component{{ID: "foobeat", InputSpec: &component.InputRuntimeSpec{BinaryName: "filebeat"}}}
+	failureThreshold := uint(15)
+
+	tcs := []struct {
+		name           string
+		monitoringCfg  *monitoringConfig
+		policy         map[string]any
+		expectedOutput map[string]any
+	}{
+		{
+			name: "default values",
+			monitoringCfg: &monitoringConfig{
+				C: &monitoringcfg.MonitoringConfig{
+					Enabled:        true,
+					MonitorMetrics: true,
+					HTTP: &monitoringcfg.MonitoringHTTPConfig{
+						Enabled: false,
+					},
+					UseOutput: monitoringcfg.DefaultOutputName,
+				},
+			},
+			policy: map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type":  "elasticsearch",
+						"hosts": []string{"http://localhost:9200"},
+					},
+				},
+			},
+			expectedOutput: map[string]any{
+				"type":  "elasticsearch",
+				"hosts": []string{"http://localhost:9200"},
+			},
+		},
+		{
+			name: "custom values",
+			monitoringCfg: &monitoringConfig{
+				C: &monitoringcfg.MonitoringConfig{
+					Enabled:        true,
+					MonitorMetrics: true,
+					HTTP: &monitoringcfg.MonitoringHTTPConfig{
+						Enabled: false,
+					},
+					MetricsPeriod:    time.Second * 30,
+					FailureThreshold: &failureThreshold,
+					UseOutput:        "custom",
+				},
+			},
+			policy: map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{
+						"type":  "elasticsearch",
+						"hosts": []string{"http://localhost:9200"},
+					},
+					"custom": map[string]any{
+						"type":  "logstash",
+						"hosts": []string{"http://localhost:5044"},
+					},
+				},
+			},
+			expectedOutput: map[string]any{
+				"type":  "logstash",
+				"hosts": []string{"http://localhost:5044"},
+			},
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			b := &BeatsMonitor{
+				enabled:         true,
+				config:          tc.monitoringCfg,
+				operatingSystem: runtime.GOOS,
+				agentInfo:       agentInfo,
+				logger:          logp.NewNopLogger(),
+			}
+			got, err := b.MonitoringConfig(tc.policy, components, map[string]uint64{})
+			assert.NoError(t, err)
+
+			// Check output
+			rawOutputs, ok := got["outputs"]
+			require.True(t, ok, "monitoring config contains no outputs")
+			outputs, ok := rawOutputs.(map[string]any)
+			require.True(t, ok, "monitoring outputs are not a map")
+
+			monitoringOutput, ok := outputs["monitoring"]
+			require.True(t, ok, "no 'monitoring' output found")
+			assert.Equal(t, tc.expectedOutput, monitoringOutput)
+
+			// Check interval and threshold
+			rawInputs, ok := got["inputs"]
+			require.True(t, ok, "monitoring config contains no input")
+			inputs, ok := rawInputs.([]any)
+			require.True(t, ok, "monitoring inputs are not a list")
+
+			for _, i := range inputs {
+				input, ok := i.(map[string]any)
+				if !assert.Truef(t, ok, "input is not represented as a map: %v", i) {
+					continue
+				}
+
+				if input["type"] == "filestream" {
+					continue // filestream inputs don't have these params
+				}
+
+				inputID := input["id"]
+				if !assert.Contains(t, input, "streams", "input %q does not contain any stream", inputID) {
+					continue
+				}
+				if !assert.IsTypef(t, []any{}, input["streams"], "streams for input %q are not a list of objects", inputID) {
+					continue
+				}
+			}
+		})
+	}
 }

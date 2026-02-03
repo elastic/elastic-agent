@@ -20,10 +20,12 @@ if [ -z "$TEST_SUDO" ]; then
   exit 1
 fi
 
+ESS_REGION=${ESS_REGION:-""}
+
 # Override the stack version from `.package-version` contents
 # There is a time when the current snapshot is not available on cloud yet, so we cannot use the latest version automatically
 # This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
-STACK_VERSION="$(jq -r '.version' .package-version)"
+STACK_VERSION="$(jq -r '.stack_version' .package-version)"
 STACK_BUILD_ID="$(jq -r '.stack_build_id' .package-version)"
 if [[ "${FIPS:-false}" == "true" ]]; then
   # FRH testing environment does not have same stack build IDs as CFT environment so
@@ -36,8 +38,8 @@ fi
 # BUILDKITE_RETRY_COUNT > 0 for the retries
 if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 || "${FORCE_ESS_CREATE:-false}" == "true" ]]; then
   echo "~~~ The steps is retried, starting the ESS stack again"
-  trap 'ess_down' EXIT
-  ess_up "$STACK_VERSION" "$STACK_BUILD_ID" || (echo -e "^^^ +++\nFailed to start ESS stack")
+  trap 'ess_down "$ESS_REGION"' EXIT
+  ess_up "$STACK_VERSION" "$STACK_BUILD_ID" "$ESS_REGION"
 else
   # For the first run, we start the stack in the start_ess.sh step and it sets the meta-data
   echo "~~~ Receiving ESS stack metadata"
@@ -66,7 +68,7 @@ else
   # test binaries are needed only when running integration tests outside of k8s
   echo "~~~ Building test binaries"
   mage build:testBinaries
-  
+
   if [ "$TEST_SUDO" == "true" ]; then
     sudo -E .buildkite/scripts/buildkite-integration-tests.sh $@
   else

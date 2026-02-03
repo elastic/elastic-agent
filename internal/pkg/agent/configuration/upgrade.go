@@ -16,8 +16,10 @@ const (
 	// period during which an upgraded Agent can be asked to rollback to the previous
 	// Agent version on disk.
 	// this is temporarily set to 0 to disable the rollback window until manual rollback functionality is complete.
-	// defaultRollbackWindowDuration = 7 * 24 * time.Hour // 7 days
-	defaultRollbackWindowDuration = 0
+	defaultRollbackWindowDuration = 7 * 24 * time.Hour // 7 days
+
+	// defaultRollbackCleanupInterval represents the interval between runs to cleanup available rollbacks
+	defaultRollbackCleanupInterval = 10 * time.Minute
 )
 
 // UpgradeConfig is the configuration related to Agent upgrades.
@@ -35,7 +37,8 @@ type UpgradeWatcherCheckConfig struct {
 }
 
 type UpgradeRollbackConfig struct {
-	Window time.Duration `yaml:"window" config:"window" json:"window"`
+	Window          time.Duration `yaml:"window" config:"window" json:"window"`
+	CleanupInterval time.Duration `yaml:"cleanup_interval" config:"cleanup_interval" json:"cleanup_interval"`
 }
 
 func DefaultUpgradeConfig() *UpgradeConfig {
@@ -47,7 +50,8 @@ func DefaultUpgradeConfig() *UpgradeConfig {
 			},
 		},
 		Rollback: &UpgradeRollbackConfig{
-			Window: defaultRollbackWindowDuration,
+			Window:          defaultRollbackWindowDuration,
+			CleanupInterval: defaultRollbackCleanupInterval,
 		},
 	}
 }

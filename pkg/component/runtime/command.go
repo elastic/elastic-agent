@@ -363,13 +363,12 @@ func (c *commandRuntime) start(comm Communicator) error {
 	}
 	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentID, c.current.ID))
 	env = append(env, fmt.Sprintf("%s=%s", envAgentComponentType, c.getSpecType()))
-	uid := os.Geteuid()
 	workDir := c.current.WorkDirPath(paths.Run())
 	path, err := filepath.Abs(c.getSpecBinaryPath())
 	if err != nil {
 		return fmt.Errorf("failed to determine absolute path: %w", err)
 	}
-	err = utils.HasStrictExecPerms(path, uid)
+	err = utils.HasStrictExecPerms(path)
 	if err != nil {
 		return fmt.Errorf("execution of component prevented: %w", err)
 	}
@@ -522,15 +521,11 @@ func attachOutErr(stdOut *logWriter, stdErr *logWriter) process.CmdOption {
 func createLogWriter(comp component.Component, baseLog *logger.Logger, cmdSpec *component.CommandSpec, typeStr string, binaryName string, ll zapcore.Level, unitLevels map[string]zapcore.Level, src logSource) *logWriter {
 	dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
 	logger := baseLog.With(
-		"component", map[string]interface{}{
-			"id":      comp.ID,
-			"type":    typeStr,
-			"binary":  binaryName,
-			"dataset": dataset,
-		},
-		"log", map[string]interface{}{
-			"source": comp.ID,
-		},
+		"component.id", comp.ID,
+		"component.type", typeStr,
+		"component.binary", binaryName,
+		"component.dataset", dataset,
+		"log.source", comp.ID,
 	)
 	return newLogWriter(logger.Core(), cmdSpec.Log, ll, unitLevels, src)
 }

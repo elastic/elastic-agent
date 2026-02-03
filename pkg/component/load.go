@@ -24,7 +24,7 @@ const (
 
 var (
 	// ErrInputNotSupported is returned when the input is not supported on any platform
-	ErrInputNotSupported = newError("input not supported")
+	ErrInputNotSupported = newError("input not supported - ensure you have installed the correct flavor: https://www.elastic.co/docs/reference/fleet/install-elastic-agents#elastic-agent-installation-flavors")
 	// ErrInputNotSupportedOnPlatform is returned when the input is supported but not on this platform
 	ErrInputNotSupportedOnPlatform = newError("input not supported on this platform")
 	// ErrOutputNotSupported is returned when the output is not supported on any platform
@@ -37,6 +37,32 @@ type InputRuntimeSpec struct {
 	BinaryName string    `yaml:"binary_name"`
 	BinaryPath string    `yaml:"binary_path"`
 	Spec       InputSpec `yaml:"spec"`
+}
+
+// BeatName returns the beat binary name that would be used to run the component. If the spec doesn't run a beat, it
+// returns an empty string.
+func (s *InputRuntimeSpec) BeatName() string {
+	commandName := s.CommandName()
+	if strings.HasSuffix(commandName, "beat") {
+		return commandName
+	}
+	return ""
+}
+
+// CommandName returns the command name used to run the component.
+//
+// This can differ from the actual binary name on disk, when the input specification states that the
+// command has a different name.
+func (s *InputRuntimeSpec) CommandName() string {
+	if s.Spec.Command != nil {
+		if s.Spec.Command.Name != "" {
+			return s.Spec.Command.Name
+		}
+		if s.BinaryName == "elastic-otel-collector" && len(s.Spec.Command.Args) > 0 {
+			return s.Spec.Command.Args[0]
+		}
+	}
+	return s.BinaryName
 }
 
 // RuntimeSpecs return all the specifications for inputs that are supported on the current platform.

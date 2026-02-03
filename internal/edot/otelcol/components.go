@@ -11,6 +11,7 @@ import (
 	"go.opentelemetry.io/collector/otelcol"
 	"go.opentelemetry.io/collector/processor"
 	"go.opentelemetry.io/collector/receiver"
+	"go.opentelemetry.io/collector/service/telemetry/otelconftelemetry"
 
 	// Receivers:
 	apachereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver"
@@ -29,10 +30,13 @@ import (
 	mysqlreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/mysqlreceiver"
 	nginxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver"
 	postgresqlreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/postgresqlreceiver"
+	prometheusremotewritereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusremotewritereceiver"
 	receivercreator "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator"
 	redisreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver"
+	snmpreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/snmpreceiver"
 	sqlserverreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver"
+	windowsperfcountersreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver"
 	zipkinreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver"
 	nopreceiver "go.opentelemetry.io/collector/receiver/nopreceiver"
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
@@ -96,12 +100,21 @@ import (
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
 	elasticapmconnector "github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector"
 	profilingmetricsconnector "github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector"
+
+	// Telemetry
+	internaltelemetry "github.com/elastic/elastic-agent/internal/pkg/otel/internaltelemetry"
+	elasticmonitoringreceiver "github.com/elastic/elastic-agent/internal/pkg/otel/receivers/elasticmonitoring"
 )
 
 func components(extensionFactories ...extension.Factory) func() (otelcol.Factories, error) {
 	return func() (otelcol.Factories, error) {
 		var err error
-		factories := otelcol.Factories{}
+		factories := otelcol.Factories{
+			Telemetry: otelconftelemetry.NewFactory(),
+		}
+
+		// Internal telemetry monitoring
+		factories.Telemetry = internaltelemetry.NewFactory()
 
 		// Receivers
 		receivers := []receiver.Factory{
@@ -120,6 +133,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			nginxreceiver.NewFactory(),
 			jaegerreceiver.NewFactory(),
 			zipkinreceiver.NewFactory(),
+			elasticmonitoringreceiver.NewFactory(),
 			fbreceiver.NewFactory(),
 			mbreceiver.NewFactory(),
 			jmxreceiver.NewFactory(),
@@ -128,9 +142,12 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			iisreceiver.NewFactory(),
 			mysqlreceiver.NewFactory(),
 			postgresqlreceiver.NewFactory(),
+			snmpreceiver.NewFactory(),
 			sqlserverreceiver.NewFactory(),
 			windowseventlogreceiver.NewFactory(),
 			awss3receiver.NewFactory(),
+			windowsperfcountersreceiver.NewFactory(),
+			prometheusremotewritereceiver.NewFactory(),
 		}
 
 		// some receivers are only available on certain OS.

@@ -43,6 +43,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -50,6 +51,7 @@ import (
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 const (
@@ -199,11 +201,41 @@ func TestComponentUpdateDiff(t *testing.T) {
 				},
 			},
 			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Len(t, logs.Components.Added, 0)
+				require.Len(t, logs.Components.Removed, 0)
+				require.Len(t, logs.Components.Updated, 1)
 				require.Contains(t, logs.Components.Updated[0], "unit-three: added")
 				require.Contains(t, logs.Components.Updated[0], "unit-x: removed")
 			},
 		},
 		{
+			name: "test-updated-component-input-id",
+			old: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{ID: "input-one"},
+					},
+				},
+			},
+			new: []component.Component{
+				{
+					ID:         "component-one",
+					OutputType: "elasticsearch",
+					Units: []component.Unit{
+						{ID: "input-two"},
+					},
+				},
+			},
+			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Len(t, logs.Components.Added, 0)
+				require.Len(t, logs.Components.Removed, 0)
+				require.Len(t, logs.Components.Updated, 1)
+				require.Contains(t, logs.Components.Updated[0], "input-two: added")
+				require.Contains(t, logs.Components.Updated[0], "input-one: removed")
+			},
+		}, {
 			name: "just-change-output",
 			old: []component.Component{
 				{
@@ -218,6 +250,9 @@ func TestComponentUpdateDiff(t *testing.T) {
 				},
 			},
 			logtest: func(t *testing.T, logs UpdateStats) {
+				require.Len(t, logs.Components.Added, 0)
+				require.Len(t, logs.Components.Removed, 0)
+				require.Len(t, logs.Components.Updated, 0)
 				require.Equal(t, []string{"elasticsearch"}, logs.Outputs.Removed)
 				require.Equal(t, []string{"logstash"}, logs.Outputs.Added)
 			},
@@ -1011,6 +1046,60 @@ func TestCoordinator_UpgradeDetails(t *testing.T) {
 	require.Equal(t, expectedErr.Error(), coord.state.UpgradeDetails.Metadata.ErrorMsg)
 }
 
+func Test_ApplyPersistedConfig(t *testing.T) {
+	cfgFile := filepath.Join(".", "testdata", "overrides.yml")
+
+	testCases := []struct {
+		name               string
+		featureEnable      bool
+		expectedLogs       bool
+		expectedOutputType string
+	}{
+		{name: "enabled", featureEnable: true, expectedLogs: false, expectedOutputType: "kafka"},
+		{name: "disabled", featureEnable: false, expectedLogs: true, expectedOutputType: "elasticsearch"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, err := config.LoadFile(filepath.Join(".", "testdata", "config.yaml"))
+			require.NoError(t, err)
+
+			testLogger, observedLogs := loggertest.New("")
+			err = applyPersistedConfig(testLogger, cfg, cfgFile, func() bool { return tc.featureEnable })
+			require.NoError(t, err)
+
+			found := false
+			// check that a log message was emitted about disabling kafka output
+			logs := observedLogs.All()
+			for _, logEntry := range logs {
+				if strings.Contains(logEntry.Message, "is disabled") {
+					found = true
+					break
+				}
+			}
+
+			require.NotEqualf(t, tc.featureEnable, found, "expected log message")
+
+			c := &configuration.Configuration{}
+			require.NoError(t, cfg.Agent.Unpack(&c))
+
+			require.Equal(t, tc.expectedLogs, c.Settings.MonitoringConfig.MonitorLogs)
+			require.True(t, c.Settings.MonitoringConfig.MonitorMetrics)
+			require.True(t, c.Settings.MonitoringConfig.Enabled)
+
+			// make sure output is not kafka
+			oc, err := cfg.Agent.Child("outputs", -1)
+			require.NoError(t, err)
+
+			do, err := oc.Child("default", -1)
+			require.NoError(t, err)
+			outputType, err := do.String("type", -1)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedOutputType, outputType, "output type should be %s, got %s", tc.expectedOutputType, outputType)
+		})
+	}
+}
+
 func BenchmarkCoordinator_generateComponentModel(b *testing.B) {
 	// load variables
 	varsMaps := []map[string]any{}
@@ -1117,9 +1206,10 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 	require.NoError(t, err)
 
 	monitoringMgr := newTestMonitoringMgr()
-	cfg := configuration.DefaultGRPCConfig()
-	cfg.Port = 0
-	rm, err := runtime.NewManager(l, l, ai, apmtest.DiscardTracer, monitoringMgr, cfg)
+	cfg := configuration.DefaultConfiguration()
+	grpcCfg := cfg.Settings.GRPC
+	grpcCfg.Port = 0
+	rm, err := runtime.NewManager(l, l, ai, apmtest.DiscardTracer, monitoringMgr, grpcCfg)
 	require.NoError(t, err)
 	otelMgr := &fakeOTelManager{}
 	caps, err := capabilities.LoadFile(paths.AgentCapabilitiesPath(), l)
@@ -1137,8 +1227,7 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 	if acker == nil {
 		acker = &fakeActionAcker{}
 	}
-
-	coord := New(l, nil, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelMgr, acker, nil)
+	coord := New(l, cfg, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelMgr, acker, nil)
 	return coord, cfgMgr, varsMgr
 }
 
@@ -1401,7 +1490,7 @@ func (f *fakeOTelManager) Errors() <-chan error {
 	return f.errChan
 }
 
-func (f *fakeOTelManager) Update(cfg *confmap.Conf, components []component.Component) {
+func (f *fakeOTelManager) Update(cfg *confmap.Conf, monitoring *monitoringCfg.MonitoringConfig, ll logp.Level, components []component.Component) {
 	var collectorResult, componentResult error
 	if f.updateCollectorCallback != nil {
 		collectorResult = f.updateCollectorCallback(cfg)

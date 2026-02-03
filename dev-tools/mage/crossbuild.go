@@ -74,6 +74,13 @@ type CrossBuildOption func(params *crossBuildParams)
 // ImageSelectorFunc returns the name of the builder image.
 type ImageSelectorFunc func(platform string) (string, error)
 
+// WithName adjust the name of the cross build action.
+func WithName(name string) CrossBuildOption {
+	return func(params *crossBuildParams) {
+		params.Name = name
+	}
+}
+
 // ForPlatforms filters the platforms based on the given expression.
 func ForPlatforms(expr string) func(params *crossBuildParams) {
 	return func(params *crossBuildParams) {
@@ -123,6 +130,7 @@ func AddPlatforms(expressions ...string) func(params *crossBuildParams) {
 }
 
 type crossBuildParams struct {
+	Name          string
 	Platforms     BuildPlatformList
 	Target        string
 	Serial        bool
@@ -132,11 +140,12 @@ type crossBuildParams struct {
 
 // CrossBuild executes a given build target once for each target platform.
 func CrossBuild(options ...CrossBuildOption) error {
-	fmt.Println("--- CrossBuild Elastic-Agent")
 	params := crossBuildParams{Platforms: Platforms, Target: defaultCrossBuildTarget, ImageSelector: CrossBuildImage}
+	params.Name = "Elastic-Agent"
 	for _, opt := range options {
 		opt(&params)
 	}
+	fmt.Printf("--- CrossBuild %s\n", params.Name)
 
 	if len(params.Platforms) == 0 {
 		log.Printf("Skipping cross-build of target=%v because platforms list is empty.", params.Target)
@@ -178,7 +187,7 @@ func CrossBuild(options ...CrossBuildOption) error {
 	// Build the magefile for Linux, so we can run it inside the container.
 	mg.Deps(buildMage)
 
-	log.Println("crossBuild: Platform list =", params.Platforms)
+	log.Printf("crossBuild(%s): Platform list = %s\n", params.Name, params.Platforms)
 	var deps []interface{}
 	for _, buildPlatform := range params.Platforms {
 		if !buildPlatform.Flags.CanCrossBuild() {
@@ -346,14 +355,6 @@ func (b GolangCrossBuilder) Build() error {
 		args = append(args, "-v", "/opt/git-mirrors:/opt/git-mirrors:ro")
 	}
 
-	if !ExternalBuild {
-		beatsPath, err := filepath.Abs(filepath.Join("../beats"))
-		if err != nil {
-			return fmt.Errorf("error while reading local beats: %w", err)
-		}
-		args = append(args, "-v", fmt.Sprintf("%s:%s", beatsPath, beatsPath))
-	}
-
 	args = append(args,
 		"--rm",
 		"--env", "GOFLAGS=-mod=readonly",
@@ -362,7 +363,6 @@ func (b GolangCrossBuilder) Build() error {
 		"--env", "MAGEFILE_TIMEOUT="+EnvOr("MAGEFILE_TIMEOUT", ""),
 		"--env", fmt.Sprintf("SNAPSHOT=%v", Snapshot),
 		"--env", fmt.Sprintf("DEV=%v", DevBuild),
-		"--env", fmt.Sprintf("EXTERNAL=%v", ExternalBuild),
 		"--env", fmt.Sprintf("FIPS=%v", FIPSBuild),
 		"-v", repoInfo.RootDir+":"+mountPoint,
 		"-w", workDir,

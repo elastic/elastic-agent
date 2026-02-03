@@ -18,7 +18,7 @@ If you think you found a bug, it probably is a bug. Fill it in [GitHub](https://
 ## Found a Security Issue?
 
 If you've found a security issue, before submitting anything via a PR, please
-get in touch with our security team [here](https://www.elastic.co/community/security).
+get in touch with our security team [here](https://github.com/elastic/.github/blob/main/SECURITY.md).
 
 # Pull Request Guidelines
 
@@ -63,3 +63,6 @@ Keep these in mind as both authors and reviewers of PRs:
 * If I'm making a suggestion, I must provide a rationale for it.  It should be clear to the author of the PR why my suggestion is better than what is already in the PR.
 
 
+## Backporting
+
+See [Backports](./docs/backports.md).

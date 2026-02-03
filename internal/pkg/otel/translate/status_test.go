@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -16,11 +17,10 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	serializablestatus "github.com/elastic/elastic-agent/internal/pkg/otel/status"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/version"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestGetAllComponentState(t *testing.T) {
@@ -30,7 +30,7 @@ func TestGetAllComponentState(t *testing.T) {
 		OutputType:     "elasticsearch",
 		RuntimeManager: component.OtelRuntimeManager,
 		InputSpec: &component.InputRuntimeSpec{
-			BinaryName: "agentbeat",
+			BinaryName: "elastic-otel-collector",
 			Spec: component.InputSpec{
 				Command: &component.CommandSpec{
 					Args: []string{"filebeat"},
@@ -104,7 +104,7 @@ func TestGetAllComponentState(t *testing.T) {
 					Component: fileStreamOtelComponent,
 					State: runtime.ComponentState{
 						State:   client.UnitStateHealthy,
-						Message: "HEALTHY",
+						Message: "Healthy",
 						Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
 							runtime.ComponentUnitKey{UnitID: "filestream-unit", UnitType: client.UnitTypeInput}: {
 								State:   client.UnitStateHealthy,
@@ -183,7 +183,7 @@ func TestGetAllComponentState(t *testing.T) {
 						Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
 							runtime.ComponentUnitKey{UnitID: "filestream-unit", UnitType: client.UnitTypeInput}: {
 								State:   client.UnitStateStarting,
-								Message: "STARTING",
+								Message: "Starting",
 								Payload: map[string]any{
 									"streams": map[string]map[string]string{
 										"test-1": {
@@ -199,7 +199,7 @@ func TestGetAllComponentState(t *testing.T) {
 							},
 							runtime.ComponentUnitKey{UnitID: "filestream-default", UnitType: client.UnitTypeOutput}: {
 								State:   client.UnitStateStarting,
-								Message: "STARTING",
+								Message: "Starting",
 							},
 						},
 						VersionInfo: runtime.ComponentVersionInfo{
@@ -492,6 +492,17 @@ func TestGetComponentUnitState(t *testing.T) {
 			},
 		},
 	}
+	comp := &component.Component{
+		ID:             "test-component",
+		RuntimeManager: component.OtelRuntimeManager,
+		Units: []component.Unit{
+			unit,
+			{
+				ID:   "output-1",
+				Type: client.UnitTypeOutput,
+			},
+		},
+	}
 
 	tests := []struct {
 		name     string
@@ -527,15 +538,15 @@ func TestGetComponentUnitState(t *testing.T) {
 			},
 			expected: runtime.ComponentUnitState{
 				State:   client.UnitStateDegraded,
-				Message: "recoverable error",
+				Message: "Recoverable: recoverable error",
 				Payload: map[string]any{
 					"streams": map[string]map[string]string{
 						"stream-1": {
-							"error":  "recoverable error",
+							"error":  "Recoverable: recoverable error",
 							"status": client.UnitStateDegraded.String(),
 						},
 						"stream-2": {
-							"error":  "recoverable error",
+							"error":  "Recoverable: recoverable error",
 							"status": client.UnitStateDegraded.String(),
 						},
 					},
@@ -546,7 +557,7 @@ func TestGetComponentUnitState(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getComponentUnitState(tt.status, unit)
+			result := getComponentUnitState(tt.status, unit, comp)
 			assert.Equal(t, tt.expected.State, result.State)
 			assert.Equal(t, tt.expected.Message, result.Message)
 			assert.Equal(t, tt.expected.Payload, result.Payload)
@@ -571,66 +582,521 @@ func TestParseEntityStatusId(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		componentKind, pipelineId, err := parseEntityStatusId(test.id)
+		componentKind, pipelineId, err := ParseEntityStatusId(test.id)
 		assert.Equal(t, test.expectedErr, err)
 		assert.Equal(t, test.expectedKind, componentKind, "component kind")
 		assert.Equal(t, test.expectedEntityID, pipelineId, "pipeline id")
 	}
 }
 
-func TestOtelStatusToUnitState(t *testing.T) {
-	tests := []struct {
-		name     string
-		status   componentstatus.Status
-		expected client.UnitState
+func TestHasStatus(t *testing.T) {
+	scenarios := []struct {
+		Name   string
+		Result bool
+		Has    componentstatus.Status
+		Status *status.AggregateStatus
 	}{
 		{
-			name:     "StatusNone",
-			status:   componentstatus.StatusNone,
-			expected: client.UnitStateDegraded,
+			Name:   "empty",
+			Result: false,
+			Has:    componentstatus.StatusOK,
+			Status: nil,
 		},
 		{
-			name:     "StatusStarting",
-			status:   componentstatus.StatusStarting,
-			expected: client.UnitStateStarting,
+			Name:   "has status",
+			Result: true,
+			Has:    componentstatus.StatusOK,
+			Status: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+			},
 		},
 		{
-			name:     "StatusOK",
-			status:   componentstatus.StatusOK,
-			expected: client.UnitStateHealthy,
+			Name:   "doesn't have status",
+			Result: false,
+			Has:    componentstatus.StatusRecoverableError,
+			Status: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+			},
 		},
 		{
-			name:     "StatusRecoverableError",
-			status:   componentstatus.StatusRecoverableError,
-			expected: client.UnitStateDegraded,
+			Name:   "sub-component has status",
+			Result: true,
+			Has:    componentstatus.StatusRecoverableError,
+			Status: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					"test-component": &status.AggregateStatus{
+						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+					},
+				},
+			},
 		},
 		{
-			name:     "StatusPermanentError",
-			status:   componentstatus.StatusPermanentError,
-			expected: client.UnitStateFailed,
+			Name:   "sub-component doesn't have status",
+			Result: false,
+			Has:    componentstatus.StatusPermanentError,
+			Status: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					"test-component": &status.AggregateStatus{
+						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+					},
+				},
+			},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.Name, func(t *testing.T) {
+			observed := HasStatus(scenario.Status, scenario.Has)
+			assert.Equal(t, scenario.Result, observed)
+		})
+	}
+}
+
+func TestStateWithMessage(t *testing.T) {
+	tests := []struct {
+		name          string
+		otelStatus    *status.AggregateStatus
+		expectedState client.UnitState
+		expectedMsg   string
+	}{
+		{
+			name: "StatusNone",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusNone),
+			},
+			expectedState: client.UnitStateHealthy,
+			expectedMsg:   "Healthy",
 		},
 		{
-			name:     "StatusFatalError",
-			status:   componentstatus.StatusFatalError,
-			expected: client.UnitStateFailed,
+			name: "StatusStarting",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusStarting),
+			},
+			expectedState: client.UnitStateStarting,
+			expectedMsg:   "Starting",
 		},
 		{
-			name:     "StatusStopping",
-			status:   componentstatus.StatusStopping,
-			expected: client.UnitStateStopping,
+			name: "StatusOK",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+			},
+			expectedState: client.UnitStateHealthy,
+			expectedMsg:   "Healthy",
 		},
 		{
-			name:     "StatusStopped",
-			status:   componentstatus.StatusStopped,
-			expected: client.UnitStateStopped,
+			name: "StatusRecoverableError",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewRecoverableErrorEvent(errors.New("test recoverable error")),
+			},
+			expectedState: client.UnitStateDegraded,
+			expectedMsg:   "Recoverable: test recoverable error",
+		},
+		{
+			name: "StatusRecoverableError without error",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+			},
+			expectedState: client.UnitStateDegraded,
+			expectedMsg:   "Unknown recoverable error",
+		},
+		{
+			name: "StatusPermanentError",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewPermanentErrorEvent(errors.New("test permanent error")),
+			},
+			expectedState: client.UnitStateFailed,
+			expectedMsg:   "Permanent: test permanent error",
+		},
+		{
+			name: "StatusPermanentError without error",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusPermanentError),
+			},
+			expectedState: client.UnitStateFailed,
+			expectedMsg:   "Unknown permanent error",
+		},
+		{
+			name: "StatusFatalError",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewFatalErrorEvent(errors.New("test fatal error")),
+			},
+			expectedState: client.UnitStateFailed,
+			expectedMsg:   "Fatal: test fatal error",
+		},
+		{
+			name: "StatusFatalError without error",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusFatalError),
+			},
+			expectedState: client.UnitStateFailed,
+			expectedMsg:   "Unknown fatal error",
+		},
+		{
+			name: "StatusStopping",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusStopping),
+			},
+			expectedState: client.UnitStateStopping,
+			expectedMsg:   "Stopping",
+		},
+		{
+			name: "StatusStopped",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusStopped),
+			},
+			expectedState: client.UnitStateStopped,
+			expectedMsg:   "Stopped",
+		},
+		{
+			name: "Unknown status",
+			otelStatus: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.Status(999)), // Simulate an unknown status
+			},
+			expectedState: client.UnitStateFailed,
+			expectedMsg:   "Unknown component status: StatusNone",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := otelStatusToUnitState(tt.status)
-			assert.Equal(t, tt.expected, result)
+			state, msg := StateWithMessage(tt.otelStatus)
+			assert.Equal(t, tt.expectedState, state)
+			assert.Equal(t, tt.expectedMsg, msg)
 		})
+	}
+}
+
+func TestGetComponentUnitStateWithStreamAttributes(t *testing.T) {
+	unit := component.Unit{
+		ID:   "filestream-unit",
+		Type: client.UnitTypeInput,
+		Config: &proto.UnitExpectedConfig{
+			Streams: []*proto.Stream{
+				{Id: "stream-1"},
+				{Id: "stream-2"},
+			},
+		},
+	}
+	comp := &component.Component{
+		ID:             "test-component",
+		RuntimeManager: component.OtelRuntimeManager,
+		Units: []component.Unit{
+			unit,
+			{
+				ID:   "output-1",
+				Type: client.UnitTypeOutput,
+			},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		status   *status.AggregateStatus
+		expected runtime.ComponentUnitState
+	}{
+		{
+			name: "stream statuses from attributes - all healthy",
+			status: aggregateStatusWithAttributes(
+				componentstatus.StatusOK,
+				nil,
+				map[string]any{
+					"inputs": map[string]any{
+						"stream-1": map[string]any{
+							"status": "StatusOK",
+							"error":  "",
+						},
+						"stream-2": map[string]any{
+							"status": "StatusOK",
+							"error":  "",
+						},
+					},
+				},
+			),
+			// When all streams are healthy, unitStateFromStreamStatuses returns (Healthy, "")
+			expected: runtime.ComponentUnitState{
+				State:   client.UnitStateHealthy,
+				Message: "",
+				Payload: map[string]any{
+					"streams": map[string]map[string]string{
+						"stream-1": {
+							"error":  "",
+							"status": client.UnitStateHealthy.String(),
+						},
+						"stream-2": {
+							"error":  "",
+							"status": client.UnitStateHealthy.String(),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "stream statuses from attributes - one degraded",
+			status: aggregateStatusWithAttributes(
+				componentstatus.StatusOK,
+				nil,
+				map[string]any{
+					"inputs": map[string]any{
+						"stream-1": map[string]any{
+							"status": "StatusOK",
+							"error":  "",
+						},
+						"stream-2": map[string]any{
+							"status": "StatusRecoverableError",
+							"error":  "stream error",
+						},
+					},
+				},
+			),
+			expected: runtime.ComponentUnitState{
+				State:   client.UnitStateDegraded,
+				Message: "Recoverable: stream error",
+				Payload: map[string]any{
+					"streams": map[string]map[string]string{
+						"stream-1": {
+							"error":  "",
+							"status": client.UnitStateHealthy.String(),
+						},
+						"stream-2": {
+							"error":  "Recoverable: stream error",
+							"status": client.UnitStateDegraded.String(),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "stream statuses from attributes - one failed",
+			status: aggregateStatusWithAttributes(
+				componentstatus.StatusOK,
+				nil,
+				map[string]any{
+					"inputs": map[string]any{
+						"stream-1": map[string]any{
+							"status": "StatusPermanentError",
+							"error":  "permanent error",
+						},
+						"stream-2": map[string]any{
+							"status": "StatusRecoverableError",
+							"error":  "recoverable error",
+						},
+					},
+				},
+			),
+			expected: runtime.ComponentUnitState{
+				State:   client.UnitStateFailed,
+				Message: "Permanent: permanent error",
+				Payload: map[string]any{
+					"streams": map[string]map[string]string{
+						"stream-1": {
+							"error":  "Permanent: permanent error",
+							"status": client.UnitStateFailed.String(),
+						},
+						"stream-2": {
+							"error":  "Recoverable: recoverable error",
+							"status": client.UnitStateDegraded.String(),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "partial stream statuses from attributes - missing stream uses top level for payload",
+			status: aggregateStatusWithAttributes(
+				componentstatus.StatusRecoverableError,
+				errors.New("top level error"),
+				map[string]any{
+					"inputs": map[string]any{
+						"stream-1": map[string]any{
+							"status": "StatusOK",
+							"error":  "",
+						},
+						// stream-2 is missing, uses top level status for payload
+					},
+				},
+			),
+			// Unit state is computed only from reported stream statuses (stream-1 = healthy)
+			// so unit state is Healthy. Payload includes stream-2 with top level status.
+			expected: runtime.ComponentUnitState{
+				State:   client.UnitStateHealthy,
+				Message: "",
+				Payload: map[string]any{
+					"streams": map[string]map[string]string{
+						"stream-1": {
+							"error":  "",
+							"status": client.UnitStateHealthy.String(),
+						},
+						"stream-2": {
+							"error":  "Recoverable: top level error",
+							"status": client.UnitStateDegraded.String(),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "no stream statuses in attributes - uses top level state",
+			status: aggregateStatusWithAttributes(
+				componentstatus.StatusRecoverableError,
+				errors.New("top level error"),
+				map[string]any{
+					"inputs": map[string]any{
+						// No stream statuses provided
+					},
+				},
+			),
+			// When no stream statuses are reported, unit state is computed from top level
+			expected: runtime.ComponentUnitState{
+				State:   client.UnitStateDegraded,
+				Message: "Recoverable: top level error",
+				Payload: map[string]any{
+					"streams": map[string]map[string]string{
+						"stream-1": {
+							"error":  "Recoverable: top level error",
+							"status": client.UnitStateDegraded.String(),
+						},
+						"stream-2": {
+							"error":  "Recoverable: top level error",
+							"status": client.UnitStateDegraded.String(),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getComponentUnitState(tt.status, unit, comp)
+			assert.Equal(t, tt.expected.State, result.State)
+			assert.Equal(t, tt.expected.Message, result.Message)
+			assert.Equal(t, tt.expected.Payload, result.Payload)
+		})
+	}
+}
+
+func TestGetComponentUnitStateWithUnitInputStatus(t *testing.T) {
+	// Test the unit aggStatus from input attributes path
+	// This can only happen for filestream, which is allowed to not have streams defined
+	unit := component.Unit{
+		ID:   "filestream-default-filestream-1", // This is what the component package sets as the unit id if there's no stream defined
+		Type: client.UnitTypeInput,
+		Config: &proto.UnitExpectedConfig{
+			Streams: []*proto.Stream{},
+		},
+	}
+	comp := &component.Component{
+		ID:             "filestream-default",
+		RuntimeManager: component.OtelRuntimeManager,
+		Units: []component.Unit{
+			unit,
+			{
+				ID:   "output-1",
+				Type: client.UnitTypeOutput,
+			},
+		},
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Command: &component.CommandSpec{
+					Args: []string{"filebeat"},
+				},
+			},
+		},
+	}
+
+	aggStatus := aggregateStatusWithAttributes(
+		componentstatus.StatusOK,
+		nil,
+		map[string]any{
+			"inputs": map[string]any{
+				"filestream-1": map[string]any{
+					"status": "StatusRecoverableError",
+					"error":  "unit level error",
+				},
+			},
+		},
+	)
+
+	expectedState := runtime.ComponentUnitState{
+		State:   client.UnitStateDegraded,
+		Message: "Recoverable: unit level error",
+		Payload: nil,
+	}
+
+	result := getComponentUnitState(aggStatus, unit, comp)
+	assert.Equal(t, expectedState.State, result.State)
+	assert.Equal(t, expectedState.Message, result.Message)
+	assert.Equal(t, expectedState.Payload, result.Payload)
+}
+
+func TestUnitStateFromStreamStatuses(t *testing.T) {
+	tests := []struct {
+		name            string
+		streamStatuses  map[string]*serializablestatus.SerializableEvent
+		expectedState   client.UnitState
+		expectedMessage string
+	}{
+		{
+			name: "all healthy",
+			streamStatuses: map[string]*serializablestatus.SerializableEvent{
+				"stream-1": {StatusString: "StatusOK"},
+				"stream-2": {StatusString: "StatusOK"},
+			},
+			expectedState:   client.UnitStateHealthy,
+			expectedMessage: "",
+		},
+		{
+			name: "one degraded",
+			streamStatuses: map[string]*serializablestatus.SerializableEvent{
+				"stream-1": {StatusString: "StatusOK"},
+				"stream-2": {StatusString: "StatusRecoverableError", Error: "degraded error"},
+			},
+			expectedState:   client.UnitStateDegraded,
+			expectedMessage: "Recoverable: degraded error",
+		},
+		{
+			name: "one failed - takes precedence",
+			streamStatuses: map[string]*serializablestatus.SerializableEvent{
+				"stream-1": {StatusString: "StatusPermanentError", Error: "failed error"},
+				"stream-2": {StatusString: "StatusRecoverableError", Error: "degraded error"},
+			},
+			expectedState:   client.UnitStateFailed,
+			expectedMessage: "Permanent: failed error",
+		},
+		{
+			name:            "empty stream statuses",
+			streamStatuses:  map[string]*serializablestatus.SerializableEvent{},
+			expectedState:   client.UnitStateHealthy,
+			expectedMessage: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			state, message := unitStateFromStreamStatuses(tt.streamStatuses)
+			assert.Equal(t, tt.expectedState, state)
+			assert.Equal(t, tt.expectedMessage, message)
+		})
+	}
+}
+
+// aggregateStatusWithAttributes creates an AggregateStatus with attributes for testing.
+func aggregateStatusWithAttributes(s componentstatus.Status, err error, attributes map[string]any) *status.AggregateStatus {
+	var errStr string
+	if err != nil {
+		errStr = err.Error()
+	}
+	event, _ := serializablestatus.FromSerializableEvent(&serializablestatus.SerializableEvent{
+		StatusString: s.String(), // Status.String() returns "StatusOK", "StatusRecoverableError", etc.
+		Error:        errStr,
+		Attributes:   attributes,
+	})
+	return &status.AggregateStatus{
+		Event:              event,
+		ComponentStatusMap: make(map[string]*status.AggregateStatus),
 	}
 }
 
@@ -641,7 +1107,7 @@ func TestOutputStatus(t *testing.T) {
 		OutputType:     "elasticsearch",
 		RuntimeManager: component.OtelRuntimeManager,
 		InputSpec: &component.InputRuntimeSpec{
-			BinaryName: "agentbeat",
+			BinaryName: "elastic-otel-collector",
 			Spec: component.InputSpec{
 				Command: &component.CommandSpec{
 					Args: []string{"filebeat"},
@@ -780,7 +1246,7 @@ func TestOutputStatus(t *testing.T) {
 						},
 						{UnitID: "filestream-default", UnitType: client.UnitTypeOutput}: {
 							State:   client.UnitStateDegraded,
-							Message: "DEGRADED",
+							Message: "Unknown recoverable error",
 						},
 					},
 				},

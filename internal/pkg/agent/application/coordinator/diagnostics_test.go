@@ -84,6 +84,7 @@ func TestDiagnosticLocalConfig(t *testing.T) {
 						ServerCA:          "/path/to/server/ca",
 					},
 				},
+				MetricsPeriod: monitoringCfg.DefaultMetricsCollectionInterval,
 			},
 		},
 	}
@@ -95,6 +96,7 @@ agent:
   download: null
   grpc: null
   id: ""
+  internal: null
   path: ""
   process: null
   reload: null
@@ -105,11 +107,12 @@ agent:
     http: null
     logs: false
     metrics: false
-    metrics_period: ""
+    metrics_period: "1m0s"
     namespace: ""
     pprof: null
     failure_threshold: null
     traces: true
+    use_output: ""
     apm:
       hosts:
         - host1
@@ -132,7 +135,7 @@ fleet:
   protocol: "test-protocol"
 `
 
-	coord := &Coordinator{cfg: cfg}
+	coord := &Coordinator{initialCfg: cfg}
 	hook, ok := diagnosticHooksMap(coord)["local-config"]
 	require.True(t, ok, "diagnostic hooks should have an entry for local-config")
 
@@ -293,6 +296,7 @@ func TestDiagnosticComponentsExpected(t *testing.T) {
 			ID:         "filestream-component",
 			InputType:  "filestream",
 			OutputType: "elasticsearch",
+			OutputName: "default",
 			InputSpec: &component.InputRuntimeSpec{
 				InputType:  "filestream",
 				BinaryName: "filestream-binary",
@@ -314,6 +318,7 @@ components:
   - id: filestream-component
     input_type: filestream
     output_type: elasticsearch
+    output_name: default
     input_spec:
       binary_name: filestream-binary
       binary_path: filestream-path
@@ -348,6 +353,7 @@ func TestDiagnosticComponentsExpectedWithAPM(t *testing.T) {
 			ID:         "some-apm-aware-component",
 			InputType:  "filestream",
 			OutputType: "elasticsearch",
+			OutputName: "default",
 			Component: &proto.Component{
 				ApmConfig: &proto.APMConfig{
 					Elastic: &proto.ElasticAPM{
@@ -372,6 +378,7 @@ components:
   - id: some-apm-aware-component
     input_type: filestream
     output_type: elasticsearch
+    output_name: default
     units: []
     component:
       limits: null
@@ -411,6 +418,7 @@ func TestDiagnosticComponentsActual(t *testing.T) {
 					Err:        errors.New("component error"),
 					InputType:  "test-input",
 					OutputType: "test-output",
+					OutputName: "test-name",
 					Units: []component.Unit{
 						{
 							ID:       "test-unit",
@@ -440,6 +448,7 @@ components:
     error: "component error"
     input_type: "test-input"
     output_type: "test-output"
+    output_name: "test-name"
     units:
       - id: test-unit
         error: {}
