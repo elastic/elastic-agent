@@ -36,8 +36,8 @@ func TestPerformComponentDiagnostics(t *testing.T) {
 	otherComp.InputSpec.Spec.Command.Args = []string{"metricbeat"}
 
 	m := &OTelManager{
-		logger:     logger,
-		components: []component.Component{filebeatComp, otherComp},
+		managerLogger: logger,
+		components:    []component.Component{filebeatComp, otherComp},
 	}
 
 	expectedDiags := []componentruntime.ComponentDiagnostic{
@@ -70,8 +70,8 @@ func TestPerformDiagnostics(t *testing.T) {
 	otherComp.InputSpec.Spec.Command.Args = []string{"metricbeat"}
 
 	m := &OTelManager{
-		logger:     logger,
-		components: []component.Component{filebeatComp, otherComp},
+		managerLogger: logger,
+		components:    []component.Component{filebeatComp, otherComp},
 	}
 
 	t.Run("diagnose all units when no request is provided", func(t *testing.T) {
@@ -128,8 +128,8 @@ func TestBeatMetrics(t *testing.T) {
 	filebeatComp.InputSpec.Spec.Command.Args = []string{"filebeat"}
 
 	m := &OTelManager{
-		logger:     logger,
-		components: []component.Component{filebeatComp},
+		managerLogger: logger,
+		components:    []component.Component{filebeatComp},
 	}
 	expectedMetricData, err := json.MarshalIndent(map[string]any{"test": "test"}, "", "  ")
 	require.NoError(t, err)
