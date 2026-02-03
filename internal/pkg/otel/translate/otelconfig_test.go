@@ -280,9 +280,6 @@ func TestGetOtelConfig(t *testing.T) {
 			"compression_params": map[string]any{
 				"level": 1,
 			},
-			"mapping": map[string]any{
-				"mode": "bodymap",
-			},
 			"endpoints":          []string{"http://localhost:9200"},
 			"password":           "password",
 			"user":               "elastic",

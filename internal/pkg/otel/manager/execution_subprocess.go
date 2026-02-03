@@ -80,7 +80,7 @@ type subprocessExecution struct {
 func (r *subprocessExecution) startCollector(
 	ctx context.Context,
 	lvl logp.Level,
-	baseLogger *logger.Logger,
+	collectorLogger *logger.Logger,
 	logger *logger.Logger,
 	cfg *confmap.Conf,
 	processErrCh chan error,
@@ -117,10 +117,10 @@ func (r *subprocessExecution) startCollector(
 		return nil, fmt.Errorf("failed to marshal config to yaml: %w", err)
 	}
 
-	stdOutLast := newZapLast(baseLogger.Core())
+	stdOutLast := newZapLast(collectorLogger.Core())
 	stdOut := runtimeLogger.NewLogWriterWithDefaults(stdOutLast, zapcore.Level(lvl))
 	// info level for stdErr because by default collector writes to stderr
-	stdErrLast := newZapLast(baseLogger.Core())
+	stdErrLast := newZapLast(collectorLogger.Core())
 	stdErr := runtimeLogger.NewLogWriterWithDefaults(stdErrLast, zapcore.Level(lvl))
 
 	procCtx, procCtxCancel := context.WithCancel(ctx)
