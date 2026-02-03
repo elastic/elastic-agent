@@ -8,8 +8,10 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -132,4 +134,14 @@ func TestEncryptConfigOnPath(t *testing.T) {
 	p, err := os.ReadFile(sourceCfg)
 	require.NoError(t, err, "unable to read source config file")
 	require.EqualValues(t, DefaultAgentEncryptedStandaloneConfig, p)
+	err = filepath.WalkDir(dir, func(dir string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if strings.HasSuffix(d.Name(), ".bak") {
+			return fmt.Errorf(".bak file detected: %s", d.Name())
+		}
+		return nil
+	})
+	require.NoError(t, err, "error when ensuring no .bak file exists")
 }

@@ -10,10 +10,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -65,6 +67,7 @@ func TestStandaloneEncyptedConfigInstall(t *testing.T) {
 	p, err := os.ReadFile(filepath.Join(topPath, "elastic-agent.yml"))
 	require.NoError(t, err, "unable to read elastic-agent.yml file")
 	require.EqualValues(t, storage.DefaultAgentEncryptedStandaloneConfig, p, "unexpected contents in elastic-agent.yml")
+	require.NoError(t, checkNoBakFile(topPath))
 	t.Log("Install test success")
 
 	t.Log("Create standalone policy with API key")
@@ -138,6 +141,7 @@ func TestStandaloneEncyptedConfigInstall(t *testing.T) {
 		p, err := os.ReadFile(filepath.Join(topPath, "elastic-agent.yml"))
 		assert.NoError(t, err, "unable to read elastic-agent.yml file")
 		assert.EqualValues(t, storage.DefaultAgentEncryptedStandaloneConfig, p, "unexpected contents in elastic-agent.yml")
+		assert.NoError(t, checkNoBakFile(topPath))
 	})
 
 	t.Run("disable encryption", func(t *testing.T) {
@@ -164,5 +168,18 @@ func TestStandaloneEncyptedConfigInstall(t *testing.T) {
 		p, err := os.ReadFile(filepath.Join(topPath, "elastic-agent.yml"))
 		assert.NoError(t, err, "unable to read elastic-agent.yml file")
 		assert.EqualValues(t, polBytes, p, "unexpected contents in elastic-agent.yml")
+		assert.NoError(t, checkNoBakFile(topPath))
+	})
+}
+
+func checkNoBakFile(path string) error {
+	return filepath.WalkDir(path, func(dir string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if strings.HasSuffix(d.Name(), ".bak") {
+			return fmt.Errorf("backup file detected: %s", d.Name())
+		}
+		return nil
 	})
 }

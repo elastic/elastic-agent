@@ -253,6 +253,7 @@ func EncryptConfigOnPath(path string) error {
 		sourceCfg,
 		DefaultAgentEncryptedStandaloneConfig,
 		destStore,
+		RemoveBackup(),
 	)
 
 	// Read file contents directly so replacer does not write to a file that is opened with a reader.
@@ -261,7 +262,6 @@ func EncryptConfigOnPath(path string) error {
 		return fmt.Errorf("failed to load encryption soure: %w", err)
 	}
 
-	// TODO file locks?
 	if err := replacer.Save(bytes.NewReader(p)); err != nil {
 		return fmt.Errorf("failed to encrypt config: %w", err)
 	}
