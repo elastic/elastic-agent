@@ -84,8 +84,6 @@ user: elastic
 headers:
   X-Header-1: foo
   X-Bar-Header: bar
-mapping:
-  mode: bodymap
 compression: gzip
 compression_params:
   level: 1
@@ -140,8 +138,6 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
-mapping:
-  mode: bodymap
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 compression: gzip
@@ -199,8 +195,6 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
-mapping:
-  mode: bodymap
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 compression: gzip
@@ -260,8 +254,6 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
-mapping:
-  mode: bodymap
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 compression: gzip
@@ -314,8 +306,6 @@ retry:
 logs_index: some-index
 password: changeme
 user: elastic
-mapping:
-  mode: bodymap
 compression: gzip
 compression_params:
   level: 1
@@ -399,8 +389,6 @@ sending_queue:
   num_consumers: 1
   queue_size: 3200
   wait_for_result: true
-mapping:
-  mode: bodymap
 compression: gzip
 compression_params:
   level: 1
@@ -514,8 +502,6 @@ user: elastic
 headers:
   X-Header-1: foo
   X-Bar-Header: bar
-mapping:
-  mode: bodymap
 compression: gzip
 compression_params:
   level: 1
@@ -572,8 +558,6 @@ user: elastic
 headers:
   X-Header-1: foo
   X-Bar-Header: bar
-mapping:
-  mode: bodymap
 compression: gzip
 compression_params:
   level: 1
@@ -637,8 +621,6 @@ sending_queue:
   num_consumers: 2
   queue_size: 3200
   wait_for_result: true
-mapping:
-  mode: bodymap
 {{ if gt . 0 }}
 compression: gzip
 compression_params:

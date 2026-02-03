@@ -140,9 +140,6 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 			"num_consumers":     getTotalNumWorkers(output), // num_workers * len(hosts) if loadbalance is true
 		},
 
-		"mapping": map[string]any{
-			"mode": "bodymap",
-		},
 		"logs_dynamic_pipeline": map[string]any{
 			"enabled": true,
 		},
