@@ -13,6 +13,9 @@ jobs:
     with:
       enable-vale-linting: true
       path-pattern: docs/**
+      include-paths: |
+        docs/release-notes/**
+        docs/reference/**
     permissions:
       deployments: write
       id-token: write
