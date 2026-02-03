@@ -230,6 +230,7 @@ func TestPackages(options ...TestPackagesOption) error {
 	goTest := sh.OutCmd("go", "test")
 
 	var args []string
+	args = append(args, "--timeout", "30m")
 	if mg.Verbose() {
 		args = append(args, "-v")
 	}
