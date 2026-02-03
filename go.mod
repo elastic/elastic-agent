@@ -14,7 +14,7 @@ require (
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260129165749-bb5a17e51305
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260203123438-1216cde935a5
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.10.0
 	github.com/elastic/elastic-agent-client/v7 v7.17.2
@@ -473,7 +473,7 @@ require (
 	github.com/mdlayher/vsock v1.2.1 // indirect
 	github.com/meraki/dashboard-api-go/v3 v3.0.9 // indirect
 	github.com/microsoft/go-mssqldb v1.9.5 // indirect
-	github.com/microsoft/wmi v0.34.0 // indirect
+	github.com/microsoft/wmi v0.38.3 // indirect
 	github.com/miekg/dns v1.1.69 // indirect
 	github.com/mileusna/useragent v1.3.5 // indirect
 	github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8 // indirect
