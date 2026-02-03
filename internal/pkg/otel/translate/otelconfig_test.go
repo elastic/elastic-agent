@@ -1593,3 +1593,49 @@ func TestUnitToExporterConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestLogLevelConversion(t *testing.T) {
+	tests := []struct {
+		name    string
+		logpLvl logp.Level
+	}{
+		{
+			name:    "debug",
+			logpLvl: logp.DebugLevel,
+		},
+		{
+			name:    "info",
+			logpLvl: logp.InfoLevel,
+		},
+		{
+			name:    "warn",
+			logpLvl: logp.WarnLevel,
+		},
+		{
+			name:    "error",
+			logpLvl: logp.ErrorLevel,
+		},
+		{
+			name:    "unknown",
+			logpLvl: logp.Level(-128),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.logpLvl >= logp.DebugLevel {
+				otelLogpLvl, err := LogpLevelToOTel(tt.logpLvl)
+				require.NoError(t, err)
+
+				logpLvl, err := OTelLevelToLogp(otelLogpLvl)
+				require.NoError(t, err)
+				require.Equal(t, tt.logpLvl, logpLvl)
+			} else {
+				unknownOTel, err := LogpLevelToOTel(tt.logpLvl)
+				require.Error(t, err)
+
+				_, err = OTelLevelToLogp(unknownOTel)
+				require.Error(t, err)
+			}
+		})
+	}
+}
