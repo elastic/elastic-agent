@@ -185,15 +185,7 @@ func (b *dockerBuilder) expandDockerfile(templatesDir string, data map[string]in
 	return nil
 }
 
-<<<<<<< HEAD
 func (b *dockerBuilder) dockerBuild() (string, error) {
-	tag := fmt.Sprintf("%s:%s", b.imageName, b.Version)
-=======
-// dockerBuild runs "docker build -t t1 -t t2 ... buildDir"
-// returns the main tag additional tags if specified as part of extra_tags property
-// the extra tags are not push to the registry from b.ExtraVars["repository"]
-// returns an error if the command fails
-func (b *dockerBuilder) dockerBuild() (string, []string, error) {
 	platform := fmt.Sprintf("%s/%s", "linux", b.Arch)
 	tagSuffix := ""
 	args := []string{
@@ -201,15 +193,14 @@ func (b *dockerBuilder) dockerBuild() (string, []string, error) {
 	}
 	if runtime.GOARCH != b.Arch { // we need a cross-platform build, check if buildx is available
 		if !b.isBuildxEnabled {
-			return "", nil, fmt.Errorf("cross-platform docker build requested, but buildx is not available")
+			return "", fmt.Errorf("cross-platform docker build requested, but buildx is not available")
 		}
 		// if building cross-platform, add the arch name to the tag
 		tagSuffix = "-" + b.Arch
 		args = append(args, "--platform", platform)
 	}
 
-	mainTag := fmt.Sprintf("%s:%s", b.imageName, b.Version)
->>>>>>> 4ea63eb20 (Allow locally building multiplatform docker images (#12363))
+	tag := fmt.Sprintf("%s:%s", b.imageName, b.Version)
 	// For Independent Agent releases, replace the "+" with a "." since the "+" character
 	// currently isn't allowed in a tag in Docker
 	// E.g., 8.13.0+build202402191057 -> 8.13.0.build202402191057
@@ -221,32 +212,13 @@ func (b *dockerBuilder) dockerBuild() (string, []string, error) {
 	if repository := b.ExtraVars["repository"]; repository != "" {
 		tag = fmt.Sprintf("%s/%s", repository, tag)
 	}
-<<<<<<< HEAD
-	return tag, sh.Run("docker", "build", "-t", tag, b.buildDir)
-=======
 
 	if tagSuffix != "" {
-		mainTag = mainTag + tagSuffix
+		tag = tag + tagSuffix
 	}
 
-	args = append(args,
-		"-t", mainTag,
-	)
-	extraTags := []string{}
-	for _, tag := range b.ExtraTags {
-		extraTag := fmt.Sprintf("%s:%s", b.imageName, tag)
-		if tagSuffix != "" {
-			extraTag = extraTag + tagSuffix
-		}
-		extraTags = append(extraTags, extraTag)
-	}
-	for _, t := range extraTags {
-		args = append(args, "-t", t)
-	}
-	args = append(args, b.buildDir)
-
-	return mainTag, extraTags, sh.Run("docker", args...)
->>>>>>> 4ea63eb20 (Allow locally building multiplatform docker images (#12363))
+	args = append(args, "-t", tag, b.buildDir)
+	return tag, sh.Run("docker", args...)
 }
 
 func (b *dockerBuilder) dockerSave(tag string) error {
