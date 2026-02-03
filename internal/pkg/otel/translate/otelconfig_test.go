@@ -280,9 +280,6 @@ func TestGetOtelConfig(t *testing.T) {
 			"compression_params": map[string]any{
 				"level": 1,
 			},
-			"mapping": map[string]any{
-				"mode": "bodymap",
-			},
 			"endpoints":          []string{"http://localhost:9200"},
 			"password":           "password",
 			"user":               "elastic",
@@ -320,7 +317,7 @@ func TestGetOtelConfig(t *testing.T) {
 		}
 	}
 
-	defaultProcessors := func(streamId, dataset string, namespace string) []any {
+	defaultInputProcessors := func(streamId, dataset string, namespace string) []any {
 		return []any{
 			mapstr.M{
 				"add_fields": mapstr.M{
@@ -377,6 +374,24 @@ func TestGetOtelConfig(t *testing.T) {
 		}
 	}
 
+	defaultGlobalProcessorsForFilebeat := []map[string]any{
+		{
+			"add_host_metadata": map[string]any{
+				"when.not.contains.tags": "forwarded",
+			},
+		},
+		{"add_cloud_metadata": nil},
+		{"add_docker_metadata": nil},
+		{"add_kubernetes_metadata": nil},
+	}
+
+	defaultGlobalProcessorsForMetricbeat := []map[string]any{
+		{"add_host_metadata": nil},
+		{"add_cloud_metadata": nil},
+		{"add_docker_metadata": nil},
+		{"add_kubernetes_metadata": nil},
+	}
+
 	// expects input id
 	expectedFilestreamConfig := func(id string) map[string]any {
 		return map[string]any{
@@ -392,7 +407,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"/var/log/*.log",
 						},
 						"index":      "logs-generic-1-default",
-						"processors": defaultProcessors("test-1", "generic-1", "logs"),
+						"processors": defaultInputProcessors("test-1", "generic-1", "logs"),
 					},
 					{
 						"id":   "test-2",
@@ -404,7 +419,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"/var/log/*.log",
 						},
 						"index":      "logs-generic-2-default",
-						"processors": defaultProcessors("test-2", "generic-2", "logs"),
+						"processors": defaultInputProcessors("test-2", "generic-2", "logs"),
 					},
 				},
 			},
@@ -421,6 +436,7 @@ func TestGetOtelConfig(t *testing.T) {
 					},
 				},
 			},
+			"processors": defaultGlobalProcessorsForFilebeat,
 			"logging": map[string]any{
 				"with_fields": map[string]any{
 					"component": map[string]any{
@@ -657,7 +673,7 @@ func TestGetOtelConfig(t *testing.T) {
 									"index":       "metrics-generic-1-default",
 									"metricsets":  []interface{}{"stats"},
 									"period":      "60s",
-									"processors":  defaultProcessors("test-1", "generic-1", "metrics"),
+									"processors":  defaultInputProcessors("test-1", "generic-1", "metrics"),
 									"module":      "beat",
 								},
 							},
@@ -675,6 +691,7 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
+						"processors": defaultGlobalProcessorsForMetricbeat,
 						"logging": map[string]any{
 							"with_fields": map[string]any{
 								"component": map[string]any{
@@ -768,7 +785,7 @@ func TestGetOtelConfig(t *testing.T) {
 											"data_stream.dataset": "system.filesystem",
 										},
 									},
-									"processors": defaultProcessors("test-1", "generic-1", "metrics"),
+									"processors": defaultInputProcessors("test-1", "generic-1", "metrics"),
 								},
 							},
 						},
@@ -785,6 +802,7 @@ func TestGetOtelConfig(t *testing.T) {
 								},
 							},
 						},
+						"processors": defaultGlobalProcessorsForMetricbeat,
 						"logging": map[string]any{
 							"with_fields": map[string]any{
 								"component": map[string]any{
@@ -1569,6 +1587,52 @@ func TestUnitToExporterConfig(t *testing.T) {
 			assert.Equal(t, tt.expectedExporterCfg, exportersCfg)
 			assert.Equal(t, tt.expectedQueueSettings, queueSettings)
 			assert.Equal(t, tt.expectedExtensionCfg, extensionCfg)
+		})
+	}
+}
+
+func TestLogLevelConversion(t *testing.T) {
+	tests := []struct {
+		name    string
+		logpLvl logp.Level
+	}{
+		{
+			name:    "debug",
+			logpLvl: logp.DebugLevel,
+		},
+		{
+			name:    "info",
+			logpLvl: logp.InfoLevel,
+		},
+		{
+			name:    "warn",
+			logpLvl: logp.WarnLevel,
+		},
+		{
+			name:    "error",
+			logpLvl: logp.ErrorLevel,
+		},
+		{
+			name:    "unknown",
+			logpLvl: logp.Level(-128),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.logpLvl >= logp.DebugLevel {
+				otelLogpLvl, err := LogpLevelToOTel(tt.logpLvl)
+				require.NoError(t, err)
+
+				logpLvl, err := OTelLevelToLogp(otelLogpLvl)
+				require.NoError(t, err)
+				require.Equal(t, tt.logpLvl, logpLvl)
+			} else {
+				unknownOTel, err := LogpLevelToOTel(tt.logpLvl)
+				require.Error(t, err)
+
+				_, err = OTelLevelToLogp(unknownOTel)
+				require.Error(t, err)
+			}
 		})
 	}
 }
