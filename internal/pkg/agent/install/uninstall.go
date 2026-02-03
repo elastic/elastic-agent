@@ -468,7 +468,7 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 			return nil, err
 		}
 
-		renderedInputs, err := transpiler.RenderInputs(inputs, varsArray)
+		renderedInputs, _, err := transpiler.RenderInputs(inputs, varsArray)
 		if err != nil {
 			return nil, err
 		}

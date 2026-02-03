@@ -181,7 +181,7 @@ func GetConfigWithVariables(ctx context.Context, l *logger.Logger, cfgPath strin
 	// Render the inputs using the discovered inputs.
 	inputs, ok := transpiler.Lookup(ast, "inputs")
 	if ok {
-		renderedInputs, err := transpiler.RenderInputs(inputs, vars)
+		renderedInputs, _, err := transpiler.RenderInputs(inputs, vars)
 		if err != nil {
 			return nil, nil, lvl, fmt.Errorf("rendering inputs failed: %w", err)
 		}

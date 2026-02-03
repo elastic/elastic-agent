@@ -19,13 +19,17 @@ const (
 	idKey      = "id"
 )
 
-// RenderInputs renders dynamic inputs section
-func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
+// RenderInputs renders dynamic inputs section. It also returns a map of input id to the dynamic provider used when
+// rendering that input.
+func RenderInputs(inputs Node, varsArray []*Vars) (Node, map[string]string, error) {
 	l, ok := inputs.Value().(*List)
 	if !ok {
-		return nil, fmt.Errorf("inputs must be an array")
+		return nil, nil, fmt.Errorf("inputs must be an array")
 	}
 	var nodes []varIDMap
+	// the below allocation doesn't account for nodes filtered out by conditions, but it's still preferable to
+	// overallocate once compared to dynamically growing the map
+	inputIdToDynamicProvider := make(map[string]string, len(varsArray)-1)
 	nodesMap := map[uint64]*Dict{}
 	hasher := xxhash.New()
 	for _, vars := range varsArray {
@@ -46,7 +50,7 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 			}
 			if err != nil {
 				// another error that needs to be reported
-				return nil, err
+				return nil, nil, err
 			}
 			if n == nil {
 				// condition removed it
@@ -66,7 +70,7 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 			_, exists := nodesMap[hash]
 			if !exists {
 				nodesMap[hash] = dict
-				nodes = append(nodes, varIDMap{vars.ID(), dict})
+				nodes = append(nodes, varIDMap{vars.ID(), vars.dynamicProvider, dict})
 			}
 		}
 	}
@@ -74,7 +78,7 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 	for _, node := range nodes {
 		if node.id != "" {
 			// vars has unique ID, concat ID onto existing ID
-			idNode, ok := node.d.Find("id")
+			idNode, ok := node.d.Find(idKey)
 			if ok {
 				idKey, _ := idNode.(*Key) // always a Key
 
@@ -94,58 +98,27 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, error) {
 				case *FloatVal:
 					idKey.value = NewStrVal(fmt.Sprintf("%f-%s", idVal.value, node.id))
 				default:
-					return nil, fmt.Errorf("id field type invalid, expected string, int, uint, or float got: %T", idKey.value)
+					return nil, nil, fmt.Errorf("id field type invalid, expected string, int, uint, or float got: %T", idKey.value)
+				}
+				if node.dynamicProvider != "" {
+					inputIdToDynamicProvider[idKey.value.String()] = node.dynamicProvider
 				}
 			} else {
 				node.d.Insert(NewKey("id", NewStrVal(node.id)))
+				if node.dynamicProvider != "" {
+					inputIdToDynamicProvider[node.id] = node.dynamicProvider
+				}
 			}
 		}
 		nInputs = append(nInputs, promoteProcessors(node.d))
 	}
-	return NewList(nInputs), nil
-}
-
-// GetInputToVarsMap returns a map of input id to vars used by said input.
-func GetInputToVarsMap(inputs Node, varsArray []*Vars) (map[string][]string, error) {
-	l, ok := inputs.Value().(*List)
-	if !ok {
-		return nil, fmt.Errorf("inputs must be an array")
-	}
-	inputToVars := map[string][]string{}
-	for _, inputNode := range l.Value().([]Node) {
-		idNode, found := inputNode.Find(idKey)
-		if !found {
-			return nil, fmt.Errorf("input must have an id: %s", inputNode.String())
-		}
-		idKeyNode, ok := idNode.(*Key)
-		if !ok {
-			return nil, fmt.Errorf("input id must be a single value: %s", inputNode.String())
-		}
-		for _, vars := range varsArray {
-			concreteIdNode, err := idKeyNode.Apply(vars)
-			if errors.Is(err, ErrNoMatch) {
-				// has a variable that didn't exist, so we ignore it
-				continue
-			}
-			if err != nil {
-				return nil, err
-			}
-			if concreteIdNode != nil {
-				idStrNode, ok := concreteIdNode.Value().(*StrVal)
-				if !ok {
-					return nil, fmt.Errorf("input id must be a string: %s", concreteIdNode.String())
-				}
-				inputToVars[idStrNode.String()] = inputNode.Vars(nil, "")
-			}
-		}
-
-	}
-	return inputToVars, nil
+	return NewList(nInputs), inputIdToDynamicProvider, nil
 }
 
 type varIDMap struct {
-	id string
-	d  *Dict
+	id              string
+	dynamicProvider string
+	d               *Dict
 }
 
 func getStreams(dict *Dict) *List {

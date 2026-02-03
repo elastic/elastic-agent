@@ -792,7 +792,7 @@ func TestRenderInputs(t *testing.T) {
 
 	for name, test := range testcases {
 		t.Run(name, func(t *testing.T) {
-			v, err := RenderInputs(test.input, test.varsArray)
+			v, _, err := RenderInputs(test.input, test.varsArray)
 			if test.err {
 				require.Error(t, err)
 			} else {
@@ -803,245 +803,84 @@ func TestRenderInputs(t *testing.T) {
 	}
 }
 
-func mustMakeVarsP(id string, mapping map[string]interface{}, processorKey string, processors Processors) *Vars {
-	v, err := NewVarsWithProcessors(id, mapping, processorKey, processors, nil, "")
-	if err != nil {
-		panic(err)
-	}
-	return v
-}
-
-func TestGetInputToVarsMap(t *testing.T) {
+func TestRenderInputs_DynamicProviderMap(t *testing.T) {
 	testcases := map[string]struct {
-		input     Node
-		varsArray []*Vars
-		expected  map[string][]string
-		errMsg    string
+		input                      Node
+		varsArray                  []*Vars
+		expectedDynamicProviderMap map[string]string
 	}{
-		"inputs not list": {
-			input: NewKey("inputs", NewStrVal("not list")),
-			varsArray: []*Vars{
-				mustMakeVars(map[string]interface{}{}),
-			},
-			errMsg: "inputs must be an array",
-		},
-		"input missing id": {
+		"no dynamic provider returns empty map": {
 			input: NewKey("inputs", NewList([]Node{
 				NewDict([]Node{
-					NewKey("type", NewStrVal("logfile")),
+					NewKey("id", NewStrVal("input-1")),
+					NewKey("type", NewStrVal("filestream")),
 				}),
 			})),
 			varsArray: []*Vars{
 				mustMakeVars(map[string]interface{}{}),
 			},
-			errMsg: "input must have an id",
+			// Static inputs (no dynamic provider) are not added to the map
+			expectedDynamicProviderMap: map[string]string{},
 		},
-		"single input with static id": {
+		"with dynamic provider": {
 			input: NewKey("inputs", NewList([]Node{
 				NewDict([]Node{
 					NewKey("id", NewStrVal("input-1")),
-					NewKey("type", NewStrVal("logfile")),
+					NewKey("type", NewStrVal("filestream")),
+					NewKey("path", NewStrVal("${kubernetes.path}")),
+				}),
+			})),
+			varsArray: []*Vars{
+				mustMakeVarsP("kubernetes-123", map[string]interface{}{
+					"kubernetes": map[string]interface{}{
+						"path": "/var/log/containers",
+					},
+				}, "kubernetes", nil),
+			},
+			expectedDynamicProviderMap: map[string]string{
+				"input-1-kubernetes-123": "kubernetes",
+			},
+		},
+		"mixed static and dynamic inputs": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("id", NewStrVal("static-input")),
+					NewKey("type", NewStrVal("filestream")),
+				}),
+				NewDict([]Node{
+					NewKey("id", NewStrVal("dynamic-input")),
+					NewKey("type", NewStrVal("filestream")),
+					NewKey("path", NewStrVal("${local_dynamic.path}")),
 				}),
 			})),
 			varsArray: []*Vars{
 				mustMakeVars(map[string]interface{}{}),
-			},
-			expected: map[string][]string{
-				"input-1": nil,
-			},
-		},
-		"single input with variable id": {
-			input: NewKey("inputs", NewList([]Node{
-				NewDict([]Node{
-					NewKey("id", NewStrVal("input-${var1.name}")),
-					NewKey("type", NewStrVal("logfile")),
-				}),
-			})),
-			varsArray: []*Vars{
-				mustMakeVars(map[string]interface{}{
-					"var1": map[string]interface{}{
-						"name": "test",
+				mustMakeVarsP("local_dynamic-abc", map[string]interface{}{
+					"local_dynamic": map[string]interface{}{
+						"path": "/var/log/test.log",
 					},
-				}),
+				}, "local_dynamic", nil),
 			},
-			expected: map[string][]string{
-				"input-test": {"var1.name"},
+			// Only dynamic inputs are added to the map
+			expectedDynamicProviderMap: map[string]string{
+				"dynamic-input-local_dynamic-abc": "local_dynamic",
 			},
-		},
-		"multiple inputs with different ids": {
-			input: NewKey("inputs", NewList([]Node{
-				NewDict([]Node{
-					NewKey("id", NewStrVal("input-1")),
-					NewKey("type", NewStrVal("logfile")),
-				}),
-				NewDict([]Node{
-					NewKey("id", NewStrVal("input-2")),
-					NewKey("type", NewStrVal("metrics")),
-				}),
-			})),
-			varsArray: []*Vars{
-				mustMakeVars(map[string]interface{}{}),
-			},
-			expected: map[string][]string{
-				"input-1": nil,
-				"input-2": nil,
-			},
-		},
-		"input with multiple vars in id": {
-			input: NewKey("inputs", NewList([]Node{
-				NewDict([]Node{
-					NewKey("id", NewStrVal("input-${var1.name}-${var1.region}")),
-					NewKey("type", NewStrVal("logfile")),
-				}),
-			})),
-			varsArray: []*Vars{
-				mustMakeVars(map[string]interface{}{
-					"var1": map[string]interface{}{
-						"name":   "test",
-						"region": "us-west",
-					},
-				}),
-			},
-			expected: map[string][]string{
-				"input-test-us-west": {"var1.name", "var1.region"},
-			},
-		},
-		"multiple vars produce multiple ids": {
-			input: NewKey("inputs", NewList([]Node{
-				NewDict([]Node{
-					NewKey("id", NewStrVal("input-${var1.name}")),
-					NewKey("type", NewStrVal("logfile")),
-				}),
-			})),
-			varsArray: []*Vars{
-				mustMakeVars(map[string]interface{}{
-					"var1": map[string]interface{}{
-						"name": "test1",
-					},
-				}),
-				mustMakeVars(map[string]interface{}{
-					"var1": map[string]interface{}{
-						"name": "test2",
-					},
-				}),
-			},
-			expected: map[string][]string{
-				"input-test1": {"var1.name"},
-				"input-test2": {"var1.name"},
-			},
-		},
-		"var with missing key is skipped": {
-			input: NewKey("inputs", NewList([]Node{
-				NewDict([]Node{
-					NewKey("id", NewStrVal("input-${var1.name}")),
-					NewKey("type", NewStrVal("logfile")),
-				}),
-			})),
-			varsArray: []*Vars{
-				mustMakeVars(map[string]interface{}{
-					"var1": map[string]interface{}{
-						"other": "value",
-					},
-				}),
-				mustMakeVars(map[string]interface{}{
-					"var1": map[string]interface{}{
-						"name": "test",
-					},
-				}),
-			},
-			expected: map[string][]string{
-				"input-test": {"var1.name"},
-			},
-		},
-		"input with vars in body": {
-			input: NewKey("inputs", NewList([]Node{
-				NewDict([]Node{
-					NewKey("id", NewStrVal("input-1")),
-					NewKey("type", NewStrVal("logfile")),
-					NewKey("path", NewStrVal("/var/log/${var1.app}.log")),
-				}),
-			})),
-			varsArray: []*Vars{
-				mustMakeVars(map[string]interface{}{
-					"var1": map[string]interface{}{
-						"app": "myapp",
-					},
-				}),
-			},
-			expected: map[string][]string{
-				"input-1": {"var1.app"},
-			},
-		},
-		"empty vars array": {
-			input: NewKey("inputs", NewList([]Node{
-				NewDict([]Node{
-					NewKey("id", NewStrVal("input-1")),
-					NewKey("type", NewStrVal("logfile")),
-				}),
-			})),
-			varsArray: []*Vars{},
-			expected:  map[string][]string{},
-		},
-		"empty inputs list": {
-			input: NewKey("inputs", NewList([]Node{})),
-			varsArray: []*Vars{
-				mustMakeVars(map[string]interface{}{}),
-			},
-			expected: map[string][]string{},
-		},
-		"input with nested vars in streams": {
-			input: NewKey("inputs", NewList([]Node{
-				NewDict([]Node{
-					NewKey("id", NewStrVal("input-1")),
-					NewKey("type", NewStrVal("logfile")),
-					NewKey("streams", NewList([]Node{
-						NewDict([]Node{
-							NewKey("paths", NewList([]Node{
-								NewStrVal("/var/log/${var1.name}.log"),
-							})),
-						}),
-					})),
-				}),
-			})),
-			varsArray: []*Vars{
-				mustMakeVars(map[string]interface{}{
-					"var1": map[string]interface{}{
-						"name": "test",
-					},
-				}),
-			},
-			expected: map[string][]string{
-				"input-1": {"var1.name"},
-			},
-		},
-		"bad variable syntax in id": {
-			input: NewKey("inputs", NewList([]Node{
-				NewDict([]Node{
-					NewKey("id", NewStrVal("${var1.name|'missing ending quote}")),
-					NewKey("type", NewStrVal("logfile")),
-				}),
-			})),
-			varsArray: []*Vars{
-				mustMakeVars(map[string]interface{}{
-					"var1": map[string]interface{}{
-						"name": "test",
-					},
-				}),
-			},
-			errMsg: "missing ending",
 		},
 	}
 
 	for name, test := range testcases {
 		t.Run(name, func(t *testing.T) {
-			result, err := GetInputToVarsMap(test.input, test.varsArray)
-			if test.errMsg != "" {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), test.errMsg)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, test.expected, result)
-			}
+			_, dynamicProviderMap, err := RenderInputs(test.input, test.varsArray)
+			require.NoError(t, err)
+			assert.Equal(t, test.expectedDynamicProviderMap, dynamicProviderMap)
 		})
 	}
+}
+
+func mustMakeVarsP(id string, mapping map[string]interface{}, processorKey string, processors Processors) *Vars {
+	v, err := NewVarsWithProcessors(id, mapping, processorKey, processors, nil, "", processorKey)
+	if err != nil {
+		panic(err)
+	}
+	return v
 }

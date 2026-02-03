@@ -566,7 +566,15 @@ func (c *controller) generateVars(fetchContextProviders mapstr.M, defaultProvide
 			local := mapping.ShallowClone()
 			_ = local.Insert(mappings.mapping, name)
 			id := fmt.Sprintf("%s-%s", name, mappings.id)
-			v := transpiler.NewVarsWithProcessorsFromAst(id, local, name, mappings.processors, fetchContextProviders, defaultProvider)
+			v := transpiler.NewVarsWithProcessorsFromAst(
+				id,
+				local,
+				name,
+				mappings.processors,
+				fetchContextProviders,
+				defaultProvider,
+				name,
+			)
 			vars = append(vars, v)
 		}
 	}

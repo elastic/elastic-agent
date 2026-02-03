@@ -1802,35 +1802,17 @@ func (c *Coordinator) observeASTVars(ctx context.Context) error {
 	return nil
 }
 
-// getDynamicInputs returns the set of dynamic inputs in the current AST. Dynamic inputs are defined as inputs whose
-// definition includes variables from dynamic providers. Such inputs can change rapidly depending on the environment,
-// resulting in frequent configuration reloads.
-// Returns a map of input ID to bool. The input IDs are fully resolved if they contain variables.
-func (c *Coordinator) getDynamicInputs() (map[string]bool, error) {
-	if c.varsMgr == nil {
-		// No varsMgr (only happens in testing)
-		return nil, nil
-	}
+// getDynamicInputs returns the set of dynamic inputs based on a map from input id to the dynamic provider used.
+// Currently, this simply checks if the provider really is dynamic, but this may become more complex in the future.
+// Returns a map of input ID to bool.
+func getDynamicInputs(inputToDynamicProvider map[string]string) map[string]bool {
 	dynamicInputs := make(map[string]bool)
-	if c.ast != nil {
-		inputs, ok := transpiler.Lookup(c.ast, "inputs")
-		if ok {
-			inputToVars, err := transpiler.GetInputToVarsMap(inputs, c.vars)
-			if err != nil {
-				return nil, err
-			}
-			for inputId, vars := range inputToVars {
-				for _, v := range vars {
-					varProviderName := composable.ProviderNameFromVarName(v)
-					if composable.IsDynamic(varProviderName) {
-						dynamicInputs[inputId] = true
-						break
-					}
-				}
-			}
+	for inputId, dynamicProvider := range inputToDynamicProvider {
+		if composable.IsDynamic(dynamicProvider) {
+			dynamicInputs[inputId] = true
 		}
 	}
-	return dynamicInputs, nil
+	return dynamicInputs
 }
 
 // processVars updates the transpiler vars in the Coordinator.
@@ -2018,8 +2000,10 @@ func (c *Coordinator) generateComponentModel() (err error) {
 
 	// perform variable substitution for inputs
 	inputs, ok := transpiler.Lookup(ast, "inputs")
+	var inputToDynamicProvider map[string]string
 	if ok {
-		renderedInputs, err := transpiler.RenderInputs(inputs, c.vars)
+		var renderedInputs transpiler.Node
+		renderedInputs, inputToDynamicProvider, err = transpiler.RenderInputs(inputs, c.vars)
 		if err != nil {
 			return fmt.Errorf("rendering inputs failed: %w", err)
 		}
@@ -2063,12 +2047,7 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		}
 		return comps, nil
 	}
-	var dynamicInputs map[string]bool
-	dynamicInputs, err = c.getDynamicInputs()
-	if err != nil {
-		c.logger.Warnf("Failed to determine dynamic inputs: %v", err)
-		dynamicInputs = make(map[string]bool)
-	}
+	dynamicInputs := getDynamicInputs(inputToDynamicProvider)
 	c.logger.With("dynamic_inputs", dynamicInputs).Debugf("Dynamic inputs found")
 	comps, err := c.specs.ToComponents(
 		cfg,
