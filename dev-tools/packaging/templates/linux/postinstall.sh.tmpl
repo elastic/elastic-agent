@@ -2,17 +2,27 @@
 
 set -e
 
+PREFIX=""
+if [[ ${RPM_INSTALL_PREFIX:-/} != "/" ]]; then
+    PREFIX=${RPM_INSTALL_PREFIX}
+fi
+
 commit_hash="{{ commit_short }}"
 version_dir="{{agent_package_version}}{{snapshot_suffix}}"
-symlink_dir="/usr/share/elastic-agent/bin"
-symlink="/usr/share/elastic-agent/bin/elastic-agent"
-new_agent_dir="/var/lib/elastic-agent/data/elastic-agent-$version_dir-$commit_hash"
+symlink_dir="${PREFIX}/usr/share/elastic-agent/bin"
+new_agent_dir="${PREFIX}/var/lib/elastic-agent/data/elastic-agent-$version_dir-$commit_hash"
 new_endpoint_component_bin="$new_agent_dir/components/endpoint-security"
 
-# delete $symlink if exists
-if test -L "$symlink"; then
-    echo "found symlink $symlink, unlink"
-    unlink "$symlink"
+default_symlink="/usr/share/elastic-agent/bin/elastic-agent"
+prefix_symlink="${PREFIX}/usr/share/elastic-agent/bin/elastic-agent"
+# delete $default_symlink if exists
+# check version without a prefix 1st in case of upgrade
+if test -L "$default_symlink"; then
+    echo "found symlink $default_symlink, unlink"
+    unlink "$default_symlink"
+elif test -L "$prefix_symlink"; then
+    echo "found symlink $prefix_symlink, unlink"
+    unlink "$prefix_symlink"
 fi
 
 SERVICE_NAME="ElasticEndpoint"
@@ -42,11 +52,38 @@ else
     echo "$SERVICE_NAME is not installed"
 fi
 
-
-# create symlink to the new agent
 mkdir -p "$symlink_dir"
-echo "create symlink "$symlink" to "$new_agent_dir/elastic-agent""
-ln -s "$new_agent_dir/elastic-agent" "$symlink"
+
+if [[ ${PREFIX} != "" ]]; then
+    # create symlink to the new agent
+    echo "create symlink \"${prefix_symlink}\" to \"${new_agent_dir}/elastic-agent\""
+    ln -s "$new_agent_dir/elastic-agent" "$prefix_symlink"
+
+    if test -f ${PREFIX}/lib/systemd/system/elastic-agent.service; then
+        echo "Prefix: ${PREFIX} detected, editing service file"
+        # Replace old paths in service file with new ones, use # as delimiter
+        sed -i "s#/etc/elastic-agent/elastic-agent.yml#${PREFIX}/etc/elastic-agent/elastic-agent.yml#g" ${PREFIX}/lib/systemd/system/elastic-agent.service
+        sed -i "s#/usr/bin/elastic-agent#${PREFIX}/usr/bin/elastic-agent#g" ${PREFIX}/lib/systemd/system/elastic-agent.service
+    fi
+
+    if test -f ${PREFIX}/usr/bin/elastic-agent; then
+        echo "editing elastic-agent wrapper"
+        # Replace paths in wrapper script
+        sed -i "s#/usr/share/elastic-agent/bin/elastic-agent#${PREFIX}/usr/share/elastic-agent/bin/elastic-agent#g" ${PREFIX}/usr/bin/elastic-agent
+        sed -i "s#/var/lib/elastic-agent#${PREFIX}/var/lib/elastic-agent#g" ${PREFIX}/usr/bin/elastic-agent
+        sed -i "s#/etc/elastic-agent#${PREFIX}/etc/elastic-agent#g" ${PREFIX}/usr/bin/elastic-agent
+        sed -i "s#/var/log/elastic-agent#${PREFIX}/var/log/elastic-agent#g" ${PREFIX}/usr/bin/elastic-agent
+    fi
+
+    if ! test -L /lib/systemd/system/elastic-agent.service; then
+        echo "link ${PREFIX}/lib/systemd/system/elastic-agent.service to /lib/systemd/system/elastic-agent.service"
+        ln -s ${PREFIX}/lib/systemd/system/elastic-agent.service /lib/systemd/system/elastic-agent.service
+    fi
+else
+    # create symlink to the new agent
+    echo "create symlink \"${default_symlink}\" to \"${new_agent_dir}/elastic-agent\""
+    ln -s "$new_agent_dir/elastic-agent" "$default_symlink"
+fi
 
 $new_agent_dir/elastic-agent apply-flavor
 
