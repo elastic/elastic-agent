@@ -117,12 +117,12 @@ type testExecution struct {
 	handle collectorHandle
 }
 
-func (e *testExecution) startCollector(ctx context.Context, level logp.Level, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
+func (e *testExecution) startCollector(ctx context.Context, level logp.Level, collectorLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error) {
 	e.mtx.Lock()
 	defer e.mtx.Unlock()
 
 	var err error
-	e.handle, err = e.exec.startCollector(ctx, level, baseLogger, logger, cfg, errCh, statusCh, forceFetchStatusCh)
+	e.handle, err = e.exec.startCollector(ctx, level, collectorLogger, logger, cfg, errCh, statusCh, forceFetchStatusCh)
 	return e.handle, err
 }
 
@@ -836,8 +836,8 @@ func TestOTelManager_Run(t *testing.T) {
 			base, obs := loggertest.New("otel")
 
 			m := &OTelManager{
-				logger:            l,
-				baseLogger:        base,
+				managerLogger:     l,
+				collectorLogger:   base,
 				errCh:             make(chan error, 1), // holds at most one error
 				updateCh:          make(chan configUpdate, 1),
 				collectorStatusCh: make(chan *status.AggregateStatus),
@@ -1316,9 +1316,9 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfgUpdate := configUpdate{
-				collectorCfg: tt.collectorCfg,
-				components:   tt.components,
-				logLevel:     configUpdateLevel,
+				collectorCfg:  tt.collectorCfg,
+				components:    tt.components,
+				agentLogLevel: configUpdateLevel,
 			}
 			result, err := buildMergedConfig(cfgUpdate, commonAgentInfo, commonBeatMonitoringConfigGetter, logptest.NewTestingLogger(t, ""))
 
@@ -1480,7 +1480,7 @@ func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mgr := &OTelManager{
-				logger:                 newTestLogger(),
+				managerLogger:          newTestLogger(),
 				components:             tt.components,
 				healthCheckExtID:       "extension:healthcheckv2/uuid",
 				currentComponentStates: make(map[string]runtime.ComponentComponentState),
@@ -1587,7 +1587,7 @@ func TestOTelManager_processComponentStates(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mgr := &OTelManager{
-				logger:                 newTestLogger(),
+				managerLogger:          newTestLogger(),
 				currentComponentStates: tt.currentComponentStates,
 			}
 
@@ -1615,8 +1615,8 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 
 	// Create manager with test dependencies
 	mgr := OTelManager{
-		logger:                     testLogger,
-		baseLogger:                 testLogger,
+		managerLogger:              testLogger,
+		collectorLogger:            testLogger,
 		errCh:                      make(chan error, 1), // holds at most one error
 		updateCh:                   make(chan configUpdate, 1),
 		collectorStatusCh:          make(chan *status.AggregateStatus, 1),
