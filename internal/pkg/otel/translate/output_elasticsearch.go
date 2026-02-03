@@ -227,7 +227,9 @@ func getURL(escfg esToOTelOptions, output *config.C) ([]string, error) {
 		decodedParam := url.Values(params)
 		// It is enough to add params as encoded query to any one host
 		// Elasticsearch exporter will make sure to add these for every outgoing request
-		hosts[0] = strings.Join([]string{hosts[0], decodedParam.Encode()}, "?")
+		for i := range hosts {
+			hosts[i] = strings.Join([]string{hosts[0], decodedParam.Encode()}, "?")
+		}
 	}
 
 	return hosts, nil
