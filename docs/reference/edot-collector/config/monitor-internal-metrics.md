@@ -10,13 +10,11 @@ applies_to:
 
 The EDOT Collector exposes internal OpenTelemetry metrics that provide visibility into its health, performance, and telemetry pipeline behavior. Monitoring these metrics can help you proactively detect backpressure, exporter failures, dropped spans, and resource saturation before they impact data ingestion.
 
-This guide shows you how to enable and collect internal metrics from the Collector, highlights key `otelcol.*` / `otelcol_*` metrics to monitor, and explains how to use them for alerting and dashboards.
-
 ## Enable internal metrics
 
 The EDOT Collector exposes internal metrics in Prometheus format by default at `http://127.0.0.1:8888/metrics`. To expose metrics on all interfaces or customize the endpoint, update the `service.telemetry.metrics` section in your Collector configuration.
 
-### Example configuration
+### Example Collector configuration
 
 ```yaml
 service:
@@ -160,7 +158,7 @@ For more information, refer to [Collector out of memory](docs-content://troubles
 
 Use internal metrics to create dashboards and alerting rules. Track real-time pipeline health and detect regressions early.
 
-### Example alert scenarios
+Example alert scenarios:
 
 - Exporter queue usage exceeds 80% for more than 5 minutes  
 - Send failure rate exceeds a defined threshold  
