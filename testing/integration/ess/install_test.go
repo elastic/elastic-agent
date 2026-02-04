@@ -156,11 +156,118 @@ func TestInstallWithBasePath(t *testing.T) {
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
-	t.Run("check second agent installs with --namespace", testSecondAgentCanInstall(ctx, fixture, basePath, false, opts))
-	t.Run("check second agent can be installed again with --namespace --force", testSecondAgentCanInstallWithForce(ctx, fixture, basePath, false, opts))
 	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
 		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
 	})
+<<<<<<< HEAD
+=======
+	t.Run("check components set",
+		testComponentsPresence(ctx, fixture,
+			[]componentPresenceDefinition{
+				{"elastic-otel-collector", []string{"windows", "linux", "darwin"}},
+				{"endpoint-security", []string{"windows", "linux", "darwin"}},
+				{"pf-host-agent", []string{"linux"}},
+			},
+			[]componentPresenceDefinition{
+				{"cloudbeat", []string{"linux"}},
+				{"apm-server", []string{"windows", "linux", "darwin"}},
+				{"fleet-server", []string{"windows", "linux", "darwin"}},
+				{"pf-elastic-symbolizer", []string{"linux"}},
+				{"pf-elastic-collector", []string{"linux"}},
+			}))
+
+	// Make sure uninstall from within the topPath fails on Windows
+	if runtime.GOOS == "windows" {
+		cwd, err := os.Getwd()
+		require.NoErrorf(t, err, "GetWd failed: %s", err)
+		err = os.Chdir(topPath)
+		require.NoErrorf(t, err, "Chdir to topPath failed: %s", err)
+		t.Cleanup(func() {
+			_ = os.Chdir(cwd)
+		})
+		out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+		require.Error(t, err, "uninstall should have failed")
+		require.Containsf(t, string(out), "uninstall must be run from outside the installed path", "expected error string not found in: %s err: %s", out, err)
+	}
+}
+
+func TestInstallServersWithBasePath(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		// We require sudo for this test to run
+		// `elastic-agent install` (even though it will
+		// be installed as non-root).
+		Sudo: true,
+
+		// It's not safe to run this test locally as it
+		// installs Elastic Agent.
+		Local: false,
+	})
+
+	// Get path to Elastic Agent executable
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	// Prepare the Elastic Agent so the binary is extracted and ready to use.
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	// When installing with unprivileged using a base path the
+	// base needs to be accessible by the `elastic-agent-user` user that will be
+	// executing the process, but is not created yet. Using a base that exists
+	// and is known to be accessible by standard users, ensures this tests
+	// works correctly and will not hit a permission issue when spawning the
+	// elastic-agent service.
+	var basePath string
+	switch runtime.GOOS {
+	case define.Linux:
+		basePath = `/usr`
+	case define.Windows:
+		basePath = `C:\`
+	default:
+		// Set up random temporary directory to serve as base path for Elastic Agent
+		// installation.
+		tmpDir := t.TempDir()
+		basePath = filepath.Join(tmpDir, strings.ToLower(randStr(8)))
+	}
+
+	// Run `elastic-agent install`.  We use `--force` to prevent interactive
+	// execution.
+	opts := atesting.InstallOpts{
+		BasePath:       basePath,
+		Force:          true,
+		Privileged:     false,
+		InstallServers: true,
+	}
+	out, err := fixture.Install(ctx, &opts)
+	if err != nil {
+		t.Logf("install output: %s", out)
+		require.NoError(t, err)
+	}
+
+	// Check that Agent was installed in the custom base path
+	topPath := filepath.Join(basePath, "Elastic", "Agent")
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
+
+	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
+
+	t.Run("check components set",
+		testComponentsPresence(ctx, fixture,
+			[]componentPresenceDefinition{
+				{"elastic-otel-collector", []string{"windows", "linux", "darwin"}},
+				{"endpoint-security", []string{"windows", "linux", "darwin"}},
+				{"pf-host-agent", []string{"linux"}},
+				{"cloudbeat", []string{"linux"}},
+				{"apm-server", []string{"windows", "linux", "darwin"}},
+				{"fleet-server", []string{"windows", "linux", "darwin"}},
+				{"pf-elastic-symbolizer", []string{"linux"}},
+				{"pf-elastic-collector", []string{"linux"}},
+			},
+			[]componentPresenceDefinition{}))
+>>>>>>> b46442579 (Isolate --develop tests to a single test for speed. (#12597))
 
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
@@ -213,8 +320,6 @@ func TestInstallPrivilegedWithoutBasePath(t *testing.T) {
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Privileged: opts.Privileged}))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
-	t.Run("check second agent installs with --namespace", testSecondAgentCanInstall(ctx, fixture, "", false, opts))
-	t.Run("check second agent can be installed again with --namespace --force", testSecondAgentCanInstallWithForce(ctx, fixture, "", false, opts))
 	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
 		require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, &installtest.CheckOpts{Privileged: opts.Privileged}))
 	})
@@ -265,11 +370,75 @@ func TestInstallPrivilegedWithBasePath(t *testing.T) {
 	topPath := filepath.Join(randomBasePath, "Elastic", "Agent")
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
-	t.Run("check second agent installs with --develop", testSecondAgentCanInstall(ctx, fixture, randomBasePath, true, opts))
-	t.Run("check second agent can be installed again with --develop --force", testSecondAgentCanInstallWithForce(ctx, fixture, randomBasePath, true, opts))
 	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
 		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, &installtest.CheckOpts{Privileged: opts.Privileged}))
 	})
+}
+
+// Isolate the tests of --develop (which uses --namespace in it's implementation) into it's own test
+// to minimize overall test execution time. These tests were previously sub-tests of every other
+// installation mode which significantly increased the testing time, as installing and uninstalling agent
+// is currently somewhat expensive. The --develop/--namespace options are mostly isolated to changing the
+// installation directory and do not interact with other installation options, and also are for internal use only.
+func TestInstallSecondAgentInDevelopmentNamespace(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		// We require sudo for this test to run
+		// `elastic-agent install` (even though it will
+		// be installed as non-root).
+		Sudo: true,
+
+		// It's not safe to run this test locally as it
+		// installs Elastic Agent.
+		Local: false,
+	})
+
+	// Get path to Elastic Agent executable
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
+	defer cancel()
+
+	// Prepare the Elastic Agent so the binary is extracted and ready to use.
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	opts := atesting.InstallOpts{Force: true, Privileged: false}
+	out, err := fixture.Install(ctx, &opts)
+	if err != nil {
+		t.Logf("install output: %s", out)
+		require.NoError(t, err)
+	}
+
+	// Check that Agent was installed in default base path
+	topPath := installtest.DefaultTopPath()
+	checks := &installtest.CheckOpts{
+		Privileged: opts.Privileged,
+	}
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
+
+	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
+	t.Run("check second agent installs with --develop", testSecondAgentCanInstall(ctx, fixture, "", true, opts))
+	// Regression test for https://github.com/elastic/elastic-agent/issues/5595
+	t.Run("check second agent can be installed again with --develop --force", testSecondAgentCanInstall(ctx, fixture, "", true, opts))
+	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
+		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
+	})
+
+	// Make sure uninstall from within the topPath fails on Windows
+	if runtime.GOOS == "windows" {
+		cwd, err := os.Getwd()
+		require.NoErrorf(t, err, "GetWd failed: %s", err)
+		err = os.Chdir(topPath)
+		require.NoErrorf(t, err, "Chdir to topPath failed: %s", err)
+		t.Cleanup(func() {
+			_ = os.Chdir(cwd)
+		})
+		out, err = fixture.Uninstall(ctx, &atesting.UninstallOpts{Force: true})
+		require.Error(t, err, "uninstall should have failed")
+		require.Containsf(t, string(out), "uninstall must be run from outside the installed path", "expected error string not found in: %s err: %s", out, err)
+	}
 }
 
 func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T, fixture *atesting.Fixture, customUsername, customGroup string) {
@@ -299,12 +468,6 @@ func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T,
 	require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
 
 	t.Run("check agent package version", testAgentPackageVersion(ctx, fixture, true))
-	t.Run("check second agent installs with --develop", testSecondAgentCanInstall(ctx, fixture, "", true, opts))
-
-	t.Run("check second agent can be installed again with --develop --force", testSecondAgentCanInstallWithForce(ctx, fixture, "", true, opts))
-	t.Run("check the initial agent is still installed and healthy", func(t *testing.T) {
-		require.NoError(t, installtest.CheckSuccess(ctx, fixture, topPath, checks))
-	})
 
 	// Make sure uninstall from within the topPath fails on Windows
 	if runtime.GOOS == "windows" {
@@ -321,9 +484,51 @@ func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T,
 	}
 }
 
+<<<<<<< HEAD
 func testSecondAgentCanInstallWithForce(ctx context.Context, fixture *atesting.Fixture, basePath string, develop bool, installOpts atesting.InstallOpts) func(*testing.T) {
 	installOpts.Force = true
 	return testSecondAgentCanInstall(ctx, fixture, basePath, develop, installOpts)
+=======
+func testComponentsPresence(ctx context.Context, fixture *atesting.Fixture, requiredComponents []componentPresenceDefinition, unwantedComponents []componentPresenceDefinition) func(*testing.T) {
+	return func(t *testing.T) {
+		agentWorkDir := fixture.WorkDir()
+		if pf := fixture.PackageFormat(); pf == "deb" || pf == "rpm" {
+			// these are hardcoded paths in packages.yml
+			agentWorkDir = "/var/lib/elastic-agent"
+		}
+		componentsDir, err := aTesting.FindComponentsDir(agentWorkDir, fixture.Version())
+		require.NoError(t, err)
+
+		componentsPaths := func(component string) []string {
+			binarySuffix := ""
+			if runtime.GOOS == "windows" {
+				binarySuffix += ".exe"
+			}
+			return []string{
+				filepath.Join(componentsDir, component+binarySuffix),
+				filepath.Join(componentsDir, component+".spec.yml"),
+			}
+		}
+
+		for _, requiredComponent := range requiredComponents {
+			for _, reqPath := range componentsPaths(requiredComponent.name) {
+				_, err := os.Stat(reqPath)
+				if slices.Contains(requiredComponent.platforms, runtime.GOOS) {
+					require.NoErrorf(t, err, "expecting component %q to be present: %v", requiredComponent, err)
+				} else {
+					require.ErrorIs(t, err, os.ErrNotExist, "expecting component %q to be missing but was found", requiredComponent)
+				}
+			}
+		}
+
+		for _, unwantedComponent := range unwantedComponents {
+			for _, reqPath := range componentsPaths(unwantedComponent.name) {
+				_, err := os.Stat(reqPath)
+				require.ErrorIs(t, err, os.ErrNotExist, "expecting component %q to be missing but was found", unwantedComponent)
+			}
+		}
+	}
+>>>>>>> b46442579 (Isolate --develop tests to a single test for speed. (#12597))
 }
 
 // Tests that a second agent can be installed in an isolated namespace, using either --develop or --namespace.
