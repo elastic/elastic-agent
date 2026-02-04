@@ -19,7 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
@@ -115,7 +114,6 @@ func TestNewEncryptedDiskStore(t *testing.T) {
 }
 
 func TestEncryptConfigOnPath(t *testing.T) {
-	fipsutils.SkipIfFIPSOnly(t, "encrypted disk storage does not use NewGCMWithRandomNonce.")
 	dir := t.TempDir()
 	sourceCfg := filepath.Join(dir, paths.DefaultConfigName)
 	err := os.WriteFile(sourceCfg, agentConfig, 0640)
