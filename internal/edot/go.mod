@@ -8,7 +8,7 @@ replace github.com/elastic/elastic-agent => ../../
 replace github.com/elastic/beats/v7 => ../../beats
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260202210424-19b5f3102121
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260204001850-2898137255fa
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.32.1
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
