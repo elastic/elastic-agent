@@ -10,7 +10,7 @@ applies_to:
 
 The EDOT Collector exposes internal OpenTelemetry metrics that provide visibility into its health, performance, and telemetry pipeline behavior. Monitoring these metrics can help you proactively detect backpressure, exporter failures, dropped spans, and resource saturation before they impact data ingestion.
 
-This guide shows you how to enable and collect internal metrics from the Collector, highlights key `otelcol_*` metrics to monitor, and explains how to use them for alerting and dashboards.
+This guide shows you how to enable and collect internal metrics from the Collector, highlights key `otelcol.*` / `otelcol_*` metrics to monitor, and explains how to use them for alerting and dashboards.
 
 ## Enable internal metrics
 
@@ -54,7 +54,7 @@ After ingestion, these metrics are available in {{product.observability}} for da
 
 ## Key metrics to monitor
 
-The EDOT Collector emits internal metrics using the `otelcol_*` namespace. Use them to monitor the Collector’s internal state and surface operational issues.
+The EDOT Collector emits internal metrics under the `otelcol.*` namespace (refer to the [Collector service metadata](https://github.com/open-telemetry/opentelemetry-collector/blob/main/service/metadata.yaml) for more information). However, when you scrape the Prometheus endpoint, metric names are normalized to Prometheus format and appear with the `otelcol_*` prefix (dots become underscores). Use them to monitor the Collector’s internal state and surface operational issues.
 
 ### Pipeline throughput
 
@@ -117,6 +117,8 @@ Resolution:
 - Tune queue and batch settings  
 - Scale the Collector instance or deployment
 
+For more information, refer to [Export failures when sending telemetry data](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/trace-export-errors.md) (`sending_queue` overflow, exporter timeouts), [429 errors when using the mOTLP endpoint](docs-content://troubleshoot/ingest/opentelemetry/429-errors-motlp.md) (rate limiting and backpressure).
+
 ### High exporter failure rates
 
 Symptoms:
@@ -132,6 +134,8 @@ Resolution:
 - Verify backend availability and credentials  
 - Review ingestion limits and retry logic  
 - Investigate latency or firewall constraints
+
+For more information, refer to [Export failures when sending telemetry data](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/trace-export-errors.md) (export failures, retries), [429 errors when using the mOTLP endpoint](docs-content://troubleshoot/ingest/opentelemetry/429-errors-motlp.md) (rate limiting), [Connectivity issues with EDOT](docs-content://troubleshoot/ingest/opentelemetry/connectivity.md) (network, authorization, firewall).
 
 ### Excessive memory or CPU usage
 
@@ -149,6 +153,8 @@ Resolution:
 - Adjust sampling or processing logic  
 - Increase resource limits  
 - Horizontally scale Collector instances
+
+For more information, refer to [Collector out of memory](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/collector-oomkilled.md) (OOM errors, memory exhaustion), [Insufficient resources in Kubernetes](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/insufficient-resources-kubestack.md) (resource limits, scaling).
 
 ## Dashboards and alerting
 
