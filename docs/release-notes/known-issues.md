@@ -23,6 +23,14 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+## New
+
+:::{changelog} /changelog/bundles
+:type: known-issue
+:::
+
+## Old
+
 :::{dropdown} Elastic Agent becomes unhealthy when an Elasticsearch output used for monitoring specifies any list parameter as a string
 **Applies to: {{agent}} 9.2.1, 9.2.2**
 
