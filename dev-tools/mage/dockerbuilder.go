@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -25,20 +26,29 @@ import (
 type dockerBuilder struct {
 	PackageSpec
 
-	imageName string
-	buildDir  string
-	beatDir   string
+	imageName       string
+	buildDir        string
+	beatDir         string
+	isBuildxEnabled bool
 }
 
 func newDockerBuilder(spec PackageSpec) (*dockerBuilder, error) {
 	buildDir := filepath.Join(spec.packageDir, "docker-build")
 	beatDir := filepath.Join(buildDir, "beat")
 
+	buildxEnabled := isBuildxEnabled()
+	if buildxEnabled {
+		fmt.Println("Docker buildx is available, cross-platform builds are possible")
+	} else {
+		fmt.Println("Docker buildx is not available")
+	}
+
 	return &dockerBuilder{
-		PackageSpec: spec,
-		imageName:   spec.ImageName(),
-		buildDir:    buildDir,
-		beatDir:     beatDir,
+		PackageSpec:     spec,
+		imageName:       spec.ImageName(),
+		buildDir:        buildDir,
+		beatDir:         beatDir,
+		isBuildxEnabled: buildxEnabled,
 	}, nil
 }
 
@@ -176,6 +186,20 @@ func (b *dockerBuilder) expandDockerfile(templatesDir string, data map[string]in
 }
 
 func (b *dockerBuilder) dockerBuild() (string, error) {
+	platform := fmt.Sprintf("%s/%s", "linux", b.Arch)
+	tagSuffix := ""
+	args := []string{
+		"build",
+	}
+	if runtime.GOARCH != b.Arch { // we need a cross-platform build, check if buildx is available
+		if !b.isBuildxEnabled {
+			return "", fmt.Errorf("cross-platform docker build requested, but buildx is not available")
+		}
+		// if building cross-platform, add the arch name to the tag
+		tagSuffix = "-" + b.Arch
+		args = append(args, "--platform", platform)
+	}
+
 	tag := fmt.Sprintf("%s:%s", b.imageName, b.Version)
 	// For Independent Agent releases, replace the "+" with a "." since the "+" character
 	// currently isn't allowed in a tag in Docker
@@ -188,7 +212,13 @@ func (b *dockerBuilder) dockerBuild() (string, error) {
 	if repository := b.ExtraVars["repository"]; repository != "" {
 		tag = fmt.Sprintf("%s/%s", repository, tag)
 	}
-	return tag, sh.Run("docker", "build", "-t", tag, b.buildDir)
+
+	if tagSuffix != "" {
+		tag = tag + tagSuffix
+	}
+
+	args = append(args, "-t", tag, b.buildDir)
+	return tag, sh.Run("docker", args...)
 }
 
 func (b *dockerBuilder) dockerSave(tag string) error {
@@ -257,4 +287,8 @@ func (b *dockerBuilder) dockerSave(tag string) error {
 		return fmt.Errorf("failed to create .sha512 file: %w", err)
 	}
 	return nil
+}
+
+func isBuildxEnabled() bool {
+	return sh.Run("docker", "buildx", "version") == nil
 }
