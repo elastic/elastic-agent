@@ -22,11 +22,7 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: elastic-agent-9.3.1-beta
-=======
-    helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
->>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
+    helm.sh/chart: elastic-agent-9.3.1-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.3.1
@@ -38,11 +34,7 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: elastic-agent-9.3.1-beta
-=======
-    helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
->>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
+    helm.sh/chart: elastic-agent-9.3.1-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.3.1
@@ -54,11 +46,7 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: elastic-agent-9.3.1-beta
-=======
-    helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
->>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
+    helm.sh/chart: elastic-agent-9.3.1-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.3.1
@@ -114,11 +102,7 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: elastic-agent-9.3.1-beta
-=======
-    helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
->>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
+    helm.sh/chart: elastic-agent-9.3.1-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.3.1
@@ -650,11 +634,7 @@ kind: ClusterRole
 metadata:
   name: agent-clusterWide-example-default
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: elastic-agent-9.3.1-beta
-=======
-    helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
->>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
+    helm.sh/chart: elastic-agent-9.3.1-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.3.1
@@ -734,11 +714,7 @@ kind: ClusterRole
 metadata:
   name: agent-perNode-example-default
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: elastic-agent-9.3.1-beta
-=======
-    helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
->>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
+    helm.sh/chart: elastic-agent-9.3.1-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.3.1
@@ -840,11 +816,7 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-clusterWide-example-default
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: elastic-agent-9.3.1-beta
-=======
-    helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
->>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
+    helm.sh/chart: elastic-agent-9.3.1-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.3.1
@@ -863,11 +835,7 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-perNode-example-default
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: elastic-agent-9.3.1-beta
-=======
-    helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
->>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
+    helm.sh/chart: elastic-agent-9.3.1-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.3.1
@@ -971,11 +939,7 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: elastic-agent-9.3.1-beta
-=======
-    helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
->>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
+    helm.sh/chart: elastic-agent-9.3.1-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.3.1
@@ -1081,11 +1045,7 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: elastic-agent-9.3.1-beta
-=======
-    helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
->>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
+    helm.sh/chart: elastic-agent-9.3.1-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.3.1
