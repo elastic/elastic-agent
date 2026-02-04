@@ -3,8 +3,13 @@ name: elastic-agent
 description: Elastic-Agent Helm Chart
 kubeVersion: ">= 1.27.0-0"
 type: application
+<<<<<<< HEAD
 appVersion: 8.19.12
 version: 8.19.12-beta
+=======
+appVersion: 9.4.0
+version: 9.4.0-SNAPSHOT
+>>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
 dependencies:
   - name: kube-state-metrics
     version: "6.1.0"

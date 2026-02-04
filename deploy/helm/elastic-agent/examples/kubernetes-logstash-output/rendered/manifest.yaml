@@ -22,14 +22,10 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: elastic-agent-8.19.12-beta
-=======
     helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
->>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.12
+    app.kubernetes.io/version: 9.4.0
 ---
 # Source: elastic-agent/templates/agent/service-account.yaml
 apiVersion: v1
@@ -38,14 +34,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: elastic-agent-8.19.12-beta
-=======
     helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
->>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.12
+    app.kubernetes.io/version: 9.4.0
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -54,31 +46,39 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: elastic-agent-8.19.12-beta
-=======
     helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
->>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.12
+    app.kubernetes.io/version: 9.4.0
 stringData:
 
   agent.yml: |-
     id: agent-clusterwide-example
     outputs:
       test:
-        api_key: ${OUTPUT_TEST_API_KEY}
         hosts:
-        - ${OUTPUT_TEST_URL}
-        type: elasticsearch
-        ssl.ca_trusted_fingerprint: sha256:2b5b:1e49:8d01:c2ac:fffd:833e:dfee:13a4:2560:d0c2:9d26:eb77:f3d5:8ca3:2069:7783
+          - "myhost:5443"
+        type: logstash
+        loadbalance: true
+        ttl: "10s"
+        slow_start: false
+        pipelining: 1
+        workers: 5
+        timeout: "30s"
+        queue.mem.flush.timeout: "30s"
+        queue.mem.flush.min_events: 1600
+        queue.mem.events: 3200
+        max_retries: 3
+        compression_level: 5
+        bulk_max_size: 1600
+        backoff.max: "30s"
+        backoff.init: "1s"
+        allow_older_versions: false  
         ssl.certificate_authorities:
-        - /mnt/secrets/elastic-agent/test.ssl.certificate_authorities.0
-        - /mnt/secrets/elastic-agent/ca-secret.secret
-        - /mnt/secrets/elastic-agent/ca-secret.secret-another
-        - /mnt/secrets/elastic-agent/test.ssl.certificate_authorities.3
-        ssl.verification_mode: strict
+          -  "/mnt/secrets/elastic-agent/test.ssl.certificate_authorities.0"
+        ssl.certificate: "/mnt/secrets/elastic-agent/cert-secret.cert"
+        ssl.key: "/mnt/secrets/elastic-agent/cert-secret.key"
+        ssl.verification_mode: "certificate"
     secret_references: []
     agent:
       monitoring:
@@ -320,27 +320,6 @@ stringData:
     Knk2MCWxZQ6t4nnqmkFoK4nSlAmW5Fnj7c2YwPYsZnscEcFlS0YDNmwC8wvDdDHL
     tD0YrMZxZDh0LAGWAW72rT+mSPCWq5eB2ZtS
     -----END CERTIFICATE-----
-  test.ssl.certificate_authorities.3 : |-
-    -----BEGIN CERTIFICATE-----
-    MIIDTTCCAjWgAwIBAgIRAJg0u9kzXY5TmEqf9BhJm4owDQYJKoZIhvcNAQELBQAw
-    LzETMBEGA1UECxMKbW9uaXRvcmluZzEYMBYGA1UEAxMPbW9uaXRvcmluZy1odHRw
-    MB4XDTI1MDQwODEyMzAwMFoXDTI2MDQwODEyNDMwMFowLzETMBEGA1UECxMKbW9u
-    aXRvcmluZzEYMBYGA1UEAxMPbW9uaXRvcmluZy1odHRwMIIBIjANBgkqhkiG9w0B
-    AQEFAAOCAQ8AMIIBCgKCAQEAwNjR+3H9uFrkZFezzKHKh8N9pPl4Rka2Jmf6hWyG
-    NdzvX77zqC4uF6zVGCZ9pSkjQaM0TWDjDtb4zK3fUXsc5Kn7uNc/h10GEqap1rLN
-    bMxzpxOFTVn4N9h1RtL7fmrTzZGkY7OxK4IjcVHg0xPSZfQZ4PSy4li4m3wl+IkA
-    MzLTeNRn4u7qZzQyGZrImh3YmXwFv2MUMtnSrZ2uLkxI4TFudwrK4ViPU4J7H0sF
-    5xk1V2LZGz4S3xqpjg6bEN6eWgbJQZT1OafDwzXsbN+cNMX0u7Z1Hd8FuY0yOY+D
-    EoKMxPDC3kZKPZzBqFaRhPYG7oZVLczUOXzkbGMSReWxdQIDAQABo2EwXzAOBgNV
-    HQ8BAf8EBAMCAoQwHQYDVR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMA8GA1Ud
-    EwEB/wQFMAMBAf8wHQYDVR0OBBYEFN1b6UqGtzPXGoNHXVv70TIQ2QkuMA0GCSqG
-    SIb3DQEBCwUAA4IBAQB3bVPlKNeJzw9Xf8OPh6ByEVhKZT/Pl25PtBQ4j2s3ONZB
-    R96QEuKvhZ0MSi0JfrJeQfQayLxKQk5OPOzVGJr8e0SxIrc30HR4Su+8HP0tXvFl
-    RP4xKz4d3fOg6yrxHFu7XYb+wLM25jkY6UDBAxKAwA8e5PTrOh8U3QEXNN6jKlaB
-    /YJvhUVEDiY6xMIWZxq4Z9ZyWpkTXjHycTL0nTkiSE9kFwIzkBBIsFV3BxyQZcGq
-    JQlw/NRukek+5pBgs3O6lFf8iqw2KZ5qFDeSVIksVnGmfxrXLkph0vW3vhmqEVXj
-    ZRDvOBf9WYc3+6xXspMHU1/x2PPax+ZG1Fqg4zy5
-    -----END CERTIFICATE-----
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -349,31 +328,39 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: elastic-agent-8.19.12-beta
-=======
     helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
->>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.12
+    app.kubernetes.io/version: 9.4.0
 stringData:
 
   agent.yml: |-
     id: agent-pernode-example
     outputs:
       test:
-        api_key: ${OUTPUT_TEST_API_KEY}
         hosts:
-        - ${OUTPUT_TEST_URL}
-        type: elasticsearch
-        ssl.ca_trusted_fingerprint: sha256:2b5b:1e49:8d01:c2ac:fffd:833e:dfee:13a4:2560:d0c2:9d26:eb77:f3d5:8ca3:2069:7783
+          - "myhost:5443"
+        type: logstash
+        loadbalance: true
+        ttl: "10s"
+        slow_start: false
+        pipelining: 1
+        workers: 5
+        timeout: "30s"
+        queue.mem.flush.timeout: "30s"
+        queue.mem.flush.min_events: 1600
+        queue.mem.events: 3200
+        max_retries: 3
+        compression_level: 5
+        bulk_max_size: 1600
+        backoff.max: "30s"
+        backoff.init: "1s"
+        allow_older_versions: false  
         ssl.certificate_authorities:
-        - /mnt/secrets/elastic-agent/test.ssl.certificate_authorities.0
-        - /mnt/secrets/elastic-agent/ca-secret.secret
-        - /mnt/secrets/elastic-agent/ca-secret.secret-another
-        - /mnt/secrets/elastic-agent/test.ssl.certificate_authorities.3
-        ssl.verification_mode: strict
+          -  "/mnt/secrets/elastic-agent/test.ssl.certificate_authorities.0"
+        ssl.certificate: "/mnt/secrets/elastic-agent/cert-secret.cert"
+        ssl.key: "/mnt/secrets/elastic-agent/cert-secret.key"
+        ssl.verification_mode: "certificate"
     secret_references: []
     agent:
       monitoring:
@@ -591,27 +578,6 @@ stringData:
     Knk2MCWxZQ6t4nnqmkFoK4nSlAmW5Fnj7c2YwPYsZnscEcFlS0YDNmwC8wvDdDHL
     tD0YrMZxZDh0LAGWAW72rT+mSPCWq5eB2ZtS
     -----END CERTIFICATE-----
-  test.ssl.certificate_authorities.3 : |-
-    -----BEGIN CERTIFICATE-----
-    MIIDTTCCAjWgAwIBAgIRAJg0u9kzXY5TmEqf9BhJm4owDQYJKoZIhvcNAQELBQAw
-    LzETMBEGA1UECxMKbW9uaXRvcmluZzEYMBYGA1UEAxMPbW9uaXRvcmluZy1odHRw
-    MB4XDTI1MDQwODEyMzAwMFoXDTI2MDQwODEyNDMwMFowLzETMBEGA1UECxMKbW9u
-    aXRvcmluZzEYMBYGA1UEAxMPbW9uaXRvcmluZy1odHRwMIIBIjANBgkqhkiG9w0B
-    AQEFAAOCAQ8AMIIBCgKCAQEAwNjR+3H9uFrkZFezzKHKh8N9pPl4Rka2Jmf6hWyG
-    NdzvX77zqC4uF6zVGCZ9pSkjQaM0TWDjDtb4zK3fUXsc5Kn7uNc/h10GEqap1rLN
-    bMxzpxOFTVn4N9h1RtL7fmrTzZGkY7OxK4IjcVHg0xPSZfQZ4PSy4li4m3wl+IkA
-    MzLTeNRn4u7qZzQyGZrImh3YmXwFv2MUMtnSrZ2uLkxI4TFudwrK4ViPU4J7H0sF
-    5xk1V2LZGz4S3xqpjg6bEN6eWgbJQZT1OafDwzXsbN+cNMX0u7Z1Hd8FuY0yOY+D
-    EoKMxPDC3kZKPZzBqFaRhPYG7oZVLczUOXzkbGMSReWxdQIDAQABo2EwXzAOBgNV
-    HQ8BAf8EBAMCAoQwHQYDVR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMA8GA1Ud
-    EwEB/wQFMAMBAf8wHQYDVR0OBBYEFN1b6UqGtzPXGoNHXVv70TIQ2QkuMA0GCSqG
-    SIb3DQEBCwUAA4IBAQB3bVPlKNeJzw9Xf8OPh6ByEVhKZT/Pl25PtBQ4j2s3ONZB
-    R96QEuKvhZ0MSi0JfrJeQfQayLxKQk5OPOzVGJr8e0SxIrc30HR4Su+8HP0tXvFl
-    RP4xKz4d3fOg6yrxHFu7XYb+wLM25jkY6UDBAxKAwA8e5PTrOh8U3QEXNN6jKlaB
-    /YJvhUVEDiY6xMIWZxq4Z9ZyWpkTXjHycTL0nTkiSE9kFwIzkBBIsFV3BxyQZcGq
-    JQlw/NRukek+5pBgs3O6lFf8iqw2KZ5qFDeSVIksVnGmfxrXLkph0vW3vhmqEVXj
-    ZRDvOBf9WYc3+6xXspMHU1/x2PPax+ZG1Fqg4zy5
-    -----END CERTIFICATE-----
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -774,14 +740,10 @@ kind: ClusterRole
 metadata:
   name: agent-clusterWide-example-default
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: elastic-agent-8.19.12-beta
-=======
     helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
->>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.12
+    app.kubernetes.io/version: 9.4.0
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
     resources:
@@ -858,14 +820,10 @@ kind: ClusterRole
 metadata:
   name: agent-perNode-example-default
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: elastic-agent-8.19.12-beta
-=======
     helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
->>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.12
+    app.kubernetes.io/version: 9.4.0
 rules:
   - apiGroups: [ "" ] # "" indicates the core API group
     resources:
@@ -964,14 +922,10 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-clusterWide-example-default
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: elastic-agent-8.19.12-beta
-=======
     helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
->>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.12
+    app.kubernetes.io/version: 9.4.0
 subjects:
   - kind: ServiceAccount
     name: agent-clusterwide-example
@@ -987,14 +941,10 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-perNode-example-default
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: elastic-agent-8.19.12-beta
-=======
     helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
->>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.12
+    app.kubernetes.io/version: 9.4.0
 subjects:
   - kind: ServiceAccount
     name: agent-pernode-example
@@ -1039,14 +989,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: elastic-agent-8.19.12-beta
-=======
     helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
->>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.12
+    app.kubernetes.io/version: 9.4.0
 spec:
   selector:
     matchLabels:
@@ -1056,7 +1002,7 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: e985ca1d58cc517ae1cfd727bb30a013ebdb6ab103397e87bb1ffa334cf3a360
+        checksum/config: 58b5f6536359da3117624c879848e4f04a8246dc8b693eb644f26fe04f8614ae
     spec:
       automountServiceAccountToken: true
       containers:
@@ -1077,17 +1023,7 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
-        - name: OUTPUT_TEST_URL
-          valueFrom:
-            secretKeyRef:
-              key: url
-              name: es-api-secret
-        - name: OUTPUT_TEST_API_KEY
-          valueFrom:
-            secretKeyRef:
-              key: api_key
-              name: es-api-secret
-        image: docker.elastic.co/elastic-agent/elastic-agent:8.19.12-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:9.4.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
@@ -1119,18 +1055,14 @@ spec:
           name: config
           readOnly: true
           subPath: test.ssl.certificate_authorities.0
-        - mountPath: /mnt/secrets/elastic-agent/ca-secret.secret
-          name: ca-secret
+        - mountPath: /mnt/secrets/elastic-agent/cert-secret.cert
+          name: cert-secret
           readOnly: true
-          subPath: secret
-        - mountPath: /mnt/secrets/elastic-agent/ca-secret.secret-another
-          name: ca-secret
+          subPath: cert
+        - mountPath: /mnt/secrets/elastic-agent/cert-secret.key
+          name: cert-secret
           readOnly: true
-          subPath: secret-another
-        - mountPath: /mnt/secrets/elastic-agent/test.ssl.certificate_authorities.3
-          name: config
-          readOnly: true
-          subPath: test.ssl.certificate_authorities.3
+          subPath: key
         - mountPath: /usr/share/elastic-agent/state
           name: agent-data
         - mountPath: /etc/elastic-agent/agent.yml
@@ -1154,10 +1086,10 @@ spec:
       - hostPath:
           path: /var/log
         name: varlog
-      - name: ca-secret
+      - name: cert-secret
         secret:
           defaultMode: 292
-          secretName: ca-secret
+          secretName: cert-secret
       - hostPath:
           path: /etc/elastic-agent/default/agent-pernode-example/state
           type: DirectoryOrCreate
@@ -1260,14 +1192,10 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: elastic-agent-8.19.12-beta
-=======
     helm.sh/chart: elastic-agent-9.4.0-SNAPSHOT
->>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 8.19.12
+    app.kubernetes.io/version: 9.4.0
 spec:
   selector:
     matchLabels:
@@ -1277,7 +1205,7 @@ spec:
       labels:
         name: agent-clusterwide-example
       annotations:
-        checksum/config: 54bb0654f742186393a646bf36b019527a1d3d7fa483bb22ec0d1a6d064bca6e
+        checksum/config: cd4b7ec10e39d622959c2eedafe1b354cd081121e0d132c0fe874f0d086e6804
     spec:
       automountServiceAccountToken: true
       containers:
@@ -1298,17 +1226,7 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
-        - name: OUTPUT_TEST_URL
-          valueFrom:
-            secretKeyRef:
-              key: url
-              name: es-api-secret
-        - name: OUTPUT_TEST_API_KEY
-          valueFrom:
-            secretKeyRef:
-              key: api_key
-              name: es-api-secret
-        image: docker.elastic.co/elastic-agent/elastic-agent:8.19.12-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:9.4.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
@@ -1334,18 +1252,14 @@ spec:
           name: config
           readOnly: true
           subPath: test.ssl.certificate_authorities.0
-        - mountPath: /mnt/secrets/elastic-agent/ca-secret.secret
-          name: ca-secret
+        - mountPath: /mnt/secrets/elastic-agent/cert-secret.cert
+          name: cert-secret
           readOnly: true
-          subPath: secret
-        - mountPath: /mnt/secrets/elastic-agent/ca-secret.secret-another
-          name: ca-secret
+          subPath: cert
+        - mountPath: /mnt/secrets/elastic-agent/cert-secret.key
+          name: cert-secret
           readOnly: true
-          subPath: secret-another
-        - mountPath: /mnt/secrets/elastic-agent/test.ssl.certificate_authorities.3
-          name: config
-          readOnly: true
-          subPath: test.ssl.certificate_authorities.3
+          subPath: key
         - mountPath: /usr/share/elastic-agent/state
           name: agent-data
         - mountPath: /etc/elastic-agent/agent.yml
@@ -1357,10 +1271,10 @@ spec:
         kubernetes.io/os: linux
       serviceAccountName: agent-clusterwide-example
       volumes:
-      - name: ca-secret
+      - name: cert-secret
         secret:
           defaultMode: 292
-          secretName: ca-secret
+          secretName: cert-secret
       - emptyDir: {}
         name: agent-data
       - name: config
