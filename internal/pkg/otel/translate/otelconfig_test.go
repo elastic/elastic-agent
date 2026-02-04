@@ -280,9 +280,6 @@ func TestGetOtelConfig(t *testing.T) {
 			"compression_params": map[string]any{
 				"level": 1,
 			},
-			"mapping": map[string]any{
-				"mode": "bodymap",
-			},
 			"endpoints":          []string{"http://localhost:9200"},
 			"password":           "password",
 			"user":               "elastic",
@@ -1590,6 +1587,52 @@ func TestUnitToExporterConfig(t *testing.T) {
 			assert.Equal(t, tt.expectedExporterCfg, exportersCfg)
 			assert.Equal(t, tt.expectedQueueSettings, queueSettings)
 			assert.Equal(t, tt.expectedExtensionCfg, extensionCfg)
+		})
+	}
+}
+
+func TestLogLevelConversion(t *testing.T) {
+	tests := []struct {
+		name    string
+		logpLvl logp.Level
+	}{
+		{
+			name:    "debug",
+			logpLvl: logp.DebugLevel,
+		},
+		{
+			name:    "info",
+			logpLvl: logp.InfoLevel,
+		},
+		{
+			name:    "warn",
+			logpLvl: logp.WarnLevel,
+		},
+		{
+			name:    "error",
+			logpLvl: logp.ErrorLevel,
+		},
+		{
+			name:    "unknown",
+			logpLvl: logp.Level(-128),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.logpLvl >= logp.DebugLevel {
+				otelLogpLvl, err := LogpLevelToOTel(tt.logpLvl)
+				require.NoError(t, err)
+
+				logpLvl, err := OTelLevelToLogp(otelLogpLvl)
+				require.NoError(t, err)
+				require.Equal(t, tt.logpLvl, logpLvl)
+			} else {
+				unknownOTel, err := LogpLevelToOTel(tt.logpLvl)
+				require.Error(t, err)
+
+				_, err = OTelLevelToLogp(unknownOTel)
+				require.Error(t, err)
+			}
 		})
 	}
 }

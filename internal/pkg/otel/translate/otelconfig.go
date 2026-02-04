@@ -110,22 +110,34 @@ func GetOtelConfig(
 	return otelConfig, nil
 }
 
-func GetOTelLogLevel(level string) string {
-	if level != "" {
-		switch strings.ToLower(level) {
-		case "debug":
-			return "DEBUG"
-		case "info":
-			return "INFO"
-		case "warning":
-			return "WARN"
-		case "error":
-			return "ERROR"
-		default:
-			return "INFO"
-		}
+func LogpLevelToOTel(lvl logp.Level) (string, error) {
+	switch lvl {
+	case logp.DebugLevel:
+		return "DEBUG", nil
+	case logp.InfoLevel:
+		return "INFO", nil
+	case logp.WarnLevel:
+		return "WARN", nil
+	case logp.ErrorLevel:
+		return "ERROR", nil
+	default:
+		return "UNKNOWN", fmt.Errorf("unknown logp level: %s", lvl)
 	}
-	return "INFO"
+}
+
+func OTelLevelToLogp(lvl string) (logp.Level, error) {
+	switch strings.ToUpper(lvl) {
+	case "DEBUG":
+		return logp.DebugLevel, nil
+	case "INFO":
+		return logp.InfoLevel, nil
+	case "WARN":
+		return logp.WarnLevel, nil
+	case "ERROR":
+		return logp.ErrorLevel, nil
+	default:
+		return logp.Level(-128), fmt.Errorf("unknown otel level: %s", lvl)
+	}
 }
 
 // VerifyComponentIsOtelSupported verifies that the given component can be run in an Otel Collector. It returns an error
@@ -350,7 +362,11 @@ func getReceiversConfigForComponent(
 	// add monitoring config if necessary
 	// we enable the basic monitoring endpoint by default, because we want to use it for diagnostics even if
 	// agent self-monitoring is disabled
-	monitoringConfig := beatMonitoringConfigGetter(comp.ID, beatName)
+	var monitoringConfig map[string]any
+	if beatMonitoringConfigGetter != nil {
+		monitoringConfig = beatMonitoringConfigGetter(comp.ID, beatName)
+	}
+
 	if monitoringConfig == nil {
 		endpoint := monitoringhelpers.BeatsMonitoringEndpoint(comp.ID)
 		monitoringConfig = map[string]any{

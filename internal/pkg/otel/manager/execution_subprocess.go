@@ -79,20 +79,14 @@ type subprocessExecution struct {
 // processErrCh channel. Other run errors, such as not able to connect to the health endpoint, are sent to the runErrCh channel.
 func (r *subprocessExecution) startCollector(
 	ctx context.Context,
-	logLevel string,
-	baseLogger *logger.Logger,
+	lvl logp.Level,
+	collectorLogger *logger.Logger,
 	logger *logger.Logger,
 	cfg *confmap.Conf,
 	processErrCh chan error,
 	statusCh chan *otelstatus.AggregateStatus,
 	forceFetchStatusCh chan struct{},
 ) (collectorHandle, error) {
-	var lvl logp.Level
-	err := lvl.Unpack(logLevel)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unpack the log level '%s': %w", logLevel, err)
-	}
-
 	if cfg == nil {
 		// configuration is required
 		return nil, errors.New("no configuration provided")
@@ -123,10 +117,10 @@ func (r *subprocessExecution) startCollector(
 		return nil, fmt.Errorf("failed to marshal config to yaml: %w", err)
 	}
 
-	stdOutLast := newZapLast(baseLogger.Core())
+	stdOutLast := newZapLast(collectorLogger.Core())
 	stdOut := runtimeLogger.NewLogWriterWithDefaults(stdOutLast, zapcore.Level(lvl))
 	// info level for stdErr because by default collector writes to stderr
-	stdErrLast := newZapLast(baseLogger.Core())
+	stdErrLast := newZapLast(collectorLogger.Core())
 	stdErr := runtimeLogger.NewLogWriterWithDefaults(stdErrLast, zapcore.Level(lvl))
 
 	procCtx, procCtxCancel := context.WithCancel(ctx)

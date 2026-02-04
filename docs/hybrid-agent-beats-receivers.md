@@ -220,8 +220,6 @@ exporters:
             - http://localhost:9200
         logs_dynamic_id:
             enabled: true
-        mapping:
-            mode: bodymap
 
         retry:
             enabled: true
