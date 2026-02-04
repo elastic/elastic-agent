@@ -222,8 +222,8 @@ func (b *dockerBuilder) dockerBuild() (string, error) {
 }
 
 func (b *dockerBuilder) dockerSave(tag string) error {
-	if _, err := os.Stat(distributionsDir); os.IsNotExist(err) {
-		err := os.MkdirAll(distributionsDir, 0750)
+	if _, err := os.Stat(DistributionsDir); os.IsNotExist(err) {
+		err := os.MkdirAll(DistributionsDir, 0750)
 		if err != nil {
 			return fmt.Errorf("cannot create folder for docker artifacts: %w", err)
 		}
@@ -237,7 +237,7 @@ func (b *dockerBuilder) dockerSave(tag string) error {
 		if err != nil {
 			return err
 		}
-		outputFile = filepath.Join(distributionsDir, outputTar)
+		outputFile = filepath.Join(DistributionsDir, outputTar)
 	}
 
 	if mg.Verbose() {
