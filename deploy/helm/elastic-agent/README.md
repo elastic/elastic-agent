@@ -5,11 +5,7 @@
 
 # elastic-agent
 
-<<<<<<< HEAD
-![Version: 8.19.0-beta](https://img.shields.io/badge/Version-8.19.0--beta-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 8.19.0](https://img.shields.io/badge/AppVersion-8.19.0-informational?style=flat-square)
-=======
-![Version: 9.4.0-SNAPSHOT](https://img.shields.io/badge/Version-9.4.0--beta-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 9.4.0](https://img.shields.io/badge/AppVersion-9.4.0-informational?style=flat-square)
->>>>>>> 7a63a56fa (helm-charts: use SNAPSHOT suffix instead of beta (#12254))
+![Version: 8.19.12-SNAPSHOT](https://img.shields.io/badge/Version-8.19.12--SNAPSHOT-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 8.19.12](https://img.shields.io/badge/AppVersion-8.19.12-informational?style=flat-square)
 
 Elastic-Agent Helm Chart
 
