@@ -11,12 +11,15 @@
 kind: enhancement
 
 # Change summary; a 80ish characters long description of the change.
-summary: Don't run inputs using variables from dynamic providers in the otel runtime
+summary: Add agent.internal.runtime.dynamic_inputs flag to control the runtime used by inputs using dynamic variables.
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-#description:
+description: |
+  Allow switching to the process runtim for inputs using dynamic variables from a dynamic provider, like the
+  Kubernetes provider. These inputs may see frequent configuration reloads, which the otel collector isn't great
+  at handling right now.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
