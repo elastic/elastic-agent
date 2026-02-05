@@ -1,6 +1,6 @@
 ## 9.3.0 [elastic-agent-release-notes-9.3.0]
 
-_This release also includes: [Breaking changes](/release-notes/breaking-changes.md#elastic-agent-9.3.0-breaking-changes) and [Known Issues](/release-notes/known-issues.md#elastic-agent-9.3.0-known-issues)._
+_This release also includes: [Breaking changes](/release-notes/breaking-changes.md#elastic-agent-9.3.0-breaking-changes) and [Known issues](/release-notes/known-issues.md)._
 
 
 ### Features and enhancements [elastic-agent-9.3.0-features-enhancements]
