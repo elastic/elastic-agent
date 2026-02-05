@@ -15,6 +15,8 @@ mkdir -p $AGENT_DROP_PATH
 
 MAGE_TARGETS=(clean downloadManifest packageUsingDRA)
 if [ "$FIPS" != "true" ]; then
+  # Build helm package only on non-FIPS builds
+  MAGE_TARGETS+=("helm:package")
   # Build ironbank only on non-FIPS builds
   MAGE_TARGETS+=("ironbank")
 fi
