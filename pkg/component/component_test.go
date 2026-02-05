@@ -2831,7 +2831,7 @@ func TestToComponents(t *testing.T) {
 			}
 
 			result, err := specs.ToComponents(
-				scenario.Policy, runtimeConfig, nil, nil, scenario.LogLevel, scenario.headers, map[string]uint64{})
+				scenario.Policy, runtimeConfig, nil, nil, scenario.LogLevel, scenario.headers, map[string]uint64{}, map[string]bool{})
 			if scenario.Err != "" {
 				assert.Equal(t, scenario.Err, err.Error())
 			} else {
@@ -3307,7 +3307,7 @@ func TestFlattenedDataStream(t *testing.T) {
 		t.Fatalf("cannot load runtime specs: %s", err)
 	}
 
-	result, err := runtime.ToComponents(policy, DefaultRuntimeConfig(), nil, nil, logp.DebugLevel, nil, map[string]uint64{})
+	result, err := runtime.ToComponents(policy, DefaultRuntimeConfig(), nil, nil, logp.DebugLevel, nil, map[string]uint64{}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("cannot convert policy to component: %s", err)
 	}
@@ -3408,7 +3408,7 @@ func TestFlattenedDataStreamIsolatedUnits(t *testing.T) {
 		t.Fatalf("cannot load runtime specs: %s", err)
 	}
 
-	result, err := runtime.ToComponents(policy, DefaultRuntimeConfig(), nil, nil, logp.DebugLevel, nil, map[string]uint64{})
+	result, err := runtime.ToComponents(policy, DefaultRuntimeConfig(), nil, nil, logp.DebugLevel, nil, map[string]uint64{}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("cannot convert policy to component: %s", err)
 	}
@@ -4064,7 +4064,176 @@ func TestToComponentsWithRuntimeConfig(t *testing.T) {
 			require.NoError(t, err)
 
 			result, err := runtime.ToComponents(
-				tt.policy, tt.runtimeConfig, nil, nil, logp.InfoLevel, nil, map[string]uint64{})
+				tt.policy, tt.runtimeConfig, nil, nil, logp.InfoLevel, nil, map[string]uint64{}, map[string]bool{})
+			require.NoError(t, err)
+			require.Len(t, result, tt.wantCount)
+
+			if tt.validate != nil {
+				tt.validate(t, result)
+			}
+		})
+	}
+}
+
+func TestToComponentsWithDynamicInputs(t *testing.T) {
+	linuxAMD64Platform := PlatformDetail{
+		Platform: Platform{
+			OS:   Linux,
+			Arch: AMD64,
+			GOOS: Linux,
+		},
+	}
+
+	tests := []struct {
+		name          string
+		policy        map[string]interface{}
+		dynamicInputs map[string]bool
+		wantCount     int
+		validate      func(t *testing.T, components []Component)
+	}{
+		{
+			name: "no dynamic inputs",
+			policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-0",
+					},
+				},
+			},
+			dynamicInputs: map[string]bool{},
+			wantCount:     1,
+			validate: func(t *testing.T, components []Component) {
+				assert.False(t, components[0].Dynamic, "component should not be dynamic when no dynamic inputs")
+			},
+		},
+		{
+			name: "single dynamic input marks component as dynamic",
+			policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-0",
+					},
+				},
+			},
+			dynamicInputs: map[string]bool{
+				"filestream-0": true,
+			},
+			wantCount: 1,
+			validate: func(t *testing.T, components []Component) {
+				assert.True(t, components[0].Dynamic, "component should be dynamic when input is dynamic")
+			},
+		},
+		{
+			name: "multiple inputs one dynamic marks component as dynamic",
+			policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-0",
+					},
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-1",
+					},
+				},
+			},
+			dynamicInputs: map[string]bool{
+				"filestream-1": true,
+			},
+			wantCount: 1,
+			validate: func(t *testing.T, components []Component) {
+				assert.True(t, components[0].Dynamic, "component should be dynamic when at least one input is dynamic")
+			},
+		},
+		{
+			name: "different input types different dynamic status",
+			policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-0",
+					},
+					map[string]interface{}{
+						"type": "log",
+						"id":   "log-0",
+					},
+				},
+			},
+			dynamicInputs: map[string]bool{
+				"filestream-0": true,
+				"log-0":        false,
+			},
+			wantCount: 2,
+			validate: func(t *testing.T, components []Component) {
+				for _, comp := range components {
+					switch comp.InputType {
+					case "filestream":
+						assert.True(t, comp.Dynamic, "filestream component should be dynamic")
+					case "log":
+						assert.False(t, comp.Dynamic, "log component should not be dynamic")
+					}
+				}
+			},
+		},
+		{
+			name: "input not in dynamicInputs map is not dynamic",
+			policy: map[string]interface{}{
+				"outputs": map[string]interface{}{
+					"default": map[string]interface{}{
+						"type":    "elasticsearch",
+						"enabled": true,
+					},
+				},
+				"inputs": []interface{}{
+					map[string]interface{}{
+						"type": "filestream",
+						"id":   "filestream-0",
+					},
+				},
+			},
+			dynamicInputs: map[string]bool{
+				"other-input": true,
+			},
+			wantCount: 1,
+			validate: func(t *testing.T, components []Component) {
+				assert.False(t, components[0].Dynamic, "component should not be dynamic when input id not in map")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runtime, err := LoadRuntimeSpecs(filepath.Join("..", "..", "specs"), linuxAMD64Platform, SkipBinaryCheck())
+			require.NoError(t, err)
+
+			result, err := runtime.ToComponents(
+				tt.policy, DefaultRuntimeConfig(), nil, nil, logp.InfoLevel, nil, map[string]uint64{}, tt.dynamicInputs)
 			require.NoError(t, err)
 			require.Len(t, result, tt.wantCount)
 
