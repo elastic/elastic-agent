@@ -1241,8 +1241,6 @@ exporters:
       block_on_overflow: true
       batch:
         flush_timeout: 1s
-    mapping:
-      mode: bodymap
 service:
   pipelines:
     logs:
@@ -1477,8 +1475,6 @@ exporters:
       block_on_overflow: true
       batch:
         flush_timeout: 1s
-    mapping:
-      mode: bodymap
     logs_dynamic_id:
       enabled: true
 service:
@@ -1708,8 +1704,6 @@ exporters:
       ca_file: {{ .CAFile }}
     auth:
       authenticator: beatsauth
-    mapping:
-      mode: bodymap
 service:
   extensions: [beatsauth]
   pipelines:
@@ -1852,8 +1846,6 @@ exporters:
         min_size: 1
     auth:
       authenticator: beatsauth
-    mapping:
-      mode: bodymap
 service:
   extensions: [beatsauth]
   pipelines:
