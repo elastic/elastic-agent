@@ -23,7 +23,7 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
-% :::{dropdown} Elastic Agent becomes unhealthy when using the warning log level
+:::{dropdown} Elastic Agent becomes unhealthy when using the warning log level
 **Applies to: {{agent}} 9.3.0**
 
 On January 30th 2026, a known issue was discovered that causes Elastic Agent to become unhealthy with the message
