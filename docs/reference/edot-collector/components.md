@@ -115,6 +115,8 @@ These components are included in EDOT Collector version 9.3.0.
 | [httpprovider](https://github.com/open-telemetry/opentelemetry-collector/tree/main/confmap/provider/httpprovider) | [OTel Core Repo](https://github.com/open-telemetry/opentelemetry-collector) | [Core] | v1.47.0 |
 | [httpsprovider](https://github.com/open-telemetry/opentelemetry-collector/tree/main/confmap/provider/httpsprovider) | [OTel Core Repo](https://github.com/open-telemetry/opentelemetry-collector) | [Core] | v1.47.0 |
 | [yamlprovider](https://github.com/open-telemetry/opentelemetry-collector/tree/main/confmap/provider/yamlprovider) | [OTel Core Repo](https://github.com/open-telemetry/opentelemetry-collector) | [Core] | v1.47.0 |
+|***Profilers***||||
+| [ebpf-profiler](https://github.com/open-telemetry/opentelemetry-ebpf-profiler) | [OTel eBPF Profiler Repo](https://github.com/open-telemetry/opentelemetry-ebpf-profiler) | [Extended] | v0.0.202547 |
 
 
 

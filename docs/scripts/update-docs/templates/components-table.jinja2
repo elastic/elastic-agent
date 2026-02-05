@@ -44,6 +44,13 @@ These components are included in EDOT Collector version {{version.edot_collector
 {% for comp in grouped_components['Providers'] -%}
 | [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}) | {{ comp['repo_link'] }} | {{ comp['support_status'] }}{% if comp.get('annotation_number') %} [^{{ comp['annotation_number'] }}]{% endif %} | {{ comp['version'] }} |
 {% endfor %}
+{%- endif -%}
+
+{%- if grouped_components.get('Profilers') -%}
+|***Profilers***||||
+{% for comp in grouped_components['Profilers'] -%}
+| [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}) | {{ comp['repo_link'] }} | {{ comp['support_status'] }}{% if comp.get('annotation_number') %} [^{{ comp['annotation_number'] }}]{% endif %} | {{ comp['version'] }} |
+{% endfor %}
 {% endif %}
 {%- if annotations %}
 
