@@ -136,7 +136,8 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			elasticmonitoringreceiver.NewFactory(),
 			fbreceiver.NewFactory(),
 			mbreceiver.NewFactory(),
-			jmxreceiver.NewFactory(),
+			jmxreceiver.NewFactory(), // deprecated, will be removed in 9.4.0
+
 			nopreceiver.NewFactory(),
 			apachereceiver.NewFactory(),
 			iisreceiver.NewFactory(),
