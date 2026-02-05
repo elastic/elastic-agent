@@ -49,18 +49,24 @@ monitoring use cases.
 
 With the changes in https://github.com/elastic/elastic-agent/pull/11186 a new `agent.internal.runtime` section allows controlling
 the default runtime where `otel` indicates the input should run as a receiver. The default can be controlled on a per Beat and per
-input basis. For example to run the `filestream` and `system/metrics` inputs as Beat receivers:
+input basis.
+
+At the time of writing (January 2026), the logic for selecting the
+runtime prioritises the most specific setting, which might be hard
+coded. Therefore it is recommended to always set the desired runtime
+for the specific input. For example to run the `filestream` and
+`system/metrics` inputs as Beat receivers:
 
 ```yaml
 agent:
   internal:
     runtime:
-      default: process # Run all beats and inputs as sub-processes unless overridden below.
+      default: process # Run all beats and inputs as sub-processes unless overridden below or by harcoded defaults.
       filebeat:
-        default: process # Run all Filebeat inputs as sub-processe unless overidden individually.
+        default: process # Run all Filebeat inputs as sub-processe unless overidden individually or by harcoded defaults.
         filestream: otel # Run the Filebeat filestream input as a beat receiver.
       metricbeat:
-        default: process # Run all Metricbeat inputs as sub-processe unless overidden individually.
+        default: process # Run all Metricbeat inputs as sub-processe unless overidden individually or by harcoded defaults.
         system/metrics: otel # Run the Metricbeat system/metrics input as a beat receiver.
 inputs:
   - id: system-metrics-receiver
@@ -214,8 +220,6 @@ exporters:
             - http://localhost:9200
         logs_dynamic_id:
             enabled: true
-        mapping:
-            mode: bodymap
 
         retry:
             enabled: true

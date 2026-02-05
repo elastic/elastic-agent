@@ -11,6 +11,7 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/confmap"
 
+	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -25,7 +26,7 @@ type collectorExecution interface {
 	//   - errCh: Process exit errors are sent to the errCh channel
 	//   - statusCh: Collector's status updates are sent to statusCh channel.
 	//   - forceFetchStatusCh: Channel that is used to trigger a forced status update.
-	startCollector(ctx context.Context, logLevel string, baseLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error)
+	startCollector(ctx context.Context, logLevel logp.Level, collectorLogger *logger.Logger, logger *logger.Logger, cfg *confmap.Conf, errCh chan error, statusCh chan *status.AggregateStatus, forceFetchStatusCh chan struct{}) (collectorHandle, error)
 }
 
 type collectorHandle interface {

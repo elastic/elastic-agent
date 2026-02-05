@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"reflect"
 	"slices"
@@ -30,8 +31,9 @@ import (
 type esToOTelOptions struct {
 	elasticsearch.ElasticsearchConfig `config:",inline"`
 
-	Index  string `config:"index"`
-	Preset string `config:"preset"`
+	Index         string `config:"index"`
+	Preset        string `config:"preset"`
+	RetryOnStatus []int  `config:"retry_on_status"`
 }
 
 var defaultOptions = esToOTelOptions{
@@ -39,6 +41,22 @@ var defaultOptions = esToOTelOptions{
 
 	Index:  "",       // Dynamic routing is disabled if index is set
 	Preset: "custom", // default is custom if not set
+	RetryOnStatus: []int{
+		// 429
+		http.StatusTooManyRequests,
+		// 5xx
+		http.StatusInternalServerError,
+		http.StatusNotImplemented,
+		http.StatusBadGateway,
+		http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout,
+		http.StatusHTTPVersionNotSupported,
+		http.StatusVariantAlsoNegotiates,
+		http.StatusInsufficientStorage,
+		http.StatusLoopDetected,
+		http.StatusNotExtended,
+		http.StatusNetworkAuthenticationRequired,
+	},
 }
 
 // ToOTelConfig converts a Beat config into OTel elasticsearch exporter config
@@ -94,22 +112,10 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 		return nil, err
 	}
 
-	// Create url using host name, protocol and path
-	outputHosts, err := outputs.ReadHostList(output)
+	hosts, err := getURL(escfg, output)
 	if err != nil {
-		return nil, fmt.Errorf("error reading host list: %w", err)
+		return nil, fmt.Errorf("error creating hosts:%w", err)
 	}
-	hosts := []string{}
-	for _, h := range outputHosts {
-		esURL, err := common.MakeURL(escfg.Protocol, escfg.Path, h, 9200)
-		if err != nil {
-			return nil, fmt.Errorf("cannot generate ES URL from host %w", err)
-		}
-		if !slices.Contains(hosts, esURL) {
-			hosts = append(hosts, esURL)
-		}
-	}
-
 	otelYAMLCfg := map[string]any{
 		"endpoints": hosts, // hosts, protocol, path, port
 
@@ -134,9 +140,6 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 			"num_consumers":     getTotalNumWorkers(output), // num_workers * len(hosts) if loadbalance is true
 		},
 
-		"mapping": map[string]any{
-			"mode": "bodymap",
-		},
 		"logs_dynamic_pipeline": map[string]any{
 			"enabled": true,
 		},
@@ -147,6 +150,7 @@ func ToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error)
 		"max_retries":      escfg.MaxRetries,
 		"initial_interval": escfg.Backoff.Init, // backoff.init
 		"max_interval":     escfg.Backoff.Max,  // backoff.max
+		"retry_on_status":  escfg.RetryOnStatus,
 	}
 	if escfg.MaxRetries == 0 {
 		// Disable retries
@@ -191,12 +195,47 @@ func getTotalNumWorkers(cfg *config.C) int {
 	return len(hostList)
 }
 
+func getURL(escfg esToOTelOptions, output *config.C) ([]string, error) {
+	// Create url using host name, protocol and path
+	outputHosts, err := outputs.ReadHostList(output)
+	if err != nil {
+		return nil, fmt.Errorf("error reading host list: %w", err)
+	}
+
+	hosts := []string{}
+	for _, h := range outputHosts {
+		esURL, err := common.MakeURL(escfg.Protocol, escfg.Path, h, 9200)
+
+		if err != nil {
+			return nil, fmt.Errorf("cannot generate ES URL from host %w", err)
+		}
+		if !slices.Contains(hosts, esURL) {
+			hosts = append(hosts, esURL)
+		}
+	}
+
+	if len(escfg.Params) != 0 {
+		// convert params to map[string][]string
+		var params = make(map[string][]string, 0)
+		for key, value := range escfg.Params {
+			params[key] = []string{value}
+		}
+
+		decodedParam := url.Values(params)
+		// It is enough to add params as encoded query to any one host
+		// Elasticsearch exporter will make sure to add these for every outgoing request
+		for i := range hosts {
+			hosts[i] = strings.Join([]string{hosts[0], decodedParam.Encode()}, "?")
+		}
+	}
+
+	return hosts, nil
+}
+
 // log warning for unsupported config
 func checkUnsupportedConfig(cfg *config.C) error {
 	if cfg.HasField("indices") {
 		return fmt.Errorf("indices is currently not supported: %w", errors.ErrUnsupported)
-	} else if cfg.HasField("parameters") {
-		return fmt.Errorf("parameters is currently not supported: %w", errors.ErrUnsupported)
 	} else if value, err := cfg.Bool("allow_older_versions", -1); err == nil && !value {
 		return fmt.Errorf("allow_older_versions:false is currently not supported: %w", errors.ErrUnsupported)
 	} else if value, err := cfg.Bool("loadbalance", -1); err == nil && !value {
