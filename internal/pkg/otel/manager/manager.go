@@ -619,6 +619,25 @@ func (m *OTelManager) applyMergedConfig(ctx context.Context,
 	forceFetchStatusCh chan struct{},
 ) error {
 	if m.proc != nil {
+		if m.mergedCollectorCfg != nil {
+			// Try in-place reload first
+			if err := m.proc.UpdateConfig(m.mergedCollectorCfg); err != nil {
+				m.managerLogger.Warnf("config reload failed, restarting collector: %v", err)
+				// Fall through to restart
+			} else {
+				m.managerLogger.Info("successfully reloaded collector config")
+				// Force a status fetch after successful reload to ensure
+				// listeners get an updated status timestamp
+				select {
+				case <-forceFetchStatusCh:
+				default:
+				}
+				forceFetchStatusCh <- struct{}{}
+				return nil
+			}
+		}
+
+		// Restart the collector
 		m.proc.Stop(m.stopTimeout)
 		m.proc = nil
 		// We wait here for the collector to exit before possibly starting a new one. The execution indicates this

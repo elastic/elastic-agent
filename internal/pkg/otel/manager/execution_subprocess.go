@@ -5,23 +5,23 @@
 package manager
 
 import (
-	"bytes"
 	"context"
+	"encoding/gob"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"sync"
 	"time"
 
-	"go.opentelemetry.io/collector/component"
-	"gopkg.in/yaml.v3"
-
 	otelstatus "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap/zapcore"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
@@ -135,11 +135,18 @@ func (r *subprocessExecution) startCollector(
 	// set collector args
 	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
 
+	// Create stdin pipe for config streaming
+	stdinReader, stdinWriter, err := os.Pipe()
+	if err != nil {
+		procCtxCancel()
+		return nil, fmt.Errorf("failed to create stdin pipe: %w", err)
+	}
+
 	processInfo, err := process.Start(r.collectorPath,
 		process.WithArgs(collectorArgs),
 		process.WithEnv(env),
 		process.WithCmdOptions(func(c *exec.Cmd) error {
-			c.Stdin = bytes.NewReader(confBytes)
+			c.Stdin = stdinReader
 			c.Stdout = stdOut
 			c.Stderr = stdErr
 			return nil
@@ -147,20 +154,31 @@ func (r *subprocessExecution) startCollector(
 	)
 	if err != nil {
 		// we failed to start the process
+		_ = stdinReader.Close()
+		_ = stdinWriter.Close()
 		procCtxCancel()
 		return nil, fmt.Errorf("failed to start supervised collector: %w", err)
 	}
+	// Close the read end in the parent process; the child has its own copy
+	_ = stdinReader.Close()
+
 	logger.Infof("supervised collector started with pid: %d and healthcheck port: %d", processInfo.Process.Pid, httpHealthCheckPort)
 	if processInfo.Process == nil {
 		// this should not happen but just in case
+		_ = stdinWriter.Close()
 		procCtxCancel()
 		return nil, fmt.Errorf("failed to start supervised collector: process is nil")
 	}
 
-	ctl := &procHandle{
-		processDoneCh: make(chan struct{}),
-		processInfo:   processInfo,
-		log:           logger,
+	ctl := newProcHandle(processInfo, logger, stdinWriter)
+
+	// Write initial config using gob-encoded YAML
+	if err := ctl.writeConfig(confBytes); err != nil {
+		_ = stdinWriter.Close()
+		procCtxCancel()
+		// Stop the process since we failed to send initial config
+		_ = processInfo.Stop()
+		return nil, fmt.Errorf("failed to write initial config: %w", err)
 	}
 
 	healthCheckDone := make(chan struct{})
@@ -350,6 +368,18 @@ type procHandle struct {
 	processDoneCh chan struct{}
 	processInfo   *process.Info
 	log           *logger.Logger
+	stdinWriter   io.WriteCloser
+	stdinEncoder  *gob.Encoder
+}
+
+func newProcHandle(processInfo *process.Info, log *logger.Logger, stdinWriter io.WriteCloser) *procHandle {
+	return &procHandle{
+		processDoneCh: make(chan struct{}),
+		processInfo:   processInfo,
+		log:           log,
+		stdinWriter:   stdinWriter,
+		stdinEncoder:  gob.NewEncoder(stdinWriter),
+	}
 }
 
 // Stop stops the process. If the process is already stopped, it does nothing. If the process does not stop within
@@ -384,6 +414,43 @@ func (s *procHandle) Stop(waitTime time.Duration) {
 		s.log.Warnf("supervised collector subprocess didn't exit in time after killing it")
 	case <-s.processDoneCh:
 	}
+
+	// Close stdin writer
+	if closeErr := s.stdinWriter.Close(); closeErr != nil {
+		s.log.Warnf("error closing otel collector input pipe: %v", closeErr)
+	}
+}
+
+// writeConfig writes a config to stdin using gob-encoded YAML bytes.
+func (s *procHandle) writeConfig(yamlBytes []byte) error {
+	if err := s.stdinEncoder.Encode(yamlBytes); err != nil {
+		return fmt.Errorf("failed to encode config: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateConfig sends a new configuration to the running collector via stdin.
+// Returns an error if the config could not be written.
+func (s *procHandle) UpdateConfig(cfg *confmap.Conf) error {
+	if cfg == nil {
+		return errors.New("no configuration provided")
+	}
+
+	// Check if process is still running
+	select {
+	case <-s.processDoneCh:
+		return errors.New("process has exited")
+	default:
+	}
+
+	confMap := cfg.ToStringMap()
+	yamlBytes, err := yaml.Marshal(confMap)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config to yaml: %w", err)
+	}
+
+	return s.writeConfig(yamlBytes)
 }
 
 type zapWriter interface {
