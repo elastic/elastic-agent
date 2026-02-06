@@ -222,7 +222,8 @@ func TestMonitoringLogsAreShipped(
 	docs = queryESDocs(t, func() (estools.Documents, error) {
 		return estools.CheckForErrorsInLogs(ctx, info.ESClient, info.Namespace, []string{
 			// acceptable error messages (include reason)
-			"Error dialing dial tcp 127.0.0.1:9200: connect: connection refused", // beat is running default config before its config gets updated
+			"Error dialing dial tcp 127.0.0.1:9200: connect: connection refused",                                                            // beat is running default config before its config gets updated
+			"Error dialing dial tcp 127.0.0.1:9200: connectex: No connection could be made because the target machine actively refused it.", // beat is running default config before its config gets updated
 			"Failed to apply initial policy from on disk configuration",
 			"Failed to connect to backoff(elasticsearch(http://127.0.0.1:9200)): Get \"http://127.0.0.1:9200\": dial tcp 127.0.0.1:9200: connect: connection refused", // Deb test
 			"Failed to download artifact",
