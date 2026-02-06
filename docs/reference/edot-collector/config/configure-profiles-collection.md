@@ -4,7 +4,7 @@ description: Learn how to configure and customize profiles collection through th
 applies_to:
   stack: preview 9.2+
   serverless:
-    observability:
+    observability: preview
   product:
     edot_collector: preview 9.2+
 products:
