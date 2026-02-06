@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -22,6 +23,7 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -48,6 +50,7 @@ const (
 	// OtelCollectorMetricsPortEnvVarName is the name of the environment variable used to pass the collector metrics
 	// port to the managed EDOT collector.
 	OtelCollectorMetricsPortEnvVarName = "EDOT_COLLECTOR_METRICS_PORT"
+	elasticApmServerUrl                = "ELASTIC_APM_SERVER_URL"
 )
 
 type collectorRecoveryTimer interface {
@@ -310,6 +313,9 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				continue
 			}
 
+			// Debug: dump the final merged collector config.
+			dumpMergedCollectorCfgYAML(mergedCfg)
+
 			// this is the only place where we mutate the internal config attributes, take a write lock for the duration
 			m.mx.Lock()
 			previousConfigHash := m.mergedCollectorCfgHash
@@ -451,6 +457,11 @@ func buildMergedConfig(
 	}
 
 	if err := addCollectorMetricsReader(mergedOtelCfg); err != nil {
+		return nil, fmt.Errorf("failed to add random collector metrics port: %w", err)
+	}
+
+	// quick and dirty poc
+	if err := addExporterInternalTelemetry(mergedOtelCfg); err != nil {
 		return nil, fmt.Errorf("failed to add random collector metrics port: %w", err)
 	}
 
@@ -879,4 +890,119 @@ func addCollectorMetricsReader(conf *confmap.Conf) error {
 		return fmt.Errorf("failed to merge config: %w", mergeErr)
 	}
 	return nil
+}
+
+func addExporterInternalTelemetry(conf *confmap.Conf) error {
+	// We operate on untyped maps instead of otel config structs because the otel collector has an elaborate
+	// configuration resolution system, and we can't reproduce it fully here. It's possible some of the values won't
+	// be valid for unmarshalling, because they're supposed to be loaded from environment variables, and so on.
+
+	// Try to read resource attributes from the environment variable
+	var resource map[string]any
+	if envAttrs := os.Getenv("OTEL_RESOURCE_ATTRIBUTES"); envAttrs != "" {
+		resource = make(map[string]any)
+		for _, attr := range strings.Split(envAttrs, ",") {
+			parts := strings.SplitN(strings.TrimSpace(attr), "=", 2)
+			if len(parts) == 2 {
+				resource[parts[0]] = parts[1]
+			}
+		}
+	}
+
+	if len(resource) > 0 {
+		resourceCfg := map[string]any{
+			"service::telemetry::resource": resource,
+		}
+		if mergeErr := conf.Merge(confmap.NewFromStringMap(resourceCfg)); mergeErr != nil {
+			return fmt.Errorf("failed to merge config: %w", mergeErr)
+		}
+	}
+
+	metricsLevel := map[string]any{
+		"service::telemetry::metrics::level": "detailed",
+	}
+	if mergeErr := conf.Merge(confmap.NewFromStringMap(metricsLevel)); mergeErr != nil {
+		return fmt.Errorf("failed to merge config: %w", mergeErr)
+	}
+
+	metricReadersUntyped := conf.Get("service::telemetry::metrics::readers")
+	if metricReadersUntyped == nil {
+		metricReadersUntyped = []any{}
+	}
+	metricsReadersList, ok := metricReadersUntyped.([]any)
+	if !ok {
+		return fmt.Errorf("couldn't convert value of service::telemetry::metrics::readers to a list: %v", metricReadersUntyped)
+	}
+
+	metricsReader := map[string]any{
+		"periodic": map[string]any{
+			"exporter": map[string]any{
+				"otlp": map[string]any{
+					"protocol": "http/protobuf",
+					// The OTel manager is required to set this environment variable. See comment at the constant
+					// definition for more information.
+					"endpoint": fmt.Sprintf("${env:%s}", elasticApmServerUrl),
+					// this is the default configuration from the otel collector
+					"temporality_preference": "delta",
+				},
+			},
+		},
+	}
+	metricsReadersList = append(metricsReadersList, metricsReader)
+	confMap := map[string]any{
+		"service::telemetry::metrics::readers": metricsReadersList,
+	}
+	if mergeErr := conf.Merge(confmap.NewFromStringMap(confMap)); mergeErr != nil {
+		return fmt.Errorf("failed to merge config: %w", mergeErr)
+	}
+
+	// traces
+	tracesProcessorsUntyped := conf.Get("service::telemetry::traces::processors")
+	if tracesProcessorsUntyped == nil {
+		tracesProcessorsUntyped = []any{}
+	}
+	tracesProcessorsList, ok := tracesProcessorsUntyped.([]any)
+	if !ok {
+		return fmt.Errorf("couldn't convert value of service::telemetry::metrics::readers to a list: %v", metricReadersUntyped)
+	}
+
+	tracesProcessor := map[string]any{
+		"batch": map[string]any{
+			"exporter": map[string]any{
+				"otlp": map[string]any{
+					"protocol": "http/protobuf",
+					"endpoint": fmt.Sprintf("${env:%s}", elasticApmServerUrl),
+				},
+			},
+		},
+	}
+	tracesProcessorsList = append(tracesProcessorsList, tracesProcessor)
+	confMap = map[string]any{
+		"service::telemetry::traces::processors": tracesProcessorsList,
+	}
+	if mergeErr := conf.Merge(confmap.NewFromStringMap(confMap)); mergeErr != nil {
+		return fmt.Errorf("failed to merge config: %w", mergeErr)
+	}
+	return nil
+}
+
+// dumpMergedCollectorCfgYAML is a small debugging helper to persist the exact merged collector config.
+// NOTE: This is intentionally hardcoded and meant for local debugging only.
+func dumpMergedCollectorCfgYAML(cfg *confmap.Conf) {
+	if cfg == nil {
+		return
+	}
+
+	const dumpDir = "/tmp"
+	dumpPath := filepath.Join(dumpDir, fmt.Sprintf("elastic-agent-merged-otel-config-%d.yml", time.Now().UnixNano()))
+
+	_ = os.MkdirAll(dumpDir, 0o755)
+
+	b, err := yaml.Marshal(cfg.ToStringMap())
+	if err != nil {
+		return
+	}
+
+	// best-effort write; ignore errors
+	_ = os.WriteFile(dumpPath, b, 0o600)
 }
