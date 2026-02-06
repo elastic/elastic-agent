@@ -163,12 +163,7 @@ func (h *PrivilegeLevelChange) handleChange(ctx context.Context, a fleetapi.Acti
 }
 
 func targetingSameUser(currentUID, currentGID, targetUID, targetGID string) bool {
-	if currentGID == targetGID && currentUID == targetUID {
-		// no change
-		return true
-	}
-
-	return false
+	return currentGID == targetGID && currentUID == targetUID
 }
 
 func (h *PrivilegeLevelChange) ackFailure(ctx context.Context, err error, action *fleetapi.ActionPrivilegeLevelChange, acker acker.Acker) {
