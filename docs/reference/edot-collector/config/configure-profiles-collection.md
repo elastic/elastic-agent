@@ -4,7 +4,7 @@ description: Learn how to configure and customize profiles collection through th
 applies_to:
   stack: preview 9.2+
   serverless:
-    observability:
+    observability: preview
   product:
     edot_collector: preview 9.2+
 products:
@@ -37,6 +37,27 @@ sudo ./otelcol --config otel.yml --feature-gates=service.profilesSupport
 ```
 ::::
 :::::
+
+## System requirements
+
+The profiling receiver is only available on Linux. Running it on an operating system other than Linux results in an error.
+
+The supported Linux kernel versions are either 5.4 and later for x86_64 or 5.5 and later for ARM64.
+
+## Supported runtimes
+
+The profiling receiver handles native runtimes, like C, C++, Go and Rust, as well as various interpreters.
+
+The minimum supported versions of each interpreter are:
+
+- JVM/JDK: 7
+- Python: 3.6
+- V8: 8.1.0
+- Perl: 5.28
+- PHP: 7.3
+- Ruby: 2.5
+- .Net: 6
+- Erlang/OTP 27.2.4 
 
 ## Generate metrics from profiles
 

@@ -21,31 +21,46 @@ dist:
 
 receivers:
 {%- for comp in grouped_components.get('Receivers', []) %}
+{%- if comp.support_status != 'Deprecated' %}
   - gomod: {{ comp.dep }}
+{%- if comp.get('special_import') %}
+    import: {{ comp.special_import }}
+{%- endif %}
+{%- endif %}
 {%- endfor %}
 
 processors:
 {%- for comp in grouped_components.get('Processors', []) %}
+{%- if comp.support_status != 'Deprecated' %}
   - gomod: {{ comp.dep }}
+{%- endif %}
 {%- endfor %}
 
 exporters:
 {%- for comp in grouped_components.get('Exporters', []) %}
+{%- if comp.support_status != 'Deprecated' %}
   - gomod: {{ comp.dep }}
+{%- endif %}
 {%- endfor %}
 
 connectors:
 {%- for comp in grouped_components.get('Connectors', []) %}
+{%- if comp.support_status != 'Deprecated' %}
   - gomod: {{ comp.dep }}
+{%- endif %}
 {%- endfor %}
 
 extensions:
 {%- for comp in grouped_components.get('Extensions', []) %}
+{%- if comp.support_status != 'Deprecated' %}
   - gomod: {{ comp.dep }}
+{%- endif %}
 {%- endfor %}
 
 providers:
 {%- for comp in grouped_components.get('Providers', []) %}
+{%- if comp.support_status != 'Deprecated' %}
   - gomod: {{ comp.dep }}
+{%- endif %}
 {%- endfor %}
 ```
