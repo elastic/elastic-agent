@@ -5,10 +5,11 @@
 package agentprovider
 
 import (
-	"bytes"
 	"context"
 	"encoding/gob"
-	"io"
+	"errors"
+	"fmt"
+	"net"
 	"sync"
 	"testing"
 	"time"
@@ -19,19 +20,13 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// encodeConfigToBuffer marshals config to YAML and encodes the bytes using gob into a buffer
-func encodeConfigToBuffer(cfg map[string]any) *bytes.Buffer {
-	yamlBytes, err := yaml.Marshal(cfg)
-	if err != nil {
-		panic(err)
-	}
-	var buf bytes.Buffer
-	encoder := gob.NewEncoder(&buf)
-	_ = encoder.Encode(yamlBytes)
-	return &buf
+// testURI returns a URI for the given socket address that matches what the
+// parent process would pass via --config.
+func testURI(addr string) string {
+	return fmt.Sprintf("%s:%s", AgentConfigProviderSchemeName, addr)
 }
 
-// encodeYAMLBytes encodes YAML bytes using gob to the given encoder
+// encodeYAMLBytes marshals config to YAML and encodes the bytes using gob.
 func encodeYAMLBytes(encoder *gob.Encoder, cfg map[string]any) error {
 	yamlBytes, err := yaml.Marshal(cfg)
 	if err != nil {
@@ -40,41 +35,56 @@ func encodeYAMLBytes(encoder *gob.Encoder, cfg map[string]any) error {
 	return encoder.Encode(yamlBytes)
 }
 
+// newTestProvider creates a StreamingProvider backed by a net.Pipe().
+// It returns the provider, the server-side connection (for writing configs),
+// and the URI to use with Retrieve.
+func newTestProvider(t *testing.T) (confmap.Provider, net.Conn, string) {
+	t.Helper()
+
+	clientConn, serverConn := net.Pipe()
+	const fakeAddr = "unix:///tmp/test.sock"
+
+	factory := NewFactoryWithDialFunc(func(_ context.Context, address string) (net.Conn, error) {
+		assert.Equal(t, fakeAddr, address)
+		return clientConn, nil
+	})
+	provider := factory.Create(confmap.ProviderSettings{})
+	return provider, serverConn, testURI(fakeAddr)
+}
+
 func TestStreamingProvider_NewFactory(t *testing.T) {
-	buf := encodeConfigToBuffer(map[string]any{"key": "value"})
+	clientConn, _ := net.Pipe()
 
-	p, err := NewStreamingProvider(buf)
-	require.NoError(t, err)
-	assert.Equal(t, p, p.NewFactory().Create(confmap.ProviderSettings{}))
+	factory := NewFactoryWithDialFunc(func(_ context.Context, _ string) (net.Conn, error) {
+		return clientConn, nil
+	})
+	p1 := factory.Create(confmap.ProviderSettings{})
+	p2 := factory.Create(confmap.ProviderSettings{})
+	// Factory always returns the same provider instance
+	assert.Same(t, p1, p2)
 }
 
-func TestStreamingProvider_Schema(t *testing.T) {
-	buf := encodeConfigToBuffer(map[string]any{"key": "value"})
-
-	p, err := NewStreamingProvider(buf)
-	require.NoError(t, err)
+func TestStreamingProvider_Scheme(t *testing.T) {
+	p, serverConn, _ := newTestProvider(t)
+	defer serverConn.Close()
 	assert.Equal(t, AgentConfigProviderSchemeName, p.Scheme())
-}
-
-func TestStreamingProvider_URI(t *testing.T) {
-	buf := encodeConfigToBuffer(map[string]any{"key": "value"})
-
-	p, err := NewStreamingProvider(buf)
-	require.NoError(t, err)
-	assert.Equal(t, p.uri, p.URI())
 }
 
 func TestStreamingProvider_InitialConfig(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	p, serverConn, uri := newTestProvider(t)
+
 	cfg := map[string]any{"receivers": map[string]any{"otlp": map[string]any{}}}
-	buf := encodeConfigToBuffer(cfg)
 
-	p, err := NewStreamingProvider(buf)
-	require.NoError(t, err)
+	// Write initial config before Retrieve
+	go func() {
+		encoder := gob.NewEncoder(serverConn)
+		_ = encodeYAMLBytes(encoder, cfg)
+	}()
 
-	ret, err := p.Retrieve(ctx, p.URI(), func(event *confmap.ChangeEvent) {})
+	ret, err := p.Retrieve(ctx, uri, func(event *confmap.ChangeEvent) {})
 	require.NoError(t, err)
 	defer ret.Close(ctx)
 
@@ -83,32 +93,32 @@ func TestStreamingProvider_InitialConfig(t *testing.T) {
 
 	// Verify the config was read correctly
 	assert.NotNil(t, retCfg.Get("receivers"))
+
+	serverConn.Close()
+	p.Shutdown(ctx)
 }
 
 func TestStreamingProvider_ConfigUpdate(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	p, serverConn, uri := newTestProvider(t)
+
 	initialCfg := map[string]any{"version": "1"}
 	updatedCfg := map[string]any{"version": "2"}
 
-	reader, writer := io.Pipe()
 	readyCh := make(chan *gob.Encoder)
 	configWritten := make(chan struct{})
 
-	// Use a single encoder for the entire stream
+	// Write initial config
 	go func() {
-		encoder := gob.NewEncoder(writer)
+		encoder := gob.NewEncoder(serverConn)
 		_ = encodeYAMLBytes(encoder, initialCfg)
-		// Signal that encoder is ready for more writes
 		readyCh <- encoder
 	}()
 
-	p, err := NewStreamingProvider(reader)
-	require.NoError(t, err)
-
 	watcherCalled := make(chan struct{})
-	ret, err := p.Retrieve(ctx, p.URI(), func(event *confmap.ChangeEvent) {
+	ret, err := p.Retrieve(ctx, uri, func(event *confmap.ChangeEvent) {
 		close(watcherCalled)
 	})
 	require.NoError(t, err)
@@ -122,7 +132,6 @@ func TestStreamingProvider_ConfigUpdate(t *testing.T) {
 	go func() {
 		_ = encodeYAMLBytes(encoder, updatedCfg)
 		close(configWritten)
-		// Don't close writer yet - keep stream open
 	}()
 
 	// Wait for watcher to be called
@@ -140,7 +149,7 @@ func TestStreamingProvider_ConfigUpdate(t *testing.T) {
 	ret.Close(ctx)
 
 	// Retrieve again to get the updated config
-	ret2, err := p.Retrieve(ctx, p.URI(), nil)
+	ret2, err := p.Retrieve(ctx, uri, nil)
 	require.NoError(t, err)
 	defer ret2.Close(ctx)
 
@@ -149,7 +158,7 @@ func TestStreamingProvider_ConfigUpdate(t *testing.T) {
 	assert.Equal(t, "2", retCfg2.Get("version"))
 
 	// Clean up
-	writer.Close()
+	serverConn.Close()
 	p.Shutdown(ctx)
 }
 
@@ -157,25 +166,23 @@ func TestStreamingProvider_MultipleUpdates(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	reader, writer := io.Pipe()
+	p, serverConn, uri := newTestProvider(t)
+
 	readyCh := make(chan *gob.Encoder)
 
-	// Use a single encoder for the entire stream
+	// Write initial config
 	go func() {
-		encoder := gob.NewEncoder(writer)
+		encoder := gob.NewEncoder(serverConn)
 		_ = encodeYAMLBytes(encoder, map[string]any{"count": 0})
 		readyCh <- encoder
 	}()
-
-	p, err := NewStreamingProvider(reader)
-	require.NoError(t, err)
 
 	// Track watcher calls
 	var watcherCallCount int
 	var watcherMu sync.Mutex
 	watcherCalled := make(chan struct{}, 10)
 
-	ret, err := p.Retrieve(ctx, p.URI(), func(event *confmap.ChangeEvent) {
+	ret, err := p.Retrieve(ctx, uri, func(event *confmap.ChangeEvent) {
 		watcherMu.Lock()
 		watcherCallCount++
 		watcherMu.Unlock()
@@ -191,7 +198,7 @@ func TestStreamingProvider_MultipleUpdates(t *testing.T) {
 			_ = encodeYAMLBytes(encoder, map[string]any{"count": i})
 			time.Sleep(50 * time.Millisecond)
 		}
-		writer.Close()
+		serverConn.Close()
 	}()
 
 	// Wait for at least one watcher call
@@ -207,29 +214,27 @@ func TestStreamingProvider_ReadError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	reader, writer := io.Pipe()
+	p, serverConn, uri := newTestProvider(t)
+
 	encoderReady := make(chan struct{})
 
 	// Write initial config then signal ready
 	go func() {
-		encoder := gob.NewEncoder(writer)
+		encoder := gob.NewEncoder(serverConn)
 		_ = encodeYAMLBytes(encoder, map[string]any{"key": "value"})
 		close(encoderReady)
 	}()
 
-	p, err := NewStreamingProvider(reader)
-	require.NoError(t, err)
-
 	watcherCalled := make(chan *confmap.ChangeEvent, 1)
-	ret, err := p.Retrieve(ctx, p.URI(), func(event *confmap.ChangeEvent) {
+	ret, err := p.Retrieve(ctx, uri, func(event *confmap.ChangeEvent) {
 		watcherCalled <- event
 	})
 	require.NoError(t, err)
 	defer ret.Close(ctx)
 
-	// Wait for initial encode, then close the writer to cause a read error
+	// Wait for initial encode, then close the connection to cause a read error
 	<-encoderReady
-	writer.Close()
+	serverConn.Close()
 
 	// Wait for watcher to be called with error
 	select {
@@ -244,47 +249,44 @@ func TestStreamingProvider_Shutdown(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	reader, writer := io.Pipe()
+	p, serverConn, uri := newTestProvider(t)
 
 	// Write initial config
 	go func() {
-		encoder := gob.NewEncoder(writer)
+		encoder := gob.NewEncoder(serverConn)
 		_ = encodeYAMLBytes(encoder, map[string]any{"key": "value"})
-		// Keep writer open so background reader is blocking
+		// Keep connection open so background reader is blocking
 	}()
 
-	p, err := NewStreamingProvider(reader)
-	require.NoError(t, err)
-
-	ret, err := p.Retrieve(ctx, p.URI(), func(event *confmap.ChangeEvent) {})
+	ret, err := p.Retrieve(ctx, uri, func(event *confmap.ChangeEvent) {})
 	require.NoError(t, err)
 	ret.Close(ctx)
 
-	// Shutdown should succeed
+	// Shutdown should succeed and close the connection
 	err = p.Shutdown(ctx)
 	require.NoError(t, err)
 
 	// Clean up
-	writer.Close()
+	serverConn.Close()
 }
 
 func TestStreamingProvider_RetrievedClose(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	reader, writer := io.Pipe()
+	p, serverConn, uri := newTestProvider(t)
+
+	readyCh := make(chan *gob.Encoder)
 
 	// Write initial config
 	go func() {
-		encoder := gob.NewEncoder(writer)
+		encoder := gob.NewEncoder(serverConn)
 		_ = encodeYAMLBytes(encoder, map[string]any{"key": "value"})
+		readyCh <- encoder
 	}()
 
-	p, err := NewStreamingProvider(reader)
-	require.NoError(t, err)
-
 	watcherCalled := make(chan struct{})
-	ret, err := p.Retrieve(ctx, p.URI(), func(event *confmap.ChangeEvent) {
+	ret, err := p.Retrieve(ctx, uri, func(event *confmap.ChangeEvent) {
 		close(watcherCalled)
 	})
 	require.NoError(t, err)
@@ -294,8 +296,8 @@ func TestStreamingProvider_RetrievedClose(t *testing.T) {
 	require.NoError(t, err)
 
 	// Write another config - watcher should NOT be called since we closed
+	encoder := <-readyCh
 	go func() {
-		encoder := gob.NewEncoder(writer)
 		_ = encodeYAMLBytes(encoder, map[string]any{"key": "value2"})
 	}()
 
@@ -308,84 +310,62 @@ func TestStreamingProvider_RetrievedClose(t *testing.T) {
 	}
 
 	// Clean up
-	writer.Close()
+	serverConn.Close()
 	p.Shutdown(ctx)
 }
 
-func TestStreamingProvider_WrongURI(t *testing.T) {
+func TestStreamingProvider_DialError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	buf := encodeConfigToBuffer(map[string]any{"key": "value"})
+	dialErr := errors.New("connection refused")
+	factory := NewFactoryWithDialFunc(func(_ context.Context, _ string) (net.Conn, error) {
+		return nil, dialErr
+	})
+	p := factory.Create(confmap.ProviderSettings{})
 
-	p, err := NewStreamingProvider(buf)
-	require.NoError(t, err)
-
-	_, err = p.Retrieve(ctx, "wrong:uri", func(event *confmap.ChangeEvent) {})
+	_, err := p.Retrieve(ctx, testURI("unix:///nonexistent.sock"), nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "uri doesn't equal defined")
-}
-
-func TestStreamingProvider_NilReader(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	p, err := NewStreamingProvider(nil)
-	require.NoError(t, err)
-	require.NotNil(t, p)
-
-	// Retrieve should fail because no config is available
-	_, err = p.Retrieve(ctx, p.URI(), nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no configuration available")
+	assert.Contains(t, err.Error(), "failed to dial config socket")
 }
 
 func TestStreamingProvider_EmptyConfig(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	buf := encodeConfigToBuffer(map[string]any{})
+	p, serverConn, uri := newTestProvider(t)
 
-	p, err := NewStreamingProvider(buf)
-	require.NoError(t, err)
+	go func() {
+		encoder := gob.NewEncoder(serverConn)
+		_ = encodeYAMLBytes(encoder, map[string]any{})
+	}()
 
-	ret, err := p.Retrieve(ctx, p.URI(), func(event *confmap.ChangeEvent) {})
+	ret, err := p.Retrieve(ctx, uri, func(event *confmap.ChangeEvent) {})
 	require.NoError(t, err)
 	defer ret.Close(ctx)
 
 	retCfg, err := ret.AsConf()
 	require.NoError(t, err)
 	assert.Equal(t, 0, len(retCfg.AllKeys()))
+
+	serverConn.Close()
+	p.Shutdown(ctx)
 }
 
 func TestStreamingProvider_InvalidGobData(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Write invalid gob data
-	buf := bytes.NewReader([]byte("invalid gob data"))
+	p, serverConn, uri := newTestProvider(t)
 
-	p, err := NewStreamingProvider(buf)
-	require.NoError(t, err)
+	// Write invalid gob data directly to the connection
+	go func() {
+		_, _ = serverConn.Write([]byte("invalid gob data"))
+		serverConn.Close()
+	}()
 
-	// Error should occur on Retrieve, not NewStreamingProvider
-	_, err = p.Retrieve(ctx, p.URI(), nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to decode config")
-}
-
-func TestStreamingProvider_IncompleteGobData(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Write truncated gob data
-	buf := bytes.NewReader([]byte{0x0c, 0xff, 0x81})
-
-	p, err := NewStreamingProvider(buf)
-	require.NoError(t, err)
-
-	// Error should occur on Retrieve, not NewStreamingProvider
-	_, err = p.Retrieve(ctx, p.URI(), nil)
+	// Error should occur on Retrieve during initial config read
+	_, err := p.Retrieve(ctx, uri, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to decode config")
 }
@@ -394,13 +374,17 @@ func TestStreamingProvider_CancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
-	buf := encodeConfigToBuffer(map[string]any{"key": "value"})
+	clientConn, serverConn := net.Pipe()
+	defer clientConn.Close()
+	defer serverConn.Close()
 
-	p, err := NewStreamingProvider(buf)
-	require.NoError(t, err)
+	factory := NewFactoryWithDialFunc(func(_ context.Context, _ string) (net.Conn, error) {
+		return clientConn, nil
+	})
+	p := factory.Create(confmap.ProviderSettings{})
 
 	// Retrieve should fail immediately with cancelled context
-	_, err = p.Retrieve(ctx, p.URI(), nil)
+	_, err := p.Retrieve(ctx, testURI("unix:///tmp/test.sock"), nil)
 	require.Error(t, err)
 	assert.Equal(t, context.Canceled, err)
 }
@@ -409,17 +393,22 @@ func TestStreamingProvider_NilWatcher(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	buf := encodeConfigToBuffer(map[string]any{"key": "value"})
+	p, serverConn, uri := newTestProvider(t)
 
-	p, err := NewStreamingProvider(buf)
-	require.NoError(t, err)
+	go func() {
+		encoder := gob.NewEncoder(serverConn)
+		_ = encodeYAMLBytes(encoder, map[string]any{"key": "value"})
+	}()
 
 	// Should work fine with nil watcher
-	ret, err := p.Retrieve(ctx, p.URI(), nil)
+	ret, err := p.Retrieve(ctx, uri, nil)
 	require.NoError(t, err)
 	defer ret.Close(ctx)
 
 	retCfg, err := ret.AsConf()
 	require.NoError(t, err)
 	assert.Equal(t, "value", retCfg.Get("key"))
+
+	serverConn.Close()
+	p.Shutdown(ctx)
 }
