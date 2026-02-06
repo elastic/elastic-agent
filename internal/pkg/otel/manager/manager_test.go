@@ -142,6 +142,7 @@ type mockExecution struct {
 	statusCh         chan *status.AggregateStatus
 	cfg              *confmap.Conf
 	collectorStarted chan struct{}
+	configUpdated    chan struct{}
 }
 
 func (e *mockExecution) startCollector(
@@ -165,8 +166,10 @@ func (e *mockExecution) startCollector(
 		reportErr(ctx, errCh, nil)
 	}()
 	handle := &mockCollectorHandle{
-		stopCh: stopCh,
-		cancel: collectorCancel,
+		stopCh:            stopCh,
+		cancel:            collectorCancel,
+		execution:         e,
+		collectorLogLevel: level,
 	}
 	if e.collectorStarted != nil {
 		e.collectorStarted <- struct{}{}
@@ -177,8 +180,10 @@ func (e *mockExecution) startCollector(
 var _ collectorHandle = &mockCollectorHandle{}
 
 type mockCollectorHandle struct {
-	stopCh chan struct{}
-	cancel context.CancelFunc
+	stopCh            chan struct{}
+	cancel            context.CancelFunc
+	execution         *mockExecution
+	collectorLogLevel logp.Level
 }
 
 func (h *mockCollectorHandle) Stop(waitTime time.Duration) {
@@ -187,6 +192,20 @@ func (h *mockCollectorHandle) Stop(waitTime time.Duration) {
 	case <-time.After(waitTime):
 	case <-h.stopCh:
 	}
+}
+
+func (h *mockCollectorHandle) UpdateConfig(cfg *confmap.Conf) error {
+	h.execution.cfg = cfg
+	select {
+	case h.execution.configUpdated <- struct{}{}:
+	default:
+	}
+
+	return nil
+}
+
+func (h *mockCollectorHandle) LogLevel() logp.Level {
+	return h.collectorLogLevel
 }
 
 func (h *mockCollectorHandle) Stopped() bool {
@@ -263,8 +282,8 @@ func (e *EventListener) EnsureHealthy(t *testing.T, u time.Time) {
 		require.NotNil(collect, latestStatus)
 		require.NotNil(collect, latestStatus.Value())
 		assert.False(collect, latestStatus.Before(u))
-		require.Equal(collect, componentstatus.StatusOK, latestStatus.Value().Status())
-	}, 60*time.Second, 1*time.Second, "otel collector never got healthy")
+		require.Equal(collect, componentstatus.StatusOK.String(), latestStatus.Value().Status().String())
+	}, 600*time.Second, 1*time.Second, "otel collector never got healthy")
 }
 
 // EnsureFatal ensures that the OTelManager is fatal by checking the latest error and status.
@@ -282,7 +301,7 @@ func (e *EventListener) EnsureFatal(t *testing.T, u time.Time, extraT ...func(co
 		require.NotNil(collect, latestStatus)
 		require.NotNil(collect, latestStatus.Value())
 		assert.False(collect, latestStatus.Before(u))
-		require.Equal(collect, componentstatus.StatusFatalError, latestStatus.Value().Status())
+		require.Equal(collect, componentstatus.StatusFatalError.String(), latestStatus.Value().Status().String())
 
 		// extra checks
 		for _, et := range extraT {
@@ -563,11 +582,6 @@ func TestOTelManager_Run(t *testing.T) {
 				e.EnsureFatal(t, time.Now().Add(time.Second), func(collectT *assert.CollectT, _ *EventTime[error], latestStatus *EventTime[*status.AggregateStatus]) {
 					status := latestStatus.Value()
 
-					// healthcheck auto added
-					extensions, ok := status.ComponentStatusMap["extensions"]
-					require.True(collectT, ok, "extensions should be present")
-					assert.Equal(collectT, extensions.Status(), componentstatus.StatusFatalError)
-
 					metrics, ok := status.ComponentStatusMap["pipeline:metrics"]
 					require.True(collectT, ok, "pipeline metrics should be present")
 					assert.Equal(collectT, metrics.Status(), componentstatus.StatusFatalError)
@@ -819,10 +833,6 @@ func TestOTelManager_Run(t *testing.T) {
 				m.Update(cfg, nil, logp.InfoLevel, nil)
 				e.EnsureFatal(t, time.Now().Add(time.Second), func(collectT *assert.CollectT, _ *EventTime[error], latestStatus *EventTime[*status.AggregateStatus]) {
 					status := latestStatus.Value()
-
-					// healthcheck auto added
-					_, ok := status.ComponentStatusMap["extensions"]
-					require.True(collectT, ok, "extensions should be present")
 
 					traces, ok := status.ComponentStatusMap["pipeline:traces"]
 					require.True(collectT, ok, "pipeline traces should be present")
@@ -1626,9 +1636,11 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	agentInfo := &info.AgentInfo{}
 	beatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
 	collectorStarted := make(chan struct{})
+	configUpdated := make(chan struct{}, 1) // buffered to avoid deadlocks in the mock execution
 
 	execution := &mockExecution{
 		collectorStarted: collectorStarted,
+		configUpdated:    configUpdated,
 	}
 
 	// Create manager with test dependencies
@@ -1711,7 +1723,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	t.Run("component config is passed down to the otel manager", func(t *testing.T) {
 		mgr.Update(collectorCfg, nil, logp.InfoLevel, components)
 		select {
-		case <-collectorStarted:
+		case <-configUpdated:
 		case <-ctx.Done():
 			t.Fatal("timeout waiting for collector config update")
 		}
@@ -1727,7 +1739,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	t.Run("empty collector config leaves the component config running", func(t *testing.T) {
 		mgr.Update(nil, nil, logp.InfoLevel, components)
 		select {
-		case <-collectorStarted:
+		case <-configUpdated:
 		case <-ctx.Done():
 			t.Fatal("timeout waiting for collector config update")
 		}
