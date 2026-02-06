@@ -425,7 +425,10 @@ def get_otel_components(version='main', component_docs_mapping=None):
         # Handle special components that don't follow standard path patterns
         if not categorized:
             if 'ebpf-profiler' in comp['dep']:
-                components_grouped['Profilers'].append(comp)
+                # ebpf-profiler is a receiver, rename to "profiling" to match deps.go
+                comp['name'] = 'profiling'
+                comp['special_import'] = 'go.opentelemetry.io/ebpf-profiler/collector'
+                components_grouped['Receivers'].append(comp)
 
     components_grouped = dict(components_grouped)
 

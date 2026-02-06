@@ -91,6 +91,8 @@ receivers:
   - gomod: go.opentelemetry.io/collector/receiver/nopreceiver v0.141.0
   - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.141.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/postgresqlreceiver v0.141.0
+  - gomod: go.opentelemetry.io/ebpf-profiler v0.0.202547
+    import: go.opentelemetry.io/ebpf-profiler/collector
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.141.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusremotewritereceiver v0.141.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.141.0
