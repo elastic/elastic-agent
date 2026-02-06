@@ -9,27 +9,32 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
-	"io"
+	"net"
+	"strings"
 	"sync"
 
-	"github.com/gofrs/uuid/v5"
 	"go.opentelemetry.io/collector/confmap"
 )
 
 // build time guard that StreamingProvider implements confmap.Provider
 var _ confmap.Provider = (*StreamingProvider)(nil)
 
-// StreamingProvider is a config provider that reads configs from a stream using
-// gob-encoded YAML bytes. On the first Retrieve call, it reads the initial config
-// synchronously and starts a background reader for subsequent configs. Each Retrieve
-// call starts a watcher goroutine that signals config changes via the WatcherFunc.
-// The watcher is stopped by calling Retrieved.Close.
+// StreamingProvider is a config provider that reads configs from a Unix domain
+// socket (or Windows named pipe) using gob-encoded YAML bytes. On the first
+// Retrieve call, it dials the socket address extracted from the URI, reads the
+// initial config synchronously, and starts a background reader for subsequent
+// configs. Each Retrieve call starts a watcher goroutine that signals config
+// changes via the WatcherFunc. The watcher is stopped by calling Retrieved.Close.
 //
 // Per the confmap.Provider contract, Retrieve and Shutdown are never called
 // concurrently with themselves or each other.
 type StreamingProvider struct {
-	uri    string
-	reader io.Reader
+	// conn is the socket connection, established on first Retrieve call
+	conn net.Conn
+
+	// dialFunc dials the socket address. Defaults to the platform-specific
+	// dialSocket function. Can be overridden for testing.
+	dialFunc func(ctx context.Context, address string) (net.Conn, error)
 
 	// decoder is created on first Retrieve call
 	decoder *gob.Decoder
@@ -50,20 +55,23 @@ type StreamingProvider struct {
 	stopCh                  chan struct{}
 }
 
-// NewStreamingProvider creates a StreamingProvider that will read configs from
-// the given reader using gob-encoded YAML bytes. No config is read until Retrieve
-// is called.
-func NewStreamingProvider(reader io.Reader) (*StreamingProvider, error) {
-	uri := fmt.Sprintf("%s:%s", AgentConfigProviderSchemeName, uuid.Must(uuid.NewV4()).String())
+// NewFactory returns a confmap.ProviderFactory that creates a StreamingProvider.
+// The returned factory always creates the same shared provider instance.
+func NewFactory() confmap.ProviderFactory {
+	return NewFactoryWithDialFunc(dialSocket)
+}
 
+// NewFactoryWithDialFunc returns a confmap.ProviderFactory using the given dial
+// function. This is useful for testing where a real socket is not desired.
+func NewFactoryWithDialFunc(dialFunc func(ctx context.Context, address string) (net.Conn, error)) confmap.ProviderFactory {
 	p := &StreamingProvider{
-		uri:     uri,
-		reader:  reader,
-		updated: make(chan struct{}, 1),
-		stopCh:  make(chan struct{}),
+		dialFunc: dialFunc,
+		updated:  make(chan struct{}, 1),
+		stopCh:   make(chan struct{}),
 	}
-
-	return p, nil
+	return confmap.NewProviderFactory(func(_ confmap.ProviderSettings) confmap.Provider {
+		return p
+	})
 }
 
 // readConfig reads a single config from the stream.
@@ -80,8 +88,8 @@ func (p *StreamingProvider) readConfig(ctx context.Context) (*confmap.Conf, erro
 		return nil, ctx.Err()
 	}
 
-	// Decode blocks until data is available or the reader is closed.
-	// Context cancellation requires closing the underlying reader.
+	// Decode blocks until data is available or the connection is closed.
+	// Context cancellation requires closing the underlying connection.
 	var yamlBytes []byte
 	if err := p.decoder.Decode(&yamlBytes); err != nil {
 		return nil, fmt.Errorf("failed to decode config: %w", err)
@@ -143,27 +151,17 @@ func (p *StreamingProvider) startBackgroundReader() {
 	}()
 }
 
-// NewFactory provides a factory.
-// This factory doesn't create a new provider on each call. It always returns the same provider.
-func (p *StreamingProvider) NewFactory() confmap.ProviderFactory {
-	return confmap.NewProviderFactory(func(_ confmap.ProviderSettings) confmap.Provider {
-		return p
-	})
-}
-
 // Retrieve returns the latest configuration and starts watching for updates.
-// On the first call, it reads the initial config synchronously from the stream.
-// The returned Retrieved.Close must be called to stop the watcher goroutine.
+// On the first call, it extracts the socket address from the URI (by stripping
+// the "elasticagent:" prefix), dials the socket, reads the initial config
+// synchronously, and starts a background reader. The returned Retrieved.Close
+// must be called to stop the watcher goroutine.
 //
 // Per the confmap.Provider contract, this method is never called concurrently
 // with itself or with Shutdown.
 func (p *StreamingProvider) Retrieve(ctx context.Context, uri string, watcher confmap.WatcherFunc) (*confmap.Retrieved, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
-	}
-
-	if uri != p.uri {
-		return nil, fmt.Errorf("%q uri doesn't equal defined %q provider", uri, AgentConfigProviderSchemeName)
 	}
 
 	// Check for any read errors from the background reader
@@ -175,9 +173,16 @@ func (p *StreamingProvider) Retrieve(ctx context.Context, uri string, watcher co
 	}
 	p.readErrMu.RUnlock()
 
-	// Initialize decoder and read first config on first Retrieve call
-	if p.decoder == nil && p.reader != nil {
-		p.decoder = gob.NewDecoder(p.reader)
+	// On first Retrieve call: dial the socket and read initial config
+	if p.decoder == nil {
+		address := strings.TrimPrefix(uri, AgentConfigProviderSchemeName+":")
+		conn, err := p.dialFunc(ctx, address)
+		if err != nil {
+			return nil, fmt.Errorf("failed to dial config socket %q: %w", address, err)
+		}
+		p.conn = conn
+		p.decoder = gob.NewDecoder(conn)
+
 		cfg, err := p.readConfig(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read initial config: %w", err)
@@ -236,7 +241,8 @@ func (p *StreamingProvider) Scheme() string {
 	return AgentConfigProviderSchemeName
 }
 
-// Shutdown called by collector when stopping. Stops the background reader.
+// Shutdown called by collector when stopping. Stops the background reader
+// and closes the socket connection.
 //
 // Per the confmap.Provider contract, this method is never called concurrently
 // with itself or with Retrieve.
@@ -244,10 +250,8 @@ func (p *StreamingProvider) Shutdown(_ context.Context) error {
 	if p.backgroundReaderStarted {
 		close(p.stopCh)
 	}
+	if p.conn != nil {
+		return p.conn.Close()
+	}
 	return nil
-}
-
-// URI returns the URI to be used for this provider.
-func (p *StreamingProvider) URI() string {
-	return p.uri
 }

@@ -9,13 +9,14 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
-	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"sync"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
 	otelstatus "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componentstatus"
@@ -27,9 +28,10 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/status"
-	runtimeLogger "github.com/elastic/elastic-agent/pkg/component/runtime"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
+	"github.com/elastic/elastic-agent/pkg/ipc"
 )
 
 const (
@@ -38,6 +40,11 @@ const (
 	OtelSupervisedMonitoringURLFlagName       = "supervised.monitoring.url"
 	OtelFeatureGatesFlagName                  = "feature-gates"
 	OtelElasticsearchExporterTelemetryFeature = "telemetry.newPipelineTelemetry"
+
+	// agentConfigProviderScheme must match agentprovider.AgentConfigProviderSchemeName.
+	// Duplicated here to avoid a cross-module import from the main module into
+	// the internal/edot submodule.
+	agentConfigProviderScheme = "elasticagent"
 )
 
 // newSubprocessExecution creates a new execution which runs the otel collector in a subprocess.
@@ -124,29 +131,37 @@ func (r *subprocessExecution) startCollector(
 	}
 
 	stdOutLast := newZapLast(collectorLogger.Core())
-	stdOut := runtimeLogger.NewLogWriterWithDefaults(stdOutLast, zapcore.Level(lvl))
+	stdOut := runtime.NewLogWriterWithDefaults(stdOutLast, zapcore.Level(lvl))
 	// info level for stdErr because by default collector writes to stderr
 	stdErrLast := newZapLast(collectorLogger.Core())
-	stdErr := runtimeLogger.NewLogWriterWithDefaults(stdErrLast, zapcore.Level(lvl))
+	stdErr := runtime.NewLogWriterWithDefaults(stdErrLast, zapcore.Level(lvl))
 
 	procCtx, procCtxCancel := context.WithCancel(ctx)
 	env := os.Environ()
 
-	// set collector args
-	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
-
-	// Create stdin pipe for config streaming
-	stdinReader, stdinWriter, err := os.Pipe()
+	// Generate a unique socket URL for config streaming
+	sockUUID, err := uuid.NewV4()
 	if err != nil {
 		procCtxCancel()
-		return nil, fmt.Errorf("failed to create stdin pipe: %w", err)
+		return nil, fmt.Errorf("failed to generate socket UUID: %w", err)
 	}
+	sockURL := socketURL(sockUUID.String())
+
+	// Create listener for config streaming socket
+	lis, err := ipc.CreateListener(logger, sockURL)
+	if err != nil {
+		procCtxCancel()
+		return nil, fmt.Errorf("failed to create config socket listener: %w", err)
+	}
+
+	// set collector args and add --config flag with the elasticagent:<socketURL> URI
+	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
+	collectorArgs = append(collectorArgs, fmt.Sprintf("--config=%s:%s", agentConfigProviderScheme, sockURL))
 
 	processInfo, err := process.Start(r.collectorPath,
 		process.WithArgs(collectorArgs),
 		process.WithEnv(env),
 		process.WithCmdOptions(func(c *exec.Cmd) error {
-			c.Stdin = stdinReader
 			c.Stdout = stdOut
 			c.Stderr = stdErr
 			return nil
@@ -154,32 +169,22 @@ func (r *subprocessExecution) startCollector(
 	)
 	if err != nil {
 		// we failed to start the process
-		_ = stdinReader.Close()
-		_ = stdinWriter.Close()
+		_ = lis.Close()
+		ipc.CleanupListener(logger, sockURL)
 		procCtxCancel()
 		return nil, fmt.Errorf("failed to start supervised collector: %w", err)
 	}
-	// Close the read end in the parent process; the child has its own copy
-	_ = stdinReader.Close()
 
 	logger.Infof("supervised collector started with pid: %d and healthcheck port: %d", processInfo.Process.Pid, httpHealthCheckPort)
 	if processInfo.Process == nil {
 		// this should not happen but just in case
-		_ = stdinWriter.Close()
+		_ = lis.Close()
+		ipc.CleanupListener(logger, sockURL)
 		procCtxCancel()
 		return nil, fmt.Errorf("failed to start supervised collector: process is nil")
 	}
 
-	ctl := newProcHandle(processInfo, logger, stdinWriter)
-
-	// Write initial config using gob-encoded YAML
-	if err := ctl.writeConfig(confBytes); err != nil {
-		_ = stdinWriter.Close()
-		procCtxCancel()
-		// Stop the process since we failed to send initial config
-		_ = processInfo.Stop()
-		return nil, fmt.Errorf("failed to write initial config: %w", err)
-	}
+	ctl := newProcHandle(processInfo, logger, nil)
 
 	healthCheckDone := make(chan struct{})
 	go func() {
@@ -277,6 +282,52 @@ func (r *subprocessExecution) startCollector(
 		r.reportErrFn(ctx, processErrCh, fmt.Errorf("failed to wait supervised collector process: %w", procErr))
 	}()
 
+	// Accept connection from subprocess (with cancellation if process dies).
+	// The monitoring goroutines are already running so that even if the process
+	// dies before connecting, its exit is properly reported.
+	type acceptResult struct {
+		conn net.Conn
+		err  error
+	}
+	acceptCh := make(chan acceptResult, 1)
+	go func() {
+		conn, err := lis.Accept()
+		acceptCh <- acceptResult{conn: conn, err: err}
+	}()
+
+	select {
+	case <-procCtx.Done():
+		// Process died before connecting. Close the listener to unblock Accept.
+		_ = lis.Close()
+		ipc.CleanupListener(logger, sockURL)
+		// The process monitoring goroutines are already running and will report
+		// the exit error. Return the handle so the caller can observe the exit.
+		return ctl, nil
+	case result := <-acceptCh:
+		// Close the listener and clean up the socket file; we only need one connection
+		_ = lis.Close()
+		ipc.CleanupListener(logger, sockURL)
+		if result.err != nil {
+			// Accept failed (e.g. listener was closed because process died).
+			// If the process context is done, the monitoring goroutines handle it.
+			if procCtx.Err() != nil {
+				return ctl, nil
+			}
+			// Accept failed for another reason - stop the process
+			_ = processInfo.Stop()
+			return nil, fmt.Errorf("failed to accept config socket connection: %w", result.err)
+		}
+		ctl.setConn(result.conn)
+	}
+
+	// Write initial config using gob-encoded YAML
+	if err := ctl.writeConfig(confBytes); err != nil {
+		_ = ctl.conn.Close()
+		// Stop the process since we failed to send initial config
+		_ = processInfo.Stop()
+		return nil, fmt.Errorf("failed to write initial config: %w", err)
+	}
+
 	return ctl, nil
 }
 
@@ -368,18 +419,27 @@ type procHandle struct {
 	processDoneCh chan struct{}
 	processInfo   *process.Info
 	log           *logger.Logger
-	stdinWriter   io.WriteCloser
-	stdinEncoder  *gob.Encoder
+	conn          net.Conn
+	encoder       *gob.Encoder
 }
 
-func newProcHandle(processInfo *process.Info, log *logger.Logger, stdinWriter io.WriteCloser) *procHandle {
-	return &procHandle{
+func newProcHandle(processInfo *process.Info, log *logger.Logger, conn net.Conn) *procHandle {
+	h := &procHandle{
 		processDoneCh: make(chan struct{}),
 		processInfo:   processInfo,
 		log:           log,
-		stdinWriter:   stdinWriter,
-		stdinEncoder:  gob.NewEncoder(stdinWriter),
+		conn:          conn,
 	}
+	if conn != nil {
+		h.encoder = gob.NewEncoder(conn)
+	}
+	return h
+}
+
+// setConn sets the socket connection and initializes the gob encoder.
+func (s *procHandle) setConn(conn net.Conn) {
+	s.conn = conn
+	s.encoder = gob.NewEncoder(conn)
 }
 
 // Stop stops the process. If the process is already stopped, it does nothing. If the process does not stop within
@@ -415,22 +475,24 @@ func (s *procHandle) Stop(waitTime time.Duration) {
 	case <-s.processDoneCh:
 	}
 
-	// Close stdin writer
-	if closeErr := s.stdinWriter.Close(); closeErr != nil {
-		s.log.Warnf("error closing otel collector input pipe: %v", closeErr)
+	// Close config socket connection
+	if s.conn != nil {
+		if closeErr := s.conn.Close(); closeErr != nil {
+			s.log.Warnf("error closing otel collector config socket: %v", closeErr)
+		}
 	}
 }
 
-// writeConfig writes a config to stdin using gob-encoded YAML bytes.
+// writeConfig writes a config using gob-encoded YAML bytes.
 func (s *procHandle) writeConfig(yamlBytes []byte) error {
-	if err := s.stdinEncoder.Encode(yamlBytes); err != nil {
+	if err := s.encoder.Encode(yamlBytes); err != nil {
 		return fmt.Errorf("failed to encode config: %w", err)
 	}
 
 	return nil
 }
 
-// UpdateConfig sends a new configuration to the running collector via stdin.
+// UpdateConfig sends a new configuration to the running collector via the config socket.
 // Returns an error if the config could not be written.
 func (s *procHandle) UpdateConfig(cfg *confmap.Conf) error {
 	if cfg == nil {
