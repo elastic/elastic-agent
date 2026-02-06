@@ -143,8 +143,8 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 		"endpoint": paths.DiagnosticsExtensionSocket(),
 	}
 	if supervised {
-		// add stdin config provider
-		configProvider, err := agentprovider.NewBufferProvider(os.Stdin)
+		// add streaming config provider for in-place config reload
+		configProvider, err := agentprovider.NewStreamingProvider(os.Stdin)
 		if err != nil {
 			return settings, fmt.Errorf("failed to create config provider: %w", err)
 		}
