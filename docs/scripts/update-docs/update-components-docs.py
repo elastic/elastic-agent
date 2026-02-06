@@ -297,6 +297,9 @@ def dep_to_component(dep):
         if match:
             html_url = f'https://github.com/open-telemetry/opentelemetry-collector/tree/main/{match.group("comp_type")}/{match.group("comp_name")}'
             repo_link = '[OTel Core Repo](https://github.com/open-telemetry/opentelemetry-collector)'
+    elif url == 'go.opentelemetry.io/ebpf-profiler':
+        html_url = 'https://github.com/open-telemetry/opentelemetry-ebpf-profiler'
+        repo_link = '[OTel eBPF Profiler Repo](https://github.com/open-telemetry/opentelemetry-ebpf-profiler)'
         
     comp = {
         'name': dep[(dep.rfind('/')+1):dep.rfind(' ')].strip(),
@@ -356,7 +359,14 @@ def get_otel_components(version='main', component_docs_mapping=None):
 
     lines = elastic_agent_go_mod.splitlines()
     components_type = ['receiver', 'connector', 'processor', 'exporter', 'extension', 'provider']
-    otel_deps = [line for line in lines if (not line.endswith('// indirect') and ("=>" not in line) and (any(f'/{comp}/' in line for comp in components_type)))]
+    # Special components that don't follow the standard path pattern
+    special_components = ['go.opentelemetry.io/ebpf-profiler']
+    otel_deps = [line for line in lines if (
+        not line.endswith('// indirect') and 
+        ("=>" not in line) and 
+        (any(f'/{comp}/' in line for comp in components_type) or 
+         any(special in line for special in special_components))
+    )]
     otel_components = list(map(dep_to_component, otel_deps))
     
     # Create annotation numbering
@@ -405,10 +415,20 @@ def get_otel_components(version='main', component_docs_mapping=None):
     components_grouped = defaultdict(list)
 
     for comp in otel_components:
+        categorized = False
         for substring in components_type:
             if f'/{substring}/' in comp['dep']:
                 components_grouped[f'{substring.capitalize()}s'].append(comp)
+                categorized = True
                 break  # Assumes each string matches only one group
+        
+        # Handle special components that don't follow standard path patterns
+        if not categorized:
+            if 'ebpf-profiler' in comp['dep']:
+                # ebpf-profiler is a receiver, rename to "profiling" to match deps.go
+                comp['name'] = 'profiling'
+                comp['special_import'] = 'go.opentelemetry.io/ebpf-profiler/collector'
+                components_grouped['Receivers'].append(comp)
 
     components_grouped = dict(components_grouped)
 

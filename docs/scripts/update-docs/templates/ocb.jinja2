@@ -22,6 +22,9 @@ dist:
 receivers:
 {%- for comp in grouped_components.get('Receivers', []) %}
   - gomod: {{ comp.dep }}
+{%- if comp.get('special_import') %}
+    import: {{ comp.special_import }}
+{%- endif %}
 {%- endfor %}
 
 processors:
