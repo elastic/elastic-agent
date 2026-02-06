@@ -80,7 +80,7 @@ func DefaultURL(ctx context.Context, client *kibana.Client) (string, error) {
 	return "", errors.New("unable to determine default fleet server URL")
 }
 
-func SwitchAgent(ctx context.Context, client *kibana.Client, agentID string) error {
+func SwitchAgentToUnprivileged(ctx context.Context, client *kibana.Client, agentID string) error {
 	userInfo := struct {
 		Groupname string `json:"groupname"`
 		Password  string `json:"password"`
