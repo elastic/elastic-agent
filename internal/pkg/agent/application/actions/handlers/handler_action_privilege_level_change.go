@@ -120,7 +120,7 @@ func (h *PrivilegeLevelChange) handleChange(ctx context.Context, a fleetapi.Acti
 			return nil
 		}
 
-		return fmt.Errorf("cannot change privilege level when not running as root/Administrator")
+		return fmt.Errorf("can change privilege level only when running as root/Administrator")
 	}
 
 	// ensure no component issues
