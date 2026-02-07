@@ -7,10 +7,12 @@ package storage
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"runtime"
 
 	"github.com/elastic/elastic-agent-libs/file"
@@ -27,6 +29,9 @@ import (
 const darwin = "darwin"
 
 var encryptionDisabled bool
+
+//go:embed embed-config/elastic-agent.encrypted-standalone.yml
+var DefaultAgentEncryptedStandaloneConfig []byte
 
 // DisableEncryptionDarwin disables storage encryption.
 // Is needed for existing unit tests on Mac OS, because the system keychain requires sudo
@@ -225,4 +230,40 @@ func (d *EncryptedDiskStore) Load() (rc io.ReadCloser, err error) {
 	}
 
 	return crypto.NewReaderWithDefaults(fd, d.key)
+}
+
+// EncryptConfigOnPath will encrypt config in the passed path, provisioning the vault if required.
+// Config file contents are replaced by contents that indicate encrypted config is used.
+func EncryptConfigOnPath(path string) error {
+	isRoot, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("failed to check for root/Administrator privileges: %w", err)
+	}
+	err = secret.CreateAgentSecret(context.Background(), vault.WithUnprivileged(!isRoot), vault.WithVaultPath(filepath.Join(path, paths.DefaultAgentVaultPath)))
+	if err != nil {
+		return fmt.Errorf("failed to read/write secrets: %w", err)
+	}
+	destStore, err := NewEncryptedDiskStore(context.Background(), filepath.Join(path, paths.DefaultAgentFleetFile), WithUnprivileged(!isRoot), WithVaultPath(filepath.Join(path, paths.DefaultAgentVaultPath)))
+	if err != nil {
+		return fmt.Errorf("failed to instantiate encryption destination: %w", err)
+	}
+
+	sourceCfg := filepath.Join(path, paths.DefaultConfigName)
+	replacer := NewReplaceOnSuccessStore(
+		sourceCfg,
+		DefaultAgentEncryptedStandaloneConfig,
+		destStore,
+		RemoveBackup(),
+	)
+
+	// Read file contents directly so replacer does not write to a file that is opened with a reader.
+	p, err := os.ReadFile(sourceCfg)
+	if err != nil {
+		return fmt.Errorf("failed to load encryption soure: %w", err)
+	}
+
+	if err := replacer.Save(bytes.NewReader(p)); err != nil {
+		return fmt.Errorf("failed to encrypt config: %w", err)
+	}
+	return nil
 }
