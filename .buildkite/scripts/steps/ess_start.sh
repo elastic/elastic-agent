@@ -6,11 +6,11 @@ source .buildkite/scripts/steps/fleet.sh
 
 STACK_VERSION="$(jq -r '.stack_version' .package-version)"
 STACK_BUILD_ID="$(jq -r '.stack_build_id' .package-version)"
-if [[ "${FIPS:-false}" == "true" ]]; then
-  # FRH testing environment does not have same stack build IDs as CFT environment so
-  # we just go with the STACK_VERSION.
-  STACK_BUILD_ID=""
-fi
+# if [[ "${FIPS:-false}" == "true" ]]; then
+#   # FRH testing environment does not have same stack build IDs as CFT environment so
+#   # we just go with the STACK_VERSION.
+#   STACK_BUILD_ID=""
+# fi
 ESS_REGION="${ESS_REGION:-gcp-us-west2}"
 
 ess_up "$STACK_VERSION" "$STACK_BUILD_ID" "$ESS_REGION"
