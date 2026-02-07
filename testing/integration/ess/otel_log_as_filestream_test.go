@@ -11,10 +11,9 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"text/template"
 	"time"
@@ -24,8 +23,6 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent-libs/testing/fs"
-	"github.com/elastic/elastic-agent/pkg/core/process"
-	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/integration"
@@ -50,49 +47,12 @@ func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
 		},
 	})
 
-	otelConfigTemplate := `receivers:
-  filebeatreceiver:
-    filebeat:
-      inputs:
-        - type: log
-          id: a-unique-id
-          allow_deprecated_use: true
-          paths:
-            {{.LogFilepath}}
-          fields:
-            find_me: {{.Namespace}}
-    output:
-      otelconsumer:
-    logging:
-      level: debug
-      selectors:
-        - '*'
-    path.home: {{.HomeDir}}
-    features.log_input_run_as_filestream.enabled: {{.AsFilestream}}
+	rootDir, err := filepath.Abs(filepath.Join("..", "..", "..", "build"))
+	require.NoError(t, err, "cannot get absolute path of rootDir")
+	tmpDir := fs.TempDir(t, rootDir)
+	agentLogFilePath := filepath.Join(tmpDir, "ea-log.ndjson")
 
-exporters:
-  elasticsearch:
-    api_key: {{.ESApiKey}}
-    endpoint: {{.ESEndpoint}}
-    logs_index: {{.Namespace}}
-    sending_queue:
-      enabled: true
-      wait_for_result: true # Avoid losing data on shutdown
-      block_on_overflow: true
-    mapping:
-      mode: none
-
-service:
-  pipelines:
-    logs:
-      receivers: [filebeatreceiver]
-      exporters: [elasticsearch]
-  telemetry:
-    logs:
-      level: DEBUG
-      encoding: json
-      disable_stacktrace: true
-`
+	cfgFile := filepath.Join("testdata", "filebeat_receiver_log_as_filestream.yml")
 
 	waitEventsInES := func(want int) {
 		t.Helper()
@@ -118,10 +78,6 @@ service:
 		}, 60*time.Second, time.Second, "did not find the expected number of events")
 	}
 
-	rootDir, err := filepath.Abs(filepath.Join("..", "..", "..", "build"))
-	require.NoError(t, err, "cannot get absolute path of rootDir")
-
-	tmpDir := fs.TempDir(t, rootDir)
 	inputFilePath, err := filepath.Abs(filepath.Join(tmpDir, "log.log"))
 
 	// Generate a string we can use to search in the logs,
@@ -134,11 +90,6 @@ service:
 	esHost, err := integration.GetESHost()
 	require.NoError(t, err, "failed to get ES host")
 
-	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(2*time.Minute))
-	defer cancel()
-
-	agentLogFile := fs.NewLogFile(t, tmpDir, t.Name())
-
 	cfg := map[string]any{
 		"HomeDir":      tmpDir,
 		"LogFilepath":  inputFilePath,
@@ -146,6 +97,7 @@ service:
 		"ESEndpoint":   esHost,
 		"Namespace":    info.Namespace,
 		"AsFilestream": false,
+		"LogFolder":    agentLogFilePath,
 	}
 
 	fixture, err := define.NewFixtureFromLocalBuild(
@@ -153,10 +105,32 @@ service:
 		define.Version())
 	require.NoError(t, err, "cannot create Elastic Agent fixture")
 
+	yamlCfg := renderCfg(t, cfgFile, cfg)
+	require.NoError(t, fixture.ConfigureOtel(t.Context(), yamlCfg), "cannot configure Otel")
+
+	wg := sync.WaitGroup{}
+
 	// Start Elastic Agent/Filebeat receiver running the Log input
-	otelConfigPath := filepath.Join(tmpDir, "otel.yml")
-	cmd := StartElasticAgentOtel(t, ctx, otelConfigTemplate, otelConfigPath, cfg, fixture, agentLogFile.File)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(3*time.Minute))
+		defer cancel()
+		require.NoError(t, fixture.RunOtelWithClient(ctx))
+	}()
+
+	agentLogFile := fs.LogFile{}
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		f, err := os.Open(agentLogFilePath)
+		if err != nil {
+			collect.Errorf("cannot open Elastic Agent log file for reading: %s", err)
+			return
+		}
+		agentLogFile.File = f
+	}, 30*time.Second, 500*time.Millisecond, "cannot open Elastic Agent log file for reading")
+
 	agentLogFile.WaitLogsContains(
+
 		t,
 		"Log input (deprecated) running as Log input (deprecated)",
 		20*time.Second,
@@ -165,11 +139,24 @@ service:
 
 	// Wait for all events to be ingested and stop Elastic Agent
 	waitEventsInES(50)
-	StopElasticAgentOtel(t, cmd, agentLogFile)
+
+	// Stop Elastic Agent
+	fixture.Stop()
+	wg.Wait()
 
 	// Enable the feature flag and start Elastic Agent
 	cfg["AsFilestream"] = true
-	cmd = StartElasticAgentOtel(t, ctx, otelConfigTemplate, otelConfigPath, cfg, fixture, agentLogFile.File)
+
+	yamlCfg = renderCfg(t, cfgFile, cfg)
+	require.NoError(t, fixture.ConfigureOtel(t.Context(), yamlCfg), "cannot configure Otel")
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(5*time.Minute))
+		defer cancel()
+		require.NoError(t, fixture.RunOtelWithClient(ctx))
+	}()
 
 	// Ensure the Filesteam input starts
 	agentLogFile.WaitLogsContains(
@@ -204,10 +191,20 @@ service:
 
 	// Ensure all 100 events have been ingested and stop Elastic Agent
 	waitEventsInES(100)
-	StopElasticAgentOtel(t, cmd, agentLogFile)
+
+	fixture.Stop()
+	wg.Wait()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(3*
+			time.Minute))
+		defer cancel()
+		require.NoError(t, fixture.RunOtelWithClient(ctx))
+	}()
 
 	// Start Elastic Agent again to ensure it is correctly tracking the state
-	cmd = StartElasticAgentOtel(t, ctx, otelConfigTemplate, otelConfigPath, cfg, fixture, agentLogFile.File)
 	agentLogFile.WaitLogsContains(
 		t,
 		"Log input (deprecated) running as Filestream input",
@@ -229,73 +226,20 @@ service:
 		"Filestream did not reach EOF")
 
 	// Stop Elastic Agent
-	StopElasticAgentOtel(t, cmd, agentLogFile)
+	fixture.Stop()
+	wg.Wait()
 
 	// Ensure there was no data duplication
 	waitEventsInES(100)
 }
 
-func StartElasticAgentOtel(
-	t *testing.T,
-	ctx context.Context,
-	otelConfigTemplate string,
-	otelConfigPath string,
-	cfg map[string]any,
-	fixture *atesting.Fixture,
-	f *os.File) *exec.Cmd {
-
+func renderCfg(t *testing.T, tmplFile string, cfg map[string]any) []byte {
 	otelConfigBuffer := bytes.Buffer{}
-	require.NoError(t,
-		template.Must(
-			template.New("otelConfig").
-				Parse(otelConfigTemplate)).
-			Execute(
-				&otelConfigBuffer,
-				cfg))
-
 	require.NoError(
 		t,
-		os.WriteFile(otelConfigPath, otelConfigBuffer.Bytes(), 0o600),
-		"cannot write configuration file")
-
-	cmd, err := fixture.PrepareAgentCommand(
-		ctx,
-		[]string{"otel", "--config", otelConfigPath},
-	)
-	require.NoError(t, err, "cannot prepare Elastic Agent command")
-
-	// This allows us to properly handle signals on Windows
-	cmd, err = process.Cmd(ctx, cmd.Path, cmd.Args[1:]...)
-	require.NoError(t, err, "cannot create exec.Cmd for Elastic Agent")
-
-	cmd.Stderr = f
-	cmd.Stdout = f
-
-	require.NoError(t, cmd.Start(), "cannot start Elastic Agent in OTel mode")
-
-	return cmd
-}
-
-func StopElasticAgentOtel(t *testing.T, cmd *exec.Cmd, f *fs.LogFile) {
-	require.NoError(
-		t,
-		process.Terminate(cmd.Process),
-		"cannot send terminate signal to Elastic Agent")
-
-	// On Windows cmd.Wait always returns an error: exit status 0xc000013a
-	// and the process is not gracefully terminated, so we ignore those checks.
-	if runtime.GOOS == "windows" {
-		cmd.Wait()
-		return
-	}
-
-	require.NoError(t, cmd.Wait(), "Elastic Agent exited with an error")
-
-	f.WaitLogsContains(
-		t,
-		"Shutdown complete.",
-		time.Second,
-		"Filebeat Receiver didn't shutdown")
+		template.Must(template.ParseFiles(tmplFile)).Execute(&otelConfigBuffer, cfg),
+		"cannot render template")
+	return otelConfigBuffer.Bytes()
 }
 
 // WriteLogFile writes count lines to path.
