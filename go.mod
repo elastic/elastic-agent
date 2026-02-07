@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent
 
-go 1.24.12
+go 1.24.13
 
 replace github.com/elastic/beats/v7 => ./beats
 
