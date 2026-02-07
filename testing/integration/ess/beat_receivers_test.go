@@ -188,9 +188,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	require.NoError(t, err, "error reading policy response")
 	defer resp.Body.Close()
 
-	apiKeyResponse, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "failed to get api key")
-	require.True(t, len(apiKeyResponse.Encoded) > 1, "api key is invalid %q", apiKeyResponse)
+	apiKeyResponse := createESApiKey(t, info.ESClient)
 	apiKey, err := getDecodedApiKey(apiKeyResponse)
 	require.NoError(t, err, "error decoding api key")
 
@@ -462,9 +460,7 @@ outputs:
 
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 
 	beatsApiKey, err := base64.StdEncoding.DecodeString(esApiKey.Encoded)
 	require.NoError(t, err, "error decoding api key")
@@ -1435,9 +1431,7 @@ func TestSensitiveLogsESExporter(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 	decodedApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err)
 
@@ -1618,9 +1612,7 @@ func TestSensitiveIncludeSourceOnError(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 	decodedApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err)
 
