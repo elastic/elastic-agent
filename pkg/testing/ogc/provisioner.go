@@ -315,7 +315,7 @@ func osBatchToOGC(cacheDir string, batch common.OSBatch) Layout {
 		Tags:          tags,
 		Labels: map[string]string{
 			"division": "engineering",
-			"org":      "ingest",
+			"org":      "obs",
 			"team":     "elastic-agent-control-plane",
 			"project":  "elastic-agent",
 		},
