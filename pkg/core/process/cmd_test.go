@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-// TestCmdAndTerminateCmd ensures the process started by this package
+// TestGetCmdAndTerminateCmd ensures the process started by this package
 // can be gracefully terminated.
 //
 // This requires two things:
@@ -32,7 +32,7 @@ import (
 //
 // If this test is failing, run go test with -v so all the output
 // of the child process is sent to stdout
-func TestCmdAndTerminateCmd(t *testing.T) {
+func TestGetCmdAndTerminateCmd(t *testing.T) {
 	wd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("cannot get working directory: %s", err)
@@ -46,7 +46,7 @@ func TestCmdAndTerminateCmd(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	t.Cleanup(cancel)
 
-	cmd, err := Cmd(ctx, testBinary, t.Name())
+	cmd, err := getCmd(ctx, testBinary, nil, os.Getuid(), os.Getgid(), t.Name())
 	if err != nil {
 		t.Fatalf("'getCmd' failed: %s", err)
 	}

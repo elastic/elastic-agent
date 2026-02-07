@@ -16,15 +16,6 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// Cmd returns an *exec.Cmd with the current environment variables set in the
-// returned Cmd and it also sets the creation flags to
-// windows.CREATE_NEW_PROCESS_GROUP, thus allowing the caller to send
-// CTRL_C_EVENT and CTRL_BREAK_EVENT to the child process without being affected
-// by them.
-func Cmd(ctx context.Context, path string, arg ...string) (*exec.Cmd, error) {
-	return getCmd(ctx, path, []string{}, os.Geteuid(), os.Getgid(), arg...)
-}
-
 func getCmd(ctx context.Context, path string, env []string, uid, gid int, arg ...string) (*exec.Cmd, error) {
 	var cmd *exec.Cmd
 	if ctx == nil {
