@@ -93,6 +93,8 @@ receivers:
       - extension: awslogs_encoding/elbaccess
   prometheusremotewrite:
     endpoint: 0.0.0.0:9090
+  statsd:
+    endpoint: localhost:8125
   elasticmonitoringreceiver:
   snmp:
     metrics:
@@ -198,6 +200,7 @@ service:
         - postgresql
         - prometheusremotewrite
         - snmp
+        - statsd
 
     metrics/aggregated:
       receivers:

@@ -35,6 +35,7 @@ import (
 	redisreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver"
 	snmpreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/snmpreceiver"
 	sqlserverreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver"
+	statsdreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/statsdreceiver"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver"
 	windowsperfcountersreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver"
 	zipkinreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver"
@@ -137,7 +138,8 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			elasticmonitoringreceiver.NewFactory(),
 			fbreceiver.NewFactory(),
 			mbreceiver.NewFactory(),
-			jmxreceiver.NewFactory(),
+			jmxreceiver.NewFactory(), // deprecated, will be removed in 9.4.0
+
 			nopreceiver.NewFactory(),
 			apachereceiver.NewFactory(),
 			iisreceiver.NewFactory(),
@@ -145,6 +147,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			postgresqlreceiver.NewFactory(),
 			snmpreceiver.NewFactory(),
 			sqlserverreceiver.NewFactory(),
+			statsdreceiver.NewFactory(),
 			windowseventlogreceiver.NewFactory(),
 			awss3receiver.NewFactory(),
 			windowsperfcountersreceiver.NewFactory(),
