@@ -128,10 +128,10 @@ func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
 			return
 		}
 		agentLogFile.File = f
+		t.Cleanup(func() { f.Close() })
 	}, 30*time.Second, 500*time.Millisecond, "cannot open Elastic Agent log file for reading")
 
 	agentLogFile.WaitLogsContains(
-
 		t,
 		"Log input (deprecated) running as Log input (deprecated)",
 		20*time.Second,
@@ -142,7 +142,7 @@ func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
 	waitEventsInES(50)
 
 	// Stop Elastic Agent
-	fixture.Stop()
+	require.NoError(t, fixture.Stop(), "cannot stop Elastic Agent process")
 	wg.Wait()
 
 	// Enable the feature flag and start Elastic Agent
@@ -193,7 +193,7 @@ func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
 	// Ensure all 100 events have been ingested and stop Elastic Agent
 	waitEventsInES(100)
 
-	fixture.Stop()
+	require.NoError(t, fixture.Stop(), "cannot stop Elastic Agent process")
 	wg.Wait()
 
 	wg.Add(1)

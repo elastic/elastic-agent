@@ -72,8 +72,10 @@ type Fixture struct {
 	// its value.
 	fileNamePrefix string
 
-	proc     *process.Info
-	stopping bool
+	// procMutex protects access to proc and stopping
+	procMutex sync.Mutex
+	proc      *process.Info
+	stopping  bool
 }
 
 // FixtureOpt is an option for the fixture.
@@ -561,6 +563,8 @@ func (f *Fixture) RunOtelWithClient(ctx context.Context, states ...State) error 
 
 // Stop gracefully stops the Elastic Agent process
 func (f *Fixture) Stop() error {
+	f.procMutex.Lock()
+	defer f.procMutex.Unlock()
 	f.stopping = true
 	return f.proc.Stop()
 }
@@ -625,11 +629,13 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 
 	args = append(args, f.additionalArgs...)
 
+	f.procMutex.Lock()
 	f.proc, err = process.Start(
 		f.binaryPath(),
 		process.WithContext(ctx),
 		process.WithArgs(args),
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
+	f.procMutex.Unlock()
 	if err != nil {
 		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
 	}
