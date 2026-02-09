@@ -81,7 +81,27 @@ receivers:
     username: test
     password: test
   docker_stats:
-
+  awss3:
+    starttime: "2024-01-01 01:00"
+    endtime: "2024-01-02"
+    s3downloader:
+      s3_bucket: 'test'
+      s3_prefix: 'test'
+    encodings:
+      - extension: awslogs_encoding/elbaccess
+  prometheusremotewrite:
+    endpoint: 0.0.0.0:9090
+  statsd:
+    endpoint: localhost:8125
+  elasticmonitoringreceiver:
+  snmp:
+    metrics:
+      snmp.uptime:
+        unit: s
+        gauge:
+          value_type: int
+        scalar_oids:
+          - oid: ".1.3.6.1.2.1.1.8.0"
 
 connectors:
   spanmetrics:
@@ -174,6 +194,9 @@ service:
         - apache
         - mysql
         - postgresql
+        - prometheusremotewrite
+        - snmp
+        - statsd
 
     metrics/aggregated:
       receivers:
