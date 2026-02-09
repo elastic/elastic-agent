@@ -6,7 +6,7 @@ receivers:
           id: a-unique-id
           allow_deprecated_use: true
           paths:
-            {{.LogFilepath}}
+            - {{.LogFilepath}}
           fields:
             find_me: {{.Namespace}}
     output:
@@ -40,4 +40,4 @@ service:
       level: DEBUG
       encoding: json
       disable_stacktrace: true
-      output_paths: {{.LogFolder}}
+      output_paths: [{{.LogFolder}}]

@@ -79,6 +79,7 @@ func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
 	}
 
 	inputFilePath, err := filepath.Abs(filepath.Join(tmpDir, "log.log"))
+	require.NoError(t, err, "cannot get absolute path of inputFilePath")
 
 	// Generate a string we can use to search in the logs,
 	// without it tests on Windows will fail
@@ -158,7 +159,7 @@ func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
 		require.NoError(t, fixture.RunOtelWithClient(ctx))
 	}()
 
-	// Ensure the Filesteam input starts
+	// Ensure the Filestream input starts
 	agentLogFile.WaitLogsContains(
 		t,
 		"Log input (deprecated) running as Filestream input",
@@ -289,7 +290,7 @@ func WriteLogFile(t *testing.T, path string, count int, append bool, prefix ...s
 
 	for i := range count {
 		if _, err := fmt.Fprintf(file, "%s           %13d\n", now, i); err != nil {
-			t.Fatalf("could not write line %d to file: %s", count+1, err)
+			t.Fatalf("could not write line %d to file: %s", i+1, err)
 		}
 	}
 }
