@@ -32,7 +32,6 @@ import (
 	receivercreator "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator"
 	redisreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver"
 	sqlserverreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver"
-	statsdreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/statsdreceiver"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver"
 	windowsperfcountersreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver"
 	zipkinreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver"
@@ -132,7 +131,6 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			mysqlreceiver.NewFactory(),
 			postgresqlreceiver.NewFactory(),
 			sqlserverreceiver.NewFactory(),
-			statsdreceiver.NewFactory(),
 			windowseventlogreceiver.NewFactory(),
 			windowsperfcountersreceiver.NewFactory(),
 		}
