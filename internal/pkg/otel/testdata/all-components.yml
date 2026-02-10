@@ -50,6 +50,7 @@ processors:
     spike_limit_mib: 800
   elasticapm:
   tail_sampling:
+  logdedup:
 
 receivers:
   nop:
@@ -155,6 +156,7 @@ service:
         - resourcedetection
         - transform
         - memory_limiter/processor
+        - logdedup
       receivers:
         - filelog
         - otlp
