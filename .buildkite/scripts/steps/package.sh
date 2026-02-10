@@ -14,6 +14,12 @@ if test -z "${MANIFEST_URL:-}"; then
   # building in SNAPSHOT mode.
   export SNAPSHOT=true
 
+  # We want to use the version from .package-version.
+  # If the version defined in version/version.go is different,
+  # the packaging step will expect artifacts with different names
+  # than what the manifest contains
+  export USE_PACKAGE_VERSION=true
+
   # No manifest URL build the the core packages.
   mage packageAgentCore
 
