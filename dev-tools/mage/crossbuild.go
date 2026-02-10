@@ -365,6 +365,17 @@ func (b GolangCrossBuilder) Build() error {
 		"--env", fmt.Sprintf("DEV=%v", DevBuild),
 		"--env", fmt.Sprintf("FIPS=%v", FIPSBuild),
 		"-v", repoInfo.RootDir+":"+mountPoint,
+	)
+
+	// If in a git worktree, mount the main repo's .git directory into the
+	// container so git can resolve the worktree reference.
+	if commonDir, err := sh.Output("git", "-C", repoInfo.RootDir, "rev-parse", "--git-common-dir"); err == nil {
+		if filepath.IsAbs(commonDir) && !strings.HasPrefix(commonDir, repoInfo.RootDir) {
+			args = append(args, "-v", commonDir+":"+commonDir+":ro")
+		}
+	}
+
+	args = append(args,
 		"-w", workDir,
 		image,
 
