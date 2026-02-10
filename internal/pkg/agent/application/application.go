@@ -183,10 +183,11 @@ func New(
 		configMgr = newTestingModeConfigManager(log)
 	} else if configuration.IsStandalone(cfg.Fleet) {
 		log.Info("Parsed configuration and determined agent is managed locally")
-		if err := features.Apply(rawConfig); err != nil {
+		flags, err := features.Parse(rawConfig)
+		if err != nil {
 			return nil, nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
 		}
-		if features.EncryptedConfig() {
+		if flags.EncryptedConfig() {
 			// Ensure elastic-agent.yml contents have not changed.
 			embeddedConfig, err := config.NewConfigFrom(storage.DefaultAgentEncryptedStandaloneConfig)
 			if err != nil {
