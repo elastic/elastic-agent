@@ -4,7 +4,7 @@ name: updatecli-compose
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 6 * * *'
+    - cron: '0 6 * * 1'
 
 permissions:
   contents: read
@@ -29,14 +29,14 @@ jobs:
 
       - uses: elastic/oblt-actions/updatecli/run@v1
         with:
-          command: --experimental compose diff
+          command: --debug compose diff
           version-file: .updatecli-version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: elastic/oblt-actions/updatecli/run@v1
         with:
-          command: --experimental compose apply
+          command: --debug compose apply
           version-file: .updatecli-version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
