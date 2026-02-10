@@ -541,8 +541,9 @@ func injectMonitoringReceiver(
 	components []component.Component,
 ) error {
 	receiverType := otelcomponent.MustNewType(elasticmonitoringreceiver.Name)
-	receiverName := "collector/internal-telemetry-monitoring"
+	receiverName := "internal-telemetry-monitoring"
 	receiverID := translate.GetReceiverID(receiverType, receiverName).String()
+	processorID := "beat/" + translate.OtelNamePrefix + receiverName
 	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
 	exporterType := otelcomponent.MustNewType("elasticsearch")
 	exporterID := translate.GetExporterID(exporterType, componentmonitoring.MonitoringOutput).String()
@@ -571,11 +572,15 @@ func injectMonitoringReceiver(
 				"exporter_names": outputNameLookup,
 			},
 		},
+		"processors": map[string]any{
+			processorID: map[string]any{},
+		},
 		"service": map[string]any{
 			"pipelines": map[string]any{
 				pipelineID: map[string]any{
-					"receivers": []string{receiverID},
-					"exporters": []string{exporterID},
+					"receivers":  []string{receiverID},
+					"processors": []string{processorID},
+					"exporters":  []string{exporterID},
 				},
 			},
 		},
