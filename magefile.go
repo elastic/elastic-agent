@@ -3510,10 +3510,10 @@ func (Otel) GolangCrossBuild(ctx context.Context) error {
 	return nil
 }
 
-// npcapImageSelectorWithConfig is similar to xpacketbeat.ImageSelector, using a single variable to enable it. Sadly
+// npcapImageSelector is similar to xpacketbeat.ImageSelector, using a single variable to enable it. Sadly
 // xpacketbeat.ImageSelector cannot be used directly because it will use its own devtools that comes from the beats
 // repository and will duplicate global state that is not correct for the elastic-agent.
-func npcapImageSelectorWithConfig(windowsNpcap bool) devtools.ImageSelectorFunc {
+func npcapImageSelector(windowsNpcap bool) devtools.ImageSelectorFunc {
 	return func(cfg *devtools.Settings, platform string) (string, error) {
 		image, err := devtools.CrossBuildImage(cfg, platform)
 		if err != nil {
@@ -3554,7 +3554,7 @@ func (Otel) CrossBuild(ctx context.Context) error {
 		// download the NPCAP installer
 		mg.SerialDeps(xpacketbeat.GetNpcapInstallerFn(filepath.Join("beats", "x-pack", "packetbeat")))
 		// use the npcap build image for windows
-		opts = append(opts, devtools.ImageSelector(npcapImageSelectorWithConfig(cfg.Docker.WindowsNpcap)))
+		opts = append(opts, devtools.ImageSelector(npcapImageSelector(cfg.Docker.WindowsNpcap)))
 	}
 
 	return devtools.CrossBuild(ctx, cfg, opts...)
