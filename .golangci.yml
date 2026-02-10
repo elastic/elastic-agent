@@ -57,7 +57,6 @@ linters:
         - github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption
         - github.com/apoydence/eachers
         - github.com/google/gopacket
-        - github.com/insomniacslk/dhcp
         - github.com/meraki/dashboard-api-go/v3
         - go.opentelemetry.io/otel/exporters/prometheus
         - github.com/elastic/elastic-agent/internal/edot

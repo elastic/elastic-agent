@@ -8,7 +8,7 @@ replace github.com/elastic/elastic-agent => ../../
 replace github.com/elastic/beats/v7 => ../../beats
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260205201918-26c266b59ad8
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260206230322-2dc4e33a7699
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.32.1
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
@@ -98,7 +98,7 @@ require (
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75 // indirect
 	github.com/gosnmp/gosnmp v1.43.2 // indirect
-	github.com/insomniacslk/dhcp v0.0.0-20220119180841-3c283ff8b7dd // indirect
+	github.com/insomniacslk/dhcp v0.0.0-20251020182700-175e84fbb167 // indirect
 	github.com/itchyny/timefmt-go v0.1.7 // indirect
 	github.com/jaypipes/ghw v0.12.0 // indirect
 	github.com/jaypipes/pcidb v1.0.0 // indirect
@@ -122,6 +122,7 @@ require (
 	github.com/samuel/go-thrift v0.0.0-20140522043831-2187045faa54 // indirect
 	github.com/schollz/progressbar/v3 v3.13.1 // indirect
 	github.com/teambition/rrule-go v1.8.2 // indirect
+	github.com/u-root/uio v0.0.0-20230220225925-ffce2a382923 // indirect
 	github.com/winlabs/gowin32 v0.0.0-20240930213947-f504d7e14639 // indirect
 	go.opentelemetry.io/collector/component/componentstatus v0.144.0 // indirect
 	go.opentelemetry.io/collector/component/componenttest v0.144.0 // indirect
@@ -774,7 +775,6 @@ replace (
 	github.com/fsnotify/fsevents => github.com/elastic/fsevents v0.0.0-20181029231046-e1d381a4d270
 	github.com/fsnotify/fsnotify => github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3
 	github.com/google/gopacket => github.com/elastic/gopacket v1.1.20-0.20241002174017-e8c5fda595e6
-	github.com/insomniacslk/dhcp => github.com/elastic/dhcp v0.0.0-20200227161230-57ec251c7eb3 // indirect
 	github.com/meraki/dashboard-api-go/v3 => github.com/tommyers-elastic/dashboard-api-go/v3 v3.0.0-20250616163611-a325b49669a4
 	// The replaces below refer to the following branch: https://github.com/elastic/opentelemetry-collector-contrib/tree/v0144-healthcheck-patched
 	// They contain an additional patch created from the content of https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/43744
