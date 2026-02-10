@@ -618,3 +618,75 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 	_, err = os.Stat(paths.AgentConfigFile())
 	require.ErrorIs(t, err, os.ErrNotExist)
 }
+
+func TestHasEncryptedStandaloneConfigChanged(t *testing.T) {
+	log, _ := loggertest.New("TestHasEncryptedStandaloneConfigChanged")
+	tests := []struct {
+		name     string
+		contents []byte
+		expect   bool
+	}{{
+		name:     "no change",
+		contents: storage.DefaultAgentEncryptedStandaloneConfig,
+		expect:   false,
+	}, {
+		name: "contents change",
+		contents: []byte(`agent:
+  features:
+    encrypted_config:
+      enabled: true
+    fqdn:
+      enabled: true
+`),
+		expect: true,
+	}, {
+		name:     "no file contents",
+		contents: []byte{},
+		expect:   true,
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "a.yml")
+			err := os.WriteFile(path, tt.contents, 0640)
+			require.NoError(t, err)
+			changed := hasEncryptedStandaloneConfigChanged(log, path)
+			require.Equal(t, tt.expect, changed)
+		})
+	}
+}
+
+func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
+	fipsutils.SkipIfFIPSOnly(t, "encrypted disk storage does not use NewGCMWithRandomNonce.")
+	log, _ := loggertest.New("TestApplicationStandaloneEncryptedWithFleetEnabled")
+
+	cfgPath := paths.Config()
+	t.Cleanup(func() { paths.SetConfig(cfgPath) })
+
+	paths.SetConfig(t.TempDir())
+	p, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "_meta", "elastic-agent.fleet.yml"))
+	require.NoError(t, err)
+	err = os.WriteFile(paths.ConfigFile(), p, 0640)
+	require.NoError(t, err)
+
+	_, _, _, err = New(
+		t.Context(),
+		log,
+		log,
+		logp.DebugLevel,
+		&info.AgentInfo{},
+		nil,
+		nil,
+		false, // not in testing mode - we are testing fs interactions
+		time.Second,
+		true,
+		nil,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+
+	ymlBytes, err := os.ReadFile(paths.ConfigFile())
+	require.NoError(t, err)
+	require.EqualValues(t, p, ymlBytes, "unexpected contents in elastic-agent.yml")
+}
