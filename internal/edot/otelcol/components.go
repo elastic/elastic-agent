@@ -35,6 +35,7 @@ import (
 	redisreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver"
 	snmpreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/snmpreceiver"
 	sqlserverreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver"
+	statsdreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/statsdreceiver"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver"
 	windowsperfcountersreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver"
 	zipkinreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver"
@@ -52,6 +53,7 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor"
 	geoipprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/geoipprocessor"                 // for adding geographical metadata associated to an IP address
 	k8sattributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/k8sattributesprocessor" // for adding k8s metadata
+	logdedupprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/logdedupprocessor"           // for deduplicating log events
 	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor"
 	resourceprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor"         // for modifying resource attributes
 	tailsamplingprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor" // for tail-based sampling
@@ -145,6 +147,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			postgresqlreceiver.NewFactory(),
 			snmpreceiver.NewFactory(),
 			sqlserverreceiver.NewFactory(),
+			statsdreceiver.NewFactory(),
 			windowseventlogreceiver.NewFactory(),
 			awss3receiver.NewFactory(),
 			windowsperfcountersreceiver.NewFactory(),
@@ -178,6 +181,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			elasticapmprocessor.NewFactory(),
 			elastictraceprocessor.NewFactory(), // deprecated, will be removed in future
 			tailsamplingprocessor.NewFactory(),
+			logdedupprocessor.NewFactory(),
 		)
 		if err != nil {
 			return otelcol.Factories{}, err
