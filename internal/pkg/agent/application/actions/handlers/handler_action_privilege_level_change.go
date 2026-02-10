@@ -114,7 +114,7 @@ func (h *PrivilegeLevelChange) handleChange(ctx context.Context, a fleetapi.Acti
 		if targetingSameUser(currentUser.Uid, currentUser.Gid, fmt.Sprint(uid), fmt.Sprint(gid)) {
 			// already running as desired user, do not fail the action
 			// some form of deduplication
-			h.log.Warnf("already running as user %s and group %s, no changes required", username, groupname)
+			h.log.Infof("already running as user %s and group %s, no changes required", username, groupname)
 			// ack action so it's not hanging
 			ackCommitFn()
 			return nil
