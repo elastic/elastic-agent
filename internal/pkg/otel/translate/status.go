@@ -198,60 +198,33 @@ func updateStatus(status *status.AggregateStatus) {
 
 // muteExporters sets all exporter statuses to OK for muted pipelines/components.
 func muteExporters(agg *status.AggregateStatus, components []component.Component) error {
-	for pipelineStatusID, pipelineStatus := range agg.ComponentStatusMap {
-		if pipelineStatusID == "extensions" {
-			// we do not want to report extension status
+	// Determine all exporter status IDs that should be muted based on components
+	// with output status reporting disabled.
+	mutedExporterStatusIDs := make(map[string]struct{})
+	for _, comp := range components {
+		if comp.OutputStatusReporting == nil || comp.OutputStatusReporting.Enabled {
 			continue
 		}
-		pipelineID, err := parsePipelineID(pipelineStatusID)
+		exporterType, err := OutputTypeToExporterType(comp.OutputType)
 		if err != nil {
 			return err
 		}
+		exporterID := GetExporterID(exporterType, comp.OutputName)
+		mutedExporterStatusIDs["exporter:"+exporterID.String()] = struct{}{}
+	}
 
-		componentID, found := strings.CutPrefix(pipelineID.Name(), OtelNamePrefix)
-		if !found || !isOutputMuted(componentID, components) {
+	// Mute the identified exporters in every pipeline.
+	for pipelineStatusID, pipelineStatus := range agg.ComponentStatusMap {
+		if pipelineStatusID == "extensions" {
 			continue
 		}
-
-		// Mute exporters for the pipeline for this component
 		for compID, compStatus := range pipelineStatus.ComponentStatusMap {
-			kind, _, err := ParseEntityStatusId(compID)
-			if err != nil {
-				return err
-			}
-			if kind == "exporter" {
+			if _, muted := mutedExporterStatusIDs[compID]; muted {
 				compStatus.Event = componentstatus.NewEvent(componentstatus.StatusOK)
 			}
 		}
 	}
 	return nil
-}
-
-// parsePipelineID extracts a *pipeline.ID from a status ID string.
-func parsePipelineID(statusID string) (*pipeline.ID, error) {
-	_, pipelineIDStr, err := ParseEntityStatusId(statusID)
-	if err != nil {
-		return nil, err
-	}
-	pID := &pipeline.ID{}
-	if err := pID.UnmarshalText([]byte(pipelineIDStr)); err != nil {
-		return nil, err
-	}
-	return pID, nil
-}
-
-// isOutputMuted checks whether output status reporting is disabled for the given componentID
-func isOutputMuted(componentID string, components []component.Component) bool {
-	for _, comp := range components {
-		if comp.ID != componentID {
-			continue
-		}
-		if comp.OutputStatusReporting == nil {
-			return false
-		}
-		return !comp.OutputStatusReporting.Enabled
-	}
-	return false
 }
 
 // getOtelRuntimePipelineStatuses finds otel pipeline statuses belonging to runtime components and returns them as a map
