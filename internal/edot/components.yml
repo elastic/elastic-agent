@@ -80,6 +80,7 @@ core_components:
 deprecated:
   - elasticinframetricsprocessor  # Deprecated in 9.2.0
   - elastictraceprocessor  # Deprecated in 9.2.0, replaced by elasticapmprocessor
+  - jmxreceiver  # (deprecated) It will be removed in 9.4.0, JMX Scraper should be used instead
 
 # Component annotations
 #
@@ -123,3 +124,6 @@ annotations:
       - Encoding options other than `otlp_proto` or `otlp_json`
       - Using the Sarama client (i.e. opting out of the `exporter.kafkaexporter.UseFranzGo` feature gate is not supported)
       - Partitioning configuration (i.e. `partition_*` options).
+  jmxreceiver:
+    comment: |
+      Deprecated in 9.3.1. JMX Scraper is recommened to run as a standalone Java program. Refer to [Migrate from deprecated components](/reference/edot-collector/components/migrate-components.md) for migration instructions.
