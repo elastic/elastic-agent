@@ -23,6 +23,17 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+:::{dropdown} Elastic Agent becomes unhealthy when using the warning log level
+**Applies to: {{agent}} 9.3.0**
+
+On January 30th 2026, a known issue was discovered that causes Elastic Agent to become unhealthy with the message
+`Fatal: failed to unpack the log level 'WARN': invalid level 'warn'` when using the warning log level. Self-monitoring data
+and metrics data will fail to be collected.
+
+% **Workaround**
+
+Affected users can use any other log level. A fix will be included in 9.3.1. See [Issue #12513](https://github.com/elastic/elastic-agent/issues/12513).
+
 :::{dropdown} Elastic Agent becomes unhealthy when an Elasticsearch output used for monitoring specifies any list parameter as a string
 **Applies to: {{agent}} 9.2.1, 9.2.2**
 
