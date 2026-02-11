@@ -7,6 +7,7 @@ package manager
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -33,21 +34,27 @@ const (
 )
 
 // AllComponentsStatuses retrieves the status of all components from the health check endpoint.
-func AllComponentsStatuses(ctx context.Context, httpHealthCheckPort int) (*otelstatus.AggregateStatus, error) {
+func AllComponentsStatuses(ctx context.Context, client http.Client, httpHealthCheckPort int) (*otelstatus.AggregateStatus, error) {
+	var err error
+
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://localhost:%d/%s?verbose",
-		httpHealthCheckPort, healthCheckHealthStatusPath), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://127.0.0.1:%d%s?verbose",
+		httpHealthCheckPort, healthCheckHealthStatusPath), http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http request: %w", err)
 	}
 
-	res, err := http.DefaultClient.Do(req)
+	req.Header.Set("Content-Type", "application/json")
+	res, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get status: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		closeErr := res.Body.Close()
+		err = errors.Join(err, closeErr)
+	}()
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -75,7 +82,8 @@ func injectHealthCheckV2Extension(conf *confmap.Conf, healthCheckExtensionID str
 					"recovery_duration":          healthCheckRecoveryDuration,
 				},
 				"http": map[string]interface{}{
-					"endpoint": fmt.Sprintf("localhost:%d", httpHealthCheckPort),
+					"endpoint":            fmt.Sprintf("localhost:%d", httpHealthCheckPort),
+					"keep_alives_enabled": true,
 					"status": map[string]interface{}{
 						"enabled":            healthCheckHealthStatusEnabled,
 						"path":               healthCheckHealthStatusPath,
