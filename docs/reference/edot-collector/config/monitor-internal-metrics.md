@@ -14,7 +14,7 @@ The EDOT Collector exposes internal OpenTelemetry metrics that provide visibilit
 
 The EDOT Collector exposes internal metrics in Prometheus format by default at `http://127.0.0.1:8888/metrics`. To expose metrics on all interfaces or customize the endpoint, update the `service.telemetry.metrics` section in your Collector configuration.
 
-### Example Collector configuration
+### Expose metrics for scraping
 
 ```yaml
 service:
@@ -34,21 +34,34 @@ This configuration serves metrics on port 8888 and makes them available to scrap
 The exact configuration might vary based on deployment mode and whether metrics are scraped directly or forwarded by another collector or {{agent}}.
 :::
 
-## Collect metrics using {{agent}}
+## Collect internal metrics
 
-To collect internal metrics with {{agent}}, scrape the Prometheus endpoint exposed by the Collector.
+To collect internal metrics, use the EDOT Collector's Prometheus receiver (`prometheusreceiver`) to scrape the Prometheus endpoint exposed by the Collector. Unlike the metricbeat-style `prometheus/metrics` input, this contrib, OTLP-native receiver doesn't add ECS fields as metadata.
 
-### Example {{agent}} configuration
+### Scrape internal metrics with the Prometheus receiver
+
+When running the Collector (including under {{agent}}), add a Prometheus receiver and a metrics pipeline that scrapes the internal metrics endpoint. For example:
 
 ```yaml
-inputs:
-  - type: prometheus/metrics
-    hosts:
-      - http://<collector-host>:8888/metrics
-    metrics_path: /metrics
+receivers:
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'otelcol-internal'
+          static_configs:
+            - targets: ['127.0.0.1:8888']
+          metrics_path: /metrics
+
+service:
+  pipelines:
+    metrics/internal:
+      receivers:
+        - prometheus
+      exporters:
+        - otlp
 ```
 
-After ingestion, these metrics are available in {{product.observability}} for dashboards, visualizations, and alerting.
+Replace `127.0.0.1:8888` with `<collector-host>:8888` if scraping from another host. After ingestion, these metrics are available in {{product.observability}} for dashboards, visualizations, and alerting.
 
 ## Key metrics to monitor
 
@@ -60,6 +73,7 @@ Monitor telemetry flow across pipeline stages:
 
 - `otelcol_receiver_accepted_spans`  
 - `otelcol_receiver_refused_spans`  
+- `otelcol_receiver_failed_spans`  
 - `otelcol_exporter_sent_spans`  
 - `otelcol_exporter_send_failed_spans`
 
