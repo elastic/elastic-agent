@@ -1948,14 +1948,6 @@ outputs:
     preset: "balanced"
     status_reporting:
       enabled: {{.StatusReportingEnabled}}
-agent.monitoring:
-  metrics: false
-  logs: false
-  http:
-    enabled: true
-    port: 6792
-agent.grpc:
-    port: 6790
 agent.internal.runtime.metricbeat:
   system/metrics: otel
 `
@@ -2070,7 +2062,7 @@ outputs:
     hosts:
       - %s
     preset: balanced
-    protocol: http	
+    protocol: http
 agent.logging.level: %s
 agent.grpc.port: 6793
 agent.monitoring.enabled: true

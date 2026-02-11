@@ -16,10 +16,10 @@ require (
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v0.0.0-20200217195037-68fc5150bcd5
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260205201918-26c266b59ad8
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260210220642-c5172fc430d2
 	github.com/elastic/cloud-on-k8s/v2 v2.0.0-20250327073047-b624240832ae
 	github.com/elastic/elastic-agent-autodiscover v0.10.0
-	github.com/elastic/elastic-agent-client/v7 v7.17.2
+	github.com/elastic/elastic-agent-client/v7 v7.18.0
 	github.com/elastic/elastic-agent-libs v0.32.1
 	github.com/elastic/elastic-agent-system-metrics v0.13.6
 	github.com/elastic/elastic-transport-go/v8 v8.8.0
@@ -385,7 +385,6 @@ replace (
 	github.com/fsnotify/fsevents => github.com/elastic/fsevents v0.0.0-20181029231046-e1d381a4d270
 	github.com/fsnotify/fsnotify => github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3
 	github.com/google/gopacket => github.com/elastic/gopacket v1.1.20-0.20241002174017-e8c5fda595e6
-	github.com/insomniacslk/dhcp => github.com/elastic/dhcp v0.0.0-20200227161230-57ec251c7eb3 // indirect
 	github.com/meraki/dashboard-api-go/v3 => github.com/tommyers-elastic/dashboard-api-go/v3 v3.0.0-20250616163611-a325b49669a4
 )
 
