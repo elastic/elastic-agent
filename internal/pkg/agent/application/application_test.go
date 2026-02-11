@@ -675,6 +675,7 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
 	err = secret.CreateAgentSecret(context.Background(), vault.WithVaultPath(filepath.Join(paths.Config(), paths.DefaultAgentVaultPath)))
 	require.NoError(t, err)
 	encStore, err := storage.NewEncryptedDiskStore(t.Context(), filepath.Join(paths.Config(), paths.DefaultAgentFleetFile), storage.WithVaultPath(filepath.Join(paths.Config(), paths.DefaultAgentVaultPath)))
+	require.NoError(t, err)
 	err = encStore.Save(strings.NewReader(`fleet:
   enabled: true
   access_api_key: "exampleKey"
