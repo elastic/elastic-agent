@@ -5,13 +5,22 @@
 package manager
 
 import (
-<<<<<<< HEAD
+	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component/componentstatus"
+	"go.opentelemetry.io/collector/confmap"
 )
 
 func TestCompareAggregateStatuses(t *testing.T) {
@@ -89,189 +98,10 @@ func TestCompareAggregateStatuses(t *testing.T) {
 							status:    componentstatus.StatusOK,
 							timestamp: timestamp,
 							err:       nil,
-=======
-	"context"
-	"encoding/json"
-	"fmt"
-	"net"
-	"net/http"
-	"net/http/httptest"
-	"strconv"
-	"testing"
-	"time"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/collector/component/componentstatus"
-	"go.opentelemetry.io/collector/confmap"
-
-	"github.com/elastic/elastic-agent/internal/pkg/otel/status"
-)
-
-func TestAllComponentsStatuses(t *testing.T) {
-	t.Run("successful response with valid status", func(t *testing.T) {
-		now := time.Now().Truncate(time.Second)
-		serStatus := &status.SerializableStatus{
-			SerializableEvent: &status.SerializableEvent{
-				Healthy:      true,
-				StatusString: "StatusOK",
-				Timestamp:    now,
-			},
-			ComponentStatuses: map[string]*status.SerializableStatus{
-				"receiver:otlp": {
-					SerializableEvent: &status.SerializableEvent{
-						Healthy:      true,
-						StatusString: "StatusOK",
-						Timestamp:    now,
-					},
-				},
-			},
-		}
-
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			assert.Equal(t, "GET", r.Method)
-			assert.Equal(t, healthCheckHealthStatusPath, r.URL.Path)
-			assert.True(t, r.URL.Query().Has("verbose"), "verbose query parameter should be present")
-			assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-
-			w.Header().Set("Content-Type", "application/json")
-			err := json.NewEncoder(w).Encode(serStatus)
-			require.NoError(t, err)
-		}))
-		defer server.Close()
-
-		port := extractPort(t, server.URL)
-		result, err := AllComponentsStatuses(context.Background(), *server.Client(), port)
-
-		require.NoError(t, err)
-		require.NotNil(t, result)
-		assert.Equal(t, componentstatus.StatusOK, result.Status())
-		assert.Contains(t, result.ComponentStatusMap, "receiver:otlp")
-	})
-
-	t.Run("successful response with error status", func(t *testing.T) {
-		now := time.Now().Truncate(time.Second)
-		serStatus := &status.SerializableStatus{
-			SerializableEvent: &status.SerializableEvent{
-				Healthy:      false,
-				StatusString: "StatusPermanentError",
-				Error:        "connection refused",
-				Timestamp:    now,
-			},
-		}
-
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			err := json.NewEncoder(w).Encode(serStatus)
-			require.NoError(t, err)
-		}))
-		defer server.Close()
-
-		port := extractPort(t, server.URL)
-		result, err := AllComponentsStatuses(context.Background(), *server.Client(), port)
-
-		require.NoError(t, err)
-		require.NotNil(t, result)
-		assert.Equal(t, componentstatus.StatusPermanentError, result.Status())
-		require.NotNil(t, result.Err())
-		assert.Equal(t, "connection refused", result.Err().Error())
-	})
-
-	t.Run("connection refused error", func(t *testing.T) {
-		// Use a port that's unlikely to be in use
-		result, err := AllComponentsStatuses(context.Background(), http.Client{}, 59999)
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to get status")
-		assert.Nil(t, result)
-	})
-
-	t.Run("invalid JSON response", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte("not valid json"))
-		}))
-		defer server.Close()
-
-		port := extractPort(t, server.URL)
-		result, err := AllComponentsStatuses(context.Background(), *server.Client(), port)
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to unmarshal serializable status")
-		assert.Nil(t, result)
-	})
-
-	t.Run("context cancelled", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			// Delay response to allow context cancellation
-			time.Sleep(100 * time.Millisecond)
-			w.WriteHeader(http.StatusOK)
-		}))
-		defer server.Close()
-
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel() // Cancel immediately
-
-		port := extractPort(t, server.URL)
-		result, err := AllComponentsStatuses(ctx, *server.Client(), port)
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to get status")
-		assert.Nil(t, result)
-	})
-
-	t.Run("empty response body", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			// Empty body
-		}))
-		defer server.Close()
-
-		port := extractPort(t, server.URL)
-		result, err := AllComponentsStatuses(context.Background(), *server.Client(), port)
-
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to unmarshal serializable status")
-		assert.Nil(t, result)
-	})
-
-	t.Run("nested component statuses", func(t *testing.T) {
-		now := time.Now().Truncate(time.Second)
-		serStatus := &status.SerializableStatus{
-			SerializableEvent: &status.SerializableEvent{
-				Healthy:      true,
-				StatusString: "StatusOK",
-				Timestamp:    now,
-			},
-			ComponentStatuses: map[string]*status.SerializableStatus{
-				"pipeline:traces": {
-					SerializableEvent: &status.SerializableEvent{
-						Healthy:      true,
-						StatusString: "StatusOK",
-						Timestamp:    now,
-					},
-					ComponentStatuses: map[string]*status.SerializableStatus{
-						"receiver:otlp": {
-							SerializableEvent: &status.SerializableEvent{
-								Healthy:      true,
-								StatusString: "StatusOK",
-								Timestamp:    now,
-							},
-						},
-						"exporter:otlp": {
-							SerializableEvent: &status.SerializableEvent{
-								Healthy:      false,
-								StatusString: "StatusRecoverableError",
-								Error:        "temporary failure",
-								Timestamp:    now,
-							},
->>>>>>> bd0fa0013 (Enable keepalives in healthcheckv2 extension (#12517))
 						},
 					},
 				},
 			},
-<<<<<<< HEAD
 			s2: &status.AggregateStatus{
 				Event: &healthCheckEvent{
 					status:    componentstatus.StatusOK,
@@ -431,7 +261,170 @@ func TestAllComponentsStatuses(t *testing.T) {
 			}
 		})
 	}
-=======
+}
+
+func TestAllComponentsStatuses(t *testing.T) {
+	t.Run("successful response with valid status", func(t *testing.T) {
+		now := time.Now().Truncate(time.Second)
+		serStatus := &SerializableStatus{
+			SerializableEvent: &SerializableEvent{
+				Healthy:      true,
+				StatusString: "StatusOK",
+				Timestamp:    now,
+			},
+			ComponentStatuses: map[string]*SerializableStatus{
+				"receiver:otlp": {
+					SerializableEvent: &SerializableEvent{
+						Healthy:      true,
+						StatusString: "StatusOK",
+						Timestamp:    now,
+					},
+				},
+			},
+		}
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "GET", r.Method)
+			assert.Equal(t, healthCheckHealthStatusPath, r.URL.Path)
+			assert.True(t, r.URL.Query().Has("verbose"), "verbose query parameter should be present")
+			assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
+			w.Header().Set("Content-Type", "application/json")
+			err := json.NewEncoder(w).Encode(serStatus)
+			require.NoError(t, err)
+		}))
+		defer server.Close()
+
+		port := extractPort(t, server.URL)
+		result, err := AllComponentsStatuses(context.Background(), *server.Client(), port)
+
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, componentstatus.StatusOK, result.Status())
+		assert.Contains(t, result.ComponentStatusMap, "receiver:otlp")
+	})
+
+	t.Run("successful response with error status", func(t *testing.T) {
+		now := time.Now().Truncate(time.Second)
+		serStatus := &SerializableStatus{
+			SerializableEvent: &SerializableEvent{
+				Healthy:      false,
+				StatusString: "StatusPermanentError",
+				Error:        "connection refused",
+				Timestamp:    now,
+			},
+		}
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			err := json.NewEncoder(w).Encode(serStatus)
+			require.NoError(t, err)
+		}))
+		defer server.Close()
+
+		port := extractPort(t, server.URL)
+		result, err := AllComponentsStatuses(context.Background(), *server.Client(), port)
+
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, componentstatus.StatusPermanentError, result.Status())
+		require.NotNil(t, result.Err())
+		assert.Equal(t, "connection refused", result.Err().Error())
+	})
+
+	t.Run("connection refused error", func(t *testing.T) {
+		// Use a port that's unlikely to be in use
+		result, err := AllComponentsStatuses(context.Background(), http.Client{}, 59999)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get status")
+		assert.Nil(t, result)
+	})
+
+	t.Run("invalid JSON response", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte("not valid json"))
+		}))
+		defer server.Close()
+
+		port := extractPort(t, server.URL)
+		result, err := AllComponentsStatuses(context.Background(), *server.Client(), port)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to unmarshal serializable status")
+		assert.Nil(t, result)
+	})
+
+	t.Run("context cancelled", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			// Delay response to allow context cancellation
+			time.Sleep(100 * time.Millisecond)
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // Cancel immediately
+
+		port := extractPort(t, server.URL)
+		result, err := AllComponentsStatuses(ctx, *server.Client(), port)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get status")
+		assert.Nil(t, result)
+	})
+
+	t.Run("empty response body", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			// Empty body
+		}))
+		defer server.Close()
+
+		port := extractPort(t, server.URL)
+		result, err := AllComponentsStatuses(context.Background(), *server.Client(), port)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to unmarshal serializable status")
+		assert.Nil(t, result)
+	})
+
+	t.Run("nested component statuses", func(t *testing.T) {
+		now := time.Now().Truncate(time.Second)
+		serStatus := &SerializableStatus{
+			SerializableEvent: &SerializableEvent{
+				Healthy:      true,
+				StatusString: "StatusOK",
+				Timestamp:    now,
+			},
+			ComponentStatuses: map[string]*SerializableStatus{
+				"pipeline:traces": {
+					SerializableEvent: &SerializableEvent{
+						Healthy:      true,
+						StatusString: "StatusOK",
+						Timestamp:    now,
+					},
+					ComponentStatuses: map[string]*SerializableStatus{
+						"receiver:otlp": {
+							SerializableEvent: &SerializableEvent{
+								Healthy:      true,
+								StatusString: "StatusOK",
+								Timestamp:    now,
+							},
+						},
+						"exporter:otlp": {
+							SerializableEvent: &SerializableEvent{
+								Healthy:      false,
+								StatusString: "StatusRecoverableError",
+								Error:        "temporary failure",
+								Timestamp:    now,
+							},
+						},
+					},
+				},
+			},
 		}
 
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -653,5 +646,4 @@ func TestInjectHealthCheckV2Extension(t *testing.T) {
 		assert.Equal(t, "pprof", extSlice[1])
 		assert.Equal(t, testExtensionID, extSlice[2])
 	})
->>>>>>> bd0fa0013 (Enable keepalives in healthcheckv2 extension (#12517))
 }
