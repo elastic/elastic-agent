@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"sync"
@@ -161,8 +162,9 @@ func (r *subprocessExecution) startCollector(ctx context.Context, baseLogger *lo
 		const healthCheckPollDuration = 1 * time.Second
 		healthCheckPollTimer := time.NewTimer(healthCheckPollDuration)
 		defer healthCheckPollTimer.Stop()
+		client := http.Client{}
 		for {
-			statuses, err := AllComponentsStatuses(procCtx, httpHealthCheckPort)
+			statuses, err := AllComponentsStatuses(procCtx, client, httpHealthCheckPort)
 			if err != nil {
 				switch {
 				case errors.Is(err, context.Canceled):
