@@ -8,7 +8,7 @@ replace github.com/elastic/elastic-agent => ../../
 replace github.com/elastic/beats/v7 => ../../beats
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260206230322-2dc4e33a7699
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260210220642-c5172fc430d2
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.32.1
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
@@ -342,7 +342,7 @@ require (
 	github.com/elastic/apm-data v1.19.5 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
 	github.com/elastic/elastic-agent-autodiscover v0.10.0 // indirect
-	github.com/elastic/elastic-agent-client/v7 v7.17.2 // indirect
+	github.com/elastic/elastic-agent-client/v7 v7.18.0 // indirect
 	github.com/elastic/elastic-agent-system-metrics v0.13.6 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.8.0 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
