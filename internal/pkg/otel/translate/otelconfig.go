@@ -32,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 // This is a prefix we add to all names of Otel entities in the configuration. Its purpose is to avoid collisions with
@@ -356,8 +357,11 @@ func getReceiversConfigForComponent(
 		receiverConfig["queue"] = outputQueueConfig
 	}
 
-	// Explicitly configure default processors for Beat receivers.
-	receiverConfig["processors"] = getDefaultProcessors(beatName)
+	// If the `default_processors` feature flag is enabled,
+	// explicitly configure default processors in Beat receivers.
+	if features.DefaultProcessors() {
+		receiverConfig["processors"] = getDefaultProcessors(beatName)
+	}
 
 	// add monitoring config if necessary
 	// we enable the basic monitoring endpoint by default, because we want to use it for diagnostics even if

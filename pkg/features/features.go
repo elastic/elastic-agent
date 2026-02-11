@@ -25,13 +25,16 @@ const defaultTamperProtection = true
 // 9.2 - disabled (acks are sent)
 const defaultDisablePolicyChangeAcks = false
 
+const defaultDefaultProcessors = true
+
 // The default value for standalone encrypted config.
 // 9.4 - disabled (plaintext config)
 const defaultEncryptedConfig = false
 
 var (
 	current = Flags{
-		tamperProtection: defaultTamperProtection,
+		tamperProtection:  defaultTamperProtection,
+		defaultProcessors: defaultDefaultProcessors,
 	}
 )
 
@@ -46,6 +49,7 @@ type Flags struct {
 
 	tamperProtection        bool
 	disablePolicyChangeAcks bool
+	defaultProcessors       bool
 	encryptedConfig         bool
 }
 
@@ -61,6 +65,9 @@ type cfg struct {
 			DisablePolicyChangeAcks *struct {
 				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
 			} `json:"disable_policy_change_acks" yaml:"disable_policy_change_acks" config:"disable_policy_change_acks"`
+			DefaultProcessors *struct {
+				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
+			} `json:"default_processors,omitempty" yaml:"default_processors,omitempty" config:"default_processors,omitempty"`
 			EncryptedConfig *struct {
 				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
 			} `json:"encrypted_config" yaml:"encrypted_config" config:"encrypted_config"`
@@ -87,6 +94,13 @@ func (f *Flags) DisablePolicyChangeAcks() bool {
 	defer f.mu.RUnlock()
 
 	return f.disablePolicyChangeAcks
+}
+
+func (f *Flags) DefaultProcessors() bool {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	return f.defaultProcessors
 }
 
 func (f *Flags) EncryptedConfig() bool {
@@ -156,6 +170,13 @@ func (f *Flags) setDisablePolicyChangeAcks(newValue bool) {
 	defer f.mu.Unlock()
 
 	f.disablePolicyChangeAcks = newValue
+}
+
+func (f *Flags) setDefaultProcessors(newValue bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.defaultProcessors = newValue
 }
 
 func (f *Flags) setEncryptedConfig(newValue bool) {
@@ -236,6 +257,12 @@ func Parse(policy any) (*Flags, error) {
 		flags.setDisablePolicyChangeAcks(defaultDisablePolicyChangeAcks)
 	}
 
+	if parsedFlags.Agent.Features.DefaultProcessors != nil {
+		flags.setDefaultProcessors(parsedFlags.Agent.Features.DefaultProcessors.Enabled)
+	} else {
+		flags.setDefaultProcessors(defaultDefaultProcessors)
+	}
+
 	if parsedFlags.Agent.Features.EncryptedConfig != nil {
 		flags.setEncryptedConfig(parsedFlags.Agent.Features.EncryptedConfig.Enabled)
 	} else {
@@ -265,6 +292,7 @@ func Apply(c *config.Config) error {
 	current.setFQDN(parsed.FQDN())
 	current.setTamperProtection(parsed.TamperProtection())
 	current.setDisablePolicyChangeAcks(parsed.DisablePolicyChangeAcks())
+	current.setDefaultProcessors(parsed.DefaultProcessors())
 	current.setEncryptedConfig(parsed.EncryptedConfig())
 	return err
 }
@@ -282,6 +310,11 @@ func TamperProtection() bool {
 // DisablePolicyChangeAcks reports if the agent will stop using ACKs for POLICY_CHANGE actions.
 func DisablePolicyChangeAcks() bool {
 	return current.DisablePolicyChangeAcks()
+}
+
+// DefaultProcessors reports if default processors should be applied.
+func DefaultProcessors() bool {
+	return current.DefaultProcessors()
 }
 
 func EncryptedConfig() bool {
