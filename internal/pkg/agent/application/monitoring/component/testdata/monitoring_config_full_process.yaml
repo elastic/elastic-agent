@@ -27,7 +27,16 @@ inputs:
     - drop_event:
         when:
           regexp:
+<<<<<<< HEAD
             message: ^Non-zero metrics in the last
+=======
+            otelcol.component.id: .*/_agent-component/monitoring$
+    - drop_event:
+        when:
+          regexp:
+            message: (^Non-zero metrics in the last)|(^Collector internal telemetry
+              metrics updated)
+>>>>>>> 04bdb2826 (Drop log events related to OTel collector monitoring components (#12663))
     - drop_event:
         when:
           equals:
