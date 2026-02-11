@@ -1105,6 +1105,7 @@ func TestOutputStatus(t *testing.T) {
 		ID:             "filestream-default",
 		InputType:      "filestream",
 		OutputType:     "elasticsearch",
+		OutputName:     "filestream-default",
 		RuntimeManager: component.OtelRuntimeManager,
 		InputSpec: &component.InputRuntimeSpec{
 			BinaryName: "elastic-otel-collector",
@@ -1137,10 +1138,12 @@ func TestOutputStatus(t *testing.T) {
 		status                *status.AggregateStatus
 		outputStatusReporting bool
 		expected              runtime.ComponentComponentState
+		expectedOverallStatus componentstatus.Status
 	}{
 		{
 			name:                  "output status reporting enabled - healthy exporter",
 			outputStatusReporting: true,
+			expectedOverallStatus: componentstatus.StatusOK,
 			status: &status.AggregateStatus{
 				Event: componentstatus.NewEvent(componentstatus.StatusOK),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
@@ -1198,6 +1201,7 @@ func TestOutputStatus(t *testing.T) {
 		{
 			name:                  "output status reporting enabled - degraded exporter",
 			outputStatusReporting: true,
+			expectedOverallStatus: componentstatus.StatusRecoverableError,
 			status: &status.AggregateStatus{
 				Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
@@ -1255,6 +1259,7 @@ func TestOutputStatus(t *testing.T) {
 		{
 			name:                  "output status reporting disabled - healthy exporter",
 			outputStatusReporting: false,
+			expectedOverallStatus: componentstatus.StatusOK,
 			status: &status.AggregateStatus{
 				Event: componentstatus.NewEvent(componentstatus.StatusOK),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
@@ -1312,6 +1317,7 @@ func TestOutputStatus(t *testing.T) {
 		{
 			name:                  "output status reporting disabled - degraded exporter",
 			outputStatusReporting: false,
+			expectedOverallStatus: componentstatus.StatusOK,
 			status: &status.AggregateStatus{
 				Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
@@ -1366,6 +1372,77 @@ func TestOutputStatus(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:                  "output status reporting disabled - degraded exporter in non-component pipeline",
+			outputStatusReporting: false,
+			expectedOverallStatus: componentstatus.StatusOK,
+			status: &status.AggregateStatus{
+				Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+				ComponentStatusMap: map[string]*status.AggregateStatus{
+					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
+						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							fmt.Sprintf("receiver:filebeat/%sfilestream-unit", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+							},
+						},
+					},
+					// This pipeline is not directly associated with a component (e.g. internal telemetry monitoring).
+					// Its exporter shares the same output and should also be muted when output status reporting is disabled.
+					fmt.Sprintf("pipeline:logs/%scollector/internal-telemetry-monitoring", OtelNamePrefix): {
+						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							fmt.Sprintf("receiver:elasticmonitoringreceiver/%scollector/internal-telemetry-monitoring", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
+							},
+						},
+					},
+				},
+			},
+			expected: runtime.ComponentComponentState{
+				Component: baseComp,
+				State: runtime.ComponentState{
+					State:   client.UnitStateHealthy,
+					Message: "",
+					VersionInfo: runtime.ComponentVersionInfo{
+						Name:      OtelComponentName,
+						BuildHash: version.Commit(),
+						Meta: map[string]string{
+							"build_time": version.BuildTime().String(),
+							"commit":     version.Commit(),
+						},
+					},
+					Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+						{UnitID: "filestream-unit", UnitType: client.UnitTypeInput}: {
+							State:   client.UnitStateHealthy,
+							Message: "Healthy",
+							Payload: map[string]any{
+								"streams": map[string]map[string]string{
+									"test-1": {
+										"error":  "",
+										"status": "HEALTHY",
+									},
+									"test-2": {
+										"error":  "",
+										"status": "HEALTHY",
+									},
+								},
+							},
+						},
+						{UnitID: "filestream-default", UnitType: client.UnitTypeOutput}: {
+							State:   client.UnitStateHealthy,
+							Message: "Healthy",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1376,9 +1453,10 @@ func TestOutputStatus(t *testing.T) {
 				Enabled: tt.outputStatusReporting,
 			}
 
-			status, err := MaybeMuteExporterStatus(tt.status, []component.Component{comp})
+			mutedStatus, err := MaybeMuteExporterStatus(tt.status, []component.Component{comp})
 			require.NoError(t, err)
-			result, err := getComponentState(status.ComponentStatusMap["pipeline:logs/_agent-component/filestream-default"], comp)
+			assert.Equal(t, tt.expectedOverallStatus, mutedStatus.Status(), "overall status after muting exporters")
+			result, err := getComponentState(mutedStatus.ComponentStatusMap["pipeline:logs/_agent-component/filestream-default"], comp)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected.Component.ID, result.Component.ID)
 			assert.Equal(t, tt.expected.State.State, result.State.State)

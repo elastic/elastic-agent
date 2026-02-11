@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent/internal/edot
 
-go 1.24.12
+go 1.24.13
 
 // use in-repo directory
 replace github.com/elastic/elastic-agent => ../../
@@ -8,7 +8,7 @@ replace github.com/elastic/elastic-agent => ../../
 replace github.com/elastic/beats/v7 => ../../beats
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260204001850-2898137255fa
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260210220642-c5172fc430d2
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.32.1
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
@@ -32,6 +32,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.144.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/logdedupprocessor v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver v0.144.0
@@ -50,6 +51,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/snmpreceiver v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver v0.144.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/statsdreceiver v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.144.0
@@ -96,7 +98,7 @@ require (
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75 // indirect
 	github.com/gosnmp/gosnmp v1.43.2 // indirect
-	github.com/insomniacslk/dhcp v0.0.0-20220119180841-3c283ff8b7dd // indirect
+	github.com/insomniacslk/dhcp v0.0.0-20251020182700-175e84fbb167 // indirect
 	github.com/itchyny/timefmt-go v0.1.7 // indirect
 	github.com/jaypipes/ghw v0.12.0 // indirect
 	github.com/jaypipes/pcidb v1.0.0 // indirect
@@ -120,6 +122,7 @@ require (
 	github.com/samuel/go-thrift v0.0.0-20140522043831-2187045faa54 // indirect
 	github.com/schollz/progressbar/v3 v3.13.1 // indirect
 	github.com/teambition/rrule-go v1.8.2 // indirect
+	github.com/u-root/uio v0.0.0-20230220225925-ffce2a382923 // indirect
 	github.com/winlabs/gowin32 v0.0.0-20240930213947-f504d7e14639 // indirect
 	go.opentelemetry.io/collector/component/componentstatus v0.144.0 // indirect
 	go.opentelemetry.io/collector/component/componenttest v0.144.0 // indirect
@@ -339,12 +342,12 @@ require (
 	github.com/elastic/apm-data v1.19.5 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
 	github.com/elastic/elastic-agent-autodiscover v0.10.0 // indirect
-	github.com/elastic/elastic-agent-client/v7 v7.17.2 // indirect
+	github.com/elastic/elastic-agent-client/v7 v7.18.0 // indirect
 	github.com/elastic/elastic-agent-system-metrics v0.13.6 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.8.0 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
 	github.com/elastic/go-docappender/v2 v2.12.1 // indirect
-	github.com/elastic/go-elasticsearch/v8 v8.19.1 // indirect
+	github.com/elastic/go-elasticsearch/v8 v8.19.2 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect
 	github.com/elastic/go-grok v0.3.1 // indirect
 	github.com/elastic/go-lumber v0.1.2-0.20220819171948-335fde24ea0f // indirect
@@ -472,7 +475,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/knadh/koanf/maps v0.1.2 // indirect
 	github.com/knadh/koanf/providers/confmap v1.0.0 // indirect
-	github.com/knadh/koanf/v2 v2.3.0 // indirect
+	github.com/knadh/koanf/v2 v2.3.2 // indirect
 	github.com/kolo/xmlrpc v0.0.0-20220921171641-a4b6fa1dd06b // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
@@ -613,7 +616,7 @@ require (
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	github.com/zeebo/xxh3 v1.0.2 // indirect
+	github.com/zeebo/xxh3 v1.1.0 // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.2 // indirect
 	go.elastic.co/apm/module/apmgrpc/v2 v2.6.0 // indirect
@@ -772,7 +775,6 @@ replace (
 	github.com/fsnotify/fsevents => github.com/elastic/fsevents v0.0.0-20181029231046-e1d381a4d270
 	github.com/fsnotify/fsnotify => github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3
 	github.com/google/gopacket => github.com/elastic/gopacket v1.1.20-0.20241002174017-e8c5fda595e6
-	github.com/insomniacslk/dhcp => github.com/elastic/dhcp v0.0.0-20200227161230-57ec251c7eb3 // indirect
 	github.com/meraki/dashboard-api-go/v3 => github.com/tommyers-elastic/dashboard-api-go/v3 v3.0.0-20250616163611-a325b49669a4
 	// The replaces below refer to the following branch: https://github.com/elastic/opentelemetry-collector-contrib/tree/v0144-healthcheck-patched
 	// They contain an additional patch created from the content of https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/43744
