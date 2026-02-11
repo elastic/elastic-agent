@@ -540,11 +540,7 @@ func injectMonitoringReceiver(
 	agentInfo info.Agent,
 	components []component.Component,
 ) error {
-	receiverType := otelcomponent.MustNewType(elasticmonitoringreceiver.Name)
-	receiverName := "internal-telemetry-monitoring"
-	receiverID := translate.GetReceiverID(receiverType, receiverName).String()
-	processorID := "beat/" + translate.OtelNamePrefix + receiverName
-	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
+	// Find the monitoring exporter that this pipeline will be writing to
 	exporterType := otelcomponent.MustNewType("elasticsearch")
 	exporterID := translate.GetExporterID(exporterType, componentmonitoring.MonitoringOutput).String()
 	monitoringExporterFound := false
@@ -564,6 +560,12 @@ func injectMonitoringReceiver(
 	if err != nil {
 		return fmt.Errorf("couldn't map exporter IDs to output names: %w", err)
 	}
+
+	receiverType := otelcomponent.MustNewType(elasticmonitoringreceiver.Name)
+	receiverName := "internal-telemetry-monitoring"
+	receiverID := translate.GetReceiverID(receiverType, receiverName).String()
+	processorID := "beat/" + translate.OtelNamePrefix + receiverName
+	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
 	receiverCfg := map[string]any{
 		"receivers": map[string]any{
 			receiverID: map[string]any{
@@ -573,7 +575,9 @@ func injectMonitoringReceiver(
 			},
 		},
 		"processors": map[string]any{
-			processorID: map[string]any{},
+			processorID: map[string]any{
+				"processors": translate.GetDefaultProcessors("collector"),
+			},
 		},
 		"service": map[string]any{
 			"pipelines": map[string]any{

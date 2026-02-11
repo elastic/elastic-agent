@@ -357,7 +357,7 @@ func getReceiversConfigForComponent(
 	}
 
 	// Explicitly configure default processors for Beat receivers.
-	receiverConfig["processors"] = getDefaultProcessors(beatName)
+	receiverConfig["processors"] = GetDefaultProcessors(beatName)
 
 	// add monitoring config if necessary
 	// we enable the basic monitoring endpoint by default, because we want to use it for diagnostics even if
@@ -385,7 +385,7 @@ func getReceiversConfigForComponent(
 	}, nil
 }
 
-func getDefaultProcessors(beatName string) []map[string]any {
+func GetDefaultProcessors(beatName string) []map[string]any {
 	addHostMetadata := map[string]any{
 		"add_host_metadata": nil,
 	}
