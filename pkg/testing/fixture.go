@@ -561,12 +561,28 @@ func (f *Fixture) RunOtelWithClient(ctx context.Context, states ...State) error 
 	return f.executeWithClient(ctx, "otel", false, false, false, states...)
 }
 
-// Stop gracefully stops the Elastic Agent process
-func (f *Fixture) Stop() error {
+// Stop gracefully stops the Elastic Agent process that has been started
+// by [RunOtelWithCliet] or [Run].
+// If the Elastic Agent has been installed, or the process
+// has not been started by [RunOtelWithCliet] or [Run],
+// Stop fails the test by calling t.Error
+func (f *Fixture) Stop() {
 	f.procMutex.Lock()
 	defer f.procMutex.Unlock()
+
+	if f.installed {
+		f.t.Error("an installed Elastic Agent cannot be stopped")
+	}
+
+	if f.proc == nil {
+		f.t.Error("Elastic Agent has not been started")
+	}
+
 	f.stopping = true
-	return f.proc.Stop()
+
+	if err := f.proc.Stop(); err != nil {
+		f.t.Errorf("Elastic Agent returned an error when stopping: %s", err)
+	}
 }
 
 func (f *Fixture) executeWithClient(ctx context.Context, command string, disableEncryptedStore bool, shouldWatchState bool, enableTestingMode bool, states ...State) error {
@@ -658,7 +674,10 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 		<-procWaitCh
 	}
 
+	f.procMutex.Lock()
 	f.stopping = false
+	f.procMutex.Unlock()
+
 	for {
 		select {
 		case <-ctx.Done():

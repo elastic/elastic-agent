@@ -142,7 +142,7 @@ func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
 	waitEventsInES(50)
 
 	// Stop Elastic Agent
-	require.NoError(t, fixture.Stop(), "cannot stop Elastic Agent process")
+	fixture.Stop()
 	wg.Wait()
 
 	// Enable the feature flag and start Elastic Agent
@@ -193,7 +193,7 @@ func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
 	// Ensure all 100 events have been ingested and stop Elastic Agent
 	waitEventsInES(100)
 
-	require.NoError(t, fixture.Stop(), "cannot stop Elastic Agent process")
+	fixture.Stop()
 	wg.Wait()
 
 	wg.Add(1)
