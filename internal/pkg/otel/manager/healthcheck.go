@@ -71,13 +71,9 @@ func (e *healthCheckEvent) Timestamp() time.Time           { return e.timestamp 
 func (e *healthCheckEvent) Err() error                     { return e.err }
 
 // AllComponentsStatuses retrieves the status of all components from the health check endpoint.
-<<<<<<< HEAD
-func AllComponentsStatuses(ctx context.Context, httpHealthCheckPort int) (*status.AggregateStatus, error) {
-=======
-func AllComponentsStatuses(ctx context.Context, client http.Client, httpHealthCheckPort int) (*otelstatus.AggregateStatus, error) {
+func AllComponentsStatuses(ctx context.Context, client http.Client, httpHealthCheckPort int) (*status.AggregateStatus, error) {
 	var err error
 
->>>>>>> bd0fa0013 (Enable keepalives in healthcheckv2 extension (#12517))
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
