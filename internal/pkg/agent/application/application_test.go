@@ -20,15 +20,18 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/details"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/limits"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 func TestMergeFleetConfig(t *testing.T) {
@@ -670,6 +673,10 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
 	err = os.WriteFile(paths.ConfigFile(), p, 0640)
 	require.NoError(t, err)
 
+	isRoot, err := utils.HasRoot()
+	require.NoError(t, err)
+	err = secret.CreateAgentSecret(t.Context(), vault.WithUnprivileged(!isRoot), vault.WithVaultPath(filepath.Join(paths.Config(), paths.DefaultAgentVaultPath)))
+	require.NoError(t, err)
 	encStore, err := storage.NewEncryptedDiskStore(t.Context(), filepath.Join(paths.Config(), paths.DefaultAgentFleetFile), storage.WithVaultPath(filepath.Join(paths.Config(), paths.DefaultAgentVaultPath)))
 	require.NoError(t, err)
 	err = encStore.Save(strings.NewReader(`fleet:
