@@ -4266,14 +4266,11 @@ func (h Helm) Package() error {
 	agentChartVersion := agentCoreVersion + "-SNAPSHOT"
 	if snapshotSuffix == "" {
 		// production build, check if chart is GA
-		agentVersion, err := version.ParseVersion(agentCoreVersion)
+		_, err := version.ParseVersion(agentCoreVersion)
 		if err != nil {
 			return fmt.Errorf("failed to parse agent version: %w", err)
 		}
-		// for 9.0.0+ or 8.18.0+ versions, elastic-agent Helm chart is GA
-		if agentVersion.Major() >= 9 || (agentVersion.Major() >= 8 && agentVersion.Minor() >= 18) {
-			agentChartVersion = agentCoreVersion
-		}
+		agentChartVersion = agentCoreVersion
 	}
 
 	for yamlFile, keyVals := range map[string][]struct {
@@ -4306,7 +4303,7 @@ func (h Helm) Package() error {
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
-	err := actionConfig.Init(settings.RESTClientGetter(), "default", "",
+	err = actionConfig.Init(settings.RESTClientGetter(), "default", "",
 		func(format string, v ...interface{}) {})
 	if err != nil {
 		return fmt.Errorf("failed to init helm action config: %w", err)
