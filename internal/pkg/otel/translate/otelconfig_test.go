@@ -540,6 +540,66 @@ func TestGetOtelConfig(t *testing.T) {
 			}),
 		},
 		{
+			name: "filestream with logstash output",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "filestream-default",
+						InputType:  "filestream",
+						OutputType: "logstash",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"filebeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "filestream-unit",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(fileStreamConfig),
+							},
+							{
+								ID:   "filestream-default",
+								Type: client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(map[string]any{
+									"type":                       "logstash",
+									"hosts":                      []any{"localhost:5044"},
+									"index":                      "logs-logstash-default",
+									"queue.mem.events":           "3200",
+									"queue.mem.flush.min_events": "1600",
+									"queue.mem.flush.timeout":    "10s",
+								}),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"logstash/_agent-component/default": map[string]any{
+						"type":  "logstash",
+						"hosts": []any{"localhost:5044"},
+						"index": "logs-logstash-default",
+					},
+				},
+				"receivers": map[string]any{
+					"filebeatreceiver/_agent-component/filestream-default": expectedFilestreamConfig("filestream-default"),
+				},
+				"service": map[string]any{
+					"pipelines": map[string]any{
+						"logs/_agent-component/filestream-default": map[string][]string{
+							"exporters": {"logstash/_agent-component/default"},
+							"receivers": {"filebeatreceiver/_agent-component/filestream-default"},
+						},
+					},
+				},
+			}),
+		},
+		{
 			name: "multiple filestream inputs and one output",
 			model: &component.Model{
 				Components: []component.Component{
@@ -1117,16 +1177,6 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			expectedError: "unsupported output type: kafka",
 		},
 		{
-			name: "unsupported output type - logstash",
-			component: &component.Component{
-				ID:         "unsupported-output",
-				InputType:  "filestream",
-				OutputType: "logstash", // unsupported
-				OutputName: "default",
-			},
-			expectedError: "unsupported output type: logstash",
-		},
-		{
 			name: "unsupported configuration",
 			component: &component.Component{
 				ID:         "unsupported-config",
@@ -1336,12 +1386,6 @@ func TestVerifyOutputIsOtelSupported(t *testing.T) {
 			outputType:    "kafka",
 			outputCfg:     map[string]any{},
 			expectedError: "unsupported output type: kafka",
-		},
-		{
-			name:          "unsupported output type - logstash",
-			outputType:    "logstash",
-			outputCfg:     map[string]any{},
-			expectedError: "unsupported output type: logstash",
 		},
 		{
 			name:       "unsupported configuration - indices field",
