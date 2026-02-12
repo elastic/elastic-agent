@@ -3967,12 +3967,16 @@ func (h Helm) RenderExamples() error {
 
 // UpdateAgentVersion updates the agent version in the Elastic-Agent and EDOT-Collector Helm charts.
 func (Helm) UpdateAgentVersion() error {
-	agentVersion := bversion.GetParsedAgentPackageVersion().CoreVersion()
-	agentSnapshotVersion := agentVersion + "-SNAPSHOT"
+	agentVersion, err := mage.AgentPackageVersion()
+	if err != nil {
+		return fmt.Errorf("failed to get agent package version: %w", err)
+	}
+	snapshotSuffix := devtools.MaybeSnapshotSuffix()
+	agentSnapshotVersion := agentVersion + snapshotSuffix
 	// until the Helm chart reaches GA this remains with -SNAPSHOT suffix
 	// that's to differentiate it from the released charts in the Helm repo using
 	// the same versioning scheme as the Unified Release process.
-	agentChartVersion := agentVersion + "-SNAPSHOT"
+	agentChartVersion := agentVersion + snapshotSuffix
 
 	for yamlFile, keyVals := range map[string][]struct {
 		key   string
@@ -4252,25 +4256,24 @@ func (h Helm) Package() error {
 	fmt.Println("--- Package Helm chart distribution")
 	mg.SerialDeps(h.BuildDependencies)
 
-	// need to explicitly set SNAPSHOT="false" to produce a production-ready package
-	productionPackage := os.Getenv("SNAPSHOT") == "false"
-
-	agentVersion := bversion.GetParsedAgentPackageVersion()
-	agentCoreVersion := agentVersion.CoreVersion()
-	agentImageTag := agentCoreVersion
-	if !productionPackage {
-		// always use the SNAPSHOT version for image tag if not a production package
-		agentImageTag = agentImageTag + "-SNAPSHOT"
+	agentCoreVersion, err := mage.AgentPackageVersion()
+	if err != nil {
+		return fmt.Errorf("failed to get agent package version: %w", err)
 	}
+	snapshotSuffix := devtools.MaybeSnapshotSuffix()
+	agentImageTag := agentCoreVersion + snapshotSuffix
 
 	agentChartVersion := agentCoreVersion + "-SNAPSHOT"
-	switch {
-	case productionPackage && agentVersion.Major() >= 9:
-		// for 9.0.0 and later versions, elastic-agent Helm chart is GA
-		agentChartVersion = agentCoreVersion
-	case productionPackage && agentVersion.Major() >= 8 && agentVersion.Minor() >= 18:
-		// for 8.18.0 and later versions, elastic-agent Helm chart is GA
-		agentChartVersion = agentCoreVersion
+	if snapshotSuffix == "" {
+		// production build, check if chart is GA
+		agentVersion, err := version.ParseVersion(agentCoreVersion)
+		if err != nil {
+			return fmt.Errorf("failed to parse agent version: %w", err)
+		}
+		// for 9.0.0+ or 8.18.0+ versions, elastic-agent Helm chart is GA
+		if agentVersion.Major() >= 9 || (agentVersion.Major() >= 8 && agentVersion.Minor() >= 18) {
+			agentChartVersion = agentCoreVersion
+		}
 	}
 
 	for yamlFile, keyVals := range map[string][]struct {
