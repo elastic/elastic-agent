@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -79,7 +80,7 @@ func TestStandaloneEncyptedConfigInstall(t *testing.T) {
 	require.NoError(t, err, "Unable to download policy")
 	defer downloadPolResp.Body.Close()
 
-	apiKeyResponse, err := createESApiKey(info.ESClient)
+	apiKeyResponse, err := estools.CreateAPIKey(t.Context(), info.ESClient, estools.APIKeyRequest{Name: "test-api-key", Expiration: "1d"})
 	require.NoError(t, err, "failed to get api key")
 	require.True(t, len(apiKeyResponse.Encoded) > 1, "api key is invalid %q", apiKeyResponse)
 	apiKey, err := getDecodedApiKey(apiKeyResponse)
