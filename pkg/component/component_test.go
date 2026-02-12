@@ -3825,7 +3825,7 @@ func TestDefaultRuntimeConfig(t *testing.T) {
 	require.NotNil(t, config)
 	assert.Equal(t, string(DefaultRuntimeManager), config.Default)
 	assert.Equal(t, "", config.Filebeat.Default)
-	assert.Nil(t, config.Filebeat.InputType)
+	assert.Empty(t, config.Filebeat.InputType)
 	assert.Equal(t, "", config.Metricbeat.Default)
 	assert.Equal(t,
 		map[string]string{
