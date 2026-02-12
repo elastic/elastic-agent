@@ -8,12 +8,12 @@ require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260211181509-0eae3ffc9e50
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.31.0
-	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.24.0
-	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.24.0
-	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.24.0
-	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.24.0
-	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.24.0
-	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.24.0
+	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.29.0
+	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.29.0
+	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.29.0
+	github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor v0.29.0
+	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.29.0
+	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.29.0
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.144.0
@@ -48,6 +48,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.70.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.5 // indirect
 	github.com/coder/websocket v1.8.14 // indirect
+	github.com/elastic/apm-data v1.19.5 // indirect
 	github.com/go-openapi/swag/cmdutils v0.25.4 // indirect
 	github.com/go-openapi/swag/conv v0.25.4 // indirect
 	github.com/go-openapi/swag/fileutils v0.25.4 // indirect
@@ -295,8 +296,8 @@ require (
 	github.com/elastic/lunes v0.2.0 // indirect
 	github.com/elastic/mito v1.24.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20251113000200-a6f7cddc8520 // indirect
-	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.24.0 // indirect
-	github.com/elastic/opentelemetry-lib v0.27.0 // indirect
+	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.29.0 // indirect
+	github.com/elastic/opentelemetry-lib v0.30.0 // indirect
 	github.com/elastic/sarama v1.19.1-0.20251224062803-313637a62841 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.36.0 // indirect
