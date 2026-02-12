@@ -7,7 +7,6 @@ package application
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"reflect"
 	"time"
@@ -198,12 +197,6 @@ func New(
 			log.Debug("Loading encrypted config")
 			configMgr = newEncryptedOnce(log, paths.AgentConfigFile())
 		} else {
-			_, err := os.Stat(paths.AgentConfigFile())
-			if err == nil {
-				// fleet.enc exists, but elastic-agent.yml does not have agent.features.encrypted_config.enabled: true,
-				// do a best effort delete
-				_ = os.Remove(paths.AgentConfigFile())
-			}
 			loader := config.NewLoader(log, paths.ExternalInputs())
 			rawCfgMap, err := rawConfig.ToMapStr()
 			if err != nil {
