@@ -44,6 +44,7 @@ receivers:
           - integration_id: "int-cloudtrail-001"
             integration_type: "aws_cloudtrail"
             integration_name: "AWS CloudTrail"
+            integration_version: "2.17.0"
             config:
               account_id: "123456789012"
               region: "us-east-1"
@@ -57,7 +58,7 @@ service:
 
 ## Configuration
 
-The receiver uses a Cloud Connector–oriented configuration: you specify the connector identity, a verification session, provider credentials, and a list of policies with their integrations. The receiver looks up required permissions per integration type and performs the checks.
+The receiver uses a Cloud Connector-oriented configuration: you specify the connector identity, a verification session, provider credentials, and a list of policies with their integrations. The receiver looks up required permissions per integration type and version, then performs the checks.
 
 ### Required fields
 
@@ -114,7 +115,9 @@ providers:
 
 ### Policy and integration structure
 
-Each policy must have `policy_id` and at least one integration. Each integration must specify `integration_type` (for example `aws_cloudtrail`, `aws_guardduty`, `aws_s3`). Optional `integration_id`, `integration_name`, and `config` provide context and provider-specific settings.
+Each policy must have `policy_id` and at least one integration. Each integration must specify `integration_type` (for example `aws_cloudtrail`, `aws_guardduty`, `aws_s3`). Optional `integration_id`, `integration_name`, `integration_version`, and `config` provide context and provider-specific settings.
+
+The `integration_version` field accepts a semantic version string (for example `2.17.0`). Different versions of an integration may require different permissions. When omitted, the latest registered permission set is used.
 
 ```yaml
 policies:
@@ -124,12 +127,14 @@ policies:
       - integration_id: "int-cloudtrail-001"
         integration_type: "aws_cloudtrail"
         integration_name: "AWS CloudTrail"
+        integration_version: "2.17.0"
         config:
           account_id: "123456789012"
           region: "us-east-1"
       - integration_id: "int-guardduty-001"
         integration_type: "aws_guardduty"
         integration_name: "AWS GuardDuty"
+        integration_version: "1.5.0"
         config:
           account_id: "123456789012"
           region: "us-east-1"
@@ -157,7 +162,7 @@ Azure, GCP, and Okta integration types are planned.
 The receiver emits OTEL logs. Each log record represents a permission verification result. Resource and log attributes include:
 
 - **Resource**: `cloud_connector.id`, `cloud_connector.name`, `verification.id`, `verification.type`, `service.name` (`permission-verifier`)
-- **Log attributes**: `policy.id`, `policy.name`, `integration.id`, `integration.type`, `provider.type`, `permission.action`, `permission.status` (`granted` / `denied` / `error` / `skipped`), `permission.error_code`, `permission.error_message`, `verification.method`, `verification.duration_ms`
+- **Log attributes**: `policy.id`, `policy.name`, `integration.id`, `integration.type`, `integration.version`, `provider.type`, `permission.action`, `permission.status` (`granted` / `denied` / `error` / `skipped`), `permission.error_code`, `permission.error_message`, `verification.method`, `verification.duration_ms`
 
 Export these logs to {{es}} (for example with the Elasticsearch exporter) and use the `logs-cloud_connector.permission_verification-*` data stream or a custom index for dashboards and alerts.
 
@@ -181,6 +186,7 @@ receivers:
           - integration_id: "int-cloudtrail-001"
             integration_type: "aws_cloudtrail"
             integration_name: "AWS CloudTrail"
+            integration_version: "2.17.0"
             config:
               region: "us-east-1"
 
