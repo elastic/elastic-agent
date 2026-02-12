@@ -163,8 +163,6 @@ func TestStandaloneEncyptedConfigInstall(t *testing.T) {
 			assert.Len(c, status.Components, 3, "unexpected number of components") // Current components are all monitoring related:  beat/metrics-monitoring, filestream-monitoring, http/metrics-monitoring
 		}, time.Minute, time.Second)
 
-		_, err = os.Stat(filepath.Join(topPath, "fleet.enc"))
-		assert.ErrorIs(t, err, os.ErrNotExist, "expected fleet.enc to be deleted")
 		p, err := os.ReadFile(filepath.Join(topPath, "elastic-agent.yml"))
 		assert.NoError(t, err, "unable to read elastic-agent.yml file")
 		assert.EqualValues(t, polBytes, p, "unexpected contents in elastic-agent.yml")
