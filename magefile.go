@@ -4265,11 +4265,6 @@ func (h Helm) Package() error {
 
 	agentChartVersion := agentCoreVersion + "-SNAPSHOT"
 	if snapshotSuffix == "" {
-		// production build, check if chart is GA
-		_, err := version.ParseVersion(agentCoreVersion)
-		if err != nil {
-			return fmt.Errorf("failed to parse agent version: %w", err)
-		}
 		agentChartVersion = agentCoreVersion
 	}
 
