@@ -107,14 +107,14 @@ providers:
 |--------|------|----------|-------------|
 | `role_arn` | `string` | Yes* | IAM role ARN to assume. |
 | `external_id` | `string` | Yes* | External ID for assume-role. |
-| `default_region` | `string` | No | Default AWS region (e.g. `us-east-1`). |
+| `default_region` | `string` | No | Default AWS region (for example `us-east-1`). |
 | `use_default_credentials` | `bool` | No | Use default credential chain (for testing). |
 
 *Required when not using `use_default_credentials`.
 
 ### Policy and integration structure
 
-Each policy must have `policy_id` and at least one integration. Each integration must specify `integration_type` (e.g. `aws_cloudtrail`, `aws_guardduty`, `aws_s3`). Optional `integration_id`, `integration_name`, and `config` provide context and provider-specific settings.
+Each policy must have `policy_id` and at least one integration. Each integration must specify `integration_type` (for example `aws_cloudtrail`, `aws_guardduty`, `aws_s3`). Optional `integration_id`, `integration_name`, and `config` provide context and provider-specific settings.
 
 ```yaml
 policies:
@@ -139,12 +139,12 @@ policies:
 
 | Integration type | Permissions verified |
 |------------------|----------------------|
-| `aws_cloudtrail` | CloudTrail, S3, SQS (e.g. `LookupEvents`, `GetObject`, `ReceiveMessage`) |
-| `aws_guardduty` | GuardDuty (e.g. `ListDetectors`, `GetFindings`, `ListFindings`) |
-| `aws_securityhub` | Security Hub (e.g. `GetFindings`, `DescribeHub`) |
-| `aws_s3` | S3 (e.g. `ListBucket`, `GetObject`, `GetBucketLocation`) |
-| `aws_ec2` | EC2 and CloudWatch (e.g. `DescribeInstances`, `DescribeRegions`, `GetMetricData`) |
-| `aws_vpcflow` | VPC Flow Logs (e.g. `FilterLogEvents`, `DescribeLogGroups`, `DescribeFlowLogs`) |
+| `aws_cloudtrail` | CloudTrail, S3, SQS (for example `LookupEvents`, `GetObject`, `ReceiveMessage`) |
+| `aws_guardduty` | GuardDuty (for example `ListDetectors`, `GetFindings`, `ListFindings`) |
+| `aws_securityhub` | Security Hub (for example `GetFindings`, `DescribeHub`) |
+| `aws_s3` | S3 (for example `ListBucket`, `GetObject`, `GetBucketLocation`) |
+| `aws_ec2` | EC2 and CloudWatch (for example `DescribeInstances`, `DescribeRegions`, `GetMetricData`) |
+| `aws_vpcflow` | VPC Flow Logs (for example `FilterLogEvents`, `DescribeLogGroups`, `DescribeFlowLogs`) |
 | `aws_waf` | WAFv2 and S3 |
 | `aws_route53` | Route53 and CloudWatch Logs |
 | `aws_elb` | ELB and S3 |
