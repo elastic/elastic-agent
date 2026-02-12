@@ -1100,6 +1100,699 @@ func Test_ApplyPersistedConfig(t *testing.T) {
 	}
 }
 
+func Test_ApplyPersistedConfig_OTelService(t *testing.T) {
+	// Table-driven test for OTel service section merging
+	tests := []struct {
+		name                string
+		fleetConfigYAML     string
+		persistedConfigYAML string
+		expectedYAML        string
+	}{
+		{
+			name: "fleet has no otel config, persisted adds it",
+			fleetConfigYAML: `
+outputs:
+  default:
+    type: elasticsearch
+    hosts: ["localhost:9200"]
+    api_key: "test-key"
+
+agent:
+  monitoring:
+    enabled: true
+    use_output: default
+    logs: true
+    metrics: true
+
+inputs:
+  - id: test-input
+    type: filestream
+    use_output: default
+    streams:
+      - data_stream:
+          dataset: test.logs
+          type: logs
+        paths:
+          - /var/log/test.log
+`,
+			persistedConfigYAML: `
+service:
+  telemetry:
+    resource:
+      policy_id: test-policy-123
+    logs:
+      level: debug
+      processors:
+        - batch:
+            exporter:
+              otlp:
+                protocol: http/protobuf
+                endpoint: https://test.example.com
+    metrics:
+      level: detailed
+      readers:
+        - periodic:
+            exporter:
+              otlp:
+                protocol: http/protobuf
+                endpoint: https://test.example.com
+    traces:
+      processors:
+        - batch:
+            exporter:
+              otlp:
+                protocol: http/protobuf
+                endpoint: https://test.example.com
+
+receivers:
+  nop:
+    # test receiver
+
+processors:
+  batch:
+    # test processor
+`,
+			expectedYAML: `
+outputs:
+  default:
+    type: elasticsearch
+    hosts: ["localhost:9200"]
+    api_key: "test-key"
+
+agent:
+  monitoring:
+    enabled: true
+    use_output: default
+    logs: true
+    metrics: true
+
+inputs:
+  - id: test-input
+    type: filestream
+    use_output: default
+    streams:
+      - data_stream:
+          dataset: test.logs
+          type: logs
+        paths:
+          - /var/log/test.log
+
+otel:
+  service:
+    telemetry:
+      resource:
+        policy_id: test-policy-123
+      logs:
+        level: debug
+        processors:
+          - batch:
+              exporter:
+                otlp:
+                  protocol: http/protobuf
+                  endpoint: https://test.example.com
+      metrics:
+        level: detailed
+        readers:
+          - periodic:
+              exporter:
+                otlp:
+                  protocol: http/protobuf
+                  endpoint: https://test.example.com
+      traces:
+        processors:
+          - batch:
+              exporter:
+                otlp:
+                  protocol: http/protobuf
+                  endpoint: https://test.example.com
+  receivers:
+    nop: null
+  processors:
+    batch: null
+`,
+		},
+		{
+			name: "both fleet and persisted have otel config, they merge",
+			fleetConfigYAML: `
+outputs:
+  default:
+    type: elasticsearch
+    hosts: ["localhost:9200"]
+    api_key: "fleet-key"
+
+agent:
+  monitoring:
+    enabled: true
+    use_output: default
+    logs: true
+    metrics: true
+
+inputs:
+  - id: fleet-input
+    type: filestream
+    use_output: default
+    streams:
+      - data_stream:
+          dataset: fleet.logs
+          type: logs
+        paths:
+          - /var/log/fleet.log
+
+service:
+  telemetry:
+    resource:
+      fleet_provided: true
+      policy_id: fleet-policy-456
+    logs:
+      level: info
+    metrics:
+      level: normal
+`,
+			persistedConfigYAML: `
+service:
+  telemetry:
+    resource:
+      local_override: true
+      policy_id: local-policy-789
+    metrics:
+      level: detailed
+      readers:
+        - periodic:
+            exporter:
+              otlp:
+                protocol: http/protobuf
+                endpoint: https://local-override.example.com
+    traces:
+      processors:
+        - batch:
+            exporter:
+              otlp:
+                protocol: http/protobuf
+                endpoint: https://local-override.example.com
+
+receivers:
+  local_receiver:
+    # Local receiver
+
+processors:
+  local_processor:
+    # Local processor
+`,
+			expectedYAML: `
+outputs:
+  default:
+    type: elasticsearch
+    hosts: ["localhost:9200"]
+    api_key: "fleet-key"
+
+agent:
+  monitoring:
+    enabled: true
+    use_output: default
+    logs: true
+    metrics: true
+
+inputs:
+  - id: fleet-input
+    type: filestream
+    use_output: default
+    streams:
+      - data_stream:
+          dataset: fleet.logs
+          type: logs
+        paths:
+          - /var/log/fleet.log
+
+otel:
+  service:
+    telemetry:
+      resource:
+        fleet_provided: true
+        local_override: true
+        policy_id: local-policy-789
+      logs:
+        level: info
+      metrics:
+        level: detailed
+        readers:
+          - periodic:
+              exporter:
+                otlp:
+                  protocol: http/protobuf
+                  endpoint: https://local-override.example.com
+      traces:
+        processors:
+          - batch:
+              exporter:
+                otlp:
+                  protocol: http/protobuf
+                  endpoint: https://local-override.example.com
+  receivers:
+    local_receiver: null
+  processors:
+    local_processor: null
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Parse Fleet config from YAML string
+			fleetCfg := config.MustNewConfigFrom(tt.fleetConfigYAML)
+
+			// Write persisted config to temporary file
+			tempDir := t.TempDir()
+			persistedCfgFile := filepath.Join(tempDir, "persisted-config.yml")
+			err := os.WriteFile(persistedCfgFile, []byte(tt.persistedConfigYAML), 0644)
+			require.NoError(t, err)
+
+			// Apply persisted config with OTel service section
+			testLogger, _ := loggertest.New("")
+			err = applyPersistedConfig(testLogger, fleetCfg, persistedCfgFile, func() bool { return true })
+			require.NoError(t, err)
+
+			// Marshal complete merged config (both Agent and OTel parts) to YAML
+			mergedConfig := make(map[string]any)
+
+			// Add Agent config
+			agentMap := make(map[string]any)
+			err = fleetCfg.Agent.Unpack(&agentMap)
+			require.NoError(t, err)
+			for k, v := range agentMap {
+				mergedConfig[k] = v
+			}
+
+			// Add OTel config under "otel" key
+			if fleetCfg.OTel != nil {
+				mergedConfig["otel"] = fleetCfg.OTel.ToStringMap()
+			}
+
+			actualYAML, err := yaml.Marshal(mergedConfig)
+			require.NoError(t, err)
+
+			// Compare YAML structures (ignores formatting/order differences)
+			require.YAMLEq(t, tt.expectedYAML, string(actualYAML))
+		})
+	}
+}
+
+func Test_Coordinator_ProcessConfig(t *testing.T) {
+	// Test that processConfig correctly sets c.otelCfg after applying persisted config
+	tests := []struct {
+		name                string
+		fleetConfigYAML     string
+		persistedConfigYAML string
+		expectOTelCfg       bool
+		expectedOTelCfgYAML string // Expected YAML content for c.otelCfg
+	}{
+		{
+			name: "fleet has no otel, persisted adds otel service",
+			fleetConfigYAML: `
+outputs:
+  default:
+    type: elasticsearch
+    hosts: ["localhost:9200"]
+`,
+			persistedConfigYAML: `
+service:
+  telemetry:
+    metrics:
+      level: detailed
+      readers:
+        - periodic:
+            exporter:
+              otlp:
+                endpoint: http://localhost:4318
+`,
+			expectOTelCfg: true,
+			expectedOTelCfgYAML: `
+service:
+  telemetry:
+    metrics:
+      level: detailed
+      readers:
+        - periodic:
+            exporter:
+              otlp:
+                endpoint: http://localhost:4318
+`,
+		},
+		{
+			name: "both fleet and persisted have otel config, they merge",
+			fleetConfigYAML: `
+outputs:
+  default:
+    type: elasticsearch
+    hosts: ["localhost:9200"]
+service:
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      level: normal
+`,
+			persistedConfigYAML: `
+service:
+  telemetry:
+    metrics:
+      level: detailed
+      readers:
+        - periodic:
+            exporter:
+              otlp:
+                endpoint: http://localhost:4318
+`,
+			expectOTelCfg: true,
+			expectedOTelCfgYAML: `
+service:
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      level: detailed
+      readers:
+        - periodic:
+            exporter:
+              otlp:
+                endpoint: http://localhost:4318
+`,
+		},
+		{
+			name: "no otel config at all",
+			fleetConfigYAML: `
+outputs:
+  default:
+    type: elasticsearch
+    hosts: ["localhost:9200"]
+`,
+			persistedConfigYAML: `
+agent:
+  monitoring:
+    enabled: true
+`,
+			expectOTelCfg: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temporary directory for config
+			tempDir := t.TempDir()
+
+			// Override the config path to point to our temp directory
+			oldConfigPath := paths.Config()
+			paths.SetConfig(tempDir)
+			t.Cleanup(func() { paths.SetConfig(oldConfigPath) })
+
+			// Write persisted config file where paths.ConfigFile() expects it
+			persistedConfigPath := paths.ConfigFile()
+			err := os.WriteFile(persistedConfigPath, []byte(tt.persistedConfigYAML), 0644)
+			require.NoError(t, err)
+
+			// Parse fleet config
+			fleetCfg := config.MustNewConfigFrom(tt.fleetConfigYAML)
+
+			// Create a fake capabilities that allows fleet override
+			fakeCaps := &fakeCapabilities{}
+			fakeCaps.On("AllowFleetOverride").Once().Return(true)
+
+			// applyPersistedConfig will only be applied in containerized environment
+			platform := component.PlatformDetail{Platform: component.Platform{OS: component.Container}}
+			specs, err := component.NewRuntimeSpecs(platform, nil)
+			require.NoError(t, err)
+
+			// Set up minimal Coordinator for processConfig
+			coord := &Coordinator{
+				logger:           logp.NewLogger("testing"),
+				agentInfo:        &info.AgentInfo{},
+				vars:             emptyVars(t),
+				ast:              emptyAST(t),
+				caps:             fakeCaps,
+				runtimeMgr:       &fakeRuntimeManager{},
+				otelMgr:          &fakeOTelManager{},
+				secretMarkerFunc: testSecretMarkerFunc,
+				specs:            specs,
+			}
+
+			// Call processConfig - this is what we're actually testing!
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			err = coord.processConfig(ctx, fleetCfg)
+			require.NoError(t, err)
+
+			// Verify c.otelCfg was set correctly
+			if tt.expectOTelCfg {
+				require.NotNil(t, coord.otelCfg, "c.otelCfg should be set when OTel config exists")
+
+				// Convert c.otelCfg to YAML for comparison
+				actualOtelMap := coord.otelCfg.ToStringMap()
+				actualYAML, err := yaml.Marshal(actualOtelMap)
+				require.NoError(t, err, "failed to marshal c.otelCfg to YAML")
+
+				// Compare the full YAML content
+				require.YAMLEq(t, tt.expectedOTelCfgYAML, string(actualYAML),
+					"c.otelCfg YAML content should match expected")
+			} else {
+				assert.Nil(t, coord.otelCfg, "c.otelCfg should be nil when no OTel config exists")
+			}
+		})
+	}
+}
+
+// Test_Coordinator_OTelManagerReceivesPersistedConfig verifies that the OTel manager
+// receives the correct configuration when both persisted config and Fleet config contain
+// OTel configuration. This test specifically checks the timing fix where c.otelCfg must
+// be set before refreshComponentModel is called.
+func Test_Coordinator_OTelManagerReceivesPersistedConfig(t *testing.T) {
+	tests := []struct {
+		name                string
+		fleetConfigYAML     string
+		persistedConfigYAML string
+		expectedOTelYAML    string // Expected OTel config passed to manager
+	}{
+		{
+			name: "local otel collector and fleet with otel collector config merged",
+			fleetConfigYAML: `
+outputs:
+  default:
+    type: elasticsearch
+    hosts: ["localhost:9200"]
+service:
+  telemetry:
+    logs:
+      level: info
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+`,
+			persistedConfigYAML: `
+service:
+  telemetry:
+    resource:
+      policy_id: my-policy-123
+    metrics:
+      level: detailed
+      readers:
+        - periodic:
+            exporter:
+              otlp:
+                endpoint: http://localhost:4318
+`,
+			expectedOTelYAML: `
+service:
+  telemetry:
+    logs:
+      level: info
+    resource:
+      policy_id: my-policy-123
+    metrics:
+      level: detailed
+      readers:
+        - periodic:
+            exporter:
+              otlp:
+                endpoint: http://localhost:4318
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+`,
+		},
+		{
+			name: "local otel collector but no otel collector config from fleet",
+			fleetConfigYAML: `
+outputs:
+  default:
+    type: elasticsearch
+    hosts: ["localhost:9200"]
+`,
+			persistedConfigYAML: `
+service:
+  telemetry:
+    resource:
+      policy_id: my-policy-456
+    logs:
+      level: debug
+      processors:
+        - batch:
+            exporter:
+              otlp:
+                protocol: http/protobuf
+                endpoint: http://otlp-endpoint:4318
+receivers:
+  hostmetrics:
+    collection_interval: 30s
+`,
+			expectedOTelYAML: `
+service:
+  telemetry:
+    resource:
+      policy_id: my-policy-456
+    logs:
+      level: debug
+      processors:
+        - batch:
+            exporter:
+              otlp:
+                protocol: http/protobuf
+                endpoint: http://otlp-endpoint:4318
+receivers:
+  hostmetrics:
+    collection_interval: 30s
+`,
+		},
+		{
+			name: "no local collector config but otel collector config in fleet",
+			fleetConfigYAML: `
+outputs:
+  default:
+    type: elasticsearch
+    hosts: ["localhost:9200"]
+service:
+  telemetry:
+    metrics:
+      level: normal
+exporters:
+  logging:
+    loglevel: debug
+`,
+			persistedConfigYAML: `
+agent:
+  monitoring:
+    enabled: true
+`,
+			expectedOTelYAML: `
+service:
+  telemetry:
+    metrics:
+      level: normal
+exporters:
+  logging:
+    loglevel: debug
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temporary directory for config
+			tempDir := t.TempDir()
+
+			// Override the config path to point to our temp directory
+			oldConfigPath := paths.Config()
+			paths.SetConfig(tempDir)
+			t.Cleanup(func() { paths.SetConfig(oldConfigPath) })
+
+			// Write persisted config file where paths.ConfigFile() expects it
+			persistedConfigPath := paths.ConfigFile()
+			err := os.WriteFile(persistedConfigPath, []byte(tt.persistedConfigYAML), 0644)
+			require.NoError(t, err)
+
+			// Parse fleet config
+			fleetCfg := config.MustNewConfigFrom(tt.fleetConfigYAML)
+
+			// Create a fake capabilities that allows fleet override
+			fakeCaps := &fakeCapabilities{}
+			fakeCaps.On("AllowFleetOverride").Once().Return(true)
+
+			// applyPersistedConfig will only be applied in containerized environment
+			platform := component.PlatformDetail{Platform: component.Platform{OS: component.Container}}
+			specs, err := component.NewRuntimeSpecs(platform, nil)
+			require.NoError(t, err)
+
+			// Track what config the OTel manager receives
+			var receivedOTelCfg *confmap.Conf
+			fakeOTel := &fakeOTelManager{
+				updateCollectorCallback: func(cfg *confmap.Conf) error {
+					receivedOTelCfg = cfg
+					return nil
+				},
+			}
+
+			// Set up minimal Coordinator for processConfig
+			coord := &Coordinator{
+				logger:           logp.NewLogger("testing"),
+				agentInfo:        &info.AgentInfo{},
+				vars:             emptyVars(t),
+				ast:              emptyAST(t),
+				caps:             fakeCaps,
+				runtimeMgr:       &fakeRuntimeManager{},
+				otelMgr:          fakeOTel,
+				secretMarkerFunc: testSecretMarkerFunc,
+				specs:            specs,
+			}
+
+			// Call processConfig - this triggers the entire flow
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			err = coord.processConfig(ctx, fleetCfg)
+			require.NoError(t, err)
+
+			// Verify the OTel manager received the correct merged configuration
+			require.NotNil(t, receivedOTelCfg, "OTel manager should have received a configuration")
+
+			// Convert received config to YAML for comparison
+			actualOtelMap := receivedOTelCfg.ToStringMap()
+			actualYAML, err := yaml.Marshal(actualOtelMap)
+			require.NoError(t, err, "failed to marshal received OTel config to YAML")
+
+			// Compare the YAML content
+			require.YAMLEq(t, tt.expectedOTelYAML, string(actualYAML),
+				"OTel manager should receive the merged configuration including persisted config")
+		})
+	}
+}
+
+// fakeCapabilities implements the capabilities.Capabilities interface for testing
+type fakeCapabilities struct {
+	mock.Mock
+}
+
+func (f *fakeCapabilities) AllowUpgrade(version string, sourceURI string) bool {
+	args := f.Called(version, sourceURI)
+	return args.Bool(0)
+}
+
+func (f *fakeCapabilities) AllowInput(name string) bool {
+	args := f.Called(name)
+	return args.Bool(0)
+}
+
+func (f *fakeCapabilities) AllowOutput(name string) bool {
+	args := f.Called(name)
+	return args.Bool(0)
+}
+
+func (f *fakeCapabilities) AllowFleetOverride() bool {
+	args := f.Called()
+	return args.Bool(0)
+}
+
 func BenchmarkCoordinator_generateComponentModel(b *testing.B) {
 	// load variables
 	varsMaps := []map[string]any{}
