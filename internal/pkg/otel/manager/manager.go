@@ -39,6 +39,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 const (
@@ -566,6 +567,11 @@ func injectMonitoringReceiver(
 	receiverID := translate.GetReceiverID(receiverType, receiverName).String()
 	processorID := "beat/" + translate.OtelNamePrefix + receiverName
 	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
+	processorCfg := map[string]any{}
+	if features.DefaultProcessors() {
+		processorCfg["processors"] = translate.GetDefaultProcessors("collector")
+	}
+
 	receiverCfg := map[string]any{
 		"receivers": map[string]any{
 			receiverID: map[string]any{
@@ -575,9 +581,7 @@ func injectMonitoringReceiver(
 			},
 		},
 		"processors": map[string]any{
-			processorID: map[string]any{
-				"processors": translate.GetDefaultProcessors("collector"),
-			},
+			processorID: processorCfg,
 		},
 		"service": map[string]any{
 			"pipelines": map[string]any{
