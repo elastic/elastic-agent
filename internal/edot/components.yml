@@ -28,6 +28,7 @@ core_components:
 
 # Receivers
   - elasticapmintakereceiver
+  - verifierreceiver
   - filelogreceiver
   - hostmetricsreceiver
   - k8sclusterreceiver

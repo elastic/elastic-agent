@@ -43,6 +43,7 @@ import (
 	otlpreceiver "go.opentelemetry.io/collector/receiver/otlpreceiver"
 
 	elasticapmintakereceiver "github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver" // for collecting APM data from Elastic APM agents
+	verifierreceiver "github.com/elastic/opentelemetry-collector-components/receiver/verifierreceiver"                 // for verifying integration permissions
 
 	fbreceiver "github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
 	mbreceiver "github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
@@ -122,6 +123,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		receivers := []receiver.Factory{
 			dockerstatsreceiver.NewFactory(),
 			elasticapmintakereceiver.NewFactory(),
+			verifierreceiver.NewFactory(),
 			otlpreceiver.NewFactory(),
 			filelogreceiver.NewFactory(),
 			kubeletstatsreceiver.NewFactory(),

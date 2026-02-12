@@ -105,6 +105,24 @@ receivers:
           value_type: int
         scalar_oids:
           - oid: ".1.3.6.1.2.1.1.8.0"
+  verifier:
+    verification_type: on_demand
+    cloud_connector_id: test-connector
+    cloud_connector_name: Test Cloud Connector
+    verification_id: test-verification
+    providers:
+      aws:
+        credentials:
+          use_default_credentials: true
+          default_region: us-east-1
+    policies:
+      - policy_id: test-policy
+        policy_name: Test Policy
+        integrations:
+          - integration_id: test-integration
+            integration_name: AWS CloudTrail
+            integration_type: aws_cloudtrail
+
 
 connectors:
   spanmetrics:
@@ -163,6 +181,16 @@ service:
         - nop
         - elasticapmintake
         - elasticmonitoringreceiver
+
+    logs/permission_verification:
+      receivers:
+        - verifier
+      exporters:
+        - nop
+        - debug
+        - elasticsearch
+        - file
+        - otlp
 
     logs/forward_receive:
       receivers:
