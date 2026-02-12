@@ -2,6 +2,6 @@ agent:
   logging:
     level: debug
   features:
-    encrypt_config: true
+    encrypted_config: true
 fleet:
   enabled: false
