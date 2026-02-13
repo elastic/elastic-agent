@@ -68,7 +68,6 @@ func TestDebLogIngestFleetManaged(t *testing.T) {
 				{"pf-host-agent", []string{"linux"}},
 			},
 			[]componentPresenceDefinition{
-				{"cloudbeat", []string{"linux"}},
 				{"apm-server", []string{"windows", "linux", "darwin"}},
 				{"fleet-server", []string{"windows", "linux", "darwin"}},
 				{"pf-elastic-symbolizer", []string{"linux"}},
@@ -114,7 +113,6 @@ func TestDebInstallsServers(t *testing.T) {
 				{"elastic-otel-collector", []string{"windows", "linux", "darwin"}},
 				{"endpoint-security", []string{"windows", "linux", "darwin"}},
 				{"pf-host-agent", []string{"linux"}},
-				{"cloudbeat", []string{"linux"}},
 				{"apm-server", []string{"windows", "linux", "darwin"}},
 				{"fleet-server", []string{"windows", "linux", "darwin"}},
 				{"pf-elastic-symbolizer", []string{"linux"}},
@@ -323,7 +321,6 @@ func testDebUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info
 				{"elastic-otel-collector", []string{"windows", "linux", "darwin"}},
 				{"endpoint-security", []string{"windows", "linux", "darwin"}},
 				{"pf-host-agent", []string{"linux"}},
-				{"cloudbeat", []string{"linux"}},
 				{"apm-server", []string{"windows", "linux", "darwin"}},
 				{"fleet-server", []string{"windows", "linux", "darwin"}},
 				{"pf-elastic-symbolizer", []string{"linux"}},
@@ -340,7 +337,6 @@ func testDebUpgrade(t *testing.T, upgradeFromVersion *version.ParsedSemVer, info
 				{"pf-host-agent", []string{"linux"}},
 			},
 			[]componentPresenceDefinition{
-				{"cloudbeat", []string{"linux"}},
 				{"apm-server", []string{"windows", "linux", "darwin"}},
 				{"fleet-server", []string{"windows", "linux", "darwin"}},
 				{"pf-elastic-symbolizer", []string{"linux"}},

@@ -233,7 +233,6 @@ shared:
   - &elastic_agent_components
     components:
       - *comp-apm_server
-      - *comp-cloudbeat
       - *comp-cloud-defend
       - *comp-connectors
       - *comp-endpoint
@@ -246,7 +245,6 @@ shared:
   - &elastic_agent_cloud_components
     components:
       - *comp-apm_server
-      - *comp-cloudbeat
       - *comp-connectors
       - *comp-endpoint
       - *comp-fleet-server

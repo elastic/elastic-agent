@@ -6,7 +6,6 @@ servers:
   - elastic-otel-collector
   - endpoint-security
   - pf-host-agent
-  - cloudbeat
   - apm-server
   - fleet-server
   - pf-elastic-symbolizer
