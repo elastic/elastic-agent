@@ -87,6 +87,11 @@ headers:
 compression: gzip
 compression_params:
   level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, err := ESToOTelConfig(cfg, logger)
@@ -143,6 +148,11 @@ api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 compression: gzip
 compression_params:
   level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, err := ESToOTelConfig(cfg, logger)
@@ -200,6 +210,11 @@ api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 compression: gzip
 compression_params:
   level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, err := ESToOTelConfig(cfg, logger)
@@ -259,6 +274,11 @@ api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 compression: gzip
 compression_params:
   level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, err := ESToOTelConfig(cfg, logger)
@@ -309,6 +329,11 @@ user: elastic
 compression: gzip
 compression_params:
   level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
 `
 
 		tests := []struct {
@@ -392,6 +417,11 @@ sending_queue:
 compression: gzip
 compression_params:
   level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
  `,
 			},
 			{
@@ -505,6 +535,11 @@ headers:
 compression: gzip
 compression_params:
   level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, err := ESToOTelConfig(cfg, logger)
@@ -561,6 +596,11 @@ headers:
 compression: gzip
 compression_params:
   level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
 		got, err := ESToOTelConfig(cfg, logger)
@@ -627,7 +667,13 @@ compression_params:
   level: {{ . }}
 {{ else }}
 compression: none
-{{ end }}`
+{{ end }}
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true   
+`
 
 	for level := range 9 {
 		t.Run(fmt.Sprintf("compression-level-%d", level), func(t *testing.T) {
