@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
+
 package translate
 
 import (
@@ -6,10 +10,11 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/go-viper/mapstructure/v2"
+
 	"github.com/elastic/beats/v7/libbeat/common/transport/kerberos"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
-	"github.com/go-viper/mapstructure/v2"
 )
 
 // Helper function to check if a struct is empty

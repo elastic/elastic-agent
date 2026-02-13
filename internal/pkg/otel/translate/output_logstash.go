@@ -1,13 +1,18 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
+
 package translate
 
 import (
 	"fmt"
 
+	"github.com/go-viper/mapstructure/v2"
+
 	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/outputs/logstash"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/go-viper/mapstructure/v2"
 )
 
 type logstashOutputConfig struct {
@@ -22,6 +27,12 @@ func LogstashToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any
 		Config: logstash.DefaultConfig(),
 	}
 
+	// this step is only to validate the config
+	if err := output.Unpack(&logstashConfig); err != nil {
+		return nil, fmt.Errorf("failed unpacking config. %w", err)
+	}
+
+	// unpack the config again into a map so that we can decode it using mapstructure with our custom decode hook
 	unpackedMap := make(map[string]any)
 	if err := output.Unpack(&unpackedMap); err != nil {
 		return nil, fmt.Errorf("failed unpacking config. %w", err)
