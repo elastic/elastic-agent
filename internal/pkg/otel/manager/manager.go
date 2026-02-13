@@ -581,7 +581,7 @@ func injectMonitoringReceiver(
 		"receivers": []string{receiverID},
 		"exporters": []string{exporterID},
 	}
-	receiverCfg := map[string]any{
+	collectorCfg := map[string]any{
 		"receivers": map[string]any{
 			receiverID: map[string]any{
 				"event_template": monitoringEventTemplate(monitoring, agentInfo),
@@ -597,7 +597,7 @@ func injectMonitoringReceiver(
 	}
 	if features.DefaultProcessors() {
 		// If default processors are enabled, add them into the base configuration.
-		receiverCfg["processors"] = map[string]any{
+		collectorCfg["processors"] = map[string]any{
 			processorID: map[string]any{
 				"processors": translate.GetDefaultProcessors("collector"),
 			},
@@ -605,7 +605,7 @@ func injectMonitoringReceiver(
 		pipelineCfg["processors"] = []string{processorID}
 	}
 
-	return config.Merge(confmap.NewFromStringMap(receiverCfg))
+	return config.Merge(confmap.NewFromStringMap(collectorCfg))
 }
 
 func (m *OTelManager) applyMergedConfig(ctx context.Context,
