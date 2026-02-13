@@ -2276,7 +2276,6 @@ func TestMonitoringReceiverProcessors(t *testing.T) {
 	err := injectMonitoringReceiver(cfg, monitoringConfig, agentInfo, components)
 	require.NoError(t, err, "injectMonitoringReceiver should succeed")
 	result := mapstr.M(cfg.ToStringMap()).Flatten()
-	fmt.Printf("%v\n", result)
 
 	expectedBeatsProcessors := []map[string]any{
 		{"add_host_metadata": nil},
@@ -2285,11 +2284,15 @@ func TestMonitoringReceiverProcessors(t *testing.T) {
 		{"add_kubernetes_metadata": nil},
 	}
 	actualBeatsProcessors := result["processors."+procName+".processors"]
-	assert.ElementsMatch(t, expectedBeatsProcessors, actualBeatsProcessors, "monitoring processors don't match expected value")
+	assert.NotNil(t, actualBeatsProcessors, "monitoring receiver processors should not be nil")
+	if actualBeatsProcessors != nil {
+		assert.ElementsMatch(t, expectedBeatsProcessors, actualBeatsProcessors, "monitoring processors don't match expected value")
+	}
 
-	expectedOTelProcessors := []string{procName}
-	actualOTelProcessors := result["service.pipelines."+pipelineName+".processors"]
-	assert.ElementsMatch(t, expectedOTelProcessors, actualOTelProcessors)
+	expectedPipelineProcessors := []string{procName}
+	actualPipelineProcessors := result["service.pipelines."+pipelineName+".processors"]
+	assert.NotNil(t, actualPipelineProcessors, "processors for monitoring receiver pipeline should not be nil")
+	assert.ElementsMatch(t, expectedPipelineProcessors, actualPipelineProcessors, "monitoring receiver pipeline processors should match default")
 }
 
 // fakeCloseListener is a wrapper around a net.Listener that ignores the Close() method. This is used in a very particular

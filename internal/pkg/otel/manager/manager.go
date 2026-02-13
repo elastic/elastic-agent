@@ -576,11 +576,11 @@ func injectMonitoringReceiver(
 	receiverID := translate.GetReceiverID(receiverType, receiverName).String()
 	processorID := "beat/" + translate.OtelNamePrefix + receiverName
 	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
-	processorCfg := map[string]any{}
-	if features.DefaultProcessors() {
-		processorCfg["processors"] = translate.GetDefaultProcessors("collector")
-	}
 
+	pipelineCfg := map[string]any{
+		"receivers": []string{receiverID},
+		"exporters": []string{exporterID},
+	}
 	receiverCfg := map[string]any{
 		"receivers": map[string]any{
 			receiverID: map[string]any{
@@ -589,19 +589,22 @@ func injectMonitoringReceiver(
 				"exporter_names": outputNameLookup,
 			},
 		},
-		"processors": map[string]any{
-			processorID: processorCfg,
-		},
 		"service": map[string]any{
 			"pipelines": map[string]any{
-				pipelineID: map[string]any{
-					"receivers":  []string{receiverID},
-					"processors": []string{processorID},
-					"exporters":  []string{exporterID},
-				},
+				pipelineID: pipelineCfg,
 			},
 		},
 	}
+	if features.DefaultProcessors() {
+		// If default processors are enabled, add them into the base configuration.
+		receiverCfg["processors"] = map[string]any{
+			processorID: map[string]any{
+				"processors": translate.GetDefaultProcessors("collector"),
+			},
+		}
+		pipelineCfg["processors"] = []string{processorID}
+	}
+
 	return config.Merge(confmap.NewFromStringMap(receiverCfg))
 }
 
