@@ -116,6 +116,7 @@ func LogIngestionFleetManaged(t *testing.T, info *define.Info) {
 // The server will respond with the passed error probabilities. If they add
 // up to zero, all requests are a success.
 func StartMockES(t *testing.T, percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge uint) *url.URL {
+    t.Helper()
 	uid := uuid.Must(uuid.NewV4())
 	clusterUUID := uuid.Must(uuid.NewV4()).String()
 
