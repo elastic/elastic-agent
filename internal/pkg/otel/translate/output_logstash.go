@@ -23,7 +23,6 @@ func LogstashToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any
 	}
 
 	unpackedMap := make(map[string]any)
-	// unpack and validate ES config
 	if err := output.Unpack(&unpackedMap); err != nil {
 		return nil, fmt.Errorf("failed unpacking config. %w", err)
 	}
@@ -43,5 +42,10 @@ func LogstashToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any
 		return nil, fmt.Errorf("failed decoding config. %w", err)
 	}
 
-	return unpackedMap, nil
+	// convert logstash config into a map
+	var finalMap map[string]any
+	lsConfig := config.MustNewConfigFrom(logstashConfig)
+	lsConfig.Unpack(&finalMap)
+
+	return finalMap, nil
 }
