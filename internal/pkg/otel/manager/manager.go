@@ -26,7 +26,6 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/mapstr"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
 
@@ -489,7 +488,17 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 	if monitoring.Namespace != "" {
 		namespace = monitoring.Namespace
 	}
-	result := mapstr.M{
+	agentFields := map[string]any{
+		"id":      agentInfo.AgentID(),
+		"version": agentInfo.Version(),
+	}
+	// Add hostname as agent.name if available
+	agentName, err := os.Hostname()
+	if err == nil {
+		agentFields["name"] = agentName
+	}
+
+	result := map[string]any{
 		"data_stream": map[string]any{
 			"dataset":   "elastic_agent.elastic_agent",
 			"namespace": namespace,
@@ -504,24 +513,16 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 			"snapshot": agentInfo.Snapshot(),
 			"version":  agentInfo.Version(),
 		},
-		"agent": mapstr.M{
-			"id":      agentInfo.AgentID(),
-			"version": agentInfo.Version(),
-		},
-		"component": mapstr.M{
+		"agent": agentFields,
+		"component": map[string]any{
 			"binary": "elastic-otel-collector",
 			"id":     "elastic-otel-collector",
 		},
-		"metricset": mapstr.M{
+		"metricset": map[string]any{
 			"name": "stats",
 		},
 	}
 
-	// Add hostname as agent.name if available
-	agentName, err := os.Hostname()
-	if err == nil {
-		result.Put("agent.name", agentName)
-	}
 	return result
 }
 
