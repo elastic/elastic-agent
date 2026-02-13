@@ -31,8 +31,10 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/logptest"
+	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -2256,6 +2258,38 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "couldn't convert value of service::telemetry::metrics::readers to a list")
 	})
+}
+
+func TestMonitoringReceiverProcessors(t *testing.T) {
+	exporterName := "elasticsearch/" + translate.OtelNamePrefix + "monitoring"
+	procName := "beat/" + translate.OtelNamePrefix + "internal-telemetry-monitoring"
+	pipelineName := "logs/" + translate.OtelNamePrefix + "internal-telemetry-monitoring"
+	baseConfig := map[string]any{
+		"exporters": map[string]any{
+			exporterName: nil,
+		},
+	}
+	cfg := confmap.NewFromStringMap(baseConfig)
+	monitoringConfig := &config.MonitoringConfig{}
+	agentInfo := &info.AgentInfo{}
+	components := []component.Component{}
+	err := injectMonitoringReceiver(cfg, monitoringConfig, agentInfo, components)
+	require.NoError(t, err, "injectMonitoringReceiver should succeed")
+	result := mapstr.M(cfg.ToStringMap()).Flatten()
+	fmt.Printf("%v\n", result)
+
+	expectedBeatsProcessors := []map[string]any{
+		{"add_host_metadata": nil},
+		{"add_cloud_metadata": nil},
+		{"add_docker_metadata": nil},
+		{"add_kubernetes_metadata": nil},
+	}
+	actualBeatsProcessors := result["processors."+procName+".processors"]
+	assert.ElementsMatch(t, expectedBeatsProcessors, actualBeatsProcessors, "monitoring processors don't match expected value")
+
+	expectedOTelProcessors := []string{procName}
+	actualOTelProcessors := result["service.pipelines."+pipelineName+".processors"]
+	assert.ElementsMatch(t, expectedOTelProcessors, actualOTelProcessors)
 }
 
 // fakeCloseListener is a wrapper around a net.Listener that ignores the Close() method. This is used in a very particular

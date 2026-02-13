@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -488,7 +489,7 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 	if monitoring.Namespace != "" {
 		namespace = monitoring.Namespace
 	}
-	return map[string]any{
+	result := mapstr.M{
 		"data_stream": map[string]any{
 			"dataset":   "elastic_agent.elastic_agent",
 			"namespace": namespace,
@@ -504,7 +505,8 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 			"version":  agentInfo.Version(),
 		},
 		"agent": mapstr.M{
-			"id": agentInfo.AgentID(),
+			"id":      agentInfo.AgentID(),
+			"version": agentInfo.Version(),
 		},
 		"component": mapstr.M{
 			"binary": "elastic-otel-collector",
@@ -514,6 +516,13 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 			"name": "stats",
 		},
 	}
+
+	// Add hostname as agent.name if available
+	agentName, err := os.Hostname()
+	if err == nil {
+		result.Put("agent.name", agentName)
+	}
+	return result
 }
 
 // exporterIDToOutputNameLookup compiles the mapping from raw collector
