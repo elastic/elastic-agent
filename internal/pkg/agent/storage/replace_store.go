@@ -27,14 +27,21 @@ func ReplaceOnSuccessStoreWithOwnership(ownership utils.FileOwner) ReplaceOnSucc
 	}
 }
 
+func RemoveBackup() ReplaceOnSuccessStoreOptionFunc {
+	return func(s *ReplaceOnSuccessStore) {
+		s.removeBackup = true
+	}
+}
+
 // ReplaceOnSuccessStore takes a target file, a replacement content and a wrapped store. This
 // store is useful if you want to trigger an action to replace another file when the wrapped store save method
 // is successful. This store will take care of making a backup copy of the target file and will not
 // override the content of the target if the target has already the same content. If an error happen,
 // we will not replace the file.
 type ReplaceOnSuccessStore struct {
-	target      string
-	replaceWith []byte
+	target       string
+	replaceWith  []byte
+	removeBackup bool
 
 	wrapped Store
 
@@ -167,6 +174,14 @@ func (r *ReplaceOnSuccessStore) Save(in io.Reader) error {
 			fmt.Sprintf("could not replace target file %s with %s", r.target, tmpFile),
 			errors.TypeFilesystem,
 			errors.M(errors.MetaKeyPath, r.target))
+	}
+
+	if r.removeBackup {
+		if err := os.Remove(backFilename); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				return fmt.Errorf("failed to remove %s: %w", backFilename, err)
+			}
+		}
 	}
 
 	return nil

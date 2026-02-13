@@ -21,6 +21,19 @@ import (
 // 8.11+ - default is enabled
 const defaultTamperProtection = true
 
+<<<<<<< HEAD
+=======
+// The default value of the disable policy change acks flag if the flag is missing.
+// 9.2 - disabled (acks are sent)
+const defaultDisablePolicyChangeAcks = false
+
+const defaultDefaultProcessors = true
+
+// The default value for standalone encrypted config.
+// 9.4 - disabled (plaintext config)
+const defaultEncryptedConfig = false
+
+>>>>>>> e3b9b4fba (Add suppport for standalone encrypted config by feature flag (#12521))
 var (
 	current = Flags{
 		tamperProtection: defaultTamperProtection,
@@ -36,7 +49,14 @@ type Flags struct {
 	fqdn          bool
 	fqdnCallbacks map[string]BoolValueOnChangeCallback
 
+<<<<<<< HEAD
 	tamperProtection bool
+=======
+	tamperProtection        bool
+	disablePolicyChangeAcks bool
+	defaultProcessors       bool
+	encryptedConfig         bool
+>>>>>>> e3b9b4fba (Add suppport for standalone encrypted config by feature flag (#12521))
 }
 
 type cfg struct {
@@ -48,6 +68,18 @@ type cfg struct {
 			TamperProtection *struct {
 				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
 			} `json:"tamper_protection,omitempty" yaml:"tamper_protection,omitempty" config:"tamper_protection,omitempty"`
+<<<<<<< HEAD
+=======
+			DisablePolicyChangeAcks *struct {
+				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
+			} `json:"disable_policy_change_acks" yaml:"disable_policy_change_acks" config:"disable_policy_change_acks"`
+			DefaultProcessors *struct {
+				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
+			} `json:"default_processors,omitempty" yaml:"default_processors,omitempty" config:"default_processors,omitempty"`
+			EncryptedConfig *struct {
+				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
+			} `json:"encrypted_config" yaml:"encrypted_config" config:"encrypted_config"`
+>>>>>>> e3b9b4fba (Add suppport for standalone encrypted config by feature flag (#12521))
 		} `json:"features" yaml:"features" config:"features"`
 	} `json:"agent" yaml:"agent" config:"agent"`
 }
@@ -66,6 +98,30 @@ func (f *Flags) TamperProtection() bool {
 	return f.tamperProtection
 }
 
+<<<<<<< HEAD
+=======
+func (f *Flags) DisablePolicyChangeAcks() bool {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	return f.disablePolicyChangeAcks
+}
+
+func (f *Flags) DefaultProcessors() bool {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	return f.defaultProcessors
+}
+
+func (f *Flags) EncryptedConfig() bool {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	return f.encryptedConfig
+}
+
+>>>>>>> e3b9b4fba (Add suppport for standalone encrypted config by feature flag (#12521))
 func (f *Flags) AsProto() *proto.Features {
 	return &proto.Features{
 		Fqdn: &proto.FQDNFeature{
@@ -121,6 +177,30 @@ func (f *Flags) setTamperProtection(newValue bool) {
 	f.tamperProtection = newValue
 }
 
+<<<<<<< HEAD
+=======
+func (f *Flags) setDisablePolicyChangeAcks(newValue bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.disablePolicyChangeAcks = newValue
+}
+
+func (f *Flags) setDefaultProcessors(newValue bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.defaultProcessors = newValue
+}
+
+func (f *Flags) setEncryptedConfig(newValue bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.encryptedConfig = newValue
+}
+
+>>>>>>> e3b9b4fba (Add suppport for standalone encrypted config by feature flag (#12521))
 // setSource sets the source from he given cfg.
 func (f *Flags) setSource(c cfg) error {
 	// Use JSON marshalling-unmarshalling to convert cfg to mapstr
@@ -186,6 +266,27 @@ func Parse(policy any) (*Flags, error) {
 		flags.setTamperProtection(defaultTamperProtection)
 	}
 
+<<<<<<< HEAD
+=======
+	if parsedFlags.Agent.Features.DisablePolicyChangeAcks != nil {
+		flags.setDisablePolicyChangeAcks(parsedFlags.Agent.Features.DisablePolicyChangeAcks.Enabled)
+	} else {
+		flags.setDisablePolicyChangeAcks(defaultDisablePolicyChangeAcks)
+	}
+
+	if parsedFlags.Agent.Features.DefaultProcessors != nil {
+		flags.setDefaultProcessors(parsedFlags.Agent.Features.DefaultProcessors.Enabled)
+	} else {
+		flags.setDefaultProcessors(defaultDefaultProcessors)
+	}
+
+	if parsedFlags.Agent.Features.EncryptedConfig != nil {
+		flags.setEncryptedConfig(parsedFlags.Agent.Features.EncryptedConfig.Enabled)
+	} else {
+		flags.setEncryptedConfig(defaultEncryptedConfig)
+	}
+
+>>>>>>> e3b9b4fba (Add suppport for standalone encrypted config by feature flag (#12521))
 	if err := flags.setSource(parsedFlags); err != nil {
 		return nil, fmt.Errorf("error creating feature flags source: %w", err)
 	}
@@ -208,6 +309,12 @@ func Apply(c *config.Config) error {
 
 	current.setFQDN(parsed.FQDN())
 	current.setTamperProtection(parsed.TamperProtection())
+<<<<<<< HEAD
+=======
+	current.setDisablePolicyChangeAcks(parsed.DisablePolicyChangeAcks())
+	current.setDefaultProcessors(parsed.DefaultProcessors())
+	current.setEncryptedConfig(parsed.EncryptedConfig())
+>>>>>>> e3b9b4fba (Add suppport for standalone encrypted config by feature flag (#12521))
 	return err
 }
 
@@ -220,3 +327,20 @@ func FQDN() bool {
 func TamperProtection() bool {
 	return current.TamperProtection()
 }
+<<<<<<< HEAD
+=======
+
+// DisablePolicyChangeAcks reports if the agent will stop using ACKs for POLICY_CHANGE actions.
+func DisablePolicyChangeAcks() bool {
+	return current.DisablePolicyChangeAcks()
+}
+
+// DefaultProcessors reports if default processors should be applied.
+func DefaultProcessors() bool {
+	return current.DefaultProcessors()
+}
+
+func EncryptedConfig() bool {
+	return current.EncryptedConfig()
+}
+>>>>>>> e3b9b4fba (Add suppport for standalone encrypted config by feature flag (#12521))
