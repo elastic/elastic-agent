@@ -2075,7 +2075,7 @@ agent.reload:
 
 	esURL := integration.StartMockES(t, 0, 0, 0, 0)
 	// start with debug logs
-	cfg := fmt.Sprintf(logConfig, esURL, "debug")
+	cfg := fmt.Sprintf(logConfig, esURL.String(), "debug")
 
 	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
 
@@ -2120,7 +2120,7 @@ agent.reload:
 	}, 1*time.Minute, 10*time.Second, "could not find debug logs")
 
 	// set agent.logging.level: info
-	cfg = fmt.Sprintf(logConfig, esURL, "info")
+	cfg = fmt.Sprintf(logConfig, esURL.String(), "info")
 	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
 
 	// wait for elastic agent to be healthy and OTel collector to start
@@ -2148,7 +2148,7 @@ service:
 	zapLogs.TakeAll()
 
 	// add service::telemetry::logs::level:debug
-	cfg = fmt.Sprintf(logConfig, esURL, "info")
+	cfg = fmt.Sprintf(logConfig, esURL.String(), "info")
 	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
 
 	// wait for elastic agent to be healthy and OTel collector to re-start

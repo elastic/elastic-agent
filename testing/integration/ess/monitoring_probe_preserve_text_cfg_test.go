@@ -10,7 +10,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/url"
 	"testing"
 	"time"
 
@@ -94,9 +93,7 @@ func TestMonitoringPreserveTextConfig(t *testing.T) {
 }
 
 func (runner *MonitoringTextRunner) SetupSuite() {
-	esURL, err := url.Parse(integration.StartMockES(runner.T(), 0, 0, 0, 0))
-	require.NoError(runner.T(), err)
-	runner.ESHost = esURL.Host
+	runner.ESHost = integration.StartMockES(runner.T(), 0, 0, 0, 0).Host
 
 	fixture, err := define.NewFixtureFromLocalBuild(runner.T(), define.Version())
 	require.NoError(runner.T(), err)

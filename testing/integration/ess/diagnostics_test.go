@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -335,8 +334,7 @@ func TestBeatDiagnostics(t *testing.T) {
 		Local: false,
 	})
 
-	esURL, err := url.Parse(integration.StartMockES(t, 0, 0, 0, 0))
-	require.NoError(t, err)
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
 
 	configTemplate := `
 inputs:

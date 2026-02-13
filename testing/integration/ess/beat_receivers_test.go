@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -832,8 +831,7 @@ func TestBeatsReceiverProcessRuntimeFallback(t *testing.T) {
 		Stack: nil,
 	})
 
-	esURL, err := url.Parse(integration.StartMockES(t, 0, 0, 0, 0))
-	require.NoError(t, err)
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
 
 	config := fmt.Sprintf(`agent.logging.to_stderr: true
 agent.logging.to_files: false
@@ -959,8 +957,7 @@ func TestBeatsReceiverDynamicInputProcessRuntimeFallback(t *testing.T) {
 		Stack: nil,
 	})
 
-	esURL, err := url.Parse(integration.StartMockES(t, 0, 0, 0, 0))
-	require.NoError(t, err)
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
 
 	config := fmt.Sprintf(`agent.logging.to_stderr: true
 agent.logging.to_files: false
@@ -1063,8 +1060,7 @@ func TestBeatsReceiverSubcomponentStatus(t *testing.T) {
 		Stack: nil,
 	})
 
-	esURL, err := url.Parse(integration.StartMockES(t, 0, 0, 0, 0))
-	require.NoError(t, err)
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
 
 	// This configuration contains two system/metrics inputs, each with two identical metricsets:
 	// * one for cpu, always healthy
