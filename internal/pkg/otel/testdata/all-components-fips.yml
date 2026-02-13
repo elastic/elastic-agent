@@ -39,6 +39,7 @@ processors:
     spike_limit_mib: 800
   elasticapm:
   tail_sampling:
+  beat:
 
 receivers:
   filelog:
