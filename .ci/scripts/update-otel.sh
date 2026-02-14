@@ -19,21 +19,13 @@ next_stable_core=${2:-}
 next_contrib=${3:-$next_beta_core}
 
 # Get current versions from internal/edot/go.mod
-current_beta_core=$(grep 'go\.opentelemetry\.io/collector/receiver/otlpreceiver ' internal/edot/go.mod | cut -d' ' -f 2 || true)
-current_stable_core=$(grep 'go\.opentelemetry\.io/collector/confmap/provider/fileprovider ' internal/edot/go.mod | cut -d' ' -f 2 || true)
-current_contrib=$(grep 'github\.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver ' internal/edot/go.mod | cut -d' ' -f 2 || true)
+current_beta_core=$(grep 'go\.opentelemetry\.io/collector/receiver/otlpreceiver v' internal/edot/go.mod | cut -d' ' -f 2 || true)
+current_stable_core=$(grep 'go\.opentelemetry\.io/collector/confmap/provider/fileprovider v' internal/edot/go.mod | cut -d' ' -f 2 || true)
+current_contrib=$(grep 'github\.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v' internal/edot/go.mod | cut -d' ' -f 2 || true)
 
-<<<<<<< HEAD
 [[ -n "$current_beta_core" ]] || (echo "Error: couldn't find current beta core version." && exit 2)
 [[ -n "$current_stable_core" ]] || (echo "Error: couldn't find current stable core version" && exit 3)
 [[ -n "$current_contrib" ]] || (echo "Error: couldn't find current contrib version" && exit 4)
-=======
-for gomod_file in "${GOMOD_FILES[@]}"; do
-  # Get current versions from the go.mod
-  current_beta_core=$(grep 'go\.opentelemetry\.io/collector/component/componentstatus v' "$gomod_file" | cut -d' ' -f 2 || true)
-  current_stable_core=$(grep 'go\.opentelemetry\.io/collector/pdata v' "$gomod_file" | cut -d' ' -f 2 || true)
-  current_contrib=$(grep 'github\.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v' "$gomod_file" | cut -d' ' -f 2 || true)
->>>>>>> d52ea6057 (ci: fix update-otel.sh script (#12706))
 
 echo "=> Updating core from $current_beta_core/$current_stable_core to $next_beta_core/$next_stable_core"
 echo "=> Updating contrib from $current_contrib to $next_contrib"
