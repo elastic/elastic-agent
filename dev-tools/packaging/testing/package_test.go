@@ -125,6 +125,50 @@ func TestDocker(t *testing.T) {
 			checkDocker(t, docker, fipsPackage)
 		})
 	}
+<<<<<<< HEAD
+=======
+
+	if len(dockers) == 0 {
+		return
+	}
+
+	// NOTE: "elastic-otel-collector" and "elastic-otel-collector-wolfi" variants used to be part of the
+	// following size comparisons test. However, by including them we cannot guarantee the order as
+	// they exclude some agent components but include additional external dependencies that makes them
+	// diverge from the other variants.
+	// As a result, the size comparison becomes non-deterministic.
+
+	// expected variants size order ascending
+	for _, variantsExpectedSizeOrder := range [][]string{
+		{"elastic-agent-slim", "elastic-agent"},
+		{"elastic-agent-slim-wolfi", "elastic-agent-wolfi"},
+	} {
+		var builtVariantsExpectedOrder []string
+		builtVariantSizes := make(map[string]int64)
+
+		// extract the built variants based on expected size order
+		for _, variant := range variantsExpectedSizeOrder {
+			if size, ok := sizeMap[variant]; ok {
+				builtVariantsExpectedOrder = append(builtVariantsExpectedOrder, variant)
+				builtVariantSizes[variant] = size
+			}
+		}
+
+		if len(builtVariantSizes) == 0 {
+			// no built variants found
+			continue
+		}
+
+		// sort the built variants by size
+		variantOrderBySize := slices.Clone(builtVariantsExpectedOrder)
+		sort.SliceStable(variantOrderBySize, func(i, j int) bool {
+			return builtVariantSizes[variantOrderBySize[i]] < builtVariantSizes[variantOrderBySize[j]]
+		})
+
+		// ensure the built variants are in the expected size order
+		assert.Equal(t, builtVariantsExpectedOrder, variantOrderBySize, "unexpected variant size ordering")
+	}
+>>>>>>> 9bdedcf32 (Fix flaky TestDocker variant size ordering assertion (#12776))
 }
 
 // Sub-tests
