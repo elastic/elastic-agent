@@ -829,7 +829,9 @@ func TestBeatsReceiverProcessRuntimeFallback(t *testing.T) {
 		Stack: nil,
 	})
 
-	config := `agent.logging.to_stderr: true
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
+
+	config := fmt.Sprintf(`agent.logging.to_stderr: true
 agent.logging.to_files: false
 inputs:
   # Collecting system metrics
@@ -842,12 +844,10 @@ inputs:
 outputs:
   default:
     type: elasticsearch
-    hosts: [http://localhost:9200]
+    hosts: [%s]
     api_key: placeholder
     indices: [] # not supported by the elasticsearch exporter
-    status_reporting:
-      enabled: false
-`
+`, esURL.Host)
 
 	// this is the context for the whole test, with a global timeout defined
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
