@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -113,7 +114,8 @@ func LogIngestionFleetManaged(t *testing.T, info *define.Info) {
 // It registers a cleanup function to close the server when the test finishes.
 // The server will respond with the passed error probabilities. If they add
 // up to zero, all requests are a success.
-func StartMockES(t *testing.T, percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge uint) string {
+func StartMockES(t *testing.T, percentDuplicate, percentTooMany, percentNonIndex, percentTooLarge uint) *url.URL {
+	t.Helper()
 	uid := uuid.Must(uuid.NewV4())
 	clusterUUID := uuid.Must(uuid.NewV4()).String()
 
@@ -129,7 +131,10 @@ func StartMockES(t *testing.T, percentDuplicate, percentTooMany, percentNonIndex
 	s := httptest.NewServer(mux)
 	t.Cleanup(s.Close)
 
-	return s.URL
+	u, err := url.Parse(s.URL)
+	require.NoError(t, err)
+
+	return u
 }
 
 // checkHealthAtStartup ensures all the beats and agent are healthy and working before we continue
