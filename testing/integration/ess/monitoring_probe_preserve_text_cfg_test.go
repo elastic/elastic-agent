@@ -8,6 +8,7 @@ package ess
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -25,11 +26,11 @@ import (
 	"github.com/elastic/elastic-agent/testing/integration"
 )
 
-var defaultTextCfg = `
+var defaultTextCfgTemplate = `
 outputs:
   default:
     type: elasticsearch
-    hosts: [127.0.0.1:9200]
+    hosts: [%s]
     api_key: "example-key"
     preset: balanced
     allow_older_versions: true
@@ -92,6 +93,8 @@ func TestMonitoringPreserveTextConfig(t *testing.T) {
 }
 
 func (runner *MonitoringTextRunner) SetupSuite() {
+	runner.ESHost = integration.StartMockES(runner.T(), 0, 0, 0, 0).Host
+
 	fixture, err := define.NewFixtureFromLocalBuild(runner.T(), define.Version())
 	require.NoError(runner.T(), err)
 	runner.agentFixture = fixture
@@ -117,7 +120,7 @@ func (runner *MonitoringTextRunner) SetupSuite() {
 	defer cancel()
 
 	// write a default config file that enables monitoring
-	err = runner.agentFixture.WriteFileToWorkDir(ctx, defaultTextCfg, "elastic-agent.yml")
+	err = runner.agentFixture.WriteFileToWorkDir(ctx, fmt.Sprintf(defaultTextCfgTemplate, runner.ESHost), "elastic-agent.yml")
 	require.NoError(runner.T(), err)
 
 	policyResp, agentID, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)

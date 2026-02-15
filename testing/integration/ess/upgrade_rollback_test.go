@@ -10,6 +10,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+<<<<<<< HEAD
+=======
+	"path/filepath"
+>>>>>>> 203484cde (Use mock-es instead of disabling output status reporting in tests (#12710))
 	"runtime"
 	"strings"
 	"testing"
@@ -46,6 +50,10 @@ func TestStandaloneUpgradeRollback(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
+<<<<<<< HEAD
+=======
+	esUrl := integration.StartMockES(t, 0, 0, 0, 0)
+>>>>>>> 203484cde (Use mock-es instead of disabling output status reporting in tests (#12710))
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()

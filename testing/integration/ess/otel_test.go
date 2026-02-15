@@ -2034,3 +2034,325 @@ agent.internal.runtime.metricbeat:
 	combinedOutput, err := fixture.Uninstall(ctx, &aTesting.UninstallOpts{Force: true})
 	require.NoErrorf(t, err, "error uninstalling classic agent monitoring, err: %s, combined output: %s", err, string(combinedOutput))
 }
+<<<<<<< HEAD
+=======
+
+// This tests that live reloading the log level works correctly
+func TestLogReloading(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		Stack: &define.Stack{},
+	})
+
+	// Flow of the test
+	// 1. Start elastic-agent with debug logs
+	// 2. Change the log level to info without restarting
+	// 3. Ensure no debug logs are printed
+	// 4. Set service::telemetry::logs::level: debug
+	// 5. Ensure service::telemetry::logs::level is given precedence even when agent logs are set to info
+
+	// Create the otel configuration file
+	type otelConfigOptions struct {
+		ESEndpoint string
+		ESApiKey   string
+		Index      string
+		CAFile     string
+	}
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	logConfig := `
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - %s
+    preset: balanced
+    protocol: http
+agent.logging.level: %s
+agent.grpc.port: 6793
+agent.monitoring.enabled: true
+agent.logging.to_stderr: true
+agent.reload:
+  period: 1s
+`
+
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
+	// start with debug logs
+	cfg := fmt.Sprintf(logConfig, esURL.String(), "debug")
+
+	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	if err != nil {
+		t.Fatalf("cannot prepare Elastic-Agent command: %s", err)
+	}
+
+	observer, zapLogs := observer.New(zap.DebugLevel)
+	logger := zap.New(observer)
+	zapWriter := &ZapWriter{logger: logger, level: zap.InfoLevel}
+	cmd.Stderr = zapWriter
+	cmd.Stdout = zapWriter
+
+	require.NoError(t, cmd.Start())
+
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 30*time.Second, 1*time.Second)
+
+	// Make sure the Elastic-Agent process is not running before
+	// exiting the test
+	t.Cleanup(func() {
+		// Ignore the error because we cancelled the context,
+		// and that always returns an error
+		_ = cmd.Wait()
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			zapLogs.All()
+		}
+	})
+
+	require.Eventually(t, func() bool {
+		// we ensure OTel runtime inputs have started with correct level
+		// and not just agent logs
+		return (zapLogs.FilterMessageSnippet("otelcol.component.kind").FilterMessageSnippet(`"log.level":"debug"`).Len() > 1)
+	}, 1*time.Minute, 10*time.Second, "could not find debug logs")
+
+	// set agent.logging.level: info
+	cfg = fmt.Sprintf(logConfig, esURL.String(), "info")
+	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
+
+	// wait for elastic agent to be healthy and OTel collector to start
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return zapLogs.FilterMessageSnippet("Everything is ready. Begin running and processing data").Len() > 1
+	}, 90*time.Second, 10*time.Second, "elastic-agent was not healthy after log level changed to info")
+
+	// this debug log should not be present again after re-loading
+	require.Equal(t, 1, zapLogs.FilterMessageSnippet(`Starting health check extension V2`).Len())
+
+	// set collector logs to debug
+	logConfig = logConfig + `
+service:
+  telemetry:
+    logs:
+      level: debug
+`
+
+	// reset zap logs
+	zapLogs.TakeAll()
+
+	// add service::telemetry::logs::level:debug
+	cfg = fmt.Sprintf(logConfig, esURL.String(), "info")
+	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
+
+	// wait for elastic agent to be healthy and OTel collector to re-start
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return zapLogs.FilterMessageSnippet("Everything is ready. Begin running and processing data").Len() > 0
+	}, 1*time.Minute, 10*time.Second, "elastic-agent is not healthy after collector log level was set")
+
+	require.Eventually(t, func() bool {
+		// we ensure inputs have reloaded with correct level
+		// and not just agent logs
+		return (zapLogs.FilterMessageSnippet("otelcol.component.kind").FilterMessageSnippet(`"log.level":"debug"`).Len() > 1)
+	}, 1*time.Minute, 10*time.Second, "collector setting for log level was not given precedence")
+}
+
+func TestMonitoringReceiver(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	indexName := strings.ToLower("logs-generic-default-" + info.Namespace)
+
+	esHost, err := integration.GetESHost()
+	require.NoError(t, err, "failed to get ES host")
+	require.True(t, len(esHost) > 0)
+
+	esClient := info.ESClient
+	require.NotNil(t, esClient)
+	esApiKey := createESApiKey(t, esClient)
+
+	cfg := `
+agent.logging.to_stderr: true
+receivers:
+  elasticmonitoringreceiver:
+    interval: 3s
+exporters:
+  elasticsearch/1:
+    endpoints:
+      - {{.ESEndpoint}}
+    api_key: {{.ESApiKey}}
+    max_conns_per_host: 1
+    logs_index: {{.Index}}
+    retry:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 1m0s
+      max_retries: 3
+    sending_queue:
+      batch:
+        flush_timeout: 10s
+        max_size: 1
+        min_size: 1
+        sizer: items
+      block_on_overflow: true
+      enabled: true
+      num_consumers: 1
+      queue_size: 3200
+      wait_for_result: true
+
+service:
+  pipelines:
+    logs:
+      receivers: [elasticmonitoringreceiver]
+      exporters:
+        - elasticsearch/1
+`
+
+	configParams := struct {
+		ESEndpoint string
+		ESApiKey   string
+		Index      string
+	}{
+		ESEndpoint: esHost,
+		ESApiKey:   esApiKey.Encoded,
+		Index:      indexName,
+	}
+
+	var configBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("config").Parse(cfg)).Execute(&configBuffer, configParams),
+	)
+
+	// Create fixture and prepare agent
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
+	defer cancel()
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	err = fixture.Configure(ctx, configBuffer.Bytes())
+	require.NoError(t, err)
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err)
+	cmd.WaitDelay = 1 * time.Second
+
+	output := strings.Builder{}
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+
+	require.NoError(t, cmd.Start(), "could not start otel collector")
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	require.Eventually(t, func() bool {
+		err = fixture.IsHealthy(ctx)
+		if err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 1*time.Minute, 1*time.Second)
+
+	// Wait for monitoring events to be indexed in Elasticsearch
+	var docs estools.Documents
+	require.EventuallyWithT(
+		t,
+		func(c *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer findCancel()
+
+			result, err := estools.GetAllLogsForIndexWithContext(
+				findCtx,
+				esClient,
+				".ds-"+indexName+"*")
+			require.NoError(c, err)
+			require.Equalf(
+				c,
+				2,
+				result.Hits.Total.Value,
+				"expecting exactly 2 monitoring events, got %d",
+				result.Hits.Total.Value)
+			docs = result
+		},
+		90*time.Second,
+		100*time.Millisecond,
+		"did not find the expected number of monitoring events")
+
+	require.Equal(t, 2, len(docs.Hits.Hits), "should have exactly 2 monitoring documents")
+	var ev mapstr.M
+	ev = docs.Hits.Hits[0].Source
+	ev = ev.Flatten()
+
+	require.NotEmpty(t, ev["@timestamp"], "expected @timestamp to be set")
+	ev.Delete("@timestamp")
+	require.Greater(t, ev["beat.stats.libbeat.output.write.bytes"], float64(0))
+	ev.Delete("beat.stats.libbeat.output.write.bytes")
+
+	expected := mapstr.M{
+		"beat.stats.libbeat.pipeline.queue.max_events":    float64(3200),
+		"beat.stats.libbeat.pipeline.queue.filled.events": float64(0),
+		"beat.stats.libbeat.pipeline.queue.filled.pct":    float64(0),
+		"beat.stats.libbeat.output.events.total":          float64(1),
+		"beat.stats.libbeat.output.events.active":         float64(0),
+		"beat.stats.libbeat.output.events.acked":          float64(1),
+		"beat.stats.libbeat.output.events.dropped":        float64(0),
+		"beat.stats.libbeat.output.events.batches":        float64(1),
+		"component.id": "elasticsearch/1",
+	}
+
+	require.Empty(t, cmp.Diff(expected, ev), "metrics do not match expected values")
+
+	cancel()
+}
+
+type ZapWriter struct {
+	logger *zap.Logger
+	level  zapcore.Level
+}
+
+func (w *ZapWriter) Write(p []byte) (n int, err error) {
+	msg := strings.TrimSpace(string(p))
+	if msg != "" {
+		w.logger.Check(w.level, msg).Write()
+		w.logger.Sync()
+	}
+	return len(p), nil
+}
+>>>>>>> 203484cde (Use mock-es instead of disabling output status reporting in tests (#12710))
