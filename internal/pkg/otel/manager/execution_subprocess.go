@@ -40,8 +40,9 @@ const (
 	OtelElasticsearchExporterTelemetryFeature = "telemetry.newPipelineTelemetry"
 )
 
-// newSubprocessExecution creates a new execution which runs the otel collector in a subprocess. A metricsPort or
-// healthCheckPort of 0 will result in a random port being used.
+// newSubprocessExecution creates a new execution which runs the otel collector in a subprocess.
+// A healthCheckPort of 0 will result in a random port being used. A metricsPort of 0 means the
+// collector will pick a random port at startup.
 func newSubprocessExecution(collectorPath string, uuid string, metricsPort int, healthCheckPort int) (*subprocessExecution, error) {
 	componentType, err := component.NewType(healthCheckExtensionName)
 	if err != nil {
@@ -103,9 +104,13 @@ func (r *subprocessExecution) startCollector(
 		return nil, fmt.Errorf("cannot access collector path: %w", err)
 	}
 
-	httpHealthCheckPort, collectorMetricsPort, err := r.getCollectorPorts()
+	httpHealthCheckPort, err := r.getCollectorHealthCheckPort()
 	if err != nil {
 		return nil, fmt.Errorf("could not find port for collector: %w", err)
+	}
+
+	if err := addCollectorMetricsReader(cfg, r.collectorMetricsPort); err != nil {
+		return nil, fmt.Errorf("failed to add collector metrics reader: %w", err)
 	}
 
 	if err := injectHealthCheckV2Extension(cfg, r.healthCheckExtensionID, httpHealthCheckPort); err != nil {
@@ -126,8 +131,6 @@ func (r *subprocessExecution) startCollector(
 
 	procCtx, procCtxCancel := context.WithCancel(ctx)
 	env := os.Environ()
-	// Set the environment variable for the collector metrics port. See comment at the constant definition for more information.
-	env = append(env, fmt.Sprintf("%s=%d", OtelCollectorMetricsPortEnvVarName, collectorMetricsPort))
 
 	// set collector args
 	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
@@ -286,35 +289,51 @@ func (r *subprocessExecution) reportSubprocessCollectorStatus(ctx context.Contex
 	reportCollectorStatus(ctx, statusCh, clonedStatus)
 }
 
-// getCollectorPorts returns the ports used by the OTel collector. If the ports set in the execution struct are 0,
-// random ports are returned instead.
-func (r *subprocessExecution) getCollectorPorts() (healthCheckPort int, metricsPort int, err error) {
-	randomPorts := make([]*int, 0, 2)
-	// if the ports are defined (non-zero), use them
-	if r.collectorMetricsPort == 0 {
-		randomPorts = append(randomPorts, &metricsPort)
-	} else {
-		metricsPort = r.collectorMetricsPort
+// getCollectorHealthCheckPort returns the health check port used by the OTel collector.
+// If the port set in the execution struct is 0, a random port is returned instead.
+func (r *subprocessExecution) getCollectorHealthCheckPort() (int, error) {
+	if r.collectorHealthCheckPort != 0 {
+		return r.collectorHealthCheckPort, nil
 	}
-	if r.collectorHealthCheckPort == 0 {
-		randomPorts = append(randomPorts, &healthCheckPort)
-	} else {
-		healthCheckPort = r.collectorHealthCheckPort
-	}
-
-	if len(randomPorts) == 0 {
-		return healthCheckPort, metricsPort, nil
-	}
-
-	// we need at least one random port, create it
-	ports, err := findRandomTCPPorts(len(randomPorts))
+	ports, err := findRandomTCPPorts(1)
 	if err != nil {
-		return 0, 0, err
+		return 0, err
 	}
-	for i, port := range ports {
-		*randomPorts[i] = port
+	return ports[0], nil
+}
+
+func addCollectorMetricsReader(conf *confmap.Conf, port int) error {
+	metricReadersUntyped := conf.Get("service::telemetry::metrics::readers")
+	if metricReadersUntyped == nil {
+		metricReadersUntyped = []any{}
 	}
-	return healthCheckPort, metricsPort, nil
+	metricsReadersList, ok := metricReadersUntyped.([]any)
+	if !ok {
+		return fmt.Errorf("couldn't convert value of service::telemetry::metrics::readers to a list: %v", metricReadersUntyped)
+	}
+
+	metricsReader := map[string]any{
+		"pull": map[string]any{
+			"exporter": map[string]any{
+				"prometheus": map[string]any{
+					"host": "localhost",
+					"port": port,
+					// this is the default configuration from the otel collector
+					"without_scope_info":  true,
+					"without_units":       true,
+					"without_type_suffix": true,
+				},
+			},
+		},
+	}
+	metricsReadersList = append(metricsReadersList, metricsReader)
+	confMap := map[string]any{
+		"service::telemetry::metrics::readers": metricsReadersList,
+	}
+	if mergeErr := conf.Merge(confmap.NewFromStringMap(confMap)); mergeErr != nil {
+		return fmt.Errorf("failed to merge config: %w", mergeErr)
+	}
+	return nil
 }
 
 func removeManagedHealthCheckExtensionStatus(status *otelstatus.AggregateStatus, healthCheckExtensionID string) {
