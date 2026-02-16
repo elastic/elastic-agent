@@ -79,6 +79,7 @@ import (
 
 	// Extensions
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/cgroupruntimeextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/awslogsencodingextension"
 	headersetterextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/headerssetterextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension"
@@ -218,6 +219,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 		}
 
 		extensions := []extension.Factory{
+			cgroupruntimeextension.NewFactory(),
 			k8sleaderelector.NewFactory(),
 			healthcheckv2extension.NewFactory(),
 			memorylimiterextension.NewFactory(),

@@ -69,6 +69,8 @@ func TestComponentsCommand(t *testing.T) {
 	for _, exporter := range expectedComponents.Exporters {
 		found := false
 		for _, exprt := range outputComponents.Exporters {
+			// TODO: This was failing locally due to expected having otlp, but output had otlpgrpc.
+			// Check later
 			if exporter.Name == exprt.Name {
 				found = true
 				break
