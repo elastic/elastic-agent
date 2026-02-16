@@ -391,6 +391,12 @@ func SetDiagnosticsExtensionSocket(path string) {
 	diagnosticsExtensionSocket = path
 }
 
+// OtelConfigSocket returns the socket path for the OTel collector config
+// streaming socket identified by the given UUID.
+func OtelConfigSocket(uuid string) string {
+	return SocketFromPath(runtime.GOOS, topPath, fmt.Sprintf("otel-config-%s.sock", uuid))
+}
+
 func pathSplit(path string) []string {
 	dir, file := filepath.Split(path)
 	if dir == "" && file == "" {

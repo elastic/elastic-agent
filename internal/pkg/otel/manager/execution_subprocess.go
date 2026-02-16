@@ -26,6 +26,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/status"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -145,7 +146,7 @@ func (r *subprocessExecution) startCollector(
 		procCtxCancel()
 		return nil, fmt.Errorf("failed to generate socket UUID: %w", err)
 	}
-	sockURL := socketURL(sockUUID.String())
+	sockURL := paths.OtelConfigSocket(sockUUID.String())
 
 	// Create listener for config streaming socket
 	lis, err := ipc.CreateListener(logger, sockURL)
@@ -311,7 +312,7 @@ func (r *subprocessExecution) startCollector(
 			// Accept failed (e.g. listener was closed because process died).
 			// If the process context is done, the monitoring goroutines handle it.
 			if procCtx.Err() != nil {
-				return ctl, nil
+				return ctl, nil //nolint: nilerr // if there's a problem, it's handled asynchronously
 			}
 			// Accept failed for another reason - stop the process
 			_ = processInfo.Stop()

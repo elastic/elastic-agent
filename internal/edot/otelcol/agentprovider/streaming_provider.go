@@ -14,6 +14,8 @@ import (
 	"sync"
 
 	"go.opentelemetry.io/collector/confmap"
+
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 )
 
 // build time guard that StreamingProvider implements confmap.Provider
@@ -58,7 +60,7 @@ type StreamingProvider struct {
 // NewFactory returns a confmap.ProviderFactory that creates a StreamingProvider.
 // The returned factory always creates the same shared provider instance.
 func NewFactory() confmap.ProviderFactory {
-	return NewFactoryWithDialFunc(dialSocket)
+	return NewFactoryWithDialFunc(client.Dialer)
 }
 
 // NewFactoryWithDialFunc returns a confmap.ProviderFactory using the given dial
