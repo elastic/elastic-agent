@@ -155,6 +155,14 @@ func (r *subprocessExecution) startCollector(
 		return nil, fmt.Errorf("failed to create config socket listener: %w", err)
 	}
 
+	// Start accepting a connection before launching the process so
+	// the collector can connect as soon as it starts.
+	acceptCh := make(chan acceptResult, 1)
+	go func() {
+		conn, err := lis.Accept()
+		acceptCh <- acceptResult{conn: conn, err: err}
+	}()
+
 	// set collector args and add --config flag with the elasticagent:<socketURL> URI
 	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
 	collectorArgs = append(collectorArgs, fmt.Sprintf("--config=%s:%s", agentConfigProviderScheme, sockURL))
@@ -185,7 +193,7 @@ func (r *subprocessExecution) startCollector(
 		return nil, fmt.Errorf("failed to start supervised collector: process is nil")
 	}
 
-	ctl := newProcHandle(processInfo, logger, nil)
+	processDoneCh := make(chan struct{})
 
 	healthCheckDone := make(chan struct{})
 	go func() {
@@ -253,7 +261,8 @@ func (r *subprocessExecution) startCollector(
 		logger.Debugf("wait for pid %d returned", processInfo.PID)
 		procCtxCancel()
 		<-healthCheckDone
-		close(ctl.processDoneCh)
+		close(processDoneCh)
+
 		// using ctx instead of procCtx in the reportErr functions below is intentional. This allows us to report
 		// errors to the caller through processErrCh and essentially discard any other errors that occurred because
 		// the process exited.
@@ -283,51 +292,15 @@ func (r *subprocessExecution) startCollector(
 		r.reportErrFn(ctx, processErrCh, fmt.Errorf("failed to wait supervised collector process: %w", procErr))
 	}()
 
-	// Accept connection from subprocess (with cancellation if process dies).
-	// The monitoring goroutines are already running so that even if the process
-	// dies before connecting, its exit is properly reported.
-	type acceptResult struct {
-		conn net.Conn
-		err  error
+	// The manageConnection goroutine takes ownership of the listener, the
+	// socket file, and the accepted connection. It handles accept, initial
+	// config write, and subsequent config updates asynchronously. Any errors
+	// are reported directly to processErrCh via reportErrFn.
+	reportConnErrFn := func(err error) {
+		r.reportErrFn(ctx, processErrCh, err)
 	}
-	acceptCh := make(chan acceptResult, 1)
-	go func() {
-		conn, err := lis.Accept()
-		acceptCh <- acceptResult{conn: conn, err: err}
-	}()
-
-	select {
-	case <-procCtx.Done():
-		// Process died before connecting. Close the listener to unblock Accept.
-		_ = lis.Close()
-		ipc.CleanupListener(logger, sockURL)
-		// The process monitoring goroutines are already running and will report
-		// the exit error. Return the handle so the caller can observe the exit.
-		return ctl, nil
-	case result := <-acceptCh:
-		// Close the listener and clean up the socket file; we only need one connection
-		_ = lis.Close()
-		ipc.CleanupListener(logger, sockURL)
-		if result.err != nil {
-			// Accept failed (e.g. listener was closed because process died).
-			// If the process context is done, the monitoring goroutines handle it.
-			if procCtx.Err() != nil {
-				return ctl, nil //nolint: nilerr // if there's a problem, it's handled asynchronously
-			}
-			// Accept failed for another reason - stop the process
-			_ = processInfo.Stop()
-			return nil, fmt.Errorf("failed to accept config socket connection: %w", result.err)
-		}
-		ctl.setConn(result.conn)
-	}
-
-	// Write initial config using gob-encoded YAML
-	if err := ctl.writeConfig(confBytes); err != nil {
-		_ = ctl.conn.Close()
-		// Stop the process since we failed to send initial config
-		_ = processInfo.Stop()
-		return nil, fmt.Errorf("failed to write initial config: %w", err)
-	}
+	ctl := newProcHandle(processInfo, logger, processDoneCh, reportConnErrFn)
+	go ctl.manageConnection(procCtx, acceptCh, lis, sockURL, confBytes)
 
 	return ctl, nil
 }
@@ -416,31 +389,78 @@ func removeManagedHealthCheckExtensionStatus(status *otelstatus.AggregateStatus,
 	delete(extensions.ComponentStatusMap, extensionID)
 }
 
+type acceptResult struct {
+	conn net.Conn
+	err  error
+}
+
 type procHandle struct {
 	processDoneCh chan struct{}
 	processInfo   *process.Info
 	log           *logger.Logger
-	conn          net.Conn
-	encoder       *gob.Encoder
+	configCh      chan []byte // buffered(1), latest-config-wins
+	reportErrFn   func(error) // reports connection errors to processErrCh
 }
 
-func newProcHandle(processInfo *process.Info, log *logger.Logger, conn net.Conn) *procHandle {
-	h := &procHandle{
-		processDoneCh: make(chan struct{}),
+func newProcHandle(processInfo *process.Info, log *logger.Logger, processDoneCh chan struct{}, reportErrFn func(error)) *procHandle {
+	return &procHandle{
+		processDoneCh: processDoneCh,
 		processInfo:   processInfo,
 		log:           log,
-		conn:          conn,
+		configCh:      make(chan []byte, 1),
+		reportErrFn:   reportErrFn,
 	}
-	if conn != nil {
-		h.encoder = gob.NewEncoder(conn)
-	}
-	return h
 }
 
-// setConn sets the socket connection and initializes the gob encoder.
-func (s *procHandle) setConn(conn net.Conn) {
-	s.conn = conn
-	s.encoder = gob.NewEncoder(conn)
+// manageConnection owns the full connection lifecycle. It waits for the
+// subprocess to connect, writes the initial config, then loops writing any
+// subsequent configs queued via configCh until the process exits.
+// Errors are reported directly to processErrCh via reportErrFn.
+func (s *procHandle) manageConnection(procCtx context.Context, acceptCh <-chan acceptResult, lis net.Listener, sockURL string, initialConfig []byte) {
+	defer func() {
+		_ = lis.Close()
+		ipc.CleanupListener(s.log, sockURL)
+	}()
+
+	// Wait for accept or process death.
+	var conn net.Conn
+	select {
+	case <-procCtx.Done():
+		// Process died before connecting; listener close unblocks Accept.
+		return
+	case result := <-acceptCh:
+		if result.err != nil {
+			if procCtx.Err() != nil {
+				// Process died and listener was closed — nothing more to do.
+				return
+			}
+			s.reportErrFn(fmt.Errorf("failed to accept config socket connection: %w", result.err))
+			return
+		}
+		conn = result.conn
+	}
+	defer conn.Close()
+
+	encoder := gob.NewEncoder(conn)
+
+	// Write initial config.
+	if err := encoder.Encode(initialConfig); err != nil {
+		s.reportErrFn(fmt.Errorf("failed to write initial config: %w", err))
+		return
+	}
+
+	// Loop: write subsequent configs until the process exits.
+	for {
+		select {
+		case <-s.processDoneCh:
+			return
+		case cfgBytes := <-s.configCh:
+			if err := encoder.Encode(cfgBytes); err != nil {
+				s.reportErrFn(fmt.Errorf("failed to write config update: %w", err))
+				return
+			}
+		}
+	}
 }
 
 // Stop stops the process. If the process is already stopped, it does nothing. If the process does not stop within
@@ -475,26 +495,10 @@ func (s *procHandle) Stop(waitTime time.Duration) {
 		s.log.Warnf("supervised collector subprocess didn't exit in time after killing it")
 	case <-s.processDoneCh:
 	}
-
-	// Close config socket connection
-	if s.conn != nil {
-		if closeErr := s.conn.Close(); closeErr != nil {
-			s.log.Warnf("error closing otel collector config socket: %v", closeErr)
-		}
-	}
 }
 
-// writeConfig writes a config using gob-encoded YAML bytes.
-func (s *procHandle) writeConfig(yamlBytes []byte) error {
-	if err := s.encoder.Encode(yamlBytes); err != nil {
-		return fmt.Errorf("failed to encode config: %w", err)
-	}
-
-	return nil
-}
-
-// UpdateConfig sends a new configuration to the running collector via the config socket.
-// Returns an error if the config could not be written.
+// UpdateConfig queues a new configuration for the running collector.
+// The actual write happens asynchronously in the manageConnection goroutine.
 func (s *procHandle) UpdateConfig(cfg *confmap.Conf) error {
 	if cfg == nil {
 		return errors.New("no configuration provided")
@@ -513,7 +517,14 @@ func (s *procHandle) UpdateConfig(cfg *confmap.Conf) error {
 		return fmt.Errorf("failed to marshal config to yaml: %w", err)
 	}
 
-	return s.writeConfig(yamlBytes)
+	// Drain any pending config (latest-wins semantics).
+	select {
+	case <-s.configCh:
+	default:
+	}
+	s.configCh <- yamlBytes
+
+	return nil
 }
 
 type zapWriter interface {
