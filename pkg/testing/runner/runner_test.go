@@ -24,10 +24,10 @@ func TestNewRunner_Clean(t *testing.T) {
 	stateDir := filepath.Join(tmpdir, "state")
 	err := os.MkdirAll(stateDir, 0755)
 	require.NoError(t, err)
-	set, err := mage.LoadSettings()
+	settings, err := mage.LoadSettings()
 	require.NoError(t, err)
 
-	goVersion, err := mage.GoVersion(set)
+	goVersion, err := mage.GoVersion(settings)
 	require.NoError(t, err)
 
 	cfg := common.Config{
