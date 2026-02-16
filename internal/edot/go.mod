@@ -341,7 +341,7 @@ require (
 	github.com/edsrzf/mmap-go v1.2.0 // indirect
 	github.com/elastic/apm-data v1.19.5 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
-	github.com/elastic/elastic-agent-autodiscover v0.10.0 // indirect
+	github.com/elastic/elastic-agent-autodiscover v0.10.2 // indirect
 	github.com/elastic/elastic-agent-client/v7 v7.18.0 // indirect
 	github.com/elastic/elastic-agent-system-metrics v0.14.1 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.8.0 // indirect
