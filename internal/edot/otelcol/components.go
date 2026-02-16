@@ -26,6 +26,7 @@ import (
 	k8sclusterreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver"
 	k8seventsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver"
 	k8sobjectsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver"
+	kafkametricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkametricsreceiver"
 	kubeletstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver"
 	mysqlreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/mysqlreceiver"
 	nginxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver"
@@ -146,6 +147,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			mysqlreceiver.NewFactory(),
 			postgresqlreceiver.NewFactory(),
 			snmpreceiver.NewFactory(),
+			kafkametricsreceiver.NewFactory(),
 			sqlserverreceiver.NewFactory(),
 			statsdreceiver.NewFactory(),
 			windowseventlogreceiver.NewFactory(),
