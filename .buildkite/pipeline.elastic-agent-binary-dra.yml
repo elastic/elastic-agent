@@ -102,9 +102,11 @@ steps:
       plugins:
         - *docker_login_plugin
 
+    # TODO: this step should be removed as soon as 8.19 or 9.3 are onboarded to the
+    #       helm-charts publishing automation in the DRA.
     - label: ":hammer: Publish helm chart snapshot"
       trigger: elastic-agent-helm-charts
-      if: build.env("BUILDKITE_BRANCH") != "8.16" && build.env("BUILDKITE_BRANCH") != "8.17"
+      if: build.env("BUILDKITE_BRANCH") != "main"
       build:
         branch: "${BUILDKITE_BRANCH}"
         commit: "${BUILDKITE_COMMIT}"
