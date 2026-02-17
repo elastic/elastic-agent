@@ -651,7 +651,7 @@ func (m *OTelManager) applyMergedConfig(ctx context.Context,
 
 	// Collector is running, update the configuration.
 	if err := m.proc.UpdateConfig(m.mergedCollectorCfg); err != nil {
-		return fmt.Errorf("collector config reload failed: %v", err)
+		return fmt.Errorf("collector config reload failed: %w", err)
 	}
 
 	return nil
