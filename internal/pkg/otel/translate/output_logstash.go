@@ -19,7 +19,6 @@ type logstashOutputConfig struct {
 }
 
 // LogstashToOTelConfig converts a Beat config into logstash exporter config
-// Note: This method may override output queue settings defined by user.
 func LogstashToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any, error) {
 	logstashConfig := logstashOutputConfig{
 		Config: logstash.DefaultConfig(),
