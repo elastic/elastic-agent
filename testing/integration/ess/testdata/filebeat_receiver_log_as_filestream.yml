@@ -1,0 +1,43 @@
+receivers:
+  filebeatreceiver:
+    filebeat:
+      inputs:
+        - type: log
+          id: a-unique-id
+          allow_deprecated_use: true
+          paths:
+            - {{.LogFilepath}}
+          fields:
+            find_me: {{.Namespace}}
+    output:
+      otelconsumer:
+    logging:
+      level: debug
+      selectors:
+        - '*'
+    path.home: {{.HomeDir}}
+    features.log_input_run_as_filestream.enabled: {{.AsFilestream}}
+
+exporters:
+  elasticsearch:
+    api_key: {{.ESApiKey}}
+    endpoint: {{.ESEndpoint}}
+    logs_index: {{.Namespace}}
+    sending_queue:
+      enabled: true
+      wait_for_result: true # Avoid losing data on shutdown
+      block_on_overflow: true
+    mapping:
+      mode: none
+
+service:
+  pipelines:
+    logs:
+      receivers: [filebeatreceiver]
+      exporters: [elasticsearch]
+  telemetry:
+    logs:
+      level: DEBUG
+      encoding: json
+      disable_stacktrace: true
+      output_paths: [{{.LogFolder}}]
