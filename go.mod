@@ -26,7 +26,7 @@ require (
 	github.com/elastic/go-elasticsearch/v8 v8.19.3
 	github.com/elastic/go-licenser v0.4.2
 	github.com/elastic/go-sysinfo v1.15.4
-	github.com/elastic/go-ucfg v0.8.9-0.20250307075119-2a22403faaea
+	github.com/elastic/go-ucfg v0.9.0
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
 	github.com/fatih/color v1.18.0
 	github.com/fsnotify/fsnotify v1.9.0
