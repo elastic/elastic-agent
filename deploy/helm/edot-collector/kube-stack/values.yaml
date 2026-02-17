@@ -16,8 +16,8 @@ crds:
   create: true # Install the OpenTelemetry Operator CRDs.
 defaultCRConfig:
   image:
-    repository: "docker.elastic.co/elastic-agent/elastic-agent"
-    tag: "9.4.0"
+    repository: "docker.elastic.co/elastic-agent/elastic-otel-collector"
+    tag: "9.4.0-SNAPSHOT"
   targetAllocator:
     enabled: false # Enable/disable the Operator's Target allocator.
     # Refer to: https://github.com/open-telemetry/opentelemetry-operator/tree/main/cmd/otel-allocator
@@ -52,6 +52,13 @@ collectors:
           endpoint: "http://opentelemetry-kube-stack-gateway-collector:4317"
           tls:
             insecure: true
+      extensions:
+        cgroupruntime:
+          gomaxprocs:
+            enabled: true
+          gomemlimit:
+            enabled: true
+            ratio: 0.8
       processors:
         # [Resource Detection Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor)
         resourcedetection/eks:
@@ -140,6 +147,7 @@ collectors:
               enabled: true
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
+        extensions: [cgroupruntime]
         pipelines:
           metrics:
             exporters:
@@ -437,7 +445,15 @@ collectors:
           extra_metadata_labels:
             - container.id
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
+      extensions:
+        cgroupruntime:
+          gomaxprocs:
+            enabled: true
+          gomemlimit:
+            enabled: true
+            ratio: 0.8
       service:
+        extensions: [cgroupruntime]
         pipelines:
           # Disable default non used kube-stack Helm Chart pipelines
           logs: null
@@ -565,7 +581,15 @@ collectors:
           #   insecure_skip_verify: true
           mapping:
             mode: otel
+      extensions:
+        cgroupruntime:
+          gomaxprocs:
+            enabled: true
+          gomemlimit:
+            enabled: true
+            ratio: 0.8
       service:
+        extensions: [cgroupruntime]
         pipelines:
           metrics:
             receivers: [otlp]
