@@ -29,6 +29,7 @@ toc:
       - file: components/k8sobjectsreceiver.md
       - file: components/kubeletstatsreceiver.md
       - file: components/prometheusremotewritereceiver.md
+      - file: components/verifierreceiver.md
   - file: customization.md
     children:
       - file: custom-collector.md

@@ -7,6 +7,8 @@ replace github.com/elastic/elastic-agent => ../../
 
 replace github.com/elastic/beats/v7 => ../../beats
 
+replace github.com/elastic/opentelemetry-collector-components/receiver/verifierreceiver => ../../../opentelemetry-collector-components/receiver/verifierreceiver
+
 require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260211214815-5ab40e641472
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
@@ -20,6 +22,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor v0.29.0
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.29.0
 	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.29.0
+	github.com/elastic/opentelemetry-collector-components/receiver/verifierreceiver v0.0.0
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.144.0
@@ -67,9 +70,13 @@ require (
 )
 
 require (
+	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/alexbrainman/sspi v0.0.0-20210105120005-909beea2cc74 // indirect
+	github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.43.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.70.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/guardduty v1.48.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/securityhub v1.52.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.5 // indirect
 	github.com/bluekeyes/go-gitdiff v0.7.1 // indirect
 	github.com/coder/websocket v1.8.14 // indirect
