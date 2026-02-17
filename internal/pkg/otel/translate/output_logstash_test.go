@@ -10,12 +10,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/logp/logptest"
 )
 
 func TestLogStashToExporter(t *testing.T) {
 	input := `
-hosts: localhost:5044
+hosts: 
+- localhost:5044
 worker: 3
 loadbalance: true
 proxy_url: socks5://user:password@socks5-proxy:2233
@@ -48,7 +49,7 @@ proxy_url: socks5://user:password@socks5-proxy:2233
 		t.Fatalf("error creating config: %v", err)
 	}
 
-	logger := logp.NewLogger("test")
+	logger := logptest.NewTestingLogger(t, "test")
 	otelCfg, err := LogstashToOTelConfig(cfg, logger)
 	if err != nil {
 		t.Fatalf("error translating logstash output to logstash exporter config: %v", err)

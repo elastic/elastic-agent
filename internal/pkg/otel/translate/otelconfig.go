@@ -11,7 +11,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/go-viper/mapstructure/v2"
 	koanfmaps "github.com/knadh/koanf/maps"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -671,22 +670,7 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 		Transport: elasticsearch.ESDefaultTransportSettings(),
 	}
 
-	var resultMap map[string]any
-	if err := outputCfg.Unpack(&resultMap); err != nil {
-		return nil, err
-	}
-
-	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		Result:          &authSettings,
-		TagName:         "config",
-		SquashTagOption: "inline",
-		DecodeHook:      cfgDecodeHookFunc(),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if err = decoder.Decode(&resultMap); err != nil {
+	if err := outputCfg.Unpack(&authSettings); err != nil {
 		return nil, err
 	}
 
