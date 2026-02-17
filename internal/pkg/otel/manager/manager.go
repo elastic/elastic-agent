@@ -618,69 +618,42 @@ func (m *OTelManager) applyMergedConfig(ctx context.Context,
 	collectorRunErr chan error,
 	forceFetchStatusCh chan struct{},
 ) error {
-	if m.proc != nil {
-		if m.mergedCollectorCfg != nil {
-			// Try in-place reload first
-			if err := m.proc.UpdateConfig(m.mergedCollectorCfg); err != nil {
-				m.managerLogger.Warnf("config reload failed, restarting collector: %v", err)
-				// Fall through to restart
-			} else {
-				m.managerLogger.Info("successfully reloaded collector config")
-				// Force a status fetch after successful reload to ensure
-				// listeners get an updated status timestamp
-				select {
-				case <-forceFetchStatusCh:
-				default:
-				}
-				forceFetchStatusCh <- struct{}{}
-				return nil
-			}
+	if m.mergedCollectorCfg == nil {
+		// No configuration, the collector should not be running.
+		if m.proc == nil {
+			// Collector isn't running, nothing to do.
+			return nil
 		}
-
-		// Restart the collector
+		// Need to stop the collector.
 		m.proc.Stop(m.stopTimeout)
 		m.proc = nil
-		// We wait here for the collector to exit before possibly starting a new one. The execution indicates this
-		// by sending an error over the appropriate channel. It will also send a nil status that we'll either process
-		// after exiting from this function and going back to the main loop, or it will be overridden by the status
-		// from the newly started collector.
-		// This is the only blocking wait inside the main loop involving channels, so we need to be extra careful not to
-		// deadlock.
-		// TODO: Verify if we need to wait for the error at all. Stop() is already blocking.
-		select {
-		case <-collectorRunErr:
-		case <-ctx.Done():
-			// our caller ctx is Done
-			return ctx.Err()
-		}
+		return nil
 	}
 
-	if m.mergedCollectorCfg == nil {
-		// no configuration then the collector should not be
-		// running.
-		// ensure that the coordinator knows that there is no error
-		// as the collector is not running anymore
-		return nil
-	} else {
-		// either a new configuration or the first configuration
-		// that results in the collector being started
+	// We have a configuration, need to apply it.
+	if m.proc == nil {
+		// Collector isn't running yet, start it.
 		proc, err := m.execution.startCollector(ctx, m.collectorLogLevel, m.collectorLogger,
 			m.managerLogger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
 		if err != nil {
-			// failed to create the collector (this is different then
-			// it's failing to run). we do not retry creation on failure
-			// as it will always fail. A new configuration is required for
-			// it not to fail (a new configuration will result in the retry)
-			// since this is a new configuration we want to start the timer
-			// from the initial delay
+			// Failed to create the collector (this is different from it failing to run).
+			// We do not retry creation on failure as it will always fail.
+			// A new configuration is required for it not to fail (a new configuration will result in the retry).
+			// Since this is a new configuration we want to start the time from the initial delay.
 			recoveryDelay := m.recoveryTimer.ResetInitial()
 			m.managerLogger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
-			return err
 		} else {
 			// all good at the moment (possible that it will fail)
 			m.proc = proc
 		}
+		return err
 	}
+
+	// Collector is running, update the configuration.
+	if err := m.proc.UpdateConfig(m.mergedCollectorCfg); err != nil {
+		return fmt.Errorf("collector config reload failed: %v", err)
+	}
+
 	return nil
 }
 

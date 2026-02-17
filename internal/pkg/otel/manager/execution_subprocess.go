@@ -48,6 +48,10 @@ const (
 	agentConfigProviderScheme = "elasticagent"
 )
 
+// ConfigModifier is a function that can modify an otel config.
+// Used for injecting a healthcheck extension and telemetry config.
+type ConfigModifier func(cfg *confmap.Conf) error
+
 // newSubprocessExecution creates a new execution which runs the otel collector in a subprocess.
 // A healthCheckPort of 0 will result in a random port being used. A metricsPort of 0 means the
 // collector will pick a random port at startup.
@@ -117,12 +121,20 @@ func (r *subprocessExecution) startCollector(
 		return nil, fmt.Errorf("could not find port for collector: %w", err)
 	}
 
-	if err := addCollectorMetricsReader(cfg, r.collectorMetricsPort); err != nil {
-		return nil, fmt.Errorf("failed to add collector metrics reader: %w", err)
+	var configModifier ConfigModifier = func(cfg *confmap.Conf) error {
+		if err := injectHealthCheckV2Extension(cfg, r.healthCheckExtensionID, httpHealthCheckPort); err != nil {
+			return fmt.Errorf("failed to inject health check extension: %w", err)
+		}
+
+		if err := addCollectorMetricsReader(cfg, r.collectorMetricsPort); err != nil {
+			return fmt.Errorf("failed to add collector metrics reader: %w", err)
+		}
+
+		return nil
 	}
 
-	if err := injectHealthCheckV2Extension(cfg, r.healthCheckExtensionID, httpHealthCheckPort); err != nil {
-		return nil, fmt.Errorf("failed to inject health check extension: %w", err)
+	if err := configModifier(cfg); err != nil {
+		return nil, err
 	}
 
 	confMap := cfg.ToStringMap()
@@ -299,7 +311,7 @@ func (r *subprocessExecution) startCollector(
 	reportConnErrFn := func(err error) {
 		r.reportErrFn(ctx, processErrCh, err)
 	}
-	ctl := newProcHandle(processInfo, logger, processDoneCh, reportConnErrFn)
+	ctl := newProcHandle(processInfo, logger, processDoneCh, reportConnErrFn, configModifier)
 	go ctl.manageConnection(procCtx, acceptCh, lis, sockURL, confBytes)
 
 	return ctl, nil
@@ -395,20 +407,27 @@ type acceptResult struct {
 }
 
 type procHandle struct {
-	processDoneCh chan struct{}
-	processInfo   *process.Info
-	log           *logger.Logger
-	configCh      chan []byte // buffered(1), latest-config-wins
-	reportErrFn   func(error) // reports connection errors to processErrCh
+	processDoneCh  chan struct{}
+	processInfo    *process.Info
+	log            *logger.Logger
+	configCh       chan []byte // buffered(1), latest-config-wins
+	configModifier ConfigModifier
+	reportErrFn    func(error) // reports connection errors to processErrCh
 }
 
-func newProcHandle(processInfo *process.Info, log *logger.Logger, processDoneCh chan struct{}, reportErrFn func(error)) *procHandle {
+func newProcHandle(
+	processInfo *process.Info,
+	log *logger.Logger,
+	processDoneCh chan struct{},
+	reportErrFn func(error),
+	configModifier ConfigModifier) *procHandle {
 	return &procHandle{
-		processDoneCh: processDoneCh,
-		processInfo:   processInfo,
-		log:           log,
-		configCh:      make(chan []byte, 1),
-		reportErrFn:   reportErrFn,
+		processDoneCh:  processDoneCh,
+		processInfo:    processInfo,
+		log:            log,
+		configCh:       make(chan []byte, 1),
+		reportErrFn:    reportErrFn,
+		configModifier: configModifier,
 	}
 }
 
@@ -509,6 +528,12 @@ func (s *procHandle) UpdateConfig(cfg *confmap.Conf) error {
 	case <-s.processDoneCh:
 		return errors.New("process has exited")
 	default:
+	}
+
+	if s.configModifier != nil {
+		if err := s.configModifier(cfg); err != nil {
+			return err
+		}
 	}
 
 	confMap := cfg.ToStringMap()

@@ -142,6 +142,7 @@ type mockExecution struct {
 	statusCh         chan *status.AggregateStatus
 	cfg              *confmap.Conf
 	collectorStarted chan struct{}
+	configUpdated    chan struct{}
 }
 
 func (e *mockExecution) startCollector(
@@ -192,14 +193,12 @@ func (h *mockCollectorHandle) Stop(waitTime time.Duration) {
 }
 
 func (h *mockCollectorHandle) UpdateConfig(cfg *confmap.Conf) error {
-	// Update the stored config
-	if h.execution != nil {
-		h.execution.cfg = cfg
-		// Signal that config was updated (like a restart would)
-		if h.execution.collectorStarted != nil {
-			h.execution.collectorStarted <- struct{}{}
-		}
+	h.execution.cfg = cfg
+	select {
+	case h.execution.configUpdated <- struct{}{}:
+	default:
 	}
+
 	return nil
 }
 
@@ -268,7 +267,7 @@ func (e *EventListener) EnsureHealthy(t *testing.T, u time.Time) {
 		require.NotNil(collect, latestStatus)
 		require.NotNil(collect, latestStatus.Value())
 		assert.False(collect, latestStatus.Before(u))
-		require.Equal(collect, componentstatus.StatusOK, latestStatus.Value().Status())
+		require.Equal(collect, componentstatus.StatusOK.String(), latestStatus.Value().Status().String())
 	}, 60*time.Second, 1*time.Second, "otel collector never got healthy")
 }
 
@@ -287,7 +286,7 @@ func (e *EventListener) EnsureFatal(t *testing.T, u time.Time, extraT ...func(co
 		require.NotNil(collect, latestStatus)
 		require.NotNil(collect, latestStatus.Value())
 		assert.False(collect, latestStatus.Before(u))
-		require.Equal(collect, componentstatus.StatusFatalError, latestStatus.Value().Status())
+		require.Equal(collect, componentstatus.StatusFatalError.String(), latestStatus.Value().Status().String())
 
 		// extra checks
 		for _, et := range extraT {
@@ -1625,9 +1624,11 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	agentInfo := &info.AgentInfo{}
 	beatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
 	collectorStarted := make(chan struct{})
+	configUpdated := make(chan struct{}, 1) // buffered to avoid deadlocks in the mock execution
 
 	execution := &mockExecution{
 		collectorStarted: collectorStarted,
+		configUpdated:    configUpdated,
 	}
 
 	// Create manager with test dependencies
@@ -1710,7 +1711,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	t.Run("component config is passed down to the otel manager", func(t *testing.T) {
 		mgr.Update(collectorCfg, nil, logp.InfoLevel, components)
 		select {
-		case <-collectorStarted:
+		case <-configUpdated:
 		case <-ctx.Done():
 			t.Fatal("timeout waiting for collector config update")
 		}
@@ -1726,7 +1727,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	t.Run("empty collector config leaves the component config running", func(t *testing.T) {
 		mgr.Update(nil, nil, logp.InfoLevel, components)
 		select {
-		case <-collectorStarted:
+		case <-configUpdated:
 		case <-ctx.Done():
 			t.Fatal("timeout waiting for collector config update")
 		}
