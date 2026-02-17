@@ -81,6 +81,9 @@ exporters:
         insecure: true
 
 service:
+  telemetry:
+    metrics:
+      level: none
   pipelines:
     logs:
       receivers: [filelog]
@@ -104,6 +107,9 @@ func TestOtelStartShutdown(t *testing.T) {
 exporters:
   nop:
 service:
+  telemetry:
+    metrics:
+      level: none
   pipelines:
     logs:
       receivers:
@@ -209,6 +215,9 @@ exporters:
   file:
     path: {{.OutputPath}}
 service:
+  telemetry:
+    metrics:
+      level: none
   pipelines:
     logs:
       receivers:
@@ -511,6 +520,8 @@ service:
       receivers:
         - filelog
   telemetry:
+    metrics:
+      level: none
     logs:
       level: DEBUG
       encoding: json
@@ -1488,6 +1499,8 @@ service:
         - elasticsearch/log
         #- debug
   telemetry:
+    metrics:
+      level: none
     logs:
       level: DEBUG
       encoding: json
