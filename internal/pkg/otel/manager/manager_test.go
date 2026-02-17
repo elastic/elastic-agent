@@ -1105,7 +1105,7 @@ func TestOTelManager_PortConflict(t *testing.T) {
 		if err != nil {
 			return nil, err
 		}
-		if timesCalled < 2 {
+		if timesCalled < 1 {
 			// only actually close the listener after test completion, freeing the port
 			t.Cleanup(func() {
 				assert.NoError(t, l.Close())
@@ -1667,7 +1667,6 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		}
 		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
 		assert.NoError(t, injectDiagnosticsExtension(expectedCfg))
-		assert.NoError(t, addCollectorMetricsReader(expectedCfg))
 		assert.Equal(t, expectedCfg, execution.cfg)
 
 	})
@@ -2185,7 +2184,7 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 			"exporter": map[string]any{
 				"prometheus": map[string]any{
 					"host":                "localhost",
-					"port":                fmt.Sprintf("${env:%s}", OtelCollectorMetricsPortEnvVarName),
+					"port":                0,
 					"without_scope_info":  true,
 					"without_units":       true,
 					"without_type_suffix": true,
@@ -2210,7 +2209,7 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 
 	t.Run("readers does not exist", func(t *testing.T) {
 		conf := otelConfigWithReaders(nil)
-		err := addCollectorMetricsReader(conf)
+		err := addCollectorMetricsReader(conf, 0)
 		require.NoError(t, err)
 
 		readers := conf.Get("service::telemetry::metrics::readers")
@@ -2224,7 +2223,7 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 
 	t.Run("readers is an empty list", func(t *testing.T) {
 		conf := otelConfigWithReaders([]any{})
-		err := addCollectorMetricsReader(conf)
+		err := addCollectorMetricsReader(conf, 0)
 		require.NoError(t, err)
 
 		readers := conf.Get("service::telemetry::metrics::readers")
@@ -2239,7 +2238,7 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 	t.Run("readers has existing items", func(t *testing.T) {
 		existingReader := map[string]any{"foo": "bar"}
 		conf := otelConfigWithReaders([]any{existingReader})
-		err := addCollectorMetricsReader(conf)
+		err := addCollectorMetricsReader(conf, 0)
 		require.NoError(t, err)
 
 		readers := conf.Get("service::telemetry::metrics::readers")
@@ -2254,7 +2253,7 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 
 	t.Run("readers is not a list", func(t *testing.T) {
 		conf := otelConfigWithReaders("not a list")
-		err := addCollectorMetricsReader(conf)
+		err := addCollectorMetricsReader(conf, 0)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "couldn't convert value of service::telemetry::metrics::readers to a list")
 	})

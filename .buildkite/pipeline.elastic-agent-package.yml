@@ -227,6 +227,8 @@ steps:
       ls -alR build
       echo "--- Copy workaround for ironbank container filename"
       .buildkite/scripts/steps/ironbank-cp-workaround.sh
+      echo "--- Copy workaround for helmchart filename"
+      .buildkite/scripts/steps/helmchart-cp-workaround.sh
       echo "--- File listing after workaround"
       ls -alR build
       echo "+++ Checking artifact validity with release-manager collect dry run"
