@@ -276,9 +276,11 @@ func getCollectorConfigForComponent(
 		return nil, err
 	}
 
+	receiverKeys := maps.Keys(receiversConfig)
+	slices.Sort(receiverKeys)
 	pipelineConfig := map[string][]string{
 		"exporters": {exporterID.String()},
-		"receivers": maps.Keys(receiversConfig),
+		"receivers": receiverKeys,
 	}
 
 	// Build the pipeline processors list: the shared beat processor first (if enabled),
@@ -317,8 +319,8 @@ func getCollectorConfigForComponent(
 	return confmap.NewFromStringMap(fullConfig), nil
 }
 
-// getReceiversConfigForComponent returns the receivers configuration for a component. Usually this will be a single
-// receiver, but in principle it could be more.
+// getReceiversConfigForComponent returns the receivers configuration for a component.
+// Each input produces its own receiver, so a component with N inputs will have N receivers.
 func getReceiversConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
@@ -336,7 +338,6 @@ func getReceiversConfigForComponent(
 	}
 
 	// get inputs for all the units
-	// we run a single receiver for each component to mirror what beats processes do
 	var inputs []map[string]any
 	for _, unit := range comp.Units {
 		if unit.Type == client.UnitTypeInput {
@@ -348,14 +349,14 @@ func getReceiversConfigForComponent(
 		}
 	}
 
-	receiverId := GetReceiverID(receiverType, comp.ID)
 	// Beat config inside a beat receiver is nested under an additional key. Not sure if this simple translation is
 	// always safe. We should either ensure this is always the case, or have an explicit mapping.
 	beatName := strings.TrimSuffix(receiverType.String(), "receiver")
 	binaryName := comp.BeatName()
 	dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
 
-	receiverConfig := map[string]any{
+	// Build the shared receiver config (same for all receivers in this component)
+	sharedConfig := map[string]any{
 		// just like we do for beats processes, each receiver needs its own data path
 		"path": map[string]any{
 			"home": paths.Components(),
@@ -376,19 +377,9 @@ func getReceiversConfigForComponent(
 			},
 		},
 	}
-	switch beatName {
-	case "filebeat":
-		receiverConfig[beatName] = map[string]any{
-			"inputs": inputs,
-		}
-	case "metricbeat":
-		receiverConfig[beatName] = map[string]any{
-			"modules": inputs,
-		}
-	}
 	// add the output queue config if present
 	if outputQueueConfig != nil {
-		receiverConfig["queue"] = outputQueueConfig
+		sharedConfig["queue"] = outputQueueConfig
 	}
 
 	// add monitoring config if necessary
@@ -409,12 +400,34 @@ func getReceiversConfigForComponent(
 		}
 	}
 	// indicate that beat receivers are managed by the elastic-agent
-	receiverConfig["management.otel.enabled"] = true
-	koanfmaps.Merge(monitoringConfig, receiverConfig)
+	sharedConfig["management.otel.enabled"] = true
+	koanfmaps.Merge(monitoringConfig, sharedConfig)
 
-	return map[string]any{
-		receiverId.String(): receiverConfig,
-	}, nil
+	// Create one receiver per input
+	receiversConfig := make(map[string]any, len(inputs))
+	for _, input := range inputs {
+		inputID, _ := input["id"].(string)
+		receiverID := GetReceiverID(receiverType, comp.ID+"/"+inputID)
+
+		// Create a new config map for this receiver, copying shared config entries
+		receiverConfig := make(map[string]any, len(sharedConfig)+1)
+		for k, v := range sharedConfig {
+			receiverConfig[k] = v
+		}
+		switch beatName {
+		case "filebeat":
+			receiverConfig[beatName] = map[string]any{
+				"inputs": []map[string]any{input},
+			}
+		case "metricbeat":
+			receiverConfig[beatName] = map[string]any{
+				"modules": []map[string]any{input},
+			}
+		}
+		receiversConfig[receiverID.String()] = receiverConfig
+	}
+
+	return receiversConfig, nil
 }
 
 // GetDefaultProcessors returns the default beat processors used across all pipelines.
