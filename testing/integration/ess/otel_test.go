@@ -2217,7 +2217,8 @@ exporters:
       wait_for_result: true
 processors:
   beat/1:
-    add_host_metadata: null
+    processors:
+      - add_host_metadata: null
 
 service:
   pipelines:
