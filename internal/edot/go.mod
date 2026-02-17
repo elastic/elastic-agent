@@ -356,7 +356,7 @@ require (
 	github.com/elastic/go-sfdc v0.0.0-20251207194532-c5aadd4a4e06 // indirect
 	github.com/elastic/go-structform v0.0.12 // indirect
 	github.com/elastic/go-sysinfo v1.15.4 // indirect
-	github.com/elastic/go-ucfg v0.8.9-0.20250307075119-2a22403faaea // indirect
+	github.com/elastic/go-ucfg v0.9.0 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect
 	github.com/elastic/gosigar v0.14.3 // indirect
