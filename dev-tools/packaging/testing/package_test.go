@@ -26,6 +26,8 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
+	"sort"
 	"strings"
 	"testing"
 
@@ -118,15 +120,15 @@ func TestZip(t *testing.T) {
 
 func TestDocker(t *testing.T) {
 	dockers := getFiles(t, regexp.MustCompile(`\.docker\.tar\.gz$`))
+	sizeMap := make(map[string]int64)
 	for _, docker := range dockers {
 		fipsPackage := strings.Contains(docker, "-fips-")
 		t.Run(filepath.Base(docker), func(t *testing.T) {
 			t.Log(docker)
-			checkDocker(t, docker, fipsPackage)
+			k, s := checkDocker(t, docker, fipsPackage)
+			sizeMap[k] = s
 		})
 	}
-<<<<<<< HEAD
-=======
 
 	if len(dockers) == 0 {
 		return
@@ -168,7 +170,6 @@ func TestDocker(t *testing.T) {
 		// ensure the built variants are in the expected size order
 		assert.Equal(t, builtVariantsExpectedOrder, variantOrderBySize, "unexpected variant size ordering")
 	}
->>>>>>> 9bdedcf32 (Fix flaky TestDocker variant size ordering assertion (#12776))
 }
 
 // Sub-tests
@@ -416,11 +417,11 @@ func checkNpcapNotices(pkg, file string, contents io.Reader) error {
 	return nil
 }
 
-func checkDocker(t *testing.T, file string, fipsPackage bool) {
+func checkDocker(t *testing.T, file string, fipsPackage bool) (string, int64) {
 	p, info, err := readDocker(t, file, true)
 	if err != nil {
 		t.Errorf("error reading file %v: %v", file, err)
-		return
+		return "", -1
 	}
 
 	checkDockerEntryPoint(t, p, info)
@@ -440,6 +441,33 @@ func checkDocker(t *testing.T, file string, fipsPackage bool) {
 	if strings.Contains(file, "-complete") {
 		checkCompleteDocker(t, file)
 	}
+
+	name, err := dockerName(file, info.Config.Labels)
+	if err != nil {
+		t.Errorf("error constructing docker name: %v", err)
+		return "", -1
+	}
+
+	return name, info.Size
+}
+
+func dockerName(file string, labels map[string]string) (string, error) {
+	version, found := labels["version"]
+	if !found {
+		return "", errors.New("version label not found")
+	}
+
+	parts := strings.Split(file, "/")
+	if len(parts) == 0 {
+		return "", errors.New("failed to get file name parts")
+	}
+
+	lastPart := parts[len(parts)-1]
+	versionIdx := strings.Index(lastPart, version)
+	if versionIdx < 0 {
+		return "", fmt.Errorf("version not found in name %q", file)
+	}
+	return lastPart[:versionIdx-1], nil
 }
 
 func checkCompleteDocker(t *testing.T, file string) {
@@ -1052,7 +1080,11 @@ func readDocker(t *testing.T, dockerFile string, filterWorkingDir bool) (*packag
 	configFile, err := img.ConfigFile()
 	require.NoError(t, err, "failed to get config file from image")
 
-	info := &dockerInfo{}
+	imgSize, err := img.Size()
+	require.NoError(t, err, "failed to get image size")
+	info := &dockerInfo{
+		Size: imgSize,
+	}
 	info.Config.Entrypoint = configFile.Config.Entrypoint
 	info.Config.Labels = configFile.Config.Labels
 	info.Config.User = configFile.Config.User
@@ -1120,6 +1152,7 @@ type dockerInfo struct {
 		User       string
 		WorkingDir string
 	} `json:"config"`
+	Size int64
 }
 
 func checkSha512PackageHash(t *testing.T, packageFile string) {
