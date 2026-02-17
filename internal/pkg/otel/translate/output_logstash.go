@@ -27,7 +27,7 @@ func LogstashToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any
 		Config: logstash.DefaultConfig(),
 	}
 
-	// this step is only to validate the config
+	// this step is only to return any validation errors
 	if err := output.Unpack(&logstashConfig); err != nil {
 		return nil, fmt.Errorf("failed unpacking config. %w", err)
 	}
@@ -56,7 +56,9 @@ func LogstashToOTelConfig(output *config.C, logger *logp.Logger) (map[string]any
 	// convert logstash config into a map
 	var finalMap map[string]any
 	lsConfig := config.MustNewConfigFrom(logstashConfig)
-	lsConfig.Unpack(&finalMap)
+	if err := lsConfig.Unpack(&finalMap); err != nil {
+		return nil, fmt.Errorf("error translating logstash config %w", err)
+	}
 
 	return finalMap, nil
 }
