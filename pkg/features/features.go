@@ -27,6 +27,10 @@ const defaultDisablePolicyChangeAcks = false
 
 const defaultDefaultProcessors = true
 
+// The default value for standalone encrypted config.
+// 9.4 - disabled (plaintext config)
+const defaultEncryptedConfig = false
+
 var (
 	current = Flags{
 		tamperProtection:  defaultTamperProtection,
@@ -46,6 +50,7 @@ type Flags struct {
 	tamperProtection        bool
 	disablePolicyChangeAcks bool
 	defaultProcessors       bool
+	encryptedConfig         bool
 }
 
 type cfg struct {
@@ -63,6 +68,9 @@ type cfg struct {
 			DefaultProcessors *struct {
 				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
 			} `json:"default_processors,omitempty" yaml:"default_processors,omitempty" config:"default_processors,omitempty"`
+			EncryptedConfig *struct {
+				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
+			} `json:"encrypted_config" yaml:"encrypted_config" config:"encrypted_config"`
 		} `json:"features" yaml:"features" config:"features"`
 	} `json:"agent" yaml:"agent" config:"agent"`
 }
@@ -93,6 +101,13 @@ func (f *Flags) DefaultProcessors() bool {
 	defer f.mu.RUnlock()
 
 	return f.defaultProcessors
+}
+
+func (f *Flags) EncryptedConfig() bool {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	return f.encryptedConfig
 }
 
 func (f *Flags) AsProto() *proto.Features {
@@ -162,6 +177,13 @@ func (f *Flags) setDefaultProcessors(newValue bool) {
 	defer f.mu.Unlock()
 
 	f.defaultProcessors = newValue
+}
+
+func (f *Flags) setEncryptedConfig(newValue bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.encryptedConfig = newValue
 }
 
 // setSource sets the source from he given cfg.
@@ -241,6 +263,12 @@ func Parse(policy any) (*Flags, error) {
 		flags.setDefaultProcessors(defaultDefaultProcessors)
 	}
 
+	if parsedFlags.Agent.Features.EncryptedConfig != nil {
+		flags.setEncryptedConfig(parsedFlags.Agent.Features.EncryptedConfig.Enabled)
+	} else {
+		flags.setEncryptedConfig(defaultEncryptedConfig)
+	}
+
 	if err := flags.setSource(parsedFlags); err != nil {
 		return nil, fmt.Errorf("error creating feature flags source: %w", err)
 	}
@@ -265,6 +293,7 @@ func Apply(c *config.Config) error {
 	current.setTamperProtection(parsed.TamperProtection())
 	current.setDisablePolicyChangeAcks(parsed.DisablePolicyChangeAcks())
 	current.setDefaultProcessors(parsed.DefaultProcessors())
+	current.setEncryptedConfig(parsed.EncryptedConfig())
 	return err
 }
 
@@ -286,4 +315,8 @@ func DisablePolicyChangeAcks() bool {
 // DefaultProcessors reports if default processors should be applied.
 func DefaultProcessors() bool {
 	return current.DefaultProcessors()
+}
+
+func EncryptedConfig() bool {
+	return current.EncryptedConfig()
 }
