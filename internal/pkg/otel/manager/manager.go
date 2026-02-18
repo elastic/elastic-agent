@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -25,7 +26,6 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/mapstr"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
 
@@ -39,6 +39,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 const (
@@ -480,7 +481,17 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 	if monitoring.Namespace != "" {
 		namespace = monitoring.Namespace
 	}
-	return map[string]any{
+	agentFields := map[string]any{
+		"id":      agentInfo.AgentID(),
+		"version": agentInfo.Version(),
+	}
+	// Add hostname as agent.name if available
+	agentName, err := os.Hostname()
+	if err == nil {
+		agentFields["name"] = agentName
+	}
+
+	result := map[string]any{
 		"data_stream": map[string]any{
 			"dataset":   "elastic_agent.elastic_agent",
 			"namespace": namespace,
@@ -495,17 +506,17 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 			"snapshot": agentInfo.Snapshot(),
 			"version":  agentInfo.Version(),
 		},
-		"agent": mapstr.M{
-			"id": agentInfo.AgentID(),
-		},
-		"component": mapstr.M{
+		"agent": agentFields,
+		"component": map[string]any{
 			"binary": "elastic-otel-collector",
 			"id":     "elastic-otel-collector",
 		},
-		"metricset": mapstr.M{
+		"metricset": map[string]any{
 			"name": "stats",
 		},
 	}
+
+	return result
 }
 
 // exporterIDToOutputNameLookup compiles the mapping from raw collector
@@ -533,10 +544,7 @@ func injectMonitoringReceiver(
 	agentInfo info.Agent,
 	components []component.Component,
 ) error {
-	receiverType := otelcomponent.MustNewType(elasticmonitoringreceiver.Name)
-	receiverName := "collector/internal-telemetry-monitoring"
-	receiverID := translate.GetReceiverID(receiverType, receiverName).String()
-	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
+	// Find the monitoring exporter that this pipeline will be writing to
 	exporterType := otelcomponent.MustNewType("elasticsearch")
 	exporterID := translate.GetExporterID(exporterType, componentmonitoring.MonitoringOutput).String()
 	monitoringExporterFound := false
@@ -556,7 +564,18 @@ func injectMonitoringReceiver(
 	if err != nil {
 		return fmt.Errorf("couldn't map exporter IDs to output names: %w", err)
 	}
-	receiverCfg := map[string]any{
+
+	receiverType := otelcomponent.MustNewType(elasticmonitoringreceiver.Name)
+	receiverName := "internal-telemetry-monitoring"
+	receiverID := translate.GetReceiverID(receiverType, receiverName).String()
+	processorID := "beat/" + translate.OtelNamePrefix + receiverName
+	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
+
+	pipelineCfg := map[string]any{
+		"receivers": []string{receiverID},
+		"exporters": []string{exporterID},
+	}
+	collectorCfg := map[string]any{
 		"receivers": map[string]any{
 			receiverID: map[string]any{
 				"event_template": monitoringEventTemplate(monitoring, agentInfo),
@@ -566,14 +585,21 @@ func injectMonitoringReceiver(
 		},
 		"service": map[string]any{
 			"pipelines": map[string]any{
-				pipelineID: map[string]any{
-					"receivers": []string{receiverID},
-					"exporters": []string{exporterID},
-				},
+				pipelineID: pipelineCfg,
 			},
 		},
 	}
-	return config.Merge(confmap.NewFromStringMap(receiverCfg))
+	if features.DefaultProcessors() {
+		// If default processors are enabled, add them into the base configuration.
+		collectorCfg["processors"] = map[string]any{
+			processorID: map[string]any{
+				"processors": translate.GetDefaultProcessors("collector"),
+			},
+		}
+		pipelineCfg["processors"] = []string{processorID}
+	}
+
+	return config.Merge(confmap.NewFromStringMap(collectorCfg))
 }
 
 func (m *OTelManager) applyMergedConfig(ctx context.Context,
