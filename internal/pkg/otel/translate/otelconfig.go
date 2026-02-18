@@ -356,6 +356,15 @@ func getReceiversConfigForComponent(
 		receiverConfig["queue"] = outputQueueConfig
 	}
 
+<<<<<<< HEAD
+=======
+	// If the `default_processors` feature flag is enabled,
+	// explicitly configure default processors in Beat receivers.
+	if features.DefaultProcessors() {
+		receiverConfig["processors"] = GetDefaultProcessors(beatName)
+	}
+
+>>>>>>> 27d1218a4 (Apply default processors to events from the monitoring receiver (#12717))
 	// add monitoring config if necessary
 	// we enable the basic monitoring endpoint by default, because we want to use it for diagnostics even if
 	// agent self-monitoring is disabled
@@ -382,6 +391,27 @@ func getReceiversConfigForComponent(
 	}, nil
 }
 
+<<<<<<< HEAD
+=======
+func GetDefaultProcessors(beatName string) []map[string]any {
+	addHostMetadata := map[string]any{
+		"add_host_metadata": nil,
+	}
+	if beatName == "filebeat" {
+		addHostMetadata["add_host_metadata"] = map[string]any{
+			"when.not.contains.tags": "forwarded",
+		}
+	}
+
+	return []map[string]any{
+		addHostMetadata,
+		{"add_cloud_metadata": nil},
+		{"add_docker_metadata": nil},
+		{"add_kubernetes_metadata": nil},
+	}
+}
+
+>>>>>>> 27d1218a4 (Apply default processors to events from the monitoring receiver (#12717))
 // getExporterConfigForComponent returns the exporter configuration and queue settings for a component. Note that a
 // valid component is always created from a single output config, so there should only be one output unit per
 // component; if there is more than one, this function returns the first.
