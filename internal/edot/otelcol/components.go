@@ -26,6 +26,7 @@ import (
 	k8sclusterreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver"
 	k8seventsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver"
 	k8sobjectsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver"
+	kafkametricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkametricsreceiver"
 	kubeletstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver"
 	mysqlreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/mysqlreceiver"
 	nginxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver"
@@ -76,6 +77,7 @@ import (
 	otlphttpexporter "go.opentelemetry.io/collector/exporter/otlphttpexporter"
 
 	"github.com/elastic/beats/v7/x-pack/otel/exporter/logstashexporter"
+	"github.com/elastic/beats/v7/x-pack/otel/processor/beatprocessor"
 
 	// Extensions
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension"
@@ -146,6 +148,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			mysqlreceiver.NewFactory(),
 			postgresqlreceiver.NewFactory(),
 			snmpreceiver.NewFactory(),
+			kafkametricsreceiver.NewFactory(),
 			sqlserverreceiver.NewFactory(),
 			statsdreceiver.NewFactory(),
 			windowseventlogreceiver.NewFactory(),
@@ -182,6 +185,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			elastictraceprocessor.NewFactory(), // deprecated, will be removed in future
 			tailsamplingprocessor.NewFactory(),
 			logdedupprocessor.NewFactory(),
+			beatprocessor.NewFactory(),
 		)
 		if err != nil {
 			return otelcol.Factories{}, err

@@ -8,7 +8,7 @@ replace github.com/elastic/elastic-agent => ../../
 replace github.com/elastic/beats/v7 => ../../beats
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260211214815-5ab40e641472
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260217221454-c0b005ff8768
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.32.2
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
@@ -41,6 +41,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkametricsreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/mysqlreceiver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver v0.145.0
