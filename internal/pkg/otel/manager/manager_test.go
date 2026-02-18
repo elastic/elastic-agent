@@ -166,9 +166,10 @@ func (e *mockExecution) startCollector(
 		reportErr(ctx, errCh, nil)
 	}()
 	handle := &mockCollectorHandle{
-		stopCh:    stopCh,
-		cancel:    collectorCancel,
-		execution: e,
+		stopCh:            stopCh,
+		cancel:            collectorCancel,
+		execution:         e,
+		collectorLogLevel: level,
 	}
 	if e.collectorStarted != nil {
 		e.collectorStarted <- struct{}{}
@@ -179,9 +180,10 @@ func (e *mockExecution) startCollector(
 var _ collectorHandle = &mockCollectorHandle{}
 
 type mockCollectorHandle struct {
-	stopCh    chan struct{}
-	cancel    context.CancelFunc
-	execution *mockExecution
+	stopCh            chan struct{}
+	cancel            context.CancelFunc
+	execution         *mockExecution
+	collectorLogLevel logp.Level
 }
 
 func (h *mockCollectorHandle) Stop(waitTime time.Duration) {
@@ -200,6 +202,10 @@ func (h *mockCollectorHandle) UpdateConfig(cfg *confmap.Conf) error {
 	}
 
 	return nil
+}
+
+func (h *mockCollectorHandle) LogLevel() logp.Level {
+	return h.collectorLogLevel
 }
 
 // EventListener listens to the events from the OTelManager and stores the latest error and status.
@@ -1675,7 +1681,8 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	components := []component.Component{testComp}
 
 	t.Run("collector config is passed down to the collector execution", func(t *testing.T) {
-		mgr.Update(collectorCfg, nil, logp.InfoLevel, nil)
+		logpLevel := logp.InfoLevel
+		mgr.Update(collectorCfg, nil, logpLevel, nil)
 		select {
 		case <-collectorStarted:
 		case <-ctx.Done():
@@ -1683,6 +1690,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		}
 		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
 		assert.NoError(t, injectDiagnosticsExtension(expectedCfg))
+		assert.NoError(t, maybeInjectLogLevel(expectedCfg, logpLevel))
 		assert.Equal(t, expectedCfg, execution.cfg)
 
 	})
@@ -1816,6 +1824,79 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		require.NotNil(t, aggStatus)
 		assert.Equal(t, aggStatus.Status(), componentstatus.StatusFatalError)
 	})
+}
+
+// TestOTelManager_RestartOnLogLevelChange verifies that the collector subprocess is restarted
+// when the effective log level changes. This is necessary because the manager wraps the collector's
+// stdout/stderr in log writers configured at a specific level, and those cannot be changed at runtime.
+func TestOTelManager_RestartOnLogLevelChange(t *testing.T) {
+	testLogger, _ := loggertest.New("test")
+	collectorStarted := make(chan struct{}, 5)
+	configUpdated := make(chan struct{}, 1)
+
+	execution := &mockExecution{
+		collectorStarted: collectorStarted,
+		configUpdated:    configUpdated,
+	}
+
+	mgr := OTelManager{
+		managerLogger:     testLogger,
+		collectorLogger:   testLogger,
+		errCh:             make(chan error, 1),
+		updateCh:          make(chan configUpdate, 1),
+		collectorStatusCh: make(chan *status.AggregateStatus, 1),
+		componentStateCh:  make(chan []runtime.ComponentComponentState, 5),
+		doneChan:          make(chan struct{}),
+		recoveryTimer:     newRestarterNoop(),
+		execution:         execution,
+		agentInfo:         &info.AgentInfo{},
+		collectorRunErr:   make(chan error),
+		stopTimeout:       time.Second,
+	}
+
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+
+	go func() {
+		err := mgr.Run(ctx)
+		assert.ErrorIs(t, err, context.Canceled)
+	}()
+
+	// Drain status channels to prevent blocking the run loop.
+	go func() {
+		for {
+			select {
+			case <-mgr.WatchCollector():
+			case <-mgr.WatchComponents():
+			case <-mgr.Errors():
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	// Start the collector with InfoLevel. The config doesn't include a log level,
+	// so the effective collector log level comes from the agent log level parameter.
+	cfg := confmap.NewFromStringMap(testConfigNoLogLevel)
+	mgr.Update(cfg, nil, logp.InfoLevel, nil)
+
+	select {
+	case <-collectorStarted:
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for initial collector start")
+	}
+
+	// Send the same config but with a different agent log level.
+	// The collector must be restarted because the stdout/stderr log writers
+	// are created at startup with a specific level and cannot be reconfigured.
+	mgr.Update(cfg, nil, logp.DebugLevel, nil)
+
+	select {
+	case <-collectorStarted:
+		// Collector was restarted with the new log level.
+	case <-time.After(5 * time.Second):
+		t.Fatal("expected collector to be restarted after log level change, but it was not")
+	}
 }
 
 // TestManagerAlwaysEmitsStoppedStatesForComponents checks that the manager always emits a STOPPED state for a component

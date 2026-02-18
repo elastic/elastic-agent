@@ -311,7 +311,7 @@ func (r *subprocessExecution) startCollector(
 	reportConnErrFn := func(err error) {
 		r.reportErrFn(ctx, processErrCh, err)
 	}
-	ctl := newProcHandle(processInfo, logger, processDoneCh, reportConnErrFn, configModifier)
+	ctl := newProcHandle(processInfo, logger, lvl, processDoneCh, reportConnErrFn, configModifier)
 	go ctl.manageConnection(procCtx, acceptCh, lis, sockURL, confBytes)
 
 	return ctl, nil
@@ -407,27 +407,30 @@ type acceptResult struct {
 }
 
 type procHandle struct {
-	processDoneCh  chan struct{}
-	processInfo    *process.Info
-	log            *logger.Logger
-	configCh       chan []byte // buffered(1), latest-config-wins
-	configModifier ConfigModifier
-	reportErrFn    func(error) // reports connection errors to processErrCh
+	processDoneCh     chan struct{}
+	processInfo       *process.Info
+	log               *logger.Logger
+	collectorLogLevel logp.Level
+	configCh          chan []byte // buffered(1), latest-config-wins
+	configModifier    ConfigModifier
+	reportErrFn       func(error) // reports connection errors to processErrCh
 }
 
 func newProcHandle(
 	processInfo *process.Info,
 	log *logger.Logger,
+	collectorLogLevel logp.Level,
 	processDoneCh chan struct{},
 	reportErrFn func(error),
 	configModifier ConfigModifier) *procHandle {
 	return &procHandle{
-		processDoneCh:  processDoneCh,
-		processInfo:    processInfo,
-		log:            log,
-		configCh:       make(chan []byte, 1),
-		reportErrFn:    reportErrFn,
-		configModifier: configModifier,
+		processDoneCh:     processDoneCh,
+		processInfo:       processInfo,
+		log:               log,
+		collectorLogLevel: collectorLogLevel,
+		configCh:          make(chan []byte, 1),
+		reportErrFn:       reportErrFn,
+		configModifier:    configModifier,
 	}
 }
 
@@ -550,6 +553,10 @@ func (s *procHandle) UpdateConfig(cfg *confmap.Conf) error {
 	s.configCh <- yamlBytes
 
 	return nil
+}
+
+func (s *procHandle) LogLevel() logp.Level {
+	return s.collectorLogLevel
 }
 
 type zapWriter interface {
