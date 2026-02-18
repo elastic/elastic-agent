@@ -53,12 +53,7 @@ collectors:
           tls:
             insecure: true
       extensions:
-        cgroupruntime:
-          gomaxprocs:
-            enabled: true
-          gomemlimit:
-            enabled: true
-            ratio: 0.8
+        cgroupruntime: {}
       processors:
         # [Resource Detection Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor)
         resourcedetection/eks:
