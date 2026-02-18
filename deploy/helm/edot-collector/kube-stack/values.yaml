@@ -572,12 +572,7 @@ collectors:
           mapping:
             mode: otel
       extensions:
-        cgroupruntime:
-          gomaxprocs:
-            enabled: true
-          gomemlimit:
-            enabled: true
-            ratio: 0.8
+        cgroupruntime: {}
       service:
         extensions: [cgroupruntime]
         pipelines:
