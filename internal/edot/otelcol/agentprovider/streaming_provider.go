@@ -41,20 +41,21 @@ type StreamingProvider struct {
 	// decoder is created on first Retrieve call
 	decoder *gob.Decoder
 
-	// cfg holds the latest config, protected by cfgMu for access from background reader
-	cfg   *confmap.Conf
-	cfgMu sync.RWMutex
+	// cond is broadcast when config is updated or an error occurs.
+	// Watcher goroutines wait on it using the generation counter to detect changes.
+	// Also protects cfg, readErr, and generation.
+	cond       *sync.Cond
+	cfg        *confmap.Conf
+	readErr    error
+	generation uint64
 
-	// updated is signaled when a new config is available
-	updated chan struct{}
-
-	// readErr holds any error from the background reader, protected by readErrMu
-	readErr   error
-	readErrMu sync.RWMutex
+	// wg tracks all goroutines (background reader + watch loops) so
+	// Shutdown can wait for them to finish.
+	wg sync.WaitGroup
 
 	// stopCh signals the background reader to stop
-	backgroundReaderStarted bool
-	stopCh                  chan struct{}
+	backgroundReaderOnce sync.Once
+	stopCh               chan struct{}
 }
 
 // NewFactory returns a confmap.ProviderFactory that creates a StreamingProvider.
@@ -68,7 +69,7 @@ func NewFactory() confmap.ProviderFactory {
 func NewFactoryWithDialFunc(dialFunc func(ctx context.Context, address string) (net.Conn, error)) confmap.ProviderFactory {
 	p := &StreamingProvider{
 		dialFunc: dialFunc,
-		updated:  make(chan struct{}, 1),
+		cond:     sync.NewCond(&sync.Mutex{}),
 		stopCh:   make(chan struct{}),
 	}
 	return confmap.NewProviderFactory(func(_ confmap.ProviderSettings) confmap.Provider {
@@ -79,15 +80,9 @@ func NewFactoryWithDialFunc(dialFunc func(ctx context.Context, address string) (
 // readConfig reads a single config from the stream.
 // The config is transmitted as gob-encoded YAML bytes.
 // Returns the parsed config or an error.
-// The context can be used to cancel a blocking read.
-func (p *StreamingProvider) readConfig(ctx context.Context) (*confmap.Conf, error) {
+func (p *StreamingProvider) readConfig() (*confmap.Conf, error) {
 	if p.decoder == nil {
 		return nil, errors.New("decoder not initialized")
-	}
-
-	// Check context before blocking on decode
-	if ctx.Err() != nil {
-		return nil, ctx.Err()
 	}
 
 	// Decode blocks until data is available or the connection is closed.
@@ -111,14 +106,12 @@ func (p *StreamingProvider) readConfig(ctx context.Context) (*confmap.Conf, erro
 }
 
 // startBackgroundReader starts a goroutine that reads subsequent configs
-// and signals updates via the updated channel. Called only once.
+// and broadcasts updates to all watchers via the condition variable.
+// Called only once.
 func (p *StreamingProvider) startBackgroundReader() {
-	if p.backgroundReaderStarted {
-		return
-	}
-	p.backgroundReaderStarted = true
-
+	p.wg.Add(1)
 	go func() {
+		defer p.wg.Done()
 		for {
 			select {
 			case <-p.stopCh:
@@ -126,28 +119,20 @@ func (p *StreamingProvider) startBackgroundReader() {
 			default:
 			}
 
-			cfg, err := p.readConfig(context.Background())
+			cfg, err := p.readConfig()
+
+			p.cond.L.Lock()
 			if err != nil {
-				p.readErrMu.Lock()
 				p.readErr = err
-				p.readErrMu.Unlock()
-				// Signal error so watchers can wake up and check
-				select {
-				case p.updated <- struct{}{}:
-				default:
-				}
-				return
+			} else {
+				p.cfg = cfg
 			}
+			p.generation++
+			p.cond.Broadcast()
+			p.cond.L.Unlock()
 
-			p.cfgMu.Lock()
-			p.cfg = cfg
-			p.cfgMu.Unlock()
-
-			// Signal that config was updated
-			select {
-			case p.updated <- struct{}{}:
-			default:
-				// already has an updated state pending
+			if err != nil {
+				return
 			}
 		}
 	}()
@@ -167,13 +152,13 @@ func (p *StreamingProvider) Retrieve(ctx context.Context, uri string, watcher co
 	}
 
 	// Check for any read errors from the background reader
-	p.readErrMu.RLock()
+	p.cond.L.Lock()
 	if p.readErr != nil {
 		err := p.readErr
-		p.readErrMu.RUnlock()
+		p.cond.L.Unlock()
 		return nil, fmt.Errorf("config read error: %w", err)
 	}
-	p.readErrMu.RUnlock()
+	p.cond.L.Unlock()
 
 	// On first Retrieve call: dial the socket and read initial config
 	if p.decoder == nil {
@@ -185,57 +170,82 @@ func (p *StreamingProvider) Retrieve(ctx context.Context, uri string, watcher co
 		p.conn = conn
 		p.decoder = gob.NewDecoder(conn)
 
-		cfg, err := p.readConfig(ctx)
+		cfg, err := p.readConfig()
 		if err != nil {
 			return nil, fmt.Errorf("failed to read initial config: %w", err)
 		}
 		p.cfg = cfg
 		// Start background reader after first config is read
-		p.startBackgroundReader()
+		p.backgroundReaderOnce.Do(p.startBackgroundReader)
 	}
 
 	// Get latest config at time of call
-	p.cfgMu.RLock()
+	p.cond.L.Lock()
 	cfg := p.cfg
-	p.cfgMu.RUnlock()
+	p.cond.L.Unlock()
 
 	if cfg == nil {
 		return nil, errors.New("no configuration available")
 	}
 
-	// Create stop channel for this watcher
-	watcherStopCh := make(chan struct{})
-
-	// Start watcher goroutine if watcher callback provided
+	// Start watcher goroutine if watcher callback provided.
+	// Each watcher gets its own stopped flag, protected by the cond's mutex,
+	// so Retrieved.Close can signal it to exit without affecting other watchers.
+	// We capture the current generation here (synchronously) so the watcher
+	// won't miss updates that occur before the goroutine is scheduled.
+	stopped := false
 	if watcher != nil {
+		p.cond.L.Lock()
+		startGen := p.generation
+		p.cond.L.Unlock()
+		p.wg.Add(1)
 		go func() {
-			select {
-			case <-watcherStopCh:
-				return
-			case <-p.updated:
-				// Check for read errors before calling watcher
-				p.readErrMu.RLock()
-				readErr := p.readErr
-				p.readErrMu.RUnlock()
-				if readErr != nil {
-					watcher(&confmap.ChangeEvent{Error: readErr})
-					return
-				}
-
-				// If the caller's context is cancelled, don't call watcher
-				if ctx.Err() != nil {
-					return
-				}
-				watcher(&confmap.ChangeEvent{})
-			}
+			p.watchLoop(ctx, watcher, &stopped, startGen)
+			defer p.wg.Done()
 		}()
 	}
 
 	// Return Retrieved with close function that stops the watcher
 	return confmap.NewRetrieved(cfg.ToStringMap(), confmap.WithRetrievedClose(func(context.Context) error {
-		close(watcherStopCh)
+		p.cond.L.Lock()
+		stopped = true
+		p.cond.L.Unlock()
+		p.cond.Broadcast()
 		return nil
 	}))
+}
+
+// watchLoop runs in a goroutine for each active watcher. It calls the watcher
+// callback on every config update or error, looping until stopped (by
+// Retrieved.Close setting *stopped=true) or until the caller's context is
+// cancelled.
+func (p *StreamingProvider) watchLoop(ctx context.Context, watcher confmap.WatcherFunc, stopped *bool, lastGen uint64) {
+	for {
+		// Wait for the next generation change or stop signal
+		p.cond.L.Lock()
+		for p.generation == lastGen && !*stopped {
+			p.cond.Wait()
+		}
+		if *stopped {
+			p.cond.L.Unlock()
+			return
+		}
+		lastGen = p.generation
+		readErr := p.readErr
+		p.cond.L.Unlock()
+
+		// If the caller's context is cancelled, stop silently
+		if ctx.Err() != nil {
+			return
+		}
+
+		if readErr != nil {
+			watcher(&confmap.ChangeEvent{Error: readErr})
+			return
+		}
+
+		watcher(&confmap.ChangeEvent{})
+	}
 }
 
 // Scheme is the scheme for this provider.
@@ -248,12 +258,21 @@ func (p *StreamingProvider) Scheme() string {
 //
 // Per the confmap.Provider contract, this method is never called concurrently
 // with itself or with Retrieve.
-func (p *StreamingProvider) Shutdown(_ context.Context) error {
-	if p.backgroundReaderStarted {
-		close(p.stopCh)
-	}
+func (p *StreamingProvider) Shutdown(ctx context.Context) error {
+	close(p.stopCh)
+	// Wake any waiting watchers so they can exit
+	p.cond.Broadcast()
 	if p.conn != nil {
 		return p.conn.Close()
+	}
+	done := make(chan struct{})
+	go func() {
+		p.wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-ctx.Done():
 	}
 	return nil
 }
