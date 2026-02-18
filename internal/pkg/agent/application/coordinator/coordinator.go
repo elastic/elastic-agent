@@ -1425,10 +1425,20 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 
 // Always called on the main Coordinator goroutine.
 func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (err error) {
+<<<<<<< HEAD
 	if c.otelMgr != nil {
 		c.otelCfg = cfg.OTel
+=======
+	c.migrationProgressWg.Wait()
+
+	// processConfigAgent will apply persisted config and set c.otelCfg before calling refreshComponentModel
+	err = c.processConfigAgent(ctx, cfg)
+	if err != nil {
+		return err
+>>>>>>> 6e8efafe5 (fix: ensure OTel collector receives persisted service.telemetry config (#12736))
 	}
-	return c.processConfigAgent(ctx, cfg)
+
+	return nil
 }
 
 // Always called on the main Coordinator goroutine.
@@ -1443,7 +1453,31 @@ func (c *Coordinator) processConfigAgent(ctx context.Context, cfg *config.Config
 		c.logger.Errorf("failed to add secret markers: %v", err)
 	}
 
+<<<<<<< HEAD
 	err = c.generateAST(cfg)
+=======
+	// override retrieved config from Fleet with persisted config from AgentConfig file
+
+	if c.caps != nil {
+		if err := applyPersistedConfig(c.logger, cfg, paths.ConfigFile(), c.isContainerizedEnvironment, c.caps.AllowFleetOverride); err != nil {
+			return fmt.Errorf("could not apply persisted configuration: %w", err)
+		}
+	}
+
+	// Set c.otelCfg after persisted config has been applied but before refreshComponentModel
+	// so that the OTel manager receives the correct configuration
+	if c.otelMgr != nil {
+		c.otelCfg = cfg.OTel
+	}
+
+	// perform and verify ast translation
+	m, err := cfg.ToMapStr()
+	if err != nil {
+		return fmt.Errorf("could not create the map from the configuration: %w", err)
+	}
+
+	err = c.generateAST(cfg, m)
+>>>>>>> 6e8efafe5 (fix: ensure OTel collector receives persisted service.telemetry config (#12736))
 	c.setConfigError(err)
 	if err != nil {
 		return err

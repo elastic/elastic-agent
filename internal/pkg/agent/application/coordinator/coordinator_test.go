@@ -1011,6 +1011,296 @@ func TestCoordinator_UpgradeDetails(t *testing.T) {
 	require.Equal(t, expectedErr.Error(), coord.state.UpgradeDetails.Metadata.ErrorMsg)
 }
 
+<<<<<<< HEAD
+=======
+func Test_ApplyPersistedConfig(t *testing.T) {
+	cfgFile := filepath.Join(".", "testdata", "overrides.yml")
+
+	testCases := []struct {
+		name               string
+		featureEnable      bool
+		expectedLogs       bool
+		expectedOutputType string
+	}{
+		{name: "enabled", featureEnable: true, expectedLogs: false, expectedOutputType: "kafka"},
+		{name: "disabled", featureEnable: false, expectedLogs: true, expectedOutputType: "elasticsearch"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, err := config.LoadFile(filepath.Join(".", "testdata", "config.yaml"))
+			require.NoError(t, err)
+
+			testLogger, observedLogs := loggertest.New("")
+			err = applyPersistedConfig(testLogger, cfg, cfgFile, func() bool { return tc.featureEnable })
+			require.NoError(t, err)
+
+			found := false
+			// check that a log message was emitted about disabling kafka output
+			logs := observedLogs.All()
+			for _, logEntry := range logs {
+				if strings.Contains(logEntry.Message, "is disabled") {
+					found = true
+					break
+				}
+			}
+
+			require.NotEqualf(t, tc.featureEnable, found, "expected log message")
+
+			c := &configuration.Configuration{}
+			require.NoError(t, cfg.Agent.Unpack(&c))
+
+			require.Equal(t, tc.expectedLogs, c.Settings.MonitoringConfig.MonitorLogs)
+			require.True(t, c.Settings.MonitoringConfig.MonitorMetrics)
+			require.True(t, c.Settings.MonitoringConfig.Enabled)
+
+			// make sure output is not kafka
+			oc, err := cfg.Agent.Child("outputs", -1)
+			require.NoError(t, err)
+
+			do, err := oc.Child("default", -1)
+			require.NoError(t, err)
+			outputType, err := do.String("type", -1)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedOutputType, outputType, "output type should be %s, got %s", tc.expectedOutputType, outputType)
+		})
+	}
+}
+
+// Test_Coordinator_OTelManagerReceivesPersistedConfig verifies that the OTel manager
+// receives the correct configuration when both persisted config and Fleet config contain
+// OTel configuration. This test specifically checks the timing fix where c.otelCfg must
+// be set before refreshComponentModel is called.
+func Test_Coordinator_OTelManagerReceivesPersistedConfig(t *testing.T) {
+	tests := []struct {
+		name                string
+		fleetConfigYAML     string
+		persistedConfigYAML string
+		expectedOTelYAML    string // Expected OTel config passed to manager
+	}{
+		{
+			name: "local otel collector and fleet with otel collector config merged",
+			fleetConfigYAML: `
+outputs:
+  default:
+    type: elasticsearch
+    hosts: ["localhost:9200"]
+service:
+  telemetry:
+    logs:
+      level: info
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+`,
+			persistedConfigYAML: `
+service:
+  telemetry:
+    resource:
+      policy_id: my-policy-123
+    metrics:
+      level: detailed
+      readers:
+        - periodic:
+            exporter:
+              otlp:
+                endpoint: http://localhost:4318
+`,
+			expectedOTelYAML: `
+service:
+  telemetry:
+    logs:
+      level: info
+    resource:
+      policy_id: my-policy-123
+    metrics:
+      level: detailed
+      readers:
+        - periodic:
+            exporter:
+              otlp:
+                endpoint: http://localhost:4318
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+`,
+		},
+		{
+			name: "local otel collector but no otel collector config from fleet",
+			fleetConfigYAML: `
+outputs:
+  default:
+    type: elasticsearch
+    hosts: ["localhost:9200"]
+`,
+			persistedConfigYAML: `
+service:
+  telemetry:
+    resource:
+      policy_id: my-policy-456
+    logs:
+      level: debug
+      processors:
+        - batch:
+            exporter:
+              otlp:
+                protocol: http/protobuf
+                endpoint: http://otlp-endpoint:4318
+receivers:
+  hostmetrics:
+    collection_interval: 30s
+`,
+			expectedOTelYAML: `
+service:
+  telemetry:
+    resource:
+      policy_id: my-policy-456
+    logs:
+      level: debug
+      processors:
+        - batch:
+            exporter:
+              otlp:
+                protocol: http/protobuf
+                endpoint: http://otlp-endpoint:4318
+receivers:
+  hostmetrics:
+    collection_interval: 30s
+`,
+		},
+		{
+			name: "no local collector config but otel collector config in fleet",
+			fleetConfigYAML: `
+outputs:
+  default:
+    type: elasticsearch
+    hosts: ["localhost:9200"]
+service:
+  telemetry:
+    metrics:
+      level: normal
+exporters:
+  logging:
+    loglevel: debug
+`,
+			persistedConfigYAML: `
+agent:
+  monitoring:
+    enabled: true
+`,
+			expectedOTelYAML: `
+service:
+  telemetry:
+    metrics:
+      level: normal
+exporters:
+  logging:
+    loglevel: debug
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temporary directory for config
+			tempDir := t.TempDir()
+
+			// Override the config path to point to our temp directory
+			oldConfigPath := paths.Config()
+			paths.SetConfig(tempDir)
+			t.Cleanup(func() { paths.SetConfig(oldConfigPath) })
+
+			// Write persisted config file where paths.ConfigFile() expects it
+			persistedConfigPath := paths.ConfigFile()
+			err := os.WriteFile(persistedConfigPath, []byte(tt.persistedConfigYAML), 0644)
+			require.NoError(t, err)
+
+			// Parse fleet config
+			fleetCfg := config.MustNewConfigFrom(tt.fleetConfigYAML)
+
+			// Create a fake capabilities that allows fleet override
+			fakeCaps := &fakeCapabilities{}
+			fakeCaps.On("AllowFleetOverride").Once().Return(true)
+
+			// applyPersistedConfig will only be applied in containerized environment
+			platform := component.PlatformDetail{Platform: component.Platform{OS: component.Container}}
+			specs, err := component.NewRuntimeSpecs(platform, nil)
+			require.NoError(t, err)
+
+			// Track what config the OTel manager receives
+			var receivedOTelCfg *confmap.Conf
+			fakeOTel := &fakeOTelManager{
+				updateCollectorCallback: func(cfg *confmap.Conf) error {
+					receivedOTelCfg = cfg
+					return nil
+				},
+			}
+
+			// Set up minimal Coordinator for processConfig
+			coord := &Coordinator{
+				logger:           logp.NewLogger("testing"),
+				agentInfo:        &info.AgentInfo{},
+				vars:             emptyVars(t),
+				ast:              emptyAST(t),
+				caps:             fakeCaps,
+				runtimeMgr:       &fakeRuntimeManager{},
+				otelMgr:          fakeOTel,
+				secretMarkerFunc: testSecretMarkerFunc,
+				specs:            specs,
+			}
+
+			// Call processConfig - this triggers the entire flow
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			err = coord.processConfig(ctx, fleetCfg)
+			require.NoError(t, err)
+
+			// Verify the OTel manager received the correct merged configuration
+			require.NotNil(t, receivedOTelCfg, "OTel manager should have received a configuration")
+
+			// Convert received config to YAML for comparison
+			actualOtelMap := receivedOTelCfg.ToStringMap()
+			actualYAML, err := yaml.Marshal(actualOtelMap)
+			require.NoError(t, err, "failed to marshal received OTel config to YAML")
+
+			// Compare the YAML content
+			require.YAMLEq(t, tt.expectedOTelYAML, string(actualYAML),
+				"OTel manager should receive the merged configuration including persisted config")
+		})
+	}
+}
+
+// fakeCapabilities implements the capabilities.Capabilities interface for testing
+type fakeCapabilities struct {
+	mock.Mock
+}
+
+func (f *fakeCapabilities) AllowUpgrade(version string, sourceURI string) bool {
+	args := f.Called(version, sourceURI)
+	return args.Bool(0)
+}
+
+func (f *fakeCapabilities) AllowInput(name string) bool {
+	args := f.Called(name)
+	return args.Bool(0)
+}
+
+func (f *fakeCapabilities) AllowOutput(name string) bool {
+	args := f.Called(name)
+	return args.Bool(0)
+}
+
+func (f *fakeCapabilities) AllowFleetOverride() bool {
+	args := f.Called()
+	return args.Bool(0)
+}
+
+>>>>>>> 6e8efafe5 (fix: ensure OTel collector receives persisted service.telemetry config (#12736))
 func BenchmarkCoordinator_generateComponentModel(b *testing.B) {
 	// load variables
 	varsMaps := []map[string]any{}
