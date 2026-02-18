@@ -115,6 +115,17 @@ steps:
           SNAPSHOT: "true"
           HELM_REPO_ENV: "dev"
 
+    - label: ":hammer: Publish helm chart staging"
+      trigger: elastic-agent-helm-charts
+      if: build.env("BUILDKITE_BRANCH") != "main"
+      build:
+        branch: "${BUILDKITE_BRANCH}"
+        commit: "${BUILDKITE_COMMIT}"
+        message: "publish helm-chart for elastic-agent in dev (staging)"
+        env:
+          SNAPSHOT: "false"
+          HELM_REPO_ENV: "dev"
+
   - group: ":beats: DRA Elastic-Agent Core Staging :beats:"
     key: "dra-core-staging"
     if: build.branch =~ /^[0-9]+\.[0-9x]+\$/ || build.env("RUN_STAGING") == "true" || build.env('VERSION_QUALIFIER') != null
