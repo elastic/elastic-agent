@@ -45,9 +45,6 @@ const (
 	// CollectorStopTimeout is the duration to wait for the collector to stop. Note: this needs to be shorter
 	// than 5 * time.Second (coordinator.managerShutdownTimeout) otherwise we might end up with a defunct process.
 	CollectorStopTimeout = 3 * time.Second
-	// OtelCollectorMetricsPortEnvVarName is the name of the environment variable used to pass the collector metrics
-	// port to the managed EDOT collector.
-	OtelCollectorMetricsPortEnvVarName = "EDOT_COLLECTOR_METRICS_PORT"
 )
 
 type collectorRecoveryTimer interface {
@@ -450,10 +447,6 @@ func buildMergedConfig(
 		}
 	}
 
-	if err := addCollectorMetricsReader(mergedOtelCfg); err != nil {
-		return nil, fmt.Errorf("failed to add random collector metrics port: %w", err)
-	}
-
 	if err := injectDiagnosticsExtension(mergedOtelCfg); err != nil {
 		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
 	}
@@ -840,43 +833,4 @@ func calculateConfmapHash(conf *confmap.Conf) ([]byte, error) {
 	}
 
 	return h.Sum(nil), nil
-}
-
-func addCollectorMetricsReader(conf *confmap.Conf) error {
-	// We operate on untyped maps instead of otel config structs because the otel collector has an elaborate
-	// configuration resolution system, and we can't reproduce it fully here. It's possible some of the values won't
-	// be valid for unmarshalling, because they're supposed to be loaded from environment variables, and so on.
-	metricReadersUntyped := conf.Get("service::telemetry::metrics::readers")
-	if metricReadersUntyped == nil {
-		metricReadersUntyped = []any{}
-	}
-	metricsReadersList, ok := metricReadersUntyped.([]any)
-	if !ok {
-		return fmt.Errorf("couldn't convert value of service::telemetry::metrics::readers to a list: %v", metricReadersUntyped)
-	}
-
-	metricsReader := map[string]any{
-		"pull": map[string]any{
-			"exporter": map[string]any{
-				"prometheus": map[string]any{
-					"host": "localhost",
-					// The OTel manager is required to set this environment variable. See comment at the constant
-					// definition for more information.
-					"port": fmt.Sprintf("${env:%s}", OtelCollectorMetricsPortEnvVarName),
-					// this is the default configuration from the otel collector
-					"without_scope_info":  true,
-					"without_units":       true,
-					"without_type_suffix": true,
-				},
-			},
-		},
-	}
-	metricsReadersList = append(metricsReadersList, metricsReader)
-	confMap := map[string]any{
-		"service::telemetry::metrics::readers": metricsReadersList,
-	}
-	if mergeErr := conf.Merge(confmap.NewFromStringMap(confMap)); mergeErr != nil {
-		return fmt.Errorf("failed to merge config: %w", mergeErr)
-	}
-	return nil
 }
