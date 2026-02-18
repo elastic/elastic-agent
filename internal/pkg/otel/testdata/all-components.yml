@@ -51,6 +51,7 @@ processors:
   elasticapm:
   tail_sampling:
   logdedup:
+  beat:
 
 receivers:
   nop:

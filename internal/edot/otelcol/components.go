@@ -77,6 +77,7 @@ import (
 	otlphttpexporter "go.opentelemetry.io/collector/exporter/otlphttpexporter"
 
 	"github.com/elastic/beats/v7/x-pack/otel/exporter/logstashexporter"
+	"github.com/elastic/beats/v7/x-pack/otel/processor/beatprocessor"
 
 	// Extensions
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension"
@@ -184,6 +185,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			elastictraceprocessor.NewFactory(), // deprecated, will be removed in future
 			tailsamplingprocessor.NewFactory(),
 			logdedupprocessor.NewFactory(),
+			beatprocessor.NewFactory(),
 		)
 		if err != nil {
 			return otelcol.Factories{}, err
