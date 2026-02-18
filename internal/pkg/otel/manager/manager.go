@@ -39,7 +39,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 const (
@@ -589,15 +588,13 @@ func injectMonitoringReceiver(
 			},
 		},
 	}
-	if features.DefaultProcessors() {
-		// If default processors are enabled, add them into the base configuration.
-		collectorCfg["processors"] = map[string]any{
-			processorID: map[string]any{
-				"processors": translate.GetDefaultProcessors("collector"),
-			},
-		}
-		pipelineCfg["processors"] = []string{processorID}
+	// Add default processors.
+	collectorCfg["processors"] = map[string]any{
+		processorID: map[string]any{
+			"processors": translate.GetDefaultProcessors("collector"),
+		},
 	}
+	pipelineCfg["processors"] = []string{processorID}
 
 	return config.Merge(confmap.NewFromStringMap(collectorCfg))
 }
