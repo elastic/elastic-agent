@@ -48,6 +48,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [k8sclusterreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/k8sclusterreceiver/v0.145.0/receiver/k8sclusterreceiver/README.md) | v0.145.0 |
 | [k8seventsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/k8seventsreceiver/v0.145.0/receiver/k8seventsreceiver/README.md) | v0.145.0 |
 | [k8sobjectsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/k8sobjectsreceiver/v0.145.0/receiver/k8sobjectsreceiver/README.md) | v0.145.0 |
+| [kafkametricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/kafkametricsreceiver/v0.145.0/receiver/kafkametricsreceiver/README.md) | v0.145.0 |
 | [kafkareceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/kafkareceiver/v0.145.0/receiver/kafkareceiver/README.md) | v0.145.0 |
 | [kubeletstatsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/kubeletstatsreceiver/v0.145.0/receiver/kubeletstatsreceiver/README.md) | v0.145.0 |
 | [mysqlreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/mysqlreceiver/v0.145.0/receiver/mysqlreceiver/README.md) | v0.145.0 |
