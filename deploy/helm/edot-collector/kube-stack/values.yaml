@@ -441,12 +441,7 @@ collectors:
             - container.id
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       extensions:
-        cgroupruntime:
-          gomaxprocs:
-            enabled: true
-          gomemlimit:
-            enabled: true
-            ratio: 0.8
+        cgroupruntime: {}
       service:
         extensions: [cgroupruntime]
         pipelines:
