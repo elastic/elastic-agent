@@ -439,9 +439,9 @@ collectors:
               enabled: true
           extra_metadata_labels:
             - container.id
-      # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       extensions:
         cgroupruntime: {}
+      # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
         extensions: [cgroupruntime]
         pipelines:
