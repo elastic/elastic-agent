@@ -166,9 +166,10 @@ func (e *mockExecution) startCollector(
 		reportErr(ctx, errCh, nil)
 	}()
 	handle := &mockCollectorHandle{
-		stopCh:    stopCh,
-		cancel:    collectorCancel,
-		execution: e,
+		stopCh:            stopCh,
+		cancel:            collectorCancel,
+		execution:         e,
+		collectorLogLevel: level,
 	}
 	if e.collectorStarted != nil {
 		e.collectorStarted <- struct{}{}
@@ -179,9 +180,10 @@ func (e *mockExecution) startCollector(
 var _ collectorHandle = &mockCollectorHandle{}
 
 type mockCollectorHandle struct {
-	stopCh    chan struct{}
-	cancel    context.CancelFunc
-	execution *mockExecution
+	stopCh            chan struct{}
+	cancel            context.CancelFunc
+	execution         *mockExecution
+	collectorLogLevel logp.Level
 }
 
 func (h *mockCollectorHandle) Stop(waitTime time.Duration) {
@@ -200,6 +202,10 @@ func (h *mockCollectorHandle) UpdateConfig(cfg *confmap.Conf) error {
 	}
 
 	return nil
+}
+
+func (h *mockCollectorHandle) LogLevel() logp.Level {
+	return h.collectorLogLevel
 }
 
 // EventListener listens to the events from the OTelManager and stores the latest error and status.
