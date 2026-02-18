@@ -3825,7 +3825,7 @@ func TestDefaultRuntimeConfig(t *testing.T) {
 	require.NotNil(t, config)
 	assert.Equal(t, string(DefaultRuntimeManager), config.Default)
 	assert.Equal(t, "", config.Filebeat.Default)
-	assert.Nil(t, config.Filebeat.InputType)
+	assert.Empty(t, config.Filebeat.InputType)
 	assert.Equal(t, "", config.Metricbeat.Default)
 	assert.Equal(t,
 		map[string]string{
@@ -4240,6 +4240,93 @@ func TestToComponentsWithDynamicInputs(t *testing.T) {
 			if tt.validate != nil {
 				tt.validate(t, result)
 			}
+		})
+	}
+}
+
+func TestRuntimeConfig_UCFGUnpack(t *testing.T) {
+	tests := map[string]struct {
+		input  map[string]interface{}
+		mutate func(*RuntimeConfig) // applied to DefaultRuntimeConfig() to build expected value
+	}{
+		"empty_input_uses_defaults": {
+			input:  map[string]interface{}{},
+			mutate: func(c *RuntimeConfig) {},
+		},
+		"override_default_runtime": {
+			input: map[string]interface{}{
+				"default": "otel",
+			},
+			mutate: func(c *RuntimeConfig) {
+				c.Default = "otel"
+			},
+		},
+		"override_metricbeat_input_type": {
+			input: map[string]interface{}{
+				"metricbeat": map[string]interface{}{
+					"system/metrics": "process",
+				},
+			},
+			mutate: func(c *RuntimeConfig) {
+				c.Metricbeat.InputType["system/metrics"] = "process"
+			},
+		},
+		"set_filebeat_default": {
+			input: map[string]interface{}{
+				"filebeat": map[string]interface{}{
+					"default": "otel",
+				},
+			},
+			mutate: func(c *RuntimeConfig) {
+				c.Filebeat.Default = "otel"
+			},
+		},
+		"set_filebeat_default_and_input_type": {
+			input: map[string]interface{}{
+				"filebeat": map[string]interface{}{
+					"default":     "otel",
+					"log/metrics": "process",
+				},
+			},
+			mutate: func(c *RuntimeConfig) {
+				c.Filebeat.Default = "otel"
+				c.Filebeat.InputType = map[string]string{
+					"log/metrics": "process",
+				}
+			},
+		},
+		"set_metricbeat_default": {
+			input: map[string]interface{}{
+				"metricbeat": map[string]interface{}{
+					"default": "process",
+				},
+			},
+			mutate: func(c *RuntimeConfig) {
+				c.Metricbeat.Default = "process"
+			},
+		},
+		"set_dynamic_inputs": {
+			input: map[string]interface{}{
+				"dynamic_inputs": "otel",
+			},
+			mutate: func(c *RuntimeConfig) {
+				c.DynamicInputs = "otel"
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := DefaultRuntimeConfig()
+			ucfgCfg, err := ucfg.NewFrom(tt.input, ucfg.PathSep("."))
+			require.NoError(t, err)
+			require.NoError(t, ucfgCfg.Unpack(cfg, ucfg.PathSep(".")))
+			require.NoError(t, cfg.Validate())
+
+			expected := DefaultRuntimeConfig()
+			tt.mutate(expected)
+
+			assert.Equal(t, expected, cfg)
 		})
 	}
 }
