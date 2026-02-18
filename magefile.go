@@ -2060,11 +2060,20 @@ func saveIronbank() error {
 }
 
 func getIronbankContextName() string {
-	ver, _ := devtools.BeatQualifiedVersion()
-	defaultBinaryName := "{{.Name}}-ironbank-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}"
+	// NOTE: IAR is only honoured at the filename level,
+	// but it's not honoured in the core version in the ironbank packaging templates
+	// this is because the ironbank packaging is not required to be shipped in the IAR
+	// but it's required to validate the artifacts with some DRA dry-run as a check.
+	// See https://github.com/elastic/elastic-agent/pull/4222
+	agentVersion, _ := devtools.AgentPackageVersion()
+
+	// add the snapshot suffix if needed
+	agentVersion += devtools.MaybeSnapshotSuffix()
+
+	defaultBinaryName := "{{.Name}}-ironbank-{{.Version}}"
 	outputDir, _ := devtools.Expand(defaultBinaryName+"-docker-build-context", map[string]interface{}{
 		"Name":    "elastic-agent",
-		"Version": ver,
+		"Version": agentVersion,
 	})
 	return outputDir
 }
