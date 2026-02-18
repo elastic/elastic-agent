@@ -4,10 +4,15 @@
 
 package pkg
 
-import devtools "github.com/elastic/elastic-agent/dev-tools/mage"
+import (
+	"context"
+
+	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
+)
 
 // PackageTest tests the generated packages in build/distributions. It checks
 // things like file ownership/mode, package attributes, etc.
-func PackageTest() error {
-	return devtools.TestPackages()
+func PackageTest(ctx context.Context) error {
+	cfg := devtools.SettingsFromContext(ctx)
+	return devtools.TestPackages(cfg)
 }

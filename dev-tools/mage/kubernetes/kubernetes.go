@@ -24,8 +24,7 @@ func init() {
 }
 
 // IntegrationTester integration tester
-type IntegrationTester struct {
-}
+type IntegrationTester struct{}
 
 // Name returns kubernetes name.
 func (d *IntegrationTester) Name() string {
@@ -55,7 +54,7 @@ func (d *IntegrationTester) StepRequirements() mage.IntegrationTestSteps {
 }
 
 // Test performs the tests with kubernetes.
-func (d *IntegrationTester) Test(dir string, mageTarget string, env map[string]string) error {
+func (d *IntegrationTester) Test(dir string, mageTarget string, cfg *mage.Settings, env map[string]string) error {
 	stdOut := io.Discard
 	stdErr := io.Discard
 	if mg.Verbose() {
@@ -119,7 +118,12 @@ func (d *IntegrationTester) Test(dir string, mageTarget string, env map[string]s
 
 	destDir := filepath.Join("/go/src", repo.CanonicalRootImportPath)
 	workDir := filepath.Join(destDir, repo.SubDir)
-	remote, err := NewKubeRemote(kubeConfig, "default", kubernetesClusterName(), workDir, destDir, repo.RootDir)
+	// determine the Go version
+	goVersion, err := mage.GoVersion(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to determine Go version: %w", err)
+	}
+	remote, err := NewKubeRemote(kubeConfig, "default", kubernetesClusterName(cfg), goVersion, workDir, destDir, repo.RootDir)
 	if err != nil {
 		return err
 	}
@@ -160,20 +164,20 @@ func waitKubeStateMetricsReadiness(env map[string]string, stdOut, stdErr io.Writ
 }
 
 // kubernetesClusterName generates a name for the Kubernetes cluster.
-func kubernetesClusterName() string {
-	commit, err := mage.CommitHash()
+func kubernetesClusterName(cfg *mage.Settings) string {
+	commit, err := cfg.Build.CommitHash()
 	if err != nil {
 		panic(fmt.Errorf("failed to construct kind cluster name: %w", err))
 	}
 
-	version, err := mage.BeatQualifiedVersion()
+	version, err := mage.BeatQualifiedVersion(cfg)
 	if err != nil {
 		panic(fmt.Errorf("failed to construct kind cluster name: %w", err))
 	}
 	version = strings.NewReplacer(".", "-").Replace(version)
 
 	clusterName := "{{.BeatName}}-{{.Version}}-{{.ShortCommit}}-{{.StackEnvironment}}"
-	clusterName = mage.MustExpand(clusterName, map[string]interface{}{
+	clusterName = mage.MustExpand(cfg, clusterName, map[string]interface{}{
 		"StackEnvironment": mage.StackEnvironment,
 		"ShortCommit":      commit[:10],
 		"Version":          version,
