@@ -1897,6 +1897,53 @@ func TestOTelManager_RestartOnLogLevelChange(t *testing.T) {
 	}
 }
 
+// TestOTelManager_CollectorRunErrWithNilConfig verifies that the manager does not panic when a
+// non-nil error arrives on collectorRunErr while mergedCollectorCfg is nil. This can happen when
+// the collector process reports an error after its configuration has been cleared.
+func TestOTelManager_CollectorRunErrWithNilConfig(t *testing.T) {
+	testLogger, _ := loggertest.New("test")
+
+	mgr := OTelManager{
+		managerLogger:     testLogger,
+		collectorLogger:   testLogger,
+		errCh:             make(chan error, 1),
+		updateCh:          make(chan configUpdate, 1),
+		collectorStatusCh: make(chan *status.AggregateStatus, 1),
+		componentStateCh:  make(chan []runtime.ComponentComponentState, 5),
+		doneChan:          make(chan struct{}),
+		recoveryTimer:     newRestarterNoop(),
+		execution:         &mockExecution{},
+		agentInfo:         &info.AgentInfo{},
+		collectorRunErr:   make(chan error, 1),
+		stopTimeout:       time.Second,
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	// Send a non-nil, non-context.Canceled error while mergedCollectorCfg is nil.
+	// This exercises the else branch of the collectorRunErr case in Run(), which
+	// calls reportStartupErr → otelConfigToStatus with a nil config.
+	mgr.collectorRunErr <- errors.New("collector crashed")
+	go func() {
+		for {
+			select {
+			case s := <-mgr.WatchCollector():
+				if s == nil {
+					cancel()
+				}
+			case <-ctx.Done():
+			}
+		}
+	}()
+
+	assert.NotPanics(t, func() {
+		// Run will process the collectorRunErr, then block on the select.
+		// Cancel the context so it exits after handling the error.
+		mgr.Run(ctx)
+	})
+}
+
 // TestManagerAlwaysEmitsStoppedStatesForComponents checks that the manager always emits a STOPPED state for a component
 // at least once, even if we're slow to retrieve the state. This is part of the contract with the coordinator.
 func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {

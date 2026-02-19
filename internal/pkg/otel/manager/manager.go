@@ -776,7 +776,7 @@ func (m *OTelManager) reportStartupErr(ctx context.Context, err error) {
 	}(err)
 	if criticalErr != nil {
 		// critical error occurred
-		reportErr(ctx, m.errCh, fmt.Errorf("failed to report statup error: %w", criticalErr))
+		reportErr(ctx, m.errCh, fmt.Errorf("failed to report startup error: %w", criticalErr))
 	} else {
 		// no error reporting (clear critical)
 		reportErr(ctx, m.errCh, nil)
