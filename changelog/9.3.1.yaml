@@ -1,0 +1,203 @@
+version: 9.3.1
+entries:
+    - kind: enhancement
+      summary: Support --prefix flag when installing from RPM
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12839
+        - https://github.com/elastic/elastic-agent/pull/12858
+        - https://github.com/elastic/elastic-agent/pull/12854
+        - https://github.com/elastic/elastic-agent/pull/12864
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/141
+      impact: ""
+      action: ""
+      timestamp: 1768496853
+      file:
+        name: 1768496853-Support---prefix-flag-when-installing-from-RPM.yaml
+        checksum: 4e141b2f36cb1bde05138157136354569efc4200
+    - kind: enhancement
+      summary: Add agent.internal.runtime.dynamic_inputs flag to control the runtime used by inputs using dynamic variables.
+      description: |
+        Allow switching to the process runtim for inputs using dynamic variables from a dynamic provider, like the
+        Kubernetes provider. These inputs may see frequent configuration reloads, which the otel collector isn't great
+        at handling right now.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12839
+        - https://github.com/elastic/elastic-agent/pull/12858
+        - https://github.com/elastic/elastic-agent/pull/12854
+        - https://github.com/elastic/elastic-agent/pull/12864
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/12750
+      impact: ""
+      action: ""
+      timestamp: 1769453831
+      file:
+        name: 1769453831-otel-dynamic-providers.yaml
+        checksum: e37e287d21b246635eb1c84c98a867366b832fc1
+    - kind: bug-fix
+      summary: Adds a missing dependency for Synthetics on wolfi docker image
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12839
+        - https://github.com/elastic/elastic-agent/pull/12858
+        - https://github.com/elastic/elastic-agent/pull/12854
+        - https://github.com/elastic/elastic-agent/pull/12864
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/12750
+      impact: ""
+      action: ""
+      timestamp: 1769621019
+      file:
+        name: 1769621019-synthetics-add-playwright-dependency-on-wolfi.yaml
+        checksum: 2bfe5a207cb383c59b53cd8a304403fce8c8b0e7
+    - kind: enhancement
+      summary: Update OTel Collector components to v0.144.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12839
+        - https://github.com/elastic/elastic-agent/pull/12858
+        - https://github.com/elastic/elastic-agent/pull/12854
+        - https://github.com/elastic/elastic-agent/pull/12864
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/12750
+      impact: ""
+      action: ""
+      timestamp: 1769775010
+      file:
+        name: 1769775010-update-otel-components-to-v0.144.0.yaml
+        checksum: 4550d9c4da87dda986a86b49141e0fb38cbb595c
+    - kind: unknown
+      summary: Ensure otel collector health check requests reuse the TCP connection
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12839
+        - https://github.com/elastic/elastic-agent/pull/12858
+        - https://github.com/elastic/elastic-agent/pull/12854
+        - https://github.com/elastic/elastic-agent/pull/12864
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/12750
+      impact: ""
+      action: ""
+      timestamp: 1769802977
+      file:
+        name: 1769802977-fix-otel-healthcheck.yaml
+        checksum: a68e4673e42829bb088d56675373f0ceb497fd10
+    - kind: bug-fix
+      summary: Fix becoming unhealthy when using the warn log level.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12519
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/12513
+      impact: ""
+      action: ""
+      timestamp: 1770045833
+      file:
+        name: 1770045833-fix-agent-becoming-unhealthy-when-using-the-warn-log-level..yaml
+        checksum: c23b58f339b3b69ca9121605fbacfbd6224eb3fa
+    - kind: deprecation
+      summary: Deprecate OpenTelemetry JMX receiver collector component
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12839
+        - https://github.com/elastic/elastic-agent/pull/12858
+        - https://github.com/elastic/elastic-agent/pull/12854
+        - https://github.com/elastic/elastic-agent/pull/12864
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/12750
+      impact: ""
+      action: ""
+      timestamp: 1770253767
+      file:
+        name: 1770253767-deprecate_jmx_receiver.yaml
+        checksum: 3b67bcd38adc2d02421bbcb8bd430028e289093f
+    - kind: enhancement
+      summary: Add statsd receiver to EDOT Collector.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12839
+        - https://github.com/elastic/elastic-agent/pull/12858
+        - https://github.com/elastic/elastic-agent/pull/12854
+        - https://github.com/elastic/elastic-agent/pull/12864
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/12750
+      impact: ""
+      action: ""
+      timestamp: 1770366462
+      file:
+        name: 1770366462-add-statsd-receiver-to-edot-collector.yaml
+        checksum: 6a66dab9fa0dfbd51571b309eac388bd76bad353
+    - kind: enhancement
+      summary: Add logdedupprocessor to EDOT as an extended component.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12839
+        - https://github.com/elastic/elastic-agent/pull/12858
+        - https://github.com/elastic/elastic-agent/pull/12854
+        - https://github.com/elastic/elastic-agent/pull/12864
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/12750
+      impact: ""
+      action: ""
+      timestamp: 1770625543
+      file:
+        name: 1770625543-log-dedup.yaml
+        checksum: d69e7249ecc47a70ea0942c567af2e3adfd05072
+    - kind: bug-fix
+      summary: Fix an issue where monitoring could reingest its own error logs in a feedback loop
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12839
+        - https://github.com/elastic/elastic-agent/pull/12858
+        - https://github.com/elastic/elastic-agent/pull/12854
+        - https://github.com/elastic/elastic-agent/pull/12864
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/12750
+      impact: ""
+      action: ""
+      timestamp: 1770671850
+      file:
+        name: 1770671850-otel-monitoring-log-feedback.yaml
+        checksum: 3651f054a305b8a8add604cf893a9e68e25ff7cd
+    - kind: bug-fix
+      summary: Fix OTel collector not receiving service.telemetry config from persisted file
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12736
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/12737
+      impact: ""
+      action: ""
+      timestamp: 1770892325
+      file:
+        name: 1770892325-fix-otel-collector-config-merge.yaml
+        checksum: 04f0415424370f194ab1ba0bc3618b48259569e8
+    - kind: enhancement
+      summary: Include more standard metadata in monitoring events from the OTel collector
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/12839
+        - https://github.com/elastic/elastic-agent/pull/12858
+        - https://github.com/elastic/elastic-agent/pull/12854
+        - https://github.com/elastic/elastic-agent/pull/12864
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/12750
+      impact: ""
+      action: ""
+      timestamp: 1770923467
+      file:
+        name: 1770923467-otel-telemetry-default-processors.yaml
+        checksum: 3668ecb56e8a5d923e6a879efa0b74481378d739
