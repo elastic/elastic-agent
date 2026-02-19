@@ -765,15 +765,19 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 // this is done by parsing the `m.mergedCollectorCfg` and converting it into the best effort *status.AggregateStatus.
 func (m *OTelManager) reportStartupErr(ctx context.Context, err error) {
 	criticalErr := func(err error) error {
-		otelStatus, err := otelConfigToStatus(m.mergedCollectorCfg, err)
-		if err != nil {
-			return err
+		otelStatus, statusErr := otelConfigToStatus(m.mergedCollectorCfg, err)
+		if statusErr != nil {
+			return statusErr
+		}
+		if otelStatus == nil {
+			// status is nil, so we've already shut down, no reason to report the error, but we should log it
+			m.managerLogger.Warnf("otel collector shut down with error: %v", err)
 		}
 		return m.reportOtelStatusUpdate(ctx, otelStatus)
 	}(err)
 	if criticalErr != nil {
 		// critical error occurred
-		reportErr(ctx, m.errCh, fmt.Errorf("failed to report statup error: %w", criticalErr))
+		reportErr(ctx, m.errCh, fmt.Errorf("failed to report startup error: %w", criticalErr))
 	} else {
 		// no error reporting (clear critical)
 		reportErr(ctx, m.errCh, nil)
