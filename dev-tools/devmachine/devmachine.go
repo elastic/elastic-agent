@@ -8,29 +8,18 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	compute "google.golang.org/api/compute/v1"
 )
 
 const (
-	ZONE_TEMPLATE  = "zones/%s/machineTypes/n1-standard-4"
-	IMAGE_TEMPLATE = "projects/%s/global/images/%s"
-	DEFAULT_IMAGE  = "family/platform-ingest-elastic-agent-ubuntu-2204"
-	DEFAULT_ZONE   = "us-central1-a"
+	zoneTemplate  = "zones/%s/machineTypes/n1-standard-4"
+	imageTemplate = "projects/%s/global/images/%s"
 )
 
-func Run(instanceName string) error {
-	machineImage := os.Getenv("MACHINE_IMAGE")
-	if machineImage == "" {
-		machineImage = DEFAULT_IMAGE
-	}
-	zone := os.Getenv("ZONE")
-	if zone == "" {
-		zone = DEFAULT_ZONE
-	}
-
+// Run creates a new devmachine instance with the given configuration.
+func Run(instanceName, machineImage, zone string) error {
 	ctx := context.Background()
 	log.Println(">> Creating devmachine")
 	projectID := "elastic-platform-ingest"
@@ -41,8 +30,8 @@ func Run(instanceName string) error {
 	}
 
 	imageProject := "elastic-images-prod"
-	machineType := fmt.Sprintf(ZONE_TEMPLATE, zone)
-	sourceImage := fmt.Sprintf(IMAGE_TEMPLATE, imageProject, machineImage)
+	machineType := fmt.Sprintf(zoneTemplate, zone)
+	sourceImage := fmt.Sprintf(imageTemplate, imageProject, machineImage)
 
 	instance := &compute.Instance{
 		Name:        instanceName,
