@@ -5,9 +5,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/12840
-        - https://github.com/elastic/elastic-agent/pull/12850
-        - https://github.com/elastic/elastic-agent/pull/12851
+        - https://github.com/elastic/elastic-agent/pull/12453
       issue: []
       impact: ""
       action: ""
@@ -15,14 +13,12 @@ entries:
       file:
         name: 1769621019-synthetics-add-playwright-dependency-on-wolfi.yaml
         checksum: 2bfe5a207cb383c59b53cd8a304403fce8c8b0e7
-    - kind: unknown
+    - kind: bug-fix
       summary: Ensure otel collector health check requests reuse the TCP connection
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/12840
-        - https://github.com/elastic/elastic-agent/pull/12850
-        - https://github.com/elastic/elastic-agent/pull/12851
+        - https://github.com/elastic/elastic-agent/pull/12517
       issue: []
       impact: ""
       action: ""
@@ -35,9 +31,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/12840
-        - https://github.com/elastic/elastic-agent/pull/12850
-        - https://github.com/elastic/elastic-agent/pull/12851
+        - https://github.com/elastic/elastic-agent/pull/12735
       issue: []
       impact: ""
       action: ""

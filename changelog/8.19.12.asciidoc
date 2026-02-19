@@ -5,27 +5,12 @@
 
 Review important information about the  8.19.12 release.
 
-
-
-
-
-
-
-
-
-
-
-
 [discrete]
 [[enhancements-8.19.12]]
 === Enhancements
 
 
-
-
-* Update OTel Collector components to v0.144.0/v1.50.0. https://github.com/elastic/elastic-agent/pull/12840[#12840] https://github.com/elastic/elastic-agent/pull/12850[#12850] https://github.com/elastic/elastic-agent/pull/12851[#12851] 
-
-
+* Update OTel Collector components to v0.144.0/v1.50.0. https://github.com/elastic/elastic-agent/pull/12735[#12735]
 
 
 [discrete]
@@ -33,8 +18,7 @@ Review important information about the  8.19.12 release.
 === Bug fixes
 
 
-
-
-* Adds a missing dependency for Synthetics on wolfi docker image. https://github.com/elastic/elastic-agent/pull/12840[#12840] https://github.com/elastic/elastic-agent/pull/12850[#12850] https://github.com/elastic/elastic-agent/pull/12851[#12851] 
+* Adds a missing dependency for Synthetics on wolfi docker image. https://github.com/elastic/elastic-agent/pull/12453[#12453]
+* Ensure otel collector health check requests reuse the TCP connection. https://github.com/elastic/elastic-agent/pull/12517[#12517]
 
 // end 8.19.12 relnotes
