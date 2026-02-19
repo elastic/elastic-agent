@@ -37,11 +37,11 @@ type HeadersProvider interface {
 type RuntimeManager string
 
 type RuntimeConfig struct {
-	Default       string                    `yaml:"default" config:"default" json:"default"`
-	Filebeat      BeatRuntimeConfig         `yaml:"filebeat" config:"filebeat" json:"filebeat"`
-	Metricbeat    BeatRuntimeConfig         `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
-	DynamicInputs string                    `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
-	Output        map[string]RuntimeManager `yaml:"output" config:"output" json:"output"`
+	Default       string            `yaml:"default" config:"default" json:"default"`
+	Filebeat      BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
+	Metricbeat    BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
+	DynamicInputs string            `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
+	Output        map[string]string `yaml:"output" config:"output" json:"output"`
 }
 
 type BeatRuntimeConfig struct {
@@ -85,9 +85,9 @@ func DefaultRuntimeConfig() *RuntimeConfig {
 			// go-ucfg sets this while unpacking, having it in the default makes testing easier
 			InputType: make(map[string]string),
 		},
-		Output: map[string]RuntimeManager{
-			"logstash": ProcessRuntimeManager, // Force all inputs using the Logstash output to use the process runtime
-			"kafka":    ProcessRuntimeManager, // Force all inputs using the kafka output to use the process runtime
+		Output: map[string]string{
+			"logstash": string(ProcessRuntimeManager), // Force all inputs using the Logstash output to use the process runtime
+			"kafka":    string(ProcessRuntimeManager), // Force all inputs using the kafka output to use the process runtime
 		},
 	}
 }
@@ -149,7 +149,7 @@ func (r *RuntimeConfig) RuntimeManagerForInputType(inputType string, beatName st
 	if r.Output != nil {
 		// Check if runtime is set for given output
 		if runtime, ok := r.Output[output.Name]; ok && output.Enabled {
-			return runtime
+			return RuntimeManager(runtime)
 		}
 	}
 

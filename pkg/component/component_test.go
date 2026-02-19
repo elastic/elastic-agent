@@ -1362,8 +1362,8 @@ func TestToComponents(t *testing.T) {
 						"log": string(OtelRuntimeManager),
 					},
 				},
-				Output: map[string]RuntimeManager{
-					"logstash": ProcessRuntimeManager,
+				Output: map[string]string{
+					"logstash": string(ProcessRuntimeManager),
 				},
 			},
 			Policy: map[string]interface{}{
@@ -3729,18 +3729,18 @@ func TestRuntimeConfigValidate(t *testing.T) {
 		{
 			name: "valid output type",
 			config: &RuntimeConfig{
-				Output: map[string]RuntimeManager{
-					"elasticsearch": ProcessRuntimeManager,
-					"logstash":      ProcessRuntimeManager,
-					"kafka":         ProcessRuntimeManager,
+				Output: map[string]string{
+					"elasticsearch": string(ProcessRuntimeManager),
+					"logstash":      string(ProcessRuntimeManager),
+					"kafka":         string(ProcessRuntimeManager),
 				},
 			},
 		},
 		{
 			name: "invalid output type",
 			config: &RuntimeConfig{
-				Output: map[string]RuntimeManager{
-					"non-existent": ProcessRuntimeManager,
+				Output: map[string]string{
+					"non-existent": string(ProcessRuntimeManager),
 				},
 			},
 			wantErr: "non-existent output is not supported",
@@ -3846,8 +3846,8 @@ func TestRuntimeConfigRuntimeManagerForInputType(t *testing.T) {
 						"filestream": string(OtelRuntimeManager),
 					},
 				},
-				Output: map[string]RuntimeManager{
-					"logstash": ProcessRuntimeManager,
+				Output: map[string]string{
+					"logstash": string(ProcessRuntimeManager),
 				},
 			},
 			output: outputI{
@@ -3868,9 +3868,9 @@ func TestRuntimeConfigRuntimeManagerForInputType(t *testing.T) {
 						"filestream": string(OtelRuntimeManager),
 					},
 				},
-				Output: map[string]RuntimeManager{
-					"logstash": ProcessRuntimeManager,
-					"kafka":    ProcessRuntimeManager,
+				Output: map[string]string{
+					"logstash": string(ProcessRuntimeManager),
+					"kafka":    string(ProcessRuntimeManager),
 				},
 			},
 			output: outputI{
