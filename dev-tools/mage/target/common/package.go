@@ -5,6 +5,7 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,7 +15,8 @@ import (
 )
 
 // PackageSystemTests packages the python system tests results
-func PackageSystemTests() error {
+func PackageSystemTests(ctx context.Context) error {
+	cfg := devtools.SettingsFromContext(ctx)
 	excludes := []string{".ci", ".git", ".github", "vendor", "dev-tools"}
 
 	// include run and docker-logs as they are the directories we want to compress
@@ -41,10 +43,10 @@ func PackageSystemTests() error {
 	}
 
 	// create a plain directory layout for all beats
-	beat := devtools.MustExpand("{{ repo.SubDir }}")
+	beat := devtools.MustExpand(cfg, "{{ repo.SubDir }}")
 	beat = strings.ReplaceAll(beat, string(os.PathSeparator), "-")
 
-	targetFile := devtools.MustExpand("{{ elastic_beats_dir }}/build/system-tests-" + beat + ".tar.gz")
+	targetFile := devtools.MustExpand(cfg, "{{ elastic_beats_dir }}/build/system-tests-"+beat+".tar.gz")
 	parent := filepath.Dir(targetFile)
 	if !fileExists(parent) {
 		fmt.Printf(">> creating parent dir: %s", parent)

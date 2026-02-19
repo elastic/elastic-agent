@@ -81,6 +81,9 @@ exporters:
         insecure: true
 
 service:
+  telemetry:
+    metrics:
+      level: none
   pipelines:
     logs:
       receivers: [filelog]
@@ -104,6 +107,9 @@ func TestOtelStartShutdown(t *testing.T) {
 exporters:
   nop:
 service:
+  telemetry:
+    metrics:
+      level: none
   pipelines:
     logs:
       receivers:
@@ -209,6 +215,9 @@ exporters:
   file:
     path: {{.OutputPath}}
 service:
+  telemetry:
+    metrics:
+      level: none
   pipelines:
     logs:
       receivers:
@@ -511,6 +520,8 @@ service:
       receivers:
         - filelog
   telemetry:
+    metrics:
+      level: none
     logs:
       level: DEBUG
       encoding: json
@@ -546,9 +557,7 @@ func TestOtelLogsIngestion(t *testing.T) {
 
 	esClient := info.ESClient
 	require.NotNil(t, esClient)
-	esApiKey, err := createESApiKey(esClient)
-	require.NoError(t, err, "failed to get api key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, esClient)
 
 	logsIngestionConfig := logsIngestionConfigTemplate
 	logsIngestionConfig = strings.ReplaceAll(logsIngestionConfig, "{{.ESApiKey}}", esApiKey.Encoded)
@@ -671,9 +680,7 @@ func TestOtelAPMIngestion(t *testing.T) {
 	require.True(t, len(esHost) > 0)
 
 	esClient := info.ESClient
-	esApiKey, err := createESApiKey(esClient)
-	require.NoError(t, err, "failed to get api key")
-	require.True(t, len(esApiKey.APIKey) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, esClient)
 
 	apmArgs := []string{
 		"run",
@@ -782,8 +789,21 @@ func TestOtelAPMIngestion(t *testing.T) {
 	apmFixtureWg.Wait()
 }
 
-func createESApiKey(esClient *elasticsearch.Client) (estools.APIKeyResponse, error) {
-	return estools.CreateAPIKey(context.Background(), esClient, estools.APIKeyRequest{Name: "test-api-key", Expiration: "1d"})
+func createESApiKey(t *testing.T, esClient *elasticsearch.Client) estools.APIKeyResponse {
+	esApiKey, err := estools.CreateAPIKey(
+		t.Context(),
+		esClient,
+		estools.APIKeyRequest{Name: "test-api-key", Expiration: "1d"},
+	)
+
+	require.NoError(t, err, "error creating API key")
+	require.Truef(
+		t,
+		len(esApiKey.APIKey) > 1 && len(esApiKey.Encoded) > 1,
+		"api key is invalid %q",
+		esApiKey)
+
+	return esApiKey
 }
 
 // getDecodedApiKey returns a decoded API key appropriate for use in beats configurations.
@@ -868,9 +888,7 @@ func TestOtelFilestreamInput(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 	decodedApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err)
 	configTemplate := `
@@ -1013,9 +1031,7 @@ func TestOTelHTTPMetricsInput(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 	decodedApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err)
 	configTemplate := `
@@ -1172,9 +1188,7 @@ func TestHybridAgentE2E(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 
 	configTemplate := `agent.logging.level: info
 agent.logging.to_stderr: true
@@ -1435,9 +1449,8 @@ func TestFBOtelRestartE2E(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
+
 	// Use a unique index to avoid conflicts with other parallel runners
 	index := strings.ToLower("logs-generic-default-" + randStr(8))
 	otelConfigTemplate := `receivers:
@@ -1486,6 +1499,8 @@ service:
         - elasticsearch/log
         #- debug
   telemetry:
+    metrics:
+      level: none
     logs:
       level: DEBUG
       encoding: json
@@ -1641,9 +1656,7 @@ func TestOtelBeatsAuthExtension(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 	index := "logs-integration-" + info.Namespace
 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -1795,9 +1808,7 @@ func TestOtelBeatsAuthExtensionInvalidCertificates(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 	index := "logs-integration-" + info.Namespace
 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -2075,7 +2086,7 @@ agent.reload:
 
 	esURL := integration.StartMockES(t, 0, 0, 0, 0)
 	// start with debug logs
-	cfg := fmt.Sprintf(logConfig, esURL, "debug")
+	cfg := fmt.Sprintf(logConfig, esURL.String(), "debug")
 
 	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
 
@@ -2120,7 +2131,7 @@ agent.reload:
 	}, 1*time.Minute, 10*time.Second, "could not find debug logs")
 
 	// set agent.logging.level: info
-	cfg = fmt.Sprintf(logConfig, esURL, "info")
+	cfg = fmt.Sprintf(logConfig, esURL.String(), "info")
 	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
 
 	// wait for elastic agent to be healthy and OTel collector to start
@@ -2148,7 +2159,7 @@ service:
 	zapLogs.TakeAll()
 
 	// add service::telemetry::logs::level:debug
-	cfg = fmt.Sprintf(logConfig, esURL, "info")
+	cfg = fmt.Sprintf(logConfig, esURL.String(), "info")
 	require.NoError(t, fixture.Configure(ctx, []byte(cfg)))
 
 	// wait for elastic agent to be healthy and OTel collector to re-start
@@ -2187,9 +2198,7 @@ func TestMonitoringReceiver(t *testing.T) {
 
 	esClient := info.ESClient
 	require.NotNil(t, esClient)
-	esApiKey, err := createESApiKey(esClient)
-	require.NoError(t, err, "failed to get api key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, esClient)
 
 	cfg := `
 agent.logging.to_stderr: true
@@ -2219,11 +2228,16 @@ exporters:
       num_consumers: 1
       queue_size: 3200
       wait_for_result: true
+processors:
+  beat/1:
+    processors:
+      - add_host_metadata: null
 
 service:
   pipelines:
     logs:
       receivers: [elasticmonitoringreceiver]
+      processors: [beat/1]
       exporters:
         - elasticsearch/1
 `
@@ -2309,6 +2323,20 @@ service:
 	require.Equal(t, 2, len(docs.Hits.Hits), "should have exactly 2 monitoring documents")
 	var ev mapstr.M
 	ev = docs.Hits.Hits[0].Source
+
+	// Check the hostname first (add_host_metadata is noisy so we exclude
+	// its entire subtree from the diff below)
+	reportedHostname, err := ev.GetValue("host.name")
+	assert.NoError(t, err, "monitoring events should include host.name")
+	if err == nil {
+		hostname, err := os.Hostname()
+		assert.NoError(t, err, "couldn't get local hostname")
+		if err == nil {
+			assert.Equal(t, reportedHostname, hostname, "monitoring event host.name should match hostname")
+		}
+	}
+	_ = ev.Delete("host")
+
 	ev = ev.Flatten()
 
 	require.NotEmpty(t, ev["@timestamp"], "expected @timestamp to be set")

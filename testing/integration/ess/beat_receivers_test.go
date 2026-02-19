@@ -188,9 +188,7 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	require.NoError(t, err, "error reading policy response")
 	defer resp.Body.Close()
 
-	apiKeyResponse, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "failed to get api key")
-	require.True(t, len(apiKeyResponse.Encoded) > 1, "api key is invalid %q", apiKeyResponse)
+	apiKeyResponse := createESApiKey(t, info.ESClient)
 	apiKey, err := getDecodedApiKey(apiKeyResponse)
 	require.NoError(t, err, "error decoding api key")
 
@@ -462,9 +460,7 @@ outputs:
 
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 
 	beatsApiKey, err := base64.StdEncoding.DecodeString(esApiKey.Encoded)
 	require.NoError(t, err, "error decoding api key")
@@ -831,7 +827,9 @@ func TestBeatsReceiverProcessRuntimeFallback(t *testing.T) {
 		Stack: nil,
 	})
 
-	config := `agent.logging.to_stderr: true
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
+
+	config := fmt.Sprintf(`agent.logging.to_stderr: true
 agent.logging.to_files: false
 agent.internal.runtime.metricbeat:
   system/metrics: otel
@@ -851,18 +849,14 @@ inputs:
 outputs:
   default:
     type: elasticsearch
-    hosts: [http://localhost:9200]
+    hosts: [%s]
     api_key: placeholder
     indices: [] # not supported by the elasticsearch exporter
-    status_reporting:
-      enabled: false
   supported:
     type: elasticsearch
-    hosts: [http://localhost:9200]
+    hosts: [%s]
     api_key: placeholder
-    status_reporting:
-      enabled: false
-`
+`, esURL.Host, esURL.Host)
 
 	// this is the context for the whole test, with a global timeout defined
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
@@ -959,7 +953,9 @@ func TestBeatsReceiverDynamicInputProcessRuntimeFallback(t *testing.T) {
 		Stack: nil,
 	})
 
-	config := `agent.logging.to_stderr: true
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
+
+	config := fmt.Sprintf(`agent.logging.to_stderr: true
 agent.logging.to_files: false
 agent.monitoring.enabled: false
 agent.internal.runtime.dynamic_inputs: process
@@ -972,16 +968,14 @@ inputs:
 outputs:
   default:
     type: elasticsearch
-    hosts: [http://localhost:9200]
+    hosts: [%s]
     api_key: placeholder
-    status_reporting:
-      enabled: false
 providers:
   local_dynamic:
     items:
     - vars:
         id: system-metrics-1
-`
+`, esURL.Host)
 
 	// this is the context for the whole test, with a global timeout defined
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
@@ -1062,13 +1056,15 @@ func TestBeatsReceiverSubcomponentStatus(t *testing.T) {
 		Stack: nil,
 	})
 
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
+
 	// This configuration contains two system/metrics inputs, each with two identical metricsets:
 	// * one for cpu, always healthy
 	// * one for processes, can't read data for some processes if not running as root
 	// The second metricset will emit a message about not being able to read process data. For the first input, this
 	// results in a Healthy status, but the second input is configured to become degraded in that case. The test
 	// verifies both of these conditions.
-	config := `agent:
+	config := fmt.Sprintf(`agent:
   logging:
     to_stderr: true
     to_files: false
@@ -1113,11 +1109,9 @@ outputs:
   default:
     api_key: placeholder
     hosts:
-    - 127.0.0.1:9200
+    - %s
     type: elasticsearch
-    status_reporting:
-      enabled: false
-`
+`, esURL.Host)
 
 	// this is the context for the whole test, with a global timeout defined
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
@@ -1435,9 +1429,7 @@ func TestSensitiveLogsESExporter(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 	decodedApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err)
 
@@ -1618,9 +1610,7 @@ func TestSensitiveIncludeSourceOnError(t *testing.T) {
 	}
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
-	esApiKey, err := createESApiKey(info.ESClient)
-	require.NoError(t, err, "error creating API key")
-	require.True(t, len(esApiKey.Encoded) > 1, "api key is invalid %q", esApiKey)
+	esApiKey := createESApiKey(t, info.ESClient)
 	decodedApiKey, err := getDecodedApiKey(esApiKey)
 	require.NoError(t, err)
 

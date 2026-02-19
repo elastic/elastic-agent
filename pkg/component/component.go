@@ -51,7 +51,7 @@ type BeatRuntimeConfig struct {
 func DefaultRuntimeConfig() *RuntimeConfig {
 	return &RuntimeConfig{
 		Default:       string(DefaultRuntimeManager),
-		DynamicInputs: "",
+		DynamicInputs: string(ProcessRuntimeManager),
 		Metricbeat: BeatRuntimeConfig{
 			InputType: map[string]string{
 				"activemq/metrics":      string(OtelRuntimeManager),
@@ -79,6 +79,10 @@ func DefaultRuntimeConfig() *RuntimeConfig {
 				"system/metrics":        string(OtelRuntimeManager),
 				"vsphere/metrics":       string(OtelRuntimeManager),
 			},
+		},
+		Filebeat: BeatRuntimeConfig{
+			// go-ucfg sets this while unpacking, having it in the default makes testing easier
+			InputType: make(map[string]string),
 		},
 	}
 }
@@ -108,7 +112,10 @@ func (r *RuntimeConfig) Validate() error {
 				return err
 			}
 		}
+		// workaround for https://github.com/elastic/go-ucfg/issues/215
+		delete(beatConfig.InputType, "default")
 	}
+
 	return nil
 }
 

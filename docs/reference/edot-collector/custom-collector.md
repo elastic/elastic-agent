@@ -98,6 +98,7 @@ receivers:
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.141.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver v0.141.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/snmpreceiver v0.141.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkametricsreceiver v0.141.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver v0.141.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver v0.141.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver v0.141.0

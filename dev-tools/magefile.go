@@ -25,6 +25,7 @@ func init() {
 // GoUnitTest executes the Go unit tests.
 // Use TEST_COVERAGE=true to enable code coverage profiling.
 // Use RACE_DETECTOR=true to enable the race detector.
-func GoUnitTest(ctx context.Context) {
-	devtools.GoTest(ctx, devtools.DefaultGoTestUnitArgs())
+func GoUnitTest(ctx context.Context) error {
+	cfg := devtools.SettingsFromContext(ctx)
+	return devtools.GoTest(ctx, devtools.DefaultGoTestUnitArgs(cfg))
 }
