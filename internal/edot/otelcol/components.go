@@ -86,8 +86,8 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension"
 	healthcheckv2extension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector"
-	opampextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension"
 	k8sobserver "github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver"
+	opampextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension"
 	pprofextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension"
 	filestorage "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage"
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
