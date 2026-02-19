@@ -37,10 +37,11 @@ type HeadersProvider interface {
 type RuntimeManager string
 
 type RuntimeConfig struct {
-	Default       string            `yaml:"default" config:"default" json:"default"`
-	Filebeat      BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
-	Metricbeat    BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
-	DynamicInputs string            `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
+	Default       string                    `yaml:"default" config:"default" json:"default"`
+	Filebeat      BeatRuntimeConfig         `yaml:"filebeat" config:"filebeat" json:"filebeat"`
+	Metricbeat    BeatRuntimeConfig         `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
+	DynamicInputs string                    `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
+	Output        map[string]RuntimeManager `yaml:"output" config:"output" json:"output"`
 }
 
 type BeatRuntimeConfig struct {
@@ -80,10 +81,19 @@ func DefaultRuntimeConfig() *RuntimeConfig {
 				"vsphere/metrics":       string(OtelRuntimeManager),
 			},
 		},
+		Filebeat: BeatRuntimeConfig{
+			// go-ucfg sets this while unpacking, having it in the default makes testing easier
+			InputType: make(map[string]string),
+		},
+		Output: map[string]RuntimeManager{
+			"logstash": ProcessRuntimeManager, // Force all inputs using the Logstash output to use the process runtime
+			"kafka":    ProcessRuntimeManager, // Force all inputs using the kafka output to use the process runtime
+		},
 	}
 }
 
 func (r *RuntimeConfig) Validate() error {
+
 	validateRuntime := func(val string, allowEmpty bool) error {
 		if allowEmpty && val == "" {
 			return nil
@@ -109,6 +119,16 @@ func (r *RuntimeConfig) Validate() error {
 			}
 		}
 	}
+
+	allowedOutput := []string{"elasticsearch", "logstash", "kafka"}
+	for name, runtime := range r.Output {
+		if !slices.Contains(allowedOutput, name) {
+			return fmt.Errorf("%s output is not supported", name)
+		}
+		if err := validateRuntime(string(runtime), false); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -123,7 +143,14 @@ func (r *RuntimeConfig) BeatRuntimeConfig(beatName string) *BeatRuntimeConfig {
 	}
 }
 
-func (r *RuntimeConfig) RuntimeManagerForInputType(inputType string, beatName string) RuntimeManager {
+func (r *RuntimeConfig) RuntimeManagerForInputType(inputType string, beatName string, output outputI) RuntimeManager {
+	if r.Output != nil {
+		// Check if runtime is set for given output
+		if runtime, ok := r.Output[output.Name]; ok && output.Enabled {
+			return runtime
+		}
+	}
+
 	beatRuntimeConfig := r.BeatRuntimeConfig(beatName)
 	if beatRuntimeConfig != nil {
 		// Check if there's a specific runtime manager for this input type
@@ -604,7 +631,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 			if input.enabled {
 				unitID := GetInputUnitId(componentID, input.id)
 				if input.runtimeManager == "" {
-					input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName())
+					input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName(), output)
 				}
 				unitsForRuntimeManager[input.runtimeManager] = append(
 					unitsForRuntimeManager[input.runtimeManager],
@@ -658,7 +685,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 			}
 
 			if input.runtimeManager == "" {
-				input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName())
+				input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName(), output)
 			}
 
 			var units []Unit
