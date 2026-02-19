@@ -30,6 +30,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/logdedupprocessor v0.145.0
