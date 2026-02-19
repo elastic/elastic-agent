@@ -5,8 +5,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/12855
-        - https://github.com/elastic/elastic-agent/pull/12863
+        - https://github.com/elastic/elastic-agent/pull/12453
       issue: []
       impact: ""
       action: ""
@@ -19,8 +18,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/12855
-        - https://github.com/elastic/elastic-agent/pull/12863
+        - https://github.com/elastic/elastic-agent/pull/12517
       issue: []
       impact: ""
       action: ""
@@ -33,8 +31,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/12855
-        - https://github.com/elastic/elastic-agent/pull/12863
+        - https://github.com/elastic/elastic-agent/pull/12735
       issue: []
       impact: ""
       action: ""
@@ -47,8 +44,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/12855
-        - https://github.com/elastic/elastic-agent/pull/12863
+        - https://github.com/elastic/elastic-agent/pull/12628
       issue: []
       impact: ""
       action: ""
