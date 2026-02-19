@@ -9,14 +9,13 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
-	"net"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"sync"
 	"time"
 
-	"github.com/gofrs/uuid/v5"
 	otelstatus "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componentstatus"
@@ -26,13 +25,11 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/status"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
-	"github.com/elastic/elastic-agent/pkg/ipc"
 )
 
 const (
@@ -152,37 +149,22 @@ func (r *subprocessExecution) startCollector(
 	procCtx, procCtxCancel := context.WithCancel(ctx)
 	env := os.Environ()
 
-	// Generate a unique socket URL for config streaming
-	sockUUID, err := uuid.NewV4()
+	// Create a pipe for streaming config to the subprocess via stdin
+	pipeReader, pipeWriter, err := os.Pipe()
 	if err != nil {
 		procCtxCancel()
-		return nil, fmt.Errorf("failed to generate socket UUID: %w", err)
-	}
-	sockURL := paths.OtelConfigSocket(sockUUID.String())
-
-	// Create listener for config streaming socket
-	lis, err := ipc.CreateListener(logger, sockURL)
-	if err != nil {
-		procCtxCancel()
-		return nil, fmt.Errorf("failed to create config socket listener: %w", err)
+		return nil, fmt.Errorf("failed to create config pipe: %w", err)
 	}
 
-	// Start accepting a connection before launching the process so
-	// the collector can connect as soon as it starts.
-	acceptCh := make(chan acceptResult, 1)
-	go func() {
-		conn, err := lis.Accept()
-		acceptCh <- acceptResult{conn: conn, err: err}
-	}()
-
-	// set collector args and add --config flag with the elasticagent:<socketURL> URI
+	// set collector args and add --config flag with the elasticagent:stdin URI
 	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
-	collectorArgs = append(collectorArgs, fmt.Sprintf("--config=%s:%s", agentConfigProviderScheme, sockURL))
+	collectorArgs = append(collectorArgs, fmt.Sprintf("--config=%s:stdin", agentConfigProviderScheme))
 
 	processInfo, err := process.Start(r.collectorPath,
 		process.WithArgs(collectorArgs),
 		process.WithEnv(env),
 		process.WithCmdOptions(func(c *exec.Cmd) error {
+			c.Stdin = pipeReader
 			c.Stdout = stdOut
 			c.Stderr = stdErr
 			return nil
@@ -190,17 +172,19 @@ func (r *subprocessExecution) startCollector(
 	)
 	if err != nil {
 		// we failed to start the process
-		_ = lis.Close()
-		ipc.CleanupListener(logger, sockURL)
+		_ = pipeReader.Close()
+		_ = pipeWriter.Close()
 		procCtxCancel()
 		return nil, fmt.Errorf("failed to start supervised collector: %w", err)
 	}
 
+	// Close the read end in the parent — the child process owns it now.
+	_ = pipeReader.Close()
+
 	logger.Infof("supervised collector started with pid: %d and healthcheck port: %d", processInfo.Process.Pid, httpHealthCheckPort)
 	if processInfo.Process == nil {
 		// this should not happen but just in case
-		_ = lis.Close()
-		ipc.CleanupListener(logger, sockURL)
+		_ = pipeWriter.Close()
 		procCtxCancel()
 		return nil, fmt.Errorf("failed to start supervised collector: process is nil")
 	}
@@ -304,15 +288,14 @@ func (r *subprocessExecution) startCollector(
 		r.reportErrFn(ctx, processErrCh, fmt.Errorf("failed to wait supervised collector process: %w", procErr))
 	}()
 
-	// The manageConnection goroutine takes ownership of the listener, the
-	// socket file, and the accepted connection. It handles accept, initial
-	// config write, and subsequent config updates asynchronously. Any errors
-	// are reported directly to processErrCh via reportErrFn.
-	reportConnErrFn := func(err error) {
+	// The pipeWriter goroutine takes ownership of the pipe. It writes the
+	// initial config and subsequent updates asynchronously. Any errors are
+	// reported directly to processErrCh via reportErrFn.
+	reportPipeErrFn := func(err error) {
 		r.reportErrFn(ctx, processErrCh, err)
 	}
-	ctl := newProcHandle(processInfo, logger, lvl, processDoneCh, reportConnErrFn, configModifier)
-	go ctl.manageConnection(procCtx, acceptCh, lis, sockURL, confBytes)
+	ctl := newProcHandle(processInfo, logger, lvl, processDoneCh, reportPipeErrFn, configModifier)
+	go ctl.writeToPipe(pipeWriter, confBytes)
 
 	return ctl, nil
 }
@@ -401,11 +384,6 @@ func removeManagedHealthCheckExtensionStatus(status *otelstatus.AggregateStatus,
 	delete(extensions.ComponentStatusMap, extensionID)
 }
 
-type acceptResult struct {
-	conn net.Conn
-	err  error
-}
-
 type procHandle struct {
 	processDoneCh     chan struct{}
 	processInfo       *process.Info
@@ -413,7 +391,7 @@ type procHandle struct {
 	collectorLogLevel logp.Level
 	configCh          chan []byte // buffered(1), latest-config-wins
 	configModifier    ConfigModifier
-	reportErrFn       func(error) // reports connection errors to processErrCh
+	reportErrFn       func(error) // reports pipe write errors to processErrCh
 }
 
 func newProcHandle(
@@ -434,36 +412,13 @@ func newProcHandle(
 	}
 }
 
-// manageConnection owns the full connection lifecycle. It waits for the
-// subprocess to connect, writes the initial config, then loops writing any
-// subsequent configs queued via configCh until the process exits.
-// Errors are reported directly to processErrCh via reportErrFn.
-func (s *procHandle) manageConnection(procCtx context.Context, acceptCh <-chan acceptResult, lis net.Listener, sockURL string, initialConfig []byte) {
-	defer func() {
-		_ = lis.Close()
-		ipc.CleanupListener(s.log, sockURL)
-	}()
+// writeToPipe owns the pipe lifecycle. It writes the initial config, then
+// loops writing subsequent configs queued via configCh until the process
+// exits. Errors are reported via reportErrFn.
+func (s *procHandle) writeToPipe(pipeWriter io.WriteCloser, initialConfig []byte) {
+	defer pipeWriter.Close()
 
-	// Wait for accept or process death.
-	var conn net.Conn
-	select {
-	case <-procCtx.Done():
-		// Process died before connecting; listener close unblocks Accept.
-		return
-	case result := <-acceptCh:
-		if result.err != nil {
-			if procCtx.Err() != nil {
-				// Process died and listener was closed — nothing more to do.
-				return
-			}
-			s.reportErrFn(fmt.Errorf("failed to accept config socket connection: %w", result.err))
-			return
-		}
-		conn = result.conn
-	}
-	defer conn.Close()
-
-	encoder := gob.NewEncoder(conn)
+	encoder := gob.NewEncoder(pipeWriter)
 
 	// Write initial config.
 	if err := encoder.Encode(initialConfig); err != nil {
@@ -519,8 +474,7 @@ func (s *procHandle) Stop(waitTime time.Duration) {
 	}
 }
 
-// UpdateConfig queues a new configuration for the running collector.
-// The actual write happens asynchronously in the manageConnection goroutine.
+// UpdateConfig writes the new configuration to the subprocess's stdin pipe.
 func (s *procHandle) UpdateConfig(cfg *confmap.Conf) error {
 	if cfg == nil {
 		return errors.New("no configuration provided")
