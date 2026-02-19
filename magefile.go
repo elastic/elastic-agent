@@ -591,27 +591,26 @@ func Package(ctx context.Context) error {
 		}
 		// Apply manifest version info to config
 		cfg = cfg.WithSnapshot(parsedVersion.IsSnapshot()).WithBeatVersion(parsedVersion.CoreVersion())
-		ctx = devtools.ContextWithSettings(ctx, cfg)
 
 		// don't download the elastic-agent-core components; built above
-		if err := downloadManifest(ctx, packaging.WithoutProjectName(agentCoreProjectName)); err != nil {
+		if err := downloadManifest(ctx, cfg, packaging.WithoutProjectName(agentCoreProjectName)); err != nil {
 			return fmt.Errorf("failed downloading manifest components: %w", err)
 		}
 	}
-	return packageAgent(ctx, "", nil)
+	return packageAgent(ctx, cfg, "", nil)
 }
 
 // DownloadManifest downloads the provided manifest file into the predefined folder and downloads all components in the manifest.
 func DownloadManifest(ctx context.Context) error {
+	cfg := mage.SettingsFromContext(ctx)
 	// Enforce that we use the correct elastic-agent packaging, to correctly load component dependencies
 	// Use mg.Deps() to ensure that the function will be called only once per mage invocation.
 	// devtools.Use*Packaging functions are not idempotent as they append in devtools.Packages
-	mg.Deps(devtools.UseElasticAgentPackaging)
-	return downloadManifest(ctx)
+	devtools.UseElasticAgentPackaging(cfg)
+	return downloadManifest(ctx, cfg)
 }
 
-func downloadManifest(ctx context.Context, filters ...packaging.ComponentFilter) error {
-	cfg := devtools.SettingsFromContext(ctx)
+func downloadManifest(ctx context.Context, cfg *mage.Settings, filters ...packaging.ComponentFilter) error {
 	fmt.Println("--- Downloading manifest")
 	start := time.Now()
 	defer func() { fmt.Println("Downloading manifest took", time.Since(start)) }()
@@ -1050,7 +1049,6 @@ func dockerCommitHash(cfg *devtools.Settings) string {
 func runAgent(ctx context.Context, env map[string]string) error {
 	// Configure for linux/amd64 only to improve build time
 	cfg := devtools.SettingsFromContext(ctx).WithPlatforms("+all linux/amd64")
-	ctx = devtools.ContextWithSettings(ctx, cfg)
 
 	supportedEnvs := map[string]int{"FLEET_ENROLLMENT_TOKEN": 0, "FLEET_ENROLL": 0, "FLEET_SETUP": 0, "FLEET_TOKEN_NAME": 0, "KIBANA_HOST": 0, "KIBANA_PASSWORD": 0, "KIBANA_USERNAME": 0}
 
@@ -1064,7 +1062,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	if !strings.Contains(dockerImageOut, tag) {
 		// produce docker package
 		mage.UseElasticAgentPackaging(cfg)
-		err = packageAgent(ctx, "", nil)
+		err = packageAgent(ctx, cfg, "", nil)
 		if err != nil {
 			return fmt.Errorf("failed to package elastic-agent: %w", err)
 		}
@@ -1114,9 +1112,8 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-func packageAgent(ctx context.Context, dependenciesVersion string, manifestResponse *manifest.Build) error {
+func packageAgent(ctx context.Context, cfg *mage.Settings, dependenciesVersion string, manifestResponse *manifest.Build) error {
 	fmt.Println("--- Package elastic-agent")
-	cfg := devtools.SettingsFromContext(ctx)
 
 	if dependenciesVersion == "" {
 		// Get beat version - first check BEAT_VERSION env var, then fall back to default
@@ -1148,7 +1145,6 @@ func packageAgent(ctx context.Context, dependenciesVersion string, manifestRespo
 
 	// Update config with the drop path and update context
 	cfg = cfg.WithAgentDropPath(dropPath)
-	ctx = devtools.ContextWithSettings(ctx, cfg)
 
 	// cleanup after build
 	if !keepArchive {
@@ -1168,13 +1164,13 @@ func packageAgent(ctx context.Context, dependenciesVersion string, manifestRespo
 	flattenDependencies(cfg, platforms, dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse, dependencies)
 
 	// extract elastic-agent-core to be used for packaging
-	err = extractAgentCoreForPackage(ctx, manifestResponse, dependenciesVersion)
+	err = extractAgentCoreForPackage(ctx, cfg, manifestResponse, dependenciesVersion)
 	if err != nil {
 		return err
 	}
 
 	// build package and test
-	if err := devtools.Package(ctx, devtools.SettingsFromContext(ctx)); err != nil {
+	if err := devtools.Package(ctx, cfg); err != nil {
 		return err
 	}
 	return nil
@@ -1492,7 +1488,7 @@ func PackageUsingDRA(ctx context.Context) error {
 		ctx = devtools.ContextWithSettings(ctx, cfg)
 	}
 
-	return packageAgent(ctx, dependenciesVersion, manifestResponse)
+	return packageAgent(ctx, cfg, dependenciesVersion, manifestResponse)
 }
 
 // downloadManifestAndParseVersion downloads the manifest and returns the build info and parsed version.
@@ -1628,8 +1624,7 @@ func downloadDRAArtifacts(ctx context.Context, build *manifest.Build, version st
 	return downloadedArtifacts, errGrp.Wait()
 }
 
-func extractAgentCoreForPackage(ctx context.Context, manifestResponse *manifest.Build, version string) error {
-	cfg := devtools.SettingsFromContext(ctx)
+func extractAgentCoreForPackage(ctx context.Context, cfg *mage.Settings, manifestResponse *manifest.Build, version string) error {
 	components, err := packaging.Components()
 	if err != nil {
 		return fmt.Errorf("retrieving defined components: %w", err)
