@@ -127,7 +127,7 @@ func (r *RuntimeConfig) Validate() error {
 		if !slices.Contains(allowedOutput, name) {
 			return fmt.Errorf("%s output is not supported", name)
 		}
-		if err := validateRuntime(string(runtime), false); err != nil {
+		if err := validateRuntime(runtime, false); err != nil {
 			return err
 		}
 	}
