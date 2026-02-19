@@ -7,9 +7,7 @@ package agentprovider
 import (
 	"context"
 	"encoding/gob"
-	"errors"
-	"fmt"
-	"net"
+	"io"
 	"sync"
 	"testing"
 	"time"
@@ -20,11 +18,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// testURI returns a URI for the given socket address that matches what the
-// parent process would pass via --config.
-func testURI(addr string) string {
-	return fmt.Sprintf("%s:%s", AgentConfigProviderSchemeName, addr)
-}
+const testURI = AgentConfigProviderSchemeName + ":stdin"
 
 // encodeYAMLBytes marshals config to YAML and encodes the bytes using gob.
 func encodeYAMLBytes(encoder *gob.Encoder, cfg map[string]any) error {
@@ -35,29 +29,22 @@ func encodeYAMLBytes(encoder *gob.Encoder, cfg map[string]any) error {
 	return encoder.Encode(yamlBytes)
 }
 
-// newTestProvider creates a StreamingProvider backed by a net.Pipe().
-// It returns the provider, the server-side connection (for writing configs),
+// newTestProvider creates a StreamingProvider backed by an io.Pipe().
+// It returns the provider, the write end of the pipe (for writing configs),
 // and the URI to use with Retrieve.
-func newTestProvider(t *testing.T) (confmap.Provider, net.Conn, string) {
+func newTestProvider(t *testing.T) (confmap.Provider, io.WriteCloser) {
 	t.Helper()
 
-	clientConn, serverConn := net.Pipe()
-	const fakeAddr = "unix:///tmp/test.sock"
-
-	factory := NewFactoryWithDialFunc(func(_ context.Context, address string) (net.Conn, error) {
-		assert.Equal(t, fakeAddr, address)
-		return clientConn, nil
-	})
+	pipeReader, pipeWriter := io.Pipe()
+	factory := NewFactoryWithReader(pipeReader)
 	provider := factory.Create(confmap.ProviderSettings{})
-	return provider, serverConn, testURI(fakeAddr)
+	return provider, pipeWriter
 }
 
 func TestStreamingProvider_NewFactory(t *testing.T) {
-	clientConn, _ := net.Pipe()
+	pipeReader, _ := io.Pipe()
 
-	factory := NewFactoryWithDialFunc(func(_ context.Context, _ string) (net.Conn, error) {
-		return clientConn, nil
-	})
+	factory := NewFactoryWithReader(pipeReader)
 	p1 := factory.Create(confmap.ProviderSettings{})
 	p2 := factory.Create(confmap.ProviderSettings{})
 	// Factory always returns the same provider instance
@@ -65,8 +52,8 @@ func TestStreamingProvider_NewFactory(t *testing.T) {
 }
 
 func TestStreamingProvider_Scheme(t *testing.T) {
-	p, serverConn, _ := newTestProvider(t)
-	defer serverConn.Close()
+	p, pipeWriter := newTestProvider(t)
+	defer pipeWriter.Close()
 	assert.Equal(t, AgentConfigProviderSchemeName, p.Scheme())
 }
 
@@ -74,17 +61,17 @@ func TestStreamingProvider_InitialConfig(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	p, serverConn, uri := newTestProvider(t)
+	p, pipeWriter := newTestProvider(t)
 
 	cfg := map[string]any{"receivers": map[string]any{"otlp": map[string]any{}}}
 
 	// Write initial config before Retrieve
 	go func() {
-		encoder := gob.NewEncoder(serverConn)
+		encoder := gob.NewEncoder(pipeWriter)
 		_ = encodeYAMLBytes(encoder, cfg)
 	}()
 
-	ret, err := p.Retrieve(ctx, uri, func(event *confmap.ChangeEvent) {})
+	ret, err := p.Retrieve(ctx, testURI, func(event *confmap.ChangeEvent) {})
 	require.NoError(t, err)
 	defer ret.Close(ctx)
 
@@ -94,7 +81,7 @@ func TestStreamingProvider_InitialConfig(t *testing.T) {
 	// Verify the config was read correctly
 	assert.NotNil(t, retCfg.Get("receivers"))
 
-	serverConn.Close()
+	pipeWriter.Close()
 	p.Shutdown(ctx)
 }
 
@@ -102,7 +89,7 @@ func TestStreamingProvider_ConfigUpdate(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	p, serverConn, uri := newTestProvider(t)
+	p, pipeWriter := newTestProvider(t)
 
 	initialCfg := map[string]any{"version": "1"}
 	updatedCfg := map[string]any{"version": "2"}
@@ -112,13 +99,13 @@ func TestStreamingProvider_ConfigUpdate(t *testing.T) {
 
 	// Write initial config
 	go func() {
-		encoder := gob.NewEncoder(serverConn)
+		encoder := gob.NewEncoder(pipeWriter)
 		_ = encodeYAMLBytes(encoder, initialCfg)
 		readyCh <- encoder
 	}()
 
 	watcherCalled := make(chan struct{})
-	ret, err := p.Retrieve(ctx, uri, func(event *confmap.ChangeEvent) {
+	ret, err := p.Retrieve(ctx, testURI, func(event *confmap.ChangeEvent) {
 		close(watcherCalled)
 	})
 	require.NoError(t, err)
@@ -149,7 +136,7 @@ func TestStreamingProvider_ConfigUpdate(t *testing.T) {
 	ret.Close(ctx)
 
 	// Retrieve again to get the updated config
-	ret2, err := p.Retrieve(ctx, uri, nil)
+	ret2, err := p.Retrieve(ctx, testURI, nil)
 	require.NoError(t, err)
 	defer ret2.Close(ctx)
 
@@ -158,7 +145,7 @@ func TestStreamingProvider_ConfigUpdate(t *testing.T) {
 	assert.Equal(t, "2", retCfg2.Get("version"))
 
 	// Clean up
-	serverConn.Close()
+	pipeWriter.Close()
 	p.Shutdown(ctx)
 }
 
@@ -166,13 +153,13 @@ func TestStreamingProvider_MultipleUpdates(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	p, serverConn, uri := newTestProvider(t)
+	p, pipeWriter := newTestProvider(t)
 
 	readyCh := make(chan *gob.Encoder)
 
 	// Write initial config
 	go func() {
-		encoder := gob.NewEncoder(serverConn)
+		encoder := gob.NewEncoder(pipeWriter)
 		_ = encodeYAMLBytes(encoder, map[string]any{"count": 0})
 		readyCh <- encoder
 	}()
@@ -182,7 +169,7 @@ func TestStreamingProvider_MultipleUpdates(t *testing.T) {
 	var watcherMu sync.Mutex
 	watcherCalled := make(chan struct{}, 10)
 
-	ret, err := p.Retrieve(ctx, uri, func(event *confmap.ChangeEvent) {
+	ret, err := p.Retrieve(ctx, testURI, func(event *confmap.ChangeEvent) {
 		watcherMu.Lock()
 		watcherCallCount++
 		watcherMu.Unlock()
@@ -198,7 +185,7 @@ func TestStreamingProvider_MultipleUpdates(t *testing.T) {
 			_ = encodeYAMLBytes(encoder, map[string]any{"count": i})
 			time.Sleep(50 * time.Millisecond)
 		}
-		serverConn.Close()
+		pipeWriter.Close()
 	}()
 
 	// Wait for at least one watcher call
@@ -214,27 +201,27 @@ func TestStreamingProvider_ReadError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	p, serverConn, uri := newTestProvider(t)
+	p, pipeWriter := newTestProvider(t)
 
 	encoderReady := make(chan struct{})
 
 	// Write initial config then signal ready
 	go func() {
-		encoder := gob.NewEncoder(serverConn)
+		encoder := gob.NewEncoder(pipeWriter)
 		_ = encodeYAMLBytes(encoder, map[string]any{"key": "value"})
 		close(encoderReady)
 	}()
 
 	watcherCalled := make(chan *confmap.ChangeEvent, 1)
-	ret, err := p.Retrieve(ctx, uri, func(event *confmap.ChangeEvent) {
+	ret, err := p.Retrieve(ctx, testURI, func(event *confmap.ChangeEvent) {
 		watcherCalled <- event
 	})
 	require.NoError(t, err)
 	defer ret.Close(ctx)
 
-	// Wait for initial encode, then close the connection to cause a read error
+	// Wait for initial encode, then close the pipe to cause a read error
 	<-encoderReady
-	serverConn.Close()
+	pipeWriter.Close()
 
 	// Wait for watcher to be called with error
 	select {
@@ -249,44 +236,44 @@ func TestStreamingProvider_Shutdown(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	p, serverConn, uri := newTestProvider(t)
+	p, pipeWriter := newTestProvider(t)
 
 	// Write initial config
 	go func() {
-		encoder := gob.NewEncoder(serverConn)
+		encoder := gob.NewEncoder(pipeWriter)
 		_ = encodeYAMLBytes(encoder, map[string]any{"key": "value"})
-		// Keep connection open so background reader is blocking
+		// Keep pipe open so background reader is blocking
 	}()
 
-	ret, err := p.Retrieve(ctx, uri, func(event *confmap.ChangeEvent) {})
+	ret, err := p.Retrieve(ctx, testURI, func(event *confmap.ChangeEvent) {})
 	require.NoError(t, err)
 	ret.Close(ctx)
 
-	// Shutdown should succeed and close the connection
+	// Shutdown should succeed and close the reader
 	err = p.Shutdown(ctx)
 	require.NoError(t, err)
 
 	// Clean up
-	serverConn.Close()
+	pipeWriter.Close()
 }
 
 func TestStreamingProvider_RetrievedClose(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	p, serverConn, uri := newTestProvider(t)
+	p, pipeWriter := newTestProvider(t)
 
 	readyCh := make(chan *gob.Encoder)
 
 	// Write initial config
 	go func() {
-		encoder := gob.NewEncoder(serverConn)
+		encoder := gob.NewEncoder(pipeWriter)
 		_ = encodeYAMLBytes(encoder, map[string]any{"key": "value"})
 		readyCh <- encoder
 	}()
 
 	watcherCalled := make(chan struct{})
-	ret, err := p.Retrieve(ctx, uri, func(event *confmap.ChangeEvent) {
+	ret, err := p.Retrieve(ctx, testURI, func(event *confmap.ChangeEvent) {
 		close(watcherCalled)
 	})
 	require.NoError(t, err)
@@ -310,37 +297,22 @@ func TestStreamingProvider_RetrievedClose(t *testing.T) {
 	}
 
 	// Clean up
-	serverConn.Close()
+	pipeWriter.Close()
 	p.Shutdown(ctx)
-}
-
-func TestStreamingProvider_DialError(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	dialErr := errors.New("connection refused")
-	factory := NewFactoryWithDialFunc(func(_ context.Context, _ string) (net.Conn, error) {
-		return nil, dialErr
-	})
-	p := factory.Create(confmap.ProviderSettings{})
-
-	_, err := p.Retrieve(ctx, testURI("unix:///nonexistent.sock"), nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to dial config socket")
 }
 
 func TestStreamingProvider_EmptyConfig(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	p, serverConn, uri := newTestProvider(t)
+	p, pipeWriter := newTestProvider(t)
 
 	go func() {
-		encoder := gob.NewEncoder(serverConn)
+		encoder := gob.NewEncoder(pipeWriter)
 		_ = encodeYAMLBytes(encoder, map[string]any{})
 	}()
 
-	ret, err := p.Retrieve(ctx, uri, func(event *confmap.ChangeEvent) {})
+	ret, err := p.Retrieve(ctx, testURI, func(event *confmap.ChangeEvent) {})
 	require.NoError(t, err)
 	defer ret.Close(ctx)
 
@@ -348,7 +320,7 @@ func TestStreamingProvider_EmptyConfig(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 0, len(retCfg.AllKeys()))
 
-	serverConn.Close()
+	pipeWriter.Close()
 	p.Shutdown(ctx)
 }
 
@@ -356,16 +328,16 @@ func TestStreamingProvider_InvalidGobData(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	p, serverConn, uri := newTestProvider(t)
+	p, pipeWriter := newTestProvider(t)
 
-	// Write invalid gob data directly to the connection
+	// Write invalid gob data directly to the pipe
 	go func() {
-		_, _ = serverConn.Write([]byte("invalid gob data"))
-		serverConn.Close()
+		_, _ = pipeWriter.Write([]byte("invalid gob data"))
+		pipeWriter.Close()
 	}()
 
 	// Error should occur on Retrieve during initial config read
-	_, err := p.Retrieve(ctx, uri, nil)
+	_, err := p.Retrieve(ctx, testURI, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to decode config")
 }
@@ -374,17 +346,15 @@ func TestStreamingProvider_CancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
-	clientConn, serverConn := net.Pipe()
-	defer clientConn.Close()
-	defer serverConn.Close()
+	pipeReader, pipeWriter := io.Pipe()
+	defer pipeReader.Close()
+	defer pipeWriter.Close()
 
-	factory := NewFactoryWithDialFunc(func(_ context.Context, _ string) (net.Conn, error) {
-		return clientConn, nil
-	})
+	factory := NewFactoryWithReader(pipeReader)
 	p := factory.Create(confmap.ProviderSettings{})
 
 	// Retrieve should fail immediately with cancelled context
-	_, err := p.Retrieve(ctx, testURI("unix:///tmp/test.sock"), nil)
+	_, err := p.Retrieve(ctx, testURI, nil)
 	require.Error(t, err)
 	assert.Equal(t, context.Canceled, err)
 }
@@ -393,15 +363,15 @@ func TestStreamingProvider_NilWatcher(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	p, serverConn, uri := newTestProvider(t)
+	p, pipeWriter := newTestProvider(t)
 
 	go func() {
-		encoder := gob.NewEncoder(serverConn)
+		encoder := gob.NewEncoder(pipeWriter)
 		_ = encodeYAMLBytes(encoder, map[string]any{"key": "value"})
 	}()
 
 	// Should work fine with nil watcher
-	ret, err := p.Retrieve(ctx, uri, nil)
+	ret, err := p.Retrieve(ctx, testURI, nil)
 	require.NoError(t, err)
 	defer ret.Close(ctx)
 
@@ -409,6 +379,6 @@ func TestStreamingProvider_NilWatcher(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "value", retCfg.Get("key"))
 
-	serverConn.Close()
+	pipeWriter.Close()
 	p.Shutdown(ctx)
 }
