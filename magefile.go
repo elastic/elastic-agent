@@ -604,8 +604,6 @@ func Package(ctx context.Context) error {
 func DownloadManifest(ctx context.Context) error {
 	cfg := mage.SettingsFromContext(ctx)
 	// Enforce that we use the correct elastic-agent packaging, to correctly load component dependencies
-	// Use mg.Deps() to ensure that the function will be called only once per mage invocation.
-	// devtools.Use*Packaging functions are not idempotent as they append in devtools.Packages
 	devtools.UseElasticAgentPackaging(cfg)
 	return downloadManifest(ctx, cfg)
 }
