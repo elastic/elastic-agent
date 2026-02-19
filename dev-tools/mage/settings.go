@@ -71,19 +71,19 @@ var BeatProjectType ProjectType
 // FuncMap returns template functions that use the config.
 func FuncMap(cfg *Settings) map[string]interface{} {
 	return map[string]interface{}{
-		"beat_doc_branch":                func() (string, error) { return cfg.DocBranch() },
-		"beat_version":                   func() (string, error) { return cfg.BeatQualifiedVersion() },
+		"beat_doc_branch":                func() string { return cfg.DocBranch() },
+		"beat_version":                   func() string { return cfg.BeatQualifiedVersion() },
 		"commit":                         func() (string, error) { return cfg.Build.CommitHash() },
 		"commit_short":                   func() (string, error) { return cfg.Build.CommitHashShort() },
 		"date":                           cfg.BuildDate,
-		"elastic_beats_dir":              func() (string, error) { return cfg.ElasticBeatsDir() },
-		"go_version":                     func() (string, error) { return cfg.GoVersion() },
-		"repo":                           func() (*ProjectRepoInfo, error) { return cfg.RepoInfo, nil },
+		"elastic_beats_dir":              func() string { return cfg.ElasticBeatsDir() },
+		"go_version":                     func() string { return cfg.GoVersion() },
+		"repo":                           func() *ProjectRepoInfo { return cfg.RepoInfo },
 		"title":                          func(s string) string { return cases.Title(language.English, cases.NoLower).String(s) },
 		"tolower":                        strings.ToLower,
 		"contains":                       strings.Contains,
 		"substring":                      Substring,
-		agentPackageVersionMappedFunc:    func() (string, error) { return AgentPackageVersion(cfg) },
+		agentPackageVersionMappedFunc:    func() string { return AgentPackageVersion(cfg) },
 		agentManifestGeneratorMappedFunc: func(fips bool) (string, error) { return PackageManifest(cfg, fips) },
 		snapshotSuffix:                   func() string { return MaybeSnapshotSuffix(cfg) },
 	}
@@ -207,9 +207,9 @@ func DumpVariables(cfg *Settings) error {
 }
 
 // AgentPackageVersion returns the agent package version using the provided config.
-func AgentPackageVersion(cfg *Settings) (string, error) {
+func AgentPackageVersion(cfg *Settings) string {
 	if cfg.Packaging.AgentPackageVersion != "" {
-		return cfg.Packaging.AgentPackageVersion, nil
+		return cfg.Packaging.AgentPackageVersion
 	}
 
 	return cfg.BeatQualifiedVersion()
@@ -217,10 +217,7 @@ func AgentPackageVersion(cfg *Settings) (string, error) {
 
 // PackageManifest generates the package manifest using the provided config.
 func PackageManifest(cfg *Settings, fips bool) (string, error) {
-	packageVersion, err := AgentPackageVersion(cfg)
-	if err != nil {
-		return "", fmt.Errorf("retrieving agent package version: %w", err)
-	}
+	packageVersion := AgentPackageVersion(cfg)
 
 	hash, err := cfg.Build.CommitHash()
 	if err != nil {
@@ -232,12 +229,7 @@ func PackageManifest(cfg *Settings, fips bool) (string, error) {
 		return "", fmt.Errorf("retrieving agent commit hash: %w", err)
 	}
 
-	registry, err := cfg.FlavorsRegistry()
-	if err != nil {
-		return "", fmt.Errorf("retrieving agent flavors: %w", err)
-	}
-
-	return GeneratePackageManifest(cfg.Beat.Name, packageVersion, cfg.Build.Snapshot, hash, commitHashShort, fips, registry)
+	return GeneratePackageManifest(cfg.Beat.Name, packageVersion, cfg.Build.Snapshot, hash, commitHashShort, fips, cfg.FlavorsRegistry())
 }
 
 func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, fullHash, shortHash string, fips bool, flavorsRegistry map[string][]string) (string, error) {
@@ -288,16 +280,13 @@ func GenerateSnapshotSuffix(snapshot bool) string {
 
 // BeatQualifiedVersion returns the Beat's qualified version.
 // If a version qualifier is set, it appends it to the version.
-func (s *Settings) BeatQualifiedVersion() (string, error) {
-	version, err := s.BeatVersion()
-	if err != nil {
-		return "", err
-	}
+func (s *Settings) BeatQualifiedVersion() string {
+	version := s.BeatVersion()
 	// version qualifier can intentionally be set to "" to override build time var
 	if !s.Build.VersionQualified || s.Build.VersionQualifier == "" {
-		return version, nil
+		return version
 	}
-	return version + "-" + s.Build.VersionQualifier, nil
+	return version + "-" + s.Build.VersionQualifier
 }
 
 var (
@@ -1697,11 +1686,8 @@ func (s *Settings) TestTagsWithFIPS() []string {
 
 // ElasticBeatsDir returns the path to the Elastic Beats directory.
 // The value is initialized during LoadSettings().
-func (s *Settings) ElasticBeatsDir() (string, error) {
-	if s.elasticBeatsDir == "" {
-		return "", fmt.Errorf("elasticBeatsDir not initialized; call LoadSettings() first")
-	}
-	return s.elasticBeatsDir, nil
+func (s *Settings) ElasticBeatsDir() string {
+	return s.elasticBeatsDir
 }
 
 // SetElasticBeatsDir sets the Elastic Beats directory path on the settings.
@@ -1712,48 +1698,36 @@ func (s *Settings) SetElasticBeatsDir(path string) {
 // GoVersion returns the Go version.
 // If BeatGoVersion override is set, it returns that value.
 // Otherwise returns the value loaded from the .go-version file.
-func (s *Settings) GoVersion() (string, error) {
+func (s *Settings) GoVersion() string {
 	if s.Build.BeatGoVersion != "" {
-		return s.Build.BeatGoVersion, nil
+		return s.Build.BeatGoVersion
 	}
-	if s.goVersion == "" {
-		return "", fmt.Errorf("goVersion not initialized; call LoadSettings() first")
-	}
-	return s.goVersion, nil
+	return s.goVersion
 }
 
 // DocBranch returns the documentation branch.
 // If BeatDocBranch override is set, it returns that value.
 // Otherwise returns the value loaded from the doc branch file.
-func (s *Settings) DocBranch() (string, error) {
+func (s *Settings) DocBranch() string {
 	if s.Build.BeatDocBranch != "" {
-		return s.Build.BeatDocBranch, nil
+		return s.Build.BeatDocBranch
 	}
-	if s.docBranch == "" {
-		return "", fmt.Errorf("docBranch not initialized; call LoadSettings() first")
-	}
-	return s.docBranch, nil
+	return s.docBranch
 }
 
 // BeatVersion returns the Beat version.
 // If Build.BeatVersion override is set, it returns that value.
 // Otherwise returns the value loaded from the version file.
-func (s *Settings) BeatVersion() (string, error) {
+func (s *Settings) BeatVersion() string {
 	if s.Build.BeatVersion != "" {
-		return s.Build.BeatVersion, nil
+		return s.Build.BeatVersion
 	}
-	if s.beatVersion == "" {
-		return "", fmt.Errorf("beatVersion not initialized; call LoadSettings() first")
-	}
-	return s.beatVersion, nil
+	return s.beatVersion
 }
 
 // FlavorsRegistry returns the flavors registry loaded from the flavors file.
-func (s *Settings) FlavorsRegistry() (map[string][]string, error) {
-	if s.flavorsRegistry == nil {
-		return nil, fmt.Errorf("flavorsRegistry not initialized; call LoadSettings() first")
-	}
-	return s.flavorsRegistry, nil
+func (s *Settings) FlavorsRegistry() map[string][]string {
+	return s.flavorsRegistry
 }
 
 // BuildDate returns the timestamp when settings were loaded (build started).

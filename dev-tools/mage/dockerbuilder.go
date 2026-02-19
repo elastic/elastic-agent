@@ -159,10 +159,7 @@ func (b *dockerBuilder) copyFiles() error {
 }
 
 func (b *dockerBuilder) prepareBuild() error {
-	elasticBeatsDir, err := b.cfg.ElasticBeatsDir()
-	if err != nil {
-		return err
-	}
+	elasticBeatsDir := b.cfg.ElasticBeatsDir()
 	templatesDir := filepath.Join(elasticBeatsDir, "dev-tools/packaging/templates/docker")
 
 	data := map[string]interface{}{
@@ -171,14 +168,14 @@ func (b *dockerBuilder) prepareBuild() error {
 		"Variant":     b.DockerVariant.String(),
 	}
 
-	err = filepath.WalkDir(templatesDir, func(path string, d fs.DirEntry, _ error) error {
+	err := filepath.WalkDir(templatesDir, func(path string, d fs.DirEntry, _ error) error {
 		if !d.Type().IsDir() && !isDockerFile(path) {
 			target := strings.TrimSuffix(
 				filepath.Join(b.buildDir, filepath.Base(path)),
 				".tmpl",
 			)
 
-			err = b.ExpandFile(path, target, data)
+			err := b.ExpandFile(path, target, data)
 			if err != nil {
 				return fmt.Errorf("expanding template '%s' to '%s': %w", path, target, err)
 			}

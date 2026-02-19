@@ -213,10 +213,7 @@ func CrossBuildImage(cfg *Settings, platform string) (string, error) {
 		tagSuffix = "windows-arm64-debian12"
 	}
 
-	goVersion, err := cfg.GoVersion()
-	if err != nil {
-		return "", err
-	}
+	goVersion := cfg.GoVersion()
 
 	if cfg.Build.FIPSBuild {
 		tagSuffix += "-fips"

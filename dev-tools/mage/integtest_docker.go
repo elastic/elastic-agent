@@ -113,10 +113,7 @@ func (d *DockerIntegrationTester) Test(dir string, mageTarget string, cfg *Setti
 		mageTarget,
 	)
 
-	composeEnv, err := integTestDockerComposeEnvVars(cfg)
-	if err != nil {
-		return err
-	}
+	composeEnv := integTestDockerComposeEnvVars(cfg)
 
 	_, testErr := sh.Exec(
 		composeEnv,
@@ -199,18 +196,13 @@ func (d *DockerIntegrationTester) InsideTest(test func() error, cfg *Settings) e
 // integTestDockerComposeEnvVars returns the environment variables used for
 // executing docker-compose (not the variables passed into the containers).
 // docker-compose uses these when evaluating docker-compose.yml files.
-func integTestDockerComposeEnvVars(cfg *Settings) (map[string]string, error) {
-	esBeatsDir, err := cfg.ElasticBeatsDir()
-	if err != nil {
-		return nil, err
-	}
-
+func integTestDockerComposeEnvVars(cfg *Settings) map[string]string {
 	return map[string]string{
-		"ES_BEATS":          esBeatsDir,
+		"ES_BEATS":          cfg.ElasticBeatsDir(),
 		"STACK_ENVIRONMENT": StackEnvironment,
 		// Deprecated use STACK_ENVIRONMENT instead (it's more descriptive).
 		"TESTING_ENVIRONMENT": StackEnvironment,
-	}, nil
+	}
 }
 
 // dockerComposeProjectName returns the project name to use with docker-compose.
@@ -223,11 +215,7 @@ func (d *DockerIntegrationTester) dockerComposeProjectName(cfg *Settings) string
 		panic(fmt.Errorf("failed to construct docker compose project name: %w", err))
 	}
 
-	version, err := cfg.BeatQualifiedVersion()
-	if err != nil {
-		panic(fmt.Errorf("failed to construct docker compose project name: %w", err))
-	}
-	version = strings.NewReplacer(".", "_").Replace(version)
+	version := strings.NewReplacer(".", "_").Replace(cfg.BeatQualifiedVersion())
 
 	projectName := "{{.BeatName}}_{{.Version}}_{{.ShortCommit}}-{{.StackEnvironment}}"
 	projectName = MustExpand(cfg, projectName, map[string]interface{}{
@@ -242,10 +230,7 @@ func (d *DockerIntegrationTester) dockerComposeProjectName(cfg *Settings) string
 func (d *DockerIntegrationTester) dockerComposeBuildImages(cfg *Settings) error {
 	fmt.Println(">> Building docker images")
 
-	composeEnv, err := integTestDockerComposeEnvVars(cfg)
-	if err != nil {
-		return err
-	}
+	composeEnv := integTestDockerComposeEnvVars(cfg)
 
 	args := []string{"-p", d.dockerComposeProjectName(cfg), "build", "--force-rm"}
 	if cfg.Docker.NoCache {
@@ -261,7 +246,7 @@ func (d *DockerIntegrationTester) dockerComposeBuildImages(cfg *Settings) error 
 		out = os.Stderr
 	}
 
-	_, err = sh.Exec(
+	_, err := sh.Exec(
 		composeEnv,
 		out,
 		os.Stderr,

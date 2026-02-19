@@ -15,19 +15,16 @@ import (
 func TestGetVersion(t *testing.T) {
 	cfg, err := LoadSettings()
 	require.NoError(t, err)
-	bp, err := cfg.BeatQualifiedVersion()
-	assert.NoError(t, err)
-	_ = bp
+	bp := cfg.BeatQualifiedVersion()
+	assert.NotEmpty(t, bp)
 }
 
 func TestAgentPackageVersion(t *testing.T) {
 	t.Run("agent package version without env var", func(t *testing.T) {
 		cfg, err := LoadSettings()
 		require.NoError(t, err)
-		expectedPkgVersion, err := cfg.BeatQualifiedVersion()
-		require.NoError(t, err)
-		actualPkgVersion, err := AgentPackageVersion(cfg)
-		require.NoError(t, err)
+		expectedPkgVersion := cfg.BeatQualifiedVersion()
+		actualPkgVersion := AgentPackageVersion(cfg)
 		assert.Equal(t, expectedPkgVersion, actualPkgVersion)
 	})
 
@@ -36,8 +33,7 @@ func TestAgentPackageVersion(t *testing.T) {
 		require.NoError(t, err)
 		expectedPkgVersion := "1.2.3-specialrelease+abcdef"
 		cfg.Packaging.AgentPackageVersion = expectedPkgVersion
-		actualPkgVersion, err := AgentPackageVersion(cfg)
-		require.NoError(t, err)
+		actualPkgVersion := AgentPackageVersion(cfg)
 		assert.Equal(t, expectedPkgVersion, actualPkgVersion)
 	})
 
@@ -47,11 +43,9 @@ func TestAgentPackageVersion(t *testing.T) {
 		cfg.Packaging.AgentPackageVersion = "1.2.3-specialrelease+abcdef"
 		funcMap := FuncMap(cfg)
 		assert.Contains(t, funcMap, agentPackageVersionMappedFunc)
-		require.IsType(t, funcMap[agentPackageVersionMappedFunc], func() (string, error) { return "", nil })
-		mappedFuncPkgVersion, err := funcMap[agentPackageVersionMappedFunc].(func() (string, error))()
-		require.NoError(t, err)
-		expectedPkgVersion, err := AgentPackageVersion(cfg)
-		require.NoError(t, err)
+		require.IsType(t, funcMap[agentPackageVersionMappedFunc], func() string { return "" })
+		mappedFuncPkgVersion := funcMap[agentPackageVersionMappedFunc].(func() string)()
+		expectedPkgVersion := AgentPackageVersion(cfg)
 		assert.Equal(t, expectedPkgVersion, mappedFuncPkgVersion)
 	})
 }

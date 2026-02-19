@@ -115,10 +115,7 @@ func (d *IntegrationTester) Test(dir string, mageTarget string, cfg *mage.Settin
 	destDir := filepath.Join("/go/src", repo.CanonicalRootImportPath)
 	workDir := filepath.Join(destDir, repo.SubDir)
 	// determine the Go version
-	goVersion, err := cfg.GoVersion()
-	if err != nil {
-		return fmt.Errorf("failed to determine Go version: %w", err)
-	}
+	goVersion := cfg.GoVersion()
 	remote, err := NewKubeRemote(kubeConfig, "default", kubernetesClusterName(cfg), goVersion, workDir, destDir, repo.RootDir)
 	if err != nil {
 		return err
@@ -166,11 +163,7 @@ func kubernetesClusterName(cfg *mage.Settings) string {
 		panic(fmt.Errorf("failed to construct kind cluster name: %w", err))
 	}
 
-	version, err := cfg.BeatQualifiedVersion()
-	if err != nil {
-		panic(fmt.Errorf("failed to construct kind cluster name: %w", err))
-	}
-	version = strings.NewReplacer(".", "-").Replace(version)
+	version := strings.NewReplacer(".", "-").Replace(cfg.BeatQualifiedVersion())
 
 	clusterName := "{{.BeatName}}-{{.Version}}-{{.ShortCommit}}-{{.StackEnvironment}}"
 	clusterName = mage.MustExpand(cfg, clusterName, map[string]interface{}{
