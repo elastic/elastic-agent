@@ -38,7 +38,7 @@ func UseElasticAgentPackaging(cfg *Settings) {
 //
 // NOTE: we assume that specFile is relative to the beatsDir.
 func MustUsePackaging(specName, specFile string, cfg *Settings) {
-	beatsDir := cfg.ElasticBeatsDir()
+	beatsDir := cfg.ElasticBeatsDir
 
 	err := LoadNamedSpec(specName, filepath.Join(beatsDir, specFile))
 	if err != nil {
@@ -49,7 +49,7 @@ func MustUsePackaging(specName, specFile string, cfg *Settings) {
 // LoadLocalNamedSpec loads the named package spec from the packages.yml in the
 // current directory.
 func LoadLocalNamedSpec(name string, cfg *Settings) {
-	beatsDir := cfg.ElasticBeatsDir()
+	beatsDir := cfg.ElasticBeatsDir
 
 	err := LoadNamedSpec(name, filepath.Join(beatsDir, packageSpecFile), "packages.yml")
 	if err != nil {

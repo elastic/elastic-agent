@@ -198,7 +198,7 @@ func (d *DockerIntegrationTester) InsideTest(test func() error, cfg *Settings) e
 // docker-compose uses these when evaluating docker-compose.yml files.
 func integTestDockerComposeEnvVars(cfg *Settings) map[string]string {
 	return map[string]string{
-		"ES_BEATS":          cfg.ElasticBeatsDir(),
+		"ES_BEATS":          cfg.ElasticBeatsDir,
 		"STACK_ENVIRONMENT": StackEnvironment,
 		// Deprecated use STACK_ENVIRONMENT instead (it's more descriptive).
 		"TESTING_ENVIRONMENT": StackEnvironment,

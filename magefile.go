@@ -806,7 +806,7 @@ func Update() {
 
 func EnsureCrossBuildOutputDir(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
-	repositoryRoot := cfg.ElasticBeatsDir()
+	repositoryRoot := cfg.ElasticBeatsDir
 	return os.MkdirAll(filepath.Join(repositoryRoot, "build", "golang-crossbuild"), 0o770)
 }
 
@@ -1423,7 +1423,7 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 	}
 
 	// Create a dir with the buildID at <root>/build/core/<buildID>
-	repositoryRoot := cfg.ElasticBeatsDir()
+	repositoryRoot := cfg.ElasticBeatsDir
 	coreDownloadDir := filepath.Join(repositoryRoot, "build", "core")
 	err = os.MkdirAll(coreDownloadDir, 0o770)
 	if err != nil {
@@ -1641,7 +1641,7 @@ func extractAgentCoreForPackage(ctx context.Context, cfg *mage.Settings, manifes
 	elasticAgentCoreComponent := elasticAgentCoreComponents[0]
 	platforms := cfg.GetPlatforms().Names()
 
-	repositoryRoot := cfg.ElasticBeatsDir()
+	repositoryRoot := cfg.ElasticBeatsDir
 	downloadDir := filepath.Join(repositoryRoot, "build", "core")
 
 	var coreDownloadDir string

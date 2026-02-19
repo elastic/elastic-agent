@@ -159,7 +159,7 @@ func (b *dockerBuilder) copyFiles() error {
 }
 
 func (b *dockerBuilder) prepareBuild() error {
-	elasticBeatsDir := b.cfg.ElasticBeatsDir()
+	elasticBeatsDir := b.cfg.ElasticBeatsDir
 	templatesDir := filepath.Join(elasticBeatsDir, "dev-tools/packaging/templates/docker")
 
 	data := map[string]interface{}{

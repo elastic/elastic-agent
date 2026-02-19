@@ -75,8 +75,8 @@ func FuncMap(cfg *Settings) map[string]interface{} {
 		"beat_version":                   func() string { return cfg.BeatQualifiedVersion() },
 		"commit":                         func() (string, error) { return cfg.Build.CommitHash() },
 		"commit_short":                   func() (string, error) { return cfg.Build.CommitHashShort() },
-		"date":                           cfg.BuildDate,
-		"elastic_beats_dir":              func() string { return cfg.ElasticBeatsDir() },
+		"date":                           func() string { return cfg.BuildDate },
+		"elastic_beats_dir":              func() string { return cfg.ElasticBeatsDir },
 		"go_version":                     func() string { return cfg.GoVersion() },
 		"repo":                           func() *ProjectRepoInfo { return cfg.RepoInfo },
 		"title":                          func(s string) string { return cases.Title(language.English, cases.NoLower).String(s) },
@@ -229,7 +229,7 @@ func PackageManifest(cfg *Settings, fips bool) (string, error) {
 		return "", fmt.Errorf("retrieving agent commit hash: %w", err)
 	}
 
-	return GeneratePackageManifest(cfg.Beat.Name, packageVersion, cfg.Build.Snapshot, hash, commitHashShort, fips, cfg.FlavorsRegistry())
+	return GeneratePackageManifest(cfg.Beat.Name, packageVersion, cfg.Build.Snapshot, hash, commitHashShort, fips, cfg.FlavorsRegistry)
 }
 
 func GeneratePackageManifest(beatName, packageVersion string, snapshot bool, fullHash, shortHash string, fips bool, flavorsRegistry map[string][]string) (string, error) {
@@ -628,9 +628,9 @@ type Settings struct {
 	// Initialized during LoadSettings().
 	RepoInfo *ProjectRepoInfo
 
-	// elasticBeatsDir is the path to the Elastic Beats directory.
+	// ElasticBeatsDir is the path to the Elastic Beats directory.
 	// Initialized during LoadSettings().
-	elasticBeatsDir string
+	ElasticBeatsDir string
 
 	// goVersion is the Go version read from .go-version file.
 	// Initialized during LoadSettings().
@@ -644,13 +644,13 @@ type Settings struct {
 	// Initialized during LoadSettings().
 	beatVersion string
 
-	// flavorsRegistry is the map of flavors read from _meta/.flavors.
+	// FlavorsRegistry is the map of flavors read from _meta/.flavors.
 	// Initialized during LoadSettings().
-	flavorsRegistry map[string][]string
+	FlavorsRegistry map[string][]string
 
-	// buildDate is the timestamp when settings were loaded (build started).
+	// BuildDate is the timestamp when settings were loaded (build started).
 	// Initialized during LoadSettings().
-	buildDate string
+	BuildDate string
 }
 
 // DefaultSettings returns a new Settings instance with all default values.
@@ -1589,14 +1589,14 @@ func (s *Settings) initElasticBeatsDir() error {
 		return fmt.Errorf("RepoInfo must be initialized before elasticBeatsDir")
 	}
 	if s.RepoInfo.IsElasticBeats() {
-		s.elasticBeatsDir = s.RepoInfo.RootDir
-		log.Println("Found Elastic Beats dir at", s.elasticBeatsDir)
+		s.ElasticBeatsDir = s.RepoInfo.RootDir
+		log.Println("Found Elastic Beats dir at", s.ElasticBeatsDir)
 		return nil
 	}
 	var err error
-	s.elasticBeatsDir, err = gotool.ListModuleCacheDir(elasticAgentModulePath)
+	s.ElasticBeatsDir, err = gotool.ListModuleCacheDir(elasticAgentModulePath)
 	if err == nil {
-		log.Println("Found Elastic Beats dir at", s.elasticBeatsDir)
+		log.Println("Found Elastic Beats dir at", s.ElasticBeatsDir)
 	}
 	return err
 }
@@ -1604,12 +1604,12 @@ func (s *Settings) initElasticBeatsDir() error {
 // initBuildVariables loads build variables from files in elasticBeatsDir.
 // Must be called after initElasticBeatsDir.
 func (s *Settings) initBuildVariables() error {
-	if s.elasticBeatsDir == "" {
+	if s.ElasticBeatsDir == "" {
 		return fmt.Errorf("elasticBeatsDir must be initialized before build variables")
 	}
 
 	// Load Go version from .go-version file
-	goVersionFile := filepath.Join(s.elasticBeatsDir, ".go-version")
+	goVersionFile := filepath.Join(s.ElasticBeatsDir, ".go-version")
 	data, err := os.ReadFile(goVersionFile)
 	if err != nil {
 		return fmt.Errorf("failed to read go version file=%v: %w", goVersionFile, err)
@@ -1617,7 +1617,7 @@ func (s *Settings) initBuildVariables() error {
 	s.goVersion = strings.TrimSpace(string(data))
 
 	// Load doc branch from version/docs/version.asciidoc
-	docBranchFile := filepath.Join(s.elasticBeatsDir, "version", "docs", "version.asciidoc")
+	docBranchFile := filepath.Join(s.ElasticBeatsDir, "version", "docs", "version.asciidoc")
 	data, err = os.ReadFile(docBranchFile)
 	if err != nil {
 		return fmt.Errorf("failed to read doc branch file=%v: %w", docBranchFile, err)
@@ -1628,7 +1628,7 @@ func (s *Settings) initBuildVariables() error {
 	}
 
 	// Load beat version from version/version.go
-	beatVersionFile := filepath.Join(s.elasticBeatsDir, "version", "version.go")
+	beatVersionFile := filepath.Join(s.ElasticBeatsDir, "version", "version.go")
 	data, err = os.ReadFile(beatVersionFile)
 	if err != nil {
 		return fmt.Errorf("failed to read beat version file=%v: %w", beatVersionFile, err)
@@ -1639,13 +1639,13 @@ func (s *Settings) initBuildVariables() error {
 	}
 
 	// Load flavors registry from _meta/.flavors
-	flavorsFile := filepath.Join(s.elasticBeatsDir, "_meta", ".flavors")
+	flavorsFile := filepath.Join(s.ElasticBeatsDir, "_meta", ".flavors")
 	data, err = os.ReadFile(flavorsFile)
 	if err != nil {
 		return fmt.Errorf("failed to read flavors file=%v: %w", flavorsFile, err)
 	}
-	s.flavorsRegistry = make(map[string][]string)
-	if err := yaml.Unmarshal(data, s.flavorsRegistry); err != nil {
+	s.FlavorsRegistry = make(map[string][]string)
+	if err := yaml.Unmarshal(data, s.FlavorsRegistry); err != nil {
 		return fmt.Errorf("failed to parse flavors: %w", err)
 	}
 
@@ -1684,17 +1684,6 @@ func (s *Settings) TestTagsWithFIPS() []string {
 	return tags
 }
 
-// ElasticBeatsDir returns the path to the Elastic Beats directory.
-// The value is initialized during LoadSettings().
-func (s *Settings) ElasticBeatsDir() string {
-	return s.elasticBeatsDir
-}
-
-// SetElasticBeatsDir sets the Elastic Beats directory path on the settings.
-func (s *Settings) SetElasticBeatsDir(path string) {
-	s.elasticBeatsDir = path
-}
-
 // GoVersion returns the Go version.
 // If BeatGoVersion override is set, it returns that value.
 // Otherwise returns the value loaded from the .go-version file.
@@ -1723,16 +1712,6 @@ func (s *Settings) BeatVersion() string {
 		return s.Build.BeatVersion
 	}
 	return s.beatVersion
-}
-
-// FlavorsRegistry returns the flavors registry loaded from the flavors file.
-func (s *Settings) FlavorsRegistry() map[string][]string {
-	return s.flavorsRegistry
-}
-
-// BuildDate returns the timestamp when settings were loaded (build started).
-func (s *Settings) BuildDate() string {
-	return s.buildDate
 }
 
 // GetPlatforms returns the parsed platform list from PLATFORMS env var.
