@@ -1040,6 +1040,8 @@ github.com/mdlayher/socket v0.4.1 h1:eM9y2/jlbs1M615oshPQOHZzj6R6wMT7bX5NPiQvn2U
 github.com/mdlayher/socket v0.4.1/go.mod h1:cAqeGjoufqdxWkD7DkpyS+wcefOtmu5OQ8KuoJGIReA=
 github.com/mdlayher/vsock v1.2.1 h1:pC1mTJTvjo1r9n9fbm7S1j04rCgCzhCOS5DY0zqHlnQ=
 github.com/mdlayher/vsock v1.2.1/go.mod h1:NRfCibel++DgeMD8z/hP+PPTjlNJsdPOmxcnENvE+SE=
+github.com/michel-laterman/proxy-connect-dialer-go v0.1.0 h1:Q8asukpmyrEheocd+R+6YEI4jcm62sHHalgTMG+LoLw=
+github.com/michel-laterman/proxy-connect-dialer-go v0.1.0/go.mod h1:HTlVkRAqzTRPYbWxgAiwMT9HRZMOqP3Mx7+toa3yJjc=
 github.com/microsoft/go-mssqldb v1.9.6 h1:1MNQg5UiSsokiPz3++K2KPx4moKrwIqly1wv+RyCKTw=
 github.com/microsoft/go-mssqldb v1.9.6/go.mod h1:yYMPDufyoF2vVuVCUGtZARr06DKFIhMrluTcgWlXpr4=
 github.com/microsoft/wmi v0.38.3 h1:RVbn+m2jlPRsB2fLADXqabJj/EhMXQbvKM7OYS8VOv0=
@@ -1161,6 +1163,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8s
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.145.0/go.mod h1:jKJ2WHjB0nm3GVBTzmAVl58UbCmhoO9kgZelaY5u5yQ=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampcustommessages v0.145.0 h1:+vxIyxe8KkaXYrABiuslJRqC0vPIPDz8JaDNszi0UpA=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampcustommessages v0.145.0/go.mod h1:fd4BmG/alnGTP5jbYwyRAegWFkvqYjgXU4EXYUXPUyA=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension v0.145.0 h1:+Kh/dU7LijmpeaaIY/liaGxOY1ELYrpCtAq+cbPgMww=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension v0.145.0/go.mod h1:A2ISSyiguBYUpTx7YuGb9tsuHoWoajOKTcQxC1oKlKg=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.145.0 h1:vXN97AHBBFB79ztIIci4Eo6mcQ4+sIkh8m8G3T5JCKI=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.145.0/go.mod h1:vd3wPg0cgd6xlny6S6wn45/RStCrZ5kvfdSR64OBZy4=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage v0.145.0 h1:STJO1EUAQA0dALZmJ7nHe7D577KfdXsgLQq9DWn8mz8=

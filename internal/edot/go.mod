@@ -30,8 +30,8 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.145.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/logdedupprocessor v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.145.0
@@ -106,6 +106,7 @@ require (
 	github.com/jaypipes/pcidb v1.0.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
+	github.com/michel-laterman/proxy-connect-dialer-go v0.1.0 // indirect
 	github.com/mileusna/useragent v1.3.5 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/moby/spdystream v0.5.0 // indirect
