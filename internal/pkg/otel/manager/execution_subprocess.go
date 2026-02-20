@@ -145,119 +145,34 @@ func (r *subprocessExecution) startCollector(
 			return nil
 		}),
 	)
-	if err != nil {
+	if err != nil || processInfo.Process == nil {
 		// we failed to start the process
+		if err == nil {
+			err = errors.New("failed to start supervised collector: process is nil")
+		}
 		procCtxCancel()
 		return nil, fmt.Errorf("failed to start supervised collector: %w", err)
 	}
+
 	logger.Infof("supervised collector started with pid: %d and healthcheck port: %d", processInfo.Process.Pid, httpHealthCheckPort)
-	if processInfo.Process == nil {
-		// this should not happen but just in case
-		procCtxCancel()
-		return nil, fmt.Errorf("failed to start supervised collector: process is nil")
-	}
 
 	ctl := &procHandle{
 		processDoneCh: make(chan struct{}),
 		processInfo:   processInfo,
 		log:           logger,
 	}
-
-	healthCheckDone := make(chan struct{})
-	go func() {
-		defer func() {
-			close(healthCheckDone)
-		}()
-		currentStatus := status.AggregateStatus(componentstatus.StatusStarting, nil)
-		r.reportSubprocessCollectorStatus(ctx, statusCh, currentStatus)
-
-		// specify a max duration of not being able to get the status from the collector
-		const maxFailuresDuration = 130 * time.Second
-		maxFailuresTimer := time.NewTimer(maxFailuresDuration)
-		defer maxFailuresTimer.Stop()
-
-		// check the health of the collector every 1 second
-		const healthCheckPollDuration = 1 * time.Second
-		healthCheckPollTimer := time.NewTimer(healthCheckPollDuration)
-		defer healthCheckPollTimer.Stop()
-		client := http.Client{}
-		for {
-			statuses, err := AllComponentsStatuses(procCtx, client, httpHealthCheckPort)
-			if err != nil {
-				switch {
-				case errors.Is(err, context.Canceled):
-					// after the collector exits, we need to report a nil status
-					r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
-					return
-				default:
-					// if we face any other error (most likely, connection refused), log the error.
-					logger.Debugf("Received an unexpected error while fetching component status: %v", err)
-				}
-			} else {
-				maxFailuresTimer.Reset(maxFailuresDuration)
-				removeManagedHealthCheckExtensionStatus(statuses, r.healthCheckExtensionID)
-				if !status.CompareStatuses(currentStatus, statuses) {
-					currentStatus = statuses
-					r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
-				}
-			}
-
-			select {
-			case <-procCtx.Done():
-				// after the collector exits, we need to report a nil status
-				r.reportSubprocessCollectorStatus(ctx, statusCh, nil)
-				return
-			case <-forceFetchStatusCh:
-				r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
-			case <-healthCheckPollTimer.C:
-				healthCheckPollTimer.Reset(healthCheckPollDuration)
-			case <-maxFailuresTimer.C:
-				failedToConnectStatuses := status.AggregateStatus(
-					componentstatus.StatusRecoverableError,
-					errors.New("failed to connect to collector"),
-				)
-				if !status.CompareStatuses(currentStatus, failedToConnectStatuses) {
-					currentStatus = statuses
-					r.reportSubprocessCollectorStatus(procCtx, statusCh, statuses)
-				}
-			}
-		}
-	}()
-
-	go func() {
-		procState, procErr := processInfo.Process.Wait()
-		logger.Debugf("wait for pid %d returned", processInfo.PID)
-		procCtxCancel()
-		<-healthCheckDone
-		close(ctl.processDoneCh)
-		// using ctx instead of procCtx in the reportErr functions below is intentional. This allows us to report
-		// errors to the caller through processErrCh and essentially discard any other errors that occurred because
-		// the process exited.
-		if procErr == nil {
-			if procState.Success() {
-				// report nil error so that the caller can be notified that the process has exited without error
-				r.reportErrFn(ctx, processErrCh, nil)
-			} else {
-				var procReportErr error
-				stderrMsg := stdErrLast.Last().Message
-				stdoutMsg := stdOutLast.Last().Message
-				if stderrMsg != "" {
-					// use stderr message as the error
-					procReportErr = errors.New(stderrMsg)
-				} else if stdoutMsg != "" {
-					// use last stdout message as the error
-					procReportErr = errors.New(stdoutMsg)
-				} else {
-					// neither case use standard process error
-					procReportErr = fmt.Errorf("supervised collector (pid: %d) exited with error: %s", procState.Pid(), procState.String())
-				}
-				r.reportErrFn(ctx, processErrCh, procReportErr)
-			}
-			return
-		}
-
-		r.reportErrFn(ctx, processErrCh, fmt.Errorf("failed to wait supervised collector process: %w", procErr))
-	}()
+	ctl.startMonitoring(monitoringArgs{
+		procCtx:                procCtx,
+		procCtxCancel:          procCtxCancel,
+		healthCheckExtensionID: r.healthCheckExtensionID,
+		httpHealthCheckPort:    httpHealthCheckPort,
+		statusCh:               statusCh,
+		forceFetchStatusCh:     forceFetchStatusCh,
+		processErrCh:           processErrCh,
+		reportErrFn:            r.reportErrFn,
+		stdOutLast:             stdOutLast,
+		stdErrLast:             stdErrLast,
+	})
 
 	return ctl, nil
 }
@@ -280,13 +195,6 @@ func cloneCollectorStatus(aStatus *otelstatus.AggregateStatus) *otelstatus.Aggre
 	}
 
 	return st
-}
-
-func (r *subprocessExecution) reportSubprocessCollectorStatus(ctx context.Context, statusCh chan *otelstatus.AggregateStatus, collectorStatus *otelstatus.AggregateStatus) {
-	// we need to clone the status to prevent any mutation on the receiver side
-	// affecting the original ref
-	clonedStatus := cloneCollectorStatus(collectorStatus)
-	reportCollectorStatus(ctx, statusCh, clonedStatus)
 }
 
 // getCollectorHealthCheckPort returns the health check port used by the OTel collector.
@@ -350,11 +258,137 @@ type procHandle struct {
 	processDoneCh chan struct{}
 	processInfo   *process.Info
 	log           *logger.Logger
+	wg            sync.WaitGroup
+}
+
+type monitoringArgs struct {
+	procCtx                context.Context
+	procCtxCancel          context.CancelFunc
+	healthCheckExtensionID string
+	httpHealthCheckPort    int
+	statusCh               chan *otelstatus.AggregateStatus
+	forceFetchStatusCh     chan struct{}
+	processErrCh           chan error
+	reportErrFn            func(ctx context.Context, errCh chan error, err error)
+	stdOutLast             *zapLast
+	stdErrLast             *zapLast
+}
+
+func (s *procHandle) startMonitoring(args monitoringArgs) {
+	healthCheckDone := make(chan struct{})
+	s.wg.Add(2)
+	go s.monitorHealth(args, healthCheckDone)
+	go s.monitorProcess(args, healthCheckDone)
+}
+
+// monitorHealth polls the collector's health check endpoint and reports status changes.
+func (s *procHandle) monitorHealth(args monitoringArgs, done chan struct{}) {
+	defer s.wg.Done()
+	defer close(done)
+
+	reportStatus := func(ctx context.Context, collectorStatus *otelstatus.AggregateStatus) {
+		reportCollectorStatus(ctx, args.statusCh, cloneCollectorStatus(collectorStatus))
+	}
+
+	currentStatus := status.AggregateStatus(componentstatus.StatusStarting, nil)
+	reportStatus(args.procCtx, currentStatus)
+
+	// specify a max duration of not being able to get the status from the collector
+	const maxFailuresDuration = 130 * time.Second
+	maxFailuresTimer := time.NewTimer(maxFailuresDuration)
+	defer maxFailuresTimer.Stop()
+
+	// check the health of the collector every 1 second
+	const healthCheckPollDuration = 1 * time.Second
+	healthCheckPollTimer := time.NewTimer(healthCheckPollDuration)
+	defer healthCheckPollTimer.Stop()
+	client := http.Client{}
+	for {
+		statuses, err := AllComponentsStatuses(args.procCtx, client, args.httpHealthCheckPort)
+		if err != nil {
+			switch {
+			case errors.Is(err, context.Canceled):
+				// after the collector exits, we need to report a nil status
+				reportStatus(args.procCtx, nil)
+				return
+			default:
+				// if we face any other error (most likely, connection refused), log the error.
+				s.log.Debugf("Received an unexpected error while fetching component status: %v", err)
+			}
+		} else {
+			maxFailuresTimer.Reset(maxFailuresDuration)
+			removeManagedHealthCheckExtensionStatus(statuses, args.healthCheckExtensionID)
+			if !status.CompareStatuses(currentStatus, statuses) {
+				currentStatus = statuses
+				reportStatus(args.procCtx, statuses)
+			}
+		}
+
+		select {
+		case <-args.procCtx.Done():
+			// after the collector exits, we need to report a nil status
+			reportStatus(args.procCtx, nil)
+			return
+		case <-args.forceFetchStatusCh:
+			reportStatus(args.procCtx, statuses)
+		case <-healthCheckPollTimer.C:
+			healthCheckPollTimer.Reset(healthCheckPollDuration)
+		case <-maxFailuresTimer.C:
+			failedToConnectStatuses := status.AggregateStatus(
+				componentstatus.StatusRecoverableError,
+				errors.New("failed to connect to collector"),
+			)
+			if !status.CompareStatuses(currentStatus, failedToConnectStatuses) {
+				currentStatus = statuses
+				reportStatus(args.procCtx, statuses)
+			}
+		}
+	}
+}
+
+// monitorProcess waits for the collector process to exit and reports the exit status.
+func (s *procHandle) monitorProcess(args monitoringArgs, healthCheckDone <-chan struct{}) {
+	defer s.wg.Done()
+
+	procState, procErr := s.processInfo.Process.Wait()
+	s.log.Debugf("wait for pid %d returned", s.processInfo.PID)
+	args.procCtxCancel()
+	<-healthCheckDone
+	close(s.processDoneCh)
+	// using args.ctx instead of args.procCtx in the reportErr functions below is intentional. This allows us to
+	// report errors to the caller through processErrCh and essentially discard any other errors that occurred
+	// because the process exited.
+	if procErr == nil {
+		if procState.Success() {
+			// report nil error so that the caller can be notified that the process has exited without error
+			args.reportErrFn(args.procCtx, args.processErrCh, nil)
+		} else {
+			var procReportErr error
+			stderrMsg := args.stdErrLast.Last().Message
+			stdoutMsg := args.stdOutLast.Last().Message
+			if stderrMsg != "" {
+				// use stderr message as the error
+				procReportErr = errors.New(stderrMsg)
+			} else if stdoutMsg != "" {
+				// use last stdout message as the error
+				procReportErr = errors.New(stdoutMsg)
+			} else {
+				// neither case use standard process error
+				procReportErr = fmt.Errorf("supervised collector (pid: %d) exited with error: %s", procState.Pid(), procState.String())
+			}
+			args.reportErrFn(args.procCtx, args.processErrCh, procReportErr)
+		}
+		return
+	}
+
+	args.reportErrFn(args.procCtx, args.processErrCh, fmt.Errorf("failed to wait supervised collector process: %w", procErr))
 }
 
 // Stop stops the process. If the process is already stopped, it does nothing. If the process does not stop within
 // processKillAfter or due to an error, it will be killed.
 func (s *procHandle) Stop(waitTime time.Duration) {
+	defer s.wg.Wait()
+
 	select {
 	case <-s.processDoneCh:
 		// process has already exited
