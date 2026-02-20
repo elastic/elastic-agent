@@ -57,6 +57,7 @@ core_components:
 
 # Extensions
   - filestorage
+  - opampextension
 
 # Providers
   - envprovider

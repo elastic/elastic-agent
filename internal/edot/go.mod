@@ -17,6 +17,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.29.0
 	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.29.0
 	github.com/gofrs/uuid/v5 v5.4.0
+<<<<<<< HEAD
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.144.0
@@ -46,6 +47,44 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.144.0
+=======
+	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/awslogsencodingextension v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/headerssetterextension v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/logdedupprocessor v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/iisreceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkametricsreceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/mysqlreceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/postgresqlreceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusremotewritereceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/redisreceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/snmpreceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/statsdreceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/zipkinreceiver v0.145.0
+>>>>>>> e8076e44e (Add opampextension to EDOT Collector (#12857))
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
@@ -73,8 +112,27 @@ require (
 	github.com/go-openapi/swag/stringutils v0.25.4 // indirect
 	github.com/go-openapi/swag/typeutils v0.25.4 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.4 // indirect
+<<<<<<< HEAD
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.144.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.144.0 // indirect
+=======
+	github.com/google/gopacket v1.1.19 // indirect
+	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75 // indirect
+	github.com/gosnmp/gosnmp v1.43.2 // indirect
+	github.com/insomniacslk/dhcp v0.0.0-20251020182700-175e84fbb167 // indirect
+	github.com/itchyny/timefmt-go v0.1.7 // indirect
+	github.com/jaypipes/ghw v0.12.0 // indirect
+	github.com/jaypipes/pcidb v1.0.0 // indirect
+	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
+	github.com/mattn/go-runewidth v0.0.16 // indirect
+	github.com/michel-laterman/proxy-connect-dialer-go v0.1.0 // indirect
+	github.com/mileusna/useragent v1.3.5 // indirect
+	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
+	github.com/moby/spdystream v0.5.0 // indirect
+	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.145.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.145.0 // indirect
+>>>>>>> e8076e44e (Add opampextension to EDOT Collector (#12857))
 	github.com/oschwald/geoip2-golang/v2 v2.1.0 // indirect
 	github.com/oschwald/maxminddb-golang/v2 v2.1.1 // indirect
 	github.com/prometheus/client_golang/exp v0.0.0-20260101091701-2cd067eb23c9 // indirect
