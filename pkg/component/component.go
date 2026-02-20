@@ -51,7 +51,7 @@ type BeatRuntimeConfig struct {
 func DefaultRuntimeConfig() *RuntimeConfig {
 	return &RuntimeConfig{
 		Default:       string(DefaultRuntimeManager),
-		DynamicInputs: "",
+		DynamicInputs: string(ProcessRuntimeManager),
 		Metricbeat: BeatRuntimeConfig{
 			InputType: map[string]string{
 				"activemq/metrics":      string(OtelRuntimeManager),
