@@ -636,7 +636,7 @@ spec:
       name: elastic-agent-version-bump
       description: Buildkite Pipeline for Elastic Agent Version Bump
     spec:
-      branch_configuration: "main 8.* 9.*"
+      branch_configuration: "main"
       repository: elastic/elastic-agent
       pipeline_file: ".buildkite/pipeline.version-bump.yml"
       provider_settings:
@@ -644,9 +644,9 @@ spec:
         build_pull_requests: false
         trigger_mode: none # don't trigger jobs from github activity
       cancel_intermediate_builds: true
-      cancel_intermediate_builds_branch_filter: "!main !8.* !9.*"
+      cancel_intermediate_builds_branch_filter: "!main"
       skip_intermediate_builds: true
-      skip_intermediate_builds_branch_filter: "!main !8.* !9.*"
+      skip_intermediate_builds_branch_filter: "!main"
       teams:
         ingest-fp:
           access_level: MANAGE_BUILD_AND_READ
