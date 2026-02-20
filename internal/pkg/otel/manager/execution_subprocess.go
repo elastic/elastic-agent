@@ -129,15 +129,14 @@ func (r *subprocessExecution) startCollector(
 
 		return nil
 	}
-
-	if err := configModifier(cfg); err != nil {
+	// make sure the config can be prepared and serialized before starting the process
+	cfgCopy, err := cfg.Sub("")
+	if err != nil {
 		return nil, err
 	}
-
-	confMap := cfg.ToStringMap()
-	confBytes, err := yaml.Marshal(confMap)
+	_, err = prepareAndSerializeConfig(cfgCopy, configModifier)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal config to yaml: %w", err)
+		return nil, err
 	}
 
 	stdOutLast := newZapLast(collectorLogger.Core())
@@ -155,6 +154,11 @@ func (r *subprocessExecution) startCollector(
 		procCtxCancel()
 		return nil, fmt.Errorf("failed to create config pipe: %w", err)
 	}
+	defer func() {
+		if closeErr := pipeReader.Close(); closeErr != nil {
+			logger.Warnf("Error closing read end of the collector config pipe: %v", err)
+		}
+	}()
 
 	// set collector args and add --config flag with the elasticagent:stdin URI
 	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
@@ -170,27 +174,19 @@ func (r *subprocessExecution) startCollector(
 			return nil
 		}),
 	)
-	if err != nil {
+	if err != nil || processInfo.Process == nil {
 		// we failed to start the process
-		_ = pipeReader.Close()
+		if err == nil {
+			err = errors.New("process is nil")
+		}
 		_ = pipeWriter.Close()
 		procCtxCancel()
 		return nil, fmt.Errorf("failed to start supervised collector: %w", err)
 	}
 
-	// Close the read end in the parent — the child process owns it now.
-	_ = pipeReader.Close()
-
 	logger.Infof("supervised collector started with pid: %d and healthcheck port: %d", processInfo.Process.Pid, httpHealthCheckPort)
-	if processInfo.Process == nil {
-		// this should not happen but just in case
-		_ = pipeWriter.Close()
-		procCtxCancel()
-		return nil, fmt.Errorf("failed to start supervised collector: process is nil")
-	}
 
 	processDoneCh := make(chan struct{})
-
 	healthCheckDone := make(chan struct{})
 	go func() {
 		defer func() {
@@ -295,7 +291,13 @@ func (r *subprocessExecution) startCollector(
 		r.reportErrFn(ctx, processErrCh, err)
 	}
 	ctl := newProcHandle(processInfo, logger, lvl, processDoneCh, reportPipeErrFn, configModifier)
-	go ctl.writeToPipe(pipeWriter, confBytes)
+	go ctl.writeToPipe(pipeWriter)
+	if updateErr := ctl.UpdateConfig(cfg); updateErr != nil {
+		// this should never happen, as the only reason updateConfig can return an error is covered by an
+		// earlier check.
+		ctl.Stop(0)
+		return nil, updateErr
+	}
 
 	return ctl, nil
 }
@@ -412,21 +414,18 @@ func newProcHandle(
 	}
 }
 
-// writeToPipe owns the pipe lifecycle. It writes the initial config, then
-// loops writing subsequent configs queued via configCh until the process
+// writeToPipe owns the pipe lifecycle. It loops writing configs queued via configCh until the process
 // exits. Errors are reported via reportErrFn.
-func (s *procHandle) writeToPipe(pipeWriter io.WriteCloser, initialConfig []byte) {
-	defer pipeWriter.Close()
+func (s *procHandle) writeToPipe(pipeWriter io.WriteCloser) {
+	defer func() {
+		if err := pipeWriter.Close(); err != nil {
+			s.log.Warnf("Error closing collector config pipe: %v", err)
+		}
+	}()
 
 	encoder := gob.NewEncoder(pipeWriter)
 
-	// Write initial config.
-	if err := encoder.Encode(initialConfig); err != nil {
-		s.reportErrFn(fmt.Errorf("failed to write initial config: %w", err))
-		return
-	}
-
-	// Loop: write subsequent configs until the process exits.
+	// Loop: write configs until the process exits.
 	for {
 		select {
 		case <-s.processDoneCh:
@@ -476,27 +475,9 @@ func (s *procHandle) Stop(waitTime time.Duration) {
 
 // UpdateConfig writes the new configuration to the subprocess's stdin pipe.
 func (s *procHandle) UpdateConfig(cfg *confmap.Conf) error {
-	if cfg == nil {
-		return errors.New("no configuration provided")
-	}
-
-	// Check if process is still running
-	select {
-	case <-s.processDoneCh:
-		return errors.New("process has exited")
-	default:
-	}
-
-	if s.configModifier != nil {
-		if err := s.configModifier(cfg); err != nil {
-			return err
-		}
-	}
-
-	confMap := cfg.ToStringMap()
-	yamlBytes, err := yaml.Marshal(confMap)
+	yamlBytes, err := prepareAndSerializeConfig(cfg, s.configModifier)
 	if err != nil {
-		return fmt.Errorf("failed to marshal config to yaml: %w", err)
+		return err
 	}
 
 	// Drain any pending config (latest-wins semantics).
@@ -511,6 +492,26 @@ func (s *procHandle) UpdateConfig(cfg *confmap.Conf) error {
 
 func (s *procHandle) LogLevel() logp.Level {
 	return s.collectorLogLevel
+}
+
+func prepareAndSerializeConfig(cfg *confmap.Conf, configModifier ConfigModifier) ([]byte, error) {
+	if cfg == nil {
+		return nil, errors.New("no configuration provided")
+	}
+
+	if configModifier != nil {
+		if err := configModifier(cfg); err != nil {
+			return nil, err
+		}
+	}
+
+	confMap := cfg.ToStringMap()
+	yamlBytes, err := yaml.Marshal(confMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal config to yaml: %w", err)
+	}
+
+	return yamlBytes, nil
 }
 
 type zapWriter interface {
