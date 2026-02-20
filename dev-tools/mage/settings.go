@@ -1585,9 +1585,6 @@ func (s *Settings) initRepoInfo() error {
 // initElasticBeatsDir initializes the elasticBeatsDir for this Settings instance.
 // Must be called after initRepoInfo.
 func (s *Settings) initElasticBeatsDir() error {
-	if s.RepoInfo == nil {
-		return fmt.Errorf("RepoInfo must be initialized before elasticBeatsDir")
-	}
 	if s.RepoInfo.IsElasticBeats() {
 		s.ElasticBeatsDir = s.RepoInfo.RootDir
 		log.Println("Found Elastic Beats dir at", s.ElasticBeatsDir)
@@ -1604,10 +1601,6 @@ func (s *Settings) initElasticBeatsDir() error {
 // initBuildVariables loads build variables from files in elasticBeatsDir.
 // Must be called after initElasticBeatsDir.
 func (s *Settings) initBuildVariables() error {
-	if s.ElasticBeatsDir == "" {
-		return fmt.Errorf("elasticBeatsDir must be initialized before build variables")
-	}
-
 	// Load Go version from .go-version file
 	goVersionFile := filepath.Join(s.ElasticBeatsDir, ".go-version")
 	data, err := os.ReadFile(goVersionFile)
