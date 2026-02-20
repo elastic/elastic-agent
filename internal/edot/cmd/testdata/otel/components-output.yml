@@ -188,6 +188,9 @@ extensions:
   - name: file_storage
     stability:
       extension: Beta
+  - name: opamp
+    stability:
+      extension: Alpha
   - name: health_check
     stability:
       extension: Beta
