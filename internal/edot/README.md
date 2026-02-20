@@ -116,6 +116,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [k8sleaderelector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/k8sleaderelector/v0.145.0/extension/k8sleaderelector/README.md) | v0.145.0 |
 | [k8sobserver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/observer/k8sobserver/v0.145.0/extension/observer/k8sobserver/README.md) | v0.145.0 |
 | [memorylimiterextension](https://github.com/open-telemetry/opentelemetry-collector/blob/extension/memorylimiterextension/v0.145.0/extension/memorylimiterextension/README.md) | v0.145.0 |
+| [opampextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/opampextension/v0.145.0/extension/opampextension/README.md) | v0.145.0 |
 | [pprofextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/pprofextension/v0.145.0/extension/pprofextension/README.md) | v0.145.0 |
 
 ### Connectors
