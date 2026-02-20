@@ -1940,7 +1940,8 @@ func TestOTelManager_CollectorRunErrWithNilConfig(t *testing.T) {
 	assert.NotPanics(t, func() {
 		// Run will process the collectorRunErr, then block on the select.
 		// Cancel the context so it exits after handling the error.
-		mgr.Run(ctx)
+		err := mgr.Run(ctx)
+		require.NoError(t, err)
 	})
 }
 
