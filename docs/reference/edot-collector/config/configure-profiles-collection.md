@@ -24,7 +24,48 @@ OpenTelemetry profiling is still under active development. Refer to [The State o
 
 ## Turn on profiling
 
-Follow these steps to turn on profiles collection through the EDOT Collector.
+### Prepare Elasticsearch for profiling data
+
+Before EDOT Collector ingests profiling data into Elasticsearch make sure that [Universal Profiling](https://www.elastic.co/docs/solutions/observability/infra-and-hosts/get-started-with-universal-profiling#profiling-configure-data-ingestion) is configured for ingestion.
+
+### Configure and run EDOT Collector with profiling
+
+Follow these steps to configure profiles collection through the EDOT Collector.
+
+::::{applies-switch}
+
+:::{applies-item} stack: preview =9.2
+```yaml
+receivers:
+  profiling:
+    SamplesPerSecond: 19
+
+service:
+  pipelines:
+    profiles:
+      receivers: [ profiling ]
+      exporters: [ elasticsearch ]
+```
+:::
+
+:::{applies-item} stack: preview 9.3+
+```yaml
+receivers:
+  profiling:
+
+service:
+  pipelines:
+    profiles:
+      receivers: [ profiling ]
+      exporters: [ elasticsearch ]
+```
+:::
+
+::::
+
+:::{note}
+{{es}} OTel Profiles is still under development and therefore protected by a feature gate.
+:::
 
 :::::{stepper}
 ::::{step} Activate profiling in the Collector
