@@ -45,42 +45,43 @@ type TestBinaryArgs struct {
 	InputFiles []string
 }
 
-func makeGoTestArgs(name string) GoTestArgs {
+func makeGoTestArgs(cfg *Settings, name string) GoTestArgs {
 	fileName := fmt.Sprintf("build/TEST-go-%s", strings.ReplaceAll(strings.ToLower(name), " ", "_"))
 	params := GoTestArgs{
 		LogName:         name,
-		Race:            RaceDetector,
+		Race:            cfg.Test.RaceDetector,
 		Packages:        []string{"./..."},
 		OutputFile:      fileName + ".out",
 		JUnitReportFile: fileName + ".xml",
-		Tags:            testTagsFromEnv(),
+		Tags:            cfg.TestTagsWithFIPS(),
 		Env:             make(map[string]string),
 	}
-	if TestCoverage {
+	if cfg.Test.Coverage {
 		params.CoverageProfileFile = fileName + ".cov"
 	}
 	return params
 }
 
-func makeGoTestArgsForModule(name, module string) GoTestArgs {
+func makeGoTestArgsForModule(cfg *Settings, name, module string) GoTestArgs {
 	fileName := fmt.Sprintf("build/TEST-go-%s-%s",
 		strings.ReplaceAll(strings.ToLower(name), " ", "_"),
 		strings.ReplaceAll(strings.ToLower(module), " ", "_"),
 	)
 	params := GoTestArgs{
 		LogName:         fmt.Sprintf("%s-%s", name, module),
-		Race:            RaceDetector,
+		Race:            cfg.Test.RaceDetector,
 		Packages:        []string{fmt.Sprintf("./module/%s/...", module)},
 		OutputFile:      fileName + ".out",
 		JUnitReportFile: fileName + ".xml",
-		Tags:            testTagsFromEnv(),
+		Tags:            cfg.TestTagsWithFIPS(),
 	}
-	if TestCoverage {
+	if cfg.Test.Coverage {
 		params.CoverageProfileFile = fileName + ".cov"
 	}
 	return params
 }
 
+<<<<<<< HEAD
 // testTagsFromEnv gets a list of comma-separated tags from the TEST_TAGS
 // environment variables, e.g: TEST_TAGS=aws,azure.
 func testTagsFromEnv() []string {
@@ -94,31 +95,35 @@ func testTagsFromEnv() []string {
 	return tags
 }
 
+=======
+>>>>>>> 1a8a5f564 (Refactor mage target configuration (#12128))
 // DefaultGoTestUnitArgs returns a default set of arguments for running
 // all unit tests. We tag unit test files with '!integration'.
-func DefaultGoTestUnitArgs() GoTestArgs { return makeGoTestArgs("Unit") }
+func DefaultGoTestUnitArgs(cfg *Settings) GoTestArgs {
+	return makeGoTestArgs(cfg, "Unit")
+}
 
 // DefaultGoTestIntegrationArgs returns a default set of arguments for running
 // all integration tests. We tag integration test files with 'integration'.
-func DefaultGoTestIntegrationArgs() GoTestArgs {
-	args := makeGoTestArgs("Integration")
+func DefaultGoTestIntegrationArgs(cfg *Settings) GoTestArgs {
+	args := makeGoTestArgs(cfg, "Integration")
 	args.Tags = append(args.Tags, "integration")
 	return args
 }
 
 // GoTestIntegrationArgsForModule returns a default set of arguments for running
 // module integration tests. We tag integration test files with 'integration'.
-func GoTestIntegrationArgsForModule(module string) GoTestArgs {
-	args := makeGoTestArgsForModule("Integration", module)
+func GoTestIntegrationArgsForModule(cfg *Settings, module string) GoTestArgs {
+	args := makeGoTestArgsForModule(cfg, "Integration", module)
 	args.Tags = append(args.Tags, "integration")
 	return args
 }
 
 // DefaultTestBinaryArgs returns the default arguments for building
 // a binary for testing.
-func DefaultTestBinaryArgs() TestBinaryArgs {
+func DefaultTestBinaryArgs(cfg *Settings) TestBinaryArgs {
 	return TestBinaryArgs{
-		Name: BeatName,
+		Name: cfg.Beat.Name,
 	}
 }
 
@@ -133,6 +138,7 @@ func DefaultTestBinaryArgs() TestBinaryArgs {
 // Use RACE_DETECTOR=true to enable the race detector.
 // Use MODULE=module to run only tests for `module`.
 func GoTestIntegrationForModule(ctx context.Context) error {
+	cfg := SettingsFromContext(ctx)
 	module := EnvOr("MODULE", "")
 	modulesDirEntry, err := os.ReadDir("./module")
 	if err != nil {
@@ -153,12 +159,12 @@ func GoTestIntegrationForModule(ctx context.Context) error {
 		// Set MODULE because only want that modules tests to run inside the testing environment.
 		env := map[string]string{"MODULE": fi.Name()}
 		passThroughEnvs(env, IntegrationTestEnvVars()...)
-		runners, err := NewIntegrationRunners(path.Join("./module", fi.Name()), env)
+		runners, err := NewIntegrationRunners(cfg, path.Join("./module", fi.Name()), env)
 		if err != nil {
 			return fmt.Errorf("test setup failed for module %s: %w", fi.Name(), err)
 		}
 		err = runners.Test("goIntegTest", func() error {
-			err := GoTest(ctx, GoTestIntegrationArgsForModule(fi.Name()))
+			err := GoTest(ctx, GoTestIntegrationArgsForModule(cfg, fi.Name()))
 			if err != nil {
 				return err
 			}
@@ -377,19 +383,19 @@ func makeCommand(ctx context.Context, env map[string]string, cmd string, args ..
 }
 
 // BuildSystemTestBinary runs BuildSystemTestGoBinary with default values.
-func BuildSystemTestBinary() error {
-	return BuildSystemTestGoBinary(DefaultTestBinaryArgs())
+func BuildSystemTestBinary(cfg *Settings) error {
+	return BuildSystemTestGoBinary(cfg, DefaultTestBinaryArgs(cfg))
 }
 
-// BuildSystemTestGoBinary build a binary for testing that is instrumented for
+// BuildSystemTestGoBinary builds a binary for testing that is instrumented for
 // testing and measuring code coverage. The binary is only instrumented for
 // coverage when TEST_COVERAGE=true (default is false).
-func BuildSystemTestGoBinary(binArgs TestBinaryArgs) error {
+func BuildSystemTestGoBinary(cfg *Settings, binArgs TestBinaryArgs) error {
 	args := []string{
 		"test", "-c",
 		"-o", binArgs.Name + ".test",
 	}
-	if TestCoverage {
+	if cfg.Test.Coverage {
 		args = append(args, "-coverpkg", "./...")
 	}
 	if len(binArgs.InputFiles) > 0 {
