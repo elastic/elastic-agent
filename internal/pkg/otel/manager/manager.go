@@ -453,14 +453,15 @@ func buildMergedConfig(
 
 // maybeInjectLogLevel adds the given log level to the collector config if it's not set.
 func maybeInjectLogLevel(config *confmap.Conf, logplevel logp.Level) error {
-	if !config.IsSet("service::telemetry::logs::level") {
-		level, err := translate.LogpLevelToOTel(logplevel)
-		if err != nil {
-			return fmt.Errorf("failed to translate log level: %s", logplevel)
-		}
-		if err := config.Merge(confmap.NewFromStringMap(map[string]any{"service::telemetry::logs::level": level})); err != nil {
-			return fmt.Errorf("failed to set log level in otel config: %w", err)
-		}
+	if config.IsSet("service::telemetry::logs::level") {
+		return nil
+	}
+	level, err := translate.LogpLevelToOTel(logplevel)
+	if err != nil {
+		return fmt.Errorf("failed to translate log level: %s", logplevel)
+	}
+	if err := config.Merge(confmap.NewFromStringMap(map[string]any{"service::telemetry::logs::level": level})); err != nil {
+		return fmt.Errorf("failed to set log level in otel config: %w", err)
 	}
 	return nil
 }
