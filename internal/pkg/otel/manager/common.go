@@ -93,6 +93,10 @@ func findRandomTCPPorts(count int) (ports []int, err error) {
 // It's a much simpler version, but follows the same for loop ordering and building of connectors of the internal
 // graph system that OTEL uses to build its component graph.
 func otelConfigToStatus(cfg *confmap.Conf, err error) (*status.AggregateStatus, error) {
+	if cfg == nil {
+		// if there's no config, return a status indicating the collector isn't running
+		return nil, nil
+	}
 	// marshall into config
 	var c otelcol.Config
 	if unmarshalErr := cfg.Unmarshal(&c); unmarshalErr != nil {

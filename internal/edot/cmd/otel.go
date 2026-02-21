@@ -143,13 +143,11 @@ func prepareCollectorSettings(configFiles []string, supervised bool, supervisedL
 		"endpoint": paths.DiagnosticsExtensionSocket(),
 	}
 	if supervised {
-		// add stdin config provider
-		configProvider, err := agentprovider.NewBufferProvider(os.Stdin)
-		if err != nil {
-			return settings, fmt.Errorf("failed to create config provider: %w", err)
-		}
-		settings.otelSettings = edotOtelCol.NewSettings(release.Version(), []string{configProvider.URI()},
-			edotOtelCol.WithConfigProviderFactory(configProvider.NewFactory()),
+		// In supervised mode, the parent process passes the config socket URI via
+		// --config=elasticagent:<socket_url>. Register the streaming provider factory
+		// so the collector can dial the socket and receive config updates.
+		settings.otelSettings = edotOtelCol.NewSettings(release.Version(), configFiles,
+			edotOtelCol.WithConfigProviderFactory(agentprovider.NewFactory()),
 			edotOtelCol.WithConfigConvertorFactory(manager.NewForceExtensionConverterFactory(elasticdiagnostics.DiagnosticsExtensionID.String(), conf)),
 		)
 
