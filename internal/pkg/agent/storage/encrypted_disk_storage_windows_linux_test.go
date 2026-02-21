@@ -21,7 +21,6 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
-	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 )
 
 const (
@@ -30,7 +29,6 @@ const (
 )
 
 func TestEncryptedDiskStorageWindowsLinuxLoad(t *testing.T) {
-	fipsutils.SkipIfFIPSOnly(t, "encrypted disk storage does not use NewGCMWithRandomNonce.")
 	dir := t.TempDir()
 
 	ctx, cn := context.WithCancel(context.Background())
