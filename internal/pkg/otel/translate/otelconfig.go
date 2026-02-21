@@ -11,7 +11,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/go-viper/mapstructure/v2"
 	koanfmaps "github.com/knadh/koanf/maps"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -52,9 +51,10 @@ type (
 )
 
 var (
-	OtelSupportedOutputTypes         = []string{"elasticsearch"}
+	OtelSupportedOutputTypes         = []string{"elasticsearch", "logstash"}
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
-		otelcomponent.MustNewType("elasticsearch"): translateEsOutputToExporter,
+		otelcomponent.MustNewType("elasticsearch"): ESToOTelConfig,
+		otelcomponent.MustNewType("logstash"):      LogstashToOTelConfig,
 	}
 )
 
@@ -95,19 +95,23 @@ func GetOtelConfig(
 			return nil, fmt.Errorf("error merging otel config for component %s: %w", comp.ID, mergeErr)
 		}
 	}
-	// create a deduplicated extensions lists in a deterministic order
-	extensionsSlice := maps.Keys(extensions)
-	slices.Sort(extensionsSlice)
-	// for consistency, we set this back as a slice of any
-	untypedExtensions := make([]any, len(extensionsSlice))
-	for i, ext := range extensionsSlice {
-		untypedExtensions[i] = ext
+
+	if len(extensions) != 0 {
+		// create a deduplicated extensions lists in a deterministic order
+		extensionsSlice := maps.Keys(extensions)
+		slices.Sort(extensionsSlice)
+		// for consistency, we set this back as a slice of any
+		untypedExtensions := make([]any, len(extensionsSlice))
+		for i, ext := range extensionsSlice {
+			untypedExtensions[i] = ext
+		}
+		extensionsConf := confmap.NewFromStringMap(map[string]any{"service::extensions": untypedExtensions})
+		err := otelConfig.Merge(extensionsConf)
+		if err != nil {
+			return nil, fmt.Errorf("error merging otel extensions: %w", err)
+		}
 	}
-	extensionsConf := confmap.NewFromStringMap(map[string]any{"service::extensions": untypedExtensions})
-	err := otelConfig.Merge(extensionsConf)
-	if err != nil {
-		return nil, fmt.Errorf("error merging otel extensions: %w", err)
-	}
+
 	return otelConfig, nil
 }
 
@@ -273,11 +277,17 @@ func getCollectorConfigForComponent(
 		"exporters": map[string]any{
 			exporterID.String(): exporterConfig,
 		},
-		"extensions": extensionConfig,
 		"service": map[string]any{
+			"pipelines": pipelinesConfig,
+		},
+	}
+
+	if extensionConfig != nil {
+		fullConfig["extensions"] = extensionConfig
+		fullConfig["service"] = map[string]any{
 			"extensions": extensionKey,
 			"pipelines":  pipelinesConfig,
-		},
+		}
 	}
 
 	return confmap.NewFromStringMap(fullConfig), nil
@@ -449,6 +459,8 @@ func OutputTypeToExporterType(outputType string) (otelcomponent.Type, error) {
 	switch outputType {
 	case "elasticsearch":
 		return otelcomponent.MustNewType("elasticsearch"), nil
+	case "logstash":
+		return otelcomponent.MustNewType("logstash"), nil
 	default:
 		return otelcomponent.Type{}, fmt.Errorf("unknown otel exporter type for output type: %s", outputType)
 	}
@@ -503,7 +515,7 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 		return nil, nil, nil, err
 	}
 
-	// beatsauth extension is not tested with output other than elasticsearch
+	// beatsauth extension is not required with output other than elasticsearch
 	if exporterType.String() == "elasticsearch" {
 		// get extension ID
 		extensionID := getBeatsAuthExtensionID(outputName)
@@ -588,21 +600,6 @@ func getDefaultDatastreamTypeForComponent(comp *component.Component) (string, er
 	}
 }
 
-// translateEsOutputToExporter translates an elasticsearch output configuration to an elasticsearch exporter configuration.
-func translateEsOutputToExporter(cfg *config.C, logger *logp.Logger) (map[string]any, error) {
-	esConfig, err := ToOTelConfig(cfg, logger)
-	if err != nil {
-		return nil, err
-	}
-
-	// we want to use dynamic log ids
-	esConfig["logs_dynamic_id"] = map[string]any{"enabled": true}
-
-	esConfig["include_source_on_error"] = true
-
-	return esConfig, nil
-}
-
 // extractOutputOtelOverrideConfig removes the configuration under the otel override key from the provided configuration
 // and returns it.
 func extractOutputOtelOverrideConfig(cfg *config.C) (*config.C, error) {
@@ -667,28 +664,13 @@ func BeatDataPath(componentId string) string {
 }
 
 // getBeatsAuthExtensionConfig sets http transport settings on beatsauth
-// currently this is only supported for elasticsearch output
+// this is only required for elasticsearch output
 func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 	authSettings := beatsauthextension.BeatsAuthConfig{
 		Transport: elasticsearch.ESDefaultTransportSettings(),
 	}
 
-	var resultMap map[string]any
-	if err := outputCfg.Unpack(&resultMap); err != nil {
-		return nil, err
-	}
-
-	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		Result:          &authSettings,
-		TagName:         "config",
-		SquashTagOption: "inline",
-		DecodeHook:      cfgDecodeHookFunc(),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if err = decoder.Decode(&resultMap); err != nil {
+	if err := outputCfg.Unpack(&authSettings); err != nil {
 		return nil, err
 	}
 
