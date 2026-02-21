@@ -7,7 +7,6 @@ package manager
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -16,265 +15,26 @@ import (
 	"testing"
 	"time"
 
-	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/status"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
 )
 
-func TestCompareAggregateStatuses(t *testing.T) {
-	timestamp := time.Now()
-	for _, tc := range []struct {
-		name     string
-		s1, s2   *status.AggregateStatus
-		expected bool
-	}{
-		{
-			name: "equal statuses",
-			s1: &status.AggregateStatus{
-				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
-				},
-			},
-			s2: &status.AggregateStatus{
-				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
-				},
-			},
-			expected: true,
-		},
-		{
-			name: "unequal statuses",
-			s1: &status.AggregateStatus{
-				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
-				},
-			},
-			s2: &status.AggregateStatus{
-				Event: &healthCheckEvent{
-					status:    componentstatus.StatusPermanentError,
-					timestamp: timestamp,
-					err:       nil,
-				},
-			},
-			expected: false,
-		},
-		{
-			name: "unequal errors",
-			s1: &status.AggregateStatus{
-				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
-				},
-			},
-			s2: &status.AggregateStatus{
-				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       errors.New("error"),
-				},
-			},
-			expected: false,
-		},
-		{
-			name: "unequal component statuses",
-			s1: &status.AggregateStatus{
-				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
-				},
-				ComponentStatusMap: map[string]*status.AggregateStatus{
-					"component1": {
-						Event: &healthCheckEvent{
-							status:    componentstatus.StatusOK,
-							timestamp: timestamp,
-							err:       nil,
-						},
-					},
-				},
-			},
-			s2: &status.AggregateStatus{
-				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
-				},
-				ComponentStatusMap: map[string]*status.AggregateStatus{
-					"component1": {
-						Event: &healthCheckEvent{
-							status:    componentstatus.StatusStopped,
-							timestamp: timestamp,
-							err:       nil,
-						},
-					},
-				},
-			},
-			expected: false,
-		},
-		{
-			name: "more components",
-			s1: &status.AggregateStatus{
-				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
-				},
-				ComponentStatusMap: map[string]*status.AggregateStatus{
-					"component1": {
-						Event: &healthCheckEvent{
-							status:    componentstatus.StatusOK,
-							timestamp: timestamp,
-							err:       nil,
-						},
-					},
-					"component2": {
-						Event: &healthCheckEvent{
-							status:    componentstatus.StatusOK,
-							timestamp: timestamp,
-							err:       nil,
-						},
-					},
-				},
-			},
-			s2: &status.AggregateStatus{
-				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
-				},
-				ComponentStatusMap: map[string]*status.AggregateStatus{
-					"component1": {
-						Event: &healthCheckEvent{
-							status:    componentstatus.StatusOK,
-							timestamp: timestamp,
-							err:       nil,
-						},
-					},
-				},
-			},
-			expected: false,
-		},
-		{
-			name: "completely different components",
-			s1: &status.AggregateStatus{
-				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
-				},
-				ComponentStatusMap: map[string]*status.AggregateStatus{
-					"component1": {
-						Event: &healthCheckEvent{
-							status:    componentstatus.StatusOK,
-							timestamp: timestamp,
-							err:       nil,
-						},
-					},
-				},
-			},
-			s2: &status.AggregateStatus{
-				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
-				},
-				ComponentStatusMap: map[string]*status.AggregateStatus{
-					"component3": {
-						Event: &healthCheckEvent{
-							status:    componentstatus.StatusOK,
-							timestamp: timestamp,
-							err:       nil,
-						},
-					},
-				},
-			},
-			expected: false,
-		},
-		{
-			name: "unequal component errors",
-			s1: &status.AggregateStatus{
-				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
-				},
-				ComponentStatusMap: map[string]*status.AggregateStatus{
-					"component1": {
-						Event: &healthCheckEvent{
-							status:    componentstatus.StatusOK,
-							timestamp: timestamp,
-							err:       errors.New("error1"),
-						},
-					},
-				},
-			},
-			s2: &status.AggregateStatus{
-				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
-				},
-				ComponentStatusMap: map[string]*status.AggregateStatus{
-					"component1": {
-						Event: &healthCheckEvent{
-							status:    componentstatus.StatusOK,
-							timestamp: timestamp,
-							err:       errors.New("error2"),
-						},
-					},
-				},
-			},
-			expected: false,
-		},
-		{
-			name:     "both nil",
-			s1:       nil,
-			s2:       nil,
-			expected: true,
-		},
-		{
-			name: "one nil",
-			s1: &status.AggregateStatus{
-				Event: &healthCheckEvent{
-					status:    componentstatus.StatusOK,
-					timestamp: timestamp,
-					err:       nil,
-				},
-			},
-			s2:       nil,
-			expected: false,
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			actual := compareStatuses(tc.s1, tc.s2)
-			if actual != tc.expected {
-				t.Errorf("expected %v, got %v", tc.expected, actual)
-			}
-		})
-	}
-}
-
 func TestAllComponentsStatuses(t *testing.T) {
 	t.Run("successful response with valid status", func(t *testing.T) {
 		now := time.Now().Truncate(time.Second)
-		serStatus := &SerializableStatus{
-			SerializableEvent: &SerializableEvent{
+		serStatus := &status.SerializableStatus{
+			SerializableEvent: &status.SerializableEvent{
 				Healthy:      true,
 				StatusString: "StatusOK",
 				Timestamp:    now,
 			},
-			ComponentStatuses: map[string]*SerializableStatus{
+			ComponentStatuses: map[string]*status.SerializableStatus{
 				"receiver:otlp": {
-					SerializableEvent: &SerializableEvent{
+					SerializableEvent: &status.SerializableEvent{
 						Healthy:      true,
 						StatusString: "StatusOK",
 						Timestamp:    now,
@@ -306,8 +66,8 @@ func TestAllComponentsStatuses(t *testing.T) {
 
 	t.Run("successful response with error status", func(t *testing.T) {
 		now := time.Now().Truncate(time.Second)
-		serStatus := &SerializableStatus{
-			SerializableEvent: &SerializableEvent{
+		serStatus := &status.SerializableStatus{
+			SerializableEvent: &status.SerializableEvent{
 				Healthy:      false,
 				StatusString: "StatusPermanentError",
 				Error:        "connection refused",
@@ -393,29 +153,29 @@ func TestAllComponentsStatuses(t *testing.T) {
 
 	t.Run("nested component statuses", func(t *testing.T) {
 		now := time.Now().Truncate(time.Second)
-		serStatus := &SerializableStatus{
-			SerializableEvent: &SerializableEvent{
+		serStatus := &status.SerializableStatus{
+			SerializableEvent: &status.SerializableEvent{
 				Healthy:      true,
 				StatusString: "StatusOK",
 				Timestamp:    now,
 			},
-			ComponentStatuses: map[string]*SerializableStatus{
+			ComponentStatuses: map[string]*status.SerializableStatus{
 				"pipeline:traces": {
-					SerializableEvent: &SerializableEvent{
+					SerializableEvent: &status.SerializableEvent{
 						Healthy:      true,
 						StatusString: "StatusOK",
 						Timestamp:    now,
 					},
-					ComponentStatuses: map[string]*SerializableStatus{
+					ComponentStatuses: map[string]*status.SerializableStatus{
 						"receiver:otlp": {
-							SerializableEvent: &SerializableEvent{
+							SerializableEvent: &status.SerializableEvent{
 								Healthy:      true,
 								StatusString: "StatusOK",
 								Timestamp:    now,
 							},
 						},
 						"exporter:otlp": {
-							SerializableEvent: &SerializableEvent{
+							SerializableEvent: &status.SerializableEvent{
 								Healthy:      false,
 								StatusString: "StatusRecoverableError",
 								Error:        "temporary failure",
