@@ -3824,6 +3824,7 @@ func TestDefaultRuntimeConfig(t *testing.T) {
 	config := DefaultRuntimeConfig()
 	require.NotNil(t, config)
 	assert.Equal(t, string(DefaultRuntimeManager), config.Default)
+	assert.Equal(t, string(ProcessRuntimeManager), config.DynamicInputs)
 	assert.Equal(t, "", config.Filebeat.Default)
 	assert.Empty(t, config.Filebeat.InputType)
 	assert.Equal(t, "", config.Metricbeat.Default)
