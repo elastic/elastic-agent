@@ -174,8 +174,11 @@ collectors:
           exclude:
             # exlude opentelemetry-kube-stack pod logs
             - /var/log/pods/*opentelemetry-kube-stack*/*/*.log
+      extensions:
+        cgroupruntime: {}
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
+        extensions: [cgroupruntime]
         pipelines:
           logs: null
           metrics: null
@@ -251,7 +254,10 @@ collectors:
               min_size: 1_000_000 # 1MB uncompressed
               max_size: 4_000_000 # 4MB uncompressed
           timeout: 15s
+      extensions:
+        cgroupruntime: {}
       service:
+        extensions: [cgroupruntime]
         pipelines:
           logs:
             receivers: [otlp]

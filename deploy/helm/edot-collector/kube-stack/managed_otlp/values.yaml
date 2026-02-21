@@ -138,8 +138,11 @@ collectors:
               enabled: true
             k8s.container.status.last_terminated_reason:
               enabled: true
+      extensions:
+        cgroupruntime: {}
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
+        extensions: [cgroupruntime]
         pipelines:
           metrics:
             exporters:
@@ -435,8 +438,11 @@ collectors:
               enabled: true
           extra_metadata_labels:
             - container.id
+      extensions:
+        cgroupruntime: {}
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
+        extensions: [cgroupruntime]
         pipelines:
           # Disable default non used kube-stack Helm Chart pipelines
           logs: null
@@ -567,7 +573,10 @@ collectors:
               min_size: 1_000_000 # 1MB uncompressed
               max_size: 4_000_000 # 4MB uncompressed
           timeout: 15s
+      extensions:
+        cgroupruntime: {}
       service:
+        extensions: [cgroupruntime]
         pipelines:
           metrics:
             receivers: [otlp]
