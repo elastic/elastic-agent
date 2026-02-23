@@ -13,8 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 func TestFixPermissions_MasksWorldPermissions(t *testing.T) {
