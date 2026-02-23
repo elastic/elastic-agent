@@ -34,7 +34,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 		// all files should be owned by uid:gid
 		// uses `os.Lchown` so the symlink is updated to have the permissions
 		if err := os.Lchown(name, o.ownership.UID, o.ownership.GID); err != nil {
-			if err != syscall.EPERM {
+			if !errors.Is(err, syscall.EPERM) {
 				// fail right away if the error is not a permission error
 				return fmt.Errorf("cannot update ownership of %q: %w", topPath, err)
 			}
@@ -47,7 +47,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 
 		// remove any world permissions from the file
 		if err := os.Chmod(name, info.Mode().Perm()&o.mask); err != nil {
-			if err != syscall.EPERM {
+			if !errors.Is(err, syscall.EPERM) {
 				// fail right away if the error is not a permission error
 				return fmt.Errorf("cannot update ownership of %q: %w", topPath, err)
 			}
@@ -68,7 +68,7 @@ func isSameUser(info fs.FileInfo, ownership utils.FileOwner) (bool, error) {
 		return false, fmt.Errorf("failed to get stat_t for %q", info.Name())
 	}
 
-	return stat.Uid == uint32(ownership.UID) && stat.Gid == uint32(ownership.GID), nil
+	return stat.Uid == uint32(ownership.UID) && stat.Gid == uint32(ownership.GID), nil //nolint:gosec // G115 Conversion from int to uint32 is safe here.
 }
 
 func maskIsStripped(info fs.FileInfo, mask os.FileMode) bool {
