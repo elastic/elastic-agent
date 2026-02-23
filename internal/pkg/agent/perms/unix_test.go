@@ -51,6 +51,37 @@ func TestFixPermissions_NonExistentRootIsIgnored(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestFixPermissions_MaskIsStripped(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	stickyDir := filepath.Join(tmpDir, "sticky")
+	require.NoError(t, os.MkdirAll(stickyDir, 0777))
+	require.NoError(t, os.Chmod(stickyDir, os.ModeSticky|0777))
+
+	before, err := os.Stat(stickyDir)
+	require.NoError(t, err)
+	require.NotEqual(t, os.FileMode(0), before.Mode()&os.ModeSticky)
+
+	// Even if a caller supplies a mask with non-permission bits,
+	// FixPermissions applies the mask to info.Mode().Perm() (permission bits only).
+	mask := os.FileMode(0777) | os.ModeSticky
+	require.NoError(t, FixPermissions(stickyDir, WithMask(mask)))
+
+	after, err := os.Stat(stickyDir)
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0777), after.Mode().Perm())
+	require.Equal(t, os.FileMode(0), after.Mode()&os.ModeSticky)
+}
+
+func TestIsMaskStripped(t *testing.T) {
+	perms := []os.FileMode{0777, 0755, 0770, 0700}
+	for _, perm := range perms {
+		fileInfo := testFileInfo{mode: perm}
+		require.Equal(t, perm&0007 == 0, maskIsStripped(fileInfo, 0007), "expected mask to be stripped for permissions %o", perm)
+	}
+
+}
+
 func Test_isSameUser_MatchesCurrentOwner(t *testing.T) {
 	tmpDir := t.TempDir()
 	filePath := filepath.Join(tmpDir, "file")
@@ -107,20 +138,20 @@ func Test_isSameUser_ErrorsWhenNoStatT(t *testing.T) {
 	owner, err := utils.CurrentFileOwner()
 	require.NoError(t, err)
 
-	info := fileInfoWithoutStatT{name: "not-a-real-file"}
+	info := testFileInfo{name: "not-a-real-file"}
 	same, err := isSameUser(info, owner)
 	require.Error(t, err)
 	require.False(t, same)
 }
 
-type fileInfoWithoutStatT struct {
+type testFileInfo struct {
 	name string
+	mode fs.FileMode
 }
 
-func (f fileInfoWithoutStatT) Name() string       { return f.name }
-func (f fileInfoWithoutStatT) Size() int64        { return 0 }
-func (f fileInfoWithoutStatT) Mode() fs.FileMode  { return 0 }
-func (f fileInfoWithoutStatT) ModTime() time.Time { return time.Time{} }
-func (f fileInfoWithoutStatT) IsDir() bool        { return false }
-func (f fileInfoWithoutStatT) Sys() any           { return nil }
-
+func (f testFileInfo) Name() string       { return f.name }
+func (f testFileInfo) Size() int64        { return 0 }
+func (f testFileInfo) Mode() fs.FileMode  { return f.mode }
+func (f testFileInfo) ModTime() time.Time { return time.Time{} }
+func (f testFileInfo) IsDir() bool        { return false }
+func (f testFileInfo) Sys() any           { return nil }

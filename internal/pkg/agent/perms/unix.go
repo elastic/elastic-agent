@@ -52,9 +52,9 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 				return fmt.Errorf("cannot update ownership of %q: %w", topPath, err)
 			}
 
-			// check desired owner is same as current file owner, if so, ignore the error as it is likely a permission issue with the user running the agent and not an issue with the file ownership
-			if same, sErr := isSameUser(info, o.ownership); sErr != nil || !same {
-				return fmt.Errorf("could not update permissions of %q: %w", topPath, err)
+			// check desired mode is same as current file mode, if so, ignore the error as it is likely a permission issue with the user running the agent and not an issue with the file permissions
+			if !maskIsStripped(info, o.mask) {
+				return fmt.Errorf("cannot update permissions of %q: %w", topPath, err)
 			}
 		}
 
@@ -69,4 +69,8 @@ func isSameUser(info fs.FileInfo, ownership utils.FileOwner) (bool, error) {
 	}
 
 	return stat.Uid == uint32(ownership.UID) && stat.Gid == uint32(ownership.GID), nil
+}
+
+func maskIsStripped(info fs.FileInfo, mask os.FileMode) bool {
+	return info.Mode().Perm()&mask == 0
 }
