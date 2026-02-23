@@ -15,8 +15,8 @@ import (
 
 	// Receivers:
 	apachereceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver"
-	azuremonitorreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azuremonitorreceiver"
 	awss3receiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awss3receiver"
+	azuremonitorreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/azuremonitorreceiver"
 	dockerstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver"
 	filelogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver" // for collecting log files
 	hostmetricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver"
@@ -145,10 +145,10 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			mbreceiver.NewFactory(),
 			jmxreceiver.NewFactory(), // deprecated, will be removed in 9.4.0
 
-		nopreceiver.NewFactory(),
-		apachereceiver.NewFactory(),
-		azuremonitorreceiver.NewFactory(),
-		iisreceiver.NewFactory(),
+			nopreceiver.NewFactory(),
+			apachereceiver.NewFactory(),
+			azuremonitorreceiver.NewFactory(),
+			iisreceiver.NewFactory(),
 			mysqlreceiver.NewFactory(),
 			postgresqlreceiver.NewFactory(),
 			snmpreceiver.NewFactory(),
