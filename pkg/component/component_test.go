@@ -1352,7 +1352,7 @@ func TestToComponents(t *testing.T) {
 			},
 		},
 		{
-			Name:     "RuntimeConfig: multiple input types with logstash output set to process runtime",
+			Name:     "RuntimeConfig: multiple input types with logstash output set to process runtime (output runtime takes precedence)",
 			Platform: linuxAMD64Platform,
 			RuntimeConfig: &RuntimeConfig{
 				Default: string(OtelRuntimeManager),

@@ -122,7 +122,7 @@ func (r *RuntimeConfig) Validate() error {
 		delete(beatConfig.InputType, "default")
 	}
 
-	allowedOutput := []string{"elasticsearch", "logstash", "kafka"}
+	allowedOutput := []string{"elasticsearch", "logstash"}
 	for name, runtime := range r.Output {
 		if !slices.Contains(allowedOutput, name) {
 			return fmt.Errorf("%s output is not supported", name)
