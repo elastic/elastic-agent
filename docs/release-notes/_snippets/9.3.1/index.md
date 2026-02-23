@@ -10,7 +10,7 @@ _This release also includes: [Deprecations](/release-notes/deprecations.md#elast
 * Add agent.internal.runtime.dynamic_inputs flag to control the runtime used by inputs using dynamic variables. [#12438](https://github.com/elastic/elastic-agent/pull/12438) [#11630](https://github.com/elastic/elastic-agent/issues/11630)
 
   Allow switching to the process runtime for inputs using dynamic variables from a dynamic provider, like the
-  Kubernetes provider. These inputs may perform frequent configuration reloads, which the otel collector isn&#39;t great
+  Kubernetes provider. These inputs can perform frequent configuration reloads, which the otel collector isn&#39;t great
   at handling right now.
   
 * Update OTel Collector components to v0.144.0. [#12449](https://github.com/elastic/elastic-agent/pull/12449) 
