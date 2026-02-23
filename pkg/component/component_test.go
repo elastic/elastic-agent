@@ -104,1162 +104,1162 @@ func TestToComponents(t *testing.T) {
 		Result        []Component
 		headers       HeadersProvider
 	}{
-		{
-			Name:     "Empty policy",
-			Platform: linuxAMD64Platform,
-			Policy:   map[string]interface{}{},
-		},
-		{
-			Name:     "Invalid: outputs as an array",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": []string{"should be a map"},
-			},
-			Err: "invalid 'outputs', expected a map not a []string",
-		},
-		{
-			Name:     "Invalid: outputs entry as an array",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": []string{"should be a map"},
-				},
-			},
-			Err: "invalid 'outputs.default', expected a map not a []string",
-		},
-		{
-			Name:     "Invalid: outputs entry missing type",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{},
-				},
-			},
-			Err: "invalid 'outputs.default', 'type' missing",
-		},
-		{
-			Name:     "Invalid: outputs entry type not a string",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type": 0,
-					},
-				},
-			},
-			Err: "invalid 'outputs.default.type', expected a string not a int",
-		},
-		{
-			Name:     "Invalid: outputs entry type not a string",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": "false",
-					},
-				},
-			},
-			Err: "invalid 'outputs.default.enabled', expected a bool not a string",
-		},
-		{
-			Name:     "No inputs",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-			},
-		},
-		{
-			Name:     "Invalid: inputs as a map",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": map[string]interface{}{},
-			},
-			Err: "invalid 'inputs', expected an array not a map[string]interface {}",
-		},
-		{
-			Name:     "Invalid: inputs entry as an array",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					[]string{"should be a map"},
-				},
-			},
-			Err: "invalid 'inputs.0', expected a map not a []string",
-		},
-		{
-			Name:     "Invalid: inputs entry missing type",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{},
-				},
-			},
-			Err: "invalid 'inputs.0', 'type' missing",
-		},
-		{
-			Name:     "Invalid: inputs entry type not a string",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type": 0,
-					},
-				},
-			},
-			Err: "invalid 'inputs.0.type', expected a string not a int",
-		},
-		{
-			Name:     "Invalid: input runtime manager type not a string",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type":                  "filestream",
-						"_runtime_experimental": 0,
-					},
-				},
-			},
-			Err: "invalid 'inputs.0.runtime', expected a string, not a int",
-		},
-		{
-			Name:     "Invalid: input runtime manager value",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type":                  "filestream",
-						"_runtime_experimental": "invalid",
-					},
-				},
-			},
-			Err: "invalid 'inputs.0.runtime', valid values are: otel, process",
-		},
-		{
-			Name:     "Invalid: inputs entry duplicate because of missing id",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type": "filestream",
-					},
-					map[string]interface{}{
-						"type": "filestream",
-					},
-				},
-			},
-			Err: `invalid 'inputs.1.id', has a duplicate id "filestream". Please add a unique value for the 'id' key to each input in the agent policy`,
-		},
-		{
-			Name:     "Invalid: inputs entry duplicate because of missing id (isolated units)",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type": "cloudbeat",
-					},
-					map[string]interface{}{
-						"type": "cloudbeat",
-					},
-				},
-			},
-			Err: `invalid 'inputs.1.id', has a duplicate id "cloudbeat". Please add a unique value for the 'id' key to each input in the agent policy`,
-		},
-		{
-			Name:     "Invalid: inputs entry id not a string",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type": "filestream",
-						"id":   0,
-					},
-				},
-			},
-			Err: "invalid 'inputs.0.id', expected a string not a int",
-		},
-		{
-			Name:     "Invalid: inputs entry id not a string (isolated units)",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type": "cloudbeat",
-						"id":   0,
-					},
-				},
-			},
-			Err: "invalid 'inputs.0.id', expected a string not a int",
-		},
-		{
-			Name:     "Invalid: inputs entry use_output not a string",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type":       "filestream",
-						"id":         "filestream-0",
-						"use_output": 0,
-					},
-				},
-			},
-			Err: "invalid 'inputs.0.use_output', expected a string not a int",
-		},
-		{
-			Name:     "Invalid: inputs entry use_output not a string (isolated units)",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type":       "cloudbeat",
-						"id":         "cloudbeat-0",
-						"use_output": 0,
-					},
-				},
-			},
-			Err: "invalid 'inputs.0.use_output', expected a string not a int",
-		},
-		{
-			Name:     "Invalid: inputs entry use_output references unknown output",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type":       "filestream",
-						"id":         "filestream-0",
-						"use_output": "other",
-					},
-				},
-			},
-			Err: "invalid 'inputs.0.use_output', references an unknown output 'other'",
-		},
-		{
-			Name:     "Invalid: inputs entry use_output references unknown output (isolated units)",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type":       "cloudbeat",
-						"id":         "cloudbeat-0",
-						"use_output": "other",
-					},
-				},
-			},
-			Err: "invalid 'inputs.0.use_output', references an unknown output 'other'",
-		},
-		{
-			Name:     "Invalid: inputs entry enabled not a bool",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type":       "filestream",
-						"id":         "filestream-0",
-						"use_output": "default",
-						"enabled":    "false",
-					},
-				},
-			},
-			Err: "invalid 'inputs.0.enabled', expected a bool not a string",
-		},
-		{
-			Name:     "Invalid: inputs entry enabled not a bool (isolated units)",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type":       "cloudbeat",
-						"id":         "cloudbeat-0",
-						"use_output": "default",
-						"enabled":    "false",
-					},
-				},
-			},
-			Err: "invalid 'inputs.0.enabled', expected a bool not a string",
-		},
-		{
-			Name:     "Invalid: inputs unknown type",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type":       "unknown",
-						"id":         "unknown-0",
-						"use_output": "default",
-						"enabled":    true,
-					},
-				},
-			},
-			Result: []Component{
-				{
-					InputType:  "unknown",
-					OutputType: "elasticsearch",
-					ID:         "unknown-default",
-					InputSpec:  &InputRuntimeSpec{},
-					Err:        ErrInputNotSupported,
-					Units: []Unit{
-						{
-							ID:       "unknown-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "unknown-default-unknown-0",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "unknown",
-								"id":   "unknown-0",
-							}),
-						},
-					},
-					RuntimeManager: DefaultRuntimeManager,
-				},
-			},
-		},
-		{
-			Name:     "Invalid: inputs fleet-server doesn't support logstash",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type": "logstash",
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type": "fleet-server",
-						"id":   "fleet-server-0",
-					},
-				},
-			},
-			Result: []Component{
-				{
-					InputType:  "fleet-server",
-					OutputType: "logstash",
-					ID:         "fleet-server-default",
-					Err:        ErrOutputNotSupported,
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "fleet-server",
-						BinaryName: "fleet-server",
-						BinaryPath: filepath.Join("..", "..", "specs", "fleet-server"),
-					},
-					Units: []Unit{
-						{
-							ID:       "fleet-server-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "logstash",
-							}),
-						},
-						{
-							ID:       "fleet-server-default-fleet-server-0",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "fleet-server",
-								"id":   "fleet-server-0",
-							}),
-						},
-					},
-					RuntimeManager: DefaultRuntimeManager,
-				},
-			},
-		},
-		{
-			Name: "Invalid: inputs endpoint doesnt support arm64 redhat major 7",
-			Platform: PlatformDetail{
-				Platform: Platform{
-					OS:   Linux,
-					Arch: ARM64,
-					GOOS: Linux,
-				},
-				Family: "redhat",
-				Major:  7,
-				Minor:  2,
-			},
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type":       "endpoint",
-						"id":         "endpoint-0",
-						"use_output": "default",
-						"enabled":    true,
-					},
-				},
-			},
-			Result: []Component{
-				{
-					InputType:  "endpoint",
-					OutputType: "elasticsearch",
-					ID:         "endpoint",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "endpoint",
-						BinaryName: "endpoint-security",
-						BinaryPath: filepath.Join("..", "..", "specs", "endpoint-security"),
-					},
-					Err: NewErrInputRuntimeCheckFail("Elastic Defend doesn't support RHEL7 on arm64"),
-					Units: []Unit{
-						{
-							ID:       "endpoint",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "endpoint-endpoint-0",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "endpoint",
-								"id":   "endpoint-0",
-							}),
-						},
-					},
-					RuntimeManager: DefaultRuntimeManager,
-				},
-			},
-		},
-		{
-			Name:     "Invalid: single input failed to decode into config",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type":       "filestream",
-						"id":         "filestream-0",
-						"use_output": "default",
-						"enabled":    true,
-					},
-					map[string]interface{}{
-						"type":       "filestream",
-						"id":         "filestream-1",
-						"use_output": "default",
-						"enabled":    true,
-						"meta": []interface{}{
-							map[string]interface{}{
-								"bad": "should not have been array of dicts",
-							},
-						},
-					},
-				},
-			},
-			Result: []Component{
-				{
-					InputType:  "filestream",
-					OutputType: "elasticsearch",
-					ID:         "filestream-default",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "filestream",
-						BinaryName: "testbeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "filestream-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "filestream-default-filestream-0",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "filestream",
-								"id":   "filestream-0",
-							}),
-						},
-						{
-							ID:       "filestream-default-filestream-1",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Err:      fmt.Errorf("decoding error: %w", makeMapStructureErr(t)),
-						},
-					},
-					RuntimeManager: DefaultRuntimeManager,
-				},
-			},
-		},
-		{
-			Name:     "Invalid: single input failed to decode into config (isolated units)",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type":       "cloudbeat",
-						"id":         "cloudbeat-0",
-						"use_output": "default",
-						"enabled":    true,
-					},
-					map[string]interface{}{
-						"type":       "cloudbeat",
-						"id":         "cloudbeat-1",
-						"use_output": "default",
-						"enabled":    true,
-						"meta": []interface{}{
-							map[string]interface{}{
-								"bad": "should not have been array of dicts",
-							},
-						},
-					},
-				},
-			},
-			Result: []Component{
-				{
-					InputType:  "cloudbeat",
-					OutputType: "elasticsearch",
-					ID:         "cloudbeat-default-cloudbeat-0",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "cloudbeat",
-						BinaryName: "cloudbeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "cloudbeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "cloudbeat-default-cloudbeat-0",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "cloudbeat-default-cloudbeat-0-unit",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "cloudbeat",
-								"id":   "cloudbeat-0",
-							}),
-						},
-					},
-					RuntimeManager: DefaultRuntimeManager,
-				},
-				{
-					InputType:  "cloudbeat",
-					OutputType: "elasticsearch",
-					ID:         "cloudbeat-default-cloudbeat-1",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "cloudbeat",
-						BinaryName: "cloudbeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "cloudbeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "cloudbeat-default-cloudbeat-1",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "cloudbeat-default-cloudbeat-1-unit",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Err:      fmt.Errorf("decoding error: %w", makeMapStructureErr(t)),
-						},
-					},
-					RuntimeManager: DefaultRuntimeManager,
-				},
-			},
-		},
-		{
-			Name:     "Output disabled",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": false,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type":    "filestream",
-						"id":      "filestream-0",
-						"enabled": true,
-					},
-				},
-			},
-		},
-		{
-			Name:     "Output disabled (isolated units)",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": false,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type":    "cloudbeat",
-						"id":      "cloudbeat-0",
-						"enabled": true,
-					},
-				},
-			},
-		},
-		{
-			Name:     "Input disabled",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type":    "filestream",
-						"id":      "filestream-0",
-						"enabled": false,
-					},
-				},
-			},
-		},
-		{
-			Name:     "Input disabled (isolated units)",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type":    "cloudbeat",
-						"id":      "cloudbeat-1",
-						"enabled": false,
-					},
-					map[string]interface{}{
-						"type":    "cloudbeat",
-						"id":      "cloudbeat-2",
-						"enabled": false,
-					},
-				},
-			},
-		},
-		{
-			Name:     "Simple representation",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type":    "filestream",
-						"id":      "filestream-0",
-						"enabled": true,
-					},
-					map[string]interface{}{
-						"type":    "filestream",
-						"id":      "filestream-1",
-						"enabled": false,
-					},
-				},
-			},
-			Result: []Component{
-				{
-					InputType:  "filestream",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "filestream",
-						BinaryName: "testbeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "filestream-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "filestream-default-filestream-0",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "filestream",
-								"id":   "filestream-0",
-							}),
-						},
-					},
-					RuntimeManager: DefaultRuntimeManager,
-				},
-			},
-		},
-		{
-			Name:     "Different runtime managers",
-			Platform: linuxAMD64Platform,
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type": "filestream",
-						"id":   "filestream-0",
-					},
-					map[string]interface{}{
-						"type":                  "filestream",
-						"id":                    "filestream-1",
-						"_runtime_experimental": "process",
-					},
-					map[string]interface{}{
-						"type":                  "filestream",
-						"id":                    "filestream-2",
-						"_runtime_experimental": "otel",
-					},
-				},
-			},
-			Result: []Component{
-				{
-					InputType:  "filestream",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "filestream",
-						BinaryName: "testbeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "filestream-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "filestream-default-filestream-2",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "filestream",
-								"id":   "filestream-2",
-							}),
-						},
-					},
-					RuntimeManager: OtelRuntimeManager,
-				},
-				{
-					InputType:  "filestream",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "filestream",
-						BinaryName: "testbeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "filestream-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "filestream-default-filestream-0",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "filestream",
-								"id":   "filestream-0",
-							}),
-						},
-						{
-							ID:       "filestream-default-filestream-1",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "filestream",
-								"id":   "filestream-1",
-							}),
-						},
-					},
-					RuntimeManager: ProcessRuntimeManager,
-				},
-			},
-		},
-		{
-			Name:     "RuntimeConfig: global default otel",
-			Platform: linuxAMD64Platform,
-			RuntimeConfig: &RuntimeConfig{
-				Default: string(OtelRuntimeManager),
-			},
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type": "filestream",
-						"id":   "filestream-0",
-					},
-					map[string]interface{}{
-						"type": "filestream",
-						"id":   "filestream-1",
-					},
-				},
-			},
-			Result: []Component{
-				{
-					InputType:  "filestream",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "filestream",
-						BinaryName: "testbeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "filestream-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "filestream-default-filestream-0",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "filestream",
-								"id":   "filestream-0",
-							}),
-						},
-						{
-							ID:       "filestream-default-filestream-1",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "filestream",
-								"id":   "filestream-1",
-							}),
-						},
-					},
-					RuntimeManager: OtelRuntimeManager,
-				},
-			},
-		},
-		{
-			Name:     "RuntimeConfig: global default process",
-			Platform: linuxAMD64Platform,
-			RuntimeConfig: &RuntimeConfig{
-				Default: string(ProcessRuntimeManager),
-			},
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type": "log",
-						"id":   "log-0",
-					},
-					map[string]interface{}{
-						"type": "log",
-						"id":   "log-1",
-					},
-				},
-			},
-			Result: []Component{
-				{
-					InputType:  "log",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "log",
-						BinaryName: "testbeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "log-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "log-default-log-0",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "log",
-								"id":   "log-0",
-							}),
-						},
-						{
-							ID:       "log-default-log-1",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "log",
-								"id":   "log-1",
-							}),
-						},
-					},
-					RuntimeManager: ProcessRuntimeManager,
-				},
-			},
-		},
-		{
-			Name:     "RuntimeConfig: mixed with _runtime_experimental override",
-			Platform: linuxAMD64Platform,
-			RuntimeConfig: &RuntimeConfig{
-				Default: string(OtelRuntimeManager),
-			},
-			Policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type": "filestream",
-						"id":   "filestream-0",
-					},
-					map[string]interface{}{
-						"type":                  "filestream",
-						"id":                    "filestream-1",
-						"_runtime_experimental": "process",
-					},
-					map[string]interface{}{
-						"type": "filestream",
-						"id":   "filestream-2",
-					},
-				},
-			},
-			Result: []Component{
-				{
-					InputType:  "filestream",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "filestream",
-						BinaryName: "testbeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "filestream-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "filestream-default-filestream-0",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "filestream",
-								"id":   "filestream-0",
-							}),
-						},
-						{
-							ID:       "filestream-default-filestream-2",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "filestream",
-								"id":   "filestream-2",
-							}),
-						},
-					},
-					RuntimeManager: OtelRuntimeManager,
-				},
-				{
-					InputType:  "filestream",
-					OutputType: "elasticsearch",
-					InputSpec: &InputRuntimeSpec{
-						InputType:  "filestream",
-						BinaryName: "testbeat",
-						BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
-					},
-					Units: []Unit{
-						{
-							ID:       "filestream-default",
-							Type:     client.UnitTypeOutput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "elasticsearch",
-							}),
-						},
-						{
-							ID:       "filestream-default-filestream-1",
-							Type:     client.UnitTypeInput,
-							LogLevel: defaultUnitLogLevel,
-							Config: MustExpectedConfig(map[string]interface{}{
-								"type": "filestream",
-								"id":   "filestream-1",
-							}),
-						},
-					},
-					RuntimeManager: ProcessRuntimeManager,
-				},
-			},
-		},
+		// {
+		// 	Name:     "Empty policy",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy:   map[string]interface{}{},
+		// },
+		// {
+		// 	Name:     "Invalid: outputs as an array",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": []string{"should be a map"},
+		// 	},
+		// 	Err: "invalid 'outputs', expected a map not a []string",
+		// },
+		// {
+		// 	Name:     "Invalid: outputs entry as an array",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": []string{"should be a map"},
+		// 		},
+		// 	},
+		// 	Err: "invalid 'outputs.default', expected a map not a []string",
+		// },
+		// {
+		// 	Name:     "Invalid: outputs entry missing type",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{},
+		// 		},
+		// 	},
+		// 	Err: "invalid 'outputs.default', 'type' missing",
+		// },
+		// {
+		// 	Name:     "Invalid: outputs entry type not a string",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type": 0,
+		// 			},
+		// 		},
+		// 	},
+		// 	Err: "invalid 'outputs.default.type', expected a string not a int",
+		// },
+		// {
+		// 	Name:     "Invalid: outputs entry type not a string",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": "false",
+		// 			},
+		// 		},
+		// 	},
+		// 	Err: "invalid 'outputs.default.enabled', expected a bool not a string",
+		// },
+		// {
+		// 	Name:     "No inputs",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	Name:     "Invalid: inputs as a map",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": map[string]interface{}{},
+		// 	},
+		// 	Err: "invalid 'inputs', expected an array not a map[string]interface {}",
+		// },
+		// {
+		// 	Name:     "Invalid: inputs entry as an array",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			[]string{"should be a map"},
+		// 		},
+		// 	},
+		// 	Err: "invalid 'inputs.0', expected a map not a []string",
+		// },
+		// {
+		// 	Name:     "Invalid: inputs entry missing type",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{},
+		// 		},
+		// 	},
+		// 	Err: "invalid 'inputs.0', 'type' missing",
+		// },
+		// {
+		// 	Name:     "Invalid: inputs entry type not a string",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type": 0,
+		// 			},
+		// 		},
+		// 	},
+		// 	Err: "invalid 'inputs.0.type', expected a string not a int",
+		// },
+		// {
+		// 	Name:     "Invalid: input runtime manager type not a string",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type":                  "filestream",
+		// 				"_runtime_experimental": 0,
+		// 			},
+		// 		},
+		// 	},
+		// 	Err: "invalid 'inputs.0.runtime', expected a string, not a int",
+		// },
+		// {
+		// 	Name:     "Invalid: input runtime manager value",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type":                  "filestream",
+		// 				"_runtime_experimental": "invalid",
+		// 			},
+		// 		},
+		// 	},
+		// 	Err: "invalid 'inputs.0.runtime', valid values are: otel, process",
+		// },
+		// {
+		// 	Name:     "Invalid: inputs entry duplicate because of missing id",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type": "filestream",
+		// 			},
+		// 			map[string]interface{}{
+		// 				"type": "filestream",
+		// 			},
+		// 		},
+		// 	},
+		// 	Err: `invalid 'inputs.1.id', has a duplicate id "filestream". Please add a unique value for the 'id' key to each input in the agent policy`,
+		// },
+		// {
+		// 	Name:     "Invalid: inputs entry duplicate because of missing id (isolated units)",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type": "cloudbeat",
+		// 			},
+		// 			map[string]interface{}{
+		// 				"type": "cloudbeat",
+		// 			},
+		// 		},
+		// 	},
+		// 	Err: `invalid 'inputs.1.id', has a duplicate id "cloudbeat". Please add a unique value for the 'id' key to each input in the agent policy`,
+		// },
+		// {
+		// 	Name:     "Invalid: inputs entry id not a string",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type": "filestream",
+		// 				"id":   0,
+		// 			},
+		// 		},
+		// 	},
+		// 	Err: "invalid 'inputs.0.id', expected a string not a int",
+		// },
+		// {
+		// 	Name:     "Invalid: inputs entry id not a string (isolated units)",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type": "cloudbeat",
+		// 				"id":   0,
+		// 			},
+		// 		},
+		// 	},
+		// 	Err: "invalid 'inputs.0.id', expected a string not a int",
+		// },
+		// {
+		// 	Name:     "Invalid: inputs entry use_output not a string",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type":       "filestream",
+		// 				"id":         "filestream-0",
+		// 				"use_output": 0,
+		// 			},
+		// 		},
+		// 	},
+		// 	Err: "invalid 'inputs.0.use_output', expected a string not a int",
+		// },
+		// {
+		// 	Name:     "Invalid: inputs entry use_output not a string (isolated units)",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type":       "cloudbeat",
+		// 				"id":         "cloudbeat-0",
+		// 				"use_output": 0,
+		// 			},
+		// 		},
+		// 	},
+		// 	Err: "invalid 'inputs.0.use_output', expected a string not a int",
+		// },
+		// {
+		// 	Name:     "Invalid: inputs entry use_output references unknown output",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type":       "filestream",
+		// 				"id":         "filestream-0",
+		// 				"use_output": "other",
+		// 			},
+		// 		},
+		// 	},
+		// 	Err: "invalid 'inputs.0.use_output', references an unknown output 'other'",
+		// },
+		// {
+		// 	Name:     "Invalid: inputs entry use_output references unknown output (isolated units)",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type":       "cloudbeat",
+		// 				"id":         "cloudbeat-0",
+		// 				"use_output": "other",
+		// 			},
+		// 		},
+		// 	},
+		// 	Err: "invalid 'inputs.0.use_output', references an unknown output 'other'",
+		// },
+		// {
+		// 	Name:     "Invalid: inputs entry enabled not a bool",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type":       "filestream",
+		// 				"id":         "filestream-0",
+		// 				"use_output": "default",
+		// 				"enabled":    "false",
+		// 			},
+		// 		},
+		// 	},
+		// 	Err: "invalid 'inputs.0.enabled', expected a bool not a string",
+		// },
+		// {
+		// 	Name:     "Invalid: inputs entry enabled not a bool (isolated units)",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type":       "cloudbeat",
+		// 				"id":         "cloudbeat-0",
+		// 				"use_output": "default",
+		// 				"enabled":    "false",
+		// 			},
+		// 		},
+		// 	},
+		// 	Err: "invalid 'inputs.0.enabled', expected a bool not a string",
+		// },
+		// {
+		// 	Name:     "Invalid: inputs unknown type",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type":       "unknown",
+		// 				"id":         "unknown-0",
+		// 				"use_output": "default",
+		// 				"enabled":    true,
+		// 			},
+		// 		},
+		// 	},
+		// 	Result: []Component{
+		// 		{
+		// 			InputType:  "unknown",
+		// 			OutputType: "elasticsearch",
+		// 			ID:         "unknown-default",
+		// 			InputSpec:  &InputRuntimeSpec{},
+		// 			Err:        ErrInputNotSupported,
+		// 			Units: []Unit{
+		// 				{
+		// 					ID:       "unknown-default",
+		// 					Type:     client.UnitTypeOutput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "elasticsearch",
+		// 					}),
+		// 				},
+		// 				{
+		// 					ID:       "unknown-default-unknown-0",
+		// 					Type:     client.UnitTypeInput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "unknown",
+		// 						"id":   "unknown-0",
+		// 					}),
+		// 				},
+		// 			},
+		// 			RuntimeManager: DefaultRuntimeManager,
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	Name:     "Invalid: inputs fleet-server doesn't support logstash",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type": "logstash",
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type": "fleet-server",
+		// 				"id":   "fleet-server-0",
+		// 			},
+		// 		},
+		// 	},
+		// 	Result: []Component{
+		// 		{
+		// 			InputType:  "fleet-server",
+		// 			OutputType: "logstash",
+		// 			ID:         "fleet-server-default",
+		// 			Err:        ErrOutputNotSupported,
+		// 			InputSpec: &InputRuntimeSpec{
+		// 				InputType:  "fleet-server",
+		// 				BinaryName: "fleet-server",
+		// 				BinaryPath: filepath.Join("..", "..", "specs", "fleet-server"),
+		// 			},
+		// 			Units: []Unit{
+		// 				{
+		// 					ID:       "fleet-server-default",
+		// 					Type:     client.UnitTypeOutput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "logstash",
+		// 					}),
+		// 				},
+		// 				{
+		// 					ID:       "fleet-server-default-fleet-server-0",
+		// 					Type:     client.UnitTypeInput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "fleet-server",
+		// 						"id":   "fleet-server-0",
+		// 					}),
+		// 				},
+		// 			},
+		// 			RuntimeManager: DefaultRuntimeManager,
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	Name: "Invalid: inputs endpoint doesnt support arm64 redhat major 7",
+		// 	Platform: PlatformDetail{
+		// 		Platform: Platform{
+		// 			OS:   Linux,
+		// 			Arch: ARM64,
+		// 			GOOS: Linux,
+		// 		},
+		// 		Family: "redhat",
+		// 		Major:  7,
+		// 		Minor:  2,
+		// 	},
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type":       "endpoint",
+		// 				"id":         "endpoint-0",
+		// 				"use_output": "default",
+		// 				"enabled":    true,
+		// 			},
+		// 		},
+		// 	},
+		// 	Result: []Component{
+		// 		{
+		// 			InputType:  "endpoint",
+		// 			OutputType: "elasticsearch",
+		// 			ID:         "endpoint",
+		// 			InputSpec: &InputRuntimeSpec{
+		// 				InputType:  "endpoint",
+		// 				BinaryName: "endpoint-security",
+		// 				BinaryPath: filepath.Join("..", "..", "specs", "endpoint-security"),
+		// 			},
+		// 			Err: NewErrInputRuntimeCheckFail("Elastic Defend doesn't support RHEL7 on arm64"),
+		// 			Units: []Unit{
+		// 				{
+		// 					ID:       "endpoint",
+		// 					Type:     client.UnitTypeOutput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "elasticsearch",
+		// 					}),
+		// 				},
+		// 				{
+		// 					ID:       "endpoint-endpoint-0",
+		// 					Type:     client.UnitTypeInput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "endpoint",
+		// 						"id":   "endpoint-0",
+		// 					}),
+		// 				},
+		// 			},
+		// 			RuntimeManager: DefaultRuntimeManager,
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	Name:     "Invalid: single input failed to decode into config",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type":       "filestream",
+		// 				"id":         "filestream-0",
+		// 				"use_output": "default",
+		// 				"enabled":    true,
+		// 			},
+		// 			map[string]interface{}{
+		// 				"type":       "filestream",
+		// 				"id":         "filestream-1",
+		// 				"use_output": "default",
+		// 				"enabled":    true,
+		// 				"meta": []interface{}{
+		// 					map[string]interface{}{
+		// 						"bad": "should not have been array of dicts",
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// 	Result: []Component{
+		// 		{
+		// 			InputType:  "filestream",
+		// 			OutputType: "elasticsearch",
+		// 			ID:         "filestream-default",
+		// 			InputSpec: &InputRuntimeSpec{
+		// 				InputType:  "filestream",
+		// 				BinaryName: "testbeat",
+		// 				BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
+		// 			},
+		// 			Units: []Unit{
+		// 				{
+		// 					ID:       "filestream-default",
+		// 					Type:     client.UnitTypeOutput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "elasticsearch",
+		// 					}),
+		// 				},
+		// 				{
+		// 					ID:       "filestream-default-filestream-0",
+		// 					Type:     client.UnitTypeInput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "filestream",
+		// 						"id":   "filestream-0",
+		// 					}),
+		// 				},
+		// 				{
+		// 					ID:       "filestream-default-filestream-1",
+		// 					Type:     client.UnitTypeInput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Err:      fmt.Errorf("decoding error: %w", makeMapStructureErr(t)),
+		// 				},
+		// 			},
+		// 			RuntimeManager: DefaultRuntimeManager,
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	Name:     "Invalid: single input failed to decode into config (isolated units)",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type":       "cloudbeat",
+		// 				"id":         "cloudbeat-0",
+		// 				"use_output": "default",
+		// 				"enabled":    true,
+		// 			},
+		// 			map[string]interface{}{
+		// 				"type":       "cloudbeat",
+		// 				"id":         "cloudbeat-1",
+		// 				"use_output": "default",
+		// 				"enabled":    true,
+		// 				"meta": []interface{}{
+		// 					map[string]interface{}{
+		// 						"bad": "should not have been array of dicts",
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// 	Result: []Component{
+		// 		{
+		// 			InputType:  "cloudbeat",
+		// 			OutputType: "elasticsearch",
+		// 			ID:         "cloudbeat-default-cloudbeat-0",
+		// 			InputSpec: &InputRuntimeSpec{
+		// 				InputType:  "cloudbeat",
+		// 				BinaryName: "cloudbeat",
+		// 				BinaryPath: filepath.Join("..", "..", "specs", "cloudbeat"),
+		// 			},
+		// 			Units: []Unit{
+		// 				{
+		// 					ID:       "cloudbeat-default-cloudbeat-0",
+		// 					Type:     client.UnitTypeOutput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "elasticsearch",
+		// 					}),
+		// 				},
+		// 				{
+		// 					ID:       "cloudbeat-default-cloudbeat-0-unit",
+		// 					Type:     client.UnitTypeInput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "cloudbeat",
+		// 						"id":   "cloudbeat-0",
+		// 					}),
+		// 				},
+		// 			},
+		// 			RuntimeManager: DefaultRuntimeManager,
+		// 		},
+		// 		{
+		// 			InputType:  "cloudbeat",
+		// 			OutputType: "elasticsearch",
+		// 			ID:         "cloudbeat-default-cloudbeat-1",
+		// 			InputSpec: &InputRuntimeSpec{
+		// 				InputType:  "cloudbeat",
+		// 				BinaryName: "cloudbeat",
+		// 				BinaryPath: filepath.Join("..", "..", "specs", "cloudbeat"),
+		// 			},
+		// 			Units: []Unit{
+		// 				{
+		// 					ID:       "cloudbeat-default-cloudbeat-1",
+		// 					Type:     client.UnitTypeOutput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "elasticsearch",
+		// 					}),
+		// 				},
+		// 				{
+		// 					ID:       "cloudbeat-default-cloudbeat-1-unit",
+		// 					Type:     client.UnitTypeInput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Err:      fmt.Errorf("decoding error: %w", makeMapStructureErr(t)),
+		// 				},
+		// 			},
+		// 			RuntimeManager: DefaultRuntimeManager,
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	Name:     "Output disabled",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": false,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type":    "filestream",
+		// 				"id":      "filestream-0",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	Name:     "Output disabled (isolated units)",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": false,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type":    "cloudbeat",
+		// 				"id":      "cloudbeat-0",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	Name:     "Input disabled",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type":    "filestream",
+		// 				"id":      "filestream-0",
+		// 				"enabled": false,
+		// 			},
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	Name:     "Input disabled (isolated units)",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type":    "cloudbeat",
+		// 				"id":      "cloudbeat-1",
+		// 				"enabled": false,
+		// 			},
+		// 			map[string]interface{}{
+		// 				"type":    "cloudbeat",
+		// 				"id":      "cloudbeat-2",
+		// 				"enabled": false,
+		// 			},
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	Name:     "Simple representation",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type":    "filestream",
+		// 				"id":      "filestream-0",
+		// 				"enabled": true,
+		// 			},
+		// 			map[string]interface{}{
+		// 				"type":    "filestream",
+		// 				"id":      "filestream-1",
+		// 				"enabled": false,
+		// 			},
+		// 		},
+		// 	},
+		// 	Result: []Component{
+		// 		{
+		// 			InputType:  "filestream",
+		// 			OutputType: "elasticsearch",
+		// 			InputSpec: &InputRuntimeSpec{
+		// 				InputType:  "filestream",
+		// 				BinaryName: "testbeat",
+		// 				BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
+		// 			},
+		// 			Units: []Unit{
+		// 				{
+		// 					ID:       "filestream-default",
+		// 					Type:     client.UnitTypeOutput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "elasticsearch",
+		// 					}),
+		// 				},
+		// 				{
+		// 					ID:       "filestream-default-filestream-0",
+		// 					Type:     client.UnitTypeInput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "filestream",
+		// 						"id":   "filestream-0",
+		// 					}),
+		// 				},
+		// 			},
+		// 			RuntimeManager: DefaultRuntimeManager,
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	Name:     "Different runtime managers",
+		// 	Platform: linuxAMD64Platform,
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type": "filestream",
+		// 				"id":   "filestream-0",
+		// 			},
+		// 			map[string]interface{}{
+		// 				"type":                  "filestream",
+		// 				"id":                    "filestream-1",
+		// 				"_runtime_experimental": "process",
+		// 			},
+		// 			map[string]interface{}{
+		// 				"type":                  "filestream",
+		// 				"id":                    "filestream-2",
+		// 				"_runtime_experimental": "otel",
+		// 			},
+		// 		},
+		// 	},
+		// 	Result: []Component{
+		// 		{
+		// 			InputType:  "filestream",
+		// 			OutputType: "elasticsearch",
+		// 			InputSpec: &InputRuntimeSpec{
+		// 				InputType:  "filestream",
+		// 				BinaryName: "testbeat",
+		// 				BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
+		// 			},
+		// 			Units: []Unit{
+		// 				{
+		// 					ID:       "filestream-default",
+		// 					Type:     client.UnitTypeOutput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "elasticsearch",
+		// 					}),
+		// 				},
+		// 				{
+		// 					ID:       "filestream-default-filestream-2",
+		// 					Type:     client.UnitTypeInput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "filestream",
+		// 						"id":   "filestream-2",
+		// 					}),
+		// 				},
+		// 			},
+		// 			RuntimeManager: OtelRuntimeManager,
+		// 		},
+		// 		{
+		// 			InputType:  "filestream",
+		// 			OutputType: "elasticsearch",
+		// 			InputSpec: &InputRuntimeSpec{
+		// 				InputType:  "filestream",
+		// 				BinaryName: "testbeat",
+		// 				BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
+		// 			},
+		// 			Units: []Unit{
+		// 				{
+		// 					ID:       "filestream-default",
+		// 					Type:     client.UnitTypeOutput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "elasticsearch",
+		// 					}),
+		// 				},
+		// 				{
+		// 					ID:       "filestream-default-filestream-0",
+		// 					Type:     client.UnitTypeInput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "filestream",
+		// 						"id":   "filestream-0",
+		// 					}),
+		// 				},
+		// 				{
+		// 					ID:       "filestream-default-filestream-1",
+		// 					Type:     client.UnitTypeInput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "filestream",
+		// 						"id":   "filestream-1",
+		// 					}),
+		// 				},
+		// 			},
+		// 			RuntimeManager: ProcessRuntimeManager,
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	Name:     "RuntimeConfig: global default otel",
+		// 	Platform: linuxAMD64Platform,
+		// 	RuntimeConfig: &RuntimeConfig{
+		// 		Default: string(OtelRuntimeManager),
+		// 	},
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type": "filestream",
+		// 				"id":   "filestream-0",
+		// 			},
+		// 			map[string]interface{}{
+		// 				"type": "filestream",
+		// 				"id":   "filestream-1",
+		// 			},
+		// 		},
+		// 	},
+		// 	Result: []Component{
+		// 		{
+		// 			InputType:  "filestream",
+		// 			OutputType: "elasticsearch",
+		// 			InputSpec: &InputRuntimeSpec{
+		// 				InputType:  "filestream",
+		// 				BinaryName: "testbeat",
+		// 				BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
+		// 			},
+		// 			Units: []Unit{
+		// 				{
+		// 					ID:       "filestream-default",
+		// 					Type:     client.UnitTypeOutput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "elasticsearch",
+		// 					}),
+		// 				},
+		// 				{
+		// 					ID:       "filestream-default-filestream-0",
+		// 					Type:     client.UnitTypeInput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "filestream",
+		// 						"id":   "filestream-0",
+		// 					}),
+		// 				},
+		// 				{
+		// 					ID:       "filestream-default-filestream-1",
+		// 					Type:     client.UnitTypeInput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "filestream",
+		// 						"id":   "filestream-1",
+		// 					}),
+		// 				},
+		// 			},
+		// 			RuntimeManager: OtelRuntimeManager,
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	Name:     "RuntimeConfig: global default process",
+		// 	Platform: linuxAMD64Platform,
+		// 	RuntimeConfig: &RuntimeConfig{
+		// 		Default: string(ProcessRuntimeManager),
+		// 	},
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type": "log",
+		// 				"id":   "log-0",
+		// 			},
+		// 			map[string]interface{}{
+		// 				"type": "log",
+		// 				"id":   "log-1",
+		// 			},
+		// 		},
+		// 	},
+		// 	Result: []Component{
+		// 		{
+		// 			InputType:  "log",
+		// 			OutputType: "elasticsearch",
+		// 			InputSpec: &InputRuntimeSpec{
+		// 				InputType:  "log",
+		// 				BinaryName: "testbeat",
+		// 				BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
+		// 			},
+		// 			Units: []Unit{
+		// 				{
+		// 					ID:       "log-default",
+		// 					Type:     client.UnitTypeOutput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "elasticsearch",
+		// 					}),
+		// 				},
+		// 				{
+		// 					ID:       "log-default-log-0",
+		// 					Type:     client.UnitTypeInput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "log",
+		// 						"id":   "log-0",
+		// 					}),
+		// 				},
+		// 				{
+		// 					ID:       "log-default-log-1",
+		// 					Type:     client.UnitTypeInput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "log",
+		// 						"id":   "log-1",
+		// 					}),
+		// 				},
+		// 			},
+		// 			RuntimeManager: ProcessRuntimeManager,
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	Name:     "RuntimeConfig: mixed with _runtime_experimental override",
+		// 	Platform: linuxAMD64Platform,
+		// 	RuntimeConfig: &RuntimeConfig{
+		// 		Default: string(OtelRuntimeManager),
+		// 	},
+		// 	Policy: map[string]interface{}{
+		// 		"outputs": map[string]interface{}{
+		// 			"default": map[string]interface{}{
+		// 				"type":    "elasticsearch",
+		// 				"enabled": true,
+		// 			},
+		// 		},
+		// 		"inputs": []interface{}{
+		// 			map[string]interface{}{
+		// 				"type": "filestream",
+		// 				"id":   "filestream-0",
+		// 			},
+		// 			map[string]interface{}{
+		// 				"type":                  "filestream",
+		// 				"id":                    "filestream-1",
+		// 				"_runtime_experimental": "process",
+		// 			},
+		// 			map[string]interface{}{
+		// 				"type": "filestream",
+		// 				"id":   "filestream-2",
+		// 			},
+		// 		},
+		// 	},
+		// 	Result: []Component{
+		// 		{
+		// 			InputType:  "filestream",
+		// 			OutputType: "elasticsearch",
+		// 			InputSpec: &InputRuntimeSpec{
+		// 				InputType:  "filestream",
+		// 				BinaryName: "testbeat",
+		// 				BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
+		// 			},
+		// 			Units: []Unit{
+		// 				{
+		// 					ID:       "filestream-default",
+		// 					Type:     client.UnitTypeOutput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "elasticsearch",
+		// 					}),
+		// 				},
+		// 				{
+		// 					ID:       "filestream-default-filestream-0",
+		// 					Type:     client.UnitTypeInput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "filestream",
+		// 						"id":   "filestream-0",
+		// 					}),
+		// 				},
+		// 				{
+		// 					ID:       "filestream-default-filestream-2",
+		// 					Type:     client.UnitTypeInput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "filestream",
+		// 						"id":   "filestream-2",
+		// 					}),
+		// 				},
+		// 			},
+		// 			RuntimeManager: OtelRuntimeManager,
+		// 		},
+		// 		{
+		// 			InputType:  "filestream",
+		// 			OutputType: "elasticsearch",
+		// 			InputSpec: &InputRuntimeSpec{
+		// 				InputType:  "filestream",
+		// 				BinaryName: "testbeat",
+		// 				BinaryPath: filepath.Join("..", "..", "specs", "testbeat"),
+		// 			},
+		// 			Units: []Unit{
+		// 				{
+		// 					ID:       "filestream-default",
+		// 					Type:     client.UnitTypeOutput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "elasticsearch",
+		// 					}),
+		// 				},
+		// 				{
+		// 					ID:       "filestream-default-filestream-1",
+		// 					Type:     client.UnitTypeInput,
+		// 					LogLevel: defaultUnitLogLevel,
+		// 					Config: MustExpectedConfig(map[string]interface{}{
+		// 						"type": "filestream",
+		// 						"id":   "filestream-1",
+		// 					}),
+		// 				},
+		// 			},
+		// 			RuntimeManager: ProcessRuntimeManager,
+		// 		},
+		// 	},
+		// },
 		{
 			Name:     "RuntimeConfig: multiple input types with different defaults",
 			Platform: linuxAMD64Platform,
@@ -2947,6 +2947,7 @@ func TestToComponents(t *testing.T) {
 					assert.Equal(t, expected.InputSpec.InputType, actual.InputSpec.InputType)
 					assert.Equal(t, expected.InputSpec.BinaryName, actual.InputSpec.BinaryName)
 					assert.Equal(t, expected.InputSpec.BinaryPath, actual.InputSpec.BinaryPath)
+					assert.Equal(t, expected.RuntimeManager, actual.RuntimeManager, "%s: input has wrong runtime manager", expected.InputType)
 					for i, eu := range expected.Units {
 						assert.EqualValues(t, eu.Config, actual.Units[i].Config)
 					}
@@ -4086,39 +4087,6 @@ func TestToComponentsWithRuntimeConfig(t *testing.T) {
 					assert.Equal(t, ProcessRuntimeManager, comp.RuntimeManager,
 						"all components should use global default process runtime")
 				}
-			},
-		},
-		{
-			name: "beat-specific configs are ignored when beat name is empty",
-			policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type": "filestream",
-						"id":   "filestream-0",
-					},
-				},
-			},
-			runtimeConfig: &RuntimeConfig{
-				Default: string(ProcessRuntimeManager),
-				// These will be ignored because testbeat doesn't use elastic-otel-collector
-				Filebeat: BeatRuntimeConfig{
-					Default: string(OtelRuntimeManager),
-					InputType: map[string]string{
-						"filestream": string(OtelRuntimeManager),
-					},
-				},
-			},
-			wantCount: 1,
-			validate: func(t *testing.T, components []Component) {
-				// Should use global default, not filebeat config
-				assert.Equal(t, ProcessRuntimeManager, components[0].RuntimeManager,
-					"should use global default when beat name is empty")
 			},
 		},
 		{

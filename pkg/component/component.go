@@ -148,7 +148,7 @@ func (r *RuntimeConfig) BeatRuntimeConfig(beatName string) *BeatRuntimeConfig {
 func (r *RuntimeConfig) RuntimeManagerForInputType(inputType string, beatName string, output outputI) RuntimeManager {
 	if r.Output != nil {
 		// Check if runtime is set for given output
-		if runtime, ok := r.Output[output.Name]; ok && output.Enabled {
+		if runtime, ok := r.Output[output.OutputType]; ok && output.Enabled {
 			return RuntimeManager(runtime)
 		}
 	}
