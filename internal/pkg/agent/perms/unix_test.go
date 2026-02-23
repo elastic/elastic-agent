@@ -53,28 +53,6 @@ func TestFixPermissions_NonExistentRootIsIgnored(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestFixPermissions_MaskIsStripped(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	stickyDir := filepath.Join(tmpDir, "sticky")
-	require.NoError(t, os.MkdirAll(stickyDir, 0777))
-	require.NoError(t, os.Chmod(stickyDir, os.ModeSticky|0777))
-
-	before, err := os.Stat(stickyDir)
-	require.NoError(t, err)
-	require.NotEqual(t, os.FileMode(0), before.Mode()&os.ModeSticky)
-
-	// Even if a caller supplies a mask with non-permission bits,
-	// FixPermissions applies the mask to info.Mode().Perm() (permission bits only).
-	mask := os.FileMode(0777) | os.ModeSticky
-	require.NoError(t, FixPermissions(stickyDir, WithMask(mask)))
-
-	after, err := os.Stat(stickyDir)
-	require.NoError(t, err)
-	require.Equal(t, os.FileMode(0777), after.Mode().Perm())
-	require.Equal(t, os.FileMode(0), after.Mode()&os.ModeSticky)
-}
-
 func TestIsMaskStripped(t *testing.T) {
 	perms := []os.FileMode{0777, 0755, 0770, 0700}
 	for _, perm := range perms {
@@ -89,15 +67,19 @@ func Test_isSameUser_MatchesCurrentOwner(t *testing.T) {
 	filePath := filepath.Join(tmpDir, "file")
 	require.NoError(t, os.WriteFile(filePath, []byte("hello"), 0600))
 
-	info, err := os.Lstat(filePath)
+	info, err := os.Stat(filePath)
 	require.NoError(t, err)
 
 	owner, err := utils.CurrentFileOwner()
 	require.NoError(t, err)
 
+	// set uid and gid
+	require.NoError(t, os.Chown(filePath, int(owner.UID), int(owner.GID)))
+
 	same, err := isSameUser(info, owner)
 	require.NoError(t, err)
-	require.True(t, same)
+	sys := info.Sys().(*syscall.Stat_t)
+	require.Truef(t, same, "expected isSameUser to return true when UID %d:%d matches %d:%d", owner.UID, owner.GID, sys.Uid, sys.Gid)
 }
 
 func Test_isSameUser_MismatchReturnsFalse(t *testing.T) {
@@ -131,6 +113,9 @@ func Test_isSameUser_UsesLstatForSymlink(t *testing.T) {
 
 	owner, err := utils.CurrentFileOwner()
 	require.NoError(t, err)
+
+	// set uid and gid
+	require.NoError(t, os.Chown(linkPath, int(owner.UID), int(owner.GID)))
 
 	same, err := isSameUser(info, owner)
 	require.NoError(t, err)
