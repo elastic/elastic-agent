@@ -74,7 +74,7 @@ func Test_isSameUser_MatchesCurrentOwner(t *testing.T) {
 	require.NoError(t, err)
 
 	// set uid and gid
-	require.NoError(t, os.Chown(filePath, int(owner.UID), int(owner.GID)))
+	require.NoError(t, os.Chown(filePath, owner.UID, owner.GID))
 
 	same, err := isSameUser(info, owner)
 	require.NoError(t, err)
@@ -115,7 +115,7 @@ func Test_isSameUser_UsesLstatForSymlink(t *testing.T) {
 	require.NoError(t, err)
 
 	// set uid and gid
-	require.NoError(t, os.Chown(linkPath, int(owner.UID), int(owner.GID)))
+	require.NoError(t, os.Lchown(linkPath, owner.UID, owner.GID))
 
 	same, err := isSameUser(info, owner)
 	require.NoError(t, err)
