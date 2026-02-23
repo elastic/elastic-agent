@@ -87,7 +87,6 @@ func DefaultRuntimeConfig() *RuntimeConfig {
 		},
 		Output: map[string]string{
 			"logstash": string(ProcessRuntimeManager), // Force all inputs using the Logstash output to use the process runtime
-			"kafka":    string(ProcessRuntimeManager), // Force all inputs using the kafka output to use the process runtime
 		},
 	}
 }
