@@ -7,11 +7,7 @@ package application
 import (
 	"context"
 	"fmt"
-<<<<<<< HEAD
-=======
-	"path/filepath"
 	"reflect"
->>>>>>> e3b9b4fba (Add suppport for standalone encrypted config by feature flag (#12521))
 	"time"
 
 	"go.elastic.co/apm/v2"
@@ -354,93 +350,6 @@ func mergeFleetConfig(ctx context.Context, rawConfig *config.Config) (storage.St
 
 	return store, cfg, nil
 }
-<<<<<<< HEAD
-=======
-
-// injectOutputOverrides takes local configuration for specific outputs and applies them to the configuration.
-//
-// The name of the output must match or no options will be overwritten.
-func injectOutputOverrides(log *logger.Logger, rawConfig *config.Config) func(change coordinator.ConfigChange) coordinator.ConfigChange {
-	// merging uses no resolving as the AST variable substitution occurs on the outputs
-	// append the values to arrays (don't allow complete overriding of arrays)
-	mergeOpts := config.NoResolveOptions
-	mergeOpts = append(mergeOpts, ucfg.AppendValues)
-
-	// parse the outputs defined local in the configuration
-	// in the case the configuration as no outputs defined (most cases) then noop can be used
-	var parsed struct {
-		Outputs map[string]*ucfg.Config `config:"outputs"`
-	}
-	err := rawConfig.UnpackTo(&parsed)
-	if err != nil {
-		log.Errorf("error decoding raw config, output injection disabled: %v", err)
-		return noop
-	}
-	if len(parsed.Outputs) == 0 {
-		return noop
-	}
-
-	return func(change coordinator.ConfigChange) coordinator.ConfigChange {
-		cfg := change.Config()
-		outputs, err := cfg.Agent.Child("outputs", -1)
-		if err != nil {
-			if !isMissingError(err) {
-				// expecting only ErrMissing
-				log.Errorf("error getting outputs from config: %v", err)
-			}
-			return change
-		}
-		for outputName, outputOverrides := range parsed.Outputs {
-			cfgOutput, err := outputs.Child(outputName, -1)
-			if err != nil {
-				// no output with that name; do nothing
-				continue
-			}
-			// the order of merging is important
-			//
-			// this merges the ConfigChange on-top of the rawConfig to ensure that the
-			// ConfigChange options always override local options
-			//
-			// meaning that local options are only applied in the case that the ConfigChange
-			// doesn't provide a different value for those fields
-			err = func() error {
-				clone, err := ucfg.NewFrom(outputOverrides, mergeOpts...)
-				if err != nil {
-					return fmt.Errorf("failed to clone output overrides: %w", err)
-				}
-				err = clone.Merge(cfgOutput, mergeOpts...)
-				if err != nil {
-					return fmt.Errorf("failed to merge output over overrides: %w", err)
-				}
-				err = outputs.SetChild(outputName, -1, clone, mergeOpts...)
-				if err != nil {
-					return fmt.Errorf("failed to re-set output with overrides: %w", err)
-				}
-				return nil
-			}()
-			if err != nil {
-				log.Errorf("failed to perform output injection for output %s: %v", outputName, err)
-				continue
-			}
-			log.Infof("successfully injected output overrides for output %s", outputName)
-		}
-		return change
-	}
-}
-
-// isMissingError returns true if the error is because the field is missing
-//
-// Sadly go-ucfg doesn't support Unwrap interface so using `errors.Is(err, ucfg.ErrMissing)` doesn't work
-// this specific function is required to ensure its an `ErrMissing` error.
-func isMissingError(err error) bool {
-	//nolint:errorlint // limitation of go-ucfg (read docstring)
-	switch v := err.(type) {
-	case ucfg.Error:
-		//nolint:errorlint // limitation of go-ucfg (read docstring)
-		return v.Reason() == ucfg.ErrMissing
-	}
-	return false
-}
 
 // hasEncryptedStandaloneConfigChanged parses the file at pathConfigFile and checks if it has the same contents as storage.DefaultAgentEncryptedStandaloneConfig
 func hasEncryptedStandaloneConfigChanged(log *logger.Logger, pathConfigFile string) bool {
@@ -475,4 +384,3 @@ func hasEncryptedStandaloneConfigChanged(log *logger.Logger, pathConfigFile stri
 
 	return !reflect.DeepEqual(embeddedMap, fileMap)
 }
->>>>>>> e3b9b4fba (Add suppport for standalone encrypted config by feature flag (#12521))
