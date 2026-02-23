@@ -69,6 +69,7 @@ require (
 )
 
 require (
+	github.com/KimMachineGun/automemlimit v0.7.5 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/alexbrainman/sspi v0.0.0-20210105120005-909beea2cc74 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.70.0 // indirect
@@ -117,8 +118,10 @@ require (
 	github.com/oschwald/maxminddb-golang/v2 v2.1.1 // indirect
 	github.com/osquery/osquery-go v0.0.0-20231108163517-e3cde127e724 // indirect
 	github.com/otiai10/copy v1.14.0 // indirect
+	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/pkg/xattr v0.4.9 // indirect
 	github.com/prometheus/client_golang/exp v0.0.0-20260101091701-2cd067eb23c9 // indirect
+	github.com/rdforte/gomaxecs v1.1.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sajari/regression v1.0.1 // indirect
 	github.com/samuel/go-parser v0.0.0-20130731160455-ca8abbf65d0e // indirect
@@ -132,6 +135,7 @@ require (
 	go.opentelemetry.io/collector/config/confighttp v0.145.0 // indirect
 	go.opentelemetry.io/collector/internal/componentalias v0.145.0 // indirect
 	go.opentelemetry.io/collector/processor/processorhelper v0.145.0 // indirect
+	go.uber.org/automaxprocs v1.6.0 // indirect
 	mvdan.cc/garble v0.12.1 // indirect
 	sigs.k8s.io/e2e-framework v0.4.0 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
@@ -143,6 +147,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.145.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/cgroupruntimeextension v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.145.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/cumulativetodeltaprocessor v0.145.0
