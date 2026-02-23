@@ -1,0 +1,5 @@
+kind: feature
+
+summary: Add Azure Monitor receiver to EDOT Collector.
+
+component: elastic-agent
