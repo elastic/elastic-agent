@@ -416,7 +416,27 @@ func buildMergedConfig(
 		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
 	}
 
+	// if the otel log level is unset, use the agent log level
+	if err := maybeInjectLogLevel(mergedOtelCfg, cfgUpdate.agentLogLevel); err != nil {
+		return nil, err
+	}
+
 	return mergedOtelCfg, nil
+}
+
+// maybeInjectLogLevel adds the given log level to the collector config if it's not set.
+func maybeInjectLogLevel(config *confmap.Conf, logplevel logp.Level) error {
+	if config.IsSet("service::telemetry::logs::level") {
+		return nil
+	}
+	level, err := translate.LogpLevelToOTel(logplevel)
+	if err != nil {
+		return fmt.Errorf("failed to translate log level: %s", logplevel)
+	}
+	if err := config.Merge(confmap.NewFromStringMap(map[string]any{"service::telemetry::logs::level": level})); err != nil {
+		return fmt.Errorf("failed to set log level in otel config: %w", err)
+	}
+	return nil
 }
 
 func injectDiagnosticsExtension(config *confmap.Conf) error {
