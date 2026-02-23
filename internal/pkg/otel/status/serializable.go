@@ -118,13 +118,17 @@ func CompareStatuses(s1, s2 *status.AggregateStatus) bool {
 		// one of them is nil
 		return false
 	}
+
+	// We do compare timestamps, because we want to emit a new status if something changed in the collector
+	// even if the same components are running, with the same status values.
+	if s1.Timestamp() != s2.Timestamp() {
+		return false
+	}
+
 	if s1.Status() != s2.Status() {
 		// status doesn't match
 		return false
 	}
-
-	// NOTE: we don't check the timestamp
-	// as we care only about the event and component statuses/error differences
 
 	if (s1.Err() == nil && s2.Err() != nil) || (s1.Err() != nil && s2.Err() == nil) {
 		return false
