@@ -17,8 +17,8 @@ entries:
     - kind: enhancement
       summary: Add agent.internal.runtime.dynamic_inputs flag to control the runtime used by inputs using dynamic variables.
       description: |
-        Allow switching to the process runtim for inputs using dynamic variables from a dynamic provider, like the
-        Kubernetes provider. These inputs may see frequent configuration reloads, which the otel collector isn't great
+        Allow switching to the process runtime for inputs using dynamic variables from a dynamic provider, like the
+        Kubernetes provider. These inputs may perform frequent configuration reloads, which the otel collector isn't great
         at handling right now.
       component: elastic-agent
       pr:

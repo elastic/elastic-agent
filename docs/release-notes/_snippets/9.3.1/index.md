@@ -9,8 +9,8 @@ _This release also includes: [Deprecations](/release-notes/deprecations.md#elast
 * Support --prefix flag when installing from RPM. [#12263](https://github.com/elastic/elastic-agent/pull/12263) [#141](https://github.com/elastic/elastic-agent/issues/141)
 * Add agent.internal.runtime.dynamic_inputs flag to control the runtime used by inputs using dynamic variables. [#12438](https://github.com/elastic/elastic-agent/pull/12438) [#11630](https://github.com/elastic/elastic-agent/issues/11630)
 
-  Allow switching to the process runtim for inputs using dynamic variables from a dynamic provider, like the
-  Kubernetes provider. These inputs may see frequent configuration reloads, which the otel collector isn&#39;t great
+  Allow switching to the process runtime for inputs using dynamic variables from a dynamic provider, like the
+  Kubernetes provider. These inputs may perform frequent configuration reloads, which the otel collector isn&#39;t great
   at handling right now.
   
 * Update OTel Collector components to v0.144.0. [#12449](https://github.com/elastic/elastic-agent/pull/12449) 
