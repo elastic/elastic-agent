@@ -321,6 +321,13 @@ func (c *enrollCmd) prepareFleetTLS() error {
 	if port == 0 {
 		port = defaultFleetServerPort
 	}
+	if c.options.FleetServer.InternalPort > 0 {
+		if c.options.FleetServer.InternalPort != defaultFleetServerInternalPort {
+			c.log.Warnf("Internal endpoint configured to: %d. Changing this value is not supported.", c.options.FleetServer.InternalPort)
+		}
+		c.options.InternalURL = net.JoinHostPort(defaultFleetServerInternalHost, strconv.Itoa(int(c.options.FleetServer.InternalPort)))
+	}
+
 	if c.options.FleetServer.Cert != "" && c.options.FleetServer.CertKey == "" {
 		return errors.New("certificate private key is required when certificate provided")
 	}
@@ -334,6 +341,9 @@ func (c *enrollCmd) prepareFleetTLS() error {
 				c.options.FleetServer.Host = defaultFleetServerInternalHost
 			}
 			c.options.URL = "http://" + net.JoinHostPort(host, strconv.Itoa(int(port)))
+			if c.options.FleetServer.ConnStr != "" && c.options.InternalURL != "" {
+				c.options.URL = "http://" + c.options.InternalURL
+			}
 			c.options.Insecure = true
 			return nil
 		}
@@ -361,20 +371,9 @@ func (c *enrollCmd) prepareFleetTLS() error {
 		return errors.New("url is required when a certificate is provided")
 	}
 
-	if c.options.FleetServer.InternalPort > 0 {
-		if c.options.FleetServer.InternalPort != defaultFleetServerInternalPort {
-			c.log.Warnf("Internal endpoint configured to: %d. Changing this value is not supported.", c.options.FleetServer.InternalPort)
-		}
-		c.options.InternalURL = net.JoinHostPort(defaultFleetServerInternalHost, strconv.Itoa(int(c.options.FleetServer.InternalPort)))
-	}
-
 	// Use internalURL if available
 	if c.options.FleetServer.ConnStr != "" && c.options.InternalURL != "" {
-		scheme := "https"
-		if c.options.Insecure || c.options.FleetServer.Insecure {
-			scheme = "http"
-		}
-		c.options.URL = scheme + "://" + c.options.InternalURL
+		c.options.URL = "https://" + c.options.InternalURL
 	}
 
 	return nil
