@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/component/componentstatus"
 )
 
@@ -37,6 +38,24 @@ func TestCompareAggregateStatuses(t *testing.T) {
 				},
 			},
 			expected: true,
+		},
+		{
+			name: "unequal timestamps",
+			s1: &status.AggregateStatus{
+				Event: &healthCheckEvent{
+					status:    componentstatus.StatusOK,
+					timestamp: timestamp,
+					err:       nil,
+				},
+			},
+			s2: &status.AggregateStatus{
+				Event: &healthCheckEvent{
+					status:    componentstatus.StatusOK,
+					timestamp: timestamp.Add(time.Second),
+					err:       nil,
+				},
+			},
+			expected: false,
 		},
 		{
 			name: "unequal statuses",
@@ -246,9 +265,7 @@ func TestCompareAggregateStatuses(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			actual := CompareStatuses(tc.s1, tc.s2)
-			if actual != tc.expected {
-				t.Errorf("expected %v, got %v", tc.expected, actual)
-			}
+			assert.Equal(t, tc.expected, actual, "expected %v, got %v", tc.expected, actual)
 		})
 	}
 }
