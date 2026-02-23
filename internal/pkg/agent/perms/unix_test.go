@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
@@ -113,7 +114,8 @@ func Test_isSameUser_MismatchReturnsFalse(t *testing.T) {
 
 	same, err := isSameUser(info, owner)
 	require.NoError(t, err)
-	require.False(t, same)
+	sys := info.Sys().(*syscall.Stat_t)
+	require.Falsef(t, same, "expected isSameUser to return false when UID %d:%d does not match %d:%d", owner.UID, owner.GID, sys.Uid, sys.Gid)
 }
 
 func Test_isSameUser_UsesLstatForSymlink(t *testing.T) {
@@ -132,7 +134,8 @@ func Test_isSameUser_UsesLstatForSymlink(t *testing.T) {
 
 	same, err := isSameUser(info, owner)
 	require.NoError(t, err)
-	require.True(t, same)
+	sys := info.Sys().(*syscall.Stat_t)
+	require.Truef(t, same, "expected isSameUser to return true when UID %d:%d matches %d:%d", owner.UID, owner.GID, sys.Uid, sys.Gid)
 }
 
 func Test_isSameUser_ErrorsWhenNoStatT(t *testing.T) {
