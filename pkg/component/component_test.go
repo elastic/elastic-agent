@@ -3733,7 +3733,6 @@ func TestRuntimeConfigValidate(t *testing.T) {
 				Output: map[string]string{
 					"elasticsearch": string(ProcessRuntimeManager),
 					"logstash":      string(ProcessRuntimeManager),
-					"kafka":         string(ProcessRuntimeManager),
 				},
 			},
 		},
