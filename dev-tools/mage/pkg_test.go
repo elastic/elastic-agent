@@ -71,15 +71,6 @@ func testPackage(t testing.TB, pack func(PackageSpec) error) {
 	readmePath := filepath.ToSlash(filepath.Clean(readme.Source))
 	assert.True(t, strings.HasPrefix(readmePath, packageStagingDir))
 
-<<<<<<< HEAD
-=======
-	commit := spec.ExtraTags[0]
-	expectedCommitHash, err := spec.cfg.Build.CommitHash()
-	require.NoError(t, err)
-	expected := "git-" + expectedCommitHash[:12]
-	assert.Equal(t, expected, commit)
-
->>>>>>> 1a8a5f564 (Refactor mage target configuration (#12128))
 	if err := pack(spec); err != nil {
 		t.Fatal(err)
 	}
