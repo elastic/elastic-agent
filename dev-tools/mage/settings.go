@@ -207,12 +207,12 @@ func DumpVariables(cfg *Settings) error {
 }
 
 // AgentPackageVersion returns the agent package version.
-func (cfg *Settings) AgentPackageVersion() string {
-	if cfg.Packaging.AgentPackageVersion != "" {
-		return cfg.Packaging.AgentPackageVersion
+func (s *Settings) AgentPackageVersion() string {
+	if s.Packaging.AgentPackageVersion != "" {
+		return s.Packaging.AgentPackageVersion
 	}
 
-	return cfg.BeatQualifiedVersion()
+	return s.BeatQualifiedVersion()
 }
 
 // PackageManifest generates the package manifest using the provided config.
