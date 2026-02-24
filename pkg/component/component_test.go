@@ -3851,31 +3851,9 @@ func TestRuntimeConfigRuntimeManagerForInputType(t *testing.T) {
 				},
 			},
 			output: outputI{
-				Name:    "logstash",
-				Enabled: true,
-			},
-			inputType: "filestream",
-			beatName:  "filebeat",
-			want:      ProcessRuntimeManager,
-		},
-		{
-			name: "use process runtime for all inputs when kafka output with process runtime is set",
-			config: &RuntimeConfig{
-				Default: string(ProcessRuntimeManager),
-				Filebeat: BeatRuntimeConfig{
-					Default: string(ProcessRuntimeManager),
-					InputType: map[string]string{
-						"filestream": string(OtelRuntimeManager),
-					},
-				},
-				Output: map[string]string{
-					"logstash": string(ProcessRuntimeManager),
-					"kafka":    string(ProcessRuntimeManager),
-				},
-			},
-			output: outputI{
-				Name:    "kafka",
-				Enabled: true,
+				Name:       "default",
+				Enabled:    true,
+				OutputType: "logstash",
 			},
 			inputType: "filestream",
 			beatName:  "filebeat",
