@@ -8,7 +8,7 @@ replace github.com/elastic/elastic-agent => ../../
 replace github.com/elastic/beats/v7 => ../../beats
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260218104129-776168f9d0ff
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260223215926-e89803edacde
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.32.2
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
@@ -31,6 +31,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.144.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/logdedupprocessor v0.144.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.144.0
@@ -103,6 +104,7 @@ require (
 	github.com/jaypipes/pcidb v1.0.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
+	github.com/michel-laterman/proxy-connect-dialer-go v0.1.0 // indirect
 	github.com/mileusna/useragent v1.3.5 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/moby/spdystream v0.5.0 // indirect
