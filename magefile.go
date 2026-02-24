@@ -960,7 +960,7 @@ func (Cloud) Image(ctx context.Context) {
 // DOCKER_IMPORT_SOURCE - override source for import
 func (Cloud) Load(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
-	agentVersion := devtools.AgentPackageVersion(cfg)
+	agentVersion := cfg.AgentPackageVersion()
 
 	source := devtools.DistributionsDir + "/elastic-agent-cloud-" + agentVersion + "-SNAPSHOT-linux-" + runtime.GOARCH + ".docker.tar.gz"
 	if cfg.Build.FIPSBuild {
@@ -977,7 +977,7 @@ func (Cloud) Load(ctx context.Context) error {
 // Previous login to elastic registry is required!
 func (Cloud) Push(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
-	agentVersion := devtools.AgentPackageVersion(cfg)
+	agentVersion := cfg.AgentPackageVersion()
 
 	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s-SNAPSHOT", agentVersion)
 	if cfg.Build.FIPSBuild {

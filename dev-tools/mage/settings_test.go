@@ -24,7 +24,7 @@ func TestAgentPackageVersion(t *testing.T) {
 		cfg, err := LoadSettings()
 		require.NoError(t, err)
 		expectedPkgVersion := cfg.BeatQualifiedVersion()
-		actualPkgVersion := AgentPackageVersion(cfg)
+		actualPkgVersion := cfg.AgentPackageVersion()
 		assert.Equal(t, expectedPkgVersion, actualPkgVersion)
 	})
 
@@ -33,7 +33,7 @@ func TestAgentPackageVersion(t *testing.T) {
 		require.NoError(t, err)
 		expectedPkgVersion := "1.2.3-specialrelease+abcdef"
 		cfg.Packaging.AgentPackageVersion = expectedPkgVersion
-		actualPkgVersion := AgentPackageVersion(cfg)
+		actualPkgVersion := cfg.AgentPackageVersion()
 		assert.Equal(t, expectedPkgVersion, actualPkgVersion)
 	})
 
@@ -45,7 +45,7 @@ func TestAgentPackageVersion(t *testing.T) {
 		assert.Contains(t, funcMap, agentPackageVersionMappedFunc)
 		require.IsType(t, funcMap[agentPackageVersionMappedFunc], func() string { return "" })
 		mappedFuncPkgVersion := funcMap[agentPackageVersionMappedFunc].(func() string)()
-		expectedPkgVersion := AgentPackageVersion(cfg)
+		expectedPkgVersion := cfg.AgentPackageVersion()
 		assert.Equal(t, expectedPkgVersion, mappedFuncPkgVersion)
 	})
 }

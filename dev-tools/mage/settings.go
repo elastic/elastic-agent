@@ -83,7 +83,7 @@ func FuncMap(cfg *Settings) map[string]interface{} {
 		"tolower":                        strings.ToLower,
 		"contains":                       strings.Contains,
 		"substring":                      Substring,
-		agentPackageVersionMappedFunc:    func() string { return AgentPackageVersion(cfg) },
+		agentPackageVersionMappedFunc:    func() string { return cfg.AgentPackageVersion() },
 		agentManifestGeneratorMappedFunc: func(fips bool) (string, error) { return PackageManifest(cfg, fips) },
 		snapshotSuffix:                   func() string { return MaybeSnapshotSuffix(cfg) },
 	}
@@ -206,8 +206,8 @@ func DumpVariables(cfg *Settings) error {
 	return nil
 }
 
-// AgentPackageVersion returns the agent package version using the provided config.
-func AgentPackageVersion(cfg *Settings) string {
+// AgentPackageVersion returns the agent package version.
+func (cfg *Settings) AgentPackageVersion() string {
 	if cfg.Packaging.AgentPackageVersion != "" {
 		return cfg.Packaging.AgentPackageVersion
 	}
@@ -217,7 +217,7 @@ func AgentPackageVersion(cfg *Settings) string {
 
 // PackageManifest generates the package manifest using the provided config.
 func PackageManifest(cfg *Settings, fips bool) (string, error) {
-	packageVersion := AgentPackageVersion(cfg)
+	packageVersion := cfg.AgentPackageVersion()
 
 	hash, err := cfg.Build.CommitHash()
 	if err != nil {
