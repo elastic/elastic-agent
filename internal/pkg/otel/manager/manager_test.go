@@ -189,6 +189,15 @@ func (h *mockCollectorHandle) Stop(waitTime time.Duration) {
 	}
 }
 
+func (h *mockCollectorHandle) Stopped() bool {
+	select {
+	case <-h.stopCh:
+		return true
+	default:
+		return false
+	}
+}
+
 // EventListener listens to the events from the OTelManager and stores the latest error and status.
 type EventListener struct {
 	mtx             sync.Mutex
@@ -845,7 +854,7 @@ func TestOTelManager_Run(t *testing.T) {
 				collectorStatusCh: make(chan *status.AggregateStatus),
 				componentStateCh:  make(chan []runtime.ComponentComponentState, 1),
 				doneChan:          make(chan struct{}),
-				collectorRunErr:   make(chan error),
+				collectorRunErr:   make(chan error, 1),
 				recoveryTimer:     tc.restarter,
 				stopTimeout:       waitTimeForStop,
 				agentInfo:         &info.AgentInfo{},
@@ -1750,16 +1759,18 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		case execution.statusCh <- otelStatus:
 		}
 
-		componentState, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchComponents(), mgr.Errors())
-		require.NoError(t, err)
-		require.NotNil(t, componentState)
-		require.Len(t, componentState, 1)
-		assert.Equal(t, componentState[0].Component, testComp)
+		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+			componentState, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchComponents(), mgr.Errors())
+			require.NoError(t, err)
+			require.NotNil(t, componentState)
+			require.Len(t, componentState, 1)
+			assert.Equal(t, componentState[0].Component, testComp)
 
-		collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
-		require.NoError(t, err)
-		require.NotNil(t, collectorStatus)
-		assert.Len(t, collectorStatus.ComponentStatusMap, 0)
+			collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
+			require.NoError(t, err)
+			require.NotNil(t, collectorStatus)
+			assert.Len(t, collectorStatus.ComponentStatusMap, 0)
+		}, time.Second*5, time.Millisecond)
 	})
 
 	t.Run("collector execution error is passed as status not error", func(t *testing.T) {

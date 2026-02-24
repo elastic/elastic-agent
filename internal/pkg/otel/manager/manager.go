@@ -191,7 +191,7 @@ func NewOTelManager(
 		doneChan:          make(chan struct{}),
 		execution:         exec,
 		recoveryTimer:     recoveryTimer,
-		collectorRunErr:   make(chan error),
+		collectorRunErr:   make(chan error, 1),
 		stopTimeout:       stopTimeout,
 		collectorLogLevel: collectorLogLevel,
 	}, nil
@@ -216,14 +216,12 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			m.recoveryTimer.Stop()
 			// our caller context is cancelled so stop the collector and return
 			// has exited.
-			if m.proc != nil {
-				m.proc.Stop(m.stopTimeout)
-			}
+			m.stopCollector()
 			return ctx.Err()
 		case <-m.recoveryTimer.C():
 			m.recoveryTimer.Stop()
 
-			if m.mergedCollectorCfg == nil || m.proc != nil || ctx.Err() != nil {
+			if !m.collectorShouldRun() || m.collectorRunning() || ctx.Err() != nil {
 				// no configuration, or the collector is already running, or the context
 				// is cancelled.
 				continue
@@ -235,28 +233,23 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 			newRetries := m.recoveryRetries.Add(1)
 			m.managerLogger.Infof("collector recovery restarting, total retries: %d", newRetries)
-			m.proc, err = m.execution.startCollector(ctx, m.collectorLogLevel, m.collectorLogger,
-				m.managerLogger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+			err = m.startCollector(ctx, collectorStatusCh, m.collectorRunErr, forceFetchStatusCh)
 			if err != nil {
-				// report a startup error (this gets reported as status)
 				m.reportStartupErr(ctx, err)
-				// reset the restart timer to the next backoff
-				recoveryDelay := m.recoveryTimer.ResetNext()
-				m.managerLogger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
 			}
 		case err = <-m.collectorRunErr:
 			m.recoveryTimer.Stop()
 			if err == nil {
 				// err is nil means that the collector has exited cleanly without an error
-				if m.proc != nil {
-					m.proc.Stop(m.stopTimeout)
-					m.proc = nil
+				if m.collectorRunning() {
+					// the collector is already running, no need to do anything
+					continue
 				}
 
 				// no critical error from this point forward
 				reportErr(ctx, m.errCh, nil)
 
-				if m.mergedCollectorCfg == nil {
+				if !m.collectorShouldRun() {
 					// no configuration then the collector should not be
 					// running.
 					continue
@@ -266,14 +259,9 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 				// in this rare case the collector stopped running but a configuration was
 				// provided and the collector stopped with a clean exit
-				m.proc, err = m.execution.startCollector(ctx, m.collectorLogLevel, m.collectorLogger,
-					m.managerLogger, m.mergedCollectorCfg, m.collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+				err = m.startCollector(ctx, collectorStatusCh, m.collectorRunErr, forceFetchStatusCh)
 				if err != nil {
-					// report a startup error (this gets reported as status)
 					m.reportStartupErr(ctx, err)
-					// reset the restart timer to the next backoff
-					recoveryDelay := m.recoveryTimer.ResetNext()
-					m.managerLogger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
 				}
 			} else {
 				// error occurred while running the collector, this occurs in the
@@ -282,10 +270,6 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				//
 				// in the case that the configuration is invalid there is no reason to
 				// try again as it will keep failing so we do not trigger a restart
-				if m.proc != nil {
-					m.proc.Stop(m.stopTimeout)
-					m.proc = nil
-				}
 				// pass the error to the errCh so the coordinator, unless it's a cancel error
 				if !errors.Is(err, context.Canceled) {
 					// report a startup error (this gets reported as status)
@@ -368,6 +352,51 @@ func (m *OTelManager) Run(ctx context.Context) error {
 // Errors returns channel that can send an error that affects the state of the running agent.
 func (m *OTelManager) Errors() <-chan error {
 	return m.errCh
+}
+
+// collectorRunning checks if the otel collector is running.
+func (m *OTelManager) collectorRunning() bool {
+	return m.proc != nil && !m.proc.Stopped()
+}
+
+// collectorShouldRun checks if the otel collector should be running.
+func (m *OTelManager) collectorShouldRun() bool {
+	return m.mergedCollectorCfg != nil
+}
+
+// stopCollector stops the otel collector. This function is idempotent.
+func (m *OTelManager) stopCollector() {
+	if m.proc != nil {
+		m.proc.Stop(m.stopTimeout)
+		m.proc = nil
+	}
+}
+
+// startCollector starts the otel collector. This function is not idempotent and will error if the collector is running.
+func (m *OTelManager) startCollector(ctx context.Context,
+	collectorStatusCh chan *status.AggregateStatus,
+	collectorRunErr chan error,
+	forceFetchStatusCh chan struct{},
+) error {
+	if m.collectorRunning() {
+		return errors.New("tried to start otel collector, but it's already running")
+	}
+	proc, err := m.execution.startCollector(ctx, m.collectorLogLevel, m.collectorLogger,
+		m.managerLogger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+	if err != nil {
+		// failed to create the collector (this is different then
+		// it's failing to run). we do not retry creation on failure
+		// as it will always fail. A new configuration is required for
+		// it not to fail (a new configuration will result in the retry)
+		// since this is a new configuration we want to start the timer
+		// from the initial delay
+		recoveryDelay := m.recoveryTimer.ResetNext()
+		m.managerLogger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
+	} else {
+		// all good at the moment (possible that it will fail)
+		m.proc = proc
+	}
+	return err
 }
 
 // newLogLevelAfterConfigUpdate returns the manager log level after a configuration update, which can
@@ -618,51 +647,29 @@ func (m *OTelManager) applyMergedConfig(ctx context.Context,
 	collectorRunErr chan error,
 	forceFetchStatusCh chan struct{},
 ) error {
-	if m.proc != nil {
-		m.proc.Stop(m.stopTimeout)
-		m.proc = nil
-		// We wait here for the collector to exit before possibly starting a new one. The execution indicates this
-		// by sending an error over the appropriate channel. It will also send a nil status that we'll either process
-		// after exiting from this function and going back to the main loop, or it will be overridden by the status
-		// from the newly started collector.
-		// This is the only blocking wait inside the main loop involving channels, so we need to be extra careful not to
-		// deadlock.
-		// TODO: Verify if we need to wait for the error at all. Stop() is already blocking.
-		select {
-		case <-collectorRunErr:
-		case <-ctx.Done():
-			// our caller ctx is Done
-			return ctx.Err()
-		}
+	if m.collectorRunning() {
+		// We wait here for the collector to exit before possibly starting a new one. stopCollector is blocking and will
+		// only exit after the process and the monitoring goroutines exit. It will also send a nil status that we'll
+		// either process after exiting from this function and going back to the main loop, or it will be overridden by
+		// the status from the newly started collector.
+		m.stopCollector()
 	}
 
-	if m.mergedCollectorCfg == nil {
+	if !m.collectorShouldRun() {
 		// no configuration then the collector should not be
 		// running.
 		// ensure that the coordinator knows that there is no error
 		// as the collector is not running anymore
 		return nil
-	} else {
-		// either a new configuration or the first configuration
-		// that results in the collector being started
-		proc, err := m.execution.startCollector(ctx, m.collectorLogLevel, m.collectorLogger,
-			m.managerLogger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
-		if err != nil {
-			// failed to create the collector (this is different then
-			// it's failing to run). we do not retry creation on failure
-			// as it will always fail. A new configuration is required for
-			// it not to fail (a new configuration will result in the retry)
-			// since this is a new configuration we want to start the timer
-			// from the initial delay
-			recoveryDelay := m.recoveryTimer.ResetInitial()
-			m.managerLogger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
-			return err
-		} else {
-			// all good at the moment (possible that it will fail)
-			m.proc = proc
-		}
 	}
-	return nil
+	// either a new configuration or the first configuration
+	// that results in the collector being started
+	err := m.startCollector(ctx, collectorStatusCh, collectorRunErr, forceFetchStatusCh)
+	if err != nil {
+		// this is a new configuration, so reset the recovery timer
+		m.recoveryTimer.ResetInitial()
+	}
+	return err
 }
 
 // Update sends collector configuration and component updates to the manager's run loop.
