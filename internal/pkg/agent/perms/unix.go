@@ -64,7 +64,7 @@ func FixPermissions(topPath string, opts ...OptFunc) error {
 
 func isSameUser(info fs.FileInfo, ownership utils.FileOwner) (bool, error) {
 	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !ok {
+	if !ok || stat == nil {
 		return false, fmt.Errorf("failed to get stat_t for %q", info.Name())
 	}
 

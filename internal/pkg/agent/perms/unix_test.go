@@ -63,64 +63,45 @@ func TestIsMaskStripped(t *testing.T) {
 }
 
 func Test_isSameUser_MatchesCurrentOwner(t *testing.T) {
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "file")
-	require.NoError(t, os.WriteFile(filePath, []byte("hello"), 0600))
+	testCases := []struct {
+		name     string
+		info     testFileInfo
+		owner    utils.FileOwner
+		expected bool
+	}{
+		{
+			name:     "matching UID and GID",
+			info:     testFileInfo{sys: &syscall.Stat_t{Uid: 1000, Gid: 1000}},
+			owner:    utils.FileOwner{UID: 1000, GID: 1000},
+			expected: true,
+		},
+		{
+			name:     "non-matching UID and GID",
+			info:     testFileInfo{sys: &syscall.Stat_t{Uid: 1000, Gid: 1000}},
+			owner:    utils.FileOwner{UID: 2000, GID: 2000},
+			expected: false,
+		},
+		{
+			name:     "non-matching UID",
+			info:     testFileInfo{sys: &syscall.Stat_t{Uid: 1000, Gid: 1000}},
+			owner:    utils.FileOwner{UID: 2000, GID: 1000},
+			expected: false,
+		},
+		{
+			name:     "non-matching GID",
+			info:     testFileInfo{sys: &syscall.Stat_t{Uid: 1000, Gid: 1000}},
+			owner:    utils.FileOwner{UID: 1000, GID: 2000},
+			expected: false,
+		},
+	}
 
-	info, err := os.Stat(filePath)
-	require.NoError(t, err)
-
-	owner, err := utils.CurrentFileOwner()
-	require.NoError(t, err)
-
-	// set uid and gid
-	require.NoError(t, os.Chown(filePath, owner.UID, owner.GID))
-
-	same, err := isSameUser(info, owner)
-	require.NoError(t, err)
-	sys := info.Sys().(*syscall.Stat_t)
-	require.Truef(t, same, "expected isSameUser to return true when UID %d:%d matches %d:%d", owner.UID, owner.GID, sys.Uid, sys.Gid)
-}
-
-func Test_isSameUser_MismatchReturnsFalse(t *testing.T) {
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "file")
-	require.NoError(t, os.WriteFile(filePath, []byte("hello"), 0600))
-
-	info, err := os.Lstat(filePath)
-	require.NoError(t, err)
-
-	owner, err := utils.CurrentFileOwner()
-	require.NoError(t, err)
-	owner.UID++
-
-	same, err := isSameUser(info, owner)
-	require.NoError(t, err)
-	sys := info.Sys().(*syscall.Stat_t)
-	require.Falsef(t, same, "expected isSameUser to return false when UID %d:%d does not match %d:%d", owner.UID, owner.GID, sys.Uid, sys.Gid)
-}
-
-func Test_isSameUser_UsesLstatForSymlink(t *testing.T) {
-	tmpDir := t.TempDir()
-	targetPath := filepath.Join(tmpDir, "target")
-	require.NoError(t, os.WriteFile(targetPath, []byte("hello"), 0600))
-
-	linkPath := filepath.Join(tmpDir, "link")
-	require.NoError(t, os.Symlink(targetPath, linkPath))
-
-	info, err := os.Lstat(linkPath)
-	require.NoError(t, err)
-
-	owner, err := utils.CurrentFileOwner()
-	require.NoError(t, err)
-
-	// set uid and gid
-	require.NoError(t, os.Lchown(linkPath, owner.UID, owner.GID))
-
-	same, err := isSameUser(info, owner)
-	require.NoError(t, err)
-	sys := info.Sys().(*syscall.Stat_t)
-	require.Truef(t, same, "expected isSameUser to return true when UID %d:%d matches %d:%d", owner.UID, owner.GID, sys.Uid, sys.Gid)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			same, err := isSameUser(tc.info, tc.owner)
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, same, "expected isSameUser to return %v when UID %d:%d matches %d:%d", tc.expected, tc.owner.UID, tc.owner.GID, tc.info.Sys().(*syscall.Stat_t).Uid, tc.info.Sys().(*syscall.Stat_t).Gid)
+		})
+	}
 }
 
 func Test_isSameUser_ErrorsWhenNoStatT(t *testing.T) {
@@ -136,6 +117,7 @@ func Test_isSameUser_ErrorsWhenNoStatT(t *testing.T) {
 type testFileInfo struct {
 	name string
 	mode fs.FileMode
+	sys  *syscall.Stat_t
 }
 
 func (f testFileInfo) Name() string       { return f.name }
@@ -143,4 +125,4 @@ func (f testFileInfo) Size() int64        { return 0 }
 func (f testFileInfo) Mode() fs.FileMode  { return f.mode }
 func (f testFileInfo) ModTime() time.Time { return time.Time{} }
 func (f testFileInfo) IsDir() bool        { return false }
-func (f testFileInfo) Sys() any           { return nil }
+func (f testFileInfo) Sys() any           { return f.sys }
