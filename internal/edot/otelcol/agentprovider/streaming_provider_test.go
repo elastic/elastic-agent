@@ -356,7 +356,7 @@ func TestStreamingProvider_CancelledContext(t *testing.T) {
 	// Retrieve should fail immediately with cancelled context
 	_, err := p.Retrieve(ctx, testURI, nil)
 	require.Error(t, err)
-	assert.Equal(t, context.Canceled, err)
+	assert.ErrorIs(t, err, context.Canceled)
 }
 
 func TestStreamingProvider_NilWatcher(t *testing.T) {
