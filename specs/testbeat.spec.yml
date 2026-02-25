@@ -17,6 +17,7 @@ inputs:
       - logstash
       - redis
     command: &command
+      name: "filebeat"
       restart_monitoring_period: 5s
       maximum_restarts_per_period: 1
       timeouts:
