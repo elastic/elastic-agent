@@ -22,7 +22,7 @@ require (
 	github.com/elastic/elastic-agent-client/v7 v7.18.0
 	github.com/elastic/elastic-agent-libs v0.32.2
 	github.com/elastic/elastic-agent-system-metrics v0.14.1
-	github.com/elastic/elastic-transport-go/v8 v8.8.0
+	github.com/elastic/elastic-transport-go/v8 v8.9.0
 	github.com/elastic/go-elasticsearch/v8 v8.19.3
 	github.com/elastic/go-licenser v0.4.2
 	github.com/elastic/go-sysinfo v1.15.4
