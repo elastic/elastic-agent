@@ -70,8 +70,6 @@ outputs:
     api_key: placeholder
 ```
 
-<<<<<<< HEAD
-=======
 With changes in https://github.com/elastic/elastic-agent/pull/12852, user can also control the runtime of the inputs based on output type.
 This can be done by setting `agent.internal.runtime.output.[output_type]` to `otel` or `process`. For example, below config would override all inputs used with elasticsearch output to use otel runtime
 
@@ -117,7 +115,6 @@ outputs:
         include_source_on_error: false # Override the generated value of include_source_on_error.
 ```
 
->>>>>>> 54cfe4562 (Add internal configuration to select runtime by output (#12852))
 ## Hybrid Agent
 
 **Hybrid Agent** refers the capability of Elastic Agent to run OpenTelemetry collector pipelines specified directly in
