@@ -127,7 +127,6 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		true,
 		nil,
 		nil,
-		nil,
 	)
 	require.NoError(t, err)
 
@@ -150,7 +149,6 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		false, // not in testing mode - we are testing fs interactions
 		time.Second,
 		true,
-		nil,
 		nil,
 		nil,
 	)
@@ -183,7 +181,6 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		true,
 		nil,
 		nil,
-		nil,
 	)
 	require.NoError(t, err)
 	encBytes3, err := os.ReadFile(paths.AgentConfigFile())
@@ -214,7 +211,6 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		false, // not in testing mode - we are testing fs interactions
 		time.Second,
 		true,
-		nil,
 		nil,
 		nil,
 	)
@@ -294,7 +290,6 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
 		false, // not in testing mode - we are testing fs interactions
 		time.Second,
 		true,
-		nil,
 		nil,
 		nil,
 	)
