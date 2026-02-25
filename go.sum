@@ -500,8 +500,8 @@ github.com/elastic/elastic-agent-libs v0.32.2 h1:2CaO4TAMcZDy0qNxh48Ui1oMc+xExKL
 github.com/elastic/elastic-agent-libs v0.32.2/go.mod h1:0xUg7alsNE/WhY9DZRIdTYW75nqSHC1octIAg//j/PQ=
 github.com/elastic/elastic-agent-system-metrics v0.14.1 h1:XdV3KWbug/M1dkn8h9Yth9pfdyeFR2Z1iqaypX+ohBg=
 github.com/elastic/elastic-agent-system-metrics v0.14.1/go.mod h1:JNfnZrC0viAjlJRUzQKKuMpDlXgjXBn4WdWEXQF7jcA=
-github.com/elastic/elastic-transport-go/v8 v8.8.0 h1:7k1Ua+qluFr6p1jfJjGDl97ssJS/P7cHNInzfxgBQAo=
-github.com/elastic/elastic-transport-go/v8 v8.8.0/go.mod h1:YLHer5cj0csTzNFXoNQ8qhtGY1GTvSqPnKWKaqQE3Hk=
+github.com/elastic/elastic-transport-go/v8 v8.9.0 h1:KeT/2P54F0xS0S8Y3Pf+tFDg4HmBgReQMB+BMz8dDAs=
+github.com/elastic/elastic-transport-go/v8 v8.9.0/go.mod h1:ssMTvNS2hwf7CaiGsRRsx4gQHFZ/jS/DkLcISxekWzc=
 github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3 h1:UyNbxdkQiSfyipwsOCWAlO+ju3xXC61Z4prx/HBTtFk=
 github.com/elastic/fsnotify v1.6.1-0.20240920222514-49f82bdbc9e3/go.mod h1:DAsKqylc/16NDcfdk8dN5axVtSOsQwgP2kV+NV5xPDE=
 github.com/elastic/go-concert v0.3.1 h1:dqtq2+xA8w7BZunI7j3Hs43CjWod7/nNRD8ByPx4YMs=
