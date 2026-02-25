@@ -7,6 +7,7 @@ package manager
 import (
 	"bytes"
 	"context"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"net/http"
@@ -39,6 +40,11 @@ const (
 	OtelSupervisedMonitoringURLFlagName       = "supervised.monitoring.url"
 	OtelFeatureGatesFlagName                  = "feature-gates"
 	OtelElasticsearchExporterTelemetryFeature = "telemetry.newPipelineTelemetry"
+
+	// stdinGobProviderScheme must match agentprovider.StdinGobProviderSchemeName.
+	// Duplicated here to avoid a cross-module import from the main module into
+	// the internal/edot submodule.
+	stdinGobProviderScheme = "stdingob"
 )
 
 // newSubprocessExecution creates a new execution which runs the otel collector in a subprocess.
@@ -124,6 +130,12 @@ func (r *subprocessExecution) startCollector(
 		return nil, fmt.Errorf("failed to marshal config to yaml: %w", err)
 	}
 
+	// Gob-encode the YAML config bytes for the stdingob provider.
+	var gobBuf bytes.Buffer
+	if err := gob.NewEncoder(&gobBuf).Encode(confBytes); err != nil {
+		return nil, fmt.Errorf("failed to gob-encode config: %w", err)
+	}
+
 	stdOutLast := newZapLast(collectorLogger.Core())
 	stdOut := runtimeLogger.NewLogWriterWithDefaults(stdOutLast, zapcore.Level(lvl))
 	// info level for stdErr because by default collector writes to stderr
@@ -133,14 +145,15 @@ func (r *subprocessExecution) startCollector(
 	procCtx, procCtxCancel := context.WithCancel(ctx)
 	env := os.Environ()
 
-	// set collector args
+	// set collector args and add --config flag with the stdingob:stdin URI
 	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
+	collectorArgs = append(collectorArgs, fmt.Sprintf("--config=%s:", stdinGobProviderScheme))
 
 	processInfo, err := process.Start(r.collectorPath,
 		process.WithArgs(collectorArgs),
 		process.WithEnv(env),
 		process.WithCmdOptions(func(c *exec.Cmd) error {
-			c.Stdin = bytes.NewReader(confBytes)
+			c.Stdin = bytes.NewReader(gobBuf.Bytes())
 			c.Stdout = stdOut
 			c.Stderr = stdErr
 			return nil
