@@ -2030,6 +2030,24 @@ func Ironbank(ctx context.Context) error {
 		return nil
 	}
 	cfg := devtools.SettingsFromContext(ctx)
+	// TODO: centralize the manifest loading logic
+	if cfg.Packaging.ManifestURL != "" { // get the version from the manifest
+		var parsedVersion *version.ParsedSemVer
+		manifestResponse, parsedVersion, err := downloadManifestAndParseVersion(ctx, cfg.Packaging.ManifestURL)
+		if err != nil {
+			return fmt.Errorf("failed downloading manifest: %w", err)
+		}
+
+		// fix the commit hash independently of the current commit hash on the branch
+		agentCoreProject, ok := manifestResponse.Projects[agentCoreProjectName]
+		if !ok {
+			return fmt.Errorf("%q project not found in manifest %q", agentCoreProjectName, cfg.Packaging.ManifestURL)
+		}
+		cfg = cfg.WithAgentCommitHashOverride(agentCoreProject.CommitHash)
+
+		// Apply manifest version to config
+		cfg = cfg.WithSnapshot(parsedVersion.IsSnapshot()).WithBeatVersion(parsedVersion.CoreVersion())
+	}
 	if err := prepareIronbankBuild(cfg); err != nil {
 		return fmt.Errorf("failed to prepare the IronBank context: %w", err)
 	}
