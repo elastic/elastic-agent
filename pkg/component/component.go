@@ -37,17 +37,11 @@ type HeadersProvider interface {
 type RuntimeManager string
 
 type RuntimeConfig struct {
-<<<<<<< HEAD
-	Default    string            `yaml:"default" config:"default" json:"default"`
-	Filebeat   BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
-	Metricbeat BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
-=======
 	Default       string            `yaml:"default" config:"default" json:"default"`
 	Filebeat      BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
 	Metricbeat    BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
 	DynamicInputs string            `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
 	Output        map[string]string `yaml:"output" config:"output" json:"output"`
->>>>>>> 54cfe4562 (Add internal configuration to select runtime by output (#12852))
 }
 
 type BeatRuntimeConfig struct {
@@ -57,9 +51,6 @@ type BeatRuntimeConfig struct {
 
 func DefaultRuntimeConfig() *RuntimeConfig {
 	return &RuntimeConfig{
-<<<<<<< HEAD
-		Default: string(DefaultRuntimeManager),
-=======
 		Default:       string(DefaultRuntimeManager),
 		DynamicInputs: string(ProcessRuntimeManager),
 		Metricbeat: BeatRuntimeConfig{
@@ -97,7 +88,6 @@ func DefaultRuntimeConfig() *RuntimeConfig {
 		Output: map[string]string{
 			"logstash": string(ProcessRuntimeManager), // Force all inputs using the Logstash output to use the process runtime
 		},
->>>>>>> 54cfe4562 (Add internal configuration to select runtime by output (#12852))
 	}
 }
 
@@ -128,8 +118,6 @@ func (r *RuntimeConfig) Validate() error {
 			}
 		}
 	}
-<<<<<<< HEAD
-=======
 
 	allowedOutput := []string{"elasticsearch", "logstash"}
 	for name, runtime := range r.Output {
@@ -140,7 +128,6 @@ func (r *RuntimeConfig) Validate() error {
 			return err
 		}
 	}
->>>>>>> 54cfe4562 (Add internal configuration to select runtime by output (#12852))
 	return nil
 }
 

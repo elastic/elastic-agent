@@ -4034,42 +4034,6 @@ func TestToComponentsWithRuntimeConfig(t *testing.T) {
 			},
 		},
 		{
-<<<<<<< HEAD
-			name: "beat-specific configs are ignored when beat name is empty",
-			policy: map[string]interface{}{
-				"outputs": map[string]interface{}{
-					"default": map[string]interface{}{
-						"type":    "elasticsearch",
-						"enabled": true,
-					},
-				},
-				"inputs": []interface{}{
-					map[string]interface{}{
-						"type": "filestream",
-						"id":   "filestream-0",
-					},
-				},
-			},
-			runtimeConfig: &RuntimeConfig{
-				Default: string(ProcessRuntimeManager),
-				// These will be ignored because testbeat doesn't use agentbeat
-				Filebeat: BeatRuntimeConfig{
-					Default: string(OtelRuntimeManager),
-					InputType: map[string]string{
-						"filestream": string(OtelRuntimeManager),
-					},
-				},
-			},
-			wantCount: 1,
-			validate: func(t *testing.T, components []Component) {
-				// Should use global default, not filebeat config
-				assert.Equal(t, ProcessRuntimeManager, components[0].RuntimeManager,
-					"should use global default when beat name is empty")
-			},
-		},
-		{
-=======
->>>>>>> 54cfe4562 (Add internal configuration to select runtime by output (#12852))
 			name: "inputs with explicit _runtime_experimental split into separate components",
 			policy: map[string]interface{}{
 				"outputs": map[string]interface{}{
