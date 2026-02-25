@@ -20,8 +20,12 @@ require (
 	github.com/elastic/elastic-agent-client/v7 v7.18.0
 	github.com/elastic/elastic-agent-libs v0.32.2
 	github.com/elastic/elastic-agent-system-metrics v0.14.1
+<<<<<<< HEAD
 	github.com/elastic/elastic-agent/internal/edot v0.0.0-20251114132921-c463803c5568
 	github.com/elastic/elastic-transport-go/v8 v8.8.0
+=======
+	github.com/elastic/elastic-transport-go/v8 v8.9.0
+>>>>>>> d472955f3 (build(deps): bump github.com/elastic/elastic-transport-go/v8 from 8.8.0 to 8.9.0 (#12932))
 	github.com/elastic/go-elasticsearch/v8 v8.19.3
 	github.com/elastic/go-licenser v0.4.2
 	github.com/elastic/go-sysinfo v1.15.4
