@@ -52,6 +52,8 @@ collectors:
           endpoint: "http://opentelemetry-kube-stack-gateway-collector:4317"
           tls:
             insecure: true
+      extensions:
+        cgroupruntime: {}
       processors:
         # [Resource Detection Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/resourcedetectionprocessor)
         resourcedetection/eks:
@@ -140,6 +142,7 @@ collectors:
               enabled: true
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
+        extensions: [cgroupruntime]
         pipelines:
           metrics:
             exporters:
@@ -436,8 +439,11 @@ collectors:
               enabled: true
           extra_metadata_labels:
             - container.id
+      extensions:
+        cgroupruntime: {}
       # [Service Section](https://opentelemetry.io/docs/collector/configuration/#service)
       service:
+        extensions: [cgroupruntime]
         pipelines:
           # Disable default non used kube-stack Helm Chart pipelines
           logs: null
@@ -565,7 +571,10 @@ collectors:
           #   insecure_skip_verify: true
           mapping:
             mode: otel
+      extensions:
+        cgroupruntime: {}
       service:
+        extensions: [cgroupruntime]
         pipelines:
           metrics:
             receivers: [otlp]
