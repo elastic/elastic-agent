@@ -41,9 +41,6 @@ if [ "${_UNSET_MANIFEST_URL:-}" = "true" ]; then
   # Unset before calling packageUsingDRA this will have the target
   # use the built agent core packages from above
   unset MANIFEST_URL
-  # SNAPSHOT and USE_PACKAGE_VERSION aren't set in the DRA workflows and we want to be as close to those as possible
-  unset SNAPSHOT
-  unset USE_PACKAGE_VERSION
 fi
 
 MAGE_TARGETS=("packageUsingDRA")
