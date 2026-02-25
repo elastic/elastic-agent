@@ -70,45 +70,6 @@ const XPackDir = "../x-pack"
 // BeatProjectType specifies the type of project (OSS vs X-Pack).
 var BeatProjectType ProjectType
 
-<<<<<<< HEAD
-	// CrossBuildMountBuildCache mounts the Go build cache into golang-crossbuild containers
-	CrossBuildMountBuildCache      = EnvOr("CROSSBUILD_MOUNT_GOCACHE", "true") == "true"
-	CrossBuildBuildCacheVolumeName = "elastic-agent-crossbuild-build-cache"
-
-	BeatName        = EnvOr("BEAT_NAME", defaultName)
-	BeatServiceName = EnvOr("BEAT_SERVICE_NAME", BeatName)
-	BeatIndexPrefix = EnvOr("BEAT_INDEX_PREFIX", BeatName)
-	BeatDescription = EnvOr("BEAT_DESCRIPTION", "")
-	BeatVendor      = EnvOr("BEAT_VENDOR", "Elastic")
-	BeatLicense     = EnvOr("BEAT_LICENSE", "Elastic License 2.0")
-	BeatURL         = EnvOr("BEAT_URL", "https://www.elastic.co/beats/"+BeatName)
-	BeatUser        = EnvOr("BEAT_USER", "root")
-
-	BeatProjectType ProjectType
-
-	Snapshot           bool
-	DevBuild           bool
-	ExternalBuild      bool
-	FIPSBuild          bool
-	OTELComponentBuild bool
-
-	versionQualified bool
-	versionQualifier string
-
-	// Env var to set the agent package version
-	agentPackageVersion string
-
-	// PackagingFromManifest This value is set to tru when we have defined a ManifestURL variable
-	PackagingFromManifest bool
-	// ManifestURL Location of the manifest file to package
-	ManifestURL string
-
-	FuncMap = map[string]interface{}{
-		"beat_doc_branch":                BeatDocBranch,
-		"beat_version":                   BeatQualifiedVersion,
-		"commit":                         CommitHash,
-		"commit_short":                   CommitHashShort,
-=======
 // FuncMap returns template functions that use the config.
 func FuncMap(cfg *Settings) map[string]interface{} {
 	return map[string]interface{}{
@@ -116,7 +77,6 @@ func FuncMap(cfg *Settings) map[string]interface{} {
 		"beat_version":                   func() (string, error) { return BeatQualifiedVersion(cfg) },
 		"commit":                         func() (string, error) { return cfg.Build.CommitHash() },
 		"commit_short":                   func() (string, error) { return cfg.Build.CommitHashShort() },
->>>>>>> 1a8a5f564 (Refactor mage target configuration (#12128))
 		"date":                           BuildDate,
 		"elastic_beats_dir":              ElasticBeatsDir,
 		"go_version":                     func() (string, error) { return GoVersion(cfg) },
@@ -129,70 +89,6 @@ func FuncMap(cfg *Settings) map[string]interface{} {
 		agentManifestGeneratorMappedFunc: func(fips bool) (string, error) { return PackageManifest(cfg, fips) },
 		snapshotSuffix:                   func() string { return MaybeSnapshotSuffix(cfg) },
 	}
-<<<<<<< HEAD
-)
-
-func init() {
-	initGlobals()
-}
-
-func initGlobals() {
-	if GOOS == "windows" {
-		BinaryExt = ".exe"
-	}
-
-	var err error
-	RaceDetector, err = strconv.ParseBool(EnvOr("RACE_DETECTOR", "false"))
-	if err != nil {
-		panic(fmt.Errorf("failed to parse RACE_DETECTOR env value: %w", err))
-	}
-
-	TestCoverage, err = strconv.ParseBool(EnvOr("TEST_COVERAGE", "false"))
-	if err != nil {
-		panic(fmt.Errorf("failed to parse TEST_COVERAGE env value: %w", err))
-	}
-
-	Snapshot, err = strconv.ParseBool(EnvOr("SNAPSHOT", "false"))
-	if err != nil {
-		panic(fmt.Errorf("failed to parse SNAPSHOT env value: %w", err))
-	}
-
-	DevBuild, err = strconv.ParseBool(EnvOr("DEV", "false"))
-	if err != nil {
-		panic(fmt.Errorf("failed to parse DEV env value: %w", err))
-	}
-
-	ExternalBuild, err = strconv.ParseBool(EnvOr("EXTERNAL", "false"))
-	if err != nil {
-		panic(fmt.Errorf("failed to parse EXTERNAL env value: %w", err))
-	}
-
-	FIPSBuild, err = strconv.ParseBool(EnvOr("FIPS", "false"))
-	if err != nil {
-		panic(fmt.Errorf("failed to parse FIPS env value: %w", err))
-	}
-
-	OTELComponentBuild, err = strconv.ParseBool(EnvOr("OTEL_COMPONENT", "false"))
-	if err != nil {
-		panic(fmt.Errorf("failed to parse OTEL_COMPONENT env value: %w", err))
-	}
-
-	versionQualifier, versionQualified = os.LookupEnv("VERSION_QUALIFIER")
-
-	// order matters: this will override some of the values. Those values can be used
-	// as fallback for the variables below (mainly agentPackageVersion and ManifestURL)
-	err = initPackageVersion()
-	if err != nil {
-		panic(fmt.Errorf("failed to init package version: %w", err))
-	}
-
-	agentPackageVersion = EnvOr(agentPackageVersionEnvVar, agentPackageVersion)
-
-	ManifestURL = EnvOr(ManifestUrlEnvVar, ManifestURL)
-	PackagingFromManifest = ManifestURL != ""
-
-=======
->>>>>>> 1a8a5f564 (Refactor mage target configuration (#12128))
 }
 
 // ProjectType specifies the type of project (OSS vs X-Pack).
@@ -233,23 +129,6 @@ func varMap(cfg *Settings, args ...map[string]interface{}) map[string]interface{
 		"PACKAGES":        cfg.CrossBuild.Packages,
 		"BinaryExt":       cfg.BinaryExt(),
 		"XPackDir":        XPackDir,
-<<<<<<< HEAD
-		"BeatName":        BeatName,
-		"BeatServiceName": BeatServiceName,
-		"BeatIndexPrefix": BeatIndexPrefix,
-		"BeatDescription": BeatDescription,
-		"BeatVendor":      BeatVendor,
-		"BeatLicense":     BeatLicense,
-		"BeatURL":         BeatURL,
-		"BeatUser":        BeatUser,
-		"Snapshot":        Snapshot,
-		"DEV":             DevBuild,
-		"EXTERNAL":        ExternalBuild,
-		"FIPS":            FIPSBuild,
-		"OTEL_COMPONENT":  OTELComponentBuild,
-		"Qualifier":       versionQualifier,
-		"CI":              CI,
-=======
 		"BeatName":        cfg.Beat.Name,
 		"BeatServiceName": cfg.Beat.ServiceName,
 		"BeatIndexPrefix": cfg.Beat.IndexPrefix,
@@ -262,9 +141,9 @@ func varMap(cfg *Settings, args ...map[string]interface{}) map[string]interface{
 		"DEV":             cfg.Build.DevBuild,
 		"EXTERNAL":        cfg.Build.ExternalBuild,
 		"FIPS":            cfg.Build.FIPSBuild,
+		"OTEL_COMPONENT":  cfg.Build.OTELComponentBuild,
 		"Qualifier":       cfg.Build.VersionQualifier,
 		"CI":              cfg.Build.CI,
->>>>>>> 1a8a5f564 (Refactor mage target configuration (#12128))
 	}
 
 	// Add the extra args to the map.
@@ -1340,6 +1219,9 @@ type BuildSettings struct {
 	// FIPSBuild indicates whether to build FIPS-compliant binaries (from FIPS env var)
 	FIPSBuild bool
 
+	// OTELComponentBuild indicates whether to build as an OTel component (from OTEL_COMPONENT env var)
+	OTELComponentBuild bool
+
 	// VersionQualifier is the version qualifier suffix e.g., "rc1" (from VERSION_QUALIFIER env var)
 	VersionQualifier string
 
@@ -1690,6 +1572,11 @@ func (s *Settings) loadBuildSettingsFromEnv() error {
 		return fmt.Errorf("failed to parse FIPS: %w", err)
 	}
 
+	s.Build.OTELComponentBuild, err = parseBoolEnv("OTEL_COMPONENT", s.Build.OTELComponentBuild)
+	if err != nil {
+		return fmt.Errorf("failed to parse OTEL_COMPONENT: %w", err)
+	}
+
 	s.Build.VersionQualifier, s.Build.VersionQualified = os.LookupEnv("VERSION_QUALIFIER")
 
 	// Parse MAX_PARALLEL - only override if set
@@ -2000,6 +1887,9 @@ func (s *Settings) TestTagsWithFIPS() []string {
 	copy(tags, s.Test.Tags)
 	if s.Build.FIPSBuild {
 		tags = append(tags, "requirefips", "ms_tls13kdf")
+	}
+	if s.Build.OTELComponentBuild {
+		tags = append(tags, "otelexternal")
 	}
 	return tags
 }

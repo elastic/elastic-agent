@@ -108,15 +108,11 @@ func DefaultBuildArgs(cfg *Settings) BuildArgs {
 		}
 	}
 
-<<<<<<< HEAD
-	if OTELComponentBuild {
+	if cfg.Build.OTELComponentBuild {
 		args.ExtraFlags = append(args.ExtraFlags, "-tags=otelexternal")
 	}
 
-	if DevBuild {
-=======
 	if cfg.Build.DevBuild {
->>>>>>> 1a8a5f564 (Refactor mage target configuration (#12128))
 		// Disable optimizations (-N) and inlining (-l) for debugging.
 		args.ExtraFlags = append(args.ExtraFlags, `-gcflags=all=-N -l`)
 	} else {

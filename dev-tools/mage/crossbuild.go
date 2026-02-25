@@ -318,7 +318,7 @@ func (b GolangCrossBuilder) Build() error {
 		args = append(args, "-v", "/opt/git-mirrors:/opt/git-mirrors:ro")
 	}
 
-	if !ExternalBuild {
+	if !cfg.Build.ExternalBuild {
 		beatsPath, err := filepath.Abs(filepath.Join("../beats"))
 		if err != nil {
 			return fmt.Errorf("error while reading local beats: %w", err)
@@ -332,17 +332,11 @@ func (b GolangCrossBuilder) Build() error {
 		"--env", fmt.Sprintf("GOCACHE=%s", buildCacheLocation), // ensure this is writable by the user
 		"--env", "MAGEFILE_VERBOSE="+verbose,
 		"--env", "MAGEFILE_TIMEOUT="+EnvOr("MAGEFILE_TIMEOUT", ""),
-<<<<<<< HEAD
-		"--env", fmt.Sprintf("SNAPSHOT=%v", Snapshot),
-		"--env", fmt.Sprintf("DEV=%v", DevBuild),
-		"--env", fmt.Sprintf("EXTERNAL=%v", ExternalBuild),
-		"--env", fmt.Sprintf("FIPS=%v", FIPSBuild),
-		"--env", fmt.Sprintf("OTEL_COMPONENT=%v", OTELComponentBuild),
-=======
 		"--env", fmt.Sprintf("SNAPSHOT=%v", cfg.Build.Snapshot),
 		"--env", fmt.Sprintf("DEV=%v", cfg.Build.DevBuild),
+		"--env", fmt.Sprintf("EXTERNAL=%v", cfg.Build.ExternalBuild),
 		"--env", fmt.Sprintf("FIPS=%v", cfg.Build.FIPSBuild),
->>>>>>> 1a8a5f564 (Refactor mage target configuration (#12128))
+		"--env", fmt.Sprintf("OTEL_COMPONENT=%v", cfg.Build.OTELComponentBuild),
 		"-v", repoInfo.RootDir+":"+mountPoint,
 	)
 

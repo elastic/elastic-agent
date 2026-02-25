@@ -81,22 +81,6 @@ func makeGoTestArgsForModule(cfg *Settings, name, module string) GoTestArgs {
 	return params
 }
 
-<<<<<<< HEAD
-// testTagsFromEnv gets a list of comma-separated tags from the TEST_TAGS
-// environment variables, e.g: TEST_TAGS=aws,azure.
-func testTagsFromEnv() []string {
-	tags := strings.Split(strings.Trim(os.Getenv("TEST_TAGS"), ", "), ",")
-	if FIPSBuild {
-		tags = append(tags, "requirefips", "ms_tls13kdf")
-	}
-	if OTELComponentBuild {
-		tags = append(tags, "otelexternal")
-	}
-	return tags
-}
-
-=======
->>>>>>> 1a8a5f564 (Refactor mage target configuration (#12128))
 // DefaultGoTestUnitArgs returns a default set of arguments for running
 // all unit tests. We tag unit test files with '!integration'.
 func DefaultGoTestUnitArgs(cfg *Settings) GoTestArgs {

@@ -17,19 +17,12 @@ import (
 
 const BeatsModulePath = "github.com/elastic/beats/v7"
 
-func Beats(targetVersion string) error {
-	mg.SerialDeps(mg.F(BeatsModule, targetVersion), common.Notice)
+func Beats(branch string, targetVersion string) error {
+	mg.SerialDeps(mg.F(BeatsModule, branch, targetVersion), common.Notice)
 
 	return nil
 }
 
-<<<<<<< HEAD
-func BeatsModule(targetVersion string) error {
-	goArgs := []string{"get", fmt.Sprintf("%s@%s", BeatsModulePath, targetVersion)}
-
-	fmt.Println("Updating beats module in edot package")
-	err := mage.Run(nil, os.Stdout, os.Stderr, "go", "internal/edot", goArgs...)
-=======
 func BeatsModule(ctx context.Context, branch string, targetVersion string) error {
 	goArgs := []string{"mod", "edit", "-require", fmt.Sprintf("%s@%s", BeatsModulePath, targetVersion)}
 
@@ -47,7 +40,6 @@ func BeatsModule(ctx context.Context, branch string, targetVersion string) error
 
 	fmt.Println("Updating beats module in edot package")
 	err = mage.Run(ctx, nil, os.Stdout, os.Stderr, "go", "internal/edot", goArgs...)
->>>>>>> 1a8a5f564 (Refactor mage target configuration (#12128))
 	if err != nil {
 		return err
 	}
