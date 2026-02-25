@@ -11,13 +11,13 @@ const (
 	// defaultAgentVaultName is keychain item name for keychain based vault (available on MacOS at the moment)
 	defaultAgentVaultName = "co.elastic.elastic-agent"
 
-	// defaultAgentVaultPath is the directory name where the file-based vault is located
-	defaultAgentVaultPath = "vault"
+	// DefaultAgentVaultPath is the directory name where the file-based vault is located
+	DefaultAgentVaultPath = "vault"
 )
 
 // AgentVaultPath is the default path for file-based vault
 func AgentVaultPath() string {
-	return filepath.Join(Config(), defaultAgentVaultPath)
+	return filepath.Join(Config(), DefaultAgentVaultPath)
 }
 
 // AgentKeychainName is the default name for the keychain based vault

@@ -21,6 +21,10 @@ import (
 // 8.11+ - default is enabled
 const defaultTamperProtection = true
 
+// The default value for standalone encrypted config.
+// 9.4 - disabled (plaintext config)
+const defaultEncryptedConfig = false
+
 var (
 	current = Flags{
 		tamperProtection: defaultTamperProtection,
@@ -37,6 +41,7 @@ type Flags struct {
 	fqdnCallbacks map[string]BoolValueOnChangeCallback
 
 	tamperProtection bool
+	encryptedConfig  bool
 }
 
 type cfg struct {
@@ -48,6 +53,9 @@ type cfg struct {
 			TamperProtection *struct {
 				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
 			} `json:"tamper_protection,omitempty" yaml:"tamper_protection,omitempty" config:"tamper_protection,omitempty"`
+			EncryptedConfig *struct {
+				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
+			} `json:"encrypted_config" yaml:"encrypted_config" config:"encrypted_config"`
 		} `json:"features" yaml:"features" config:"features"`
 	} `json:"agent" yaml:"agent" config:"agent"`
 }
@@ -64,6 +72,13 @@ func (f *Flags) TamperProtection() bool {
 	defer f.mu.RUnlock()
 
 	return f.tamperProtection
+}
+
+func (f *Flags) EncryptedConfig() bool {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	return f.encryptedConfig
 }
 
 func (f *Flags) AsProto() *proto.Features {
@@ -119,6 +134,13 @@ func (f *Flags) setTamperProtection(newValue bool) {
 	defer f.mu.Unlock()
 
 	f.tamperProtection = newValue
+}
+
+func (f *Flags) setEncryptedConfig(newValue bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.encryptedConfig = newValue
 }
 
 // setSource sets the source from he given cfg.
@@ -186,6 +208,12 @@ func Parse(policy any) (*Flags, error) {
 		flags.setTamperProtection(defaultTamperProtection)
 	}
 
+	if parsedFlags.Agent.Features.EncryptedConfig != nil {
+		flags.setEncryptedConfig(parsedFlags.Agent.Features.EncryptedConfig.Enabled)
+	} else {
+		flags.setEncryptedConfig(defaultEncryptedConfig)
+	}
+
 	if err := flags.setSource(parsedFlags); err != nil {
 		return nil, fmt.Errorf("error creating feature flags source: %w", err)
 	}
@@ -208,6 +236,7 @@ func Apply(c *config.Config) error {
 
 	current.setFQDN(parsed.FQDN())
 	current.setTamperProtection(parsed.TamperProtection())
+	current.setEncryptedConfig(parsed.EncryptedConfig())
 	return err
 }
 
@@ -219,4 +248,8 @@ func FQDN() bool {
 // TamperProtection reports if tamper protection feature is enabled
 func TamperProtection() bool {
 	return current.TamperProtection()
+}
+
+func EncryptedConfig() bool {
+	return current.EncryptedConfig()
 }
