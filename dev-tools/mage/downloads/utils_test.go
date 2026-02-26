@@ -86,6 +86,7 @@ func TestVerifyChecksum(t *testing.T) {
 		require.NoError(t, os.WriteFile(checksumPath, []byte(checksumContent), 0644))
 
 		err := verifyChecksum(checksumPath)
-		assert.ErrorContains(t, err, "does not match expected checksum")
+		contains := fmt.Sprintf("%s checksum mismatch: expected=%s", fileName, hashHex)
+		assert.ErrorContains(t, err, contains)
 	})
 }
