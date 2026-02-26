@@ -1918,15 +1918,12 @@ func TestOTelManager_CollectorRunErrWithNilConfig(t *testing.T) {
 	runErr := errors.New("collector crashed")
 	mgr.collectorRunErr <- runErr
 	go func() {
-		for {
-			select {
-			case s := <-mgr.WatchCollector():
-				if s == nil {
-					cancel()
-				}
-			case <-ctx.Done():
+		select {
+		case s := <-mgr.WatchCollector():
+			if s == nil {
+				cancel()
 			}
-			return
+		case <-ctx.Done():
 		}
 	}()
 
