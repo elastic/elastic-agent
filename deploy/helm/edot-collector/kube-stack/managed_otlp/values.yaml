@@ -545,6 +545,7 @@ collectors:
       processors: {}
       exporters:
         debug:
+          verbosity: basic
         otlp/ingest_logs:
           endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
           headers:
