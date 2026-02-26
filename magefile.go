@@ -119,6 +119,8 @@ const (
 	helmOtelChartPath  = "./deploy/helm/edot-collector/kube-stack"
 	helmMOtelChartPath = "./deploy/helm/edot-collector/kube-stack/managed_otlp"
 	sha512FileExt      = ".sha512"
+
+	goReleaserCrossbuilderImageName = "docker.elastic.co/observability-ci/golangreleaser-crossbuild"
 )
 
 var (
@@ -178,6 +180,126 @@ type Otel mg.Namespace
 
 // Devmachine namespace contains tasks related to remote development machines.
 type Devmachine mg.Namespace
+
+// GoReleaser namespace contains experimental mage targets for using goreleaser. NOT STABLE, USE AT YOUR OWN RISK!
+type GoReleaser mg.Namespace
+
+func (GoReleaser) MakeCrossBuilder() error {
+	log.Printf("Creating image %s for LOCAL USE ONLY! Do not push this experimental image anywhere", goReleaserCrossbuilderImageName)
+	goVersion, err := devtools.GoVersion()
+	if err != nil {
+		return fmt.Errorf("detecting go version: %w", err)
+	}
+	return sh.Run("docker", "build",
+		"-f", "Dockerfile.goreleaser",
+		"--build-arg", fmt.Sprintf("GO_VERSION=%s", goVersion),
+		"-t", fmt.Sprintf("%s:%s", goReleaserCrossbuilderImageName, goVersion),
+		".",
+	)
+}
+
+func (GoReleaser) Build() error {
+	mg.Deps(GoReleaser.MakeCrossBuilder)
+	goVersion, err := devtools.GoVersion()
+	if err != nil {
+		return fmt.Errorf("detecting go version: %w", err)
+	}
+
+	return sh.Run("docker", "run", "--rm",
+		// source mounted as volume
+		"-v", ".:/src",
+		fmt.Sprintf("%s:%s", goReleaserCrossbuilderImageName, goVersion),
+		// GoReleaser args
+		"--verbose",
+		"--clean",
+		"--snapshot",
+		"build",
+	)
+}
+
+func (GoReleaser) Package() error {
+	mg.Deps(GoReleaser.MakeCrossBuilder)
+	goVersion, err := devtools.GoVersion()
+	if err != nil {
+		return fmt.Errorf("detecting go version: %w", err)
+	}
+	// TODO transform this into an external packaging, using the docker container to build only
+	return sh.Run("docker", "run", "--rm",
+		// source mounted as volume
+		"-v", ".:/src",
+		fmt.Sprintf("%s:%s", goReleaserCrossbuilderImageName, goVersion),
+		// GoReleaser args
+		"--verbose",
+		"--clean",
+		"--snapshot",
+		"release",
+	)
+}
+
+func (GoReleaser) CollectComponents(ctx context.Context) error {
+	start := time.Now()
+	defer func() { fmt.Println("package ran for", time.Since(start)) }()
+
+	platforms := devtools.Platforms.Names()
+	if len(platforms) == 0 {
+		panic("elastic-agent package is expected to build at least one platform package")
+	}
+
+	var err error
+	var manifestResponse *manifest.Build
+	if devtools.PackagingFromManifest {
+		manifestResponse, _, err = downloadManifestAndSetVersion(ctx, devtools.ManifestURL)
+		if err != nil {
+			return fmt.Errorf("failed downloading manifest: %w", err)
+		}
+	}
+
+	var dependenciesVersion string
+	if beatVersion, found := os.LookupEnv("BEAT_VERSION"); !found {
+		dependenciesVersion = bversion.GetDefaultVersion()
+	} else {
+		dependenciesVersion = beatVersion
+	}
+
+	// add the snapshot suffix if needed
+	dependenciesVersion += devtools.SnapshotSuffix()
+
+	log.Println("--- Running packaging function")
+	mg.Deps(devtools.UseElasticAgentPackaging)
+
+	dependencies, err := ExtractComponentsFromSelectedPkgSpecs(devtools.Packages)
+	if err != nil {
+		return fmt.Errorf("failed extracting dependencies: %w", err)
+	}
+
+	if mg.Verbose() {
+		log.Printf("dependencies extracted from package specs: %v", dependencies)
+	}
+
+	// download/copy all the necessary dependencies for packaging elastic-agent
+	archivePath, dropPath, dependencies := collectPackageDependencies(platforms, dependenciesVersion, devtools.SelectedPackageTypes, dependencies)
+
+	//// cleanup after build
+	//defer os.RemoveAll(archivePath)
+	//defer os.RemoveAll(dropPath)
+	//defer os.Unsetenv(agentDropPath)
+
+	// create flat dir
+	flatPath := filepath.Join(dropPath, ".elastic-agent_flat")
+
+	if mg.Verbose() {
+		log.Printf("Drop path: %s", dropPath)
+		log.Printf("Archive path: %s", archivePath)
+		log.Printf("Flat path: %s", flatPath)
+	}
+
+	os.MkdirAll(flatPath, 0o755)
+	defer os.RemoveAll(flatPath)
+
+	// extract all dependencies from their archives into flat dir
+	flattenDependencies(platforms, dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse, dependencies)
+	return nil
+}
 
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
