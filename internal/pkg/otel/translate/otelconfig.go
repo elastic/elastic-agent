@@ -572,17 +572,17 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 // extractOtelProcessors extracts the processor IDs from the output configuration.
 func extractOtelProcessors(outputConfig *config.C) ([]string, error) {
 	if !outputConfig.HasField("processors") {
-		return []string{}, nil
+		return nil, nil
 	}
 
 	processorIdsC, err := outputConfig.Child("processors", -1)
 	if err != nil {
-		return []string{}, err
+		return nil, err
 	}
 
 	var processorIds []string
 	if err := processorIdsC.Unpack(&processorIds); err != nil {
-		return []string{}, err
+		return nil, err
 	}
 	return processorIds, nil
 }
