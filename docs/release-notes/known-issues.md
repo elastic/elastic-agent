@@ -200,7 +200,7 @@ Until a bug fix is available in a later release, you can resolve the issue tempo
 
 On May 26th, 2025, a known issue was discovered that causes the `osquery` integration to fail on new {{agent}} installations on macOS. During the installation process, the required `osquery.app/` directory is removed, which prevents the integration from starting.
 
-For more information, check [Issue #8245](https://github.com/elastic/elastic-agent/issues/8245).
+For more information, check [Issue #10994](https://github.com/elastic/elastic-agent/issues/10994).
 
 **Workaround**
 
@@ -282,6 +282,41 @@ To work around this issue, manually update the configuration of the generated `o
 ```yaml
 batch:
   flush_timeout: 1s
+```
+
+:::
+
+:::{dropdown} Upgrade failures caused by failure to reload {{agent}} download settings
+
+**Applies to: {{agent}} 8.18.7, 8.18.8, 8.19.4, 8.19.5, 8.19.6, 9.0.7, 9.0.8, 9.1.4, 9.1.5, 9.1.6, 9.2.0**
+
+On November 3, 2025, a known issue was discovered where {{agent}} fails to use
+custom `Agent Binary Download` settings defined in the Fleet policy. The issue
+occurs because the artifact downloader would not refresh its own settings to use
+the latest version of the settings from policy to download. This will impact proxy
+and custom binary location settings.
+
+For more information, check [Issue #8245](https://github.com/elastic/elastic-agent/issues/8245).
+
+**Workaround**
+
+Possible workaround require access on the hosts to unlock the situation:
+
+1. Temporarily define [`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` env variables](docs-content://reference/fleet/host-proxy-env-vars.md) on the Elastic Agent service. Then restart Elastic Agent.
+
+    :::{important}
+    You will need to provide a correct `NO_PROXY` value in order to force Elastic Agent to use the proxy _only_ when accessing the URL of the artifacts, otherwise it will affect _any_ HTTP communication to go through the proxy. Then restart the Elastic Agent and re-attempt the upgrade.
+    :::
+
+2. Temporarily grant access to the public Artifacts repository (or the self-hosted one) without the need of the HTTP proxy. This might imply updating firewalls or host settings.
+
+3. Upgrade Elastic by Agent downloading the file locally via other methods. You can download the agent upgrade `.zip` or
+`.tar.gz` along with the `.sha512` and `.asc` files. Then use the upgrade command with a `file://` URI to upgrade from
+local disk.
+
+```shell
+# --force is needed for fleet managed agents
+sudo elastic-agent upgrade 9.1.7 --force --source-uri file:///path/to/files
 ```
 
 :::
