@@ -926,3 +926,62 @@ func readConfig(raw []byte) (*configuration.FleetAgentConfig, error) {
 	}
 	return cfg.Fleet, nil
 }
+<<<<<<< HEAD
+=======
+
+func cleanTags(tags []string) []string {
+	var r []string
+	// Create a map to store unique elements
+	seen := make(map[string]bool)
+	for _, str := range tags {
+		tag := strings.TrimSpace(str)
+		if tag != "" {
+			if _, ok := seen[tag]; !ok {
+				seen[tag] = true
+				r = append(r, tag)
+			}
+		}
+	}
+	return r
+}
+
+func Test_EnrollCmd_PrepareFleetServerTLS(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  enroll.EnrollCmdFleetServerOption
+		url  string
+	}{{
+		name: "with cert",
+		cfg: enroll.EnrollCmdFleetServerOption{
+			ConnStr:      "http://elastic.internal:9220",
+			InternalPort: defaultFleetServerInternalPort,
+			Cert:         "exmple-cert",
+			CertKey:      "example-key",
+		},
+		url: "https://localhost:8221",
+	}, {
+		name: "insecure",
+		cfg: enroll.EnrollCmdFleetServerOption{
+			Insecure:     true,
+			ConnStr:      "http://elastic.internal:9220",
+			InternalPort: defaultFleetServerInternalPort,
+		},
+		url: "http://localhost:8221",
+	}}
+	log, _ := loggertest.New("Test_EnrollCmd_PrepareFleetServerTLS")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &enrollCmd{
+				log: log,
+				options: &enroll.EnrollOptions{
+					FleetServer: tt.cfg,
+					URL:         "example.com",
+				},
+			}
+			err := c.prepareFleetTLS()
+			require.NoError(t, err)
+			require.Equal(t, tt.url, c.options.URL)
+		})
+	}
+}
+>>>>>>> bcf8bacba (Use localhost:8221 for enroll request when bootstrapping fleet-server (#12917))
