@@ -1,0 +1,41 @@
+---
+name: macos
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 20 * * 6"
+
+  pull_request:
+    branches:
+      - main
+      - 8.*
+      - 9.*
+  # Being: for testing purposes
+  push:
+    branches:
+      - feature/run-unit-tests-only-macos
+  # End: for testing purposes
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    strategy:
+      matrix:
+        # NOTE: macos-13 is intel, macos-14 is arm64, macos-15 is arm64
+        os: [ macos-13, macos-14, macos-15 ]
+      fail-fast: false
+    runs-on: ${{  matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
+
+      - name: Run Unit Tests
+        run: |
+          go install github.com/magefile/mage
+          RACE_DETECTOR=true TEST_COVERAGE=true mage unitTest
