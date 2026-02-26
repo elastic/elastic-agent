@@ -369,6 +369,36 @@ func TestHTTPClient(t *testing.T) {
 			assert.Equal(t, successResp, string(body))
 		},
 	))
+
+	t.Run("Basic auth header", withServer(
+		func(t *testing.T) *http.ServeMux {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+				user, pass, _ := r.BasicAuth()
+				if user != "test-user" || pass != "test-pass" {
+					w.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+			})
+			return mux
+		}, func(t *testing.T, host string) {
+			cfg := config.MustNewConfigFrom(map[string]any{
+				"host": host,
+				"auth": map[string]any{
+					"username": "test-user",
+					"password": "test-pass",
+				},
+			})
+			client, err := NewWithRawConfig(nil, cfg, nil)
+			require.NoError(t, err)
+
+			resp, err := client.Send(t.Context(), http.MethodGet, "/", nil, nil, nil)
+			require.NoError(t, err)
+			resp.Body.Close()
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+		},
+	))
 }
 
 func TestSortClients(t *testing.T) {
