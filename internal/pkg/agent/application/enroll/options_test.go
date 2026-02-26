@@ -195,7 +195,30 @@ func TestRemoteConfig(t *testing.T) {
 			},
 			false,
 		},
-
+		{
+			"Fleet server TLS mode is set to certificate mode",
+			false,
+			EnrollOptions{
+				URL: "https://localhost:8221",
+				FleetServer: EnrollCmdFleetServerOption{
+					ConnStr: "http://localhost:9200",
+				},
+			},
+			remote.Config{
+				Protocol: "https",
+				Host:     "localhost:8221",
+				Transport: httpcommon.HTTPTransportSettings{
+					TLS: &tlscommon.Config{
+						VerificationMode: tlscommon.VerifyCertificate,
+					},
+					Timeout: remote.DefaultClientConfig().Transport.Timeout,
+					Proxy: httpcommon.HTTPClientProxySettings{
+						Disable: true,
+					},
+				},
+			},
+			false,
+		},
 		{
 			"Proxy settings - disabled when fleet server specified",
 			false,
@@ -209,7 +232,9 @@ func TestRemoteConfig(t *testing.T) {
 				Path:     "",
 				Host:     "localhost",
 				Transport: httpcommon.HTTPTransportSettings{
-					TLS:     &tlscommon.Config{},
+					TLS: &tlscommon.Config{
+						VerificationMode: tlscommon.VerifyCertificate,
+					},
 					Timeout: remote.DefaultClientConfig().Transport.Timeout,
 					Proxy: httpcommon.HTTPClientProxySettings{
 						URL:     &httpcommon.ProxyURI{Scheme: "", Path: "proxy.url"},
