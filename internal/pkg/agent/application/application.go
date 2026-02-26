@@ -7,6 +7,7 @@ package application
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"go.elastic.co/apm/v2"
@@ -160,20 +161,35 @@ func New(
 		configMgr = newTestingModeConfigManager(log)
 	} else if configuration.IsStandalone(cfg.Fleet) {
 		log.Info("Parsed configuration and determined agent is managed locally")
-
-		loader := config.NewLoader(log, paths.ExternalInputs())
-		rawCfgMap, err := rawConfig.ToMapStr()
+		flags, err := features.Parse(rawConfig)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to transform agent configuration into a map: %w", err)
+			return nil, nil, nil, fmt.Errorf("could not parse and apply feature flags config: %w", err)
 		}
-		discover := config.Discoverer(pathConfigFile, cfg.Settings.Path, paths.ExternalInputs(),
-			kubernetes.GetHintsInputConfigPath(log, rawCfgMap))
-		if !cfg.Settings.Reload.Enabled {
-			log.Debug("Reloading of configuration is off")
-			configMgr = newOnce(log, discover, loader)
+		if flags.EncryptedConfig() {
+			if hasEncryptedStandaloneConfigChanged(log, pathConfigFile) {
+				log.Debug("Detected config file change, re-encrypting...")
+				if err := storage.EncryptConfigOnPath(paths.Config()); err != nil {
+					return nil, nil, nil, fmt.Errorf("failed to encrypt config file: %w", err)
+				}
+			}
+
+			log.Debug("Loading encrypted config")
+			configMgr = newEncryptedOnce(log, paths.AgentConfigFile())
 		} else {
-			log.Debugf("Reloading of configuration is on, frequency is set to %s", cfg.Settings.Reload.Period)
-			configMgr = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader)
+			loader := config.NewLoader(log, paths.ExternalInputs())
+			rawCfgMap, err := rawConfig.ToMapStr()
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to transform agent configuration into a map: %w", err)
+			}
+			discover := config.Discoverer(pathConfigFile, cfg.Settings.Path, paths.ExternalInputs(),
+				kubernetes.GetHintsInputConfigPath(log, rawCfgMap))
+			if !cfg.Settings.Reload.Enabled {
+				log.Debug("Reloading of configuration is off")
+				configMgr = newOnce(log, discover, loader)
+			} else {
+				log.Debugf("Reloading of configuration is on, frequency is set to %s", cfg.Settings.Reload.Period)
+				configMgr = newPeriodic(log, cfg.Settings.Reload.Period, discover, loader)
+			}
 		}
 	} else {
 		isManaged = true
@@ -333,4 +349,38 @@ func mergeFleetConfig(ctx context.Context, rawConfig *config.Config) (storage.St
 	}
 
 	return store, cfg, nil
+}
+
+// hasEncryptedStandaloneConfigChanged parses the file at pathConfigFile and checks if it has the same contents as storage.DefaultAgentEncryptedStandaloneConfig
+func hasEncryptedStandaloneConfigChanged(log *logger.Logger, pathConfigFile string) bool {
+	embeddedConfig, err := config.NewConfigFrom(storage.DefaultAgentEncryptedStandaloneConfig)
+	if err != nil {
+		log.Errorw("Unable to load embedded defaults as config.", "err", err)
+		return false
+	}
+
+	opts := make([]interface{}, 0, len(config.NoResolveOptions))
+	for _, opt := range config.NoResolveOptions {
+		opts = append(opts, opt)
+	}
+	embeddedMap, err := embeddedConfig.ToMapStr(opts...)
+	if err != nil {
+		log.Errorw("Unable to unpack ebedded defaults as map.", "err", err)
+		return false
+	}
+
+	// reread config file, rawConfig contains injected attributes, not just  the encryption feature flag.
+	fileConfig, err := config.LoadFile(pathConfigFile)
+	if err != nil {
+		log.Errorw("Unable to load file config.", "err", err)
+		return false
+
+	}
+	fileMap, err := fileConfig.ToMapStr(opts...)
+	if err != nil {
+		log.Errorw("Unable to unpack file config as map", "err", err)
+		return false
+	}
+
+	return !reflect.DeepEqual(embeddedMap, fileMap)
 }
