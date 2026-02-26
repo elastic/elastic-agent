@@ -1761,15 +1761,15 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 			componentState, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchComponents(), mgr.Errors())
-			require.NoError(t, err)
-			require.NotNil(t, componentState)
-			require.Len(t, componentState, 1)
-			assert.Equal(t, componentState[0].Component, testComp)
+			require.NoError(collect, err)
+			require.NotNil(collect, componentState)
+			require.Len(collect, componentState, 1)
+			assert.Equal(collect, componentState[0].Component, testComp)
 
 			collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
-			require.NoError(t, err)
-			require.NotNil(t, collectorStatus)
-			assert.Len(t, collectorStatus.ComponentStatusMap, 0)
+			require.NoError(collect, err)
+			require.NotNil(collect, collectorStatus)
+			assert.Len(collect, collectorStatus.ComponentStatusMap, 0)
 		}, time.Second*5, time.Millisecond)
 	})
 
@@ -1926,6 +1926,7 @@ func TestOTelManager_CollectorRunErrWithNilConfig(t *testing.T) {
 				}
 			case <-ctx.Done():
 			}
+			return
 		}
 	}()
 
