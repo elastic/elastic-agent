@@ -459,7 +459,13 @@ func OutputTypeToExporterType(outputType string) (otelcomponent.Type, error) {
 	}
 }
 
-// unitToExporterConfig translates a component.Unit to return an otel exporter configuration and output queue settings
+// unitToExporterConfig translates an output unit into OTel component configuration(s).
+// The returned configurations include:
+// - exportersCfg: OTel exporter configuration
+// - queueSettings: the output's queue configuration
+// - extensionCfg: OTel extension configuration, or nil if not needed for the exporter
+// - processors: list of OTel processor IDs defined in the output, or nil if the output does not define any
+// - err: the error, if any
 func unitToExporterConfig(unit component.Unit, outputName string, exporterType otelcomponent.Type, logger *logp.Logger) (exportersCfg map[string]any, queueSettings map[string]any, extensionCfg map[string]any, processors []string, err error) {
 	if unit.Type == client.UnitTypeInput {
 		return nil, nil, nil, nil, fmt.Errorf("unit type is an input, expected output: %v", unit)
