@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"github.com/magefile/mage/mg"
 )
@@ -56,9 +55,9 @@ type IntegrationTestSetupStep interface {
 	// when a step is defined as a dependency of a tester.
 	Use(dir string) (bool, error)
 	// Setup sets up the environment for the integration test.
-	Setup(env map[string]string) error
+	Setup(cfg *Settings, env map[string]string) error
 	// Teardown brings down the environment for the integration test.
-	Teardown(env map[string]string) error
+	Teardown(cfg *Settings, env map[string]string) error
 }
 
 // IntegrationTestSteps wraps all the steps and completes the in the order added.
@@ -73,16 +72,16 @@ func (steps IntegrationTestSteps) Name() string {
 //
 // In the case that Setup fails on a step, Teardown will be called on the previous
 // successful steps.
-func (steps IntegrationTestSteps) Setup(env map[string]string) error {
+func (steps IntegrationTestSteps) Setup(cfg *Settings, env map[string]string) error {
 	for i, step := range steps {
 		if mg.Verbose() {
 			fmt.Printf("Setup %s...\n", step.Name())
 		}
-		if err := step.Setup(env); err != nil {
+		if err := step.Setup(cfg, env); err != nil {
 			prev := i - 1
 			if prev >= 0 {
 				// errors ignored
-				_ = steps.teardownFrom(prev, env)
+				_ = steps.teardownFrom(prev, cfg, env)
 			}
 			return fmt.Errorf("%s setup failed: %w", step.Name(), err)
 		}
@@ -95,17 +94,17 @@ func (steps IntegrationTestSteps) Setup(env map[string]string) error {
 // In the case a teardown step fails the error is recorded but the
 // previous steps teardown is still called. This guarantees that teardown
 // will always be called for each step.
-func (steps IntegrationTestSteps) Teardown(env map[string]string) error {
-	return steps.teardownFrom(len(steps)-1, env)
+func (steps IntegrationTestSteps) Teardown(cfg *Settings, env map[string]string) error {
+	return steps.teardownFrom(len(steps)-1, cfg, env)
 }
 
-func (steps IntegrationTestSteps) teardownFrom(start int, env map[string]string) error {
+func (steps IntegrationTestSteps) teardownFrom(start int, cfg *Settings, env map[string]string) error {
 	var errs []error
 	for i := start; i >= 0; i-- {
 		if mg.Verbose() {
 			fmt.Printf("Teardown %s...\n", steps[i].Name())
 		}
-		if err := steps[i].Teardown(env); err != nil {
+		if err := steps[i].Teardown(cfg, env); err != nil {
 			errs = append(errs, fmt.Errorf("%s teardown failed: %w", steps[i].Name(), err))
 		}
 	}
@@ -121,7 +120,7 @@ type IntegrationTester interface {
 	// HasRequirements returns an error if requirements are missing.
 	HasRequirements() error
 	// Test performs executing the test inside the environment.
-	Test(dir string, mageTarget string, env map[string]string) error
+	Test(dir string, mageTarget string, cfg *Settings, env map[string]string) error
 	// InsideTest performs the actual test on the inside of environment.
 	InsideTest(test func() error) error
 	// StepRequirements returns the steps this tester requires. These
@@ -131,6 +130,7 @@ type IntegrationTester interface {
 
 // IntegrationRunner performs the running of the integration tests.
 type IntegrationRunner struct {
+	cfg    *Settings
 	steps  IntegrationTestSteps
 	tester IntegrationTester
 	dir    string
@@ -141,7 +141,7 @@ type IntegrationRunner struct {
 type IntegrationRunners []*IntegrationRunner
 
 // NewIntegrationRunners returns the integration test runners discovered from the provided path.
-func NewIntegrationRunners(path string, passInEnv map[string]string) (IntegrationRunners, error) {
+func NewIntegrationRunners(cfg *Settings, path string, passInEnv map[string]string) (IntegrationRunners, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
@@ -158,7 +158,7 @@ func NewIntegrationRunners(path string, passInEnv map[string]string) (Integratio
 		if !use {
 			continue
 		}
-		runner, err := initRunner(t, dir, passInEnv)
+		runner, err := initRunner(cfg, t, dir, passInEnv)
 		if err != nil {
 			return nil, fmt.Errorf("initializing %s runner: %w", t.Name(), err)
 		}
@@ -174,7 +174,7 @@ func NewIntegrationRunners(path string, passInEnv map[string]string) (Integratio
 		if !ok {
 			return nil, fmt.Errorf("docker integration test runner not registered")
 		}
-		runner, err := initRunner(tester, dir, passInEnv)
+		runner, err := initRunner(cfg, tester, dir, passInEnv)
 		if err != nil {
 			return nil, fmt.Errorf("initializing docker runner: %w", err)
 		}
@@ -184,7 +184,7 @@ func NewIntegrationRunners(path string, passInEnv map[string]string) (Integratio
 }
 
 // NewDockerIntegrationRunner returns an integration runner configured only for docker.
-func NewDockerIntegrationRunner(passThroughEnvVars ...string) (*IntegrationRunner, error) {
+func NewDockerIntegrationRunner(cfg *Settings, passThroughEnvVars ...string) (*IntegrationRunner, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
@@ -193,10 +193,10 @@ func NewDockerIntegrationRunner(passThroughEnvVars ...string) (*IntegrationRunne
 	if !ok {
 		return nil, fmt.Errorf("docker integration test runner not registered")
 	}
-	return initRunner(tester, cwd, nil, passThroughEnvVars...)
+	return initRunner(cfg, tester, cwd, nil, passThroughEnvVars...)
 }
 
-func initRunner(tester IntegrationTester, dir string, passInEnv map[string]string, passThroughEnvVars ...string) (*IntegrationRunner, error) {
+func initRunner(cfg *Settings, tester IntegrationTester, dir string, passInEnv map[string]string, passThroughEnvVars ...string) (*IntegrationRunner, error) {
 	var runnerSteps IntegrationTestSteps
 	requirements := tester.StepRequirements()
 	if requirements != nil {
@@ -218,6 +218,7 @@ func initRunner(tester IntegrationTester, dir string, passInEnv map[string]strin
 	}
 
 	runner := &IntegrationRunner{
+		cfg:    cfg,
 		steps:  runnerSteps,
 		tester: tester,
 		dir:    dir,
@@ -234,25 +235,18 @@ func (r *IntegrationRunner) Test(mageTarget string, test func() error) error {
 	}
 
 	// Honor the TEST_ENVIRONMENT value if set.
-	if testEnvVar, isSet := os.LookupEnv("TEST_ENVIRONMENT"); isSet {
-		enabled, err := strconv.ParseBool(testEnvVar)
-		if err != nil {
-			return fmt.Errorf("failed to parse TEST_ENVIRONMENT value: %w", err)
-		}
-		if !enabled {
-			return fmt.Errorf("TEST_ENVIRONMENT=%s", testEnvVar)
-		}
+	if !r.cfg.IntegrationTest.TestEnvironmentEnabled {
+		return fmt.Errorf("TEST_ENVIRONMENT is disabled")
 	}
 
 	// log missing requirements and do nothing
 	err := r.tester.HasRequirements()
 	if err != nil {
 		fmt.Printf("skipping test run with %s due to missing requirements: %s\n", r.tester.Name(), err)
-		//nolint:nilerr // log error; and return (otherwise on machines without requirements it will mark the tests as failed)
 		return nil
 	}
 
-	if err := r.steps.Setup(r.env); err != nil {
+	if err := r.steps.Setup(r.cfg, r.env); err != nil {
 		return err
 	}
 
@@ -263,7 +257,7 @@ func (r *IntegrationRunner) Test(mageTarget string, test func() error) error {
 			err = recoverErr.(error)
 			if !inTeardown {
 				// ignore errors
-				_ = r.steps.Teardown(r.env)
+				_ = r.steps.Teardown(r.cfg, r.env)
 			}
 		}
 	}()
@@ -272,14 +266,14 @@ func (r *IntegrationRunner) Test(mageTarget string, test func() error) error {
 		fmt.Printf(">> Running testing inside of %s...\n", r.tester.Name())
 	}
 
-	err = r.tester.Test(r.dir, mageTarget, r.env)
+	err = r.tester.Test(r.dir, mageTarget, r.cfg, r.env)
 
 	if mg.Verbose() {
 		fmt.Printf(">> Done running testing inside of %s...\n", r.tester.Name())
 	}
 
 	inTeardown = true
-	if teardownErr := r.steps.Teardown(r.env); teardownErr != nil {
+	if teardownErr := r.steps.Teardown(r.cfg, r.env); teardownErr != nil {
 		if err == nil {
 			// test didn't error, but teardown did
 			err = teardownErr

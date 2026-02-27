@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -25,45 +24,23 @@ type packageVersion struct {
 	StackBuildID string `json:"stack_build_id"`
 }
 
-func initPackageVersion() error {
-	if os.Getenv("USE_PACKAGE_VERSION") != "true" {
-		return nil
+// GetPackageVersionInfo reads the package version file if USE_PACKAGE_VERSION is set.
+// Returns nil if USE_PACKAGE_VERSION is not set or the file doesn't exist.
+func GetPackageVersionInfo(cfg *Settings) (*packageVersion, error) {
+	if !cfg.Packaging.UsePackageVersion {
+		return nil, nil
 	}
 
 	_, err := os.Stat(PackageVersionFilename)
 	if err != nil {
 		if os.IsNotExist(err) {
 			log.Printf("USE_PACKAGE_VERSION is set, but %q does not exist, not overriding\n", PackageVersionFilename)
-			return nil
+			return nil, nil
 		}
-		return fmt.Errorf("failed to stat %q: %w", PackageVersionFilename, err)
+		return nil, fmt.Errorf("failed to stat %q: %w", PackageVersionFilename, err)
 	}
 
-	pv, err := readPackageVersion()
-	if err != nil {
-		// err is wrapped in readPackageVersion
-		return err
-	}
-
-	PackagingFromManifest = true
-	ManifestURL = pv.ManifestURL
-	agentPackageVersion = pv.CoreVersion
-	Snapshot = true
-
-	_ = os.Setenv("BEAT_VERSION", pv.CoreVersion)
-	_ = os.Setenv("AGENT_VERSION", pv.Version)
-	_ = os.Setenv("AGENT_STACK_VERSION", pv.StackVersion)
-	_ = os.Setenv("SNAPSHOT", "true")
-
-	dropPath := filepath.Join("build", "distributions", "elastic-agent-drop")
-	dropPath, err = filepath.Abs(dropPath)
-	if err != nil {
-		return fmt.Errorf("failed to obtain absolute path for default drop path: %w", err)
-	}
-
-	_ = os.Setenv("AGENT_DROP_PATH", dropPath)
-
-	return nil
+	return readPackageVersion()
 }
 
 func UpdatePackageVersion(version, buildID, stackVersion, stackBuildId, manifestURL, summaryURL string) error {
