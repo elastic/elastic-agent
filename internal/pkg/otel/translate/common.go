@@ -17,11 +17,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 )
 
-// Helper function to check if a struct is empty
-func isStructEmpty(s any) bool {
-	return reflect.DeepEqual(s, reflect.Zero(reflect.TypeOf(s)).Interface())
-}
-
 // Helper function to conditionally add fields to the map
 func setIfNotNil(m map[string]any, key string, value any) {
 	if value == nil {
@@ -31,20 +26,17 @@ func setIfNotNil(m map[string]any, key string, value any) {
 	v := reflect.ValueOf(value)
 
 	switch v.Kind() {
-	case reflect.String:
-		if v.String() != "" {
-			m[key] = value
-		}
+	case reflect.Int:
+		// we set integer values even if they are zero
+		m[key] = value
 	case reflect.Map, reflect.Slice:
 		if v.Len() > 0 {
 			m[key] = value
 		}
-	case reflect.Struct:
-		if !isStructEmpty(value) {
+	default:
+		if !reflect.DeepEqual(value, reflect.Zero(reflect.TypeOf(value)).Interface()) {
 			m[key] = value
 		}
-	default:
-		m[key] = value
 	}
 }
 
