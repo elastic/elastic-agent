@@ -37,9 +37,11 @@ type HeadersProvider interface {
 type RuntimeManager string
 
 type RuntimeConfig struct {
-	Default    string            `yaml:"default" config:"default" json:"default"`
-	Filebeat   BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
-	Metricbeat BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
+	Default       string            `yaml:"default" config:"default" json:"default"`
+	Filebeat      BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
+	Metricbeat    BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
+	DynamicInputs string            `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
+	Output        map[string]string `yaml:"output" config:"output" json:"output"`
 }
 
 type BeatRuntimeConfig struct {
@@ -49,11 +51,48 @@ type BeatRuntimeConfig struct {
 
 func DefaultRuntimeConfig() *RuntimeConfig {
 	return &RuntimeConfig{
-		Default: string(DefaultRuntimeManager),
+		Default:       string(DefaultRuntimeManager),
+		DynamicInputs: string(ProcessRuntimeManager),
+		Metricbeat: BeatRuntimeConfig{
+			InputType: map[string]string{
+				"activemq/metrics":      string(OtelRuntimeManager),
+				"apache/metrics":        string(OtelRuntimeManager),
+				"beat/metrics":          string(OtelRuntimeManager),
+				"containerd/metrics":    string(OtelRuntimeManager),
+				"docker/metrics":        string(OtelRuntimeManager),
+				"elasticsearch/metrics": string(OtelRuntimeManager),
+				"etcd/metrics":          string(OtelRuntimeManager),
+				"http/metrics":          string(OtelRuntimeManager),
+				"jolokia/metrics":       string(OtelRuntimeManager),
+				"kafka/metrics":         string(OtelRuntimeManager),
+				"kibana/metrics":        string(OtelRuntimeManager),
+				"linux/metrics":         string(OtelRuntimeManager),
+				"logstash/metrics":      string(OtelRuntimeManager),
+				"memcached/metrics":     string(OtelRuntimeManager),
+				"mongodb/metrics":       string(OtelRuntimeManager),
+				"mysql/metrics":         string(OtelRuntimeManager),
+				"nats/metrics":          string(OtelRuntimeManager),
+				"nginx/metrics":         string(OtelRuntimeManager),
+				"rabbitmq/metrics":      string(OtelRuntimeManager),
+				"sql/metrics":           string(OtelRuntimeManager),
+				"stan/metrics":          string(OtelRuntimeManager),
+				"statsd/metrics":        string(OtelRuntimeManager),
+				"system/metrics":        string(OtelRuntimeManager),
+				"vsphere/metrics":       string(OtelRuntimeManager),
+			},
+		},
+		Filebeat: BeatRuntimeConfig{
+			// go-ucfg sets this while unpacking, having it in the default makes testing easier
+			InputType: make(map[string]string),
+		},
+		Output: map[string]string{
+			"logstash": string(ProcessRuntimeManager), // Force all inputs using the Logstash output to use the process runtime
+		},
 	}
 }
 
 func (r *RuntimeConfig) Validate() error {
+
 	validateRuntime := func(val string, allowEmpty bool) error {
 		if allowEmpty && val == "" {
 			return nil
@@ -79,6 +118,16 @@ func (r *RuntimeConfig) Validate() error {
 			}
 		}
 	}
+
+	allowedOutput := []string{"elasticsearch", "logstash"}
+	for name, runtime := range r.Output {
+		if !slices.Contains(allowedOutput, name) {
+			return fmt.Errorf("%s output is not supported", name)
+		}
+		if err := validateRuntime(runtime, false); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -93,7 +142,14 @@ func (r *RuntimeConfig) BeatRuntimeConfig(beatName string) *BeatRuntimeConfig {
 	}
 }
 
-func (r *RuntimeConfig) RuntimeManagerForInputType(inputType string, beatName string) RuntimeManager {
+func (r *RuntimeConfig) RuntimeManagerForInputType(inputType string, beatName string, output outputI) RuntimeManager {
+	if r.Output != nil {
+		// Check if runtime is set for given output
+		if runtime, ok := r.Output[output.OutputType]; ok && output.Enabled {
+			return RuntimeManager(runtime)
+		}
+	}
+
 	beatRuntimeConfig := r.BeatRuntimeConfig(beatName)
 	if beatRuntimeConfig != nil {
 		// Check if there's a specific runtime manager for this input type
@@ -520,7 +576,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 			if input.enabled {
 				unitID := fmt.Sprintf("%s-%s", componentID, input.id)
 				if input.runtimeManager == "" {
-					input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName())
+					input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName(), output)
 				}
 				unitsForRuntimeManager[input.runtimeManager] = append(
 					unitsForRuntimeManager[input.runtimeManager],
@@ -561,7 +617,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 			}
 
 			if input.runtimeManager == "" {
-				input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName())
+				input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName(), output)
 			}
 
 			var units []Unit
