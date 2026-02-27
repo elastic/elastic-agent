@@ -26,7 +26,7 @@ OpenTelemetry profiling is still under active development. Refer to [The State o
 
 ### Prepare Elasticsearch for profiling data
 
-Before EDOT Collector ingests profiling data into Elasticsearch make sure that [Universal Profiling](https://www.elastic.co/docs/solutions/observability/infra-and-hosts/get-started-with-universal-profiling#profiling-configure-data-ingestion) is configured for ingestion.
+Before EDOT Collector ingests profiling data into Elasticsearch, make sure that [Universal Profiling](https://www.elastic.co/docs/solutions/observability/infra-and-hosts/get-started-with-universal-profiling#profiling-configure-data-ingestion) is configured for ingestion.
 
 ### Configure and run EDOT Collector with profiling
 
