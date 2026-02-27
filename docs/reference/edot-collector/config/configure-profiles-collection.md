@@ -67,6 +67,9 @@ service:
 {{es}} OTel Profiles is still under development and therefore protected by a feature gate.
 :::
 
+### Activate profiling in the Collector
+
+
 :::::{stepper}
 ::::{step} Activate profiling in the Collector
 To activate profiling in the EDOT Collector, start it using the additional argument `--feature-gates=service.profilesSupport`.
