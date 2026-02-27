@@ -22,7 +22,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
-	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 )
 
 type configfile struct {
@@ -106,7 +105,6 @@ func TestMigrateToEncryptedConfig(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			fipsutils.SkipIfFIPSOnly(t, "encrypted config does not use NewGCMWithRandomNonce.")
 			//setup begin
 			top := t.TempDir()
 			paths.SetTop(top)
@@ -202,7 +200,6 @@ func TestErrorMigrateToEncryptedConfig(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			fipsutils.SkipIfFIPSOnly(t, "vault does not use NewGCMWithRandomNonce.")
 			//setup begin
 			top := t.TempDir()
 			paths.SetTop(top)

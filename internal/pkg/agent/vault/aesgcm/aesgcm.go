@@ -8,7 +8,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"syscall"
 )
 
 // AESKeyType indicates the AES key length.
@@ -52,18 +51,13 @@ func Encrypt(key, data []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	aesGCM, err := cipher.NewGCM(block)
+	aesGCM, err := cipher.NewGCMWithRandomNonce(block)
 	if err != nil {
 		return nil, err
 	}
 
-	nonce := make([]byte, aesGCM.NonceSize())
-	if _, err = rand.Read(nonce); err != nil {
-		return nil, err
-	}
-
 	// The first parameter is nonce in order to get the ciphertext as concatenation of nonce and encrypted data
-	ciphertext := aesGCM.Seal(nonce, nonce, data, nil)
+	ciphertext := aesGCM.Seal(nil, nil, data, nil)
 
 	return ciphertext, nil
 }
@@ -75,16 +69,10 @@ func Decrypt(key, data []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	aesGCM, err := cipher.NewGCM(block)
+	aesGCM, err := cipher.NewGCMWithRandomNonce(block)
 	if err != nil {
 		return nil, err
 	}
 
-	nonceSize := aesGCM.NonceSize()
-	if len(data) < nonceSize {
-		return nil, syscall.EINVAL
-	}
-	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
-
-	return aesGCM.Open(nil, nonce, ciphertext, nil)
+	return aesGCM.Open(nil, nil, data, nil)
 }

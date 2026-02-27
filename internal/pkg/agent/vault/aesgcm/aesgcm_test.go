@@ -10,8 +10,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-
-	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 )
 
 var testKeyTypes []AESKeyType = []AESKeyType{AES128, AES192, AES256}
@@ -31,7 +29,6 @@ func TestNewKey(t *testing.T) {
 }
 
 func TestEncryptDecrypt(t *testing.T) {
-	fipsutils.SkipIfFIPSOnly(t, "aesgcm does not use NewGCMWithRandomNonce.")
 	tests := []struct {
 		name string
 		data []byte
@@ -85,7 +82,6 @@ func TestEncryptDecrypt(t *testing.T) {
 }
 
 func TestEncryptDecryptDifferentLengths(t *testing.T) {
-	fipsutils.SkipIfFIPSOnly(t, "aesgcm does not use NewGCMWithRandomNonce.")
 	const maxDataSize = 55 // test for sufficient length for the key and a bit more
 	for _, kt := range testKeyTypes {
 		t.Run(kt.String(), func(t *testing.T) {

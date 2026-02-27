@@ -12,10 +12,6 @@ import (
 
 // Validate the options for encoding and decoding values.
 func (o *Option) Validate() error {
-	if o.IVLength == 0 {
-		return errors.New("IVLength must be superior to 0")
-	}
-
 	if o.SaltLength == 0 {
 		return errors.New("SaltLength must be superior to 0")
 	}
