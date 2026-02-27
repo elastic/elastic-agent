@@ -601,6 +601,63 @@ func TestGetOtelConfig(t *testing.T) {
 			}),
 		},
 		{
+			name: "filestream with global processors",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "filestream-default",
+						InputType:  "filestream",
+						OutputType: "elasticsearch",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"filebeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "filestream-unit",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(fileStreamConfig),
+							},
+							{
+								ID:   "filestream-default",
+								Type: client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(esOutputConfig(extraParams{
+									key:   "processors",
+									value: []any{"filter/remove-something", "beat", "batch"},
+								})),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"elasticsearch/_agent-component/default": expectedESConfig("default"),
+				},
+				"extensions": map[string]any{
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
+				},
+				"receivers": map[string]any{
+					"filebeatreceiver/_agent-component/filestream-default": expectedFilestreamConfig("filestream-default"),
+				},
+				"service": map[string]any{
+					"extensions": []any{"beatsauth/_agent-component/default"},
+					"pipelines": map[string]any{
+						"logs/_agent-component/filestream-default": map[string][]string{
+							"exporters":  {"elasticsearch/_agent-component/default"},
+							"processors": {"filter/remove-something", "beat", "batch"},
+							"receivers":  {"filebeatreceiver/_agent-component/filestream-default"},
+						},
+					},
+				},
+			}),
+		},
+		{
 			name: "multiple filestream inputs and one output",
 			model: &component.Model{
 				Components: []component.Component{
@@ -1670,7 +1727,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			exportersCfg, queueSettings, extensionCfg, err := unitToExporterConfig(tt.unit, tt.outputName, tt.exporterType, logger)
+			exportersCfg, queueSettings, extensionCfg, _, err := unitToExporterConfig(tt.unit, tt.outputName, tt.exporterType, logger)
 
 			if tt.expectedError != "" {
 				require.Error(t, err)
