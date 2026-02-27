@@ -142,6 +142,7 @@ type mockExecution struct {
 	statusCh         chan *status.AggregateStatus
 	cfg              *confmap.Conf
 	collectorStarted chan struct{}
+	configUpdated    chan struct{}
 }
 
 func (e *mockExecution) startCollector(
@@ -165,8 +166,10 @@ func (e *mockExecution) startCollector(
 		reportErr(ctx, errCh, nil)
 	}()
 	handle := &mockCollectorHandle{
-		stopCh: stopCh,
-		cancel: collectorCancel,
+		stopCh:            stopCh,
+		cancel:            collectorCancel,
+		execution:         e,
+		collectorLogLevel: level,
 	}
 	if e.collectorStarted != nil {
 		e.collectorStarted <- struct{}{}
@@ -177,8 +180,10 @@ func (e *mockExecution) startCollector(
 var _ collectorHandle = &mockCollectorHandle{}
 
 type mockCollectorHandle struct {
-	stopCh chan struct{}
-	cancel context.CancelFunc
+	stopCh            chan struct{}
+	cancel            context.CancelFunc
+	execution         *mockExecution
+	collectorLogLevel logp.Level
 }
 
 func (h *mockCollectorHandle) Stop(waitTime time.Duration) {
@@ -187,6 +192,20 @@ func (h *mockCollectorHandle) Stop(waitTime time.Duration) {
 	case <-time.After(waitTime):
 	case <-h.stopCh:
 	}
+}
+
+func (h *mockCollectorHandle) UpdateConfig(cfg *confmap.Conf) error {
+	h.execution.cfg = cfg
+	select {
+	case h.execution.configUpdated <- struct{}{}:
+	default:
+	}
+
+	return nil
+}
+
+func (h *mockCollectorHandle) LogLevel() logp.Level {
+	return h.collectorLogLevel
 }
 
 // EventListener listens to the events from the OTelManager and stores the latest error and status.
@@ -254,7 +273,7 @@ func (e *EventListener) EnsureHealthy(t *testing.T, u time.Time) {
 		require.NotNil(collect, latestStatus)
 		require.NotNil(collect, latestStatus.Value())
 		assert.False(collect, latestStatus.Before(u))
-		require.Equal(collect, componentstatus.StatusOK, latestStatus.Value().Status())
+		require.Equal(collect, componentstatus.StatusOK.String(), latestStatus.Value().Status().String())
 	}, 60*time.Second, 1*time.Second, "otel collector never got healthy")
 }
 
@@ -273,7 +292,7 @@ func (e *EventListener) EnsureFatal(t *testing.T, u time.Time, extraT ...func(co
 		require.NotNil(collect, latestStatus)
 		require.NotNil(collect, latestStatus.Value())
 		assert.False(collect, latestStatus.Before(u))
-		require.Equal(collect, componentstatus.StatusFatalError, latestStatus.Value().Status())
+		require.Equal(collect, componentstatus.StatusFatalError.String(), latestStatus.Value().Status().String())
 
 		// extra checks
 		for _, et := range extraT {
@@ -1611,9 +1630,11 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	agentInfo := &info.AgentInfo{}
 	beatMonitoringConfigGetter := mockBeatMonitoringConfigGetter
 	collectorStarted := make(chan struct{})
+	configUpdated := make(chan struct{}, 1) // buffered to avoid deadlocks in the mock execution
 
 	execution := &mockExecution{
 		collectorStarted: collectorStarted,
+		configUpdated:    configUpdated,
 	}
 
 	// Create manager with test dependencies
@@ -1696,7 +1717,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	t.Run("component config is passed down to the otel manager", func(t *testing.T) {
 		mgr.Update(collectorCfg, nil, logp.InfoLevel, components)
 		select {
-		case <-collectorStarted:
+		case <-configUpdated:
 		case <-ctx.Done():
 			t.Fatal("timeout waiting for collector config update")
 		}
@@ -1712,7 +1733,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	t.Run("empty collector config leaves the component config running", func(t *testing.T) {
 		mgr.Update(nil, nil, logp.InfoLevel, components)
 		select {
-		case <-collectorStarted:
+		case <-configUpdated:
 		case <-ctx.Done():
 			t.Fatal("timeout waiting for collector config update")
 		}
@@ -1874,6 +1895,54 @@ func TestOTelManager_RestartOnLogLevelChange(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("expected collector to be restarted after log level change, but it was not")
 	}
+}
+
+// TestOTelManager_CollectorRunErrWithNilConfig verifies that the manager does not panic when a
+// non-nil error arrives on collectorRunErr while mergedCollectorCfg is nil. This can happen when
+// the collector process reports an error after its configuration has been cleared.
+func TestOTelManager_CollectorRunErrWithNilConfig(t *testing.T) {
+	testLogger, _ := loggertest.New("test")
+
+	mgr := OTelManager{
+		managerLogger:     testLogger,
+		collectorLogger:   testLogger,
+		errCh:             make(chan error, 1),
+		updateCh:          make(chan configUpdate, 1),
+		collectorStatusCh: make(chan *status.AggregateStatus, 1),
+		componentStateCh:  make(chan []runtime.ComponentComponentState, 5),
+		doneChan:          make(chan struct{}),
+		recoveryTimer:     newRestarterNoop(),
+		execution:         &mockExecution{},
+		agentInfo:         &info.AgentInfo{},
+		collectorRunErr:   make(chan error, 1),
+		stopTimeout:       time.Second,
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	// Send a non-nil, non-context.Canceled error while mergedCollectorCfg is nil.
+	// This exercises the else branch of the collectorRunErr case in Run(), which
+	// calls reportStartupErr → otelConfigToStatus with a nil config.
+	mgr.collectorRunErr <- errors.New("collector crashed")
+	go func() {
+		for {
+			select {
+			case s := <-mgr.WatchCollector():
+				if s == nil {
+					cancel()
+				}
+			case <-ctx.Done():
+			}
+		}
+	}()
+
+	assert.NotPanics(t, func() {
+		// Run will process the collectorRunErr, then block on the select.
+		// Cancel the context so it exits after handling the error.
+		err := mgr.Run(ctx)
+		require.ErrorIs(t, err, context.Canceled)
+	})
 }
 
 // TestManagerAlwaysEmitsStoppedStatesForComponents checks that the manager always emits a STOPPED state for a component

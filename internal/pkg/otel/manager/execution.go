@@ -34,4 +34,9 @@ type collectorHandle interface {
 	// doesn't exit within that time, it will be killed and then it will wait an extra second for it to ensure it's
 	// really stopped.
 	Stop(waitTime time.Duration)
+	// UpdateConfig sends a new configuration to the running collector for in-place reload.
+	// Returns an error if the config could not be written.
+	UpdateConfig(cfg *confmap.Conf) error
+	// LogLevel returns the log level of the running collector.
+	LogLevel() logp.Level
 }

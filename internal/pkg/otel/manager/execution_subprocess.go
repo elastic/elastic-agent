@@ -5,29 +5,29 @@
 package manager
 
 import (
-	"bytes"
 	"context"
+	"encoding/gob"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"sync"
 	"time"
 
-	"go.opentelemetry.io/collector/component"
-	"gopkg.in/yaml.v3"
-
 	otelstatus "github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap/zapcore"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/status"
-	runtimeLogger "github.com/elastic/elastic-agent/pkg/component/runtime"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
@@ -38,7 +38,16 @@ const (
 	OtelSupervisedMonitoringURLFlagName       = "supervised.monitoring.url"
 	OtelFeatureGatesFlagName                  = "feature-gates"
 	OtelElasticsearchExporterTelemetryFeature = "telemetry.newPipelineTelemetry"
+
+	// agentConfigProviderScheme must match agentprovider.AgentConfigProviderSchemeName.
+	// Duplicated here to avoid a cross-module import from the main module into
+	// the internal/edot submodule.
+	agentConfigProviderScheme = "elasticagent"
 )
+
+// ConfigModifier is a function that can modify an otel config.
+// Used for injecting a healthcheck extension and telemetry config.
+type ConfigModifier func(cfg *confmap.Conf) error
 
 // newSubprocessExecution creates a new execution which runs the otel collector in a subprocess.
 // A healthCheckPort of 0 will result in a random port being used. A metricsPort of 0 means the
@@ -109,60 +118,75 @@ func (r *subprocessExecution) startCollector(
 		return nil, fmt.Errorf("could not find port for collector: %w", err)
 	}
 
-	if err := addCollectorMetricsReader(cfg, r.collectorMetricsPort); err != nil {
-		return nil, fmt.Errorf("failed to add collector metrics reader: %w", err)
-	}
+	var configModifier ConfigModifier = func(cfg *confmap.Conf) error {
+		if err := injectHealthCheckV2Extension(cfg, r.healthCheckExtensionID, httpHealthCheckPort); err != nil {
+			return fmt.Errorf("failed to inject health check extension: %w", err)
+		}
 
-	if err := injectHealthCheckV2Extension(cfg, r.healthCheckExtensionID, httpHealthCheckPort); err != nil {
-		return nil, fmt.Errorf("failed to inject health check extension: %w", err)
-	}
+		if err := addCollectorMetricsReader(cfg, r.collectorMetricsPort); err != nil {
+			return fmt.Errorf("failed to add collector metrics reader: %w", err)
+		}
 
-	confMap := cfg.ToStringMap()
-	confBytes, err := yaml.Marshal(confMap)
+		return nil
+	}
+	// make sure the config can be prepared and serialized before starting the process
+	cfgCopy, err := cfg.Sub("")
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal config to yaml: %w", err)
+		return nil, err
+	}
+	_, err = prepareAndSerializeConfig(cfgCopy, configModifier)
+	if err != nil {
+		return nil, err
 	}
 
 	stdOutLast := newZapLast(collectorLogger.Core())
-	stdOut := runtimeLogger.NewLogWriterWithDefaults(stdOutLast, zapcore.Level(lvl))
+	stdOut := runtime.NewLogWriterWithDefaults(stdOutLast, zapcore.Level(lvl))
 	// info level for stdErr because by default collector writes to stderr
 	stdErrLast := newZapLast(collectorLogger.Core())
-	stdErr := runtimeLogger.NewLogWriterWithDefaults(stdErrLast, zapcore.Level(lvl))
+	stdErr := runtime.NewLogWriterWithDefaults(stdErrLast, zapcore.Level(lvl))
 
 	procCtx, procCtxCancel := context.WithCancel(ctx)
 	env := os.Environ()
 
-	// set collector args
+	// Create a pipe for streaming config to the subprocess via stdin
+	pipeReader, pipeWriter, err := os.Pipe()
+	if err != nil {
+		procCtxCancel()
+		return nil, fmt.Errorf("failed to create config pipe: %w", err)
+	}
+	defer func() {
+		if closeErr := pipeReader.Close(); closeErr != nil {
+			logger.Warnf("Error closing read end of the collector config pipe: %v", err)
+		}
+	}()
+
+	// set collector args and add --config flag with the elasticagent:stdin URI
 	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
+	collectorArgs = append(collectorArgs, fmt.Sprintf("--config=%s:stdin", agentConfigProviderScheme))
 
 	processInfo, err := process.Start(r.collectorPath,
 		process.WithArgs(collectorArgs),
 		process.WithEnv(env),
 		process.WithCmdOptions(func(c *exec.Cmd) error {
-			c.Stdin = bytes.NewReader(confBytes)
+			c.Stdin = pipeReader
 			c.Stdout = stdOut
 			c.Stderr = stdErr
 			return nil
 		}),
 	)
-	if err != nil {
+	if err != nil || processInfo.Process == nil {
 		// we failed to start the process
+		if err == nil {
+			err = errors.New("process is nil")
+		}
+		_ = pipeWriter.Close()
 		procCtxCancel()
 		return nil, fmt.Errorf("failed to start supervised collector: %w", err)
 	}
+
 	logger.Infof("supervised collector started with pid: %d and healthcheck port: %d", processInfo.Process.Pid, httpHealthCheckPort)
-	if processInfo.Process == nil {
-		// this should not happen but just in case
-		procCtxCancel()
-		return nil, fmt.Errorf("failed to start supervised collector: process is nil")
-	}
 
-	ctl := &procHandle{
-		processDoneCh: make(chan struct{}),
-		processInfo:   processInfo,
-		log:           logger,
-	}
-
+	processDoneCh := make(chan struct{})
 	healthCheckDone := make(chan struct{})
 	go func() {
 		defer func() {
@@ -229,7 +253,8 @@ func (r *subprocessExecution) startCollector(
 		logger.Debugf("wait for pid %d returned", processInfo.PID)
 		procCtxCancel()
 		<-healthCheckDone
-		close(ctl.processDoneCh)
+		close(processDoneCh)
+
 		// using ctx instead of procCtx in the reportErr functions below is intentional. This allows us to report
 		// errors to the caller through processErrCh and essentially discard any other errors that occurred because
 		// the process exited.
@@ -258,6 +283,21 @@ func (r *subprocessExecution) startCollector(
 
 		r.reportErrFn(ctx, processErrCh, fmt.Errorf("failed to wait supervised collector process: %w", procErr))
 	}()
+
+	// The pipeWriter goroutine takes ownership of the pipe. It writes the
+	// initial config and subsequent updates asynchronously. Any errors are
+	// reported directly to processErrCh via reportErrFn.
+	reportPipeErrFn := func(err error) {
+		r.reportErrFn(ctx, processErrCh, err)
+	}
+	ctl := newProcHandle(processInfo, logger, lvl, processDoneCh, reportPipeErrFn, configModifier)
+	go ctl.writeToPipe(pipeWriter)
+	if updateErr := ctl.UpdateConfig(cfg); updateErr != nil {
+		// this should never happen, as the only reason updateConfig can return an error is covered by an
+		// earlier check.
+		ctl.Stop(0)
+		return nil, updateErr
+	}
 
 	return ctl, nil
 }
@@ -347,9 +387,56 @@ func removeManagedHealthCheckExtensionStatus(status *otelstatus.AggregateStatus,
 }
 
 type procHandle struct {
-	processDoneCh chan struct{}
-	processInfo   *process.Info
-	log           *logger.Logger
+	processDoneCh     chan struct{}
+	processInfo       *process.Info
+	log               *logger.Logger
+	collectorLogLevel logp.Level
+	configCh          chan []byte // buffered(1), latest-config-wins
+	configModifier    ConfigModifier
+	reportErrFn       func(error) // reports pipe write errors to processErrCh
+}
+
+func newProcHandle(
+	processInfo *process.Info,
+	log *logger.Logger,
+	collectorLogLevel logp.Level,
+	processDoneCh chan struct{},
+	reportErrFn func(error),
+	configModifier ConfigModifier) *procHandle {
+	return &procHandle{
+		processDoneCh:     processDoneCh,
+		processInfo:       processInfo,
+		log:               log,
+		collectorLogLevel: collectorLogLevel,
+		configCh:          make(chan []byte, 1),
+		reportErrFn:       reportErrFn,
+		configModifier:    configModifier,
+	}
+}
+
+// writeToPipe owns the pipe lifecycle. It loops writing configs queued via configCh until the process
+// exits. Errors are reported via reportErrFn.
+func (s *procHandle) writeToPipe(pipeWriter io.WriteCloser) {
+	defer func() {
+		if err := pipeWriter.Close(); err != nil {
+			s.log.Warnf("Error closing collector config pipe: %v", err)
+		}
+	}()
+
+	encoder := gob.NewEncoder(pipeWriter)
+
+	// Loop: write configs until the process exits.
+	for {
+		select {
+		case <-s.processDoneCh:
+			return
+		case cfgBytes := <-s.configCh:
+			if err := encoder.Encode(cfgBytes); err != nil {
+				s.reportErrFn(fmt.Errorf("failed to write config update: %w", err))
+				return
+			}
+		}
+	}
 }
 
 // Stop stops the process. If the process is already stopped, it does nothing. If the process does not stop within
@@ -384,6 +471,47 @@ func (s *procHandle) Stop(waitTime time.Duration) {
 		s.log.Warnf("supervised collector subprocess didn't exit in time after killing it")
 	case <-s.processDoneCh:
 	}
+}
+
+// UpdateConfig writes the new configuration to the subprocess's stdin pipe.
+func (s *procHandle) UpdateConfig(cfg *confmap.Conf) error {
+	yamlBytes, err := prepareAndSerializeConfig(cfg, s.configModifier)
+	if err != nil {
+		return err
+	}
+
+	// Drain any pending config (latest-wins semantics).
+	select {
+	case <-s.configCh:
+	default:
+	}
+	s.configCh <- yamlBytes
+
+	return nil
+}
+
+func (s *procHandle) LogLevel() logp.Level {
+	return s.collectorLogLevel
+}
+
+func prepareAndSerializeConfig(cfg *confmap.Conf, configModifier ConfigModifier) ([]byte, error) {
+	if cfg == nil {
+		return nil, errors.New("no configuration provided")
+	}
+
+	if configModifier != nil {
+		if err := configModifier(cfg); err != nil {
+			return nil, err
+		}
+	}
+
+	confMap := cfg.ToStringMap()
+	yamlBytes, err := yaml.Marshal(confMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal config to yaml: %w", err)
+	}
+
+	return yamlBytes, nil
 }
 
 type zapWriter interface {

@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -18,7 +19,7 @@ import (
 // It launches a supervised collector using cmd.RunCollector, and can be
 // configured via env vars to simulate different scenarios:
 //   - TEST_SUPERVISED_COLLECTOR_PANIC: triggers a panic after the given delay,
-//     allowing tests to verify the manager’s panic/restart behavior.
+//     allowing tests to verify the manager's panic/restart behavior.
 //   - TEST_SUPERVISED_COLLECTOR_DELAY: delays process shutdown by the given
 //     duration, letting tests observe graceful termination handling.
 //
@@ -48,7 +49,16 @@ func main() {
 
 	monitoringURL := os.Getenv("TEST_SUPERVISED_COLLECTOR_MONITORING_URL")
 
-	err = cmd.RunCollector(ctx, nil, true, "debug", monitoringURL)
+	// Extract --config values from command-line arguments.
+	// The parent process passes the config socket URI via --config=elasticagent:<socket_url>.
+	var configFiles []string
+	for _, arg := range os.Args[1:] {
+		if strings.HasPrefix(arg, "--config=") {
+			configFiles = append(configFiles, strings.TrimPrefix(arg, "--config="))
+		}
+	}
+
+	err = cmd.RunCollector(ctx, configFiles, true, "debug", monitoringURL)
 	if err != nil && !errors.Is(err, context.Canceled) {
 		logp.NewLogger("").Fatal("collector server run finished with error: %v", err)
 	}

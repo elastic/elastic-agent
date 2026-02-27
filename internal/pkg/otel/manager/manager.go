@@ -216,9 +216,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			m.recoveryTimer.Stop()
 			// our caller context is cancelled so stop the collector and return
 			// has exited.
-			if m.proc != nil {
-				m.proc.Stop(m.stopTimeout)
-			}
+			m.stopCollector()
 			return ctx.Err()
 		case <-m.recoveryTimer.C():
 			m.recoveryTimer.Stop()
@@ -248,10 +246,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			m.recoveryTimer.Stop()
 			if err == nil {
 				// err is nil means that the collector has exited cleanly without an error
-				if m.proc != nil {
-					m.proc.Stop(m.stopTimeout)
-					m.proc = nil
-				}
+				m.stopCollector()
 
 				// no critical error from this point forward
 				reportErr(ctx, m.errCh, nil)
@@ -282,10 +277,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				//
 				// in the case that the configuration is invalid there is no reason to
 				// try again as it will keep failing so we do not trigger a restart
-				if m.proc != nil {
-					m.proc.Stop(m.stopTimeout)
-					m.proc = nil
-				}
+				m.stopCollector()
 				// pass the error to the errCh so the coordinator, unless it's a cancel error
 				if !errors.Is(err, context.Canceled) {
 					// report a startup error (this gets reported as status)
@@ -613,56 +605,74 @@ func injectMonitoringReceiver(
 	return config.Merge(confmap.NewFromStringMap(collectorCfg))
 }
 
-func (m *OTelManager) applyMergedConfig(ctx context.Context,
+func (m *OTelManager) applyMergedConfig(
+	ctx context.Context,
+	collectorStatusCh chan *status.AggregateStatus,
+	collectorRunErr chan error,
+	forceFetchStatusCh chan struct{},
+) error {
+	// No configuration, the collector should not be running.
+	if m.mergedCollectorCfg == nil {
+		m.stopCollector()
+		return nil
+	}
+
+	// We have a configuration, need to apply it.
+
+	// Collector isn't running yet, start it.
+	if m.proc == nil {
+		return m.startCollector(ctx, collectorStatusCh, collectorRunErr, forceFetchStatusCh)
+	}
+
+	// Collector is running, update the configuration.
+
+	// If we changed the log level, we need to restart the collector, as out loggers read directly from the collector's
+	// stdout and stderr.
+	if m.proc.LogLevel() != m.collectorLogLevel {
+		m.stopCollector()
+		return m.startCollector(ctx, collectorStatusCh, collectorRunErr, forceFetchStatusCh)
+	}
+
+	// Normal config update
+	if err := m.proc.UpdateConfig(m.mergedCollectorCfg); err != nil {
+		return fmt.Errorf("collector config reload failed: %w", err)
+	}
+
+	return nil
+}
+
+func (m *OTelManager) startCollector(
+	ctx context.Context,
 	collectorStatusCh chan *status.AggregateStatus,
 	collectorRunErr chan error,
 	forceFetchStatusCh chan struct{},
 ) error {
 	if m.proc != nil {
-		m.proc.Stop(m.stopTimeout)
-		m.proc = nil
-		// We wait here for the collector to exit before possibly starting a new one. The execution indicates this
-		// by sending an error over the appropriate channel. It will also send a nil status that we'll either process
-		// after exiting from this function and going back to the main loop, or it will be overridden by the status
-		// from the newly started collector.
-		// This is the only blocking wait inside the main loop involving channels, so we need to be extra careful not to
-		// deadlock.
-		// TODO: Verify if we need to wait for the error at all. Stop() is already blocking.
-		select {
-		case <-collectorRunErr:
-		case <-ctx.Done():
-			// our caller ctx is Done
-			return ctx.Err()
-		}
+		return errors.New("collector already running")
 	}
-
-	if m.mergedCollectorCfg == nil {
-		// no configuration then the collector should not be
-		// running.
-		// ensure that the coordinator knows that there is no error
-		// as the collector is not running anymore
-		return nil
+	proc, err := m.execution.startCollector(ctx, m.collectorLogLevel, m.collectorLogger,
+		m.managerLogger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+	if err != nil {
+		// Failed to create the collector (this is different from it failing to run).
+		// We do not retry creation on failure as it will always fail.
+		// A new configuration is required for it not to fail (a new configuration will result in the retry).
+		// Since this is a new configuration we want to start the time from the initial delay.
+		recoveryDelay := m.recoveryTimer.ResetInitial()
+		m.managerLogger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
 	} else {
-		// either a new configuration or the first configuration
-		// that results in the collector being started
-		proc, err := m.execution.startCollector(ctx, m.collectorLogLevel, m.collectorLogger,
-			m.managerLogger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
-		if err != nil {
-			// failed to create the collector (this is different then
-			// it's failing to run). we do not retry creation on failure
-			// as it will always fail. A new configuration is required for
-			// it not to fail (a new configuration will result in the retry)
-			// since this is a new configuration we want to start the timer
-			// from the initial delay
-			recoveryDelay := m.recoveryTimer.ResetInitial()
-			m.managerLogger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
-			return err
-		} else {
-			// all good at the moment (possible that it will fail)
-			m.proc = proc
-		}
+		// all good at the moment (possible that it will fail)
+		m.proc = proc
 	}
-	return nil
+	return err
+}
+
+func (m *OTelManager) stopCollector() {
+	if m.proc == nil {
+		// Collector isn't running, nothing to do.
+		return
+	}
+	m.proc.Stop(m.stopTimeout)
+	m.proc = nil
 }
 
 // Update sends collector configuration and component updates to the manager's run loop.
@@ -766,7 +776,7 @@ func (m *OTelManager) reportStartupErr(ctx context.Context, err error) {
 	}(err)
 	if criticalErr != nil {
 		// critical error occurred
-		reportErr(ctx, m.errCh, fmt.Errorf("failed to report statup error: %w", criticalErr))
+		reportErr(ctx, m.errCh, fmt.Errorf("failed to report startup error: %w", criticalErr))
 	} else {
 		// no error reporting (clear critical)
 		reportErr(ctx, m.errCh, nil)
