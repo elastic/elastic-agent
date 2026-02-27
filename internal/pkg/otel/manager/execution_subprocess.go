@@ -164,9 +164,11 @@ func (r *subprocessExecution) startCollector(
 	}
 
 	healthCheckDone := make(chan struct{})
+	ctl.processMonitoringWg.Add(2)
 	go func() {
 		defer func() {
 			close(healthCheckDone)
+			ctl.processMonitoringWg.Done()
 		}()
 		currentStatus := status.AggregateStatus(componentstatus.StatusStarting, nil)
 		r.reportSubprocessCollectorStatus(ctx, statusCh, currentStatus)
@@ -225,6 +227,7 @@ func (r *subprocessExecution) startCollector(
 	}()
 
 	go func() {
+		defer ctl.processMonitoringWg.Done()
 		procState, procErr := processInfo.Process.Wait()
 		logger.Debugf("wait for pid %d returned", processInfo.PID)
 		procCtxCancel()
@@ -347,14 +350,16 @@ func removeManagedHealthCheckExtensionStatus(status *otelstatus.AggregateStatus,
 }
 
 type procHandle struct {
-	processDoneCh chan struct{}
-	processInfo   *process.Info
-	log           *logger.Logger
+	processDoneCh       chan struct{}
+	processInfo         *process.Info
+	processMonitoringWg sync.WaitGroup
+	log                 *logger.Logger
 }
 
 // Stop stops the process. If the process is already stopped, it does nothing. If the process does not stop within
 // processKillAfter or due to an error, it will be killed.
 func (s *procHandle) Stop(waitTime time.Duration) {
+	defer s.processMonitoringWg.Wait()
 	select {
 	case <-s.processDoneCh:
 		// process has already exited
@@ -384,6 +389,15 @@ func (s *procHandle) Stop(waitTime time.Duration) {
 		s.log.Warnf("supervised collector subprocess didn't exit in time after killing it")
 	case <-s.processDoneCh:
 	}
+}
+
+func (s *procHandle) Stopped() bool {
+	select {
+	case <-s.processDoneCh:
+		return true
+	default:
+	}
+	return false
 }
 
 type zapWriter interface {
