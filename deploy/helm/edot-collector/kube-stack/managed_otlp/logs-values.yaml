@@ -240,6 +240,7 @@ collectors:
       processors: {}
       exporters:
         debug:
+          verbosity: basic
         otlp/ingest:
           endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
           headers:

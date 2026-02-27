@@ -6,6 +6,9 @@ package mage
 
 import (
 	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -758,6 +761,43 @@ func TestLoadSettings(t *testing.T) {
 		assert.True(t, settings.Packaging.UsePackageVersion)
 		assert.Equal(t, "/drop/path", settings.Packaging.AgentDropPath)
 		assert.True(t, settings.Packaging.KeepArchive)
+	})
+
+	t.Run("applies .package-version overrides when USE_PACKAGE_VERSION is set", func(t *testing.T) {
+		// Create a temporary directory with a .package-version file and
+		// chdir into it so that GetPackageVersionInfo can find it.
+		dir := t.TempDir()
+		pv := map[string]string{
+			"version":        "9.4.0-SNAPSHOT",
+			"build_id":       "9.4.0-abc123",
+			"manifest_url":   "https://snapshots.elastic.co/9.4.0-abc123/manifest-9.4.0-SNAPSHOT.json",
+			"summary_url":    "https://snapshots.elastic.co/9.4.0-abc123/summary-9.4.0-SNAPSHOT.html",
+			"core_version":   "9.4.0",
+			"stack_version":  "9.4.0-SNAPSHOT",
+			"stack_build_id": "9.4.0-abc123-SNAPSHOT",
+		}
+		pvBytes, err := json.Marshal(pv)
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, PackageVersionFilename), pvBytes, 0644))
+
+		origDir, err := os.Getwd()
+		require.NoError(t, err)
+		require.NoError(t, os.Chdir(dir))
+		t.Cleanup(func() { assert.NoError(t, os.Chdir(origDir)) })
+
+		t.Setenv("USE_PACKAGE_VERSION", "true")
+
+		settings, err := LoadSettings()
+		require.NoError(t, err)
+
+		assert.True(t, settings.Packaging.PackagingFromManifest)
+		assert.Equal(t, pv["manifest_url"], settings.Packaging.ManifestURL)
+		assert.Equal(t, pv["core_version"], settings.Packaging.AgentPackageVersion)
+		assert.Equal(t, pv["core_version"], settings.Build.BeatVersion)
+		assert.True(t, settings.Build.Snapshot)
+		assert.Equal(t, pv["version"], settings.IntegrationTest.AgentVersion)
+		assert.Equal(t, pv["stack_version"], settings.IntegrationTest.AgentStackVersion)
+		assert.NotEmpty(t, settings.Packaging.AgentDropPath)
 	})
 
 	t.Run("loads integration test settings from env vars", func(t *testing.T) {

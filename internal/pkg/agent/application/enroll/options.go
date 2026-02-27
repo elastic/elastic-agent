@@ -91,6 +91,9 @@ func (e *EnrollOptions) RemoteConfig(failOnInsecureMismatch bool) (remote.Config
 	}
 	if e.Insecure {
 		tlsCfg.VerificationMode = tlscommon.VerifyNone
+	} else if e.FleetServer.ConnStr != "" && !e.FleetServer.Insecure {
+		// If we are communicating with a local fleet-server instance use cert verifcation
+		tlsCfg.VerificationMode = tlscommon.VerifyCertificate
 	}
 	if e.Certificate != "" || e.Key != "" {
 		tlsCfg.Certificate = tlscommon.CertificateConfig{

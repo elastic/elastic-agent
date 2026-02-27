@@ -1425,6 +1425,35 @@ func (s *Settings) loadPackagingSettingsFromEnv() {
 	if _, ok := os.LookupEnv("KEEP_ARCHIVE"); ok {
 		s.Packaging.KeepArchive = true
 	}
+
+	// Apply .package-version overrides when USE_PACKAGE_VERSION is set.
+	// This mirrors the old initPackageVersion() behavior: read the file,
+	// set ManifestURL / PackagingFromManifest / AgentDropPath so the
+	// packaging path downloads components from the manifest instead of
+	// fetching them individually. Values from the .package-version file
+	// take precedence over environment variables.
+	if s.Packaging.UsePackageVersion {
+		pv, err := GetPackageVersionInfo(s)
+		if err != nil {
+			log.Printf("Warning: failed to get package version info: %v", err)
+		}
+		if pv != nil {
+			s.Packaging.PackagingFromManifest = true
+			s.Packaging.ManifestURL = pv.ManifestURL
+			s.Packaging.AgentPackageVersion = pv.CoreVersion
+			s.Build.BeatVersion = pv.CoreVersion
+			s.Build.Snapshot = true
+			s.IntegrationTest.AgentVersion = pv.Version
+			s.IntegrationTest.AgentStackVersion = pv.StackVersion
+
+			if s.Packaging.AgentDropPath == "" {
+				dropPath, absErr := filepath.Abs(filepath.Join("build", "distributions", "elastic-agent-drop"))
+				if absErr == nil {
+					s.Packaging.AgentDropPath = dropPath
+				}
+			}
+		}
+	}
 }
 
 // loadIntegrationTestSettingsFromEnv overrides integration test settings from environment variables.
