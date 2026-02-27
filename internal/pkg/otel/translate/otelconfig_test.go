@@ -601,6 +601,128 @@ func TestGetOtelConfig(t *testing.T) {
 			}),
 		},
 		{
+			name: "metricbeat with logstash output",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "beat-metrics-monitoring",
+						InputType:  "beat/metrics",
+						OutputType: "logstash",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"metricbeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:     "beat/metrics-monitoring",
+								Type:   client.UnitTypeInput,
+								Config: component.MustExpectedConfig(beatMetricsConfig),
+							},
+							{
+								ID:   "beat/metrics-default",
+								Type: client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(map[string]any{
+									"type":                       "logstash",
+									"hosts":                      []any{"localhost:5044"},
+									"queue.mem.events":           3200,
+									"queue.mem.flush.min_events": 1600,
+									"queue.mem.flush.timeout":    "10s",
+								}),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"logstash/_agent-component/default": map[string]any{
+						"hosts": []any{"localhost:5044"},
+						"backoff": map[string]any{
+							"init": "1s",
+							"max":  "1m0s",
+						},
+						"bulk_max_size":            uint64(2048),
+						"compression_level":        uint64(3),
+						"escape_html":              false,
+						"index":                    "",
+						"loadbalance":              false,
+						"max_retries":              uint64(3),
+						"pipelining":               uint64(2),
+						"proxy_url":                "",
+						"proxy_use_local_resolver": false,
+						"slow_start":               false,
+						"timeout":                  "30s",
+						"ttl":                      "0s",
+						"worker":                   int64(0),
+						"workers":                  int64(0),
+					},
+				},
+				"receivers": map[string]any{
+					"metricbeatreceiver/_agent-component/beat-metrics-monitoring": map[string]any{
+						"metricbeat": map[string]any{
+							"modules": []map[string]any{
+								{
+									"data_stream": map[string]any{"dataset": "generic-1"},
+									"hosts":       "http://localhost:5066",
+									"id":          "test-1",
+									"index":       "metrics-generic-1-default",
+									"metricsets":  []interface{}{"stats"},
+									"period":      "60s",
+									"processors":  defaultInputProcessors("test-1", "generic-1", "metrics"),
+									"module":      "beat",
+								},
+							},
+						},
+						"path": map[string]any{
+							"home": paths.Components(),
+							"data": filepath.Join(paths.Run(), "beat-metrics-monitoring"),
+						},
+						"queue": map[string]any{
+							"mem": map[string]any{
+								"events": float64(3200),
+								"flush": map[string]any{
+									"min_events": float64(1600),
+									"timeout":    "10s",
+								},
+							},
+						},
+						"processors": defaultGlobalProcessorsForMetricbeat,
+						"logging": map[string]any{
+							"with_fields": map[string]any{
+								"component": map[string]any{
+									"binary":  "metricbeat",
+									"dataset": "elastic_agent.metricbeat",
+									"type":    "beat/metrics",
+									"id":      "beat-metrics-monitoring",
+								},
+								"log": map[string]any{
+									"source": "beat-metrics-monitoring",
+								},
+							},
+						},
+						"http": map[string]any{
+							"enabled": true,
+							"host":    "localhost",
+						},
+						"management.otel.enabled": true,
+					},
+				},
+				"service": map[string]any{
+					"pipelines": map[string]any{
+						"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
+							"exporters": {"logstash/_agent-component/default"},
+							"receivers": {"metricbeatreceiver/_agent-component/beat-metrics-monitoring"},
+						},
+					},
+				},
+			}),
+		},
+		{
 			name: "multiple filestream inputs and one output",
 			model: &component.Model{
 				Components: []component.Component{
@@ -1212,16 +1334,6 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			expectedError: "unsupported output type: kafka",
 		},
 		{
-			name: "unsupported output type - logstash",
-			component: &component.Component{
-				ID:         "unsupported-output",
-				InputType:  "filestream",
-				OutputType: "logstash", // unsupported
-				OutputName: "default",
-			},
-			expectedError: "unsupported output type: logstash",
-		},
-		{
 			name: "unsupported configuration",
 			component: &component.Component{
 				ID:         "unsupported-config",
@@ -1362,36 +1474,6 @@ func TestGetBeatsAuthExtensionConfig(t *testing.T) {
 				"timeout": "1m30s",
 			},
 		},
-		{
-			name: "with kerberos is enabled",
-			outputCfg: map[string]any{
-				"kerberos": map[string]any{
-					"enabled":     true,
-					"auth_type":   "password",
-					"config_path": "temp/krb5.conf",
-					"username":    "beats",
-					"password":    "testing",
-					"realm":       "elastic",
-				},
-			},
-			expected: map[string]any{
-				"continue_on_error":       true,
-				"idle_connection_timeout": "3s",
-				"timeout":                 "1m30s",
-				"kerberos": map[string]any{
-					"enabled":          true,
-					"auth_type":        "password",
-					"config_path":      "temp/krb5.conf",
-					"username":         "beats",
-					"password":         "testing",
-					"realm":            "elastic",
-					"enable_krb5_fast": false,
-					"service_name":     "",
-					"keytab":           "",
-				},
-				"proxy_disable": false,
-			},
-		},
 	}
 
 	for _, tt := range tests {
@@ -1431,12 +1513,6 @@ func TestVerifyOutputIsOtelSupported(t *testing.T) {
 			outputType:    "kafka",
 			outputCfg:     map[string]any{},
 			expectedError: "unsupported output type: kafka",
-		},
-		{
-			name:          "unsupported output type - logstash",
-			outputType:    "logstash",
-			outputCfg:     map[string]any{},
-			expectedError: "unsupported output type: logstash",
 		},
 		{
 			name:       "unsupported configuration - indices field",

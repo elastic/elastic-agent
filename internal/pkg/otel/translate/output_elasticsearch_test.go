@@ -87,9 +87,14 @@ headers:
 compression: gzip
 compression_params:
   level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, err := ToOTelConfig(cfg, logger)
+		got, err := ESToOTelConfig(cfg, logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -143,9 +148,14 @@ api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 compression: gzip
 compression_params:
   level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, err := ToOTelConfig(cfg, logger)
+		got, err := ESToOTelConfig(cfg, logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -200,9 +210,14 @@ api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 compression: gzip
 compression_params:
   level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, err := ToOTelConfig(cfg, logger)
+		got, err := ESToOTelConfig(cfg, logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -259,9 +274,14 @@ api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 compression: gzip
 compression_params:
   level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, err := ToOTelConfig(cfg, logger)
+		got, err := ESToOTelConfig(cfg, logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -309,6 +329,11 @@ user: elastic
 compression: gzip
 compression_params:
   level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
 `
 
 		tests := []struct {
@@ -392,6 +417,11 @@ sending_queue:
 compression: gzip
 compression_params:
   level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
  `,
 			},
 			{
@@ -433,7 +463,7 @@ sending_queue:
 		for _, test := range tests {
 			t.Run("config translation w/"+test.presetName, func(t *testing.T) {
 				cfg := config.MustNewConfigFrom(fmt.Sprintf(commonBeatCfg, test.presetName))
-				got, err := ToOTelConfig(cfg, logger)
+				got, err := ESToOTelConfig(cfg, logger)
 				require.NoError(t, err, "error translating elasticsearch output to OTel ES exporter type")
 				expOutput := newFromYamlString(t, test.output)
 				compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -505,9 +535,14 @@ headers:
 compression: gzip
 compression_params:
   level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, err := ToOTelConfig(cfg, logger)
+		got, err := ESToOTelConfig(cfg, logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -561,9 +596,14 @@ headers:
 compression: gzip
 compression_params:
   level: 1
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true  
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, err := ToOTelConfig(cfg, logger)
+		got, err := ESToOTelConfig(cfg, logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -627,12 +667,18 @@ compression_params:
   level: {{ . }}
 {{ else }}
 compression: none
-{{ end }}`
+{{ end }}
+include_source_on_error: true
+logs_dynamic_id:
+  enabled: true
+logs_dynamic_pipeline:
+  enabled: true   
+`
 
 	for level := range 9 {
 		t.Run(fmt.Sprintf("compression-level-%d", level), func(t *testing.T) {
 			cfg := config.MustNewConfigFrom(fmt.Sprintf(compressionConfig, level))
-			got, err := ToOTelConfig(cfg, logp.NewNopLogger())
+			got, err := ESToOTelConfig(cfg, logp.NewNopLogger())
 			require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 			var otelBuffer bytes.Buffer
 			require.NoError(t, template.Must(template.New("config").Parse(otelConfig)).Execute(&otelBuffer, level))
@@ -662,7 +708,7 @@ func TestToOTelConfig_CheckUnsupported(t *testing.T) {
 			cfg, err := config.NewConfigFrom(c.cfg)
 			require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 
-			_, err = ToOTelConfig(cfg, logger)
+			_, err = ESToOTelConfig(cfg, logger)
 			require.ErrorContains(t, err, c.wantErrContains)
 		})
 	}
