@@ -141,7 +141,6 @@ func varMap(cfg *Settings, args ...map[string]interface{}) map[string]interface{
 		"DEV":             cfg.Build.DevBuild,
 		"EXTERNAL":        cfg.Build.ExternalBuild,
 		"FIPS":            cfg.Build.FIPSBuild,
-		"OTEL_COMPONENT":  cfg.Build.OTELComponentBuild,
 		"Qualifier":       cfg.Build.VersionQualifier,
 		"CI":              cfg.Build.CI,
 	}
@@ -1219,9 +1218,6 @@ type BuildSettings struct {
 	// FIPSBuild indicates whether to build FIPS-compliant binaries (from FIPS env var)
 	FIPSBuild bool
 
-	// OTELComponentBuild indicates whether to build as an OTel component (from OTEL_COMPONENT env var)
-	OTELComponentBuild bool
-
 	// VersionQualifier is the version qualifier suffix e.g., "rc1" (from VERSION_QUALIFIER env var)
 	VersionQualifier string
 
@@ -1572,11 +1568,6 @@ func (s *Settings) loadBuildSettingsFromEnv() error {
 		return fmt.Errorf("failed to parse FIPS: %w", err)
 	}
 
-	s.Build.OTELComponentBuild, err = parseBoolEnv("OTEL_COMPONENT", s.Build.OTELComponentBuild)
-	if err != nil {
-		return fmt.Errorf("failed to parse OTEL_COMPONENT: %w", err)
-	}
-
 	s.Build.VersionQualifier, s.Build.VersionQualified = os.LookupEnv("VERSION_QUALIFIER")
 
 	// Parse MAX_PARALLEL - only override if set
@@ -1718,7 +1709,8 @@ func (s *Settings) loadPackagingSettingsFromEnv() {
 	// This mirrors the old initPackageVersion() behavior: read the file,
 	// set ManifestURL / PackagingFromManifest / AgentDropPath so the
 	// packaging path downloads components from the manifest instead of
-	// fetching them individually.
+	// fetching them individually. Values from the .package-version file
+	// take precedence over environment variables.
 	if s.Packaging.UsePackageVersion {
 		pv, err := GetPackageVersionInfo(s)
 		if err != nil {
@@ -1728,18 +1720,15 @@ func (s *Settings) loadPackagingSettingsFromEnv() {
 			s.Packaging.PackagingFromManifest = true
 			s.Packaging.ManifestURL = pv.ManifestURL
 			s.Packaging.AgentPackageVersion = pv.CoreVersion
+			s.Build.BeatVersion = pv.CoreVersion
 			s.Build.Snapshot = true
-
-			_ = os.Setenv("BEAT_VERSION", pv.CoreVersion)
-			_ = os.Setenv("AGENT_VERSION", pv.Version)
-			_ = os.Setenv("AGENT_STACK_VERSION", pv.StackVersion)
-			_ = os.Setenv("SNAPSHOT", "true")
+			s.IntegrationTest.AgentVersion = pv.Version
+			s.IntegrationTest.AgentStackVersion = pv.StackVersion
 
 			if s.Packaging.AgentDropPath == "" {
 				dropPath, absErr := filepath.Abs(filepath.Join("build", "distributions", "elastic-agent-drop"))
 				if absErr == nil {
 					s.Packaging.AgentDropPath = dropPath
-					_ = os.Setenv("AGENT_DROP_PATH", dropPath)
 				}
 			}
 		}
@@ -1918,9 +1907,6 @@ func (s *Settings) TestTagsWithFIPS() []string {
 	copy(tags, s.Test.Tags)
 	if s.Build.FIPSBuild {
 		tags = append(tags, "requirefips", "ms_tls13kdf")
-	}
-	if s.Build.OTELComponentBuild {
-		tags = append(tags, "otelexternal")
 	}
 	return tags
 }
