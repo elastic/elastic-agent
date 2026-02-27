@@ -1963,6 +1963,24 @@ func Ironbank(ctx context.Context) error {
 		return nil
 	}
 	cfg := devtools.SettingsFromContext(ctx)
+	// TODO: centralize the manifest loading logic
+	if cfg.Packaging.ManifestURL != "" { // get the version from the manifest
+		var parsedVersion *version.ParsedSemVer
+		manifestResponse, parsedVersion, err := downloadManifestAndParseVersion(ctx, cfg.Packaging.ManifestURL)
+		if err != nil {
+			return fmt.Errorf("failed downloading manifest: %w", err)
+		}
+
+		// fix the commit hash independently of the current commit hash on the branch
+		agentCoreProject, ok := manifestResponse.Projects[agentCoreProjectName]
+		if !ok {
+			return fmt.Errorf("%q project not found in manifest %q", agentCoreProjectName, cfg.Packaging.ManifestURL)
+		}
+		cfg = cfg.WithAgentCommitHashOverride(agentCoreProject.CommitHash)
+
+		// Apply manifest version to config
+		cfg = cfg.WithSnapshot(parsedVersion.IsSnapshot()).WithBeatVersion(parsedVersion.CoreVersion())
+	}
 	if err := prepareIronbankBuild(cfg); err != nil {
 		return fmt.Errorf("failed to prepare the IronBank context: %w", err)
 	}
@@ -3701,7 +3719,7 @@ func (Otel) OsquerybeatFetchOsqueryDistros(ctx context.Context) error {
 // Git submodules by default have a .git file that points to the parent repo's .git/modules/<submodule> directory.
 // When running  crossbuild in Docker, only the submodule directory is mounted, so the reference to the parent's
 // .git/modules breaks. This function copies the actual git directory into the submodule so it works standalone
-// in Docker.
+// in Docker. Call restoreBeatsSubmodule after the build to restore the original state.
 func (Otel) PrepareBeats() error {
 	beatsGitPath := filepath.Join("beats", ".git")
 
@@ -3734,17 +3752,6 @@ func (Otel) PrepareBeats() error {
 
 	fmt.Printf(">> Converting beats submodule .git file to directory (source: %s)\n", gitdirAbsPath)
 
-	// remove the core.worktree config from the source before copying.
-	// use git config -f to edit the file directly without needing a valid worktree.
-	// otherwise it would error with "fatal: cannot chdir to '../../../beats': No such file or directory"
-	sourceConfigPath := filepath.Join(gitdirAbsPath, "config")
-	if err := sh.Run("git", "config", "-f", sourceConfigPath, "--unset", "core.worktree"); err != nil {
-		// exit code 5 means the key was not found, which is fine
-		if sh.ExitStatus(err) != 5 {
-			return fmt.Errorf("failed to unset core.worktree in git config: %w", err)
-		}
-	}
-
 	// remove the .git file and copy the directory
 	if err := os.Remove(beatsGitPath); err != nil {
 		return fmt.Errorf("failed to remove beats/.git file: %w", err)
@@ -3763,17 +3770,56 @@ func (Otel) PrepareBeats() error {
 		return fmt.Errorf("failed to copy git directory: %w", err)
 	}
 
+	// remove core.worktree from the copy (not the source) since the worktree path
+	// is relative to the original .git/modules/beats location and is invalid in the copy.
+	copyConfigPath := filepath.Join(beatsGitPath, "config")
+	if err := sh.Run("git", "config", "-f", copyConfigPath, "--unset", "core.worktree"); err != nil {
+		// exit code 5 means the key was not found, which is fine
+		if sh.ExitStatus(err) != 5 {
+			return fmt.Errorf("failed to unset core.worktree in copied git config: %w", err)
+		}
+	}
+
 	fmt.Println(">> Successfully converted beats/.git to a directory")
+	return nil
+}
+
+// restoreBeatsSubmodule restores the beats submodule's .git file after PrepareBeats converted it to a directory.
+func restoreBeatsSubmodule() error {
+	beatsGitPath := filepath.Join("beats", ".git")
+
+	info, err := os.Lstat(beatsGitPath)
+	if err != nil || !info.IsDir() {
+		// already a file or doesn't exist, nothing to revert
+		return nil
+	}
+
+	// Remove the copied git directory
+	if err := os.RemoveAll(beatsGitPath); err != nil {
+		return fmt.Errorf("failed to remove beats/.git directory: %w", err)
+	}
+
+	// Let git restore the submodule's .git file and worktree linkage
+	if err := sh.Run("git", "submodule", "update", "--no-fetch", "--", "beats"); err != nil {
+		return fmt.Errorf("failed to restore beats submodule: %w", err)
+	}
+
+	fmt.Println(">> Reverted beats/.git to submodule reference")
 	return nil
 }
 
 func (Otel) OsquerybeatCrossBuildExt() error {
 	mg.Deps(Otel.PrepareBeats)
+	defer func() {
+		if err := restoreBeatsSubmodule(); err != nil {
+			fmt.Printf("WARNING: failed to revert beats .git: %v\n", err)
+		}
+	}()
 	fmt.Println("--- CrossBuild osquery-extension")
 	osquerybeatDir := filepath.Join("beats", "x-pack", "osquerybeat")
 	err := sh.RunV("mage", "-d", osquerybeatDir, "crossBuildExt")
 	if err != nil {
-		return fmt.Errorf("failed to run mage -d %s crossBuildExt: %w", err)
+		return fmt.Errorf("failed to run mage -d %s crossBuildExt: %w", osquerybeatDir, err)
 	}
 	return nil
 }
