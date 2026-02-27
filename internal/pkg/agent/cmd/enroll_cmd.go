@@ -156,6 +156,9 @@ func (e *enrollCmdOption) remoteConfig() (remote.Config, error) {
 	}
 	if e.Insecure {
 		tlsCfg.VerificationMode = tlscommon.VerifyNone
+	} else if e.FleetServer.ConnStr != "" && !e.FleetServer.Insecure {
+		// If we are communicating with a local fleet-server instance use cert verifcation
+		tlsCfg.VerificationMode = tlscommon.VerifyCertificate
 	}
 	if e.Certificate != "" || e.Key != "" {
 		tlsCfg.Certificate = tlscommon.CertificateConfig{
@@ -257,8 +260,6 @@ func (c *enrollCmd) Execute(ctx context.Context, streams *cli.IOStreams) error {
 	if localFleetServer {
 		// Ensure that the agent does not use a proxy configuration
 		// when connecting to the local fleet server.
-		// Note that when running fleet-server the enroll request will be sent to :8220,
-		// however when the agent is running afterward requests will be sent to :8221
 		c.remoteConfig.Transport.Proxy.Disable = true
 	}
 
@@ -433,6 +434,13 @@ func (c *enrollCmd) prepareFleetTLS() error {
 	if port == 0 {
 		port = defaultFleetServerPort
 	}
+	if c.options.FleetServer.InternalPort > 0 {
+		if c.options.FleetServer.InternalPort != defaultFleetServerInternalPort {
+			c.log.Warnf("Internal endpoint configured to: %d. Changing this value is not supported.", c.options.FleetServer.InternalPort)
+		}
+		c.options.InternalURL = net.JoinHostPort(defaultFleetServerInternalHost, strconv.Itoa(int(c.options.FleetServer.InternalPort)))
+	}
+
 	if c.options.FleetServer.Cert != "" && c.options.FleetServer.CertKey == "" {
 		return errors.New("certificate private key is required when certificate provided")
 	}
@@ -446,6 +454,9 @@ func (c *enrollCmd) prepareFleetTLS() error {
 				c.options.FleetServer.Host = defaultFleetServerInternalHost
 			}
 			c.options.URL = "http://" + net.JoinHostPort(host, strconv.Itoa(int(port)))
+			if c.options.FleetServer.ConnStr != "" && c.options.InternalURL != "" {
+				c.options.URL = "http://" + c.options.InternalURL
+			}
 			c.options.Insecure = true
 			return nil
 		}
@@ -473,11 +484,9 @@ func (c *enrollCmd) prepareFleetTLS() error {
 		return errors.New("url is required when a certificate is provided")
 	}
 
-	if c.options.FleetServer.InternalPort > 0 {
-		if c.options.FleetServer.InternalPort != defaultFleetServerInternalPort {
-			c.log.Warnf("Internal endpoint configured to: %d. Changing this value is not supported.", c.options.FleetServer.InternalPort)
-		}
-		c.options.InternalURL = net.JoinHostPort(defaultFleetServerInternalHost, strconv.Itoa(int(c.options.FleetServer.InternalPort)))
+	// Use internalURL if available
+	if c.options.FleetServer.ConnStr != "" && c.options.InternalURL != "" {
+		c.options.URL = "https://" + c.options.InternalURL
 	}
 
 	return nil
