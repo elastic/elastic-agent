@@ -65,21 +65,6 @@ func ChecksumsWithoutManifest(platform string, dependenciesVersion string, versi
 			continue
 		}
 
-		atLeastOnePackageTypeSelected := false
-		for _, pkgType := range dep.PackageTypes {
-			if IsPackageTypeSelected(PackageType(pkgType)) {
-				atLeastOnePackageTypeSelected = true
-				break
-			}
-		}
-
-		if !atLeastOnePackageTypeSelected {
-			if mg.Verbose() {
-				log.Printf(">>>>>>> Component %s/%s supported package types %v do not overlap selected package types %v, skipping", dep.ProjectName, dep.BinaryName, dep.PackageTypes, SelectedPackageTypes)
-			}
-			continue
-		}
-
 		srcDir := filepath.Join(versionedFlatPath, dep.GetRootDir(dependenciesVersion, platform))
 
 		if mg.Verbose() {

@@ -5,6 +5,7 @@
 package update
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -22,17 +23,17 @@ func Beats(targetVersion string) error {
 	return nil
 }
 
-func BeatsModule(targetVersion string) error {
+func BeatsModule(ctx context.Context, targetVersion string) error {
 	goArgs := []string{"get", fmt.Sprintf("%s@%s", BeatsModulePath, targetVersion)}
 
 	fmt.Println("Updating beats module in edot package")
-	err := mage.Run(nil, os.Stdout, os.Stderr, "go", "internal/edot", goArgs...)
+	err := mage.Run(ctx, nil, os.Stdout, os.Stderr, "go", "internal/edot", goArgs...)
 	if err != nil {
 		return err
 	}
 
 	fmt.Println("Updating beats module in elastic-agent package")
-	err = mage.Run(nil, os.Stdout, os.Stderr, "go", "", goArgs...)
+	err = mage.Run(ctx, nil, os.Stdout, os.Stderr, "go", "", goArgs...)
 	if err != nil {
 		return err
 	}
