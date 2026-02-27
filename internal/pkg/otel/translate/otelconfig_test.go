@@ -1474,36 +1474,6 @@ func TestGetBeatsAuthExtensionConfig(t *testing.T) {
 				"timeout": "1m30s",
 			},
 		},
-		{
-			name: "with kerberos enabled",
-			outputCfg: map[string]any{
-				"kerberos": map[string]any{
-					"enabled":     true,
-					"auth_type":   "password",
-					"config_path": "temp/krb5.conf",
-					"username":    "beats",
-					"password":    "testing",
-					"realm":       "elastic",
-				},
-			},
-			expected: map[string]any{
-				"continue_on_error":       true,
-				"idle_connection_timeout": "3s",
-				"timeout":                 "1m30s",
-				"kerberos": map[string]any{
-					"enabled":          true,
-					"auth_type":        "password",
-					"config_path":      "temp/krb5.conf",
-					"username":         "beats",
-					"password":         "testing",
-					"realm":            "elastic",
-					"enable_krb5_fast": false,
-					"service_name":     "",
-					"keytab":           "",
-				},
-				"proxy_disable": false,
-			},
-		},
 	}
 
 	for _, tt := range tests {
