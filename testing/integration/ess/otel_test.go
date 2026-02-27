@@ -81,6 +81,9 @@ exporters:
         insecure: true
 
 service:
+  telemetry:
+    metrics:
+      level: none
   pipelines:
     logs:
       receivers: [filelog]
@@ -104,6 +107,9 @@ func TestOtelStartShutdown(t *testing.T) {
 exporters:
   nop:
 service:
+  telemetry:
+    metrics:
+      level: none
   pipelines:
     logs:
       receivers:
@@ -209,6 +215,9 @@ exporters:
   file:
     path: {{.OutputPath}}
 service:
+  telemetry:
+    metrics:
+      level: none
   pipelines:
     logs:
       receivers:
@@ -511,6 +520,8 @@ service:
       receivers:
         - filelog
   telemetry:
+    metrics:
+      level: none
     logs:
       level: DEBUG
       encoding: json
@@ -1488,6 +1499,8 @@ service:
         - elasticsearch/log
         #- debug
   telemetry:
+    metrics:
+      level: none
     logs:
       level: DEBUG
       encoding: json
@@ -2215,11 +2228,16 @@ exporters:
       num_consumers: 1
       queue_size: 3200
       wait_for_result: true
+processors:
+  beat/1:
+    processors:
+      - add_host_metadata: null
 
 service:
   pipelines:
     logs:
       receivers: [elasticmonitoringreceiver]
+      processors: [beat/1]
       exporters:
         - elasticsearch/1
 `
@@ -2305,6 +2323,20 @@ service:
 	require.Equal(t, 2, len(docs.Hits.Hits), "should have exactly 2 monitoring documents")
 	var ev mapstr.M
 	ev = docs.Hits.Hits[0].Source
+
+	// Check the hostname first (add_host_metadata is noisy so we exclude
+	// its entire subtree from the diff below)
+	reportedHostname, err := ev.GetValue("host.name")
+	assert.NoError(t, err, "monitoring events should include host.name")
+	if err == nil {
+		hostname, err := os.Hostname()
+		assert.NoError(t, err, "couldn't get local hostname")
+		if err == nil {
+			assert.Equal(t, reportedHostname, hostname, "monitoring event host.name should match hostname")
+		}
+	}
+	_ = ev.Delete("host")
+
 	ev = ev.Flatten()
 
 	require.NotEmpty(t, ev["@timestamp"], "expected @timestamp to be set")

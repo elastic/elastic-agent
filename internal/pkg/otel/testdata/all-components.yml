@@ -51,6 +51,7 @@ processors:
   elasticapm:
   tail_sampling:
   logdedup:
+  beat:
 
 receivers:
   nop:
@@ -105,6 +106,14 @@ receivers:
           value_type: int
         scalar_oids:
           - oid: ".1.3.6.1.2.1.1.8.0"
+  kafkametrics:
+    brokers: [localhost:9092]
+    protocol_version: 2.0.0
+    scrapers:
+      - brokers
+      - topics
+      - consumers
+    collection_interval: 60s
 
 connectors:
   spanmetrics:
@@ -202,6 +211,7 @@ service:
         - postgresql
         - prometheusremotewrite
         - snmp
+        - kafkametrics
         - statsd
 
     metrics/aggregated:

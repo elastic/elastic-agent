@@ -360,7 +360,7 @@ func getReceiversConfigForComponent(
 	// If the `default_processors` feature flag is enabled,
 	// explicitly configure default processors in Beat receivers.
 	if features.DefaultProcessors() {
-		receiverConfig["processors"] = getDefaultProcessors(beatName)
+		receiverConfig["processors"] = GetDefaultProcessors(beatName)
 	}
 
 	// add monitoring config if necessary
@@ -389,7 +389,7 @@ func getReceiversConfigForComponent(
 	}, nil
 }
 
-func getDefaultProcessors(beatName string) []map[string]any {
+func GetDefaultProcessors(beatName string) []map[string]any {
 	addHostMetadata := map[string]any{
 		"add_host_metadata": nil,
 	}

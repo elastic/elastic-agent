@@ -11,15 +11,14 @@
 kind: enhancement
 
 # Change summary; a 80ish characters long description of the change.
-summary: Add agent.internal.runtime.dynamic_inputs flag to control the runtime used by inputs using dynamic variables.
+summary: Enrolling fleet-server uses internal port
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
 description: |
-  Allow switching to the process runtim for inputs using dynamic variables from a dynamic provider, like the
-  Kubernetes provider. These inputs may see frequent configuration reloads, which the otel collector isn't great
-  at handling right now.
+  The bootstraping process to enroll an agent into a local fleet-server instance
+  now uses the internal port (https://localhost:8221) instead of the URL flag.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
@@ -28,7 +27,7 @@ component: elastic-agent
 # If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
 # NOTE: the tooling supports backports, so it's able to fill the original PR number instead of the backport PR number.
 # Please provide it if you are adding a fragment for a different PR.
-#pr: https://github.com/owner/repo/1234
+pr: https://github.com/elastic/elastic-agent/pull/12917
 
 # Issue URL; optional; the GitHub issue related to this changeset (either closes or is part of).
 # If not present is automatically filled by the tooling with the issue linked to the PR number.
