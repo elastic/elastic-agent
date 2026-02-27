@@ -65,8 +65,6 @@ import (
 	elasticapmprocessor "github.com/elastic/opentelemetry-collector-components/processor/elasticapmprocessor"
 	elastictraceprocessor "github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor"
 
-	"github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor"
-
 	// Exporters:
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter"
 	fileexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter" // for e2e tests
@@ -180,7 +178,6 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			filterprocessor.NewFactory(),
 			geoipprocessor.NewFactory(),
 			k8sattributesprocessor.NewFactory(),
-			elasticinframetricsprocessor.NewFactory(),
 			resourcedetectionprocessor.NewFactory(),
 			memorylimiterprocessor.NewFactory(),
 			elasticapmprocessor.NewFactory(),
