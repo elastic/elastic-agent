@@ -36,11 +36,10 @@ Follow these steps to configure profiles collection through the EDOT Collector.
 
 ::::{applies-switch}
 
-:::{applies-item} stack: preview =9.2
+:::{applies-item} stack: preview 9.3+
 ```yaml
 receivers:
   profiling:
-    SamplesPerSecond: 19
 
 service:
   pipelines:
@@ -50,10 +49,11 @@ service:
 ```
 :::
 
-:::{applies-item} stack: preview 9.3+
+:::{applies-item} stack: preview =9.2
 ```yaml
 receivers:
   profiling:
+    SamplesPerSecond: 19
 
 service:
   pipelines:
