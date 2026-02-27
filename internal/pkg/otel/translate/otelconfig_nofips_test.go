@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build requirefips
+//go:build !requirefips
 
 package translate
 
@@ -34,7 +34,23 @@ func TestBeatsAuthExtensionKerberos(t *testing.T) {
 					"realm":       "elastic",
 				},
 			},
-			expectedError: "kerberos is not supported in fips mode accessing 'kerberos'",
+			expected: map[string]any{
+				"continue_on_error":       true,
+				"idle_connection_timeout": "3s",
+				"timeout":                 "1m30s",
+				"kerberos": map[string]any{
+					"enabled":          true,
+					"auth_type":        "password",
+					"config_path":      "temp/krb5.conf",
+					"username":         "beats",
+					"password":         "testing",
+					"realm":            "elastic",
+					"enable_krb5_fast": false,
+					"service_name":     "",
+					"keytab":           "",
+				},
+				"proxy_disable": false,
+			},
 		},
 	}
 
