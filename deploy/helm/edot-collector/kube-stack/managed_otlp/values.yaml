@@ -14,6 +14,7 @@ opentelemetry-operator:
       recreate: true # Force certificate regeneration on updates. Only applicable if autoGenerateCert.enabled is true.
 crds:
   create: true # Install the OpenTelemetry Operator CRDs.
+  installPrometheus: true
 defaultCRConfig:
   image:
     repository: "docker.elastic.co/elastic-agent/elastic-agent"
@@ -175,6 +176,9 @@ collectors:
     env:
       - name: ELASTIC_AGENT_OTEL
         value: '"true"'
+    targetAllocator:
+      enabled: true # Enable the Operator's Target allocator.
+      allocationStrategy: per-node
     presets:
       logsCollection:
         enabled: true # Enable/disable the collection of node's logs.
@@ -311,6 +315,19 @@ collectors:
               - "service.version"
               - "service.instance.id"
       receivers:
+        prometheus:
+          config:
+            scrape_configs:
+              # Collect all metrics from pods on the daemon set's node with at least this annotation
+              # prometheus.io/scrape: 'true'
+              # This can be further customized by setting the following annotations:
+              # prometheus.io/scheme: 'https'
+              # prometheus.io/path: '/data/metrics'
+              # prometheus.io/port: '80'
+              - job_name: kubernetes-pods
+                scrape_interval: 30s
+                kubernetes_sd_configs:
+                  - role: pod
         # [OTLP Receiver](https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver)
         otlp:
           protocols:
@@ -466,6 +483,7 @@ collectors:
             receivers:
               - kubeletstats
               - hostmetrics
+              - prometheus
             processors:
               - batch/metrics
               - k8sattributes
