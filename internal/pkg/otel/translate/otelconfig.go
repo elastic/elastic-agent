@@ -43,6 +43,7 @@ const (
 	outputOtelOverrideFieldName           = "otel"
 	outputOtelOverrideExporterFieldName   = "exporter"
 	outputOtelOverrideExtensionsFieldName = "extensions"
+	elasticsearchStateStoreExtensionName  = "elastic_storage"
 )
 
 // BeatMonitoringConfigGetter is a function that returns the monitoring configuration for a beat receiver.
@@ -347,6 +348,7 @@ func getReceiversConfigForComponent(
 		receiverConfig[beatName] = map[string]any{
 			"inputs": inputs,
 		}
+		receiverConfig["storage"] = "elastic_storage"
 	case "metricbeat":
 		receiverConfig[beatName] = map[string]any{
 			"modules": inputs,
@@ -525,6 +527,10 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 			"authenticator": extensionID.String(),
 		}
 
+		// Add elasticsearch state store extension for agentless mode
+		// We paste the config as is, without any translation.
+		// The state store extension will pick up relevant settings from it and ignore the rest.
+		extensionCfg[elasticsearchStateStoreExtensionName] = unitConfigMap
 	}
 
 	return exporterConfig, queueSettings, extensionCfg, nil
