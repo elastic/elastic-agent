@@ -81,10 +81,11 @@
 #   - security
 #   - other
 
-prs:
-- https://github.com/elastic/elastic-agent/pull/12239
+title: Replace elastic-agent/collector component name with elastic-otel-collector in self-monitoring.
 type: enhancement
+prs:
+- https://github.com/elastic/elastic-agent/pull/12364
 products:
 - product: elastic-agent
   target: 9.3.0
-title: 'feat: add SNMP receiver to EDOT Collector'
+description: Make self-monitoring metrics consistently use the name of the new elastic-otel-collector binary executing the EDOT collector and beats receivers.

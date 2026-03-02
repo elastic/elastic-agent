@@ -66,8 +66,8 @@
 #   An optional array of strings that contain the issues that are
 #   relevant to the PR.
 
-# pr:
-#   An optional string that contains the pull request number.
+# prs:
+#   An optional array of strings that contain the pull request numbers.
 
 # subtype:
 #   An optional string that applies only to breaking changes.
@@ -81,12 +81,10 @@
 #   - security
 #   - other
 
-pr: https://github.com/elastic/elastic-agent/pull/12187
-issues:
-- https://github.com/elastic/elastic-agent/issues/12070
-- https://github.com/elastic/elastic-agent/issues/123
-type: breaking-change
+# title: # TODO: Add title
+# type: # TODO: Add type (e.g., feature, enhancement, bug-fix, breaking-change)
+prs:
+- https://github.com/elastic/elastic-agent/pull/12187
 products:
 - product: elastic-agent
   target: 9.3.0
-title: add changelog entry for otel subcommand flag issue

@@ -75,52 +75,100 @@ pivot:
     # Security: ":Security/Security"
     # Watcher: ":Data Management/Watcher"
 
-# Block configuration - combined create and publish blockers
-block:
-  # Global labels that block changelog creation for all products (comma-separated string)
-  create: "skip-changelog, backport"
+# Rules configuration — controls which PRs create changelogs and which entries are published.
+# All list-like fields (exclude, include, exclude_types, etc.) accept BOTH forms:
+#   - Comma-separated string: "value1, value2, value3"
+#   - YAML list: [value1, value2, value3]
+#
+# Global match default for multi-valued fields (labels, areas).
+#   any (default) = match if ANY item matches the list
+#   all           = match only if ALL items match the list
+# Inherited by create, publish, and all product overrides.
+rules:
+  match: any
 
-  # Block changelog entries from publishing based on entry type or area
+  # Create — controls which PRs generate changelog entries.
+  #   exclude: block PRs with these labels (string or list)
+  #   include: only create changelogs for PRs with these labels (string or list)
+  # Cannot specify both.
+  #
+  create:
+    exclude:  "skip-changelog, backport"
+  #   # Or equivalently:
+  #   # exclude:
+  #   #   - ">non-issue"
+  #   #   - ">test"
+  #   # match: any
+  #   products:
+  #     'elasticsearch, kibana':
+  #       exclude: ">test"
+  #     'cloud-serverless':
+  #       exclude: "ILM"
+
+  # Publish — controls which entries appear in rendered output.
+  #   exclude_types / include_types (string or list)
+  #   exclude_areas / include_areas (string or list)
+  # Cannot mix exclude_ and include_ for the same field.
+  #
+  # match_areas inherits from rules.match if not specified.
+  #
   # publish:
-  #   types:
-  #     - deprecation
-  #     - known-issue
-  #   areas:
+  #   # match_areas: any
+  #   exclude_types: "deprecation, known-issue"
+  #   # Or equivalently:
+  #   # exclude_types:
+  #   #   - deprecation
+  #   #   - known-issue
+  #   exclude_areas:
   #     - "Internal"
-
-  # Product-specific overrides (override global blockers, don't merge)
-  # Dictionary key can be a single product ID or comma-separated product IDs
-  # product:
-    # Example: Block these labels for elasticsearch and kibana
-    # 'elasticsearch, kibana':
-    #   create: ">test"
-    #   publish:
-    #     types:
-    #       - docs
-    # Example: Block ILM label for cloud-serverless
-    # 'cloud-serverless':
-    #   create: "ILM"
-    #   publish:
-    #     areas:
-    #       - "ILM"
+  #   products:
+  #     'elasticsearch, kibana':
+  #       exclude_types:
+  #         - docs
+  #     'cloud-serverless':
+  #       # match_areas: any
+  #       include_areas:
+  #         - "Search"
+  #         - "Monitoring"
 
 # Bundle configuration (profiles and defaults)
-# bundle:
+bundle:
   # Input directory containing changelog YAML files
-  # directory: docs/changelog
+  directory: changelog/new
   # Output directory for bundled changelog files
-  # output_directory: docs/releases
+  output_directory: docs/changelog/bundles
   # Whether to resolve (copy contents) by default
-  # resolve: true
+  resolve: true
+  # Optional: default GitHub repo name applied to all profiles that do not specify their own.
+  # Used by the {changelog} directive to generate correct PR/issue links when the product ID
+  # differs from the GitHub repository name. Can be overridden per profile.
+  repo: elastic-agent
+  # Optional: default GitHub owner applied to all profiles that do not specify their own.
+  owner: elastic
 
-  # Named bundle profiles for different release scenarios
-  # profiles:
+  # Named bundle profiles for different release scenarios.
+  # Profiles can be used with both 'changelog bundle' and 'changelog remove':
+  #   docs-builder changelog bundle elasticsearch-release 9.2.0
+  #   docs-builder changelog remove elasticsearch-release 9.2.0
+  # When used with 'changelog remove', only the 'products' field is applied.
+  # The 'output', 'output_products', 'repo', 'owner', and 'hide_features' fields are
+  # bundle-specific and are ignored for removal.
+  profiles:
     # Example: Elasticsearch release profile
-    # elasticsearch-release:
-    #   products: "elasticsearch {version} {lifecycle}"
-    #   output: "elasticsearch-{version}.yaml"
-
-    # Example: Serverless release profile
-    # serverless-release:
-    #   products: "cloud-serverless {version} *"
-    #   output: "serverless-{version}.yaml"
+    elastic-agent-release:
+    #   # Filter: which input changelogs to include ({version} and {lifecycle} are substituted at runtime)
+      # products: "elasticsearch {version} {lifecycle}"
+    #   # Output filename ({version} is substituted at runtime)
+      output: "{version}.yaml"
+    #   # Optional: override the products array written to the bundle output.
+    #   # Useful when the bundle should advertise a different lifecycle than was used for filtering.
+      output_products: "elastic-agent {version}"
+    #   # Optional: profile-specific GitHub repo name (overrides bundle.repo if set).
+    #   # Only needed when this profile's product ID differs from the repository name.
+    #   # repo: elasticsearch
+    #   # Optional: profile-specific GitHub owner (overrides bundle.owner if set).
+    #   # owner: elastic
+    #   # Feature IDs to hide when bundling with this profile (accepts string or list)
+    #   hide_features:
+    #     - feature-flag-1
+    #     - feature-flag-2

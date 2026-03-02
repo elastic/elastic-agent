@@ -81,10 +81,10 @@
 #   - security
 #   - other
 
+title: Fix diagnostics socket path for read-only container filesystems.
+type: bug-fix
 prs:
-- https://github.com/elastic/elastic-agent/pull/12239
-type: enhancement
+- https://github.com/elastic/elastic-agent/pull/12312
 products:
 - product: elastic-agent
   target: 9.3.0
-title: 'feat: add SNMP receiver to EDOT Collector'

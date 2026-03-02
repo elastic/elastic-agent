@@ -81,10 +81,10 @@
 #   - security
 #   - other
 
+title: Fix reloading agent.logging.level for standalone Elastic Agent.
+type: bug-fix
 prs:
-- https://github.com/elastic/elastic-agent/pull/12239
-type: enhancement
+- https://github.com/elastic/elastic-agent/pull/11998
 products:
 - product: elastic-agent
   target: 9.3.0
-title: 'feat: add SNMP receiver to EDOT Collector'
