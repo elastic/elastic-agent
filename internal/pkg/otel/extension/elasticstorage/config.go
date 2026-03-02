@@ -9,22 +9,6 @@ import (
 )
 
 type Config struct {
-	// Hosts    []string          `mapstructure:"hosts"`
-	// Protocol string            `mapstructure:"protocol"`
-	// Path     string            `mapstructure:"path"`
-	// Params   map[string]string `mapstructure:"parameters"`
-	// Headers  map[string]string `mapstructure:"headers"`
-
-	// Kerberos *kerberos.Config `mapstructure:"kerberos"`
-
-	// Username string `mapstructure:"username"`
-	// Password string `mapstructure:"password"`
-	// APIKey   string `mapstructure:"api_key"`
-
-	// CompressionLevel int  `mapstructure:"compression_level"`
-	// EscapeHTML       bool `mapstructure:"escape_html"`
-
-	// Transport httpcommon.HTTPTransportSettings `mapstructure:",squash"`
 	ElasticsearchConfig map[string]interface{} `mapstructure:",remain"`
 }
 
