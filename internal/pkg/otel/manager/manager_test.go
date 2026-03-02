@@ -2335,7 +2335,7 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 
 func TestMonitoringReceiverProcessors(t *testing.T) {
 	exporterName := "elasticsearch/" + translate.OtelNamePrefix + "monitoring"
-	procName := "beat/" + translate.OtelNamePrefix + "internal-telemetry-monitoring"
+	procName := translate.GetProcessorID().String()
 	pipelineName := "logs/" + translate.OtelNamePrefix + "internal-telemetry-monitoring"
 	baseConfig := map[string]any{
 		"exporters": map[string]any{
@@ -2350,12 +2350,7 @@ func TestMonitoringReceiverProcessors(t *testing.T) {
 	require.NoError(t, err, "injectMonitoringReceiver should succeed")
 	result := mapstr.M(cfg.ToStringMap()).Flatten()
 
-	expectedBeatsProcessors := []map[string]any{
-		{"add_host_metadata": nil},
-		{"add_cloud_metadata": nil},
-		{"add_docker_metadata": nil},
-		{"add_kubernetes_metadata": nil},
-	}
+	expectedBeatsProcessors := translate.GetDefaultProcessors()
 	actualBeatsProcessors := result["processors."+procName+".processors"]
 	assert.NotNil(t, actualBeatsProcessors, "monitoring receiver processors should not be nil")
 	if actualBeatsProcessors != nil {

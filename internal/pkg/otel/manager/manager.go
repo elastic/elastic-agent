@@ -579,9 +579,8 @@ func injectMonitoringReceiver(
 	receiverType := otelcomponent.MustNewType(elasticmonitoringreceiver.Name)
 	receiverName := "internal-telemetry-monitoring"
 	receiverID := translate.GetReceiverID(receiverType, receiverName).String()
-	processorID := "beat/" + translate.OtelNamePrefix + receiverName
+	processorID := translate.GetProcessorID().String()
 	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
-
 	pipelineCfg := map[string]any{
 		"receivers": []string{receiverID},
 		"exporters": []string{exporterID},
@@ -601,10 +600,12 @@ func injectMonitoringReceiver(
 		},
 	}
 	if features.DefaultProcessors() {
-		// If default processors are enabled, add them into the base configuration.
+		// If default processors are enabled, reference the shared beat processor.
+		// The processor definition is the same as the one added in GetOtelConfig,
+		// so upon merge one replaces the other with identical content.
 		collectorCfg["processors"] = map[string]any{
 			processorID: map[string]any{
-				"processors": translate.GetDefaultProcessors("collector"),
+				"processors": translate.GetDefaultProcessors(),
 			},
 		}
 		pipelineCfg["processors"] = []string{processorID}
