@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -239,13 +240,13 @@ func (r *subprocessExecution) startCollector(
 				r.reportErrFn(ctx, processErrCh, nil)
 			} else {
 				var procReportErr error
-				stderrMsg := stdErrLast.Last().Message
-				stdoutMsg := stdOutLast.Last().Message
+				stderrMsg := stdErrLast.LastMessage()
+				stdoutMsg := stdOutLast.LastMessage()
 				if stderrMsg != "" {
-					// use stderr message as the error
+					// use stderr messages as the error
 					procReportErr = errors.New(stderrMsg)
 				} else if stdoutMsg != "" {
-					// use last stdout message as the error
+					// use stdout messages as the error
 					procReportErr = errors.New(stdoutMsg)
 				} else {
 					// neither case use standard process error
@@ -389,29 +390,44 @@ func (s *procHandle) Stop(waitTime time.Duration) {
 type zapWriter interface {
 	Write(zapcore.Entry, []zapcore.Field) error
 }
+
+// zapLast is a zapWriter that tracks the most recent error context from the
+// collector subprocess. It uses a heuristic to distinguish structured (JSON)
+// log entries from unstructured plain-text output:
+//
+//   - Structured entries (fields != nil) are normal collector logs. Each one
+//     resets the accumulated messages and stands on its own.
+//   - Unstructured entries (fields == nil) are plain-text lines, typically from
+//     multi-line errors (e.g. errors.Join output written to stderr). These are
+//     accumulated so LastMessage can reconstruct the full error.
 type zapLast struct {
 	wrapped zapWriter
-	last    zapcore.Entry
+	msgs    []string
 	mx      sync.Mutex
 }
 
 func newZapLast(w zapWriter) *zapLast {
-	return &zapLast{
-		wrapped: w,
-	}
+	return &zapLast{wrapped: w}
 }
 
-// Write stores the most recent log entry.
 func (z *zapLast) Write(entry zapcore.Entry, fields []zapcore.Field) error {
 	z.mx.Lock()
-	z.last = entry
+	if fields != nil {
+		// Structured (JSON) log entry — reset and store as standalone message.
+		z.msgs = z.msgs[:0]
+	}
+	if entry.Message != "" {
+		z.msgs = append(z.msgs, entry.Message)
+	}
 	z.mx.Unlock()
 	return z.wrapped.Write(entry, fields)
 }
 
-// Last returns the last log entry.
-func (z *zapLast) Last() zapcore.Entry {
+// LastMessage returns the most recent message context. For multi-line
+// plain-text output (e.g. errors.Join), the accumulated lines are joined
+// with "; " to reconstruct the full error text.
+func (z *zapLast) LastMessage() string {
 	z.mx.Lock()
 	defer z.mx.Unlock()
-	return z.last
+	return strings.Join(z.msgs, "; ")
 }
