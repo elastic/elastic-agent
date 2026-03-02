@@ -34,8 +34,8 @@ import (
 )
 
 const (
-	// distributionsDir is the dir where packages are written.
-	distributionsDir = "build/distributions"
+	// DistributionsDir is the dir where packages are written.
+	DistributionsDir = "build/distributions"
 
 	// packageStagingDir is the staging directory for any temporary files that
 	// need to be written to disk for inclusion in a package.
@@ -626,7 +626,7 @@ func PackageZip(spec PackageSpec) error {
 		if err != nil {
 			return err
 		}
-		spec.OutputFile = filepath.Join(distributionsDir, outputZip)
+		spec.OutputFile = filepath.Join(DistributionsDir, outputZip)
 	}
 	spec.OutputFile = Zip.AddFileExtension(spec.OutputFile)
 
@@ -657,7 +657,7 @@ func PackageTarGz(spec PackageSpec) error {
 		if err != nil {
 			return err
 		}
-		spec.OutputFile = filepath.Join(distributionsDir, outputTarGz)
+		spec.OutputFile = filepath.Join(DistributionsDir, outputTarGz)
 	}
 	spec.OutputFile = TarGz.AddFileExtension(spec.OutputFile)
 
@@ -784,7 +784,7 @@ func runFPM(spec PackageSpec, packageType PackageType) error {
 	}
 
 	// Build a tar file as the input to FPM.
-	inputTar := filepath.Join(distributionsDir, "tmp-"+fpmPackageType+"-"+spec.rootDir()+"-"+spec.hash()+".tar.gz")
+	inputTar := filepath.Join(DistributionsDir, "tmp-"+fpmPackageType+"-"+spec.rootDir()+"-"+spec.hash()+".tar.gz")
 	spec.OutputFile = inputTar
 	if err := PackageTarGz(spec); err != nil {
 		return err
@@ -795,7 +795,7 @@ func runFPM(spec PackageSpec, packageType PackageType) error {
 	if err != nil {
 		return err
 	}
-	spec.OutputFile = packageType.AddFileExtension(filepath.Join(distributionsDir, outputFile))
+	spec.OutputFile = packageType.AddFileExtension(filepath.Join(DistributionsDir, outputFile))
 
 	dockerRun := sh.RunCmd("docker", "run")
 	var args []string

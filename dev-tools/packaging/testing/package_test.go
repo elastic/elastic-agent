@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"hash"
 	"io"
-	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -168,7 +167,7 @@ func TestDocker(t *testing.T) {
 		}
 
 		// sort the built variants by size
-		variantOrderBySize := slices.Collect(maps.Keys(builtVariantSizes))
+		variantOrderBySize := slices.Clone(builtVariantsExpectedOrder)
 		sort.SliceStable(variantOrderBySize, func(i, j int) bool {
 			return builtVariantSizes[variantOrderBySize[i]] < builtVariantSizes[variantOrderBySize[j]]
 		})

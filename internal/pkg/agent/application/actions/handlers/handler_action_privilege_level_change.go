@@ -7,6 +7,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"os/user"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -16,6 +17,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 type reexecCoordinator interface {
@@ -57,16 +59,18 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 		}
 	}()
 
+	isRoot, err := utils.HasRoot()
+	if err != nil {
+		return fmt.Errorf("failed to determine root/Administrator: %w", err)
+	}
+
+	return h.handleChange(ctx, a, acker, action, isRoot)
+}
+
+func (h *PrivilegeLevelChange) handleChange(ctx context.Context, a fleetapi.Action, acker acker.Acker, action *fleetapi.ActionPrivilegeLevelChange, isRoot bool) (rerr error) {
 	if !action.Data.Unprivileged {
 		// only unprivileged supported at this point
 		return fmt.Errorf("unsupported action, ActionPrivilegeLevelChange supports only downgrading permissions")
-	}
-
-	// ensure no component issues
-	err := componentvalidation.EnsureNoServiceComponentIssues()
-	if err != nil {
-		h.log.Debugf("handlerPrivilegeLevelChange: found issues with components: %v", err)
-		return err
 	}
 
 	var username, groupname, password string
@@ -77,6 +81,54 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 	}
 	username, password = install.UnprivilegedUser(username, password)
 	groupname = install.UnprivilegedGroup(groupname)
+
+	ackCommitFn := func() {
+		if err := acker.Ack(ctx, a); err != nil {
+			h.log.Errorw("failed to ACK an action",
+				"error.message", err,
+				"action", a)
+		}
+		if err := acker.Commit(ctx); err != nil {
+			h.log.Errorw("failed to commit ACK of an action",
+				"error.message", err,
+				"action", a)
+		}
+	}
+
+	if !isRoot {
+		// check if we're already running as the desired user
+		gid, err := install.FindGID(groupname)
+		if err != nil {
+			return fmt.Errorf("failed to find GID for group %s: %w", groupname, err)
+		}
+		uid, err := install.FindUID(username)
+		if err != nil {
+			return fmt.Errorf("failed to find UID for user %s: %w", username, err)
+		}
+
+		currentUser, err := user.Current()
+		if err != nil {
+			return fmt.Errorf("failed to get current user: %w", err)
+		}
+
+		if targetingSameUser(currentUser.Uid, currentUser.Gid, fmt.Sprint(uid), fmt.Sprint(gid)) {
+			// already running as desired user, do not fail the action
+			// some form of deduplication
+			h.log.Infof("already running as user %s and group %s, no changes required", username, groupname)
+			// ack action so it's not hanging
+			ackCommitFn()
+			return nil
+		}
+
+		return fmt.Errorf("can change privilege level only when running as root/Administrator")
+	}
+
+	// ensure no component issues
+	err := componentvalidation.EnsureNoServiceComponentIssues()
+	if err != nil {
+		h.log.Debugf("handlerPrivilegeLevelChange: found issues with components: %v", err)
+		return err
+	}
 
 	// apply empty config to stop processing
 	stopComponents(ctx, h.ch, a, acker, nil)
@@ -90,16 +142,7 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 	}
 
 	// ack
-	if err := acker.Ack(ctx, a); err != nil {
-		h.log.Errorw("failed to ACK an action",
-			"error.message", err,
-			"action", a)
-	}
-	if err := acker.Commit(ctx); err != nil {
-		h.log.Errorw("failed to commit ACK of an action",
-			"error.message", err,
-			"action", a)
-	}
+	ackCommitFn()
 
 	// check everything is properly set up
 	userName, groupName, err := install.GetDesiredUser()
@@ -117,6 +160,10 @@ func (h *PrivilegeLevelChange) handle(ctx context.Context, a fleetapi.Action, ac
 	// restart
 	h.coord.ReExec(nil)
 	return nil
+}
+
+func targetingSameUser(currentUID, currentGID, targetUID, targetGID string) bool {
+	return currentGID == targetGID && currentUID == targetUID
 }
 
 func (h *PrivilegeLevelChange) ackFailure(ctx context.Context, err error, action *fleetapi.ActionPrivilegeLevelChange, acker acker.Acker) {

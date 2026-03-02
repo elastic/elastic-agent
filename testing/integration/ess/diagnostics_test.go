@@ -334,6 +334,8 @@ func TestBeatDiagnostics(t *testing.T) {
 		Local: false,
 	})
 
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
+
 	configTemplate := `
 inputs:
   - id: filestream-filebeat
@@ -346,10 +348,8 @@ inputs:
 outputs:
   default:
     type: elasticsearch
-    hosts: [http://localhost:9200]
+    hosts: [{{ .ESHost }}]
     api_key: placeholder
-    status_reporting:
-      enabled: false
 agent.monitoring.enabled: false
 agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 `
@@ -427,6 +427,7 @@ agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 				template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, map[string]any{
 					"Runtime":   tc.runtime,
 					"InputFile": inputFile.Name(),
+					"ESHost":    esURL.Host,
 				}))
 			expDiagFiles := append([]string{}, diagnosticsFiles...)
 			if tc.runtime == "otel" {

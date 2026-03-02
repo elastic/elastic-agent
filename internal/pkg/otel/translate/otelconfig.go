@@ -382,6 +382,24 @@ func getReceiversConfigForComponent(
 	}, nil
 }
 
+func GetDefaultProcessors(beatName string) []map[string]any {
+	addHostMetadata := map[string]any{
+		"add_host_metadata": nil,
+	}
+	if beatName == "filebeat" {
+		addHostMetadata["add_host_metadata"] = map[string]any{
+			"when.not.contains.tags": "forwarded",
+		}
+	}
+
+	return []map[string]any{
+		addHostMetadata,
+		{"add_cloud_metadata": nil},
+		{"add_docker_metadata": nil},
+		{"add_kubernetes_metadata": nil},
+	}
+}
+
 // getExporterConfigForComponent returns the exporter configuration and queue settings for a component. Note that a
 // valid component is always created from a single output config, so there should only be one output unit per
 // component; if there is more than one, this function returns the first.

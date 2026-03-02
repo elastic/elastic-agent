@@ -73,6 +73,7 @@ func TestStandaloneUpgradeRollback(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
+	esUrl := integration.StartMockES(t, 0, 0, 0, 0)
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
 	defer cancel()
@@ -110,15 +111,13 @@ func TestStandaloneUpgradeRollback(t *testing.T) {
 outputs:
   default:
     type: elasticsearch
-    hosts: [127.0.0.1:9200]
-    status_reporting:
-      enabled: false
+    hosts: [%s]
 
 inputs:
   - condition: '${agent.version.version} == "%s"'
     type: invalid
     id: invalid-input
-`, endVersion.CoreVersion())
+`, esUrl.Host, endVersion.CoreVersion())
 		return startFixture.Configure(ctx, []byte(invalidInputPolicy))
 	}
 

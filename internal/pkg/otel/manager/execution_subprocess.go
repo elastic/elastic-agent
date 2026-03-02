@@ -9,8 +9,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -39,8 +41,9 @@ const (
 	OtelElasticsearchExporterTelemetryFeature = "telemetry.newPipelineTelemetry"
 )
 
-// newSubprocessExecution creates a new execution which runs the otel collector in a subprocess. A metricsPort or
-// healthCheckPort of 0 will result in a random port being used.
+// newSubprocessExecution creates a new execution which runs the otel collector in a subprocess.
+// A healthCheckPort of 0 will result in a random port being used. A metricsPort of 0 means the
+// collector will pick a random port at startup.
 func newSubprocessExecution(collectorPath string, uuid string, metricsPort int, healthCheckPort int) (*subprocessExecution, error) {
 	componentType, err := component.NewType(healthCheckExtensionName)
 	if err != nil {
@@ -102,9 +105,13 @@ func (r *subprocessExecution) startCollector(
 		return nil, fmt.Errorf("cannot access collector path: %w", err)
 	}
 
-	httpHealthCheckPort, collectorMetricsPort, err := r.getCollectorPorts()
+	httpHealthCheckPort, err := r.getCollectorHealthCheckPort()
 	if err != nil {
 		return nil, fmt.Errorf("could not find port for collector: %w", err)
+	}
+
+	if err := addCollectorMetricsReader(cfg, r.collectorMetricsPort); err != nil {
+		return nil, fmt.Errorf("failed to add collector metrics reader: %w", err)
 	}
 
 	if err := injectHealthCheckV2Extension(cfg, r.healthCheckExtensionID, httpHealthCheckPort); err != nil {
@@ -125,8 +132,6 @@ func (r *subprocessExecution) startCollector(
 
 	procCtx, procCtxCancel := context.WithCancel(ctx)
 	env := os.Environ()
-	// Set the environment variable for the collector metrics port. See comment at the constant definition for more information.
-	env = append(env, fmt.Sprintf("%s=%d", OtelCollectorMetricsPortEnvVarName, collectorMetricsPort))
 
 	// set collector args
 	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
@@ -176,8 +181,9 @@ func (r *subprocessExecution) startCollector(
 		const healthCheckPollDuration = 1 * time.Second
 		healthCheckPollTimer := time.NewTimer(healthCheckPollDuration)
 		defer healthCheckPollTimer.Stop()
+		client := http.Client{}
 		for {
-			statuses, err := AllComponentsStatuses(procCtx, httpHealthCheckPort)
+			statuses, err := AllComponentsStatuses(procCtx, client, httpHealthCheckPort)
 			if err != nil {
 				switch {
 				case errors.Is(err, context.Canceled):
@@ -234,13 +240,13 @@ func (r *subprocessExecution) startCollector(
 				r.reportErrFn(ctx, processErrCh, nil)
 			} else {
 				var procReportErr error
-				stderrMsg := stdErrLast.Last().Message
-				stdoutMsg := stdOutLast.Last().Message
+				stderrMsg := stdErrLast.LastMessage()
+				stdoutMsg := stdOutLast.LastMessage()
 				if stderrMsg != "" {
-					// use stderr message as the error
+					// use stderr messages as the error
 					procReportErr = errors.New(stderrMsg)
 				} else if stdoutMsg != "" {
-					// use last stdout message as the error
+					// use stdout messages as the error
 					procReportErr = errors.New(stdoutMsg)
 				} else {
 					// neither case use standard process error
@@ -284,35 +290,51 @@ func (r *subprocessExecution) reportSubprocessCollectorStatus(ctx context.Contex
 	reportCollectorStatus(ctx, statusCh, clonedStatus)
 }
 
-// getCollectorPorts returns the ports used by the OTel collector. If the ports set in the execution struct are 0,
-// random ports are returned instead.
-func (r *subprocessExecution) getCollectorPorts() (healthCheckPort int, metricsPort int, err error) {
-	randomPorts := make([]*int, 0, 2)
-	// if the ports are defined (non-zero), use them
-	if r.collectorMetricsPort == 0 {
-		randomPorts = append(randomPorts, &metricsPort)
-	} else {
-		metricsPort = r.collectorMetricsPort
+// getCollectorHealthCheckPort returns the health check port used by the OTel collector.
+// If the port set in the execution struct is 0, a random port is returned instead.
+func (r *subprocessExecution) getCollectorHealthCheckPort() (int, error) {
+	if r.collectorHealthCheckPort != 0 {
+		return r.collectorHealthCheckPort, nil
 	}
-	if r.collectorHealthCheckPort == 0 {
-		randomPorts = append(randomPorts, &healthCheckPort)
-	} else {
-		healthCheckPort = r.collectorHealthCheckPort
-	}
-
-	if len(randomPorts) == 0 {
-		return healthCheckPort, metricsPort, nil
-	}
-
-	// we need at least one random port, create it
-	ports, err := findRandomTCPPorts(len(randomPorts))
+	ports, err := findRandomTCPPorts(1)
 	if err != nil {
-		return 0, 0, err
+		return 0, err
 	}
-	for i, port := range ports {
-		*randomPorts[i] = port
+	return ports[0], nil
+}
+
+func addCollectorMetricsReader(conf *confmap.Conf, port int) error {
+	metricReadersUntyped := conf.Get("service::telemetry::metrics::readers")
+	if metricReadersUntyped == nil {
+		metricReadersUntyped = []any{}
 	}
-	return healthCheckPort, metricsPort, nil
+	metricsReadersList, ok := metricReadersUntyped.([]any)
+	if !ok {
+		return fmt.Errorf("couldn't convert value of service::telemetry::metrics::readers to a list: %v", metricReadersUntyped)
+	}
+
+	metricsReader := map[string]any{
+		"pull": map[string]any{
+			"exporter": map[string]any{
+				"prometheus": map[string]any{
+					"host": "localhost",
+					"port": port,
+					// this is the default configuration from the otel collector
+					"without_scope_info":  true,
+					"without_units":       true,
+					"without_type_suffix": true,
+				},
+			},
+		},
+	}
+	metricsReadersList = append(metricsReadersList, metricsReader)
+	confMap := map[string]any{
+		"service::telemetry::metrics::readers": metricsReadersList,
+	}
+	if mergeErr := conf.Merge(confmap.NewFromStringMap(confMap)); mergeErr != nil {
+		return fmt.Errorf("failed to merge config: %w", mergeErr)
+	}
+	return nil
 }
 
 func removeManagedHealthCheckExtensionStatus(status *otelstatus.AggregateStatus, healthCheckExtensionID string) {
@@ -368,29 +390,44 @@ func (s *procHandle) Stop(waitTime time.Duration) {
 type zapWriter interface {
 	Write(zapcore.Entry, []zapcore.Field) error
 }
+
+// zapLast is a zapWriter that tracks the most recent error context from the
+// collector subprocess. It uses a heuristic to distinguish structured (JSON)
+// log entries from unstructured plain-text output:
+//
+//   - Structured entries (fields != nil) are normal collector logs. Each one
+//     resets the accumulated messages and stands on its own.
+//   - Unstructured entries (fields == nil) are plain-text lines, typically from
+//     multi-line errors (e.g. errors.Join output written to stderr). These are
+//     accumulated so LastMessage can reconstruct the full error.
 type zapLast struct {
 	wrapped zapWriter
-	last    zapcore.Entry
+	msgs    []string
 	mx      sync.Mutex
 }
 
 func newZapLast(w zapWriter) *zapLast {
-	return &zapLast{
-		wrapped: w,
-	}
+	return &zapLast{wrapped: w}
 }
 
-// Write stores the most recent log entry.
 func (z *zapLast) Write(entry zapcore.Entry, fields []zapcore.Field) error {
 	z.mx.Lock()
-	z.last = entry
+	if fields != nil {
+		// Structured (JSON) log entry — reset and store as standalone message.
+		z.msgs = z.msgs[:0]
+	}
+	if entry.Message != "" {
+		z.msgs = append(z.msgs, entry.Message)
+	}
 	z.mx.Unlock()
 	return z.wrapped.Write(entry, fields)
 }
 
-// Last returns the last log entry.
-func (z *zapLast) Last() zapcore.Entry {
+// LastMessage returns the most recent message context. For multi-line
+// plain-text output (e.g. errors.Join), the accumulated lines are joined
+// with "; " to reconstruct the full error text.
+func (z *zapLast) LastMessage() string {
 	z.mx.Lock()
 	defer z.mx.Unlock()
-	return z.last
+	return strings.Join(z.msgs, "; ")
 }

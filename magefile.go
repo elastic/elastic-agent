@@ -1011,9 +1011,9 @@ func (Cloud) Load() error {
 
 	devtools.FIPSBuild = fipsVal
 
-	source := "build/distributions/elastic-agent-cloud-" + agentVersion + "-SNAPSHOT-linux-" + runtime.GOARCH + ".docker.tar.gz"
+	source := devtools.DistributionsDir + "/elastic-agent-cloud-" + agentVersion + "-SNAPSHOT-linux-" + runtime.GOARCH + ".docker.tar.gz"
 	if fipsVal {
-		source = "build/distributions/elastic-agent-cloud-fips-" + agentVersion + "-SNAPSHOT-linux-" + runtime.GOARCH + ".docker.tar.gz"
+		source = devtools.DistributionsDir + "/elastic-agent-cloud-fips-" + agentVersion + "-SNAPSHOT-linux-" + runtime.GOARCH + ".docker.tar.gz"
 	}
 	if envSource, ok := os.LookupEnv("DOCKER_IMPORT_SOURCE"); ok && envSource != "" {
 		source = envSource
@@ -1999,11 +1999,12 @@ type checksumFile struct {
 	Checksum string `yaml:"sha512"`
 }
 
-// Package packages elastic-agent for the IronBank distribution, relying on the
+// Ironbank packages elastic-agent for the IronBank distribution, relying on the
 // binaries having already been built.
 //
 // Use SNAPSHOT=true to build snapshots.
 func Ironbank() error {
+	fmt.Println("--- Package Ironbank distribution")
 	if runtime.GOARCH != "amd64" {
 		fmt.Printf(">> IronBank images are only supported for amd64 arch (%s is not supported)\n", runtime.GOARCH)
 		return nil
@@ -2026,9 +2027,8 @@ func saveIronbank() error {
 		return fmt.Errorf("cannot find the folder with the ironbank context: %+v", err)
 	}
 
-	distributionsDir := "build/distributions"
-	if _, err := os.Stat(distributionsDir); os.IsNotExist(err) {
-		err := os.MkdirAll(distributionsDir, 0o750)
+	if _, err := os.Stat(devtools.DistributionsDir); os.IsNotExist(err) {
+		err := os.MkdirAll(devtools.DistributionsDir, 0o750)
 		if err != nil {
 			return fmt.Errorf("cannot create folder for docker artifacts: %+v", err)
 		}
@@ -2042,7 +2042,7 @@ func saveIronbank() error {
 
 	// move the folder to the parent folder, there are two parent folder since
 	// buildDir contains a two folders dir.
-	tarGzFile := filepath.Join("..", "..", distributionsDir, ironbank+".tar.gz")
+	tarGzFile := filepath.Join("..", "..", devtools.DistributionsDir, ironbank+".tar.gz")
 
 	// Save the build context as tar.gz artifact
 	err := devtools.Tar("./", tarGzFile)
@@ -3724,7 +3724,7 @@ func (Otel) OsquerybeatFetchOsqueryDistros() error {
 // Git submodules by default have a .git file that points to the parent repo's .git/modules/<submodule> directory.
 // When running  crossbuild in Docker, only the submodule directory is mounted, so the reference to the parent's
 // .git/modules breaks. This function copies the actual git directory into the submodule so it works standalone
-// in Docker.
+// in Docker. Call restoreBeatsSubmodule after the build to restore the original state.
 func (Otel) PrepareBeats() error {
 	beatsGitPath := filepath.Join("beats", ".git")
 
@@ -3757,17 +3757,6 @@ func (Otel) PrepareBeats() error {
 
 	fmt.Printf(">> Converting beats submodule .git file to directory (source: %s)\n", gitdirAbsPath)
 
-	// remove the core.worktree config from the source before copying.
-	// use git config -f to edit the file directly without needing a valid worktree.
-	// otherwise it would error with "fatal: cannot chdir to '../../../beats': No such file or directory"
-	sourceConfigPath := filepath.Join(gitdirAbsPath, "config")
-	if err := sh.Run("git", "config", "-f", sourceConfigPath, "--unset", "core.worktree"); err != nil {
-		// exit code 5 means the key was not found, which is fine
-		if sh.ExitStatus(err) != 5 {
-			return fmt.Errorf("failed to unset core.worktree in git config: %w", err)
-		}
-	}
-
 	// remove the .git file and copy the directory
 	if err := os.Remove(beatsGitPath); err != nil {
 		return fmt.Errorf("failed to remove beats/.git file: %w", err)
@@ -3786,17 +3775,56 @@ func (Otel) PrepareBeats() error {
 		return fmt.Errorf("failed to copy git directory: %w", err)
 	}
 
+	// remove core.worktree from the copy (not the source) since the worktree path
+	// is relative to the original .git/modules/beats location and is invalid in the copy.
+	copyConfigPath := filepath.Join(beatsGitPath, "config")
+	if err := sh.Run("git", "config", "-f", copyConfigPath, "--unset", "core.worktree"); err != nil {
+		// exit code 5 means the key was not found, which is fine
+		if sh.ExitStatus(err) != 5 {
+			return fmt.Errorf("failed to unset core.worktree in copied git config: %w", err)
+		}
+	}
+
 	fmt.Println(">> Successfully converted beats/.git to a directory")
+	return nil
+}
+
+// restoreBeatsSubmodule restores the beats submodule's .git file after PrepareBeats converted it to a directory.
+func restoreBeatsSubmodule() error {
+	beatsGitPath := filepath.Join("beats", ".git")
+
+	info, err := os.Lstat(beatsGitPath)
+	if err != nil || !info.IsDir() {
+		// already a file or doesn't exist, nothing to revert
+		return nil
+	}
+
+	// Remove the copied git directory
+	if err := os.RemoveAll(beatsGitPath); err != nil {
+		return fmt.Errorf("failed to remove beats/.git directory: %w", err)
+	}
+
+	// Let git restore the submodule's .git file and worktree linkage
+	if err := sh.Run("git", "submodule", "update", "--no-fetch", "--", "beats"); err != nil {
+		return fmt.Errorf("failed to restore beats submodule: %w", err)
+	}
+
+	fmt.Println(">> Reverted beats/.git to submodule reference")
 	return nil
 }
 
 func (Otel) OsquerybeatCrossBuildExt() error {
 	mg.Deps(Otel.PrepareBeats)
+	defer func() {
+		if err := restoreBeatsSubmodule(); err != nil {
+			fmt.Printf("WARNING: failed to revert beats .git: %v\n", err)
+		}
+	}()
 	fmt.Println("--- CrossBuild osquery-extension")
 	osquerybeatDir := filepath.Join("beats", "x-pack", "osquerybeat")
 	err := sh.RunV("mage", "-d", osquerybeatDir, "crossBuildExt")
 	if err != nil {
-		return fmt.Errorf("failed to run mage -d %s crossBuildExt: %w", err)
+		return fmt.Errorf("failed to run mage -d %s crossBuildExt: %w", osquerybeatDir, err)
 	}
 	return nil
 }
@@ -3915,8 +3943,10 @@ func (h Helm) RenderExamples() error {
 func (Helm) UpdateAgentVersion() error {
 	agentVersion := bversion.GetParsedAgentPackageVersion().CoreVersion()
 	agentSnapshotVersion := agentVersion + "-SNAPSHOT"
-	// until the Helm chart reaches GA this remains with -beta suffix
-	agentChartVersion := agentVersion + "-beta"
+	// until the Helm chart reaches GA this remains with -SNAPSHOT suffix
+	// that's to differentiate it from the released charts in the Helm repo using
+	// the same versioning scheme as the Unified Release process.
+	agentChartVersion := agentVersion + "-SNAPSHOT"
 
 	for yamlFile, keyVals := range map[string][]struct {
 		key   string
@@ -4193,6 +4223,7 @@ func (h Helm) UpdateDependencies() error {
 
 // Package packages the Elastic-Agent Helm chart. Note that you need to set SNAPSHOT="false" to build a production-ready package.
 func (h Helm) Package() error {
+	fmt.Println("--- Package Helm chart distribution")
 	mg.SerialDeps(h.BuildDependencies)
 
 	// need to explicitly set SNAPSHOT="false" to produce a production-ready package
@@ -4206,7 +4237,7 @@ func (h Helm) Package() error {
 		agentImageTag = agentImageTag + "-SNAPSHOT"
 	}
 
-	agentChartVersion := agentCoreVersion + "-beta"
+	agentChartVersion := agentCoreVersion + "-SNAPSHOT"
 	switch {
 	case productionPackage && agentVersion.Major() >= 9:
 		// for 9.0.0 and later versions, elastic-agent Helm chart is GA
@@ -4253,10 +4284,24 @@ func (h Helm) Package() error {
 	}
 
 	packageAction := action.NewPackage()
-	_, err = packageAction.Run(helmChartPath, nil)
+	packagePath, err := packageAction.Run(helmChartPath, nil)
 	if err != nil {
 		return fmt.Errorf("failed to package helm chart: %w", err)
 	}
+
+	// Create a copy with the DRA naming convention
+	// TODO: as soon as we confirm DRA works as expected we will replace the original naming
+	alternativeName := fmt.Sprintf("elastic-agent-helm-chart-%s.tgz", agentChartVersion)
+
+	srcFile := packagePath
+	dstFile := filepath.Join(devtools.DistributionsDir, alternativeName)
+
+	fmt.Printf(">>> CopyFile from %s to %s\n", srcFile, dstFile)
+	devtools.CreateDir(dstFile)
+	if err := copyFile(srcFile, dstFile); err != nil {
+		return fmt.Errorf("failed to create alternative package name: %w", err)
+	}
+
 	return nil
 }
 

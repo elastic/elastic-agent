@@ -33,6 +33,22 @@ EOF
 
 docker_disable_containerd_snapshotter
 
+# Disable background package managers to prevent RPM lock contention
+# during tests. The dnf-makecache timer periodically refreshes package
+# metadata and holds the RPM database lock while doing so, which causes
+# "Resource temporarily unavailable" errors when tests run rpm commands.
+disable_background_package_managers() {
+  if ! command -v dnf >/dev/null 2>&1; then
+    return 0
+  fi
+  echo "Disabling background package managers to prevent RPM lock contention"
+  for unit in dnf-makecache.timer dnf-makecache.service packagekit.service; do
+    sudo systemctl disable --now "$unit" 2>/dev/null || true
+  done
+}
+
+disable_background_package_managers
+
 getOSOptions() {
   case $(uname | tr '[:upper:]' '[:lower:]') in
     linux*)

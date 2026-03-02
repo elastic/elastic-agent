@@ -368,7 +368,7 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 		}
 
 		return false
-	}, 2*time.Second, 200*time.Millisecond)
+	}, 30*time.Second, 1*time.Second)
 }
 
 // TestServiceStartRetry tests that the service runtime will

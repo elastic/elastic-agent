@@ -1,6 +1,6 @@
 ## 9.3.0 [elastic-agent-release-notes-9.3.0]
 
-_This release also includes: [Breaking changes](/release-notes/breaking-changes.md#elastic-agent-9.3.0-breaking-changes)._
+_This release also includes: [Breaking changes](/release-notes/breaking-changes.md#elastic-agent-9.3.0-breaking-changes) and [Known issues](/release-notes/known-issues.md)._
 
 
 ### Features and enhancements [elastic-agent-9.3.0-features-enhancements]
@@ -11,9 +11,9 @@ _This release also includes: [Breaking changes](/release-notes/breaking-changes.
 
 * Add support for downgrading a running Agent&#39;s privileges from Fleet. [#10231](https://github.com/elastic/elastic-agent/pull/10231)
 * Add awss3receiver to EDOT. [#10515](https://github.com/elastic/elastic-agent/pull/10515) [#604](https://github.com/elastic/obs-integration-team/issues/604)
-* Add awslogsencodingextension to EDOT. [#11107](https://github.com/elastic/elastic-agent/pull/11107) 
-* Add opex to elastic-agent helm chart. This change adds the Opex-CCM support to the offical elastic-agent helm chart deployment. [#9363](https://github.com/elastic/elastic-agent/pull/9363) 
-* Add windowseventlogreceiver to EDOT. [#11418](https://github.com/elastic/elastic-agent/pull/11418) 
+* Add awslogsencodingextension to EDOT. [#11107](https://github.com/elastic/elastic-agent/pull/11107)
+* Add opex to elastic-agent helm chart. This change adds the Opex-CCM support to the offical elastic-agent helm chart deployment. [#9363](https://github.com/elastic/elastic-agent/pull/9363)
+* Add windowseventlogreceiver to EDOT. [#11418](https://github.com/elastic/elastic-agent/pull/11418)
 * Allow setting component runtime per input type. [#11186](https://github.com/elastic/elastic-agent/pull/11186)
 * Improve metrics monitoring coverage for OTel-based ingestion. [#11813](https://github.com/elastic/elastic-agent/pull/11813)
 
@@ -21,12 +21,12 @@ _This release also includes: [Breaking changes](/release-notes/breaking-changes.
 * Allow manually initiating an upgrade rollback within a configurable window. [#11955](https://github.com/elastic/elastic-agent/pull/11955) [#6881](https://github.com/elastic/elastic-agent/issues/6881)
 * Add SNMP receiver to EDOT Collector. [#12239](https://github.com/elastic/elastic-agent/pull/12239)
 * Restore cloud-defend to the basic and complete Docker images. [#11795](https://github.com/elastic/elastic-agent/pull/11795)
-* Make otel default runtime for system\metrics input. [#11613](https://github.com/elastic/elastic-agent/pull/11613) 
+* Make otel default runtime for system\metrics input. [#11613](https://github.com/elastic/elastic-agent/pull/11613)
 * Update OTel Collector components to v0.141.0. [#11671](https://github.com/elastic/elastic-agent/pull/11671)
-* Change default runtime for select metricbeat inputs. [#11754](https://github.com/elastic/elastic-agent/pull/11754) 
+* Change default runtime for select metricbeat inputs. [#11754](https://github.com/elastic/elastic-agent/pull/11754)
 
   The following metricbeat inputs will use the otel runtime by default if the elasticsearch output is used:
-  
+
     - &#34;activemq/metrics&#34;
     - &#34;apache/metrics&#34;
     - &#34;beat/metrics&#34;
@@ -51,17 +51,17 @@ _This release also includes: [Breaking changes](/release-notes/breaking-changes.
     - &#34;statsd/metrics&#34;
     - &#34;system/metrics&#34;
     - &#34;vsphere/metrics&#34;
-  
+
   This will result in a memory reduction since fewer agentbeat processes are started, because the otel runtime runs within the collector process.  If the policy is not compatible with the otel runtime, it will fall back to the process runtime.
 * Improve input not supported error message to reference installation flavors. [#11825](https://github.com/elastic/elastic-agent/pull/11825)
-* Add service.instance.id to k8s attributes in helm charts. [#11844](https://github.com/elastic/elastic-agent/pull/11844) 
+* Add service.instance.id to k8s attributes in helm charts. [#11844](https://github.com/elastic/elastic-agent/pull/11844)
 * Reduce installation size for all versions of the Elastic Agent. [#11821](https://github.com/elastic/elastic-agent/pull/11821)
 
   The Elastic Agent now ships with a single elastic-otel-collector binary that contains both the
   OTEL collector, beats receivers, and beat modules. This reduces the size of the Elastic Agent roughly
   ~200MB (amount depends on the platform). The elastic-agent.exe has also been greatly reduced from ~400M to ~75M.
-  
-* Add prometheusremotewrite receiver to EDOT. [#11937](https://github.com/elastic/elastic-agent/pull/11937) 
+
+* Add prometheusremotewrite receiver to EDOT. [#11937](https://github.com/elastic/elastic-agent/pull/11937)
 * Replace elastic-agent/collector component name with elastic-otel-collector in self-monitoring. [#12364](https://github.com/elastic/elastic-agent/pull/12364)
 
   Make self-monitoring metrics consistently use the name of the new elastic-otel-collector binary executing the EDOT collector and beats receivers.

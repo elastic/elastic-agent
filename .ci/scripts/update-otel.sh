@@ -22,9 +22,9 @@ GOMOD_FILES=("internal/edot/go.mod" "go.mod")
 
 for gomod_file in "${GOMOD_FILES[@]}"; do
   # Get current versions from the go.mod
-  current_beta_core=$(grep 'go\.opentelemetry\.io/collector/component/componentstatus ' "$gomod_file" | cut -d' ' -f 2 || true)
-  current_stable_core=$(grep 'go\.opentelemetry\.io/collector/pdata ' "$gomod_file" | cut -d' ' -f 2 || true)
-  current_contrib=$(grep 'github\.com/open-telemetry/opentelemetry-collector-contrib/pkg/status ' "$gomod_file" | cut -d' ' -f 2 || true)
+  current_beta_core=$(grep 'go\.opentelemetry\.io/collector/component/componentstatus v' "$gomod_file" | cut -d' ' -f 2 || true)
+  current_stable_core=$(grep 'go\.opentelemetry\.io/collector/pdata v' "$gomod_file" | cut -d' ' -f 2 || true)
+  current_contrib=$(grep 'github\.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v' "$gomod_file" | cut -d' ' -f 2 || true)
 
   [[ -n "$current_beta_core" ]] || (echo "Error: couldn't find current beta core version." && exit 2)
   [[ -n "$current_stable_core" ]] || (echo "Error: couldn't find current stable core version" && exit 3)

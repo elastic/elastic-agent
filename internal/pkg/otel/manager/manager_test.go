@@ -31,8 +31,10 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/logptest"
+	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -1099,11 +1101,12 @@ func TestOTelManager_PortConflict(t *testing.T) {
 	netListen = func(network string, address string) (net.Listener, error) {
 		mx.Lock()
 		defer mx.Unlock()
-		l, err := net.Listen(network, address)
+		lc := &net.ListenConfig{}
+		l, err := lc.Listen(t.Context(), network, address)
 		if err != nil {
 			return nil, err
 		}
-		if timesCalled < 2 {
+		if timesCalled < 1 {
 			// only actually close the listener after test completion, freeing the port
 			t.Cleanup(func() {
 				assert.NoError(t, l.Close())
@@ -1657,7 +1660,8 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	components := []component.Component{testComp}
 
 	t.Run("collector config is passed down to the collector execution", func(t *testing.T) {
-		mgr.Update(collectorCfg, nil, logp.InfoLevel, nil)
+		logpLevel := logp.InfoLevel
+		mgr.Update(collectorCfg, nil, logpLevel, nil)
 		select {
 		case <-collectorStarted:
 		case <-ctx.Done():
@@ -1665,7 +1669,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		}
 		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
 		assert.NoError(t, injectDiagnosticsExtension(expectedCfg))
-		assert.NoError(t, addCollectorMetricsReader(expectedCfg))
+		assert.NoError(t, maybeInjectLogLevel(expectedCfg, logpLevel))
 		assert.Equal(t, expectedCfg, execution.cfg)
 
 	})
@@ -1799,6 +1803,77 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		require.NotNil(t, aggStatus)
 		assert.Equal(t, aggStatus.Status(), componentstatus.StatusFatalError)
 	})
+}
+
+// TestOTelManager_RestartOnLogLevelChange verifies that the collector subprocess is restarted
+// when the effective log level changes. This is necessary because the manager wraps the collector's
+// stdout/stderr in log writers configured at a specific level, and those cannot be changed at runtime.
+func TestOTelManager_RestartOnLogLevelChange(t *testing.T) {
+	testLogger, _ := loggertest.New("test")
+	collectorStarted := make(chan struct{}, 5)
+
+	execution := &mockExecution{
+		collectorStarted: collectorStarted,
+	}
+
+	mgr := OTelManager{
+		managerLogger:     testLogger,
+		collectorLogger:   testLogger,
+		errCh:             make(chan error, 1),
+		updateCh:          make(chan configUpdate, 1),
+		collectorStatusCh: make(chan *status.AggregateStatus, 1),
+		componentStateCh:  make(chan []runtime.ComponentComponentState, 5),
+		doneChan:          make(chan struct{}),
+		recoveryTimer:     newRestarterNoop(),
+		execution:         execution,
+		agentInfo:         &info.AgentInfo{},
+		collectorRunErr:   make(chan error),
+		stopTimeout:       time.Second,
+	}
+
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+
+	go func() {
+		err := mgr.Run(ctx)
+		assert.ErrorIs(t, err, context.Canceled)
+	}()
+
+	// Drain status channels to prevent blocking the run loop.
+	go func() {
+		for {
+			select {
+			case <-mgr.WatchCollector():
+			case <-mgr.WatchComponents():
+			case <-mgr.Errors():
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	// Start the collector with InfoLevel. The config doesn't include a log level,
+	// so the effective collector log level comes from the agent log level parameter.
+	cfg := confmap.NewFromStringMap(testConfigNoLogLevel)
+	mgr.Update(cfg, nil, logp.InfoLevel, nil)
+
+	select {
+	case <-collectorStarted:
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for initial collector start")
+	}
+
+	// Send the same config but with a different agent log level.
+	// The collector must be restarted because the stdout/stderr log writers
+	// are created at startup with a specific level and cannot be reconfigured.
+	mgr.Update(cfg, nil, logp.DebugLevel, nil)
+
+	select {
+	case <-collectorStarted:
+		// Collector was restarted with the new log level.
+	case <-time.After(5 * time.Second):
+		t.Fatal("expected collector to be restarted after log level change, but it was not")
+	}
 }
 
 // TestManagerAlwaysEmitsStoppedStatesForComponents checks that the manager always emits a STOPPED state for a component
@@ -2183,7 +2258,7 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 			"exporter": map[string]any{
 				"prometheus": map[string]any{
 					"host":                "localhost",
-					"port":                fmt.Sprintf("${env:%s}", OtelCollectorMetricsPortEnvVarName),
+					"port":                0,
 					"without_scope_info":  true,
 					"without_units":       true,
 					"without_type_suffix": true,
@@ -2208,7 +2283,7 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 
 	t.Run("readers does not exist", func(t *testing.T) {
 		conf := otelConfigWithReaders(nil)
-		err := addCollectorMetricsReader(conf)
+		err := addCollectorMetricsReader(conf, 0)
 		require.NoError(t, err)
 
 		readers := conf.Get("service::telemetry::metrics::readers")
@@ -2222,7 +2297,7 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 
 	t.Run("readers is an empty list", func(t *testing.T) {
 		conf := otelConfigWithReaders([]any{})
-		err := addCollectorMetricsReader(conf)
+		err := addCollectorMetricsReader(conf, 0)
 		require.NoError(t, err)
 
 		readers := conf.Get("service::telemetry::metrics::readers")
@@ -2237,7 +2312,7 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 	t.Run("readers has existing items", func(t *testing.T) {
 		existingReader := map[string]any{"foo": "bar"}
 		conf := otelConfigWithReaders([]any{existingReader})
-		err := addCollectorMetricsReader(conf)
+		err := addCollectorMetricsReader(conf, 0)
 		require.NoError(t, err)
 
 		readers := conf.Get("service::telemetry::metrics::readers")
@@ -2252,10 +2327,45 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 
 	t.Run("readers is not a list", func(t *testing.T) {
 		conf := otelConfigWithReaders("not a list")
-		err := addCollectorMetricsReader(conf)
+		err := addCollectorMetricsReader(conf, 0)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "couldn't convert value of service::telemetry::metrics::readers to a list")
 	})
+}
+
+func TestMonitoringReceiverProcessors(t *testing.T) {
+	exporterName := "elasticsearch/" + translate.OtelNamePrefix + "monitoring"
+	procName := "beat/" + translate.OtelNamePrefix + "internal-telemetry-monitoring"
+	pipelineName := "logs/" + translate.OtelNamePrefix + "internal-telemetry-monitoring"
+	baseConfig := map[string]any{
+		"exporters": map[string]any{
+			exporterName: nil,
+		},
+	}
+	cfg := confmap.NewFromStringMap(baseConfig)
+	monitoringConfig := &config.MonitoringConfig{}
+	agentInfo := &info.AgentInfo{}
+	components := []component.Component{}
+	err := injectMonitoringReceiver(cfg, monitoringConfig, agentInfo, components)
+	require.NoError(t, err, "injectMonitoringReceiver should succeed")
+	result := mapstr.M(cfg.ToStringMap()).Flatten()
+
+	expectedBeatsProcessors := []map[string]any{
+		{"add_host_metadata": nil},
+		{"add_cloud_metadata": nil},
+		{"add_docker_metadata": nil},
+		{"add_kubernetes_metadata": nil},
+	}
+	actualBeatsProcessors := result["processors."+procName+".processors"]
+	assert.NotNil(t, actualBeatsProcessors, "monitoring receiver processors should not be nil")
+	if actualBeatsProcessors != nil {
+		assert.ElementsMatch(t, expectedBeatsProcessors, actualBeatsProcessors, "monitoring processors don't match expected value")
+	}
+
+	expectedPipelineProcessors := []string{procName}
+	actualPipelineProcessors := result["service.pipelines."+pipelineName+".processors"]
+	assert.NotNil(t, actualPipelineProcessors, "processors for monitoring receiver pipeline should not be nil")
+	assert.ElementsMatch(t, expectedPipelineProcessors, actualPipelineProcessors, "monitoring receiver pipeline processors should match default")
 }
 
 // fakeCloseListener is a wrapper around a net.Listener that ignores the Close() method. This is used in a very particular

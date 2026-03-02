@@ -812,7 +812,8 @@ func processorsForAgentFilestream() []any {
 		// without dropping these events the filestream gets stuck in an infinite loop
 		// if filestream hits an issue publishing the events it logs an error which then filestream monitor
 		// will read from the logs and try to also publish that new log message (thus the infinite loop).
-		dropEventsFromMonitoringComponentsProcessor(),
+		dropEventsFromProcessMonitoringProcessor(),
+		dropEventsFromOTelMonitoringProcessor(),
 		// drop periodic metrics logs (those are useful mostly in diagnostic dumps where we collect log files)
 		dropPeriodicMetricsLogsProcessor(),
 		// drop event logs
@@ -1045,17 +1046,32 @@ func dropEventLogs() map[string]any {
 	}
 }
 
-// dropEventsFromMonitoringComponentsProcessor returns a processor which drops all events from monitoring components.
+// dropEventsFromProcessMonitoringProcessor returns a processor which drops all events from monitoring components.
 // We identify a monitoring component by looking at their ID. They all end in `-monitoring`, e.g:
 // - "beat/metrics-monitoring"
 // - "filestream-monitoring"
 // - "http/metrics-monitoring"
-func dropEventsFromMonitoringComponentsProcessor() map[string]any {
+func dropEventsFromProcessMonitoringProcessor() map[string]any {
 	return map[string]interface{}{
 		"drop_event": map[string]interface{}{
 			"when": map[string]interface{}{
 				"regexp": map[string]interface{}{
 					"component.id": ".*-monitoring$",
+				},
+			},
+		},
+	}
+}
+
+// dropEventsFromOTelMonitoringProcessor returns a processor which drops all events from monitoring-specific
+// OTel collector components
+func dropEventsFromOTelMonitoringProcessor() map[string]any {
+	otelMonitoringPattern := ".*/" + translate.OtelNamePrefix + "monitoring$"
+	return map[string]interface{}{
+		"drop_event": map[string]interface{}{
+			"when": map[string]interface{}{
+				"regexp": map[string]interface{}{
+					"otelcol.component.id": otelMonitoringPattern,
 				},
 			},
 		},

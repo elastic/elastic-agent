@@ -427,7 +427,15 @@ func serviceComponentsFromConfig(specs component.RuntimeSpecs, rawCfg *config.Co
 		return nil, aerrors.New("failed to unpack config", err)
 	}
 	allComps, err := specs.ToComponents(
-		mm, cfg.Settings.Internal.Runtime, nil, nil, logp.InfoLevel, nil, map[string]uint64{})
+		mm,
+		cfg.Settings.Internal.Runtime,
+		nil,
+		nil,
+		logp.InfoLevel,
+		nil,
+		map[string]uint64{},
+		map[string]bool{},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to render components: %w", err)
 	}
@@ -460,7 +468,7 @@ func applyDynamics(ctx context.Context, log *logger.Logger, cfg *config.Config) 
 			return nil, err
 		}
 
-		renderedInputs, err := transpiler.RenderInputs(inputs, varsArray)
+		renderedInputs, _, err := transpiler.RenderInputs(inputs, varsArray)
 		if err != nil {
 			return nil, err
 		}

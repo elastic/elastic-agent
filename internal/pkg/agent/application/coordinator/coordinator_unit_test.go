@@ -55,6 +55,8 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
+	"github.com/elastic/elastic-agent/internal/pkg/composable"
+	_ "github.com/elastic/elastic-agent/internal/pkg/composable/providers/localdynamic"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/backoff"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -1157,6 +1159,87 @@ service:
 		require.NotNil(t, otelConfig, "OTel manager should have config")
 
 		assert.Len(t, components, 2, "both components should be assigned to the runtime manager")
+	})
+
+	t.Run("dynamic input switches from otel to process runtime", func(t *testing.T) {
+		// Reset state from previous test runs
+		updated = false
+		otelUpdated = false
+		components = nil
+		otelConfig = nil
+
+		// Track components sent to otel manager
+		var otelComponents []pkgcomponent.Component
+		otelManager.updateComponentCallback = func(comp []pkgcomponent.Component) error {
+			otelComponents = comp
+			return nil
+		}
+
+		// Create a policy where the filestream input uses a dynamic provider variable.
+		// The input is configured for OTel runtime, but because it uses a dynamic provider
+		// (local_dynamic) and dynamic_inputs is set to "process", it should be switched to process runtime.
+		cfg := config.MustNewConfigFrom(`
+agent.internal.runtime.filebeat.filestream: otel
+agent.internal.runtime.dynamic_inputs: process
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - localhost:9200
+inputs:
+  - id: dynamic-filestream-input
+    type: filestream
+    path: "${local_dynamic.path}"
+    use_output: default
+`)
+
+		// Create vars with the local_dynamic provider mapping
+		// The vars tree needs to have local_dynamic.path so the variable ${local_dynamic.path} can be resolved
+		vars, err := transpiler.NewVarsWithProcessors("local_dynamic-1", map[string]interface{}{
+			"local_dynamic": map[string]interface{}{
+				"path": "/var/log/test.log",
+			},
+		}, "local_dynamic", nil, nil, "", "local_dynamic")
+		require.NoError(t, err)
+		coord.vars = []*transpiler.Vars{vars}
+
+		// Set a varsMgr so the coordinator can generate the component model
+		coord.varsMgr = &fakeVarsManager{}
+
+		// Send the policy change
+		cfgChange := &configChange{cfg: cfg}
+		configChan <- cfgChange
+		coord.runLoopIteration(ctx)
+		assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+		assert.NoError(t, cfgChange.err, "config processing shouldn't report an error")
+
+		// The component should be routed to the runtime manager (not otel) because
+		// it uses a dynamic provider variable
+		assert.True(t, updated, "Runtime manager should be updated")
+		assert.True(t, otelUpdated, "OTel manager should be updated")
+
+		// Find the filestream component - it should be in the runtime manager's components
+		// because dynamic inputs are switched to process runtime
+		var filestreamInRuntime bool
+		for _, comp := range components {
+			if strings.Contains(comp.ID, "filestream") {
+				filestreamInRuntime = true
+				assert.Equal(t, pkgcomponent.ProcessRuntimeManager, comp.RuntimeManager,
+					"Dynamic input should use ProcessRuntimeManager")
+				assert.True(t, comp.Dynamic, "Component should be marked as dynamic")
+			}
+		}
+
+		// The filestream should NOT be in otel components
+		var filestreamInOtel bool
+		for _, comp := range otelComponents {
+			if strings.Contains(comp.ID, "filestream") {
+				filestreamInOtel = true
+			}
+		}
+
+		assert.True(t, filestreamInRuntime, "Dynamic filestream input should be in runtime manager")
+		assert.False(t, filestreamInOtel, "Dynamic filestream input should NOT be in otel manager")
 	})
 
 }
@@ -2521,4 +2604,163 @@ func TestCoordinator_Upgrade_InsufficientDiskSpaceError(t *testing.T) {
 			},
 		},
 	}, upgradeDetails)
+}
+
+func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
+	logger := logp.NewLogger("testing")
+
+	t.Run("process runtime is not changed", func(t *testing.T) {
+		runtimeCfg := &pkgcomponent.RuntimeConfig{
+			DynamicInputs: "process",
+		}
+		comp := pkgcomponent.Component{
+			ID:             "test-component",
+			RuntimeManager: pkgcomponent.ProcessRuntimeManager,
+			Dynamic:        false,
+		}
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
+		assert.Equal(t, pkgcomponent.ProcessRuntimeManager, comp.RuntimeManager, "ProcessRuntimeManager should not be changed")
+
+		// Even if dynamic, ProcessRuntimeManager should stay
+		comp.Dynamic = true
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
+		assert.Equal(t, pkgcomponent.ProcessRuntimeManager, comp.RuntimeManager, "ProcessRuntimeManager should not be changed even when dynamic")
+	})
+
+	t.Run("dynamic otel component switches to process runtime when configured", func(t *testing.T) {
+		runtimeCfg := &pkgcomponent.RuntimeConfig{
+			DynamicInputs: "process",
+		}
+		comp := pkgcomponent.Component{
+			ID:             "test-component",
+			RuntimeManager: pkgcomponent.OtelRuntimeManager,
+			Dynamic:        true,
+		}
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
+		assert.Equal(t, pkgcomponent.ProcessRuntimeManager, comp.RuntimeManager, "Dynamic OTel component should switch to ProcessRuntimeManager when DynamicInputs is 'process'")
+	})
+
+	t.Run("dynamic otel component stays otel when DynamicInputs is empty", func(t *testing.T) {
+		runtimeCfg := &pkgcomponent.RuntimeConfig{
+			DynamicInputs: "",
+		}
+		comp := pkgcomponent.Component{
+			ID:             "test-component",
+			RuntimeManager: pkgcomponent.OtelRuntimeManager,
+			Dynamic:        true,
+			OutputType:     "elasticsearch",
+			Units: []pkgcomponent.Unit{
+				{
+					ID:   "test-unit",
+					Type: client.UnitTypeOutput,
+					Config: &proto.UnitExpectedConfig{
+						Type: "elasticsearch",
+					},
+				},
+			},
+		}
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
+		// When DynamicInputs is empty, dynamic components should NOT be switched
+		assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager, "Dynamic OTel component should stay as OTel when DynamicInputs is empty")
+	})
+
+	t.Run("dynamic otel component stays otel when DynamicInputs is otel", func(t *testing.T) {
+		runtimeCfg := &pkgcomponent.RuntimeConfig{
+			DynamicInputs: "otel",
+		}
+		comp := pkgcomponent.Component{
+			ID:             "test-component",
+			RuntimeManager: pkgcomponent.OtelRuntimeManager,
+			Dynamic:        true,
+			OutputType:     "elasticsearch",
+			Units: []pkgcomponent.Unit{
+				{
+					ID:   "test-unit",
+					Type: client.UnitTypeOutput,
+					Config: &proto.UnitExpectedConfig{
+						Type: "elasticsearch",
+					},
+				},
+			},
+		}
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
+		// When DynamicInputs matches the current runtime, no switch should happen
+		assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager, "Dynamic OTel component should stay as OTel when DynamicInputs is 'otel'")
+	})
+
+	t.Run("non-dynamic otel component stays as otel runtime", func(t *testing.T) {
+		runtimeCfg := &pkgcomponent.RuntimeConfig{
+			DynamicInputs: "process",
+		}
+		// This test verifies the component stays as OTel when:
+		// - RuntimeManager is OtelRuntimeManager
+		// - Dynamic is false
+		// - No unsupported config issues (we're not setting any complex output config)
+		comp := pkgcomponent.Component{
+			ID:             "test-component",
+			RuntimeManager: pkgcomponent.OtelRuntimeManager,
+			Dynamic:        false,
+			OutputType:     "elasticsearch",
+			Units: []pkgcomponent.Unit{
+				{
+					ID:   "test-unit",
+					Type: client.UnitTypeOutput,
+					Config: &proto.UnitExpectedConfig{
+						Type: "elasticsearch",
+					},
+				},
+			},
+		}
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
+		// Note: the component may still be switched to ProcessRuntimeManager by
+		// VerifyComponentIsOtelSupported if there are other unsupported features
+		// For this test, we're just verifying the Dynamic flag check
+		// Since there's no error from VerifyComponentIsOtelSupported in this minimal case,
+		// the runtime should stay as OTel unless the translate package rejects it
+		assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager, "Non-dynamic OTel component should stay as OTel even when DynamicInputs is 'process'")
+	})
+}
+
+func TestGetDynamicInputs(t *testing.T) {
+	// Import the kubernetes provider to register "kubernetes" as a dynamic provider
+	// This is done via import side effects in the actual application
+	_ = composable.Providers
+
+	t.Run("returns empty map when inputToDynamicProvider is nil", func(t *testing.T) {
+		result := getDynamicInputs(nil)
+		assert.NotNil(t, result)
+		assert.Empty(t, result)
+	})
+
+	t.Run("returns empty map when inputToDynamicProvider is empty", func(t *testing.T) {
+		result := getDynamicInputs(map[string]string{})
+		assert.NotNil(t, result)
+		assert.Empty(t, result)
+	})
+
+	t.Run("identifies inputs with dynamic provider variables", func(t *testing.T) {
+		// The `local_dynamic` provider is registered via import side effect above
+		inputToDynamicProvider := map[string]string{
+			"static-input":  "",              // no dynamic provider
+			"dynamic-input": "local_dynamic", // uses local_dynamic provider
+		}
+		result := getDynamicInputs(inputToDynamicProvider)
+		assert.NotNil(t, result)
+		// The static-input should NOT be marked as dynamic (empty provider)
+		assert.False(t, result["static-input"], "static-input should not be marked as dynamic")
+		// The dynamic-input SHOULD be marked as dynamic because it uses local_dynamic provider
+		assert.True(t, result["dynamic-input"], "dynamic-input should be marked as dynamic")
+	})
+
+	t.Run("inputs with non-dynamic provider variables are not marked dynamic", func(t *testing.T) {
+		// The env provider is a context provider, not a dynamic provider
+		inputToDynamicProvider := map[string]string{
+			"env-input": "env",
+		}
+		result := getDynamicInputs(inputToDynamicProvider)
+		assert.NotNil(t, result)
+		// The env provider is a context provider, not a dynamic provider
+		// So this input should NOT be marked as dynamic
+		assert.False(t, result["env-input"], "env-input should not be marked as dynamic")
+	})
 }

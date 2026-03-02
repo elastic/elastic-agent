@@ -831,7 +831,9 @@ func TestBeatsReceiverProcessRuntimeFallback(t *testing.T) {
 		Stack: nil,
 	})
 
-	config := `agent.logging.to_stderr: true
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
+
+	config := fmt.Sprintf(`agent.logging.to_stderr: true
 agent.logging.to_files: false
 agent.internal.runtime.metricbeat:
   system/metrics: otel
@@ -851,18 +853,14 @@ inputs:
 outputs:
   default:
     type: elasticsearch
-    hosts: [http://localhost:9200]
+    hosts: [%s]
     api_key: placeholder
     indices: [] # not supported by the elasticsearch exporter
-    status_reporting:
-      enabled: false
   supported:
     type: elasticsearch
-    hosts: [http://localhost:9200]
+    hosts: [%s]
     api_key: placeholder
-    status_reporting:
-      enabled: false
-`
+`, esURL.Host, esURL.Host)
 
 	// this is the context for the whole test, with a global timeout defined
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
@@ -940,6 +938,114 @@ outputs:
 	assert.NotEmpty(t, monitoringOutputUnsupportedLogRecord, "should get a log line about monitoring output not being supported")
 }
 
+const (
+	otelDynamicVariableLogLineTemplate = "Component %s uses dynamic variable providers, switching to process runtime"
+)
+
+// TestBeatsReceiverDynamicInputProcessRuntimeFallback verifies that we fall back to the process runtime if the input
+// uses variables from a dynamic provider.
+func TestBeatsReceiverDynamicInputProcessRuntimeFallback(t *testing.T) {
+	_ = define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: nil,
+	})
+
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
+
+	config := fmt.Sprintf(`agent.logging.to_stderr: true
+agent.logging.to_files: false
+agent.monitoring.enabled: false
+agent.internal.runtime.dynamic_inputs: process
+inputs:
+  - type: system/metrics
+    id: "${local_dynamic.id}"
+    streams:
+      - metricsets:
+        - cpu
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [%s]
+    api_key: placeholder
+providers:
+  local_dynamic:
+    items:
+    - vars:
+        id: system-metrics-1
+`, esURL.Host)
+
+	// this is the context for the whole test, with a global timeout defined
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+
+	// set up a standalone agent
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+	err = fixture.Configure(ctx, []byte(config))
+	require.NoError(t, err)
+
+	installOutput, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true})
+	require.NoError(t, err, "install failed, output: %s", string(installOutput))
+
+	var compId string
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var statusErr error
+		status, statusErr := fixture.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+		// we should be running a single component in a beat process
+		assert.Equal(collect, int(cproto.State_HEALTHY), status.State)
+		require.Equal(collect, 1, len(status.Components))
+		comp := status.Components[0]
+
+		assert.Equal(collect, int(cproto.State_HEALTHY), comp.State)
+		expectedComponentVersionInfoName := componentVersionInfoNameForRuntime(component.ProcessRuntimeManager)
+		assert.Equal(collect, expectedComponentVersionInfoName, comp.VersionInfo.Name)
+		for _, unit := range comp.Units {
+			assert.Equal(collect, int(cproto.State_HEALTHY), unit.State)
+		}
+		compId = comp.ID
+	}, 1*time.Minute, 1*time.Second)
+	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
+	require.NoError(t, err)
+
+	// verify we've logged a warning about using the process runtime
+	foundLogMessage := false
+	expectedMessage := fmt.Sprintf(otelDynamicVariableLogLineTemplate, compId)
+	for _, line := range strings.Split(string(logsBytes), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var logRecord struct {
+			Message string
+		}
+		if unmarshalErr := json.Unmarshal([]byte(line), &logRecord); unmarshalErr != nil {
+			continue
+		}
+
+		foundLogMessage = foundLogMessage || logRecord.Message == expectedMessage
+	}
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent logs seen by the test:")
+			t.Log(string(logsBytes))
+		}
+	})
+
+	assert.True(t, foundLogMessage, "there should be a log line with a warning about falling back to process runtime")
+}
+
 // TestBeatsReceiverSubcomponentStatus verifies that we correctly reflect the status of beats inputs in the elastic
 // agent component and unit statuses.
 func TestBeatsReceiverSubcomponentStatus(t *testing.T) {
@@ -954,13 +1060,15 @@ func TestBeatsReceiverSubcomponentStatus(t *testing.T) {
 		Stack: nil,
 	})
 
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
+
 	// This configuration contains two system/metrics inputs, each with two identical metricsets:
 	// * one for cpu, always healthy
 	// * one for processes, can't read data for some processes if not running as root
 	// The second metricset will emit a message about not being able to read process data. For the first input, this
 	// results in a Healthy status, but the second input is configured to become degraded in that case. The test
 	// verifies both of these conditions.
-	config := `agent:
+	config := fmt.Sprintf(`agent:
   logging:
     to_stderr: true
     to_files: false
@@ -1005,11 +1113,9 @@ outputs:
   default:
     api_key: placeholder
     hosts:
-    - 127.0.0.1:9200
+    - %s
     type: elasticsearch
-    status_reporting:
-      enabled: false
-`
+`, esURL.Host)
 
 	// this is the context for the whole test, with a global timeout defined
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
