@@ -637,6 +637,11 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
+				"processors": map[string]any{
+					"beat/_agent-component": map[string]any{
+						"processors": defaultGlobalProcessors,
+					},
+				},
 				"receivers": map[string]any{
 					"filebeatreceiver/_agent-component/filestream-default": expectedFilestreamConfig("filestream-default"),
 				},
@@ -645,7 +650,7 @@ func TestGetOtelConfig(t *testing.T) {
 					"pipelines": map[string]any{
 						"logs/_agent-component/filestream-default": map[string][]string{
 							"exporters":  {"elasticsearch/_agent-component/default"},
-							"processors": {"filter/remove-something", "beat", "batch"},
+							"processors": {"beat/_agent-component", "filter/remove-something", "beat", "batch"},
 							"receivers":  {"filebeatreceiver/_agent-component/filestream-default"},
 						},
 					},

@@ -281,11 +281,15 @@ func getCollectorConfigForComponent(
 		"receivers": maps.Keys(receiversConfig),
 	}
 
-	// If the `default_processors` feature flag is enabled,
-	// reference the shared beat processor in this pipeline.
-	// The processor definition itself is added once in GetOtelConfig.
+	// Build the pipeline processors list: the shared beat processor first (if enabled),
+	// followed by any per-output processors defined in the output configuration.
+	var pipelineProcessors []string
 	if features.DefaultProcessors() {
-		pipelineConfig["processors"] = []string{GetProcessorID().String()}
+		pipelineProcessors = append(pipelineProcessors, GetProcessorID().String())
+	}
+	pipelineProcessors = append(pipelineProcessors, processors...)
+	if len(pipelineProcessors) > 0 {
+		pipelineConfig["processors"] = pipelineProcessors
 	}
 
 	pipelinesConfig := map[string]any{
