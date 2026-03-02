@@ -70,6 +70,9 @@ spec:
             # For more info: https://www.elastic.co/guide/en/beats/metricbeat/current/add-host-metadata.html
             - name: ELASTIC_NETINFO
               value: "false"
+            # 'Defend for containers' integration (cloud-defend) uses the HOSTFS_PROC_PATH variable for accessing process information from the node.
+            - name: HOSTFS_PROC_PATH
+              value: "/hostfs/proc"
           securityContext:
             runAsUser: 0
             # The following capabilities are needed for 'Defend for containers' integration (cloud-defend)
