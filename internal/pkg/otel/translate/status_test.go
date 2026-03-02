@@ -1535,7 +1535,10 @@ func TestOutputStatus(t *testing.T) {
 					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
 						ComponentStatusMap: map[string]*status.AggregateStatus{
-							fmt.Sprintf("receiver:filebeat/%sfilestream-unit", OtelNamePrefix): {
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-1", OtelNamePrefix): {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-2", OtelNamePrefix): {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
 							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
