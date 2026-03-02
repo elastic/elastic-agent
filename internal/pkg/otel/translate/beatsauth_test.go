@@ -702,7 +702,7 @@ func getTranslatedConf(t *testing.T, input map[string]any) (map[string]any, map[
 		Config: agentComponent.MustExpectedConfig(input),
 	}
 
-	exporterCfg, _, beatsauthCfg, err := unitToExporterConfig(unit, "default", component.MustNewType("elasticsearch"), logp.NewNopLogger())
+	exporterCfg, _, beatsauthCfg, _, err := unitToExporterConfig(unit, "default", component.MustNewType("elasticsearch"), logp.NewNopLogger())
 	if err != nil {
 		t.Fatalf("could not convert given output config to OTel config:%v", err)
 
