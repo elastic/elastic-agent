@@ -1,0 +1,27 @@
+# Minimal OTEL Collector test configuration for quick smoke tests
+# Run with: ./_build/elastic-collector-components --config=./receiver/verifierreceiver/testdata/otel-config.yaml
+#
+# This config uses minimal settings - no AWS credentials configured.
+# The receiver will emit logs with "error" status showing "VerifierNotInitialized".
+
+receivers:
+  verifier:
+    cloud_connector_id: "cc-test-minimal"
+    verification_id: "verify-minimal-001"
+    
+    policies:
+      - policy_id: "test-policy-local"
+        policy_name: "Minimal Test Policy"
+        integrations:
+          - integration_type: "aws_cloudtrail"
+            integration_name: "Test CloudTrail"
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    logs:
+      receivers: [verifier]
+      exporters: [debug]
