@@ -1,0 +1,33 @@
+# Verifier Integration Template
+# This template defines how the verifier receiver should be configured
+# when used as a Fleet integration.
+#
+# Variables are substituted by Fleet/Elastic Agent when the policy is applied:
+# - ${var:cloud_connector_id} - Unique identifier for the Cloud Connector
+# - ${var:verification_id} - Unique verification session ID
+# - ${var:providers.aws.credentials.*} - AWS credentials for verification
+# - ${var:policies} - List of policies with integrations to verify
+
+receivers:
+  verifier:
+    cloud_connector_id: ${var:cloud_connector_id}
+    cloud_connector_name: ${var:cloud_connector_name}
+    verification_id: ${var:verification_id}
+    verification_type: ${var:verification_type}
+    providers:
+      aws:
+        credentials:
+          role_arn: ${var:providers.aws.credentials.role_arn}
+          external_id: ${var:providers.aws.credentials.external_id}
+          default_region: ${var:providers.aws.credentials.default_region}
+    policies: ${var:policies}
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    logs/verifier:
+      receivers: [verifier]
+      exporters: [debug]

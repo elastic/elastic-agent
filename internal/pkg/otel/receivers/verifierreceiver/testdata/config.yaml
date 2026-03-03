@@ -1,0 +1,106 @@
+# Test configuration for verifier receiver
+# This file demonstrates the OTel Collector configuration format for the verifier receiver
+
+receivers:
+  # Default verifier configuration
+  verifier:
+    cloud_connector_id: "cc-12345"
+    cloud_connector_name: "Production Connector"
+    verification_id: "verify-abc123"
+    verification_type: "on_demand"
+    # AWS Authentication - Cloud Connector STS AssumeRole
+    providers:
+      aws:
+        credentials:
+          role_arn: "arn:aws:iam::123456789012:role/ElasticAgentRole"
+          external_id: "elastic-external-id-12345"
+          default_region: "us-east-1"
+    policies:
+      - policy_id: "policy-1"
+        policy_name: "AWS Security Monitoring"
+        integrations:
+          - integration_id: "int-cloudtrail-001"
+            integration_type: "aws_cloudtrail"
+            integration_name: "AWS CloudTrail"
+            integration_version: "2.17.0"
+            config:
+              account_id: "123456789012"
+              region: "us-east-1"
+          - integration_id: "int-guardduty-001"
+            integration_type: "aws_guardduty"
+            integration_name: "AWS GuardDuty"
+            integration_version: "1.5.0"
+            config:
+              account_id: "123456789012"
+              region: "us-east-1"
+      - policy_id: "policy-2"
+        policy_name: "AWS Infrastructure"
+        integrations:
+          - integration_id: "int-ec2-001"
+            integration_type: "aws_ec2"
+            integration_name: "AWS EC2 Metrics"
+            # No integration_version - will use latest permission set
+            config:
+              account_id: "123456789012"
+              region: "us-west-2"
+
+  # Named verifier instance for single integration testing
+  verifier/single-integration:
+    cloud_connector_id: "cc-single"
+    cloud_connector_name: "Single Integration Test Connector"
+    verification_id: "verify-single-001"
+    verification_type: "on_demand"
+    providers:
+      aws:
+        credentials:
+          role_arn: "arn:aws:iam::123456789012:role/ElasticAgentRole"
+          external_id: "elastic-external-id-single"
+          default_region: "us-east-1"
+    policies:
+      - policy_id: "policy-single"
+        policy_name: "Single Integration Test"
+        integrations:
+          - integration_id: "int-s3-001"
+            integration_type: "aws_s3"
+            integration_name: "AWS S3 Logs"
+            config:
+              account_id: "123456789012"
+
+  # Named verifier instance for Security Hub testing
+  verifier/security-hub:
+    cloud_connector_id: "cc-securityhub"
+    cloud_connector_name: "Security Hub Connector"
+    verification_id: "verify-sechub-001"
+    verification_type: "on_demand"
+    providers:
+      aws:
+        credentials:
+          role_arn: "arn:aws:iam::123456789012:role/ElasticAgentRole"
+          external_id: "elastic-external-id-sechub"
+          default_region: "us-east-1"
+    policies:
+      - policy_id: "policy-security"
+        policy_name: "Security Hub Policy"
+        integrations:
+          - integration_id: "int-securityhub-001"
+            integration_type: "aws_securityhub"
+            integration_name: "AWS Security Hub"
+            config:
+              account_id: "123456789012"
+              region: "us-east-1"
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    logs:
+      receivers: [verifier]
+      exporters: [debug]
+    logs/single:
+      receivers: [verifier/single-integration]
+      exporters: [debug]
+    logs/security:
+      receivers: [verifier/security-hub]
+      exporters: [debug]
