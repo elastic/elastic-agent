@@ -5,10 +5,13 @@
 package build
 
 import (
+	"context"
+
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 )
 
 // Build builds the Beat binary.
-func Build() error {
-	return devtools.Build(devtools.DefaultBuildArgs())
+func Build(ctx context.Context) error {
+	cfg := devtools.SettingsFromContext(ctx)
+	return devtools.Build(ctx, cfg, devtools.DefaultBuildArgs(cfg))
 }

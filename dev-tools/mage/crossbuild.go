@@ -5,6 +5,7 @@
 package mage
 
 import (
+	"context"
 	"fmt"
 	"go/build"
 	"log"
@@ -24,55 +25,11 @@ import (
 
 const defaultCrossBuildTarget = "golangCrossBuild"
 
-// Platforms contains the set of target platforms for cross-builds. It can be
-// modified at runtime by setting the PLATFORMS environment variable.
-// See NewPlatformList for details about platform filtering expressions.
-var Platforms = BuildPlatforms.Defaults()
-
-// SelectedPackageTypes is the list of package types. If empty, all packages types
-// are considered to be selected (see IsPackageTypeSelected).
-var SelectedPackageTypes []PackageType
-
-// SelectedDockerVariants is the list of docker variants. If empty, all docker variants
-// are considered to be selected (see IsDockerVariantSelected).
-var SelectedDockerVariants []DockerVariant
-
-func init() {
-	// Allow overriding via PLATFORMS.
-	if expression := os.Getenv("PLATFORMS"); len(expression) > 0 {
-		Platforms = NewPlatformList(expression)
-	}
-
-	// Allow overriding via PACKAGES.
-	if packageTypes := os.Getenv("PACKAGES"); len(packageTypes) > 0 {
-		for _, pkgtype := range strings.Split(packageTypes, ",") {
-			var p PackageType
-			err := p.UnmarshalText([]byte(pkgtype))
-			if err != nil {
-				continue
-			}
-			SelectedPackageTypes = append(SelectedPackageTypes, p)
-		}
-	}
-
-	// Allow overriding via DOCKER_VARIANTS.
-	if dockerVariants := os.Getenv("DOCKER_VARIANTS"); len(dockerVariants) > 0 {
-		for _, docvariant := range strings.Split(dockerVariants, ",") {
-			var v DockerVariant
-			err := v.UnmarshalText([]byte(docvariant))
-			if err != nil {
-				continue
-			}
-			SelectedDockerVariants = append(SelectedDockerVariants, v)
-		}
-	}
-}
-
 // CrossBuildOption defines an option to the CrossBuild target.
 type CrossBuildOption func(params *crossBuildParams)
 
 // ImageSelectorFunc returns the name of the builder image.
-type ImageSelectorFunc func(platform string) (string, error)
+type ImageSelectorFunc func(cfg *Settings, platform string) (string, error)
 
 // WithName adjust the name of the cross build action.
 func WithName(name string) CrossBuildOption {
@@ -139,8 +96,8 @@ type crossBuildParams struct {
 }
 
 // CrossBuild executes a given build target once for each target platform.
-func CrossBuild(options ...CrossBuildOption) error {
-	params := crossBuildParams{Platforms: Platforms, Target: defaultCrossBuildTarget, ImageSelector: CrossBuildImage}
+func CrossBuild(ctx context.Context, cfg *Settings, options ...CrossBuildOption) error {
+	params := crossBuildParams{Platforms: cfg.GetPlatforms(), Target: defaultCrossBuildTarget, ImageSelector: CrossBuildImage}
 	params.Name = "Elastic-Agent"
 	for _, opt := range options {
 		opt(&params)
@@ -155,17 +112,18 @@ func CrossBuild(options ...CrossBuildOption) error {
 	// AIX can't really be crossbuilt, due to cgo and various compiler shortcomings.
 	// If we have a singular AIX platform set, revert to a native build toolchain
 	if runtime.GOOS == "aix" {
-		for _, platform := range params.Platforms {
-			if platform.GOOS() == "aix" {
+		platform := cfg.Platform()
+		for _, p := range params.Platforms {
+			if p.GOOS() == "aix" {
 				if len(params.Platforms) != 1 {
 					return fmt.Errorf("platform AIX cannot be crossbuilt with other platforms. Set PLATFORMS='aix/ppc64'")
 				}
 				// This is basically a short-out so we can attempt to build on AIX in a relatively generic way
 				log.Printf("Target is building for AIX, skipping normal crossbuild process")
-				args := DefaultBuildArgs()
+				args := DefaultBuildArgs(cfg)
 				args.OutputDir = filepath.Join("build", "golang-crossbuild")
-				args.Name += "-" + Platform.GOOS + "-" + Platform.Arch
-				return Build(args)
+				args.Name += "-" + platform.GOOS + "-" + platform.Arch
+				return Build(ctx, cfg, args)
 
 			}
 		}
@@ -178,7 +136,7 @@ func CrossBuild(options ...CrossBuildOption) error {
 		return err
 	}
 
-	if CrossBuildMountModcache {
+	if cfg.CrossBuild.MountModcache {
 		// Make sure the module dependencies are downloaded on the host,
 		// as they will be mounted into the container read-only.
 		mg.Deps(func() error { return gotool.Mod.Download() })
@@ -193,7 +151,7 @@ func CrossBuild(options ...CrossBuildOption) error {
 		if !buildPlatform.Flags.CanCrossBuild() {
 			return fmt.Errorf("unsupported cross build platform %v", buildPlatform.Name)
 		}
-		builder := GolangCrossBuilder{buildPlatform.Name, params.Target, params.InDir, params.ImageSelector}
+		builder := GolangCrossBuilder{Platform: buildPlatform.Name, Target: params.Target, InDir: params.InDir, ImageSelector: params.ImageSelector, Config: cfg}
 		if params.Serial {
 			if err := builder.Build(); err != nil {
 				return fmt.Errorf("failed cross-building target=%s for platform=%s: %w",
@@ -213,10 +171,10 @@ func CrossBuild(options ...CrossBuildOption) error {
 // CrossBuildXPack executes the 'golangCrossBuild' target in the Beat's
 // associated x-pack directory to produce a version of the Beat that contains
 // Elastic licensed content.
-func CrossBuildXPack(options ...CrossBuildOption) error {
-	o := []CrossBuildOption{InDir("x-pack", BeatName)}
+func CrossBuildXPack(ctx context.Context, cfg *Settings, options ...CrossBuildOption) error {
+	o := []CrossBuildOption{InDir("x-pack", cfg.Beat.Name)}
 	o = append(o, options...)
-	return CrossBuild(o...)
+	return CrossBuild(ctx, cfg, o...)
 }
 
 // buildMage pre-compiles the magefile to a binary using the GOARCH parameter.
@@ -229,7 +187,7 @@ func buildMage() error {
 }
 
 // CrossBuildImage build the docker image.
-func CrossBuildImage(platform string) (string, error) {
+func CrossBuildImage(cfg *Settings, platform string) (string, error) {
 	tagSuffix := "main"
 
 	switch {
@@ -255,12 +213,12 @@ func CrossBuildImage(platform string) (string, error) {
 		tagSuffix = "windows-arm64-debian12"
 	}
 
-	goVersion, err := GoVersion()
+	goVersion, err := GoVersion(cfg)
 	if err != nil {
 		return "", err
 	}
 
-	if FIPSBuild {
+	if cfg.Build.FIPSBuild {
 		tagSuffix += "-fips"
 	}
 
@@ -274,10 +232,15 @@ type GolangCrossBuilder struct {
 	Target        string
 	InDir         string
 	ImageSelector ImageSelectorFunc
+	Config        *Settings
 }
 
 // Build executes the build inside of Docker.
 func (b GolangCrossBuilder) Build() error {
+	if b.Config == nil {
+		return fmt.Errorf("GolangCrossBuilder.Config must be set")
+	}
+	cfg := b.Config
 	fmt.Printf(">> %v: Building for %v\n", b.Target, b.Platform)
 
 	repoInfo, err := GetProjectRepoInfo()
@@ -309,7 +272,7 @@ func (b GolangCrossBuilder) Build() error {
 	buildCmd = filepath.ToSlash(buildCmd)
 
 	dockerRun := sh.RunCmd("docker", "run")
-	image, err := b.ImageSelector(b.Platform)
+	image, err := b.ImageSelector(cfg, b.Platform)
 	if err != nil {
 		return fmt.Errorf("failed to determine golang-crossbuild image tag: %w", err)
 	}
@@ -333,20 +296,20 @@ func (b GolangCrossBuilder) Build() error {
 			"--env", fmt.Sprintf("EXEC_GID=%d", gid),
 		)
 	}
-	if versionQualified {
-		args = append(args, "--env", "VERSION_QUALIFIER="+versionQualifier)
+	if cfg.Build.VersionQualified {
+		args = append(args, "--env", "VERSION_QUALIFIER="+cfg.Build.VersionQualifier)
 	}
-	if CrossBuildMountModcache {
+	if cfg.CrossBuild.MountModcache {
 		// Mount $GOPATH/pkg/mod into the container, read-only.
 		hostDir := filepath.Join(build.Default.GOPATH, "pkg", "mod")
 		args = append(args, "-v", hostDir+":/go/pkg/mod:ro")
 	}
 
 	buildCacheLocation := "/tmp/.cache/go-build"
-	if CrossBuildMountBuildCache {
+	if cfg.CrossBuild.MountBuildCache {
 		// Mount the go build cache volume into the container.
 		args = append(args,
-			"-v", fmt.Sprintf("%s:%s", CrossBuildBuildCacheVolumeName, buildCacheLocation),
+			"-v", fmt.Sprintf("%s:%s", cfg.CrossBuild.BuildCacheVolumeName, buildCacheLocation),
 		)
 	}
 
@@ -361,9 +324,9 @@ func (b GolangCrossBuilder) Build() error {
 		"--env", fmt.Sprintf("GOCACHE=%s", buildCacheLocation), // ensure this is writable by the user
 		"--env", "MAGEFILE_VERBOSE="+verbose,
 		"--env", "MAGEFILE_TIMEOUT="+EnvOr("MAGEFILE_TIMEOUT", ""),
-		"--env", fmt.Sprintf("SNAPSHOT=%v", Snapshot),
-		"--env", fmt.Sprintf("DEV=%v", DevBuild),
-		"--env", fmt.Sprintf("FIPS=%v", FIPSBuild),
+		"--env", fmt.Sprintf("SNAPSHOT=%v", cfg.Build.Snapshot),
+		"--env", fmt.Sprintf("DEV=%v", cfg.Build.DevBuild),
+		"--env", fmt.Sprintf("FIPS=%v", cfg.Build.FIPSBuild),
 		"-v", repoInfo.RootDir+":"+mountPoint,
 	)
 
