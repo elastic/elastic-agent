@@ -717,6 +717,8 @@ spec:
               fieldPath: metadata.name
         - name: ELASTIC_NETINFO
           value: "false"
+        - name: HOSTFS_PROC_PATH
+          value: /hostfs/proc
         - name: API_KEY
           valueFrom:
             secretKeyRef:
