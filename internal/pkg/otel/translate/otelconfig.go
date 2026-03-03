@@ -108,6 +108,22 @@ func GetOtelConfig(
 	if err != nil {
 		return nil, fmt.Errorf("error merging otel extensions: %w", err)
 	}
+
+	// If the default_processors feature flag is enabled, add a single shared
+	// beat processor definition that all pipelines reference.
+	if features.DefaultProcessors() {
+		processorConf := confmap.NewFromStringMap(map[string]any{
+			"processors": map[string]any{
+				GetProcessorID().String(): map[string]any{
+					"processors": GetDefaultProcessors(),
+				},
+			},
+		})
+		if mergeErr := otelConfig.Merge(processorConf); mergeErr != nil {
+			return nil, fmt.Errorf("error merging beat processor config: %w", mergeErr)
+		}
+	}
+
 	return otelConfig, nil
 }
 
@@ -221,6 +237,11 @@ func GetExporterID(exporterType otelcomponent.Type, outputName string) otelcompo
 	return otelcomponent.NewIDWithName(exporterType, exporterName)
 }
 
+// GetProcessorID returns the shared beat processor id used across all pipelines.
+func GetProcessorID() otelcomponent.ID {
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("beat"), strings.TrimSuffix(OtelNamePrefix, "/"))
+}
+
 // getBeatsAuthExtensionID returns the id for beatsauth extension
 // outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
 func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
@@ -255,16 +276,24 @@ func getCollectorConfigForComponent(
 		return nil, err
 	}
 
-	pipelineComponents := map[string][]string{
-		"exporters": []string{exporterID.String()},
+	pipelineConfig := map[string][]string{
+		"exporters": {exporterID.String()},
 		"receivers": maps.Keys(receiversConfig),
 	}
-	if len(processors) > 0 {
-		pipelineComponents["processors"] = processors
+
+	// Build the pipeline processors list: the shared beat processor first (if enabled),
+	// followed by any per-output processors defined in the output configuration.
+	var pipelineProcessors []string
+	if features.DefaultProcessors() {
+		pipelineProcessors = append(pipelineProcessors, GetProcessorID().String())
+	}
+	pipelineProcessors = append(pipelineProcessors, processors...)
+	if len(pipelineProcessors) > 0 {
+		pipelineConfig["processors"] = pipelineProcessors
 	}
 
 	pipelinesConfig := map[string]any{
-		pipelineID.String(): pipelineComponents,
+		pipelineID.String(): pipelineConfig,
 	}
 
 	// we need to convert []string to []interface for this to work
@@ -362,12 +391,6 @@ func getReceiversConfigForComponent(
 		receiverConfig["queue"] = outputQueueConfig
 	}
 
-	// If the `default_processors` feature flag is enabled,
-	// explicitly configure default processors in Beat receivers.
-	if features.DefaultProcessors() {
-		receiverConfig["processors"] = GetDefaultProcessors(beatName)
-	}
-
 	// add monitoring config if necessary
 	// we enable the basic monitoring endpoint by default, because we want to use it for diagnostics even if
 	// agent self-monitoring is disabled
@@ -394,18 +417,14 @@ func getReceiversConfigForComponent(
 	}, nil
 }
 
-func GetDefaultProcessors(beatName string) []map[string]any {
-	addHostMetadata := map[string]any{
-		"add_host_metadata": nil,
-	}
-	if beatName == "filebeat" {
-		addHostMetadata["add_host_metadata"] = map[string]any{
-			"when.not.contains.tags": "forwarded",
-		}
-	}
-
+// GetDefaultProcessors returns the default beat processors used across all pipelines.
+func GetDefaultProcessors() []map[string]any {
 	return []map[string]any{
-		addHostMetadata,
+		{
+			"add_host_metadata": map[string]any{
+				"when.not.contains.tags": "forwarded",
+			},
+		},
 		{"add_cloud_metadata": nil},
 		{"add_docker_metadata": nil},
 		{"add_kubernetes_metadata": nil},
