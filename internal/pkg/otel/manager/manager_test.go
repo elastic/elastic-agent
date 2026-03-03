@@ -189,6 +189,15 @@ func (h *mockCollectorHandle) Stop(waitTime time.Duration) {
 	}
 }
 
+func (h *mockCollectorHandle) Stopped() bool {
+	select {
+	case <-h.stopCh:
+		return true
+	default:
+		return false
+	}
+}
+
 // EventListener listens to the events from the OTelManager and stores the latest error and status.
 type EventListener struct {
 	mtx             sync.Mutex
@@ -845,7 +854,7 @@ func TestOTelManager_Run(t *testing.T) {
 				collectorStatusCh: make(chan *status.AggregateStatus),
 				componentStateCh:  make(chan []runtime.ComponentComponentState, 1),
 				doneChan:          make(chan struct{}),
-				collectorRunErr:   make(chan error),
+				collectorRunErr:   make(chan error, 1),
 				recoveryTimer:     tc.restarter,
 				stopTimeout:       waitTimeForStop,
 				agentInfo:         &info.AgentInfo{},
@@ -1750,16 +1759,18 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		case execution.statusCh <- otelStatus:
 		}
 
-		componentState, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchComponents(), mgr.Errors())
-		require.NoError(t, err)
-		require.NotNil(t, componentState)
-		require.Len(t, componentState, 1)
-		assert.Equal(t, componentState[0].Component, testComp)
+		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+			componentState, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchComponents(), mgr.Errors())
+			require.NoError(collect, err)
+			require.NotNil(collect, componentState)
+			require.Len(collect, componentState, 1)
+			assert.Equal(collect, componentState[0].Component, testComp)
 
-		collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
-		require.NoError(t, err)
-		require.NotNil(t, collectorStatus)
-		assert.Len(t, collectorStatus.ComponentStatusMap, 0)
+			collectorStatus, err := getFromChannelOrErrorWithContext(t, ctx, mgr.WatchCollector(), mgr.Errors())
+			require.NoError(collect, err)
+			require.NotNil(collect, collectorStatus)
+			assert.Len(collect, collectorStatus.ComponentStatusMap, 0)
+		}, time.Second*5, time.Millisecond)
 	})
 
 	t.Run("collector execution error is passed as status not error", func(t *testing.T) {
@@ -1874,6 +1885,57 @@ func TestOTelManager_RestartOnLogLevelChange(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("expected collector to be restarted after log level change, but it was not")
 	}
+}
+
+// TestOTelManager_CollectorRunErrWithNilConfig verifies that the manager does not panic when a
+// non-nil error arrives on collectorRunErr while mergedCollectorCfg is nil. This can happen when
+// the collector process reports an error after its configuration has been cleared.
+func TestOTelManager_CollectorRunErrWithNilConfig(t *testing.T) {
+	managerLogger, obs := loggertest.New("otel-manager")
+	collectorLogger, _ := loggertest.New("otel")
+
+	mgr := OTelManager{
+		managerLogger:     managerLogger,
+		collectorLogger:   collectorLogger,
+		errCh:             make(chan error, 1),
+		updateCh:          make(chan configUpdate, 1),
+		collectorStatusCh: make(chan *status.AggregateStatus, 1),
+		componentStateCh:  make(chan []runtime.ComponentComponentState, 5),
+		doneChan:          make(chan struct{}),
+		recoveryTimer:     newRestarterNoop(),
+		execution:         &mockExecution{},
+		agentInfo:         &info.AgentInfo{},
+		collectorRunErr:   make(chan error, 1),
+		stopTimeout:       time.Second,
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	// Send a non-nil, non-context.Canceled error while mergedCollectorCfg is nil.
+	// This exercises the else branch of the collectorRunErr case in Run(), which
+	// calls reportStartupErr → otelConfigToStatus with a nil config.
+	runErr := errors.New("collector crashed")
+	mgr.collectorRunErr <- runErr
+	go func() {
+		select {
+		case s := <-mgr.WatchCollector():
+			if s == nil {
+				cancel()
+			}
+		case <-ctx.Done():
+		}
+	}()
+
+	assert.NotPanics(t, func() {
+		// Run will process the collectorRunErr, then block on the select.
+		// Cancel the context so it exits after handling the error.
+		err := mgr.Run(ctx)
+		assert.ErrorIs(t, err, context.Canceled)
+	})
+	expectedLogMessage := fmt.Sprintf("otel collector shut down with error: %v", runErr)
+	warnMessages := obs.FilterMessage(expectedLogMessage)
+	require.Equal(t, 1, warnMessages.Len())
 }
 
 // TestManagerAlwaysEmitsStoppedStatesForComponents checks that the manager always emits a STOPPED state for a component
