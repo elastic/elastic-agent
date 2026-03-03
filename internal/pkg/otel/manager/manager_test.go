@@ -2327,7 +2327,6 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 				"prometheus": map[string]any{
 					"host":                "localhost",
 					"port":                0,
-					"without_scope_info":  false,
 					"without_units":       true,
 					"without_type_suffix": true,
 				},
