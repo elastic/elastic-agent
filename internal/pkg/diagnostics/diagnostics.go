@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -36,8 +37,9 @@ const (
 	// ContentTypeDirectory should be used to indicate that a directory should be made in the resulting bundle
 	ContentTypeDirectory = "directory"
 	// REDACTED is used to replace sensative fields
-	REDACTED  = "<REDACTED>"
-	agentName = "elastic-agent"
+	REDACTED          = "<REDACTED>"
+	REDACTED_URL_SAFE = "REDACTED"
+	agentName         = "elastic-agent"
 )
 
 // DiagCPU* are contstants to describe the CPU profile that is collected when the --cpu-profile flag is used with the diagnostics command, or the diagnostics action contains "CPU" in the additional_metrics list.
@@ -376,7 +378,7 @@ const redactionMarkerPrefix = "__mark_redact_"
 // the whole generic function here is out of paranoia. Although extremely unlikely,
 // we have no way of guaranteeing we'll get a "normal" map[string]interface{},
 // since the diagnostic interface is a bit of a free-for-all
-func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, sliceElem bool) map[K]interface{} {
+func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}) map[K]interface{} {
 	if inputMap == nil {
 		return nil
 	}
@@ -386,12 +388,13 @@ func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, slice
 		if rootValue != nil {
 			switch cast := rootValue.(type) {
 			case map[string]interface{}:
-				rootValue = redactMap(errOut, cast, false)
+				rootValue = redactMap(errOut, cast)
 			case map[interface{}]interface{}:
-				rootValue = redactMap(errOut, cast, false)
+				rootValue = redactMap(errOut, cast)
 			case map[int]interface{}:
-				rootValue = redactMap(errOut, cast, false)
+				rootValue = redactMap(errOut, cast)
 			case []interface{}:
+				newArray := make([]interface{}, len(cast))
 				// Recursively process each element in the slice so that we also walk
 				// through lists (e.g. inputs[4].streams[0]). This is required to
 				// reach redaction markers that are inside slice items. Set SliceElem to true
@@ -399,20 +402,27 @@ func redactMap[K comparable](errOut io.Writer, inputMap map[K]interface{}, slice
 				for i, value := range cast {
 					switch m := value.(type) {
 					case map[string]interface{}:
-						cast[i] = redactMap(errOut, m, true)
+						newArray[i] = redactMap(errOut, m)
 					case map[interface{}]interface{}:
-						cast[i] = redactMap(errOut, m, true)
+						newArray[i] = redactMap(errOut, m)
 					case map[int]interface{}:
-						cast[i] = redactMap(errOut, m, true)
+						newArray[i] = redactMap(errOut, m)
+					case string:
+						if redactedValue, redact := redactString(m); redact {
+							newArray[i] = redactedValue
+						} else {
+							newArray[i] = m
+						}
+					default:
+						newArray[i] = value
 					}
 				}
-				rootValue = cast
+				rootValue = newArray
 			case string:
-				if keyString, ok := any(rootKey).(string); ok {
-					// Avoid global redaction of slice elements.
-					if redactKey(keyString) && !sliceElem {
-						rootValue = REDACTED
-					}
+				if keyString, ok := any(rootKey).(string); ok && redactKey(keyString) {
+					rootValue = REDACTED
+				} else if redactedValue, redact := redactString(cast); redact {
+					rootValue = redactedValue
 				}
 			case bool: // redaction marker values are always going to be bool, process redaction markers in this case
 				if keyString, ok := any(rootKey).(string); ok {
@@ -466,6 +476,15 @@ func redactKey(k string) bool {
 		strings.Contains(k, "token") ||
 		strings.Contains(k, "key") ||
 		strings.Contains(k, "secret")
+}
+
+func redactString(v string) (string, bool) {
+	if u, err := url.Parse(v); err != nil || u.User == nil {
+		return v, false
+	} else {
+		u.User = url.UserPassword(REDACTED_URL_SAFE, REDACTED_URL_SAFE)
+		return u.String(), true
+	}
 }
 
 func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool) error {
@@ -649,7 +668,7 @@ func saveLogs(name string, logPath string, zw *zip.Writer) error {
 
 // Redact redacts sensitive values from the passed mapStr.
 func Redact(mapStr map[string]any, errOut io.Writer) map[string]any {
-	return redactMap(errOut, mapStr, false)
+	return redactMap(errOut, mapStr)
 }
 
 // AddSecretMarkers adds secret redaction markers to the config by looking at the secret_paths field.
