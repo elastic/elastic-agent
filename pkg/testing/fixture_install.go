@@ -34,6 +34,45 @@ import (
 // ErrNotInstalled is returned in cases where Agent isn't installed
 var ErrNotInstalled = errors.New("Elastic Agent is not installed") //nolint:staticcheck // Elastic Agent is a proper noun
 
+// rpmLockPaths lists known RPM database lock file locations across distro versions.
+var rpmLockPaths = []string{
+	"/usr/lib/sysimage/rpm/.rpm.lock",
+	"/var/lib/rpm/.rpm.lock",
+}
+
+// logRpmLockDiagnostics logs information about what process holds the RPM
+// database lock. Call this when an rpm command fails with a lock error to help
+// identify the culprit process.
+func logRpmLockDiagnostics(t *gotesting.T) {
+	t.Helper()
+	t.Log("=== RPM lock diagnostics ===")
+
+	for _, lockPath := range rpmLockPaths {
+		out, err := exec.Command("sudo", "fuser", "-v", lockPath).CombinedOutput() // #nosec G204
+		if err == nil && len(out) > 0 {
+			t.Logf("fuser -v %s:\n%s", lockPath, string(out))
+		}
+	}
+
+	for _, cmd := range []struct {
+		name string
+		args []string
+	}{
+		{"systemctl list-timers", []string{"systemctl", "list-timers", "--all", "--no-pager"}},
+		{"systemctl active units", []string{"systemctl", "list-units", "--state=running", "--no-pager"}},
+		{"ps aux", []string{"ps", "aux"}},
+	} {
+		out, err := exec.Command("sudo", cmd.args...).CombinedOutput() // #nosec G204
+		if err != nil {
+			t.Logf("%s: error: %v", cmd.name, err)
+		} else {
+			t.Logf("%s:\n%s", cmd.name, string(out))
+		}
+	}
+
+	t.Log("=== end RPM lock diagnostics ===")
+}
+
 // CmdOpts creates vectors of command arguments for different agent commands
 type CmdOpts interface {
 	toCmdArgs() []string
@@ -605,6 +644,7 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 	}
 	installOut, err := cmd.CombinedOutput()
 	if err != nil {
+		logRpmLockDiagnostics(f.t)
 		return installOut, fmt.Errorf("rpm install failed: %w output:%s", err, string(installOut))
 	}
 
@@ -623,6 +663,7 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 		f.t.Logf("running 'sudo rpm -e elastic-agent'")
 		out, err = exec.CommandContext(uninstallCtx, "sudo", "rpm", "-e", "elastic-agent").CombinedOutput()
 		if err != nil {
+			logRpmLockDiagnostics(f.t)
 			f.t.Logf("failed to 'sudo rpm -e elastic-agent': %s, output: %s", err, string(out))
 			f.t.FailNow()
 		}
@@ -741,6 +782,7 @@ func (f *Fixture) uninstallRpm(ctx context.Context, uninstallOpts *UninstallOpts
 	}
 	out, err = exec.CommandContext(ctx, "sudo", "rpm", "-e", "elastic-agent").CombinedOutput()
 	if err != nil {
+		logRpmLockDiagnostics(f.t)
 		return out, fmt.Errorf("error running 'sudo rpm -e elastic-agent': %w", err)
 	}
 	return out, nil
