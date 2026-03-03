@@ -28,11 +28,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
+	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -925,4 +928,86 @@ func readConfig(raw []byte) (*configuration.FleetAgentConfig, error) {
 		return nil, err
 	}
 	return cfg.Fleet, nil
+}
+
+func Test_EnrollCmd_PrepareFleetServerTLS(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  enrollCmdFleetServerOption
+		url  string
+	}{{
+		name: "with cert",
+		cfg: enrollCmdFleetServerOption{
+			ConnStr:      "http://elastic.internal:9220",
+			InternalPort: defaultFleetServerInternalPort,
+			Cert:         "exmple-cert",
+			CertKey:      "example-key",
+		},
+		url: "https://localhost:8221",
+	}, {
+		name: "insecure",
+		cfg: enrollCmdFleetServerOption{
+			Insecure:     true,
+			ConnStr:      "http://elastic.internal:9220",
+			InternalPort: defaultFleetServerInternalPort,
+		},
+		url: "http://localhost:8221",
+	}}
+	log, _ := loggertest.New("Test_EnrollCmd_PrepareFleetServerTLS")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &enrollCmd{
+				log: log,
+				options: &enrollCmdOption{
+					FleetServer: tt.cfg,
+					URL:         "example.com",
+				},
+			}
+			err := c.prepareFleetTLS()
+			require.NoError(t, err)
+			require.Equal(t, tt.url, c.options.URL)
+		})
+	}
+}
+
+func Test_EnrollCmd_RemoteConfig(t *testing.T) {
+	cases := []struct {
+		name    string
+		options enrollCmdOption
+
+		expectedRemote remote.Config
+		expectedError  bool
+	}{{
+		"Fleet server TLS mode is set to certificate mode",
+		enrollCmdOption{
+			URL: "https://localhost:8221",
+			FleetServer: enrollCmdFleetServerOption{
+				ConnStr: "http://localhost:9200",
+			},
+		},
+		remote.Config{
+			Protocol: "https",
+			Host:     "localhost:8221",
+			Transport: httpcommon.HTTPTransportSettings{
+				TLS: &tlscommon.Config{
+					VerificationMode: tlscommon.VerifyCertificate,
+				},
+				Timeout: remote.DefaultClientConfig().Transport.Timeout,
+			},
+		},
+		false,
+	}}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			actCfg, actErr := tc.options.remoteConfig()
+			if tc.expectedError {
+				require.Error(t, actErr)
+				return
+			}
+
+			require.NoError(t, actErr)
+			require.EqualValues(t, tc.expectedRemote, actCfg)
+		})
+	}
 }
