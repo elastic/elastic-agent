@@ -1899,15 +1899,26 @@ func isPlatformIndependentPackage(f string, packageVersion string, dependencies 
 			log.Printf("evaluating if %s is a platform independent package", f)
 		}
 		packageName := spec.GetPackageName(packageVersion, "")
-		// as of now only python wheels packages are platform-independent
 		if mg.Verbose() {
 			log.Printf("checking expected package name %s against actual file name %s", packageName, fileBaseName)
 		}
-		if spec.PythonWheel && (fileBaseName == packageName || fileBaseName == packageName+sha512FileExt) {
-			if mg.Verbose() {
-				log.Printf("%s is a platform independent package", f)
+		if fileBaseName == packageName || fileBaseName == packageName+sha512FileExt {
+			// Python wheels are always platform-independent
+			if spec.PythonWheel {
+				if mg.Verbose() {
+					log.Printf("%s is a platform independent package (python wheel)", f)
+				}
+				return true
 			}
-			return true
+			// Packages whose name doesn't change with platform are also platform-independent
+			// (e.g. connectors, which produce the same zip regardless of platform)
+			platformPackageName := spec.GetPackageName(packageVersion, "linux/amd64")
+			if platformPackageName == packageName {
+				if mg.Verbose() {
+					log.Printf("%s is a platform independent package (same name for all platforms)", f)
+				}
+				return true
+			}
 		}
 	}
 	if mg.Verbose() {
