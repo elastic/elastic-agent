@@ -34,4 +34,7 @@ type collectorHandle interface {
 	// doesn't exit within that time, it will be killed and then it will wait an extra second for it to ensure it's
 	// really stopped.
 	Stop(waitTime time.Duration)
+
+	// Stopped returns whether the process represented the handle has exited.
+	Stopped() bool
 }
