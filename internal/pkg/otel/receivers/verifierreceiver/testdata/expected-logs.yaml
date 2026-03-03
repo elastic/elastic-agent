@@ -1,0 +1,199 @@
+# Expected log output from the verifier receiver
+# This file documents the expected OTLP log format for permission verification results
+
+resourceLogs:
+  - resource:
+      attributes:
+        - key: cloud_connector.id
+          value:
+            stringValue: cc-12345
+        - key: cloud_connector.name
+          value:
+            stringValue: Production Connector
+        - key: verification.id
+          value:
+            stringValue: verify-abc123
+        - key: verification.timestamp
+          value:
+            stringValue: "2024-01-15T10:30:00Z"
+        - key: verification.type
+          value:
+            stringValue: on_demand
+        - key: service.name
+          value:
+            stringValue: permission-verifier
+        - key: service.version
+          value:
+            stringValue: "1.0.0"
+    scopeLogs:
+      - scope:
+          name: elastic.permission_verification
+          version: "1.0.0"
+        logRecords:
+          # Permission granted example
+          - severityNumber: 9
+            severityText: INFO
+            body:
+              stringValue: "Permission check: aws/cloudtrail:LookupEvents - granted"
+            attributes:
+              - key: policy.id
+                value:
+                  stringValue: policy-1
+              - key: policy.name
+                value:
+                  stringValue: AWS Security Monitoring
+              - key: integration.id
+                value:
+                  stringValue: int-cloudtrail-001
+              - key: integration.name
+                value:
+                  stringValue: AWS CloudTrail
+              - key: integration.type
+                value:
+                  stringValue: aws_cloudtrail
+              - key: integration.version
+                value:
+                  stringValue: "2.17.0"
+              - key: provider.type
+                value:
+                  stringValue: aws
+              - key: provider.region
+                value:
+                  stringValue: us-east-1
+              - key: permission.action
+                value:
+                  stringValue: cloudtrail:LookupEvents
+              - key: permission.category
+                value:
+                  stringValue: data_access
+              - key: permission.status
+                value:
+                  stringValue: granted
+              - key: permission.required
+                value:
+                  boolValue: true
+              - key: verification.method
+                value:
+                  stringValue: api_call
+              - key: verification.endpoint
+                value:
+                  stringValue: cloudtrail:LookupEvents
+              - key: verification.duration_ms
+                value:
+                  intValue: 450
+
+          # Permission denied example
+          - severityNumber: 13
+            severityText: WARN
+            body:
+              stringValue: "Permission check: aws/guardduty:ListDetectors - denied"
+            attributes:
+              - key: policy.id
+                value:
+                  stringValue: policy-1
+              - key: policy.name
+                value:
+                  stringValue: AWS Security Monitoring
+              - key: integration.id
+                value:
+                  stringValue: int-guardduty-001
+              - key: integration.name
+                value:
+                  stringValue: AWS GuardDuty
+              - key: integration.type
+                value:
+                  stringValue: aws_guardduty
+              - key: integration.version
+                value:
+                  stringValue: "1.5.0"
+              - key: provider.type
+                value:
+                  stringValue: aws
+              - key: provider.region
+                value:
+                  stringValue: us-east-1
+              - key: permission.action
+                value:
+                  stringValue: guardduty:ListDetectors
+              - key: permission.category
+                value:
+                  stringValue: data_access
+              - key: permission.status
+                value:
+                  stringValue: denied
+              - key: permission.required
+                value:
+                  boolValue: true
+              - key: permission.error_code
+                value:
+                  stringValue: AccessDenied
+              - key: permission.error_message
+                value:
+                  stringValue: "User is not authorized to perform guardduty:ListDetectors"
+              - key: verification.method
+                value:
+                  stringValue: api_call
+              - key: verification.endpoint
+                value:
+                  stringValue: guardduty:ListDetectors
+              - key: verification.duration_ms
+                value:
+                  intValue: 320
+
+          # Permission error example
+          - severityNumber: 17
+            severityText: ERROR
+            body:
+              stringValue: "Permission check: aws/cloudtrail:GetTrailStatus - error"
+            attributes:
+              - key: policy.id
+                value:
+                  stringValue: policy-1
+              - key: policy.name
+                value:
+                  stringValue: AWS Security Monitoring
+              - key: integration.id
+                value:
+                  stringValue: int-cloudtrail-001
+              - key: integration.name
+                value:
+                  stringValue: AWS CloudTrail
+              - key: integration.type
+                value:
+                  stringValue: aws_cloudtrail
+              - key: integration.version
+                value:
+                  stringValue: "2.17.0"
+              - key: provider.type
+                value:
+                  stringValue: aws
+              - key: provider.region
+                value:
+                  stringValue: us-east-1
+              - key: permission.action
+                value:
+                  stringValue: cloudtrail:GetTrailStatus
+              - key: permission.category
+                value:
+                  stringValue: management
+              - key: permission.status
+                value:
+                  stringValue: error
+              - key: permission.required
+                value:
+                  boolValue: false
+              - key: permission.error_code
+                value:
+                  stringValue: TrailNotFoundException
+              - key: permission.error_message
+                value:
+                  stringValue: "Trail not found"
+              - key: verification.method
+                value:
+                  stringValue: api_call
+              - key: verification.endpoint
+                value:
+                  stringValue: cloudtrail:GetTrailStatus
+              - key: verification.duration_ms
+                value:
+                  intValue: 280
