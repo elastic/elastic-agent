@@ -1,0 +1,70 @@
+# GCP verifier test using application default credentials
+#
+# Prerequisites:
+#   gcloud auth application-default login
+#
+# Run with:
+#   GCP_PROJECT_ID=your-project-id ./_build/elastic-collector-components --config ./receiver/verifierreceiver/testdata/test-gcp.yaml
+
+receivers:
+  verifier:
+    cloud_connector_id: "cc-test-gcp"
+    cloud_connector_name: "GCP Test"
+    namespace: "default"
+    account_type: "single_account"
+    verification_id: "verify-gcp-001"
+    verification_type: "on_demand"
+
+    providers:
+      gcp:
+        credentials:
+          use_default_credentials: true
+          project_id: "${GCP_PROJECT_ID}"
+
+    policies:
+      - policy_id: "policy-gcp-security"
+        policy_name: "GCP Security"
+        integrations:
+          - policy_template: "audit"
+            package_name: "gcp"
+            package_policy_id: "pp-audit-001"
+            package_title: "GCP"
+            config:
+              project_id: "${GCP_PROJECT_ID}"
+          - policy_template: "cspm"
+            package_name: "gcp"
+            package_policy_id: "pp-cspm-001"
+            package_title: "GCP"
+            config:
+              project_id: "${GCP_PROJECT_ID}"
+          - policy_template: "asset_inventory"
+            package_name: "gcp"
+            package_policy_id: "pp-asset-001"
+            package_title: "GCP"
+            config:
+              project_id: "${GCP_PROJECT_ID}"
+          - policy_template: "storage"
+            package_name: "gcp"
+            package_policy_id: "pp-storage-001"
+            package_title: "GCP"
+            config:
+              project_id: "${GCP_PROJECT_ID}"
+          - policy_template: "pubsub"
+            package_name: "gcp"
+            package_policy_id: "pp-pubsub-001"
+            package_title: "GCP"
+            config:
+              project_id: "${GCP_PROJECT_ID}"
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  telemetry:
+    logs:
+      level: info
+  pipelines:
+    logs:
+      receivers: [verifier]
+      exporters: [debug]

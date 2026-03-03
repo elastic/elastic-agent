@@ -1,0 +1,78 @@
+# Simulates the Elastic Agent OTEL mode configuration
+# This tests the same receiver that would run inside elastic-agent
+#
+# Run with:
+#   AWS_PROFILE=csp ./_build/elastic-collector-components --config ./receiver/verifierreceiver/testdata/agent-simulation.yaml
+
+receivers:
+  verifier:
+    # Cloud Connector Identification (would come from Fleet)
+    cloud_connector_id: "cc-agent-simulation-001"
+    cloud_connector_name: "Agent Simulation Test"
+    
+    # Verification Session (would be generated per run)
+    verification_id: "verify-sim-001"
+    verification_type: "on_demand"
+    
+    # Provider Credentials
+    providers:
+      aws:
+        credentials:
+          # Using default credentials (AWS_PROFILE) for testing
+          use_default_credentials: true
+          default_region: "us-east-1"
+    
+    # Policies and Integrations (would come from Fleet policy)
+    policies:
+      - policy_id: "policy-aws-security"
+        policy_name: "AWS Security Monitoring"
+        integrations:
+          - integration_id: "int-cloudtrail-001"
+            integration_type: "aws_cloudtrail"
+            integration_name: "AWS CloudTrail"
+            integration_version: "2.17.0"
+            config:
+              region: "us-east-1"
+          - integration_id: "int-guardduty-001"
+            integration_type: "aws_guardduty"
+            integration_name: "AWS GuardDuty"
+            integration_version: "1.5.0"
+            config:
+              region: "us-east-1"
+      
+      - policy_id: "policy-aws-infra"
+        policy_name: "AWS Infrastructure"
+        integrations:
+          - integration_id: "int-s3-001"
+            integration_type: "aws_s3"
+            integration_name: "AWS S3 Logs"
+            integration_version: "1.0.0"
+            config:
+              region: "us-west-2"
+          - integration_id: "int-ec2-001"
+            integration_type: "aws_ec2"
+            integration_name: "AWS EC2 Metrics"
+            integration_version: "2.0.0"
+            config:
+              region: "us-east-1"
+
+exporters:
+  # Debug exporter shows detailed output in console
+  debug:
+    verbosity: detailed
+
+processors:
+  # Batch processor for efficiency (like production)
+  batch:
+    timeout: 5s
+    send_batch_size: 100
+
+service:
+  telemetry:
+    logs:
+      level: info
+  pipelines:
+    logs:
+      receivers: [verifier]
+      processors: [batch]
+      exporters: [debug]

@@ -90,10 +90,20 @@ require (
 require (
 	cloud.google.com/go/pubsub/v2 v2.0.0 // indirect
 	github.com/DeRuina/timberjack v1.3.9 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/appservice/armappservice v1.0.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v6 v6.4.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v6 v6.2.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage v1.6.0 // indirect
 	github.com/KimMachineGun/automemlimit v0.7.5 // indirect
+	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/alexbrainman/sspi v0.0.0-20210105120005-909beea2cc74 // indirect
+	github.com/aws/aws-sdk-go-v2/service/cloudfront v1.60.3 // indirect
+	github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.55.8 // indirect
+	github.com/aws/aws-sdk-go-v2/service/configservice v1.62.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.71.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/guardduty v1.74.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/kafka v1.46.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.8 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect

@@ -105,6 +105,7 @@ import (
 
 	elasticsearchstorage "github.com/elastic/beats/v7/x-pack/otel/extension/elasticsearchstorage"
 	elasticdiagnostics "github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
+	verifierreceiver "github.com/elastic/elastic-agent/internal/pkg/otel/receivers/verifierreceiver"
 
 	"github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension"
 	"github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension"
@@ -152,6 +153,7 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			jaegerreceiver.NewFactory(),
 			zipkinreceiver.NewFactory(),
 			elasticmonitoringreceiver.NewFactory(),
+			verifierreceiver.NewFactory(),
 			fbreceiver.NewFactoryWithSettings(fbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			mbreceiver.NewFactoryWithSettings(mbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 

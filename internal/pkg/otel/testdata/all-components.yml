@@ -99,6 +99,14 @@ receivers:
   statsd:
     endpoint: localhost:8125
   elasticmonitoringreceiver:
+  verifier:
+    cloud_connector_id: "test-cc-001"
+    verification_id: "test-verify-001"
+    policies:
+      - policy_id: "policy-001"
+        integrations:
+          - policy_template: "cloudtrail"
+            package_name: "aws"
   snmp:
     metrics:
       snmp.uptime:
@@ -196,6 +204,7 @@ service:
         - nop
         - elasticapmintake
         - elasticmonitoringreceiver
+        - verifier
 
     logs/forward_receive:
       receivers:

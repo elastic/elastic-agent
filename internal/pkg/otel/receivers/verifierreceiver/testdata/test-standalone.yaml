@@ -1,0 +1,95 @@
+# Standalone test configuration for the verifier receiver
+# 
+# Run with:
+#   cd opentelemetry-collector-components
+#   make genelasticcol
+#   ./_build/elastic-collector-components --config ./receiver/verifierreceiver/testdata/test-standalone.yaml
+#
+# For AWS Cloud Connector authentication:
+#   1. Set the role_arn to the IAM role ARN in the target AWS account
+#   2. Set the external_id to the value from Cloud Connector setup
+#
+# Without provider credentials, the receiver will still run but report "error" status
+# with "VerifierNotInitialized" for permissions requiring those providers.
+
+receivers:
+  verifier:
+    cloud_connector_id: "cc-test-12345"
+    cloud_connector_name: "Local Test Connector"
+    namespace: "default"
+    account_type: "single_account"
+    verification_id: "verify-local-001"
+    verification_type: "on_demand"
+    
+    # Provider Credentials
+    # Each CSP supports two auth modes:
+    #   1. Cloud connector (production) - OIDC JWT-based federated credentials
+    #   2. Default credentials (testing) - use_default_credentials: true
+    providers:
+      # AWS - use_default_credentials or cloud connector (role_arn + env vars)
+      aws:
+        credentials:
+          # use_default_credentials: true
+          # role_arn: "arn:aws:iam::123456789012:role/ElasticAgentRole"
+          # external_id: "your-external-id-from-elastic"
+          default_region: "us-east-1"
+      
+      # Azure - use_default_credentials or cloud connector (tenant_id + client_id + env vars)
+      # azure:
+      #   credentials:
+      #     use_default_credentials: true
+      #     subscription_id: "your-subscription-id"
+      
+      # GCP - use_default_credentials or cloud connector (workload_identity_provider + env vars)
+      # gcp:
+      #   credentials:
+      #     use_default_credentials: true
+      #     project_id: "your-project-id"
+      
+      # Okta Authentication (future)
+      # okta:
+      #   credentials:
+      #     domain: "dev-123456.okta.com"
+      #     api_token: "your-api-token"
+    
+    policies:
+      - policy_id: "policy-aws-security"
+        policy_name: "AWS Security Monitoring"
+        integrations:
+          - policy_template: "cloudtrail"
+            package_name: "aws"
+            package_policy_id: "pp-cloudtrail-001"
+            package_title: "AWS"
+            package_version: "2.17.0"
+            config:
+              account_id: "123456789012"
+              region: "us-east-1"
+          - policy_template: "guardduty"
+            package_name: "aws"
+            package_policy_id: "pp-guardduty-001"
+            package_title: "AWS"
+            package_version: "1.5.0"
+            config:
+              account_id: "123456789012"
+              region: "us-east-1"
+      - policy_id: "policy-aws-infra"
+        policy_name: "AWS Infrastructure"
+        integrations:
+          - policy_template: "s3"
+            package_name: "aws"
+            package_policy_id: "pp-s3-001"
+            package_title: "AWS"
+            package_version: "1.0.0"
+            config:
+              account_id: "123456789012"
+              region: "us-west-2"
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    logs:
+      receivers: [verifier]
+      exporters: [debug]
