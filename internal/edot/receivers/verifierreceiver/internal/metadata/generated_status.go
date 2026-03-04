@@ -12,7 +12,7 @@ import (
 
 var (
 	Type      = component.MustNewType("verifier")
-	ScopeName = "github.com/elastic/elastic-agent/internal/pkg/otel/receivers/verifierreceiver"
+	ScopeName = "github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver"
 )
 
 const (

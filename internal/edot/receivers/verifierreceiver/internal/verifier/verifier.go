@@ -5,7 +5,7 @@
 // Package verifier provides permission verification for cloud providers.
 // It defines interfaces and types for verifying permissions across different
 // cloud providers (AWS, Azure, GCP) and identity providers (Okta, etc.).
-package verifier // import "github.com/elastic/elastic-agent/internal/pkg/otel/receivers/verifierreceiver/internal/verifier"
+package verifier // import "github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver/internal/verifier"
 
 import (
 	"context"

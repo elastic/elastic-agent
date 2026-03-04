@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package verifierreceiver // import "github.com/elastic/elastic-agent/internal/pkg/otel/receivers/verifierreceiver"
+package verifierreceiver // import "github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver"
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/receiver"
 
-	"github.com/elastic/elastic-agent/internal/pkg/otel/receivers/verifierreceiver/internal/metadata"
+	"github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver/internal/metadata"
 )
 
 // NewFactory creates a new factory for the verifier receiver.

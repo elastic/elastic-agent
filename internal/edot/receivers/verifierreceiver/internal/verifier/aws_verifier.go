@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package verifier // import "github.com/elastic/elastic-agent/internal/pkg/otel/receivers/verifierreceiver/internal/verifier"
+package verifier // import "github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver/internal/verifier"
 
 import (
 	"context"
