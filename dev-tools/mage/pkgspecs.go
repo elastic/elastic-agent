@@ -22,8 +22,8 @@ var Packages []OSPackageArgs
 
 // UseElasticAgentCorePackaging configures the package target to build binary packages
 // for an Elastic Agent.
-func UseElasticAgentCorePackaging() {
-	MustUsePackaging("elastic_agent_core", packageSpecFile)
+func UseElasticAgentCorePackaging(cfg *Settings) {
+	MustUsePackaging(cfg, "elastic_agent_core", packageSpecFile)
 }
 
 // UseCommunityBeatPackaging configures the package target to build packages for
@@ -34,8 +34,9 @@ func UseCommunityBeatPackaging() {
 
 // UseElasticAgentPackaging configures the package target to build packages for
 // an Elastic Agent.
-func UseElasticAgentPackaging() {
+func UseElasticAgentPackaging(cfg *Settings) {
 	// Prepare binaries so they can be packed into agent
+<<<<<<< HEAD
 	MustUsePackaging("elastic_beat_agent_binaries", packageSpecFile)
 }
 
@@ -44,6 +45,9 @@ func UseElasticAgentPackaging() {
 func UseElasticAgentDemoPackaging() {
 	// Prepare binaries so they can be packed into agent
 	MustUsePackaging("elastic_beat_agent_demo_binaries", packageSpecFile)
+=======
+	MustUsePackaging(cfg, "elastic_agent_packaging", packageSpecFile)
+>>>>>>> 9041ee9d3 (Drop remaining globals from mage settings (#12856))
 }
 
 // UseElasticBeatPackaging configures the package target to build packages for
@@ -90,13 +94,10 @@ func UseElasticBeatWithoutXPackPackaging() {
 // occurs when loading the specs it will panic.
 //
 // NOTE: we assume that specFile is relative to the beatsDir.
-func MustUsePackaging(specName, specFile string) {
-	beatsDir, err := ElasticBeatsDir()
-	if err != nil {
-		panic(err)
-	}
+func MustUsePackaging(cfg *Settings, specName, specFile string) {
+	beatsDir := cfg.ElasticBeatsDir
 
-	err = LoadNamedSpec(specName, filepath.Join(beatsDir, specFile))
+	err := LoadNamedSpec(specName, filepath.Join(beatsDir, specFile))
 	if err != nil {
 		panic(err)
 	}
@@ -104,13 +105,10 @@ func MustUsePackaging(specName, specFile string) {
 
 // LoadLocalNamedSpec loads the named package spec from the packages.yml in the
 // current directory.
-func LoadLocalNamedSpec(name string) {
-	beatsDir, err := ElasticBeatsDir()
-	if err != nil {
-		panic(err)
-	}
+func LoadLocalNamedSpec(cfg *Settings, name string) {
+	beatsDir := cfg.ElasticBeatsDir
 
-	err = LoadNamedSpec(name, filepath.Join(beatsDir, packageSpecFile), "packages.yml")
+	err := LoadNamedSpec(name, filepath.Join(beatsDir, packageSpecFile), "packages.yml")
 	if err != nil {
 		panic(err)
 	}
