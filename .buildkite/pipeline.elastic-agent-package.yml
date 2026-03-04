@@ -255,4 +255,4 @@ steps:
 
 notify:
 - slack: "#ingest-notifications"
-  if: build.branch == 'main' || build.branch =~ /^[0-9]+\.[0-9x]+\$/
+
