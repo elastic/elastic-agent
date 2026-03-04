@@ -320,10 +320,8 @@ func addCollectorMetricsReader(conf *confmap.Conf, port int) error {
 		"pull": map[string]any{
 			"exporter": map[string]any{
 				"prometheus": map[string]any{
-					"host": "localhost",
-					"port": port,
-					// this is the default configuration from the otel collector
-					"without_scope_info":  true,
+					"host":                "localhost",
+					"port":                port,
 					"without_units":       true,
 					"without_type_suffix": true,
 				},
