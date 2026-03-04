@@ -375,9 +375,9 @@ func TestGetProviderForPackage(t *testing.T) {
 
 func TestIntegrationConfig_IntegrationType(t *testing.T) {
 	tests := []struct {
-		name           string
-		config         IntegrationConfig
-		wantType       string
+		name     string
+		config   IntegrationConfig
+		wantType string
 	}{
 		{
 			name:     "AWS CloudTrail",

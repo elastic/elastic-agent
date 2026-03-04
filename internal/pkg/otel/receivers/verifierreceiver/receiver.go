@@ -396,7 +396,7 @@ func (r *verifierReceiver) verifyPermission(
 
 	return v.Verify(ctx, verifier.Permission{
 		Action:   perm.Action,
-		Method:   verifier.VerificationMethod(perm.Method),
+		Method:   perm.Method,
 		Required: perm.Required,
 		Category: perm.Category,
 	}, providerCfg)
