@@ -254,5 +254,8 @@ steps:
       fi
 
 notify:
-- slack: "#ingest-notifications"
+- slack:
+    channels:
+      - "#ingest-notifications"
+    message: "Testing build notifications for elastic-agent-package <!subteam^S030QSX59PH>"
 
