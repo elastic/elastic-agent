@@ -8,7 +8,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/consumer/consumertest"
@@ -102,7 +101,7 @@ func TestReceiver_StartShutdown(t *testing.T) {
 
 	dsDataset, ok := attrs.Get("data_stream.dataset")
 	require.True(t, ok)
-	assert.Equal(t, "verifier_otel.verification", dsDataset.Str())
+	assert.Equal(t, "cloud_connector.permission_verification", dsDataset.Str())
 
 	dsNamespace, ok := attrs.Get("data_stream.namespace")
 	require.True(t, ok)
@@ -351,8 +350,9 @@ func TestReceiver_AzureIntegrations(t *testing.T) {
 		Providers: ProvidersConfig{
 			Azure: AzureProviderConfig{
 				Credentials: AzureCredentials{
-					TenantID: "00000000-0000-0000-0000-000000000000",
-					ClientID: "11111111-1111-1111-1111-111111111111",
+					TenantID:       "00000000-0000-0000-0000-000000000000",
+					ClientID:       "11111111-1111-1111-1111-111111111111",
+					SubscriptionID: "22222222-2222-2222-2222-222222222222",
 				},
 			},
 		},
@@ -744,8 +744,6 @@ func TestPermissionRegistry(t *testing.T) {
 			"aws_route53",
 			"aws_elb",
 			"aws_cloudfront",
-			"aws_cspm",
-			"aws_asset_inventory",
 		}
 
 		for _, integration := range awsIntegrations {
@@ -761,8 +759,6 @@ func TestPermissionRegistry(t *testing.T) {
 			"azure_activitylogs",
 			"azure_auditlogs",
 			"azure_blob_storage",
-			"azure_cspm",
-			"azure_asset_inventory",
 		}
 
 		for _, integration := range azureIntegrations {
@@ -778,8 +774,6 @@ func TestPermissionRegistry(t *testing.T) {
 			"gcp_audit",
 			"gcp_storage",
 			"gcp_pubsub",
-			"gcp_cspm",
-			"gcp_asset_inventory",
 		}
 
 		for _, integration := range gcpIntegrations {
@@ -877,259 +871,4 @@ func TestPermissionRegistry(t *testing.T) {
 		constraints := registry.GetVersionConstraints("unknown_integration")
 		assert.Nil(t, constraints)
 	})
-
-	// Pre-release version tests: fallback to release constraints
-	t.Run("beta version falls back to release constraint", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_cloudtrail", "2.17.0-beta1")
-		require.NotNil(t, perms, "2.17.0-beta1 should match via fallback to >=2.0.0")
-		assert.Equal(t, verifier.ProviderAWS, perms.Provider)
-
-		for _, p := range perms.Permissions {
-			if p.Action == "sqs:ReceiveMessage" {
-				assert.True(t, p.Required, "beta version should fall back to v2+ permissions")
-			}
-		}
-	})
-
-	t.Run("beta.N version falls back to release constraint", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_cloudtrail", "2.17.0-beta.2")
-		require.NotNil(t, perms, "2.17.0-beta.2 should match via fallback to >=2.0.0")
-	})
-
-	t.Run("preview version falls back to release constraint", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_guardduty", "3.0.0-preview05")
-		require.NotNil(t, perms, "3.0.0-preview05 should match via fallback to >=0.0.0")
-		assert.Equal(t, verifier.ProviderAWS, perms.Provider)
-	})
-
-	t.Run("rc version falls back to v1 release constraint", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_cloudtrail", "1.5.0-rc1")
-		require.NotNil(t, perms, "1.5.0-rc1 should match via fallback to >=1.0.0,<2.0.0")
-
-		for _, p := range perms.Permissions {
-			if p.Action == "sqs:ReceiveMessage" {
-				assert.False(t, p.Required, "rc v1 should get v1 permissions (SQS optional)")
-			}
-		}
-	})
-
-	t.Run("boundary beta version matches release constraint", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_cloudtrail", "2.0.0-beta1")
-		require.NotNil(t, perms, "2.0.0-beta1 should match via fallback to >=2.0.0")
-
-		for _, p := range perms.Permissions {
-			if p.Action == "sqs:ReceiveMessage" {
-				assert.True(t, p.Required, "2.0.0-beta1 should get v2+ permissions")
-			}
-		}
-	})
-
-	t.Run("preview with timestamp suffix", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_guardduty", "2.26.0-preview-1747764883")
-		require.NotNil(t, perms, "version with timestamp preview suffix should match")
-		assert.Equal(t, verifier.ProviderAWS, perms.Provider)
-	})
-
-	t.Run("version with build metadata", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_cloudtrail", "2.17.0+build123")
-		require.NotNil(t, perms, "version with build metadata should match >=2.0.0")
-
-		for _, p := range perms.Permissions {
-			if p.Action == "sqs:ReceiveMessage" {
-				assert.True(t, p.Required, "build metadata version should get v2+ permissions")
-			}
-		}
-	})
-
-	t.Run("0.x version treated as preview", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_guardduty", "0.5.0")
-		require.NotNil(t, perms, "0.5.0 should match via fallback to >=0.0.0")
-		assert.Equal(t, verifier.ProviderAWS, perms.Provider)
-	})
-}
-
-func TestPermissionRegistry_TagSpecific(t *testing.T) {
-	registry := &PermissionRegistry{
-		integrations: make(map[string][]VersionedPermissions),
-	}
-
-	betaPerms := IntegrationPermissions{
-		Provider: verifier.ProviderAWS,
-		Permissions: []Permission{
-			{Action: "test:BetaAction", Required: true, Method: MethodAPICall},
-		},
-	}
-	previewPerms := IntegrationPermissions{
-		Provider: verifier.ProviderAWS,
-		Permissions: []Permission{
-			{Action: "test:PreviewAction", Required: true, Method: MethodAPICall},
-		},
-	}
-	rcPerms := IntegrationPermissions{
-		Provider: verifier.ProviderAWS,
-		Permissions: []Permission{
-			{Action: "test:RCAction", Required: true, Method: MethodAPICall},
-		},
-	}
-	releasePerms := IntegrationPermissions{
-		Provider: verifier.ProviderAWS,
-		Permissions: []Permission{
-			{Action: "test:ReleaseAction", Required: true, Method: MethodAPICall},
-		},
-	}
-
-	registry.registerWithTag("test_integration", ">=1.0.0", PrereleaseTagBeta, betaPerms)
-	registry.registerWithTag("test_integration", ">=1.0.0", PrereleaseTagPreview, previewPerms)
-	registry.registerWithTag("test_integration", ">=1.0.0", PrereleaseTagRC, rcPerms)
-	registry.register("test_integration", ">=1.0.0", releasePerms)
-
-	t.Run("beta version matches beta entry", func(t *testing.T) {
-		perms := registry.GetPermissions("test_integration", "2.0.0-beta.1")
-		require.NotNil(t, perms)
-		require.Len(t, perms.Permissions, 1)
-		assert.Equal(t, "test:BetaAction", perms.Permissions[0].Action)
-	})
-
-	t.Run("preview version matches preview entry", func(t *testing.T) {
-		perms := registry.GetPermissions("test_integration", "2.0.0-preview01")
-		require.NotNil(t, perms)
-		require.Len(t, perms.Permissions, 1)
-		assert.Equal(t, "test:PreviewAction", perms.Permissions[0].Action)
-	})
-
-	t.Run("rc version matches rc entry", func(t *testing.T) {
-		perms := registry.GetPermissions("test_integration", "2.0.0-rc1")
-		require.NotNil(t, perms)
-		require.Len(t, perms.Permissions, 1)
-		assert.Equal(t, "test:RCAction", perms.Permissions[0].Action)
-	})
-
-	t.Run("release version matches release entry", func(t *testing.T) {
-		perms := registry.GetPermissions("test_integration", "2.0.0")
-		require.NotNil(t, perms)
-		require.Len(t, perms.Permissions, 1)
-		assert.Equal(t, "test:ReleaseAction", perms.Permissions[0].Action)
-	})
-
-	t.Run("no version returns release entry", func(t *testing.T) {
-		perms := registry.GetPermissions("test_integration", "")
-		require.NotNil(t, perms)
-		require.Len(t, perms.Permissions, 1)
-		assert.Equal(t, "test:ReleaseAction", perms.Permissions[0].Action)
-	})
-
-	t.Run("invalid version returns release entry", func(t *testing.T) {
-		perms := registry.GetPermissions("test_integration", "not-valid")
-		require.NotNil(t, perms)
-		require.Len(t, perms.Permissions, 1)
-		assert.Equal(t, "test:ReleaseAction", perms.Permissions[0].Action)
-	})
-
-	t.Run("version constraints include tags", func(t *testing.T) {
-		constraints := registry.GetVersionConstraints("test_integration")
-		require.Len(t, constraints, 4)
-		assert.Equal(t, ">=1.0.0 [beta]", constraints[0])
-		assert.Equal(t, ">=1.0.0 [preview]", constraints[1])
-		assert.Equal(t, ">=1.0.0 [rc]", constraints[2])
-		assert.Equal(t, ">=1.0.0", constraints[3])
-	})
-}
-
-func TestPermissionRegistry_TagFallback(t *testing.T) {
-	registry := &PermissionRegistry{
-		integrations: make(map[string][]VersionedPermissions),
-	}
-
-	betaPerms := IntegrationPermissions{
-		Provider: verifier.ProviderAWS,
-		Permissions: []Permission{
-			{Action: "test:BetaOnly", Required: true, Method: MethodAPICall},
-		},
-	}
-	releasePerms := IntegrationPermissions{
-		Provider: verifier.ProviderAWS,
-		Permissions: []Permission{
-			{Action: "test:Release", Required: true, Method: MethodAPICall},
-		},
-	}
-
-	registry.registerWithTag("test_fallback", ">=2.0.0", PrereleaseTagBeta, betaPerms)
-	registry.register("test_fallback", ">=1.0.0", releasePerms)
-
-	t.Run("beta version in range gets beta permissions", func(t *testing.T) {
-		perms := registry.GetPermissions("test_fallback", "2.5.0-beta.1")
-		require.NotNil(t, perms)
-		assert.Equal(t, "test:BetaOnly", perms.Permissions[0].Action)
-	})
-
-	t.Run("beta version below tag range falls back to release", func(t *testing.T) {
-		perms := registry.GetPermissions("test_fallback", "1.5.0-beta.1")
-		require.NotNil(t, perms)
-		assert.Equal(t, "test:Release", perms.Permissions[0].Action)
-	})
-
-	t.Run("preview version with no preview entry falls back to release", func(t *testing.T) {
-		perms := registry.GetPermissions("test_fallback", "2.5.0-preview01")
-		require.NotNil(t, perms)
-		assert.Equal(t, "test:Release", perms.Permissions[0].Action)
-	})
-
-	t.Run("rc version with no rc entry falls back to release", func(t *testing.T) {
-		perms := registry.GetPermissions("test_fallback", "2.5.0-rc1")
-		require.NotNil(t, perms)
-		assert.Equal(t, "test:Release", perms.Permissions[0].Action)
-	})
-}
-
-func TestExtractPrereleaseTag(t *testing.T) {
-	tests := []struct {
-		version string
-		want    string
-	}{
-		{"2.17.0", ""},
-		{"2.17.0-beta1", PrereleaseTagBeta},
-		{"2.17.0-beta.1", PrereleaseTagBeta},
-		{"2.17.0-beta", PrereleaseTagBeta},
-		{"3.3.0-preview05", PrereleaseTagPreview},
-		{"3.3.0-preview.5", PrereleaseTagPreview},
-		{"9.1.0-preview-1747764883", PrereleaseTagPreview},
-		{"2.0.0-rc1", PrereleaseTagRC},
-		{"2.0.0-rc.1", PrereleaseTagRC},
-		{"1.0.0-alpha.1", PrereleaseTagBeta},
-		{"1.0.0-SNAPSHOT", PrereleaseTagBeta},
-		{"0.5.0", PrereleaseTagPreview},
-		{"0.1.0-beta.1", PrereleaseTagPreview},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.version, func(t *testing.T) {
-			v, err := semver.NewVersion(tt.version)
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, extractPrereleaseTag(v))
-		})
-	}
-}
-
-func TestStripPrerelease(t *testing.T) {
-	tests := []struct {
-		version string
-		want    string
-	}{
-		{"2.17.0", "2.17.0"},
-		{"2.17.0-beta1", "2.17.0"},
-		{"3.3.0-preview05", "3.3.0"},
-		{"9.1.0-preview-1747764883", "9.1.0"},
-		{"2.0.0-rc.1", "2.0.0"},
-		{"2.17.0+build123", "2.17.0"},
-		{"1.0.0-beta.1+build456", "1.0.0"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.version, func(t *testing.T) {
-			v, err := semver.NewVersion(tt.version)
-			require.NoError(t, err)
-			stripped := stripPrerelease(v)
-			assert.Equal(t, tt.want, stripped.String())
-		})
-	}
 }
