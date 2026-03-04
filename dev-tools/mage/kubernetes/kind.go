@@ -13,6 +13,8 @@ import (
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
+
+	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 )
 
 // KindIntegrationTestStep setups a kind environment.
@@ -34,7 +36,7 @@ func (m *KindIntegrationTestStep) Use(dir string) (bool, error) {
 // Setup ensures that a kubernetes cluster is up and running.
 //
 // If `KUBECONFIG` is already deinfed in the env then it will do nothing.
-func (m *KindIntegrationTestStep) Setup(env map[string]string) error {
+func (m *KindIntegrationTestStep) Setup(cfg *devtools.Settings, env map[string]string) error {
 
 	envVars := []string{"KUBECONFIG", "KUBE_CONFIG"}
 	for _, envVar := range envVars {
@@ -51,8 +53,7 @@ func (m *KindIntegrationTestStep) Setup(env map[string]string) error {
 		}
 		return nil
 	}
-
-	clusterName := kubernetesClusterName()
+	clusterName := kubernetesClusterName(cfg)
 	stdOut := io.Discard
 	stdErr := io.Discard
 	if mg.Verbose() {
@@ -81,7 +82,7 @@ func (m *KindIntegrationTestStep) Setup(env map[string]string) error {
 		"--wait",
 		"300s",
 	}
-	kubeVersion := os.Getenv("K8S_VERSION")
+	kubeVersion := cfg.Kubernetes.K8sVersion
 	if kubeVersion != "" {
 		args = append(args, "--image", fmt.Sprintf("kindest/node:%s", kubeVersion))
 	}
@@ -102,7 +103,7 @@ func (m *KindIntegrationTestStep) Setup(env map[string]string) error {
 }
 
 // Teardown destroys the kubernetes cluster.
-func (m *KindIntegrationTestStep) Teardown(env map[string]string) error {
+func (m *KindIntegrationTestStep) Teardown(cfg *devtools.Settings, env map[string]string) error {
 	stdOut := io.Discard
 	stdErr := io.Discard
 	if mg.Verbose() {
@@ -111,8 +112,7 @@ func (m *KindIntegrationTestStep) Teardown(env map[string]string) error {
 	}
 
 	name, created := env["KIND_CLUSTER"]
-	_, keepUp := os.LookupEnv("KIND_SKIP_DELETE")
-	if created && !keepUp {
+	if created && !cfg.Kubernetes.KindSkipDelete {
 		_, err := sh.Exec(
 			env,
 			stdOut,
