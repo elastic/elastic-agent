@@ -24,6 +24,10 @@ func TestPackUnpack(t *testing.T) {
 		Path:     "/ok",
 		Transport: httpcommon.HTTPTransportSettings{
 			Timeout: 10 * time.Second,
+			Auth: &httpcommon.HTTPAuthorization{
+				Username: "user",
+				Password: "pass",
+			},
 		},
 	}
 
