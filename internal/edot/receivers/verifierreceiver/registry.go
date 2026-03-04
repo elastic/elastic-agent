@@ -6,7 +6,6 @@ package verifierreceiver // import "github.com/elastic/elastic-agent/internal/ed
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/Masterminds/semver/v3"
 
@@ -19,11 +18,10 @@ type VerificationMethod = verifier.VerificationMethod
 
 // Re-export verification method constants for use by registry callers.
 var (
-	MethodAPICall               = verifier.MethodAPICall
-	MethodDryRun                = verifier.MethodDryRun
-	MethodHTTPProbe             = verifier.MethodHTTPProbe
-	MethodGraphQL               = verifier.MethodGraphQL
-	MethodPolicyAttachmentCheck = verifier.MethodPolicyAttachmentCheck
+	MethodAPICall   = verifier.MethodAPICall
+	MethodDryRun    = verifier.MethodDryRun
+	MethodHTTPProbe = verifier.MethodHTTPProbe
+	MethodGraphQL   = verifier.MethodGraphQL
 )
 
 // PermissionStatus represents the result of a permission verification.
@@ -64,14 +62,6 @@ type IntegrationPermissions struct {
 	Permissions []Permission
 }
 
-// Pre-release tag constants aligned with Kibana Fleet's getPackageReleaseLabel
-// (x-pack/platform/plugins/shared/fleet/common/services/package_prerelease.ts).
-const (
-	PrereleaseTagPreview = "preview"
-	PrereleaseTagRC      = "rc"
-	PrereleaseTagBeta    = "beta"
-)
-
 // VersionedPermissions associates a semver constraint with a set of integration permissions.
 // The constraint string follows semver syntax (e.g., ">=2.0.0", ">=1.0.0,<2.0.0").
 type VersionedPermissions struct {
@@ -80,12 +70,6 @@ type VersionedPermissions struct {
 
 	// Constraint is the parsed semver constraint used for matching.
 	Constraint *semver.Constraints
-
-	// PrereleaseTag scopes this entry to a specific pre-release stage.
-	// When empty, the entry applies to release (ga) versions and serves as
-	// the fallback for pre-release versions that have no tag-specific entry.
-	// Valid values: "", "beta", "preview", "rc".
-	PrereleaseTag string
 
 	// Permissions is the permission set for integrations matching this constraint.
 	Permissions IntegrationPermissions
@@ -116,19 +100,11 @@ func NewPermissionRegistry() *PermissionRegistry {
 	return registry
 }
 
-// register adds a versioned permission set for release (ga) versions of an integration type.
+// register adds a versioned permission set for an integration type.
 // Entries should be registered newest-first so that the first entry serves as the
 // default when no version is specified. The constraint string follows semver syntax
 // (e.g., ">=2.0.0", ">=1.0.0,<2.0.0", ">=0.0.0").
 func (r *PermissionRegistry) register(integrationType string, constraintStr string, perms IntegrationPermissions) {
-	r.registerWithTag(integrationType, constraintStr, "", perms)
-}
-
-// registerWithTag adds a versioned permission set scoped to a specific pre-release
-// tag. Use an empty prereleaseTag for release (ga) versions. When GetPermissions
-// receives a pre-release version (e.g., "2.17.0-beta1"), it first looks for entries
-// matching the extracted tag ("beta"), then falls back to release entries.
-func (r *PermissionRegistry) registerWithTag(integrationType string, constraintStr string, prereleaseTag string, perms IntegrationPermissions) {
 	constraint, err := semver.NewConstraint(constraintStr)
 	if err != nil {
 		panic(fmt.Sprintf("invalid semver constraint %q for integration %q: %v", constraintStr, integrationType, err))
@@ -137,7 +113,6 @@ func (r *PermissionRegistry) registerWithTag(integrationType string, constraintS
 	r.integrations[integrationType] = append(r.integrations[integrationType], VersionedPermissions{
 		ConstraintStr: constraintStr,
 		Constraint:    constraint,
-		PrereleaseTag: prereleaseTag,
 		Permissions:   perms,
 	})
 }
@@ -145,51 +120,29 @@ func (r *PermissionRegistry) registerWithTag(integrationType string, constraintS
 // GetPermissions returns the permissions required for an integration type and version.
 // If version is empty, the first (latest) registered permission set is returned.
 // If no constraint matches the version, nil is returned.
-//
-// Pre-release versions (e.g., "2.17.0-beta1", "3.3.0-preview05") are supported via
-// a two-pass lookup:
-//
-//  1. Tag-specific pass: the pre-release tag is extracted (e.g., "beta") and matched
-//     against entries registered with that PrereleaseTag.
-//  2. Fallback pass: entries with an empty PrereleaseTag (release/ga) are tried.
-//
-// The base version (major.minor.patch without the pre-release suffix) is used for
-// constraint checking because Masterminds/semver does not match pre-release versions
-// against constraints that lack pre-release markers.
 func (r *PermissionRegistry) GetPermissions(integrationType string, version string) *IntegrationPermissions {
 	entries, ok := r.integrations[integrationType]
 	if !ok || len(entries) == 0 {
 		return nil
 	}
 
-	// If no version specified, return the first (latest) release entry
+	// If no version specified, return the first (latest) entry
 	if version == "" {
-		return r.firstReleaseEntry(entries)
+		perms := entries[0].Permissions
+		return &perms
 	}
 
 	// Parse the provided version
 	v, err := semver.NewVersion(version)
 	if err != nil {
-		// If the version string is not valid semver, fall back to the latest release entry
-		return r.firstReleaseEntry(entries)
+		// If the version string is not valid semver, fall back to the latest entry
+		perms := entries[0].Permissions
+		return &perms
 	}
 
-	tag := extractPrereleaseTag(v)
-	base := stripPrerelease(v)
-
-	// Pass 1: look for entries matching the specific pre-release tag
-	if tag != "" {
-		for i := range entries {
-			if entries[i].PrereleaseTag == tag && entries[i].Constraint.Check(base) {
-				perms := entries[i].Permissions
-				return &perms
-			}
-		}
-	}
-
-	// Pass 2: fall back to release (ga) entries
+	// Find the first matching constraint
 	for i := range entries {
-		if entries[i].PrereleaseTag == "" && entries[i].Constraint.Check(base) {
+		if entries[i].Constraint.Check(v) {
 			perms := entries[i].Permissions
 			return &perms
 		}
@@ -197,60 +150,6 @@ func (r *PermissionRegistry) GetPermissions(integrationType string, version stri
 
 	// No matching constraint found
 	return nil
-}
-
-// firstReleaseEntry returns the first entry with an empty PrereleaseTag,
-// which represents the latest release (ga) permission set.
-func (r *PermissionRegistry) firstReleaseEntry(entries []VersionedPermissions) *IntegrationPermissions {
-	for i := range entries {
-		if entries[i].PrereleaseTag == "" {
-			perms := entries[i].Permissions
-			return &perms
-		}
-	}
-	if len(entries) > 0 {
-		perms := entries[0].Permissions
-		return &perms
-	}
-	return nil
-}
-
-// stripPrerelease returns a version with only the major.minor.patch components,
-// removing any pre-release suffix and build metadata. This is needed because
-// Masterminds/semver does not match pre-release versions against constraints
-// that lack pre-release markers (e.g., ">=2.0.0" won't match "2.17.0-beta1").
-func stripPrerelease(v *semver.Version) *semver.Version {
-	if v.Prerelease() == "" && v.Metadata() == "" {
-		return v
-	}
-	stripped, err := semver.NewVersion(fmt.Sprintf("%d.%d.%d", v.Major(), v.Minor(), v.Patch()))
-	if err != nil {
-		return v
-	}
-	return stripped
-}
-
-// extractPrereleaseTag classifies a version's pre-release suffix into a tag.
-// The classification follows the same priority as Kibana Fleet's getPackageReleaseLabel:
-//   - major == 0 or pre-release contains "preview" --> "preview"
-//   - pre-release contains "rc" --> "rc"
-//   - any other pre-release --> "beta" (catch-all)
-//   - no pre-release --> "" (ga/release)
-func extractPrereleaseTag(v *semver.Version) string {
-	pre := v.Prerelease()
-	if v.Major() == 0 {
-		return PrereleaseTagPreview
-	}
-	if pre == "" {
-		return ""
-	}
-	if strings.Contains(pre, PrereleaseTagPreview) {
-		return PrereleaseTagPreview
-	}
-	if strings.Contains(pre, PrereleaseTagRC) {
-		return PrereleaseTagRC
-	}
-	return PrereleaseTagBeta
 }
 
 // IsSupported returns true if the integration type is registered in the registry.
@@ -280,7 +179,6 @@ func (r *PermissionRegistry) SupportedIntegrationsByProvider() map[verifier.Prov
 }
 
 // GetVersionConstraints returns the version constraints registered for an integration type.
-// Each string includes the pre-release tag when set (e.g., ">=2.0.0 [beta]").
 // Returns nil if the integration type is not registered.
 func (r *PermissionRegistry) GetVersionConstraints(integrationType string) []string {
 	entries, ok := r.integrations[integrationType]
@@ -289,11 +187,7 @@ func (r *PermissionRegistry) GetVersionConstraints(integrationType string) []str
 	}
 	constraints := make([]string, len(entries))
 	for i, entry := range entries {
-		if entry.PrereleaseTag != "" {
-			constraints[i] = fmt.Sprintf("%s [%s]", entry.ConstraintStr, entry.PrereleaseTag)
-		} else {
-			constraints[i] = entry.ConstraintStr
-		}
+		constraints[i] = entry.ConstraintStr
 	}
 	return constraints
 }
@@ -638,28 +532,78 @@ func (r *PermissionRegistry) registerAWSIntegrations() {
 	})
 
 	// AWS CSPM - Cloud Security Posture Management
-	// Verifies that the SecurityAudit managed policy is attached to the assumed role.
+	// Requires the SecurityAudit managed policy. These are representative checks
+	// that confirm the policy is attached.
 	r.register("aws_cspm", ">=0.0.0", IntegrationPermissions{
 		Provider: verifier.ProviderAWS,
 		Permissions: []Permission{
 			{
-				Action:   "arn:aws:iam::aws:policy/SecurityAudit",
+				Action:   "iam:GetAccountSummary",
 				Required: true,
-				Method:   MethodPolicyAttachmentCheck,
+				Method:   MethodAPICall,
+				Category: "security_posture",
+			},
+			{
+				Action:   "ec2:DescribeInstances",
+				Required: true,
+				Method:   MethodDryRun,
+				Category: "security_posture",
+			},
+			{
+				Action:   "s3:GetBucketAcl",
+				Required: true,
+				Method:   MethodAPICall,
+				Category: "security_posture",
+			},
+			{
+				Action:   "cloudtrail:DescribeTrails",
+				Required: true,
+				Method:   MethodAPICall,
+				Category: "security_posture",
+			},
+			{
+				Action:   "config:DescribeComplianceByConfigRule",
+				Required: true,
+				Method:   MethodAPICall,
 				Category: "security_posture",
 			},
 		},
 	})
 
 	// AWS Asset Inventory - Cloud Asset Discovery
-	// Verifies that the SecurityAudit managed policy is attached to the assumed role.
+	// Requires the SecurityAudit managed policy. These checks verify access to
+	// the core resource types inventoried by Cloud Asset Discovery.
 	r.register("aws_asset_inventory", ">=0.0.0", IntegrationPermissions{
 		Provider: verifier.ProviderAWS,
 		Permissions: []Permission{
 			{
-				Action:   "arn:aws:iam::aws:policy/SecurityAudit",
+				Action:   "ec2:DescribeInstances",
 				Required: true,
-				Method:   MethodPolicyAttachmentCheck,
+				Method:   MethodDryRun,
+				Category: "asset_inventory",
+			},
+			{
+				Action:   "ec2:DescribeSecurityGroups",
+				Required: true,
+				Method:   MethodAPICall,
+				Category: "asset_inventory",
+			},
+			{
+				Action:   "s3:ListAllMyBuckets",
+				Required: true,
+				Method:   MethodAPICall,
+				Category: "asset_inventory",
+			},
+			{
+				Action:   "iam:ListUsers",
+				Required: true,
+				Method:   MethodAPICall,
+				Category: "asset_inventory",
+			},
+			{
+				Action:   "rds:DescribeDBInstances",
+				Required: true,
+				Method:   MethodAPICall,
 				Category: "asset_inventory",
 			},
 		},
@@ -708,28 +652,64 @@ func (r *PermissionRegistry) registerAzureIntegrations() {
 	})
 
 	// Azure CSPM - Cloud Security Posture Management
-	// Verifies that the Reader built-in role is assigned at subscription scope.
+	// Requires Reader built-in role + custom role with Microsoft.Web permissions.
 	r.register("azure_cspm", ">=0.0.0", IntegrationPermissions{
 		Provider: verifier.ProviderAzure,
 		Permissions: []Permission{
 			{
-				Action:   "Reader",
+				Action:   "Microsoft.Resources/subscriptions/read",
 				Required: true,
-				Method:   MethodPolicyAttachmentCheck,
+				Method:   MethodAPICall,
+				Category: "security_posture",
+			},
+			{
+				Action:   "Microsoft.Compute/virtualMachines/read",
+				Required: true,
+				Method:   MethodAPICall,
+				Category: "security_posture",
+			},
+			{
+				Action:   "Microsoft.Storage/storageAccounts/read",
+				Required: true,
+				Method:   MethodAPICall,
+				Category: "security_posture",
+			},
+			{
+				Action:   "Microsoft.Web/sites/config/Read",
+				Required: true,
+				Method:   MethodAPICall,
 				Category: "security_posture",
 			},
 		},
 	})
 
 	// Azure Asset Inventory - Cloud Asset Discovery
-	// Verifies that the Reader built-in role is assigned at subscription scope.
+	// Requires Reader built-in role.
 	r.register("azure_asset_inventory", ">=0.0.0", IntegrationPermissions{
 		Provider: verifier.ProviderAzure,
 		Permissions: []Permission{
 			{
-				Action:   "Reader",
+				Action:   "Microsoft.Resources/subscriptions/resources/read",
 				Required: true,
-				Method:   MethodPolicyAttachmentCheck,
+				Method:   MethodAPICall,
+				Category: "asset_inventory",
+			},
+			{
+				Action:   "Microsoft.Compute/virtualMachines/read",
+				Required: true,
+				Method:   MethodAPICall,
+				Category: "asset_inventory",
+			},
+			{
+				Action:   "Microsoft.Network/networkSecurityGroups/read",
+				Required: true,
+				Method:   MethodAPICall,
+				Category: "asset_inventory",
+			},
+			{
+				Action:   "Microsoft.Storage/storageAccounts/read",
+				Required: true,
+				Method:   MethodAPICall,
 				Category: "asset_inventory",
 			},
 		},
@@ -784,42 +764,58 @@ func (r *PermissionRegistry) registerGCPIntegrations() {
 	})
 
 	// GCP CSPM - Cloud Security Posture Management
-	// Verifies that roles/cloudasset.viewer and roles/browser are bound to the
-	// service account in the project's IAM policy.
+	// Requires roles/cloudasset.viewer and roles/browser.
 	r.register("gcp_cspm", ">=0.0.0", IntegrationPermissions{
 		Provider: verifier.ProviderGCP,
 		Permissions: []Permission{
 			{
-				Action:   "roles/cloudasset.viewer",
+				Action:   "cloudasset.assets.searchAllResources",
 				Required: true,
-				Method:   MethodPolicyAttachmentCheck,
+				Method:   MethodAPICall,
 				Category: "security_posture",
 			},
 			{
-				Action:   "roles/browser",
+				Action:   "resourcemanager.projects.get",
 				Required: true,
-				Method:   MethodPolicyAttachmentCheck,
+				Method:   MethodAPICall,
+				Category: "security_posture",
+			},
+			{
+				Action:   "compute.instances.list",
+				Required: true,
+				Method:   MethodAPICall,
+				Category: "security_posture",
+			},
+			{
+				Action:   "storage.buckets.list",
+				Required: true,
+				Method:   MethodAPICall,
 				Category: "security_posture",
 			},
 		},
 	})
 
 	// GCP Asset Inventory - Cloud Asset Discovery
-	// Verifies that roles/cloudasset.viewer and roles/browser are bound to the
-	// service account in the project's IAM policy.
+	// Requires roles/cloudasset.viewer and roles/browser.
 	r.register("gcp_asset_inventory", ">=0.0.0", IntegrationPermissions{
 		Provider: verifier.ProviderGCP,
 		Permissions: []Permission{
 			{
-				Action:   "roles/cloudasset.viewer",
+				Action:   "cloudasset.assets.searchAllResources",
 				Required: true,
-				Method:   MethodPolicyAttachmentCheck,
+				Method:   MethodAPICall,
 				Category: "asset_inventory",
 			},
 			{
-				Action:   "roles/browser",
+				Action:   "resourcemanager.projects.get",
 				Required: true,
-				Method:   MethodPolicyAttachmentCheck,
+				Method:   MethodAPICall,
+				Category: "asset_inventory",
+			},
+			{
+				Action:   "compute.instances.list",
+				Required: true,
+				Method:   MethodAPICall,
 				Category: "asset_inventory",
 			},
 		},

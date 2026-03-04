@@ -6,18 +6,14 @@ package verifier // import "github.com/elastic/elastic-agent/internal/edot/recei
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
-	"golang.org/x/oauth2/google/externalaccount"
 	cloudasset "google.golang.org/api/cloudasset/v1"
 	"google.golang.org/api/cloudresourcemanager/v3"
 	compute "google.golang.org/api/compute/v1"
@@ -26,16 +22,17 @@ import (
 	"google.golang.org/api/option"
 	pubsubapi "google.golang.org/api/pubsub/v1"
 	storageapi "google.golang.org/api/storage/v1"
+
+	"golang.org/x/oauth2/google"
 )
 
 // GCPVerifier implements permission verification for GCP.
 type GCPVerifier struct {
-	logger              *zap.Logger
-	opts                []option.ClientOption
-	configured          bool
-	authConfig          GCPAuthConfig
-	projectID           string
-	serviceAccountEmail string
+	logger     *zap.Logger
+	opts       []option.ClientOption
+	configured bool
+	authConfig GCPAuthConfig
+	projectID  string
 }
 
 var _ Verifier = (*GCPVerifier)(nil)
@@ -53,10 +50,9 @@ func NewGCPVerifierFactory() VerifierFactory {
 
 // NewGCPVerifier creates a new GCP verifier.
 //
-// Cloud connector mode (IDTokenFile + WorkloadIdentityProvider + GlobalRoleARN set):
+// Cloud connector mode (IDTokenFile + WorkloadIdentityProvider set):
 //
-//	JWT → AWS AssumeRoleWithWebIdentity(GlobalRoleARN) → AWS creds →
-//	GCP STS(WorkloadIdentityProvider) → Service Account Impersonation
+//	JWT → GCP Workload Identity Federation(audience) → Service Account Impersonation
 //
 // Default credentials mode (testing): Application Default Credentials.
 func NewGCPVerifier(ctx context.Context, logger *zap.Logger, authConfig GCPAuthConfig) (*GCPVerifier, error) {
@@ -64,50 +60,43 @@ func NewGCPVerifier(ctx context.Context, logger *zap.Logger, authConfig GCPAuthC
 
 	switch {
 	case authConfig.IsCloudConnector():
-		// AWS-mediated WIF flow matching Cloudbeat:
-		// 1. Assume Elastic global AWS role using the OIDC JWT
-		// 2. Supply AWS credentials to GCP STS for WIF token exchange
-		// 3. Impersonate the target GCP service account
-		sessionName := authConfig.CloudResourceID + "-" + authConfig.CloudConnectorID
-		stsClient := sts.New(sts.Options{Region: "us-east-1"})
-		webIdentityProvider := stscreds.NewWebIdentityRoleProvider(
-			stsClient,
-			authConfig.GlobalRoleARN,
-			stscreds.IdentityTokenFile(authConfig.IDTokenFile),
-			func(o *stscreds.WebIdentityRoleOptions) {
-				o.RoleSessionName = sessionName
+		// Cloud connector WIF flow: build an external_account credential config
+		// that reads the OIDC JWT from a file and exchanges it for a GCP token
+		// via the STS endpoint.
+		extAccount := map[string]interface{}{
+			"type":               "external_account",
+			"audience":           authConfig.WorkloadIdentityProvider,
+			"subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
+			"token_url":          "https://sts.googleapis.com/v1/token",
+			"credential_source": map[string]interface{}{
+				"file": authConfig.IDTokenFile,
+				"format": map[string]interface{}{
+					"type": "text",
+				},
 			},
-		)
-		credsCache := aws.NewCredentialsCache(webIdentityProvider)
-
-		credSupplier := &awsCredentialsSupplier{
-			region:     "us-east-1",
-			credsCache: credsCache,
-		}
-
-		extCfg := externalaccount.Config{
-			Audience:                       authConfig.WorkloadIdentityProvider,
-			SubjectTokenType:               "urn:ietf:params:aws:token-type:aws4_request",
-			TokenURL:                       "https://sts.googleapis.com/v1/token",
-			Scopes:                         []string{"https://www.googleapis.com/auth/cloud-platform"},
-			AwsSecurityCredentialsSupplier: credSupplier,
 		}
 		if authConfig.ServiceAccountEmail != "" {
-			extCfg.ServiceAccountImpersonationURL = fmt.Sprintf(
+			extAccount["service_account_impersonation_url"] = fmt.Sprintf(
 				"https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/%s:generateAccessToken",
 				authConfig.ServiceAccountEmail,
 			)
 		}
 
-		tokenSource, err := externalaccount.NewTokenSource(ctx, extCfg)
+		credJSON, err := json.Marshal(extAccount)
 		if err != nil {
-			logger.Warn("Failed to create GCP external account token source", zap.Error(err))
+			return nil, fmt.Errorf("failed to build GCP WIF credential config: %w", err)
+		}
+
+		creds, err := google.CredentialsFromJSON(ctx, credJSON,
+			"https://www.googleapis.com/auth/cloud-platform.read-only",
+		)
+		if err != nil {
+			logger.Warn("Failed to create GCP WIF credentials", zap.Error(err))
 			return &GCPVerifier{logger: logger, configured: false}, nil
 		}
-		opts = append(opts, option.WithTokenSource(tokenSource))
-		logger.Info("GCP cloud connector AWS-mediated WIF credential configured",
+		opts = append(opts, option.WithCredentials(creds))
+		logger.Info("GCP cloud connector WIF credential configured",
 			zap.String("audience", authConfig.WorkloadIdentityProvider),
-			zap.String("global_role", authConfig.GlobalRoleARN),
 			zap.Bool("has_service_account_impersonation", authConfig.ServiceAccountEmail != ""),
 		)
 
@@ -135,12 +124,11 @@ func NewGCPVerifier(ctx context.Context, logger *zap.Logger, authConfig GCPAuthC
 	)
 
 	return &GCPVerifier{
-		logger:              logger,
-		opts:                opts,
-		configured:          true,
-		authConfig:          authConfig,
-		projectID:           authConfig.ProjectID,
-		serviceAccountEmail: authConfig.ServiceAccountEmail,
+		logger:     logger,
+		opts:       opts,
+		configured: true,
+		authConfig: authConfig,
+		projectID:  authConfig.ProjectID,
 	}, nil
 }
 
@@ -194,13 +182,9 @@ func (v *GCPVerifier) Verify(ctx context.Context, permission Permission, provide
 	case "compute":
 		result = v.verifyCompute(ctx, projectID, permission.Action)
 	default:
-		if permission.Method == MethodPolicyAttachmentCheck {
-			result = v.verifyPolicyAttachment(ctx, projectID, permission.Action)
-		} else {
-			result = Result{
-				Status:       StatusSkipped,
-				ErrorMessage: "Unsupported GCP service: " + service,
-			}
+		result = Result{
+			Status:       StatusSkipped,
+			ErrorMessage: "Unsupported GCP service: " + service,
 		}
 	}
 
@@ -350,45 +334,6 @@ func (v *GCPVerifier) verifyCompute(ctx context.Context, projectID, action strin
 	}
 }
 
-// verifyPolicyAttachment checks whether the expected IAM role is bound to the
-// service account in the project's IAM policy.
-func (v *GCPVerifier) verifyPolicyAttachment(ctx context.Context, projectID, expectedRole string) Result {
-	svc, err := cloudresourcemanager.NewService(ctx, v.opts...)
-	if err != nil {
-		return v.handleGCPError(err, "cloudresourcemanager:NewService")
-	}
-
-	policy, err := svc.Projects.GetIamPolicy("projects/"+projectID,
-		&cloudresourcemanager.GetIamPolicyRequest{}).Context(ctx).Do()
-	if err != nil {
-		return v.handleGCPError(err, "cloudresourcemanager:GetIamPolicy")
-	}
-
-	saEmail := v.serviceAccountEmail
-	memberPrefix := "serviceAccount:" + saEmail
-
-	for _, binding := range policy.Bindings {
-		if binding.Role != expectedRole {
-			continue
-		}
-		for _, member := range binding.Members {
-			if member == memberPrefix {
-				return Result{
-					Status:   StatusGranted,
-					Endpoint: fmt.Sprintf("cloudresourcemanager:GetIamPolicy (found %s bound to %s in project %s)", expectedRole, saEmail, projectID),
-				}
-			}
-		}
-	}
-
-	return Result{
-		Status:       StatusDenied,
-		ErrorCode:    "RoleNotBound",
-		ErrorMessage: fmt.Sprintf("IAM role %s is not bound to %s in project %s", expectedRole, saEmail, projectID),
-		Endpoint:     "cloudresourcemanager:GetIamPolicy",
-	}
-}
-
 // handleGCPError converts a GCP API error to a verification result.
 func (v *GCPVerifier) handleGCPError(err error, endpoint string) Result {
 	if err == nil {
@@ -439,27 +384,4 @@ func (v *GCPVerifier) handleGCPError(err error, endpoint string) Result {
 		ErrorMessage: err.Error(),
 		Endpoint:     endpoint,
 	}
-}
-
-// awsCredentialsSupplier implements externalaccount.AwsSecurityCredentialsSupplier.
-// It provides cached AWS credentials to GCP for Workload Identity Federation.
-type awsCredentialsSupplier struct {
-	region     string
-	credsCache *aws.CredentialsCache
-}
-
-func (s *awsCredentialsSupplier) AwsRegion(_ context.Context, _ externalaccount.SupplierOptions) (string, error) {
-	return s.region, nil
-}
-
-func (s *awsCredentialsSupplier) AwsSecurityCredentials(ctx context.Context, _ externalaccount.SupplierOptions) (*externalaccount.AwsSecurityCredentials, error) {
-	creds, err := s.credsCache.Retrieve(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("retrieving AWS credentials for GCP WIF: %w", err)
-	}
-	return &externalaccount.AwsSecurityCredentials{
-		AccessKeyID:     creds.AccessKeyID,
-		SecretAccessKey: creds.SecretAccessKey,
-		SessionToken:    creds.SessionToken,
-	}, nil
 }

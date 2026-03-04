@@ -7,16 +7,13 @@ package verifier // import "github.com/elastic/elastic-agent/internal/edot/recei
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/appservice/armappservice"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v6"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v6"
@@ -28,14 +25,11 @@ import (
 
 // AzureVerifier implements permission verification for Azure.
 type AzureVerifier struct {
-	logger     *zap.Logger
-	credential azcore.TokenCredential
-	configured bool
-	authConfig AzureAuthConfig
-
-	cachedSubscriptionID string
-	subscriptionOnce     sync.Once
-	subscriptionErr      error
+	logger         *zap.Logger
+	credential     azcore.TokenCredential
+	configured     bool
+	authConfig     AzureAuthConfig
+	subscriptionID string
 }
 
 var _ Verifier = (*AzureVerifier)(nil)
@@ -102,10 +96,11 @@ func NewAzureVerifier(ctx context.Context, logger *zap.Logger, authConfig AzureA
 	}
 
 	return &AzureVerifier{
-		logger:     logger,
-		credential: cred,
-		configured: true,
-		authConfig: authConfig,
+		logger:         logger,
+		credential:     cred,
+		configured:     true,
+		authConfig:     authConfig,
+		subscriptionID: authConfig.SubscriptionID,
 	}, nil
 }
 
@@ -115,34 +110,6 @@ func (v *AzureVerifier) ProviderType() ProviderType {
 
 func (v *AzureVerifier) Close() error {
 	return nil
-}
-
-// discoverSubscriptionID discovers the subscription ID at runtime by listing
-// the subscriptions visible to the authenticated principal. The result is
-// cached after the first successful call.
-func (v *AzureVerifier) discoverSubscriptionID(ctx context.Context) (string, error) {
-	v.subscriptionOnce.Do(func() {
-		client, err := armsubscriptions.NewClient(v.credential, nil)
-		if err != nil {
-			v.subscriptionErr = fmt.Errorf("creating subscriptions client: %w", err)
-			return
-		}
-		pager := client.NewListPager(nil)
-		page, err := pager.NextPage(ctx)
-		if err != nil {
-			v.subscriptionErr = fmt.Errorf("listing subscriptions: %w", err)
-			return
-		}
-		if len(page.Value) == 0 {
-			v.subscriptionErr = errors.New("no subscriptions found for the authenticated principal")
-			return
-		}
-		v.cachedSubscriptionID = *page.Value[0].SubscriptionID
-		v.logger.Info("Discovered Azure subscription",
-			zap.String("subscription_id", v.cachedSubscriptionID),
-		)
-	})
-	return v.cachedSubscriptionID, v.subscriptionErr
 }
 
 // Verify checks if an Azure permission is granted by making a minimal API call
@@ -159,14 +126,9 @@ func (v *AzureVerifier) Verify(ctx context.Context, permission Permission, provi
 		}
 	}
 
-	subscriptionID, err := v.discoverSubscriptionID(ctx)
-	if err != nil {
-		return Result{
-			Status:       StatusError,
-			ErrorCode:    "SubscriptionDiscoveryError",
-			ErrorMessage: fmt.Sprintf("failed to discover Azure subscription: %v", err),
-			Duration:     time.Since(start),
-		}
+	subscriptionID := v.subscriptionID
+	if providerCfg.SubscriptionID != "" {
+		subscriptionID = providerCfg.SubscriptionID
 	}
 
 	// Parse the action to determine the resource provider.
@@ -194,13 +156,9 @@ func (v *AzureVerifier) Verify(ctx context.Context, permission Permission, provi
 	case "Microsoft.Network":
 		result = v.verifyNetwork(ctx, subscriptionID, permission.Action)
 	default:
-		if permission.Method == MethodPolicyAttachmentCheck {
-			result = v.verifyPolicyAttachment(ctx, subscriptionID, permission.Action)
-		} else {
-			result = Result{
-				Status:       StatusSkipped,
-				ErrorMessage: "Unsupported Azure service: " + service,
-			}
+		result = Result{
+			Status:       StatusSkipped,
+			ErrorMessage: "Unsupported Azure service: " + service,
 		}
 	}
 
@@ -358,65 +316,6 @@ func (v *AzureVerifier) verifyNetwork(ctx context.Context, subscriptionID, actio
 			Status:       StatusSkipped,
 			ErrorMessage: "Unsupported Network action: " + action,
 		}
-	}
-}
-
-// verifyPolicyAttachment checks whether the authenticated principal has a
-// specific built-in role assigned at the subscription scope.
-// The action string is the role name (e.g. "Reader") and the role definition
-// GUID is embedded in the method for known roles.
-func (v *AzureVerifier) verifyPolicyAttachment(ctx context.Context, subscriptionID, roleName string) Result {
-	roleGUID := resolveAzureRoleGUID(roleName)
-	if roleGUID == "" {
-		return Result{
-			Status:       StatusError,
-			ErrorCode:    "UnknownRole",
-			ErrorMessage: "no known GUID for Azure role: " + roleName,
-			Endpoint:     "armauthorization:ListRoleAssignments",
-		}
-	}
-
-	expectedRoleDefSuffix := "/providers/Microsoft.Authorization/roleDefinitions/" + roleGUID
-
-	client, err := armauthorization.NewRoleAssignmentsClient(subscriptionID, v.credential, nil)
-	if err != nil {
-		return v.handleAzureError(err, "armauthorization:NewRoleAssignmentsClient")
-	}
-
-	scope := "/subscriptions/" + subscriptionID
-	pager := client.NewListForScopePager(scope, nil)
-	for pager.More() {
-		page, pageErr := pager.NextPage(ctx)
-		if pageErr != nil {
-			return v.handleAzureError(pageErr, "armauthorization:ListForScope")
-		}
-		for _, assignment := range page.Value {
-			if assignment.Properties != nil && assignment.Properties.RoleDefinitionID != nil {
-				if strings.HasSuffix(*assignment.Properties.RoleDefinitionID, expectedRoleDefSuffix) {
-					return Result{
-						Status:   StatusGranted,
-						Endpoint: fmt.Sprintf("armauthorization:ListForScope (found %s role on subscription %s)", roleName, subscriptionID),
-					}
-				}
-			}
-		}
-	}
-
-	return Result{
-		Status:       StatusDenied,
-		ErrorCode:    "RoleNotAssigned",
-		ErrorMessage: fmt.Sprintf("built-in role %s (GUID %s) is not assigned on subscription %s", roleName, roleGUID, subscriptionID),
-		Endpoint:     "armauthorization:ListForScope",
-	}
-}
-
-// resolveAzureRoleGUID returns the well-known GUID for an Azure built-in role name.
-func resolveAzureRoleGUID(roleName string) string {
-	switch roleName {
-	case "Reader":
-		return "acdd72a7-3385-48ef-bd42-f606fba81ae7"
-	default:
-		return ""
 	}
 }
 

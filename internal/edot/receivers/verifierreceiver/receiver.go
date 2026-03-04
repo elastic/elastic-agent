@@ -158,7 +158,7 @@ func (r *verifierReceiver) initializeVerifiers(ctx context.Context) {
 
 	// Initialize GCP verifier if configured
 	if r.config.Providers.GCP.Credentials.IsConfigured() {
-		authCfg := r.config.Providers.GCP.Credentials.ToAuthConfig(cc, r.config.CloudConnectorID)
+		authCfg := r.config.Providers.GCP.Credentials.ToAuthConfig(cc)
 		if authCfg.IsCloudConnector() {
 			r.logger.Info("Initializing GCP verifier with cloud connector WIF flow",
 				zap.String("project_id", authCfg.ProjectID),
@@ -270,7 +270,7 @@ func (r *verifierReceiver) verifyPermissions(ctx context.Context) error {
 	// Data stream routing attributes for the Elasticsearch exporter.
 	// Native OTel inputs must set these explicitly for dynamic index routing.
 	resource.Attributes().PutStr("data_stream.type", "logs")
-	resource.Attributes().PutStr("data_stream.dataset", "verifier_otel.verification")
+	resource.Attributes().PutStr("data_stream.dataset", "cloud_connector.permission_verification")
 	resource.Attributes().PutStr("data_stream.namespace", namespace)
 
 	resource.Attributes().PutStr("verification.id", r.config.VerificationID)
@@ -364,6 +364,9 @@ func (r *verifierReceiver) verifyPermission(
 	}
 
 	// Azure-specific config
+	if subscriptionID, ok := integration.Config["subscription_id"].(string); ok {
+		providerCfg.SubscriptionID = subscriptionID
+	}
 	if resourceGroup, ok := integration.Config["resource_group"].(string); ok {
 		providerCfg.ResourceGroup = resourceGroup
 	}
@@ -488,6 +491,9 @@ func (r *verifierReceiver) emitPermissionCheckLog(
 	}
 	if region, ok := integration.Config["region"].(string); ok && region != "" {
 		attrs.PutStr("provider.region", region)
+	}
+	if subscriptionID, ok := integration.Config["subscription_id"].(string); ok && subscriptionID != "" {
+		attrs.PutStr("provider.subscription_id", subscriptionID)
 	}
 	if projectID, ok := integration.Config["project_id"].(string); ok && projectID != "" {
 		attrs.PutStr("provider.project_id", projectID)
