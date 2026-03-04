@@ -1231,6 +1231,13 @@ func LoadSettings() (*Settings, error) {
 	}
 
 	s.loadCrossBuildSettingsFromEnv()
+
+	// Initialize repo info early so that loadPackagingSettingsFromEnv can
+	// default PackageVersionDir to the repo root.
+	if err := s.initRepoInfo(); err != nil {
+		return nil, fmt.Errorf("initializing repo info: %w", err)
+	}
+
 	s.loadPackagingSettingsFromEnv()
 	if err := s.loadIntegrationTestSettingsFromEnv(); err != nil {
 		return nil, fmt.Errorf("loading integration test settings: %w", err)
@@ -1240,11 +1247,8 @@ func LoadSettings() (*Settings, error) {
 	s.loadDevMachineSettingsFromEnv()
 	s.loadFmtSettingsFromEnv()
 
-	// Initialize repo info, elastic beats dir, and build variables.
+	// Initialize elastic beats dir and build variables.
 	// These depend on the filesystem and must be initialized in order.
-	if err := s.initRepoInfo(); err != nil {
-		return nil, fmt.Errorf("initializing repo info: %w", err)
-	}
 	if err := s.initElasticBeatsDir(); err != nil {
 		return nil, fmt.Errorf("initializing elastic beats dir: %w", err)
 	}
@@ -1447,10 +1451,7 @@ func (s *Settings) loadPackagingSettingsFromEnv() {
 			s.IntegrationTest.AgentStackVersion = pv.StackVersion
 
 			if s.Packaging.AgentDropPath == "" {
-				dropPath, absErr := filepath.Abs(filepath.Join("build", "distributions", "elastic-agent-drop"))
-				if absErr == nil {
-					s.Packaging.AgentDropPath = dropPath
-				}
+				s.Packaging.AgentDropPath = filepath.Join(s.RepoInfo.RootDir, "build", "distributions", "elastic-agent-drop")
 			}
 		}
 	}

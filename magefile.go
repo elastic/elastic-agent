@@ -2321,6 +2321,7 @@ func (Integration) UpdateVersions(ctx context.Context) error {
 
 // UpdatePackageVersion update the file that contains the latest available snapshot version
 func (Integration) UpdatePackageVersion(ctx context.Context) error {
+	cfg := mage.SettingsFromContext(ctx)
 	currentReleaseBranch, err := git.GetCurrentReleaseBranch(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to identify the current release branch: %w", err)
@@ -2349,8 +2350,14 @@ func (Integration) UpdatePackageVersion(ctx context.Context) error {
 	}
 
 	err = devtools.UpdatePackageVersion(
-		branchInformation.Version, branchInformation.BuildID, stackVersion, stackBuildId,
-		branchInformation.ManifestURL, branchInformation.SummaryURL)
+		cfg,
+		branchInformation.Version,
+		branchInformation.BuildID,
+		stackVersion,
+		stackBuildId,
+		branchInformation.ManifestURL,
+		branchInformation.SummaryURL,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to write package version: %w", err)
 	}
