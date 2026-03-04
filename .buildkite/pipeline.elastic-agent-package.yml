@@ -252,3 +252,7 @@ steps:
         buildkite-agent meta-data set "triggered_build_id" "$BUILDKITE_BUILD_ID" --job $TRIGGER_JOB_ID
         buildkite-agent meta-data set "triggered_commit_hash" "$BUILDKITE_COMMIT" --job $TRIGGER_JOB_ID
       fi
+
+notify:
+- slack: "#ingest-notifications"
+  if: build.branch == 'main' || build.branch =~ /^[0-9]+\.[0-9x]+\$/
