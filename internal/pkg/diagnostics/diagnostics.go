@@ -478,13 +478,17 @@ func redactKey(k string) bool {
 		strings.Contains(k, "secret")
 }
 
+// This currently only redacts credentials embedded in URLs, but if we find other patterns of sensitive strings in the future we can add them here
 func redactString(v string) (string, bool) {
-	if u, err := url.Parse(v); err != nil || u.User == nil {
+	u, err := url.Parse(v)
+
+	if err != nil || u.User == nil {
 		return v, false
-	} else {
-		u.User = url.UserPassword(REDACTED_URL_SAFE, REDACTED_URL_SAFE)
-		return u.String(), true
 	}
+
+	u.User = url.UserPassword(REDACTED_URL_SAFE, REDACTED_URL_SAFE)
+
+	return u.String(), true
 }
 
 func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool) error {
