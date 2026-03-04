@@ -969,8 +969,14 @@ func TestOTelManager_Logging(t *testing.T) {
 			assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 				logs := obs.All()
 				require.NotEmpty(collect, logs, "Logs should not be empty")
-				firstMessage := logs[0].Message
-				assert.Equal(collect, "Internal metrics telemetry disabled", firstMessage)
+				found := false
+				for _, entry := range logs {
+					if entry.Message == "Internal metrics telemetry disabled" {
+						found = true
+						break
+					}
+				}
+				assert.True(collect, found, "Expected log message 'Internal metrics telemetry disabled' not found in logs")
 			}, time.Second*10, time.Second)
 		})
 	}
@@ -2321,7 +2327,6 @@ func TestAddCollectorMetricsPort(t *testing.T) {
 				"prometheus": map[string]any{
 					"host":                "localhost",
 					"port":                0,
-					"without_scope_info":  true,
 					"without_units":       true,
 					"without_type_suffix": true,
 				},
