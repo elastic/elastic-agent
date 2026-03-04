@@ -110,6 +110,7 @@ type PackageSpec struct {
 	ExtraVars               map[string]string      `yaml:"extra_vars,omitempty"`  // Optional
 	Components              []packaging.BinarySpec `yaml:"components"`            // Optional: Components required for this package
 
+	cfg                    *Settings
 	evalContext            map[string]interface{}
 	packageDir             string
 	localPreInstallScript  string
@@ -342,8 +343,8 @@ func (s *PackageSpec) ExtraVar(key, value string) {
 
 // Expand expands a templated string using data from the spec.
 func (s PackageSpec) Expand(in string, args ...map[string]interface{}) (string, error) {
-	return expandTemplate("inline", in, FuncMap,
-		EnvMap(append([]map[string]interface{}{s.evalContext, s.toMap()}, args...)...))
+	return expandTemplate("inline", in, FuncMap(s.cfg),
+		EnvMap(s.cfg, append([]map[string]interface{}{s.evalContext, s.toMap()}, args...)...))
 }
 
 // MustExpand expands a templated string using data from the spec. It panics if
@@ -358,8 +359,8 @@ func (s PackageSpec) MustExpand(in string, args ...map[string]interface{}) strin
 
 // ExpandFile expands a template file using data from the spec.
 func (s PackageSpec) ExpandFile(src, dst string, args ...map[string]interface{}) error {
-	return expandFile(src, dst,
-		EnvMap(append([]map[string]interface{}{s.evalContext, s.toMap()}, args...)...))
+	return expandFile(s.cfg, src, dst,
+		EnvMap(s.cfg, append([]map[string]interface{}{s.evalContext, s.toMap()}, args...)...))
 }
 
 // MustExpandFile expands a template file using data from the spec. It panics if
@@ -378,7 +379,7 @@ func (s PackageSpec) Evaluate(args ...map[string]interface{}) PackageSpec {
 		if in == "" {
 			return ""
 		}
-		return MustExpand(in, args...)
+		return MustExpand(s.cfg, in, args...)
 	}
 
 	if s.evalContext == nil {
@@ -484,7 +485,7 @@ func (s PackageSpec) ImageName() string {
 		}
 
 		data := s.toMap()
-		for k, v := range varMap() {
+		for k, v := range varMap(s.cfg) {
 			data[k] = v
 		}
 
