@@ -1754,89 +1754,15 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	})
 }
 
-<<<<<<< HEAD
-=======
-// TestOTelManager_RestartOnLogLevelChange verifies that the collector subprocess is restarted
-// when the effective log level changes. This is necessary because the manager wraps the collector's
-// stdout/stderr in log writers configured at a specific level, and those cannot be changed at runtime.
-func TestOTelManager_RestartOnLogLevelChange(t *testing.T) {
-	testLogger, _ := loggertest.New("test")
-	collectorStarted := make(chan struct{}, 5)
-
-	execution := &mockExecution{
-		collectorStarted: collectorStarted,
-	}
-
-	mgr := OTelManager{
-		managerLogger:     testLogger,
-		collectorLogger:   testLogger,
-		errCh:             make(chan error, 1),
-		updateCh:          make(chan configUpdate, 1),
-		collectorStatusCh: make(chan *status.AggregateStatus, 1),
-		componentStateCh:  make(chan []runtime.ComponentComponentState, 5),
-		doneChan:          make(chan struct{}),
-		recoveryTimer:     newRestarterNoop(),
-		execution:         execution,
-		agentInfo:         &info.AgentInfo{},
-		collectorRunErr:   make(chan error),
-		stopTimeout:       time.Second,
-	}
-
-	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
-	defer cancel()
-
-	go func() {
-		err := mgr.Run(ctx)
-		assert.ErrorIs(t, err, context.Canceled)
-	}()
-
-	// Drain status channels to prevent blocking the run loop.
-	go func() {
-		for {
-			select {
-			case <-mgr.WatchCollector():
-			case <-mgr.WatchComponents():
-			case <-mgr.Errors():
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	// Start the collector with InfoLevel. The config doesn't include a log level,
-	// so the effective collector log level comes from the agent log level parameter.
-	cfg := confmap.NewFromStringMap(testConfigNoLogLevel)
-	mgr.Update(cfg, nil, logp.InfoLevel, nil)
-
-	select {
-	case <-collectorStarted:
-	case <-ctx.Done():
-		t.Fatal("timeout waiting for initial collector start")
-	}
-
-	// Send the same config but with a different agent log level.
-	// The collector must be restarted because the stdout/stderr log writers
-	// are created at startup with a specific level and cannot be reconfigured.
-	mgr.Update(cfg, nil, logp.DebugLevel, nil)
-
-	select {
-	case <-collectorStarted:
-		// Collector was restarted with the new log level.
-	case <-time.After(5 * time.Second):
-		t.Fatal("expected collector to be restarted after log level change, but it was not")
-	}
-}
-
 // TestOTelManager_CollectorRunErrWithNilConfig verifies that the manager does not panic when a
 // non-nil error arrives on collectorRunErr while mergedCollectorCfg is nil. This can happen when
 // the collector process reports an error after its configuration has been cleared.
 func TestOTelManager_CollectorRunErrWithNilConfig(t *testing.T) {
-	managerLogger, obs := loggertest.New("otel-manager")
-	collectorLogger, _ := loggertest.New("otel")
+	testLogger, obs := loggertest.New("otel-manager")
 
 	mgr := OTelManager{
-		managerLogger:     managerLogger,
-		collectorLogger:   collectorLogger,
+		logger:            testLogger,
+		baseLogger:        testLogger,
 		errCh:             make(chan error, 1),
 		updateCh:          make(chan configUpdate, 1),
 		collectorStatusCh: make(chan *status.AggregateStatus, 1),
@@ -1878,7 +1804,6 @@ func TestOTelManager_CollectorRunErrWithNilConfig(t *testing.T) {
 	require.Equal(t, 1, warnMessages.Len())
 }
 
->>>>>>> 1a0ba477b (Cleanup and improve handling of collector exits in otel manager (#12927))
 // TestManagerAlwaysEmitsStoppedStatesForComponents checks that the manager always emits a STOPPED state for a component
 // at least once, even if we're slow to retrieve the state. This is part of the contract with the coordinator.
 func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
