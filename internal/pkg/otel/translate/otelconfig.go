@@ -24,6 +24,7 @@ import (
 	"go.opentelemetry.io/collector/pipeline"
 	"golang.org/x/exp/maps"
 
+	fbfeatures "github.com/elastic/beats/v7/filebeat/features"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
@@ -348,7 +349,9 @@ func getReceiversConfigForComponent(
 		receiverConfig[beatName] = map[string]any{
 			"inputs": inputs,
 		}
-		receiverConfig["storage"] = "elastic_storage"
+		if fbfeatures.IsElasticsearchStateStoreEnabled() {
+			receiverConfig["storage"] = "elastic_storage"
+		}
 	case "metricbeat":
 		receiverConfig[beatName] = map[string]any{
 			"modules": inputs,
@@ -526,11 +529,12 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 		exporterConfig["auth"] = map[string]any{
 			"authenticator": extensionID.String(),
 		}
-
-		// Add elasticsearch state store extension for agentless mode
-		// We paste the config as is, without any translation.
-		// The state store extension will pick up relevant settings from it and ignore the rest.
-		extensionCfg[elasticsearchStateStoreExtensionName] = unitConfigMap
+		if fbfeatures.IsElasticsearchStateStoreEnabled() {
+			// Add elasticsearch state store extension for agentless mode
+			// We paste the config as is, without any translation.
+			// The state store extension will pick up relevant settings from it and ignore the rest.
+			extensionCfg[elasticsearchStateStoreExtensionName] = unitConfigMap
+		}
 	}
 
 	return exporterConfig, queueSettings, extensionCfg, nil
