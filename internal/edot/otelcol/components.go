@@ -105,7 +105,7 @@ import (
 
 	elasticsearchstorage "github.com/elastic/beats/v7/x-pack/otel/extension/elasticsearchstorage"
 	elasticdiagnostics "github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
-	verifierreceiver "github.com/elastic/elastic-agent/internal/pkg/otel/receivers/verifierreceiver"
+	verifierreceiver "github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver"
 
 	"github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension"
 	"github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension"

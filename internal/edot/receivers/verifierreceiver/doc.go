@@ -57,4 +57,4 @@
 //
 // The receiver emits OTEL logs with structured attributes following the
 // RFC specification for Cloud Connector Permission Verification.
-package verifierreceiver // import "github.com/elastic/elastic-agent/internal/pkg/otel/receivers/verifierreceiver"
+package verifierreceiver // import "github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver"

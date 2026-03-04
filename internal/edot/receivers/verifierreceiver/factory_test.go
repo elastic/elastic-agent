@@ -14,7 +14,7 @@ import (
 	"go.opentelemetry.io/collector/consumer/consumertest"
 	"go.opentelemetry.io/collector/receiver/receivertest"
 
-	"github.com/elastic/elastic-agent/internal/pkg/otel/receivers/verifierreceiver/internal/metadata"
+	"github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver/internal/metadata"
 )
 
 func TestNewFactory(t *testing.T) {

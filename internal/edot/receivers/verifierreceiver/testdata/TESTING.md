@@ -168,7 +168,7 @@ receivers:
 cd elastic-agent
 
 # Update go.mod to point to local opentelemetry-collector-components
-go mod edit -replace github.com/elastic/elastic-agent/internal/pkg/otel/receivers/verifierreceiver=../opentelemetry-collector-components/receiver/verifierreceiver
+go mod edit -replace github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver=../opentelemetry-collector-components/receiver/verifierreceiver
 
 go mod tidy
 mage build

@@ -79,6 +79,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
+	go.opentelemetry.io/collector/component/componenttest v0.148.0
 	go.opentelemetry.io/collector/connector/forwardconnector v0.148.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.148.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.148.0
@@ -90,21 +91,10 @@ require (
 require (
 	cloud.google.com/go/pubsub/v2 v2.0.0 // indirect
 	github.com/DeRuina/timberjack v1.3.9 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/appservice/armappservice v1.0.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v6 v6.4.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v6 v6.2.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage v1.8.1 // indirect
-	github.com/DeRuina/timberjack v1.3.9 // indirect
 	github.com/KimMachineGun/automemlimit v0.7.5 // indirect
-	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/alexbrainman/sspi v0.0.0-20210105120005-909beea2cc74 // indirect
-	github.com/aws/aws-sdk-go-v2/service/cloudfront v1.60.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/cloudtrail v1.55.8 // indirect
-	github.com/aws/aws-sdk-go-v2/service/configservice v1.62.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.71.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/guardduty v1.74.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/kafka v1.46.7 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.8 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
@@ -184,7 +174,6 @@ require (
 	github.com/winlabs/gowin32 v0.0.0-20240930213947-f504d7e14639 // indirect
 	go.mongodb.org/mongo-driver/v2 v2.3.1 // indirect
 	go.opentelemetry.io/collector/component/componentstatus v0.148.1-0.20260320051400-372cc483b303 // indirect
-	go.opentelemetry.io/collector/component/componenttest v0.148.1-0.20260320051400-372cc483b303 // indirect
 	go.opentelemetry.io/collector/config/confighttp v0.148.1-0.20260320051400-372cc483b303 // indirect
 	go.opentelemetry.io/collector/internal/componentalias v0.148.1-0.20260320051400-372cc483b303 // indirect
 	go.opentelemetry.io/collector/processor/processorhelper v0.148.0 // indirect
@@ -264,8 +253,8 @@ require (
 	github.com/Azure/azure-event-hubs-go/v3 v3.6.1 // indirect
 	github.com/Azure/azure-pipeline-go v0.2.3 // indirect
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.21.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.13.1 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.21.0
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.13.1
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.2 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/messaging/azeventhubs v1.3.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics v1.1.0 // indirect
@@ -273,9 +262,9 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4 v4.8.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/costmanagement/armcostmanagement v1.1.1 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor v0.8.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor v0.8.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v4 v4.3.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.0 // indirect
 	github.com/Azure/azure-storage-blob-go v0.15.0 // indirect
 	github.com/Azure/go-amqp v1.4.0 // indirect
@@ -331,11 +320,11 @@ require (
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.21 // indirect
 	github.com/aws/aws-sdk-go-v2/service/apigateway v1.31.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/apigatewayv2 v1.28.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.45.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.50.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.45.2
+	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.50.2
 	github.com/aws/aws-sdk-go-v2/service/costexplorer v1.51.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.294.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.45.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.294.0
+	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.45.4
 	github.com/aws/aws-sdk-go-v2/service/health v1.30.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/iam v1.42.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.7 // indirect
@@ -344,7 +333,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.20 // indirect
 	github.com/aws/aws-sdk-go-v2/service/lightsail v1.50.11 // indirect
 	github.com/aws/aws-sdk-go-v2/service/organizations v1.38.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/rds v1.97.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/rds v1.97.2
 	github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi v1.26.5 // indirect
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.97.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/servicediscovery v1.39.24 // indirect
@@ -706,7 +695,7 @@ require (
 	go.opentelemetry.io/collector/consumer v1.54.0
 	go.opentelemetry.io/collector/consumer/consumererror v0.148.0 // indirect
 	go.opentelemetry.io/collector/consumer/consumererror/xconsumererror v0.148.0 // indirect
-	go.opentelemetry.io/collector/consumer/consumertest v0.148.0 // indirect
+	go.opentelemetry.io/collector/consumer/consumertest v0.148.0
 	go.opentelemetry.io/collector/consumer/xconsumer v0.148.0 // indirect
 	go.opentelemetry.io/collector/exporter/exporterhelper v0.148.0 // indirect
 	go.opentelemetry.io/collector/exporter/exporterhelper/xexporterhelper v0.148.0 // indirect
@@ -732,7 +721,7 @@ require (
 	go.opentelemetry.io/collector/processor/processortest v0.148.0 // indirect
 	go.opentelemetry.io/collector/processor/xprocessor v0.148.0 // indirect
 	go.opentelemetry.io/collector/receiver/receiverhelper v0.148.0 // indirect
-	go.opentelemetry.io/collector/receiver/receivertest v0.148.0 // indirect
+	go.opentelemetry.io/collector/receiver/receivertest v0.148.0
 	go.opentelemetry.io/collector/receiver/xreceiver v0.148.0 // indirect
 	go.opentelemetry.io/collector/scraper v0.148.0 // indirect
 	go.opentelemetry.io/collector/scraper/scraperhelper v0.148.0 // indirect
@@ -765,7 +754,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.42.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
-	go.uber.org/goleak v1.3.0 // indirect
+	go.uber.org/goleak v1.3.0
 	go.uber.org/mock v0.5.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/ratelimit v0.3.1 // indirect
@@ -787,7 +776,7 @@ require (
 	golang.org/x/tools v0.43.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect
-	google.golang.org/api v0.270.0 // indirect
+	google.golang.org/api v0.270.0
 	google.golang.org/genproto v0.0.0-20260128011058-8636f8732409 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260226221140-a57be14db171 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260330182312-d5a96adf58d8 // indirect
