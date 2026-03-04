@@ -155,7 +155,6 @@ func components(extensionFactories ...extension.Factory) func() (otelcol.Factori
 			verifierreceiver.NewFactory(),
 			fbreceiver.NewFactoryWithSettings(fbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			mbreceiver.NewFactoryWithSettings(mbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
-
 			nopreceiver.NewFactory(),
 			apachereceiver.NewFactory(),
 			couchdbreceiver.NewFactory(),
