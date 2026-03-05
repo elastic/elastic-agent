@@ -263,6 +263,12 @@ func WithProjectName(projectName string) ComponentFilter {
 	}
 }
 
+func WithoutProjectName(projectName string) ComponentFilter {
+	return func(p BinarySpec) bool {
+		return p.ProjectName != projectName
+	}
+}
+
 func WithFIPS(fips bool) ComponentFilter {
 	return func(p BinarySpec) bool {
 		return p.FIPS == fips

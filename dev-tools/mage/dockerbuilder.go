@@ -280,15 +280,9 @@ func (b *dockerBuilder) dockerBuild() (string, []string, error) {
 	return mainTag, extraTags, sh.Run("docker", args...)
 }
 
-<<<<<<< HEAD
-func (b *dockerBuilder) dockerSave(tag string, templateExtraArgs ...map[string]interface{}) error {
+func (b *dockerBuilder) dockerSave(ctx context.Context, tag string, templateExtraArgs ...map[string]interface{}) error {
 	if _, err := os.Stat(distributionsDir); os.IsNotExist(err) {
 		err := os.MkdirAll(distributionsDir, 0750)
-=======
-func (b *dockerBuilder) dockerSave(ctx context.Context, tag string, templateExtraArgs ...map[string]interface{}) error {
-	if _, err := os.Stat(DistributionsDir); os.IsNotExist(err) {
-		err := os.MkdirAll(DistributionsDir, 0750)
->>>>>>> 9041ee9d3 (Drop remaining globals from mage settings (#12856))
 		if err != nil {
 			return fmt.Errorf("cannot create folder for docker artifacts: %w", err)
 		}
