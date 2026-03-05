@@ -35,7 +35,6 @@ import (
 	"time"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	filecopy "github.com/otiai10/copy"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
@@ -536,44 +535,22 @@ func Package(ctx context.Context) error {
 		panic("elastic-agent package is expected to build at least one platform package")
 	}
 
-<<<<<<< HEAD
-	var err error
-	var manifestResponse *manifest.Build
-=======
 	// needs elastic-agent-core built first
 	mg.CtxDeps(ctx, PackageAgentCore)
 
 	// switch to the main package target
 	mage.UseElasticAgentPackaging(cfg)
 
->>>>>>> 9041ee9d3 (Drop remaining globals from mage settings (#12856))
 	if cfg.Packaging.PackagingFromManifest {
-		var parsedVersion *version.ParsedSemVer
-		manifestResponse, parsedVersion, err = downloadManifestAndParseVersion(ctx, cfg.Packaging.ManifestURL)
+		// manifest is not passed into packageAgent below because we want packageAgent to go through the
+		// flow using the elastic-agent-core that was built above. if it was passed in, it would download
+		// elastic-agent-core from the manifest and it would not be the code from this repository in the package
+		_, parsedVersion, err := downloadManifestAndParseVersion(ctx, cfg.Packaging.ManifestURL)
 		if err != nil {
 			return fmt.Errorf("failed downloading manifest: %w", err)
 		}
+		// Apply manifest version info to config
 		cfg = cfg.WithSnapshot(parsedVersion.IsSnapshot()).WithBeatVersion(parsedVersion.CoreVersion())
-<<<<<<< HEAD
-		ctx = devtools.ContextWithSettings(ctx, cfg)
-		// we need that dependency to essentially download
-		// the components from the given manifest
-		mg.CtxDeps(ctx, DownloadManifest)
-	}
-
-	var dependenciesVersion string
-	if cfg.Build.BeatVersion != "" {
-		dependenciesVersion = cfg.Build.BeatVersion
-	} else {
-		dependenciesVersion = bversion.GetDefaultVersion()
-	}
-
-	// add the snapshot suffix if needed
-	dependenciesVersion += devtools.MaybeSnapshotSuffix(cfg)
-
-	packageAgent(ctx, cfg, dependenciesVersion, manifestResponse, mg.F(devtools.UseElasticAgentPackaging), getAgentBuildTargets(cfg)...)
-	return nil
-=======
 
 		// don't download the elastic-agent-core components; built above
 		if err := downloadManifest(ctx, cfg, packaging.WithoutProjectName(agentCoreProjectName)); err != nil {
@@ -581,14 +558,10 @@ func Package(ctx context.Context) error {
 		}
 	}
 	return packageAgent(ctx, cfg, "", nil)
->>>>>>> 9041ee9d3 (Drop remaining globals from mage settings (#12856))
 }
 
 // DownloadManifest downloads the provided manifest file into the predefined folder and downloads all components in the manifest.
 func DownloadManifest(ctx context.Context) error {
-<<<<<<< HEAD
-	cfg := devtools.SettingsFromContext(ctx)
-=======
 	cfg := mage.SettingsFromContext(ctx)
 	// Enforce that we use the correct elastic-agent packaging, to correctly load component dependencies
 	devtools.UseElasticAgentPackaging(cfg)
@@ -596,7 +569,6 @@ func DownloadManifest(ctx context.Context) error {
 }
 
 func downloadManifest(ctx context.Context, cfg *mage.Settings, filters ...packaging.ComponentFilter) error {
->>>>>>> 9041ee9d3 (Drop remaining globals from mage settings (#12856))
 	fmt.Println("--- Downloading manifest")
 	start := time.Now()
 	defer func() { fmt.Println("Downloading manifest took", time.Since(start)) }()
@@ -616,14 +588,14 @@ func downloadManifest(ctx context.Context, cfg *mage.Settings, filters ...packag
 		return errAtLeastOnePlatform
 	}
 
-	// Enforce that we use the correct elastic-agent packaging, to correctly load component dependencies
-	// Use mg.CtxDeps() to ensure that the function will be called only once per mage invocation.
-	// devtools.Use*Packaging functions are not idempotent as they append in devtools.Packages
-	mg.CtxDeps(ctx, devtools.UseElasticAgentPackaging)
-	dependencies, err := ExtractComponentsFromSelectedPkgSpecs(cfg, devtools.Packages)
+	dependencies, err := extractComponentsFromSelectedPkgSpecs(cfg, devtools.Packages)
 	if err != nil {
 		return fmt.Errorf("failed extracting dependencies: %w", err)
 	}
+
+	// Only include components that support at least one of the selected package types
+	filters = append(filters, supportsSelectedPackageTypesFilter(platforms, cfg.GetPackageTypes()))
+	dependencies = packaging.FilterComponents(dependencies, filters...)
 
 	if e := manifest.DownloadComponents(ctx, dependencies, cfg.Packaging.ManifestURL, platforms, dropPath); e != nil {
 		return fmt.Errorf("failed to download the manifest file, %w", e)
@@ -633,7 +605,7 @@ func downloadManifest(ctx context.Context, cfg *mage.Settings, filters ...packag
 	return nil
 }
 
-func ExtractComponentsFromSelectedPkgSpecs(cfg *devtools.Settings, pkgSpecs []devtools.OSPackageArgs) ([]packaging.BinarySpec, error) {
+func extractComponentsFromSelectedPkgSpecs(cfg *devtools.Settings, pkgSpecs []devtools.OSPackageArgs) ([]packaging.BinarySpec, error) {
 	// Extract the dependencies from the selected packages
 	mappedDependencies := map[string]packaging.BinarySpec{}
 	for _, pkg := range pkgSpecs {
@@ -828,19 +800,12 @@ func CrossBuild(ctx context.Context) error {
 
 // PackageAgentCore cross-builds and packages distribution artifacts containing
 // only elastic-agent binaries with no extra files or dependencies.
-func PackageAgentCore() {
+func PackageAgentCore(ctx context.Context) error {
 	start := time.Now()
 	defer func() { fmt.Println("packageAgentCore ran for", time.Since(start)) }()
 
-	mg.Deps(CrossBuild)
+	cfg := devtools.SettingsFromContext(ctx)
 
-<<<<<<< HEAD
-	devtools.UseElasticAgentCorePackaging()
-
-	if err := devtools.Package(devtools.MustLoadSettings()); err != nil {
-		panic(err)
-	}
-=======
 	// If Docker is selected but TarGz isn't, add TarGz since it's required for docker images
 	if cfg.IsPackageTypeSelected(devtools.Docker) && !cfg.IsPackageTypeSelected(devtools.TarGz) {
 		cfg = cfg.WithAddedPackageType(devtools.TarGz)
@@ -848,14 +813,13 @@ func PackageAgentCore() {
 	}
 
 	fmt.Println("--- Build elastic-agent-core")
-	mg.CtxDeps(ctx, Update, Otel.Prepare, Otel.CrossBuild, CrossBuild, Build.WindowsArchiveRootBinary)
+	mg.CtxDeps(ctx, Update, Otel.CrossBuild, CrossBuild, Build.WindowsArchiveRootBinary)
 
 	fmt.Println("--- Package elastic-agent-core")
 	devtools.UseElasticAgentCorePackaging(cfg)
 
 	// ran directly as we don't want mage to cache that it already called devtools.Package
 	return devtools.Package(ctx, devtools.SettingsFromContext(ctx))
->>>>>>> 9041ee9d3 (Drop remaining globals from mage settings (#12856))
 }
 
 // Config generates both the short/reference/docker.
@@ -1077,23 +1041,11 @@ func runAgent(ctx context.Context, env map[string]string) error {
 
 	// docker does not exists for this commit, build it
 	if !strings.Contains(dockerImageOut, tag) {
-		var dependenciesVersion string
-		if cfg.Build.BeatVersion != "" {
-			dependenciesVersion = cfg.Build.BeatVersion
-		} else {
-			dependenciesVersion = bversion.GetDefaultVersion()
-		}
-
 		// produce docker package
-<<<<<<< HEAD
-		if err := packageAgent(ctx, cfg, dependenciesVersion, nil, mg.F(devtools.UseElasticAgentDemoPackaging), CrossBuild); err != nil {
-			return err
-=======
 		mage.UseElasticAgentPackaging(cfg)
 		err = packageAgent(ctx, cfg, "", nil)
 		if err != nil {
 			return fmt.Errorf("failed to package elastic-agent: %w", err)
->>>>>>> 9041ee9d3 (Drop remaining globals from mage settings (#12856))
 		}
 
 		dockerPackagePath := filepath.Join("build", "package", "elastic-agent", "elastic-agent-linux-amd64.docker", "docker-build")
@@ -1141,14 +1093,6 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-<<<<<<< HEAD
-func packageAgent(ctx context.Context, cfg *devtools.Settings, dependenciesVersion string, manifestResponse *manifest.Build, agentPackaging mg.Fn, agentBinaryTargets ...interface{}) error {
-	fmt.Println("--- Package Elastic-Agent")
-
-	platforms := cfg.GetPlatforms()
-	if mg.Verbose() {
-		log.Printf("--- Packaging dependenciesVersion[%s], %+v \n", dependenciesVersion, platforms)
-=======
 func packageAgent(ctx context.Context, cfg *mage.Settings, dependenciesVersion string, manifestResponse *manifest.Build) error {
 	fmt.Println("--- Package elastic-agent")
 
@@ -1162,13 +1106,11 @@ func packageAgent(ctx context.Context, cfg *mage.Settings, dependenciesVersion s
 		}
 		// add the snapshot suffix if needed
 		dependenciesVersion += devtools.MaybeSnapshotSuffix(cfg)
->>>>>>> 9041ee9d3 (Drop remaining globals from mage settings (#12856))
 	}
 
-	log.Println("--- Running packaging function")
-	mg.CtxDeps(ctx, agentPackaging)
+	log.Printf("Packaging with dependenciesVersion: %s", dependenciesVersion)
 
-	dependencies, err := ExtractComponentsFromSelectedPkgSpecs(cfg, devtools.Packages)
+	dependencies, err := extractComponentsFromSelectedPkgSpecs(cfg, devtools.Packages)
 	if err != nil {
 		return fmt.Errorf("failed extracting dependencies: %w", err)
 	}
@@ -1177,10 +1119,11 @@ func packageAgent(ctx context.Context, cfg *mage.Settings, dependenciesVersion s
 		log.Printf("dependencies extracted from package specs: %v", dependencies)
 	}
 
-	keepArchive := os.Getenv("KEEP_ARCHIVE") != ""
+	keepArchive := cfg.Packaging.KeepArchive
+	platforms := cfg.GetPlatforms().Names()
 
 	// download/copy all the necessary dependencies for packaging elastic-agent
-	archivePath, dropPath, dependencies := collectPackageDependencies(cfg, platforms.Names(), dependenciesVersion, dependencies)
+	archivePath, dropPath, dependencies := collectPackageDependencies(cfg, platforms, dependenciesVersion, dependencies)
 
 	// Update cfg with the resolved drop path
 	cfg = cfg.WithAgentDropPath(dropPath)
@@ -1200,25 +1143,8 @@ func packageAgent(ctx context.Context, cfg *mage.Settings, dependenciesVersion s
 	defer os.RemoveAll(flatPath)
 
 	// extract all dependencies from their archives into flat dir
-	flattenDependencies(cfg, platforms.Names(), dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse, dependencies)
+	flattenDependencies(cfg, platforms, dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse, dependencies)
 
-<<<<<<< HEAD
-	// package agent
-	log.Println("--- Running post packaging ")
-	mg.CtxDeps(ctx, Update)
-	mg.SerialCtxDeps(ctx, agentBinaryTargets...)
-
-	// compile the elastic-agent.exe proxy binary for the windows archive
-	for _, p := range platforms {
-		if p.GOOS() == "windows" {
-			mg.CtxDeps(ctx, Build.WindowsArchiveRootBinary)
-			break
-		}
-	}
-
-	// build package and test
-	return devtools.Package(cfg)
-=======
 	// extract elastic-agent-core to be used for packaging
 	err = extractAgentCoreForPackage(ctx, cfg, manifestResponse, dependenciesVersion)
 	if err != nil {
@@ -1230,7 +1156,42 @@ func packageAgent(ctx context.Context, cfg *mage.Settings, dependenciesVersion s
 		return err
 	}
 	return nil
->>>>>>> 9041ee9d3 (Drop remaining globals from mage settings (#12856))
+}
+
+func supportsAtLeastOnePackageType(platform string, spec packaging.BinarySpec, packageTypes []devtools.PackageType) bool {
+	for _, pkgType := range packageTypes {
+		if mg.Verbose() {
+			log.Printf(">>> Evaluating pkgType %v for component %s/%s", pkgType, spec.BinaryName, platform)
+		}
+		if !spec.SupportsPackageType(pkgcommon.PackageType(pkgType)) {
+			continue
+		}
+		if mg.Verbose() {
+			log.Printf(">>> Selecting component %s/%s because of pkgType %s", spec.BinaryName, platform, pkgType)
+		}
+		return true
+	}
+	log.Printf(">>> Component %s/%s not supported for any of the selected package types %v. Skipping...", spec.BinaryName, platform, packageTypes)
+	return false
+}
+
+// supportsSelectedPackageTypesFilter returns a filter which will exclude components that do not support at least one of the selected package types
+func supportsSelectedPackageTypesFilter(platforms []string, packageTypes []devtools.PackageType) packaging.ComponentFilter {
+	return func(dep packaging.BinarySpec) bool {
+		// If there are no package types set, return true to include all components by default
+		if len(packageTypes) == 0 {
+			return true
+		}
+		for _, platform := range platforms {
+			if supportsAtLeastOnePackageType(platform, dep, packageTypes) {
+				return true
+			}
+		}
+		if mg.Verbose() {
+			log.Printf(">>> Filtering out component %s as it doesn't support any selected package types %v", dep.BinaryName, packageTypes)
+		}
+		return false
+	}
 }
 
 // collectPackageDependencies performs the download (if it's an external dep), unpacking and move all the elastic-agent
@@ -1516,25 +1477,15 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 	branchInformation, err := findLatestBuildForBranch(ctx, baseURLForSnapshotDRA, branch)
 
 	if err != nil {
-		return fmt.Errorf("getting latest build for branch %q: %v", err)
+		return fmt.Errorf("getting latest build for branch %q: %w", branch, err)
 	}
 
-<<<<<<< HEAD
-	// Create a dir with the buildID at <root>/build/dra/<buildID>
-	repositoryRoot, err := mage.ElasticBeatsDir()
-	if err != nil {
-		return fmt.Errorf("finding repository root: %w", err)
-	}
-	draDownloadDir := filepath.Join(repositoryRoot, "build", "dra")
-	err = os.MkdirAll(draDownloadDir, 0o770)
-=======
 	// Create a dir with the buildID at <root>/build/core/<buildID>
 	repositoryRoot := cfg.ElasticBeatsDir
 	coreDownloadDir := filepath.Join(repositoryRoot, "build", "core")
 	err = os.MkdirAll(coreDownloadDir, 0o770)
->>>>>>> 9041ee9d3 (Drop remaining globals from mage settings (#12856))
 	if err != nil {
-		return fmt.Errorf("creating %q directory: %w", err)
+		return fmt.Errorf("creating %q directory: %w", coreDownloadDir, err)
 	}
 
 	build, err := manifest.DownloadManifest(ctx, branchInformation.ManifestURL)
@@ -1542,14 +1493,14 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 		return fmt.Errorf("downloading manifest from %q: %w", branchInformation.ManifestURL, err)
 	}
 
-	artifacts, err := downloadDRAArtifacts(ctx, cfg, &build, build.Version, draDownloadDir, elasticAgentCoreComponent)
+	artifacts, err := downloadDRAArtifacts(ctx, &build, build.Version, coreDownloadDir, cfg.GetPlatforms().Names(), elasticAgentCoreComponent)
 	if err != nil {
 		return fmt.Errorf("downloading DRA artifacts from %q: %w", branchInformation.ManifestURL, err)
 	}
 
 	fmt.Println("Downloaded agent core DRAs:")
 	for k := range artifacts {
-		fmt.Println(filepath.Join(draDownloadDir, k))
+		fmt.Println(filepath.Join(coreDownloadDir, k))
 	}
 	return nil
 }
@@ -1566,36 +1517,6 @@ func PackageUsingDRA(ctx context.Context) error {
 		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")
 	}
 
-<<<<<<< HEAD
-	if !cfg.Packaging.PackagingFromManifest {
-		return fmt.Errorf("elastic-agent PackageUsingDRA is expected to build from a manifest. Check that %s is set to a manifest URL", devtools.ManifestUrlEnvVar)
-	}
-
-	manifestResponse, parsedVersion, err := downloadManifestAndParseVersion(ctx, cfg.Packaging.ManifestURL)
-	if err != nil {
-		return fmt.Errorf("failed downloading manifest: %w", err)
-	}
-
-	// Apply manifest version to config
-	cfg = cfg.WithSnapshot(parsedVersion.IsSnapshot()).WithBeatVersion(parsedVersion.CoreVersion())
-
-	// fix the commit hash independently of the current commit hash on the branch
-	agentCoreProject, ok := manifestResponse.Projects[agentCoreProjectName]
-	if !ok {
-		return fmt.Errorf("%q project not found in manifest %q", agentCoreProjectName, cfg.Packaging.ManifestURL)
-	}
-	cfg = cfg.WithAgentCommitHashOverride(agentCoreProject.CommitHash)
-	ctx = devtools.ContextWithSettings(ctx, cfg)
-
-	return packageAgent(
-		ctx,
-		cfg,
-		parsedVersion.VersionWithPrerelease(),
-		manifestResponse,
-		mg.F(devtools.UseElasticAgentPackaging),
-		mg.F(useDRAAgentBinaryForPackage, cfg.Packaging.ManifestURL, parsedVersion.VersionWithPrerelease()),
-	)
-=======
 	// final package build
 	mage.UseElasticAgentPackaging(cfg)
 
@@ -1628,7 +1549,6 @@ func PackageUsingDRA(ctx context.Context) error {
 	}
 
 	return packageAgent(ctx, cfg, dependenciesVersion, manifestResponse)
->>>>>>> 9041ee9d3 (Drop remaining globals from mage settings (#12856))
 }
 
 // downloadManifestAndParseVersion downloads the manifest and returns the build info and parsed version.
@@ -1684,28 +1604,7 @@ func findLatestBuildForBranch(ctx context.Context, baseURL string, branch string
 	return bi, nil
 }
 
-func mapManifestPlatformToAgentPlatform(manifestPltf string) (string, bool) {
-	mappings := map[string]string{
-		"linux-x86_64":   "linux-amd64",
-		"windows-x86_64": "windows-amd64",
-		"darwin-x86_64":  "darwin-amd64",
-		"darwin-aarch64": "darwin-arm64",
-		"linux/x86_64":   "linux/amd64",
-		"windows/x86_64": "windows/amd64",
-		"darwin/x86_64":  "darwin/amd64",
-		"darwin/aarch64": "darwin/arm64",
-	}
-
-	mappedPltf, found := mappings[manifestPltf]
-	if !found {
-		// default to the manifest platform if no mapping is found
-		mappedPltf = manifestPltf
-	}
-
-	return mappedPltf, found
-}
-
-func downloadDRAArtifacts(ctx context.Context, cfg *devtools.Settings, build *manifest.Build, version string, draDownloadDir string, components ...packaging.BinarySpec) (map[string]manifest.Package, error) {
+func downloadDRAArtifacts(ctx context.Context, build *manifest.Build, version string, draDownloadDir string, platforms []string, components ...packaging.BinarySpec) (map[string]manifest.Package, error) {
 	err := os.MkdirAll(draDownloadDir, 0o770)
 	if err != nil {
 		return nil, fmt.Errorf("creating %q directory: %w", draDownloadDir, err)
@@ -1719,7 +1618,7 @@ func downloadDRAArtifacts(ctx context.Context, cfg *devtools.Settings, build *ma
 	var downloaders []func() error
 
 	for _, comp := range components {
-		for _, platform := range cfg.GetPlatforms().Names() {
+		for _, platform := range platforms {
 
 			if !comp.SupportsPlatform(platform) {
 				if mg.Verbose() {
@@ -1785,12 +1684,7 @@ func downloadDRAArtifacts(ctx context.Context, cfg *devtools.Settings, build *ma
 	return downloadedArtifacts, errGrp.Wait()
 }
 
-<<<<<<< HEAD
-func useDRAAgentBinaryForPackage(ctx context.Context, manifestURL string, version string) error {
-	cfg := devtools.SettingsFromContext(ctx)
-=======
 func extractAgentCoreForPackage(ctx context.Context, cfg *mage.Settings, manifestResponse *manifest.Build, version string) error {
->>>>>>> 9041ee9d3 (Drop remaining globals from mage settings (#12856))
 	components, err := packaging.Components()
 	if err != nil {
 		return fmt.Errorf("retrieving defined components: %w", err)
@@ -1806,86 +1700,54 @@ func extractAgentCoreForPackage(ctx context.Context, cfg *mage.Settings, manifes
 	}
 
 	elasticAgentCoreComponent := elasticAgentCoreComponents[0]
-	if mg.Verbose() {
-		log.Printf("found elastic-agent-core component used: %v", elasticAgentCoreComponent)
-	}
+	platforms := cfg.GetPlatforms().Names()
 
-<<<<<<< HEAD
-	repositoryRoot, err := mage.ElasticBeatsDir()
-	if err != nil {
-		return fmt.Errorf("looking up for repository root: %w", err)
-	}
-
-	downloadDir := filepath.Join(repositoryRoot, "build", "dra")
-=======
 	repositoryRoot := cfg.ElasticBeatsDir
 	downloadDir := filepath.Join(repositoryRoot, "build", "core")
->>>>>>> 9041ee9d3 (Drop remaining globals from mage settings (#12856))
 
-	manifestResponse, err := manifest.DownloadManifest(ctx, manifestURL)
-	if err != nil {
-		return fmt.Errorf("downloading manifest from %s: %w", manifestURL, err)
+	var coreDownloadDir string
+	if manifestResponse == nil {
+		// Use the build elastic-agent-core packages from the build/distributions
+		coreDownloadDir = filepath.Join(repositoryRoot, "build", "distributions")
+	} else {
+		// Download the artifacts from the manifest response with the buildID at <downloadDir>/<buildID>
+		coreDownloadDir = filepath.Join(downloadDir, manifestResponse.BuildID)
+		_, err = downloadDRAArtifacts(ctx, manifestResponse, version, coreDownloadDir, platforms, elasticAgentCoreComponent)
+		if err != nil {
+			return fmt.Errorf("downloading elastic-agent-core artifacts: %w", err)
+		}
 	}
 
-	// fetch the agent-core DRA artifacts for the current branch
+	// Create extracted director, ensure it doesn't exist.
+	const extractionSubdir = "extracted"
+	extractDir := filepath.Join(downloadDir, extractionSubdir)
+	_ = os.RemoveAll(extractDir) // ignore error
 
-	// Create a dir with the buildID at <downloadDir>/<buildID>
-	draDownloadDir := filepath.Join(downloadDir, manifestResponse.BuildID)
-	artifacts, err := downloadDRAArtifacts(ctx, cfg, &manifestResponse, version, draDownloadDir, elasticAgentCoreComponent)
-	if err != nil {
-		return fmt.Errorf("downloading elastic-agent-core artifacts: %w", err)
-	}
-
-	mg.CtxDeps(ctx, EnsureCrossBuildOutputDir)
-
-	// place the artifacts where the package.yml expects them (in build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}})
-	for _, platform := range cfg.GetPlatforms().Names() {
+	// place the artifacts where the package.yml expects them (in 'build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}')
+	for _, platform := range platforms {
 		if !elasticAgentCoreComponent.SupportsPlatform(platform) {
 			continue
 		}
-
 		expectedPackageName := elasticAgentCoreComponent.GetPackageName(version, platform)
 
-		artifactMetadata, ok := artifacts[expectedPackageName]
-
-		if !ok {
-			return fmt.Errorf("elastic-agent-core package %q has not been downloaded for platform %s", expectedPackageName, platform)
-		}
-
 		// uncompress the archive first
-		const extractionSubdir = "extracted"
-		extractDir := filepath.Join(draDownloadDir, extractionSubdir)
-		artifactFile := filepath.Join(draDownloadDir, expectedPackageName)
+		artifactFile := filepath.Join(coreDownloadDir, expectedPackageName)
+		log.Printf("extracting artifact from %q into %q", artifactFile, extractDir)
 		err = devtools.Extract(artifactFile, extractDir)
 		if err != nil {
 			return fmt.Errorf("extracting %q: %w", artifactFile, err)
 		}
 
-		// this is the directory name where we can find the agent executable
+		// rename this directory to match the format expected by the core_source packaging target
+		// this is 'build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}' in the repository
 		targetArtifactName := elasticAgentCoreComponent.GetRootDir(version, platform)
-		binaryExt := ""
-		if slices.Contains(artifactMetadata.Os, "windows") {
-			binaryExt += ".exe"
-		}
-
-		srcBinaryPath := filepath.Join(extractDir, targetArtifactName, elasticAgentCoreComponent.BinaryName+binaryExt)
-		srcStat, err := os.Stat(srcBinaryPath)
+		srcDir := filepath.Join(extractDir, targetArtifactName)
+		dstDir := filepath.Join(extractDir, strings.Replace(platform, "/", "-", 1))
+		_ = os.RemoveAll(dstDir) // ignore error, just can't exist before the rename
+		log.Printf("renaming %q to %q", srcDir, dstDir)
+		err := os.Rename(srcDir, dstDir)
 		if err != nil {
-			return fmt.Errorf("stat source binary name %q: %w", srcBinaryPath, err)
-		}
-		log.Printf("Source binary %q stat: %+v", srcBinaryPath, srcStat)
-
-		dstPlatform, _ := mapManifestPlatformToAgentPlatform(fmt.Sprintf("%s-%s", artifactMetadata.Os[0], artifactMetadata.Architecture))
-		dstFileName := fmt.Sprintf("elastic-agent-%s", dstPlatform) + binaryExt
-		dstBinaryPath := filepath.Join(repositoryRoot, "build", "golang-crossbuild", dstFileName)
-
-		log.Printf("copying %q to %q", srcBinaryPath, dstBinaryPath)
-
-		err = filecopy.Copy(srcBinaryPath, dstBinaryPath, filecopy.Options{
-			PermissionControl: filecopy.PerservePermission,
-		})
-		if err != nil {
-			return fmt.Errorf("copying %q to %q: %w", srcBinaryPath, dstBinaryPath, err)
+			return fmt.Errorf("failed renaming %q to %q: %w", srcDir, dstDir, err)
 		}
 	}
 
@@ -1917,8 +1779,8 @@ func appendComponentChecksums(versionedDropPath string, checksums map[string]str
 		componentFile := strings.TrimSuffix(file, devtools.ComponentSpecFileSuffix)
 		hash, err := devtools.GetSHA512Hash(filepath.Join(versionedDropPath, componentFile))
 		if errors.Is(err, os.ErrNotExist) {
-			fmt.Printf(">>> Computing hash for %q failed: file not present %w \n", componentFile, err)
-			continue
+			fmt.Printf(">>> Computing hash for %q failed: %s\n", componentFile, err)
+			return fmt.Errorf("cannot generate SHA512 for %q: %s", componentFile, err)
 		} else if err != nil {
 			return err
 		}
@@ -2242,15 +2104,11 @@ func saveIronbank(cfg *devtools.Settings) error {
 }
 
 func getIronbankContextName(cfg *devtools.Settings) string {
-<<<<<<< HEAD
-	version, _ := devtools.BeatQualifiedVersion(cfg)
-=======
 	ver := cfg.BeatQualifiedVersion()
->>>>>>> 9041ee9d3 (Drop remaining globals from mage settings (#12856))
 	defaultBinaryName := "{{.Name}}-ironbank-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}"
 	outputDir, _ := devtools.Expand(cfg, defaultBinaryName+"-docker-build-context", map[string]interface{}{
 		"Name":    "elastic-agent",
-		"Version": version,
+		"Version": ver,
 	})
 	return outputDir
 }
@@ -4265,14 +4123,4 @@ func getMacOSMajorVersion() (int, error) {
 	}
 
 	return majorVer, nil
-}
-
-func getAgentBuildTargets(cfg *devtools.Settings) []interface{} {
-	// add otel:crossBuild as pre-build for packaging when OTEL_COMPONENT=true
-	buildTargets := make([]interface{}, 0, 2)
-	if cfg.Build.OTELComponentBuild {
-		buildTargets = append(buildTargets, Otel.CrossBuild)
-	}
-	buildTargets = append(buildTargets, CrossBuild)
-	return buildTargets
 }

@@ -83,19 +83,6 @@ func (b *dockerBuilder) Build(ctx context.Context) error {
 		return fmt.Errorf("failed to save docker as artifact: %w", err)
 	}
 
-<<<<<<< HEAD
-=======
-	// additional tags should not be created with
-	for _, tag := range additionalTags {
-		if err := b.dockerSave(ctx, tag, map[string]interface{}{
-			// effectively override the name used from b.ImageName() to the tag
-			"Name": strings.ReplaceAll(tag, ":", "-"),
-		}); err != nil {
-			return fmt.Errorf("failed to save docker with tag %s as artifact: %w", tag, err)
-		}
-	}
-
->>>>>>> 9041ee9d3 (Drop remaining globals from mage settings (#12856))
 	return nil
 }
 
@@ -232,11 +219,7 @@ func (b *dockerBuilder) dockerBuild() (string, error) {
 	return tag, sh.Run("docker", args...)
 }
 
-<<<<<<< HEAD
-func (b *dockerBuilder) dockerSave(tag string) error {
-=======
 func (b *dockerBuilder) dockerSave(ctx context.Context, tag string, templateExtraArgs ...map[string]interface{}) error {
->>>>>>> 9041ee9d3 (Drop remaining globals from mage settings (#12856))
 	if _, err := os.Stat(DistributionsDir); os.IsNotExist(err) {
 		err := os.MkdirAll(DistributionsDir, 0750)
 		if err != nil {
