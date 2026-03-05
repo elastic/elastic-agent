@@ -1,0 +1,70 @@
+# AWS CSPM + Asset Discovery + CloudTrail verification policy
+#
+# Prerequisites:
+#   export AWS_PROFILE=your-profile
+#   # or: export AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... AWS_REGION=us-east-1
+#
+# Build:
+#   mage build:all
+#
+# Run:
+#   ./build/elastic-agent otel --config path/to/aws-cspm-policy.yaml
+
+receivers:
+  verifier:
+    cloud_connector_id: "cc-aws-local"
+    cloud_connector_name: "AWS Local Test"
+    namespace: "default"
+    account_type: "single_account"
+    verification_id: "verify-aws-cspm-001"
+    verification_type: "on_demand"
+
+    providers:
+      aws:
+        credentials:
+          use_default_credentials: true
+          default_region: "us-east-1"
+
+    policies:
+      - policy_id: "policy-aws-cspm"
+        policy_name: "AWS Cloud Security Posture"
+        integrations:
+          - policy_template: "cspm"
+            package_name: "aws"
+            package_policy_id: "pp-cspm-001"
+            package_title: "AWS"
+            config:
+              region: "us-east-1"
+
+          - policy_template: "asset_inventory"
+            package_name: "aws"
+            package_policy_id: "pp-asset-001"
+            package_title: "AWS"
+            config:
+              region: "us-east-1"
+
+          - policy_template: "cloudtrail"
+            package_name: "aws"
+            package_policy_id: "pp-cloudtrail-001"
+            package_title: "AWS"
+            package_version: "2.17.0"
+            config:
+              region: "us-east-1"
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  telemetry:
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: localhost
+                port: 18888
+  pipelines:
+    logs:
+      receivers: [verifier]
+      exporters: [debug]
