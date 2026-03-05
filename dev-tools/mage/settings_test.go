@@ -6,6 +6,8 @@ package mage
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -881,6 +883,95 @@ func TestMustLoadSettings(t *testing.T) {
 			settings := MustLoadSettings()
 			assert.NotNil(t, settings)
 		})
+	})
+}
+
+func TestLoadPackageSpecs(t *testing.T) {
+	// writeSpecFile is a helper that writes a packages.yml file under the
+	// expected relative path inside a temporary directory and returns a
+	// Settings instance pointing at that directory.
+	writeSpecFile := func(t *testing.T, content string) *Settings {
+		t.Helper()
+		tmpDir := t.TempDir()
+		specDir := filepath.Join(tmpDir, filepath.Dir(packageSpecFile))
+		require.NoError(t, os.MkdirAll(specDir, 0o755))
+		require.NoError(t, os.WriteFile(
+			filepath.Join(tmpDir, packageSpecFile),
+			[]byte(content), 0o644,
+		))
+		s := DefaultSettings()
+		s.ElasticBeatsDir = tmpDir
+		return s
+	}
+
+	t.Run("loads both specs successfully", func(t *testing.T) {
+		s := writeSpecFile(t, `
+specs:
+  elastic_agent_core:
+    - os: linux
+      types:
+        - targz
+      spec:
+        name: core-pkg
+  elastic_agent_packaging:
+    - os: windows
+      types:
+        - zip
+      spec:
+        name: packaging-pkg
+`)
+		err := s.loadPackageSpecs()
+		require.NoError(t, err)
+
+		// Verify the specs were stored and are accessible via the public methods.
+		s.UseElasticAgentCorePackaging()
+		require.Len(t, s.Packages, 1)
+		assert.Equal(t, "linux", s.Packages[0].OS)
+		assert.Equal(t, "core-pkg", s.Packages[0].Spec.Name)
+
+		s.UseElasticAgentPackaging()
+		require.Len(t, s.Packages, 1)
+		assert.Equal(t, "windows", s.Packages[0].OS)
+		assert.Equal(t, "packaging-pkg", s.Packages[0].Spec.Name)
+	})
+
+	t.Run("returns error when spec file does not exist", func(t *testing.T) {
+		s := DefaultSettings()
+		s.ElasticBeatsDir = t.TempDir() // no packages.yml here
+
+		err := s.loadPackageSpecs()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to load package specs")
+	})
+
+	t.Run("returns error when elastic_agent_core is missing", func(t *testing.T) {
+		s := writeSpecFile(t, `
+specs:
+  elastic_agent_packaging:
+    - os: linux
+      types:
+        - targz
+      spec:
+        name: pkg
+`)
+		err := s.loadPackageSpecs()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "elastic_agent_core")
+	})
+
+	t.Run("returns error when elastic_agent_packaging is missing", func(t *testing.T) {
+		s := writeSpecFile(t, `
+specs:
+  elastic_agent_core:
+    - os: linux
+      types:
+        - targz
+      spec:
+        name: core
+`)
+		err := s.loadPackageSpecs()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "elastic_agent_packaging")
 	})
 }
 

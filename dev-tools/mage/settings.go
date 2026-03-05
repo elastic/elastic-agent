@@ -652,9 +652,11 @@ type Settings struct {
 	// Initialized during LoadSettings().
 	BuildDate string
 
-	// packageSpecs holds all package specifications loaded from the packages.yml file.
-	// Initialized during LoadSettings().
-	packageSpecs map[string][]OSPackageArgs
+	// package specs that we directly use in the course of packaging agents
+	// these also appear in packageSpecs above, but we extract them specifically to ensure they exist
+	// when loading Settings
+	agentCorePackageSpec []OSPackageArgs
+	agentPackageSpec     []OSPackageArgs
 
 	// Packages holds the selected package specifications for the current build.
 	// This is set by UseElasticAgentPackaging etc.
@@ -1685,15 +1687,31 @@ func (s *Settings) initBuildVariables() error {
 	}
 
 	// Load package specs from packages.yml
+	err = s.loadPackageSpecs()
+	if err != nil {
+		return fmt.Errorf("failed to load package specs")
+	}
+
+	return nil
+}
+
+func (s *Settings) loadPackageSpecs() error {
 	pkgSpecFile := filepath.Join(s.ElasticBeatsDir, packageSpecFile)
-	s.packageSpecs, err = LoadSpecs(pkgSpecFile)
+	packageSpecs, err := LoadSpecs(pkgSpecFile)
 	if err != nil {
 		return fmt.Errorf("failed to load package specs: %w", err)
 	}
-	for _, specName := range expectedSpecNames {
-		if _, ok := s.packageSpecs[specName]; !ok {
-			return fmt.Errorf("missing expected package spec '%s'", specName)
-		}
+
+	if agentCoreSpec, ok := packageSpecs["elastic_agent_core"]; ok {
+		s.agentCorePackageSpec = agentCoreSpec
+	} else {
+		return fmt.Errorf("%v not found in package specs", "elastic_agent_core")
+	}
+
+	if agentPackageSpec, ok := packageSpecs["elastic_agent_packaging"]; ok {
+		s.agentPackageSpec = agentPackageSpec
+	} else {
+		return fmt.Errorf("%v not found in package specs", "elastic_agent_packaging")
 	}
 
 	return nil
@@ -1867,39 +1885,14 @@ func (s *Settings) IsDockerVariantSelected(docVariant DockerVariant) bool {
 
 const packageSpecFile = "dev-tools/packaging/packages.yml"
 
-var expectedSpecNames = []string{
-	"elastic_agent_core",
-	"elastic_agent_packaging",
-}
-
 // UseElasticAgentCorePackaging selects the elastic_agent_core package spec
 // for building binary packages for an Elastic Agent.
 func (s *Settings) UseElasticAgentCorePackaging() {
-	s.MustSelectPackageSpec("elastic_agent_core")
+	s.Packages = s.agentCorePackageSpec
 }
 
 // UseElasticAgentPackaging selects the elastic_agent_packaging package spec
 // for building packages for an Elastic Agent.
 func (s *Settings) UseElasticAgentPackaging() {
-	s.MustSelectPackageSpec("elastic_agent_packaging")
-}
-
-func (s *Settings) MustSelectPackageSpec(packageSpecName string) {
-	err := s.SelectPackageSpec(packageSpecName)
-	if err != nil {
-		panic(err)
-	}
-}
-
-// SelectPackageSpec selects a package specification by name from the pre-loaded specs.
-// The specs are loaded during Settings initialization from packages.yml.
-func (s *Settings) SelectPackageSpec(name string) error {
-	packages, found := s.packageSpecs[name]
-	if !found {
-		return fmt.Errorf("%v not found in package specs", name)
-	}
-
-	log.Printf("%v package spec selected", name)
-	s.Packages = packages
-	return nil
+	s.Packages = s.agentPackageSpec
 }
