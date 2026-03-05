@@ -16,7 +16,39 @@ summary: Run all metricbeat inputs in an otel collector
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-#description:
+description: >-
+  The following metricbeat inputs will now use the otel runtime by
+  default, relative to 9.3:
+
+    - "aerospike/metrics"
+    - "autoops_es/metrics"
+    - "aws/metrics"
+    - "awsfargate/metrics"
+    - "azure/metrics"
+    - "cloudfoundry/metrics"
+    - "gcp/metrics"
+    - "haproxy/metrics"
+    - "iis/metrics"
+    - "kubernetes/metrics"
+    - "meraki/metrics"
+    - "mssql/metrics"
+    - "openai/metrics"
+    - "oracle/metrics"
+    - "panw/metrics"
+    - "postgresql/metrics"
+    - "prometheus/metrics"
+    - "redis/metrics"
+    - "syncgateway/metrics"
+    - "traefik/metrics"
+    - "uwsgi/metrics"
+    - "windows/metrics"
+    - "zookeeper/metrics"
+
+
+  This will result in a memory reduction since fewer agentbeat
+  processes are started, because the otel runtime runs within the
+  collector process. If the policy is not compatible with the otel
+  runtime, it will fall back to the process runtime.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent
