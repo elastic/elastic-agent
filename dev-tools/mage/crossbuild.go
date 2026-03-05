@@ -213,10 +213,7 @@ func CrossBuildImage(cfg *Settings, platform string) (string, error) {
 		tagSuffix = "windows-arm64-debian12"
 	}
 
-	goVersion, err := GoVersion(cfg)
-	if err != nil {
-		return "", err
-	}
+	goVersion := cfg.GoVersion()
 
 	if cfg.Build.FIPSBuild {
 		tagSuffix += "-fips"
@@ -243,11 +240,7 @@ func (b GolangCrossBuilder) Build() error {
 	cfg := b.Config
 	fmt.Printf(">> %v: Building for %v\n", b.Target, b.Platform)
 
-	repoInfo, err := GetProjectRepoInfo()
-	if err != nil {
-		return fmt.Errorf("failed to determine repo root and package sub dir: %w", err)
-	}
-
+	repoInfo := cfg.RepoInfo
 	uid := os.Getuid()
 	gid := os.Getgid()
 
