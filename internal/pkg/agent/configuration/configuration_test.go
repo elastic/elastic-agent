@@ -42,6 +42,6 @@ func TestNewFromConfig_RuntimeConfigFromFile(t *testing.T) {
 
 	// metricbeat: no default override; system/metrics set in the fixture, rest
 	// comes from DefaultRuntimeConfig defaults.
-	assert.Equal(t, "", runtime.Metricbeat.Default)
+	assert.Equal(t, string(component.OtelRuntimeManager), runtime.Metricbeat.Default)
 	assert.Equal(t, string(component.OtelRuntimeManager), runtime.Metricbeat.InputType["system/metrics"])
 }
