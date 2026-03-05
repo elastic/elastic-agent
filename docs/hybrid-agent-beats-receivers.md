@@ -87,6 +87,24 @@ outputs:
     api_key: placeholder
 ```
 
+With changes in https://github.com/elastic/elastic-agent/pull/12852, user can also control the runtime of the inputs based on output type.
+This can be done by setting `agent.internal.runtime.output.[output_type]` to `otel` or `process`. For example, below config would override all inputs used with elasticsearch output to use otel runtime
+
+```yaml
+agent:
+  internal:
+    runtime:
+      default: process
+      filebeat:
+        filestream: otel
+      metricbeat:
+        system/metrics: otel
+      output: # Override the runtime used based on the output type.
+        elasticsearch: otel # Force all inputs using the Elasticearch output to use the otel runtime 
+        logstash: process # Force all inputs using the Logstash output to use the process runtime
+        kafka: process # Force all inputs using the kafka output to use the process runtime
+```
+
 ### Configuration Translation Overrides
 
 When an input is executed as a Beat receiver, it is injected into an OpenTelemetry collector pipeline that was

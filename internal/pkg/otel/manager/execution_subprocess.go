@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -164,9 +165,11 @@ func (r *subprocessExecution) startCollector(
 	}
 
 	healthCheckDone := make(chan struct{})
+	ctl.processMonitoringWg.Add(2)
 	go func() {
 		defer func() {
 			close(healthCheckDone)
+			ctl.processMonitoringWg.Done()
 		}()
 		currentStatus := status.AggregateStatus(componentstatus.StatusStarting, nil)
 		r.reportSubprocessCollectorStatus(ctx, statusCh, currentStatus)
@@ -225,6 +228,7 @@ func (r *subprocessExecution) startCollector(
 	}()
 
 	go func() {
+		defer ctl.processMonitoringWg.Done()
 		procState, procErr := processInfo.Process.Wait()
 		logger.Debugf("wait for pid %d returned", processInfo.PID)
 		procCtxCancel()
@@ -239,13 +243,13 @@ func (r *subprocessExecution) startCollector(
 				r.reportErrFn(ctx, processErrCh, nil)
 			} else {
 				var procReportErr error
-				stderrMsg := stdErrLast.Last().Message
-				stdoutMsg := stdOutLast.Last().Message
+				stderrMsg := stdErrLast.LastMessage()
+				stdoutMsg := stdOutLast.LastMessage()
 				if stderrMsg != "" {
-					// use stderr message as the error
+					// use stderr messages as the error
 					procReportErr = errors.New(stderrMsg)
 				} else if stdoutMsg != "" {
-					// use last stdout message as the error
+					// use stdout messages as the error
 					procReportErr = errors.New(stdoutMsg)
 				} else {
 					// neither case use standard process error
@@ -316,10 +320,8 @@ func addCollectorMetricsReader(conf *confmap.Conf, port int) error {
 		"pull": map[string]any{
 			"exporter": map[string]any{
 				"prometheus": map[string]any{
-					"host": "localhost",
-					"port": port,
-					// this is the default configuration from the otel collector
-					"without_scope_info":  true,
+					"host":                "localhost",
+					"port":                port,
 					"without_units":       true,
 					"without_type_suffix": true,
 				},
@@ -347,14 +349,16 @@ func removeManagedHealthCheckExtensionStatus(status *otelstatus.AggregateStatus,
 }
 
 type procHandle struct {
-	processDoneCh chan struct{}
-	processInfo   *process.Info
-	log           *logger.Logger
+	processDoneCh       chan struct{}
+	processInfo         *process.Info
+	processMonitoringWg sync.WaitGroup
+	log                 *logger.Logger
 }
 
 // Stop stops the process. If the process is already stopped, it does nothing. If the process does not stop within
 // processKillAfter or due to an error, it will be killed.
 func (s *procHandle) Stop(waitTime time.Duration) {
+	defer s.processMonitoringWg.Wait()
 	select {
 	case <-s.processDoneCh:
 		// process has already exited
@@ -386,32 +390,56 @@ func (s *procHandle) Stop(waitTime time.Duration) {
 	}
 }
 
+func (s *procHandle) Stopped() bool {
+	select {
+	case <-s.processDoneCh:
+		return true
+	default:
+	}
+	return false
+}
+
 type zapWriter interface {
 	Write(zapcore.Entry, []zapcore.Field) error
 }
+
+// zapLast is a zapWriter that tracks the most recent error context from the
+// collector subprocess. It uses a heuristic to distinguish structured (JSON)
+// log entries from unstructured plain-text output:
+//
+//   - Structured entries (fields != nil) are normal collector logs. Each one
+//     resets the accumulated messages and stands on its own.
+//   - Unstructured entries (fields == nil) are plain-text lines, typically from
+//     multi-line errors (e.g. errors.Join output written to stderr). These are
+//     accumulated so LastMessage can reconstruct the full error.
 type zapLast struct {
 	wrapped zapWriter
-	last    zapcore.Entry
+	msgs    []string
 	mx      sync.Mutex
 }
 
 func newZapLast(w zapWriter) *zapLast {
-	return &zapLast{
-		wrapped: w,
-	}
+	return &zapLast{wrapped: w}
 }
 
-// Write stores the most recent log entry.
 func (z *zapLast) Write(entry zapcore.Entry, fields []zapcore.Field) error {
 	z.mx.Lock()
-	z.last = entry
+	if fields != nil {
+		// Structured (JSON) log entry — reset and store as standalone message.
+		z.msgs = z.msgs[:0]
+	}
+	if entry.Message != "" {
+		z.msgs = append(z.msgs, entry.Message)
+	}
 	z.mx.Unlock()
 	return z.wrapped.Write(entry, fields)
 }
 
-// Last returns the last log entry.
-func (z *zapLast) Last() zapcore.Entry {
+// LastMessage returns the most recent message context. For multi-line
+// plain-text output (e.g. errors.Join), the accumulated lines are joined
+// with "; " to reconstruct the full error text.
+func (z *zapLast) LastMessage() string {
 	z.mx.Lock()
 	defer z.mx.Unlock()
-	return z.last
+	return strings.Join(z.msgs, "; ")
 }

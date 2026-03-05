@@ -48,6 +48,26 @@ func TestCompareAggregateStatuses(t *testing.T) {
 			expected: true,
 		},
 		{
+			name: "unequal timestamps",
+			s1: &status.AggregateStatus{
+				Event: &healthCheckEvent{
+					status:     componentstatus.StatusOK,
+					timestamp:  timestamp,
+					attributes: pcommon.NewMap(),
+					err:        nil,
+				},
+			},
+			s2: &status.AggregateStatus{
+				Event: &healthCheckEvent{
+					status:     componentstatus.StatusOK,
+					timestamp:  timestamp.Add(time.Second),
+					attributes: pcommon.NewMap(),
+					err:        nil,
+				},
+			},
+			expected: false,
+		},
+		{
 			name: "unequal statuses",
 			s1: &status.AggregateStatus{
 				Event: &healthCheckEvent{
