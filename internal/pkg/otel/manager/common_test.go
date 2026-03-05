@@ -668,6 +668,12 @@ func TestOtelConfigToStatus(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("nil config", func(t *testing.T) {
+		result, err := otelConfigToStatus(nil, errors.New("collector crashed"))
+		require.NoError(t, err)
+		assert.Nil(t, result)
+	})
 }
 
 func TestRecordSpecificErr(t *testing.T) {
