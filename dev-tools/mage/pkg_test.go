@@ -86,14 +86,12 @@ func testPackage(t testing.TB, pack func(PackageSpec) error) {
 }
 
 func TestRepoRoot(t *testing.T) {
-	repo, err := GetProjectRepoInfo()
-	if err != nil {
-		t.Error(err)
-	}
+	cfg, err := LoadSettings()
+	require.NoError(t, err)
 
-	assert.Equal(t, "github.com/elastic/elastic-agent", repo.RootImportPath)
-	assert.True(t, filepath.IsAbs(repo.RootDir))
-	cwd := filepath.Join(repo.RootDir, repo.SubDir)
+	assert.Equal(t, "github.com/elastic/elastic-agent", cfg.RepoInfo.RootImportPath)
+	assert.True(t, filepath.IsAbs(cfg.RepoInfo.RootDir))
+	cwd := filepath.Join(cfg.RepoInfo.RootDir, cfg.RepoInfo.SubDir)
 	assert.Equal(t, CWD(), cwd)
 }
 
