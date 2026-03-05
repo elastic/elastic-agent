@@ -6,6 +6,7 @@ package mage
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -28,8 +29,9 @@ func UseElasticAgentCorePackaging(cfg *Settings) {
 
 // UseElasticAgentPackaging configures the package target to build packages for
 // an Elastic Agent.
-func UseElasticAgentPackaging(cfg *Settings) {
+func UseElasticAgentPackaging(ctx context.Context) {
 	// Prepare binaries so they can be packed into agent
+	cfg := SettingsFromContext(ctx)
 	MustUsePackaging(cfg, "elastic_beat_agent_binaries", packageSpecFile)
 }
 
