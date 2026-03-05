@@ -6,6 +6,7 @@ package mage
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -22,81 +23,27 @@ var Packages []OSPackageArgs
 
 // UseElasticAgentCorePackaging configures the package target to build binary packages
 // for an Elastic Agent.
-func UseElasticAgentCorePackaging() {
-	MustUsePackaging("elastic_agent_core", packageSpecFile)
-}
-
-// UseCommunityBeatPackaging configures the package target to build packages for
-// a community Beat.
-func UseCommunityBeatPackaging() {
-	MustUsePackaging("community_beat", packageSpecFile)
+func UseElasticAgentCorePackaging(cfg *Settings) {
+	MustUsePackaging(cfg, "elastic_agent_core", packageSpecFile)
 }
 
 // UseElasticAgentPackaging configures the package target to build packages for
 // an Elastic Agent.
-func UseElasticAgentPackaging() {
+func UseElasticAgentPackaging(ctx context.Context) {
+	// this function is called by wrapping it in mage.F, so it can't take settings as an argument directly
+	cfg := SettingsFromContext(ctx)
 	// Prepare binaries so they can be packed into agent
-	MustUsePackaging("elastic_beat_agent_binaries", packageSpecFile)
-}
-
-// UseElasticAgentDemoPackaging configures the package target to build packages for
-// an Elastic Agent demo purposes.
-func UseElasticAgentDemoPackaging() {
-	// Prepare binaries so they can be packed into agent
-	MustUsePackaging("elastic_beat_agent_demo_binaries", packageSpecFile)
-}
-
-// UseElasticBeatPackaging configures the package target to build packages for
-// an Elastic Beat. This means it will generate two sets of packages -- one
-// that is purely OSS under Apache 2.0 and one that is licensed under the
-// Elastic License and may contain additional X-Pack features.
-func UseElasticBeatPackaging() {
-	UseElasticBeatOSSPackaging()
-	MustUsePackaging("elastic_beat_xpack_separate_binaries", packageSpecFile)
-}
-
-// UseElasticBeatOSSPackaging configures the package target to build OSS
-// packages.
-func UseElasticBeatOSSPackaging() {
-	MustUsePackaging("elastic_beat_oss", packageSpecFile)
-}
-
-// UseElasticBeatXPackPackaging configures the package target to build Elastic
-// licensed (X-Pack) packages.
-func UseElasticBeatXPackPackaging() {
-	MustUsePackaging("elastic_beat_xpack", packageSpecFile)
-}
-
-// UseElasticBeatXPackReducedPackaging configures the package target to build Elastic
-// licensed (X-Pack) packages for agent use.
-func UseElasticBeatXPackReducedPackaging() {
-	MustUsePackaging("elastic_beat_xpack_reduced", packageSpecFile)
-}
-
-// UseElasticBeatWithoutXPackPackaging configures the package target to build
-// packages for an Elastic Beat. This means it will generate two sets of
-// packages -- one that is purely OSS under Apache 2.0 and one that is licensed
-// under the Elastic License and may contain additional X-Pack features.
-//
-// NOTE: This method doesn't use binaries produced in the x-pack folder, this is
-// a temporary packaging target for projects that depends on beat but do have
-// concrete x-pack binaries.
-func UseElasticBeatWithoutXPackPackaging() {
-	UseElasticBeatOSSPackaging()
-	UseElasticBeatXPackPackaging()
+	MustUsePackaging(cfg, "elastic_beat_agent_binaries", packageSpecFile)
 }
 
 // MustUsePackaging will load a named spec from a named file, if any errors
 // occurs when loading the specs it will panic.
 //
 // NOTE: we assume that specFile is relative to the beatsDir.
-func MustUsePackaging(specName, specFile string) {
-	beatsDir, err := ElasticBeatsDir()
-	if err != nil {
-		panic(err)
-	}
+func MustUsePackaging(cfg *Settings, specName, specFile string) {
+	beatsDir := cfg.ElasticBeatsDir
 
-	err = LoadNamedSpec(specName, filepath.Join(beatsDir, specFile))
+	err := LoadNamedSpec(specName, filepath.Join(beatsDir, specFile))
 	if err != nil {
 		panic(err)
 	}
@@ -104,13 +51,10 @@ func MustUsePackaging(specName, specFile string) {
 
 // LoadLocalNamedSpec loads the named package spec from the packages.yml in the
 // current directory.
-func LoadLocalNamedSpec(name string) {
-	beatsDir, err := ElasticBeatsDir()
-	if err != nil {
-		panic(err)
-	}
+func LoadLocalNamedSpec(cfg *Settings, name string) {
+	beatsDir := cfg.ElasticBeatsDir
 
-	err = LoadNamedSpec(name, filepath.Join(beatsDir, packageSpecFile), "packages.yml")
+	err := LoadNamedSpec(name, filepath.Join(beatsDir, packageSpecFile), "packages.yml")
 	if err != nil {
 		panic(err)
 	}
