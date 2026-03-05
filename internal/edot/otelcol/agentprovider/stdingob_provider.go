@@ -48,10 +48,10 @@ type StdinGobProvider struct {
 
 	// wg tracks the background reader goroutine so Shutdown can wait
 	// for it to finish.
-	wg      sync.WaitGroup
-	closeCh chan struct{}
-
-	backgroundReaderOnce sync.Once
+	wg                     sync.WaitGroup
+	backgroundReaderOnce   sync.Once
+	backgroundReaderCtx    context.Context
+	backgroundReaderCancel context.CancelFunc
 }
 
 // NewFactory returns a confmap.ProviderFactory that creates a
@@ -72,11 +72,13 @@ func NewStdinGobFactoryWithReader(reader io.ReadCloser) confmap.ProviderFactory 
 }
 
 func newProvider(reader io.ReadCloser, settings confmap.ProviderSettings) confmap.Provider {
+	backgroundReaderCtx, cancel := context.WithCancel(context.Background())
 	return &StdinGobProvider{
-		reader:   reader,
-		logger:   settings.Logger,
-		watchers: make(map[int]confmap.WatcherFunc),
-		closeCh:  make(chan struct{}),
+		reader:                 reader,
+		logger:                 settings.Logger,
+		watchers:               make(map[int]confmap.WatcherFunc),
+		backgroundReaderCtx:    backgroundReaderCtx,
+		backgroundReaderCancel: cancel,
 	}
 }
 
@@ -109,22 +111,13 @@ func (p *StdinGobProvider) readCfgBytes(ctx context.Context) ([]byte, error) {
 // startBackgroundReader starts goroutines that read subsequent configs
 // and call all registered watchers directly. Called only once.
 func (p *StdinGobProvider) startBackgroundReader() {
-	p.wg.Add(2)
-	ctx, cancel := context.WithCancel(context.Background())
+	p.wg.Add(1)
 
-	// Wait for closeCh to be closed and cancel the reading context, signaling the reader goroutine to exit.
-	go func() {
-		defer p.wg.Done()
-		select {
-		case <-p.closeCh:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
+	// The background reader goroutine exits after its context is cancelled.
 	go func() {
 		defer p.wg.Done()
 		for {
-			yamlCfg, readErr := p.readCfgBytes(ctx)
+			yamlCfg, readErr := p.readCfgBytes(p.backgroundReaderCtx)
 
 			// EOF means the writer has no more configs to send. This is not an error — just stop reading and keep
 			// serving the last known config.
@@ -213,7 +206,7 @@ func (p *StdinGobProvider) Scheme() string {
 // Per the confmap.Provider contract, this method is never called concurrently
 // with itself or with Retrieve.
 func (p *StdinGobProvider) Shutdown(ctx context.Context) error {
-	close(p.closeCh)
+	p.backgroundReaderCancel()
 	done := make(chan struct{})
 	go func() {
 		p.wg.Wait()
