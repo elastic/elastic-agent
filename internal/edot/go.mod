@@ -8,7 +8,7 @@ replace github.com/elastic/elastic-agent => ../../
 replace github.com/elastic/beats/v7 => ../../beats
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260304193545-d1e1c2a27208
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260305101239-77ff8b8266ec
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.33.3
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
@@ -113,7 +113,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.144.0 // indirect
 	github.com/oschwald/geoip2-golang/v2 v2.1.0 // indirect
 	github.com/oschwald/maxminddb-golang/v2 v2.1.1 // indirect
-	github.com/osquery/osquery-go v0.0.0-20231108163517-e3cde127e724 // indirect
+	github.com/osquery/osquery-go v0.0.0-20260226222546-0cc22f415e57 // indirect
 	github.com/otiai10/copy v1.14.0 // indirect
 	github.com/pkg/xattr v0.4.9 // indirect
 	github.com/prometheus/client_golang/exp v0.0.0-20260101091701-2cd067eb23c9 // indirect
