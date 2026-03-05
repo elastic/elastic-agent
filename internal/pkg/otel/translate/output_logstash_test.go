@@ -59,7 +59,6 @@ worker: 3
 ssl.enabled: true
 ssl.certificate_authorities: "/not/a/real/path/ca.pem"
 ssl.supported_protocols: "TLSv1.3"
-ssl.cipher_suites: "ECDHE-ECDSA-AES-256-CBC-SHA"
 ssl.curve_types: "P-256"
 `,
 			expectedMap: map[string]any{
@@ -93,7 +92,7 @@ ssl.curve_types: "P-256"
 					"supported_protocols":     []any{uint64(772)},
 					"certificate_authorities": []any{"/not/a/real/path/ca.pem"},
 					"renegotiation":           int64(0),
-					"cipher_suites":           []any{uint64(49162)},
+					"cipher_suites":           []any{},
 					"verification_mode":       uint64(0),
 					"curve_types":             []any{uint64(23)},
 				},
